@@ -1,0 +1,18 @@
+# a deliberately drifted inventory file: entries disagree on their
+# area.surface prefix, so `canon fmt --check` cannot safely resolve ONE
+# target Hive partition for the whole file (S11 design D8, ambiguous-partition).
+world.map.pin-marker:
+  upstream:
+    pin: 9c93d024b
+    file: routes/world/map/index.tsx
+    symbol: MapView
+    lines: 10-20
+  covered_by: [world.map.01]
+
+world.place-map.legend:
+  upstream:
+    pin: 9c93d024b
+    file: routes/world/place-map/index.tsx
+    symbol: PlaceMapView
+    lines: 30-40
+  covered_by: [world.place-map.01]

@@ -1,0 +1,13 @@
+# Selftest fixture (design.md §8): exercises E-UNKNOWN-ATTR for an evidence
+# value carrying an extra key beyond the typed `{kind, ref}` contract -- the
+# checker must reject it, never silently pass it through to compile_task's
+# attrs-map JSON encode.
+- id: bad-unknown-evidence-field#1
+  tag: task
+  attrs:
+    desc: "evidence has an extra field beyond kind/ref"
+    status: open
+    evidence:
+      kind: test-run
+      ref: "x"
+      unchecked: "surprise"

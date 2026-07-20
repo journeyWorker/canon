@@ -1,0 +1,13 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "implementer"
+  },
+  "at": "2026-07-10T12:00:00Z",
+  "kind": "evidence_record",
+  "run_id": "01J0Z9Z9Z9Z9Z9Z9Z9Z9Z9Z9Z9",
+  "scenario_id": "Not Valid!!",
+  "schema": 1,
+  "task_id": "s1-state-model-join-spine#6.2",
+  "verdict": "faithful"
+}

@@ -1,0 +1,8 @@
+# canon selftest fixture — spec-ledger-selftest / clean-root.
+# Format: `<tag> <subject>` — same 2-column grep-stable oracle shape
+# `crates/canon-gate/fixtures/*/expected_failures.txt` uses. The corpus
+# is built in Rust (crates/canon-cli/src/inventory_selftest.rs) — this
+# oracle is the reviewable artifact.
+#
+# One well-formed scenario, zero violations, zero sync_errors — this
+# file intentionally carries no non-comment lines.

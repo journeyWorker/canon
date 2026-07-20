@@ -1,0 +1,24 @@
+[package]
+name = "canon-gate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "the trust spine: covered/green evidence gating (S5) — FAILURE_CLASSES, the trust ladder, PolicyResolution, and the gate-context seam wave-2 checks build against."
+
+[lib]
+name = "canon_gate"
+path = "src/lib.rs"
+
+[dependencies]
+canon-model = { workspace = true }
+canon-store = { workspace = true }
+canon-policy = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+thiserror = { workspace = true }
+chrono = { version = "0.4.45", features = ["serde"] }
+schemars = { version = "1.2.1", features = ["chrono04"] }
+
+[dev-dependencies]
+tempfile = "3"

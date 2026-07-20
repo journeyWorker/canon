@@ -1,0 +1,171 @@
+---
+title: canon
+description: >-
+  Harness knowledge substrate — systematic spec planning, machine-enforced
+  task completion, unified agent-session logging, and accumulation-driven
+  harness improvement. One Rust core, usable from any repo via bunx @journeykit/canon.
+template: splash
+hero:
+  title: Coding agents can say they're done. Canon makes them prove it.
+  tagline: >-
+    canon gate makes completion evidence-gated — stable failure classes,
+    evidence separated from verdict, and staleness checks, with a real exit
+    code. The same evidence extends into unified session logging and
+    role-scoped strategy memory.
+  image:
+    html: |
+      <svg class="canon-voices" viewBox="0 0 440 320" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Five voices entering a canon in imitation">
+        <g class="staff" stroke-width="1" opacity="0.6">
+          <line x1="0" y1="52" x2="440" y2="52" />
+          <line x1="0" y1="112" x2="440" y2="112" />
+          <line x1="0" y1="172" x2="440" y2="172" />
+          <line x1="0" y1="232" x2="440" y2="232" />
+          <line x1="0" y1="292" x2="440" y2="292" />
+        </g>
+        <g stroke-width="2.5" stroke-linecap="round">
+          <g transform="translate(16,52)">
+            <circle class="voice-head" r="4.5" style="animation-delay:.05s" />
+            <path class="voice" style="animation-delay:.1s" d="M0 0 C 40 -22, 80 10, 120 -6 S 200 14, 240 -4" />
+            <text x="0" y="-14" style="animation-delay:.2s">planning</text>
+          </g>
+          <g transform="translate(58,112)">
+            <circle class="voice-head" r="4.5" style="animation-delay:.35s" />
+            <path class="voice" style="animation-delay:.4s" d="M0 0 C 40 -22, 80 10, 120 -6 S 200 14, 240 -4" />
+            <text x="0" y="-14" style="animation-delay:.5s">design</text>
+          </g>
+          <g transform="translate(100,172)">
+            <circle class="voice-head" r="4.5" style="animation-delay:.65s" />
+            <path class="voice" style="animation-delay:.7s" d="M0 0 C 40 -22, 80 10, 120 -6 S 200 14, 240 -4" />
+            <text x="0" y="-14" style="animation-delay:.8s">dev</text>
+          </g>
+          <g transform="translate(142,232)">
+            <circle class="voice-head" r="4.5" style="animation-delay:.95s" />
+            <path class="voice" style="animation-delay:1s" d="M0 0 C 40 -22, 80 10, 120 -6 S 200 14, 240 -4" />
+            <text x="0" y="-14" style="animation-delay:1.1s">test</text>
+          </g>
+          <g transform="translate(184,292)">
+            <circle class="voice-head" r="4.5" style="animation-delay:1.25s" />
+            <path class="voice" style="animation-delay:1.3s" d="M0 0 C 40 -22, 80 10, 120 -6 S 200 14, 240 -4" />
+            <text x="0" y="-14" style="animation-delay:1.4s">review</text>
+          </g>
+        </g>
+      </svg>
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+    - text: GitHub
+      link: https://github.com/journeyWorker/canon
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+<span class="canon-kicker">Why canon</span>
+
+## Evidence-gated completion, not self-reported completion
+
+<CardGrid stagger>
+  <Card title="The problem" icon="warning">
+    Agents claim done. Repositories cannot verify what "done" means.
+  </Card>
+  <Card title="The core: evidence-gated completion" icon="approve-check">
+    `canon gate` only flips a checkbox when policy-required evidence exists,
+    carries a pass verdict, and hasn't gone stale — with stable failure
+    classes when it doesn't, and a real exit code either way.
+  </Card>
+</CardGrid>
+
+<span class="canon-kicker">What the same evidence extends into</span>
+
+<CardGrid stagger>
+  <Card title="Systematic spec planning" icon="pen">
+    Specs are a first-class corpus — structured change lifecycles,
+    Gherkin scenario ledgers, and a format authority (`canon fmt`) that keeps
+    every artifact valid, versioned, and machine-readable.
+  </Card>
+  <Card title="Unified session logging" icon="bars">
+    One join spine across agent CLIs. `canon ingest` normalizes transcripts
+    from Claude Code, Codex, and friends into tiered storage — git, hot, and
+    cold — with a single documented join key.
+  </Card>
+  <Card title="Role-scoped strategy memory" icon="puzzle">
+    Reviews and verdicts distill into per-role strategies — planning, design,
+    dev, test, review — each voice evolving on the same shared backbone.
+    `canon retrieve` surfaces them before the next run starts.
+  </Card>
+</CardGrid>
+
+<span class="canon-kicker">The flywheel</span>
+
+## Every run feeds the next
+
+<div class="canon-flywheel">
+  team runs agents → <b>ingest</b> sessions, reviews, handoffs<br />
+  → trajectories + verdicts, <b>per role</b><br />
+  → <b>distill</b>: success → strategy, finding → guardrail<br />
+  → <b>promotion gate</b> — only repeatedly supported patterns advance<br />
+  → <b>promote</b> to git, versioned and PR-reviewed<br />
+  → <b>retrieve</b> before the next task<br />
+  → better agent runs ↻
+</div>
+
+<span class="canon-kicker">Honest about limits</span>
+
+## What canon proves — and what it doesn't
+
+Canon strongly verifies:
+
+- that policy-required evidence exists
+- that evidence is recorded as pass or fail
+- who recorded it
+- that the target code hasn't changed out from under the evidence (freshness)
+- that a completion mark passed a defined procedure
+
+Canon does **not** prove:
+
+- whether a test actually verifies the requirement
+- whether a reviewer judged correctly
+- that a malicious user fabricated plausible-looking evidence
+- mathematical or semantic correctness of the program
+
+**Canon verifies the structure, provenance, verdict, and freshness of
+evidence. It does not decide whether a test or reviewer is semantically
+correct.**
+
+That's the boundary on purpose: `coverage` — does evidence exist — is
+tracked separately from `verdict` — did it pass. Tools that oversell
+themselves blur that line; canon draws it deliberately.
+
+<span class="canon-kicker">Quick start</span>
+
+## See it in 60 seconds
+
+```bash
+mkdir canon-demo && cd canon-demo
+bunx @journeykit/canon demo init      # scaffolds a throwaway evidence loop
+bunx @journeykit/canon gate check     # RED
+# canon gate check: 1 violation(s)
+#
+# uncovered-cell (1):
+#   uncovered-cell auth.login.01 — policy-required cell 'reviewer' has no matching-role evidence record
+bunx @journeykit/canon demo attest    # records the reviewer's evidence
+bunx @journeykit/canon gate check     # GREEN
+# canon gate check: clean (0 violations)
+```
+
+Watch the gate flip from red to green the instant reviewer evidence lands —
+no scenarios, review records, or regime keys required to see it happen.
+
+## In any repo
+
+```bash
+# one Rust core, distributed through npm
+bunx @journeykit/canon report          # where does this repo stand?
+bunx @journeykit/canon gate check      # is "done" actually done?
+bunx @journeykit/canon ingest sessions # fold agent transcripts into the ledger
+```
+
+canon is named for the musical form: one subject, taken up by many voices,
+each developing it in its own register. [Read the concept →](/concepts/canon/)

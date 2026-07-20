@@ -1,0 +1,5 @@
+{"type":"session","id":"omp_ses_alpha_7c3f9a","timestamp":"2026-07-01T09:00:00.000Z","cwd":"/Users/example/project"}
+{"type":"message","id":"msg_001","parentId":null,"timestamp":"2026-07-01T09:00:05.000Z","message":{"role":"user"}}
+{"type":"message","id":"msg_002","parentId":"msg_001","timestamp":"2026-07-01T09:00:12.000Z","message":{"role":"assistant","model":"claude-sonnet-5","provider":"anthropic","usage":{"input":420,"output":180,"cacheRead":1200,"cacheWrite":0,"totalTokens":1800}}}
+{"type":"message","id":"msg_003","parentId":"msg_002","timestamp":"2026-07-01T09:02:40.000Z","message":{"role":"user"}}
+{"type":"message","id":"msg_004","parentId":"msg_003","timestamp":"2026-07-01T09:02:58.000Z","message":{"role":"assistant","model":"claude-sonnet-5","provider":"anthropic","usage":{"input":610,"output":240,"cacheRead":1600,"cacheWrite":30,"totalTokens":2480}}}

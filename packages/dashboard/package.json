@@ -1,0 +1,36 @@
+{
+  "name": "@canon-dev/dashboard",
+  "version": "0.1.0",
+  "description": "canon — zero-network DuckDB-Wasm dashboard rendering the 5 canon report panels from a `canon report --snapshot` parquet snapshot.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/canon-dev/canon.git",
+    "directory": "packages/dashboard"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173",
+    "test": "bun test",
+    "fixture:build": "bun scripts/build-fixture-snapshot.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@duckdb/duckdb-wasm": "1.32.0",
+    "apache-arrow": "17.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "puppeteer-core": "25.3.0",
+    "typescript": "^5.0.0",
+    "vite": "^7.1.0"
+  },
+  "keywords": [
+    "canon",
+    "dashboard",
+    "duckdb-wasm"
+  ]
+}

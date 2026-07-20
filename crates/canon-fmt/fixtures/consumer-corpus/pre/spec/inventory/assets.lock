@@ -1,0 +1,8 @@
+# spec/inventory/assets.lock — schema 1 (GENERATED; DO NOT EDIT BY HAND)
+# upstream SoT pin: 9c93d024b  (packages/data-catalog/data/)
+# regenerate: python3 tools/gen_assets_lock.py   |   drift check: --check
+# line: <asset-id>\t<source>\t<upstream-ref>   source in {lab_assets, data-catalog}
+BG.space.1f_beauty_zone.interior.afternoon	lab_assets	assets/backgrounds/space-1f_beauty_zone-interior-afternoon
+CH.idol.reika.casual	data-catalog	characters/reika/casual
+[port_only]
+lib/assets/local_only_icon.png	no upstream equivalent, port-local asset

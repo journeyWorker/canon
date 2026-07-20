@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "implementer"
+  },
+  "at": "2026-07-10T12:00:00Z",
+  "kind": "review",
+  "pin": "9c93d024b1a2",
+  "provenance_ref": {
+    "upstream_ref": "routes/world.tsx#onPurchased"
+  },
+  "reviewer": "reviewer",
+  "project_id": "root",
+  "scenario_id": "world.place-lock.01",
+  "schema": 1
+}

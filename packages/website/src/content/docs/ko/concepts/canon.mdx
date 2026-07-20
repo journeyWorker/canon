@@ -1,0 +1,104 @@
+---
+title: 캐논 개념
+description: 도구 이름이 음악의 캐논에서 온 이유 — 하나의 주제, 여러 성부 — 그리고 이것이 대체한 네 개의 분리된 섬들.
+---
+
+음악의 캐논은 하나의 주제를 제시한 뒤, 이를 이어받는 성부들이 각자의
+성역에서 발전시키면서도 원래 주제는 그대로 유지되는 형식입니다. canon(도구)이
+이 이름을 쓰는 이유도 같습니다: planning, design, dev, test, review 등 각
+전문 에이전트 역할이 자신만의 전략 메모리를 발전시키지만, 모두 하나의
+공유된 백본 위에 서 있습니다.
+
+**공유된 주제** (하나의 백본, canon-model + canon-store + canon-gate):
+
+- 모든 아티팩트 종류(`Change`, `Task`, `Scenario`, `Subject`, `Session`,
+  `Run`, `Event`, `Handoff`, `Review`, `Divergence`, `Trajectory`,
+  `StrategyItem`, `EvidenceRecord`)에 대한 하나의 버전 있는 레코드 스키마
+- 모든 역할에 대해 동일한 방식으로 완료를 게이팅하는 하나의 트러스트
+  스파인(`canon gate`)
+- 하나의 조인 스파인 — `task_id`, `scenario_id`, `session_id`, `run_id`,
+  `regime_key` — 어떤 아티팩트든 이를 만들어낸 세션과 트래젝토리로 항상
+  거슬러 추적할 수 있게 함
+
+**역할별 성부** (canon-learn):
+
+- 역할별로 네임스페이스화된 전략 메모리(`planning`, `design`, `dev`,
+  `test`, `review`, …), 각각 자신의 판정 스트림으로부터 진화
+- `canon retrieve`가 태스크 시작 전 역할·레짐 스코프 가이던스를 꺼내줌 —
+  [전략 메모리](/ko/concepts/strategy-memory/) 참고
+
+## 서브젝트
+
+**서브젝트(Subject)**는 canon의 durable product unit입니다 — 팀이 여러
+change와 여러 scenario에 걸쳐 계획하고, 설계하고, 구현하고, 검증하고,
+출시하는 그 단위입니다. 리뷰된 13번째 레코드 종류(`RecordKind::Subject`)이자
+전체 루프가 도는 조인 키입니다: 본격적인 작업에서 에이전트의 첫 행동은
+서브젝트를 저작하거나 갱신하는 것이고, 이후 모든 다운스트림 아티팩트
+(scenario, task, review, 판정, trajectory, 전략)가 그 `subject_id`로
+거슬러 조인됩니다.
+
+이름은 의도적입니다. 음악의 캐논은 하나의 주제를 제시하고 여러 성부가
+이어받습니다 — 그래서 canon **서브젝트**는 product unit이고, 그 `.feature`
+파일들은 그것의 behavior spec이며, 둘은 결코 같은 단어가 아닙니다:
+"feature docs"는 항상 Gherkin 파일을, "subject"는 관리 레코드를 뜻합니다.
+
+각 서브젝트는 `domain`(vocabulary로 정의된 slug — 기본
+`planning`/`design`/`dev`/`data`/`test`, 레포별 확장)과 상태 라이프사이클
+`proposed → specced → building → verifying → shipped`(및 any → `retired`)를
+가집니다. 출시는 증거 게이팅됩니다: 서브젝트는 연결된 모든 scenario가 최신
+non-Divergent 판정을 가질 때에만 `verifying → shipped`로 이동합니다 — task
+완료를 게이팅하는 것과 동일한 트러스트 스파인을 product unit에 적용한
+것입니다. `canon query --kind subject`와 `canon report`의 Subjects 패널이
+도메인별 관리 뷰를 제공하며, [CLI 레퍼런스](/ko/cli/#subjects)에 저작
+명령어가 정리되어 있습니다.
+
+## 문제: 네 개의 분리된 섬
+
+코딩 에이전트를 본격적으로 운용하는 팀은 서로 조인 키 없이 각자
+자라난 네 가지 역량을 축적하게 됩니다:
+
+| 역량 | 보통 존재하는 형태 | 갭 |
+|---|---|---|
+| 스펙 플래닝 | 변경 라이프사이클과 시나리오/스펙 코퍼스 | 동작은 하지만, 상태가 나머지 모든 것과 분리되어 있음 |
+| 작업 관리 | plan 파일 체크박스, 별도의 핸드오프 큐, 산문 형태 진행 로그 | 서로 조율되지 않는 시스템들; 완료가 **자가 보고**되었고 증거가 전혀 없음 |
+| 로깅 | CLI별 세션/이벤트 스토어 | 둘 사이에 문서화된 조인 키가 없음; 로그가 의사결정 루프로 이어지지 않음 |
+| 학습 → 개선 | 추론/전략 증류 | 리워드 경로가 절반만 연결됨, 공유 표면 없음, 메모리가 역할이 아닌 도메인 단위로 스코프됨 |
+
+각 섬은 개별적으로는 강력할 수 있습니다 — Gherkin 코퍼스, 정책 기반
+커버리지, append-only 레저, 트러스트 래더 — 그러나 그 규율이 레포 내부의
+단일 스크립트에 갇혀 포맷이 드리프트하고 서로 소통하지 못합니다.
+
+한편 코드 리뷰, 디자인 리뷰, CI 결과, 다이버전스 발견 등 에이전트 실행에서
+나온 통찰은 write-only 로그로만 쌓입니다. 이 중 어떤 것도 에이전트가
+계획하고, 설계하고, 구현하고, 테스트하는 방식으로 되먹임되지 않아
+전문 에이전트가 역할별로 진화하지 못합니다.
+
+canon은 네 섬을 하나의 조인 스파인과 하나의 증거 게이트 뒤로 통합합니다:
+모든 아티팩트가 이를 만들어낸 세션과 트래젝토리로 거슬러 추적되고, 완료는
+자가 보고가 아니라 증명됩니다.
+
+## canon이 결정한 것
+
+canon의 핵심 설계 결정:
+
+- **독립 레포.** 기존 모노레포 안의 패키지가 아니라, 어떤 컨슈머 레포든
+  `bunx @journeykit/canon`로 가져다 쓰는 전용 레포입니다.
+- **Rust 코어 + Bun 런처.** 프리빌트 플랫폼 바이너리가 npm
+  `optionalDependencies`로 배포되고, 얇은 JS 런처가 알맞은 것을 고릅니다.
+- **canon이 포맷 권위입니다.** 레저 레코드, 다이버전스 로그, 트래젝토리,
+  전략, 세션 등 모든 아티팩트 종류가 버전 있는 스키마를 가집니다. 기존
+  코퍼스가 canon 검증 포맷으로 마이그레이션되며, 그 반대는 아닙니다.
+- **스토리지는 티어드입니다**: git(버전 관리, 레포 로컬), Postgres(hot,
+  팀 공유), R2(cold, append-only, 분석용) — [티어드 스토리지](/ko/concepts/tiered-storage/)
+  참고.
+- **전략 메모리는 역할별 네임스페이스입니다**: planning / design / dev /
+  test / review / … 가 같은 백본 위에서 독립적으로 진화합니다.
+- **리뷰는 판정 신호입니다.** 축적된 코드·디자인 리뷰가 역할별
+  가드레일과 전략의 증류 입력이 되어, 네 섬이 결코 닫지 못했던 루프를
+  닫습니다.
+
+## 다음
+
+- [트러스트 스파인](/ko/concepts/trust-spine/) — 증거 아니면 무효인 완료
+- [티어드 스토리지](/ko/concepts/tiered-storage/) — git / Postgres / R2
+- [전략 메모리](/ko/concepts/strategy-memory/) — 증류 플라이휠

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "kind": "handoff",
+  "at": "2026-07-01T09:00:00Z",
+  "actor": {
+    "agent_id": "s4-fixture"
+  },
+  "id": "20260701-0905-s4-claim-c1a2",
+  "state": "in-progress",
+  "chain_id": "22222222-2222-4222-8222-222222222222",
+  "parent_handoff_id": null,
+  "seq": 1,
+  "claimed_by": "s4handoff-agent",
+  "claimed_at": "2026-07-01T09:06:00Z",
+  "completed_at": null,
+  "abandoned_at": null,
+  "openspec_change_slug": "s4-artifact-ingest",
+  "research_vendor_slug": null,
+  "tags": [],
+  "title": "Implement handoff adapter parse()",
+  "body": {
+    "domain": "development",
+    "template_version": 1,
+    "fields": {
+      "title": "Implement handoff adapter parse()",
+      "summary": "map state transitions to ArtifactEvent",
+      "acceptance-criteria": ["cargo test -p canon-ingest green"]
+    }
+  }
+}

@@ -1,0 +1,128 @@
+---
+title: Architecture
+description: The crate map, storage tiers, packaging model, and per-repo layout behind canon.
+---
+
+canon is **one Rust core**, split into single-purpose crates, distributed as a
+thin JS launcher so any repo can run it with `bunx @journeykit/canon` — no local Rust
+toolchain required.
+
+## Crate map
+
+```
+┌──── canon (this repo) ────────────────────────────────┐
+│ crates/                                               │
+│    canon-model   types + versioned JSON schemas       │
+│    canon-store   git / pg / r2 tier adapters          │
+│    canon-ingest  session + artifact adapters          │
+│    canon-gate    trust spine (covered/green)          │
+│    canon-learn   role-namespaced strategy memory      │
+│    canon-policy  CEL policy-expression engine         │
+│    canon-fmt     format authority (corpus check)      │
+│    canon-vocab   typed authoring vocabulary           │
+│    canon-plugin  ledger-overlay plugin manifests      │
+│    canon-report  report + dashboard data              │
+│    canon-cli     single entrypoint                    │
+│ packages/                                             │
+│    cli           JS launcher (npm: @journeykit/canon) │
+│    core-<plat>   prebuilt binaries (optionalDeps)     │
+└───────────────────────────────────────────────────────┘
+```
+
+- **canon-model** — canon's closed, versioned artifact-family types: the
+  envelope, the twelve record kinds, the join-spine key newtypes, and
+  generated JSON-schema + join-spine doc output.
+- **canon-store** — one storage trait behind git / Postgres / R2 tier
+  adapters.
+- **canon-ingest** — the adapter registry that turns raw agent-CLI session
+  transcripts and artifact evidence (ledger, divergences, openspec tasks,
+  handoffs) into canon-model records.
+- **canon-gate** — the trust spine: covered/green evidence gating,
+  `FAILURE_CLASSES`, the trust ladder, and policy resolution.
+- **canon-learn** — role-namespaced strategy memory: trace → verdict →
+  distill → store → retrieve → apply, keyed by `regime_key`.
+- **canon-policy** — canon's CEL policy-expression engine: parse/type-check/
+  evaluate predicates bound to canon-model's schema registry.
+- **canon-fmt** — the artifact-family format authority: `canon fmt --check`
+  validates an external consumer-repo corpus against schemas + layout
+  descriptors.
+- **canon-vocab** — the typed authoring vocabulary: `plugin.yaml`/directives/
+  enums manifests, capability-snapshot resolution, and typed task-atom /
+  handoff-body compilation against canon-model.
+- **canon-plugin** — the ledger-overlay plugin manifest surface: `plugin.yaml`
+  schema/loader, capability-snapshot resolution, and the overlay
+  structural-shape checker — extends what a query can project without
+  widening canon-model's frozen record-kind set.
+- **canon-report** — the generated-never-edited markdown status report over
+  canon-store's DuckDB view layer, plus the `--snapshot` Parquet export the
+  dashboard reads.
+- **canon-cli** — the single entrypoint binary all of the above are wired
+  into.
+
+## Storage tiers
+
+canon-store routes every record kind to one of two zero-credential tiers by
+default, plus optional scale-up backends, and ages records between them on a
+schedule (`canon tier age`):
+
+```
+┌──────────────────────┬──────────────────────────┬────────────────────────┐
+│ local (Git)          │ hot (SQLite, default)    │ optional scale-up      │
+├──────────────────────┼──────────────────────────┼────────────────────────┤
+│ authored specs       │ task / handoff /         │ Postgres — hot swap    │
+│ promoted strategies  │ session / run / event    │ for shared, concurrent │
+│ evidence ledger      │ (canon/hot.db,           │ R2 / S3 — cold, bulk   │
+│ (Hive, append-only)  │ gitignored)              │ data (credentialed)    │
+└──────────────────────┴──────────────────────────┴────────────────────────┘
+```
+
+`canon init` uses Git for durable, reviewable records — append-only,
+Hive-partitioned JSON reviewable in a normal PR diff — and local SQLite for
+high-volume operational records (`canon/hot.db`, gitignored by `canon init`).
+PostgreSQL and S3-compatible storage are optional scale-up backends that
+require operator-supplied credentials. See
+[Tiered storage](/concepts/tiered-storage/).
+
+## The flywheel
+
+```
+team runs agents → ingest (sessions, reviews, handoffs, CI/PR)
+                 → trajectories + verdicts (per role)
+                 → distill (success → strategy, review-finding → guardrail)
+                 → statistical promotion gate (no noise distilled)
+                 → promote to git tier (versioned, PR-reviewed)
+                 → retrieve-before-task (role + regime scoped, advisory)
+                 → better agent runs
+```
+
+See [Strategy memory](/concepts/strategy-memory/) for the role-namespaced
+version of this loop.
+
+## Packaging
+
+canon follows a proven Rust-core→npm packaging pattern (adapted from a
+vendored upstream launcher project): the published `@journeykit/canon`
+package (`packages/cli`) is a thin JS launcher with **no runtime
+dependencies of its own**. Platform-specific `canon-cli` binaries ship as
+`optionalDependencies` (`@journeykit/canon-core-darwin-arm64`,
+`@journeykit/canon-core-linux-x64`, …); npm/Bun installs only the one matching the
+running platform, and the launcher's `bin.js` resolves + execs it. This is
+what makes `bunx @journeykit/canon` work from any repo with zero local Rust toolchain.
+
+## Consumer-repo config
+
+Every repo canon operates on carries its own config at the repo root:
+
+```
+<repo>/canon.yaml           # tier endpoints, specs.roots[], plans: sources
+<repo>/canon/policy.yaml    # required-cell derivation for evidence gating
+<repo>/canon/ledger/        # Hive: kind=<kind>/area=<area>/*.json, append-only
+<repo>/canon/strategies/    # promoted strategy items (git tier, PR-reviewed)
+<repo>/canon/plugins/       # <id>/plugin.yaml ledger-overlay manifests
+```
+
+`canon init` scaffolds a working `canon.yaml` skeleton; `canon init
+--check-config` validates one that already exists. See
+[CLI reference](/cli/) for the full command surface, or
+[The canon concept](/concepts/canon/) for why the repo, not the process, is
+the unit of state.

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>canon dashboard</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header id="banner" class="banner banner-loading">Loading snapshot…</header>
+    <main id="panels">
+      <section id="panel-trust-matrix" class="panel">
+        <h2>Change / Task Trust Matrix</h2>
+        <p class="panel-source">mart_trust_matrix</p>
+        <div class="panel-body"></div>
+      </section>
+      <section id="panel-session-costs" class="panel">
+        <h2>Session Costs</h2>
+        <p class="panel-source">mart_session_costs</p>
+        <div class="panel-body"></div>
+      </section>
+      <section id="panel-role-memory" class="panel">
+        <h2>Role Memory</h2>
+        <p class="panel-source">mart_role_memory</p>
+        <div class="panel-body"></div>
+      </section>
+      <section id="panel-flywheel-funnel" class="panel">
+        <h2>Flywheel Funnel</h2>
+        <p class="panel-source">mart_flywheel_funnel (verdicts → distilled → retrieved → applied)</p>
+        <div class="panel-body"></div>
+      </section>
+      <section id="panel-review-burndown" class="panel">
+        <h2>Review Burn-down</h2>
+        <p class="panel-source">mart_review_burndown</p>
+        <div class="panel-body"></div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+# canon selftest fixture — spec-ledger-selftest / frozen-incident.
+# Pins a REAL past divergence-fold case (spec Req 3):
+# a donor parity-harness divergence log (§3.3) — a real
+# backfilled donor run file (scenario world.firstbuy-hotdeal.26,
+# round 8, run_seq 1, status open) that a later fresh review campaign
+# (round 3, run_seq 3, status resolved) correctly outranks: "the
+# numerically smaller round (3 < 8) carries the numerically greater
+# run_seq (3 > 1) and correctly wins the fold". A regression that ranks
+# by round instead of run_seq would resurrect the stale `open` record
+# and flip the `fold:` line below to `open`.
+#
+# The `fold-live:` line exercises design D8's resolved-then-invalidated
+# re-check: a live-binding snapshot whose app_sha has moved off the
+# winner's resolved sha downgrades the SAME winning record to
+# `resolved-invalid`, never rewriting the on-disk event.
+fold:world.firstbuy-hotdeal.26 resolved
+fold-live:world.firstbuy-hotdeal.26 resolved-invalid

@@ -1,0 +1,10 @@
+# Selftest fixture (design.md §8): exercises E-BAD-ENUM (the verbatim
+# "expected one of: …" message, `status` outside the `task-status` domain).
+- id: bad-bad-enum#1
+  tag: task
+  attrs:
+    desc: "status is not a valid task-status member"
+    status: in-progress
+    evidence:
+      kind: test-run
+      ref: "x"

@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Session",
+  "description": "An agent-CLI session (join-spine `session_id` row: session ↔ cost ↔\nrun ↔ trajectory). `client` names the adapter that produced it (e.g.\n`\"claude-code\"`, `\"codex\"`, `\"omp\"`) as a plain string, not a closed\nenum — S3 (`canon-ingest`) owns the adapter registry; a `Session`\nrecord itself is adapter-agnostic.\n\n`workspace_key`/`workspace_label`/`project_key` (s31 D3, additive —\n`#[serde(default, skip_serializing_if = \"Option::is_none\")]` on all\nthree, so a pre-s31 `Session` simply lacks the keys on reserialize):\n`workspace_key`/`workspace_label` are populated by\n`canon_ingest::normalize` from the session's own `UnifiedRow`/\n`DirectiveRow` workspace context (first non-`None` across its rows);\n`project_key` is left `None` by `canon-ingest` (a plain `pub` field,\nnever derived inside this crate or `canon-ingest` — s31 design D3:\n\"project_key set by the CLI layer\") and stamped on directly by\n`canon-cli`'s ingest pass once it has resolved the current project's\nmain-worktree key, so queries can aggregate a repo's main worktree\nand its linked `git worktree`s as one project.",
+  "type": "object",
+  "properties": {
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "client": {
+      "type": "string"
+    },
+    "ended_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "kind": {
+      "$ref": "#/$defs/RecordKind"
+    },
+    "project_key": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schema": {
+      "description": "Per-kind schema version, bumped on any breaking field change to\nthat kind (design D2; `canon fmt`/`canon migrate`, S11, key off\nit).",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "session_id": {
+      "$ref": "#/$defs/SessionId"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "workspace_key": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "workspace_label": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "at",
+    "actor",
+    "session_id",
+    "client",
+    "started_at"
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "RecordKind": {
+      "description": "The thirteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36 — the \"a new kind is\na reviewed, breaking `canon-model` change\" process design D1 mandates,\nexercised for real). A fourteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+      "type": "string",
+      "enum": [
+        "change",
+        "task",
+        "scenario",
+        "session",
+        "run",
+        "event",
+        "handoff",
+        "review",
+        "divergence",
+        "trajectory",
+        "strategy_item",
+        "evidence_record",
+        "subject"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    }
+  }
+}

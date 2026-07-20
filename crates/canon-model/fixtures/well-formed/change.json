@@ -1,0 +1,13 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "implementer"
+  },
+  "at": "2026-07-10T12:00:00Z",
+  "change_id": "s1-state-model-join-spine",
+  "kind": "change",
+  "schema": 1,
+  "status": "in_progress",
+  "summary": "join spine",
+  "title": "S1"
+}

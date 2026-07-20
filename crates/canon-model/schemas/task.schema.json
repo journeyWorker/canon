@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Task",
+  "description": "A task within a change (join-spine `task_id` row: task ↔ evidence ↔\ntrajectory). `change_id` is never a separate field — `task_id`\nalready embeds it; use [`TaskId::change_id`] to decompose.",
+  "type": "object",
+  "properties": {
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "evidence_note": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "kind": {
+      "$ref": "#/$defs/RecordKind"
+    },
+    "scenario_refs": {
+      "description": "Optional, declaratively-authored scenario-coverage references\n(design s20 Decision 1) — which `Scenario`(s) this task is\nmeant to satisfy, populated ONLY from an explicit `[covers:\n…]` `tasks.md` segment, never inferred from prose. Empty by\ndefault, mirroring `EvidenceRecord.surface_ref`'s own\nadditive-field shape; a `Task` with no declared refs is\nbyte-identical to a pre-s20 `Task` on the wire.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ScenarioId"
+      }
+    },
+    "schema": {
+      "description": "Per-kind schema version, bumped on any breaking field change to\nthat kind (design D2; `canon fmt`/`canon migrate`, S11, key off\nit).",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "status": {
+      "$ref": "#/$defs/TaskStatus"
+    },
+    "task_id": {
+      "$ref": "#/$defs/TaskId"
+    },
+    "title": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "at",
+    "actor",
+    "task_id",
+    "title",
+    "status"
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "RecordKind": {
+      "description": "The thirteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36 — the \"a new kind is\na reviewed, breaking `canon-model` change\" process design D1 mandates,\nexercised for real). A fourteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+      "type": "string",
+      "enum": [
+        "change",
+        "task",
+        "scenario",
+        "session",
+        "run",
+        "event",
+        "handoff",
+        "review",
+        "divergence",
+        "trajectory",
+        "strategy_item",
+        "evidence_record",
+        "subject"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "ScenarioId": {
+      "description": "`<area>.<surface>.<nn>` — `[a-z0-9-]+\\.[a-z0-9-]+\\.\\d{2,}`; never renumbered once assigned — joins: spec ↔ test ↔ ledger ↔ divergence",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    },
+    "TaskId": {
+      "description": "`<change_id>#<n>`, where `<n>` is one or more dot-separated integers (`1`, `1.1`, `6.2`) matching `tasks.md`'s own numbering — joins: task ↔ evidence ↔ trajectory",
+      "type": "string"
+    },
+    "TaskStatus": {
+      "description": "A `tasks.md` checkbox's canonical state — `Open` is the unchecked\n`- [ ]`, `Done` the checked `- [x]`. `evidence_note` carries the\nsame \"one-line evidence note\" discipline this very change's own\ntasks.md is held to — a `Done` task without one is a checkbox\noverclaim, not evidence.",
+      "type": "string",
+      "enum": [
+        "open",
+        "done"
+      ]
+    }
+  }
+}

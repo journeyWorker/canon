@@ -1,0 +1,8 @@
+[alias]
+# S1 (design D3): `cargo xtask check-generated` regenerates canon-model's
+# join-spine doc + per-record-kind JSON-schemas in memory and diffs them
+# against the committed `crates/canon-model/JOIN_SPINE.md` /
+# `crates/canon-model/schemas/*.schema.json` output, failing non-zero on
+# drift. `cargo xtask write` regenerates and overwrites the committed files
+# (the developer workflow after a doc-comment/type change).
+xtask = "run -p canon-model --bin xtask --"

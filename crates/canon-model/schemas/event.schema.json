@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Event",
+  "description": "One event within a run (join-spine `run_id` row: run ↔ events ↔\nmanifest). `detail` is deliberately open (`serde_json::Value`) —\nevents are the most heterogeneous record kind (tool calls, token\ndeltas, tool errors, …); narrowing `detail` to a closed shape is a\nlater, per-event-family change, not S1's.",
+  "type": "object",
+  "properties": {
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "detail": {
+      "default": null
+    },
+    "kind": {
+      "$ref": "#/$defs/RecordKind"
+    },
+    "label": {
+      "type": "string"
+    },
+    "run_id": {
+      "$ref": "#/$defs/RunId"
+    },
+    "schema": {
+      "description": "Per-kind schema version, bumped on any breaking field change to\nthat kind (design D2; `canon fmt`/`canon migrate`, S11, key off\nit).",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "seq": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "at",
+    "actor",
+    "run_id",
+    "seq",
+    "label"
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "RecordKind": {
+      "description": "The thirteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36 — the \"a new kind is\na reviewed, breaking `canon-model` change\" process design D1 mandates,\nexercised for real). A fourteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+      "type": "string",
+      "enum": [
+        "change",
+        "task",
+        "scenario",
+        "session",
+        "run",
+        "event",
+        "handoff",
+        "review",
+        "divergence",
+        "trajectory",
+        "strategy_item",
+        "evidence_record",
+        "subject"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "RunId": {
+      "description": "ULID (Crockford base32, 26 chars) — joins: run ↔ events ↔ manifest",
+      "type": "string",
+      "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    }
+  }
+}

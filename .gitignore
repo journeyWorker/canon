@@ -1,0 +1,29 @@
+target/
+node_modules/
+dist/
+# Prebuilt native binaries staged into platform packages at publish time
+# (populated by .github/workflows/build-native.yml / publish.yml, never
+# committed).
+packages/core-*/bin/*
+!packages/core-*/bin/.gitkeep
+.superpowers/
+*.duckdb
+# Local runtime store roots (git/hot/cold-tier ledger + cursors + trajectory,
+# written by `canon ingest`/`sync` and tests; derived from committed
+# openspec/ + specs/ sources, regenerable, never committed).
+canon/ledger/
+canon/learn/
+canon/r2/
+canon/ingest/
+canon/REPORT.md
+.env
+.env.*
+!.env.example
+.DS_Store
+# Python bytecode cache (scripts/ helpers, e.g. the release-safety checker).
+__pycache__/
+*.pyc
+# Local-only vendored reference copies; kept on disk, never tracked.
+vendors/
+# Astro build cache (packages/website).
+.astro/

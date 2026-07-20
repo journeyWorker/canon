@@ -1,0 +1,10 @@
+# canon selftest fixture — spec-ledger-selftest / duplicate-scenario.
+# Two well-formed features declare the SAME scenario_id under one root
+# — passes S11 `canon-fmt::check` (never dedups scenario_ids) but
+# violates D5's one-record-per-key contract, so the root aborts (0
+# writes) via `RootSyncOutcome.sync_errors`, never a frozen
+# `FmtFailureClass` violation. The subject below is the EXACT
+# deterministic message `sync_one_root` produces for this fixture's
+# fixed inputs (scenario_id `world.hotdeal.01`, the default root id
+# `root`).
+sync:duplicate-scenario scenario_id `world.hotdeal.01` is scanned more than once under root `root` — deduplicate the `.feature` corpus (D5: exactly one index record per (project_id, scenario_id))

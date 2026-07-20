@@ -1,0 +1,59 @@
+# Vocabulary-defined handoff body templates (S10 design.md D5): one
+# directive per handoff domain, validated and rendered through the exact
+# same resolve-snapshot -> validate-attrs pipeline as the `task` directive.
+# A handoff's `domain` field selects the directive tag (`handoff-<domain>`).
+#
+# These domain names are ENGLISH (dev/design/content/test), per this
+# change's assignment -- distinct from S1's already-shipped Korean-string
+# `GihoekTemplate` (기획, `crates/canon-model/src/handoff.rs`). Reconciling
+# the two domain vocabularies is a follow-up concern for whichever future
+# change wires this compiler's output into S1's `TemplateRegistry`; see
+# `canon_vocab::handoff_compile`'s module doc.
+directives:
+  - name: handoff-dev
+    attrs:
+      - name: title
+        type: string
+        required: true
+      - name: summary
+        type: string
+        required: true
+      - name: verification-steps
+        type: { list: string }
+        required: true
+
+  - name: handoff-design
+    attrs:
+      - name: title
+        type: string
+        required: true
+      - name: summary
+        type: string
+        required: true
+      - name: references
+        type: { list: string }
+        required: true
+
+  - name: handoff-content
+    attrs:
+      - name: title
+        type: string
+        required: true
+      - name: summary
+        type: string
+        required: true
+      - name: acceptance-criteria
+        type: { list: string }
+        required: true
+
+  - name: handoff-test
+    attrs:
+      - name: title
+        type: string
+        required: true
+      - name: summary
+        type: string
+        required: true
+      - name: scenarios
+        type: { list: string }
+        required: true

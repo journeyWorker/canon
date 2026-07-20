@@ -1,0 +1,7 @@
+# spec/policy.yaml — required-cell derivation policy (DECISIONS D7).
+schema: 1
+platforms_active: [macos, web-chrome]
+risk_platforms:
+  render: [macos, web-chrome]
+severity_rigor:
+  p1: { lanes: [live-api, native], mode: any }

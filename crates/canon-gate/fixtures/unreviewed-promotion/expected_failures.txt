@@ -1,0 +1,3 @@
+# canon gate selftest fixture — unreviewed-promotion (D21).
+# `reviewed` lifecycle tag with no matching ledger review-record.
+unreviewed-promotion s5-selftest-unreviewed-promotion#1

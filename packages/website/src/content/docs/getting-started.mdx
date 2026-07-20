@@ -1,0 +1,143 @@
+---
+title: Getting Started
+description: Install canon, scaffold canon.yaml, and run your first gate check.
+---
+
+import { Steps } from "@astrojs/starlight/components";
+
+canon ships as **one Rust core behind an npm launcher**: prebuilt platform
+binaries are npm `optionalDependencies`, and a thin JS shim picks the right
+one. If you have [Bun](https://bun.sh), you already have everything you need.
+The npm package is `@journeykit/canon`; the installed binary is still `canon`, so
+`bun add -g @journeykit/canon` followed by plain `canon <cmd>` also works.
+
+```bash
+bunx @journeykit/canon --help
+```
+
+**Prebuilt:** macOS arm64 · Linux x64 (glibc). Other platforms (Windows,
+Intel Mac, musl/arm64 Linux) build from source with a local Rust toolchain
+(`cargo build --release -p canon-cli`).
+
+## See it in 5 minutes: a gate fail, then pass
+
+Before wiring canon into a real repo, watch the trust spine work on a
+throwaway demo. `canon demo` scaffolds a tiny evidence loop — no concepts
+required up front.
+
+```bash
+mkdir canon-demo && cd canon-demo
+
+bunx @journeykit/canon demo init      # scaffold a throwaway evidence loop
+bunx @journeykit/canon gate check     # RED  — the gate refuses
+bunx @journeykit/canon demo attest    # record the reviewer's evidence
+bunx @journeykit/canon gate check     # GREEN — the gate passes
+```
+
+The first `gate check` fails, naming the exact missing evidence:
+
+```
+canon gate check: 1 violation(s)
+
+uncovered-cell (1):
+  uncovered-cell auth.login.01 — policy-required cell 'reviewer' has no matching-role evidence record
+```
+
+The `dev` voice recorded evidence for scenario `auth.login.01`, but
+`policy.yaml` requires an independent `reviewer`. No reviewer evidence → the
+cell is uncovered → the gate is red. `demo attest` records that evidence, and
+the same check turns green:
+
+```
+canon gate check: clean (0 violations)
+```
+
+That red → green flip *is* canon: completion is gated on evidence that exists,
+is attributed, and is fresh — never on a self-report. See
+[Trust spine](/concepts/trust-spine/) for the full failure-class table.
+
+## Set up a repo
+
+<Steps>
+
+1. **Scaffold the config.** From your repo root:
+
+   ```bash
+   bunx @journeykit/canon init
+   ```
+
+   This writes a working `canon.yaml` skeleton — storage `tiers:`, record
+   `routing:`, `specs:` roots, and `plans:` sources. It refuses to overwrite
+   an existing file. Validate an existing config any time with:
+
+   ```bash
+   bunx @journeykit/canon init --check-config
+   ```
+
+2. **See the authoring surface.** Before writing any canon artifact, ask
+   the repo what vocabulary and schemas it resolves to:
+
+   ```bash
+   bunx @journeykit/canon context
+   ```
+
+   This is a capability *query*, never validation — it always exits 0 and
+   prints record kinds, enum domains, join-key grammars, and policy-derived
+   requirements. Add `--json` for a machine-readable surface.
+
+3. **Index your spec corpus.** If the repo keeps Gherkin `.feature` specs
+   under a configured `specs.roots[]` entry:
+
+   ```bash
+   bunx @journeykit/canon fmt --check      # validate the corpus first
+   bunx @journeykit/canon inventory sync   # materialize the scenario ledger index
+   ```
+
+4. **Ingest agent sessions.** Fold transcripts from Claude Code, Codex, and
+   other registered agent CLIs into tiered storage — incrementally, via a
+   per-source watermark:
+
+   ```bash
+   bunx @journeykit/canon ingest sessions
+   bunx @journeykit/canon ingest sessions --watch   # keep polling
+   ```
+
+5. **Gate your work.** The trust spine checks coverage, the verdict ledger,
+   and staleness — completion is evidence-gated, never self-reported:
+
+   ```bash
+   bunx @journeykit/canon gate check
+   ```
+
+6. **Read the room.** Generate the repo status report (generated, never
+   edited) or open the local dashboard:
+
+   ```bash
+   bunx @journeykit/canon report
+   bunx @journeykit/canon dashboard
+   ```
+
+</Steps>
+
+## For agent harnesses
+
+If your repo runs coding agents, two more commands close the loop:
+
+```bash
+# materialize canon's companion skills into .claude/ and .codex/
+bunx @journeykit/canon skills install --source canon/skills --target .
+
+# surface role-scoped strategy memory before a task starts
+bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon regime-key dev my-repo core abc123)"
+```
+
+Strategies are distilled from your team's own verdicts and promoted through a
+statistical gate — see [Strategy memory](/concepts/strategy-memory/) for the
+full flywheel.
+
+## Next
+
+- [The canon concept](/concepts/canon/) — why "one subject, many voices"
+- [Trust spine](/concepts/trust-spine/) — how evidence-gated completion works
+- [Architecture](/architecture/) — the crate map
+- [Examples](/examples/) — end-to-end walkthroughs

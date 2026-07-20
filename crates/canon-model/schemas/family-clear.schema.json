@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LedgerReviewRecord",
+  "description": "`kind=review/`, `kind=clear/`, `kind=code-review/`,\n`kind=design-review/` (S11 design D1: area-scoped, one\n`<scenario_id>.json` leaf). Audit gaps this closes: free-text\n`upstream_ref`, `;`/`,`-joined `port_ref` strings (design §5 S11 table)\n— both raw source strings are KEPT (never destroyed) alongside the\nnew structured `refs` array, since a free-text ref that fails to\nparse must still be readable on the record `canon fmt --check` flags it on.",
+  "type": "object",
+  "properties": {
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "app_sha": {
+      "description": "`code-review`/`design-review` only.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "change_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ChangeId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "checked": {
+      "description": "D4.5: optional aspects-checked content on a passing review —\nleft absent unless the source data actually names what was\nchecked (never fabricated).",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "divergence_refs": {
+      "description": "D6's reciprocal half: one entry per divergence event (identified\nby its own corpus-relative file path) whose `ledger_ref` points\nat this record.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
+    "kind": {
+      "$ref": "#/$defs/LedgerKind"
+    },
+    "original_spec_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pin": {
+      "type": "string"
+    },
+    "port_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "refs": {
+      "description": "The structured replacement for `upstream_ref`/`port_ref` (design\nD4) — every successfully-parsed `<file>#<symbol>[:<a>-<b>]`\nsegment, in source order. Empty when nothing parsed (fully\nfree-text ref, flagged as `free-text-ref` by `canon fmt --check`)\nor when the record predates this migration.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Ref"
+      }
+    },
+    "reviewer": {
+      "type": "string"
+    },
+    "scenario_id": {
+      "$ref": "#/$defs/ScenarioId"
+    },
+    "schema": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TaskId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "upstream_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "verdict": {
+      "description": "`code-review`/`design-review` only — `\"faithful\"` or `\"n-a\"`\n(parity.py's axis-2 rule: a divergence is represented by record\nABSENCE, never a third verdict value here).",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "at",
+    "actor",
+    "scenario_id",
+    "reviewer",
+    "pin"
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "ChangeId": {
+      "description": "openspec change slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the directory name under `openspec/changes/` — joins: change ↔ tasks ↔ specs",
+      "type": "string"
+    },
+    "LedgerKind": {
+      "description": "The ledger's six on-disk `kind` values (S11 task 1.1). `run`/`drill`\nshare [`LedgerRunRecord`]'s shape; `review`/`clear`/`code-review`/\n`design-review` share [`LedgerReviewRecord`]'s shape — `envelope.kind`\nalone discriminates within each shared-shape pair.",
+      "type": "string",
+      "enum": [
+        "run",
+        "drill",
+        "review",
+        "clear",
+        "code-review",
+        "design-review"
+      ]
+    },
+    "LineRange": {
+      "description": "An inclusive `<a>-<b>` line range, as seen in donor ref strings like\n`#_storySpecFor:397-447` or an inventory entry's `lines: 262-270`.",
+      "type": "object",
+      "properties": {
+        "end": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "start": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ]
+    },
+    "Ref": {
+      "description": "A single structured code/behavior reference (S11 design D4): a file\npath, the symbol within it, and an optional line range. Never\nconstructed by guessing from prose — [`crate::family::refs::Ref`]\nvalues only ever come from successfully parsing a donor\n`<file>#<symbol>[:<a>-<b>]`-shaped segment; unparseable text is left\nas the original string and reported as a `canon fmt --check`\n`free-text-ref` violation instead (S11 design D4).",
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "lines": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LineRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "symbol": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "symbol"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "ScenarioId": {
+      "description": "`<area>.<surface>.<nn>` — `[a-z0-9-]+\\.[a-z0-9-]+\\.\\d{2,}`; never renumbered once assigned — joins: spec ↔ test ↔ ledger ↔ divergence",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    },
+    "TaskId": {
+      "description": "`<change_id>#<n>`, where `<n>` is one or more dot-separated integers (`1`, `1.1`, `6.2`) matching `tasks.md`'s own numbering — joins: task ↔ evidence ↔ trajectory",
+      "type": "string"
+    }
+  }
+}

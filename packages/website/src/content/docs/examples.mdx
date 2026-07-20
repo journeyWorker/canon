@@ -1,0 +1,365 @@
+---
+title: Examples
+description: Four end-to-end walkthroughs — wiring a repo, the evidence loop, session telemetry, and importing plans — plus a dogfood case study.
+---
+
+import { Steps } from "@astrojs/starlight/components";
+
+Four walkthroughs, each a real command sequence you can run against your
+own repo. See [Getting Started](/getting-started/) for the one-command
+version and [the CLI reference](/cli/) for every flag.
+
+## 1. Wiring a consumer repo
+
+Scaffold `canon.yaml`, then validate and index a spec corpus.
+
+<Steps>
+
+1. **Scaffold the config.**
+
+   ```bash
+   bunx @journeykit/canon init
+   ```
+
+   Writes a working `canon.yaml`. `canon init` uses Git for durable,
+   reviewable records and local SQLite for high-volume operational
+   records. PostgreSQL and S3-compatible storage are optional scale-up
+   backends. Seven of canon-model's twelve record kinds route to the
+   zero-env-var `local` (git-backed) rung; `task`, `handoff`, `session`,
+   `run`, and `event` route to `hot` (SQLite by default, at
+   `canon/hot.db`, gitignored). Commented `postgres`/`s3` stanzas show
+   the scale-up swap, plus one real `specs.roots[]` entry and an empty
+   `plans: { sources: [] }`:
+
+   ```yaml
+   tiers:
+     local:
+       backend: git
+       root: canon/ledger
+     hot:
+       backend: sqlite
+       path: canon/hot.db
+     # swap hot to postgres once you need a real server:
+     #   backend: postgres
+     #   dsn_env: CANON_PG_DSN
+     #   schema: canon_v1
+     # cold:
+     #   backend: s3
+     #   bucket_env: CANON_R2_BUCKET
+     #   prefix: "canon/"
+   routing:
+     change: local
+     task: hot
+     scenario: local
+     session: hot
+     run: hot
+     event: hot
+     handoff: hot
+     review: local
+     divergence: local
+     trajectory: local
+     strategy_item: local
+     evidence_record: local
+   specs:
+     roots:
+       - id: root
+         root: specs
+   plans:
+     sources: []
+   ```
+
+   `canon init` refuses to overwrite an existing `canon.yaml`. Re-validate
+   it any time (chains the same three strict loaders `inventory sync` /
+   `ingest plans` / `tier age` use):
+
+   ```bash
+   bunx @journeykit/canon init --check-config
+   ```
+
+2. **Validate the spec corpus.** `.feature` files live under whatever
+   `specs.roots[]` names (`specs/` by default):
+
+   ```bash
+   bunx @journeykit/canon fmt --check specs
+   ```
+
+   Checks the corpus against canon's artifact-family schemas and layout
+   descriptors. Any violation — missing provenance, a layout-grammar
+   miss — is reported; nothing downstream runs until this is clean.
+
+3. **Materialize the ledger index.**
+
+   ```bash
+   bunx @journeykit/canon inventory sync
+   ```
+
+   Re-validates each configured root with the same `fmt --check` pass,
+   then walks `<root>/features/**/*.feature` and upserts one `Scenario`
+   ledger record per `(project_id, scenario_id)`. A violation aborts
+   the WHOLE root — zero records written for it, never a partial sync.
+   An unchanged `.feature` file (same `source_digest`) is a no-op; a
+   changed one appends a new record (append-only, nothing overwritten).
+
+</Steps>
+
+## 2. The evidence loop
+
+Author a scenario, attach a reviewer's verdict, gate on it, then render
+the status report.
+
+<Steps>
+
+1. **Scaffold a scenario stub.**
+
+   ```bash
+   bunx @journeykit/canon scenario new auth.login.01 --title "Login rejects bad password"
+   ```
+
+   Appends an S11-conformant `.feature` stub — creating the file if it
+   doesn't exist — under the target derived from the tag's own
+   `<area>.<surface>` (or an explicit `--feature <path>` under a
+   configured `specs.roots[]` entry). Writes no ledger record; you
+   still fill in the Gherkin body, then run `fmt --check` and
+   `inventory sync` from walkthrough 1 to index it.
+
+2. **Attest a review.**
+
+   ```bash
+   bunx @journeykit/canon review add \
+     --project-id root \
+     --scenario-id auth.login.01 \
+     --reviewer alice \
+     --pin "$(git rev-parse HEAD)" \
+     --original-spec-ref specs/auth.feature \
+     --role dev
+   ```
+
+   Writes one native, attributed `Review` record. Exactly one of
+   `--upstream-ref` / `--original-spec-ref` is required — provenance is
+   never synthesized.
+
+3. **Gate the work.**
+
+   ```bash
+   bunx @journeykit/canon gate check
+   ```
+
+   Runs the coverage / verdict-ledger / staleness / trust-ladder check
+   set over the evidence corpus and prints every violation grouped by
+   failure class (`uncovered-cell`, `stale-evidence`, `flagged`, …).
+   Exit `0` clean, `1` gate-red, `2` on a usage or load failure. Add
+   `--release` to additionally engage the release-scoped
+   `trust-below-required` check — see [Trust spine](/concepts/trust-spine/)
+   for the full failure-class table.
+
+4. **Render the status report.**
+
+   ```bash
+   bunx @journeykit/canon report
+   ```
+
+   Renders the five status panels (trust matrix, session costs, role
+   memory, flywheel funnel, review burn-down) to `canon/REPORT.md` —
+   generated, never hand-edited. Wire `canon report --check` into CI
+   to byte-diff the committed file against current inputs the same way
+   you'd wire `canon gate check`.
+
+</Steps>
+
+## 3. Session telemetry
+
+Fold agent-CLI transcripts into tiered storage, then read them back.
+
+<Steps>
+
+1. **Ingest once, then watch.**
+
+   ```bash
+   bunx @journeykit/canon ingest sessions
+   bunx @journeykit/canon ingest sessions --watch   # poll every 30s (--interval-secs)
+   ```
+
+   Scans every registered adapter (`omp`, `hermes`, `claude`, `codex`),
+   normalizes into `Session` / `Run` / `Event` records, and persists
+   through the same tier resolution `canon query` uses. A per-source
+   watermark cursor skips a source whose transcripts are byte-identical
+   to last pass — a steady-state `--watch` loop only re-parses what
+   changed. Force a full rescan with `--full`.
+
+2. **Query the records back.**
+
+   ```bash
+   bunx @journeykit/canon query --kind session --json
+   bunx @journeykit/canon query --kind run --since 2026-07-01
+   ```
+
+   Fans the read across every tier the kind may live in and merges by
+   `at`. `--json` prints the merged record bodies; omit it for a human
+   table.
+
+3. **Open the dashboard.**
+
+   ```bash
+   bunx @journeykit/canon dashboard
+   ```
+
+   Regenerates a fresh Parquet snapshot (`canon report --snapshot`
+   under the hood, into `canon/dashboard-snapshot`) and serves the
+   built `packages/dashboard` app locally, pointed at it — the same
+   five panels `canon report` renders, read from the snapshot instead
+   of recomputed in the browser. Pass `--snapshot <dir>` to serve a
+   snapshot generated elsewhere (e.g. a downloaded CI artifact) as-is.
+
+</Steps>
+
+## 4. Importing a superpowers plan
+
+Mirror a superpowers `writing-plans` plan doc into `Change`/`Task` core
+records — no hand-authoring required.
+
+<Steps>
+
+1. **Configure the source.**
+
+   ```yaml
+   plans:
+     sources:
+       - dialect: superpowers
+         root: docs/superpowers/plans
+   ```
+
+   Or bypass `canon.yaml` for a one-shot import:
+
+   ```bash
+   bunx @journeykit/canon ingest plans --dialect superpowers --source docs/superpowers/plans
+   ```
+
+2. **Run the import.**
+
+   ```bash
+   bunx @journeykit/canon ingest plans
+   ```
+
+   Each `*.md` plan doc under the root becomes one `Change`: `change_id`
+   is the filename stem, slugified (the date prefix is kept verbatim);
+   `summary` is the `**Goal:**` line's text. Each `### Task N: <name>`
+   section becomes one `Task` (`task_id = <change_id>#<N>`), `done` iff
+   the section has at least one checkbox and all are checked, `open`
+   otherwise — a zero-checkbox section is open, never done. Steps and
+   prose headings are never read.
+
+3. **Read the mirror back.**
+
+   ```bash
+   bunx @journeykit/canon query --kind change --json
+   bunx @journeykit/canon query --kind task --json
+   ```
+
+   Imported rows are ordinary core records — `canon query` cannot tell
+   (and must not be able to tell) them apart from a hand-authored
+   `canon gate task`. This mirror is queryable, never authoritative:
+   `canon gate check` reads evidence (`Review`/`EvidenceRecord`), never
+   plan-imported `Change`/`Task` rows — flipping a plan checkbox alone
+   can never turn the gate red or green.
+
+</Steps>
+
+## 5. The subject-domain loop
+
+Author a subject, adopt an imported change under it, pull subject-scoped
+guidance, then drive it through its evidence-gated lifecycle.
+
+<Steps>
+
+1. **Author the subject FIRST.**
+
+   ```bash
+   bunx @journeykit/canon subject new checkout-revamp \
+     --domain dev --title "Checkout revamp" --owner-role implementer
+   ```
+
+   The kebab-slug `<id>` is the durable `subject_id` join key; the
+   subject starts at status `proposed`. `--domain` is a vocabulary
+   slug (`planning`/`design`/`dev`/`data`/`test` by default).
+
+2. **Adopt an imported plan change under it.**
+
+   ```bash
+   bunx @journeykit/canon subject adopt checkout-revamp-plan --subject checkout-revamp
+   ```
+
+   This stamps `Change.subject_id` and appends the change to the
+   subject's `change_ids` — the plan unit now belongs to a managed
+   product unit.
+
+3. **Retrieve subject-scoped guidance before working.**
+
+   ```bash
+   bunx @journeykit/canon retrieve --role dev --domain dev --subject checkout-revamp
+   ```
+
+   Retrieval tries the area candidates `dev-checkout-revamp` then `dev`
+   in that fallback order, so the subject's own accumulated lessons win,
+   falling back to the domain's shared memory when the subject is new.
+
+4. **Drive the lifecycle.**
+
+   ```bash
+   bunx @journeykit/canon subject status checkout-revamp specced
+   bunx @journeykit/canon subject status checkout-revamp building
+   bunx @journeykit/canon subject status checkout-revamp verifying
+   bunx @journeykit/canon subject status checkout-revamp shipped
+   ```
+
+   The `verifying → shipped` step is evidence-gated: it succeeds only
+   when every scenario the subject links carries a latest non-Divergent
+   verdict. Otherwise it prints the offending scenarios, exits `1`, and
+   the status stays `verifying`.
+
+5. **Read the per-domain management view.**
+
+   ```bash
+   bunx @journeykit/canon query --kind subject --domain dev
+   bunx @journeykit/canon report
+   ```
+
+   `canon report`'s Subjects panel rolls up each subject's status ×
+   scenario coverage per domain.
+
+</Steps>
+
+## Next
+
+- [CLI reference](/cli/) — every subcommand and flag
+- [Trust spine](/concepts/trust-spine/) — the eight failure classes in full
+- [Tiered storage](/concepts/tiered-storage/) — how `local`/`hot`/`cold` routing works
+
+## Case study: Red Panda Ridge
+
+[`examples/platformer`](https://github.com/journeyWorker/canon/tree/main/examples/platformer)
+is a small Vite + React + PixiJS platformer built and verified
+end-to-end by five persona agents dogfooding canon, one agent per
+canon voice, each using the real CLI:
+
+| Voice | What they did | canon surface |
+|---|---|---|
+| planning | wrote the implementation plan (superpowers `writing-plans` format) | plan doc → mirrored by `canon ingest plans --dialect superpowers` |
+| design | authored the 8 new behavior scenarios | `canon context` → `canon scenario new` × 8 → `canon fmt --check` (0 violations) |
+| dev | implemented against the 16-scenario ledger, flipped plan checkboxes | `canon query --kind scenario`, `canon retrieve --role dev` |
+| test | independently verified all 16 scenarios, fixed 2 provable defects | `canon review add` × 16 (attested, pinned to the verified sha) |
+| review | filed 8 confirmed ship-blockers as divergences | `canon divergence stage`/`promote` × 8 → `resolve` × 6 |
+
+The plan doc is a roadmap; the 16-scenario `.feature` corpus
+(materialized by `canon inventory sync`) is the acceptance authority
+dev and test actually worked against — the two never merge:
+
+```
+dev claims done   → plan checkboxes → canon ingest plans   (mirror, never trusted)
+test proves done  → canon review add per scenario           (evidence)
+review disagrees  → canon divergence stage/promote          (tracked, run_seq-ordered)
+fix lands         → re-verify → attest → divergence resolve (burndown to zero)
+                  → canon gate check: clean (0 violations)
+```
+
+Final state: 16/16 scenarios attested, divergence burndown
+`open=0 resolved=6`, `canon gate check` clean.

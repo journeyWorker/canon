@@ -1,0 +1,7 @@
+# Selftest fixture (design.md §8): exercises E-MISSING-ATTR (the required
+# `evidence` attribute is absent).
+- id: bad-missing-attr#1
+  tag: task
+  attrs:
+    desc: "no evidence attribute at all"
+    status: open

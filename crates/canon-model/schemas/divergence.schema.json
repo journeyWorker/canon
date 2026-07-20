@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Divergence",
+  "description": "A tracked divergence (join-spine `scenario_id` row). `run_seq`/\n`round` are the fold-ordering fields the design doc's Risk section\ncalls out for `Divergence`/`EvidenceRecord` — mirrors\n`divergence-log.md`'s \"serialized-integrator monotonic `run_seq`\n(primary), `round` (tiebreak-only)\" fold rule; the fold algorithm\nitself lives in [`crate::fold`]. `project_id` is REQUIRED (design\nD6, clean cutover) and, together with `scenario_id`, is the fold's\ngrouping key.",
+  "type": "object",
+  "properties": {
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "detail": {
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/RecordKind"
+    },
+    "project_id": {
+      "$ref": "#/$defs/ProjectId"
+    },
+    "reviewer": {
+      "type": "string"
+    },
+    "round": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "run_seq": {
+      "description": "The SOLE primary fold-ordering key within a `(project_id,\nscenario_id)` group — `round` below is a tiebreak ONLY among\nequal `run_seq` values, never an independent ordering axis.",
+      "$ref": "#/$defs/TotalOrder"
+    },
+    "scenario_id": {
+      "$ref": "#/$defs/ScenarioId"
+    },
+    "schema": {
+      "description": "Per-kind schema version, bumped on any breaking field change to\nthat kind (design D2; `canon fmt`/`canon migrate`, S11, key off\nit).",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "sha": {
+      "$ref": "#/$defs/Sha"
+    },
+    "status": {
+      "$ref": "#/$defs/DivergenceStatus"
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "at",
+    "actor",
+    "project_id",
+    "scenario_id",
+    "sha",
+    "status",
+    "run_seq",
+    "round",
+    "reviewer"
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "DivergenceStatus": {
+      "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "open",
+            "resolved",
+            "still_divergent"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "deferred": {
+              "type": "object",
+              "properties": {
+                "expiry": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason",
+                "expiry"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "deferred"
+          ]
+        }
+      ]
+    },
+    "ProjectId": {
+      "description": "`[a-z0-9][a-z0-9-]*` — lowercase alnum + hyphen, first character alphanumeric, no underscore (keeps the `__` natural-key separator unambiguous) — joins: not a join-spine key; composite identity prefix on Scenario/Review/Divergence natural keys (`<project_id>__<scenario_id>…`), optional on EvidenceRecord",
+      "type": "string"
+    },
+    "RecordKind": {
+      "description": "The thirteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36 — the \"a new kind is\na reviewed, breaking `canon-model` change\" process design D1 mandates,\nexercised for real). A fourteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+      "type": "string",
+      "enum": [
+        "change",
+        "task",
+        "scenario",
+        "session",
+        "run",
+        "event",
+        "handoff",
+        "review",
+        "divergence",
+        "trajectory",
+        "strategy_item",
+        "evidence_record",
+        "subject"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "ScenarioId": {
+      "description": "`<area>.<surface>.<nn>` — `[a-z0-9-]+\\.[a-z0-9-]+\\.\\d{2,}`; never renumbered once assigned — joins: spec ↔ test ↔ ledger ↔ divergence",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    },
+    "Sha": {
+      "description": "git commit SHA-1: exactly 40 lowercase hex characters — joins: reward signals ↔ trajectory",
+      "type": "string"
+    },
+    "TotalOrder": {
+      "description": "monotonic fold-ordering rank (e.g. Divergence.run_seq) — the SOLE primary sort key within a fold group; never compared against a round tiebreak",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  }
+}

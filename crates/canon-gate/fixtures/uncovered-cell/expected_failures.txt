@@ -1,0 +1,8 @@
+# canon gate selftest fixture — uncovered-cell (D3a).
+# Format: `<failure-class> <subject>` — the same grep-stable oracle shape
+# `tools/parity.py`'s own `expected_failures.txt` uses
+# (the donor parity-harness audit's fixtures-selftest notes §3.2). The
+# corpus itself is built in Rust (crates/canon-gate/src/selftest.rs) —
+# GitTier's content-digest-suffixed filenames make a hand-authored literal
+# ledger fixture file impractical; this oracle is the reviewable artifact.
+uncovered-cell s5-selftest-uncovered-cell#1

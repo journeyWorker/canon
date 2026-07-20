@@ -1,0 +1,33 @@
+[package]
+name = "canon-learn"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "role-namespaced strategy memory (S6): trace -> verdict -> distill -> store -> retrieve -> apply, generalizing the donor harness's reasoning-bank + the donor tuning project's sweep-trajectory into a regime_key-keyed two-tier (raw Trajectory / distilled StrategyItem) store."
+
+[lib]
+name = "canon_learn"
+path = "src/lib.rs"
+
+[dependencies]
+# `regime_key`/`RegimeKey`/`RoleId` — the single canonical join-key
+# serialization (frozen S1 foundation) every write/read path in this
+# crate reuses, never re-derives.
+canon-model.workspace = true
+# `verdict::{VerdictRow, Polarity, Becomes}` ONLY — the frozen S4
+# artifact-ingest contract (S4Foundation commit 7b258b7a). This crate
+# never calls `derive_verdict`/touches `ArtifactEventKind`/adapter
+# internals; it consumes the bare, already-derived `VerdictRow` shape a
+# caller (S4's wave-2 adapters, or a synthetic fixture) hands it.
+canon-ingest.workspace = true
+arrow = "59.1.0"
+parquet = "59.1.0"
+chrono = { version = "0.4.45", features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+serde_yaml = "0.9"
+thiserror.workspace = true
+ulid = { version = "1.2.1", features = ["serde"] }
+
+[dev-dependencies]
+tempfile = "3"

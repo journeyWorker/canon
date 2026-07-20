@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Scenario",
+  "description": "A scenario (join-spine `scenario_id` row: spec ↔ test ↔ ledger ↔\ndivergence). A ledger INDEX record (design D2) — `project_id` +\n`scenario_id` are the composite identity (design D6: `project_id`\nis REQUIRED, clean-cutover, no legacy `Option` branch); `title`/\n`description` are a denormalized nicety kept for free. The GENERAL\nindex is `envelope + project_id + scenario_id + title + description +\nsource_digest` ONLY (s15 P3a/task 3.3) — rich facts (steps,\nprovenance, `covered_by`) stay in the S11-validated family\ndocuments; `canon inventory sync` derives this index from the\n`.feature` corpus ALONE, never a second source of truth for those\ndocuments. `covered`/`surface_ref` are deliberately NOT core fields\n(P1 shipped them, P3a removed them). Coverage stays `canon-gate`'s\nown `uncovered-cell` authority. Any donor-inventory-derived\nenrichment (for example a donor `covered_by` join) stays\nplugin-extensible: a future s16 porting plugin owns it as a\nforeign-namespace overlay record, never as a field that core\nre-materializes here, because a plugin cannot safely own a field\nthat core clobbers on every sync.",
+  "type": "object",
+  "properties": {
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "description": {
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/RecordKind"
+    },
+    "project_id": {
+      "$ref": "#/$defs/ProjectId"
+    },
+    "scenario_id": {
+      "$ref": "#/$defs/ScenarioId"
+    },
+    "schema": {
+      "description": "Per-kind schema version, bumped on any breaking field change to\nthat kind (design D2; `canon fmt`/`canon migrate`, S11, key off\nit).",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "source_digest": {
+      "description": "sha256-hex over the source `.feature` file's bytes (design D4) —\nthe freshness signal `sync`'s logical-idempotence check compares\nagainst, NOT `ids::Sha` (a 40-hex git commit sha).",
+      "$ref": "#/$defs/SpecDigest"
+    },
+    "subject_id": {
+      "description": "The durable [`Subject`] this scenario is specced against (s36,\nadditive — `#[serde(default, skip_serializing_if =\n\"Option::is_none\")]`, so a pre-s36 `Scenario` is byte-identical\non the wire), mapped from a `.feature` scenario's\n`@subject:<subject-id>` Gherkin tag by `canon inventory sync`\n(mirrors `Change.subject_id`, which `subject adopt` stamps). A\nplain `pub` field left `None` by [`Scenario::new`] and populated\noutside this crate; a malformed or absent tag simply leaves it\n`None` (fail-soft), never a hard parse error here.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SubjectId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "title": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "at",
+    "actor",
+    "project_id",
+    "scenario_id",
+    "title",
+    "source_digest"
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "ProjectId": {
+      "description": "`[a-z0-9][a-z0-9-]*` — lowercase alnum + hyphen, first character alphanumeric, no underscore (keeps the `__` natural-key separator unambiguous) — joins: not a join-spine key; composite identity prefix on Scenario/Review/Divergence natural keys (`<project_id>__<scenario_id>…`), optional on EvidenceRecord",
+      "type": "string"
+    },
+    "RecordKind": {
+      "description": "The thirteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36 — the \"a new kind is\na reviewed, breaking `canon-model` change\" process design D1 mandates,\nexercised for real). A fourteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+      "type": "string",
+      "enum": [
+        "change",
+        "task",
+        "scenario",
+        "session",
+        "run",
+        "event",
+        "handoff",
+        "review",
+        "divergence",
+        "trajectory",
+        "strategy_item",
+        "evidence_record",
+        "subject"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "ScenarioId": {
+      "description": "`<area>.<surface>.<nn>` — `[a-z0-9-]+\\.[a-z0-9-]+\\.\\d{2,}`; never renumbered once assigned — joins: spec ↔ test ↔ ledger ↔ divergence",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    },
+    "SpecDigest": {
+      "description": "sha256-hex: exactly 64 lowercase hex characters, over a `.feature` file's raw bytes — joins: not a join-spine key; Scenario.source_digest, the inventory-sync freshness signal",
+      "type": "string"
+    },
+    "SubjectId": {
+      "description": "subject slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the durable product-unit identifier — joins: subject ↔ change ↔ scenario",
+      "type": "string"
+    }
+  }
+}

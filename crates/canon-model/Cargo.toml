@@ -1,0 +1,28 @@
+[package]
+name = "canon-model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "canon's closed, versioned artifact-family types (S1): envelope, the twelve record kinds, the join-spine key newtypes, evidence-integrity validation, and generated JSON-schema + join-spine doc output."
+
+[lib]
+name = "canon_model"
+path = "src/lib.rs"
+
+# `cargo run -p canon-model --bin xtask -- check-generated` (aliased to
+# `cargo xtask check-generated` by the repo's `.cargo/config.toml`) drives
+# the join-spine-doc + JSON-schema generation described in design D3.
+[[bin]]
+name = "xtask"
+path = "src/bin/xtask.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { version = "0.4.45", features = ["serde"] }
+schemars = { version = "1.2.1", features = ["chrono04", "uuid1"] }
+serde_yaml = "0.9.34"
+ulid = { version = "1.2.1", features = ["serde"] }
+uuid = { version = "1.23.4", features = ["v4", "serde"] }
+sha2 = { workspace = true }

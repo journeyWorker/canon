@@ -1,0 +1,144 @@
+---
+title: Strategy Memory
+description: The role-namespaced ReasoningBank layer — trajectory to verdict to distillation to statistical promotion to retrieval.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+canon's strategy memory (S6/S7/S8) turns accumulated verdict
+trajectories into retrievable, promotable insight — role-namespaced:
+`planning`, `design`, `dev`, `test`, `review`, and others share one
+backbone but evolve separately.
+
+## The flywheel
+
+```
+ingest (sessions, reviews, handoffs) → trajectories + verdicts (per role)
+    → distill: success → strategy, review finding → guardrail
+    → statistical promotion gate — no noise distilled
+    → promote to git tier (versioned, PR-reviewed)
+    → retrieve-before-task (role + regime scoped, advisory)
+    → better agent runs ↻
+```
+
+## Two tiers, two stores
+
+- **Warm — trajectories (Parquet).** `ParquetTrajectoryStore` under
+  `<repo>/canon/learn/trajectories/`: raw, verdict-keyed rows written
+  by ingest. Local, rebuildable, `.gitignore`d — never hand-committed.
+- **Durable — strategies (git).** `ParquetStrategyStore` plus
+  git-tracked `<repo>/canon/strategies/<role>/<id>.md` files: the
+  distilled, PR-reviewable `StrategyItem`s a promotion writes into and
+  a demotion soft-flags.
+
+Strategy memory is **rebuilt, not recomputed once**: `canon ingest
+artifacts` re-derives distilled strategies from the current trajectory
+set (`rebuild_namespace`) every time it runs. The rebuild is
+non-destructive — it never deletes a strategy the raw trajectory rows
+don't touch, so a rebuild can't silently drop a hand-promoted strategy.
+There is no standalone `canon learn` rebuild command; the only `canon
+learn` subcommand is `promote`.
+
+## Rewarding a trajectory
+
+Each role has its own reward function — never one formula applied
+uniformly. `dev`'s reward is a weighted composite (`pr-merged 0.4 +
+ci-pass 0.3 + no-rollback 0.3`, floored to `0.1` on a rollback or CI
+failure, shortcut to `1.0` on human approval). Other built-in roles
+share a provisional default (`0.9` success / `0.3` failure / `0.5`
+pending) until real cross-role data justifies their own formula.
+
+A trajectory is marked with a covering verdict exactly once — moving it
+off `Pending` is a one-way transition; an unknown trajectory id fails
+loud rather than silently no-op'ing.
+
+## The promotion gate: `crn` vs `occurrence`
+
+A role's promotion gate is a `canon.yaml` `learn:` config choice, not a
+compile-time one:
+
+```yaml
+learn:
+  promotion:
+    dev:
+      mode: occurrence
+      n_min: 8 # optional — defaults to 5
+      window_days: 14 # optional — defaults to 30
+    sim:
+      mode: crn
+  demotion:
+    hard_delete: false # optional — soft-flag is the default
+    strategies_root: canon/strategies
+```
+
+- **`occurrence`** — for roles whose domain doesn't support
+  deterministic replay (most of `dev`/`content`/`design`/`review`).
+  Promotes once at least `n_min` `Success`-verdict trajectories
+  accumulate for the same regime inside the trailing window, with zero
+  `Failure`/`RolledBack` trajectories in that window. A contradicting
+  failure **resets** the count — it's never averaged away.
+- **`crn`** — for roles that can run a deterministic simulator: a
+  paired common-random-number statistical corroboration gate
+  (band-variance decomposition, F/t critical-value tables).
+
+A role with no explicit `promotion.<role>` entry resolves to the
+conservative default: `occurrence`, `n_min: 5`, `window_days: 30`.
+
+## Promoting and demoting
+
+```bash
+canon learn promote 01J...ULID           # promote a distilled strategy
+canon learn promote 01J...ULID --dry-run # preview: lint + resolve, no write
+```
+
+`canon learn promote` graduates a distilled `StrategyItem` (by its ULID)
+from the warm parquet tier into `canon/strategies/<role>/<id>.md`, with
+YAML front matter (`status`, `regime_key`, `role`, `title`,
+`source_trajectory_ids`, `recorded_at`). It runs advisory lints
+(content-length ceiling, literal-absolute-path rejection) —
+non-blocking — and rewrites the whole file idempotently, so a later
+manual edit to a promoted file doesn't survive a re-promote.
+
+A strategy that later collects a **contradicting** trajectory is
+demoted, not deleted: a soft-flag merges `status: demoted` and a
+`reason:` into the file's existing front matter, body untouched,
+preserving git blame. Demotion is append-only evidence — nothing is
+force-rewritten.
+
+## Retrieving before a task
+
+```bash
+canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2
+canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2 --k 3 --json
+```
+
+`--regime` is the full `regime_key` string,
+`<role>/<repo>/<area>/<hash>` — the same canonical serialization the
+write side produces. Assemble it through the one serializer instead of
+a second, drifting derivation:
+
+```bash
+canon regime-key --role dev --repo canon --area join-spine --hash abc123
+```
+
+`--role` must equal `--regime`'s own leading segment; a mismatch is a
+clean usage error (exit `2`). Once role and regime agree, retrieval is
+**fail-soft and always exits `0`** — a store outage, an empty store, or
+a malformed row all degrade to an empty guidance list, never a nonzero
+exit a caller must handle.
+
+<Aside type="note">
+  A dispatched run snapshots what `canon retrieve` returned into its own
+  manifest (`Run.injected_guidance`) rather than pointing at the live
+  store — a later edit or demotion can never retroactively change what
+  a manifest already recorded. Replaying a run reads that snapshot, not
+  a fresh retrieval.
+</Aside>
+
+## Next
+
+- [Tiered storage](/concepts/tiered-storage/) — where trajectories and
+  promoted strategies actually live
+- [Trust spine](/concepts/trust-spine/) — the verdicts strategy memory
+  distills from
+- [CLI reference](/cli/) — the full `canon learn` / `canon retrieve` surface

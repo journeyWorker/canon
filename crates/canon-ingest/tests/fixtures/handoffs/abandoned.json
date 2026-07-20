@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "kind": "handoff",
+  "at": "2026-07-01T09:00:00Z",
+  "actor": {
+    "agent_id": "s4-fixture"
+  },
+  "id": "20260701-0915-s4-drop-a1a4",
+  "state": "abandoned",
+  "chain_id": "44444444-4444-4444-8444-444444444444",
+  "parent_handoff_id": null,
+  "seq": 1,
+  "claimed_by": "s4handoff-agent",
+  "claimed_at": "2026-07-01T09:16:00Z",
+  "completed_at": null,
+  "abandoned_at": "2026-07-01T09:25:00Z",
+  "openspec_change_slug": null,
+  "research_vendor_slug": null,
+  "tags": [],
+  "title": "Superseded by rescope directive",
+  "body": {
+    "domain": "planning",
+    "template_version": 1,
+    "fields": {
+      "title": "Superseded by rescope directive",
+      "summary": "original hosted-Postgres plan dropped for canon's own store",
+      "acceptance-criteria": ["abandonment rationale recorded"]
+    }
+  }
+}

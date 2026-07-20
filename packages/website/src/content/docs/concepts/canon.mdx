@@ -1,0 +1,107 @@
+---
+title: The Canon Concept
+description: Why the tool is named for the musical canon — one subject, many voices — and the four disconnected islands it replaces.
+---
+
+A musical canon states one subject, then hands it to successive voices, each
+developing it in its own register while the underlying subject stays intact.
+canon (the tool) is named for the same shape: every specialist agent role —
+planning, design, dev, test, review — evolves its own strategy memory, but
+all of them stand on one shared backbone.
+
+**Shared subject** (one backbone, canon-model + canon-store + canon-gate):
+
+- one versioned record schema for every artifact kind (`Change`, `Task`,
+  `Scenario`, `Subject`, `Session`, `Run`, `Event`, `Handoff`, `Review`,
+  `Divergence`, `Trajectory`, `StrategyItem`, `EvidenceRecord`)
+- one trust spine (`canon gate`) that gates completion the same way for
+  every role
+- one join spine — `task_id`, `scenario_id`, `session_id`, `run_id`,
+  `regime_key` — so an artifact can always be traced back to the session
+  and trajectory that produced it
+
+**Per-role voices** (canon-learn):
+
+- strategy memory namespaced by role (`planning`, `design`, `dev`, `test`,
+  `review`, …), each evolving from its own verdict stream
+- `canon retrieve` pulls role- and regime-scoped guidance before a task
+  starts — see [Strategy memory](/concepts/strategy-memory/)
+
+## Subjects
+
+A **Subject** is canon's durable product unit — the thing a team plans,
+designs, builds, verifies, and ships across many changes and many
+scenarios. It is the reviewed 13th record kind (`RecordKind::Subject`)
+and the join key the whole loop turns on: an agent's first act on
+substantial work is authoring or updating the Subject, and every
+downstream artifact (scenarios, tasks, reviews, verdicts, trajectories,
+strategies) then joins back to its `subject_id`.
+
+The name is deliberate. A musical canon states one subject, taken up by
+many voices — so a canon **Subject** is the product unit, its `.feature`
+files are its behavior specs, and the two are never the same word:
+"feature docs" always means the Gherkin files, a "subject" is the
+management record.
+
+Each Subject carries a `domain` (a vocabulary-defined slug —
+`planning`/`design`/`dev`/`data`/`test` by default, extended per repo)
+and a status lifecycle `proposed → specced → building → verifying →
+shipped` (plus any → `retired`). Shipping is evidence-gated: a Subject
+moves `verifying → shipped` only when every scenario it links carries a
+latest non-Divergent verdict — the same trust spine that gates task
+completion, applied to the product unit. `canon query --kind subject`
+and `canon report`'s Subjects panel give the per-domain management view;
+the [CLI reference](/cli/#subjects) lists the authoring commands.
+
+## The problem: four disconnected islands
+
+Teams that run coding agents at scale accumulate four capabilities that
+grow up independently, with no shared join key between them:
+
+| Capability | Typically exists as | Gap |
+|---|---|---|
+| Spec planning | Change lifecycles and a scenario/spec corpus | Works, but its state is fragmented from everything else |
+| Work management | Plan-file checkboxes, a separate handoff queue, and prose progress logs | Uncoordinated systems; completion is **self-reported**, with zero evidence |
+| Logging | Per-CLI session/event stores | No documented join key between them; logs never feed a decision loop |
+| Learning → improvement | Reasoning/strategy distillation | Reward path half-wired, no shared surface, memory scoped by domain rather than role |
+
+Each island can be individually strong — a Gherkin corpus, policy-derived
+coverage, an append-only ledger, a trust ladder — yet still trap that
+discipline inside one repo-local script, drifting in format and unable to
+talk to the others.
+
+Meanwhile, insights from agent runs — code reviews, design reviews, CI
+results, divergence findings — accumulate as write-only logs. Nothing
+distills them back into how agents plan, design, implement, or test, so
+specialist agents never evolve per role.
+
+canon unifies the four islands behind one join spine and one evidence
+gate: every artifact traces back to the session and trajectory that
+produced it, and completion is proven, never self-reported.
+
+## What canon decided
+
+canon's core design decisions:
+
+- **Standalone repo.** Not a package inside an existing monorepo — a
+  dedicated repo any consumer repo pulls in via `bunx @journeykit/canon`.
+- **Rust core + Bun launcher.** Prebuilt platform binaries ship as npm
+  `optionalDependencies`; a thin JS launcher resolves the right one.
+- **canon is the format authority.** Every artifact kind — ledger records,
+  divergence logs, trajectories, strategies, sessions — has a versioned
+  schema. Existing corpora migrate onto canon-validated formats, not the
+  other way around.
+- **Storage is tiered**: git (versioned, repo-local), Postgres (hot,
+  team-shared), R2 (cold, append-only, analytical) — see
+  [Tiered storage](/concepts/tiered-storage/).
+- **Strategy memory is role-namespaced**: planning / design / dev / test /
+  review / … evolve independently on the same backbone.
+- **Reviews are verdict signals.** Accumulated code and design reviews
+  become the distillation input for role-scoped guardrails and strategies,
+  closing the loop the four islands never closed.
+
+## Next
+
+- [Trust spine](/concepts/trust-spine/) — evidence-or-nothing completion
+- [Tiered storage](/concepts/tiered-storage/) — git / Postgres / R2
+- [Strategy memory](/concepts/strategy-memory/) — the distillation flywheel

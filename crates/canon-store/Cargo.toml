@@ -1,0 +1,43 @@
+[package]
+name = "canon-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "git / pg / r2 tier adapters behind one storage trait (S2)."
+
+[lib]
+name = "canon_store"
+path = "src/lib.rs"
+
+[dependencies]
+arrow = "59.1.0"
+bytes = "1.12.1"
+canon-model.workspace = true
+chrono = { version = "0.4.45", features = ["serde"] }
+futures = "0.3.32"
+object_store = { version = "0.14.0", features = ["aws"] }
+parquet = "59.1.0"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+serde_yaml = "0.9"
+sha2.workspace = true
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "sqlite", "chrono", "json"] }
+thiserror.workspace = true
+tokio = { version = "1.52.3", features = ["rt", "rt-multi-thread", "macros"] }
+walkdir = "2"
+
+[dev-dependencies]
+async-trait = "0.1"
+tempfile = "3"
+uuid = { version = "1.23.4", features = ["v4"] }
+
+# `live-pg`/`live-r2` gate the sqlx-Postgres / object_store-R2 LIVE
+# integration tests (a real DSN / R2 bucket, credentials from env) so
+# `cargo test --workspace` (no extra flags) never attempts network I/O
+# (design §9 local-first, S2 assignment constraint). The adapters'
+# LOGIC (SQL generation, Hive path derivation, local-parquet
+# write/read) is unit-tested unconditionally, offline, without these
+# features.
+[features]
+live-pg = []
+live-r2 = []

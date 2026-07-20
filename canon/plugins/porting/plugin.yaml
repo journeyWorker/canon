@@ -1,0 +1,12 @@
+id: porting
+namespace: porting
+overlays:
+  - kind: coverage
+    attaches_to:
+      core_kind: scenario
+      join_key: [project_id, scenario_id]
+    fields:
+      - name: covered
+        type: bool
+      - name: surface_ref
+        type: { list: string }

@@ -1,0 +1,12 @@
+schema: 1
+kind: inventory
+at: "2026-07-09T09:20:00Z"
+actor:
+  agent_id: canon-fmt-test
+idolive.hub.hub-header:
+  upstream:
+    pin: 9c93d024b
+    file: routes/idolive/replays/index.tsx
+    symbol: RouteComponent
+    lines: 262-270
+  covered_by: [idolive.hub.01]

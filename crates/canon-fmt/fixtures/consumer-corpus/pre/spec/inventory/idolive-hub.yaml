@@ -1,0 +1,16 @@
+# spec/inventory/idolive-hub.yaml — reference-keyed behavior inventory (DECISIONS D6).
+idolive.hub.hub-header:
+  upstream:
+    pin: 9c93d024b
+    file: routes/idolive/replays/index.tsx
+    symbol: RouteComponent
+    lines: 262-270
+  covered_by: [idolive.hub.01]
+
+idolive.hub.map-button:
+  upstream:
+    pin: 9c93d024b
+    file: routes/idolive/replays/index.tsx
+    symbol: RouteComponent
+    lines: 280-290
+  covered_by: [idolive.hub.25]

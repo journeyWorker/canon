@@ -1,0 +1,13 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "implementer"
+  },
+  "at": "2026-07-10T12:00:00Z",
+  "client": "claude-code",
+  "ended_at": "2026-07-10T12:00:00Z",
+  "kind": "session",
+  "schema": 1,
+  "session_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "started_at": "2026-07-10T11:00:00Z"
+}

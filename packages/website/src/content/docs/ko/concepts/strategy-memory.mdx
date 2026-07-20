@@ -1,0 +1,144 @@
+---
+title: 전략 메모리
+description: 역할별로 네임스페이스가 나뉜 ReasoningBank 레이어 — trajectory에서 verdict, distillation, 통계적 promotion, retrieval까지.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+canon의 전략 메모리(S6/S7/S8)는 누적된 verdict trajectory를 검색 가능하고
+승급 가능한 인사이트로 바꿉니다 — 역할별로 네임스페이스가 나뉩니다:
+`planning`, `design`, `dev`, `test`, `review` 등이 하나의 백본을
+공유하면서도 각자 따로 진화합니다.
+
+## 플라이휠
+
+```
+ingest (세션, 리뷰, 핸드오프) → trajectory + verdict (역할별)
+    → distill: 성공 → 전략, 리뷰 지적 → 가드레일
+    → 통계적 승급 게이트 — 노이즈는 증류되지 않음
+    → git 티어로 승급 (버전 관리, PR 리뷰)
+    → 태스크 시작 전 retrieve (역할 + regime 스코프, 어드바이저리)
+    → 더 나은 에이전트 실행 ↻
+```
+
+## 두 개의 티어, 두 개의 스토어
+
+- **웜 — trajectory (Parquet).** `<repo>/canon/learn/trajectories/`
+  아래의 `ParquetTrajectoryStore`: ingest가 기록한 원시 verdict-키
+  로우. 로컬, 재빌드 가능, `.gitignore` 대상 — 절대 수동 커밋되지
+  않습니다.
+- **더러블 — 전략 (git).** `ParquetStrategyStore`와 git으로 추적되는
+  `<repo>/canon/strategies/<role>/<id>.md` 파일: promotion이 쓰고
+  demotion이 소프트 플래그를 다는, 증류된 PR 리뷰 가능한
+  `StrategyItem`.
+
+전략 메모리는 **한 번 계산되고 끝나는 게 아니라 재빌드**됩니다: `canon
+ingest artifacts`는 실행할 때마다 현재 trajectory 집합으로부터 증류된
+전략을 다시 파생시킵니다(`rebuild_namespace`). 이 재빌드는
+비파괴적(non-destructive)입니다 — 원시 trajectory 로우가 건드리지
+않는 전략은 절대 삭제되지 않으므로, 재빌드가 수동으로 승급한 전략을
+조용히 지우는 일은 없습니다. 독립된 `canon learn` 재빌드 명령은
+없으며, `canon learn`의 유일한 서브커맨드는 `promote`입니다.
+
+## trajectory에 보상 매기기
+
+역할마다 자기만의 보상 함수가 있습니다 — 하나의 공식을 획일적으로
+적용하지 않습니다. `dev`의 보상은 가중 합성입니다(`pr-merged 0.4 +
+ci-pass 0.3 + no-rollback 0.3`, 롤백이나 CI 실패 시 `0.1`로 바닥,
+사람 승인이 있으면 `1.0`으로 즉시 확정). 다른 빌트인 역할들은 실제
+역할별 데이터가 쌓여 자기만의 공식을 정당화하기 전까지 잠정 기본값
+(성공 `0.9` / 실패 `0.3` / 대기 `0.5`)을 공유합니다.
+
+trajectory는 정확히 한 번 커버링 verdict가 매겨집니다 — `Pending`
+상태를 벗어나는 것은 단방향 전이이며, 알 수 없는 trajectory id는
+조용히 no-op하지 않고 즉시 실패합니다.
+
+## 승급 게이트: `crn` vs `occurrence`
+
+역할의 승급 게이트는 컴파일 타임이 아니라 `canon.yaml`의 `learn:`
+설정으로 선택합니다:
+
+```yaml
+learn:
+  promotion:
+    dev:
+      mode: occurrence
+      n_min: 8 # 선택 — 기본값 5
+      window_days: 14 # 선택 — 기본값 30
+    sim:
+      mode: crn
+  demotion:
+    hard_delete: false # 선택 — 기본은 소프트 플래그
+    strategies_root: canon/strategies
+```
+
+- **`occurrence`** — 결정적 리플레이를 지원하지 않는 도메인의
+  역할용(대부분의 `dev`/`content`/`design`/`review`). 트레일링
+  윈도우 안에서 같은 regime에 대해 `Success` verdict trajectory가
+  최소 `n_min`개 쌓이고, 그 윈도우 안에 `Failure`/`RolledBack`
+  trajectory가 하나도 없을 때 승급합니다. 상반되는 실패 하나가
+  카운트를 **리셋**시킵니다 — 평균으로 희석되지 않습니다.
+- **`crn`** — 결정적 시뮬레이터를 돌릴 수 있는 역할용: paired
+  common-random-number 통계적 교차 검증 게이트(band-variance 분해,
+  F/t 임계값 표)입니다.
+
+명시적인 `promotion.<role>` 항목이 없는 역할은 보수적인 기본값
+(`occurrence`, `n_min: 5`, `window_days: 30`)으로 해석됩니다.
+
+## 승급과 강등
+
+```bash
+canon learn promote 01J...ULID           # 증류된 전략을 승급
+canon learn promote 01J...ULID --dry-run # 미리보기: lint + resolve, 쓰기 없음
+```
+
+`canon learn promote`는 증류된 `StrategyItem`(ULID 기준)을 웜
+parquet 티어에서 `canon/strategies/<role>/<id>.md`로 승급시키며, YAML
+프론트매터(`status`, `regime_key`, `role`, `title`,
+`source_trajectory_ids`, `recorded_at`)를 함께 씁니다. 어드바이저리
+lint(콘텐츠 길이 상한, 리터럴 절대 경로 거부)를 실행하지만 이는
+non-blocking이며, 파일 전체를 멱등하게 다시 씁니다 — 즉 승급된 파일을
+수동으로 편집해도 재승급하면 살아남지 않습니다.
+
+이후 **상반되는** trajectory를 수집한 전략은 삭제가 아니라
+강등됩니다: 소프트 플래그가 파일의 기존 프론트매터에 `status:
+demoted`와 `reason:`을 병합하며, 본문은 손대지 않아 git blame이
+보존됩니다. 강등은 append-only 증거입니다 — 아무것도 강제로 다시
+쓰이지 않습니다.
+
+## 태스크 전에 retrieve하기
+
+```bash
+canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2
+canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2 --k 3 --json
+```
+
+`--regime`은 전체 `regime_key` 문자열, `<role>/<repo>/<area>/<hash>`
+입니다 — 쓰기 쪽이 만드는 것과 동일한 정규 직렬화입니다. 두 번째로
+갈라질 수 있는 별도 파생 대신 하나의 시리얼라이저로 조립하세요:
+
+```bash
+canon regime-key --role dev --repo canon --area join-spine --hash abc123
+```
+
+`--role`은 `--regime`의 선두 세그먼트와 반드시 일치해야 합니다 —
+불일치는 깔끔한 사용법 오류(exit `2`)입니다. role과 regime이 일치하고
+나면, retrieval은 **fail-soft이며 항상 exit `0`**입니다 — 스토어
+장애, 빈 스토어, 손상된 로우 모두 빈 가이던스 목록으로 저하될 뿐,
+호출자가 처리해야 하는 nonzero exit로 드러나지 않습니다.
+
+<Aside type="note">
+  디스패치된 실행은 `canon retrieve`가 반환한 값을 라이브 스토어를
+  가리키는 대신 자신의 매니페스트(`Run.injected_guidance`)에
+  스냅샷으로 저장합니다 — 이후 원본 전략이 편집되거나 강등되어도 이미
+  기록된 매니페스트를 소급해서 바꿀 수 없습니다. 실행을 리플레이하면
+  새로 retrieve하지 않고 이 스냅샷을 읽습니다.
+</Aside>
+
+## 다음
+
+- [티어드 스토리지](/ko/concepts/tiered-storage/) — trajectory와 승급된
+  전략이 실제로 어디에 저장되는지
+- [트러스트 스파인](/ko/concepts/trust-spine/) — 전략 메모리가 증류하는
+  원천인 verdict
+- [CLI 레퍼런스](/ko/cli/) — `canon learn` / `canon retrieve`의 전체 표면

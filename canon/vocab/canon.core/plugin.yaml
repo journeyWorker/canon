@@ -1,0 +1,13 @@
+# canon.core -- canon's own core vocabulary plugin (S10 design.md D1),
+# analogous to a donor authoring-vocabulary project's own core
+# vocabulary plugin. Always active, resolved from disk by
+# `canon_vocab::resolve_snapshot` exactly like any consumer
+# `canon/vocab/<id>/plugin.yaml` (D3) -- unlike that donor's core
+# plugin, it is NOT compile-time-embedded, since canon is a
+# monorepo-embedded tool, not a distributable language runtime.
+id: canon.core
+version: "0.1.0"
+kind: core
+exports:
+  directives: directives/
+  enums: enums.yaml

@@ -1,0 +1,26 @@
+[package]
+name = "canon-plugin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "canon's ledger-overlay plugin manifest (s16 P1, openspec/changes/s16-plugin-extensibility/): plugin.yaml schema/loader scanning canon/plugins/<id>/, ONE resolve_plugin_snapshot capability-snapshot resolution, and the overlay Type structural-shape checker -- mirrors canon-vocab's plugin.yaml/resolve_snapshot architecture (design.md D2) by INSPIRATION, taking NO canon-vocab crate dependency: a genuinely separate manifest surface (namespace/overlay ledger-record declarations, not directives/enums authoring vocabulary)."
+
+[lib]
+name = "canon_plugin"
+path = "src/lib.rs"
+
+[dependencies]
+# RecordKind::ALL/as_str (the twelve-kind collision check, design D1/R5)
+# only -- canon-plugin never depends on canon-vocab (design D2/R4: the two
+# manifest surfaces stay genuinely separate).
+canon-model = { workspace = true }
+# P2's write path (write_namespaced/scan_namespaced_kind) -- the plugin-aware
+# writer's ONLY storage dependency (design.md D4).
+canon-store = { workspace = true }
+chrono = { version = "0.4.45", features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+
+[dev-dependencies]
+tempfile = "3"

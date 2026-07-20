@@ -1,0 +1,126 @@
+---
+title: Trust Spine
+description: How canon gate turns task completion from self-reported to evidence-gated, and reads the eight stable failure classes.
+---
+
+`canon-gate` is canon's trust spine: a two-layer evidence gate over any
+`EvidenceRecord`-shaped corpus. It answers two **different** questions per
+artifact, and never collapses them into one "done" boolean:
+
+- **Coverage** — does the required evidence *exist* for this artifact, per
+  policy?
+- **Verdict ledger** — did that evidence *pass*, by whom, and how stale is
+  it now?
+
+A `Divergent` verdict still satisfies coverage — coverage is "a test
+exists", never "a test passed".
+
+## The eight failure classes
+
+Every violation `canon gate` reports carries one of these stable, grep-able
+strings. They are never renamed without a coordinated fixtures+hooks
+migration:
+
+| Class | Meaning |
+|---|---|
+| `uncovered-cell` | A policy-required evidence cell (role × artifact) has no matching record at all. |
+| `unreviewed-promotion` | An artifact's `reviewed` lifecycle tag has no matching ledger review-record. |
+| `trust-below-required` | The artifact's trust level is below `policy.yaml`'s `trust_required` — release-scoped only (`canon gate check --release`). |
+| `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only ever degrades an already-green record. |
+| `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
+| `flagged` | The human-only `flagged` overlay is set — never green regardless of any passing evidence. |
+| `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` `EvidenceRecord`. |
+| `fabricated-evidence` | The evidence note attached to a flip contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) or a bare `verified` claim with no attached command result. |
+
+## The trust ladder
+
+Artifacts climb: **draft → reviewed** (agent + review-record) **→
+ratified** (human). Bare promotion without a matching review-record is
+`unreviewed-promotion`. `flagged` is human-only, never green, and clears
+only via a human-attributed clear-record — a one-way ratchet.
+
+## Checking a repo
+
+```bash
+canon gate check --repo .            # ordinary evaluation
+canon gate check --repo . --release  # + trust-below-required
+```
+
+`canon gate check` is the dispatcher: it assembles coverage + ledger +
+staleness + the always-on trust-ladder check and prints every violation
+grouped by failure class. `--release` additionally engages the
+release-scoped `trust-below-required` check — the trust-ladder check is
+never dropped when `--release` is passed. Exit `0` clean, `1` gate-red (any
+violation), `2` usage/load failure (unreadable ledger, corrupt
+`canon.yaml`).
+
+## Gating a task checkbox flip
+
+```bash
+canon gate task s5-trust-spine-gate#5.2 --repo .
+```
+
+`canon gate task <task_id>` is the evidence-gated flip of one checkbox row
+in a change's `tasks.md` plan file. It resolves `<task_id>`
+(`<change_id>#<n>`) to that change's `tasks.md` (currently resolved under
+`openspec/changes/` — a plan-dialect coupling slated to move behind the
+plan-adapter seam),
+requires a matching, non-`Divergent` `EvidenceRecord` in the ledger, and
+flips `- [ ]` → `- [x]` with an appended evidence note **only** on a clean
+check. Missing evidence, a `Divergent` verdict, or a fabricated evidence
+note leaves the row byte-unchanged and exits `1` with the blocking
+violation on stderr. An already-`[x]` row is an idempotent no-op. An
+unknown `task_id` is reported, never silently ignored.
+
+## Staging → promote
+
+```bash
+canon gate promote --repo .              # land every staged candidate
+canon gate promote --repo . --dry-run    # preview only
+```
+
+Every well-formed record under `canon/ledger/_staging/` is re-validated
+with the same checks the gate applies, assigned a monotonic per-(role,
+surface) `run_seq` — gap-free within one invocation, continuing from the
+committed tier's own max — and moved into the committed ledger. A
+malformed or unpartitionable candidate is refused: exit `1`, no `run_seq`
+consumed, the staging file left in place for a reviewer to fix. `--dry-run`
+prints the plan without writing or deleting anything.
+
+## Installing the hook seam
+
+```bash
+canon gate install-hooks --repo .
+```
+
+Idempotent, diff-only: merges a hook entry into both
+`.claude/settings.json` and `.codex/hooks.json`, additive only, never
+touching an existing entry in the same matcher group. Running it twice
+with no manual edits between reports "no diff" and writes nothing. When
+neither file already invokes `canon gate`, it also emits
+`scripts/canon-gate-pre-commit.sh` (advisory by default; set
+`CANON_GATE_ADVISORY=0` to block the commit on a failing gate).
+
+## Proving the gate itself
+
+```bash
+canon gate selftest
+```
+
+Runs the shipped fixture corpus — one fixture per failure class, each a
+deliberately broken corpus proving that class fires and only that class.
+Run this after touching the gate's own code, before trusting any other
+`canon gate check` run's green.
+
+## Reading a violation
+
+Every printed line is `<failure-class> <subject> — <detail>`. `<subject>`
+is the artifact's own join-spine identity (`task_id` preferred, then
+`scenario_id`, then `run_id`) — grep the ledger or `tasks.md` for it
+directly, never guess.
+
+## Next
+
+- [The canon concept](/concepts/canon/) — why evidence-or-nothing exists
+- [Tiered storage](/concepts/tiered-storage/) — where the ledger lives
+- [CLI reference](/cli/) — the full `canon gate` surface

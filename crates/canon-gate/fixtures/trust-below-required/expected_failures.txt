@@ -1,0 +1,6 @@
+# canon gate selftest fixture — trust-below-required (D7, release-scoped).
+# class `p1` requires `human`; the record achieves only `agent`
+# (reviewed + a matching review-record). Only fires when the selftest
+# runner engages the release-scoped ReleaseTrustCheck (canon-gate's own
+# dispatcher always does — crates/canon-gate/src/dispatch.rs).
+trust-below-required s5-selftest-trust-below-required#1

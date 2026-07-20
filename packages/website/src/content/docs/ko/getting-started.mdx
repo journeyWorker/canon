@@ -1,0 +1,148 @@
+---
+title: 시작하기
+description: canon을 설치하고, canon.yaml을 스캐폴드하고, 첫 gate check를 실행합니다.
+---
+
+import { Steps } from "@astrojs/starlight/components";
+
+canon은 **npm 런처 뒤에 있는 하나의 Rust 코어**로 배포됩니다: 미리
+빌드된 플랫폼 바이너리가 npm `optionalDependencies`이고, 얇은 JS
+쉼(shim)이 맞는 것을 골라 씁니다. [Bun](https://bun.sh)이 있다면
+이미 필요한 모든 것이 갖춰진 셈입니다. npm 패키지 이름은
+`@journeykit/canon`이며, 설치되는 바이너리 이름은 여전히 `canon`이므로
+`bun add -g @journeykit/canon` 후 그냥 `canon <cmd>`로 실행해도 됩니다.
+
+```bash
+bunx @journeykit/canon --help
+```
+
+**미리 빌드됨:** macOS arm64 · Linux x64 (glibc). 그 외 플랫폼(Windows,
+Intel Mac, musl/arm64 Linux)은 로컬 Rust 툴체인으로 소스에서 빌드합니다
+(`cargo build --release -p canon-cli`).
+
+## 5분 만에 보기: gate가 막고, 통과하기
+
+canon을 실제 레포에 연결하기 전에, 일회용 데모로 trust spine이 어떻게
+동작하는지 먼저 봅니다. `canon demo`는 작은 evidence loop를 스캐폴드합니다
+— 사전 개념 학습이 필요 없습니다.
+
+```bash
+mkdir canon-demo && cd canon-demo
+
+bunx @journeykit/canon demo init      # 일회용 evidence loop 스캐폴드
+bunx @journeykit/canon gate check     # RED  — gate가 거부
+bunx @journeykit/canon demo attest    # reviewer의 evidence 기록
+bunx @journeykit/canon gate check     # GREEN — gate 통과
+```
+
+첫 `gate check`는 실패하며, 빠진 evidence를 정확히 지목합니다:
+
+```
+canon gate check: 1 violation(s)
+
+uncovered-cell (1):
+  uncovered-cell auth.login.01 — policy-required cell 'reviewer' has no matching-role evidence record
+```
+
+`dev` voice가 scenario `auth.login.01`에 evidence를 남겼지만, `policy.yaml`은
+독립적인 `reviewer`를 요구합니다. reviewer evidence가 없으니 → 이 cell은
+uncovered → gate가 red입니다. `demo attest`가 그 evidence를 기록하면 같은
+check가 green으로 바뀝니다:
+
+```
+canon gate check: clean (0 violations)
+```
+
+이 red → green 전환이 곧 canon입니다: 완료는 자가 보고가 아니라, 존재하고
+귀속되며 최신인(fresh) evidence로 게이트됩니다. 전체 failure-class 표는
+[Trust spine](/ko/concepts/trust-spine/)을 참고하세요.
+
+## 레포 설정하기
+
+<Steps>
+
+1. **설정 파일 스캐폴드.** 레포 루트에서:
+
+   ```bash
+   bunx @journeykit/canon init
+   ```
+
+   바로 동작하는 `canon.yaml` 스켈레톤을 씁니다 — 스토리지
+   `tiers:`, 레코드 `routing:`, `specs:` root, `plans:` 소스까지.
+   기존 파일은 절대 덮어쓰지 않고 거부합니다. 기존 설정은 언제든
+   다음으로 검증할 수 있습니다:
+
+   ```bash
+   bunx @journeykit/canon init --check-config
+   ```
+
+2. **저작 표면(authoring surface) 확인.** canon 아티팩트를 작성하기
+   전에, 이 레포가 어떤 어휘와 스키마로 해석되는지 먼저 물어봅니다:
+
+   ```bash
+   bunx @journeykit/canon context
+   ```
+
+   이것은 검증이 아니라 역량 *조회*(query)입니다 — 항상 exit 0으로
+   종료하며 레코드 종류, enum domain, join-key 문법, 정책 기반
+   요구사항을 출력합니다. 머신이 읽을 수 있는 형태가 필요하면
+   `--json`을 추가하세요.
+
+3. **스펙 코퍼스 인덱싱.** 레포가 설정된 `specs.roots[]` 항목 아래에
+   Gherkin `.feature` 스펙을 보관하고 있다면:
+
+   ```bash
+   bunx @journeykit/canon fmt --check      # 먼저 코퍼스를 검증
+   bunx @journeykit/canon inventory sync   # 시나리오 레저 인덱스를 구체화
+   ```
+
+4. **에이전트 세션 적재.** Claude Code, Codex 등 등록된 에이전트
+   CLI의 트랜스크립트를 티어드 스토리지로 접어 넣습니다 — 소스별
+   워터마크를 통해 증분(incremental) 방식으로:
+
+   ```bash
+   bunx @journeykit/canon ingest sessions
+   bunx @journeykit/canon ingest sessions --watch   # 계속 폴링
+   ```
+
+5. **작업 게이트 통과.** 트러스트 스파인이 coverage, verdict
+   ledger, staleness를 검사합니다 — 완료는 절대 자가 보고되지
+   않고 항상 증거로 게이트됩니다:
+
+   ```bash
+   bunx @journeykit/canon gate check
+   ```
+
+6. **현재 상황 읽기.** 레포 상태 리포트를 생성하거나(생성된
+   파일이며 절대 손으로 편집하지 않음) 로컬 대시보드를 엽니다:
+
+   ```bash
+   bunx @journeykit/canon report
+   bunx @journeykit/canon dashboard
+   ```
+
+</Steps>
+
+## 에이전트 하네스를 위한 설정
+
+레포에서 코딩 에이전트를 실행한다면, 루프를 마무리하는 명령이 두
+개 더 있습니다:
+
+```bash
+# canon의 컴패니언 스킬을 .claude/와 .codex/에 구체화
+bunx @journeykit/canon skills install --source canon/skills --target .
+
+# 태스크 시작 전에 역할별 전략 메모리를 노출
+bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon regime-key dev my-repo core abc123)"
+```
+
+전략은 팀 자신의 판정(verdict)에서 증류되어 통계적 게이트를 통과해야
+승급됩니다 — 전체 플라이휠은 [전략 메모리](/ko/concepts/strategy-memory/)를
+참고하세요.
+
+## 다음으로
+
+- [canon 개념](/ko/concepts/canon/) — 왜 "하나의 주제, 여러 성부"인가
+- [트러스트 스파인](/ko/concepts/trust-spine/) — 증거 기반 완료 게이팅이 동작하는 방식
+- [아키텍처](/ko/architecture/) — 크레이트 맵
+- [예제](/ko/examples/) — 엔드투엔드 워크스루

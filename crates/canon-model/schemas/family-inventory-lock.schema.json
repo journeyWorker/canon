@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InventoryLock",
+  "description": "`spec/inventory/kind=inventory-lock/assets.lock.yaml` (design D3):\nthe donor's hand-rolled TSV-with-comments `assets.lock` format,\nconverted to enveloped YAML. Generated-only (D16 pattern) — canon\nnever expects a human-authored instance of this type.",
+  "type": "object",
+  "properties": {
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/LockAsset"
+      }
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "kind": {
+      "$ref": "#/$defs/InventoryLockKind"
+    },
+    "port_only": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PortOnlyEntry"
+      }
+    },
+    "schema": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "at",
+    "actor",
+    "assets"
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "InventoryLockKind": {
+      "type": "string",
+      "enum": [
+        "inventory-lock"
+      ]
+    },
+    "LockAsset": {
+      "description": "One `assets.lock` line (`<asset-id>\\t<source>\\t<upstream-ref>`).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "upstream_ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "upstream_ref"
+      ]
+    },
+    "PortOnlyEntry": {
+      "description": "One `[port_only]` section line (`<id-or-path>\\t<reason>`).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "reason"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    }
+  }
+}

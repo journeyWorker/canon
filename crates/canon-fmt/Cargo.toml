@@ -1,0 +1,22 @@
+[package]
+name = "canon-fmt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "the artifact-family format authority (S11): canon fmt --check over an external consumer-repo corpus (e.g. a donor project's spec/**), never canon's own storage tiers (that is canon-store's job)."
+
+[lib]
+name = "canon_fmt"
+path = "src/lib.rs"
+
+[dependencies]
+canon-model.workspace = true
+chrono = { version = "0.4.45", features = ["serde"] }
+jsonschema = { version = "0.47.0", default-features = false }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+serde_yaml = "0.9"
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"

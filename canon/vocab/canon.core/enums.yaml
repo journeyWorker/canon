@@ -1,0 +1,32 @@
+# canon.core's shared enum vocabulary (S10 design.md D1). The evidence-kind
+# domain is DELIBERATELY ABSENT here (design.md D4's explicit decision,
+# superseding D1's looser context bullet): it resolves dynamically from S5's
+# `canon/policy.yaml` (`canon_vocab::policy_bridge`), never a locally-
+# declared enum -- see that module's doc comment for the full reconciliation.
+enums:
+  # `task` directive's `status` attr domain (Type::Domain(task-status)).
+  task-status:
+    - open
+    - done
+  # Documents the vocabulary-defined handoff domains (S10 design.md D5) for
+  # `canon context`-style consumers. Not currently referenced by a
+  # `Type::Domain` attr type -- a handoff's domain is selected via its
+  # DIRECTIVE TAG (`handoff-<domain>`), not an attr value the checker
+  # validates against this list.
+  handoff-domain:
+    - dev
+    - design
+    - content
+    - test
+  # The s36 `Subject.domain` base vocabulary (s36 design D2). canon-model
+  # validates a `domain` value's SHAPE only (a kebab-case slug); the
+  # CLOSED base membership lives HERE, in the vocab plugin, and a consumer
+  # repo extends it via its OWN `canon/vocab/<id>/plugin.yaml` enums export
+  # (never a canon-model change). Surfaced by `canon context` so an author
+  # can see the activated domain set before writing a Subject.
+  domain:
+    - planning
+    - design
+    - dev
+    - data
+    - test

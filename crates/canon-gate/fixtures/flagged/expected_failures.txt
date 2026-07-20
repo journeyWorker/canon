@@ -1,0 +1,5 @@
+# canon gate selftest fixture — flagged (D21).
+# A ratified-but-flagged artifact — flagged overrides any passing
+# evidence and any other lifecycle rung, checked first in
+# TrustRung::classify.
+flagged s5-selftest-flagged#1

@@ -1,0 +1,17 @@
+# S10 part2 pilot (openspec/changes/s10-vocab-pilot/): the evidence-kind
+# domain canon's typed authoring vocabulary (canon-vocab's Type::Evidence,
+# design.md D4) resolves `Type::Evidence`'s `kind` domain against for this
+# repo -- canon-gate's own `PolicyResolution::trust_required` key set
+# (crates/canon-vocab/src/policy_bridge.rs module doc: "whatever key
+# vocabulary a repo's policy.yaml declares"). `test-run`/`manual-review`
+# match the convention already used throughout canon-vocab's own fixtures
+# (crates/canon-vocab/fixtures/atoms/good.yaml) and this change's own
+# integration test suite (crates/canon-cli/tests/gate.rs). Additive: no
+# `risk_routing`/`trust_sample`/`staleness` entries are declared, so this
+# file does not itself engage `canon gate check`'s coverage/trust-ladder
+# checks for any existing ledger content -- those checks key off records
+# that explicitly opt in via their own `trust_ladder`/`risk_routing`
+# companion tags, none of which this repo's ledger carries yet.
+trust_required:
+  test-run: agent
+  manual-review: human

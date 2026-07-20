@@ -1,0 +1,13 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "implementer"
+  },
+  "at": "2026-07-10T12:00:00Z",
+  "content": "prefer typed newtypes over bare strings for join keys",
+  "kind": "strategy_item",
+  "regime_key": "implementer/canon/join-spine/9c93d024b1a2",
+  "role": "implementer",
+  "schema": 1,
+  "source_task_id": "s1-state-model-join-spine#2.1"
+}

@@ -1,0 +1,14 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "implementer"
+  },
+  "at": "2026-07-10T12:00:00Z",
+  "description": "first-buy hotdeal overlay",
+  "kind": "scenario",
+  "project_id": "root",
+  "scenario_id": "world.firstbuy-hotdeal.26",
+  "schema": 1,
+  "source_digest": "35c8108febef5114231270499c009815415cc2257cf048184cd3704de212e428",
+  "title": "hotdeal"
+}

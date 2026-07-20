@@ -1,0 +1,37 @@
+[package]
+name = "canon-report"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "generated-never-edited markdown status report over S2's DuckDB view layer, byte-stable `--check` drift gate + `--snapshot` Parquet export (S9)."
+
+[lib]
+name = "canon_report"
+path = "src/lib.rs"
+
+[[bin]]
+name = "canon-report"
+path = "src/bin/canon-report.rs"
+
+[dependencies]
+arrow = "59.1.0"
+canon-model.workspace = true
+canon-store.workspace = true
+chrono = { version = "0.4.45", features = ["serde"] }
+parquet = "59.1.0"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+serde_yaml = "0.9"
+sha2.workspace = true
+tempfile = "3"
+thiserror.workspace = true
+
+[dev-dependencies]
+# Fixture-construction only (task 2.6): builds a real, wire-compatible
+# `canon-learn` parquet-store corpus for `mart_role_memory`/
+# `mart_flywheel_funnel` tests via the crate's OWN encoder, never a
+# hand-authored binary fixture that could silently drift from S6's
+# actual on-disk shape. `canon-report` itself never depends on
+# `canon-learn` at runtime (design D1: view consumption only).
+canon-learn.workspace = true
+canon-ingest.workspace = true

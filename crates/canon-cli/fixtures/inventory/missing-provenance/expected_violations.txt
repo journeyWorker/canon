@@ -1,0 +1,7 @@
+# canon selftest fixture — spec-ledger-selftest / missing-provenance.
+# Both Feature:/Scenario: headers lack a `# canon: {...}` provenance
+# comment — S11 `canon-fmt::check` reports exactly one
+# `missing-provenance` violation (the corpus is Hive-laid-out, so no
+# incidental `layout-grammar` violation also fires); the whole root
+# aborts (0 writes) per D5.
+fmt:missing-provenance features/kind=feature/area=world/hotdeal.feature

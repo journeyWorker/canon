@@ -1,0 +1,116 @@
+---
+title: Data & Privacy
+description: What Canon reads from your machine, what it stores, where it stores it, and what stays local by default.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+`canon ingest sessions` (the S3 pipeline) turns your agent CLIs' own local
+transcript files into canon-model `Session`/`Run`/`Event` records. This page
+states exactly what it reads, what it stores, where that data lives, and what
+is (and isn't) available yet for redaction and deletion.
+
+## What Canon reads
+
+`canon-ingest` ships four adapters, each reading **local transcript files
+only** — never a network call, never a third-party API:
+
+- **omp/pi** — `~/.omp/agent/sessions/<encoded-cwd>/*.jsonl` and
+  `~/.pi/agent/sessions/<encoded-cwd>/*.jsonl` (badlogic/pi-mono and its Oh My
+  Pi fork share one JSONL format; both homes are scanned).
+- **Claude Code** — `~/.claude/projects/<sanitized-cwd>/*.jsonl`.
+- **Codex** — `${CODEX_HOME:-~/.codex}/sessions/*.jsonl`, unioned with
+  `archived_sessions/*.jsonl` (where Codex CLI rotates older sessions).
+- **Hermes Agent** — a SQLite database at `~/.hermes/state.db`, plus any
+  profile databases under `~/.hermes/profiles/<name>/state.db`.
+
+Each adapter also honors an env override
+(`CANON_INGEST_OMP_SESSIONS_DIR`, `CANON_INGEST_CLAUDE_SESSIONS_DIR`,
+`CODEX_HOME`, `HERMES_HOME`) and a `canon.yaml` `ingest.sources.<id>.roots`
+override. A source root that doesn't exist on your machine is a silent,
+zero-record skip — never an error.
+
+## What Canon stores
+
+A pass normalizes every scanned transcript into canon-model `Session`, `Run`,
+and `Event` records:
+
+- **Sessions/Runs** carry per-run token and cost telemetry (model, token
+  counts, provider, cost where the source CLI reports it).
+- **Events** interleave `token_usage` rows with **`user_directive`** events —
+  one per user-turn message, carrying the **full verbatim text of your
+  prompt** (`detail.text`), never truncated or summarized. This applies to
+  every adapter except Hermes, whose on-disk format has no per-turn
+  message table to read directive text from (Hermes emits zero directives —
+  a documented format gap, not a privacy filter).
+
+There is no separate "metadata-only" mode: ingesting sessions from an adapter
+that supports directive capture stores your prompt text.
+
+## Where it stores it
+
+With `canon init`'s default `canon.yaml`, `session`, `run`, and `event`
+records route to the **`hot`** tier, backed by **SQLite** at `canon/hot.db`
+in your repo. `canon init` adds `canon/hot.db*` (the db file plus its WAL/SHM
+sidecars) to `.gitignore` — this data is **not** committed to Git and never
+enters your repo's history. The per-file ingest watermark (used by
+`--watch` to avoid re-parsing unchanged transcripts) lives alongside it under
+`canon/ingest/cursors/`, also gitignored.
+
+Every other record kind canon manages (specs, evidence records, reviews,
+divergences, strategies) routes to the **`local`** tier — Git-backed,
+committed under `canon/ledger`, reviewable in a normal PR diff. PostgreSQL
+(a same-class swap for `hot`) and S3/R2 (`cold`) are optional scale-up
+backends that only activate if an operator explicitly adds credentials to
+`canon.yaml`.
+
+## What never leaves your machine
+
+With the default `canon init` config there is **no network egress** at all:
+every record — including the verbatim `user_directive` text above — stays in
+local Git (`canon/ledger`, committed) and local SQLite (`canon/hot.db`,
+gitignored, disk-only). Nothing is sent anywhere.
+
+Data leaves your machine **only** if an operator explicitly configures a
+PostgreSQL DSN (swapping `hot` to a shared Postgres instance) or an S3/R2
+bucket (`cold`) in `canon.yaml`. Neither is present in the scaffolded
+default config.
+
+## Redaction and deletion
+
+<Aside type="caution" title="No automatic redaction yet">
+  Canon does **not** currently redact, mask, or scan secrets out of ingested
+  transcripts. If a prompt you typed contained a token, password, or other
+  sensitive string, that string is stored verbatim in the `user_directive`
+  event text. This is a known gap, not a hidden one — treat local transcript
+  ingestion the same way you'd treat any other local log of your agent
+  sessions.
+</Aside>
+
+Deletion today is manual and file-level:
+
+- Delete `canon/hot.db*` to drop every ingested `session`/`run`/`event`
+  record (including all `user_directive` text) and reset the ingest cursor
+  state.
+- Remove the specific record file(s) under `canon/ledger` for any `local`-
+  tier kind you want gone, then commit the removal like any other repo
+  change.
+
+There is no automatic retention policy or expiry — records persist until you
+remove them by hand.
+
+## Project-scoped vs all-workspaces
+
+By default, `canon ingest sessions` scans **only the current project**: the
+repo's main `git worktree` root plus every linked worktree (resolved via
+`git worktree list --porcelain`). omp/pi and Claude Code partition their
+session store on disk by a forward-encoded cwd, so out-of-scope project
+directories are pruned before any file is even opened; Codex and Hermes (not
+partitioned on disk) are instead filtered row-by-row after parsing, by
+recorded workspace.
+
+`--all-workspaces` opts into a machine-wide scan across every registered
+transcript home, restoring the pre-project-scoping behavior. **The default
+(project-scoped) is recommended** — it's both the smaller data footprint and
+the more useful one, since `canon query --kind session` is meant to answer
+"what happened in this project," not "what happened on this machine."

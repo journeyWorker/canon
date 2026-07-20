@@ -1,0 +1,5 @@
+# canon gate selftest fixture — unevidenced-flip (gated-task-completion).
+# `canon gate task` attempted on a task_id with zero matching evidence
+# records — checkbox::gate_task's own fail-closed path, not a
+# GateCheck over GateContext.
+unevidenced-flip s5-selftest-unevidenced-flip#1

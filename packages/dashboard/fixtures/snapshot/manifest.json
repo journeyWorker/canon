@@ -1,0 +1,35 @@
+{
+  "generated_at": "2026-07-11T00:00:00Z",
+  "source_git_sha": "fixture0000",
+  "source_digest": "be5e147e89ad",
+  "tables": [
+    {
+      "table": "mart_trust_matrix",
+      "file": "mart_trust_matrix.parquet"
+    },
+    {
+      "table": "mart_session_costs",
+      "file": "mart_session_costs.parquet"
+    },
+    {
+      "table": "mart_role_memory",
+      "file": "mart_role_memory.parquet"
+    },
+    {
+      "table": "mart_flywheel_funnel",
+      "file": "mart_flywheel_funnel.parquet"
+    },
+    {
+      "table": "mart_review_burndown",
+      "file": "mart_review_burndown.parquet"
+    },
+    {
+      "table": "mart_scope_status",
+      "file": "mart_scope_status.parquet"
+    },
+    {
+      "table": "mart_subjects",
+      "file": "mart_subjects.parquet"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+# S10 part2 pilot (task 7.1, design.md "one consumer repo authors a real
+# change with it"): the SAME task tracked in this change's own tasks.md,
+# additionally authored in canon's typed vocabulary -- proves the
+# validate/compile/round-trip/gate mechanism on a real, non-canon-vocab-
+# fixture consumer change. Uses canon.core's own `task` directive (D1);
+# no new `canon/vocab/<pilot>/` plugin is needed for this pilot (design's
+# own "(or use canon.core)" allowance).
+- id: s10-vocab-pilot#1
+  tag: task
+  attrs:
+    desc: "author canon/policy.yaml declaring the evidence-kind domain canon's typed authoring vocabulary resolves Type::Evidence against"
+    status: open
+    evidence:
+      kind: test-run
+      ref: "cargo test -p canon-vocab policy_bridge"

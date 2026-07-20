@@ -1,0 +1,21 @@
+# The `task` directive (S10 design.md D1/D2): canon's typed task atom,
+# replacing a freeform `tasks.md` checkbox line's evidence requirement with
+# a structured, checker-validated attribute (D4).
+directives:
+  - name: task
+    attrs:
+      - name: desc
+        type: string
+        required: true
+      - name: owner
+        type: string
+        required: false
+      - name: status
+        type: { domain: task-status }
+        required: true
+      # D4: {kind: <policy-resolved evidence kind>, ref: <string>} -- kind's
+      # domain resolves from S5's live `canon/policy.yaml`
+      # (`canon_vocab::policy_bridge`), never a locally-declared enum.
+      - name: evidence
+        type: evidence
+        required: true

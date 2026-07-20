@@ -1,0 +1,11 @@
+# Selftest fixture (design.md §8, design.md D4): exercises
+# E-BAD-EVIDENCE-KIND -- the "expected one of: …" message listing the
+# POLICY-resolved kinds, not a locally-declared enum.
+- id: bad-bad-evidence-kind#1
+  tag: task
+  attrs:
+    desc: "evidence.kind is outside the policy-resolved domain"
+    status: open
+    evidence:
+      kind: totally-made-up-kind
+      ref: "x"

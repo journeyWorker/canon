@@ -1,0 +1,60 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/canon-model",
+    "crates/canon-store",
+    "crates/canon-ingest",
+    "crates/canon-gate",
+    "crates/canon-learn",
+    "crates/canon-report",
+    "crates/canon-cli",
+    "crates/canon-fmt",
+    "crates/canon-policy",
+    "crates/canon-vocab",
+    "crates/canon-plugin",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/journeyWorker/canon"
+
+[workspace.dependencies]
+# Internal crates
+canon-model = { path = "crates/canon-model" }
+canon-store = { path = "crates/canon-store" }
+canon-ingest = { path = "crates/canon-ingest" }
+canon-gate = { path = "crates/canon-gate" }
+canon-learn = { path = "crates/canon-learn" }
+canon-report = { path = "crates/canon-report" }
+canon-fmt = { path = "crates/canon-fmt" }
+canon-policy = { path = "crates/canon-policy" }
+canon-vocab = { path = "crates/canon-vocab" }
+canon-plugin = { path = "crates/canon-plugin" }
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# Content hashing (skill materialization lock, D4)
+sha2 = "0.10"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2"
+anyhow = "1.0"
+
+# Size-optimized release profile. `panic = "abort"` is deliberately NOT
+# set: canon-policy wraps the CEL compiler/interpreter in
+# `std::panic::catch_unwind` (eval.rs/validate.rs) to convert a parser
+# panic into `Err(PolicyError)` — abort would turn that into a process
+# crash. LTO + one codegen unit + `opt-level = "s"` + symbol strip are
+# the size levers that don't change runtime semantics.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

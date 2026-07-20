@@ -1,0 +1,10 @@
+# Selftest fixture (design.md §8): exercises E-UNKNOWN-ATTR.
+- id: bad-unknown-attr#1
+  tag: task
+  attrs:
+    desc: "well-formed except for one extra attr"
+    status: open
+    evidence:
+      kind: test-run
+      ref: "x"
+    not-a-declared-attr: "surprise"

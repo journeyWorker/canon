@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Handoff",
+  "description": "The `handoffs` state machine (S1 design D4): each field below except\n`envelope` and `body` maps 1:1 to a same-named column of the donor\nhandoff queue's `handoffs` Postgres table — the 13 fields the\nhandoff-state-machine spec fixes, on which a canon-written row and a\ndonor-CLI-written row agree exactly. This is\nstate-machine-core compatibility, not a full-row mapping onto the\nlive table: the donor's `trigger` column (`NOT NULL`, no default) has no\nanalog here, the donor's `created_at`/`created_by_*`/`refs_extra` columns\nhave no `Handoff` field, and `envelope` (`schema`/`kind`/`at`/`actor`)\nis canon-only with no donor column — see the module doc comment for\nthe full gap and S4's ownership of bridging it. `body` is likewise\nnot a column itself — canon's own typed staging area for the table's\n`body_text` column, rendered via [`TemplateRegistry::render_body`].",
+  "type": "object",
+  "properties": {
+    "abandoned_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "default": null
+    },
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "body": {
+      "$ref": "#/$defs/HandoffBody"
+    },
+    "chain_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "claimed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "default": null
+    },
+    "claimed_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "completed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "default": null
+    },
+    "id": {
+      "$ref": "#/$defs/HandoffId"
+    },
+    "kind": {
+      "$ref": "#/$defs/RecordKind"
+    },
+    "openspec_change_slug": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ChangeId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "parent_handoff_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HandoffId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "research_vendor_slug": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "schema": {
+      "description": "Per-kind schema version, bumped on any breaking field change to\nthat kind (design D2; `canon fmt`/`canon migrate`, S11, key off\nit).",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "seq": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "state": {
+      "$ref": "#/$defs/HandoffState"
+    },
+    "tags": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
+    "title": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "at",
+    "actor",
+    "id",
+    "state",
+    "chain_id",
+    "seq",
+    "title",
+    "body"
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "ChangeId": {
+      "description": "openspec change slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the directory name under `openspec/changes/` — joins: change ↔ tasks ↔ specs",
+      "type": "string"
+    },
+    "DomainId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "HandoffBody": {
+      "description": "The handoff body: a domain-scoped, template-validated payload\ndistinct from the fixed state-machine fields (design D4). Not itself\na `handoffs.ts` column — the registered domain's\n[`HandoffTemplate::render`] produces the table's `body_text` column.",
+      "type": "object",
+      "properties": {
+        "domain": {
+          "$ref": "#/$defs/DomainId"
+        },
+        "fields": true,
+        "template_version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "domain",
+        "template_version",
+        "fields"
+      ]
+    },
+    "HandoffId": {
+      "description": "the donor CLI's handoff-id grammar: `YYYYMMDD-HHmm-<topic-slug>-<nonce>` — joins: handoff ↔ session ↔ change",
+      "type": "string"
+    },
+    "HandoffState": {
+      "description": "`handoffs.state` — `text`, runtime-checked in the donor to exactly\nthese four values (donor `handoffs` table doc comment).\n`Done`/`Abandoned` are terminal: [`HandoffState::can_transition_to`]\nnever allows a transition back out of either.",
+      "type": "string",
+      "enum": [
+        "pending",
+        "in-progress",
+        "done",
+        "abandoned"
+      ]
+    },
+    "RecordKind": {
+      "description": "The thirteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36 — the \"a new kind is\na reviewed, breaking `canon-model` change\" process design D1 mandates,\nexercised for real). A fourteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+      "type": "string",
+      "enum": [
+        "change",
+        "task",
+        "scenario",
+        "session",
+        "run",
+        "event",
+        "handoff",
+        "review",
+        "divergence",
+        "trajectory",
+        "strategy_item",
+        "evidence_record",
+        "subject"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    }
+  }
+}

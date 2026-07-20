@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "implementer"
+  },
+  "at": "2026-07-10T12:00:00Z",
+  "detail": "port_ref mismatch",
+  "kind": "divergence",
+  "reviewer": "reviewer",
+  "project_id": "root",
+  "round": 8,
+  "run_seq": 3,
+  "scenario_id": "world.place-lock.01",
+  "schema": 1,
+  "sha": "8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552",
+  "status": "open"
+}

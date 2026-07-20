@@ -1,0 +1,176 @@
+---
+title: 티어드 스토리지
+description: canon-store가 모든 레코드 종류를 라우팅하는 세 개의 스토리지 단(local/hot/cold)과 조회·에이징 방법.
+---
+
+import { CardGrid, Card, Aside } from "@astrojs/starlight/components";
+
+`canon-store`는 **하나의 스토리지 트레이트**(`Tier`)이며, 네 개의 벤더
+백엔드 어댑터(`GitTier` / `PgTier` / `SqliteTier` / `R2Tier`)가 이를 구현합니다. 이후의
+모든 크레이트(`canon-ingest`, `canon-gate`, `canon-learn`, …)는 이 트레이트를
+통해서만 읽고 씁니다. `canon-store` 밖의 어떤 호출자도 레코드 종류 문자열을
+직접 분기해 저장 위치를 결정하지 않습니다.
+
+## 백엔드가 아니라 단(rung)
+
+`canon.yaml`의 `routing:`과 `aging:` 섹션은 벤더 백엔드가 아니라 **단
+(rung)** — `local`, `hot`, `cold` — 을 지정합니다. 어떤 백엔드가 현재 그
+단을 구현하는지는 별도 선언, `tiers.<rung>.backend`입니다.
+
+<CardGrid stagger>
+  <Card title="local — git" icon="seti:git">
+    버전 관리되는, 레포 로컬, Hive 레이아웃, append-only. 작성된 스펙,
+    승급된 전략, 증거 레저(evidence ledger)가 여기 있습니다.
+  </Card>
+  <Card title="hot — sqlite(기본값) / Postgres" icon="seti:db">
+    실시간 조회 가능. `canon init`은 `hot`을 로컬 sqlite 파일로
+    스캐폴딩합니다 — 서비스도, env 변수도 필요 없고, 단일 writer
+    WAL 모드로 동작합니다. 팀 공유·다중 에이전트 동시성이 필요하면
+    Postgres로 교체하세요(같은 클래스, 한 줄만 바꾸면 됩니다).
+  </Card>
+  <Card title="cold — S3/R2" icon="seti:folder">
+    대용량, 공유, 분석용. 원시 트랜스크립트, 전체 이벤트 로그, Parquet
+    마트, 원시 트래젝토리가 여기 있습니다.
+  </Card>
+</CardGrid>
+
+레거시 백엔드 이름(`git`/`pg`/`r2`)을 단이 와야 할 자리 —
+`routing.*`, `aging.*.to`, `tiers.*` 키 — 에 쓰면 명시적인 힌트와 함께
+거부됩니다. 조용히 별칭 처리되는 일은 없습니다. `canon init`은 새
+레포의 `hot` 단을 기본적으로 sqlite로 스캐폴딩합니다
+(`path: canon/hot.db`) — 첫 `canon ingest sessions`에 어떤 서비스도
+필요하지 않습니다. 아래 예시는 이 레포 자신의 팀 규모 설정입니다
+(`hot: postgres`).
+
+## `canon.yaml` 설정
+
+canon의 열두 개 레코드 종류는 각각 `routing:` 항목이 반드시 있어야
+합니다 — 라우팅되지 않은 종류는 첫 쓰기/조회 시도에서 곧바로
+`StoreError::UnroutedKind`가 발생합니다. 이 레포 자신의 설정입니다:
+
+```yaml
+tiers:
+  local: { backend: git, root: canon/ledger }
+  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }
+  cold: { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: "canon/" }
+
+routing:
+  change: local
+  scenario: local
+  review: local
+  divergence: local
+  evidence_record: local
+  strategy_item: local
+  task: hot
+  handoff: hot
+  session: hot
+  run: hot
+  event: hot
+  trajectory: cold
+
+aging:
+  handoff: { after: 30d, to: cold }
+  event: { after: 7d, to: cold }
+```
+
+`routing:` 값을 바꾸면 **앞으로의** 쓰기만 이동합니다 — `canon-store`
+소스 변경이 전혀 필요 없습니다: `TierRegistry::persist` / `query` /
+`age_all`은 호출할 때마다 정책을 다시 해석합니다. `aging:`은 `at`이
+`after`를 넘으면 레코드를 라우팅된 단에서 `to:` 단으로 이동시킵니다
+(`<n>d/h/m/s` — 정수 하나 + 단위 하나). `to:` 단은 반드시 앞으로만
+(`local < hot < cold`) 이동해야 합니다 — 같은 단이거나 뒤로 가는
+규칙은 `TierPolicy::from_yaml`이 파싱 시점에 거부합니다. 조용히
+받아들여지지 않습니다 (s29 D2).
+
+<Aside type="tip">
+  네트워크가 전혀 필요 없는 것은 `local`(git)과 `hot`(sqlite,
+  `canon init`의 기본값)입니다. `PgTier`/`R2Tier`는 실제 자격 증명이
+  필요하며, 설정된 단이 연결에 실패하면 조용히 git으로 폴백하지
+  않고 즉시 실패합니다. sqlite도 같은 방식으로 실패하지만, 그 원인은
+  자격 증명이 아니라 파일을 열 수 없는 경우(권한, 손상)뿐입니다.
+</Aside>
+
+### 라이브 티어 env 계약
+
+위 `tiers:` 블록의 `dsn_env`/`bucket_env`는 어떤 env 변수를 읽을지만
+지정합니다 — 비밀 값 자체는 아닙니다. 덕분에 `canon.yaml`은 커밋해도
+안전합니다. sqlite는 env 계약이 전혀 없습니다: `hot`의 `path:`는
+canon.yaml에 직접 설정하며(s32 `sqlite-hot-backend`), `dsn_env`
+방식의 간접 참조가 필요 없습니다 — 로컬 db 파일은 비밀 값을 담지
+않기 때문입니다.
+
+| 변수 | 용도 |
+|---|---|
+| `CANON_PG_DSN` | 전체 Postgres DSN URL (`dsn_env`의 기본값) — user/pass/host를 나눈 필드가 아니라 원자적 비밀 하나입니다. |
+| `CANON_R2_BUCKET` | Cold 단의 버킷 이름 (`bucket_env`의 기본값). |
+| `CANON_S3_ENDPOINT` / `CANON_S3_ACCESS_KEY` / `CANON_S3_SECRET_KEY` | S3 호환 엔드포인트 + 자격 증명. |
+| `CANON_S3_REGION` | S3 리전; 모든 빌드에서 기본값 `us-east-1`. |
+
+디버그 빌드는 설정되지 않은 모든 `CANON_S3_*` 변수를 로컬
+`docker-compose.yml` MinIO 스택으로 기본 설정합니다. **릴리스
+빌드**는 세 개의 `CANON_S3_*` 변수를 명시적으로 요구합니다 (s29
+D1) — 하나라도 빠지면 조용히 loopback 개발 스택에 붙는 대신,
+빠진 변수를 모두 이름 붙여 즉시 실패합니다. 필요한 단을 사용할 수
+없을 때의 degrade 사유에도 설정해야 할 env 변수 이름이 함께
+담깁니다 (s29 D6).
+
+## `canon tier age`와 `canon query`
+
+```bash
+# 이동될 항목만 미리 확인 — read-only, 아무것도 쓰거나 삭제하지 않습니다.
+canon tier age --dry-run
+
+# aging: 규칙을 한 번 전부 적용합니다 (move+delete, 파괴적).
+canon tier age
+
+# 한 종류가 현재 있을 수 있는 모든 단(라우팅된 단 + 에이징 목적지가
+# 있다면 그곳)을 전부 조회해 `at` 기준으로 병합합니다.
+canon query --kind handoff --since 2026-06-01T00:00:00Z
+
+# 기본 사람이 읽는 표 대신 기계가 읽을 수 있는 출력.
+canon query --kind trajectory --json
+```
+
+`canon tier age`의 move+delete는 콘텐츠 다이제스트 기준으로
+멱등(idempotent)합니다: 전체 실행 직후 다시 실행하면 이동할 것이 남아
+있지 않고, 부분 실패(목적지 쓰기는 성공, 원본 삭제는 실패) 후 다시
+실행하면 같은 레코드를 다시 선택하지만 목적지 쓰기는 no-op이 됩니다.
+
+한 종류가 현재 두 단에 걸쳐 있는 경우(일부는 에이징됨, 일부는 아님)도
+정확히 읽힙니다: `canon query`가 두 단을 `at` 기준으로 병합하며, 크로스
+티어 JOIN은 없습니다.
+
+## DuckDB 뷰 읽기
+
+`crates/canon-store/sql/views.sql`은 로컬에서 오프라인으로 읽을 수 있는
+단 위에 `stg_` / `int_` / `mart_` 계층 뷰를 둡니다:
+
+- `stg_git_records` / `stg_r2_records` / `stg_records` — 얇고, 콘텐츠
+  신뢰(content-trusted) 방식의 추출(`kind`/`at`/`scenario_id`은 각
+  레코드 자체의 JSON/Parquet 본문에서 읽습니다). `stg_records`는
+  정확히 `stg_git_records UNION ALL stg_r2_records`입니다 — Postgres에
+  대응하는 SQL 뷰는 여기 없습니다.
+- `int_evidence_verdicts` — 증거-판정 파생 레이어.
+- `mart_records_by_kind` — 사용자 대상 요약.
+
+```bash
+CANON_GIT_ROOT=/path/to/canon/ledger \
+CANON_R2_ROOT=/path/to/local/r2/root/canon \
+  duckdb -init crates/canon-store/sql/views.sql \
+    -c "SELECT * FROM mart_records_by_kind;"
+```
+
+이 뷰들은 절대 단에 다시 쓰지 않습니다 — `canon fmt`, `canon migrate`,
+그리고 티어 쓰기만이 유일하게 승인된 변경자입니다. 리포트에서 직접 읽을
+수 없는 단(Postgres/sqlite는 항상; S3/cold는 로컬 미러가 없는 한)으로
+라우팅된 종류도 유실되지 않습니다 — `canon query --kind <kind>`로
+계속 조회할 수 있고, `canon report`는 이 공백을 축소 집계하지 않고
+명시적으로 알립니다.
+
+## 다음
+
+- [트러스트 스파인](/ko/concepts/trust-spine/) — 이 티어가 저장하는 증거
+  레저를 무엇이 읽는지
+- [전략 메모리](/ko/concepts/strategy-memory/) — 승급된 전략이 로컬 git
+  티어에 어떻게 안착하는지
+- [CLI 레퍼런스](/ko/cli/) — `canon tier` / `canon query`의 전체 표면

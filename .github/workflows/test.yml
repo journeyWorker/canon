@@ -1,0 +1,90 @@
+name: Test
+
+# `offline` is the baseline `cargo test --workspace` gate — zero network,
+# runs on every PR touching Rust sources. `live-tier` is S2 tiered-
+# storage's local docker-compose retrofit (operator directive
+# 2026-07-10): it spins the repo-root `docker-compose.yml` stack
+# (`postgres` backs `PgTier`, `minio` backs `R2Tier`) and runs
+# `crates/canon-store`'s `live-pg`/`live-r2`-gated integration tests
+# against REAL local services, never real cloud credentials. Both tests'
+# own skip-if-down probes (`tests/pg_tier_live.rs`/`tests/r2_tier_live.rs`)
+# are told to fail hard instead of skipping via `CANON_REQUIRE_LIVE=1` —
+# without it, a docker-compose regression that left the stack unreachable
+# would go GREEN, exercising nothing; `CANON_REQUIRE_LIVE=1` makes that a
+# hard CI failure instead.
+
+on:
+  pull_request:
+    paths:
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "docker-compose.yml"
+      - ".github/workflows/test.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  offline:
+    name: cargo test --workspace (offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-offline-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: cargo test --workspace
+        run: cargo test --workspace
+
+  live-tier:
+    name: cargo test -p canon-store --features live-pg,live-r2 (docker-compose)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-live-tier-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: docker compose up (postgres + minio)
+        run: docker compose up -d --wait postgres minio
+
+      - name: docker compose up minio-init (create the `canon` bucket)
+        run: docker compose up minio-init
+
+      - name: cargo test -p canon-store --features live-pg,live-r2
+        env:
+          CANON_REQUIRE_LIVE: "1"
+          CANON_PG_DSN: "postgres://canon:canon@127.0.0.1:55432/canon_v1"
+          CANON_S3_ENDPOINT: "http://127.0.0.1:59000"
+          CANON_S3_BUCKET: "canon"
+          CANON_S3_ACCESS_KEY: "canon"
+          CANON_S3_SECRET_KEY: "canoncanon"
+        run: cargo test -p canon-store --features live-pg,live-r2
+
+      - name: docker compose down
+        if: always()
+        run: docker compose down -v

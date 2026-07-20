@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "implementer"
+  },
+  "at": "2026-07-20T12:00:00Z",
+  "change_ids": [
+    "s36-subject-domain-loop"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "scenario_ids": [
+    "world.subject-loop.01"
+  ],
+  "schema": 1,
+  "status": "building",
+  "subject_id": "subject-domain-loop",
+  "summary": "the durable product unit teams plan, design, build, and measure",
+  "title": "subject-domain loop"
+}

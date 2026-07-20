@@ -1,0 +1,10 @@
+{
+  "name": "canon-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "devDependencies": {
+    "@fission-ai/openspec": "^1.5.0"
+  }
+}

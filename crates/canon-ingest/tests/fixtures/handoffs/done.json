@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "kind": "handoff",
+  "at": "2026-07-01T09:00:00Z",
+  "actor": {
+    "agent_id": "s4-fixture"
+  },
+  "id": "20260701-0910-s4-done-d1a3",
+  "state": "done",
+  "chain_id": "33333333-3333-4333-8333-333333333333",
+  "parent_handoff_id": null,
+  "seq": 1,
+  "claimed_by": "s4handoff-agent",
+  "claimed_at": "2026-07-01T09:11:00Z",
+  "completed_at": "2026-07-01T09:20:00Z",
+  "abandoned_at": null,
+  "openspec_change_slug": "s4-artifact-ingest",
+  "research_vendor_slug": null,
+  "tags": [],
+  "title": "Ship handoff adapter fixtures",
+  "body": {
+    "domain": "development",
+    "template_version": 1,
+    "fields": {
+      "title": "Ship handoff adapter fixtures",
+      "summary": "checked-in frozen Handoff fixture corpus",
+      "acceptance-criteria": ["fixture round-trips through GitTier"]
+    }
+  }
+}

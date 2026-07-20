@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "implementer"
+  },
+  "at": "2026-07-10T12:00:00Z",
+  "detail": {
+    "path": "src/lib.rs",
+    "tool": "read"
+  },
+  "kind": "event",
+  "label": "tool_call",
+  "run_id": "01J0Z9Z9Z9Z9Z9Z9Z9Z9Z9Z9Z9",
+  "schema": 1,
+  "seq": 1
+}

@@ -1,0 +1,175 @@
+---
+title: Tiered Storage
+description: The three storage rungs (local/hot/cold) canon-store routes every record kind through, and how to query and age them.
+---
+
+import { CardGrid, Card, Aside } from "@astrojs/starlight/components";
+
+`canon-store` is **one storage trait** — `Tier` — implemented by four
+vendor backend adapters (`GitTier` / `PgTier` / `SqliteTier` / `R2Tier`).
+Every later crate (`canon-ingest`, `canon-gate`, `canon-learn`, …)
+writes and reads through it. Nothing outside `canon-store` branches on
+a literal record kind to decide where it lives.
+
+## Rungs, not backends
+
+`canon.yaml`'s `routing:` and `aging:` sections name a capability
+**rung** — `local`, `hot`, or `cold` — never a vendor backend directly.
+Which backend currently implements a rung is a separate declaration,
+`tiers.<rung>.backend`:
+
+<CardGrid stagger>
+  <Card title="local — git" icon="seti:git">
+    Versioned, repo-local, Hive-layout, append-only. Authored specs,
+    promoted strategies, and the evidence ledger.
+  </Card>
+  <Card title="hot — sqlite (default) / Postgres" icon="seti:db">
+    Live-queryable. `canon init` scaffolds `hot` as a local sqlite
+    file — zero services, zero env vars, single-writer WAL mode. Swap
+    to Postgres (same class, one-line change) for team-shared,
+    multi-agent concurrency.
+  </Card>
+  <Card title="cold — S3/R2" icon="seti:folder">
+    Bulk, shared, analytical. Raw transcripts, the full event log,
+    Parquet marts, raw trajectories.
+  </Card>
+</CardGrid>
+
+A legacy backend name (`git`/`pg`/`r2`) used where a rung is expected —
+`routing.*`, `aging.*.to`, or a `tiers.*` key — is rejected with an
+explicit hint, never silently aliased. `canon init` scaffolds a fresh
+repo's `hot` rung as sqlite by default (`path: canon/hot.db`) — zero
+services required for the first `canon ingest sessions`; the example
+below is this repo's own team-scale config (`hot: postgres`).
+
+## Configuring `canon.yaml`
+
+Every one of canon's twelve record kinds needs a `routing:` entry — an
+unrouted kind is a hard `StoreError::UnroutedKind` at the first
+write/query attempt, never a silently-dropped record. This repo's own
+config:
+
+```yaml
+tiers:
+  local: { backend: git, root: canon/ledger }
+  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }
+  cold: { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: "canon/" }
+
+routing:
+  change: local
+  scenario: local
+  review: local
+  divergence: local
+  evidence_record: local
+  strategy_item: local
+  task: hot
+  handoff: hot
+  session: hot
+  run: hot
+  event: hot
+  trajectory: cold
+
+aging:
+  handoff: { after: 30d, to: cold }
+  event: { after: 7d, to: cold }
+```
+
+Changing a `routing:` value moves **future** writes with no
+`canon-store` source change required — `TierRegistry::persist` /
+`query` / `age_all` re-resolve the policy on every call.
+`aging:` moves records from their routed rung to a `to:` rung once
+`at` exceeds `after` (`<n>d/h/m/s` — one integer, one unit). A `to:`
+rung must move strictly forward (`local < hot < cold`) — a same-rung
+or backward rule is rejected by `TierPolicy::from_yaml` at parse
+time, never silently accepted (s29 D2).
+
+<Aside type="tip">
+  `local` (git) and `hot` (sqlite, `canon init`'s default) both need
+  zero network. `PgTier`/`R2Tier` require live credentials and fail
+  loud — never a silent fallback to git — if a configured rung can't
+  attach; sqlite fails the same way only on a genuinely unopenable db
+  file (permissions, corruption) — no credentials to be missing.
+</Aside>
+
+### Live-tier env contract
+
+`dsn_env`/`bucket_env` in the `tiers:` block above name WHICH env var
+to read, never the secret itself — `canon.yaml` stays commit-safe.
+sqlite carries no env contract at all: `hot`'s `path:` is set
+directly in canon.yaml (s32 `sqlite-hot-backend`), never `dsn_env`-
+style indirection — a local db file carries no secret.
+
+| Var | Purpose |
+|---|---|
+| `CANON_PG_DSN` | Full Postgres DSN URL (`dsn_env`'s default) — one atomic secret, not split user/pass/host fields. |
+| `CANON_R2_BUCKET` | Cold-tier bucket name (`bucket_env`'s default). |
+| `CANON_S3_ENDPOINT` / `CANON_S3_ACCESS_KEY` / `CANON_S3_SECRET_KEY` | S3-compatible endpoint + credentials. |
+| `CANON_S3_REGION` | S3 region; defaults to `us-east-1` in every build. |
+
+Debug builds default every `CANON_S3_*` var to the local
+`docker-compose.yml` MinIO stack when unset. **Release builds**
+require the three `CANON_S3_*` vars set explicitly (s29 D1) — a
+missing one fails attachment loud, naming every unset var, rather
+than silently attaching to the loopback dev stack. An unavailable
+rung's degrade reason also names the env var to set (s29 D6).
+
+## `canon tier age` and `canon query`
+
+```bash
+# Preview what would move — read-only, writes/deletes nothing.
+canon tier age --dry-run
+
+# Apply every aging: rule once (destructive move+delete).
+canon tier age
+
+# Fan out a kind's read across every rung it may currently live in
+# (its routed rung AND its aging destination, if any), merged by `at`.
+canon query --kind handoff --since 2026-06-01T00:00:00Z
+
+# Machine-readable output instead of the default human table.
+canon query --kind trajectory --json
+```
+
+`canon tier age`'s move+delete is content-digest-idempotent: re-running
+it right after a full run finds nothing left to move; re-running after
+a partial failure (destination write succeeded, source delete didn't)
+re-selects the same record but the destination write is a no-op.
+
+A kind currently split across two rungs — some records aged, some not
+— is still read correctly: `canon query` merges both rungs by `at`,
+no cross-tier join.
+
+## Reading the DuckDB views
+
+`crates/canon-store/sql/views.sql` layers `stg_` / `int_` / `mart_`
+views over the local, offline-readable rungs:
+
+- `stg_git_records` / `stg_r2_records` / `stg_records` — thin,
+  content-trusted extraction (`kind`/`at`/`scenario_id` read from each
+  record's own JSON/Parquet body). `stg_records` is exhaustively
+  `stg_git_records UNION ALL stg_r2_records` — Postgres has no SQL view
+  here.
+- `int_evidence_verdicts` — an evidence-verdict derivation layer.
+- `mart_records_by_kind` — the persona-facing summary.
+
+```bash
+CANON_GIT_ROOT=/path/to/canon/ledger \
+CANON_R2_ROOT=/path/to/local/r2/root/canon \
+  duckdb -init crates/canon-store/sql/views.sql \
+    -c "SELECT * FROM mart_records_by_kind;"
+```
+
+These views never write back to a rung — `canon fmt`, `canon migrate`,
+and tier writes are the only sanctioned mutators. A kind routed to a
+rung that isn't directly report-readable (Postgres/sqlite always;
+S3/cold unless a local mirror happens to exist) isn't lost — it stays reachable
+through `canon query --kind <kind>`, and `canon report` names the gap
+explicitly rather than under-counting it.
+
+## Next
+
+- [Trust spine](/concepts/trust-spine/) — what reads the evidence ledger this
+  tier stores
+- [Strategy memory](/concepts/strategy-memory/) — how promoted strategies land
+  in the local git tier
+- [CLI reference](/cli/) — the full `canon tier` / `canon query` surface

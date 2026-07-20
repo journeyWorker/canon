@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "kind": "run",
+  "scenario_ids": "settings.index.03",
+  "lane": "unit",
+  "app_sha": "2745ca4c889d49f11aa96c51b2f2cf01a4be0009",
+  "actor": {"agent_id": "flutter-test-machine"},
+  "at": "2026-07-09T09:15:00Z",
+  "result": "pass",
+  "evidence": [{"type": "log", "path": "artifact://abc"}]
+}

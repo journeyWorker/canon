@@ -1,0 +1,39 @@
+# Selftest fixture (design.md §8): a well-formed atoms file exercising both
+# task atoms and every declared handoff domain. Must validate with ZERO
+# diagnostics against canon.core's real, checked-in manifest.
+- id: s10-typed-authoring-vocabulary#99.1
+  tag: task
+  attrs:
+    desc: "wire the checker against the real canon.core manifest"
+    owner: alice
+    status: open
+    evidence:
+      kind: test-run
+      ref: "cargo test -p canon-vocab"
+
+- id: s10-typed-authoring-vocabulary#99.2
+  tag: task
+  attrs:
+    desc: "a done task needs no owner"
+    status: done
+    evidence:
+      kind: manual-review
+      ref: "reviewer sign-off"
+
+- id: selftest-handoff-1
+  tag: handoff-dev
+  attrs:
+    title: "wire canon-vocab into canon-cli"
+    summary: "the foundation crate is ready for the part2 CLI integration"
+    verification-steps:
+      - "cargo build -p canon-vocab"
+      - "cargo test -p canon-vocab"
+
+- id: selftest-handoff-2
+  tag: handoff-content
+  attrs:
+    title: "author the companion skill"
+    summary: "teach agents to author with the typed vocabulary"
+    acceptance-criteria:
+      - "skill documents the task directive"
+      - "skill documents every handoff domain"

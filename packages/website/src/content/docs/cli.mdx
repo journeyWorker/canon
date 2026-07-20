@@ -1,0 +1,123 @@
+---
+title: CLI Reference
+description: Every canon subcommand, grouped by purpose, with exact flags from canon --help.
+---
+
+`canon` is a single binary with one subcommand per capability. Run `canon
+<command> --help` (or `canon <command> <subcommand> --help`) for the
+authoritative flag list at any time — this page mirrors that output.
+
+Most subcommands accept `--repo <dir>` (default `.`): the literal `.` default
+walks `cwd`'s ancestors for the nearest `canon.yaml`; any other explicit path
+is used as-is, no walk. Several also accept `--json` for machine-readable
+output instead of the default human-readable table/summary.
+
+## Try it
+
+A self-contained first-run demo — see a gate fail, add evidence, watch it pass.
+No prior setup required.
+
+| Command | What it does |
+|---|---|
+| `canon demo init [--repo <dir>]` | Scaffold a throwaway evidence loop: the real `canon init` config, a `reviewer`-requiring `policy.yaml`, and one seeded `dev` evidence record — leaving `canon gate check` red with `uncovered-cell auth.login.01`. Refuses to overwrite an existing `canon.yaml`. |
+| `canon demo attest [--repo <dir>]` | Record the missing independent-`reviewer` evidence for the demo scenario, turning the same `canon gate check` green. |
+
+## Setup
+
+Scaffold a repo's config, inspect what it resolves to, and materialize
+companion agent skills.
+
+| Command | Description |
+|---|---|
+| `canon init [--repo <dir>]` | Scaffold a fresh, working `canon.yaml` (`tiers:`/`routing:`/`specs:`/`plans:`) at `<repo>/canon.yaml`. Refuses to overwrite an existing file. |
+| `canon init --check-config [--repo <dir>]` | Read-only validate an existing `canon.yaml`, chaining the same strict loaders `inventory sync`/`ingest plans`/`tier age` use. |
+| `canon context [--repo <dir>] [--json]` | Emit the resolved authoring surface: record kinds + envelope fields, enum domains, join-key grammars, partition layout, policy-derived requirements, capability version. A capability *query* — always exits 0, even when `fmt --check`/`gate` would report diagnostics. |
+| `canon skills install [--source <dir>] [--target <dir>]` | Materialize `canon/skills/<name>/SKILL.md` into `.claude/skills/` and `.codex/skills/` in a consumer repo, updating the content-hash + version lock. Defaults: `--source canon/skills`, `--target .`. |
+
+## Subjects
+
+Author and drive the durable product unit — canon's 13th record kind —
+through its lifecycle, and adopt imported plan changes under it. See
+[The Canon Concept](/concepts/canon/#subjects) for the subject-write-first
+loop; "feature docs" always means Gherkin `.feature` files, a "subject"
+is the management record.
+
+| Command | Description |
+|---|---|
+| `canon subject new <id> --domain <d> --title <t> [--summary <s>] [--owner-role <r>] [--repo <dir>] [--json]` | Author a `Subject` (kebab-slug `<id>` is the durable `subject_id` join key). `--domain` is a vocabulary-defined kebab slug — base set `planning`/`design`/`dev`/`data`/`test`, extended per-repo via `canon/vocab`. Starts at status `proposed`; `--owner-role` defaults to `implementer`. Envelope + policy validated at write. |
+| `canon subject adopt <change_id> --subject <id> [--repo <dir>] [--json]` | Link an imported plan `Change` (from `canon ingest plans`) to a `Subject`: stamps `Change.subject_id` and appends to the subject's `change_ids`. |
+| `canon subject status <id> <state> [--repo <dir>] [--json]` | Policy-gated transition along `proposed → specced → building → verifying → shipped` (plus any → `retired`). `verifying → shipped` additionally requires every linked scenario to carry a latest non-Divergent verdict; a violation prints by failure class, exits `1`, and leaves the record unchanged (fail closed). |
+
+## Corpus
+
+Validate and grow a Gherkin `.feature` spec corpus.
+
+| Command | Description |
+|---|---|
+| `canon fmt --check [--repo <dir>] <ROOT>` | Validate a corpus root (e.g. `spec/`) against the artifact-family schemas + layout descriptors. `--check` is fmt's only supported mode today. |
+| `canon inventory sync [--repo <dir>] [--spec-root <dir>]` | Validate each configured `specs.roots[]` entry with `canon-fmt`, then materialize one `Scenario` ledger-index record per `(project_id, scenario_id)`. `--spec-root` overrides `canon.yaml` for one ad hoc root. |
+| `canon scenario new <TAG> --title <label> [--feature <path>] [--repo <dir>]` | Append (creating if absent) an S11-conformant `.feature` stub for a `<area>.<surface>.<nn>` tag. Writes no ledger record. |
+| `canon feature new <SURFACE> --title <label> [--repo <dir>]` | Scaffold a fresh, zero-scenario `.feature` file for a not-yet-started `<area>.<surface>`. Fails loud rather than overwriting an existing file. |
+
+## Ingest
+
+Fold agent-CLI sessions, evidence artifacts, and foreign plan dialects into
+tiered storage.
+
+| Command | Description |
+|---|---|
+| `canon ingest sessions [--watch] [--interval-secs <n>] [--home <dir>] [--canon-yaml <path>] [--full] [--all-workspaces]` | Scan every registered session-store adapter (`omp`/`pi`, Claude Code, Codex, Hermes), normalize into `Session`/`Run`/`Event` records — including `user_directive` events captured from user turns — persist through canon-store. Defaults to THIS PROJECT's sessions (main worktree + every linked `git worktree` root); `--all-workspaces` restores the machine-wide scan. `--watch` polls (default 30s) with a per-FILE watermark so only changed transcripts reparse; `--full` ignores the watermark. |
+| `canon ingest artifacts [--watch] [--interval-secs <n>] [--repo <dir>] [--json]` | Run the artifact/verdict half of the join spine: ledger/divergence/openspec-task path adapters plus the handoff records-source, derive verdicts, fold into regime-keyed trajectories, persist via canon-learn. Unlike `sessions`, a repeated `--watch` pass is not yet write-idempotent. |
+| `canon ingest plans [--dialect <name> --source <dir>] [--repo <dir>] [--json]` | Import one plan dialect — `openspec` change dirs, or `superpowers` writing-plans-shaped docs (s30: `# <title>`/`**Goal:**`/`### Task N:` sections, a task done iff every checkbox in its section is checked) — into canon-model's Change/Task records, both keyed `task_id = <change_id>#<n>` through the same join. No `--watch` — plans are operator-pulled. `--dialect`/`--source` bypass `canon.yaml`'s `plans:` section for a one-shot import; both are required together. |
+
+## Trust
+
+The trust-spine gate, plus the native `Review`/`Divergence` verdict
+producers it reads.
+
+| Command | Description |
+|---|---|
+| `canon gate check [--repo <dir>] [--release]` | Run the coverage/ledger/staleness/trust-ladder check set, printing violations by failure class. Exit `0` clean, `1` gate-red, `2` usage/load failure. `--release` additionally engages the release-scoped trust check. |
+| `canon gate task <TASK_ID> [--repo <dir>]` | Evidence-gated checkbox flip for one plan `task_id` (`<change_id>#<n>`). Fails closed — the row stays unflipped — on missing, malformed, or fabricated evidence. |
+| `canon gate promote [--repo <dir>] [--dry-run]` | Promote `_staging/` evidence records to the committed ledger, assigning a monotonic per-(role, surface) `run_seq`. `--dry-run` prints the plan without writing. |
+| `canon gate install-hooks [--repo <dir>] [--event <name>] [--matcher <m>] [--command <cmd>] [--timeout <secs>]` | Idempotent, diff-only hook-seam install into `.claude/settings.json`/`.codex/hooks.json`, plus a generic pre-commit script. Defaults: `--event PreToolUse`, `--command "canon gate task"`, `--timeout 30`. |
+| `canon gate selftest` | Run the shipped fixture corpus: every `FAILURE_CLASSES` string proven to fire, exact-set-match against `expected_failures.txt`. Takes no `--repo`. |
+| `canon review add --project-id <id> --scenario-id <id> --reviewer <name> --pin <pin> --role <role> --upstream-ref <ref>` (or `--original-spec-ref <ref>`) `[--actor-id <id>] [--repo <dir>]` | Write one native, attributed `Review` record. Exactly one of `--upstream-ref`/`--original-spec-ref` is required — both or neither refuses the write. |
+| `canon divergence stage --project-id <id> --scenario-id <id> --sha <sha> --reviewer <name> --role <role> [--status <status>] [--reason <r>] [--expiry <e>] [--round <n>] [--detail <d>] [--repo <dir>]` | Write one unordered staging candidate carrying no `run_seq`; `--status` accepts `open`, `still-divergent`, `resolved`, or `deferred` (`deferred` additionally requires `--reason`/`--expiry`). `canon divergence promote` assigns `run_seq` later. |
+| `canon divergence promote [--repo <dir>] [--dry-run]` | Batch-promote every currently-staged `Divergence` candidate, assigning each a monotonic `run_seq` within its `(project_id, role, surface)` partition. |
+| `canon divergence resolve --project-id <id> --scenario-id <id> --sha <sha> --reviewer <name> --role <role> [--round <n>] [--detail <d>] [--repo <dir>]` | Direct-commit a `Resolved` candidate — never touches the staging directory. |
+| `canon divergence defer --project-id <id> --scenario-id <id> --sha <sha> --reviewer <name> --reason <r> --expiry <e> --role <role> [--round <n>] [--repo <dir>]` | Direct-commit a `Deferred { reason, expiry }` candidate — never touches the staging directory. |
+| `canon divergence status [--repo <dir>] [--as-of <date>]` | The current-state divergence burn-down view. `--as-of` governs `Deferred` expiry evaluation; defaults to now. |
+
+## Memory
+
+Distilled strategies, role+regime-scoped retrieval, and the dispatch-time
+write seam.
+
+| Command | Description |
+|---|---|
+| `canon learn promote <STRATEGY_ID> [--repo <dir>] [--dry-run]` | Promote one distilled `StrategyItem` (by ULID) into the git tier at `canon/strategies/<role>/<id>.md`, running an advisory promote lint (content length, literal absolute paths) as non-blocking warnings. |
+| `canon retrieve --role <role> (--regime <regime_key> \| --domain <d> [--subject <id>]) [--k <n>] [--repo <dir>] [--json]` | Role+regime-scoped strategy retrieval. Give `--regime` directly, or derive it from `--domain`/`--subject` — retrieval tries area candidates `<domain>-<subject_id>` then `<domain>` in that fallback order. `--role` must equal the regime's leading segment (exit `2` on mismatch). Fail-soft: always exits `0` once that holds; a store outage degrades to an empty list. |
+| `canon dispatch begin --role <role> --regime <regime_key> [--agent-id <id>] [--repo <dir>] [--json]` | Mint a `Run` (status `Running`), retrieve guidance for `--role`/`--regime`, record it into the run's `injected_guidance`, and write the manifest to `<repo>/.canon/dispatch/<run_id>.json`. |
+| `canon regime-key --role <r> --repo <r> --area <a> --hash <h>` | Serialize + validate one canonical `regime_key` (`<role>/<repo>/<area>/<hash>`) from raw segments — the shell-facing counterpart to the Rust serializer every write/read path shares. Prints the key and exits `0`; exits `2` on a malformed result. |
+
+## Surface
+
+Read the current state: reports, the dashboard, ad hoc queries, tier
+maintenance, plugin overlays, and self-checks.
+
+| Command | Description |
+|---|---|
+| `canon report [--repo <dir>] [--check] [--snapshot <dir>]` | Generate the markdown status report (default), byte-diff it against the committed copy (`--check`, exit `1` on drift), or export panel marts to Parquet + `manifest.json` (`--snapshot`, wins if both given). |
+| `canon dashboard [--repo <dir>] [--snapshot <dir>] [--port <n>]` | Serve the built dashboard app locally against a snapshot. Default port `4173`; an omitted `--snapshot` regenerates fresh at `canon/dashboard-snapshot` on every run. |
+| `canon query --kind <kind> [--since <ts>] [--repo <dir>] [--canon-yaml <path>] [--json] [--plugin <id>] [--change-id <id>] [--domain <d>] [--status <s>]` | Fan out a record kind's read across every tier it may live in and merge by `at`. `--plugin` projects a resolved plugin's overlay fields onto each record, fail-soft on an unresolved plugin or kind mismatch. `--change-id` scopes `--kind change`/`--kind task`; `--domain`/`--status` scope `--kind subject` (the per-domain management view), and `--status` also scopes `--kind change`/`--kind task`. |
+| `canon tier age [--dry-run] [--repo <dir>] [--canon-yaml <path>]` | Apply every `canon.yaml` `aging:` rule once, moving records past their threshold to their configured destination tier. `--dry-run` previews without writing. |
+| `canon plugin sync <PLUGIN_ID> [--repo <dir>] [--spec-root <dir>]` | Resolve `<plugin-id>`'s manifest-declared overlay(s), hand each to its registered source, write every candidate through the validate-then-write pipeline. |
+| `canon selftest [--json]` | Run every registered crate's fixture-corpus self-test and diff against its EXPECTED oracle. Additive alongside `canon gate selftest`. |
+
+## Next
+
+- [Architecture](/architecture/) — the crate map these commands are built from
+- [Trust spine](/concepts/trust-spine/) — what `gate check` actually enforces
+- [Strategy memory](/concepts/strategy-memory/) — the `learn`/`retrieve` loop
+- [Examples](/examples/) — these commands strung into end-to-end workflows

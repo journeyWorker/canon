@@ -1,0 +1,5 @@
+# Selftest fixture (design.md §8): exercises E-UNKNOWN-DIRECTIVE.
+- id: bad-unknown-directive#1
+  tag: not-a-real-directive
+  attrs:
+    desc: "this tag does not exist in canon.core"

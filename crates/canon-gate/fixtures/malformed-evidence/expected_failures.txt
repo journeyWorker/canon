@@ -1,0 +1,5 @@
+# canon gate selftest fixture — malformed-evidence (§7).
+# A misfiled/invalid-JSON file under kind=evidence_record/ — the ledger's
+# own fail-loud collection (crate::LedgerCheck), surfaced by subject =
+# the git-tier-relative path of the offending file.
+malformed-evidence kind=evidence_record/broken.json

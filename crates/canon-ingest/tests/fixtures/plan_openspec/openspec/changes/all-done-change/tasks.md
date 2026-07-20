@@ -1,0 +1,2 @@
+- [x] 1.1 finish thing one — ✅ done
+- [x] 1.2 finish thing two — ✅ done

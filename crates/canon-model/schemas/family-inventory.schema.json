@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InventoryFile",
+  "description": "One `spec/inventory/kind=inventory/area=<area>/[surface=<surface>/]<key>.yaml`\nfile: the schema envelope (additive top-level YAML keys, design D3)\nflattened alongside the file's own entries (also flattened, keyed by\ntheir dotted entry id — `idolive.hub.hub-header`, …).",
+  "type": "object",
+  "properties": {
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "kind": {
+      "$ref": "#/$defs/InventoryKind"
+    },
+    "schema": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": {
+    "$ref": "#/$defs/InventoryEntry"
+  },
+  "required": [
+    "schema",
+    "kind",
+    "at",
+    "actor"
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "InventoryEntry": {
+      "description": "One inventory entry — `covered_by` XOR `out_of_scope` (donor\nconvention; `out_of_scope`'s own shape varies by entry — a bare\n`true` or a reason string — kept open rather than guessed).",
+      "type": "object",
+      "properties": {
+        "covered_by": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ScenarioId"
+          }
+        },
+        "out_of_scope": true,
+        "upstream": {
+          "$ref": "#/$defs/InventoryEntryRef"
+        }
+      },
+      "required": [
+        "upstream"
+      ]
+    },
+    "InventoryEntryRef": {
+      "description": "The donor's existing 4-field reference (`pin`/`file`/`symbol`/\n`lines`) — kept as its own type (not [`crate::family::refs::Ref`]):\nit carries `pin` (the shared type does not) and `lines` stays the\ndonor's own `\"262-270\"` hyphen-string, never reparsed into\n[`crate::family::refs::LineRange`] since nothing about it is\nambiguous or in need of upgrading.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "lines": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pin": {
+          "type": "string"
+        },
+        "symbol": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pin",
+        "file",
+        "symbol"
+      ]
+    },
+    "InventoryKind": {
+      "type": "string",
+      "enum": [
+        "inventory"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "ScenarioId": {
+      "description": "`<area>.<surface>.<nn>` — `[a-z0-9-]+\\.[a-z0-9-]+\\.\\d{2,}`; never renumbered once assigned — joins: spec ↔ test ↔ ledger ↔ divergence",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    }
+  }
+}

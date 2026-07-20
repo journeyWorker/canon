@@ -1,0 +1,87 @@
+name: Build Native (Test Only)
+
+# Adapted from the vendored upstream release pipeline's build workflow (design
+# D3), scoped to S0's acceptance bar: macOS arm64 + Linux x64 gnu only.
+# Both matrix rows build on a host that natively matches the target triple
+# (macos-14 runners are Apple Silicon; ubuntu-latest runners are x86_64),
+# so no cross-compilation toolchain (zig / cargo-zigbuild) is needed for
+# either row — that machinery only becomes necessary once a target is
+# added whose triple doesn't match any available runner's native arch.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  safety:
+    name: Release workflow safety check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Cross-workflow drift guard (the upstream release pipeline's lesson,
+      # recommended action #1): fails the moment this workflow's build
+      # matrix / env drifts from publish.yml's, or from the platform
+      # package manifests. Dependency-free (stdlib python3).
+      - name: Check release workflow safety
+        run: python3 scripts/check-release-workflow-safety.py
+
+  build:
+    name: Build - ${{ matrix.settings.target }}
+    runs-on: ${{ matrix.settings.host }}
+    needs: safety
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: macos-14
+            target: aarch64-apple-darwin
+            package_dir: core-darwin-arm64
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            package_dir: core-linux-x64
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-cli-${{ matrix.settings.target }}-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: Build canon-cli binary
+        run: cargo build --release -p canon-cli --target ${{ matrix.settings.target }}
+
+      - name: Strip binary
+        run: strip "target/${{ matrix.settings.target }}/release/canon"
+
+      - name: Stage into platform package (local verification only — not committed)
+        run: |
+          mkdir -p "packages/${{ matrix.settings.package_dir }}/bin"
+          cp "target/${{ matrix.settings.target }}/release/canon" "packages/${{ matrix.settings.package_dir }}/bin/canon"
+          chmod +x "packages/${{ matrix.settings.package_dir }}/bin/canon"
+          "packages/${{ matrix.settings.package_dir }}/bin/canon" --version
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: canon-binary-${{ matrix.settings.target }}
+          path: target/${{ matrix.settings.target }}/release/canon
+          if-no-files-found: error

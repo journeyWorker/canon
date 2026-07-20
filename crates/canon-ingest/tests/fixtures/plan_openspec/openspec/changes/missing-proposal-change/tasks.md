@@ -1,0 +1,1 @@
+- [x] 1.1 this should never surface — ✅ because the dir has no proposal.md

@@ -1,0 +1,123 @@
+---
+title: 트러스트 스파인
+description: canon gate가 태스크 완료를 자가 보고에서 증거 기반 게이팅으로 바꾸는 방법과 8개의 안정적인 실패 클래스.
+---
+
+`canon-gate`는 canon의 트러스트 스파인입니다: `EvidenceRecord` 형태의
+코퍼스 위에서 동작하는 2계층 증거 게이트입니다. 아티팩트마다 **서로 다른**
+두 질문에 답하며, 이를 절대 하나의 "완료" 불리언으로 뭉뚱그리지 않습니다:
+
+- **커버리지** — 정책상 요구되는 증거가 이 아티팩트에 대해 *존재*하는가?
+- **판정 레저** — 그 증거가 *통과*했는가, 누가 했는가, 얼마나 오래됐는가?
+
+`Divergent` 판정도 커버리지는 만족합니다 — 커버리지는 "테스트가
+존재한다"이지, 결코 "테스트가 통과했다"가 아닙니다.
+
+## 8개의 실패 클래스
+
+`canon gate`가 보고하는 모든 위반은 아래의 안정적이고 grep 가능한 문자열
+중 하나를 가집니다. 조율된 픽스처+훅 마이그레이션 없이는 이름을 절대
+바꾸지 않습니다:
+
+| 클래스 | 의미 |
+|---|---|
+| `uncovered-cell` | 정책상 요구되는 증거 셀(역할 × 아티팩트)에 대응하는 레코드가 아예 없음. |
+| `unreviewed-promotion` | 아티팩트의 `reviewed` 라이프사이클 태그에 대응하는 레저 리뷰-레코드가 없음. |
+| `trust-below-required` | 아티팩트의 트러스트 레벨이 `policy.yaml`의 `trust_required`보다 낮음 — release 스코프 전용(`canon gate check --release`). |
+| `stale-evidence` | 통과했던 레코드가 stale로 저하됨: `evidence_sha` 이후 선언된 표면이 변경됐거나, HEAD가 `staleness.max_commits_behind`를 넘어섬. 이미 green인 레코드만 저하시킴. |
+| `malformed-evidence` | 후보 레코드가 파싱되지 않거나, 잘못된 위치에 있거나, 파싱 불가능한 임시 태그를 가짐. 잘못된 형식의 증거는 증거가 아님. |
+| `flagged` | 사람만 설정 가능한 `flagged` 오버레이가 켜짐 — 어떤 통과 증거가 있어도 절대 green이 되지 않음. |
+| `unevidenced-flip` | `canon gate task <task_id>`가 대응하는 non-`Divergent` `EvidenceRecord` 없이 체크박스 플립을 요청받음. |
+| `fabricated-evidence` | 플립에 첨부된 증거 노트에 차단 대상 마커(`"would pass"`, `"TBD"`, `"n/a"`)가 있거나, 첨부된 커맨드 결과 없이 `verified`만 주장함. |
+
+## 트러스트 래더
+
+아티팩트는 **draft → reviewed**(에이전트 + 리뷰-레코드) **→ ratified**(사람)
+순으로 올라갑니다. 대응하는 리뷰-레코드 없는 단순 승급은
+`unreviewed-promotion`입니다. `flagged`는 사람만 설정 가능하며 절대
+green이 되지 않고, 사람이 귀속된 clear-record로만 해제됩니다 — 한 방향
+래칫입니다.
+
+## 레포 검사
+
+```bash
+canon gate check --repo .            # 일반 평가
+canon gate check --repo . --release  # + trust-below-required
+```
+
+`canon gate check`는 디스패처입니다: 커버리지 + 레저 + staleness + 항상
+켜져 있는 트러스트 래더 검사를 모아 실행하고, 모든 위반을 실패 클래스별로
+묶어 출력합니다. `--release`는 release 스코프의 `trust-below-required`
+검사를 추가로 켭니다 — `--release`가 전달되어도 트러스트 래더 검사는
+절대 빠지지 않습니다. 종료 코드: 깨끗하면 `0`, 게이트 red(위반 존재)면
+`1`, 사용법/로드 실패(읽을 수 없는 레저, 손상된 `canon.yaml`)면 `2`입니다.
+
+## 태스크 체크박스 플립 게이팅
+
+```bash
+canon gate task s5-trust-spine-gate#5.2 --repo .
+```
+
+`canon gate task <task_id>`는 change의 `tasks.md` plan 파일에서 체크박스 행
+하나를 증거 기반으로 플립합니다. `<task_id>`(`<change_id>#<n>`)를 해당
+change의 `tasks.md`로 해석하며(현재는 `openspec/changes/` 아래에서 해석됨 —
+plan-어댑터 seam 뒤로 옮겨질 예정인 plan-dialect 커플링),
+레저에서 대응하는 non-`Divergent` `EvidenceRecord`를 요구하며, 검사가
+깨끗할 때에만 `- [ ]` → `- [x]`로 플립하면서 증거 노트를 덧붙입니다.
+증거가 없거나, `Divergent` 판정이거나, 조작된 증거 노트인 경우 해당 행은
+바이트 단위로 변경되지 않고 `1`로 종료하며 차단 위반을 stderr에
+출력합니다. 이미 `[x]`인 행은 멱등 no-op입니다. 알 수 없는 `task_id`는
+보고되며, 절대 조용히 무시되지 않습니다.
+
+## 스테이징 → 승급
+
+```bash
+canon gate promote --repo .              # 스테이징된 모든 후보를 반영
+canon gate promote --repo . --dry-run    # 미리보기만
+```
+
+`canon/ledger/_staging/` 아래의 잘 정형화된 모든 레코드는 게이트와 동일한
+검사로 재검증되고, (역할, 표면)별 단조 증가하는 `run_seq`를 부여받은 뒤 —
+한 번의 호출 내에서 빈틈없이, 커밋된 티어 자체의 최댓값에서 이어서 —
+커밋된 레저로 옮겨집니다. 잘못된 형식이거나 파티션 불가능한 후보는
+거부됩니다: `1`로 종료하고, `run_seq`가 소비되지 않으며, 스테이징 파일은
+리뷰어가 고칠 수 있도록 그대로 남습니다. `--dry-run`은 아무것도 쓰거나
+지우지 않고 계획만 출력합니다.
+
+## 훅 심(seam) 설치
+
+```bash
+canon gate install-hooks --repo .
+```
+
+멱등적이고 diff 전용입니다: `.claude/settings.json`과
+`.codex/hooks.json` 양쪽에 훅 항목을 병합하며, 추가만 하고 같은 matcher
+그룹 안의 기존 항목은 절대 건드리지 않습니다. 수동 편집 없이 두 번
+실행하면 "no diff"를 보고하고 아무것도 쓰지 않습니다. 두 파일 모두
+`canon gate`를 호출하는 항목이 없을 때는 `scripts/canon-gate-pre-commit.sh`도
+함께 생성합니다(기본은 advisory; 게이트 실패 시 커밋을 막으려면
+`CANON_GATE_ADVISORY=0`을 설정).
+
+## 게이트 자체를 검증하기
+
+```bash
+canon gate selftest
+```
+
+내장된 픽스처 코퍼스를 실행합니다 — 실패 클래스마다 하나씩, 의도적으로
+깨진 코퍼스로 해당 클래스만 발동함을 증명합니다. 게이트 자체의 코드를
+건드린 뒤, 다른 `canon gate check` 실행의 green을 신뢰하기 전에
+실행하십시오.
+
+## 위반 읽기
+
+모든 출력 줄은 `<failure-class> <subject> — <detail>` 형태입니다.
+`<subject>`는 아티팩트 자신의 조인 스파인 식별자입니다(`task_id` 우선,
+다음 `scenario_id`, 다음 `run_id`) — 이것으로 레저나 `tasks.md`를 직접
+grep 하십시오, 절대 추측하지 마십시오.
+
+## 다음
+
+- [캐논 개념](/ko/concepts/canon/) — 증거 아니면 무효가 존재하는 이유
+- [티어드 스토리지](/ko/concepts/tiered-storage/) — 레저가 저장되는 곳
+- [CLI 레퍼런스](/ko/cli/) — `canon gate`의 전체 표면

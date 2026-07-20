@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "implementer"
+  },
+  "at": "2026-07-10T12:00:00Z",
+  "kind": "trajectory",
+  "pr": 42,
+  "reward": 0.75,
+  "run_id": "01J0Z9Z9Z9Z9Z9Z9Z9Z9Z9Z9Z9",
+  "schema": 1,
+  "session_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "sha": "8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552",
+  "task_id": "s1-state-model-join-spine#6.2"
+}

@@ -1,0 +1,6 @@
+# canon gate selftest fixture — fabricated-evidence (gated-task-completion).
+# A clean, non-Divergent EvidenceRecord exists, but its paired
+# EvidenceNote's summary carries a blocklisted fabrication marker
+# ("TBD") — markers::scan_fake_markers's own detection, surfaced by
+# checkbox::gate_task before any flip is committed.
+fabricated-evidence s5-selftest-fabricated-evidence#1

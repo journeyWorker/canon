@@ -1,0 +1,5 @@
+{
+  "_note": "Not a full record — a from/to state-transition descriptor consumed specially by fixtures::round_trip_all, since a single static Handoff snapshot cannot itself represent an invalid TRANSITION (a transition needs two states).",
+  "from": "done",
+  "to": "pending"
+}

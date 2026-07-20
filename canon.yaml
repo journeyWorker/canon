@@ -1,0 +1,89 @@
+# canon's per-repo configuration. S1 (`s1-state-model-join-spine`) owns
+# only the `handoff_templates:` key below (design D5) — later changes add
+# their own top-level sections here (e.g. S2's `tiers:` / `TierPolicy`,
+# design D3 of `s2-tiered-storage`) without touching this one.
+
+# Domains registered for this repo's Handoff body template registry
+# (`canon_model::TemplateRegistry::from_manifest`). A template compiled
+# into `canon-model` but not listed here is treated as unregistered —
+# `Handoff` construction against it fails with a structured
+# `unregistered-handoff-domain` violation rather than persisting a body
+# no template can validate or render.
+handoff_templates:
+  - 기획
+
+# S2 (`s2-tiered-storage`) TierPolicy (design D3), rekeyed to the
+# rung/backend split (s27 `tier-role-backend-split` design D1/D3):
+# `routing`/`aging` name a capability RUNG (`local`/`hot`/`cold`)
+# each of canon-model's twelve record kinds lands in; each `tiers.<rung>`
+# block tags its own vendor `backend:`. Routing/aging keys are
+# `RecordKind::as_str()`'s stable snake_case wire strings — the same
+# string every record's own `kind` field already serializes to
+# (canon-store's `policy` module doc explains why, over the design
+# doc's illustrative kebab-case spelling). `canon-store` resolves every
+# `Tier::write`/`Tier::read`/`canon tier age` call through this section;
+# no caller branches on a literal kind name to pick a tier.
+tiers:
+  local: { backend: git, root: canon/ledger }
+  hot:       { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }
+  cold:      { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: "canon/" }
+
+routing:
+  # local (repo-local, Hive, append-only, git-backed): authored
+  # specs + promoted strategies + the evidence ledger (design §4 tier
+  # diagram).
+  change: local
+  # subject (s36): the durable product/management unit — authored,
+  # repo-local, git-tracked like the rest of the spec corpus.
+  subject: local
+  scenario: local
+  review: local
+  divergence: local
+  evidence_record: local
+  strategy_item: local
+  # hot (live-queryable, shared, postgres-backed): in-flight
+  # task/handoff state + recent events.
+  task: hot
+  handoff: hot
+  session: hot
+  run: hot
+  event: hot
+  # cold (bulk archive, shared, s3-backed): raw, reward-eligible
+  # trajectories — cold from birth, no hot phase.
+  trajectory: cold
+
+aging:
+  # D3's own worked example values, verbatim (rung-renamed).
+  handoff: { after: 30d, to: cold }
+  event: { after: 7d, to: cold }
+
+# s20 (`s20-plan-corpus-join`) self-hosted plan import (design D4): the
+# FIRST live, non-fixture, non-test `plans:` configuration in this
+# repo's own canon.yaml — `canon ingest plans` reads this repo's own
+# `openspec/changes/` tree. `root: openspec/changes` is the DIRECT-
+# changes-dir shape `discover_change_dirs` already tolerates,
+# deliberately NOT the `root: openspec` near-miss shape (tracked
+# separately, `s18-uniform-root-and-loud-import`) that makes discovery
+# treat `openspec/changes` itself as one malformed change dir.
+plans:
+  sources:
+    - dialect: openspec
+      root: openspec/changes
+    # s30 (`plan-dialect-superpowers`): this repo's own superpowers
+    # plan corpus (writing-plans skill shape) — the second live,
+    # self-hosted dialect source; `examples/platformer` is its first
+    # imported plan.
+    - dialect: superpowers
+      root: docs/superpowers/plans
+
+# s15 (`spec-ledger-unification`) spec corpus (design D3): the first
+# live `.feature` corpus in this repo — `examples/platformer`'s
+# behavior scenarios. `canon inventory sync` validates (S11) then
+# materializes one `Scenario` ledger-index record per tagged scenario;
+# `canon review add` attests against the SAME (project_id, scenario_id)
+# join. Single entry deliberately: `canon feature new`/`scenario new`
+# refuse a multi-root config.
+specs:
+  roots:
+    - id: platformer
+      root: examples/platformer/specs

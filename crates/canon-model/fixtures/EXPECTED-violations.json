@@ -1,0 +1,6 @@
+{
+  "missing-actor.json": "malformed",
+  "invalid-scenario-id.json": "invalid-join-key",
+  "invalid-state-transition.json": "invalid-state-transition",
+  "unregistered-handoff-domain.json": "unregistered-handoff-domain"
+}

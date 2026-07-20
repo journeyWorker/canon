@@ -1,0 +1,31 @@
+[package]
+name = "canon-vocab"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "canon's typed authoring vocabulary (S10): plugin.yaml/directives/enums.yaml manifests, ONE resolve_snapshot capability-snapshot resolution, the check_directive-lineage checker/diagnostics, and typed task-atom/handoff-body compile+round-trip against canon-model's Task/HandoffBody — lifted from the donor manifest layer + the donor span primitives (source-imported as modules, no donor crate dependency) and INSPIRE-only against the donor checker's fold_env/check_directive shape (design.md open-Q1)."
+
+[lib]
+name = "canon_vocab"
+path = "src/lib.rs"
+
+[dependencies]
+canon-model = { workspace = true }
+# S5's OWN parsed `canon/policy.yaml` (`PolicyResolution`) lives in canon-gate,
+# not literally in the `canon-policy` crate (that crate is S13's CEL engine,
+# which `PolicyResolution` itself calls) -- see src/policy_bridge.rs module doc
+# for the full reconciliation. READ-only: canon-vocab depends on canon-gate's
+# public `policy` module only, never edits canon-gate.
+canon-gate = { workspace = true }
+canon-policy = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+thiserror = { workspace = true }
+chrono = { version = "0.4.45", features = ["serde"] }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+proptest = "1"
+uuid = { version = "1.23.4", features = ["v4"] }

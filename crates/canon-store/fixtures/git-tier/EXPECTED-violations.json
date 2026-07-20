@@ -1,0 +1,7 @@
+{
+  "kind=scenario/world.firstbuy-hotdeal.26.json": "malformed",
+  "kind=scenario/area=world/wrong-filename.json": "malformed",
+  "kind=scenario/area=wrong-area/world.firstbuy-hotdeal.26__42553957b462.json": "malformed",
+  "kind=task/s2-tiered-storage__f9089cbd709e.json": "malformed",
+  "kind=change/broken.json": "malformed"
+}

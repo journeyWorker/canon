@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "s10-part2-pilot",
+    "role": "implementer"
+  },
+  "at": "2026-07-10T21:28:50.716086Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-vocab policy_bridge"
+  },
+  "kind": "evidence_record",
+  "schema": 1,
+  "task_id": "s10-vocab-pilot#1",
+  "verdict": "faithful"
+}

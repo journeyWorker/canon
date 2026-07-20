@@ -1,0 +1,37 @@
+[package]
+name = "canon-ingest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "session ingest adapter registry: raw agent-CLI transcripts -> UnifiedRow -> canon-model Session/Run/Event (S3)."
+
+[lib]
+name = "canon_ingest"
+path = "src/lib.rs"
+
+[dependencies]
+canon-model.workspace = true
+chrono = { version = "0.4.45", features = ["serde"] }
+rayon = "1.10"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+sha2.workspace = true
+simd-json = "0.14"
+ulid = "1.2.1"
+thiserror.workspace = true
+rusqlite = { version = "0.32", features = ["bundled"] }
+walkdir = "2"
+
+[dev-dependencies]
+# S4 wave-2 handoff-adapter fixture (`tests/handoff_fixture.rs`) ONLY:
+# writes/reads the frozen `tests/fixtures/handoffs/*.json` corpus
+# through a real `canon_store::Tier` (`GitTier`, tempdir-rooted, fully
+# offline) to prove the exact tier round trip design.md D3 names
+# ("reads canon's own `Handoff` table... via `canon-store`'s Postgres
+# tier `Tier::read`"), without pulling `canon-store` into this crate's
+# PRODUCTION dependency graph — `crate::artifact_adapter` module doc /
+# task 0.1: "so the handoff adapter never needs a `canon-store`
+# dependency inside `canon-ingest`" still holds for `cargo build`;
+# only `cargo test` links this.
+canon-store.workspace = true
+tempfile = "3"

@@ -1,0 +1,44 @@
+{
+  "name": "@journeykit/canon",
+  "version": "0.1.0",
+  "description": "canon — harness knowledge substrate. JS launcher: platform detection + native binary resolution.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "canon": "./bin.js"
+  },
+  "files": [
+    "bin.js",
+    "dist/**/*"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/journeyWorker/canon.git",
+    "directory": "packages/cli"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target node --format esm",
+    "dev": "bun src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {},
+  "optionalDependencies": {
+    "@journeykit/canon-core-darwin-arm64": "workspace:*",
+    "@journeykit/canon-core-linux-x64": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "canon",
+    "harness",
+    "spec-driven",
+    "cli"
+  ]
+}

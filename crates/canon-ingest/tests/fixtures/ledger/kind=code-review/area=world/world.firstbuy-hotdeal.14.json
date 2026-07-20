@@ -1,0 +1,1 @@
+{"schema":1,"kind":"code-review","scenario_id":"world.firstbuy-hotdeal.14","verdict":"still-divergent","port_ref":"lib/features/world/hotdeal/firstbuy_hotdeal_overlay.dart#_startObtainedReveal","upstream_ref":"routes/world/_components/use-hotdeal-offer-purchase.tsx#onPurchased","pin":"9c93d024b","reviewer":"code-reviewer-world-firstbuy-hotdeal","at":"2026-07-08T20:05:49Z"}

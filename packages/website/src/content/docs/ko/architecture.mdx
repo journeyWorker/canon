@@ -1,0 +1,127 @@
+---
+title: 아키텍처
+description: canon의 크레이트 맵, 스토리지 티어, 패키징 방식, 레포별 레이아웃.
+---
+
+canon은 **하나의 Rust 코어**를 단일 책임 크레이트로 나눈 뒤, 얇은 JS 런처로
+배포합니다. 로컬 Rust 툴체인 없이도 어느 레포에서든 `bunx @journeykit/canon`로 바로
+실행할 수 있습니다.
+
+## 크레이트 맵
+
+```
+┌──── canon (this repo) ────────────────────────────────┐
+│ crates/                                               │
+│    canon-model   types + versioned JSON schemas       │
+│    canon-store   git / pg / r2 tier adapters          │
+│    canon-ingest  session + artifact adapters          │
+│    canon-gate    trust spine (covered/green)          │
+│    canon-learn   role-namespaced strategy memory      │
+│    canon-policy  CEL policy-expression engine         │
+│    canon-fmt     format authority (corpus check)      │
+│    canon-vocab   typed authoring vocabulary           │
+│    canon-plugin  ledger-overlay plugin manifests      │
+│    canon-report  report + dashboard data              │
+│    canon-cli     single entrypoint                    │
+│ packages/                                             │
+│    cli           JS launcher (npm: @journeykit/canon) │
+│    core-<plat>   prebuilt binaries (optionalDeps)     │
+└───────────────────────────────────────────────────────┘
+```
+
+- **canon-model** — canon의 닫힌 버전 관리 아티팩트 패밀리 타입입니다.
+  envelope, 열두 개 레코드 종류, 조인 스파인 키 newtype, 그리고 생성된
+  JSON 스키마 + 조인 스파인 문서 출력을 담당합니다.
+- **canon-store** — 하나의 스토리지 trait 뒤에 git / Postgres / R2 티어
+  어댑터를 둡니다.
+- **canon-ingest** — 원본 에이전트 CLI 세션 트랜스크립트와 아티팩트 증거
+  (ledger, divergences, openspec tasks, handoffs)를 canon-model 레코드로
+  정규화하는 어댑터 레지스트리입니다.
+- **canon-gate** — 트러스트 스파인입니다: covered/green 증거 게이팅,
+  `FAILURE_CLASSES`, 트러스트 래더, 정책 해석을 담당합니다.
+- **canon-learn** — 역할별 전략 메모리입니다: trace → verdict → distill →
+  store → retrieve → apply, `regime_key`로 키가 매겨집니다.
+- **canon-policy** — canon의 CEL 정책 표현식 엔진입니다. canon-model의
+  스키마 레지스트리에 바인딩된 predicate를 파싱/타입 체크/평가합니다.
+- **canon-fmt** — 아티팩트 패밀리 포맷 권위입니다. `canon fmt --check`는
+  외부 consumer 레포의 코퍼스를 스키마 + 레이아웃 디스크립터에 대해
+  검증합니다.
+- **canon-vocab** — 타입이 있는 저작 어휘입니다. `plugin.yaml`/directives/
+  enums 매니페스트, capability-snapshot 해석, canon-model에 대한 타입
+  task-atom / handoff-body 컴파일을 담당합니다.
+- **canon-plugin** — ledger-overlay 플러그인 매니페스트 표면입니다.
+  `plugin.yaml` 스키마/로더, capability-snapshot 해석, overlay 구조 형태
+  검사기를 담당합니다 — canon-model의 고정된 레코드 종류 집합을 넓히지
+  않으면서 query가 투영할 수 있는 필드를 확장합니다.
+- **canon-report** — canon-store의 DuckDB 뷰 레이어 위에서 생성되며
+  절대 수동 편집하지 않는 markdown 상태 리포트와, 대시보드가 읽는
+  `--snapshot` Parquet export를 담당합니다.
+- **canon-cli** — 위 모든 것이 연결되는 단일 엔트리포인트 바이너리입니다.
+
+## 스토리지 티어
+
+canon-store는 기본적으로 모든 레코드 종류를 자격 증명이 필요 없는 두
+티어 중 하나로 라우팅하고, 여기에 선택적 스케일업 백엔드를 더해
+일정에 따라 티어 사이를 이동시킵니다 (`canon tier age`):
+
+```
+┌──────────────────────┬──────────────────────────┬────────────────────────┐
+│ local (Git)          │ hot (SQLite, default)    │ optional scale-up      │
+├──────────────────────┼──────────────────────────┼────────────────────────┤
+│ authored specs       │ task / handoff /         │ Postgres — hot swap    │
+│ promoted strategies  │ session / run / event    │ for shared, concurrent │
+│ evidence ledger      │ (canon/hot.db,           │ R2 / S3 — cold, bulk   │
+│ (Hive, append-only)  │ gitignored)              │ data (credentialed)    │
+└──────────────────────┴──────────────────────────┴────────────────────────┘
+```
+
+`canon init`은 내구성 있고 리뷰 가능한 레코드에는 Git을 사용합니다 —
+append-only Hive 파티션 JSON으로 일반 PR diff에서 리뷰할 수 있습니다.
+대량으로 발생하는 운영 레코드에는 로컬 SQLite를 사용합니다
+(`canon/hot.db`, `canon init`이 gitignore에 추가합니다). PostgreSQL과
+S3 호환 스토리지는 운영자가 직접 자격 증명을 제공해야 하는 선택적
+스케일업 백엔드입니다. 자세한 내용은
+[티어 스토리지](/ko/concepts/tiered-storage/)를 참고하세요.
+
+## 플라이휠
+
+```
+team runs agents → ingest (sessions, reviews, handoffs, CI/PR)
+                 → trajectories + verdicts (per role)
+                 → distill (success → strategy, review-finding → guardrail)
+                 → statistical promotion gate (no noise distilled)
+                 → promote to git tier (versioned, PR-reviewed)
+                 → retrieve-before-task (role + regime scoped, advisory)
+                 → better agent runs
+```
+
+같은 루프의 역할별 버전은 [전략 메모리](/ko/concepts/strategy-memory/)를
+참고하세요.
+
+## 패키징
+
+canon은 검증된 Rust-core→npm 패키징 패턴(벤더링된 업스트림 런처
+프로젝트에서 적응)을 따릅니다: 배포되는 `@journeykit/canon` 패키지
+(`packages/cli`)는 자체 런타임 의존성이 없는 얇은 JS 런처입니다.
+플랫폼별 `canon-cli` 바이너리는 `optionalDependencies`로 배포됩니다
+(`@journeykit/canon-core-darwin-arm64`, `@journeykit/canon-core-linux-x64` 등). npm/Bun은
+현재 실행 중인 플랫폼에 맞는 것 하나만 설치하고, 런처의 `bin.js`가 그것을
+찾아 실행합니다. `bunx @journeykit/canon`가 로컬 Rust 툴체인 없이 어느 레포에서든
+동작하는 이유입니다.
+
+## Consumer 레포 설정
+
+canon이 동작하는 모든 레포는 레포 루트에 자신의 설정을 둡니다:
+
+```
+<repo>/canon.yaml           # tier endpoints, specs.roots[], plans: sources
+<repo>/canon/policy.yaml    # required-cell derivation for evidence gating
+<repo>/canon/ledger/        # Hive: kind=<kind>/area=<area>/*.json, append-only
+<repo>/canon/strategies/    # promoted strategy items (git tier, PR-reviewed)
+<repo>/canon/plugins/       # <id>/plugin.yaml ledger-overlay manifests
+```
+
+`canon init`은 동작하는 `canon.yaml` 스켈레톤을 생성하고, `canon init
+--check-config`는 이미 존재하는 설정을 검증합니다. 전체 명령어 표면은
+[CLI 레퍼런스](/ko/cli/)를, 왜 프로세스가 아니라 레포가 상태의 단위인지는
+[canon 개념](/ko/concepts/canon/)을 참고하세요.

@@ -1,0 +1,28 @@
+[package]
+name = "canon-policy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "canon's CEL policy-expression engine (S13): parse/type-check/evaluate CEL predicates on upstream `cel` (the `cel-interpreter` project's current crates.io name — see src/lib.rs), bindings generated from canon-model's schema registry, with no dependency on `cel-parser` or on the donor's CEL crates."
+
+[lib]
+name = "canon_policy"
+path = "src/lib.rs"
+
+[dependencies]
+canon-model = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { version = "0.4.45", features = ["serde"] }
+schemars = { version = "1.2.1", features = ["chrono04", "uuid1"] }
+sha2 = { workspace = true }
+
+# Upstream CEL engine (design D1): the `cel-interpreter` crates.io package is
+# frozen at 0.10.0 and transitively depends on `cel-parser` 0.10.1 (the exact
+# antlr4rust-backed crate this change's own spec requires excluding) — see
+# src/lib.rs module doc for the full explanation. `cel` is the SAME upstream
+# project (cel-rust/cel-rust), same maintainers, published under a renamed
+# crates.io package starting v0.11; it has no dependency on `cel-parser` or on
+# the donor's CEL crates.
+cel = { version = "0.14", default-features = false, features = ["chrono"] }

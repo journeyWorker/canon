@@ -1,0 +1,3 @@
+- [x] 1.1 wire the hotdeal surface [covers: world.hotdeal.01, world.hotdeal.02] — ✅ crates/app tests green
+- [ ] 1.2 fix several scenarios [covers: world.hotdeal.03, not-a-scenario-id, world.hotdeal.04]
+- [x] 1.3 an ordinary covers-free row — ✅ done

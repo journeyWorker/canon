@@ -1,0 +1,401 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DivergenceEvent",
+  "description": "One JSONL line — `type`-tagged, internally-tagged serde enum so the\nwire form stays `{\"type\": \"manifest\", ...}` with no extra nesting.",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "manifest"
+        }
+      },
+      "$ref": "#/$defs/DivergenceManifest",
+      "required": [
+        "type"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "review"
+        }
+      },
+      "$ref": "#/$defs/DivergenceReview",
+      "required": [
+        "type"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "remediation"
+        }
+      },
+      "$ref": "#/$defs/DivergenceRemediation",
+      "required": [
+        "type"
+      ]
+    }
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "DivergenceManifest": {
+      "description": "`type: \"manifest\"` — one review round's scope: which scenarios\n(`reviewed_ids`) a reviewer took up, at which pin/app_sha.",
+      "type": "object",
+      "properties": {
+        "actor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Actor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "app_sha": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lane": {
+          "type": "string"
+        },
+        "pin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reviewed_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ScenarioId"
+          }
+        },
+        "reviewer": {
+          "type": "string"
+        },
+        "round": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "run_seq": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "schema": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "surface": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true,
+      "required": [
+        "schema",
+        "lane",
+        "surface",
+        "round",
+        "reviewer",
+        "reviewed_ids",
+        "app_sha",
+        "at",
+        "run_seq"
+      ]
+    },
+    "DivergenceRemediation": {
+      "description": "`type: \"remediation\"` — a fix applied in response to a divergence\n(`disposition`, `files` changed, `status: \"remediated\"`).",
+      "type": "object",
+      "properties": {
+        "actor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Actor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "app_sha": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "disposition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "files": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "lane": {
+          "type": "string"
+        },
+        "pin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reviewer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "round": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "scenario_id": {
+          "$ref": "#/$defs/ScenarioId"
+        },
+        "schema": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "required": [
+        "schema",
+        "lane",
+        "scenario_id",
+        "round",
+        "app_sha",
+        "at"
+      ]
+    },
+    "DivergenceReview": {
+      "description": "`type: \"review\"` — one scenario's outcome within a manifest's round:\n`status` ∈ `open | resolved | still-divergent | deferred` (real\ncorpus distribution). `ledger_ref` is the donor's EXISTING one-way\npointer at the corresponding ledger record's corpus-relative path —\ndesign D6's reciprocal (`divergence_refs`) is added on that ledger\nrecord by `canon-fmt`'s cross-indexing pass, not here.",
+      "type": "object",
+      "properties": {
+        "actor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Actor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "app_sha": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lane": {
+          "type": "string"
+        },
+        "ledger_app_sha": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ledger_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "ledger_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ledger_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ledger_reviewer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "port_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "refs": {
+          "description": "Structured replacement for `port_ref` (design D4) — see\n[`crate::family::ledger::LedgerReviewRecord::refs`]'s doc for the\nsame parse-or-report discipline.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Ref"
+          }
+        },
+        "reviewer": {
+          "type": "string"
+        },
+        "round": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "scenario_id": {
+          "$ref": "#/$defs/ScenarioId"
+        },
+        "schema": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true,
+      "required": [
+        "schema",
+        "lane",
+        "scenario_id",
+        "round",
+        "status",
+        "app_sha",
+        "reviewer",
+        "at"
+      ]
+    },
+    "LineRange": {
+      "description": "An inclusive `<a>-<b>` line range, as seen in donor ref strings like\n`#_storySpecFor:397-447` or an inventory entry's `lines: 262-270`.",
+      "type": "object",
+      "properties": {
+        "end": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "start": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ]
+    },
+    "Ref": {
+      "description": "A single structured code/behavior reference (S11 design D4): a file\npath, the symbol within it, and an optional line range. Never\nconstructed by guessing from prose — [`crate::family::refs::Ref`]\nvalues only ever come from successfully parsing a donor\n`<file>#<symbol>[:<a>-<b>]`-shaped segment; unparseable text is left\nas the original string and reported as a `canon fmt --check`\n`free-text-ref` violation instead (S11 design D4).",
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "lines": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LineRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "symbol": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "symbol"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "ScenarioId": {
+      "description": "`<area>.<surface>.<nn>` — `[a-z0-9-]+\\.[a-z0-9-]+\\.\\d{2,}`; never renumbered once assigned — joins: spec ↔ test ↔ ledger ↔ divergence",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    }
+  }
+}

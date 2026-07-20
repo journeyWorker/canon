@@ -1,0 +1,5 @@
+# canon gate selftest fixture — stale-evidence (D4/A3).
+# A green record's declared surface (`surface.txt`) changed after its
+# `evidence_sha` — a real `git init`/commit corpus, built in-test
+# (crates/canon-gate/src/staleness.rs's own test-fixture discipline).
+stale-evidence s5-selftest-stale-evidence#1
