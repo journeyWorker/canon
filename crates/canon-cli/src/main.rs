@@ -46,420 +46,241 @@ use clap::{Parser, Subcommand};
 #[command(
     name = "canon",
     version,
-    about = "canon — harness knowledge substrate",
-    long_about = None
+    about = "Specs, evidence gates, and agent memory for your repo",
+    long_about = "canon keeps a repo's specs, review evidence, and agent strategy \
+memory in one place: author .feature specs, gate task completion on real evidence, \
+ingest agent sessions, and retrieve role-scoped guidance.",
+    arg_required_else_help = true,
+    propagate_version = true,
+    after_help = "\
+Examples:
+  canon init                Set up canon in the current repo
+  canon demo init           Scaffold a throwaway demo repo to try the evidence loop
+  canon format spec         Validate a spec corpus
+  canon gate check          Run the evidence gate
+
+Learn more:
+  Use `canon <command> --help` for details on any command.
+  `canon skills install` materializes the full guides into .claude/skills/ and .codex/skills/."
 )]
 struct Cli {
     #[command(subcommand)]
-    command: Option<Command>,
+    command: Command,
 }
 
 #[derive(Subcommand)]
 enum Command {
-    /// Materialize `canon/skills/` companion skills into consumer repos.
-    Skills {
-        #[command(subcommand)]
-        action: SkillsCommand,
-    },
-    /// Tier-storage maintenance (S2 `s2-tiered-storage`).
-    Tier {
-        #[command(subcommand)]
-        action: TierCommand,
-    },
-    /// Fan out a record kind's read across every tier it may currently
-    /// live in and merge by `at` (S2 task 4.1, unified-query spec).
-    /// `--plugin <id>` (s16 P3, tasks.md 3.3) projects a resolved
-    /// plugin's declared overlay fields onto each queried record --
-    /// fail-soft (`canon_cli::query`'s module doc): an unresolved
-    /// plugin, or a `--kind`/overlay `core_kind` mismatch, degrades to
-    /// the unmodified core view plus a stderr diagnostic, never a
-    /// process error.
-    Query {
-        /// A `RecordKind` wire string (`RecordKind::as_str()`, e.g.
-        /// `handoff`, `strategy_item`).
-        #[arg(long, value_parser = canon_cli::query::parse_kind)]
-        kind: RecordKind,
-        /// Only records with `at >= <since>` (RFC3339/ISO-8601).
-        #[arg(long, value_parser = canon_cli::query::parse_since)]
-        since: Option<DateTime<Utc>>,
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`,
-        /// the SAME ancestor walk every sibling verb (`canon context`,
-        /// `canon gate check`, `canon ingest plans`, …) already uses:
-        /// `--repo == "."` (the default) walks `cwd.ancestors()` for the
-        /// nearest `canon.yaml`; any other explicit `--repo <dir>` is used
-        /// as-is. Ignored whenever `--canon-yaml` is also supplied
-        /// (`--canon-yaml` wins — see that flag's own doc).
-        #[arg(long, default_value = ".")]
-        repo: PathBuf,
-        /// An explicit, literal `canon.yaml` path override that BYPASSES
-        /// `--repo`'s ancestor walk entirely — read AS-IS from exactly this
-        /// path, regardless of cwd. Takes precedence over `--repo` when
-        /// supplied. Omitted (the ordinary invocation shape every sibling
-        /// verb already supports): `--repo`'s ancestor-walk resolution
-        /// governs instead.
-        #[arg(long)]
-        canon_yaml: Option<PathBuf>,
-        /// Machine-readable output (the merged record bodies) instead
-        /// of the default human table.
-        #[arg(long)]
-        json: bool,
-        /// A `.canon/plugins/<id>/plugin.yaml` manifest id (s16 P3) --
-        /// project that plugin's declared overlay fields onto each
-        /// queried record before printing/emitting. Omitted: output is
-        /// byte-identical to the pre-s16 `canon query`.
-        #[arg(long)]
-        plugin: Option<String>,
-        /// s19 `query-scope-filters` (design D5): scopes `--kind
-        /// change`/`--kind task` to one `ChangeId`'s own row(s) —
-        /// `Change.change_id` equality, or `TaskId::change_id()`
-        /// equality for `--kind task`. Any other `--kind` fails loud
-        /// (exit `2`) — kind-gating happens in `canon_cli::query`, not
-        /// here, so the error can name the queried kind
-        /// (`canon_cli::query::validate_scope`).
-        #[arg(long, value_parser = canon_cli::query::parse_change_id)]
-        change_id: Option<ChangeId>,
-        /// s19 `query-scope-filters`: scopes `--kind change`/`--kind
-        /// task` by their own `status` field. Kept a raw `String` here
-        /// (never a clap value parser) because its valid domain
-        /// depends on the QUERIED kind (`open`/`done` for `task`; the
-        /// four `ChangeStatus` values for `change`) — validated in
-        /// `canon_cli::query::validate_scope`, which can name the
-        /// kind-specific valid set on a mismatch.
-        #[arg(long)]
-        status: Option<String>,
-        /// s36 `subject-domain-loop`: scopes `--kind subject` to one
-        /// `domain` (its own `domain` field equality). Any other
-        /// `--kind` fails loud (exit `2`) — kind-gating in
-        /// `canon_cli::query::validate_scope`, mirroring `--change-id`.
-        #[arg(long)]
-        domain: Option<String>,
-    },
-    /// Validate a consumer-repo corpus (e.g. `spec/`) against the
-    /// artifact-family schemas + layout descriptors (S11 task 2.1).
-    Fmt {
-        /// Report every violation found — `canon fmt`'s only
-        /// supported mode today.
-        #[arg(long)]
-        check: bool,
-        /// Corpus root, e.g. a consumer repo's `spec/` directory.
-        root: PathBuf,
-        /// Repo root the corpus `root` is resolved under (s26 D1). Omitted
-        /// (the default, i.e. every existing invocation): `root` is used
-        /// EXACTLY as given -- byte-identical to today, no new code path
-        /// runs. Given: resolved via the SAME
-        /// `canon_cli::context::resolve_repo_root` ancestor walk every
-        /// sibling verb's `--repo` uses (`--repo .` walks `cwd.ancestors()`
-        /// for the nearest `canon.yaml`; any other explicit `--repo <dir>`
-        /// is used as-is), and the corpus actually checked becomes
-        /// `resolve_repo_root(repo).join(root)` -- `root` stays the
-        /// corpus-relative suffix, never replaced.
-        #[arg(long)]
-        repo: Option<PathBuf>,
-    },
-    /// Emit the project-resolved AUTHORING SURFACE (S12
-    /// `context-authoring-surface`): record kinds + envelope fields,
-    /// enum domains, join-key grammars, partition layout,
-    /// policy-derived requirements, and a capability version. A
-    /// capability QUERY, never validation — exits 0 with the full
-    /// surface even when `canon fmt --check`/`canon gate` would
-    /// report diagnostics against the same repo.
-    Context {
-        /// Repo root to resolve the schema/policy registry against
-        /// (`<repo>/.canon/policy.yaml`). Omitted, or the literal `.`
-        /// default, resolves the PROJECT root instead — the nearest
-        /// ancestor of cwd carrying a `canon.yaml` (design D7, task 1.4;
-        /// `canon_cli::context::resolve_repo_root`), matching `canon
-        /// fmt`/`canon gate`'s own `canon.yaml`-anchored root convention —
-        /// so `canon context` run from any subdirectory still surfaces the
-        /// repo root's policy, never a subdirectory's absence of one. Any
-        /// OTHER explicit `--repo <dir>` is used as-is (no walk), same as
-        /// `canon gate`'s own `GateCtx::from_repo`.
-        #[arg(long, default_value = ".")]
-        repo: PathBuf,
-        /// Emit the machine-readable JSON surface instead of the
-        /// default compact human outline — both render from the
-        /// identical resolved surface (design D5).
-        #[arg(long)]
-        json: bool,
-    },
-    /// Scan + parse + normalize agent-CLI session transcripts into
-    /// canon-model records, project-scoped by default (s31
-    /// `s31-scoped-session-ingest`). See `canon_cli::ingest`'s module
-    /// doc.
-    Ingest {
-        #[command(subcommand)]
-        action: IngestCommand,
-    },
-    /// The trust-spine gate (S5 wave-2-part2, `s5-trust-spine-gate`):
-    /// evidence-gated coverage/verdict-ledger/staleness/trust-ladder
-    /// checking, task-checkbox flips, staging→promote, and hook-seam
-    /// installation. See `canon_cli::gate`'s module doc.
-    Gate {
-        #[command(subcommand)]
-        action: GateCommand,
-    },
-    /// `canon review add` (s15 P3b, native-verdict-lifecycle spec):
-    /// the native, attributed `Review` producer. See
-    /// `canon_cli::review`'s module doc.
-    Review {
-        #[command(subcommand)]
-        action: ReviewCommand,
-    },
-    /// `canon divergence {stage,promote,resolve,defer}` (s15 P3b,
-    /// native-verdict-lifecycle spec): the native `Divergence`
-    /// producer + monotonic `run_seq` promotion. See
-    /// `canon_cli::divergence`'s module doc.
-    Divergence {
-        #[command(subcommand)]
-        action: DivergenceCliCommand,
-    },
-    /// `canon inventory sync [--spec-root <dir>]` (s15 P3a,
-    /// `inventory-materialization` spec): validates each configured
-    /// `specs.roots[]` entry (`canon.yaml`, design D3) with
-    /// `canon-fmt::check`, then materializes one `Scenario`
-    /// ledger-index record per `(project_id, scenario_id)` — the
-    /// general feature-corpus → ledger indexer. See
-    /// `canon_cli::inventory`'s module doc.
-    Inventory {
-        #[command(subcommand)]
-        action: InventoryCommand,
-    },
-    /// `canon plugin sync <plugin-id> [--spec-root <dir>]` (s16 P4,
-    /// `openspec/changes/s16-plugin-extensibility/`, tasks.md 4.3,
-    /// design.md D5, `porting-plugin` spec): the GENERIC dispatcher —
-    /// resolves `<plugin-id>`'s manifest-declared overlay(s) (`canon-
-    /// plugin` P1), hands each to its registered `OverlaySource` impl,
-    /// and writes every returned candidate through P2's validate-then-
-    /// write pipeline (`canon_plugin::overlay::write_overlay`). See
-    /// `canon_cli::plugin_sync`'s module doc — this command never
-    /// string-matches a specific plugin id itself.
-    Plugin {
-        #[command(subcommand)]
-        action: PluginCommand,
-    },
-    /// `canon scenario new <area>.<surface>.<nn> --title <label>
-    /// --feature <path>` (s16 P5, `corpus-authoring-scaffold` spec,
-    /// tasks.md 5.1): appends (creating if absent) an S11-conformant
-    /// `.feature` stub — the exact tag-then-header shape
-    /// `canon-fmt::gherkin::scan` already reads (s15 D4). Writes NO
-    /// ledger record; see `canon_cli::scaffold`'s module doc.
-    /// INDEPENDENT of every s16 P1-P4 plugin concern — a
-    /// corpus-authoring convenience only.
-    Scenario {
-        #[command(subcommand)]
-        action: ScenarioCommand,
-    },
-    /// `canon feature new <area>.<surface> --title <label>` (s16 P5,
-    /// `corpus-authoring-scaffold` spec, tasks.md 5.2): scaffolds a
-    /// fresh, zero-scenario `.feature` file for a not-yet-started
-    /// surface — fails loud rather than overwriting an existing one.
-    /// The stub carries only a `Feature:` header + `# canon:`
-    /// provenance; an empty feature is not yet a valid corpus entry, so
-    /// `canon fmt --check` flags it until the first `canon scenario new`
-    /// adds a `@<area>.<surface>.<nn>`-tagged scenario — the spec ties
-    /// the fmt-clean round-trip to `scenario new`'s output, never the
-    /// bare stub. See `canon_cli::scaffold`'s module doc.
-    Feature {
-        #[command(subcommand)]
-        action: FeatureCommand,
-    },
-    /// `canon subject {new,adopt,status}` (s36 `subject-domain-loop`):
-    /// author + evolve the durable product/management unit (the
-    /// reviewed 13th record kind). See `canon_cli::subject`'s module
-    /// doc.
-    Subject {
-        #[command(subcommand)]
-        action: SubjectCommand,
-    },
-    /// `canon init [--repo <dir>]` + `canon init --check-config
-    /// [--repo <dir>]` (s19 `canon-init-scaffold`): scaffolds a fresh,
-    /// WORKING `canon.yaml` skeleton (`tiers:`/`routing:`/`specs:`/
-    /// `plans:`, design D8/D9) at `<repo>/canon.yaml` -- refuses to
-    /// overwrite an existing one -- or, with `--check-config`,
-    /// READ-ONLY validates an existing `canon.yaml` by chaining the
-    /// SAME three strict loaders `canon inventory sync`/`canon ingest
-    /// plans`/`canon tier age` already use (design D7). See
-    /// `canon_cli::init`'s module doc.
+    // ── Getting started ──
+    /// Set up canon in a repo (writes a starter canon.yaml)
+    #[command(after_help = "Examples:\n  canon init\n  canon init --check-config")]
     Init {
-        /// Repo root `<repo>/canon.yaml` resolves against -- used
-        /// AS-IS, literally joined (never an ancestor walk: `init`'s
-        /// whole job is bootstrapping the FIRST `canon.yaml`, so
-        /// there is no existing repo root to walk up and find).
+        /// Directory to set up (used as-is)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// READ-ONLY validate an existing `canon.yaml` instead of
-        /// writing one -- mutually exclusive in effect with the
-        /// default write mode (never both in the same invocation).
+        /// Validate an existing canon.yaml instead of writing one
         #[arg(long)]
         check_config: bool,
     },
-    /// `canon demo {init,attest}`: a self-contained, throwaway
-    /// evidence-loop demo for first-time users. `demo init` scaffolds a
-    /// real demo repo (the `canon init` skeleton + a `reviewer`-requiring
-    /// `policy.yaml`) and seeds one dev-authored evidence record, so
-    /// `canon gate check` is RED (`uncovered-cell`); `demo attest` records
-    /// the reviewer evidence, turning the same gate GREEN. See
-    /// `canon_cli::demo`'s module doc.
+    /// Try the evidence loop end-to-end in a throwaway demo repo
+    #[command(after_help = "Examples:\n  canon demo init --repo /tmp/canon-demo && cd /tmp/canon-demo\n  canon gate check   # RED\n  canon demo attest && canon gate check   # GREEN")]
     Demo {
         #[command(subcommand)]
         action: DemoCommand,
     },
-    /// S8 part2 (`s8-retrieve-before-task`, design.md decisions 1/3):
-    /// role+regime-scoped strategy retrieval — the CLI surface over
-    /// `canon_learn::guidance::retrieve_guidance`. FAIL-SOFT: once
-    /// `--role`/`--regime` parse and agree with each other (a CLI usage
-    /// precondition — exit `2` on mismatch, see `canon_cli::retrieve`'s
-    /// module doc), retrieval always exits `0`, printing possibly-empty
-    /// guidance; a store outage or malformed row degrades to an empty
-    /// list internally, never a nonzero exit.
-    Retrieve {
-        /// A `RoleId` slug — the retrieval's role scope (design
-        /// decision 1). With `--regime` it MUST equal that key's own
-        /// leading segment; with `--domain`/`--subject` it is the
-        /// `<role>` the derived regime candidates are built from.
-        #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
-        role: RoleId,
-        /// The full `regime_key` string (`<role>/<repo>/<area>/<hash>`)
-        /// — the SAME canonical serialization S6's write side produces
-        /// (no second key derivation, design decision 1). MUTUALLY
-        /// EXCLUSIVE with `--domain`/`--subject` (s36): supply either
-        /// an explicit regime OR the derived `<domain>[/<subject>]`
-        /// pair, never both — enforced in `canon_cli::retrieve` (exit
-        /// `2` on violation), never a clap group.
-        #[arg(long, value_parser = canon_cli::retrieve::parse_regime)]
-        regime: Option<RegimeKey>,
-        /// s36 `subject-domain-loop`: derive the retrieval regime from
-        /// a `domain` (kebab slug), trying `<domain>/<subject_id>` then
-        /// `<domain>` in the `<area>` segment (fallback hierarchy).
-        /// Mutually exclusive with `--regime`.
-        #[arg(long)]
-        domain: Option<String>,
-        /// s36 `subject-domain-loop`: narrows the `--domain`-derived
-        /// regime to one `subject_id` (tried before the domain-only
-        /// fallback). Requires `--domain`; mutually exclusive with
-        /// `--regime`.
-        #[arg(long, value_parser = canon_cli::retrieve::parse_subject)]
-        subject: Option<SubjectId>,
-        /// Top-`k` cap, defaulting to
-        /// `canon_learn::guidance::DEFAULT_K` when omitted.
-        #[arg(long)]
-        k: Option<usize>,
-        /// Repo root — resolved via
-        /// `canon_cli::context::resolve_repo_root` (design D7), same
-        /// as `canon context`/`canon gate`.
+    /// Show what you can author here: record kinds, fields, enums, policies
+    Context {
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Machine-readable output (the raw `Vec<StrategyRef>`
-        /// snapshot, the exact shape `Run::injected_guidance` would
-        /// embed) instead of the default human table.
+        /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
     },
-    /// Serialize + validate one canonical `regime_key`
-    /// (`<role>/<repo>/<area>/<hash>`) from raw segments — the
-    /// SHELL-facing counterpart to `canon_model::ids::regime_key`, the
-    /// ONE serializer S4/S6/S7/S8's Rust write+read paths all call
-    /// (design decision 1, "no second key derivation"). Exists so hook
-    /// / script authors (S8's `pre-dispatch.sh`) assemble the retrieval
-    /// `--regime` through this EXACT normalizer instead of a second,
-    /// drifting shell derivation that could write `my_repo` yet query
-    /// `my-repo` and silently miss the namespace
-    /// (`s8-retrieve-before-task` whole-branch-review fix). Prints the
-    /// validated key and exits `0`; on a malformed result (empty
-    /// segment, or a non-hex/too-short `<hash>`) reports to stderr and
-    /// exits `2` with nothing on stdout — a caller's own `|| exit 0`
-    /// turns that into a clean fail-soft branch.
-    RegimeKey {
-        /// The `<role>` segment; canonicalized (trimmed, lowercased,
-        /// whitespace/`/` runs collapsed to `-`, all other characters
-        /// preserved) exactly as the Rust write path canonicalizes it.
-        #[arg(long)]
-        role: String,
-        /// The `<repo>` segment (same canonicalization) — typically the
-        /// repo directory basename.
-        #[arg(long)]
-        repo: String,
-        /// The `<area>` segment (same canonicalization).
-        #[arg(long)]
-        area: String,
-        /// The `<hash>` segment — passed through lowercased/trimmed,
-        /// never re-hashed here (a 6-64-char lowercase hex digest the
-        /// caller owns, e.g. S3's session digest or an area digest).
-        #[arg(long)]
-        hash: String,
-    },
-    /// S9 part2 (`s9-unified-surface`, design D1/D2/D3): the CLI
-    /// surface over `canon-report`'s library API — generate the
-    /// markdown status report (default), byte-diff it against the
-    /// committed copy (`--check`), or export the panel marts to
-    /// Parquet + `manifest.json` (`--snapshot <dir>`). See
-    /// `canon_cli::report`'s module doc for root/roots resolution.
-    Report {
-        /// Repo root — resolved via
-        /// `canon_cli::context::resolve_repo_root` (design D7), same
-        /// as `canon context`/`canon fmt`/`canon gate`/`canon retrieve`.
-        #[arg(long, default_value = ".")]
-        repo: PathBuf,
-        /// Regenerate the report in memory and byte-diff it against
-        /// the existing `.canon/REPORT.md` (design D2): exit `0` on no
-        /// drift, `1` on `MISSING`/`DRIFT`. Mutually exclusive with
-        /// `--snapshot` — when both are given, `--snapshot` wins.
+
+    // ── Specs & authoring ──
+    /// Validate a spec/artifact corpus against canon's format
+    #[command(name = "format", visible_alias = "fmt", after_help = "Examples:\n  canon format spec\n  canon format spec --repo ~/work/myrepo")]
+    Format {
+        /// Validate and report violations (the default; kept for compatibility)
         #[arg(long)]
         check: bool,
-        /// Export every panel mart to `<dir>/<table>.parquet` plus a
-        /// declared `<dir>/manifest.json` (design D3) instead of
-        /// writing/checking the markdown report.
+        /// Corpus root, e.g. a consumer repo's spec/ directory
+        root: PathBuf,
+        /// Repo root the corpus is resolved under (default: root used as-is)
         #[arg(long)]
-        snapshot: Option<PathBuf>,
+        repo: Option<PathBuf>,
     },
-    /// S9 part3 (`s9-unified-surface`, tasks.md 6.1): serves the built
-    /// `packages/dashboard` app locally, pointed at a snapshot via the
-    /// app's own `?snapshot=` override. See `canon_cli::dashboard`'s
-    /// module doc for the two-route server shape and the
-    /// default-vs-explicit `--snapshot` regeneration rule.
-    Dashboard {
-        /// Repo root — resolved via
-        /// `canon_cli::context::resolve_repo_root` (design D7), same
-        /// as every other subcommand.
+    /// Scaffold a new .feature spec file
+    Feature {
+        #[command(subcommand)]
+        action: FeatureCommand,
+    },
+    /// Add a tagged scenario to a .feature spec file
+    Scenario {
+        #[command(subcommand)]
+        action: ScenarioCommand,
+    },
+    /// Create and manage subjects (durable product units)
+    Subject {
+        #[command(subcommand)]
+        action: SubjectCommand,
+    },
+    /// Index a validated .feature corpus into the scenario ledger
+    Inventory {
+        #[command(subcommand)]
+        action: InventoryCommand,
+    },
+
+    // ── Evidence loop ──
+    /// Run evidence gates, flip task checkboxes, install hooks
+    #[command(after_help = "Examples:\n  canon gate check\n  canon gate task my-change#3\n  canon gate install-hooks")]
+    Gate {
+        #[command(subcommand)]
+        action: GateCommand,
+    },
+    /// Record an attributed review verdict
+    Review {
+        #[command(subcommand)]
+        action: ReviewCommand,
+    },
+    /// Stage, promote, resolve, and inspect spec divergences
+    Divergence {
+        #[command(subcommand)]
+        action: DivergenceCliCommand,
+    },
+
+    // ── Ingest & memory ──
+    /// Import agent sessions, artifacts, and plans into canon's store
+    #[command(after_help = "Examples:\n  canon ingest sessions --watch\n  canon ingest artifacts\n  canon ingest plans")]
+    Ingest {
+        #[command(subcommand)]
+        action: IngestCommand,
+    },
+    /// Fetch role-scoped strategy guidance
+    Retrieve {
+        /// Role scope; with --regime must equal its leading segment
+        #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
+        role: RoleId,
+        /// Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject
+        #[arg(long, value_parser = canon_cli::retrieve::parse_regime)]
+        regime: Option<RegimeKey>,
+        /// Derive the regime from a domain slug; mutually exclusive with --regime
+        #[arg(long)]
+        domain: Option<String>,
+        /// Narrow --domain to one subject_id; requires --domain, mutually exclusive with --regime
+        #[arg(long, value_parser = canon_cli::retrieve::parse_subject)]
+        subject: Option<SubjectId>,
+        /// Top-k cap (default: canon's DEFAULT_K)
+        #[arg(long)]
+        k: Option<usize>,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Directory to serve the snapshot from. Omitted: regenerated
-        /// fresh on every run at the conventional
-        /// `.canon/dashboard-snapshot` scratch dir — "the repo's last
-        /// `canon report --snapshot` output" (task 6.1) IS whatever
-        /// this run just produced there. Given: served as-is when it
-        /// already has a `manifest.json`, else generated there once
-        /// (never silently regenerated over a caller-provided
-        /// snapshot).
+        /// Output JSON instead of the human-readable form
         #[arg(long)]
-        snapshot: Option<PathBuf>,
-        /// Local port to bind — `0` picks any OS-assigned free port
-        /// (the actually-bound port is always printed regardless of
-        /// what was requested). Defaults to the same port
-        /// `packages/dashboard`'s own `bun run preview` uses.
-        #[arg(long, default_value_t = 4173)]
-        port: u16,
+        json: bool,
     },
-    /// S6 (`role-strategy-memory`, task group 4): promote a distilled
-    /// strategy from the operator-local parquet warm tier up into the
-    /// git-tracked, PR-reviewed tier (`.canon/strategies/<role>/<id>.md`).
-    /// See `canon_cli::learn`'s module doc.
+    /// Promote a proven strategy into the git-tracked tier
     Learn {
         #[command(subcommand)]
         action: LearnCommand,
     },
-    /// S8 (`retrieve-before-task`, task 2.3): the live run-manifest write
-    /// seam — retrieve role+regime guidance at dispatch time and record
-    /// it verbatim into a `Run` manifest. See `canon_cli::dispatch`.
+    /// Begin an agent run with retrieved guidance recorded
     Dispatch {
         #[command(subcommand)]
         action: DispatchCommand,
     },
-    /// Run every registered crate's fixture-corpus self-test and diff
-    /// against its EXPECTED oracle (design §8, `canon selftest`). Additive
-    /// alongside `canon gate selftest`; see `canon_cli::selftest`.
+    /// Build a canonical regime key for hook scripts
+    RegimeKey {
+        /// The <role> segment (canonicalized)
+        #[arg(long)]
+        role: String,
+        /// The <repo> segment (canonicalized)
+        #[arg(long)]
+        repo: String,
+        /// The <area> segment (canonicalized)
+        #[arg(long)]
+        area: String,
+        /// The <hash> segment (6-64-char lowercase hex; passed through, never re-hashed)
+        #[arg(long)]
+        hash: String,
+    },
+
+    // ── Reading & reporting ──
+    /// Read stored records across every storage tier
+    Query {
+        /// Record kind to read (e.g. handoff, strategy_item)
+        #[arg(long, value_parser = canon_cli::query::parse_kind)]
+        kind: RecordKind,
+        /// Only records with at >= <since> (RFC3339/ISO-8601)
+        #[arg(long, value_parser = canon_cli::query::parse_since)]
+        since: Option<DateTime<Utc>>,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Explicit canon.yaml path (overrides --repo resolution)
+        #[arg(long)]
+        canon_yaml: Option<PathBuf>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+        /// Project a plugin's overlay fields onto each record (fail-soft)
+        #[arg(long)]
+        plugin: Option<String>,
+        /// Scope --kind change/task to one ChangeId (other kinds exit 2)
+        #[arg(long, value_parser = canon_cli::query::parse_change_id)]
+        change_id: Option<ChangeId>,
+        /// Scope --kind change/task by status field (other kinds exit 2)
+        #[arg(long)]
+        status: Option<String>,
+        /// Scope --kind subject by domain (other kinds exit 2)
+        #[arg(long)]
+        domain: Option<String>,
+    },
+    /// Generate the status report (write, --check, or --snapshot)
+    Report {
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Byte-diff against .canon/REPORT.md (0 clean, 1 drift); --snapshot wins if both given
+        #[arg(long)]
+        check: bool,
+        /// Export panel marts to <dir>/*.parquet + manifest.json instead
+        #[arg(long)]
+        snapshot: Option<PathBuf>,
+    },
+    /// Serve the local status dashboard
+    Dashboard {
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Snapshot dir to serve (default: regenerated fresh each run)
+        #[arg(long)]
+        snapshot: Option<PathBuf>,
+        /// Local port to bind (0 = OS-assigned free port)
+        #[arg(long, default_value_t = 4173)]
+        port: u16,
+    },
+
+    // ── Maintenance ──
+    /// Sync plugin overlay records onto the ledger
+    Plugin {
+        #[command(subcommand)]
+        action: PluginCommand,
+    },
+    /// Install canon's agent guides into a repo
+    Skills {
+        #[command(subcommand)]
+        action: SkillsCommand,
+    },
+    /// Age records between storage tiers
+    Tier {
+        #[command(subcommand)]
+        action: TierCommand,
+    },
+    /// Run canon's built-in fixture self-tests
     Selftest {
-        /// Emit a machine-readable per-suite JSON summary.
+        /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
     },
@@ -467,21 +288,15 @@ enum Command {
 
 #[derive(Subcommand)]
 enum LearnCommand {
-    /// Promote one distilled `StrategyItem` (by id) into the git tier
-    /// (`canon_learn::promote_strategy`), running the advisory promote
-    /// lint (content length + literal absolute paths) as non-blocking
-    /// stderr warnings.
+    /// Promote a distilled strategy (by id) into .canon/strategies/
     Promote {
-        /// The `StrategyId` (ULID) to promote — a malformed id is a
-        /// clap usage error (exit `2`), never reaching the command body.
+        /// The StrategyId (ULID) to promote
         #[arg(value_parser = canon_cli::learn::parse_strategy_id)]
         strategy_id: StrategyId,
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`
-        /// (design D7), same as every other subcommand.
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Preview the promotion (target path + advisory warnings)
-        /// without writing the git-tier file.
+        /// Preview without writing anything
         #[arg(long)]
         dry_run: bool,
     },
@@ -489,20 +304,15 @@ enum LearnCommand {
 
 #[derive(Subcommand)]
 enum DemoCommand {
-    /// Scaffold the throwaway demo repo (real `canon init` config + a
-    /// `reviewer`-requiring `policy.yaml` + one seeded dev evidence
-    /// record). Leaves `canon gate check` RED with `uncovered-cell`.
+    /// Scaffold the demo repo (gate starts RED)
     Init {
-        /// Repo root the demo scaffolds into — used AS-IS (never an
-        /// ancestor walk), same as `canon init`. Refuses to overwrite an
-        /// existing `canon.yaml`.
+        /// Directory to set up (used as-is)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
-    /// Record the missing reviewer evidence, turning `canon gate check`
-    /// GREEN.
+    /// Record the missing reviewer evidence (gate turns GREEN)
     Attest {
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`.
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
@@ -510,28 +320,21 @@ enum DemoCommand {
 
 #[derive(Subcommand)]
 enum DispatchCommand {
-    /// Mint a `Run` (status `Running`), retrieve `--role`/`--regime`
-    /// guidance, record it into the run's `injected_guidance`, and write
-    /// the manifest to `<repo>/.canon/dispatch/<run_id>.json` (a private
-    /// side-channel, never canon-store's git tier — see
-    /// `canon_cli::dispatch`'s module doc).
+    /// Mint a Run manifest with retrieved guidance recorded into it
     Begin {
-        /// The role about to run — MUST equal `--regime`'s leading
-        /// segment (design decision 1).
+        /// Role about to run; must equal --regime's leading segment
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
-        /// The full `regime_key` (`<role>/<repo>/<area>/<hash>`) to
-        /// retrieve guidance for.
+        /// Full regime key (<role>/<repo>/<area>/<hash>) to retrieve guidance for
         #[arg(long, value_parser = canon_cli::retrieve::parse_regime)]
         regime: RegimeKey,
-        /// The dispatching agent's id (recorded as the run's actor).
+        /// The dispatching agent's id (recorded as the run's actor)
         #[arg(long, default_value = "canon")]
         agent_id: String,
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`.
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Emit the machine-readable JSON summary (run_id + manifest path
-        /// + the recorded guidance) instead of the human line.
+        /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
     },
@@ -539,104 +342,54 @@ enum DispatchCommand {
 
 #[derive(Subcommand)]
 enum IngestCommand {
-    /// Scan every registered `canon-ingest` adapter's session store
-    /// (`omp`/`pi`, Claude Code, Codex, Hermes), normalize into
-    /// canon-model `Session`/`Run`/`Event` records, and persist through
-    /// `canon-store`'s write path (S3 task 5.1). Defaults to THIS
-    /// PROJECT's own sessions — the repo's main `git worktree` root
-    /// plus every linked one (s31 design D3); see `--all-workspaces`.
+    /// Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes)
     Sessions {
-        /// Poll the configured roots on an interval instead of exiting
-        /// after one pass. Each pass applies the s31 D1 per-file
-        /// watermark gate ([`canon_store::cursor::SourceCursor::diff`]):
-        /// a file whose content is byte-identical to its persisted
-        /// cursor entry is skipped, so a steady-state `--watch` loop
-        /// re-parses only the files that actually changed
-        /// (correctness still rests on canon-store's digest-suffixed
-        /// idempotent write path — the watermark removes wasted
-        /// parse/normalize/persist work above it).
+        /// Keep polling instead of exiting after one pass
         #[arg(long)]
         watch: bool,
-        /// Seconds between `--watch` passes.
+        /// Seconds between polls
         #[arg(long, default_value_t = 30)]
         interval_secs: u64,
-        /// The scan root's home directory (defaults to `$HOME`).
+        /// The scan root's home directory (defaults to $HOME)
         #[arg(long)]
         home: Option<PathBuf>,
-        /// This repo's `canon.yaml` (S2's `TierPolicy` source) — the
-        /// same tier resolution `canon query`/`canon tier age` use.
+        /// This repo's canon.yaml (tier-policy source)
         #[arg(long, default_value = "canon.yaml")]
         canon_yaml: PathBuf,
-        /// Ignore the persisted watermark cursors and re-parse every
-        /// present (in-scope) file this pass (a full rescan / cursor
-        /// reset). The digest-idempotent write path keeps a forced
-        /// re-ingest from double-writing; cursors are re-advanced
-        /// afterward.
+        /// Ignore watermark cursors and re-parse every in-scope file
         #[arg(long)]
         full: bool,
-        /// Scan every workspace on this machine instead of the s31 D3
-        /// default project scope (this repo's main worktree + every
-        /// linked `git worktree` root) — restores the pre-s31
-        /// machine-wide corpus. `Session.project_key` is still stamped
-        /// on any session whose workspace resolves into this repo's
-        /// project set even with this flag set.
+        /// Scan every workspace on this machine, not just this project
         #[arg(long)]
         all_workspaces: bool,
     },
-    /// S14 (`s14-artifact-ingest-cli`): run the artifact/verdict half of
-    /// canon's join spine — the `ledger`/`divergence`/`openspec-task`
-    /// path-source adapters (config-driven scan) plus the `handoff`
-    /// records-source adapter (this driver reads canon's own `Handoff`
-    /// records off canon-store's `Tier` and feeds them in) — derive
-    /// verdicts (S4), fold into regime-keyed trajectories, and persist
-    /// via `canon-learn`'s `store_trajectory` + `rebuild_namespace`
-    /// into the SAME store `canon retrieve` (S8) and `canon report`'s
-    /// `mart_role_memory`/`mart_flywheel_funnel` (S9) already read. See
-    /// `canon_cli::artifact_ingest`'s module doc.
+    /// Import review/divergence/task/handoff artifacts and derive verdicts
     Artifacts {
-        /// Poll on an interval instead of exiting after one pass.
-        /// Unlike `sessions`, a re-scan is NOT yet write-idempotent (S4
-        /// tasks.md group 6 "Idempotence" is unshipped upstream) — a
-        /// repeated pass over an unchanged corpus persists FRESH
-        /// trajectories rather than deduping.
+        /// Keep polling instead of exiting after one pass
         #[arg(long)]
         watch: bool,
-        /// Seconds between `--watch` passes.
+        /// Seconds between polls
         #[arg(long, default_value_t = 30)]
         interval_secs: u64,
-        /// Repo root — resolved via
-        /// `canon_cli::context::resolve_repo_root` (design D7), same
-        /// as `canon context`/`canon gate`/`canon retrieve`.
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Emit the machine-readable JSON outcome instead of the
-        /// default human summary.
+        /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
     },
-    /// s17 P3 (`s17-plan-import`): the plan-import connector meets
-    /// canon-store -- the third instance of `ingest sessions`/`ingest
-    /// artifacts`'s adapter -> normalize -> persist shape, generalized
-    /// to `canon_ingest::plan_registry`'s `PlanAdapter`s (`openspec`,
-    /// s17's reference dialect). No `--watch` (design D2: plans are
-    /// operator-pulled, not streamed). See `canon_cli::plans`'s module
-    /// doc.
+    /// Import a plan corpus (openspec, superpowers) as Change/Task records
     Plans {
-        /// One-shot override: import exactly this dialect's `--source`
-        /// root, bypassing `canon.yaml`'s `plans:` section entirely.
-        /// REQUIRES `--source` (either flag alone fails loud).
+        /// One-shot override: import this dialect's --source root (requires --source)
         #[arg(long)]
         dialect: Option<String>,
-        /// One-shot override's source root (paired with `--dialect`).
+        /// One-shot override's source root (paired with --dialect)
         #[arg(long)]
         source: Option<PathBuf>,
-        /// Repo root -- resolved via
-        /// `canon_cli::context::resolve_repo_root` (design D7), same
-        /// as `canon context`/`canon gate`/`canon ingest artifacts`.
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Emit the machine-readable JSON outcome instead of the
-        /// default human summary.
+        /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
     },
@@ -644,77 +397,57 @@ enum IngestCommand {
 
 #[derive(Subcommand)]
 enum GateCommand {
-    /// Assemble + run the coverage/ledger/staleness/trust-ladder
-    /// `GateCheck` set (task 1.9, `canon_gate::check_set`) over the
-    /// resolved repo's evidence corpus, printing violations by failure
-    /// class. Exit `0` clean / `1` gate-red / `2` usage-or-load failure.
+    /// Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
     Check {
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`
-        /// (design D7), same as `canon context`/`canon fmt`.
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Additionally engage the release-scoped `ReleaseTrustCheck`
-        /// (`trust-below-required`, D7/spec.md "does not block ordinary
-        /// (non-release) evaluation") — the always-on trust-ladder
-        /// check is never dropped either way (`canon_gate::dispatch`).
+        /// Additionally engage the release-scoped trust check
         #[arg(long)]
         release: bool,
     },
-    /// Evidence-gated checkbox flip for one openspec `task_id`
-    /// (`<change_id>#<n>`, S1 join spine) — fails closed (row stays
-    /// unflipped) on missing, malformed, or fabricated evidence.
+    /// Flip one task checkbox, gated on real evidence (fails closed)
     Task {
+        /// The openspec task id (<change_id>#<n>)
         task_id: String,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
-    /// Promote `_staging/` evidence records to the committed ledger,
-    /// assigning a monotonic per-(role, surface) `run_seq` (O13).
+    /// Promote staged evidence records to the committed ledger
     Promote {
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Print the plan (target, assigned `run_seq`) without writing
-        /// or deleting anything.
+        /// Preview without writing anything
         #[arg(long)]
         dry_run: bool,
     },
-    /// Idempotent, diff-only hook-seam installation into
-    /// `.claude/settings.json`/`.codex/hooks.json` (design D8), plus a
-    /// generic pre-commit script for a repo with no existing `canon
-    /// gate`-invoking hook entries.
+    /// Install the gate hook into .claude/settings.json / .codex/hooks.json
     InstallHooks {
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// The hook event name (Claude-Code/Codex convention, e.g.
-        /// `PreToolUse`, `Stop`).
+        /// The hook event name (e.g. PreToolUse, Stop)
         #[arg(long, default_value = "PreToolUse")]
         event: String,
-        /// Omitted for a matcher-less event (round-trips with no
-        /// `matcher` key at all, never a JSON `null`).
+        /// Omitted for a matcher-less event
         #[arg(long)]
         matcher: Option<String>,
-        /// Defaults to `canon gate task` — the evidence-gated task-flip
-        /// entry point (gated-task-completion spec.md "Hook-seam wiring
-        /// generation"), not the read-only `canon gate check`.
+        /// The command the hook runs
         #[arg(long, default_value = "canon gate task")]
         command: String,
+        /// Hook timeout in seconds
         #[arg(long, default_value_t = 30)]
         timeout: u32,
     },
-    /// Run the shipped fixture corpus (task 5.2): every
-    /// `FAILURE_CLASSES` string proven to fire on its own fixture,
-    /// exact-set-match against `expected_failures.txt`. Takes no
-    /// `--repo` — self-contained, never touches a real repo.
+    /// Run the gate's self-contained fixture self-test
     Selftest,
 }
 
 #[derive(Subcommand)]
 enum ReviewCommand {
-    /// `canon review add` (s15 P3b, native-verdict-lifecycle spec):
-    /// writes ONE native, attributed `Review` record. Exactly one of
-    /// `--upstream-ref`/`--original-spec-ref` is REQUIRED — neither given
-    /// (or both given) refuses the write and exits non-zero, never
-    /// synthesizing a ref.
+    /// Write one attributed Review record (exactly one provenance ref required)
     Add {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
@@ -724,20 +457,18 @@ enum ReviewCommand {
         reviewer: String,
         #[arg(long)]
         pin: String,
-        /// Provenance ref option 1 of 2 — mutually exclusive with
-        /// `--original-spec-ref`; exactly one is required.
+        /// Provenance ref (mutually exclusive with --original-spec-ref; exactly one required)
         #[arg(long)]
         upstream_ref: Option<String>,
-        /// Provenance ref option 2 of 2 — mutually exclusive with
-        /// `--upstream-ref`; exactly one is required.
+        /// Provenance ref (mutually exclusive with --upstream-ref; exactly one required)
         #[arg(long)]
         original_spec_ref: Option<String>,
-        /// The invoking actor's id, attributed onto the written
-        /// `Review`'s envelope.
+        /// The invoking actor's id
         #[arg(long, default_value = "canon")]
         actor_id: String,
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
@@ -745,11 +476,7 @@ enum ReviewCommand {
 
 #[derive(Subcommand)]
 enum DivergenceCliCommand {
-    /// Write ONE unordered staging candidate carrying no `run_seq` —
-    /// `--status` accepts `open`/`still-divergent`/`resolved`/
-    /// `deferred` (`deferred` additionally requires `--reason`/
-    /// `--expiry`). `canon divergence promote` assigns the monotonic
-    /// `run_seq` later.
+    /// Stage a divergence candidate (no run_seq yet)
     Stage {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
@@ -757,6 +484,7 @@ enum DivergenceCliCommand {
         scenario_id: ScenarioId,
         #[arg(long, value_parser = canon_cli::divergence::parse_sha)]
         sha: Sha,
+        /// open / still-divergent / resolved / deferred (deferred needs --reason/--expiry)
         #[arg(long, default_value = "open")]
         status: String,
         #[arg(long)]
@@ -773,20 +501,20 @@ enum DivergenceCliCommand {
         actor_id: String,
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
-    /// Batch-promote every currently-staged `Divergence` candidate,
-    /// assigning each a monotonic `run_seq` within its
-    /// `(project_id, role, surface)` partition.
+    /// Promote all staged candidates, assigning run_seq
     Promote {
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Preview without writing anything
         #[arg(long)]
         dry_run: bool,
     },
-    /// Direct-commit a `Resolved` candidate — never touches the batch
-    /// staging directory (`canon_cli::divergence`'s module doc).
+    /// Directly record a resolved divergence
     Resolve {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
@@ -804,11 +532,11 @@ enum DivergenceCliCommand {
         actor_id: String,
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
-    /// Direct-commit a `Deferred { reason, expiry }` candidate — never
-    /// touches the batch staging directory.
+    /// Directly record a deferred divergence (requires --reason/--expiry)
     Defer {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
@@ -828,16 +556,16 @@ enum DivergenceCliCommand {
         actor_id: String,
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
-    /// The S9 divergence burn-down's CURRENT-STATE view (task 4.5):
-    /// `canon_report::divergence::current_states`/`summarize` — see
-    /// `canon_cli::divergence::run_status`'s own doc.
+    /// Show the current divergence burn-down state
     Status {
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Governs `Deferred` expiry; defaults to now.
+        /// Governs Deferred expiry; defaults to now
         #[arg(long, value_parser = canon_cli::divergence::parse_timestamp)]
         as_of: Option<DateTime<Utc>>,
     },
@@ -845,19 +573,12 @@ enum DivergenceCliCommand {
 
 #[derive(Subcommand)]
 enum InventoryCommand {
-    /// See `Command::Inventory`'s doc.
+    /// Validate each spec root, then materialize scenario index records
     Sync {
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`
-        /// (design D7), same as `canon context`/`canon fmt`/`canon gate`.
-        /// Its `canon.yaml` supplies BOTH the `specs.roots[]` config (D3)
-        /// and the ledger `tiers.git.root` records are written through
-        /// (`GateCtx::from_repo`).
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Override `canon.yaml`'s `specs.roots[]` config entirely and
-        /// sync exactly ONE ad hoc root at this directory, under the
-        /// same stable literal id the absent-`specs:` default uses.
-        /// Absent: resolve every configured root from `canon.yaml`.
+        /// Sync exactly one ad hoc root, overriding canon.yaml's specs.roots[]
         #[arg(long)]
         spec_root: Option<PathBuf>,
     },
@@ -865,23 +586,14 @@ enum InventoryCommand {
 
 #[derive(Subcommand)]
 enum PluginCommand {
-    /// See `Command::Plugin`'s doc.
+    /// Validate and write a plugin's overlay records
     Sync {
-        /// A `.canon/plugins/<id>/plugin.yaml` manifest `id` (s16 P4) —
-        /// e.g. `porting`. Matched against each registered
-        /// `canon_cli::plugin_sync::OverlaySource::plugin_id()` by
-        /// string equality (`canon_cli::plugin_sync`'s module doc).
+        /// A .canon/plugins/<id>/plugin.yaml manifest id (e.g. porting)
         plugin_id: String,
-        /// Repo root — resolved the SAME way `canon inventory sync`
-        /// resolves it (`canon_cli::plugin_sync::run_sync`'s own doc:
-        /// reuses `canon_cli::inventory::SyncCtx` verbatim), so a
-        /// `canon plugin sync porting` run writes into the SAME git
-        /// tier `canon query --plugin porting` reads.
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Override `canon.yaml`'s `specs.roots[]` config entirely and
-        /// sync exactly ONE ad hoc root at this directory — identical
-        /// override semantics to `canon inventory sync --spec-root`.
+        /// Sync exactly one ad hoc root, overriding canon.yaml's specs.roots[]
         #[arg(long)]
         spec_root: Option<PathBuf>,
     },
@@ -889,33 +601,18 @@ enum PluginCommand {
 
 #[derive(Subcommand)]
 enum ScenarioCommand {
-    /// See `Command::Scenario`'s doc.
+    /// Append a tagged scenario stub to its .feature file (created if missing)
     New {
-        /// `<area>.<surface>.<nn>` — the scenario tag this stub
-        /// carries (`canon_model::ids::ScenarioId`'s own grammar,
-        /// reused verbatim via `canon_cli::scaffold::parse_scenario_tag`
-        /// — a malformed tag is a clap usage error, exit `2`, never
-        /// reaching the command body).
+        /// <area>.<surface>.<nn> scenario tag
         #[arg(value_parser = canon_cli::scaffold::parse_scenario_tag)]
         tag: ScenarioId,
-        /// The `Scenario:` header label.
+        /// The Scenario: header label
         #[arg(long)]
         title: String,
-        /// The `.feature` file to append to (created fresh, with its
-        /// own `Feature:` header, if it doesn't exist yet) — relative
-        /// to `--repo` unless absolute. s19 `derived-validated-
-        /// scenario-feature`: OPTIONAL — omitted, the target is
-        /// derived from `<tag>`'s own `area`/`surface` via the SAME
-        /// join `canon feature new` uses (design D1/D2); given, it
-        /// MUST resolve under a configured `specs.roots[]` entry or
-        /// the command refuses (design D3).
+        /// Target .feature file (default: derived from <tag>; must live under a specs.roots[] entry)
         #[arg(long)]
         feature: Option<PathBuf>,
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`
-        /// (design D7), same as every other subcommand. Its
-        /// `canon.yaml` `specs.roots[]` (design D3) is the "target
-        /// feature corpus" the duplicate-tag rejection scans
-        /// (`canon_cli::scaffold::run_scenario_new`'s own doc).
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
@@ -923,21 +620,15 @@ enum ScenarioCommand {
 
 #[derive(Subcommand)]
 enum FeatureCommand {
-    /// See `Command::Feature`'s doc.
+    /// Create a fresh .feature file for a new area.surface
     New {
-        /// `<area>.<surface>` — the not-yet-started surface this
-        /// fresh `.feature` file scaffolds.
+        /// <area>.<surface> the fresh .feature file scaffolds
         #[arg(value_parser = canon_cli::scaffold::parse_area_surface)]
         surface: AreaSurface,
-        /// The `Feature:` header label.
+        /// The Feature: header label
         #[arg(long)]
         title: String,
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`
-        /// (design D7). The file path is derived from the SAME single
-        /// configured `specs.roots[]` entry `canon inventory sync`
-        /// would resolve — this command refuses a multi-root config;
-        /// no `--spec-root` override exists here to disambiguate
-        /// (`canon_cli::scaffold::run_feature_new`'s own doc).
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
@@ -945,70 +636,60 @@ enum FeatureCommand {
 
 #[derive(Subcommand)]
 enum SubjectCommand {
-    /// `canon subject new <id> --domain <d> --title <t>` — author a
-    /// fresh `Subject` at status `proposed`. See `canon_cli::subject`.
+    /// Author a new subject at status `proposed`
     New {
-        /// The subject's kebab-slug id (`SubjectId` grammar).
+        /// The subject's kebab-slug id
         #[arg(value_parser = canon_cli::subject::parse_subject_id)]
         id: SubjectId,
-        /// The subject's domain (kebab slug; base vocabulary
-        /// `planning`/`design`/`dev`/`data`/`test` lives in
-        /// `.canon/vocab`). Shape-validated at write.
+        /// The subject's domain (kebab slug)
         #[arg(long)]
         domain: String,
-        /// The `Subject.title`.
+        /// The subject's title
         #[arg(long)]
         title: String,
-        /// The `Subject.summary` (optional).
+        /// The subject's summary (optional)
         #[arg(long, default_value = "")]
         summary: String,
-        /// The accountable owning role (`Subject.owner_role`) and the
-        /// authoring envelope's role. Defaults to `implementer`.
+        /// The accountable owning role (default: implementer)
         #[arg(long, value_parser = canon_cli::retrieve::parse_role, default_value = "implementer")]
         owner_role: RoleId,
-        /// The invoking actor's id, stamped onto the envelope
-        /// (mirrors `canon review add`'s `--actor-id`).
+        /// The invoking actor's id
         #[arg(long, default_value = "canon")]
         actor_id: String,
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`.
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Emit the written record as JSON.
+        /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
     },
-    /// `canon subject adopt <change_id> --subject <id>` — link an
-    /// imported plan change to a subject (stamps `Change.subject_id`,
-    /// appends to `Subject.change_ids`). See `canon_cli::subject`.
+    /// Link an imported plan change to a subject
     Adopt {
-        /// The imported `Change`'s id.
+        /// The imported Change's id
         #[arg(value_parser = canon_cli::subject::parse_change_id)]
         change_id: ChangeId,
-        /// The `Subject` to adopt the change under.
+        /// The subject to adopt the change under
         #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
         subject: SubjectId,
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`.
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Emit the updated subject record as JSON.
+        /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
     },
-    /// `canon subject status <id> <state>` — apply a policy-gated
-    /// lifecycle transition; `verifying → shipped` is evidence-gated.
-    /// See `canon_cli::subject`.
+    /// Transition a subject's lifecycle status (shipping is evidence-gated)
     Status {
-        /// The `Subject` to transition.
+        /// The subject to transition
         #[arg(value_parser = canon_cli::subject::parse_subject_id)]
         id: SubjectId,
-        /// The target lifecycle state (`proposed`/`specced`/`building`/
-        /// `verifying`/`shipped`/`retired`).
+        /// Target state (proposed/specced/building/verifying/shipped/retired)
         #[arg(value_parser = canon_cli::subject::parse_status)]
         state: canon_model::SubjectStatus,
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`.
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// Emit the updated subject record as JSON.
+        /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
     },
@@ -1016,14 +697,12 @@ enum SubjectCommand {
 
 #[derive(Subcommand)]
 enum SkillsCommand {
-    /// Materialize `canon/skills/<name>/SKILL.md` into `.claude/skills/`
-    /// and `.codex/skills/`, updating the content-hash + version lock.
+    /// Copy canon's skill guides into .claude/skills/ and .codex/skills/
     Install {
-        /// Directory holding `<name>/SKILL.md` sources (the canon
-        /// checkout's `canon/skills/` by convention).
+        /// Directory holding <name>/SKILL.md sources
         #[arg(long, default_value = "canon/skills")]
         source: PathBuf,
-        /// Consumer repo root to materialize `.claude/` and `.codex/` into.
+        /// Consumer repo root to materialize .claude/ and .codex/ into
         #[arg(long, default_value = ".")]
         target: PathBuf,
     },
@@ -1031,25 +710,15 @@ enum SkillsCommand {
 
 #[derive(Subcommand)]
 enum TierCommand {
-    /// Apply every `canon.yaml` `aging:` rule once, moving records past
-    /// their threshold to their configured destination tier (S2 task
-    /// 3.3, tier-policy spec).
+    /// Apply canon.yaml aging rules, moving old records to their destination tier
     Age {
-        /// Preview what would move (a read-only threshold scan) without
-        /// writing or deleting anything.
+        /// Preview without writing anything
         #[arg(long)]
         dry_run: bool,
-        /// Repo root — resolved via `canon_cli::context::resolve_repo_root`
-        /// (s26 D2), the SAME `repo`/`canon_yaml` precedence pair `canon
-        /// query` already ships. Ignored whenever `--canon-yaml` is also
-        /// supplied (`--canon-yaml` wins — see that flag's own doc).
+        /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        /// An explicit, literal `canon.yaml` path override that BYPASSES
-        /// `--repo`'s ancestor walk entirely — read AS-IS from exactly this
-        /// path, regardless of cwd. Takes precedence over `--repo` when
-        /// supplied. Omitted: `--repo`'s ancestor-walk resolution
-        /// (`resolve_repo_root(repo).join("canon.yaml")`) governs instead.
+        /// Explicit canon.yaml path (overrides --repo resolution)
         #[arg(long)]
         canon_yaml: Option<PathBuf>,
     },
@@ -1058,24 +727,23 @@ enum TierCommand {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
-        None => ExitCode::SUCCESS,
-        Some(Command::Skills { action }) => match action {
+        Command::Skills { action } => match action {
             SkillsCommand::Install { source, target } => run_skills_install(&source, &target),
         },
-        Some(Command::Tier { action }) => match action {
+        Command::Tier { action } => match action {
             TierCommand::Age { dry_run, repo, canon_yaml } => run_tier_age(&repo, canon_yaml.as_deref(), dry_run),
         },
-        Some(Command::Query { kind, since, repo, canon_yaml, json, plugin, change_id, status, domain }) => {
+        Command::Query { kind, since, repo, canon_yaml, json, plugin, change_id, status, domain } => {
             run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, change_id, status, domain)
         }
-        Some(Command::Fmt { check, root, repo }) => run_fmt(&root, repo.as_deref(), check),
-        Some(Command::Context { repo, json }) => run_context(&repo, json),
-        Some(Command::Ingest { action }) => match action {
+        Command::Format { check: _, root, repo } => run_fmt(&root, repo.as_deref()),
+        Command::Context { repo, json } => run_context(&repo, json),
+        Command::Ingest { action } => match action {
             IngestCommand::Sessions { watch, interval_secs, home, canon_yaml, full, all_workspaces } => run_ingest_sessions(&canon_yaml, home.as_deref(), watch, interval_secs, full, all_workspaces),
             IngestCommand::Artifacts { watch, interval_secs, repo, json } => run_ingest_artifacts(&repo, watch, interval_secs, json),
             IngestCommand::Plans { dialect, source, repo, json } => run_ingest_plans(&repo, dialect.as_deref(), source.as_deref(), json),
         },
-        Some(Command::Gate { action }) => match action {
+        Command::Gate { action } => match action {
             GateCommand::Check { repo, release } => ExitCode::from(canon_cli::gate::run_check(&repo, release) as u8),
             GateCommand::Task { task_id, repo } => ExitCode::from(canon_cli::gate::run_task(&repo, &task_id) as u8),
             GateCommand::Promote { repo, dry_run } => ExitCode::from(canon_cli::gate::run_promote(&repo, dry_run) as u8),
@@ -1084,12 +752,12 @@ fn main() -> ExitCode {
             }
             GateCommand::Selftest => ExitCode::from(canon_cli::gate::run_selftest() as u8),
         },
-        Some(Command::Review { action }) => match action {
+        Command::Review { action } => match action {
             ReviewCommand::Add { project_id, scenario_id, reviewer, pin, upstream_ref, original_spec_ref, actor_id, role, repo } => ExitCode::from(
                 canon_cli::review::run_add(&repo, &project_id, &scenario_id, &reviewer, &pin, upstream_ref.as_deref(), original_spec_ref.as_deref(), &actor_id, &role) as u8,
             ),
         },
-        Some(Command::Divergence { action }) => match action {
+        Command::Divergence { action } => match action {
             DivergenceCliCommand::Stage { project_id, scenario_id, sha, status, reason, expiry, round, reviewer, detail, actor_id, role, repo } => {
                 match canon_cli::divergence::parse_status(&status, reason.as_deref(), expiry) {
                     Ok(status) => ExitCode::from(canon_cli::divergence::run_stage(&repo, &project_id, &scenario_id, &sha, status, round, &reviewer, &detail, &actor_id, &role) as u8),
@@ -1108,41 +776,41 @@ fn main() -> ExitCode {
             }
             DivergenceCliCommand::Status { repo, as_of } => ExitCode::from(canon_cli::divergence::run_status(&repo, as_of) as u8),
         },
-        Some(Command::Inventory { action }) => match action {
+        Command::Inventory { action } => match action {
             InventoryCommand::Sync { repo, spec_root } => run_inventory_sync(&repo, spec_root.as_deref()),
         },
-        Some(Command::Plugin { action }) => match action {
+        Command::Plugin { action } => match action {
             PluginCommand::Sync { plugin_id, repo, spec_root } => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref()),
         },
-        Some(Command::Scenario { action }) => match action {
+        Command::Scenario { action } => match action {
             ScenarioCommand::New { tag, title, feature, repo } => run_scenario_new(&repo, &tag, &title, feature.as_deref()),
         },
-        Some(Command::Feature { action }) => match action {
+        Command::Feature { action } => match action {
             FeatureCommand::New { surface, title, repo } => run_feature_new(&repo, &surface, &title),
         },
-        Some(Command::Subject { action }) => match action {
+        Command::Subject { action } => match action {
             SubjectCommand::New { id, domain, title, summary, owner_role, actor_id, repo, json } => {
                 ExitCode::from(canon_cli::subject::run_new(&repo, &id, &domain, &title, &summary, &owner_role, &actor_id, json) as u8)
             }
             SubjectCommand::Adopt { change_id, subject, repo, json } => ExitCode::from(canon_cli::subject::run_adopt(&repo, &change_id, &subject, json) as u8),
             SubjectCommand::Status { id, state, repo, json } => ExitCode::from(canon_cli::subject::run_status(&repo, &id, state, json) as u8),
         },
-        Some(Command::Init { repo, check_config }) => run_init(&repo, check_config),
-        Some(Command::Demo { action }) => match action {
+        Command::Init { repo, check_config } => run_init(&repo, check_config),
+        Command::Demo { action } => match action {
             DemoCommand::Init { repo } => ExitCode::from(canon_cli::demo::run_demo_init(&repo) as u8),
             DemoCommand::Attest { repo } => ExitCode::from(canon_cli::demo::run_demo_attest(&repo) as u8),
         },
-        Some(Command::Retrieve { role, regime, domain, subject, k, repo, json }) => run_retrieve(&repo, &role, regime.as_ref(), domain.as_deref(), subject.as_ref(), k, json),
-        Some(Command::Report { repo, check, snapshot }) => run_report(&repo, check, snapshot.as_deref()),
-        Some(Command::Dashboard { repo, snapshot, port }) => run_dashboard(&repo, snapshot.as_deref(), port),
-        Some(Command::RegimeKey { role, repo, area, hash }) => run_regime_key(&role, &repo, &area, &hash),
-        Some(Command::Learn { action }) => match action {
+        Command::Retrieve { role, regime, domain, subject, k, repo, json } => run_retrieve(&repo, &role, regime.as_ref(), domain.as_deref(), subject.as_ref(), k, json),
+        Command::Report { repo, check, snapshot } => run_report(&repo, check, snapshot.as_deref()),
+        Command::Dashboard { repo, snapshot, port } => run_dashboard(&repo, snapshot.as_deref(), port),
+        Command::RegimeKey { role, repo, area, hash } => run_regime_key(&role, &repo, &area, &hash),
+        Command::Learn { action } => match action {
             LearnCommand::Promote { strategy_id, repo, dry_run } => canon_cli::learn::run_promote(&repo, &strategy_id, dry_run),
         },
-        Some(Command::Dispatch { action }) => match action {
+        Command::Dispatch { action } => match action {
             DispatchCommand::Begin { role, regime, agent_id, repo, json } => canon_cli::dispatch::run_begin(&repo, &role, &regime, &agent_id, json),
         },
-        Some(Command::Selftest { json }) => canon_cli::selftest::run_selftest(json),
+        Command::Selftest { json } => canon_cli::selftest::run_selftest(json),
     }
 }
 
@@ -1256,11 +924,7 @@ fn run_query(
 /// Some(r)` resolves the corpus actually checked as
 /// `resolve_repo_root(r).join(root)` -- `root` stays the corpus-relative
 /// suffix, `--repo` supplies the base.
-fn run_fmt(root: &std::path::Path, repo: Option<&std::path::Path>, check: bool) -> ExitCode {
-    if !check {
-        eprintln!("canon fmt: only `--check` is currently supported");
-        return ExitCode::FAILURE;
-    }
+fn run_fmt(root: &std::path::Path, repo: Option<&std::path::Path>) -> ExitCode {
     let resolved_root = match repo {
         Some(r) => canon_cli::context::resolve_repo_root(r).join(root),
         None => root.to_path_buf(),

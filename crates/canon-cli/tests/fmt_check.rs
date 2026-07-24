@@ -29,6 +29,20 @@ fn fmt_check_exits_nonzero_and_lists_audited_gap_categories() {
     }
 }
 
+/// The `fmt` command is now `format` (with `fmt` kept as a visible alias),
+/// and validation runs unconditionally — no `--check` required. The
+/// two-word `canon format <root>` invocation must exit nonzero and print
+/// the same failure classes as the aliased `fmt --check` form above.
+#[test]
+fn format_without_check_flag_exits_nonzero_and_lists_the_same_failure_classes() {
+    let output = run_canon(&["format", &fixture_root().to_string_lossy()]);
+    assert!(!output.status.success(), "format on a corpus with real violations must exit nonzero");
+    let text = stdout(&output);
+    for class in ["layout-grammar", "missing-actor", "free-text-ref", "joined-ref", "abbreviated-sha", "one-way-backref"] {
+        assert!(text.contains(&format!("[{class}]")), "expected `[{class}]` in output:\n{text}");
+    }
+}
+
 /// s26 `repo-flag-uniformity` D1/F3: `--repo <repo-dir>` combined with a
 /// repo-relative positional `<root>` resolves the identical corpus, and
 /// produces byte-identical stdout/exit-code, to the bare-positional

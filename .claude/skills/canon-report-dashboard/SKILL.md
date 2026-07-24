@@ -48,7 +48,7 @@ committed `.canon/REPORT.md`:
   `canon report`).
 
 ```bash
-canon report --check   # wire into CI exactly like canon fmt --check / canon gate check
+canon report --check   # wire into CI exactly like canon format --check / canon gate check
 ```
 
 Wire it as a CI step or pre-push hook the same way `canon gate

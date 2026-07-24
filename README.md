@@ -10,6 +10,19 @@ developing it in its own register — the same shared backbone on which every
 specialist agent role (planning / design / dev / test / review) evolves its own
 strategy memory.
 
+## Quick start
+
+```bash
+bunx @journeykit/canon --help    # or: cargo install --path crates/canon-cli
+canon init                       # write a starter canon.yaml in your repo
+canon demo init --repo /tmp/canon-demo   # or try the evidence loop in a sandbox
+canon format spec                # validate a spec corpus
+canon gate check                 # run the evidence gate
+```
+
+Run `canon <command> --help` for any command, and `canon skills install`
+to materialize the full guides into `.claude/skills/` and `.codex/skills/`.
+
 ## Status
 
 Public pre-alpha. Core workflows are implemented and dogfooded; interfaces

@@ -12,7 +12,7 @@ domain agent follows.
 ## Vocabulary rule (non-negotiable)
 
 - **"feature docs" / ".feature files" = Gherkin behavior specs** — the
-  `.feature` corpus `canon fmt`/`canon inventory sync` validate. "Read
+  `.feature` corpus `canon format`/`canon inventory sync` validate. "Read
   the feature docs" ALWAYS means the Gherkin files, never a Subject.
 - **"subject" = the management record** authored by `canon subject new`.
   A Subject is the product unit; its `.feature` files are its behavior

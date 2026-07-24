@@ -6,13 +6,13 @@ description: How to run canon inventory sync — the validate-then-materialize s
 # canon-inventory
 
 `canon inventory sync` is the FIRST stage of canon's unified spec loop:
-it turns a hand-authored, `canon fmt`-validated `.feature` corpus into
+it turns a hand-authored, `canon format`-validated `.feature` corpus into
 the scenario ledger-INDEX records every downstream stage joins against.
 
 ## The unified loop
 
 ```
-author .feature corpus  →  canon fmt --check (validate)
+author .feature corpus  →  canon format --check (validate)
         │
         ▼
 canon inventory sync            # THIS skill — materializes scenario index records
@@ -41,7 +41,7 @@ canon inventory sync --spec-root ./specs    # ad hoc: ignore canon.yaml entirely
 
 Per configured root, in order:
 
-1. **Validate** — runs `canon fmt --check` over the root. ANY violation
+1. **Validate** — runs `canon format --check` over the root. ANY violation
    (missing provenance, layout-grammar, …) ABORTS THE WHOLE ROOT: zero
    records written for it, the violation(s) reported. Never a partial sync.
 2. **Scan** — walks `<root>/features/**/*.feature`, pairing each
@@ -84,7 +84,7 @@ specs:
 
 ## Sync-abort causes
 
-- **A `canon fmt --check` validation violation** in the root's corpus →
+- **A `canon format --check` validation violation** in the root's corpus →
   whole root aborts, 0 writes, violations reported.
 - **A duplicate `scenario_id`** within one root → that root aborts, 0
   writes, reported as a sync error (a distinct lane from fmt violations).

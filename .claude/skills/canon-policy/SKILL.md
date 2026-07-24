@@ -45,7 +45,7 @@ Run `canon context --json` and read its `cel` section: for each record
 kind it lists the bindable `record.<field>` names + types and the
 callable function allowlist a `policy.yaml` predicate may reference. This
 is the source of truth for "what can a CEL predicate for this kind
-reference?" — it's derived from the same schema `canon fmt` validates
+reference?" — it's derived from the same schema `canon format` validates
 against, so there is no second, hand-maintained list to drift. See the
 `canon-context` skill.
 

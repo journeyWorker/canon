@@ -36,7 +36,7 @@ canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2 --k 3 --jso
   0-clean/1-red/2-usage convention), never a panic or a silently-ignored
   mismatch.
 - `--repo` resolves through the same nearest-`canon.yaml`-ancestor walk
-  `canon context`/`canon fmt`/`canon gate` use. The resolved
+  `canon context`/`canon format`/`canon gate` use. The resolved
   `canon.yaml` `learn:` section names the store root (`.canon/learn` by
   default); a repo with no `canon.yaml` still works, defaulting cleanly.
 

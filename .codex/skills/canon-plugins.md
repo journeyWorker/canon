@@ -95,7 +95,7 @@ canon query --kind scenario                           # no --plugin: byte-identi
 
 1. `.canon/plugins/porting/plugin.yaml` — the manifest above.
 2. Its overlay source reads a spec root's `inventory/**/*.yaml` (the same
-   inventory files `canon fmt --check` covers) and, for every
+   inventory files `canon format --check` covers) and, for every
    `(project_id, scenario_id)` `canon inventory sync` would index, emits
    one candidate: `covered = true` iff that `scenario_id` appears in ANY
    inventory entry's `covered_by` list; `surface_ref` = every inventory-

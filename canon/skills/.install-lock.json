@@ -5,20 +5,20 @@
       "version": 2
     },
     "canon-context": {
-      "contentHash": "sha256:a0dde8e936ee891782e49aa3e76ba7b863fd4fe4313de1eb4b88c998fc4bb486",
-      "version": 3
+      "contentHash": "sha256:293ce6cac12a3acb697f7709c68b0255574e64220bd301a9202e9de6a6bb11b0",
+      "version": 4
     },
     "canon-fmt": {
-      "contentHash": "sha256:3c1bce0d124bb00c43dc1ce3db2ac51b527db2648eb473dd714114b9c14dd8cc",
-      "version": 1
+      "contentHash": "sha256:d92ae3866c59ba49d867bd6b4425c94c0fa913b413f985555c9cfc8c26faa819",
+      "version": 2
     },
     "canon-gate": {
       "contentHash": "sha256:cf373b282a0f26718fdc8b3507256941bccfd7816cc0d124b196d4760de05e9d",
       "version": 2
     },
     "canon-inventory": {
-      "contentHash": "sha256:75789ce07b09237776cdc71faedebe75ae17f900635d993cf0f679d766c95639",
-      "version": 5
+      "contentHash": "sha256:22ce37c74af91824e1c1c914e01e6867932e53c2d6cc2d1e8caedf1e21b4fbd9",
+      "version": 6
     },
     "canon-learn": {
       "contentHash": "sha256:5d48349d80d7ef6ba6b537608218b1e2386504315f22c79b44c5ad82a6d32253",
@@ -29,20 +29,20 @@
       "version": 4
     },
     "canon-plugins": {
-      "contentHash": "sha256:e3b0c754b45007b20f0703844278b93ac472c8b5b60ca5d1320370e17b4fc472",
-      "version": 4
-    },
-    "canon-policy": {
-      "contentHash": "sha256:5648d94f39fc38d551ddf632d7248a509ae9216e4d7bb83134f806985234c220",
-      "version": 2
-    },
-    "canon-report-dashboard": {
-      "contentHash": "sha256:ed54abaf9d604941c6970447fd0b198ea73115d11a1d7fe63172fdc1f69e8ee4",
+      "contentHash": "sha256:f398362c296b1a13ba783be2e05936e822e3c9377da3f9858276ed563af97dae",
       "version": 5
     },
-    "canon-retrieve": {
-      "contentHash": "sha256:f4e57441df9db209741bb1b17e9a1e016d3842461c1b3cea67da6b219ce89095",
+    "canon-policy": {
+      "contentHash": "sha256:5399ada4a80fa79e359a57668eb06e6b831a33a15bd996cfe20deb92a899b1a3",
+      "version": 3
+    },
+    "canon-report-dashboard": {
+      "contentHash": "sha256:a962d171830457ba489d59c0de914e3a70576b87c1a3b5905df1c4afb71ba420",
       "version": 6
+    },
+    "canon-retrieve": {
+      "contentHash": "sha256:7a58ad83f5d50355318cf3b8d431cbcf8edb025d8fd3cd0e1249470da78eef90",
+      "version": 7
     },
     "canon-session-ingest": {
       "contentHash": "sha256:764a618d5c39ac28052c9c763d886fdf0c3573eac11a449b3b4825f6335d446c",
@@ -53,8 +53,8 @@
       "version": 2
     },
     "canon-subject": {
-      "contentHash": "sha256:98f117ab16e503528709f251107f3a0b4cc18cc401b651812304df5d49298623",
-      "version": 4
+      "contentHash": "sha256:29c03a4eec4d5c62661818427b360327c1de1db2ab5034354122fbaf08550971",
+      "version": 5
     },
     "canon-vocab": {
       "contentHash": "sha256:29837a83ff729bbec23b2a36542d3bf853f4cf3098998f4d901b72c79b4279e3",

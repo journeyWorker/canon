@@ -148,7 +148,7 @@ impl FmtReport {
     /// `canon fmt --check`'s stdout.
     pub fn format_human(&self) -> String {
         let mut out = String::new();
-        out.push_str(&format!("canon fmt --check: {} file(s) checked, {} violation(s)\n", self.files_checked, self.violations.len()));
+        out.push_str(&format!("canon format: {} file(s) checked, {} violation(s)\n", self.files_checked, self.violations.len()));
         for class in FmtFailureClass::ALL {
             let matching: Vec<&Violation> = self.violations.iter().filter(|v| v.class == class).collect();
             if matching.is_empty() {
