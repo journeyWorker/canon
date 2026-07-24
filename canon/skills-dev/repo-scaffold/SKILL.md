@@ -58,11 +58,13 @@ non-goals).
 ```bash
 cargo build --release -p canon-cli
 ./target/release/canon skills install --source canon/skills --target .
+./target/release/canon skills install --source canon/skills-dev --target .
 ```
 
-`--source` defaults to `canon/skills` and `--target` defaults to the
-current directory, so inside the canon repo root the bare `canon skills
-install` materializes canon's own companion skills into canon's own
-`.claude/` and `.codex/` trees. Run it twice in a row with no source
-change and diff `canon/skills/.install-lock.json` — it must be
+`--source` defaults to `canon/skills` (the user-facing companion-skill
+tree, materialized into consumer repos) and `--target` defaults to the
+current directory. canon's own repo also carries the developer-skill
+tree `canon/skills-dev/`, materialized by the second invocation; each
+source keeps its own `.install-lock.json`. Run either install twice in
+a row with no source change and diff its lock — it must be
 byte-identical (skill-materialization spec).

@@ -1,45 +1,29 @@
 ---
 name: canon-learn
-description: How to run canon learn promote and how strategy memory is rebuilt — the S6 (role-strategy-memory) layer. Strategy memory is re-derived non-destructively from a repo's verdict trajectories (parquet warm tier) as part of canon ingest artifacts (rebuild_namespace); the sole canon learn subcommand, promote, graduates a distilled StrategyItem into the git-tracked, PR-reviewable strategies tier. Use when promoting a proven strategy for a role, or when reasoning about the trajectory→strategy→retrieval flywheel that canon retrieve (S8) reads.
+description: How to run canon learn promote, choose a promotion gate mode (crn vs occurrence) in canon.yaml, and read a demoted strategy's status:demoted front-matter. Strategy memory is re-derived from a repo's verdict trajectories by canon ingest artifacts; promote graduates a distilled strategy into the git-tracked, reviewable strategies tier. Use when promoting a proven strategy for a role, configuring the promotion/demotion gate, or reading the trajectory→strategy→retrieval flywheel that canon retrieve queries.
 ---
 
 # canon-learn
 
-S6 (`s6-role-strategy-memory`) is canon's ReasoningBank layer: the
-role-namespaced strategy memory that turns accumulated verdict
-trajectories into retrievable, promotable strategy insights. Strategy
-memory is rebuilt (re-derived) from trajectories by `canon ingest
-artifacts` (`rebuild_namespace`); `canon learn promote` graduates a
-distilled strategy into the durable git tier that `canon retrieve` (S8)
-reads before a task dispatch.
+canon's role-namespaced strategy memory turns accumulated verdict
+trajectories into retrievable, promotable insights. Two tiers:
 
-## Two tiers, two stores
-
-- **Warm tier — trajectories (parquet).** `ParquetTrajectoryStore` under
-  `<repo>/canon/learn/trajectories/`: the raw verdict-keyed trajectory
-  rows written by ingest (S3/S4). Local, rebuildable, never
-  hand-committed (`.gitignore`d).
-- **Durable tier — strategies (git).** `ParquetStrategyStore` +
-  git-tracked `<repo>/canon/strategies/<role>/<id>.md` files: the
-  distilled, PR-reviewable `StrategyItem`s. This is the tier a promotion
+- **Trajectories (warm, local).** Raw verdict-keyed rows under
+  `<repo>/canon/learn/trajectories/`, written by ingest. Rebuildable,
+  gitignored, never hand-committed.
+- **Strategies (durable, git).** Distilled, reviewable
+  `<repo>/canon/strategies/<role>/<id>.md` files — the tier a promotion
   writes into and a demotion soft-flags.
 
-Both sit behind the `TrajectoryStore` / `StrategyStore` traits (parquet
-is the shipped backend, OQ2 — a vector-backed impl is a future ADDITIVE
-adapter, never a rewrite).
+## Rebuilding strategy memory
 
-## Rebuilding strategy memory (non-destructive)
-
-Strategy memory is rebuilt from the current trajectory set as part of
-`canon ingest artifacts` (S14): after that command persists a repo's
-verdict trajectories, it calls `rebuild_namespace` to re-derive the
-distilled strategies. There is NO standalone bare `canon learn` rebuild
-command — the only `canon learn` subcommand is `promote` (below).
-
-The rebuild is NON-DESTRUCTIVE (`rebuild_namespace`): it re-derives
-distilled strategies from trajectories without ever deleting a strategy
-the raw trajectory rows don't touch — a rebuild never silently drops a
-hand-promoted strategy.
+Strategy memory is re-derived from the current trajectory set as part of
+`canon ingest artifacts` (see `canon-artifact-ingest`): after it
+persists a repo's verdict trajectories, it re-derives the distilled
+strategies. This is NON-DESTRUCTIVE — a rebuild never drops a
+hand-promoted strategy the trajectory rows don't touch. There is no
+standalone `canon learn` rebuild command; the only subcommand is
+`promote`.
 
 ## `canon learn promote <strategy_id> [--dry-run]`
 
@@ -48,45 +32,106 @@ canon learn promote 01J...ULID           # promote a distilled strategy
 canon learn promote 01J...ULID --dry-run # preview: lint + resolve, no write
 ```
 
-Promotes a distilled `StrategyItem` (by its `StrategyId` ULID) from the
-operator-local parquet warm tier UP into the git-tracked, PR-reviewable
-`canon/strategies/<role>/<id>.md` tier (S6 task group 4). It:
+Graduates a distilled strategy (by its ULID) from the local warm tier UP
+into the git-tracked `canon/strategies/<role>/<id>.md` tier. It:
 
-- resolves the repo via the shared `canon.yaml` root walk, opens the
-  strategy store + the git-tier strategies root (`LearnConfig`);
-- runs advisory lints (content-length ceiling + literal-absolute-path
-  rejection) — NON-blocking (printed, never fails the promote);
-- writes the strategy's git-tier file with YAML front-matter
-  (`status`, `regime_key`, `role`, `title`, `source_trajectory_ids`,
-  `recorded_at`) + the strategy content as the body;
-- `--dry-run` does everything EXCEPT the write (plan + lint + render).
+- resolves the repo via the nearest-`canon.yaml`-ancestor walk;
+- runs advisory lints (content-length ceiling, literal-absolute-path
+  rejection) — printed, NON-blocking;
+- writes the file with YAML front-matter (`status`, `regime_key`,
+  `role`, `title`, `source_trajectory_ids`, `recorded_at`) + the
+  strategy content as the body;
+- `--dry-run` does everything EXCEPT the write.
 
-An unknown `strategy_id` fails loud (nonzero exit), never a silent no-op.
-Promotion RE-RENDERS and rewrites the whole `<role>/<id>.md` file
-(`fs::write`, idempotent by content — re-promoting an unchanged strategy
-is a byte-identical rewrite, so it does NOT preserve manual edits to that
-file); a later demotion soft-flags the SAME file by merging
-`status: demoted` into its front-matter, preserving git blame.
+An unknown `strategy_id` fails loud (nonzero exit). Promotion re-renders
+the whole file, idempotent by content — re-promoting an unchanged
+strategy is a byte-identical rewrite, so it does NOT preserve manual
+edits to that file. A later demotion soft-flags the SAME file, preserving
+git blame.
+
+## Choosing a promotion gate: `crn` vs `occurrence`
+
+A role's promotion gate is a `canon.yaml` `learn:`-section choice:
+
+```yaml
+# canon.yaml
+learn:
+  promotion:
+    dev:
+      mode: occurrence
+      n_min: 8            # optional — defaults to 5
+      window_days: 14     # optional — defaults to 30
+    sim:
+      mode: crn
+  demotion:
+    hard_delete: false                 # optional — soft-flag is the default
+    strategies_root: canon/strategies  # optional
+```
+
+A role with no explicit `promotion.<role>` entry is not an error — it
+defaults to `mode: occurrence, n_min: 5, window_days: 30` (the
+conservative defaults).
+
+- **`occurrence`** — for roles whose domain does NOT support
+  deterministic replay (most of `dev`/`content`/`design`/`review`).
+  Promotes when, inside the trailing `window_days`, at least `n_min`
+  `Success`-verdict trajectories accumulate for the SAME `regime_key`
+  AND zero `Failure`/`RolledBack`-verdict trajectories arrived for that
+  regime. A contradicting failure RESETS the count (never averaged
+  away). Samples older than the window don't count; a `Pending` sample
+  (no covering verdict yet) is skipped. `RolledBack` resets the count
+  like `Failure` (a stronger negative signal).
+- **`crn`** — for roles that CAN run a deterministic simulator
+  (`sim`-shaped domains): a paired common-random-number statistical
+  corroboration gate. A CRN-capable role's trajectory-recording caller
+  stamps `crn:config=<label>` / `crn:panel=<index>` tags on each
+  trajectory it records.
+
+## How verdicts feed scoring
+
+Verdicts arrive from `canon ingest artifacts` (see
+`canon-artifact-ingest`), persisted regime-keyed
+(`<role>/<repo>/<area>/<hash>`). Each verdict scores its covering
+trajectory into `Success` / `Failure` / `RolledBack` / `Pending`; the
+promotion gate above reads a regime's accumulated verdicts to decide
+promotion, and a contradicting trajectory arriving for an
+already-promoted strategy triggers a demotion.
+
+## Reading a demoted strategy
+
+A promoted strategy that later collects a contradicting trajectory is
+demoted append-only: the soft-flag (default) merges `status: demoted` +
+`reason: <text>` into the strategy file's EXISTING front-matter, leaving
+every other key and the whole body byte-unchanged:
+
+```markdown
+---
+title: batch the parquet writes
+description: avoids one fsync per row
+status: demoted
+reason: 'contradicting trajectory 01J... arrived for regime dev/app/auth-flow/deadbeef'
+---
+buffer writes and flush once per namespace
+```
+
+Set `demotion.hard_delete: true` to delete the file instead of
+soft-flagging. A strategy demoted before it was ever promoted to the git
+tier has no file to flag — that is not an error. A non-demoted strategy
+simply has no `status`/`reason` keys. `canon retrieve` skips any
+`status: demoted` strategy.
 
 ## The flywheel
 
 ```
-ingest (S3/S4) → trajectories → rebuild (canon ingest artifacts) → strategies
-      ↑                                                      │
-   verdicts                              canon learn promote │ (graduate)
-                                                             ▼
-                     canon retrieve (S8) reads promoted strategies
-                          before a task dispatch (pre-dispatch hook)
+ingest → trajectories → rebuild (canon ingest artifacts) → strategies
+   ↑                                                   │
+verdicts                       canon learn promote      │ (graduate)
+                                                        ▼
+             canon retrieve reads promoted strategies before a dispatch
 ```
-
-Promotion/demotion DECISIONS (the statistical reward gate) are S7's job
-(`canon.yaml` `learn:` config); `canon learn promote` is the mechanism
-that ACTS on a decision by writing the git tier.
 
 ## What this skill does NOT cover
 
-- The reward/promotion statistics (when a strategy SHOULD be promoted) —
-  S7; `canon learn promote` only performs a decided promotion.
 - Retrieval at dispatch time (`canon retrieve`, the pre-dispatch hook) —
   see the `canon-retrieve` skill.
 - Producing the verdict trajectories promotion reads — see the
