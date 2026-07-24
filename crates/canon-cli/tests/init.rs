@@ -44,9 +44,9 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
 
     let text = std::fs::read_to_string(dir.path().join("canon.yaml")).unwrap();
     assert!(text.contains("tiers:"), "{text}");
-    assert!(text.contains("root: canon/ledger"), "{text}");
+    assert!(text.contains("root: .canon/ledger"), "{text}");
     assert!(text.contains("backend: sqlite"), "{text}");
-    assert!(text.contains("path: canon/hot.db"), "{text}");
+    assert!(text.contains("path: .canon/hot.db"), "{text}");
     assert!(text.contains("#   backend: postgres"), "postgres must stay present as a commented same-class swap: {text}");
     assert!(text.contains("dsn_env: CANON_PG_DSN"), "the commented postgres swap must keep its dsn_env line intact: {text}");
     for kind in ["task", "handoff", "session", "run", "event"] {
@@ -61,13 +61,13 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
     assert!(text.contains("sources: []"), "{text}");
 
     let gitignore = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
-    assert!(gitignore.lines().any(|line| line.trim() == "canon/hot.db*"), "expected the hot tier's db+WAL+SHM glob in .gitignore: {gitignore}");
+    assert!(gitignore.lines().any(|line| line.trim() == ".canon/hot.db*"), "expected the hot tier's db+WAL+SHM glob in .gitignore: {gitignore}");
 }
 
 #[test]
 fn init_refuses_to_overwrite_an_existing_canon_yaml() {
     let dir = tempfile::tempdir().unwrap();
-    write(dir.path(), "canon.yaml", "# a hand-authored config\ntiers:\n  git:\n    root: canon/ledger\n");
+    write(dir.path(), "canon.yaml", "# a hand-authored config\ntiers:\n  git:\n    root: .canon/ledger\n");
     let before = std::fs::read(dir.path().join("canon.yaml")).unwrap();
 
     let out = run_canon(&["init", "--repo", "."], dir.path());
@@ -134,7 +134,7 @@ fn check_config_surfaces_a_malformed_section_without_hiding_the_others() {
     write(
         dir.path(),
         "canon.yaml",
-        "tiers:\n  local:\n    backend: git\n    root: canon/ledger\nrouting:\n  change: local\nspecs:\n  roots:\n    - id: root\n      root: specs\nplans:\n  sources:\n    - dialect: not-a-real-dialect\n      root: plans-src\n",
+        "tiers:\n  local:\n    backend: git\n    root: .canon/ledger\nrouting:\n  change: local\nspecs:\n  roots:\n    - id: root\n      root: specs\nplans:\n  sources:\n    - dialect: not-a-real-dialect\n      root: plans-src\n",
     );
 
     let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
@@ -152,7 +152,7 @@ fn check_config_treats_an_absent_plans_key_as_not_configured_not_a_failure() {
     write(
         dir.path(),
         "canon.yaml",
-        "tiers:\n  local:\n    backend: git\n    root: canon/ledger\nrouting:\n  change: local\nspecs:\n  roots:\n    - id: root\n      root: specs\n",
+        "tiers:\n  local:\n    backend: git\n    root: .canon/ledger\nrouting:\n  change: local\nspecs:\n  roots:\n    - id: root\n      root: specs\n",
     );
 
     let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
@@ -173,7 +173,7 @@ fn check_config_fails_on_a_malformed_pg_schema_and_never_prints_pass_for_tiers()
     write(
         dir.path(),
         "canon.yaml",
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: Bad-Schema }\nrouting:\n  task: hot\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: Bad-Schema }\nrouting:\n  task: hot\n",
     );
 
     let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
@@ -189,7 +189,7 @@ fn check_config_fails_on_a_malformed_pg_schema_and_never_prints_pass_for_tiers()
 #[test]
 fn check_config_validates_a_sqlite_hot_config_end_to_end() {
     let dir = tempfile::tempdir().unwrap();
-    write(dir.path(), "canon.yaml", "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: sqlite, path: canon/hot.db }\nrouting:\n  task: hot\n");
+    write(dir.path(), "canon.yaml", "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  task: hot\n");
 
     let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
     assert!(out.status.success(), "check-config on a valid sqlite hot config must exit 0: {}", stderr(&out));
@@ -200,7 +200,7 @@ fn check_config_validates_a_sqlite_hot_config_end_to_end() {
 #[test]
 fn check_config_fails_loud_on_a_sqlite_entry_missing_path() {
     let dir = tempfile::tempdir().unwrap();
-    write(dir.path(), "canon.yaml", "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: sqlite }\nrouting:\n  task: hot\n");
+    write(dir.path(), "canon.yaml", "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite }\nrouting:\n  task: hot\n");
 
     let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
     assert!(!out.status.success(), "a sqlite entry missing `path` must fail check-config nonzero");
@@ -221,7 +221,7 @@ fn check_config_fails_loud_on_a_sqlite_entry_missing_path() {
 fn init_then_ingest_sessions_writes_the_sqlite_hot_tier_with_zero_env_or_services() {
     let dir = tempfile::tempdir().unwrap();
     assert!(run_canon(&["init", "--repo", "."], dir.path()).status.success());
-    assert!(!dir.path().join("canon/hot.db").exists(), "canon init itself must not eagerly create the hot tier's db file");
+    assert!(!dir.path().join(".canon/hot.db").exists(), "canon init itself must not eagerly create the hot tier's db file");
 
     let home = tempfile::tempdir().unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_canon"))
@@ -235,5 +235,5 @@ fn init_then_ingest_sessions_writes_the_sqlite_hot_tier_with_zero_env_or_service
         .expect("spawn canon binary");
 
     assert!(out.status.success(), "canon ingest sessions against a fresh sqlite-hot init must exit 0 with zero services: {}", stderr(&out));
-    assert!(dir.path().join("canon/hot.db").exists(), "expected the sqlite hot tier's db file to be written by the ingest pass");
+    assert!(dir.path().join(".canon/hot.db").exists(), "expected the sqlite hot tier's db file to be written by the ingest pass");
 }

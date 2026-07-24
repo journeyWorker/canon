@@ -36,9 +36,9 @@
 //! s27's `!Backend::offline_file_readable()` filter WRONGLY treated
 //! `S3` as report-visible: `canon report`'s marts read ONLY `canon-
 //! report`'s own local roots — the git ledger (`stg_git_records`) and
-//! a LOCAL `canon/r2` parquet directory (`stg_r2_records`, rooted at
+//! a LOCAL `.canon/r2` parquet directory (`stg_r2_records`, rooted at
 //! `CANON_R2_ROOT`) — never a live S3 bucket. `canon tier age` writes
-//! cold/S3 records to the LIVE bucket, not to local `canon/r2`; a
+//! cold/S3 records to the LIVE bucket, not to local `.canon/r2`; a
 //! local mirror only exists if an operator separately materializes
 //! one, which canon has no automatic sync for today. This module now
 //! filters on `!Backend::read_directly_by_report()`
@@ -56,12 +56,12 @@
 //! `crates/canon-store/sql/views.sql`'s `stg_records` is exhaustively
 //! `stg_git_records UNION ALL stg_r2_records` — no third source, and
 //! `stg_r2_records` scans whatever parquet happens to sit at
-//! `CANON_R2_ROOT` (default `<repo>/canon/r2`), REGARDLESS of whether
+//! `CANON_R2_ROOT` (default `<repo>/.canon/r2`), REGARDLESS of whether
 //! that directory is a live-synced mirror of an S3-backed cold rung, a
 //! stale one, or empty. So a kind named here is GUARANTEED to route to
 //! a backend whose own live store the report never opens directly —
 //! but its data MAY still incidentally appear in a panel if a local
-//! `canon/r2` mirror happens to hold it (s28 design D3: this is why
+//! `.canon/r2` mirror happens to hold it (s28 design D3: this is why
 //! the rendered note and stderr WARN never claim an absolute "not
 //! reflected" — they say "not read directly", true whether or not a
 //! mirror exists).
@@ -70,7 +70,7 @@
 //! A missing or malformed `canon.yaml` degrades to an empty `Vec` —
 //! never a panic, never an `Err` — mirroring
 //! `crate::digest::DigestHeader::compute`'s existing `<repo_root>/
-//! canon/policy.yaml` precedent exactly (s25 design D1/R1): a config
+//! .canon/policy.yaml` precedent exactly (s25 design D1/R1): a config
 //! error ELSEWHERE in `canon.yaml` (e.g. a malformed `aging` duration,
 //! unrelated to `routing`) must never turn an otherwise-successful
 //! `canon report` run into a hard failure. `canon fmt`/`canon gate
@@ -80,7 +80,7 @@
 //! # No live, non-directly-readable-backend read anywhere in this module
 //! Explicit non-goal (s25/s27/s28 proposals): no `PgTier::connect`, no
 //! row count, no `stg_pg_records`/`stg_s3_records`, no automatic
-//! `canon/r2` materialization. Data routed to a backend the report
+//! `.canon/r2` materialization. Data routed to a backend the report
 //! does not read directly stays reachable exclusively through `canon
 //! query --kind <kind>` (s22 `query-tier-degradation`) — this module
 //! only names the boundary, it never crosses it.
@@ -131,9 +131,9 @@ pub fn kinds_not_read_directly(repo_root: &Path) -> Vec<RecordKind> {
 /// The sentence both [`render_note`] and [`warn_line`] share verbatim
 /// (module doc: one derivation, never two hand-authored copies whose
 /// wording could drift apart independently). s28 design D3: truthful
-/// WITH OR WITHOUT a local `canon/r2` mirror — never an absolute "not
+/// WITH OR WITHOUT a local `.canon/r2` mirror — never an absolute "not
 /// reflected" claim.
-const ESCAPE_HATCH_SENTENCE: &str = "canon report reads its local roots directly (the git ledger + local `canon/r2` + `canon/learn` parquet); the kinds below route to a backend whose own store it does not read (a live database or object-store bucket), so their data appears only if materialized into the local report roots — it may be incomplete or stale. Read them live with `canon query --kind <kind>`.";
+const ESCAPE_HATCH_SENTENCE: &str = "canon report reads its local roots directly (the git ledger + local `.canon/r2` + `.canon/learn` parquet); the kinds below route to a backend whose own store it does not read (a live database or object-store bucket), so their data appears only if materialized into the local report roots — it may be incomplete or stale. Read them live with `canon query --kind <kind>`.";
 
 /// `## Kinds not read directly` — `None` when `kinds` is empty (design
 /// D2: an empty set renders NOTHING at all, not an empty section, so
@@ -195,7 +195,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_canon_yaml(
             dir.path(),
-            "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  task: local\n  change: local\n",
+            "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  task: local\n  change: local\n",
         );
         assert!(kinds_not_read_directly(dir.path()).is_empty());
     }
@@ -205,7 +205,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_canon_yaml(
             dir.path(),
-            "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }\nrouting:\n  task: hot\n  change: local\n  session: hot\n  event: hot\n",
+            "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }\nrouting:\n  task: hot\n  change: local\n  session: hot\n  event: hot\n",
         );
         let kinds = kinds_not_read_directly(dir.path());
         assert_eq!(kinds.iter().map(|k| k.as_str()).collect::<Vec<_>>(), vec!["event", "session", "task"]);

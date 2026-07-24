@@ -79,7 +79,7 @@ fn ingest_json(dir: &Path, args: &[&str]) -> Value {
 #[test]
 fn absent_plans_section_is_a_clean_noop() {
     let dir = tempfile::tempdir().unwrap();
-    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\n");
+    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
 
     let output = run_canon(&["ingest", "plans"], dir.path());
     assert!(output.status.success(), "stderr: {}", stderr(&output));
@@ -93,7 +93,7 @@ fn absent_plans_section_is_a_clean_noop() {
 #[test]
 fn a_typod_plans_key_fails_loud() {
     let dir = tempfile::tempdir().unwrap();
-    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  source: []\n");
+    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  source: []\n");
 
     let output = run_canon(&["ingest", "plans"], dir.path());
     assert!(!output.status.success(), "a typo'd `plans:` key must fail loud, never silently scan zero sources");
@@ -106,7 +106,7 @@ fn an_unregistered_dialect_in_config_fails_loud_naming_registered_ids() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: no-such-dialect\n      root: .\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: no-such-dialect\n      root: .\n",
     );
 
     let output = run_canon(&["ingest", "plans"], dir.path());
@@ -121,7 +121,7 @@ fn a_nonexistent_configured_source_root_fails_loud_naming_the_source() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: does-not-exist\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: does-not-exist\n",
     );
 
     let output = run_canon(&["ingest", "plans"], dir.path());
@@ -135,7 +135,7 @@ fn a_nonexistent_configured_source_root_fails_loud_naming_the_source() {
 #[test]
 fn one_shot_override_requires_both_flags_dialect_alone_fails() {
     let dir = tempfile::tempdir().unwrap();
-    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\n");
+    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
 
     let output = run_canon(&["ingest", "plans", "--dialect", "openspec"], dir.path());
     assert!(!output.status.success(), "`--dialect` without `--source` must fail loud");
@@ -145,7 +145,7 @@ fn one_shot_override_requires_both_flags_dialect_alone_fails() {
 #[test]
 fn one_shot_override_requires_both_flags_source_alone_fails() {
     let dir = tempfile::tempdir().unwrap();
-    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\n");
+    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
 
     let output = run_canon(&["ingest", "plans", "--source", "."], dir.path());
     assert!(!output.status.success(), "`--source` without `--dialect` must fail loud");
@@ -155,7 +155,7 @@ fn one_shot_override_requires_both_flags_source_alone_fails() {
 #[test]
 fn one_shot_override_with_an_unknown_dialect_fails_loud() {
     let dir = tempfile::tempdir().unwrap();
-    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\n");
+    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
 
     let output = run_canon(&["ingest", "plans", "--dialect", "no-such-dialect", "--source", "."], dir.path());
     assert!(!output.status.success());
@@ -166,7 +166,7 @@ fn one_shot_override_with_an_unknown_dialect_fails_loud() {
 #[test]
 fn one_shot_override_bypasses_config_and_imports_the_given_source() {
     let dir = tempfile::tempdir().unwrap();
-    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\n");
+    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
     write_change_dir(dir.path(), "add-widget", "Adds a widget.", &["- [x] 1.1 wire it — ✅ done", "- [ ] 1.2 ship it"]);
 
     let json = ingest_json(dir.path(), &["--dialect", "openspec", "--source", "."]);
@@ -181,7 +181,7 @@ fn an_unchanged_source_rerun_writes_zero_records() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
     );
     let src = dir.path().join("openspec-src");
     std::fs::create_dir_all(&src).unwrap();
@@ -212,7 +212,7 @@ fn a_checkbox_flip_appends_refreshed_records() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
     );
     let src = dir.path().join("openspec-src");
     std::fs::create_dir_all(&src).unwrap();
@@ -233,12 +233,12 @@ fn a_checkbox_flip_appends_refreshed_records() {
 fn one_shot_source_dot_at_repo_root_excludes_its_own_ledger_and_cursor_output_from_the_digest() {
     // `--source .` (root == repo root, F2's "a source root that
     // CONTAINS the importer's own repo-local write surface" case): the
-    // git ledger (`tiers.git.root`) and the `canon/ingest` cursor tree
+    // git ledger (`tiers.git.root`) and the `.canon/ingest` cursor tree
     // both land INSIDE the scanned source tree. Without the exclusion
     // this self-churns forever -- pass 1's own writes shift pass 2's
     // digest before `source_unchanged` ever sees a match.
     let dir = tempfile::tempdir().unwrap();
-    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\n");
+    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
     write_change_dir(dir.path(), "add-widget", "Adds a widget.", &["- [x] 1.1 wire it — ✅ done", "- [ ] 1.2 ship it"]);
 
     let first = ingest_json(dir.path(), &["--dialect", "openspec", "--source", "."]);
@@ -262,7 +262,7 @@ fn pg_unreachable_task_persists_git_change_but_degrades_task_to_unwritten_and_do
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S17_TEST_UNSET, schema: canon_v1 }\nrouting:\n  change: local\n  task: hot\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S17_TEST_UNSET, schema: canon_v1 }\nrouting:\n  change: local\n  task: hot\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
     );
     let src = dir.path().join("openspec-src");
     std::fs::create_dir_all(&src).unwrap();
@@ -302,7 +302,7 @@ fn a_present_dsn_with_a_malformed_pg_schema_fails_loud_not_a_silent_unwritten_de
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S17_TEST_MALFORMED_SCHEMA, schema: bad-schema }\nrouting:\n  change: local\n  task: hot\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S17_TEST_MALFORMED_SCHEMA, schema: bad-schema }\nrouting:\n  change: local\n  task: hot\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
     );
     let src = dir.path().join("openspec-src");
     std::fs::create_dir_all(&src).unwrap();
@@ -335,7 +335,7 @@ fn an_unset_dsn_with_a_malformed_pg_schema_also_fails_loud_never_masked_by_the_d
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S17_TEST_UNSET_MALFORMED, schema: bad-schema }\nrouting:\n  change: local\n  task: hot\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S17_TEST_UNSET_MALFORMED, schema: bad-schema }\nrouting:\n  change: local\n  task: hot\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
     );
     let src = dir.path().join("openspec-src");
     std::fs::create_dir_all(&src).unwrap();
@@ -365,7 +365,7 @@ fn cross_source_change_id_collision_first_configured_source_wins() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: source-a\n    - dialect: openspec\n      root: source-b\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: source-a\n    - dialect: openspec\n      root: source-b\n",
     );
     let src_a = dir.path().join("source-a");
     let src_b = dir.path().join("source-b");
@@ -384,7 +384,7 @@ fn cross_source_change_id_collision_first_configured_source_wins() {
     // Only ONE `Change` record actually landed in the git tier, and it
     // carries source A's content -- never two competing histories from
     // one pass.
-    let ledger_root = dir.path().join("canon/ledger");
+    let ledger_root = dir.path().join(".canon/ledger");
     let read = GitTier::new(&ledger_root).read(&TierQuery::kind(RecordKind::Change)).expect("read the git tier");
     assert_eq!(read.records.len(), 1, "exactly one Change record, never two competing add-widget histories: {:?}", read.records);
     assert_eq!(read.records[0].0["summary"], "Source A's widget proposal.", "the FIRST-configured source's content is the one that landed: {:?}", read.records[0]);
@@ -395,7 +395,7 @@ fn cross_source_change_id_collision_is_visible_in_the_default_human_summary() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: source-a\n    - dialect: openspec\n      root: source-b\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: source-a\n    - dialect: openspec\n      root: source-b\n",
     );
     let src_a = dir.path().join("source-a");
     let src_b = dir.path().join("source-b");
@@ -424,9 +424,9 @@ fn canon_gate_check_verdicts_are_byte_identical_with_and_without_a_prior_plan_im
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec-src\n",
     );
-    write_evidence(&dir.path().join("canon/ledger"), "unrelated-change#1");
+    write_evidence(&dir.path().join(".canon/ledger"), "unrelated-change#1");
 
     let src = dir.path().join("openspec-src");
     std::fs::create_dir_all(&src).unwrap();
@@ -467,7 +467,7 @@ fn root_pointed_one_level_above_openspec_changes_exits_non_zero_with_named_diagn
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec\n",
     );
     // The real change dir lives at `openspec/changes/widget-feature/` --
     // but `root: openspec` (one level too high) makes the adapter scan
@@ -509,7 +509,7 @@ fn a_malformed_only_source_becomes_quiet_once_the_config_is_fixed() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec\n",
     );
     write_change_dir(dir.path(), "widget-feature", "Adds a widget.", &["- [x] 1.1 wire it — ✅ done"]);
 
@@ -550,7 +550,7 @@ fn a_legitimately_empty_source_stays_a_clean_silent_no_op() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: .\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: .\n",
     );
     // A well-formed, genuinely empty source: `openspec/changes/` exists
     // but has zero change dirs yet -- `malformed == 0`.
@@ -580,7 +580,7 @@ fn a_source_with_some_malformed_dirs_but_at_least_one_persisted_record_stays_cle
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: .\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: .\n",
     );
     write_change_dir(dir.path(), "add-widget", "Adds a widget.", &["- [x] 1.1 wire it — ✅ done"]);
     // A sibling malformed dir (basename fails ChangeId's grammar) sits
@@ -616,7 +616,7 @@ fn one_flagged_source_among_several_makes_the_whole_pass_non_zero() {
     // source) and `bad/openspec` (the near-miss, one level too high).
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: good\n    - dialect: openspec\n      root: bad/openspec\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: good\n    - dialect: openspec\n      root: bad/openspec\n",
     );
     write_change_dir(&dir.path().join("good"), "add-widget", "Adds a widget.", &["- [x] 1.1 wire it — ✅ done"]);
     write_change_dir(&dir.path().join("bad"), "widget-feature", "Adds a widget.", &["- [x] 1.1 wire it — ✅ done"]);
@@ -639,7 +639,7 @@ fn superpowers_dialect_end_to_end_import_via_one_shot_override() {
     // one open task exits 0, and `canon query --kind change`/`--kind
     // task` return the imported records with the derived statuses.
     let dir = tempfile::tempdir().unwrap();
-    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\n");
+    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
     write_plan_doc(
         &dir.path().join("plans"),
         "2026-07-14-demo-feature.md",
@@ -684,7 +684,7 @@ fn superpowers_dialect_resolves_through_the_canon_yaml_plans_config_path() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: superpowers\n      root: plans\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: superpowers\n      root: plans\n",
     );
     write_plan_doc(&dir.path().join("plans"), "2026-07-14-config-path.md", "Config-path goal.", &[("Task 1: Only", &["- [x] step one"])]);
 

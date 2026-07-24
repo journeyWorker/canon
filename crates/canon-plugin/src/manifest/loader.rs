@@ -1,5 +1,5 @@
 //! `plugin.yaml` package loader (design.md D2, tasks.md 1.1): scans
-//! `<project_dir>/canon/plugins/<id>/plugin.yaml`, mirroring
+//! `<project_dir>/.canon/plugins/<id>/plugin.yaml`, mirroring
 //! `canon_vocab::manifest::loader::load_plugins_dir`'s shape
 //! (`crates/canon-vocab/src/manifest/loader.rs:86-119`) by INSPIRATION --
 //! sorted directory order, per-package, a duplicate manifest `id` DROPS
@@ -25,7 +25,7 @@ pub enum LoadError {
     /// `plugin.yaml` is missing, unreadable, or fails to parse as
     /// [`PluginManifest`] (including a missing required field).
     Manifest { dir: String, msg: String },
-    /// A second `canon/plugins/<dir>/plugin.yaml` declared the same
+    /// A second `.canon/plugins/<dir>/plugin.yaml` declared the same
     /// manifest `id` as an earlier (directory-sort order) package.
     DuplicateId { id: String, first_dir: String, second_dir: String },
 }
@@ -139,7 +139,7 @@ mod tests {
 
     #[test]
     fn load_plugins_dir_on_missing_dir_returns_an_empty_registry() {
-        let (reg, errs) = load_plugins_dir(Path::new("/does/not/exist/at/all/canon/plugins"));
+        let (reg, errs) = load_plugins_dir(Path::new("/does/not/exist/at/all/.canon/plugins"));
         assert!(reg.is_empty());
         assert!(errs.is_empty());
     }

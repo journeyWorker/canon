@@ -15,15 +15,15 @@ use crate::manifest::loader::load_plugins_dir;
 use crate::manifest::resolve::assemble_snapshot;
 use crate::manifest::snapshot::PluginSnapshot;
 
-/// Ledger-overlay plugins live at `<project_dir>/canon/plugins/<id>/
+/// Ledger-overlay plugins live at `<project_dir>/.canon/plugins/<id>/
 /// plugin.yaml` -- a directory distinct from `canon_vocab`'s OWN
-/// `canon/vocab/<id>/plugin.yaml` (design.md D2/R4). This crate's loader
-/// never descends into `canon/vocab/`, and never even reads it.
-pub const PLUGINS_DIR_RELATIVE_PATH: &str = "canon/plugins";
+/// `.canon/vocab/<id>/plugin.yaml` (design.md D2/R4). This crate's loader
+/// never descends into `.canon/vocab/`, and never even reads it.
+pub const PLUGINS_DIR_RELATIVE_PATH: &str = canon_model::paths::PLUGINS_DIR;
 
 /// Resolve `project_dir`'s installed ledger-overlay plugins into one
 /// [`PluginSnapshot`], plus every resolution diagnostic (a missing
-/// `canon/plugins/` directory, a malformed manifest, a grammar
+/// `.canon/plugins/` directory, a malformed manifest, a grammar
 /// violation, a duplicate id, a duplicate overlay identity, an
 /// unsupported `core_kind`). Pure, total, NEVER panics -- every failure
 /// degrades to a usable (possibly plugin-empty) snapshot plus a
@@ -57,7 +57,7 @@ mod tests {
     #[test]
     fn a_well_formed_manifest_resolves_its_declared_shape() {
         let tmp = tempfile::TempDir::new().unwrap();
-        write(tmp.path(), "canon/plugins/porting/plugin.yaml", PORTING_YAML);
+        write(tmp.path(), ".canon/plugins/porting/plugin.yaml", PORTING_YAML);
         let (snap, diags) = resolve_plugin_snapshot(tmp.path());
         assert!(diags.is_empty(), "diags: {diags:?}");
         let decl = snap.overlay("porting.coverage").expect("overlay present");
@@ -71,7 +71,7 @@ mod tests {
         let tmp = tempfile::TempDir::new().unwrap();
         write(
             tmp.path(),
-            "canon/plugins/bad/plugin.yaml",
+            ".canon/plugins/bad/plugin.yaml",
             "id: bad\nnamespace: bad\noverlays:\n  - kind: coverage\n    attaches_to:\n      core_kind: scenario\n",
         );
         let (snap, diags) = resolve_plugin_snapshot(tmp.path());
@@ -82,8 +82,8 @@ mod tests {
     #[test]
     fn duplicate_plugin_ids_drop_the_later_package_with_a_diagnostic() {
         let tmp = tempfile::TempDir::new().unwrap();
-        write(tmp.path(), "canon/plugins/pkg-a/plugin.yaml", "id: porting\nnamespace: porting-a\noverlays:\n  - kind: coverage\n    attaches_to:\n      core_kind: scenario\n      join_key: [project_id, scenario_id]\n");
-        write(tmp.path(), "canon/plugins/pkg-b/plugin.yaml", "id: porting\nnamespace: porting-b\noverlays:\n  - kind: coverage\n    attaches_to:\n      core_kind: scenario\n      join_key: [project_id, scenario_id]\n");
+        write(tmp.path(), ".canon/plugins/pkg-a/plugin.yaml", "id: porting\nnamespace: porting-a\noverlays:\n  - kind: coverage\n    attaches_to:\n      core_kind: scenario\n      join_key: [project_id, scenario_id]\n");
+        write(tmp.path(), ".canon/plugins/pkg-b/plugin.yaml", "id: porting\nnamespace: porting-b\noverlays:\n  - kind: coverage\n    attaches_to:\n      core_kind: scenario\n      join_key: [project_id, scenario_id]\n");
         let (snap, diags) = resolve_plugin_snapshot(tmp.path());
         assert!(snap.plugins.contains_key("porting"));
         assert_eq!(snap.plugins["porting"].namespace, "porting-a");
@@ -95,12 +95,12 @@ mod tests {
         let tmp = tempfile::TempDir::new().unwrap();
         write(
             tmp.path(),
-            "canon/plugins/bad-ns/plugin.yaml",
+            ".canon/plugins/bad-ns/plugin.yaml",
             "id: bad-ns\nnamespace: Porting_Two\noverlays:\n  - kind: coverage\n    attaches_to:\n      core_kind: scenario\n      join_key: [project_id]\n",
         );
         write(
             tmp.path(),
-            "canon/plugins/bad-kind/plugin.yaml",
+            ".canon/plugins/bad-kind/plugin.yaml",
             "id: bad-kind\nnamespace: porting\noverlays:\n  - kind: \"coverage/extra\"\n    attaches_to:\n      core_kind: scenario\n      join_key: [project_id]\n",
         );
         let (snap, diags) = resolve_plugin_snapshot(tmp.path());
@@ -113,7 +113,7 @@ mod tests {
         let tmp = tempfile::TempDir::new().unwrap();
         write(
             tmp.path(),
-            "canon/plugins/bad/plugin.yaml",
+            ".canon/plugins/bad/plugin.yaml",
             "id: bad\nnamespace: bad\noverlays:\n  - kind: coverage\n    attaches_to:\n      core_kind: task\n      join_key: [project_id, task_id]\n",
         );
         let (snap, diags) = resolve_plugin_snapshot(tmp.path());
@@ -142,15 +142,15 @@ mod tests {
     #[test]
     fn the_canon_vocab_directory_is_never_read_by_this_crates_loader() {
         // Proves design.md D2/R4's directory disjointness from this
-        // crate's own side: a `canon/vocab/<id>/plugin.yaml` (canon-vocab's
+        // crate's own side: a `.canon/vocab/<id>/plugin.yaml` (canon-vocab's
         // authoring-vocabulary schema, unrelated to ours) sitting alongside
-        // a well-formed `canon/plugins/<id>/plugin.yaml` is entirely
-        // ignored -- this crate's loader only ever globs `canon/plugins/`.
+        // a well-formed `.canon/plugins/<id>/plugin.yaml` is entirely
+        // ignored -- this crate's loader only ever globs `.canon/plugins/`.
         let tmp = tempfile::TempDir::new().unwrap();
-        write(tmp.path(), "canon/plugins/porting/plugin.yaml", PORTING_YAML);
+        write(tmp.path(), ".canon/plugins/porting/plugin.yaml", PORTING_YAML);
         write(
             tmp.path(),
-            "canon/vocab/my-tasks/plugin.yaml",
+            ".canon/vocab/my-tasks/plugin.yaml",
             "id: my-tasks\nversion: \"0.1.0\"\nkind: project\nexports:\n  directives: directives/\n",
         );
         let (snap, diags) = resolve_plugin_snapshot(tmp.path());

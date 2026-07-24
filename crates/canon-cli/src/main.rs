@@ -103,7 +103,7 @@ enum Command {
         /// of the default human table.
         #[arg(long)]
         json: bool,
-        /// A `canon/plugins/<id>/plugin.yaml` manifest id (s16 P3) --
+        /// A `.canon/plugins/<id>/plugin.yaml` manifest id (s16 P3) --
         /// project that plugin's declared overlay fields onto each
         /// queried record before printing/emitting. Omitted: output is
         /// byte-identical to the pre-s16 `canon query`.
@@ -165,7 +165,7 @@ enum Command {
     /// report diagnostics against the same repo.
     Context {
         /// Repo root to resolve the schema/policy registry against
-        /// (`<repo>/canon/policy.yaml`). Omitted, or the literal `.`
+        /// (`<repo>/.canon/policy.yaml`). Omitted, or the literal `.`
         /// default, resolves the PROJECT root instead — the nearest
         /// ancestor of cwd carrying a `canon.yaml` (design D7, task 1.4;
         /// `canon_cli::context::resolve_repo_root`), matching `canon
@@ -401,7 +401,7 @@ enum Command {
         #[arg(long, default_value = ".")]
         repo: PathBuf,
         /// Regenerate the report in memory and byte-diff it against
-        /// the existing `canon/REPORT.md` (design D2): exit `0` on no
+        /// the existing `.canon/REPORT.md` (design D2): exit `0` on no
         /// drift, `1` on `MISSING`/`DRIFT`. Mutually exclusive with
         /// `--snapshot` — when both are given, `--snapshot` wins.
         #[arg(long)]
@@ -425,7 +425,7 @@ enum Command {
         repo: PathBuf,
         /// Directory to serve the snapshot from. Omitted: regenerated
         /// fresh on every run at the conventional
-        /// `canon/dashboard-snapshot` scratch dir — "the repo's last
+        /// `.canon/dashboard-snapshot` scratch dir — "the repo's last
         /// `canon report --snapshot` output" (task 6.1) IS whatever
         /// this run just produced there. Given: served as-is when it
         /// already has a `manifest.json`, else generated there once
@@ -442,7 +442,7 @@ enum Command {
     },
     /// S6 (`role-strategy-memory`, task group 4): promote a distilled
     /// strategy from the operator-local parquet warm tier up into the
-    /// git-tracked, PR-reviewed tier (`canon/strategies/<role>/<id>.md`).
+    /// git-tracked, PR-reviewed tier (`.canon/strategies/<role>/<id>.md`).
     /// See `canon_cli::learn`'s module doc.
     Learn {
         #[command(subcommand)]
@@ -867,7 +867,7 @@ enum InventoryCommand {
 enum PluginCommand {
     /// See `Command::Plugin`'s doc.
     Sync {
-        /// A `canon/plugins/<id>/plugin.yaml` manifest `id` (s16 P4) —
+        /// A `.canon/plugins/<id>/plugin.yaml` manifest `id` (s16 P4) —
         /// e.g. `porting`. Matched against each registered
         /// `canon_cli::plugin_sync::OverlaySource::plugin_id()` by
         /// string equality (`canon_cli::plugin_sync`'s module doc).
@@ -953,7 +953,7 @@ enum SubjectCommand {
         id: SubjectId,
         /// The subject's domain (kebab slug; base vocabulary
         /// `planning`/`design`/`dev`/`data`/`test` lives in
-        /// `canon/vocab`). Shape-validated at write.
+        /// `.canon/vocab`). Shape-validated at write.
         #[arg(long)]
         domain: String,
         /// The `Subject.title`.

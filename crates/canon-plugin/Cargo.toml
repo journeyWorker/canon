@@ -3,7 +3,7 @@ name = "canon-plugin"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "canon's ledger-overlay plugin manifest (s16 P1, openspec/changes/s16-plugin-extensibility/): plugin.yaml schema/loader scanning canon/plugins/<id>/, ONE resolve_plugin_snapshot capability-snapshot resolution, and the overlay Type structural-shape checker -- mirrors canon-vocab's plugin.yaml/resolve_snapshot architecture (design.md D2) by INSPIRATION, taking NO canon-vocab crate dependency: a genuinely separate manifest surface (namespace/overlay ledger-record declarations, not directives/enums authoring vocabulary)."
+description = "canon's ledger-overlay plugin manifest (s16 P1, openspec/changes/s16-plugin-extensibility/): plugin.yaml schema/loader scanning .canon/plugins/<id>/, ONE resolve_plugin_snapshot capability-snapshot resolution, and the overlay Type structural-shape checker -- mirrors canon-vocab's plugin.yaml/resolve_snapshot architecture (design.md D2) by INSPIRATION, taking NO canon-vocab crate dependency: a genuinely separate manifest surface (namespace/overlay ledger-record declarations, not directives/enums authoring vocabulary)."
 
 [lib]
 name = "canon_plugin"

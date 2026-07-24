@@ -8,10 +8,10 @@ canon's role-namespaced strategy memory turns accumulated verdict
 trajectories into retrievable, promotable insights. Two tiers:
 
 - **Trajectories (warm, local).** Raw verdict-keyed rows under
-  `<repo>/canon/learn/trajectories/`, written by ingest. Rebuildable,
+  `<repo>/.canon/learn/trajectories/`, written by ingest. Rebuildable,
   gitignored, never hand-committed.
 - **Strategies (durable, git).** Distilled, reviewable
-  `<repo>/canon/strategies/<role>/<id>.md` files — the tier a promotion
+  `<repo>/.canon/strategies/<role>/<id>.md` files — the tier a promotion
   writes into and a demotion soft-flags.
 
 ## Rebuilding strategy memory
@@ -32,7 +32,7 @@ canon learn promote 01J...ULID --dry-run # preview: lint + resolve, no write
 ```
 
 Graduates a distilled strategy (by its ULID) from the local warm tier UP
-into the git-tracked `canon/strategies/<role>/<id>.md` tier. It:
+into the git-tracked `.canon/strategies/<role>/<id>.md` tier. It:
 
 - resolves the repo via the nearest-`canon.yaml`-ancestor walk;
 - runs advisory lints (content-length ceiling, literal-absolute-path
@@ -64,7 +64,7 @@ learn:
       mode: crn
   demotion:
     hard_delete: false                 # optional — soft-flag is the default
-    strategies_root: canon/strategies  # optional
+    strategies_root: .canon/strategies  # optional
 ```
 
 A role with no explicit `promotion.<role>` entry is not an error — it

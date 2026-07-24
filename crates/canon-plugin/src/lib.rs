@@ -1,6 +1,6 @@
 //! `canon-plugin` (s16 P1+P2+P3, `openspec/changes/s16-plugin-extensibility/`):
 //! canon's ledger-overlay plugin manifest -- `plugin.yaml` schema/loader
-//! scanning `canon/plugins/<id>/plugin.yaml`, ONE `resolve_plugin_snapshot`
+//! scanning `.canon/plugins/<id>/plugin.yaml`, ONE `resolve_plugin_snapshot`
 //! capability-snapshot resolution, the overlay field [`Type`] structural-
 //! shape checker (P1), the overlay write + validation path (P2):
 //! [`overlay::OverlayEnvelope`], [`overlay::validate_overlay_body`], and
@@ -16,9 +16,9 @@
 //! manifest, ONE `resolve_snapshot(project_dir, profile) ->
 //! (CapabilitySnapshot, Vec<Diagnostic>)` entry point, fail-soft/total/
 //! never-panics -- for canon's task-atom authoring vocabulary
-//! (`canon/vocab/<id>/plugin.yaml`: directives + enums). s16 builds the
+//! (`.canon/vocab/<id>/plugin.yaml`: directives + enums). s16 builds the
 //! SAME architecture for a genuinely DIFFERENT manifest content-domain:
-//! ledger-record overlays (`canon/plugins/<id>/plugin.yaml`: namespace +
+//! ledger-record overlays (`.canon/plugins/<id>/plugin.yaml`: namespace +
 //! overlay declarations attached to a core record kind). Design.md D2
 //! rejects conflating the two into one crate ("one crate now serves two
 //! unrelated vocabularies -- exactly the 'second, independently-computed

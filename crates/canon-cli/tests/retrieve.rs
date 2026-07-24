@@ -29,12 +29,12 @@ fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
 
-/// Seed a `<repo>/canon/learn/strategies` `ParquetStrategyStore` with
+/// Seed a `<repo>/.canon/learn/strategies` `ParquetStrategyStore` with
 /// one item, matching `canon_learn::LearnConfig::default`'s own
 /// operator-local root — the exact path `canon retrieve` resolves to
 /// when `--repo` carries no `canon.yaml` `learn:` override.
 fn seed_strategy(repo: &Path, regime_key: &RegimeKey, role: &RoleId, title: &str) {
-    let store = ParquetStrategyStore::open(repo.join("canon").join("learn").join("strategies"));
+    let store = ParquetStrategyStore::open(repo.join(".canon").join("learn").join("strategies"));
     let item =
         StrategyItem::new(StrategyId::new(), regime_key.clone(), role.clone(), title, "description", "content", vec![TrajectoryId::new()], Utc::now());
     store.append(&item).expect("seed strategy");
@@ -64,7 +64,7 @@ fn retrieve_over_a_seeded_store_returns_the_role_and_regime_snapshot() {
 }
 
 /// Fail-soft (design decision 3): a repo with no seeded store at all —
-/// no `canon.yaml`, no `canon/learn/strategies` directory — still
+/// no `canon.yaml`, no `.canon/learn/strategies` directory — still
 /// exits `0` and prints an explicit empty result, never an error.
 #[test]
 fn retrieve_against_a_nonexistent_store_prints_empty_and_exits_zero() {

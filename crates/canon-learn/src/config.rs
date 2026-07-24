@@ -36,22 +36,22 @@ use serde::Deserialize;
 
 use crate::error::LearnError;
 
-/// Operator-local files land under `<repo_root>/canon/learn` by
+/// Operator-local files land under `<repo_root>/.canon/learn` by
 /// default when `canon.yaml` carries no `learn:` section at all
 /// (local-first: `canon-learn` works with zero config, matching
 /// `canon-store`'s "an unconfigured tier is never attempted" ethos
 /// applied here to "a default IS attempted, just at a sane default
 /// path" — trajectory/strategy storage is this crate's core function,
 /// not an opt-in tier).
-pub const DEFAULT_LEARN_ROOT: &str = "canon/learn";
+pub const DEFAULT_LEARN_ROOT: &str = canon_model::paths::LEARN_DIR;
 
 /// The git tier a promoted [`crate::strategy::StrategyItem`] lands
-/// under (S6 design decision 4: `canon/strategies/<role>/<id>.md`) —
+/// under (S6 design decision 4: `.canon/strategies/<role>/<id>.md`) —
 /// also where [`crate::promotion::demote_strategy`] soft-flags/
 /// hard-deletes a demoted strategy's file. Distinct from
 /// [`DEFAULT_LEARN_ROOT`]: that is the operator-local PARQUET warm/cold
 /// tier; this is the git-tracked, PR-reviewed tier.
-pub const DEFAULT_STRATEGIES_ROOT: &str = "canon/strategies";
+pub const DEFAULT_STRATEGIES_ROOT: &str = canon_model::paths::STRATEGIES_DIR;
 
 /// [`PromotionRoleConfig::n_min`]'s conservative default (S7 design D3
 /// risk section: "ship conservative defaults... documented as
@@ -253,16 +253,16 @@ mod tests {
 
     #[test]
     fn manifest_with_other_sections_only_reads_learn() {
-        let yaml = "tiers:\n  git: { root: canon/ledger }\n";
+        let yaml = "tiers:\n  git: { root: .canon/ledger }\n";
         let config = LearnConfig::from_manifest(yaml).unwrap();
         assert_eq!(config.root, PathBuf::from(DEFAULT_LEARN_ROOT));
     }
 
     #[test]
     fn explicit_root_and_roles_are_parsed() {
-        let yaml = "learn:\n  root: canon/learn-custom\n  roles:\n    - triage\n    - ops\n";
+        let yaml = "learn:\n  root: .canon/learn-custom\n  roles:\n    - triage\n    - ops\n";
         let config = LearnConfig::from_manifest(yaml).unwrap();
-        assert_eq!(config.root, PathBuf::from("canon/learn-custom"));
+        assert_eq!(config.root, PathBuf::from(".canon/learn-custom"));
         assert_eq!(config.extra_roles, vec![RoleId::parse("triage").unwrap(), RoleId::parse("ops").unwrap()]);
     }
 
@@ -333,9 +333,9 @@ mod tests {
 
     #[test]
     fn demotion_policy_and_strategies_root_are_parsed() {
-        let yaml = "learn:\n  demotion:\n    hard_delete: true\n    strategies_root: canon/strategies-custom\n";
+        let yaml = "learn:\n  demotion:\n    hard_delete: true\n    strategies_root: .canon/strategies-custom\n";
         let config = LearnConfig::from_manifest(yaml).unwrap();
         assert!(config.demotion.hard_delete);
-        assert_eq!(config.strategies_root, PathBuf::from("canon/strategies-custom"));
+        assert_eq!(config.strategies_root, PathBuf::from(".canon/strategies-custom"));
     }
 }

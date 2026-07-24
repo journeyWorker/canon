@@ -11,7 +11,7 @@ path = "src/lib.rs"
 
 [dependencies]
 canon-model = { workspace = true }
-# S5's OWN parsed `canon/policy.yaml` (`PolicyResolution`) lives in canon-gate,
+# S5's OWN parsed `.canon/policy.yaml` (`PolicyResolution`) lives in canon-gate,
 # not literally in the `canon-policy` crate (that crate is S13's CEL engine,
 # which `PolicyResolution` itself calls) -- see src/policy_bridge.rs module doc
 # for the full reconciliation. READ-only: canon-vocab depends on canon-gate's

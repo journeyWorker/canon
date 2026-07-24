@@ -51,11 +51,11 @@
 //! # Correcting the report-inclusion signal (s28 design D2)
 //! s27's `Backend::offline_file_readable()` returned `true` for `S3`
 //! — WRONG: `canon report`'s marts read ONLY `canon-report`'s own
-//! local roots (the git ledger, a local `canon/r2` parquet directory,
-//! and `canon/learn` parquet), never a live S3 bucket. `canon tier age`
+//! local roots (the git ledger, a local `.canon/r2` parquet directory,
+//! and `.canon/learn` parquet), never a live S3 bucket. `canon tier age`
 //! writes cold/S3 records to the LIVE bucket, not to local
-//! `canon/r2` — so an S3-routed kind's data is NOT read directly by
-//! the report; it appears only if a local `canon/r2` mirror is
+//! `.canon/r2` — so an S3-routed kind's data is NOT read directly by
+//! the report; it appears only if a local `.canon/r2` mirror is
 //! separately materialized, which canon has no automatic sync for
 //! today. Renamed to `Backend::read_directly_by_report()`
 //! (git → `true`; postgres/S3 → `false`) to say exactly this, no
@@ -239,7 +239,7 @@ impl Backend {
     /// backed rung's data lives exclusively behind a live DSN, and an
     /// S3-backed rung's data is written to the LIVE bucket by `canon
     /// tier age` (`crates/canon-store/src/r2_tier.rs`), never to the
-    /// local `canon/r2` parquet directory the report's `stg_r2_records`
+    /// local `.canon/r2` parquet directory the report's `stg_r2_records`
     /// view scans — that local directory is a SEPARATE, non-automatic
     /// mirror an operator may or may not keep in sync. Distinct from
     /// `Backend::class` (D1: a parse-time COMPATIBILITY classification)
@@ -501,7 +501,7 @@ fn decode_backend_config(rung_key: &str, value: serde_yaml::Value, canon_yaml_di
 /// [`TierPolicy::from_yaml`]'s own `.` default) joined onto the
 /// process's current directory. Never touches the filesystem (no
 /// `canonicalize`): the db file legitimately may not exist yet at
-/// parse time (a fresh `canon init` repo's `canon/hot.db`), so this
+/// parse time (a fresh `canon init` repo's `.canon/hot.db`), so this
 /// is a pure path-algebra join, not an existence-requiring resolve.
 fn resolve_sqlite_path(path: &Path, canon_yaml_dir: &Path) -> PathBuf {
     let joined = if path.is_absolute() { path.to_path_buf() } else { canon_yaml_dir.join(path) };
@@ -634,7 +634,7 @@ mod tests {
 handoff_templates:
   - 기획
 tiers:
-  local: { backend: git, root: canon/ledger }
+  local: { backend: git, root: .canon/ledger }
   hot:       { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }
   cold:      { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: "canon/" }
 routing:
@@ -836,7 +836,7 @@ routing:
     #[test]
     fn each_class_correct_rung_backend_pairing_parses() {
         for (rung_yaml, expected_backend) in [
-            ("local: { backend: git, root: canon/ledger }", Backend::Git),
+            ("local: { backend: git, root: .canon/ledger }", Backend::Git),
             ("hot: { backend: postgres, dsn_env: CANON_PG_DSN_CLASS_OK, schema: canon_v1 }", Backend::Postgres),
             ("cold: { backend: s3, bucket_env: CANON_R2_BUCKET_CLASS_OK, prefix: \"canon/\" }", Backend::S3),
         ] {
@@ -898,7 +898,7 @@ routing:
     fn legacy_git_named_top_level_tiers_key_fails_loud_with_the_same_hint() {
         let bad = r#"
 tiers:
-  git: { backend: git, root: canon/ledger }
+  git: { backend: git, root: .canon/ledger }
 routing:
   change: local
 "#;
@@ -931,7 +931,7 @@ routing:
     fn hot_rung_on_sqlite_parses_and_resolves_to_a_sqlite_backend() {
         let yaml = r#"
 tiers:
-  hot: { backend: sqlite, path: canon/hot.db }
+  hot: { backend: sqlite, path: .canon/hot.db }
 routing:
   session: hot
 "#;
@@ -986,14 +986,14 @@ routing:
         let dir = tempfile::tempdir().unwrap();
         let yaml = r#"
 tiers:
-  hot: { backend: sqlite, path: canon/hot.db }
+  hot: { backend: sqlite, path: .canon/hot.db }
 routing:
   session: hot
 "#;
         let policy = TierPolicy::from_yaml_at(yaml, dir.path()).unwrap();
         let BackendConfig::Sqlite(cfg) = policy.tiers.get(&Rung::Hot).unwrap() else { panic!("expected a sqlite config") };
         assert!(cfg.path.is_absolute(), "path must already be absolute: {}", cfg.path.display());
-        assert_eq!(cfg.path, dir.path().join("canon/hot.db"));
+        assert_eq!(cfg.path, dir.path().join(".canon/hot.db"));
     }
 
     /// s32 design counter-case: an ALREADY-absolute `path:` passes

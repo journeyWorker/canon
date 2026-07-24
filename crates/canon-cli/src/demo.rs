@@ -29,7 +29,7 @@ const DEMO_SCENARIO: &str = "auth.login.01";
 /// independent `reviewer`-role record. `demo init` seeds only the `dev`
 /// record, so the reviewer cell is uncovered until `demo attest`.
 const DEMO_POLICY_YAML: &str = "\
-# canon demo policy (canon/policy.yaml): every evidenced cell needs an
+# canon demo policy (.canon/policy.yaml): every evidenced cell needs an
 # independent `reviewer`-role evidence record. `canon demo init` seeds
 # only the dev record, so `canon gate check` is RED until `canon demo
 # attest` records the reviewer's evidence.
@@ -39,10 +39,10 @@ risk_routing:
 
 /// The git-backed `local` ledger root the demo writes evidence to and
 /// `canon gate check` reads it from — the `tiers.local.root` the scaffolded
-/// `canon.yaml` declares (`canon/ledger`), which is also `canon gate`'s
+/// `canon.yaml` declares (`.canon/ledger`), which is also `canon gate`'s
 /// own default when no override is present.
 fn ledger_root(repo: &Path) -> PathBuf {
-    repo.join("canon").join("ledger")
+    repo.join(".canon").join("ledger")
 }
 
 /// Write one `EvidenceRecord` for [`DEMO_SCENARIO`], authored by `agent`
@@ -70,7 +70,7 @@ pub fn run_demo_init(repo: &Path) -> i32 {
         return code;
     }
 
-    let policy_path = repo.join("canon").join("policy.yaml");
+    let policy_path = repo.join(".canon").join("policy.yaml");
     if let Some(parent) = policy_path.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
             eprintln!("canon demo init: failed to create `{}`: {e}", parent.display());

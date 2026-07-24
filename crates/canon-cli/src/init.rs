@@ -30,6 +30,7 @@ use std::io::Write as _;
 use std::path::Path;
 
 use canon_model::envelope::RecordKind;
+use canon_model::paths;
 use canon_store::policy::{BackendConfig, TierPolicy};
 
 /// Kinds routed to `hot` by [`skeleton_yaml`] (s32 `sqlite-hot-backend`):
@@ -44,10 +45,10 @@ const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, Recor
 
 /// The line [`scaffold_gitignore`] ensures is present in
 /// `<repo>/.gitignore`: one glob covering the sqlite hot tier's db
-/// file AND its WAL/SHM sidecars (`canon/hot.db-wal`/`canon/hot.db-shm`
+/// file AND its WAL/SHM sidecars (`.canon/hot.db-wal`/`.canon/hot.db-shm`
 /// -- sqlite's own WAL-journal-mode naming convention), since all
-/// three share the `canon/hot.db` prefix.
-const GITIGNORE_LINE: &str = "canon/hot.db*";
+/// three share the `.canon/hot.db` prefix.
+const GITIGNORE_LINE: &str = paths::HOT_DB_GITIGNORE;
 
 /// D8/D9's skeleton `canon.yaml` body: every one of `RecordKind::ALL`'s
 /// thirteen wire strings (s36: `subject` is the reviewed 13th kind)
@@ -82,10 +83,10 @@ fn skeleton_yaml() -> String {
     out.push_str("tiers:\n");
     out.push_str("  local:\n");
     out.push_str("    backend: git\n");
-    out.push_str("    root: canon/ledger\n");
+    out.push_str(&format!("    root: {}\n", paths::LEDGER_DIR));
     out.push_str("  hot:\n");
     out.push_str("    backend: sqlite\n");
-    out.push_str("    path: canon/hot.db\n");
+    out.push_str(&format!("    path: {}\n", paths::HOT_DB_FILE));
     out.push_str("  # hot (same-class swap for team-scale multi-agent concurrency --\n");
     out.push_str("  # sqlite's WAL journal mode already covers concurrent batch\n");
     out.push_str("  # ingest from a single operator; swap to postgres once you need a\n");
@@ -276,7 +277,7 @@ mod tests {
         let policy = TierPolicy::from_yaml_at(&text, dir.path()).unwrap();
         let hot = policy.tiers.get(&canon_store::policy::Rung::Hot).expect("scaffolded config must configure a `hot` rung");
         match hot {
-            BackendConfig::Sqlite(cfg) => assert_eq!(cfg.path, dir.path().join("canon/hot.db")),
+            BackendConfig::Sqlite(cfg) => assert_eq!(cfg.path, dir.path().join(".canon/hot.db")),
             other => panic!("expected the scaffolded `hot` rung to be sqlite-backed, got {other:?}"),
         }
     }

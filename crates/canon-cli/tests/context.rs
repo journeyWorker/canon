@@ -68,7 +68,7 @@ fn context_exits_zero_with_a_full_surface_even_when_the_corpus_fails_fmt_check()
 }
 
 /// `--repo` defaults to `.` — a bare `canon context` from a directory with
-/// no `canon.yaml`/`canon/policy.yaml` at all still resolves and exits 0
+/// no `canon.yaml`/`.canon/policy.yaml` at all still resolves and exits 0
 /// (policy degrades to documented defaults, matching the library-level
 /// `resolve_surface_never_fails_on_a_repo_with_no_canon_state_at_all` test).
 #[test]
@@ -83,16 +83,16 @@ fn context_with_no_repo_flag_defaults_to_cwd_and_still_exits_zero() {
 /// repo — no `--repo` flag, so clap's `.` default applies — resolves the
 /// nearest ANCESTOR `canon.yaml` as the project root, matching `canon
 /// fmt`/`canon gate`'s own root convention, and surfaces THAT root's real
-/// `canon/policy.yaml` (`trust_required: p1: human`), never a
+/// `.canon/policy.yaml` (`trust_required: p1: human`), never a
 /// subdirectory-relative default (the "no canon state at all" degraded
 /// policy `context_with_no_repo_flag_defaults_to_cwd_and_still_exits_zero`
 /// exercises above).
 #[test]
 fn context_from_a_subdirectory_resolves_the_ancestor_repo_root_policy() {
     let repo = tempfile::tempdir().unwrap();
-    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  git: { root: canon/ledger }\n").unwrap();
-    std::fs::create_dir_all(repo.path().join("canon")).unwrap();
-    std::fs::write(repo.path().join("canon/policy.yaml"), "trust_required:\n  p1: human\n").unwrap();
+    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  git: { root: .canon/ledger }\n").unwrap();
+    std::fs::create_dir_all(repo.path().join(".canon")).unwrap();
+    std::fs::write(repo.path().join(".canon/policy.yaml"), "trust_required:\n  p1: human\n").unwrap();
 
     let subdir = repo.path().join("nested").join("deep");
     std::fs::create_dir_all(&subdir).unwrap();

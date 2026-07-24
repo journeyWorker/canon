@@ -27,7 +27,7 @@
 //!
 //! # Watermark cursor (S3 §3 generalized, task 3.4)
 //! One [`SourceCursor`] per configured `(dialect, root)` source, under
-//! the SAME `<repo>/canon/ingest/cursors/` root session-ingest already
+//! the SAME `<repo>/.canon/ingest/cursors/` root session-ingest already
 //! uses (a distinct filename per source, [`plan_source_cursor_id`], so
 //! the two families never collide). Unlike a `SessionAdapter` (which
 //! exposes its own file-matching predicate), a `PlanAdapter` is only
@@ -311,7 +311,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
 
     // F2 / design note: the digest below must never include this
     // driver's OWN repo-local write surface (the git ledger root, the
-    // `canon/ingest` cursor tree) — computed ONCE per run, as an
+    // `.canon/ingest` cursor tree) — computed ONCE per run, as an
     // absolute/canonicalized dir per [`canonicalize_or`], so the
     // per-file exclusion check is a real-filesystem `starts_with`,
     // never a text-level "any path segment named canon" match. A
@@ -321,11 +321,11 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
     if let Some(tier) = &git {
         excluded_dirs.push(canonicalize_or(tier.root()));
     }
-    excluded_dirs.push(canonicalize_or(&repo.join("canon/ingest")));
+    excluded_dirs.push(canonicalize_or(&repo.join(".canon/ingest")));
 
     let store = TierRegistry::new(policy, git, pg, r2, sqlite);
 
-    let cursors = CursorStore::open(repo.join("canon/ingest/cursors"));
+    let cursors = CursorStore::open(repo.join(".canon/ingest/cursors"));
 
     let mut outcome = PlansOutcome::default();
     let mut seen_change_ids: BTreeSet<ChangeId> = BTreeSet::new();

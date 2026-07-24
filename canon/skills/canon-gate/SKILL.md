@@ -51,7 +51,7 @@ canon gate check --repo . --release  # + trust-below-required
 Exit `0` clean, `1` gate-red (any violation), `2` usage/load failure
 (unreadable ledger, corrupt `canon.yaml`). `--repo` (or its omission)
 resolves through the nearest-ancestor `canon.yaml` walk, so it reads the
-repo ROOT's `canon/policy.yaml` and `canon/ledger` from any subdirectory.
+repo ROOT's `.canon/policy.yaml` and `.canon/ledger` from any subdirectory.
 
 ## `canon gate task <task_id> [--repo <dir>]`
 
@@ -74,7 +74,7 @@ through `canon gate task`, never by hand.
 ## `canon gate promote [--repo <dir>] [--dry-run]`
 
 Staging → committed: every well-formed record under
-`canon/ledger/_staging/` is re-validated with the SAME checks the gate
+`.canon/ledger/_staging/` is re-validated with the SAME checks the gate
 applies, assigned a monotonic per-(role, surface) `run_seq` (gap-free
 within one invocation, continuing from the committed max), and moved into
 the committed ledger. A malformed or unpartitionable candidate is refused
@@ -96,7 +96,7 @@ additive only, never touching an existing entry in the same matcher
 group. Running it twice with no manual edits between reports "no diff"
 and writes nothing. When neither file already carries a `canon
 gate`-invoking command, it ALSO emits
-`<repo>/scripts/canon-gate-pre-commit.sh` (advisory by default — set
+`<repo>/.canon/scripts/canon-gate-pre-commit.sh` (advisory by default — set
 `CANON_GATE_ADVISORY=0` to make it block the commit on a failing gate).
 
 ```bash

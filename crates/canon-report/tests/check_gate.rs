@@ -105,7 +105,7 @@ fn check_reports_no_drift_after_the_commit_that_adds_the_report_itself_moves_hea
     let report_path = dir.path().join("REPORT.md");
     let in_ = inputs(dir.path());
 
-    // The P1 regression this guards: a committed `canon/REPORT.md` can
+    // The P1 regression this guards: a committed `.canon/REPORT.md` can
     // never contain the hash of the commit that adds it (that commit's
     // hash is a function of the report's own bytes). If the digest
     // header ever regressed to embedding `git rev-parse HEAD`, this

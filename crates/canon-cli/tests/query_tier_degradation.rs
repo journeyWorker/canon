@@ -96,7 +96,7 @@ fn plant_scenario_in_r2(r2_root: &Path, project_id: &str, scenario_id: &str, tit
 }
 
 fn write_plugin_manifest(root: &Path, id: &str, yaml: &str) {
-    let dir = root.join("canon/plugins").join(id);
+    let dir = root.join(".canon/plugins").join(id);
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("plugin.yaml"), yaml).unwrap();
 }
@@ -145,9 +145,9 @@ fn git_routed_kind_query_succeeds_when_pg_and_r2_are_both_unreachable() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T1, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S22_QD_T1, prefix: \"canon/\" }\nrouting:\n  change: local\n  task: hot\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T1, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S22_QD_T1, prefix: \"canon/\" }\nrouting:\n  change: local\n  task: hot\n",
     );
-    plant_change(&dir.path().join("canon/ledger"), "add-widget", "Adds a widget");
+    plant_change(&dir.path().join(".canon/ledger"), "add-widget", "Adds a widget");
 
     let output = run_canon(&["query", "--kind", "change", "--json"], dir.path(), &[]);
     assert!(output.status.success(), "a git-routed kind must never require live pg/r2 credentials: stderr={}", stderr(&output));
@@ -171,7 +171,7 @@ fn pg_routed_kind_query_fails_naming_pg_and_the_no_live_dsn_reason() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T2, schema: canon_v1 }\nrouting:\n  change: local\n  task: hot\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T2, schema: canon_v1 }\nrouting:\n  change: local\n  task: hot\n",
     );
 
     let output = run_canon(&["query", "--kind", "task"], dir.path(), &[]);
@@ -192,7 +192,7 @@ fn r2_routed_kind_query_fails_naming_r2_distinctly_from_a_pg_failure() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S22_QD_T3, prefix: \"canon/\" }\nrouting:\n  change: local\n  trajectory: cold\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S22_QD_T3, prefix: \"canon/\" }\nrouting:\n  change: local\n  trajectory: cold\n",
     );
 
     let output = run_canon(&["query", "--kind", "trajectory"], dir.path(), &[]);
@@ -211,7 +211,7 @@ fn r2_routed_kind_query_fails_naming_r2_distinctly_from_a_pg_failure() {
 #[test]
 fn own_tier_unavailable_failure_exits_with_a_nonzero_code() {
     let dir = tempfile::tempdir().unwrap();
-    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T2B, schema: canon_v1 }\nrouting:\n  task: hot\n");
+    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T2B, schema: canon_v1 }\nrouting:\n  task: hot\n");
 
     let output = run_canon(&["query", "--kind", "task"], dir.path(), &[]);
     assert_eq!(output.status.code(), Some(1), "canon query must exit 1, not merely a nonzero-but-unspecified code");
@@ -228,7 +228,7 @@ fn a_malformed_pg_schema_fails_loud_never_masked_by_the_unset_dsn_degrade() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T4, schema: Bad-Schema }\nrouting:\n  task: hot\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T4, schema: Bad-Schema }\nrouting:\n  task: hot\n",
     );
 
     let output = run_canon(&["query", "--kind", "task"], dir.path(), &[]);
@@ -255,7 +255,7 @@ fn pg_routed_r2_aged_kind_query_fails_named_never_silently() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T5, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S22_QD_T5, prefix: \"canon/\" }\nrouting:\n  handoff: hot\naging:\n  handoff: { after: 30d, to: cold }\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T5, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S22_QD_T5, prefix: \"canon/\" }\nrouting:\n  handoff: hot\naging:\n  handoff: { after: 30d, to: cold }\n",
     );
 
     let output = run_canon(&["query", "--kind", "handoff"], dir.path(), &[]);
@@ -278,12 +278,12 @@ fn plugin_git_attachment_is_unconditional_even_when_the_queried_kinds_own_routin
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T6, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S22_QD_T6, prefix: \"canon/\" }\nrouting:\n  scenario: cold\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T6, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S22_QD_T6, prefix: \"canon/\" }\nrouting:\n  scenario: cold\n",
     );
     let r2_root = dir.path().join("r2-local");
     plant_scenario_in_r2(&r2_root, "root", "world.hotdeal.01", "a scenario");
     write_plugin_manifest(dir.path(), "porting", PORTING_YAML);
-    plant_overlay(&dir.path().join("canon/ledger"), "root", "world.hotdeal.01", true, &["world.hotdeal.01"]);
+    plant_overlay(&dir.path().join(".canon/ledger"), "root", "world.hotdeal.01", true, &["world.hotdeal.01"]);
 
     let output = run_canon(
         &["query", "--kind", "scenario", "--plugin", "porting", "--json"],
@@ -311,7 +311,7 @@ fn plugin_git_attachment_is_unconditional_even_when_the_queried_kinds_own_routin
 #[test]
 fn unconfigured_rung_query_fails_naming_the_rung_alone() {
     let dir = tempfile::tempdir().unwrap();
-    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  task: hot\n");
+    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  task: hot\n");
 
     let output = run_canon(&["query", "--kind", "task"], dir.path(), &[]);
     assert!(!output.status.success(), "an unconfigured routed rung must fail the command, never a silent empty result");

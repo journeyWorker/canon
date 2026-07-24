@@ -22,6 +22,7 @@ pub mod gen;
 pub mod handoff;
 pub mod ids;
 pub mod join_spine_doc;
+pub mod paths;
 pub mod records;
 pub mod schema_export;
 pub mod trust;

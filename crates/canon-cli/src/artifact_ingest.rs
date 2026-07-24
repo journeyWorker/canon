@@ -494,7 +494,7 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
     // MUST fail this whole pass loud (`?` into `ArtifactIngestError::
     // Learn`, surfaced by `main.rs` as a nonzero exit) rather than
     // silently falling back to `LearnConfig::default()` and persisting
-    // this run's trajectories into `<repo>/canon/learn` — the wrong
+    // this run's trajectories into `<repo>/.canon/learn` — the wrong
     // store whenever the repo configured a different `learn.root`.
     let learn_config = LearnConfig::from_manifest(&canon_yaml_text)?;
 

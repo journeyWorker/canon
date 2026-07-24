@@ -114,7 +114,7 @@ fn parquet_columns(file: &Path) -> Vec<String> {
 /// the contract exactly as well as a populated one while staying fully
 /// isolated from this shared worktree's own `canon/` scratch state
 /// (other sibling agents may be writing to the real repo's `canon/
-/// ledger`/`canon/learn`/`canon/r2` concurrently).
+/// ledger`/`.canon/learn`/`.canon/r2` concurrently).
 #[test]
 fn fresh_snapshot_matches_the_committed_dashboard_fixture_contract() {
     if !duckdb_available() {
@@ -163,7 +163,7 @@ fn write_evidence(ledger_root: &Path, task_id: &str) {
 /// invocations against UNCHANGED input, which is exactly the property
 /// `canon report --check`'s byte-diff gate relies on (a rendering is
 /// byte-stable iff its digest inputs are stable). Seeds one real
-/// evidence record + `canon/policy.yaml` first so the digest is a real
+/// evidence record + `.canon/policy.yaml` first so the digest is a real
 /// hash, not the empty-corpus `—` placeholder — a stronger proof than
 /// the trivially-stable empty case above.
 #[test]
@@ -173,9 +173,9 @@ fn report_and_snapshot_share_a_stable_digest_across_independent_runs() {
         return;
     }
     let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir_all(dir.path().join("canon")).unwrap();
-    std::fs::write(dir.path().join("canon/policy.yaml"), "risk_routing:\n  reviewer: true\n").unwrap();
-    write_evidence(&dir.path().join("canon/ledger"), "selftest-change#1");
+    std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "risk_routing:\n  reviewer: true\n").unwrap();
+    write_evidence(&dir.path().join(".canon/ledger"), "selftest-change#1");
 
     // `canon report --check` is byte-stable immediately after a write
     // (design D2) — the half of task 7.2 already covered end-to-end by

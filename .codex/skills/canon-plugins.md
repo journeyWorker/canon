@@ -15,7 +15,7 @@ core kind's on-disk path even by accident. Today overlays attach to the
 
 ## 1. Author a `plugin.yaml` manifest
 
-`canon/plugins/<id>/plugin.yaml`:
+`.canon/plugins/<id>/plugin.yaml`:
 
 ```yaml
 id: porting
@@ -45,7 +45,7 @@ overlays:
   `{ list: <type> }`.
 - Two packages declaring the SAME `id`: the later (directory-sort order)
   is dropped and diagnosed, never merged (`E-PLUGIN-DUP-ID`).
-- An absent `canon/plugins/` directory resolves an empty, valid snapshot —
+- An absent `.canon/plugins/` directory resolves an empty, valid snapshot —
   never a panic.
 
 ## 2. Validate + write overlay records
@@ -93,7 +93,7 @@ canon query --kind scenario                           # no --plugin: byte-identi
 `porting` moves the `covered`/`surface_ref` fields off the core
 `scenario` record and into a plugin overlay:
 
-1. `canon/plugins/porting/plugin.yaml` — the manifest above.
+1. `.canon/plugins/porting/plugin.yaml` — the manifest above.
 2. Its overlay source reads a spec root's `inventory/**/*.yaml` (the same
    inventory files `canon fmt --check` covers) and, for every
    `(project_id, scenario_id)` `canon inventory sync` would index, emits
@@ -115,10 +115,10 @@ an overlay field into a gate decision needs its own reviewed change
 
 ## Do not confuse the two `plugin.yaml` surfaces
 
-The typed-authoring vocabulary (`canon/vocab/<id>/plugin.yaml`: directives
+The typed-authoring vocabulary (`.canon/vocab/<id>/plugin.yaml`: directives
 + enums for task-atom authoring — see `canon-vocab`) is a
 DIFFERENT directory and a DIFFERENT schema. A ledger-overlay manifest
-misplaced under `canon/vocab/<id>/` fails that loader (missing
+misplaced under `.canon/vocab/<id>/` fails that loader (missing
 `directives`/`enums`), not silently parsing as an authoring vocabulary.
 
 ## What this skill does NOT cover

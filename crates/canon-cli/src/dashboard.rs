@@ -14,9 +14,9 @@
 //! # Default vs. explicit `--snapshot`
 //! `--snapshot` omitted: the snapshot is regenerated fresh, every run,
 //! at the conventional [`DEFAULT_SNAPSHOT_DIR`] scratch directory — a
-//! sibling of `canon/REPORT.md`
+//! sibling of `.canon/REPORT.md`
 //! ([`canon_report::render::DEFAULT_REPORT_PATH`]) and the other
-//! `canon/*` tier roots (`canon/ledger`, `canon/r2`, `canon/learn`).
+//! `.canon/*` tier roots (`.canon/ledger`, `.canon/r2`, `.canon/learn`).
 //! There is no separately-persisted "last used directory" state to
 //! track (no other `canon-cli` subcommand keeps one either) — task
 //! 6.1's "defaulting to the repo's last `canon report --snapshot`
@@ -61,10 +61,12 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 
+use canon_model::paths;
+
 use crate::report::resolve_inputs;
 
 /// Conventional default snapshot scratch dir (module doc).
-pub const DEFAULT_SNAPSHOT_DIR: &str = "canon/dashboard-snapshot";
+pub const DEFAULT_SNAPSHOT_DIR: &str = paths::DASHBOARD_SNAPSHOT_DIR;
 
 /// The built `packages/dashboard` static app, relative to a resolved
 /// repo root — `packages/dashboard`'s own `vite build` output
@@ -317,7 +319,7 @@ mod tests {
     #[test]
     fn resolve_snapshot_dir_defaults_to_the_conventional_scratch_dir_under_repo_root() {
         let repo = PathBuf::from("/some/repo");
-        assert_eq!(resolve_snapshot_dir(&repo, None), PathBuf::from("/some/repo/canon/dashboard-snapshot"));
+        assert_eq!(resolve_snapshot_dir(&repo, None), PathBuf::from("/some/repo/.canon/dashboard-snapshot"));
     }
 
     #[test]
@@ -347,21 +349,21 @@ mod tests {
     #[test]
     fn resolve_file_maps_bare_root_to_index_html_under_dist_dir() {
         let dist = PathBuf::from("/repo/packages/dashboard/dist");
-        let snap = PathBuf::from("/repo/canon/dashboard-snapshot");
+        let snap = PathBuf::from("/repo/.canon/dashboard-snapshot");
         assert_eq!(resolve_file("/", &dist, &snap), Some(dist.join("index.html")));
     }
 
     #[test]
     fn resolve_file_maps_an_asset_path_under_dist_dir() {
         let dist = PathBuf::from("/repo/packages/dashboard/dist");
-        let snap = PathBuf::from("/repo/canon/dashboard-snapshot");
+        let snap = PathBuf::from("/repo/.canon/dashboard-snapshot");
         assert_eq!(resolve_file("/assets/duckdb-mvp.wasm", &dist, &snap), Some(dist.join("assets/duckdb-mvp.wasm")));
     }
 
     #[test]
     fn resolve_file_maps_the_live_snapshot_route_under_snapshot_dir() {
         let dist = PathBuf::from("/repo/packages/dashboard/dist");
-        let snap = PathBuf::from("/repo/canon/dashboard-snapshot");
+        let snap = PathBuf::from("/repo/.canon/dashboard-snapshot");
         assert_eq!(resolve_file("/live-snapshot/manifest.json", &dist, &snap), Some(snap.join("manifest.json")));
         assert_eq!(resolve_file("/live-snapshot/mart_trust_matrix.parquet", &dist, &snap), Some(snap.join("mart_trust_matrix.parquet")));
     }
@@ -369,14 +371,14 @@ mod tests {
     #[test]
     fn resolve_file_rejects_bare_live_snapshot_route_with_no_file() {
         let dist = PathBuf::from("/repo/packages/dashboard/dist");
-        let snap = PathBuf::from("/repo/canon/dashboard-snapshot");
+        let snap = PathBuf::from("/repo/.canon/dashboard-snapshot");
         assert_eq!(resolve_file(LIVE_SNAPSHOT_ROUTE, &dist, &snap), None);
     }
 
     #[test]
     fn resolve_file_rejects_any_path_traversal_segment() {
         let dist = PathBuf::from("/repo/packages/dashboard/dist");
-        let snap = PathBuf::from("/repo/canon/dashboard-snapshot");
+        let snap = PathBuf::from("/repo/.canon/dashboard-snapshot");
         assert_eq!(resolve_file("/../../etc/passwd", &dist, &snap), None);
         assert_eq!(resolve_file("/live-snapshot/../../../etc/passwd", &dist, &snap), None);
     }
@@ -390,7 +392,7 @@ mod tests {
         // absolute-path-replaces-current-path behavior. Caught here,
         // before the join ever runs.
         let dist = PathBuf::from("/repo/packages/dashboard/dist");
-        let snap = PathBuf::from("/repo/canon/dashboard-snapshot");
+        let snap = PathBuf::from("/repo/.canon/dashboard-snapshot");
         assert_eq!(resolve_file("/live-snapshot//etc/passwd", &dist, &snap), None);
     }
 

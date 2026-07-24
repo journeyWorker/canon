@@ -95,7 +95,7 @@ fn write_age_query_and_duckdb_views_round_trip_across_all_three_tiers() {
     // (s3) directly.
     let yaml = r#"
 tiers:
-  local: { backend: git, root: canon/ledger }
+  local: { backend: git, root: .canon/ledger }
   hot:       { backend: postgres, dsn_env: CANON_PG_DSN_E2E, schema: canon_v1_e2e }
   cold:      { backend: s3, bucket_env: CANON_R2_BUCKET_E2E, prefix: "canon/" }
 routing:

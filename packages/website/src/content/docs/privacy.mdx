@@ -50,16 +50,16 @@ that supports directive capture stores your prompt text.
 ## Where it stores it
 
 With `canon init`'s default `canon.yaml`, `session`, `run`, and `event`
-records route to the **`hot`** tier, backed by **SQLite** at `canon/hot.db`
-in your repo. `canon init` adds `canon/hot.db*` (the db file plus its WAL/SHM
+records route to the **`hot`** tier, backed by **SQLite** at `.canon/hot.db`
+in your repo. `canon init` adds `.canon/hot.db*` (the db file plus its WAL/SHM
 sidecars) to `.gitignore` — this data is **not** committed to Git and never
 enters your repo's history. The per-file ingest watermark (used by
 `--watch` to avoid re-parsing unchanged transcripts) lives alongside it under
-`canon/ingest/cursors/`, also gitignored.
+`.canon/ingest/cursors/`, also gitignored.
 
 Every other record kind canon manages (specs, evidence records, reviews,
 divergences, strategies) routes to the **`local`** tier — Git-backed,
-committed under `canon/ledger`, reviewable in a normal PR diff. PostgreSQL
+committed under `.canon/ledger`, reviewable in a normal PR diff. PostgreSQL
 (a same-class swap for `hot`) and S3/R2 (`cold`) are optional scale-up
 backends that only activate if an operator explicitly adds credentials to
 `canon.yaml`.
@@ -68,7 +68,7 @@ backends that only activate if an operator explicitly adds credentials to
 
 With the default `canon init` config there is **no network egress** at all:
 every record — including the verbatim `user_directive` text above — stays in
-local Git (`canon/ledger`, committed) and local SQLite (`canon/hot.db`,
+local Git (`.canon/ledger`, committed) and local SQLite (`.canon/hot.db`,
 gitignored, disk-only). Nothing is sent anywhere.
 
 Data leaves your machine **only** if an operator explicitly configures a
@@ -89,10 +89,10 @@ default config.
 
 Deletion today is manual and file-level:
 
-- Delete `canon/hot.db*` to drop every ingested `session`/`run`/`event`
+- Delete `.canon/hot.db*` to drop every ingested `session`/`run`/`event`
   record (including all `user_directive` text) and reset the ingest cursor
   state.
-- Remove the specific record file(s) under `canon/ledger` for any `local`-
+- Remove the specific record file(s) under `.canon/ledger` for any `local`-
   tier kind you want gone, then commit the removal like any other repo
   change.
 

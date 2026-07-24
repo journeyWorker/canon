@@ -24,7 +24,7 @@ handoff_templates:
 # `Tier::write`/`Tier::read`/`canon tier age` call through this section;
 # no caller branches on a literal kind name to pick a tier.
 tiers:
-  local: { backend: git, root: canon/ledger }
+  local: { backend: git, root: .canon/ledger }
   hot:       { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }
   cold:      { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: "canon/" }
 

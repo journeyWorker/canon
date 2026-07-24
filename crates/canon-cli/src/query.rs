@@ -420,7 +420,7 @@ fn resolve_and_project(project_dir: &Path, git: Option<&GitTier>, kind: RecordKi
     diagnostics.extend(resolve_diags.iter().map(format_plugin_diag));
 
     let Some(resolved) = snapshot.plugins.get(plugin_id) else {
-        diagnostics.push(format!("plugin `{plugin_id}` has no installed manifest under `canon/plugins/` -- unmodified core view"));
+        diagnostics.push(format!("plugin `{plugin_id}` has no installed manifest under `.canon/plugins/` -- unmodified core view"));
         return PluginQueryOutcome { projections: Vec::new(), diagnostics };
     };
 

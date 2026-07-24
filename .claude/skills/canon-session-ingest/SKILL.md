@@ -13,7 +13,7 @@ current PROJECT; the watermark gate is per-file; user directives are
 captured.
 
 **Quick start needs zero docker/services.** `canon init` scaffolds `hot`
-as a local sqlite file (`canon/hot.db`) with `session`/`run`/`event`
+as a local sqlite file (`.canon/hot.db`) with `session`/`run`/`event`
 already routed to it — a fresh repo's FIRST `canon ingest sessions`
 persists real records with no `docker compose` stack, no `CANON_PG_DSN`,
 no live database. Swap `hot` to postgres (the commented stanza `canon
@@ -87,7 +87,7 @@ fails soft to the repo root alone.
 
 Each pass content-digests every present (post-pruning) file and diffs it
 against its source's persisted cursor (under
-`<repo>/canon/ingest/cursors/`, gitignored), written after a durable
+`<repo>/.canon/ingest/cursors/`, gitignored), written after a durable
 pass. A file whose digest matches its cursor is SKIPPED — never parsed; a
 new or changed file is (re-)parsed. One session derives from exactly one
 file, so a single growing transcript re-parses alone instead of dragging

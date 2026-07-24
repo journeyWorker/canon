@@ -71,14 +71,14 @@ schedule (`canon tier age`):
 ├──────────────────────┼──────────────────────────┼────────────────────────┤
 │ authored specs       │ task / handoff /         │ Postgres — hot swap    │
 │ promoted strategies  │ session / run / event    │ for shared, concurrent │
-│ evidence ledger      │ (canon/hot.db,           │ R2 / S3 — cold, bulk   │
+│ evidence ledger      │ (.canon/hot.db,          │ R2 / S3 — cold, bulk   │
 │ (Hive, append-only)  │ gitignored)              │ data (credentialed)    │
 └──────────────────────┴──────────────────────────┴────────────────────────┘
 ```
 
 `canon init` uses Git for durable, reviewable records — append-only,
 Hive-partitioned JSON reviewable in a normal PR diff — and local SQLite for
-high-volume operational records (`canon/hot.db`, gitignored by `canon init`).
+high-volume operational records (`.canon/hot.db`, gitignored by `canon init`).
 PostgreSQL and S3-compatible storage are optional scale-up backends that
 require operator-supplied credentials. See
 [Tiered storage](/concepts/tiered-storage/).
@@ -115,10 +115,10 @@ Every repo canon operates on carries its own config at the repo root:
 
 ```
 <repo>/canon.yaml           # tier endpoints, specs.roots[], plans: sources
-<repo>/canon/policy.yaml    # required-cell derivation for evidence gating
-<repo>/canon/ledger/        # Hive: kind=<kind>/area=<area>/*.json, append-only
-<repo>/canon/strategies/    # promoted strategy items (git tier, PR-reviewed)
-<repo>/canon/plugins/       # <id>/plugin.yaml ledger-overlay manifests
+<repo>/.canon/policy.yaml   # required-cell derivation for evidence gating
+<repo>/.canon/ledger/       # Hive: kind=<kind>/area=<area>/*.json, append-only
+<repo>/.canon/strategies/   # promoted strategy items (git tier, PR-reviewed)
+<repo>/.canon/plugins/      # <id>/plugin.yaml ledger-overlay manifests
 ```
 
 `canon init` scaffolds a working `canon.yaml` skeleton; `canon init

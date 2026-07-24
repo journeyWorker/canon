@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::manifest::types::Type;
 
-/// A `canon/plugins/<id>/plugin.yaml` document, exactly as authored --
+/// A `.canon/plugins/<id>/plugin.yaml` document, exactly as authored --
 /// this is PARSE INPUT, not the resolved/validated shape
 /// ([`crate::manifest::snapshot::PluginSnapshot`]/[`crate::manifest::
 /// snapshot::OverlayDecl`] is that). `attaches_to.core_kind`'s grammar

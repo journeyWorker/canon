@@ -53,7 +53,7 @@ pub const CANON_R2_ROOT_ENV: &str = "CANON_R2_ROOT";
 
 /// The rebindable-root env var [`VIEWS_SQL`] reads (S9 addition): S6/
 /// S7/S8's `canon-learn`-owned operator-local parquet store root
-/// (`<repo>/canon/learn`, `crates/canon-learn/src/config.rs::
+/// (`<repo>/.canon/learn`, `crates/canon-learn/src/config.rs::
 /// DEFAULT_LEARN_ROOT`) — the parent of both its `strategies/` and
 /// `trajectories/` subdirectories.
 pub const CANON_LEARN_ROOT_ENV: &str = "CANON_LEARN_ROOT";

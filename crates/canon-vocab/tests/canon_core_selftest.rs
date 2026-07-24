@@ -1,5 +1,5 @@
 //! canon.core selftest (design.md §8, tasks 2.6/3.4/4.6/5.4): proves the
-//! REAL, checked-in `canon/vocab/canon.core/` manifest resolves clean, a
+//! REAL, checked-in `.canon/vocab/canon.core/` manifest resolves clean, a
 //! good atoms fixture validates against it, a bad fixture per diagnostic
 //! class produces exactly that class, and compile/round-trip is proven
 //! against the SAME real manifest — not a synthetic in-crate snapshot.

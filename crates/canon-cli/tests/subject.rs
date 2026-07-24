@@ -3,7 +3,7 @@
 //! against an offline git-tier fixture in a tmpdir — zero network, no
 //! credentials (mirrors `tests/gate.rs`/`tests/query.rs`'s shape). The
 //! subject write path routes through `TierRegistry` (subject → `local`
-//! rung → git tier at `canon/ledger`); records seeded directly here go
+//! rung → git tier at `.canon/ledger`); records seeded directly here go
 //! through the SAME `GitTier` root, so the CLI reads back exactly what
 //! the fixtures plant.
 
@@ -21,12 +21,12 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 /// A minimal, WORKING `canon.yaml` routing every kind this suite
-/// touches to the git-backed `local` rung at `canon/ledger` — the same
+/// touches to the git-backed `local` rung at `.canon/ledger` — the same
 /// root `GateCtx::from_repo` (the `verifying → shipped` evidence gate)
 /// resolves from `tiers.local.root`.
 const CANON_YAML: &str = "\
 tiers:
-  local: { backend: git, root: canon/ledger }
+  local: { backend: git, root: .canon/ledger }
 routing:
   subject: local
   change: local
@@ -53,7 +53,7 @@ fn stderr(o: &Output) -> String {
 }
 
 fn ledger(repo: &Path) -> GitTier {
-    GitTier::new(repo.join("canon/ledger"))
+    GitTier::new(repo.join(".canon/ledger"))
 }
 
 fn seed_change(repo: &Path, change_id: &str) {

@@ -23,7 +23,7 @@ use std::process::{Command, Output};
 
 use serde_json::Value;
 
-const CANON_YAML: &str = "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  scenario: local\n";
+const CANON_YAML: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\n";
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
@@ -194,7 +194,7 @@ fn inventory_sync_materializes_exactly_the_tagged_scenario_identical_to_a_hand_a
 fn neither_command_writes_any_ledger_record() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(dir.path());
-    let ledger_dir = dir.path().join("canon/ledger");
+    let ledger_dir = dir.path().join(".canon/ledger");
 
     assert!(feature_new(dir.path(), "world.hotdeal", "Hotdeal").status.success());
     assert!(scenario_new(dir.path(), "world.hotdeal.42", "Apply a hotdeal coupon", HOTDEAL_FEATURE_PATH).status.success());
@@ -254,7 +254,7 @@ fn feature_new_against_an_already_existing_file_is_rejected_loud_with_the_file_u
 // ── s19 `derived-validated-scenario-feature`: --feature is optional, tag-derived, validated ──
 
 const CANON_YAML_TWO_ROOTS: &str =
-    "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  scenario: local\nspecs:\n  roots:\n    - id: root\n      root: specs\n    - id: extra\n      root: specs2\n";
+    "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\nspecs:\n  roots:\n    - id: root\n      root: specs\n    - id: extra\n      root: specs2\n";
 
 #[test]
 fn omitting_feature_derives_the_identical_path_feature_new_would_scaffold() {

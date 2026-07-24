@@ -52,9 +52,9 @@ fn parse_args() -> Args {
         }
     }
 
-    let git_root = git_root.unwrap_or_else(|| repo_root.join("canon/ledger"));
-    let r2_root = r2_root.unwrap_or_else(|| repo_root.join("canon/r2"));
-    let learn_root = learn_root.unwrap_or_else(|| repo_root.join("canon/learn"));
+    let git_root = git_root.unwrap_or_else(|| repo_root.join(canon_model::paths::LEDGER_DIR));
+    let r2_root = r2_root.unwrap_or_else(|| repo_root.join(canon_model::paths::R2_LOCAL_DIR));
+    let learn_root = learn_root.unwrap_or_else(|| repo_root.join(canon_model::paths::LEARN_DIR));
     let out = out.unwrap_or_else(|| repo_root.join(canon_report::render::DEFAULT_REPORT_PATH));
 
     Args { check, out, repo_root, git_root, r2_root, learn_root }

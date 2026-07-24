@@ -27,7 +27,7 @@ import { Steps } from "@astrojs/starlight/components";
    스케일업 백엔드입니다. canon-model의 12개 레코드 종류 중 7개는
    환경 변수가 필요 없는 `local`(git 백엔드) rung으로 라우팅되고,
    `task`, `handoff`, `session`, `run`, `event`는 `hot`(기본값
-   SQLite, `canon/hot.db`, gitignore 처리됨)으로 라우팅됩니다.
+   SQLite, `.canon/hot.db`, gitignore 처리됨)으로 라우팅됩니다.
    주석 처리된 `postgres`/`s3` 스탠자는 스케일업 전환 방법을
    보여주며, 실제로 동작하는 `specs.roots[]` 항목 하나와 비어 있는
    `plans: { sources: [] }`도 포함됩니다:
@@ -36,10 +36,10 @@ import { Steps } from "@astrojs/starlight/components";
    tiers:
      local:
        backend: git
-       root: canon/ledger
+       root: .canon/ledger
      hot:
        backend: sqlite
-       path: canon/hot.db
+       path: .canon/hot.db
      # swap hot to postgres once you need a real server:
      #   backend: postgres
      #   dsn_env: CANON_PG_DSN
@@ -165,7 +165,7 @@ import { Steps } from "@astrojs/starlight/components";
    ```
 
    다섯 개 상태 패널(트러스트 매트릭스, 세션 비용, 역할별 메모리,
-   플라이휠 퍼널, 리뷰 번다운)을 `canon/REPORT.md`에 렌더링합니다
+   플라이휠 퍼널, 리뷰 번다운)을 `.canon/REPORT.md`에 렌더링합니다
    — 생성된 파일이며 절대 손으로 편집하지 않습니다. `canon gate
    check`를 CI에 연결하는 것과 같은 방식으로 `canon report --check`를
    연결해 커밋된 파일을 현재 입력과 byte-diff하세요.
@@ -212,7 +212,7 @@ import { Steps } from "@astrojs/starlight/components";
    ```
 
    새 Parquet 스냅샷을 생성하고(내부적으로 `canon report
-   --snapshot`을 `canon/dashboard-snapshot`에 실행) 빌드된
+   --snapshot`을 `.canon/dashboard-snapshot`에 실행) 빌드된
    `packages/dashboard` 앱을 로컬에서 그 스냅샷을 가리켜
    서빙합니다 — `canon report`가 렌더링하는 것과 동일한 다섯 개
    패널을, 브라우저에서 다시 계산하는 대신 스냅샷에서 읽습니다.

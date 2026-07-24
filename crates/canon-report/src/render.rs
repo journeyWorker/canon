@@ -18,9 +18,9 @@ use crate::tier_boundary;
 /// The path a rendered report is conventionally written to when a
 /// caller (this crate's own `[[bin]]`, or the future `canon-cli`
 /// `canon report` arm, part2) does not have a `canon.yaml`-configured
-/// override — mirrors `canon-learn`'s own `canon/`-prefixed default
+/// override — mirrors `canon-learn`'s own `.canon/`-prefixed default
 /// convention (`DEFAULT_LEARN_ROOT`, `DEFAULT_STRATEGIES_ROOT`).
-pub const DEFAULT_REPORT_PATH: &str = "canon/REPORT.md";
+pub const DEFAULT_REPORT_PATH: &str = canon_model::paths::REPORT_FILE;
 
 fn cell(row: &crate::query::Row, column: &str) -> String {
     match row.get(column) {

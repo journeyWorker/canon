@@ -48,15 +48,15 @@ fn provenance() -> String {
 }
 
 /// A fixture repo carrying: `canon.yaml` (git tier + `scenario: git`
-/// routing), `canon/plugins/porting/plugin.yaml` (task 4.1's own
+/// routing), `.canon/plugins/porting/plugin.yaml` (task 4.1's own
 /// manifest, byte-identical to the checked-in one), a clean two-scenario
 /// `.feature` corpus (`idolive.hub.01` covered, `idolive.hub.02` not),
 /// and an `inventory/` entry whose `covered_by` names ONLY
 /// `idolive.hub.01` — the exact "one covered, one not" shape
 /// `porting-plugin` spec's own scenarios describe.
 fn write_repo(dir: &Path) {
-    write(dir, "canon.yaml", "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  scenario: local\n");
-    write(dir, "canon/plugins/porting/plugin.yaml", PORTING_YAML);
+    write(dir, "canon.yaml", "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\n");
+    write(dir, ".canon/plugins/porting/plugin.yaml", PORTING_YAML);
 
     let prov = provenance();
     let feature_text = format!(
@@ -157,7 +157,7 @@ fn a_second_porting_sync_over_an_unchanged_inventory_writes_zero_new_overlay_rec
     sync_inventory(dir.path());
 
     let first = sync_porting(dir.path());
-    let overlay_dir = dir.path().join("canon/ledger/kind=porting.coverage");
+    let overlay_dir = dir.path().join(".canon/ledger/kind=porting.coverage");
     let count_after_first = files_under(&overlay_dir).len();
     assert_eq!(count_after_first, 2, "one overlay record per scanned scenario; stdout: {}", stdout(&first));
     assert!(stdout(&first).contains("2 written"), "{}", stdout(&first));
@@ -196,7 +196,7 @@ fn a_porting_sync_and_query_round_trip_leaves_core_scenario_files_byte_identical
     write_repo(dir.path());
     sync_inventory(dir.path());
 
-    let scenario_dir = dir.path().join("canon/ledger/kind=scenario");
+    let scenario_dir = dir.path().join(".canon/ledger/kind=scenario");
     let before = snapshot_bytes(&scenario_dir);
     assert_eq!(before.len(), 2, "fixture must have materialized both Scenario records before this round-trip");
 
@@ -327,8 +327,8 @@ fn plugin_sync_from_a_subdirectory_resolves_the_repo_root_tier() {
     assert!(stdout(&out).contains("2 written"), "must write into the repo-root tier: {}", stdout(&out));
 
     // Overlays land under the repo ROOT tier; no subdir-local tier appears.
-    assert_eq!(files_under(&dir.path().join("canon/ledger/kind=porting.coverage")).len(), 2, "overlay records must be under the repo ROOT tier");
-    assert!(!sub.join("canon").exists(), "no subdir-local canon/ tier may be created: {sub:?}");
+    assert_eq!(files_under(&dir.path().join(".canon/ledger/kind=porting.coverage")).len(), 2, "overlay records must be under the repo ROOT tier");
+    assert!(!sub.join(".canon").exists(), "no subdir-local canon/ tier may be created: {sub:?}");
 
     // A root-run query projects exactly the overlays the subdir sync wrote (same tier).
     let records = query_scenarios_with_plugin(dir.path());

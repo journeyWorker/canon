@@ -108,9 +108,9 @@ fn a_stream_with_a_contradicting_failure_inside_the_window_rejects() {
 #[test]
 fn a_contradicting_trajectory_after_promotion_demotes_the_strategy_and_soft_flags_its_git_tier_file() {
     let repo_root = tempfile::tempdir().unwrap();
-    let strategy_store = ParquetStrategyStore::open(repo_root.path().join("canon/learn/strategies"));
-    let trajectory_store = ParquetTrajectoryStore::open(repo_root.path().join("canon/learn/trajectories"));
-    let git_tier_root = repo_root.path().join("canon/strategies");
+    let strategy_store = ParquetStrategyStore::open(repo_root.path().join(".canon/learn/strategies"));
+    let trajectory_store = ParquetTrajectoryStore::open(repo_root.path().join(".canon/learn/trajectories"));
+    let git_tier_root = repo_root.path().join(".canon/strategies");
 
     let gate = OccurrencePromotionGate::new(3, Duration::days(30));
     let now = Utc::now();

@@ -79,7 +79,7 @@ canon gate promote --repo .              # land every staged candidate
 canon gate promote --repo . --dry-run    # preview only
 ```
 
-Every well-formed record under `canon/ledger/_staging/` is re-validated
+Every well-formed record under `.canon/ledger/_staging/` is re-validated
 with the same checks the gate applies, assigned a monotonic per-(role,
 surface) `run_seq` — gap-free within one invocation, continuing from the
 committed tier's own max — and moved into the committed ledger. A
@@ -98,7 +98,7 @@ Idempotent, diff-only: merges a hook entry into both
 touching an existing entry in the same matcher group. Running it twice
 with no manual edits between reports "no diff" and writes nothing. When
 neither file already invokes `canon gate`, it also emits
-`scripts/canon-gate-pre-commit.sh` (advisory by default; set
+`.canon/scripts/canon-gate-pre-commit.sh` (advisory by default; set
 `CANON_GATE_ADVISORY=0` to block the commit on a failing gate).
 
 ## Proving the gate itself

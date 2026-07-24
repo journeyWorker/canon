@@ -38,7 +38,7 @@ Which backend currently implements a rung is a separate declaration,
 A legacy backend name (`git`/`pg`/`r2`) used where a rung is expected —
 `routing.*`, `aging.*.to`, or a `tiers.*` key — is rejected with an
 explicit hint, never silently aliased. `canon init` scaffolds a fresh
-repo's `hot` rung as sqlite by default (`path: canon/hot.db`) — zero
+repo's `hot` rung as sqlite by default (`path: .canon/hot.db`) — zero
 services required for the first `canon ingest sessions`; the example
 below is this repo's own team-scale config (`hot: postgres`).
 
@@ -51,7 +51,7 @@ config:
 
 ```yaml
 tiers:
-  local: { backend: git, root: canon/ledger }
+  local: { backend: git, root: .canon/ledger }
   hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }
   cold: { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: "canon/" }
 
@@ -153,7 +153,7 @@ views over the local, offline-readable rungs:
 - `mart_records_by_kind` — the persona-facing summary.
 
 ```bash
-CANON_GIT_ROOT=/path/to/canon/ledger \
+CANON_GIT_ROOT=/path/to/.canon/ledger \
 CANON_R2_ROOT=/path/to/local/r2/root/canon \
   duckdb -init crates/canon-store/sql/views.sql \
     -c "SELECT * FROM mart_records_by_kind;"

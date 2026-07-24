@@ -38,8 +38,8 @@ pub struct DirectiveDecl {
 
 /// plugin §5's `kind:` field (verified, module doc) — CLOSED here
 /// (the closed-vocabulary audit pattern): only the two values this workspace's own
-/// manifests ever declare (the real `canon/vocab/canon.core/plugin.yaml`'s
-/// `kind: core`, and every consumer-repo `canon/vocab/<id>/plugin.yaml`'s
+/// manifests ever declare (the real `.canon/vocab/canon.core/plugin.yaml`'s
+/// `kind: core`, and every consumer-repo `.canon/vocab/<id>/plugin.yaml`'s
 /// `kind: project`) parse; anything else is an `E-PLUGIN-MANIFEST` at
 /// `plugin.yaml` parse time (serde's own "unknown variant" diagnostic),
 /// never a value silently carried through and left unchecked. Nothing in

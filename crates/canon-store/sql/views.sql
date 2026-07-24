@@ -31,7 +31,7 @@
 -- rebindable root, `CANON_LEARN_ROOT`, points at S6/S7/S8's
 -- `canon-learn`-owned operator-local parquet store root
 -- (`crates/canon-learn/src/config.rs::DEFAULT_LEARN_ROOT`, i.e.
--- `<repo>/canon/learn`) — a physical source distinct from the git/r2
+-- `<repo>/.canon/learn`) — a physical source distinct from the git/r2
 -- tiers above; see `stg_strategy_items`/`stg_trajectories` below for
 -- why it needs its own root instead of reusing `CANON_R2_ROOT`.
 
@@ -92,7 +92,7 @@ FROM read_parquet(getenv('CANON_R2_ROOT') || '/kind=*/**/*.parquet');
 -- wrongly treated S3 as always report-visible). Data routed to a
 -- rung whose backend `crates/canon-store/src/policy.rs::Backend::
 -- read_directly_by_report()` reports `false` for (Postgres always;
--- S3 unless a local `canon/r2` mirror happens to be current) is NOT
+-- S3 unless a local `.canon/r2` mirror happens to be current) is NOT
 -- lost: it stays live-readable via `canon query --kind <kind>`
 -- (`canon-cli`'s own tier fan-out, s22 `query-tier-degradation`) —
 -- this view deliberately never grows a live-backend-reading

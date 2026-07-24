@@ -34,7 +34,7 @@ fn synthetic_trajectory(task: &str, polarity: Polarity, becomes: Becomes) -> Tra
 /// A `canon.yaml`-shaped fixture manifest — proves `LearnConfig`
 /// resolves an operator-local learn root + widens the role registry
 /// from a real (fixture) config document, not just hard-coded defaults.
-const FIXTURE_CANON_YAML: &str = "learn:\n  root: canon/learn\n  roles:\n    - triage\n";
+const FIXTURE_CANON_YAML: &str = "learn:\n  root: .canon/learn\n  roles:\n    - triage\n";
 
 #[test]
 fn store_distill_rebuild_search_round_trip_over_a_fixture_corpus() {

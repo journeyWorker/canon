@@ -84,7 +84,7 @@ fn unknown_kind_is_a_clean_cli_error() {
 #[test]
 fn query_with_no_flags_resolves_from_a_subdirectory_of_the_repo_root() {
     let repo = tempfile::tempdir().unwrap();
-    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n").unwrap();
+    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
     let subdir = repo.path().join("nested").join("deep");
     std::fs::create_dir_all(&subdir).unwrap();
 
@@ -103,7 +103,7 @@ fn query_with_no_flags_resolves_from_a_subdirectory_of_the_repo_root() {
 #[test]
 fn query_with_no_flags_at_the_repo_root_resolves_and_succeeds() {
     let repo = tempfile::tempdir().unwrap();
-    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n").unwrap();
+    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
 
     let output =
         std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(["query", "--kind", "change"]).current_dir(repo.path()).output().expect("spawn canon binary");
@@ -121,7 +121,7 @@ fn query_with_no_flags_at_the_repo_root_resolves_and_succeeds() {
 #[test]
 fn query_explicit_non_default_repo_is_used_as_is_no_walk() {
     let repo = tempfile::tempdir().unwrap();
-    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n").unwrap();
+    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
     let cwd = tempfile::tempdir().unwrap();
 
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
@@ -144,7 +144,7 @@ fn query_explicit_non_default_repo_is_used_as_is_no_walk() {
 fn query_explicit_canon_yaml_still_resolves_the_literal_path_from_any_cwd() {
     let snapshot = tempfile::tempdir().unwrap();
     let canon_yaml_path = snapshot.path().join("snapshot-canon.yaml");
-    std::fs::write(&canon_yaml_path, "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n").unwrap();
+    std::fs::write(&canon_yaml_path, "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
     let cwd = tempfile::tempdir().unwrap(); // unrelated to `snapshot`, no ancestor relation
 
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
@@ -169,10 +169,10 @@ fn query_explicit_canon_yaml_still_resolves_the_literal_path_from_any_cwd() {
 #[test]
 fn query_canon_yaml_wins_over_repo_when_both_supplied_and_would_resolve_differently() {
     let repo_a = tempfile::tempdir().unwrap();
-    std::fs::write(repo_a.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: canon/ledger }\n").unwrap();
+    std::fs::write(repo_a.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
     let repo_b = tempfile::tempdir().unwrap();
     let canon_yaml_b = repo_b.path().join("canon.yaml");
-    std::fs::write(&canon_yaml_b, "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  change: local\n").unwrap();
+    std::fs::write(&canon_yaml_b, "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
 
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
         .args(["query", "--kind", "change", "--repo"])

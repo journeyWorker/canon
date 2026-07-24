@@ -2,8 +2,8 @@
 //! change with it"): proves the typed task-atom mechanism against a REAL,
 //! non-canon-vocab-fixture consumer change —
 //! `openspec/changes/s10-vocab-pilot/tasks.vocab.yaml`, resolved against
-//! THIS repo's own real, checked-in `canon/vocab/canon.core/` +
-//! `canon/policy.yaml` (not a tempdir copy, unlike
+//! THIS repo's own real, checked-in `.canon/vocab/canon.core/` +
+//! `.canon/policy.yaml` (not a tempdir copy, unlike
 //! `canon_core_selftest.rs`'s own fixture-corpus proof). Read-only —
 //! never mutates the real repo; the pilot's own `canon gate task` flip
 //! was performed once, manually, against the real binary, and its result

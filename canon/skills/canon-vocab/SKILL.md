@@ -1,6 +1,6 @@
 ---
 name: canon-vocab
-description: How to author against canon's typed vocabulary — declare a directive or enum in a canon/vocab/<id> plugin, author a typed `::task` atom with a policy-resolved evidence requirement, author a `::handoff-<domain>` body, and why to run canon context first. Use when adding a directive/enum, or writing a typed task or handoff atom.
+description: How to author against canon's typed vocabulary — declare a directive or enum in a .canon/vocab/<id> plugin, author a typed `::task` atom with a policy-resolved evidence requirement, author a `::handoff-<domain>` body, and why to run canon context first. Use when adding a directive/enum, or writing a typed task or handoff atom.
 ---
 
 # canon-vocab
@@ -8,7 +8,7 @@ description: How to author against canon's typed vocabulary — declare a direct
 Canon's typed authoring layer replaces a freeform `tasks.md` checkbox's
 implicit evidence with a structured, checker-validated, policy-resolved
 attribute — and gives handoff bodies a declared, rendered template. You
-declare a vocabulary in a `canon/vocab/<id>/` plugin, then author atoms
+declare a vocabulary in a `.canon/vocab/<id>/` plugin, then author atoms
 that the checker validates against it.
 
 ## Run `canon context` FIRST
@@ -22,10 +22,10 @@ surface is the source of truth for "what can I declare here?" See
 
 ## Declaring a directive or enum
 
-A vocabulary plugin lives at `canon/vocab/<id>/`:
+A vocabulary plugin lives at `.canon/vocab/<id>/`:
 
 ```yaml
-# canon/vocab/<id>/plugin.yaml
+# .canon/vocab/<id>/plugin.yaml
 id: my.plugin
 version: "0.1.0"
 kind: project           # `core` for canon.core; `project` for a consumer plugin
@@ -35,7 +35,7 @@ exports:
 ```
 
 ```yaml
-# canon/vocab/<id>/directives/thing.yaml
+# .canon/vocab/<id>/directives/thing.yaml
 directives:
   - name: thing
     attrs:
@@ -50,19 +50,19 @@ directives:
         required: false
       - name: evidence
         type: evidence           # SPECIAL: {kind, ref}; `kind`'s domain
-        required: true           # resolves LIVE from canon/policy.yaml,
+        required: true           # resolves LIVE from .canon/policy.yaml,
                                  # never a locally-declared enum
 ```
 
 ```yaml
-# canon/vocab/<id>/enums.yaml
+# .canon/vocab/<id>/enums.yaml
 enums:
   task-status: [open, done]
 ```
 
 - **Type kinds**: `string`; `{ domain: <enum> }` (validated against
   `enums.yaml`); `{ list: <type> }`; and `evidence` (the `{kind, ref}`
-  shape whose `kind` domain comes from `canon/policy.yaml`'s evidence
+  shape whose `kind` domain comes from `.canon/policy.yaml`'s evidence
   kinds, NOT a local enum).
 - The evidence-kind domain is DELIBERATELY absent from `enums.yaml` — do
   not add it there; it resolves dynamically from policy.

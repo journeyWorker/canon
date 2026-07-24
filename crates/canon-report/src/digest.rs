@@ -37,7 +37,7 @@ use crate::error::ReportError;
 /// duplicated here as a bare path constant — never the CEL-evaluation
 /// logic that constant's owning module implements — since this crate
 /// depends on `canon-model`/`canon-store` only, task 1.1).
-pub const POLICY_YAML_RELATIVE_PATH: &str = "canon/policy.yaml";
+pub const POLICY_YAML_RELATIVE_PATH: &str = canon_model::paths::POLICY_FILE;
 
 /// The record kinds [`corpus_hash`] digests (module doc).
 const CORPUS_KINDS: [RecordKind; 3] = [RecordKind::Change, RecordKind::Task, RecordKind::Scenario];
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn compute_reads_policy_yaml_when_present() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join("canon")).unwrap();
+        std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
         std::fs::write(dir.path().join(POLICY_YAML_RELATIVE_PATH), "trust_required:\n  p1: human\n").unwrap();
 
         let header = DigestHeader::compute(dir.path(), &dir.path().join("ledger")).unwrap();

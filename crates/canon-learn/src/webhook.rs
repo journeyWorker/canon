@@ -881,7 +881,7 @@ mod tests {
 
     #[test]
     fn manifest_with_other_sections_only_reads_webhook_and_no_rollback() {
-        let yaml = "learn:\n  root: canon/learn-custom\n";
+        let yaml = "learn:\n  root: .canon/learn-custom\n";
         let config = WebhookConfig::from_manifest(yaml).unwrap();
         assert_eq!(config, WebhookConfig::default());
     }

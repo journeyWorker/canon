@@ -158,7 +158,7 @@ pub fn load_spec_roots(canon_yaml: &Path) -> Result<Vec<SpecRoot>, InventoryErro
 /// spec-ledger-selftest Req 2) — composes over [`GateCtx`]'s own
 /// two-constructor pattern (`from_repo`/`from_fixture`) rather than a
 /// second, hand-rolled copy of its `<repo>/canon.yaml` `tiers.git.root`
-/// resolution / default `canon/ledger` layout: inventory-sync and the
+/// resolution / default `.canon/ledger` layout: inventory-sync and the
 /// gate read the SAME ledger. [`SyncCtx::spec_roots`] is the ONE
 /// `specs.roots[]` resolver both constructors run through —
 /// [`run_sync_with_ctx`] is the ONE downstream sync entry point a
@@ -186,7 +186,7 @@ impl SyncCtx {
 
     /// Fixture binding (spec-ledger-selftest Req 2's "fixture constructor
     /// runs fully offline against a tempdir" scenario): every root under
-    /// one fresh tempdir, the identical `canon/ledger` default layout
+    /// one fresh tempdir, the identical `.canon/ledger` default layout
     /// [`GateCtx::from_fixture`] uses. Never reads a `canon.yaml` at all
     /// for `ledger_root` (there is none in a fresh fixture dir);
     /// [`SyncCtx::spec_roots`] below still probes for one through the
@@ -620,7 +620,7 @@ mod tests {
     #[test]
     fn missing_specs_key_resolves_the_default_single_root() {
         let dir = TempDir::new().unwrap();
-        write(dir.path(), "canon.yaml", "tiers:\n  git:\n    root: canon/ledger\n");
+        write(dir.path(), "canon.yaml", "tiers:\n  git:\n    root: .canon/ledger\n");
         let roots = load_spec_roots(&dir.path().join("canon.yaml")).unwrap();
         assert_eq!(roots, vec![SpecRoot { id: ProjectId::parse("root").unwrap(), root: dir.path().join("specs") }]);
     }

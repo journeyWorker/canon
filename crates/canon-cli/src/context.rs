@@ -230,7 +230,7 @@ pub struct AuthoringSurface {
 /// explicit `--repo .` resolves the PROJECT root — the nearest ancestor of
 /// cwd carrying a `canon.yaml`, the identical repo-root marker `canon
 /// fmt`/`canon gate` key off — so running `canon context` from any
-/// subdirectory still reads the repo ROOT's `<repo>/canon/policy.yaml`,
+/// subdirectory still reads the repo ROOT's `<repo>/.canon/policy.yaml`,
 /// never a subdirectory's absence of one. Any OTHER explicit `--repo
 /// <dir>` is used as-is (no walk), matching every other canon-cli root
 /// argument (`canon fmt`'s `root`, `canon gate`'s `GateCtx::from_repo`).
@@ -612,8 +612,8 @@ mod tests {
     fn fixture_repo(policy_yaml: Option<&str>) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         if let Some(yaml) = policy_yaml {
-            std::fs::create_dir_all(dir.path().join("canon")).unwrap();
-            std::fs::write(dir.path().join("canon/policy.yaml"), yaml).unwrap();
+            std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+            std::fs::write(dir.path().join(".canon/policy.yaml"), yaml).unwrap();
         }
         dir
     }
@@ -629,7 +629,7 @@ mod tests {
     }
 
     /// Invariant 1: `resolve_surface` never touches a corpus at all — a
-    /// repo with no `canon/policy.yaml`, no ledger, and no `canon.yaml`
+    /// repo with no `.canon/policy.yaml`, no ledger, and no `canon.yaml`
     /// still resolves a full surface (every kind, every enum, every join
     /// key), only `policy` degrading to documented defaults + a `Missing`
     /// diagnostic.
@@ -780,22 +780,22 @@ mod tests {
 
     /// A minimal, self-contained vocabulary plugin tree scoped to one
     /// directive + one enum — S10 part2's OWN fixture, independent of this
-    /// repo's real checked-in `canon/vocab/canon.core/`, so this test suite
+    /// repo's real checked-in `.canon/vocab/canon.core/`, so this test suite
     /// never depends on that content changing (mirrors `canon-vocab`'s own
     /// `canon_core_selftest.rs` "seed a tempdir" pattern, just smaller).
     fn seed_vocab(dir: &std::path::Path) {
-        std::fs::create_dir_all(dir.join("canon/vocab/canon.core/directives")).unwrap();
+        std::fs::create_dir_all(dir.join(".canon/vocab/canon.core/directives")).unwrap();
         std::fs::write(
-            dir.join("canon/vocab/canon.core/plugin.yaml"),
+            dir.join(".canon/vocab/canon.core/plugin.yaml"),
             "id: canon.core\nversion: \"0.1.0\"\nkind: core\nexports:\n  directives: directives/\n  enums: enums.yaml\n",
         )
         .unwrap();
         std::fs::write(
-            dir.join("canon/vocab/canon.core/directives/task.yaml"),
+            dir.join(".canon/vocab/canon.core/directives/task.yaml"),
             "directives:\n  - name: task\n    attrs:\n      - name: desc\n        type: string\n        required: true\n      - name: status\n        type: { domain: task-status }\n        required: true\n      - name: evidence\n        type: evidence\n        required: true\n",
         )
         .unwrap();
-        std::fs::write(dir.join("canon/vocab/canon.core/enums.yaml"), "enums:\n  task-status:\n    - open\n    - done\n").unwrap();
+        std::fs::write(dir.join(".canon/vocab/canon.core/enums.yaml"), "enums:\n  task-status:\n    - open\n    - done\n").unwrap();
     }
 
     /// Design.md D3, S10 part2 task 6.1: `resolve_surface`'s `vocab.snapshot`
@@ -854,7 +854,7 @@ mod tests {
         }
     }
 
-    /// Invariant 1, extended: a repo with NO `canon/vocab/` directory at
+    /// Invariant 1, extended: a repo with NO `.canon/vocab/` directory at
     /// all still resolves a full surface — `vocab.snapshot` degrades to the
     /// empty-but-valid snapshot `canon_vocab::resolve_snapshot` itself
     /// documents for a missing vocab dir, never a panic.

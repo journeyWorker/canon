@@ -456,8 +456,8 @@ mod tests {
     #[test]
     fn class_below_required_release_trust_level_emits_trust_below_required() {
         let dir = TempDir::new().unwrap();
-        std::fs::create_dir_all(dir.path().join("canon")).unwrap();
-        std::fs::write(dir.path().join("canon").join("policy.yaml"), "trust_required:\n  p1: human\n  p2: agent\n").unwrap();
+        std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+        std::fs::write(dir.path().join(".canon").join("policy.yaml"), "trust_required:\n  p1: human\n  p2: agent\n").unwrap();
 
         let gate_ctx = GateCtx::from_fixture(dir.path());
         let tier = GitTier::new(&gate_ctx.ledger_root);
@@ -494,8 +494,8 @@ mod tests {
         // what surfaces `malformed-evidence` now (`dispatch.rs`'s own
         // test proves that, through the NORMAL dispatcher).
         let dir = TempDir::new().unwrap();
-        std::fs::create_dir_all(dir.path().join("canon")).unwrap();
-        std::fs::write(dir.path().join("canon").join("policy.yaml"), "trust_required:\n  p1: human\n").unwrap();
+        std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+        std::fs::write(dir.path().join(".canon").join("policy.yaml"), "trust_required:\n  p1: human\n").unwrap();
 
         let gate_ctx = GateCtx::from_fixture(dir.path());
         let tier = GitTier::new(&gate_ctx.ledger_root);

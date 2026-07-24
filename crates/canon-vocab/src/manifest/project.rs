@@ -1,8 +1,8 @@
 //! Retargeted from the donor manifest layer's project-file loader (design.md
 //! D1: "a `canon.project.yaml` ... analog of the donor's
 //! `pluginsDir`/`profiles` shape"). Renamed
-//! `pluginsDir` -> `vocabDir` (default `canon/vocab/`) since that is where
-//! BOTH `canon.core` and every consumer `canon/vocab/<id>/plugin.yaml` live
+//! `pluginsDir` -> `vocabDir` (default `.canon/vocab/`) since that is where
+//! BOTH `canon.core` and every consumer `.canon/vocab/<id>/plugin.yaml` live
 //! (D1/D3) — unlike the donor, canon's core plugin is not
 //! compile-time-embedded,
 //! it is scanned from the same directory as any other plugin (see
@@ -17,13 +17,13 @@ use crate::manifest::resolve::{ActivationMap, Profile, ProfileGraph};
 use crate::manifest::types::Literal;
 
 pub const PROJECT_YAML_RELATIVE_PATH: &str = "canon.project.yaml";
-const DEFAULT_VOCAB_DIR: &str = "canon/vocab/";
+const DEFAULT_VOCAB_DIR: &str = canon_model::paths::VOCAB_DIR;
 
 #[derive(Clone, Debug)]
 pub struct ProjectConfig {
     pub graph: ProfileGraph,
     /// Resolved vocab dir (`project_dir.join(vocabDir)`; defaults to
-    /// `project_dir/canon/vocab/`).
+    /// `project_dir/.canon/vocab/`).
     pub vocab_dir: PathBuf,
 }
 

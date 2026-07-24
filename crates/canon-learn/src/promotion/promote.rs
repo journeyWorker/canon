@@ -4,7 +4,7 @@
 //! `<git_tier_root>/<role>/<strategy_id>.md` file a later demotion
 //! soft-flags or hard-deletes. Promotion moves a distilled
 //! [`StrategyItem`] from the operator-local parquet warm tier up into
-//! the git-tracked, PR-reviewed tier (`canon/strategies/<role>/<id>.md`
+//! the git-tracked, PR-reviewed tier (`.canon/strategies/<role>/<id>.md`
 //! by default, [`crate::config::DEFAULT_STRATEGIES_ROOT`]).
 //!
 //! The file is written as a `---`-delimited YAML front-matter block +

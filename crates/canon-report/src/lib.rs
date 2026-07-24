@@ -52,7 +52,7 @@ pub use snapshot::snapshot;
 /// roots (`roots`).
 #[derive(Debug, Clone)]
 pub struct ReportInputs {
-    /// The consumer repo's root — where `canon/policy.yaml` and the
+    /// The consumer repo's root — where `.canon/policy.yaml` and the
     /// `.git` directory `git rev-parse HEAD` runs against both live.
     pub repo_root: PathBuf,
     pub roots: Roots,
@@ -82,7 +82,7 @@ pub fn report(inputs: &ReportInputs) -> Result<String, ReportError> {
     };
     // Design D3: `canon-report` reads `<repo_root>/canon.yaml` itself
     // (mirroring `digest::DigestHeader::compute`'s own direct
-    // `canon/policy.yaml` read) — an input `report()` DERIVES, never a
+    // `.canon/policy.yaml` read) — an input `report()` DERIVES, never a
     // live, non-directly-readable-backend read (module doc of
     // `tier_boundary`, s28 design D2).
     let kinds_not_read_directly = tier_boundary::kinds_not_read_directly(&inputs.repo_root);

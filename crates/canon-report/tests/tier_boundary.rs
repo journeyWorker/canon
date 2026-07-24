@@ -28,7 +28,7 @@ fn multi_tier_config_renders_the_boundary_note_naming_exactly_the_kinds_not_read
     let roots = support::corpus::build(dir.path());
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_TB1, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_TB1, prefix: \"canon/\" }\nrouting:\n  task: hot\n  session: hot\n  change: local\n  scenario: cold\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_TB1, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_TB1, prefix: \"canon/\" }\nrouting:\n  task: hot\n  session: hot\n  change: local\n  scenario: cold\n",
     );
     let inputs = ReportInputs::new(dir.path(), roots);
 
@@ -93,7 +93,7 @@ fn git_only_routing_renders_no_boundary_section() {
     let roots = support::corpus::build(dir.path());
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  task: local\n  change: local\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  task: local\n  change: local\n",
     );
     let inputs = ReportInputs::new(dir.path(), roots);
 
@@ -120,7 +120,7 @@ fn a_cold_rung_backed_by_s3_now_appears_in_the_boundary_section() {
     let roots = support::corpus::build(dir.path());
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_TB5, prefix: \"canon/\" }\nrouting:\n  task: local\n  change: local\n  scenario: cold\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_TB5, prefix: \"canon/\" }\nrouting:\n  task: local\n  change: local\n  scenario: cold\n",
     );
     let inputs = ReportInputs::new(dir.path(), roots);
 

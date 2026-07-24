@@ -33,8 +33,8 @@ at startup — never a silent fallback to local files.
 
 ```yaml
 tiers:
-  local: { backend: git, root: canon/ledger }
-  hot:   { backend: sqlite, path: canon/hot.db }
+  local: { backend: git, root: .canon/ledger }
+  hot:   { backend: sqlite, path: .canon/hot.db }
   # hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon }
   cold:  { backend: s3, bucket_env: CANON_BUCKET, prefix: canon/ }
 ```
@@ -108,12 +108,12 @@ canon query --kind trajectory --json
 
 canon exposes layered `stg_`/`int_`/`mart_` query views; `canon report`
 builds its numbers from the `mart_` views. Those read ONLY local roots
-— the git ledger and a LOCAL `canon/r2` parquet mirror. `canon report`
+— the git ledger and a LOCAL `.canon/r2` parquet mirror. `canon report`
 never opens a live DB connection or the live bucket, so:
 
 - Kinds routed to `hot` (sqlite/postgres) do NOT appear in `canon
   report`.
-- Kinds routed to `cold` (s3) appear only if a local `canon/r2` mirror
+- Kinds routed to `cold` (s3) appear only if a local `.canon/r2` mirror
   has been separately materialized — there is no automatic sync.
 
 These kinds are not lost: read them with `canon query --kind <kind>`.

@@ -2,10 +2,10 @@
 //! `openspec/changes/s16-plugin-extensibility/`, tasks.md 6.1): the
 //! 10th `canon selftest` suite (registered as `"plugin-overlays"` in
 //! `canon-cli`'s `crate::selftest::suites`). A SYNTHETIC fixture corpus
-//! -- a `canon/plugins/<id>/plugin.yaml` manifest plus overlay records,
+//! -- a `.canon/plugins/<id>/plugin.yaml` manifest plus overlay records,
 //! built entirely inside a scratch directory at RUN time (no checked-in
 //! fixture files; this module never reads or writes anything under this
-//! repo's own `canon/plugins/porting/`) -- exercises the FULL P1-P3
+//! repo's own `.canon/plugins/porting/`) -- exercises the FULL P1-P3
 //! machinery this crate ships in one pipeline: resolve a manifest
 //! snapshot ([`resolve_plugin_snapshot`]), validate a well-formed body
 //! AND three independently-malformed candidate bodies
@@ -48,8 +48,8 @@
 //! selftest`, not only under `cargo test`. Side-effect-free against the
 //! real repo: every read/write is scoped to a fresh scratch directory
 //! under `std::env::temp_dir()`, `Drop`-cleaned, mirroring production's
-//! own `<repo>/canon/plugins/<id>/plugin.yaml` +
-//! `<repo>/canon/ledger/kind=<x>/...` layout (`GateCtx::from_repo`'s
+//! own `<repo>/.canon/plugins/<id>/plugin.yaml` +
+//! `<repo>/.canon/ledger/kind=<x>/...` layout (`GateCtx::from_repo`'s
 //! default `ledger_root`) so the fixture stays realistic.
 
 use std::collections::BTreeSet;
@@ -234,15 +234,15 @@ struct FixtureRun {
 
 fn run_fixture() -> Result<FixtureRun, String> {
     let scratch = ScratchDir::new()?;
-    write_file(scratch.path(), &format!("canon/plugins/{PLUGIN_ID}/plugin.yaml"), PLUGIN_MANIFEST_YAML)?;
+    write_file(scratch.path(), &format!("{}/{PLUGIN_ID}/plugin.yaml", canon_model::paths::PLUGINS_DIR), PLUGIN_MANIFEST_YAML)?;
 
     let (snapshot, resolution_diags) = resolve_plugin_snapshot(scratch.path());
     let decl = snapshot.overlay(OVERLAY_IDENTITY).cloned().ok_or_else(|| format!("resolved snapshot is missing the `{OVERLAY_IDENTITY}` overlay declaration"))?;
 
-    // Mirrors production's own `<repo>/canon/ledger` default
+    // Mirrors production's own `<repo>/.canon/ledger` default
     // (`GateCtx::from_repo`) -- nested under the SAME scratch root as
-    // `canon/plugins/`, so this fixture's layout matches a real repo's.
-    let tier = GitTier::new(scratch.path().join("canon/ledger"));
+    // `.canon/plugins/`, so this fixture's layout matches a real repo's.
+    let tier = GitTier::new(scratch.path().join(canon_model::paths::LEDGER_DIR));
 
     let covered_receipt =
         write_overlay(&tier, &decl, well_formed_body("world.selftest.01", true, &["world.selftest.01"])).map_err(|e| format!("write covered overlay: {e}"))?;

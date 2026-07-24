@@ -123,7 +123,7 @@ pub struct LoadedTiers {
 /// `canon_yaml_path`'s own directory (not the process's CWD) -- the
 /// PROJECT root every `canon.yaml`-relative path (`tiers.local.root`,
 /// `tiers.<rung>.path` for a sqlite-backed rung, and s16's
-/// `canon/plugins/<id>/plugin.yaml`, `resolve_plugin_
+/// `.canon/plugins/<id>/plugin.yaml`, `resolve_plugin_
 /// snapshot::PLUGINS_DIR_RELATIVE_PATH`) resolves against, so `canon`
 /// behaves the same regardless of where it is invoked from within a
 /// repo checkout. `.` when `canon_yaml_path` carries no parent
@@ -656,7 +656,7 @@ mod lenient_tier_tests {
         let path = dir.join("canon.yaml");
         std::fs::write(
             &path,
-            "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_UNIT_UNSET, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S22_UNIT_UNSET, prefix: \"canon/\" }\nrouting:\n  change: local\n  task: hot\n  handoff: hot\naging:\n  handoff: { after: 30d, to: cold }\n",
+            "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_UNIT_UNSET, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S22_UNIT_UNSET, prefix: \"canon/\" }\nrouting:\n  change: local\n  task: hot\n  handoff: hot\naging:\n  handoff: { after: 30d, to: cold }\n",
         )
         .unwrap();
         path
@@ -753,7 +753,7 @@ mod lenient_tier_tests {
         let path = dir.join("canon.yaml");
         std::fs::write(
             &path,
-            "tiers:\n  local: { backend: git, root: canon/ledger }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S27_STRICT_UNSET, prefix: \"canon/\" }\nrouting:\n  change: local\n  handoff: cold\n",
+            "tiers:\n  local: { backend: git, root: .canon/ledger }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_S27_STRICT_UNSET, prefix: \"canon/\" }\nrouting:\n  change: local\n  handoff: cold\n",
         )
         .unwrap();
         path

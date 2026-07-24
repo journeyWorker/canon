@@ -24,10 +24,10 @@ ingest (sessions, reviews, handoffs) → trajectories + verdicts (per role)
 ## Two tiers, two stores
 
 - **Warm — trajectories (Parquet).** `ParquetTrajectoryStore` under
-  `<repo>/canon/learn/trajectories/`: raw, verdict-keyed rows written
+  `<repo>/.canon/learn/trajectories/`: raw, verdict-keyed rows written
   by ingest. Local, rebuildable, `.gitignore`d — never hand-committed.
 - **Durable — strategies (git).** `ParquetStrategyStore` plus
-  git-tracked `<repo>/canon/strategies/<role>/<id>.md` files: the
+  git-tracked `<repo>/.canon/strategies/<role>/<id>.md` files: the
   distilled, PR-reviewable `StrategyItem`s a promotion writes into and
   a demotion soft-flags.
 
@@ -68,7 +68,7 @@ learn:
       mode: crn
   demotion:
     hard_delete: false # optional — soft-flag is the default
-    strategies_root: canon/strategies
+    strategies_root: .canon/strategies
 ```
 
 - **`occurrence`** — for roles whose domain doesn't support
@@ -92,7 +92,7 @@ canon learn promote 01J...ULID --dry-run # preview: lint + resolve, no write
 ```
 
 `canon learn promote` graduates a distilled `StrategyItem` (by its ULID)
-from the warm parquet tier into `canon/strategies/<role>/<id>.md`, with
+from the warm parquet tier into `.canon/strategies/<role>/<id>.md`, with
 YAML front matter (`status`, `regime_key`, `role`, `title`,
 `source_trajectory_ids`, `recorded_at`). It runs advisory lints
 (content-length ceiling, literal-absolute-path rejection) —

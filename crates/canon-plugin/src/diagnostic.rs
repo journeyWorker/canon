@@ -19,7 +19,7 @@
 /// -- including a missing required field, which serde rejects outright
 /// rather than defaulting.
 pub const E_PLUGIN_MANIFEST: &str = "E-PLUGIN-MANIFEST";
-/// Two packages under `canon/plugins/` declare the same manifest `id`
+/// Two packages under `.canon/plugins/` declare the same manifest `id`
 /// (`E-PLUGIN-DUP-ID`) -- the later (directory-sort order) package is
 /// dropped, never silently merged or overwritten.
 pub const E_PLUGIN_DUP_ID: &str = "E-PLUGIN-DUP-ID";

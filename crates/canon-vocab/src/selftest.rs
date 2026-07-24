@@ -4,10 +4,10 @@
 //! suite through, so it can run this crate's corpus without a `cargo test`
 //! harness. Wraps the SAME resolve/validate/compile round-trip
 //! `tests/canon_core_selftest.rs` proves as five separate `#[test]`s — the
-//! REAL, checked-in `canon/vocab/canon.core/` manifest, this crate's own
+//! REAL, checked-in `.canon/vocab/canon.core/` manifest, this crate's own
 //! checked-in `fixtures/atoms/*.yaml` corpus, resolved and validated exactly
 //! as any real consumer repo would (module doc there: this repo has no real
-//! `canon/policy.yaml` yet, so this module supplies its own, in a COPY of
+//! `.canon/policy.yaml` yet, so this module supplies its own, in a COPY of
 //! the tree, never touching the real one).
 //!
 //! # Rebindable root, no `tempfile` dependency
@@ -23,7 +23,7 @@
 //!
 //! Side-effect-free against the real repo: every read is scoped to a copy
 //! under [`ScratchDir`] plus this crate's own `fixtures/atoms/` (read-only);
-//! nothing under the real repo's `canon/` tree is ever written.
+//! nothing under the real repo's `.canon/` tree is ever written.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -77,14 +77,15 @@ fn copy_dir(src: &Path, dst: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// A scratch dir carrying a COPY of the real `canon/vocab/canon.core/` tree
-/// plus a selftest-owned `canon/policy.yaml` declaring the evidence kinds
+/// A scratch dir carrying a COPY of the real `.canon/vocab/canon.core/` tree
+/// plus a selftest-owned `.canon/policy.yaml` declaring the evidence kinds
 /// `fixtures/atoms/good.yaml` uses (module doc).
 fn project_with_real_canon_core() -> Result<ScratchDir, String> {
     let scratch = ScratchDir::new()?;
-    copy_dir(&repo_root().join("canon/vocab/canon.core"), &scratch.path().join("canon/vocab/canon.core"))?;
-    std::fs::write(scratch.path().join("canon/policy.yaml"), "trust_required:\n  test-run: agent\n  manual-review: human\n")
-        .map_err(|e| format!("write selftest canon/policy.yaml: {e}"))?;
+    let core_rel = format!("{}canon.core", canon_model::paths::VOCAB_DIR);
+    copy_dir(&repo_root().join(&core_rel), &scratch.path().join(&core_rel))?;
+    std::fs::write(scratch.path().join(canon_model::paths::POLICY_FILE), "trust_required:\n  test-run: agent\n  manual-review: human\n")
+        .map_err(|e| format!("write selftest .canon/policy.yaml: {e}"))?;
     Ok(scratch)
 }
 

@@ -195,7 +195,7 @@ mod tests {
     }
 
     fn ctx_with(policy: PolicyResolution, evidence: Vec<EvidenceRecord>) -> GateContext {
-        GateContext { ctx: GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/canon/ledger".into() }, policy, evidence, violations: Vec::new(), now: Utc::now() }
+        GateContext { ctx: GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/.canon/ledger".into() }, policy, evidence, violations: Vec::new(), now: Utc::now() }
     }
 
     #[test]

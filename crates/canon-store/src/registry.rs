@@ -208,7 +208,7 @@ mod tests {
 
     const POLICY_YAML: &str = r#"
 tiers:
-  local: { backend: git, root: canon/ledger }
+  local: { backend: git, root: .canon/ledger }
   cold:      { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: "canon/" }
 routing:
   change: local
@@ -268,7 +268,7 @@ aging: {}
         // needing a live postgres instance.
         let yaml = r#"
 tiers:
-  local: { backend: git, root: canon/ledger }
+  local: { backend: git, root: .canon/ledger }
   cold:      { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: "canon/" }
 routing:
   trajectory: local
@@ -315,7 +315,7 @@ aging:
         let r2_dir = tempfile::tempdir().unwrap();
         let yaml = r#"
 tiers:
-  local: { backend: git, root: canon/ledger }
+  local: { backend: git, root: .canon/ledger }
   cold:      { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: "canon/" }
 routing:
   trajectory: local

@@ -10,7 +10,7 @@
 //! once per gate run, fixture-rebindable.
 //!
 //! # `policy.yaml`'s on-disk shape
-//! Fixed at `<repo>/canon/policy.yaml`
+//! Fixed at `<repo>/.canon/policy.yaml`
 //! ([`POLICY_YAML_RELATIVE_PATH`] —
 //! `docs/superpowers/specs/2026-07-10-canon-design.md`'s infra layout
 //! table). Every field — `trust_required`/`trust_sample`'s per-key
@@ -60,10 +60,10 @@ use serde::Deserialize;
 use crate::trust_ladder::TrustLevel;
 
 /// `policy.yaml`'s fixed on-disk location relative to a repo root
-/// (infra layout doc: `<repo>/canon/policy.yaml # required-cell
+/// (infra layout doc: `<repo>/.canon/policy.yaml # required-cell
 /// derivation (D7 pattern)`) — unlike `canon.yaml`'s own
 /// `tiers.git.root`, this path is NOT per-repo-configurable.
-pub const POLICY_YAML_RELATIVE_PATH: &str = "canon/policy.yaml";
+pub const POLICY_YAML_RELATIVE_PATH: &str = canon_model::paths::POLICY_FILE;
 
 /// The [`RecordKind`] every `policy.yaml` CEL predicate binds against
 /// (module doc) — the one `bindings_for` call [`PolicyResolution::resolve`]
@@ -307,7 +307,7 @@ pub struct PolicyResolution {
 
 impl PolicyResolution {
     /// THE single resolver S12's `canon context` and S5's own gate
-    /// both call (module doc). Loads `<repo>/canon/policy.yaml`,
+    /// both call (module doc). Loads `<repo>/.canon/policy.yaml`,
     /// compiles every `{cel: ...}` field against `registry`-derived
     /// bindings (write-time validation, `canon_policy::compile`), and
     /// returns a resolution that is ALWAYS usable — a missing file, a
@@ -479,7 +479,7 @@ mod tests {
     }
 
     fn write_policy(dir: &TempDir, contents: &str) -> PathBuf {
-        let canon_dir = dir.path().join("canon");
+        let canon_dir = dir.path().join(".canon");
         std::fs::create_dir_all(&canon_dir).unwrap();
         let path = canon_dir.join("policy.yaml");
         std::fs::write(&path, contents).unwrap();

@@ -458,7 +458,7 @@ mod tests {
     use super::*;
 
     fn tiers(dir: &TempDir) -> (GitTier, GitTier) {
-        let ledger_root = dir.path().join("canon").join("ledger");
+        let ledger_root = dir.path().join(".canon").join("ledger");
         (GitTier::new(ledger_root.join("_staging")), GitTier::new(ledger_root))
     }
 
@@ -647,7 +647,7 @@ mod tests {
     #[test]
     fn divergence_stage_then_promote_assigns_a_monotonic_run_seq() {
         let dir = TempDir::new().unwrap();
-        let ledger_root = dir.path().join("canon").join("ledger");
+        let ledger_root = dir.path().join(".canon").join("ledger");
         let staging_dir = divergence_staging_dir(&ledger_root);
         let committed = GitTier::new(&ledger_root);
 
@@ -676,7 +676,7 @@ mod tests {
     #[test]
     fn divergence_promote_refuses_a_malformed_candidate_without_consuming_a_run_seq() {
         let dir = TempDir::new().unwrap();
-        let ledger_root = dir.path().join("canon").join("ledger");
+        let ledger_root = dir.path().join(".canon").join("ledger");
         let staging_dir = divergence_staging_dir(&ledger_root);
         let committed = GitTier::new(&ledger_root);
         std::fs::create_dir_all(&staging_dir).unwrap();
@@ -696,7 +696,7 @@ mod tests {
     #[test]
     fn divergence_promote_refuses_a_candidate_with_no_derivable_partition_key() {
         let dir = TempDir::new().unwrap();
-        let ledger_root = dir.path().join("canon").join("ledger");
+        let ledger_root = dir.path().join(".canon").join("ledger");
         let staging_dir = divergence_staging_dir(&ledger_root);
         let committed = GitTier::new(&ledger_root);
 
@@ -714,7 +714,7 @@ mod tests {
     #[test]
     fn divergence_promotion_partitions_run_seq_by_project_id_role_surface() {
         let dir = TempDir::new().unwrap();
-        let ledger_root = dir.path().join("canon").join("ledger");
+        let ledger_root = dir.path().join(".canon").join("ledger");
         let staging_dir = divergence_staging_dir(&ledger_root);
         let committed = GitTier::new(&ledger_root);
 
@@ -731,7 +731,7 @@ mod tests {
     #[test]
     fn commit_divergence_direct_commit_never_touches_the_staging_directory() {
         let dir = TempDir::new().unwrap();
-        let ledger_root = dir.path().join("canon").join("ledger");
+        let ledger_root = dir.path().join(".canon").join("ledger");
         let staging_dir = divergence_staging_dir(&ledger_root);
         let committed = GitTier::new(&ledger_root);
 

@@ -1,5 +1,5 @@
 //! [`PluginSnapshot`] (design.md D2, tasks.md 1.2): the resolved,
-//! validated overlay declarations folded from every `canon/plugins/<id>/
+//! validated overlay declarations folded from every `.canon/plugins/<id>/
 //! plugin.yaml` under a project directory --
 //! [`crate::resolve_plugin_snapshot::resolve_plugin_snapshot`]'s sole
 //! output type. No `Deserialize` -- a snapshot is a RESOLUTION OUTPUT,

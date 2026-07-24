@@ -44,7 +44,7 @@ is the management record.
 
 | Command | Description |
 |---|---|
-| `canon subject new <id> --domain <d> --title <t> [--summary <s>] [--owner-role <r>] [--repo <dir>] [--json]` | Author a `Subject` (kebab-slug `<id>` is the durable `subject_id` join key). `--domain` is a vocabulary-defined kebab slug — base set `planning`/`design`/`dev`/`data`/`test`, extended per-repo via `canon/vocab`. Starts at status `proposed`; `--owner-role` defaults to `implementer`. Envelope + policy validated at write. |
+| `canon subject new <id> --domain <d> --title <t> [--summary <s>] [--owner-role <r>] [--repo <dir>] [--json]` | Author a `Subject` (kebab-slug `<id>` is the durable `subject_id` join key). `--domain` is a vocabulary-defined kebab slug — base set `planning`/`design`/`dev`/`data`/`test`, extended per-repo via `.canon/vocab`. Starts at status `proposed`; `--owner-role` defaults to `implementer`. Envelope + policy validated at write. |
 | `canon subject adopt <change_id> --subject <id> [--repo <dir>] [--json]` | Link an imported plan `Change` (from `canon ingest plans`) to a `Subject`: stamps `Change.subject_id` and appends to the subject's `change_ids`. |
 | `canon subject status <id> <state> [--repo <dir>] [--json]` | Policy-gated transition along `proposed → specced → building → verifying → shipped` (plus any → `retired`). `verifying → shipped` additionally requires every linked scenario to carry a latest non-Divergent verdict; a violation prints by failure class, exits `1`, and leaves the record unchanged (fail closed). |
 
@@ -96,7 +96,7 @@ write seam.
 
 | Command | Description |
 |---|---|
-| `canon learn promote <STRATEGY_ID> [--repo <dir>] [--dry-run]` | Promote one distilled `StrategyItem` (by ULID) into the git tier at `canon/strategies/<role>/<id>.md`, running an advisory promote lint (content length, literal absolute paths) as non-blocking warnings. |
+| `canon learn promote <STRATEGY_ID> [--repo <dir>] [--dry-run]` | Promote one distilled `StrategyItem` (by ULID) into the git tier at `.canon/strategies/<role>/<id>.md`, running an advisory promote lint (content length, literal absolute paths) as non-blocking warnings. |
 | `canon retrieve --role <role> (--regime <regime_key> \| --domain <d> [--subject <id>]) [--k <n>] [--repo <dir>] [--json]` | Role+regime-scoped strategy retrieval. Give `--regime` directly, or derive it from `--domain`/`--subject` — retrieval tries area candidates `<domain>-<subject_id>` then `<domain>` in that fallback order. `--role` must equal the regime's leading segment (exit `2` on mismatch). Fail-soft: always exits `0` once that holds; a store outage degrades to an empty list. |
 | `canon dispatch begin --role <role> --regime <regime_key> [--agent-id <id>] [--repo <dir>] [--json]` | Mint a `Run` (status `Running`), retrieve guidance for `--role`/`--regime`, record it into the run's `injected_guidance`, and write the manifest to `<repo>/.canon/dispatch/<run_id>.json`. |
 | `canon regime-key --role <r> --repo <r> --area <a> --hash <h>` | Serialize + validate one canonical `regime_key` (`<role>/<repo>/<area>/<hash>`) from raw segments — the shell-facing counterpart to the Rust serializer every write/read path shares. Prints the key and exits `0`; exits `2` on a malformed result. |
@@ -109,7 +109,7 @@ maintenance, plugin overlays, and self-checks.
 | Command | Description |
 |---|---|
 | `canon report [--repo <dir>] [--check] [--snapshot <dir>]` | Generate the markdown status report (default), byte-diff it against the committed copy (`--check`, exit `1` on drift), or export panel marts to Parquet + `manifest.json` (`--snapshot`, wins if both given). |
-| `canon dashboard [--repo <dir>] [--snapshot <dir>] [--port <n>]` | Serve the built dashboard app locally against a snapshot. Default port `4173`; an omitted `--snapshot` regenerates fresh at `canon/dashboard-snapshot` on every run. |
+| `canon dashboard [--repo <dir>] [--snapshot <dir>] [--port <n>]` | Serve the built dashboard app locally against a snapshot. Default port `4173`; an omitted `--snapshot` regenerates fresh at `.canon/dashboard-snapshot` on every run. |
 | `canon query --kind <kind> [--since <ts>] [--repo <dir>] [--canon-yaml <path>] [--json] [--plugin <id>] [--change-id <id>] [--domain <d>] [--status <s>]` | Fan out a record kind's read across every tier it may live in and merge by `at`. `--plugin` projects a resolved plugin's overlay fields onto each record, fail-soft on an unresolved plugin or kind mismatch. `--change-id` scopes `--kind change`/`--kind task`; `--domain`/`--status` scope `--kind subject` (the per-domain management view), and `--status` also scopes `--kind change`/`--kind task`. |
 | `canon tier age [--dry-run] [--repo <dir>] [--canon-yaml <path>]` | Apply every `canon.yaml` `aging:` rule once, moving records past their threshold to their configured destination tier. `--dry-run` previews without writing. |
 | `canon plugin sync <PLUGIN_ID> [--repo <dir>] [--spec-root <dir>]` | Resolve `<plugin-id>`'s manifest-declared overlay(s), hand each to its registered source, write every candidate through the validate-then-write pipeline. |

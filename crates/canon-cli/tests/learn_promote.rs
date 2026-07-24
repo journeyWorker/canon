@@ -3,7 +3,7 @@
 //! subprocess against the real `canon` binary: seed a distilled
 //! `StrategyItem` into the operator-local parquet warm tier, then prove
 //! `canon learn promote` materializes it as a git-tier
-//! `canon/strategies/<role>/<id>.md` file (and that `--dry-run` writes
+//! `.canon/strategies/<role>/<id>.md` file (and that `--dry-run` writes
 //! nothing).
 
 use std::path::Path;
@@ -14,7 +14,7 @@ use canon_model::ids::{regime_key, RegimeKey, RoleId};
 use chrono::Utc;
 
 fn seed_strategy(repo: &Path, content: &str) -> StrategyId {
-    let store = ParquetStrategyStore::open(repo.join("canon").join("learn").join("strategies"));
+    let store = ParquetStrategyStore::open(repo.join(".canon").join("learn").join("strategies"));
     let id = StrategyId::new();
     let rk = RegimeKey::parse(regime_key("dev", "canon", "join-spine", "9c93d024b1a2")).unwrap();
     let item = StrategyItem::new(id, rk, RoleId::parse("dev").unwrap(), "review guidance", "one-liner", content, vec![TrajectoryId::new()], Utc::now());
@@ -42,7 +42,7 @@ fn promote_materializes_a_seeded_strategy_as_a_git_tier_file() {
     let output = run_promote(dir.path(), &id, &[]);
     assert!(output.status.success(), "promote must exit 0; stderr: {}", String::from_utf8_lossy(&output.stderr));
 
-    let git_tier_file = dir.path().join("canon").join("strategies").join("dev").join(format!("{id}.md"));
+    let git_tier_file = dir.path().join(".canon").join("strategies").join("dev").join(format!("{id}.md"));
     assert!(git_tier_file.exists(), "promote must write the git-tier file at {}", git_tier_file.display());
     let written = std::fs::read_to_string(&git_tier_file).unwrap();
     assert!(written.starts_with("---\n"), "front-matter opener");
@@ -61,7 +61,7 @@ fn dry_run_previews_without_writing_the_git_tier_file() {
     let output = run_promote(dir.path(), &id, &["--dry-run"]);
     assert!(output.status.success(), "dry-run must exit 0; stderr: {}", String::from_utf8_lossy(&output.stderr));
 
-    let git_tier_file = dir.path().join("canon").join("strategies").join("dev").join(format!("{id}.md"));
+    let git_tier_file = dir.path().join(".canon").join("strategies").join("dev").join(format!("{id}.md"));
     assert!(!git_tier_file.exists(), "--dry-run must NOT write the git-tier file");
     assert!(String::from_utf8_lossy(&output.stdout).contains("[dry-run]"), "dry-run output is labeled");
 }

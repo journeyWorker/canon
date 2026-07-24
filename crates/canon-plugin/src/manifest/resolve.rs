@@ -65,7 +65,7 @@ fn diag(code: &str, message: impl Into<String>, subject: impl Into<String>) -> D
 /// violation found, so the caller can report all of them at once rather
 /// than stopping at the first. Pure, never panics.
 fn validate_plugin(loaded: &LoadedPlugin) -> Result<Vec<OverlayDecl>, Vec<Diagnostic>> {
-    let subject = format!("canon/plugins/{}/plugin.yaml", loaded.manifest.id);
+    let subject = format!("{}/{}/plugin.yaml", canon_model::paths::PLUGINS_DIR, loaded.manifest.id);
     let mut errs = Vec::new();
 
     if !is_kebab_token(&loaded.manifest.namespace) {
@@ -175,7 +175,7 @@ mod tests {
     fn plugin(id: &str, namespace: &str, overlays: Vec<OverlayEntry>) -> LoadedPlugin {
         LoadedPlugin {
             manifest: PluginManifest { id: id.to_string(), namespace: namespace.to_string(), overlays },
-            dir: PathBuf::from(format!("canon/plugins/{id}")),
+            dir: PathBuf::from(format!("{}/{id}", canon_model::paths::PLUGINS_DIR)),
         }
     }
 

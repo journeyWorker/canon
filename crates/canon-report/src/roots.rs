@@ -60,7 +60,7 @@ pub struct Roots {
     /// `canon.yaml`'s `tiers.r2.*` — the r2 tier's local (or synced)
     /// `kind=*/**/*.parquet` directory.
     pub r2_root: PathBuf,
-    /// `canon-learn`'s `DEFAULT_LEARN_ROOT` (`<repo>/canon/learn`) —
+    /// `canon-learn`'s `DEFAULT_LEARN_ROOT` (`<repo>/.canon/learn`) —
     /// the parent of its `strategies/`/`trajectories/` parquet stores.
     pub learn_root: PathBuf,
 }

@@ -127,7 +127,7 @@ pub fn evaluate_now(gate: &dyn PromotionGate, regime_key: &RegimeKey, samples: &
 /// the PURE value [`demote_strategy`] constructs and returns. The full
 /// write path (persisting an S1-envelope-shaped demotion evidence
 /// record via [`crate::store::StrategyStore::mark_demoted`], and
-/// soft-flagging/hard-deleting the git-tier `canon/strategies/<role>/
+/// soft-flagging/hard-deleting the git-tier `.canon/strategies/<role>/
 /// <id>.md` file per its [`demote::DemotionPolicy`]) lives in
 /// [`demote`] (task group 4, S7 wave-2) — `demote_strategy`'s WIDENED
 /// signature is what makes that write path reachable; this struct

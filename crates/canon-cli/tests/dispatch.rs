@@ -26,7 +26,7 @@ use chrono::Utc;
 const REGIME: &str = "dev/canon/join-spine/9c93d024b1a2";
 
 fn strategy_store(repo: &Path) -> ParquetStrategyStore {
-    ParquetStrategyStore::open(repo.join("canon").join("learn").join("strategies"))
+    ParquetStrategyStore::open(repo.join(".canon").join("learn").join("strategies"))
 }
 
 fn seed(repo: &Path, content: &str) -> StrategyId {
@@ -78,7 +78,7 @@ fn a_recorded_manifest_replays_verbatim_even_after_the_source_is_demoted() {
 
     // Mutate the store AFTER the dispatch: demote the source strategy.
     let store = strategy_store(dir.path());
-    let git_tier_root = dir.path().join("canon").join("strategies");
+    let git_tier_root = dir.path().join(".canon").join("strategies");
     demote_strategy(&store, id, TrajectoryId::new(), &git_tier_root, DemotionPolicy::SOFT_FLAG).unwrap();
 
     // 4.3 new-retrieval half: a FRESH retrieval now excludes the demoted strategy.

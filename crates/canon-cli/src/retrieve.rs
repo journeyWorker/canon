@@ -57,7 +57,7 @@
 //! gate` already use (design D7) — never a second root-resolution
 //! convention. The resolved repo's `canon.yaml` `learn:` section
 //! (`canon_learn::LearnConfig`) names the operator-local store root
-//! (`canon/learn` by default, `LearnConfig::default`'s own "a repo
+//! (`.canon/learn` by default, `LearnConfig::default`'s own "a repo
 //! works with zero config" ethos); a missing/unreadable/malformed
 //! `canon.yaml` degrades to `LearnConfig::default()` rather than
 //! erroring, matching `canon context`'s own "no canon state at all"

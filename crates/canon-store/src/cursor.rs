@@ -19,8 +19,8 @@
 //!    credentials — so it is NOT written into the git-committed
 //!    `GitTier`, the shared `PgTier`, or the cloud `R2Tier`. It
 //!    persists under a local cursor root ([`CursorStore::open`]'s
-//!    `root`, by convention `<repo>/canon/ingest/cursors/`, gitignored
-//!    alongside `canon/learn` + `canon/r2`). canon-store still OWNS the
+//!    `root`, by convention `<repo>/.canon/ingest/cursors/`, gitignored
+//!    alongside `.canon/learn` + `.canon/r2`). canon-store still OWNS the
 //!    cursor type and its atomic IO (via [`crate::write_atomic`]), so
 //!    "through canon-store" holds at the persistence-authority level;
 //!    only the tier CHOICE (a local root, not git/pg/r2) deviates, and

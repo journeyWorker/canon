@@ -1,7 +1,7 @@
 //! `canon learn promote <strategy_id>` (S6 `role-strategy-memory` task
 //! group 4): promote a distilled [`canon_learn::StrategyItem`] from the
 //! operator-local parquet warm tier up into the git-tracked, PR-reviewed
-//! tier (`<repo>/canon/strategies/<role>/<id>.md`, `LearnConfig::
+//! tier (`<repo>/.canon/strategies/<role>/<id>.md`, `LearnConfig::
 //! strategies_root`). The write path itself is `canon-learn`'s
 //! ([`canon_learn::promote_strategy`]); this module only resolves the
 //! repo's `canon.yaml`-configured store roots (mirroring

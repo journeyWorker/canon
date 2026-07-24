@@ -35,12 +35,12 @@ use crate::Violation;
 
 /// The infra-layout doc's fixed ledger location relative to a repo
 /// root (`docs/superpowers/specs/2026-07-10-canon-design.md`:
-/// `<repo>/canon/ledger/ # Hive: kind=<kind>/area=<area>/*.json —
+/// `<repo>/.canon/ledger/ # Hive: kind=<kind>/area=<area>/*.json —
 /// append-only`) — the [`canon_store::git_tier::GitTier`] root
 /// [`GateCtx::from_repo`] defaults to when the canonical
 /// `<repo>/canon.yaml` (S2's [`canon_store::policy::TierPolicy`]
 /// source of truth) declares no `tiers.git.root` override.
-pub const DEFAULT_LEDGER_RELATIVE_PATH: &str = "canon/ledger";
+pub const DEFAULT_LEDGER_RELATIVE_PATH: &str = canon_model::paths::LEDGER_DIR;
 
 /// Rebindable roots every S5 wave-2 check reads through — the direct
 /// Rust port of `tools/parity.py`'s `GateCtx` (module doc). Two
@@ -75,7 +75,7 @@ impl GateCtx {
     /// (fixtures-selftest.md §3.1's `fixture_ctx(fx)` — "binds EVERY
     /// `GateCtx` field into one fixture directory"). A fixture never
     /// reads `<repo>/canon.yaml`; `ledger_root` is always
-    /// `fixture_dir/canon/ledger`, the identical layout
+    /// `fixture_dir/.canon/ledger`, the identical layout
     /// [`GateCtx::from_repo`]'s default uses.
     pub fn from_fixture(fixture_dir: impl Into<PathBuf>) -> Self {
         let repo = fixture_dir.into();
@@ -204,14 +204,14 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let ctx = GateCtx::from_repo(dir.path());
         assert_eq!(ctx.repo, dir.path());
-        assert_eq!(ctx.ledger_root, dir.path().join("canon").join("ledger"));
+        assert_eq!(ctx.ledger_root, dir.path().join(".canon").join("ledger"));
     }
 
     #[test]
     fn from_fixture_uses_identical_default_layout() {
         let dir = TempDir::new().unwrap();
         let ctx = GateCtx::from_fixture(dir.path());
-        assert_eq!(ctx.ledger_root, dir.path().join("canon").join("ledger"));
+        assert_eq!(ctx.ledger_root, dir.path().join(".canon").join("ledger"));
     }
 
     #[test]
@@ -229,9 +229,11 @@ mod tests {
 
     #[test]
     fn from_repo_ignores_a_dot_canon_canon_yaml_the_wrong_legacy_path() {
-        // A stray `.canon/canon.yaml` (the OLD, incorrect location this
-        // fix removes) must never be read — only `<repo>/canon.yaml`
-        // (S2's canonical `TierPolicy` source) may set `ledger_root`.
+        // The config anchor is ALWAYS `<repo>/canon.yaml` at the repo
+        // root — `.canon/` holds canon's PRODUCTS, never its config.
+        // A stray `.canon/canon.yaml` must never be read; only the root
+        // `<repo>/canon.yaml` (S2's canonical `TierPolicy` source) may
+        // set `ledger_root`.
         let dir = TempDir::new().unwrap();
         std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
         std::fs::write(dir.path().join(".canon").join("canon.yaml"), "tiers:\n  local:\n    backend: git\n    root: custom/ledger-root\n").unwrap();

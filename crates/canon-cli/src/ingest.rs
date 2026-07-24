@@ -49,6 +49,7 @@ use canon_ingest::adapter::{DirectiveRow, UnifiedRow};
 use canon_ingest::normalize::{NormalizedSession, normalize, normalize_workspace_key};
 use canon_ingest::{enumerate, registry, scanner};
 use canon_model::envelope::RecordKind;
+use canon_model::paths;
 use canon_store::cursor::{CursorStore, SourceCursor, file_digest};
 use canon_store::policy::BackendConfig;
 use canon_store::registry::TierRegistry;
@@ -446,7 +447,7 @@ fn git_worktree_roots(repo_root: &Path) -> Option<Vec<PathBuf>> {
 /// **s31 D1 file-granular watermark gate.** Before parsing, each
 /// present file (after D3 project pruning below) is content-digested
 /// and diffed against its source's persisted [`SourceCursor`] (under
-/// `<repo>/canon/ingest/cursors/`, resolved from `canon_yaml`'s
+/// `<repo>/.canon/ingest/cursors/`, resolved from `canon_yaml`'s
 /// directory) via [`SourceCursor::diff`]: a file whose digest exactly
 /// matches is SKIPPED (never parsed), one that's new or changed is
 /// parsed — so a single growing transcript among thousands re-parses
@@ -475,7 +476,7 @@ fn git_worktree_roots(repo_root: &Path) -> Option<Vec<PathBuf>> {
 /// independent of `all_workspaces`.
 pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: bool, all_workspaces: bool) -> Result<IngestOutcome, IngestError> {
     let repo_root = canon_yaml.parent().unwrap_or_else(|| Path::new("."));
-    let cursors = CursorStore::open(repo_root.join("canon/ingest/cursors"));
+    let cursors = CursorStore::open(repo_root.join(paths::INGEST_CURSORS_DIR));
     let scope = ProjectScope::resolve(repo_root, home, all_workspaces);
     let scope_summary = scope.summary();
 
@@ -794,7 +795,7 @@ mod tests {
 
     fn write_canon_yaml(root: &Path, routed: bool) -> PathBuf {
         let routing = if routed { "  session: local\n  run: local\n  event: local\n" } else { "" };
-        let yaml = format!("tiers:\n  local: {{ backend: git, root: canon/ledger }}\nrouting:\n{routing}\n");
+        let yaml = format!("tiers:\n  local: {{ backend: git, root: .canon/ledger }}\nrouting:\n{routing}\n");
         let path = root.join("canon.yaml");
         std::fs::write(&path, yaml).unwrap();
         path
@@ -864,7 +865,7 @@ mod tests {
         assert_eq!(second.events_written, 0);
         assert_eq!(second.adapters[0].reparsed, 0, "unchanged source is not re-parsed");
         assert!(second.adapters[0].skipped_unchanged >= 1, "the skip must be surfaced in the summary");
-        assert!(dir.path().join("canon/ingest/cursors/omp.json").exists(), "the pass-1 cursor persisted");
+        assert!(dir.path().join(".canon/ingest/cursors/omp.json").exists(), "the pass-1 cursor persisted");
 
         // S3 6.8 (watermark reset): `--full` (full_rescan) ignores the
         // cursor and re-parses every source — the reset re-scan. The S3
@@ -886,7 +887,7 @@ mod tests {
                 }
             }
             let mut n = 0;
-            walk(&dir.path().join("canon/ledger"), &mut n);
+            walk(&dir.path().join(".canon/ledger"), &mut n);
             n
         };
         let before = count_records();
@@ -950,14 +951,14 @@ mod tests {
                 }
             }
             let mut n = 0;
-            walk(&dir.join("canon/ledger"), &mut n);
+            walk(&dir.join(".canon/ledger"), &mut n);
             n
         };
         let before = count(dir.path());
         assert!(before >= 3);
 
         // literally reset: remove the persisted cursor file.
-        let cursor = dir.path().join("canon/ingest/cursors/omp.json");
+        let cursor = dir.path().join(".canon/ingest/cursors/omp.json");
         assert!(cursor.exists(), "pass 1 wrote the cursor");
         std::fs::remove_file(&cursor).unwrap();
 
@@ -999,7 +1000,7 @@ mod tests {
         )
         .unwrap();
         let path = dir.path().join("canon.yaml");
-        std::fs::write(&path, "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\ningest:\n  sources:\n    omp:\n      roots: [custom-omp]\n").unwrap();
+        std::fs::write(&path, "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\ningest:\n  sources:\n    omp:\n      roots: [custom-omp]\n").unwrap();
 
         let outcome = run(&path, dir.path(), false, false, true).unwrap();
         assert_eq!(outcome.sessions_normalized, 1, "only the configured-root session is scanned (replace, not union)");
@@ -1015,7 +1016,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_fixture_home(dir.path());
         let path = dir.path().join("canon.yaml");
-        std::fs::write(&path, "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\ningest:\n  sources:\n    omp:\n      roots: []\n").unwrap();
+        std::fs::write(&path, "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\ningest:\n  sources:\n    omp:\n      roots: []\n").unwrap();
 
         let outcome = run(&path, dir.path(), false, false, true).unwrap();
         assert_eq!(outcome.sessions_normalized, 0, "explicit `roots: []` scans zero; the default home fixture is NOT ingested");
@@ -1028,7 +1029,7 @@ mod tests {
         // that adapter would scan its default home roots.
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("canon.yaml");
-        std::fs::write(&path, "tiers:\n  local: { backend: git, root: canon/ledger }\ningest:\n  sources:\n    claude:\n      roots: [x]\n").unwrap();
+        std::fs::write(&path, "tiers:\n  local: { backend: git, root: .canon/ledger }\ningest:\n  sources:\n    claude:\n      roots: [x]\n").unwrap();
 
         let err = run(&path, dir.path(), false, false, true).unwrap_err();
         assert!(matches!(err, IngestError::Config(_)), "unknown source id must fail loud, got {err:?}");
@@ -1043,7 +1044,7 @@ mod tests {
         // rejects it rather than silently scanning the default home roots.
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("canon.yaml");
-        std::fs::write(&path, "tiers:\n  local: { backend: git, root: canon/ledger }\ningest:\n  sources:\n    omp:\n      root: [x]\n").unwrap();
+        std::fs::write(&path, "tiers:\n  local: { backend: git, root: .canon/ledger }\ningest:\n  sources:\n    omp:\n      root: [x]\n").unwrap();
 
         let err = run(&path, dir.path(), false, false, true).unwrap_err();
         assert!(matches!(err, IngestError::Config(_)), "a `root:` typo must fail loud, got {err:?}");
@@ -1074,7 +1075,7 @@ mod tests {
     fn an_unrelated_unset_cold_bucket_never_blocks_session_persistence() {
         let dir = tempfile::tempdir().unwrap();
         write_fixture_home(dir.path());
-        let yaml = "tiers:\n  local: { backend: git, root: canon/ledger }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_INGEST_S29_D6_UNSET, prefix: \"canon/\" }\nrouting:\n  session: local\n  run: local\n  event: local\n  handoff: cold\n";
+        let yaml = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_INGEST_S29_D6_UNSET, prefix: \"canon/\" }\nrouting:\n  session: local\n  run: local\n  event: local\n  handoff: cold\n";
         let canon_yaml = dir.path().join("canon.yaml");
         std::fs::write(&canon_yaml, yaml).unwrap();
         std::env::remove_var("CANON_R2_BUCKET_INGEST_S29_D6_UNSET");
@@ -1095,7 +1096,7 @@ mod tests {
     fn a_degraded_hot_rung_outcome_names_the_unset_dsn_env_var() {
         let dir = tempfile::tempdir().unwrap();
         write_fixture_home(dir.path());
-        let yaml = "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_INGEST_S29_D6_UNSET, schema: canon_v1 }\nrouting:\n  session: hot\n  run: hot\n  event: hot\n";
+        let yaml = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_INGEST_S29_D6_UNSET, schema: canon_v1 }\nrouting:\n  session: hot\n  run: hot\n  event: hot\n";
         let canon_yaml = dir.path().join("canon.yaml");
         std::fs::write(&canon_yaml, yaml).unwrap();
         std::env::remove_var("CANON_PG_DSN_INGEST_S29_D6_UNSET");
@@ -1121,7 +1122,7 @@ mod tests {
     fn a_malformed_pg_schema_fails_the_whole_command_loud_not_a_silent_degrade() {
         let dir = tempfile::tempdir().unwrap();
         write_fixture_home(dir.path());
-        let yaml = "tiers:\n  local: { backend: git, root: canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_INGEST_S29_D6_SCHEMA, schema: Bad-Schema }\nrouting:\n  session: hot\n  run: hot\n  event: hot\n";
+        let yaml = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_INGEST_S29_D6_SCHEMA, schema: Bad-Schema }\nrouting:\n  session: hot\n  run: hot\n  event: hot\n";
         let canon_yaml = dir.path().join("canon.yaml");
         std::fs::write(&canon_yaml, yaml).unwrap();
 
@@ -1188,7 +1189,7 @@ mod tests {
 
         let routing = if routed { "  session: local\n  run: local\n  event: local\n" } else { "" };
         let canon_yaml = project_a.join("canon.yaml");
-        std::fs::write(&canon_yaml, format!("tiers:\n  local: {{ backend: git, root: canon/ledger }}\nrouting:\n{routing}\n")).unwrap();
+        std::fs::write(&canon_yaml, format!("tiers:\n  local: {{ backend: git, root: .canon/ledger }}\nrouting:\n{routing}\n")).unwrap();
 
         TwoProjectFixture { _root: root, home, canon_yaml, project_a }
     }

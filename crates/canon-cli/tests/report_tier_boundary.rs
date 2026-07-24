@@ -37,7 +37,7 @@ fn multi_tier_repo_emits_a_warn_line_matching_the_reports_own_note() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\nrouting:\n  task: hot\n  session: hot\n  event: hot\n  change: local\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  task: hot\n  session: hot\n  event: hot\n  change: local\n",
     );
 
     let output = run_canon(&["report", "--repo", "."], dir.path());
@@ -50,7 +50,7 @@ fn multi_tier_repo_emits_a_warn_line_matching_the_reports_own_note() {
     }
     assert!(!err.contains("change"), "WARN must never name a git-routed kind: {err}");
 
-    let report_path = dir.path().join("canon/REPORT.md");
+    let report_path = dir.path().join(".canon/REPORT.md");
     let content = std::fs::read_to_string(&report_path).unwrap();
     assert!(content.contains("## Kinds not read directly"), "{content}");
     for kind in ["task", "session", "event"] {

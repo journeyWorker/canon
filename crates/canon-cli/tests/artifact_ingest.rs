@@ -164,12 +164,12 @@ fn build_native_flywheel_repo(tmp: &Path) -> PathBuf {
     std::fs::create_dir_all(&repo).unwrap();
     std::fs::write(
         repo.join("canon.yaml"),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n\nrouting:\n  review: local\n  divergence: local\n\nartifacts:\n  native_records: true\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n\nrouting:\n  review: local\n  divergence: local\n\nartifacts:\n  native_records: true\n",
     )
     .unwrap();
 
-    plant_review_in_git(&repo.join("canon/ledger"));
-    plant_divergence_resolved_in_git(&repo.join("canon/ledger"));
+    plant_review_in_git(&repo.join(".canon/ledger"));
+    plant_divergence_resolved_in_git(&repo.join(".canon/ledger"));
 
     repo
 }
@@ -186,12 +186,12 @@ fn build_fixture_repo(tmp: &Path) -> PathBuf {
 
     std::fs::write(
         repo.join("canon.yaml"),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n\nrouting:\n  handoff: local\n\nartifacts:\n  ledger_root: fixtures/ledger\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n\nrouting:\n  handoff: local\n\nartifacts:\n  ledger_root: fixtures/ledger\n",
     )
     .unwrap();
 
     plant_ledger_code_review_finding(&repo.join("fixtures/ledger"));
-    plant_handoff_in_git(&repo.join("canon/ledger"));
+    plant_handoff_in_git(&repo.join(".canon/ledger"));
 
     repo
 }
@@ -242,7 +242,7 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
     // ── (b) a trajectory parquet row was actually WRITTEN, read back
     //        through canon-learn's own public store API. ──
     let regime_key = RegimeKey::parse(&regime_key_str).unwrap();
-    let learn_root = repo.join("canon/learn");
+    let learn_root = repo.join(".canon/learn");
     let trajectory_store = ParquetTrajectoryStore::open(learn_root.join("trajectories"));
     let rows = trajectory_store.query_by_regime_key(&regime_key).expect("query_by_regime_key must not error");
     assert_eq!(rows.len(), 1, "exactly one trajectory row must be readable back from the parquet store");
@@ -263,7 +263,7 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
          above only prove the write side) — a missing `duckdb` CLI must FAIL this test, never \
          silently skip past the one proof this capstone test exists to give"
     );
-    let roots = canon_report::roots::Roots::new(repo.join("canon/ledger"), repo.join("canon/r2"), &learn_root);
+    let roots = canon_report::roots::Roots::new(repo.join(".canon/ledger"), repo.join(".canon/r2"), &learn_root);
     roots.ensure_seeded().expect("seed empty-glob placeholders for r2 (unused by these two marts)");
 
     let role_memory = canon_report::marts::fetch_role_memory(&roots).expect("mart_role_memory query must succeed");
@@ -308,7 +308,7 @@ fn a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories() {
     assert_eq!(first_payload["trajectories_skipped_duplicate"], 0, "{first_payload}");
     let regime_key_str = first_payload["trajectories_persisted"][0]["regime_key"].as_str().unwrap().to_string();
 
-    let learn_root = repo.join("canon/learn");
+    let learn_root = repo.join(".canon/learn");
     let trajectory_store = ParquetTrajectoryStore::open(learn_root.join("trajectories"));
     let regime_key = RegimeKey::parse(&regime_key_str).unwrap();
     let after_first = trajectory_store.query_by_regime_key(&regime_key).expect("query_by_regime_key must not error");
@@ -359,7 +359,7 @@ fn an_unrouted_handoff_source_degrades_to_unavailable_without_aborting_the_rest_
     let tmp = tempfile::tempdir().unwrap();
     let repo = tmp.path().join("acme-repo-unrouted");
     std::fs::create_dir_all(&repo).unwrap();
-    std::fs::write(repo.join("canon.yaml"), "tiers:\n  local: { backend: git, root: canon/ledger }\n\nartifacts:\n  ledger_root: fixtures/ledger\n").unwrap();
+    std::fs::write(repo.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n\nartifacts:\n  ledger_root: fixtures/ledger\n").unwrap();
     plant_ledger_code_review_finding(&repo.join("fixtures/ledger"));
 
     let output = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
@@ -387,25 +387,25 @@ fn an_unrouted_handoff_source_degrades_to_unavailable_without_aborting_the_rest_
 /// kebab-slug `RoleId`, `canon_model::ids::RoleId::GRAMMAR`) — as the
 /// command's own error, exiting nonzero, rather than silently falling
 /// back to `LearnConfig::default()` and persisting this run's
-/// trajectories into the WRONG store (`<repo>/canon/learn`, the
+/// trajectories into the WRONG store (`<repo>/.canon/learn`, the
 /// built-in default) when the repo actually configured a different
 /// `learn.root`. Contrast with `LearnConfig::from_manifest`'s OWN
 /// documented default-on-absent case (crates/canon-learn/src/
 /// config.rs): a genuinely ABSENT `learn:` section is not this test's
 /// concern and is untouched — every OTHER test in this file configures
 /// no `learn:` section at all and still ingests + persists
-/// successfully into `<repo>/canon/learn` (the clean-default path).
+/// successfully into `<repo>/.canon/learn` (the clean-default path).
 #[test]
 fn a_malformed_learn_config_fails_loud_instead_of_silently_defaulting() {
     let tmp = tempfile::tempdir().unwrap();
     let repo = tmp.path().join("acme-repo-malformed-learn");
     std::fs::create_dir_all(&repo).unwrap();
     // `learn.root` names a store OTHER than the built-in default
-    // (`canon/learn`) — proving a silent default-fallback would land
+    // (`.canon/learn`) — proving a silent default-fallback would land
     // trajectories in the WRONG place, not merely skip a custom root.
     std::fs::write(
         repo.join("canon.yaml"),
-        "learn:\n  root: canon/learn-custom\n  roles:\n    - \"Not A Valid Role!\"\n",
+        "learn:\n  root: .canon/learn-custom\n  roles:\n    - \"Not A Valid Role!\"\n",
     )
     .unwrap();
 
@@ -427,10 +427,10 @@ fn a_malformed_learn_config_fails_loud_instead_of_silently_defaulting() {
     // through to silently opening (and writing into) the built-in
     // default store, nor the configured-but-unreached custom root.
     assert!(
-        !repo.join("canon/learn").exists(),
-        "a malformed learn config must never fall through to writing the default `<repo>/canon/learn` store"
+        !repo.join(".canon/learn").exists(),
+        "a malformed learn config must never fall through to writing the default `<repo>/.canon/learn` store"
     );
-    assert!(!repo.join("canon/learn-custom").exists(), "nor may it write to the configured-but-unreached custom root");
+    assert!(!repo.join(".canon/learn-custom").exists(), "nor may it write to the configured-but-unreached custom root");
 }
 
 #[test]
@@ -493,7 +493,7 @@ fn native_flywheel_review_and_divergence_resolved_in_same_run_both_produce_traje
     //    like an S4-derived trajectory (`ingest_artifacts_drives_
     //    both_source_shapes...` above proves the same read-back shape
     //    for the raw-artifact path). ──
-    let learn_root = repo.join("canon/learn");
+    let learn_root = repo.join(".canon/learn");
     let trajectory_store = ParquetTrajectoryStore::open(learn_root.join("trajectories"));
 
     let review_key = RegimeKey::parse(review_regime).unwrap();
@@ -525,7 +525,7 @@ fn native_records_true_with_a_raw_path_fails_the_xor_before_any_read() {
     std::fs::create_dir_all(&repo).unwrap();
     std::fs::write(
         repo.join("canon.yaml"),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n\nartifacts:\n  native_records: true\n  ledger_root: fixtures/ledger\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n\nartifacts:\n  native_records: true\n  ledger_root: fixtures/ledger\n",
     )
     .unwrap();
     plant_ledger_code_review_finding(&repo.join("fixtures/ledger"));
@@ -545,7 +545,7 @@ fn native_records_true_with_a_raw_path_fails_the_xor_before_any_read() {
     // so not even the ledger's own (otherwise perfectly valid) finding
     // is ever parsed — no learn store is created at all.
     assert!(
-        !repo.join("canon/learn").exists(),
+        !repo.join(".canon/learn").exists(),
         "no trajectory may be written when config validation rejects the run before any read"
     );
 }
@@ -565,17 +565,17 @@ fn handoff_adapter_is_unaffected_by_the_native_records_switch() {
 
     let repo_off = tmp.path().join("acme-repo-switch-off");
     std::fs::create_dir_all(&repo_off).unwrap();
-    std::fs::write(repo_off.join("canon.yaml"), "tiers:\n  local: { backend: git, root: canon/ledger }\n\nrouting:\n  handoff: local\n").unwrap();
-    plant_handoff_in_git(&repo_off.join("canon/ledger"));
+    std::fs::write(repo_off.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n\nrouting:\n  handoff: local\n").unwrap();
+    plant_handoff_in_git(&repo_off.join(".canon/ledger"));
 
     let repo_on = tmp.path().join("acme-repo-switch-on");
     std::fs::create_dir_all(&repo_on).unwrap();
     std::fs::write(
         repo_on.join("canon.yaml"),
-        "tiers:\n  local: { backend: git, root: canon/ledger }\n\nrouting:\n  handoff: local\n  review: local\n  divergence: local\n\nartifacts:\n  native_records: true\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n\nrouting:\n  handoff: local\n  review: local\n  divergence: local\n\nartifacts:\n  native_records: true\n",
     )
     .unwrap();
-    plant_handoff_in_git(&repo_on.join("canon/ledger"));
+    plant_handoff_in_git(&repo_on.join(".canon/ledger"));
 
     let off = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo_off);
     assert!(off.status.success(), "stderr: {}", stderr(&off));

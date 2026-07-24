@@ -23,7 +23,7 @@ use canon_store::git_tier::GitTier;
 use canon_store::tier::{Tier, WriteReceipt};
 use chrono::{DateTime, Utc};
 
-/// A tempdir-rooted fixture: `<root>/canon.yaml`, `<root>/canon/ledger`
+/// A tempdir-rooted fixture: `<root>/canon.yaml`, `<root>/.canon/ledger`
 /// (git tier), `<root>/r2-local` (the offline r2 tier's local root,
 /// bound in via `canon-cli`'s `CANON_R2_LOCAL_ROOT` test seam).
 pub struct Fixture {
@@ -38,7 +38,7 @@ impl Fixture {
     pub fn new(routing_yaml: &str, aging_yaml: &str) -> Self {
         let root = tempfile::tempdir().unwrap();
         let canon_yaml = format!(
-            "tiers:\n  local: {{ backend: git, root: canon/ledger }}\n  cold: {{ backend: s3, bucket_env: CANON_R2_BUCKET_TEST_UNUSED, prefix: \"canon/\" }}\nrouting:\n{routing_yaml}\naging:\n{aging_yaml}\n"
+            "tiers:\n  local: {{ backend: git, root: .canon/ledger }}\n  cold: {{ backend: s3, bucket_env: CANON_R2_BUCKET_TEST_UNUSED, prefix: \"canon/\" }}\nrouting:\n{routing_yaml}\naging:\n{aging_yaml}\n"
         );
         std::fs::write(root.path().join("canon.yaml"), canon_yaml).unwrap();
         Self { root }
@@ -49,7 +49,7 @@ impl Fixture {
     }
 
     pub fn git_root(&self) -> PathBuf {
-        self.root.path().join("canon/ledger")
+        self.root.path().join(".canon/ledger")
     }
 
     pub fn r2_root(&self) -> PathBuf {
@@ -117,12 +117,12 @@ impl Fixture {
         git.write(&record).unwrap()
     }
 
-    /// Write `canon/plugins/<id>/plugin.yaml` under this fixture's
+    /// Write `.canon/plugins/<id>/plugin.yaml` under this fixture's
     /// project root (`resolve_plugin_snapshot::PLUGINS_DIR_RELATIVE_PATH`,
     /// s16 P1) -- `yaml` is pasted verbatim, mirroring `Fixture::new`'s
     /// own "caller supplies exactly the YAML body" convention.
     pub fn write_plugin_manifest(&self, id: &str, yaml: &str) {
-        let dir = self.root.path().join("canon/plugins").join(id);
+        let dir = self.root.path().join(".canon/plugins").join(id);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("plugin.yaml"), yaml).unwrap();
     }

@@ -323,7 +323,7 @@ mod tests {
         init_repo(repo);
         let sha = write_and_commit(repo, "crates/foo/src/bar.rs", "fn bar() {}", "initial");
 
-        let ledger_root = repo.join("canon/ledger");
+        let ledger_root = repo.join(".canon/ledger");
         write_green_record(&ledger_root, "s5#1.7", "implementer", &sha, &["crates/foo/src/bar.rs"]);
 
         // Move HEAD by touching the DECLARED surface file.
@@ -344,7 +344,7 @@ mod tests {
         init_repo(repo);
         let sha = write_and_commit(repo, "crates/foo/src/bar.rs", "fn bar() {}", "initial");
 
-        let ledger_root = repo.join("canon/ledger");
+        let ledger_root = repo.join(".canon/ledger");
         write_green_record(&ledger_root, "s5#1.7", "implementer", &sha, &["crates/foo/src/bar.rs"]);
 
         // Move HEAD via an UNRELATED file — the declared surface never changes.
@@ -364,7 +364,7 @@ mod tests {
         init_repo(repo);
         let sha = write_and_commit(repo, "crates/foo/src/bar.rs", "fn bar() {}", "initial");
 
-        let ledger_root = repo.join("canon/ledger");
+        let ledger_root = repo.join(".canon/ledger");
         write_green_record(&ledger_root, "s5#1.7", "implementer", &sha, &["crates/foo/src/bar.rs"]);
 
         write_and_commit(repo, "crates/other/src/unrelated.rs", "fn unrelated() {}", "unrelated change 1");
@@ -385,7 +385,7 @@ mod tests {
         init_repo(repo);
         let sha = write_and_commit(repo, "README.md", "hello", "initial");
 
-        let ledger_root = repo.join("canon/ledger");
+        let ledger_root = repo.join(".canon/ledger");
         write_green_record(&ledger_root, "s5#1.7", "implementer", &sha, &[]);
 
         write_and_commit(repo, "README.md", "hello again", "second");
@@ -404,7 +404,7 @@ mod tests {
         init_repo(repo);
         write_and_commit(repo, "README.md", "hello", "initial");
 
-        let ledger_root = repo.join("canon/ledger");
+        let ledger_root = repo.join(".canon/ledger");
         // Well-formed 40-hex sha grammar, but it never existed in this repo's history.
         let fake_sha = "0".repeat(40);
         write_green_record(&ledger_root, "s5#1.7", "implementer", &fake_sha, &["README.md"]);
@@ -420,7 +420,7 @@ mod tests {
         init_repo(repo);
         write_and_commit(repo, "README.md", "hello", "initial");
 
-        let ledger_root = repo.join("canon/ledger");
+        let ledger_root = repo.join(".canon/ledger");
         let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
         let record = EvidenceRecord::new(envelope, Some(TaskId::parse("s5#1.7").unwrap()), None, None, EvidenceVerdict::Faithful);
         let value = serde_json::to_value(&record).unwrap();
@@ -437,7 +437,7 @@ mod tests {
         init_repo(repo);
         let sha = write_and_commit(repo, "crates/foo/src/bar.rs", "fn bar() {}", "initial");
 
-        let ledger_root = repo.join("canon/ledger");
+        let ledger_root = repo.join(".canon/ledger");
         let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
         let record = EvidenceRecord::new(envelope, Some(TaskId::parse("s5#1.7").unwrap()), None, None, EvidenceVerdict::Divergent);
         let mut value = serde_json::to_value(&record).unwrap();
@@ -464,7 +464,7 @@ mod tests {
         init_repo(repo);
         let sha = write_and_commit(repo, "crates/foo/src/bar.rs", "fn bar() {}", "initial");
 
-        let ledger_root = repo.join("canon/ledger");
+        let ledger_root = repo.join(".canon/ledger");
         let old_at = Utc::now() - chrono::Duration::hours(1);
         let new_at = Utc::now();
 
@@ -513,7 +513,7 @@ mod tests {
     /// A git repo with ONE green evidence record (fixed `at`,
     /// `evidence_sha` = the repo's initial commit, declaring the
     /// surface file as its own) followed by a SECOND commit that
-    /// changes that exact surface file — plus a `canon/policy.yaml`
+    /// changes that exact surface file — plus a `.canon/policy.yaml`
     /// whose `staleness.surface_scoped` is a CEL predicate over
     /// `age_days(record.at)`. `surface_scoped` resolving `false`
     /// (age below threshold) means the surface-changed reason never
@@ -531,8 +531,8 @@ mod tests {
 
         write_and_commit(&repo, "crates/foo/src/bar.rs", "fn bar() { /* changed */ }", "surface changed");
 
-        std::fs::create_dir_all(repo.join("canon")).unwrap();
-        std::fs::write(repo.join("canon").join("policy.yaml"), "staleness:\n  surface_scoped:\n    cel: \"age_days(record.at) > 5\"\n").unwrap();
+        std::fs::create_dir_all(repo.join(".canon")).unwrap();
+        std::fs::write(repo.join(".canon").join("policy.yaml"), "staleness:\n  surface_scoped:\n    cel: \"age_days(record.at) > 5\"\n").unwrap();
 
         (dir, repo)
     }

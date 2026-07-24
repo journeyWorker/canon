@@ -9,7 +9,7 @@
 //! resolves it through [`crate::context::resolve_repo_root`] — the SAME
 //! nearest-ancestor `canon.yaml` walk `canon context`/`canon fmt` use
 //! (design D7) — so a gate subcommand run from a subdirectory reads the
-//! repo ROOT's `<repo>/canon.yaml`/`<repo>/canon/policy.yaml`, never a
+//! repo ROOT's `<repo>/canon.yaml`/`<repo>/.canon/policy.yaml`, never a
 //! subdirectory's absence of one; `canon_gate::GateCtx::from_repo`'s own
 //! doc is explicit that it takes `repo` AS GIVEN, no walk — the walk
 //! lives here, exactly once, mirroring `run_context`'s identical split.
@@ -76,6 +76,7 @@ use canon_gate::{
     PromoteReport, TaskFlipDecision, FAILURE_CLASSES, PRE_COMMIT_SCRIPT,
 };
 use canon_ingest::{find_plan_adapter, PlanWriteBack, WriteBackError};
+use canon_model::paths;
 use canon_model::{validate_evidence_batch, Actor, Envelope, RawRecord, RecordKind, TaskId};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
@@ -471,7 +472,7 @@ fn format_promote_report(report: &PromoteReport, dry_run: bool) -> String {
 /// carries ANY existing `canon gate`-invoking command (checked BEFORE
 /// this call's own edit), also emits the generic
 /// `canon-gate-pre-commit.sh` (`PRE_COMMIT_SCRIPT`, task 4.2) into
-/// `<repo>/scripts/`, matching spec.md's "a non-donor repo gets a generic
+/// `<repo>/.canon/scripts/`, matching spec.md's "a non-donor repo gets a generic
 /// pre-commit script" scenario.
 #[allow(clippy::too_many_arguments)]
 pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32) -> i32 {
@@ -499,7 +500,7 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     };
 
     if !already_has_canon_gate_command {
-        let script_path = repo.join("scripts").join("canon-gate-pre-commit.sh");
+        let script_path = repo.join(paths::PRE_COMMIT_SCRIPT);
         if !script_path.exists() {
             if let Err(e) = write_pre_commit_script(&script_path) {
                 eprintln!("canon gate install-hooks: failed to write {}: {e}", script_path.display());

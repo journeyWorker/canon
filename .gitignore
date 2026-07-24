@@ -11,11 +11,11 @@ packages/core-*/bin/*
 # Local runtime store roots (git/hot/cold-tier ledger + cursors + trajectory,
 # written by `canon ingest`/`sync` and tests; derived from committed
 # openspec/ + specs/ sources, regenerable, never committed).
-canon/ledger/
-canon/learn/
-canon/r2/
-canon/ingest/
-canon/REPORT.md
+.canon/ledger/
+.canon/learn/
+.canon/r2/
+.canon/ingest/
+.canon/REPORT.md
 .env
 .env.*
 !.env.example

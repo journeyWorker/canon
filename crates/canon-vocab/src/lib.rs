@@ -62,7 +62,7 @@
 //! evidence path (task 4.4), and the pilot consumer-repo change (task 7.1)
 //! are S10 part2 — deferred, not implemented here. This crate builds/tests
 //! green standalone; nothing outside `crates/canon-vocab/**` and
-//! `canon/vocab/canon.core/**` is wired to it yet.
+//! `.canon/vocab/canon.core/**` is wired to it yet.
 
 pub mod atom;
 pub mod checker;

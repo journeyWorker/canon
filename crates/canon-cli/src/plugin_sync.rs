@@ -21,7 +21,7 @@
 //! other plugin-specific string — the ONLY place the literal
 //! `"porting"` appears is [`PortingOverlaySource::plugin_id`]'s own
 //! return value, mirroring design.md D5's "every reference to
-//! `porting` lives in exactly two places: `canon/plugins/porting/
+//! `porting` lives in exactly two places: `.canon/plugins/porting/
 //! plugin.yaml` (data) and one `PortingOverlaySource` Rust type". A
 //! second donor-porting plugin would register its own [`OverlaySource`]
 //! impl in [`registry`] and touch nothing else here.
@@ -30,7 +30,7 @@
 //!
 //! [`PortingOverlaySource::overlay_candidates`] is HANDED the resolved
 //! `&OverlayDecl` — it never constructs its own `OverlayDecl` or
-//! assumes a field shape independent of `canon/plugins/porting/
+//! assumes a field shape independent of `.canon/plugins/porting/
 //! plugin.yaml` (a source drifting from the manifest is exactly what
 //! P1's "one resolution entry point" forbids). It reads a spec root's
 //! `inventory/**/*.yaml` (`canon_model::family::inventory::
@@ -100,7 +100,7 @@ fn source_actor() -> Actor {
 /// looked up by [`OverlaySource::plugin_id`] STRING EQUALITY, never a
 /// hardcoded match arm (module doc).
 pub trait OverlaySource {
-    /// The `canon/plugins/<id>/plugin.yaml` `id` this source produces
+    /// The `.canon/plugins/<id>/plugin.yaml` `id` this source produces
     /// overlay records for — [`run_sync`] matches a `canon plugin sync
     /// <plugin-id>` invocation against this value, never the other way
     /// around.
@@ -130,7 +130,7 @@ pub enum OverlaySourceError {
 /// tasks.md 4.2, `porting-plugin` spec's "derives covered/surface_ref
 /// from the donor inventory's covered_by join, inverted per scenario"
 /// requirement) — canon-cli's own registered [`OverlaySource`] impl,
-/// the ONE other place besides `canon/plugins/porting/plugin.yaml`
+/// the ONE other place besides `.canon/plugins/porting/plugin.yaml`
 /// this change's `porting`-specific name lives (design.md D5).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PortingOverlaySource;
@@ -215,7 +215,7 @@ pub enum PluginSyncError {
     Inventory(#[from] InventoryError),
     #[error("no OverlaySource is registered for plugin `{0}`")]
     UnknownSource(String),
-    #[error("plugin `{0}` has no installed manifest under `canon/plugins/`")]
+    #[error("plugin `{0}` has no installed manifest under `.canon/plugins/`")]
     UnresolvedPlugin(String),
     #[error("plugin `{0}` declares no overlay")]
     NoOverlay(String),

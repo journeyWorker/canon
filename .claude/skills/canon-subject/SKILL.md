@@ -43,7 +43,7 @@ canon subject new subject-domain-loop \
   `subject_id` join key, never renumbered once assigned.
 - `--domain <d>` is a kebab-case slug validated at write. The closed base
   vocabulary (`planning`, `design`, `dev`, `data`, `test`) is extended in
-  the `canon/vocab` plugin (see `canon-vocab`); run `canon
+  the `.canon/vocab` plugin (see `canon-vocab`); run `canon
   context` to see the domains a repo has activated.
 - `--summary` is optional; `--owner-role` defaults to `implementer`;
   `--actor-id` defaults to `canon`. A freshly-authored Subject with no

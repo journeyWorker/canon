@@ -36,7 +36,7 @@ fn digest_header_reflects_the_repo_state_the_corpus_was_built_at() {
     let inputs = ReportInputs::new(dir.path(), roots);
 
     let content = report(&inputs).unwrap();
-    // No `canon/policy.yaml` in this fixture dir — the policy digest
+    // No `.canon/policy.yaml` in this fixture dir — the policy digest
     // degrades to its documented placeholder, never a panic or an
     // `Err`.
     assert!(content.contains("| policy | `—` |"));

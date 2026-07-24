@@ -110,8 +110,8 @@ fn envelope(role: &str) -> Envelope {
 }
 
 fn write_policy_yaml(dir: &Path, contents: &str) {
-    let canon_dir = dir.join("canon");
-    std::fs::create_dir_all(&canon_dir).expect("create fixture canon/ dir");
+    let canon_dir = dir.join(".canon");
+    std::fs::create_dir_all(&canon_dir).expect("create fixture .canon/ dir");
     std::fs::write(canon_dir.join("policy.yaml"), contents).expect("write fixture policy.yaml");
 }
 

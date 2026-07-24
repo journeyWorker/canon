@@ -27,7 +27,7 @@ Scaffold `canon.yaml`, then validate and index a spec corpus.
    backends. Seven of canon-model's twelve record kinds route to the
    zero-env-var `local` (git-backed) rung; `task`, `handoff`, `session`,
    `run`, and `event` route to `hot` (SQLite by default, at
-   `canon/hot.db`, gitignored). Commented `postgres`/`s3` stanzas show
+   `.canon/hot.db`, gitignored). Commented `postgres`/`s3` stanzas show
    the scale-up swap, plus one real `specs.roots[]` entry and an empty
    `plans: { sources: [] }`:
 
@@ -35,10 +35,10 @@ Scaffold `canon.yaml`, then validate and index a spec corpus.
    tiers:
      local:
        backend: git
-       root: canon/ledger
+       root: .canon/ledger
      hot:
        backend: sqlite
-       path: canon/hot.db
+       path: .canon/hot.db
      # swap hot to postgres once you need a real server:
      #   backend: postgres
      #   dsn_env: CANON_PG_DSN
@@ -159,7 +159,7 @@ the status report.
    ```
 
    Renders the five status panels (trust matrix, session costs, role
-   memory, flywheel funnel, review burn-down) to `canon/REPORT.md` —
+   memory, flywheel funnel, review burn-down) to `.canon/REPORT.md` —
    generated, never hand-edited. Wire `canon report --check` into CI
    to byte-diff the committed file against current inputs the same way
    you'd wire `canon gate check`.
@@ -204,7 +204,7 @@ Fold agent-CLI transcripts into tiered storage, then read them back.
    ```
 
    Regenerates a fresh Parquet snapshot (`canon report --snapshot`
-   under the hood, into `canon/dashboard-snapshot`) and serves the
+   under the hood, into `.canon/dashboard-snapshot`) and serves the
    built `packages/dashboard` app locally, pointed at it — the same
    five panels `canon report` renders, read from the snapshot instead
    of recomputed in the browser. Pass `--snapshot <dir>` to serve a

@@ -13,52 +13,52 @@
       "version": 1
     },
     "canon-gate": {
-      "contentHash": "sha256:7498b8f1b2208248289085aa4b00dba51ffab544634c12f52950a2fdf77b9dfe",
-      "version": 1
+      "contentHash": "sha256:cf373b282a0f26718fdc8b3507256941bccfd7816cc0d124b196d4760de05e9d",
+      "version": 2
     },
     "canon-inventory": {
       "contentHash": "sha256:75789ce07b09237776cdc71faedebe75ae17f900635d993cf0f679d766c95639",
       "version": 5
     },
     "canon-learn": {
-      "contentHash": "sha256:172896bf3f7f15c7b35302885d645af17e0f8c5e5d8deae442dbffac874b3dfa",
-      "version": 4
+      "contentHash": "sha256:5d48349d80d7ef6ba6b537608218b1e2386504315f22c79b44c5ad82a6d32253",
+      "version": 5
     },
     "canon-plan-import": {
       "contentHash": "sha256:843b337d7981693bfbb670483b091518eb74028dad327eff07a402155bd64bf9",
       "version": 4
     },
     "canon-plugins": {
-      "contentHash": "sha256:b096770c53b22eccb8dcb16d95c107dd62ba3207ab6d7b1b654345279fc6036d",
-      "version": 3
+      "contentHash": "sha256:e3b0c754b45007b20f0703844278b93ac472c8b5b60ca5d1320370e17b4fc472",
+      "version": 4
     },
     "canon-policy": {
       "contentHash": "sha256:5648d94f39fc38d551ddf632d7248a509ae9216e4d7bb83134f806985234c220",
       "version": 2
     },
     "canon-report-dashboard": {
-      "contentHash": "sha256:2ce5729e65d6c3ae611231010d564ce62518c61fdec2cac1248baf8b484cd8db",
-      "version": 4
-    },
-    "canon-retrieve": {
-      "contentHash": "sha256:84a470d827114201e6e398102a28383d362ece27ff68fd52d94de4e5baa535e8",
+      "contentHash": "sha256:ed54abaf9d604941c6970447fd0b198ea73115d11a1d7fe63172fdc1f69e8ee4",
       "version": 5
     },
-    "canon-session-ingest": {
-      "contentHash": "sha256:b6252bd82892c1d1eccb05e44120362da9ffcd1d4c0380e00ac79c97031847dc",
+    "canon-retrieve": {
+      "contentHash": "sha256:f4e57441df9db209741bb1b17e9a1e016d3842461c1b3cea67da6b219ce89095",
       "version": 6
     },
+    "canon-session-ingest": {
+      "contentHash": "sha256:764a618d5c39ac28052c9c763d886fdf0c3573eac11a449b3b4825f6335d446c",
+      "version": 7
+    },
     "canon-storage": {
-      "contentHash": "sha256:8c38efbb34bf863cffb16c4160748eede2af6a65fbb24c4e9004b267b3368755",
-      "version": 1
+      "contentHash": "sha256:4e9bdcf04e1df0d241acd6c357098c6a07d901ab88b838499afed0face7b97c4",
+      "version": 2
     },
     "canon-subject": {
-      "contentHash": "sha256:6bd9457e6128d555336c8e45b3c405911c3d82416d9014349e34cc8708ab4fba",
-      "version": 3
+      "contentHash": "sha256:98f117ab16e503528709f251107f3a0b4cc18cc401b651812304df5d49298623",
+      "version": 4
     },
     "canon-vocab": {
-      "contentHash": "sha256:270cd2f0e733d627f8d8adb10c6e19d029e6999e3a81d435fc7d41013f390671",
-      "version": 1
+      "contentHash": "sha256:29837a83ff729bbec23b2a36542d3bf853f4cf3098998f4d901b72c79b4279e3",
+      "version": 2
     }
   }
 }

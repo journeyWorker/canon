@@ -46,9 +46,9 @@ fn gate_check_exits_clean_on_an_empty_repo() {
 #[test]
 fn gate_check_exits_gate_red_on_a_seeded_uncovered_cell_violation() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir_all(dir.path().join("canon")).unwrap();
-    std::fs::write(dir.path().join("canon/policy.yaml"), "risk_routing:\n  reviewer: true\n").unwrap();
-    write_evidence(&dir.path().join("canon/ledger"), "seed-change#1", "implementer", EvidenceVerdict::Faithful);
+    std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "risk_routing:\n  reviewer: true\n").unwrap();
+    write_evidence(&dir.path().join(".canon/ledger"), "seed-change#1", "implementer", EvidenceVerdict::Faithful);
 
     let output = run_canon(&["gate", "check", "--repo", "."], dir.path());
     assert_eq!(output.status.code(), Some(1), "an uncovered-cell violation must gate-red (exit 1); stdout: {}", stdout(&output));
@@ -60,15 +60,15 @@ fn gate_check_exits_gate_red_on_a_seeded_uncovered_cell_violation() {
 #[test]
 fn gate_check_release_flag_engages_release_trust_check_but_ordinary_run_stays_silent_on_it() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir_all(dir.path().join("canon")).unwrap();
-    std::fs::write(dir.path().join("canon/policy.yaml"), "trust_required:\n  p1: human\n").unwrap();
+    std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  p1: human\n").unwrap();
 
     // A `reviewed` record tagged class `p1` with no matching review
     // record: `TrustLadderCheck` reports `unreviewed-promotion` either
     // way; `trust-below-required` needs the release-scoped check.
     // `lifecycle`/`flagged` are native `EvidenceRecord` fields (s15
     // P3b); `class` stays a raw companion key (never migrated).
-    let ledger_root = dir.path().join("canon/ledger");
+    let ledger_root = dir.path().join(".canon/ledger");
     std::fs::create_dir_all(&ledger_root).unwrap();
     let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("it-agent", RoleId::parse("implementer").unwrap()));
     let record = EvidenceRecord::new(envelope, Some(TaskId::parse("seed-change#1").unwrap()), None, None, EvidenceVerdict::Faithful).with_lifecycle(canon_model::TrustLifecycle::Reviewed);
@@ -91,15 +91,15 @@ fn gate_check_release_flag_engages_release_trust_check_but_ordinary_run_stays_si
 /// resolves the nearest ANCESTOR `canon.yaml` as the repo root (matching
 /// `canon context`'s own `context_from_a_subdirectory_resolves_the_
 /// ancestor_repo_root_policy` test) and surfaces THAT root's real
-/// `canon/policy.yaml` + `canon/ledger`, never a subdirectory-relative
+/// `.canon/policy.yaml` + `.canon/ledger`, never a subdirectory-relative
 /// default.
 #[test]
 fn gate_check_from_a_subdirectory_resolves_the_ancestor_repo_root() {
     let repo = tempfile::tempdir().unwrap();
-    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  git: { root: canon/ledger }\n").unwrap();
-    std::fs::create_dir_all(repo.path().join("canon")).unwrap();
-    std::fs::write(repo.path().join("canon/policy.yaml"), "risk_routing:\n  reviewer: true\n").unwrap();
-    write_evidence(&repo.path().join("canon/ledger"), "seed-change#1", "implementer", EvidenceVerdict::Faithful);
+    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  git: { root: .canon/ledger }\n").unwrap();
+    std::fs::create_dir_all(repo.path().join(".canon")).unwrap();
+    std::fs::write(repo.path().join(".canon/policy.yaml"), "risk_routing:\n  reviewer: true\n").unwrap();
+    write_evidence(&repo.path().join(".canon/ledger"), "seed-change#1", "implementer", EvidenceVerdict::Faithful);
 
     let subdir = repo.path().join("nested").join("deep");
     std::fs::create_dir_all(&subdir).unwrap();
@@ -139,7 +139,7 @@ fn gate_task_flip_is_blocked_with_no_evidence_record() {
 fn gate_task_flip_succeeds_with_clean_evidence() {
     let dir = tempfile::tempdir().unwrap();
     let tasks_path = write_tasks_md(dir.path(), "it-task-flip-ok", "- [ ] 1 Do the thing\n");
-    write_evidence(&dir.path().join("canon/ledger"), "it-task-flip-ok#1", "implementer", EvidenceVerdict::Faithful);
+    write_evidence(&dir.path().join(".canon/ledger"), "it-task-flip-ok#1", "implementer", EvidenceVerdict::Faithful);
 
     let output = run_canon(&["gate", "task", "it-task-flip-ok#1", "--repo", "."], dir.path());
     assert!(output.status.success(), "clean evidence must flip the row; stderr: {}", stderr(&output));
@@ -156,7 +156,7 @@ fn gate_task_flip_succeeds_with_clean_evidence() {
 fn gate_task_flip_is_blocked_on_a_divergent_verdict() {
     let dir = tempfile::tempdir().unwrap();
     let tasks_path = write_tasks_md(dir.path(), "it-task-flip-divergent", "- [ ] 1 Do the thing\n");
-    write_evidence(&dir.path().join("canon/ledger"), "it-task-flip-divergent#1", "implementer", EvidenceVerdict::Divergent);
+    write_evidence(&dir.path().join(".canon/ledger"), "it-task-flip-divergent#1", "implementer", EvidenceVerdict::Divergent);
 
     let output = run_canon(&["gate", "task", "it-task-flip-divergent#1", "--repo", "."], dir.path());
     assert_eq!(output.status.code(), Some(1), "a Divergent verdict is no evidence; stdout: {}", stdout(&output));
@@ -190,9 +190,9 @@ fn write_tasks_under(root: &Path, change_id: &str, body: &str) -> PathBuf {
 #[test]
 fn gate_task_compat_default_resolves_openspec_at_repo_when_plans_is_absent() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  git:\n    root: canon/ledger\n").unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  git:\n    root: .canon/ledger\n").unwrap();
     let tasks_path = write_tasks_md(dir.path(), "it-compat-default", "- [ ] 1 Do the thing\n");
-    write_evidence(&dir.path().join("canon/ledger"), "it-compat-default#1", "implementer", EvidenceVerdict::Faithful);
+    write_evidence(&dir.path().join(".canon/ledger"), "it-compat-default#1", "implementer", EvidenceVerdict::Faithful);
 
     let output = run_canon(&["gate", "task", "it-compat-default#1", "--repo", "."], dir.path());
     assert!(output.status.success(), "compat default must flip via openspec@repo; stderr: {}", stderr(&output));
@@ -207,11 +207,11 @@ fn gate_task_resolves_the_task_in_a_later_configured_source() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("canon.yaml"),
-        "tiers:\n  git:\n    root: canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n    - dialect: openspec\n      root: plansB\n",
+        "tiers:\n  git:\n    root: .canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n    - dialect: openspec\n      root: plansB\n",
     )
     .unwrap();
     let tasks_b = write_tasks_under(&dir.path().join("plansB"), "it-multi", "- [ ] 1 Do the thing\n");
-    write_evidence(&dir.path().join("canon/ledger"), "it-multi#1", "implementer", EvidenceVerdict::Faithful);
+    write_evidence(&dir.path().join(".canon/ledger"), "it-multi#1", "implementer", EvidenceVerdict::Faithful);
 
     let output = run_canon(&["gate", "task", "it-multi#1", "--repo", "."], dir.path());
     assert!(output.status.success(), "the second source must be consulted; stderr: {}", stderr(&output));
@@ -225,12 +225,12 @@ fn gate_task_first_configured_source_wins_when_both_locate_the_task() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("canon.yaml"),
-        "tiers:\n  git:\n    root: canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n    - dialect: openspec\n      root: plansB\n",
+        "tiers:\n  git:\n    root: .canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n    - dialect: openspec\n      root: plansB\n",
     )
     .unwrap();
     let tasks_a = write_tasks_under(&dir.path().join("plansA"), "it-both", "- [ ] 1 Do the thing\n");
     let tasks_b = write_tasks_under(&dir.path().join("plansB"), "it-both", "- [ ] 1 Do the thing\n");
-    write_evidence(&dir.path().join("canon/ledger"), "it-both#1", "implementer", EvidenceVerdict::Faithful);
+    write_evidence(&dir.path().join(".canon/ledger"), "it-both#1", "implementer", EvidenceVerdict::Faithful);
 
     let output = run_canon(&["gate", "task", "it-both#1", "--repo", "."], dir.path());
     assert!(output.status.success(), "stderr: {}", stderr(&output));
@@ -246,7 +246,7 @@ fn gate_task_reports_when_no_plan_source_locates_the_task() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("canon.yaml"),
-        "tiers:\n  git:\n    root: canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n",
+        "tiers:\n  git:\n    root: .canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n",
     )
     .unwrap();
 
@@ -267,10 +267,10 @@ fn write_tasks_vocab(repo: &Path, change_id: &str, yaml: &str) -> PathBuf {
 
 /// A minimal, self-contained `canon.core` vocabulary plugin — one `task`
 /// directive, one `task-status` enum — independent of this repo's real
-/// checked-in `canon/vocab/canon.core/` (mirrors `src/context.rs`'s own
+/// checked-in `.canon/vocab/canon.core/` (mirrors `src/context.rs`'s own
 /// `seed_vocab` test fixture).
 fn seed_vocab_core(repo: &Path) {
-    let core = repo.join("canon/vocab/canon.core");
+    let core = repo.join(".canon/vocab/canon.core");
     std::fs::create_dir_all(core.join("directives")).unwrap();
     std::fs::write(core.join("plugin.yaml"), "id: canon.core\nversion: \"0.1.0\"\nkind: core\nexports:\n  directives: directives/\n  enums: enums.yaml\n").unwrap();
     std::fs::write(
@@ -315,13 +315,13 @@ fn task_atom_yaml(id: &str, kind: &str, evidence_ref: &str) -> String {
 #[test]
 fn gate_task_typed_path_passes_with_a_matching_typed_evidence_record() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir_all(dir.path().join("canon")).unwrap();
-    std::fs::write(dir.path().join("canon/policy.yaml"), "trust_required:\n  test-run: agent\n").unwrap();
+    std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  test-run: agent\n").unwrap();
     seed_vocab_core(dir.path());
 
     let tasks_path = write_tasks_md(dir.path(), "it-typed-gate", "- [ ] 1 Do the typed thing\n");
     write_tasks_vocab(dir.path(), "it-typed-gate", &task_atom_yaml("it-typed-gate#1", "test-run", "cargo test -p it"));
-    write_typed_evidence(&dir.path().join("canon/ledger"), "it-typed-gate#1", "implementer", EvidenceVerdict::Faithful, "test-run", "cargo test -p it");
+    write_typed_evidence(&dir.path().join(".canon/ledger"), "it-typed-gate#1", "implementer", EvidenceVerdict::Faithful, "test-run", "cargo test -p it");
 
     let output = run_canon(&["gate", "task", "it-typed-gate#1", "--repo", "."], dir.path());
     assert!(output.status.success(), "a matching typed evidence.kind/ref must flip the row; stderr: {}", stderr(&output));
@@ -337,14 +337,14 @@ fn gate_task_typed_path_passes_with_a_matching_typed_evidence_record() {
 #[test]
 fn gate_task_typed_path_blocks_on_a_wrong_kind_evidence_record() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir_all(dir.path().join("canon")).unwrap();
-    std::fs::write(dir.path().join("canon/policy.yaml"), "trust_required:\n  test-run: agent\n  manual-review: human\n").unwrap();
+    std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  test-run: agent\n  manual-review: human\n").unwrap();
     seed_vocab_core(dir.path());
 
     let tasks_path = write_tasks_md(dir.path(), "it-typed-gate-wrong-kind", "- [ ] 1 Do the typed thing\n");
     write_tasks_vocab(dir.path(), "it-typed-gate-wrong-kind", &task_atom_yaml("it-typed-gate-wrong-kind#1", "test-run", "cargo test -p it"));
     // Wrong kind: the atom declared `test-run`, this record is `manual-review`.
-    write_typed_evidence(&dir.path().join("canon/ledger"), "it-typed-gate-wrong-kind#1", "implementer", EvidenceVerdict::Faithful, "manual-review", "reviewer sign-off");
+    write_typed_evidence(&dir.path().join(".canon/ledger"), "it-typed-gate-wrong-kind#1", "implementer", EvidenceVerdict::Faithful, "manual-review", "reviewer sign-off");
 
     let output = run_canon(&["gate", "task", "it-typed-gate-wrong-kind#1", "--repo", "."], dir.path());
     assert_eq!(output.status.code(), Some(1), "a wrong-kind evidence record must not satisfy the typed requirement; stdout: {}", stdout(&output));
@@ -363,8 +363,8 @@ fn gate_task_typed_path_blocks_on_a_wrong_kind_evidence_record() {
 #[test]
 fn gate_task_typed_path_pairs_notes_with_only_the_matching_typed_record() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir_all(dir.path().join("canon")).unwrap();
-    std::fs::write(dir.path().join("canon/policy.yaml"), "trust_required:\n  test-run: agent\n  manual-review: human\n").unwrap();
+    std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  test-run: agent\n  manual-review: human\n").unwrap();
     seed_vocab_core(dir.path());
 
     let tasks_path = write_tasks_md(dir.path(), "it-typed-gate-note-pairing", "- [ ] 1 Do the typed thing\n");
@@ -372,7 +372,7 @@ fn gate_task_typed_path_pairs_notes_with_only_the_matching_typed_record() {
     // Stale/wrong-kind record for the SAME task_id, carrying its OWN
     // note — must be excluded from both evidence AND notes.
     write_typed_evidence_with_note(
-        &dir.path().join("canon/ledger"),
+        &dir.path().join(".canon/ledger"),
         "it-typed-gate-note-pairing#1",
         "reviewer",
         EvidenceVerdict::Faithful,
@@ -382,7 +382,7 @@ fn gate_task_typed_path_pairs_notes_with_only_the_matching_typed_record() {
     );
     // The correctly-typed matching record, with its own note.
     write_typed_evidence_with_note(
-        &dir.path().join("canon/ledger"),
+        &dir.path().join(".canon/ledger"),
         "it-typed-gate-note-pairing#1",
         "implementer",
         EvidenceVerdict::Faithful,
@@ -405,13 +405,13 @@ fn gate_task_typed_path_pairs_notes_with_only_the_matching_typed_record() {
 #[test]
 fn gate_task_typed_path_rejects_an_evidence_kind_outside_the_policy_domain() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir_all(dir.path().join("canon")).unwrap();
-    std::fs::write(dir.path().join("canon/policy.yaml"), "trust_required:\n  test-run: agent\n").unwrap();
+    std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  test-run: agent\n").unwrap();
     seed_vocab_core(dir.path());
 
     let tasks_path = write_tasks_md(dir.path(), "it-typed-gate-bad-kind", "- [ ] 1 Do the typed thing\n");
     write_tasks_vocab(dir.path(), "it-typed-gate-bad-kind", &task_atom_yaml("it-typed-gate-bad-kind#1", "not-a-real-kind", "whatever"));
-    write_typed_evidence(&dir.path().join("canon/ledger"), "it-typed-gate-bad-kind#1", "implementer", EvidenceVerdict::Faithful, "not-a-real-kind", "whatever");
+    write_typed_evidence(&dir.path().join(".canon/ledger"), "it-typed-gate-bad-kind#1", "implementer", EvidenceVerdict::Faithful, "not-a-real-kind", "whatever");
 
     let output = run_canon(&["gate", "task", "it-typed-gate-bad-kind#1", "--repo", "."], dir.path());
     assert_eq!(output.status.code(), Some(1), "an out-of-domain evidence kind must fail closed; stdout: {}", stdout(&output));
@@ -432,7 +432,7 @@ fn gate_task_falls_back_to_the_free_path_with_no_typed_atom_for_this_task_id() {
     // fall through to the free path untouched.
     let tasks_path = write_tasks_md(dir.path(), "it-typed-gate-fallback", "- [ ] 1 Do the untyped thing\n");
     write_tasks_vocab(dir.path(), "it-typed-gate-fallback", &task_atom_yaml("it-typed-gate-fallback#2", "test-run", "n/a"));
-    write_evidence(&dir.path().join("canon/ledger"), "it-typed-gate-fallback#1", "implementer", EvidenceVerdict::Faithful);
+    write_evidence(&dir.path().join(".canon/ledger"), "it-typed-gate-fallback#1", "implementer", EvidenceVerdict::Faithful);
 
     let output = run_canon(&["gate", "task", "it-typed-gate-fallback#1", "--repo", "."], dir.path());
     assert!(output.status.success(), "an untyped task_id must still flip via the free path; stderr: {}", stderr(&output));
@@ -444,7 +444,7 @@ fn gate_task_falls_back_to_the_free_path_with_no_typed_atom_for_this_task_id() {
 #[test]
 fn gate_promote_assigns_a_run_seq_and_lands_the_record_in_the_committed_tier() {
     let dir = tempfile::tempdir().unwrap();
-    let ledger_root = dir.path().join("canon/ledger");
+    let ledger_root = dir.path().join(".canon/ledger");
     write_evidence(&ledger_root.join("_staging"), "it-promote#1", "implementer", EvidenceVerdict::Faithful);
 
     let output = run_canon(&["gate", "promote", "--repo", "."], dir.path());
@@ -462,7 +462,7 @@ fn gate_promote_assigns_a_run_seq_and_lands_the_record_in_the_committed_tier() {
 #[test]
 fn gate_promote_dry_run_writes_nothing() {
     let dir = tempfile::tempdir().unwrap();
-    let ledger_root = dir.path().join("canon/ledger");
+    let ledger_root = dir.path().join(".canon/ledger");
     write_evidence(&ledger_root.join("_staging"), "it-promote-dry#1", "implementer", EvidenceVerdict::Faithful);
 
     let output = run_canon(&["gate", "promote", "--repo", ".", "--dry-run"], dir.path());
@@ -485,7 +485,7 @@ fn gate_install_hooks_is_idempotent_and_seeds_a_pre_commit_script_for_a_fresh_re
     assert!(first.status.success(), "stderr: {}", stderr(&first));
     let settings: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.path().join(".claude/settings.json")).unwrap()).unwrap();
     assert_eq!(settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"], serde_json::json!("canon gate task"), "the default install-hooks command must be the evidence-gated task-flip entry point, not the read-only check");
-    let script_path = dir.path().join("scripts/canon-gate-pre-commit.sh");
+    let script_path = dir.path().join(".canon/scripts/canon-gate-pre-commit.sh");
     assert!(script_path.is_file(), "a fresh repo with no canon-gate hook entries must get the generic pre-commit script");
 
     let first_bytes = std::fs::read(&script_path).unwrap();

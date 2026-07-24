@@ -9,7 +9,7 @@
 //! (`canon_policy::{compile, evaluate, SchemaRegistry}`) — it has no
 //! `policy.yaml`-file parser of its own (verified: `crates/canon-policy/src/
 //! lib.rs`'s own module doc lists S5 among CEL's "intended consumers", not
-//! its policy loader). S5's ACTUAL `<repo>/canon/policy.yaml` parser is
+//! its policy loader). S5's ACTUAL `<repo>/.canon/policy.yaml` parser is
 //! [`canon_gate::PolicyResolution`] (`crates/canon-gate/src/policy.rs`),
 //! which is BUILT ON `canon-policy`'s CEL engine (compiles each field's
 //! `{cel: "…"}` predicate through it) but lives in the `canon-gate` crate.
@@ -69,8 +69,8 @@ mod tests {
     #[test]
     fn trust_required_keys_become_the_evidence_kind_domain() {
         let tmp = tempfile::TempDir::new().unwrap();
-        std::fs::create_dir_all(tmp.path().join("canon")).unwrap();
-        std::fs::write(tmp.path().join("canon/policy.yaml"), "trust_required:\n  test-run: agent\n  manual-review: human\n").unwrap();
+        std::fs::create_dir_all(tmp.path().join(".canon")).unwrap();
+        std::fs::write(tmp.path().join(".canon/policy.yaml"), "trust_required:\n  test-run: agent\n  manual-review: human\n").unwrap();
         let mut kinds = evidence_kind_domain(tmp.path());
         kinds.sort();
         assert_eq!(kinds, vec!["manual-review".to_string(), "test-run".to_string()]);

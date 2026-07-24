@@ -11,8 +11,8 @@
 //! Unlike the donor vocabulary system's core plugin (compile-time
 //! `include_str!`-embedded, because the donor CLI
 //! ships as a project-independent binary), `canon.core` is scanned from disk
-//! at `<project_dir>/canon/vocab/canon.core/` exactly like any consumer
-//! plugin (design.md D3: "resolving canon.core + any consumer `canon/vocab/
+//! at `<project_dir>/.canon/vocab/canon.core/` exactly like any consumer
+//! plugin (design.md D3: "resolving canon.core + any consumer `.canon/vocab/
 //! <id>/plugin.yaml`") — canon is a monorepo-embedded tool, not a
 //! distributable language runtime.
 
@@ -32,7 +32,7 @@ fn resolve_diag(code: &str, message: impl Into<String>) -> Diagnostic {
 }
 
 /// Resolve `project_dir`'s active vocabulary (canon.core + every consumer
-/// `canon/vocab/<id>/plugin.yaml` a `canon.project.yaml` profile activates)
+/// `.canon/vocab/<id>/plugin.yaml` a `canon.project.yaml` profile activates)
 /// into a merged capability snapshot, plus every resolution diagnostic
 /// (missing/malformed `canon.project.yaml`, plugin load errors, an
 /// unresolvable `depends` range, an assembly-time duplicate). `profile`
@@ -54,7 +54,7 @@ pub fn resolve_snapshot(project_dir: &Path, profile: Option<&str>) -> (Capabilit
 
     let (vocab_dir, graph, selected_owned) = match &project {
         Some(p) => (p.vocab_dir.clone(), p.graph.clone(), profile.map(str::to_string).unwrap_or_else(|| p.graph.default_profile.clone())),
-        None => (project_dir.join("canon/vocab/"), ProfileGraph::empty(DEFAULT_PROFILE), profile.map(str::to_string).unwrap_or_else(|| DEFAULT_PROFILE.to_string())),
+        None => (project_dir.join(canon_model::paths::VOCAB_DIR), ProfileGraph::empty(DEFAULT_PROFILE), profile.map(str::to_string).unwrap_or_else(|| DEFAULT_PROFILE.to_string())),
     };
     let selected = selected_owned.as_str();
 
@@ -106,15 +106,15 @@ mod tests {
     fn write_canon_core(project_dir: &Path) {
         write(
             project_dir,
-            "canon/vocab/canon.core/plugin.yaml",
+            ".canon/vocab/canon.core/plugin.yaml",
             "id: canon.core\nversion: \"0.1.0\"\nkind: core\nexports:\n  directives: directives/\n  enums: enums.yaml\n",
         );
         write(
             project_dir,
-            "canon/vocab/canon.core/directives/task.yaml",
+            ".canon/vocab/canon.core/directives/task.yaml",
             "directives:\n  - name: task\n    attrs:\n      - name: desc\n        type: string\n        required: true\n      - name: status\n        type: { domain: task-status }\n        required: true\n",
         );
-        write(project_dir, "canon/vocab/canon.core/enums.yaml", "enums:\n  task-status: [open, done]\n");
+        write(project_dir, ".canon/vocab/canon.core/enums.yaml", "enums:\n  task-status: [open, done]\n");
     }
 
     #[test]
@@ -153,12 +153,12 @@ mod tests {
         write_canon_core(tmp.path());
         write(
             tmp.path(),
-            "canon/vocab/consumer.extra/plugin.yaml",
+            ".canon/vocab/consumer.extra/plugin.yaml",
             "id: consumer.extra\nversion: \"0.1.0\"\nkind: project\nexports:\n  directives: directives/\n",
         );
         write(
             tmp.path(),
-            "canon/vocab/consumer.extra/directives/extra.yaml",
+            ".canon/vocab/consumer.extra/directives/extra.yaml",
             "directives:\n  - name: extra-task\n    attrs:\n      - name: note\n        type: string\n        required: false\n",
         );
         write(
@@ -194,7 +194,7 @@ mod tests {
 
         // A manifest content change with no code change at all: one new
         // enum member in canon.core's own enums.yaml.
-        write(tmp.path(), "canon/vocab/canon.core/enums.yaml", "enums:\n  task-status: [open, done, blocked]\n");
+        write(tmp.path(), ".canon/vocab/canon.core/enums.yaml", "enums:\n  task-status: [open, done, blocked]\n");
         let (after, _) = resolve_snapshot(tmp.path(), None);
 
         assert_ne!(before.capability_version, after.capability_version);

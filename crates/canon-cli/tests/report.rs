@@ -45,8 +45,8 @@ fn report_writes_canon_report_md_under_the_resolved_repo_root() {
     let output = run_canon(&["report", "--repo", "."], dir.path());
 
     assert!(output.status.success(), "canon report must exit 0; stderr: {}", stderr(&output));
-    assert!(stdout(&output).contains("canon/REPORT.md"), "{}", stdout(&output));
-    let report_path = dir.path().join("canon/REPORT.md");
+    assert!(stdout(&output).contains(".canon/REPORT.md"), "{}", stdout(&output));
+    let report_path = dir.path().join(".canon/REPORT.md");
     assert!(report_path.is_file());
     let content = std::fs::read_to_string(&report_path).unwrap();
     assert!(content.starts_with("# canon report\n"));
@@ -75,7 +75,7 @@ fn check_exit_codes_track_missing_no_drift_and_drift_across_the_full_lifecycle()
     assert!(stderr(&no_drift).contains("no drift"), "{}", stderr(&no_drift));
 
     // Drift — hand-edit the committed report.
-    let report_path = dir.path().join("canon/REPORT.md");
+    let report_path = dir.path().join(".canon/REPORT.md");
     let mut content = std::fs::read_to_string(&report_path).unwrap();
     content.push_str("\nhand-edited, never generated\n");
     std::fs::write(&report_path, content).unwrap();
@@ -110,9 +110,9 @@ fn snapshot_writes_seven_parquet_files_and_a_manifest_under_the_given_dir() {
     let manifest: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&manifest_path).unwrap()).unwrap();
     assert_eq!(manifest["tables"].as_array().unwrap().len(), 7);
 
-    // `--snapshot` never wrote/touched `canon/REPORT.md` — it is a
+    // `--snapshot` never wrote/touched `.canon/REPORT.md` — it is a
     // distinct action from the default write mode.
-    assert!(!dir.path().join("canon/REPORT.md").exists());
+    assert!(!dir.path().join(".canon/REPORT.md").exists());
 }
 
 #[test]
