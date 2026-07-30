@@ -50,12 +50,37 @@ platformer.session.04: resolved divergence
 resolved divergence: Fixed and independently re-verified+attested at 505a668efedaed6dfb5e125a0d927f118b2dfad1 (dev-fix wave 8d3c1506..505a668e; movement.03/session.03 at ea77374)
 ```
 
+A record carrying no prose is not a ceiling, because canon's join spine
+exists so a record does not have to hold every fact about itself. Two
+joins supply the text the event itself lacks:
+
+- **Antecedent findings.** A verdict-bearing event distills together with
+  the prose-bearing non-verdict events on the same artifact that preceded
+  it. A `resolved` divergence therefore carries the `open` ship-blockers
+  it closed — the pitfall and its demonstrated fix in one item, which is
+  the most useful shape a strategy can take. Open findings stay
+  non-verdict: they never mint a verdict, reward, or trajectory of their
+  own.
+- **Scenario titles.** A trajectory whose artifact is a scenario names it
+  in human terms, so an attestation says what it attested.
+
+```
+platformer.session.04: resolved divergence — Idle and resize sessions stay error-free
+    resolved divergence: Fixed and independently re-verified+attested at 505a668e...
+    preceded on this artifact by:
+      - open divergence: SHIP-BLOCKER src/render/PixiStage.tsx:28-32 assigns app before
+        awaiting loadTextures ... Centralize teardown behind an idempotent owner.
+      - open divergence: SHIP-BLOCKER src/App.tsx:45-46 calls sim.setPaused() inside a
+        React updater ... Compute the next pause state outside the updater.
+```
+
 <Aside type="note">
-  A review-derived item can only ever quote its pin (`review
-  attestation: 6be8cc2b...`). That is a model-level ceiling, not a
-  distiller weakness: `records::Review` carries `reviewer`, `pin`, and
-  `provenance_ref` — no prose field at all for the distiller to reach
-  for.
+  `records::Review` really does carry no prose — only `reviewer`, `pin`,
+  and `provenance_ref`. Its attestations read as evidence anyway because
+  they are joined to the scenario they attest and to the findings filed
+  against it, not because the record grew a field. Antecedents are
+  ordered by `(at, line)`, deduped, and capped, so this text stays
+  deterministic.
 </Aside>
 
 Strategy memory is **rebuilt, not recomputed once**: `canon ingest

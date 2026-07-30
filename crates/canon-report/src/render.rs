@@ -113,7 +113,21 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     render_table(&mut out, &marts.flywheel_funnel);
 
     out.push_str("## Review burn-down\n\n");
-    out.push_str("Review-feedback burn-down over time (`mart_review_burndown`).\n\n");
+    // s39 (`joined-evidence-grounding`): the panel is a per-day TREND
+    // over raw `Divergence.status` events, and `divergence_open_running_
+    // total` is a running `opened - resolved` count of those events --
+    // NOT how many divergences are open now. The two differ whenever one
+    // `resolved` record closes several findings on a scenario, which is
+    // normal: `fold_to_current_state` ranks a scenario's records by
+    // `run_seq`, so the latest wins per `(project_id, scenario_id)`. On
+    // canon's own corpus this panel reads `2` while every scenario is in
+    // fact resolved. The column name alone invites reading the trend as
+    // current state, so the pointer to the surface that answers that
+    // question ships in the panel itself rather than only in
+    // `canon_report::divergence`'s module doc.
+    out.push_str(
+        "Review-feedback burn-down over time (`mart_review_burndown`) — a per-day trend over raw `Divergence.status` events, so `divergence_open_running_total` is a running `opened - resolved` event count, NOT the number open now. For current state per scenario, run `canon divergence status`.\n\n",
+    );
     render_table(&mut out, &marts.review_burndown);
 
     out.push_str("## Scope status\n\n");

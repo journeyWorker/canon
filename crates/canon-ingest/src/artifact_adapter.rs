@@ -354,6 +354,33 @@ impl ArtifactEvent {
         label.to_string()
     }
 
+    /// Whether [`Self::evidence_line`] will carry genuine NARRATIVE —
+    /// i.e. whether [`Self::salient_prose`] finds one of
+    /// `EVIDENCE_PROSE_FIELDS` — rather than degrading to the bare
+    /// [`Self::display_label`] or to the `<label>: status <token>`
+    /// fallback (s39 `joined-evidence-grounding`).
+    ///
+    /// `canon-cli::artifact_ingest`'s antecedent join needs exactly this
+    /// distinction: a NON-verdict event contributes its prose as
+    /// antecedent evidence to the verdict that later closed it, and a
+    /// bare kind label ("open divergence", "non-verdict") is not
+    /// evidence of anything — it would pad every retrieved strategy with
+    /// canon's own vocabulary, the precise regression
+    /// `s38-evidence-bearing-memory` removed.
+    ///
+    /// Exposed as a predicate BESIDE `salient_prose` rather than
+    /// re-deriving the judgement in the caller, for two reasons.
+    /// `EVIDENCE_PROSE_FIELDS`' priority order is a contract stated once
+    /// here (its own doc comment), and a second copy in another crate
+    /// would drift. And the obvious caller-side alternative —
+    /// `evidence_line() != display_label()` — silently passes the
+    /// status/state fallback line, which names a state token, not a
+    /// narrative: `non-verdict: status still_divergent` would be
+    /// absorbed as though it were a reviewer's finding.
+    pub fn has_salient_prose(&self) -> bool {
+        self.salient_prose().is_some()
+    }
+
     /// The first present, non-blank `EVIDENCE_PROSE_FIELDS` string,
     /// compacted ([`compact_evidence_text`]). Scans in the constant's
     /// declared order and stops at the first hit, so at most one
