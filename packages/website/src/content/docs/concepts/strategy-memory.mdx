@@ -10,10 +10,14 @@ trajectories into retrievable, promotable insight — role-namespaced:
 `planning`, `design`, `dev`, `test`, `review`, and others share one
 backbone but evolve separately.
 
+canon's position is that strategy memory is only worth retrieving if its
+text is grounded in artifacts outside the model — otherwise a retrieval
+loop just recycles the model's own output back into itself.
+
 ## The flywheel
 
 ```
-ingest (sessions, reviews, handoffs) → trajectories + verdicts (per role)
+ingest (sessions, reviews, divergences, handoffs, task flips) → trajectories + verdicts (per role)
     → distill: success → strategy, review finding → guardrail
     → statistical promotion gate — no noise distilled
     → promote to git tier (versioned, PR-reviewed)
@@ -24,16 +28,42 @@ ingest (sessions, reviews, handoffs) → trajectories + verdicts (per role)
 ## Two tiers, two stores
 
 - **Warm — trajectories (Parquet).** `ParquetTrajectoryStore` under
-  `<repo>/.canon/learn/trajectories/`: raw, verdict-keyed rows written
-  by ingest. Local, rebuildable, `.gitignore`d — never hand-committed.
+  `<repo>/.canon/learn/trajectories/`: verdict-keyed rows written by
+  ingest. Local, rebuildable, `.gitignore`d — never hand-committed.
 - **Durable — strategies (git).** `ParquetStrategyStore` plus
   git-tracked `<repo>/.canon/strategies/<role>/<id>.md` files: the
   distilled, PR-reviewable `StrategyItem`s a promotion writes into and
   a demotion soft-flags.
 
+A trajectory names its concrete artifact — the scenario, handoff, or
+task it was derived from — and carries the prose the underlying evidence
+record actually holds: a reviewer's pin, a divergence finding's
+narrative, a task's evidence note. So a distilled strategy quotes real
+evidence instead of a summary of canon's own ingest:
+
+```
+# before — the trajectory described the adapters that produced it
+2 verdict(s) derived from canon-ingest artifact adapters for regime test/canon/platformer/41fdd8c50ee6
+
+# now — the title names the artifact, the content quotes the evidence
+platformer.session.04: resolved divergence
+resolved divergence: Fixed and independently re-verified+attested at 505a668efedaed6dfb5e125a0d927f118b2dfad1 (dev-fix wave 8d3c1506..505a668e; movement.03/session.03 at ea77374)
+```
+
+<Aside type="note">
+  A review-derived item can only ever quote its pin (`review
+  attestation: 6be8cc2b...`). That is a model-level ceiling, not a
+  distiller weakness: `records::Review` carries `reviewer`, `pin`, and
+  `provenance_ref` — no prose field at all for the distiller to reach
+  for.
+</Aside>
+
 Strategy memory is **rebuilt, not recomputed once**: `canon ingest
 artifacts` re-derives distilled strategies from the current trajectory
-set (`rebuild_namespace`) every time it runs. The rebuild is
+set (`rebuild_namespace`) every time it runs. That re-derivation is
+deterministic — a second ingest pass over the same artifacts derives
+byte-identical trajectory content, so the duplicate skip the rebuild
+rests on still fires and repeated runs don't churn. The rebuild is
 non-destructive — it never deletes a strategy the raw trajectory rows
 don't touch, so a rebuild can't silently drop a hand-promoted strategy.
 There is no standalone `canon learn` rebuild command; the only `canon

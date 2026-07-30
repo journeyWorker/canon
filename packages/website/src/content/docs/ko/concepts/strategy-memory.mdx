@@ -10,10 +10,14 @@ canon의 전략 메모리(S6/S7/S8)는 누적된 verdict trajectory를 검색 �
 `planning`, `design`, `dev`, `test`, `review` 등이 하나의 백본을
 공유하면서도 각자 따로 진화합니다.
 
+canon의 입장은 이렇습니다: 전략 메모리는 그 텍스트가 모델 외부의
+아티팩트에 근거할 때에만 검색할 가치가 있습니다 — 그렇지 않으면
+retrieval 루프는 모델 자신의 출력을 다시 되먹이는 데 그칩니다.
+
 ## 플라이휠
 
 ```
-ingest (세션, 리뷰, 핸드오프) → trajectory + verdict (역할별)
+ingest (세션, 리뷰, divergence, 핸드오프, 태스크 체크박스) → trajectory + verdict (역할별)
     → distill: 성공 → 전략, 리뷰 지적 → 가드레일
     → 통계적 승급 게이트 — 노이즈는 증류되지 않음
     → git 티어로 승급 (버전 관리, PR 리뷰)
@@ -24,17 +28,43 @@ ingest (세션, 리뷰, 핸드오프) → trajectory + verdict (역할별)
 ## 두 개의 티어, 두 개의 스토어
 
 - **웜 — trajectory (Parquet).** `<repo>/.canon/learn/trajectories/`
-  아래의 `ParquetTrajectoryStore`: ingest가 기록한 원시 verdict-키
-  로우. 로컬, 재빌드 가능, `.gitignore` 대상 — 절대 수동 커밋되지
+  아래의 `ParquetTrajectoryStore`: ingest가 기록한 verdict-키 로우.
+  로컬, 재빌드 가능, `.gitignore` 대상 — 절대 수동 커밋되지
   않습니다.
 - **더러블 — 전략 (git).** `ParquetStrategyStore`와 git으로 추적되는
   `<repo>/.canon/strategies/<role>/<id>.md` 파일: promotion이 쓰고
   demotion이 소프트 플래그를 다는, 증류된 PR 리뷰 가능한
   `StrategyItem`.
 
+trajectory는 자신이 파생된 구체적 아티팩트 — scenario, handoff,
+task — 를 제목에 지목하고, 그 근거가 된 evidence 레코드가 실제로 들고
+있는 산문을 그대로 실어 나릅니다: 리뷰어의 pin, divergence 지적의
+서술, 태스크의 증거 노트. 그래서 증류된 전략은 canon 자신의 ingest를
+요약한 문장이 아니라 실제 증거를 인용합니다:
+
+```
+# before — the trajectory described the adapters that produced it
+2 verdict(s) derived from canon-ingest artifact adapters for regime test/canon/platformer/41fdd8c50ee6
+
+# now — the title names the artifact, the content quotes the evidence
+platformer.session.04: resolved divergence
+resolved divergence: Fixed and independently re-verified+attested at 505a668efedaed6dfb5e125a0d927f118b2dfad1 (dev-fix wave 8d3c1506..505a668e; movement.03/session.03 at ea77374)
+```
+
+<Aside type="note">
+  review에서 파생된 아이템은 자기 pin만 인용할 수 있습니다(`review
+  attestation: 6be8cc2b...`). 이는 distiller의 약점이 아니라 모델
+  수준의 한계입니다: `records::Review`는 `reviewer`, `pin`,
+  `provenance_ref`를 담을 뿐, distiller가 인용할 산문 필드를 아예 갖고
+  있지 않습니다.
+</Aside>
+
 전략 메모리는 **한 번 계산되고 끝나는 게 아니라 재빌드**됩니다: `canon
 ingest artifacts`는 실행할 때마다 현재 trajectory 집합으로부터 증류된
-전략을 다시 파생시킵니다(`rebuild_namespace`). 이 재빌드는
+전략을 다시 파생시킵니다(`rebuild_namespace`). 이 재파생은
+결정적입니다 — 같은 아티팩트를 두 번 ingest하면 바이트 단위로 동일한
+trajectory 콘텐츠가 파생되므로, 재빌드가 의존하는 중복 스킵이 그대로
+동작하고 반복 실행이 내용을 흔들지 않습니다. 이 재빌드는
 비파괴적(non-destructive)입니다 — 원시 trajectory 로우가 건드리지
 않는 전략은 절대 삭제되지 않으므로, 재빌드가 수동으로 승급한 전략을
 조용히 지우는 일은 없습니다. 독립된 `canon learn` 재빌드 명령은
