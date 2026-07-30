@@ -153,7 +153,7 @@ use canon_ingest::artifact_adapter::{ArtifactEvent, ArtifactJoinKey, ArtifactSou
 use canon_ingest::artifact_registry::{ArtifactDispatchOutcome, ArtifactSourceKind};
 use canon_ingest::normalize::content_digest;
 use canon_ingest::verdict::{VerdictRow, attach_regime_key, derive_native_divergence_verdict, derive_native_review_verdict, derive_verdict};
-use canon_learn::{LearnConfig, LearnError, ParquetStrategyStore, ParquetTrajectoryStore, RoleRegistry, Trajectory, TrajectoryId, TrajectoryStore, rebuild_namespace, store_trajectory};
+use canon_learn::{LearnConfig, LearnError, ParquetStrategyStore, ParquetTrajectoryStore, RewardRegistry, RoleRegistry, Trajectory, TrajectoryId, TrajectoryStore, VerdictOutcome, mark_trajectory_verdict, rebuild_namespace, store_trajectory};
 use canon_model::envelope::RecordKind;
 use canon_model::evidence::RawRecord;
 use canon_model::ids::RegimeKey;
@@ -247,6 +247,29 @@ pub struct ArtifactIngestOutcome {
     /// lands in `stg_strategy_items`, i.e. what makes S9's
     /// `mart_role_memory` non-empty.
     pub strategy_items_rebuilt: usize,
+    /// Trajectories whose covering verdict+reward was RESOLVED and
+    /// written back in this same pass
+    /// ([`canon_learn::RewardRegistry::compute_for_trajectory`] +
+    /// [`canon_learn::mark_trajectory_verdict`]). Every freshly
+    /// constructed `Trajectory` starts `VerdictOutcome::Pending` (S7
+    /// design D2's two-phase reward-write model), and S7's promotion
+    /// gates read `verdict_record.outcome`, NOT the raw `verdicts`
+    /// list — so a trajectory left `Pending` is invisible to
+    /// `OccurrencePromotionGate`/`CrnPromotionGate` and can never
+    /// corroborate a promotion. This counter is what makes the
+    /// artifact-ingest half of the flywheel observable.
+    pub trajectories_marked: usize,
+    /// Trajectories deliberately LEFT `Pending`: the role's own
+    /// `RewardFn` resolved to [`VerdictOutcome::Pending`], which
+    /// `mark_trajectory_verdict` rejects outright
+    /// ([`canon_learn::LearnError::CannotMarkVerdictPending`]) because
+    /// `Pending` is the unset default, never a covering-verdict write.
+    /// The `dev` role reaches this legitimately: `compute_dev_reward`'s
+    /// additive triad stays `Pending` below a full `1.0` (a partial
+    /// `pr-merged` + `ci-pass` without `no-rollback`), waiting for the
+    /// S7 webhook receiver's no-rollback timer to resolve it. Counted,
+    /// never an error.
+    pub trajectories_left_pending: usize,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -630,11 +653,18 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
     let trajectory_store = ParquetTrajectoryStore::open(learn_root.join("trajectories"));
     let strategy_store = ParquetStrategyStore::open(learn_root.join("strategies"));
     let role_registry = RoleRegistry::from_config(&learn_config);
+    // S7's per-role reward table (`dev`'s ported weighted composite plus
+    // the five provisional roles); an unregistered role falls back to
+    // `default_reward_fn` rather than erroring, so every trajectory
+    // always has SOME reward function.
+    let reward_registry = RewardRegistry::builtin();
 
     let mut trajectories_persisted = Vec::new();
     let mut trajectories_skipped_unregistered_role = 0usize;
     let mut trajectories_skipped_duplicate = 0usize;
     let mut strategy_items_rebuilt = 0usize;
+    let mut trajectories_marked = 0usize;
+    let mut trajectories_left_pending = 0usize;
     for (regime_key, (rows, at)) in by_regime {
         let verdict_count = rows.len();
         let digest = trajectory_content_digest(&regime_key, &rows);
@@ -654,6 +684,36 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
         match store_trajectory(&role_registry, &trajectory_store, &trajectory) {
             Ok(()) => {
                 trajectories_persisted.push(PersistedTrajectory { regime_key: regime_key.as_str().to_string(), verdict_count });
+                // Resolve the covering verdict+reward from the SAME
+                // `VerdictRow`(s) this trajectory was just built from,
+                // then write it back — closing S7 design D2's two-phase
+                // reward-write model at the one call site that has both
+                // halves in hand. `compute_for_trajectory` is documented
+                // as "the shape `mark_trajectory_verdict`'s caller
+                // typically wants" (`reward.rs`); before this wiring
+                // existed every artifact-derived trajectory stayed
+                // `Pending` forever, so no promotion gate could ever see
+                // a corroborating sample. The role is known-registered
+                // here — `store_trajectory` above already rejected an
+                // unregistered one — so the `?` is a genuine
+                // store/parse failure, not a routine miss.
+                match reward_registry.compute_for_trajectory(&trajectory)? {
+                    // `Pending` is the unset default; marking it is
+                    // rejected by design. Leave the trajectory pending
+                    // for a later covering signal (the S7 webhook
+                    // receiver's PR/CI path) and count it.
+                    (VerdictOutcome::Pending, _) => trajectories_left_pending += 1,
+                    (outcome, reward) => {
+                        // Marked BEFORE `rebuild_namespace` deliberately:
+                        // `mark_verdict` is the ONLY path allowed to
+                        // rewrite a stored trajectory, and
+                        // `rebuild_namespace` must leave those bytes
+                        // untouched (asserted by
+                        // `parquet_trajectory`'s own round-trip test).
+                        mark_trajectory_verdict(&trajectory_store, &trajectory.id, outcome, reward)?;
+                        trajectories_marked += 1;
+                    }
+                }
                 let items = rebuild_namespace(&trajectory_store, &strategy_store, &regime_key)?;
                 strategy_items_rebuilt += items.len();
             }
@@ -671,6 +731,8 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
         trajectories_skipped_unregistered_role,
         trajectories_skipped_duplicate,
         strategy_items_rebuilt,
+        trajectories_marked,
+        trajectories_left_pending,
     })
 }
 
@@ -705,6 +767,8 @@ pub fn format_human(outcome: &ArtifactIngestOutcome) -> String {
     out.push_str(&format!("trajectories skipped (unregistered role): {}\n", outcome.trajectories_skipped_unregistered_role));
     out.push_str(&format!("trajectories skipped (duplicate, already persisted): {}\n", outcome.trajectories_skipped_duplicate));
     out.push_str(&format!("strategy items rebuilt (distilled): {}\n", outcome.strategy_items_rebuilt));
+    out.push_str(&format!("trajectories marked (covering verdict resolved): {}\n", outcome.trajectories_marked));
+    out.push_str(&format!("trajectories left pending (awaiting a covering signal): {}\n", outcome.trajectories_left_pending));
     out
 }
 

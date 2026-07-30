@@ -36,6 +36,8 @@ Graduates a distilled strategy (by its ULID) from the local warm tier UP
 into the git-tracked `.canon/strategies/<role>/<id>.md` tier. It:
 
 - resolves the repo via the nearest-`canon.yaml`-ancestor walk;
+- **evaluates the role's promotion gate and FAILS CLOSED** (see below) —
+  this is the primary enforcement point, not the lint;
 - runs advisory lints (content-length ceiling, literal-absolute-path
   rejection) — printed, NON-blocking;
 - writes the file with YAML front-matter (`status`, `regime_key`,
@@ -48,6 +50,38 @@ the whole file, idempotent by content — re-promoting an unchanged
 strategy is a byte-identical rewrite, so it does NOT preserve manual
 edits to that file. A later demotion soft-flags the SAME file, preserving
 git blame.
+
+### The gate blocks unproven promotions
+
+Promotion is evidence-gated. Before any write, canon resolves the
+strategy's own `regime_key`, reads that regime's trajectories, and
+evaluates the role's configured gate:
+
+```
+canon learn promote: blocked by the promotion gate: 1 corroborating
+successes since the last contradiction (need n_min 5) in the trailing
+30-day window
+```
+
+Exit `1`, nothing written. **There is no `--force`.** A refusal means the
+evidence is not there yet; the fix is to resolve the regime's
+trajectories, not to bypass the gate.
+
+The gate reads each trajectory's RESOLVED `verdict_record.outcome` — NOT
+its raw verdict rows. A trajectory sitting at `pending` neither
+corroborates nor contradicts, so a wall of pending trajectories is still
+a refusal. `canon ingest artifacts` is what resolves them (it computes
+each trajectory's covering verdict + reward and writes it back in the
+same pass, reporting `trajectories marked` and `trajectories left
+pending`). So the working order is always:
+
+```bash
+canon ingest artifacts        # derive verdicts AND resolve trajectories
+canon learn promote <id>      # now the gate can see corroboration
+```
+
+A blocked `--dry-run` still prints its preview (you asked what WOULD be
+written), then reports the refusal and exits `1`.
 
 ## Choosing a promotion gate: `crn` vs `occurrence`
 

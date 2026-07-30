@@ -94,10 +94,26 @@ canon learn promote 01J...ULID --dry-run # preview: lint + resolve, no write
 `canon learn promote` graduates a distilled `StrategyItem` (by its ULID)
 from the warm parquet tier into `.canon/strategies/<role>/<id>.md`, with
 YAML front matter (`status`, `regime_key`, `role`, `title`,
-`source_trajectory_ids`, `recorded_at`). It runs advisory lints
-(content-length ceiling, literal-absolute-path rejection) —
-non-blocking — and rewrites the whole file idempotently, so a later
-manual edit to a promoted file doesn't survive a re-promote.
+`source_trajectory_ids`, `recorded_at`).
+
+Promotion is **evidence-gated and fails closed**. Before writing
+anything, canon reads the strategy's own regime trajectories and
+evaluates the role's configured gate; a strategy without enough
+corroboration is refused with a named reason and exit `1`, and nothing is
+written. There is no `--force` — a refusal means the evidence is not
+there yet.
+
+The gate reads each trajectory's **resolved** outcome, not its raw
+verdict rows, so trajectories still sitting at `pending` never
+corroborate a promotion. `canon ingest artifacts` resolves them (it
+computes each trajectory's covering verdict and reward in the same pass),
+which makes the working order `canon ingest artifacts` → `canon learn
+promote`.
+
+Beyond the gate it runs advisory lints (content-length ceiling,
+literal-absolute-path rejection) — non-blocking — and rewrites the whole
+file idempotently, so a later manual edit to a promoted file doesn't
+survive a re-promote.
 
 A strategy that later collects a **contradicting** trajectory is
 demoted, not deleted: a soft-flag merges `status: demoted` and a
