@@ -218,12 +218,41 @@ pub struct Task {
     /// byte-identical to a pre-s20 `Task` on the wire.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scenario_refs: Vec<ScenarioId>,
+    /// Optional, declaratively-authored DEPENDENCY references (s37
+    /// `execution-graph-topology`, subject `flywheel-execution-graph`)
+    /// — which sibling `Task`(s) in the SAME change this task's own
+    /// plan text declares it comes after. Populated ONLY from a
+    /// dependency expression the dialect's corpus demonstrably uses
+    /// (the openspec dialect's in-row `depends on <n>`/`after <n>`
+    /// marker prose; the superpowers dialect's `- Consumes: … from
+    /// Task <n>` interface line), never from a syntax invented for
+    /// canon's convenience and never from dotted-numbering nesting —
+    /// `<change>#6.2` does NOT implicitly depend on `<change>#6`. A
+    /// reference that fails to resolve to a real sibling row is
+    /// DROPPED with a named import diagnostic, never an import
+    /// failure, because prose is ambiguous and "malformed evidence is
+    /// no evidence".
+    ///
+    /// DECLARED INTENT ONLY: canon never schedules, orders, blocks, or
+    /// executes anything from this field. It is the PLAN-side half of
+    /// the execution graph — the half s37's plan-vs-actual diff reads
+    /// against `Run.parent_run_id`'s OBSERVED dispatch lineage, which
+    /// is what makes a declared-but-never-honored ordering visible to
+    /// the reward flywheel at all.
+    ///
+    /// Empty by default, mirroring [`Task::scenario_refs`]'s own
+    /// additive-field shape (and, like it, `skip_serializing_if` so an
+    /// empty vec never introduces a spurious key — every pre-s37
+    /// `Task` stays byte-identical on the wire, and its content digest
+    /// with it, so no `Envelope::schema` bump is owed).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub depends_on: Vec<TaskId>,
 }
 
 impl Task {
     pub fn new(envelope: Envelope, task_id: TaskId, title: impl Into<String>, status: TaskStatus, evidence_note: Option<String>) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Task);
-        Self { envelope, task_id, title: title.into(), status, evidence_note, scenario_refs: Vec::new() }
+        Self { envelope, task_id, title: title.into(), status, evidence_note, scenario_refs: Vec::new(), depends_on: Vec::new() }
     }
 
     /// Builder for [`Task::scenario_refs`] — mirrors
@@ -231,6 +260,17 @@ impl Task {
     /// `Task::new`'s own signature stays unchanged.
     pub fn with_scenario_refs(mut self, scenario_refs: Vec<ScenarioId>) -> Self {
         self.scenario_refs = scenario_refs;
+        self
+    }
+
+    /// Builder for [`Task::depends_on`] — mirrors
+    /// [`Task::with_scenario_refs`]'s additive-field pattern; `Task::
+    /// new`'s own signature stays unchanged. A plan adapter calls this
+    /// only AFTER it has read the change's complete row set, since a
+    /// declared reference is resolved against that set (a reference to
+    /// a row that does not exist is dropped, not carried).
+    pub fn with_depends_on(mut self, depends_on: Vec<TaskId>) -> Self {
+        self.depends_on = depends_on;
         self
     }
 }
@@ -390,6 +430,26 @@ pub struct Run {
     #[serde(flatten)]
     pub envelope: Envelope,
     pub run_id: RunId,
+    /// The run that DISPATCHED this run — a subagent run's parent,
+    /// `None` for a root run. canon's ONLY representation of agent
+    /// execution topology: without it a session's runs are a flat bag
+    /// and a dispatch tree (main agent -> N subagents -> their own
+    /// subagents) is unrecoverable after ingest, which is exactly what
+    /// the plan-vs-actual graph diff needs to compare a declared
+    /// [`Task::depends_on`] plan against what actually ran.
+    ///
+    /// A pointer along the SAME join-spine `run_id` key this record is
+    /// already keyed by — deliberately not a new join key, so
+    /// `run <-> events <-> manifest` stays the one run-scoped spine.
+    /// `#[serde(default, skip_serializing_if = "Option::is_none")]`
+    /// carries the same backward/forward-compat discipline
+    /// [`Run::injected_guidance`] establishes: a pre-existing manifest
+    /// with no `parent_run_id` key deserializes to `None`, AND a root
+    /// run reserializes WITHOUT the key at all — so adding execution
+    /// lineage never perturbs the on-disk shape of the (still
+    /// overwhelmingly common) single-agent, no-parent case.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_run_id: Option<RunId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<SessionId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -413,6 +473,11 @@ pub struct Run {
 }
 
 impl Run {
+    /// Constructs a ROOT run: `parent_run_id` starts `None` (and
+    /// `injected_guidance` empty), mirroring the same
+    /// "additive field no early caller needs to set" precedent
+    /// [`EvidenceRecord::new`] cites. Use [`Run::with_parent_run_id`]
+    /// to make it a dispatched child.
     pub fn new(
         envelope: Envelope,
         run_id: RunId,
@@ -423,7 +488,7 @@ impl Run {
         ended_at: Option<DateTime<Utc>>,
     ) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Run);
-        Self { envelope, run_id, session_id, task_id, status, started_at, ended_at, injected_guidance: Vec::new() }
+        Self { envelope, run_id, parent_run_id: None, session_id, task_id, status, started_at, ended_at, injected_guidance: Vec::new() }
     }
 
     /// Records S8's retrieved guidance into this run's manifest (design
@@ -434,6 +499,18 @@ impl Run {
     /// `RunStatus` lifecycle has no "re-dispatch" transition).
     pub fn with_injected_guidance(mut self, injected_guidance: Vec<StrategyRef>) -> Self {
         self.injected_guidance = injected_guidance;
+        self
+    }
+
+    /// Records the run that DISPATCHED this one — see
+    /// [`Run::parent_run_id`]. Meant to be called exactly ONCE, at the
+    /// moment the dispatch edge is known (dispatch time for a live run,
+    /// normalization time for an ingested transcript), for the same
+    /// reason [`Run::with_injected_guidance`] is: a `Run` is only ever
+    /// dispatched once, so a second call simply replaces the value
+    /// rather than merging.
+    pub fn with_parent_run_id(mut self, parent_run_id: RunId) -> Self {
+        self.parent_run_id = Some(parent_run_id);
         self
     }
 }
@@ -962,6 +1039,43 @@ mod tests {
     }
 
     round_trip_test!(
+        task_with_depends_on_round_trips,
+        Task::new(envelope(RecordKind::Task), TaskId::parse("s37-execution-graph-topology#6.3").unwrap(), "fixtures", TaskStatus::Open, None).with_depends_on(vec![
+            TaskId::parse("s37-execution-graph-topology#6.1").unwrap(),
+            TaskId::parse("s37-execution-graph-topology#6.2").unwrap()
+        ])
+    );
+
+    /// A `Task` from before s37 (no `depends_on` key at all in the
+    /// JSON) still deserializes — to an empty `Vec` — and reserializes
+    /// byte-identically, so the whole pre-s37 corpus keeps its content
+    /// digest and no `Envelope::schema` bump is owed. The same
+    /// additive-field bar `scenario_refs` above (and
+    /// `Run.injected_guidance` before it) is held to: an empty
+    /// `depends_on` never reserializes a spurious `"depends_on": []`
+    /// key.
+    #[test]
+    fn task_without_depends_on_key_deserializes_empty_and_reserializes_without_the_key() {
+        let at = serde_json::to_value(Utc::now()).unwrap();
+        let pre_s37_json = serde_json::json!({
+            "schema": 1,
+            "kind": "task",
+            "at": at,
+            "actor": {"agent_id": "codex-cli", "role": "implementer"},
+            "task_id": "s1-state-model-join-spine#6.2",
+            "title": "fixtures",
+            "status": "done",
+            "evidence_note": "evidence",
+        });
+
+        let task: Task = serde_json::from_value(pre_s37_json.clone()).expect("a pre-s37 Task with no depends_on key must still deserialize");
+        assert!(task.depends_on.is_empty());
+
+        let reserialized = serde_json::to_value(&task).unwrap();
+        assert_eq!(reserialized, pre_s37_json, "empty depends_on must not introduce a spurious key on reserialize");
+    }
+
+    round_trip_test!(
         scenario_round_trips,
         Scenario::new(
             envelope(RecordKind::Scenario),
@@ -1059,6 +1173,11 @@ mod tests {
             ])
     );
 
+    round_trip_test!(
+        run_with_parent_run_id_round_trips,
+        Run::new(envelope(RecordKind::Run), RunId::new(), None, None, RunStatus::Succeeded, Utc::now(), Some(Utc::now())).with_parent_run_id(RunId::new())
+    );
+
     /// S7-era `Run`/manifest JSON — the exact shape `Run::new` produced
     /// before this change added `injected_guidance` — has no
     /// `injected_guidance` key at all. Backward compat: it must still
@@ -1092,6 +1211,53 @@ mod tests {
 
         let reserialized = serde_json::to_value(&run).unwrap();
         assert_eq!(reserialized, pre_s8_json, "empty injected_guidance must not introduce a spurious key on reserialize");
+    }
+
+    /// s37-execution-graph-topology, the additive-field bar
+    /// `injected_guidance` above already sets, applied to
+    /// `parent_run_id`: a pre-s37 run record (no `parent_run_id` key)
+    /// deserializes to `None`, and a ROOT run reserializes WITHOUT the
+    /// key — never a spurious `"parent_run_id": null`. Load-bearing
+    /// beyond cosmetics: canon's write-time idempotence keys on a
+    /// content digest over these bytes, so an extra key would silently
+    /// re-digest every already-persisted run in the corpus.
+    #[test]
+    fn run_without_parent_run_id_key_deserializes_none_and_reserializes_without_the_key() {
+        // Same serde-encoded timestamp discipline the
+        // injected_guidance test above explains.
+        let at = serde_json::to_value(Utc::now()).unwrap();
+        let started_at = serde_json::to_value(Utc::now()).unwrap();
+        let pre_s37_json = serde_json::json!({
+            "schema": 1,
+            "kind": "run",
+            "at": at,
+            "actor": {"agent_id": "codex-cli", "role": "implementer"},
+            "run_id": RunId::new().to_string(),
+            "status": "succeeded",
+            "started_at": started_at,
+        });
+
+        let run: Run = serde_json::from_value(pre_s37_json.clone()).expect("a pre-s37 run record with no parent_run_id key must still deserialize");
+        assert_eq!(run.parent_run_id, None);
+
+        let reserialized = serde_json::to_value(&run).unwrap();
+        assert_eq!(reserialized, pre_s37_json, "a root run must not introduce a spurious parent_run_id key on reserialize");
+    }
+
+    /// s37-execution-graph-topology: `with_parent_run_id` sets the
+    /// dispatch edge without disturbing anything else, and — like
+    /// `with_injected_guidance` — replaces rather than merges on a
+    /// second call, since a run is only ever dispatched once.
+    #[test]
+    fn with_parent_run_id_replaces_rather_than_accumulating() {
+        let first_parent = RunId::new();
+        let second_parent = RunId::new();
+        let run = Run::new(envelope(RecordKind::Run), RunId::new(), None, None, RunStatus::Succeeded, Utc::now(), None)
+            .with_parent_run_id(first_parent)
+            .with_parent_run_id(second_parent);
+
+        assert_eq!(run.parent_run_id, Some(second_parent));
+        assert!(run.injected_guidance.is_empty(), "setting a parent must not perturb any other field");
     }
 
     round_trip_test!(

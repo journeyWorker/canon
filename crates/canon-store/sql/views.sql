@@ -509,8 +509,10 @@ ORDER BY day;
 -- no dedicated `session_id` field of its own today — verified against
 -- `crates/canon-model/src/handoff.rs`, 2026-07-11: its own fields are
 -- `id`/`state`/`chain_id`/`parent_handoff_id`/`seq`/`claimed_by`/
--- `openspec_change_slug`/`tags`/`title`/`body`, none of them a session
--- key. The one currently-available, honest join key is every record's
+-- `openspec_change_slug`/`tags`/`title`/`body`, plus s37's
+-- `from_role`/`to_role` edge endpoints — the endpoints type WHICH ROLE
+-- handed to which, still not WHICH SESSION, so none of these is a
+-- session key. The one currently-available, honest join key is every record's
 -- OWN envelope `actor.session_id` (S1's structured-actor design,
 -- `canon_model::envelope::Actor::session_id` — the "no artifact can
 -- join to the session… that produced it" gap this exact field exists

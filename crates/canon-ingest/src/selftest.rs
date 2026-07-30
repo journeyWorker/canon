@@ -49,6 +49,8 @@ fn row(session_id: &str, ts_ms: i64) -> UnifiedRow {
         duration_ms: None,
         dedup_key: None,
         is_turn_start: false,
+        agent_id: None,
+        parent_agent_id: None,
     }
 }
 

@@ -35,10 +35,12 @@
 //! Deliberately NOT ported in this Wave 2 slice (the donor's full
 //! feature inventory covers several units, none of which this task's Change
 //! section calls out): the headless `--output-format json` fast path
-//! (`claudecode.rs:378-391,1108-1249`), subagent
-//! display-name resolution (`resolve_subagent_name`,
-//! `claudecode.rs:89-129` — `UnifiedRow` has no `agent` field to carry
-//! it), the `cc-mirror` wrapper's variant-metadata lookup
+//! (`claudecode.rs:378-391,1108-1249`), subagent DISPLAY-NAME
+//! resolution (`resolve_subagent_name`, `claudecode.rs:89-129` — the
+//! human-readable label, e.g. `"code-reviewer"`, which needs the
+//! agent-definition lookup that function performs; the subagent's
+//! machine IDENTITY is no longer discarded, see the execution-lineage
+//! paragraph below), the `cc-mirror` wrapper's variant-metadata lookup
 //! (`claudecode.rs:750-776` — its bare path-window shape is still
 //! ported as part of unit 3 above, verbatim, since skipping it would
 //! mean re-deriving `claude_workspace_from_path` rather than porting
@@ -51,6 +53,24 @@
 //! `provider_id` defaults to Claude Code's own backend (`"anthropic"`)
 //! rather than porting `claude_provider_choice`'s hint/confidence
 //! ladder.
+//!
+//! **Execution-lineage capture (s37-execution-graph-topology — no
+//! donor line range, the donor's unified row modeled no agent identity
+//! at all):** unit 2's sidechain override attributes a subagent
+//! transcript's rows to the PARENT `sessionId`, which is deliberate —
+//! a dispatch and its subagents are one session, and every downstream
+//! consumer groups on that. But attributing the rows there used to be
+//! the WHOLE story, so the subagent's own identity was thrown away and
+//! the dispatch tree was unrecoverable after ingest. It no longer is:
+//! alongside the parent `session_id`, every sidechain row/directive
+//! now carries [`crate::adapter::UnifiedRow::agent_id`] = the
+//! subagent's own transcript-file STEM (the stable per-subagent handle
+//! available at this layer — Claude Code writes one file per subagent)
+//! and `parent_agent_id` = the parent `sessionId` that dispatched it.
+//! `crate::normalize` turns that pair into a child `Run` under the
+//! session's root run. A root (non-sidechain) transcript leaves both
+//! `None`, so a plain single-agent session's normalized output is
+//! byte-identical to what it was before this existed.
 //!
 //! **s31 design D4 (user-directive capture, added alongside the five
 //! ATTRIBUTED-PORT units above — no donor line range, the donor never
@@ -66,7 +86,9 @@
 //! `user` line regardless of `isSidechain` — a subagent's own prompt
 //! is still a directive, resolved to the SAME parent `session_id`
 //! unit 2's sidechain override already attributes its billable rows
-//! to.
+//! to, and (s37-execution-graph-topology) carrying the same
+//! `agent_id`/`parent_agent_id` pair those rows do, so a subagent's
+//! prompt lands on the SUBAGENT's run rather than its dispatcher's.
 
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader};
@@ -175,8 +197,13 @@ fn parse_claude_file(path: &Path) -> ParseOutcome {
     // Filename-stem session_id, ported from `claudecode.rs:370-374` —
     // overridden below by the sidechain parent `sessionId`, ported
     // from `claudecode.rs:436-442`, once the first parseable line is
-    // seen.
-    let mut session_id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string();
+    // seen. The stem is retained separately because that override
+    // consumes it: for a sidechain transcript the stem IS the
+    // subagent's own stable identity (s37-execution-graph-topology),
+    // and it is the only per-subagent handle this layer has once
+    // `session_id` has been repointed at the dispatcher.
+    let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string();
+    let mut session_id = file_stem.clone();
 
     let fallback_timestamp = file_modified_timestamp_ms(path);
 
@@ -203,6 +230,13 @@ fn parse_claude_file(path: &Path) -> ParseOutcome {
     // Sidechain detection is resolved lazily on the first parseable
     // entry, ported from `claudecode.rs:415-417,434-450`.
     let mut sidechain_detected = false;
+    // Execution lineage (s37-execution-graph-topology), resolved by the
+    // SAME first-parseable-entry check: `Some` only for a sidechain
+    // transcript whose parent `sessionId` is actually present, so a
+    // root transcript emits rows with both fields `None` — the
+    // byte-identical single-agent case.
+    let mut agent_id: Option<String> = None;
+    let mut parent_agent_id: Option<String> = None;
 
     for line in reader.lines() {
         let line = match line {
@@ -237,6 +271,15 @@ fn parse_claude_file(path: &Path) -> ParseOutcome {
             sidechain_detected = true;
             if entry.is_sidechain {
                 if let Some(parent_id) = entry.session_id.clone() {
+                    // s37-execution-graph-topology: capture the dispatch
+                    // edge BEFORE the override consumes the two ids it
+                    // is derived from. Both are set only on this branch
+                    // — an `isSidechain` line with no `sessionId` names
+                    // no dispatcher, and a lineage edge to an unknown
+                    // parent is worse than none, so it stays `None`
+                    // exactly as the session_id override stays unapplied.
+                    agent_id = Some(file_stem.clone());
+                    parent_agent_id = Some(parent_id.clone());
                     session_id = parent_id;
                 }
             }
@@ -265,9 +308,13 @@ fn parse_claude_file(path: &Path) -> ParseOutcome {
                     text,
                     workspace_key: workspace_key.clone(),
                     workspace_label: workspace_label.clone(),
+                    agent_id: agent_id.clone(),
+                    parent_agent_id: parent_agent_id.clone(),
                 });
             }
-            if let Some(row) = extract_claude_tool_result_row(trimmed, &entry, &session_id, fallback_timestamp, workspace_key.clone(), workspace_label.clone()) {
+            if let Some(row) =
+                extract_claude_tool_result_row(trimmed, &entry, &session_id, fallback_timestamp, workspace_key.clone(), workspace_label.clone(), agent_id.clone(), parent_agent_id.clone())
+            {
                 match row.dedup_key.clone() {
                     Some(dedup_key) => match processed_hashes.get(&dedup_key) {
                         Some(&existing_idx) => merge_claude_tool_result_duplicate(&mut rows[existing_idx], row.tokens.input, row.timestamp_ms),
@@ -348,6 +395,11 @@ fn parse_claude_file(path: &Path) -> ParseOutcome {
             dedup_key,
             // Excluded donor feature — see module doc.
             is_turn_start: false,
+            // s37-execution-graph-topology: `Some` only on a sidechain
+            // transcript — see the module doc's execution-lineage
+            // paragraph.
+            agent_id: agent_id.clone(),
+            parent_agent_id: parent_agent_id.clone(),
         });
     }
 
@@ -391,9 +443,22 @@ struct ClaudeToolResultUsage {
 /// human message) or no positive token count. Ported from
 /// `claudecode.rs:857-917` (`extract_claude_tool_result_message`),
 /// trimmed of the provider-hint ladder / `last_model` fallback /
-/// sidechain-agent-name fields this port's scope excludes (module doc
-/// above).
-fn extract_claude_tool_result_row(trimmed: &str, entry: &ClaudeEntry, session_id: &str, fallback_timestamp: i64, workspace_key: Option<String>, workspace_label: Option<String>) -> Option<UnifiedRow> {
+/// sidechain-agent-DISPLAY-NAME fields this port's scope excludes
+/// (module doc above) — the caller-resolved `agent_id`/
+/// `parent_agent_id` lineage pair (s37-execution-graph-topology) IS
+/// threaded through, since a subagent's `tool_result` tokens belong to
+/// the subagent's run.
+#[allow(clippy::too_many_arguments)]
+fn extract_claude_tool_result_row(
+    trimmed: &str,
+    entry: &ClaudeEntry,
+    session_id: &str,
+    fallback_timestamp: i64,
+    workspace_key: Option<String>,
+    workspace_label: Option<String>,
+    agent_id: Option<String>,
+    parent_agent_id: Option<String>,
+) -> Option<UnifiedRow> {
     let value: Value = serde_json::from_str(trimmed).ok()?;
     let usage = extract_claude_tool_result_usage(&value)?;
 
@@ -417,6 +482,8 @@ fn extract_claude_tool_result_row(trimmed: &str, entry: &ClaudeEntry, session_id
         // assistant-message dedup key.
         dedup_key: usage.dedup_key.map(|key| format!("claude-code:tool_result:{session_id}:{key}")),
         is_turn_start: false,
+        agent_id,
+        parent_agent_id,
     })
 }
 
@@ -752,6 +819,70 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].session_id, "parent-session-xyz");
         assert_ne!(rows[0].session_id, file.path().file_stem().unwrap().to_string_lossy());
+    }
+
+    /// s37-execution-graph-topology: the sidechain override above keeps
+    /// attributing the row to the PARENT session (unchanged), but the
+    /// subagent's own identity is no longer discarded — `agent_id` is
+    /// the transcript's own file stem, `parent_agent_id` the dispatcher
+    /// it was collapsed into. Both are needed for `normalize` to mint a
+    /// child `Run`; either one missing loses the dispatch edge.
+    #[test]
+    fn sidechain_rows_and_directives_carry_the_subagents_own_agent_id() {
+        let content = r#"{"type":"user","isSidechain":true,"sessionId":"parent-session-xyz","message":{"role":"user","content":"audit the parser"}}
+{"type":"assistant","isSidechain":true,"sessionId":"parent-session-xyz","timestamp":"2026-01-01T00:05:00.000Z","message":{"id":"msg_sub","model":"claude-sonnet-5","usage":{"input_tokens":3,"output_tokens":2,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}"#;
+        let file = write_fixture(content);
+        let stem = file.path().file_stem().unwrap().to_string_lossy().to_string();
+
+        let outcome = parse_claude_file(file.path());
+
+        assert_eq!(outcome.rows.len(), 1);
+        assert_eq!(outcome.rows[0].session_id, "parent-session-xyz", "session grouping is unchanged by lineage capture");
+        assert_eq!(outcome.rows[0].agent_id.as_deref(), Some(stem.as_str()), "the file stem the session_id override consumed IS the subagent's identity");
+        assert_eq!(outcome.rows[0].parent_agent_id.as_deref(), Some("parent-session-xyz"));
+
+        assert_eq!(outcome.directives.len(), 1);
+        assert_eq!(outcome.directives[0].agent_id.as_deref(), Some(stem.as_str()), "a subagent's own prompt belongs to the subagent, not its dispatcher");
+        assert_eq!(outcome.directives[0].parent_agent_id.as_deref(), Some("parent-session-xyz"));
+    }
+
+    /// s37-execution-graph-topology: a ROOT (non-sidechain) transcript
+    /// must leave both lineage fields `None` — the overwhelmingly common
+    /// single-agent case, whose normalized output has to stay
+    /// byte-identical to its pre-s37 form.
+    #[test]
+    fn a_root_transcript_carries_no_agent_lineage_at_all() {
+        let content = r#"{"type":"user","message":{"role":"user","content":"ship it"}}
+{"type":"assistant","timestamp":"2026-01-01T00:00:01.000Z","message":{"id":"msg_root","model":"claude-sonnet-5","usage":{"input_tokens":9,"output_tokens":4,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}"#;
+        let file = write_fixture(content);
+
+        let outcome = parse_claude_file(file.path());
+
+        assert_eq!(outcome.rows.len(), 1);
+        assert_eq!(outcome.rows[0].agent_id, None);
+        assert_eq!(outcome.rows[0].parent_agent_id, None);
+        assert_eq!(outcome.directives.len(), 1);
+        assert_eq!(outcome.directives[0].agent_id, None);
+        assert_eq!(outcome.directives[0].parent_agent_id, None);
+    }
+
+    /// s37-execution-graph-topology: an `isSidechain` line with NO
+    /// `sessionId` names no dispatcher. The `session_id` override
+    /// already declines to fire there, and the lineage pair must decline
+    /// with it — a self-parented or unknown-parent edge is worse than no
+    /// edge, because `normalize` would mint a child run pointing nowhere.
+    #[test]
+    fn a_sidechain_line_without_a_parent_session_id_records_no_lineage() {
+        let content = r#"{"type":"assistant","isSidechain":true,"timestamp":"2026-01-01T00:05:00.000Z","message":{"id":"msg_sub","model":"claude-sonnet-5","usage":{"input_tokens":3,"output_tokens":2,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}"#;
+        let file = write_fixture(content);
+        let stem = file.path().file_stem().unwrap().to_string_lossy().to_string();
+
+        let rows = parse_claude_file(file.path()).rows;
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].session_id, stem, "with no parent sessionId the stem-derived session_id stands");
+        assert_eq!(rows[0].agent_id, None, "no dispatcher known means no lineage edge to record");
+        assert_eq!(rows[0].parent_agent_id, None);
     }
 
     #[test]

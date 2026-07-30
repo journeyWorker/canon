@@ -21,6 +21,7 @@
   "claimed_at": null,
   "claimed_by": null,
   "completed_at": null,
+  "from_role": "implementer",
   "id": "20260710-1432-ship-s1-a1b2",
   "kind": "handoff",
   "openspec_change_slug": "s1-state-model-join-spine",
@@ -30,5 +31,6 @@
   "seq": 1,
   "state": "pending",
   "tags": [],
-  "title": "Ship S1"
+  "title": "Ship S1",
+  "to_role": "reviewer"
 }

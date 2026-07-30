@@ -84,6 +84,18 @@ pub(crate) const DIAG_GOAL_MISSING: &str = "goal-missing";
 /// `### Task N:` heading — a docs-dir false positive (e.g. a stray
 /// `README.md`) is skipped loud, never imported as a garbage `Change`.
 pub(crate) const DIAG_NOT_A_PLAN_DOC: &str = "not-a-plan-doc";
+/// Named diagnostic (s37 `execution-graph-topology`, subject
+/// `flywheel-execution-graph`) for one `- Consumes:` task reference
+/// that named no `### Task N:` section this document actually has —
+/// dropped from the imported `Task.depends_on`, counted once per
+/// unresolvable token, never sinking the section's other well-formed
+/// dependencies or its own `Task` import. Keyed
+/// `"<DIAG_UNRESOLVABLE_TASK_DEP>:<task_id>"` for the same reason the
+/// openspec dialect's identically-named diagnostic is (a flat count
+/// cannot tell an operator WHICH section to fix); a fresh per-module
+/// constant rather than a cross-module import, exactly like
+/// [`SCHEMA_VERSION`] above.
+pub(crate) const DIAG_UNRESOLVABLE_TASK_DEP: &str = "unresolvable-task-dep";
 
 pub struct SuperpowersPlanAdapter;
 
@@ -282,17 +294,161 @@ fn is_heading_line(line: &str) -> bool {
     line.trim_start().starts_with('#')
 }
 
+/// The `**Interfaces:**` block's dependency bullet label (design D1's
+/// grammar authority — the `writing-plans` skill's own task template:
+/// "Consumes: [what this task uses from earlier tasks — exact
+/// signatures]"). Matched case-insensitively after a `- `/`* ` list
+/// marker.
+const CONSUMES_LABEL: &str = "consumes:";
+
+/// The reference keyword a `- Consumes:` bullet names its source
+/// sections with. Every one of the corpus's Consumes lines is either
+/// `nothing (first task)` or cites sections exactly this way — `from
+/// Task 1`, `(Task 2)`, `(Tasks 2-3)`, `everything produced by Tasks
+/// 1-3`, `the fully assembled app from Tasks 1-5` — so this dialect's
+/// dependency expression is READ, not invented (s37
+/// `execution-graph-topology`).
+const TASK_KEYWORDS: [&str; 2] = ["task", "tasks"];
+
+/// One `- Consumes: …` bullet's remainder (design D1's
+/// `**Interfaces:**` block), or `None` when `line` is not that bullet.
+/// Distinct from a checkbox STEP line ([`checkbox_state`] requires
+/// `- [`), so the two recognizers can never claim the same line.
+fn consumes_line(line: &str) -> Option<&str> {
+    let trimmed = line.trim();
+    let rest = trimmed.strip_prefix("- ").or_else(|| trimmed.strip_prefix("* "))?;
+    let len = CONSUMES_LABEL.len();
+    // `is_char_boundary` is false past the end AND mid-character, so
+    // this one guard covers both (the bullet text is arbitrary prose).
+    if !rest.is_char_boundary(len) || !rest[..len].eq_ignore_ascii_case(CONSUMES_LABEL) {
+        return None;
+    }
+    Some(rest[len..].trim())
+}
+
+/// Extract every DECLARED dependency reference token from one section's
+/// `- Consumes:` bullet text (s37 `execution-graph-topology`). Returns
+/// raw `<n>` tokens in first-seen order; resolution against the
+/// document's own sections, and the drop of anything that does not
+/// resolve, is [`task_rows::resolve_declared_deps`]'s job.
+///
+/// Grammar: a `Task`/`Tasks` keyword on both-side word boundaries, then
+/// a `<n>` token, then optionally a `,`/`/`/`+`/`&`/`and`-separated
+/// list — plus INCLUSIVE RANGES (`Tasks 1-3` -> `1`, `2`, `3`), which
+/// this dialect's Consumes lines use as their dominant plural form and
+/// which are unambiguous here because `### Task N:` numbering is flat.
+/// A range is expanded only between two FLAT endpoints in ascending
+/// order and only up to [`MAX_RANGE_SPAN`] wide; outside that, the
+/// element degrades to its LEFT endpoint alone, so a mis-read
+/// `Tasks 1-9999` yields one reference rather than thousands of
+/// phantom ones.
+///
+/// Scoped to the Consumes bullet ALONE — never the section's prose,
+/// step lines, or code blocks, where "Task 2" appears as ordinary
+/// narration. A section with no Consumes bullet, or one reading
+/// `nothing (first task)`, yields nothing.
+fn consumes_refs(text: &str) -> Vec<String> {
+    let lower = text.to_ascii_lowercase();
+    let bytes = lower.as_bytes();
+    let mut refs: Vec<String> = Vec::new();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        let Some(keyword_len) = task_rows::word_start_boundary(bytes, i).then(|| task_rows::word_at(bytes, i, &TASK_KEYWORDS)).flatten() else {
+            i += 1;
+            continue;
+        };
+        // A `Task`/`Tasks` keyword with no number behind it is ordinary
+        // prose ("nothing (first task)"): abandon the match and keep
+        // scanning from just past the keyword.
+        i = scan_task_ref_list(bytes, i + keyword_len, &mut refs).unwrap_or(i + keyword_len);
+    }
+    refs
+}
+
+/// The widest `Tasks <a>-<b>` span [`consumes_refs`] will expand. A
+/// plan doc's section count is small by construction (the skill's own
+/// task right-sizing), so a wider span is a mis-read number, not a
+/// dependency on 64 sections.
+const MAX_RANGE_SPAN: u32 = 64;
+
+/// Consume the reference LIST (single, range, or separated list) that
+/// must follow a `Task`/`Tasks` keyword, pushing each token onto `refs`.
+/// `None` when no reference follows at all; otherwise the byte offset
+/// just past the last token consumed.
+fn scan_task_ref_list(bytes: &[u8], start: usize, refs: &mut Vec<String>) -> Option<usize> {
+    let mut end = scan_one_task_ref(bytes, task_rows::skip_ws(bytes, start), refs)?;
+    while let Some(after_sep) = task_rows::list_separator(bytes, end) {
+        let Some(next) = scan_one_task_ref(bytes, task_rows::skip_ws(bytes, after_sep), refs) else {
+            break;
+        };
+        end = next;
+    }
+    Some(end)
+}
+
+/// One list element: a `<n>` token, or an inclusive `<a>-<b>` range
+/// expanded into every number it covers. Returns the byte offset just
+/// past the element, or `None` when no token starts at `i`. A range
+/// whose endpoints are not both flat, are descending, or span more than
+/// [`MAX_RANGE_SPAN`] contributes its LEFT endpoint alone — the
+/// conservative reading, never a guess at what the author meant.
+fn scan_one_task_ref(bytes: &[u8], i: usize, refs: &mut Vec<String>) -> Option<usize> {
+    let (first, first_end) = task_rows::number_token_at(bytes, i)?;
+    let Some(after_dash) = range_dash(bytes, first_end) else {
+        refs.push(first);
+        return Some(first_end);
+    };
+    let Some((last, last_end)) = task_rows::number_token_at(bytes, after_dash) else {
+        refs.push(first);
+        return Some(first_end);
+    };
+    match (first.parse::<u32>(), last.parse::<u32>()) {
+        (Ok(lo), Ok(hi)) if hi >= lo && hi - lo <= MAX_RANGE_SPAN => {
+            for n in lo..=hi {
+                refs.push(n.to_string());
+            }
+            Some(last_end)
+        }
+        _ => {
+            refs.push(first);
+            Some(first_end)
+        }
+    }
+}
+
+/// The range dash between two `Tasks <a>-<b>` endpoints — ASCII `-` or
+/// the en dash `–` the corpus's prose also uses — returning the byte
+/// offset just past it. Deliberately NOT whitespace-tolerant: a
+/// spaced `1 - 3` in prose is far more likely a dash in a sentence than
+/// a range, and a spaced form appears nowhere in the corpus.
+fn range_dash(bytes: &[u8], i: usize) -> Option<usize> {
+    if bytes.get(i) == Some(&b'-') {
+        return Some(i + 1);
+    }
+    bytes[i..].starts_with(EN_DASH.as_bytes()).then_some(i + EN_DASH.len())
+}
+
+/// The en dash (`–`, 3 bytes in UTF-8) — a constant rather than a byte
+/// comparison for the same multi-byte reason [`task_rows`]'s lexer is
+/// byte-wise.
+const EN_DASH: &str = "–";
+
 /// One attempted `### Task N: <name>` section (design D3): the heading
 /// SHAPE matched ([`task_heading`]); `n_token`'s own grammar validity
 /// is checked by the caller. `done`/`open` are this section's own
 /// checkbox-STEP tallies ([`checkbox_state`]) — never leaked into a
 /// sibling section, since a heading line (any level) always closes the
-/// current one first.
+/// current one first. `consumes` is this section's own `- Consumes:`
+/// bullet text (s37 `execution-graph-topology`), the FIRST one if a
+/// document repeats the label, and `None` when the section has no
+/// `**Interfaces:**` block at all — scoped per section for the same
+/// reason the tallies are.
 struct AttemptedSection {
     n_token: String,
     name: String,
     done: usize,
     open: usize,
+    consumes: Option<String>,
 }
 
 /// One forward pass over `text`'s lines producing: the first
@@ -321,7 +477,16 @@ fn scan_plan_doc(text: &str) -> (Option<String>, bool, Vec<AttemptedSection>) {
             }
             if let Some((n_token, name)) = task_heading(trimmed) {
                 has_task_heading_shape = true;
-                current = Some(AttemptedSection { n_token: n_token.to_string(), name, done: 0, open: 0 });
+                current = Some(AttemptedSection { n_token: n_token.to_string(), name, done: 0, open: 0, consumes: None });
+            }
+            continue;
+        }
+
+        if let Some(consumes) = consumes_line(line) {
+            if let Some(section) = current.as_mut() {
+                if section.consumes.is_none() {
+                    section.consumes = Some(consumes.to_string());
+                }
             }
             continue;
         }
@@ -382,6 +547,12 @@ fn parse_plan_doc(path: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
 
     let mut seen_numbers: BTreeSet<String> = BTreeSet::new();
     let mut tasks = Vec::new();
+    // Each emitted task's index paired with its section's `- Consumes:`
+    // text, resolved only AFTER the loop (s37 `execution-graph-
+    // topology`): a Consumes bullet may cite any section, and
+    // `seen_numbers` — the set membership in which IS the validation —
+    // is not complete until every section has been accepted or skipped.
+    let mut pending_deps: Vec<(usize, String)> = Vec::new();
     let mut done_count = 0usize;
     let mut open_count = 0usize;
 
@@ -406,8 +577,24 @@ fn parse_plan_doc(path: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
             TaskStatus::Done => done_count += 1,
             TaskStatus::Open => open_count += 1,
         }
+        if let Some(consumes) = section.consumes {
+            pending_deps.push((tasks.len(), consumes));
+        }
         let envelope = Envelope::new(SCHEMA_VERSION, RecordKind::Task, at, actor());
         tasks.push(Task::new(envelope, task_id, section.name, status, None));
+    }
+
+    for (idx, consumes) in pending_deps {
+        let task_id = tasks[idx].task_id.clone();
+        let (depends_on, unresolvable) = task_rows::resolve_declared_deps(&change_id, &task_id, &consumes_refs(&consumes), &seen_numbers);
+        for _ in &unresolvable {
+            // One Consumes reference naming no section this document has
+            // — dropped, counted against THIS section's task_id, never
+            // an import failure (s37: the expression is prose, so a
+            // mis-read candidate must fail soft and stay visible).
+            outcome.record_unmapped(&format!("{DIAG_UNRESOLVABLE_TASK_DEP}:{}", task_id.as_str()));
+        }
+        tasks[idx].depends_on = depends_on;
     }
 
     // No archive convention (design D4): `derive_status` shared
@@ -661,5 +848,238 @@ mod tests {
         let outcome = parse_root(tmp.path());
         assert!(outcome.changes.iter().any(|c| c.change_id.as_str() == "2026-07-14-nested"));
         assert!(outcome.changes.iter().all(|c| c.change_id.as_str() != "2026-07-14-decoy"));
+    }
+
+    // ── `- Consumes:` -> Task.depends_on (s37 execution-graph-topology) ──
+
+    fn dep_ids(task: &Task) -> Vec<&str> {
+        task.depends_on.iter().map(|t| t.as_str()).collect()
+    }
+
+    /// The corpus's own Consumes shapes, verbatim: `nothing (first
+    /// task).`, `… from Task 1.`, `… (Task 2).`, `… (Tasks 2-3).` —
+    /// including the inclusive-range expansion that is this dialect's
+    /// dominant plural form.
+    #[test]
+    fn a_consumes_bullet_populates_depends_on_including_an_inclusive_range() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_plan(
+            tmp.path(),
+            "2026-07-14-consumes.md",
+            "# Consumes Plan\n\n**Goal:** Prove Consumes-line dependency extraction.\n\n\
+             ### Task 1: Assets\n\n**Interfaces:**\n- Consumes: nothing (first task).\n- Produces: `loadTextures()`.\n\n- [x] **Step 1:** wire it\n\n\
+             ### Task 2: Simulation\n\n**Interfaces:**\n- Consumes: `loadTextures()`, `ASSET_DEFS` (Task 1).\n\n- [x] **Step 1:** wire it\n\n\
+             ### Task 3: Enemies\n\n**Interfaces:**\n- Consumes: `GameSimulation`, `RenderSnapshot` (Task 2).\n\n- [ ] **Step 1:** not yet\n\n\
+             ### Task 4: Platforms\n\n**Interfaces:**\n- Consumes: `resolveAxis`'s `extraSolids` parameter (Tasks 2-3).\n\n- [ ] **Step 1:** not yet\n\n\
+             ### Task 5: Smoke test\n\n**Interfaces:**\n- Consumes: the fully assembled app from Tasks 1-4. Produces nothing new.\n\n- [ ] **Step 1:** not yet\n",
+        );
+
+        let outcome = parse_root(tmp.path());
+        assert!(dep_ids(find_task(&outcome, "2026-07-14-consumes#1")).is_empty(), "`nothing (first task)` declares nothing");
+        assert_eq!(dep_ids(find_task(&outcome, "2026-07-14-consumes#2")), vec!["2026-07-14-consumes#1"]);
+        assert_eq!(dep_ids(find_task(&outcome, "2026-07-14-consumes#3")), vec!["2026-07-14-consumes#2"]);
+        assert_eq!(
+            dep_ids(find_task(&outcome, "2026-07-14-consumes#4")),
+            vec!["2026-07-14-consumes#2", "2026-07-14-consumes#3"],
+            "`Tasks 2-3` expands inclusively"
+        );
+        assert_eq!(
+            dep_ids(find_task(&outcome, "2026-07-14-consumes#5")),
+            vec!["2026-07-14-consumes#1", "2026-07-14-consumes#2", "2026-07-14-consumes#3", "2026-07-14-consumes#4"],
+            "`Tasks 1-4` expands inclusively, in ascending order, deduplicated"
+        );
+        assert!(outcome.unmapped.keys().all(|k| !k.starts_with(DIAG_UNRESOLVABLE_TASK_DEP)), "every reference resolved: {:?}", outcome.unmapped);
+    }
+
+    #[test]
+    fn a_section_with_no_consumes_bullet_has_an_empty_depends_on_and_no_diagnostic() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_plan(
+            tmp.path(),
+            "2026-07-14-no-interfaces.md",
+            "# No Interfaces Plan\n\n**Goal:** A plan doc with no Interfaces block at all.\n\n\
+             ### Task 1: Adapter\n- [x] **Step 1:** wire it up\n\n\
+             ### Task 2: Docs\nProse mentioning Task 1 outside any Consumes bullet.\n- [ ] **Step 1:** draft\n",
+        );
+
+        let outcome = parse_root(tmp.path());
+        assert!(dep_ids(find_task(&outcome, "2026-07-14-no-interfaces#1")).is_empty());
+        assert!(
+            dep_ids(find_task(&outcome, "2026-07-14-no-interfaces#2")).is_empty(),
+            "`Task 1` in ordinary section prose is narration, not a declaration — extraction is scoped to the Consumes bullet alone"
+        );
+        assert!(outcome.unmapped.keys().all(|k| !k.starts_with(DIAG_UNRESOLVABLE_TASK_DEP)), "no reference read means no diagnostic: {:?}", outcome.unmapped);
+    }
+
+    #[test]
+    fn an_unresolvable_consumes_reference_is_dropped_and_counted_without_sinking_the_section() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_plan(
+            tmp.path(),
+            "2026-07-14-bad-consumes.md",
+            "# Bad Consumes Plan\n\n**Goal:** Prove an unresolvable Consumes reference fails soft.\n\n\
+             ### Task 1: Adapter\n\n**Interfaces:**\n- Consumes: `helper()` from Task 1 and Task 9.\n\n- [x] **Step 1:** wire it up\n",
+        );
+
+        let outcome = parse_root(tmp.path());
+        let task = find_task(&outcome, "2026-07-14-bad-consumes#1");
+        assert!(dep_ids(task).is_empty(), "`Task 1` is this section's own number (dropped silently) and `Task 9` names no section");
+        assert_eq!(task.status, TaskStatus::Done, "the section itself still imports — a dropped reference is never an import failure");
+        assert_eq!(
+            outcome.unmapped.get(&format!("{DIAG_UNRESOLVABLE_TASK_DEP}:2026-07-14-bad-consumes#1")),
+            Some(&1),
+            "exactly ONE diagnostic: the self-reference is not a mistake, only `Task 9` is"
+        );
+        assert!(outcome.malformed.is_empty(), "an unresolvable reference is an `unmapped` diagnostic, never a `malformed` construct: {:?}", outcome.malformed);
+    }
+
+    // ── consumes_line / consumes_refs: the bullet grammar itself ──
+
+    #[test]
+    fn consumes_line_recognizes_only_the_consumes_bullet() {
+        assert_eq!(consumes_line("- Consumes: `loadTextures()` (Task 1)."), Some("`loadTextures()` (Task 1)."));
+        assert_eq!(consumes_line("  - consumes: lowercase label"), Some("lowercase label"));
+        assert_eq!(consumes_line("* Consumes: a star bullet"), Some("a star bullet"));
+        assert_eq!(consumes_line("- Produces: `TILE`"), None);
+        assert_eq!(consumes_line("- [x] **Step 1:** a checkbox step, never a Consumes bullet"), None);
+        assert_eq!(consumes_line("Consumes: not a list item at all"), None);
+        assert_eq!(consumes_line("- ✅"), None, "a short multi-byte bullet must not panic on the label-length slice");
+    }
+
+    #[test]
+    fn consumes_refs_reads_the_corpus_shapes_and_declines_the_rest() {
+        assert!(consumes_refs("nothing (first task).").is_empty());
+        assert_eq!(consumes_refs("`CANVAS_W`, `keys`, `update(dt)` from Task 1."), vec!["1"]);
+        assert_eq!(consumes_refs("`loadTextures()`, `ASSET_DEFS` (Task 1)."), vec!["1"]);
+        assert_eq!(consumes_refs("everything produced by Tasks 1-3 (`update`, `render`)."), vec!["1", "2", "3"]);
+        assert_eq!(consumes_refs("`HudSnapshot`, `LEVELS` (Tasks 2, 3 and 4)."), vec!["2", "3", "4"]);
+        assert_eq!(consumes_refs("`GameSimulation` (Tasks 2–4)."), vec!["2", "3", "4"], "the en dash the corpus's prose also uses");
+        assert_eq!(consumes_refs("the fully assembled app from Tasks 1-5. Produces nothing new."), vec!["1", "2", "3", "4", "5"]);
+        assert_eq!(consumes_refs("Tasks 1-9999 is a mis-read number"), vec!["1"], "a span wider than MAX_RANGE_SPAN degrades to its left endpoint, never thousands of phantom refs");
+        assert_eq!(consumes_refs("Tasks 4-2 is descending"), vec!["4"], "a descending range degrades to its left endpoint");
+    }
+
+    /// s37 review finding, pinned against the corpus document VERBATIM.
+    ///
+    /// A live-store read reported `2026-07-14-red-panda-ridge-v2` tasks
+    /// `#2`/`#3`/`#4` as unpopulated while `#5`/`#6` — structurally the
+    /// SAME `(Tasks A-B)` shape — were populated, with zero
+    /// `unresolvable-task-dep` diagnostics. The parser was never at
+    /// fault: re-importing the real document into a fresh tier
+    /// populates all six correctly. The split came from the READ path —
+    /// a superpowers `Task`'s `at` is the plan doc's mtime, which a
+    /// canon CODE change does not advance, so a pre-s37 record and its
+    /// post-s37 replacement carry an IDENTICAL `at` and
+    /// `canon_store::fold::fold_latest_by_key`'s `(at, digest)`
+    /// supersession fold decides between them by LEXICOGRAPHIC DIGEST,
+    /// which is arbitrary per row.
+    ///
+    /// Every `- Consumes:` line below is copied byte-for-byte from
+    /// `docs/superpowers/plans/2026-07-14-red-panda-ridge-v2.md`
+    /// (lines 37, 281, 870, 1014, 1233, 1495), as are the six
+    /// `### Task N:` headings and the `**Interfaces:**`/`**Files:**`
+    /// block structure around them. The intervening step bodies (which
+    /// in the real document run to hundreds of lines each) are elided —
+    /// they carry no Consumes bullet, and section scope is asserted
+    /// independently by `a_section_with_no_consumes_bullet_…` above.
+    #[test]
+    fn the_verbatim_ridge_v2_consumes_lines_populate_the_whole_dependency_chain() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_plan(
+            tmp.path(),
+            "2026-07-14-red-panda-ridge-v2.md",
+            "# Red Panda Ridge v2 Implementation Plan\n\
+             \n\
+             **Goal:** Rebuild the platformer on Vite/React/Pixi with three levels.\n\
+             \n\
+             ### Task 1: Vite/React/Pixi scaffold and asset pipeline\n\
+             \n\
+             **Files:**\n\
+             - Create: `examples/platformer/src/render/assets.ts`\n\
+             \n\
+             **Interfaces:**\n\
+             - Consumes: nothing (first task). Assumes all 8 sprite PNGs already exist at `examples/platformer/assets/{red-panda,squirrel,acorn,tile,background,pinecone,heart,platform}.png` (5 pre-existing, 3 new — produced by the art workstream in parallel; this task only wires the loader against those exact filenames).\n\
+             - Produces:\n\
+             \x20 - `ASSET_DEFS` in `src/render/assets.ts`.\n\
+             \n\
+             - [x] **Step 1:** wire the loader\n\
+             \n\
+             ### Task 2: Engine port — physics, level, camera parity with v1\n\
+             \n\
+             **Files:**\n\
+             - Modify: `examples/platformer/src/render/PixiStage.tsx`\n\
+             \n\
+             **Interfaces:**\n\
+             - Consumes: `loadTextures()`, `ASSET_DEFS` (Task 1).\n\
+             - Produces:\n\
+             \x20 - `GameSimulation` in `simulation.ts`.\n\
+             \n\
+             - [x] **Step 1:** port the physics\n\
+             \n\
+             ### Task 3: Pinecone enemies, hearts, and game over\n\
+             \n\
+             **Files:**\n\
+             - Modify: `examples/platformer/src/engine/simulation.ts`\n\
+             \n\
+             **Interfaces:**\n\
+             - Consumes: `PlayerState`, `LevelData`, `aabbOverlap`, `GameSimulation`, `RenderSnapshot`, `HudSnapshot` (Task 2).\n\
+             - Produces:\n\
+             \x20 - `EnemyState` in `types.ts`.\n\
+             \n\
+             - [ ] **Step 1:** add the enemies\n\
+             \n\
+             ### Task 4: Moving platforms, 3-level data, and progression\n\
+             \n\
+             **Files:**\n\
+             - Modify: `examples/platformer/src/engine/level.ts` (add `LEVELS: LevelData[]`)\n\
+             \n\
+             **Interfaces:**\n\
+             - Consumes: `resolveAxis`'s `extraSolids` parameter, `updatePlayer`'s `extraSolids`/return value, `GameSimulation`, `HudSnapshot`, `RenderSnapshot` (Tasks 2-3).\n\
+             - Produces:\n\
+             \x20 - `MovingPlatformState` in `types.ts`.\n\
+             \n\
+             - [ ] **Step 1:** add the platforms\n\
+             \n\
+             ### Task 5: React HUD, menus, and localStorage records\n\
+             \n\
+             **Files:**\n\
+             - Modify: `examples/platformer/src/App.tsx`\n\
+             \n\
+             **Interfaces:**\n\
+             - Consumes: `GameSimulation` (constructor, `setPaused`, `restartLevel`, `goToLevel`), `useHudSnapshot`, `HudSnapshot` (all fields), `LEVELS` (Tasks 2-4).\n\
+             - Produces:\n\
+             \x20 - `LevelRecord` in `records.ts`.\n\
+             \n\
+             - [ ] **Step 1:** build the HUD\n\
+             \n\
+             ### Task 6: End-to-end smoke test\n\
+             \n\
+             **Files:**\n\
+             - Test: manual smoke pass\n\
+             \n\
+             **Interfaces:**\n\
+             - Consumes: the fully assembled app from Tasks 1-5. Produces nothing new — this task only verifies.\n\
+             \n\
+             - [ ] **Step 1:** play it through\n",
+        );
+
+        let outcome = parse_root(tmp.path());
+        let id = |n: u32| format!("2026-07-14-red-panda-ridge-v2#{n}");
+
+        assert!(
+            dep_ids(find_task(&outcome, &id(1))).is_empty(),
+            "`nothing (first task)` declares nothing — and neither `this task only wires the loader` nor the 8/5/3 counts fabricate a reference"
+        );
+        assert_eq!(dep_ids(find_task(&outcome, &id(2))), vec![id(1)], "`(Task 1).` — reported unpopulated by the live-store read");
+        assert_eq!(dep_ids(find_task(&outcome, &id(3))), vec![id(2)], "`(Task 2).` — reported unpopulated by the live-store read");
+        assert_eq!(dep_ids(find_task(&outcome, &id(4))), vec![id(2), id(3)], "`(Tasks 2-3).` — reported unpopulated by the live-store read");
+        assert_eq!(dep_ids(find_task(&outcome, &id(5))), vec![id(2), id(3), id(4)], "`(Tasks 2-4).`");
+        assert_eq!(dep_ids(find_task(&outcome, &id(6))), vec![id(1), id(2), id(3), id(4), id(5)], "`from Tasks 1-5.`");
+        assert!(
+            outcome.unmapped.keys().all(|k| !k.starts_with(DIAG_UNRESOLVABLE_TASK_DEP)),
+            "every reference in the real document resolves: {:?}",
+            outcome.unmapped
+        );
+        assert!(outcome.malformed.is_empty(), "the real document imports clean: {:?}", outcome.malformed);
     }
 }

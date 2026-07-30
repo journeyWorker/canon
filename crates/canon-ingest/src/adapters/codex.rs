@@ -477,6 +477,14 @@ fn parse_codex_reader<R: BufRead>(mut reader: R, session_id: &str, fallback_time
                     text,
                     workspace_key: state.session_workspace_key.clone(),
                     workspace_label: state.session_workspace_label.clone(),
+                    // `None`: Codex's rollout format marks a FORK
+                    // (`session_forked_from_id`, a replay of one
+                    // agent's own history into a sibling file), never a
+                    // dispatch of a distinct subagent, so it carries no
+                    // agent-delegation edge to record
+                    // (s37-execution-graph-topology).
+                    agent_id: None,
+                    parent_agent_id: None,
                 });
             }
         }
@@ -578,6 +586,10 @@ fn parse_codex_reader<R: BufRead>(mut reader: R, session_id: &str, fallback_time
                 duration_ms,
                 dedup_key: None,
                 is_turn_start: false,
+                // `None` — see the directive path above: a fork is not
+                // a dispatch (s37-execution-graph-topology).
+                agent_id: None,
+                parent_agent_id: None,
             };
 
             if state.pending_turn_start {

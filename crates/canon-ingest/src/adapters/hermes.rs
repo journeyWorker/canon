@@ -273,6 +273,13 @@ pub fn parse_hermes_sqlite(db_path: &Path) -> ParseOutcome {
                     duration_ms: None,
                     dedup_key: Some(session_id),
                     is_turn_start: false,
+                    // `None`: Hermes's SQLite schema has one
+                    // `sessions` row per agent session with no
+                    // parent/subagent column at all — no
+                    // agent-delegation edge exists to record
+                    // (s37-execution-graph-topology).
+                    agent_id: None,
+                    parent_agent_id: None,
                 }
             },
         )

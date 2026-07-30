@@ -51,8 +51,41 @@ pub const USER_DIRECTIVE_LABEL: &str = "user_directive";
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct NormalizedSession {
     pub session: Session,
+    /// The session's ROOT run — the main agent's own run, always
+    /// `parent_run_id: None`. Stays a single non-optional field (not
+    /// folded into `child_runs`) because every pre-
+    /// s37-execution-graph-topology consumer reads exactly this one run
+    /// per session, and the root's derivation is unchanged: same
+    /// `deterministic_run_id(session_id, None, started_at_ms)`, same
+    /// session-wide `started_at`/`ended_at`, same events pointing at
+    /// it.
     pub run: Run,
+    /// One child run per distinct `UnifiedRow::agent_id`/
+    /// `DirectiveRow::agent_id` present in this session
+    /// (s37-execution-graph-topology), each with `parent_run_id`
+    /// pointing at its dispatcher's run — another child's when
+    /// `parent_agent_id` names a sibling agent (a nested subagent),
+    /// [`Self::run`]'s otherwise. Sorted by `agent_id`, so two
+    /// normalization passes over unchanged input emit them in
+    /// byte-identical order, the same determinism bar
+    /// [`NormalizeOutcome`] holds for sessions.
+    ///
+    /// EMPTY for a plain single-agent session — the overwhelmingly
+    /// common case, whose normalized output is unchanged by this field
+    /// existing.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub child_runs: Vec<Run>,
     pub events: Vec<Event>,
+}
+
+impl NormalizedSession {
+    /// Every run this session normalized to, root first then each
+    /// child in `child_runs` order — the walk a topology consumer
+    /// (e.g. the plan-vs-actual graph diff) wants, so it never has to
+    /// remember that the root lives outside the child vec.
+    pub fn runs(&self) -> impl Iterator<Item = &Run> {
+        std::iter::once(&self.run).chain(self.child_runs.iter())
+    }
 }
 
 /// The full result of normalizing a batch of `UnifiedRow`s/
@@ -93,6 +126,17 @@ impl EventSeed<'_> {
         match self {
             EventSeed::TokenUsage(row) => (row.workspace_key.clone(), row.workspace_label.clone()),
             EventSeed::UserDirective(directive) => (directive.workspace_key.clone(), directive.workspace_label.clone()),
+        }
+    }
+
+    /// This seed's `(agent_id, parent_agent_id)` execution-lineage
+    /// pair (s37-execution-graph-topology) — `(None, None)` for every
+    /// row of a plain single-agent session. Borrowed, not cloned:
+    /// [`normalize_session`]'s agent fold only needs to key on these.
+    fn lineage(&self) -> (Option<&str>, Option<&str>) {
+        match self {
+            EventSeed::TokenUsage(row) => (row.agent_id.as_deref(), row.parent_agent_id.as_deref()),
+            EventSeed::UserDirective(directive) => (directive.agent_id.as_deref(), directive.parent_agent_id.as_deref()),
         }
     }
 }
@@ -236,7 +280,7 @@ fn normalize_session(session_id_str: &str, rows: &[&UnifiedRow], directives: &[&
     session.workspace_key = workspace_key;
     session.workspace_label = workspace_label;
 
-    let run_id = deterministic_run_id(&session_id, started_at_ms);
+    let run_id = deterministic_run_id(&session_id, None, started_at_ms);
     let run_actor = Actor::new_unattributed(client.clone()).with_session(session_id.clone());
     let run = Run::new(
         Envelope::new(SCHEMA_VERSION, RecordKind::Run, ended_at, run_actor),
@@ -247,6 +291,8 @@ fn normalize_session(session_id_str: &str, rows: &[&UnifiedRow], directives: &[&
         started_at,
         Some(ended_at),
     );
+
+    let child_runs = child_runs_for_agents(&seeds, &session_id, &client, run_id);
 
     let events = seeds
         .iter()
@@ -290,24 +336,120 @@ fn normalize_session(session_id_str: &str, rows: &[&UnifiedRow], directives: &[&
         })
         .collect();
 
-    Some(NormalizedSession { session, run, events })
+    Some(NormalizedSession { session, run, child_runs, events })
+}
+
+/// Build one child [`Run`] per distinct `agent_id` in this session's
+/// merged seed stream (s37-execution-graph-topology), reconstructing
+/// the dispatch tree an adapter recorded via
+/// `agent_id`/`parent_agent_id`.
+///
+/// Returns an EMPTY vec for a plain single-agent session (every seed's
+/// `agent_id` is `None`) — the overwhelmingly common case, which must
+/// normalize to exactly the one root run it did before this function
+/// existed.
+///
+/// Determinism, the same bar [`NormalizeOutcome`] holds: the fold is a
+/// `BTreeMap` keyed by `agent_id`, so the emitted order is lexical by
+/// agent id rather than seed-arrival order, and each child's `run_id`
+/// comes from [`deterministic_run_id`] — re-normalizing an unchanged
+/// transcript yields byte-identical child runs, ids included.
+///
+/// `parent_run_id` resolution: `parent_agent_id` naming another
+/// `agent_id` present in THIS session is a nested dispatch, so it
+/// resolves to that sibling's child run; anything else (the parent
+/// session's own id — what Claude Code's sidechain lines carry — or an
+/// absent/unknown parent) resolves to `root_run_id`. An agent whose
+/// dispatcher is not in this session is still a child of the session's
+/// main agent, never a second root.
+fn child_runs_for_agents(seeds: &[EventSeed<'_>], session_id: &SessionId, client: &str, root_run_id: RunId) -> Vec<Run> {
+    /// One agent's accumulated span + declared dispatcher.
+    struct AgentSpan<'a> {
+        started_at_ms: i64,
+        ended_at_ms: i64,
+        /// First non-`None` `parent_agent_id` seen for this agent, in
+        /// seed order — an adapter emits the same dispatcher on every
+        /// row of one agent, so a later disagreement is source
+        /// corruption, not a re-parent, and the first value wins.
+        parent_agent_id: Option<&'a str>,
+    }
+
+    let mut spans: BTreeMap<&str, AgentSpan<'_>> = BTreeMap::new();
+    for seed in seeds {
+        let (Some(agent_id), parent_agent_id) = seed.lineage() else { continue };
+        let ts = seed.timestamp_ms();
+        let span = spans.entry(agent_id).or_insert(AgentSpan { started_at_ms: ts, ended_at_ms: ts, parent_agent_id });
+        // No-ops on the just-inserted case, which is why one `or_insert`
+        // replaces an `and_modify`/`or_insert` pair: `ts` is already
+        // both bounds and `parent_agent_id` is already itself.
+        span.started_at_ms = span.started_at_ms.min(ts);
+        span.ended_at_ms = span.ended_at_ms.max(ts);
+        span.parent_agent_id = span.parent_agent_id.or(parent_agent_id);
+    }
+
+    if spans.is_empty() {
+        return Vec::new();
+    }
+
+    // Every child's id is derivable from (session_id, agent_id, its own
+    // start), so a nested dispatch's parent link needs no ordering
+    // between siblings — resolve each independently rather than
+    // topologically sorting a tree canon never executes.
+    let child_run_ids: BTreeMap<&str, RunId> =
+        spans.iter().map(|(agent_id, span)| (*agent_id, deterministic_run_id(session_id, Some(*agent_id), span.started_at_ms))).collect();
+
+    spans
+        .iter()
+        .map(|(agent_id, span)| {
+            let parent_run_id = span.parent_agent_id.and_then(|parent| child_run_ids.get(parent)).copied().unwrap_or(root_run_id);
+            let actor = Actor::new_unattributed(client).with_session(session_id.clone());
+            let ended_at = millis_to_utc(span.ended_at_ms);
+            Run::new(
+                Envelope::new(SCHEMA_VERSION, RecordKind::Run, ended_at, actor),
+                child_run_ids[*agent_id],
+                Some(session_id.clone()),
+                None,
+                // Same hardcoded terminal status the root run carries:
+                // a transcript on disk is a run that already finished,
+                // and this layer has no per-agent failure signal to
+                // distinguish `Failed` from `Succeeded` with.
+                RunStatus::Succeeded,
+                millis_to_utc(span.started_at_ms),
+                Some(ended_at),
+            )
+            .with_parent_run_id(parent_run_id)
+        })
+        .collect()
 }
 
 fn millis_to_utc(ms: i64) -> DateTime<Utc> {
     Utc.timestamp_millis_opt(ms).single().unwrap_or_else(Utc::now)
 }
 
-/// A `RunId` (ULID) deterministically derived from `session_id` +
-/// `started_at_ms` — never `RunId::new()`'s random generator, whose
-/// output would differ across two ingest runs and break the S3
-/// "identical normalized output across two runs" acceptance bar.
-/// `Ulid::from_parts(timestamp_ms, random)` (the crate's own
-/// deterministic constructor) takes the session's start time as the
-/// ULID's time component and a sha256-derived value (over
-/// `session_id`) as the random component, so re-ingesting the same
-/// session always yields the same `run_id`.
-fn deterministic_run_id(session_id: &SessionId, started_at_ms: i64) -> RunId {
-    let digest = Sha256::digest(session_id.as_str().as_bytes());
+/// A `RunId` (ULID) deterministically derived from `session_id` (+ an
+/// optional `agent_id`) and `started_at_ms` — never `RunId::new()`'s
+/// random generator, whose output would differ across two ingest runs
+/// and break the S3 "identical normalized output across two runs"
+/// acceptance bar. `Ulid::from_parts(timestamp_ms, random)` (the
+/// crate's own deterministic constructor) takes the run's start time as
+/// the ULID's time component and a sha256-derived value as the random
+/// component, so re-ingesting the same session always yields the same
+/// `run_id`.
+///
+/// `agent_id` (s37-execution-graph-topology) separates a subagent's
+/// child run from its session's root run. `None` hashes the session id
+/// ALONE — byte-for-byte the pre-s37 digest input — so every existing
+/// root `run_id` on disk is unchanged; `Some` appends a NUL separator
+/// before the agent id, a delimiter neither id's grammar admits, so no
+/// (session, agent) pair can collide with another's concatenation.
+fn deterministic_run_id(session_id: &SessionId, agent_id: Option<&str>, started_at_ms: i64) -> RunId {
+    let mut hasher = Sha256::new();
+    hasher.update(session_id.as_str().as_bytes());
+    if let Some(agent_id) = agent_id {
+        hasher.update(b"\0");
+        hasher.update(agent_id.as_bytes());
+    }
+    let digest = hasher.finalize();
     let random = u128::from_be_bytes(digest[0..16].try_into().expect("sha256 digest is >= 16 bytes"));
     let ulid = ulid::Ulid::from_parts(started_at_ms.max(0) as u64, random);
     RunId::parse(ulid.to_string()).expect("Ulid::to_string always yields a valid RunId grammar")
@@ -389,6 +531,8 @@ mod tests {
             duration_ms: None,
             dedup_key: None,
             is_turn_start: false,
+            agent_id: None,
+            parent_agent_id: None,
         }
     }
 
@@ -400,7 +544,18 @@ mod tests {
             text: text.into(),
             workspace_key: Some("/tmp/proj".into()),
             workspace_label: Some("proj".into()),
+            agent_id: None,
+            parent_agent_id: None,
         }
+    }
+
+    /// A [`row`] re-attributed to a dispatched subagent
+    /// (s37-execution-graph-topology): same `session_id` — the
+    /// dispatch and its subagents are ONE session, exactly what
+    /// `adapters::claude`'s sidechain override produces — plus the
+    /// agent-lineage pair the child-run fold keys on.
+    fn agent_row(session_id: &str, ts_ms: i64, agent_id: &str, parent_agent_id: &str) -> UnifiedRow {
+        UnifiedRow { agent_id: Some(agent_id.into()), parent_agent_id: Some(parent_agent_id.into()), ..row(session_id, ts_ms) }
     }
 
     #[test]
@@ -474,6 +629,137 @@ mod tests {
         let second_json = serde_json::to_value(&second.sessions[0].run).unwrap();
         assert_eq!(first_json, second_json);
         assert_eq!(content_digest(&first_json), content_digest(&second_json));
+    }
+
+    /// s37-execution-graph-topology, THE regression that matters most:
+    /// a plain single-agent session (every row's `agent_id` is `None`,
+    /// which is what omp/codex/hermes and every non-sidechain Claude
+    /// transcript emit) must still normalize to EXACTLY one run, with
+    /// no parent and no child runs — and that run must reserialize
+    /// WITHOUT a `parent_run_id` key, so an already-persisted pre-s37
+    /// run record's bytes (and its content digest) are untouched.
+    #[test]
+    fn a_single_agent_session_still_normalizes_to_exactly_one_parentless_run() {
+        let rows = vec![row("ses_solo", 1_000), row("ses_solo", 2_000)];
+        let outcome = normalize_rows(&rows);
+
+        assert_eq!(outcome.sessions.len(), 1);
+        let session = &outcome.sessions[0];
+        assert!(session.child_runs.is_empty(), "no agent_id anywhere means no child runs at all");
+        assert_eq!(session.runs().count(), 1, "the root run is the WHOLE run set for a single-agent session");
+        assert_eq!(session.run.parent_run_id, None);
+
+        let json = serde_json::to_value(&session.run).unwrap();
+        assert!(json.get("parent_run_id").is_none(), "a root run must not introduce a spurious `parent_run_id` key");
+    }
+
+    /// s37-execution-graph-topology: rows carrying an `agent_id` (what
+    /// `adapters::claude` now emits for a sidechain transcript) become
+    /// one child run per distinct agent, parented to the session's root
+    /// run — while session grouping and the token/cost event stream stay
+    /// exactly where they were: ONE session, every event still keyed to
+    /// the root run.
+    #[test]
+    fn subagent_rows_become_child_runs_parented_to_the_session_root_run() {
+        let rows = vec![
+            row("ses_dispatch", 1_000),
+            agent_row("ses_dispatch", 2_000, "sub-b", "ses_dispatch"),
+            agent_row("ses_dispatch", 3_000, "sub-a", "ses_dispatch"),
+            agent_row("ses_dispatch", 4_000, "sub-a", "ses_dispatch"),
+        ];
+        let outcome = normalize_rows(&rows);
+
+        assert_eq!(outcome.sessions.len(), 1, "a dispatch and its subagents are ONE session");
+        let session = &outcome.sessions[0];
+        assert_eq!(session.events.len(), 4, "every row still contributes exactly one token_usage event");
+        for event in &session.events {
+            assert_eq!(event.run_id, session.run.run_id, "token/cost attribution stays on the root run, unchanged by lineage capture");
+        }
+
+        assert_eq!(session.child_runs.len(), 2);
+        assert_eq!(session.runs().count(), 3, "root + one child per subagent");
+        let starts: Vec<i64> = session.child_runs.iter().map(|child| child.started_at.timestamp_millis()).collect();
+        assert_eq!(starts, vec![3_000, 2_000], "children are emitted in lexical agent_id order (sub-a then sub-b), never seed-arrival order");
+
+        for child in &session.child_runs {
+            assert_eq!(child.parent_run_id, Some(session.run.run_id), "parent_agent_id naming the session itself resolves to the root run");
+            assert_eq!(child.session_id.as_ref().map(SessionId::as_str), Some("ses_dispatch"), "a child run stays on its parent's session — grouping is untouched");
+            assert_eq!(child.status, RunStatus::Succeeded);
+        }
+
+        let child_ids: BTreeSet<RunId> = session.child_runs.iter().map(|child| child.run_id).collect();
+        assert_eq!(child_ids.len(), 2, "two distinct agent_ids must mint two distinct run ids");
+        assert!(!child_ids.contains(&session.run.run_id), "a child run id must never collide with its root's");
+
+        // `sub-a` has two rows (3000, 4000); its span must cover both,
+        // not inherit the session's 1000..4000.
+        let sub_a = session.child_runs.iter().find(|child| child.started_at.timestamp_millis() == 3_000).expect("sub-a child run");
+        assert_eq!(sub_a.ended_at.map(|at| at.timestamp_millis()), Some(4_000), "a child's span is min/max over ITS OWN rows");
+    }
+
+    /// s37-execution-graph-topology: a nested dispatch (a subagent that
+    /// itself dispatched a subagent) parents to the SIBLING child run
+    /// its `parent_agent_id` names, not to the session root — otherwise
+    /// a depth-3 tree flattens to depth 2 and the topology is still lost.
+    #[test]
+    fn a_nested_subagent_parents_to_its_dispatching_subagent_not_the_root() {
+        let rows = vec![
+            row("ses_nested", 1_000),
+            agent_row("ses_nested", 2_000, "sub-outer", "ses_nested"),
+            agent_row("ses_nested", 3_000, "sub-inner", "sub-outer"),
+        ];
+        let outcome = normalize_rows(&rows);
+        let session = &outcome.sessions[0];
+
+        let outer = session.child_runs.iter().find(|child| child.started_at.timestamp_millis() == 2_000).expect("sub-outer child run");
+        let inner = session.child_runs.iter().find(|child| child.started_at.timestamp_millis() == 3_000).expect("sub-inner child run");
+
+        assert_eq!(outer.parent_run_id, Some(session.run.run_id));
+        assert_eq!(inner.parent_run_id, Some(outer.run_id), "parent_agent_id naming a sibling agent must resolve to that sibling's run");
+    }
+
+    /// s37-execution-graph-topology: an `agent_id` whose
+    /// `parent_agent_id` names nobody in this session (Claude Code's
+    /// sidechain lines name the PARENT SESSION, which is never an
+    /// agent_id) — or names nobody at all — is still the main agent's
+    /// child, never a second root. A rootless child run would be
+    /// unreachable from the session's own run and drop silently out of
+    /// any topology walk.
+    #[test]
+    fn a_subagent_with_an_unknown_dispatcher_falls_back_to_the_root_run() {
+        let mut orphan = agent_row("ses_orphan", 2_000, "sub-x", "who-dispatched-me");
+        let named_stranger = normalize_rows(&[row("ses_orphan", 1_000), orphan.clone()]);
+        let session = &named_stranger.sessions[0];
+        assert_eq!(session.child_runs[0].parent_run_id, Some(session.run.run_id));
+
+        orphan.parent_agent_id = None;
+        let no_parent_at_all = normalize_rows(&[row("ses_orphan", 1_000), orphan]);
+        let session = &no_parent_at_all.sessions[0];
+        assert_eq!(session.child_runs[0].parent_run_id, Some(session.run.run_id));
+    }
+
+    /// s37-execution-graph-topology idempotence: re-normalizing an
+    /// unchanged multi-agent transcript must yield byte-identical child
+    /// runs — ids, order, and parent links — or the watermark cursor
+    /// would re-persist the same subagent as a NEW run on every ingest
+    /// pass. The bar
+    /// [`normalization_is_deterministic_across_two_runs`] holds for the
+    /// root run, extended over the whole run set.
+    #[test]
+    fn re_normalizing_a_multi_agent_session_yields_identical_run_ids() {
+        let rows = vec![
+            row("ses_idem", 1_000),
+            agent_row("ses_idem", 2_000, "sub-a", "ses_idem"),
+            agent_row("ses_idem", 3_000, "sub-b", "sub-a"),
+        ];
+        let as_json = |outcome: &NormalizeOutcome| serde_json::to_value(outcome.sessions[0].runs().collect::<Vec<_>>()).expect("Run always serializes");
+
+        let first = as_json(&normalize_rows(&rows));
+        let second = as_json(&normalize_rows(&rows));
+
+        assert!(first.as_array().is_some_and(|runs| runs.len() == 3), "sanity: this fixture must actually produce a root + 2 children, or it proves nothing");
+        assert_eq!(first, second, "two passes over unchanged input must produce byte-identical root + child runs");
+        assert_eq!(content_digest(&first), content_digest(&second));
     }
 
     #[test]

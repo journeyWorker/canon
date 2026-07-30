@@ -2,8 +2,8 @@
 //! machine (S1 design D4) plus the per-domain body template registry
 //! (D5, tasks group 5).
 //!
-//! The 13 non-body fields below (plus the closed 4-state enum) are a
-//! fixed struct that mirrors the *matching* handoff-queue columns
+//! The 13 donor-column fields below (plus the closed 4-state enum) are
+//! a fixed struct that mirrors the *matching* handoff-queue columns
 //! column-for-column by name and shape — that is the state-machine core
 //! this type exists to guarantee, and a canon-written row and a
 //! donor-CLI-written row agree exactly on those fields. This is NOT a
@@ -13,7 +13,9 @@
 //! `created_at`/`created_by_session_id`/`created_by_branch`/
 //! `created_by_worktree`/`created_by_host`/`refs_extra` columns have no
 //! `Handoff` field (reading a real donor row drops them), and canon's own
-//! envelope (`schema`/`kind`/`at`/`actor`) has no donor column at all.
+//! envelope (`schema`/`kind`/`at`/`actor`) plus the
+//! `from_role`/`to_role` edge endpoints
+//! (s37-execution-graph-topology) have no donor column at all.
 //! Whichever change actually reads/writes the donor's live table (S4,
 //! artifact/handoff ingest) owns bridging that gap — see this change's
 //! proposal.md for the forward note. The body (`HandoffBody`) is
@@ -31,7 +33,7 @@ use uuid::Uuid;
 
 use crate::envelope::{CanonRecord, Envelope, RecordKind};
 use crate::evidence::{EvidenceViolation, FailureClass};
-use crate::ids::{ChangeId, HandoffId};
+use crate::ids::{ChangeId, HandoffId, RoleId};
 
 /// `handoffs.state` — `text`, runtime-checked in the donor to exactly
 /// these four values (donor `handoffs` table doc comment).
@@ -269,7 +271,8 @@ impl TemplateRegistry {
 }
 
 /// The `handoffs` state machine (S1 design D4): each field below except
-/// `envelope` and `body` maps 1:1 to a same-named column of the donor
+/// `envelope`, `body`, and the `from_role`/`to_role` pair maps 1:1 to a
+/// same-named column of the donor
 /// handoff queue's `handoffs` Postgres table — the 13 fields the
 /// handoff-state-machine spec fixes, on which a canon-written row and a
 /// donor-CLI-written row agree exactly. This is
@@ -281,6 +284,13 @@ impl TemplateRegistry {
 /// the full gap and S4's ownership of bridging it. `body` is likewise
 /// not a column itself — canon's own typed staging area for the table's
 /// `body_text` column, rendered via [`TemplateRegistry::render_body`].
+/// `from_role`/`to_role` (s37-execution-graph-topology) are the third
+/// canon-only group: the edge endpoints this state machine's
+/// `chain_id`/`parent_handoff_id`/`seq` edge never carried, additive
+/// (`Option` + `#[serde(default, skip_serializing_if =
+/// "Option::is_none")]`, so an unset endpoint is an absent key and an
+/// already-stored handoff's bytes never change) — the donor-compatible
+/// core is untouched and no `Envelope.schema` bump is needed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Handoff {
     #[serde(flatten)]
@@ -307,6 +317,54 @@ pub struct Handoff {
     #[serde(default)]
     pub tags: Vec<String>,
     pub title: String,
+
+    /// The role this handoff's work came FROM — the edge's source
+    /// endpoint (s37-execution-graph-topology). `chain_id`/
+    /// `parent_handoff_id`/`seq` already make a handoff a directed edge
+    /// in a chain, but that edge had no endpoints: `claimed_by` names
+    /// whoever picked the work up (a claimant, set by
+    /// [`Handoff::transition_to`], absent until `in-progress`) and
+    /// `envelope.actor.role` names whoever WROTE the record, and
+    /// neither is a source→target pair. Without these two, a chain of
+    /// handoffs cannot answer "which role handed to which" — the
+    /// role-scoped question the flywheel's strategy memory
+    /// (`canon retrieve --role`) and the trust matrix are both keyed on.
+    ///
+    /// Canon-only, like `envelope`/`body`: the donor `handoffs` table
+    /// has no `from_role`/`to_role` column, so these are NOT part of
+    /// this type's column-for-column state-machine core (see the
+    /// struct doc above and `every_field_maps_to_a_handoffs_ts_column`,
+    /// which asserts them separately from the donor column table).
+    /// `Option` + `#[serde(default, skip_serializing_if =
+    /// "Option::is_none")]`: a handoff written before this field
+    /// existed, or by the donor CLI (which cannot supply it),
+    /// deserializes unchanged with `None` — an additive field, no
+    /// `Envelope.schema` bump. The `skip_serializing_if` half is
+    /// load-bearing, not cosmetic, and is why this pair does NOT follow
+    /// the always-`null` shape of its donor-column siblings
+    /// (`parent_handoff_id`/`claimed_by`, which mirror columns that
+    /// always exist): a bare `#[serde(default)]` would make every
+    /// already-stored handoff reserialize with two new `null` keys,
+    /// changing its content digest and so breaking the write-time
+    /// idempotence that `canon report --check`'s drift gate and ingest
+    /// watermarks both rest on. An unset endpoint is an ABSENT key,
+    /// byte-identical to a pre-s37 row — the same discipline
+    /// [`crate::records::Change::subject_id`] and `Actor::role` already
+    /// follow.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_role: Option<RoleId>,
+    /// The role this handoff's work is destined FOR — the edge's target
+    /// endpoint, the `from_role` counterpart (same
+    /// s37-execution-graph-topology reasoning, same additive
+    /// `Option`/`#[serde(default, skip_serializing_if =
+    /// "Option::is_none")]` shape). Deliberately independent of
+    /// `claimed_by`: `to_role` is the INTENDED recipient role at
+    /// creation time, `claimed_by` is the agent that actually claimed
+    /// it later — a handoff addressed to `reviewer` and claimed by
+    /// nobody is a real, representable state, and the gap between the
+    /// two is exactly what a plan-vs-actual graph diff reads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to_role: Option<RoleId>,
 
     pub body: HandoffBody,
 }
@@ -339,8 +397,28 @@ impl Handoff {
             research_vendor_slug: None,
             tags: Vec::new(),
             title: title.into(),
+            from_role: None,
+            to_role: None,
             body,
         }
+    }
+
+    /// Builder for the [`Handoff::from_role`]/[`Handoff::to_role`] edge
+    /// endpoints — mirrors [`crate::records::Task::with_scenario_refs`]'s
+    /// additive-field pattern, so `Handoff::new`'s own signature (already
+    /// eight arguments, already `#[allow(clippy::too_many_arguments)]`)
+    /// stays unchanged and every existing caller keeps compiling.
+    /// Both endpoints move together because a half-typed edge answers
+    /// nothing a graph reader can use; pass `None` for an end that is
+    /// genuinely unknown rather than guessing one
+    /// (s37-execution-graph-topology). Unlike `claimed_by` — which
+    /// [`Handoff::transition_to`] stamps as a state transition happens —
+    /// these are creation-time intent, so a builder (not a transition)
+    /// is the right seam.
+    pub fn with_roles(mut self, from_role: Option<RoleId>, to_role: Option<RoleId>) -> Self {
+        self.from_role = from_role;
+        self.to_role = to_role;
+        self
     }
 
     /// Apply a state transition, stamping the matching timestamp column
@@ -418,20 +496,101 @@ mod tests {
             sample_body(valid_gihoek_fields()),
         );
         let json = serde_json::to_value(&handoff).unwrap();
+        // The donor-mapped columns are unconditional: every one of them
+        // always reaches the wire, `null` included.
         for column in ["id", "state", "chain_id", "parent_handoff_id", "seq", "claimed_by", "openspec_change_slug", "tags", "title"] {
             assert!(json.get(column).is_some(), "missing column {column}");
+        }
+        // The canon-only endpoints (s37-execution-graph-topology) are the
+        // one conditional part of the column set: they carry
+        // `skip_serializing_if = "Option::is_none"`, so an unset endpoint
+        // is an ABSENT key — which is what keeps an already-stored
+        // handoff's bytes, and therefore its content digest, unchanged.
+        // They appear only once a caller types the edge.
+        for endpoint in ["from_role", "to_role"] {
+            assert!(json.get(endpoint).is_none(), "an unset `{endpoint}` must never reach the wire");
+        }
+        let typed = handoff.clone().with_roles(Some(RoleId::parse("implementer").unwrap()), Some(RoleId::parse("reviewer").unwrap()));
+        let typed_json = serde_json::to_value(&typed).unwrap();
+        for endpoint in ["from_role", "to_role"] {
+            assert!(typed_json.get(endpoint).is_some(), "a typed `{endpoint}` must reach the wire");
         }
         assert_eq!(json.get("state").unwrap(), "pending");
         let round_tripped: Handoff = serde_json::from_value(json).unwrap();
         assert_eq!(handoff, round_tripped);
     }
 
-    /// Task 5.2's mapping test: every `Handoff` field maps to a donor
-    /// `handoffs` column of a compatible name/type, read directly from
+    /// s37-execution-graph-topology: a typed edge (both endpoints set)
+    /// survives the wire verbatim — the endpoints are `RoleId`s, not
+    /// free strings, so a round trip also proves the grammar holds.
+    #[test]
+    fn a_handoff_with_both_role_endpoints_round_trips() {
+        let handoff = Handoff::new(
+            sample_envelope(),
+            HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(),
+            Uuid::new_v4(),
+            None,
+            1,
+            "topic",
+            None,
+            sample_body(valid_gihoek_fields()),
+        )
+        .with_roles(Some(RoleId::parse("implementer").unwrap()), Some(RoleId::parse("reviewer").unwrap()));
+
+        let json = serde_json::to_value(&handoff).unwrap();
+        assert_eq!(json.get("from_role").unwrap(), "implementer");
+        assert_eq!(json.get("to_role").unwrap(), "reviewer");
+
+        let round_tripped: Handoff = serde_json::from_value(json).unwrap();
+        assert_eq!(handoff, round_tripped);
+        assert_eq!(round_tripped.from_role.as_ref().map(RoleId::as_str), Some("implementer"));
+        assert_eq!(round_tripped.to_role.as_ref().map(RoleId::as_str), Some("reviewer"));
+    }
+
+    /// The additive-field bar (s37-execution-graph-topology): the
+    /// legacy, endpoint-less shape — a row written before `from_role`/
+    /// `to_role` existed, or by the donor CLI which has no such column —
+    /// still constructs, still round-trips, and reserializes to
+    /// BYTE-IDENTICAL JSON with neither key present. That byte identity
+    /// is the real bar: canon's write-time idempotence (content digests,
+    /// ingest watermarks, `canon report --check`'s drift gate) would
+    /// break corpus-wide if every stored handoff suddenly grew two
+    /// `null` keys, so this asserts absence rather than `null`.
+    #[test]
+    fn a_legacy_handoff_with_no_role_endpoints_still_constructs_and_round_trips() {
+        let handoff = Handoff::new(
+            sample_envelope(),
+            HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(),
+            Uuid::new_v4(),
+            None,
+            1,
+            "topic",
+            None,
+            sample_body(valid_gihoek_fields()),
+        );
+        assert_eq!(handoff.from_role, None, "Handoff::new leaves the endpoints unset — only with_roles sets them");
+        assert_eq!(handoff.to_role, None);
+        assert_eq!(handoff.envelope.schema, 1, "an additive Option field never bumps the envelope schema");
+
+        let json = serde_json::to_value(&handoff).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("from_role"), "an endpoint-less handoff must reserialize without the key: {json}");
+        assert!(!obj.contains_key("to_role"), "an endpoint-less handoff must reserialize without the key: {json}");
+
+        // The same bytes a pre-s37 writer would have produced, fed back
+        // in: `#[serde(default)]` supplies `None` for both absent keys.
+        let legacy: Handoff = serde_json::from_value(json).expect("a pre-s37 row with neither key must still deserialize");
+        assert_eq!(handoff, legacy);
+    }
+
+    /// Task 5.2's mapping test: every donor-mapped `Handoff` field maps
+    /// to a donor `handoffs` column of a compatible name/type, read from
     /// the donor table's own column list (the 13 fixed fields) as the
     /// fixture source of truth — no live database connection. `state`'s
     /// four wire values are asserted separately
-    /// (`state_only_takes_the_four_wire_values`).
+    /// (`state_only_takes_the_four_wire_values`), and the canon-only
+    /// fields (`body`, plus s37's `from_role`/`to_role`) are asserted at
+    /// the end rather than smuggled into the donor column table.
     #[test]
     fn every_field_maps_to_a_handoffs_ts_column() {
         let schema = serde_json::to_value(schemars::schema_for!(Handoff)).unwrap();
@@ -473,6 +632,22 @@ mod tests {
         // domain template, so it is deliberately excluded from `columns`
         // above and asserted separately here.
         assert!(properties.contains_key("body"));
+
+        // `from_role`/`to_role` (s37-execution-graph-topology) are the
+        // other canon-only group: the donor's `pgTable` has no such
+        // column, so listing them in `columns` above would make that
+        // table lie about the donor schema. They are asserted here
+        // instead — present on the type, and never `required`, which is
+        // what makes them additive (a donor-written or pre-s37 row
+        // deserializes without them and needs no `schema` bump).
+        for canon_only in ["from_role", "to_role"] {
+            assert!(properties.contains_key(canon_only), "Handoff lost its canon-only `{canon_only}` edge endpoint");
+            assert!(!required.contains(canon_only), "Handoff.{canon_only} must stay optional — a required endpoint would break every donor-written row");
+            assert!(
+                !columns.iter().any(|(column, ..)| *column == canon_only),
+                "`{canon_only}` is canon-only and must never be claimed as a handoffs.ts column"
+            );
+        }
     }
 
     /// The registry actually reads THIS repo's own `canon.yaml`

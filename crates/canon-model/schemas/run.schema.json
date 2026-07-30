@@ -28,6 +28,17 @@
     "kind": {
       "$ref": "#/$defs/RecordKind"
     },
+    "parent_run_id": {
+      "description": "The run that DISPATCHED this run — a subagent run's parent,\n`None` for a root run. canon's ONLY representation of agent\nexecution topology: without it a session's runs are a flat bag\nand a dispatch tree (main agent -> N subagents -> their own\nsubagents) is unrecoverable after ingest, which is exactly what\nthe plan-vs-actual graph diff needs to compare a declared\n[`Task::depends_on`] plan against what actually ran.\n\nA pointer along the SAME join-spine `run_id` key this record is\nalready keyed by — deliberately not a new join key, so\n`run <-> events <-> manifest` stays the one run-scoped spine.\n`#[serde(default, skip_serializing_if = \"Option::is_none\")]`\ncarries the same backward/forward-compat discipline\n[`Run::injected_guidance`] establishes: a pre-existing manifest\nwith no `parent_run_id` key deserializes to `None`, AND a root\nrun reserializes WITHOUT the key at all — so adding execution\nlineage never perturbs the on-disk shape of the (still\noverwhelmingly common) single-agent, no-parent case.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RunId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "run_id": {
       "$ref": "#/$defs/RunId"
     },

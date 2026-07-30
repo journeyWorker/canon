@@ -105,3 +105,49 @@ fn normalized_sessions_carry_the_claude_client_id_through_to_canon_model() {
     assert_eq!(alpha.run.session_id.as_ref().unwrap().as_str(), "sess-alpha");
     assert_eq!(alpha.events.len(), 3, "msg_001 (merged) + msg_002 + the sidechain row");
 }
+
+/// s37-execution-graph-topology, end to end over the real fixture home:
+/// `agent-sub01.jsonl` is a sidechain transcript whose rows are
+/// attributed to `sess-alpha` (unchanged), so `sess-alpha` normalizes to
+/// its root run PLUS one child run for that subagent, with the dispatch
+/// edge recorded. The sibling assertions that session grouping and event
+/// attribution are untouched live in the test above; this one asserts the
+/// topology that used to be destroyed at ingest time.
+#[test]
+fn a_sidechain_transcript_normalizes_to_a_root_run_plus_one_child_run_per_subagent() {
+    let home = fixtures_home();
+    let scan = canon_ingest::registry::scan_and_parse(claude_entry(), &home, false);
+    let outcome = canon_ingest::normalize_rows(&scan.rows);
+
+    let alpha = outcome.sessions.iter().find(|s| s.session.session_id.as_str() == "sess-alpha").expect("sess-alpha session normalized");
+
+    assert_eq!(alpha.run.parent_run_id, None, "the main agent's run is the root");
+    assert_eq!(alpha.child_runs.len(), 1, "one child run for the one sidechain subagent transcript: {:?}", alpha.child_runs);
+    assert_eq!(alpha.child_runs[0].parent_run_id, Some(alpha.run.run_id), "the subagent's run hangs off the dispatching session's root run");
+    assert_eq!(
+        alpha.child_runs[0].session_id.as_ref().unwrap().as_str(),
+        "sess-alpha",
+        "the child run stays on the parent session — lineage capture never re-groups sessions"
+    );
+    assert_ne!(alpha.child_runs[0].run_id, alpha.run.run_id);
+    assert_eq!(alpha.runs().count(), 2);
+}
+
+/// s37-execution-graph-topology: the whole normalize pass — root run,
+/// child runs, and their parent links — is byte-identical across two
+/// ingests of an unchanged fixture home. Without this, the watermark
+/// cursor would re-persist every subagent as a brand-new run on each
+/// pass.
+#[test]
+fn normalized_run_topology_is_identical_across_two_ingest_runs() {
+    let home = fixtures_home();
+    let run_once = || {
+        let scan = canon_ingest::registry::scan_and_parse(claude_entry(), &home, false);
+        let outcome = canon_ingest::normalize_rows(&scan.rows);
+        serde_json::to_value(outcome.sessions.iter().flat_map(canon_ingest::NormalizedSession::runs).collect::<Vec<_>>()).unwrap()
+    };
+
+    let first = run_once();
+    assert!(first.as_array().is_some_and(|runs| runs.len() >= 2), "sanity: the fixture home must actually produce a child run, or this proves nothing");
+    assert_eq!(first, run_once(), "re-ingesting an unchanged fixture home must yield byte-identical run ids and parent links");
+}

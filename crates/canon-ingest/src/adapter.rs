@@ -88,6 +88,42 @@ pub struct UnifiedRow {
     /// carry turn-boundary information (omp/pi's `pi.rs` donor never
     /// sets this either — ported behavior, not an omission).
     pub is_turn_start: bool,
+    /// This row's own agent identity WITHIN its `session_id` — a
+    /// stable per-agent handle when the source format distinguishes a
+    /// dispatched subagent from the main agent (Claude Code's
+    /// `isSidechain` transcripts: the subagent's own transcript-file
+    /// stem), paired with [`Self::parent_agent_id`] naming whoever
+    /// dispatched it. `crate::normalize` turns each distinct
+    /// `agent_id` in a session into its own child
+    /// `canon_model::records::Run` under the session's root run,
+    /// reconstructing the dispatch tree an earlier ingest collapsed.
+    ///
+    /// BOTH stay `None` for a plain single-agent session — the
+    /// overwhelmingly common case, which must normalize to exactly the
+    /// single root run it did before these fields existed. An adapter
+    /// whose format carries no agent-delegation edge leaves them
+    /// `None` rather than inventing one from an intra-session
+    /// message-threading pointer (see `adapters::omp`'s
+    /// `PiSessionEntry` doc for that exact trap).
+    /// `#[serde(default, skip_serializing_if = "Option::is_none")]`,
+    /// NOT the bare `Option<String>` the surrounding
+    /// `workspace_key`/`dedup_key` fields use: those were in this
+    /// struct's shape from the start, so their `null` is part of the
+    /// established wire form, whereas these two are ADDITIVE — skipping
+    /// them when unset is what keeps an already-serialized row's bytes
+    /// (and therefore `crate::normalize::content_digest` over anything
+    /// derived from it) identical to its pre-s37 form. The same
+    /// discipline `canon_model::records::Run::parent_run_id` states at
+    /// length.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
+    /// The agent that DISPATCHED this row's agent — see
+    /// [`Self::agent_id`]. Names either another row's `agent_id`
+    /// (nested subagent) or the session itself (a subagent dispatched
+    /// by the main agent), which `crate::normalize` resolves to the
+    /// session's root run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_agent_id: Option<String>,
 }
 
 /// One USER-role message extracted verbatim from a transcript (s31
@@ -119,6 +155,19 @@ pub struct DirectiveRow {
     /// same rule as [`UnifiedRow::workspace_key`].
     pub workspace_key: Option<String>,
     pub workspace_label: Option<String>,
+    /// This directive's own agent identity within its `session_id` —
+    /// same rule and same `None`-for-single-agent default as
+    /// [`UnifiedRow::agent_id`]. A subagent's own prompt is a
+    /// directive, and it belongs to the SUBAGENT's run, not the
+    /// dispatcher's.
+    /// Same additive `skip_serializing_if` discipline
+    /// [`UnifiedRow::agent_id`] documents.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
+    /// The agent that dispatched this directive's agent — same rule as
+    /// [`UnifiedRow::parent_agent_id`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_agent_id: Option<String>,
 }
 
 /// The result of one [`SessionAdapter::parse`] call: the rows it

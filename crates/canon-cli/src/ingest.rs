@@ -654,8 +654,19 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
     let mut event_buf: Vec<canon_model::records::Event> = Vec::new();
     for session in &normalized.sessions {
         session_buf.push(session.session.clone());
-        run_buf.push(session.run.clone());
-        runs_written += 1;
+        // s37 (`execution-graph-topology`): persist the session's ROOT
+        // run AND every child run `normalize` derived for a distinct
+        // `agent_id` — `NormalizedSession::runs()` yields root-first,
+        // then children, each child carrying `parent_run_id`. Pushing
+        // only `session.run` (the pre-s37 shape) would silently drop the
+        // whole subagent tier: `normalize` would build the lineage and
+        // nothing would ever write it, so a real multi-agent transcript
+        // still landed as one flat run. A single-agent session yields
+        // exactly one run here, unchanged.
+        for run in session.runs() {
+            run_buf.push(run.clone());
+            runs_written += 1;
+        }
         for event in &session.events {
             event_buf.push(event.clone());
             events_written += 1;
