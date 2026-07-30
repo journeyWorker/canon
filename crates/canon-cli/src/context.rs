@@ -57,17 +57,17 @@ use canon_policy::SchemaRegistry;
 use canon_vocab::CapabilitySnapshot;
 use serde::Serialize;
 
-/// canon-model has not yet introduced per-kind schema-version bumps: every
-/// record constructed anywhere in this workspace still passes
-/// `Envelope::new(1, ...)` (`canon_model::envelope::Envelope.schema`'s own
-/// doc: "bumped on any breaking field change to that kind" — none has
-/// happened yet). This is the single current baseline both
-/// `capabilityVersion` and every kind's `schema_version` read; the day
-/// canon-model versions a kind independently, this becomes a lookup into
-/// that registry instead of a constant — a one-line change here, matching
-/// design D1's "resolve, then render" split (the registry call site stays
-/// singular either way).
-const CURRENT_SCHEMA_VERSION: u32 = 1;
+/// The authoring-surface CAPABILITY version — `canon context`'s own
+/// outline/JSON contract version, deliberately NOT any record kind's
+/// `Envelope.schema`. Those became genuinely per-kind in
+/// `s38-evidence-bearing-memory` (`Task` is generation `2`, every other
+/// kind `1`), which is exactly the day this doc anticipated: each
+/// [`KindSurface::schema_version`] is now the lookup
+/// [`canon_model::RecordKind::schema_version`] answers, so the surface
+/// can never advertise a generation nothing writes, while this constant
+/// keeps describing the CLI surface itself (design D1's "resolve, then
+/// render" split — the registry call site stays singular either way).
+const CURRENT_CAPABILITY_VERSION: u32 = 1;
 
 /// Resolution-time options beyond the repo root itself. Empty today —
 /// `canon context` takes only `--repo`/`--json`, and `--json` selects a
@@ -95,6 +95,10 @@ pub struct PartitionLayout {
 /// partition it lands in, and its current schema version.
 #[derive(Debug, Clone, Serialize)]
 pub struct KindSurface {
+    /// This kind's CURRENT format generation, read straight from
+    /// [`canon_model::RecordKind::schema_version`] — never a
+    /// hand-maintained copy, so `canon context` can never advertise a
+    /// generation no writer stamps (`s38-evidence-bearing-memory`).
     pub schema_version: u32,
     /// Every top-level field name this kind's record carries (envelope
     /// fields `schema`/`kind`/`at`/`actor` flattened alongside the kind's
@@ -295,7 +299,7 @@ pub fn resolve_surface(repo: &Path, _opts: ContextOptions) -> AuthoringSurface {
     let (vocab_snapshot, vocab_diagnostics) = canon_vocab::resolve_snapshot(repo, None);
 
     AuthoringSurface {
-        capability_version: CURRENT_SCHEMA_VERSION,
+        capability_version: CURRENT_CAPABILITY_VERSION,
         kinds: collect_kinds(&registry),
         enums: collect_enums(&registry),
         join_keys: collect_join_keys(),
@@ -326,7 +330,7 @@ fn collect_kinds(registry: &SchemaRegistry) -> BTreeMap<String, KindSurface> {
             .map(|props| props.keys().map(|name| (name.clone(), required.contains(name.as_str()))).collect())
             .unwrap_or_default();
         let partition = PartitionLayout { template: kind.partition_template().to_string(), area_scoped: kind.is_area_scoped() };
-        kinds.insert(kind.as_str().to_string(), KindSurface { schema_version: CURRENT_SCHEMA_VERSION, envelope_fields, partition });
+        kinds.insert(kind.as_str().to_string(), KindSurface { schema_version: kind.schema_version(), envelope_fields, partition });
     }
     kinds
 }

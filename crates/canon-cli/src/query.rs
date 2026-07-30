@@ -201,7 +201,7 @@ fn scope_sort_key(kind: RecordKind, raw: &RawRecord) -> (String, Vec<u64>) {
 /// `canon-report::divergence`), keyed by the SAME natural key
 /// [`scope_sort_key`]/[`format_human`] already derive
 /// (`canon_store::partition::resolve_partition`), winner = greatest
-/// `(at, content_digest12)`. A no-op for every kind routed to a
+/// `(at, envelope.schema, content_digest12)`. A no-op for every kind routed to a
 /// local/cold (GitTier/R2Tier-backed) rung (returned untouched)
 /// and for a corpus with no supersession (row-count parity, design.md
 /// R3's own mitigation).
@@ -238,27 +238,39 @@ fn fold_subject_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord
     fold_latest_by_natural_key(kind, records)
 }
 
-/// The shared fold-to-latest-per-natural-key body (design D11/s21 D3):
-/// winner per natural key ([`canon_store::partition::resolve_partition`])
-/// is the greatest `(at, content_digest12)` pair, via the SAME
+/// The shared fold-to-latest-per-natural-key body (design D11/s21 D3,
+/// `s38-evidence-bearing-memory`): winner per natural key
+/// ([`canon_store::partition::resolve_partition`]) is the greatest
+/// `(at, envelope.schema, content_digest12)` triple, via the SAME
 /// [`fold_latest_by_key`] `canon-gate::ledger` and `canon-report`
 /// already use. Called by both [`fold_pg_routed_kind`] (hot-routed
 /// multi-version kinds) and [`fold_subject_kind`] (git-routed but
 /// re-written), so the two can never drift in fold rule.
+///
+/// This is the reader where the `schema` rung EARNS its place: a plan
+/// `Task`'s `at` is `file_modified_at(<source doc>)` (s20 D7,
+/// byte-stable so an unchanged plan re-imports idempotently), so a canon
+/// PARSER change — which does not touch the source document's mtime —
+/// leaves the stale and fresh record for one `task_id` tied on `at`.
+/// Before the `schema` rung, the lexicographic digest decided that tie,
+/// which meant `canon query --kind task` surfaced a newly-parsed field
+/// on an ARBITRARY SUBSET of rows from one file, with no diagnostic.
 fn fold_latest_by_natural_key(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
     struct Candidate {
         key: String,
         at: DateTime<Utc>,
+        schema: u32,
         digest: String,
         record: RawRecord,
     }
     let candidates = records.into_iter().map(|record| {
         let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
         let at = canon_store::tier::raw_record_at(&record);
+        let schema = canon_store::tier::raw_record_schema(&record);
         let digest = canon_store::partition::content_digest12(&record.0);
-        Candidate { key, at, digest, record }
+        Candidate { key, at, schema, digest, record }
     });
-    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.digest.as_str()).into_values().map(|c| c.record).collect()
+    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| c.record).collect()
 }
 
 /// Post-tier-merge scope application (design D5/D6, tasks 3.4/3.6;

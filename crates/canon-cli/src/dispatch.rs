@@ -45,13 +45,6 @@ use canon_store::write_atomic;
 
 use crate::context::resolve_repo_root;
 
-/// The `Run` kind's current envelope schema version — mirrors
-/// `canon_ingest::normalize`'s own `SCHEMA_VERSION` const for the Run
-/// kind (both write a `RecordKind::Run` envelope; they must agree so a
-/// reconciler reads a dispatch-tier and an ingest-tier Run under one
-/// schema).
-const RUN_SCHEMA_VERSION: u32 = 1;
-
 /// The private side-channel directory a dispatch record lands under,
 /// relative to the repo root (module doc: never `canon-store`'s git
 /// tier).
@@ -115,7 +108,7 @@ pub fn begin(repo: &Path, role: &RoleId, regime_key: &RegimeKey, agent_id: &str)
     let run_id = RunId::new();
     let now = chrono::Utc::now();
     let actor = Actor::new(agent_id.to_string(), role.clone());
-    let run = Run::new(Envelope::new(RUN_SCHEMA_VERSION, RecordKind::Run, now, actor), run_id, None, None, RunStatus::Running, now, None)
+    let run = Run::new(Envelope::current(RecordKind::Run, now, actor), run_id, None, None, RunStatus::Running, now, None)
         .with_injected_guidance(guidance);
 
     let manifest_path = repo.join(DISPATCH_DIR).join(format!("{run_id}.json"));

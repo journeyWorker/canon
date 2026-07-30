@@ -20,10 +20,12 @@
 //! function). Two resolutions of byte-identical manifests always fold to
 //! the same digest; changing ANY directive attr, enum member, plugin
 //! version, or the live evidence-kind domain changes it — genuine drift
-//! detection, unlike `canon-cli::context::CURRENT_SCHEMA_VERSION` (a
-//! separate, hand-maintained integer `canon-cli`'s own `AuthoringSurface`
-//! uses for `canon-model` record-envelope schema bumps, an unrelated
-//! concept this crate does not touch). A snapshot built directly via
+//! detection, unlike `canon-cli::context::CURRENT_CAPABILITY_VERSION`
+//! (a separate, hand-maintained integer `canon-cli`'s own
+//! `AuthoringSurface` uses for its OWN CLI-surface version — per-kind
+//! record-envelope generations live in
+//! `canon_model::RecordKind::schema_version`, and neither concept is
+//! one this crate touches). A snapshot built directly via
 //! [`CapabilitySnapshot::default`] (every in-crate unit test that hand-rolls
 //! a snapshot rather than calling `resolve_snapshot`) carries the empty
 //! string here — never a hash of nothing masquerading as "resolved".

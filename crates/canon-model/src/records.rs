@@ -244,7 +244,22 @@ pub struct Task {
     /// additive-field shape (and, like it, `skip_serializing_if` so an
     /// empty vec never introduces a spurious key — every pre-s37
     /// `Task` stays byte-identical on the wire, and its content digest
-    /// with it, so no `Envelope::schema` bump is owed).
+    /// with it).
+    ///
+    /// This field IS nonetheless what bumped `Task` to
+    /// [`RecordKind::schema_version`] `2`
+    /// (`s38-evidence-bearing-memory`), and NOT because the wire form
+    /// broke — it did not. A `Task`'s `Envelope.at` is
+    /// `file_modified_at(<source plan doc>)` (s20 D7), byte-stable so an
+    /// unchanged plan re-imports idempotently; adding this field changed
+    /// the PARSER, not the source document's mtime, so the stale and
+    /// fresh record for one `task_id` carry an IDENTICAL `at` and
+    /// `canon_store::fold::fold_latest_by_key` needs a generation signal
+    /// to order them. Without the bump it fell through to the
+    /// lexicographic digest tie-break and surfaced this field on an
+    /// arbitrary SUBSET of one file's rows. See
+    /// [`RecordKind::schema_version`] for why `Run`/`Handoff` gained
+    /// fields on the same branch and correctly stayed at `1`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub depends_on: Vec<TaskId>,
 }
@@ -880,8 +895,13 @@ mod tests {
     use crate::envelope::Actor;
     use crate::ids::RoleId;
 
+    /// Every round-trip fixture below builds its envelope at the kind's
+    /// OWN current generation ([`RecordKind::schema_version`]) — never a
+    /// hardcoded `1`, which would silently assert a generation the
+    /// writers no longer stamp once a kind is bumped
+    /// (`s38-evidence-bearing-memory`).
     fn envelope(kind: RecordKind) -> Envelope {
-        Envelope::new(1, kind, Utc::now(), Actor::new("codex-cli", RoleId::parse("implementer").unwrap()))
+        Envelope::current(kind, Utc::now(), Actor::new("codex-cli", RoleId::parse("implementer").unwrap()))
     }
 
     fn project_id() -> ProjectId {
@@ -1049,11 +1069,19 @@ mod tests {
     /// A `Task` from before s37 (no `depends_on` key at all in the
     /// JSON) still deserializes — to an empty `Vec` — and reserializes
     /// byte-identically, so the whole pre-s37 corpus keeps its content
-    /// digest and no `Envelope::schema` bump is owed. The same
-    /// additive-field bar `scenario_refs` above (and
+    /// digest. The same additive-field bar `scenario_refs` above (and
     /// `Run.injected_guidance` before it) is held to: an empty
     /// `depends_on` never reserializes a spurious `"depends_on": []`
     /// key.
+    ///
+    /// This fixture deliberately stays at `"schema": 1`: it MODELS a
+    /// pre-bump record, which is exactly the generation
+    /// `s38-evidence-bearing-memory` has to keep readable — a
+    /// `Task` canon writes TODAY carries `2`
+    /// ([`RecordKind::schema_version`]), and the two coexisting in one
+    /// corpus is the whole point of the fold's schema rung. Bumping this
+    /// literal would delete the backward-compatibility case it exists to
+    /// prove.
     #[test]
     fn task_without_depends_on_key_deserializes_empty_and_reserializes_without_the_key() {
         let at = serde_json::to_value(Utc::now()).unwrap();

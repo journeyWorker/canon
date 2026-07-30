@@ -402,16 +402,26 @@ fn fold_handoff_records(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRec
     struct Candidate {
         key: String,
         at: DateTime<Utc>,
+        // s38 (`evidence-bearing-memory`): the record's own format
+        // generation, the rung `fold_latest_by_key` now compares between
+        // `at` and `digest`. Read through `raw_record_schema` rather than
+        // a typed envelope because these candidates are bare `RawRecord`
+        // JSON at this point; a malformed record missing `schema`
+        // degrades to `0`, which sorts strictly below every real
+        // generation (kinds start at `1`), so it can never out-rank a
+        // well-formed row on a tie.
+        schema: u32,
         digest: String,
         record: RawRecord,
     }
     let candidates = records.into_iter().map(|record| {
         let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
         let at = canon_store::tier::raw_record_at(&record);
+        let schema = canon_store::tier::raw_record_schema(&record);
         let digest = canon_store::partition::content_digest12(&record.0);
-        Candidate { key, at, digest, record }
+        Candidate { key, at, schema, digest, record }
     });
-    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.digest.as_str()).into_values().map(|c| c.record).collect()
+    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| c.record).collect()
 }
 
 /// The resolved repo's `regime_key` `<repo>` segment — its directory
@@ -454,6 +464,147 @@ fn trajectory_content_digest(regime_key: &RegimeKey, verdicts: &[VerdictRow]) ->
     let verdict_json: Vec<serde_json::Value> =
         verdicts.iter().map(|v| serde_json::json!({"role": v.role.as_str(), "polarity": v.polarity.as_str(), "becomes": v.becomes.as_str()})).collect();
     content_digest(&serde_json::json!({"regime_key": regime_key.as_str(), "verdicts": verdict_json}))
+}
+
+/// One derived verdict PLUS the salient evidence of the event it came
+/// from (`s38-evidence-bearing-memory`).
+///
+/// [`run`]'s accumulator used to collapse to a bare
+/// `(RegimeKey, VerdictRow, DateTime<Utc>)` tuple and drop the event on
+/// the floor — so the only material left for the trajectory's
+/// `task`/`context` (which become a distilled
+/// `canon_learn::StrategyItem`'s TITLE and CONTENT, and from there the
+/// guidance `canon retrieve` injects into a dispatched agent) was a
+/// description of this driver's own plumbing. A named struct rather
+/// than a wider tuple because six positional fields at one call site is
+/// how the wrong two get swapped.
+struct DerivedVerdict {
+    regime_key: RegimeKey,
+    row: VerdictRow,
+    at: DateTime<Utc>,
+    /// The event's [`ArtifactJoinKey::as_str`] — the CONCRETE artifact
+    /// id (`platformer.hud.01`) the trajectory names.
+    join_key: String,
+    kind_label: &'static str,
+    evidence_line: String,
+}
+
+/// One regime group's accumulated verdicts and evidence — the value
+/// side of [`group_by_regime`]'s map (`s38-evidence-bearing-memory`).
+struct RegimeEvidence {
+    rows: Vec<VerdictRow>,
+    /// The newest source-record timestamp in this group (the
+    /// trajectory's `recorded_at`).
+    latest_at: DateTime<Utc>,
+    /// `Some(id)` while every absorbed verdict shared ONE join key —
+    /// which is the invariant by construction, since `regime_key`'s
+    /// `<hash>` component IS [`regime_hash`] of the join key, so one
+    /// regime group can only ever hold one key. `None` is the honest
+    /// degrade if that ever stops holding: [`Self::trajectory_text`]
+    /// then names the regime key rather than picking one member's id
+    /// and printing a wrong one.
+    join_key: Option<String>,
+    /// Deduped [`ArtifactEvent::display_label`]s in first-seen order —
+    /// the SAME strings [`ArtifactEvent::evidence_line`] prefixes its
+    /// lines with, so a trajectory's title and its content always name
+    /// the same things.
+    kind_labels: Vec<&'static str>,
+    /// Deduped [`ArtifactEvent::evidence_line`]s in first-seen order.
+    evidence_lines: Vec<String>,
+}
+
+impl Default for RegimeEvidence {
+    /// `latest_at` seeds `DateTime::<Utc>::MIN_UTC` so the first
+    /// absorbed verdict always wins the running max — no `Option`
+    /// dance, and no unreachable `unwrap` at the one place the
+    /// timestamp is read. (`chrono` implements no `Default` for
+    /// `DateTime<Utc>`, hence the hand-written impl.)
+    fn default() -> Self {
+        Self { rows: Vec::new(), latest_at: DateTime::<Utc>::MIN_UTC, join_key: None, kind_labels: Vec::new(), evidence_lines: Vec::new() }
+    }
+}
+
+impl RegimeEvidence {
+    /// Folds one [`DerivedVerdict`] in, keeping the running max
+    /// timestamp and both first-seen-ordered dedup lists.
+    fn absorb(&mut self, derived: DerivedVerdict) {
+        let DerivedVerdict { regime_key: _, row, at, join_key, kind_label, evidence_line } = derived;
+        if self.rows.is_empty() {
+            self.join_key = Some(join_key);
+        } else {
+            // Unreachable by construction (see `join_key`'s doc): a
+            // group's `regime_key` hash IS this key's digest. Asserted
+            // in debug rather than assumed silently — and in release it
+            // degrades to naming the regime key, never a wrong id.
+            debug_assert_eq!(
+                self.join_key.as_deref(),
+                Some(join_key.as_str()),
+                "a regime group must hold exactly one join key — regime_hash is content_digest of it"
+            );
+            if self.join_key.as_deref() != Some(join_key.as_str()) {
+                self.join_key = None;
+            }
+        }
+        self.rows.push(row);
+        if at > self.latest_at {
+            self.latest_at = at;
+        }
+        push_first_seen(&mut self.kind_labels, kind_label);
+        push_first_seen(&mut self.evidence_lines, evidence_line);
+    }
+
+    /// This group's `(task, context)` — the trajectory fields
+    /// `canon_learn::distill_trajectory` turns into a strategy's TITLE
+    /// and CONTENT (`s38-evidence-bearing-memory`):
+    ///
+    /// - `task` names the concrete artifact plus its deduped kind
+    ///   labels (`platformer.hud.01: review promotion`), so a retrieved
+    ///   `avoid: …` guardrail says what to avoid on WHAT.
+    /// - `context` is the deduped evidence lines, newline-joined — real
+    ///   reviewer/divergence/task prose, never a `detail` blob (see
+    ///   [`ArtifactEvent::evidence_line`]).
+    ///
+    /// Both are pure functions of the accumulated, first-seen-ordered
+    /// input, and `canon_ingest::scanner::scan_dir` hands this driver a
+    /// byte-lexically deterministic event order — so two passes over an
+    /// unchanged corpus produce byte-identical strings and
+    /// [`trajectory_content_digest`]'s duplicate skip still fires.
+    fn trajectory_text(&self, regime_key: &RegimeKey) -> (String, String) {
+        let subject = self.join_key.as_deref().unwrap_or_else(|| regime_key.as_str());
+        let task = if self.kind_labels.is_empty() { subject.to_string() } else { format!("{subject}: {}", self.kind_labels.join(", ")) };
+        (task, self.evidence_lines.join("\n"))
+    }
+}
+
+/// Appends `item` only if absent, preserving FIRST-SEEN order
+/// (`s38-evidence-bearing-memory`). A `BTreeSet` would dedupe too, but
+/// would re-sort the labels/lines alphabetically — and the order a
+/// regime's evidence was observed in is the order that reads as a
+/// narrative. Linear `contains` is right at this size: a regime group
+/// holds a handful of events, and the allocation a hash set would cost
+/// exceeds the scan it saves.
+fn push_first_seen<T: PartialEq>(seen: &mut Vec<T>, item: T) {
+    if !seen.contains(&item) {
+        seen.push(item);
+    }
+}
+
+/// Groups every derived verdict onto its `regime_key`
+/// (`s38-evidence-bearing-memory`) — extracted from [`run`] so the
+/// evidence accumulation this drives is unit-testable without a live
+/// store. `BTreeMap` (not a hash map) keeps the persist loop's regime
+/// order deterministic, as it was before.
+fn group_by_regime(derived: Vec<DerivedVerdict>) -> BTreeMap<RegimeKey, RegimeEvidence> {
+    let mut by_regime: BTreeMap<RegimeKey, RegimeEvidence> = BTreeMap::new();
+    for verdict in derived {
+        // `entry` needs an owned key while `absorb` consumes the rest
+        // of the struct, so the key is cloned once per verdict — a
+        // short `String`, and the alternative is a five-positional-
+        // argument `absorb` whose call site invites exactly the
+        // parameter mix-up `DerivedVerdict` exists to remove.
+        by_regime.entry(verdict.regime_key.clone()).or_default().absorb(verdict);
+    }
+    by_regime
 }
 
 /// Derives one `VerdictRow` from an `ArtifactEvent` — dispatching to
@@ -630,24 +781,23 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
     }
 
     let label = repo_label(&repo);
-    let mut verdicts: Vec<(RegimeKey, VerdictRow, DateTime<Utc>)> = Vec::new();
+    let mut derived: Vec<DerivedVerdict> = Vec::new();
     for event in &all_events {
         let Some(row) = derive_verdict_for_event(event) else { continue };
         let area = event.area.clone().unwrap_or_else(|| "unscoped".to_string());
         let hash = regime_hash(&event.join_key);
         let verdict = attach_regime_key(row, event.join_key.clone(), &label, &area, &hash, event.trust_level.clone())?;
-        verdicts.push((verdict.regime_key, verdict.row, event.at));
+        derived.push(DerivedVerdict {
+            regime_key: verdict.regime_key,
+            row: verdict.row,
+            at: event.at,
+            join_key: event.join_key.as_str().to_string(),
+            kind_label: event.display_label(),
+            evidence_line: event.evidence_line(),
+        });
     }
-    let verdicts_derived = verdicts.len();
-
-    let mut by_regime: BTreeMap<RegimeKey, (Vec<VerdictRow>, DateTime<Utc>)> = BTreeMap::new();
-    for (regime_key, row, at) in verdicts {
-        let bucket = by_regime.entry(regime_key).or_insert_with(|| (Vec::new(), at));
-        bucket.0.push(row);
-        if at > bucket.1 {
-            bucket.1 = at;
-        }
-    }
+    let verdicts_derived = derived.len();
+    let by_regime = group_by_regime(derived);
 
     let learn_root = repo.join(&learn_config.root);
     let trajectory_store = ParquetTrajectoryStore::open(learn_root.join("trajectories"));
@@ -665,9 +815,9 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
     let mut strategy_items_rebuilt = 0usize;
     let mut trajectories_marked = 0usize;
     let mut trajectories_left_pending = 0usize;
-    for (regime_key, (rows, at)) in by_regime {
-        let verdict_count = rows.len();
-        let digest = trajectory_content_digest(&regime_key, &rows);
+    for (regime_key, evidence) in by_regime {
+        let verdict_count = evidence.rows.len();
+        let digest = trajectory_content_digest(&regime_key, &evidence.rows);
         let already_persisted = trajectory_store
             .query_by_regime_key(&regime_key)?
             .iter()
@@ -676,10 +826,10 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
             trajectories_skipped_duplicate += 1;
             continue;
         }
-        let task = format!("{verdict_count} verdict(s) derived from canon-ingest artifact adapters for regime {regime_key}");
-        let context =
-            format!("canon ingest artifacts: {verdict_count} VerdictRow(s) folded onto regime_key {regime_key} by the S14 artifact-ingest driver");
-        let trajectory = Trajectory::new(TrajectoryId::new(), regime_key.clone(), task, context, rows, at, vec!["artifact-ingest".to_string()])?;
+        let (task, context) = evidence.trajectory_text(&regime_key);
+        let at = evidence.latest_at;
+        let trajectory =
+            Trajectory::new(TrajectoryId::new(), regime_key.clone(), task, context, evidence.rows, at, vec!["artifact-ingest".to_string()])?;
 
         match store_trajectory(&role_registry, &trajectory_store, &trajectory) {
             Ok(()) => {
@@ -832,6 +982,8 @@ pub fn selftest() -> Result<usize, Vec<String>> {
 
 #[cfg(test)]
 mod tests {
+    use canon_ingest::artifact_adapter::ArtifactEventKind as Kind;
+
     use super::*;
 
     #[test]
@@ -966,5 +1118,141 @@ mod tests {
         };
         let row = derive_verdict_for_event(&event).expect("a native review event derives a verdict via adapter_id routing");
         assert_eq!(row, derive_native_review_verdict(&role), "role is the record's actor.role, routed by adapter_id despite NonVerdict kind");
+    }
+
+    /// One `DerivedVerdict` built the way [`run`] builds it — through a
+    /// real `ArtifactEvent`, so these tests exercise the actual
+    /// `join_key`/`display_label`/`evidence_line` accessors rather than
+    /// hand-written strings.
+    fn derived_with(adapter_id: &'static str, regime: &RegimeKey, join_key: &str, kind: Kind, detail: serde_json::Value, at: &str) -> DerivedVerdict {
+        let event = ArtifactEvent {
+            adapter_id,
+            join_key: ArtifactJoinKey::Scenario(canon_model::ids::ScenarioId::parse(join_key.to_string()).unwrap()),
+            kind,
+            authoring_role: Some(canon_model::ids::RoleId::parse("dev").unwrap()),
+            area: Some("world".to_string()),
+            trust_level: None,
+            at: at.parse().unwrap(),
+            detail,
+        };
+        DerivedVerdict {
+            regime_key: regime.clone(),
+            row: verdict_row("dev", canon_ingest::verdict::Polarity::Failure, canon_ingest::verdict::Becomes::GuardrailCandidate),
+            at: event.at,
+            join_key: event.join_key.as_str().to_string(),
+            kind_label: event.display_label(),
+            evidence_line: event.evidence_line(),
+        }
+    }
+
+    fn derived(regime: &RegimeKey, join_key: &str, kind: Kind, detail: serde_json::Value, at: &str) -> DerivedVerdict {
+        derived_with("ledger", regime, join_key, kind, detail, at)
+    }
+
+    fn finding(text: &str) -> serde_json::Value {
+        serde_json::json!({"detail": text})
+    }
+
+    #[test]
+    fn a_regime_groups_every_verdict_and_keeps_the_newest_timestamp() {
+        let key = regime("world", "abc123");
+        let scenario = "world.firstbuy-hotdeal.14";
+        let group = group_by_regime(vec![
+            derived(&key, scenario, Kind::CodeReviewFinding, finding("reveal reads the client cart"), "2026-07-08T20:05:49Z"),
+            derived(&key, scenario, Kind::RemediationResolved, finding("re-read the grant from the result"), "2026-07-09T10:15:00Z"),
+        ]);
+        let evidence = group.get(&key).expect("both verdicts fold onto the one regime");
+        assert_eq!(evidence.rows.len(), 2);
+        assert_eq!(evidence.latest_at, "2026-07-09T10:15:00Z".parse::<DateTime<Utc>>().unwrap(), "recorded_at is the newest source record");
+    }
+
+    #[test]
+    fn trajectory_text_names_the_artifact_with_deduped_labels_and_evidence_in_first_seen_order() {
+        // The whole point of s38-evidence-bearing-memory: the TITLE
+        // names a real scenario and what happened to it, and the CONTENT
+        // quotes the reviewer's actual findings — no describing the
+        // ingest driver, no `detail` blob, no alphabetical re-sorting of
+        // a narrative.
+        let key = regime("world", "abc123");
+        let scenario = "world.firstbuy-hotdeal.14";
+        let group = group_by_regime(vec![
+            derived(&key, scenario, Kind::CodeReviewFinding, finding("reveal reads the client cart"), "2026-07-08T20:05:49Z"),
+            // Same kind AND same prose as the first: contributes neither
+            // a duplicate label nor a duplicate line.
+            derived(&key, scenario, Kind::CodeReviewFinding, finding("reveal reads the client cart"), "2026-07-08T21:00:00Z"),
+            derived(&key, scenario, Kind::RemediationResolved, finding("re-read the grant from the result"), "2026-07-09T10:15:00Z"),
+        ]);
+        let (task, context) = group.get(&key).unwrap().trajectory_text(&key);
+        assert_eq!(task, "world.firstbuy-hotdeal.14: code-review finding, remediation resolved");
+        assert_eq!(context, "code-review finding: reveal reads the client cart\nremediation resolved: re-read the grant from the result");
+        assert!(
+            !context.contains("canon ingest artifacts") && !context.contains("VerdictRow"),
+            "a strategy's content never describes the ingest driver: {context}"
+        );
+    }
+
+    #[test]
+    fn trajectory_text_is_byte_identical_across_two_passes_over_the_same_events() {
+        // `trajectory_content_digest`'s duplicate skip only fires if the
+        // text a second ingest pass derives matches the first exactly.
+        let key = regime("world", "abc123");
+        let scenario = "world.firstbuy-hotdeal.14";
+        let events = || {
+            vec![
+                derived(&key, scenario, Kind::CodeReviewFinding, finding("reveal reads the client cart"), "2026-07-08T20:05:49Z"),
+                derived(&key, scenario, Kind::ClearAfterFlagged, serde_json::json!({"pin": "9c93d024b"}), "2026-07-09T09:00:00Z"),
+            ]
+        };
+        let first = group_by_regime(events());
+        let second = group_by_regime(events());
+        assert_eq!(first.get(&key).unwrap().trajectory_text(&key), second.get(&key).unwrap().trajectory_text(&key));
+    }
+
+    #[test]
+    fn trajectory_text_degrades_to_the_regime_key_rather_than_printing_a_wrong_artifact_id() {
+        // Unreachable by construction (`regime_hash` IS the join key's
+        // digest, and `absorb` debug-asserts it), so this exercises the
+        // release-build degrade directly: a group that somehow spanned
+        // two keys names the regime, never one arbitrary member's id.
+        let key = regime("world", "abc123");
+        let mut evidence = RegimeEvidence::default();
+        evidence.absorb(derived(&key, "world.firstbuy-hotdeal.14", Kind::CodeReviewFinding, finding("a finding"), "2026-07-08T20:05:49Z"));
+        evidence.join_key = None;
+        let (task, _) = evidence.trajectory_text(&key);
+        assert_eq!(task, format!("{}: code-review finding", key.as_str()));
+    }
+
+    #[test]
+    fn push_first_seen_dedupes_without_re_sorting() {
+        let mut seen = Vec::new();
+        for item in ["remediation resolved", "code-review finding", "remediation resolved"] {
+            push_first_seen(&mut seen, item);
+        }
+        assert_eq!(seen, vec!["remediation resolved", "code-review finding"]);
+    }
+
+    #[test]
+    fn a_native_verdict_regime_titles_itself_by_the_record_never_non_verdict() {
+        // The shape `canon retrieve` returns for a repo configured
+        // `artifacts.native_records: true` (this one): the native
+        // adapters set `kind = NonVerdict` — their verdicts come from the
+        // native derivation path — so labelling off `kind` alone would
+        // title every strategy here "non-verdict".
+        let key = regime("platformer", "41fdd8c5");
+        let native = |status: &str, prose: &str, at: &str| {
+            let detail = serde_json::json!({"native_kind": "divergence", "status": status, "detail": prose});
+            derived_with("divergence-native", &key, "platformer.session.04", Kind::NonVerdict, detail, at)
+        };
+        let group = group_by_regime(vec![
+            native("still_divergent", "SHIP-BLOCKER App.tsx:45 calls sim.setPaused inside a React updater", "2026-07-14T20:50:34Z"),
+            native("resolved", "Fixed and re-verified at 505a668e", "2026-07-14T21:38:36Z"),
+        ]);
+        let (task, context) = group.get(&key).unwrap().trajectory_text(&key);
+        assert_eq!(task, "platformer.session.04: still-divergent divergence, resolved divergence");
+        assert!(!task.contains("non-verdict"), "a record that DID score must not be titled non-verdict: {task}");
+        assert_eq!(
+            context,
+            "still-divergent divergence: SHIP-BLOCKER App.tsx:45 calls sim.setPaused inside a React updater\nresolved divergence: Fixed and re-verified at 505a668e"
+        );
     }
 }

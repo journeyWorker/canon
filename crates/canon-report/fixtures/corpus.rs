@@ -195,7 +195,7 @@ fn build_git_tier(git_root: &Path) {
     // ── trust matrix: 3 tasks, 2 evidence records ──────────────────
     tier.write(
         &Task::new(
-            Envelope::new(1, RecordKind::Task, at(2026, 1, 1, 9), Actor::new_unattributed("fixture")),
+            Envelope::current(RecordKind::Task, at(2026, 1, 1, 9), Actor::new_unattributed("fixture")),
             TaskId::parse("s9-fixture#1").unwrap(),
             "task one",
             TaskStatus::Done,
@@ -206,7 +206,7 @@ fn build_git_tier(git_root: &Path) {
     .unwrap();
     tier.write(
         &Task::new(
-            Envelope::new(1, RecordKind::Task, at(2026, 1, 1, 9), Actor::new_unattributed("fixture")),
+            Envelope::current(RecordKind::Task, at(2026, 1, 1, 9), Actor::new_unattributed("fixture")),
             TaskId::parse("s9-fixture#2").unwrap(),
             "task two",
             TaskStatus::Done,
@@ -216,7 +216,7 @@ fn build_git_tier(git_root: &Path) {
     )
     .unwrap();
     tier.write(&Task::new(
-        Envelope::new(1, RecordKind::Task, at(2026, 1, 1, 9), Actor::new_unattributed("fixture")),
+        Envelope::current(RecordKind::Task, at(2026, 1, 1, 9), Actor::new_unattributed("fixture")),
         TaskId::parse("s9-fixture#3").unwrap(),
         "task three",
         TaskStatus::Open,

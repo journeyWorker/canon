@@ -67,6 +67,25 @@ pub fn raw_record_at(raw: &RawRecord) -> DateTime<Utc> {
         .expect("raw record reaching raw_record_at already passed validate_envelope_shape")
 }
 
+/// Parse the `schema` field out of a raw record's JSON — the
+/// [`crate::fold::fold_latest_by_key`] generation discriminator
+/// (`s38-evidence-bearing-memory`) for any caller that folds bare
+/// [`RawRecord`]s rather than typed records with an
+/// `envelope.schema` in hand (`canon query`'s natural-key fold,
+/// `canon subject`'s re-write fold, the plugin-overlay projection).
+///
+/// Unlike [`raw_record_at`] this NEVER panics on a malformed field: it
+/// falls back to `0`, which sorts strictly below every real format
+/// generation (a kind's `schema` starts at `1`), so a record whose
+/// `schema` is missing or non-integer can never out-rank a well-formed
+/// record of the same key on an equal-`at` tie. Folding is a read-side
+/// resolution, not a validation surface —
+/// `canon_model::validate_envelope_shape` is where a missing `schema`
+/// is reported as `Malformed`.
+pub fn raw_record_schema(raw: &RawRecord) -> u32 {
+    raw.0.get("schema").and_then(|v| v.as_u64()).and_then(|n| u32::try_from(n).ok()).unwrap_or(0)
+}
+
 /// Untyped, already-serialized content ready for `Tier::write` — the
 /// aging/migration write path (module doc: coherence forces this to be
 /// a distinct newtype rather than a second `impl StoredRecord for

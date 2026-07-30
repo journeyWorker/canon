@@ -35,11 +35,6 @@ use sha2::{Digest, Sha256};
 
 use crate::adapter::{DirectiveRow, UnifiedRow};
 
-/// canon-model's envelope schema version every record this module
-/// constructs carries (design D2: "per-kind schema version, bumped on
-/// any breaking field change to that kind").
-const SCHEMA_VERSION: u32 = 1;
-
 /// The `Event.label` every normalized token/cost row carries.
 pub const TOKEN_USAGE_LABEL: &str = "token_usage";
 
@@ -271,7 +266,7 @@ fn normalize_session(session_id_str: &str, rows: &[&UnifiedRow], directives: &[&
 
     let session_actor = Actor::new_unattributed(client.clone()).with_session(session_id.clone());
     let mut session = Session::new(
-        Envelope::new(SCHEMA_VERSION, RecordKind::Session, ended_at, session_actor),
+        Envelope::current(RecordKind::Session, ended_at, session_actor),
         session_id.clone(),
         client.clone(),
         started_at,
@@ -283,7 +278,7 @@ fn normalize_session(session_id_str: &str, rows: &[&UnifiedRow], directives: &[&
     let run_id = deterministic_run_id(&session_id, None, started_at_ms);
     let run_actor = Actor::new_unattributed(client.clone()).with_session(session_id.clone());
     let run = Run::new(
-        Envelope::new(SCHEMA_VERSION, RecordKind::Run, ended_at, run_actor),
+        Envelope::current(RecordKind::Run, ended_at, run_actor),
         run_id,
         Some(session_id.clone()),
         None,
@@ -321,7 +316,7 @@ fn normalize_session(session_id_str: &str, rows: &[&UnifiedRow], directives: &[&
                         "dedup_key": row.dedup_key,
                         "is_turn_start": row.is_turn_start,
                     });
-                    Event::new(Envelope::new(SCHEMA_VERSION, RecordKind::Event, at, actor), run_id, seq, TOKEN_USAGE_LABEL, detail)
+                    Event::new(Envelope::current(RecordKind::Event, at, actor), run_id, seq, TOKEN_USAGE_LABEL, detail)
                 }
                 EventSeed::UserDirective(directive) => {
                     let actor = Actor::new_unattributed(client.clone()).with_session(session_id.clone());
@@ -330,7 +325,7 @@ fn normalize_session(session_id_str: &str, rows: &[&UnifiedRow], directives: &[&
                         "workspace_key": directive.workspace_key,
                         "workspace_label": directive.workspace_label,
                     });
-                    Event::new(Envelope::new(SCHEMA_VERSION, RecordKind::Event, at, actor), run_id, seq, USER_DIRECTIVE_LABEL, detail)
+                    Event::new(Envelope::current(RecordKind::Event, at, actor), run_id, seq, USER_DIRECTIVE_LABEL, detail)
                 }
             }
         })
@@ -405,7 +400,7 @@ fn child_runs_for_agents(seeds: &[EventSeed<'_>], session_id: &SessionId, client
             let actor = Actor::new_unattributed(client).with_session(session_id.clone());
             let ended_at = millis_to_utc(span.ended_at_ms);
             Run::new(
-                Envelope::new(SCHEMA_VERSION, RecordKind::Run, ended_at, actor),
+                Envelope::current(RecordKind::Run, ended_at, actor),
                 child_run_ids[*agent_id],
                 Some(session_id.clone()),
                 None,

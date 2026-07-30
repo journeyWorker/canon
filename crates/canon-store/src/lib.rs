@@ -29,7 +29,8 @@ pub use atomic::write_atomic;
 /// IO; `canon-cli`'s `canon ingest sessions` drives read/gate/advance.
 pub use cursor::{CursorDiff, CursorStore, FileSeen, SourceCursor};
 
-/// The generic last-wins-by-`at` fold (design D11, [`fold::fold_latest_by_key`])
+/// The generic last-wins-by-`(at, schema, digest)` fold (design D11, s21
+/// D3, `s38-evidence-bearing-memory`; [`fold::fold_latest_by_key`])
 /// — hoisted here so `canon-gate::ledger::latest_verdicts` and every
 /// other s15 consumer (sync's upsert-check, the divergence fold, the
 /// flywheel) share one implementation instead of a fourth local copy.

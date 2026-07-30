@@ -127,6 +127,7 @@ fn write_read_upsert_and_age_round_trip_against_a_live_instance() {
         digested,
         |r| r.raw.0["session_id"].as_str().unwrap().to_string(),
         |r| canon_store::tier::raw_record_at(&r.raw),
+        |r| canon_store::tier::raw_record_schema(&r.raw),
         |r| r.digest.as_str(),
     );
     let winner = folded.get(&session_id_str).expect("folded winner for this session_id");

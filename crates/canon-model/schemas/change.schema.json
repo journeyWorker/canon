@@ -18,7 +18,7 @@
       "$ref": "#/$defs/RecordKind"
     },
     "schema": {
-      "description": "Per-kind schema version, bumped on any breaking field change to\nthat kind (design D2; `canon fmt`/`canon migrate`, S11, key off\nit).",
+      "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
       "type": "integer",
       "format": "uint32",
       "minimum": 0

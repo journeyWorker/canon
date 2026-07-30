@@ -70,6 +70,13 @@ fn diag(code: &str, message: impl Into<String>, subject: impl Into<String>) -> D
 struct Survivor {
     key: ScenarioKey,
     at: DateTime<Utc>,
+    /// The overlay record's OWN `schema` (its `OverlayEnvelope.schema`,
+    /// the overlay kind's format generation) -- the fold's equal-`at`
+    /// generation discriminator (`s38-evidence-bearing-memory`). An
+    /// overlay's `at` is as byte-stable as its source, so two
+    /// generations of one overlay record can tie on `at` exactly like a
+    /// plan-derived core record can.
+    schema: u32,
     digest: String,
     fields: serde_json::Map<String, Value>,
 }
@@ -117,7 +124,8 @@ fn extract_key(obj: &serde_json::Map<String, Value>, decl: &OverlayDecl, diags: 
 /// surviving record (passed [`validate_overlay_body`] AND carried
 /// well-formed join-key values) is folded latest-by-`(join_key, at)`,
 /// reusing [`fold_latest_by_key`]'s exact last-wins-by-`at`,
-/// ties-broken-by-content-digest semantics (s21 P1); the winning record's own
+/// ties-broken-by-`(schema, content_digest)` semantics (s21 P1,
+/// `s38-evidence-bearing-memory`); the winning record's own
 /// `decl.fields`-named values are extracted into the returned map,
 /// filtered to keys `core` actually carries -- `core` is this join's
 /// LEFT side, so an overlay record for a key `core` doesn't contain
@@ -149,19 +157,21 @@ pub fn project_overlay(
         let Some(key) = extract_key(obj, decl, &mut diags) else { continue };
 
         // `validate_overlay_body` also already confirmed `at` is a
-        // present, RFC3339-valid string (`check_envelope_fields`
-        // reuses `canon_model::evidence::validate_envelope_shape`) --
-        // safe to call unconditionally at this point.
+        // present, RFC3339-valid string and `schema` a present integer
+        // (`check_envelope_fields` reuses
+        // `canon_model::evidence::validate_envelope_shape`) -- safe to
+        // call both unconditionally at this point.
         let at = canon_store::tier::raw_record_at(raw);
+        let schema = canon_store::tier::raw_record_schema(raw);
         let digest = canon_store::partition::content_digest12(&raw.0);
 
         let fields: serde_json::Map<String, Value> =
             decl.fields.iter().filter_map(|field| obj.get(&field.name).map(|v| (field.name.clone(), v.clone()))).collect();
 
-        survivors.push(Survivor { key, at, digest, fields });
+        survivors.push(Survivor { key, at, schema, digest, fields });
     }
 
-    let folded = fold_latest_by_key(survivors, |s| s.key.clone(), |s| s.at, |s| s.digest.as_str());
+    let folded = fold_latest_by_key(survivors, |s| s.key.clone(), |s| s.at, |s| s.schema, |s| s.digest.as_str());
 
     let projected =
         folded.into_iter().filter(|(key, _)| core_keys.contains(key)).map(|(key, survivor)| (key, survivor.fields)).collect();

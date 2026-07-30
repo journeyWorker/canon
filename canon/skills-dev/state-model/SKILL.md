@@ -12,15 +12,16 @@ respect.
 
 ## The record-kind set is closed — review before extending
 
-`RecordKind` (`src/envelope.rs`) has exactly twelve variants (design D1):
-`Change`, `Task`, `Scenario`, `Session`, `Run`, `Event`, `Handoff`,
-`Review`, `Divergence`, `Trajectory`, `StrategyItem`, `EvidenceRecord`.
+`RecordKind` (`src/envelope.rs`) has exactly thirteen variants (design
+D1): `Change`, `Task`, `Scenario`, `Session`, `Run`, `Event`, `Handoff`,
+`Review`, `Divergence`, `Trajectory`, `StrategyItem`, `EvidenceRecord`,
+`Subject`.
 This is deliberate friction, not an oversight — an open `kind: String` +
 untyped `payload` escape hatch is exactly what let an internal monorepo accumulate three
 uncoordinated management systems before canon existed (design D1's
 rejected alternative).
 
-Before adding a thirteenth kind:
+Before adding a fourteenth kind:
 
 1. Confirm the new artifact family genuinely doesn't fit an existing
    kind's fields (extending an existing kind's `schema` version, below,
@@ -29,7 +30,7 @@ Before adding a thirteenth kind:
    `canon-model` change — not a drive-by addition inside an unrelated
    spec's implementation. Add the variant to `RecordKind` AND to
    `RecordKind::ALL` (both are asserted in sync by
-   `envelope::tests::all_twelve_kinds_present_exactly_once`), add the
+   `envelope::tests::all_thirteen_kinds_present_exactly_once`), add the
    struct in `src/records.rs` (or its own module, for something
    `Handoff`-sized), implement `CanonRecord` for it, add it to
    `schema_export::record_schemas()`, and add a well-formed fixture
@@ -41,23 +42,70 @@ Before adding a thirteenth kind:
 
 ## Bumping a kind's `schema` version
 
-`Envelope.schema: u32` (design D2) is the per-kind version integer,
-bumped on any breaking field change to that kind. Bump it when:
+`Envelope.schema: u32` (design D2) is the per-kind FORMAT GENERATION.
+Bump it when:
 
 - A required field is added/removed/retyped on an existing record kind.
 - A `FailureClass` string is renamed (evidence-integrity spec: "renaming
   a failure class requires a coordinated migration" — ship the rename
   together with updated fixtures referencing the old string, in the same
   change).
+- **A kind whose `at` is BYTE-STABLE gains any field that changes its
+  derived content** — even a purely additive `Option<T>`/`Vec<T>`. See
+  the trap below; this one is not about wire compatibility at all.
 
-Non-breaking additions (a new `Option<T>` field with `#[serde(default)]`)
-do not require a bump — `schema_export`'s own scenario ("a field
-addition is reflected without a second registration site") assumes
-additive changes are the common case.
+### The additive-field trap on byte-stable-`at` kinds
+
+A plan-derived record's `Envelope.at` is `file_modified_at(<source
+doc>)` — deliberately byte-stable, never wall-clock (s20 D7), which is
+what makes re-importing an unchanged source idempotent. The consequence
+(found the hard way in s38 `evidence-bearing-memory`): a canon CODE
+change does not advance the source file's mtime, so the stale and fresh
+records for one natural key carry an IDENTICAL `at`.
+
+`canon_store::fold::fold_latest_by_key` orders by `(at, schema,
+digest)`. With no schema bump both generations tie on `at` AND on
+`schema`, so the winner falls to the lexicographic `digest` tie-break —
+**arbitrary per row**. The symptom is brutal to diagnose: the new field
+appears on some records and not others within one source file, with zero
+import diagnostics, looking exactly like a parser bug. Three plausible
+structural hypotheses were chased before the store fold was identified.
+
+So for `Task`/`Change` (and any future kind projected from a source
+document), a field addition IS a generation change and MUST bump
+`schema`. `Task` is at `2` for exactly this reason.
+
+Kinds whose `at` is derivation-time (`Run`, `Handoff`, `Session`,
+`Event`, …) cannot tie this way, so a purely additive `Option<T>` field
+with `#[serde(default)]` needs no bump there — `schema_export`'s own
+scenario ("a field addition is reflected without a second registration
+site") still holds for them.
+
+### Additive fields must also skip when empty
+
+Independent of the bump: a new field MUST be
+`#[serde(default, skip_serializing_if = "Option::is_none")]` (or
+`"Vec::is_empty"`), never a bare `#[serde(default)]`. Bare default makes
+every EXISTING record reserialize with a spurious `null`/`[]`, which
+changes its `content_digest12` and breaks the write-time idempotence that
+ingest watermark cursors, `trajectory_content_digest`, and `canon report
+--check`'s byte-diff drift gate all rest on. Note
+`fixtures/well-formed/*.json` assert a LOSSLESS round-trip
+(`to_value(value) == fixture`), so a fixture demonstrating the full field
+surface must carry real values rather than nulls.
+
+### A parser change needs a cursor bump too
+
+Bumping `schema` makes the fresh record WIN, but something still has to
+make it get WRITTEN. The plan-import cursor is keyed on dialect + root +
+per-file content digests, so a parser change looks like "unchanged" and
+the source is skipped. `PlanAdapter::parse_version()` is folded into the
+cursor id for that reason — bump it whenever a dialect's parse output
+changes for identical input.
 
 ## Adding a join-spine key newtype
 
-The eight join-spine keys (`src/ids.rs`) are declared through the
+The nine join-spine keys (`src/ids.rs`) are declared through the
 `join_key_newtype!` macro: one literal `grammar`/`joins` pair per
 invocation, expanded into the type's own rustdoc comment, its
 `GRAMMAR`/`JOINS` associated constants, and its `JsonSchema` impl — all

@@ -36,12 +36,6 @@ use crate::plan_writeback::{FlipDocOutcome, PlanTaskLocation, PlanWriteBack, Wri
 use crate::plan_adapter::{PlanAdapter, PlanParseOutcome, PlanSourceConfig, PlanSourceHandle, resolve_path_source};
 use crate::scanner::scan_dir;
 
-/// canon-model's envelope schema version every record this adapter
-/// constructs carries (mirrors `crate::normalize::SCHEMA_VERSION`'s own
-/// doc comment: "per-kind schema version, bumped on any breaking field
-/// change to that kind").
-const SCHEMA_VERSION: u32 = 1;
-
 /// The fixed, per-dialect unattributed actor every `Change`/`Task` this
 /// adapter emits carries (design D7: "provenance visible in every
 /// record, byte-stable across runs" — never a wall-clock- or
@@ -92,6 +86,19 @@ pub struct OpenspecPlanAdapter;
 impl PlanAdapter for OpenspecPlanAdapter {
     fn dialect_id(&self) -> &'static str {
         "openspec"
+    }
+
+    /// `2` — this dialect's parse output changed for identical input
+    /// when `s37-execution-graph-topology` taught
+    /// [`parse_tasks_md`] to extract `depends_on` from the in-row
+    /// `depends on <n>`/`after <n>` marker prose. An unchanged
+    /// `tasks.md` therefore yields DIFFERENT `Task` records than it did
+    /// before that change, which is exactly what this generation
+    /// declares to the plan-import cursor
+    /// (`canon-cli::plans::plan_source_cursor_id`) so the source is
+    /// re-parsed rather than reported `skipped unchanged`.
+    fn parse_version(&self) -> u32 {
+        2
     }
 
     fn resolve_source(&self, config: &PlanSourceConfig) -> Option<PlanSourceHandle> {
@@ -306,7 +313,7 @@ fn parse_change_dir(dir: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
     let (tasks, done_count, open_count, change_at) = parse_tasks_file(dir, root, &change_id, proposal_mtime, outcome);
 
     let status = derive_status(archived, done_count, open_count);
-    let envelope = Envelope::new(SCHEMA_VERSION, RecordKind::Change, change_at, actor());
+    let envelope = Envelope::current(RecordKind::Change, change_at, actor());
     outcome.changes.push(Change::new(envelope, change_id, basename, summary, status));
     outcome.tasks.extend(tasks);
 
@@ -392,7 +399,7 @@ fn parse_tasks_file(
             // candidate must fail soft and stay visible).
             outcome.record_unmapped(&format!("{DIAG_UNRESOLVABLE_TASK_DEP}:{}", task_id.as_str()));
         }
-        let envelope = Envelope::new(SCHEMA_VERSION, RecordKind::Task, tasks_mtime, actor());
+        let envelope = Envelope::current(RecordKind::Task, tasks_mtime, actor());
         tasks.push(Task::new(envelope, task_id, title, status, evidence_note).with_scenario_refs(row.scenario_refs).with_depends_on(depends_on));
     }
 
@@ -688,6 +695,16 @@ mod tests {
     #[test]
     fn dialect_id_is_openspec() {
         assert_eq!(OpenspecPlanAdapter.dialect_id(), "openspec");
+    }
+
+    /// `s38-evidence-bearing-memory`: this dialect gained `depends_on`
+    /// extraction, so its parse output for an IDENTICAL `tasks.md`
+    /// changed and its generation must be past `1` — otherwise
+    /// `canon-cli::plans`'s cursor id is unchanged and `canon ingest
+    /// plans` reports `skipped unchanged` instead of re-parsing.
+    #[test]
+    fn parse_version_is_two_because_dependency_extraction_changed_this_dialects_output() {
+        assert_eq!(OpenspecPlanAdapter.parse_version(), 2);
     }
 
     #[test]
@@ -1061,12 +1078,19 @@ mod tests {
     /// parser was never at fault (proven by re-importing the real
     /// corpus into a fresh tier): a plan `Task`'s `at` is its
     /// `tasks.md` mtime, which a canon CODE change does not advance, so
-    /// a pre-s37 record and its post-s37 replacement share an
-    /// IDENTICAL `at` and `canon query`'s `(at, digest)` supersession
-    /// fold (`canon_store::fold::fold_latest_by_key`) resolves them by
-    /// LEXICOGRAPHIC DIGEST — picking the stale body for an arbitrary
-    /// subset of rows. This test defends the parse side in CI so that
-    /// diagnosis can never be re-litigated by inspection.
+    /// a pre-s37 record and its post-s37 replacement shared an
+    /// IDENTICAL `at`, and `canon query`'s supersession fold
+    /// (`canon_store::fold::fold_latest_by_key`) then had only a
+    /// LEXICOGRAPHIC DIGEST to choose by — picking the stale body for an
+    /// arbitrary subset of rows.
+    ///
+    /// `s38-evidence-bearing-memory` closed BOTH halves of that:
+    /// [`OpenspecPlanAdapter::parse_version`] forces the re-parse the
+    /// content-digest cursor could not detect, and the fold now orders
+    /// an equal-`at` tie by `Envelope.schema` (`Task` is generation `2`)
+    /// before it ever reaches the digest. This test defends the parse
+    /// side in CI so that diagnosis can never be re-litigated by
+    /// inspection.
     ///
     /// Rows `4.4` and `4.5` plus their continuation lines are copied
     /// byte-for-byte from `openspec/changes/s20-plan-corpus-join/

@@ -379,7 +379,7 @@ fn typed_path_evidence(
     // throwaway envelope's `at`; it is NOT the gate clock (that is the single
     // dispatch-boundary `now` threaded on `GateContext`) and never enters a
     // verdict — `compile_task` reads the atom's evidence, not this `at`.
-    let envelope = Envelope::new(1, RecordKind::Task, Utc::now(), Actor::new_unattributed("canon-gate"));
+    let envelope = Envelope::current(RecordKind::Task, Utc::now(), Actor::new_unattributed("canon-gate"));
     let task = canon_vocab::compile_task(atom, &snapshot, envelope).map_err(|diags| {
         let rendered = diags.iter().map(|d| format!("{}: {} ({})", d.code, d.message, d.subject)).collect::<Vec<_>>().join("; ");
         format!("typed task atom `{}` failed vocabulary validation: {rendered}", atom.id)

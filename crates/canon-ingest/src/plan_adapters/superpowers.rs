@@ -60,13 +60,6 @@ use crate::plan_writeback::{FlipDocOutcome, PlanTaskLocation, PlanWriteBack, Wri
 use crate::plan_adapter::{PlanAdapter, PlanParseOutcome, PlanSourceConfig, PlanSourceHandle, resolve_path_source};
 use crate::plan_adapters::openspec::derive_status;
 
-/// canon-model's envelope schema version every record this adapter
-/// constructs carries (mirrors `openspec.rs`'s `SCHEMA_VERSION`'s
-/// own doc comment — a fresh per-dialect constant since that one is
-/// private to its own module, never a cross-module import for a bare
-/// `u32`).
-const SCHEMA_VERSION: u32 = 1;
-
 /// The fixed, per-dialect unattributed actor every `Change`/`Task`
 /// this adapter emits carries (design D7, s17 D7's identical
 /// "provenance visible in every record, byte-stable across runs" —
@@ -93,8 +86,8 @@ pub(crate) const DIAG_NOT_A_PLAN_DOC: &str = "not-a-plan-doc";
 /// `"<DIAG_UNRESOLVABLE_TASK_DEP>:<task_id>"` for the same reason the
 /// openspec dialect's identically-named diagnostic is (a flat count
 /// cannot tell an operator WHICH section to fix); a fresh per-module
-/// constant rather than a cross-module import, exactly like
-/// [`SCHEMA_VERSION`] above.
+/// constant rather than a cross-module import, exactly like the
+/// openspec dialect's own identically-named constant.
 pub(crate) const DIAG_UNRESOLVABLE_TASK_DEP: &str = "unresolvable-task-dep";
 
 pub struct SuperpowersPlanAdapter;
@@ -102,6 +95,18 @@ pub struct SuperpowersPlanAdapter;
 impl PlanAdapter for SuperpowersPlanAdapter {
     fn dialect_id(&self) -> &'static str {
         "superpowers"
+    }
+
+    /// `2` — this dialect's parse output changed for identical input
+    /// when `s37-execution-graph-topology` taught [`parse_plan_doc`] to
+    /// extract `depends_on` from the `- Consumes: … from Task <n>`
+    /// interface line. An unchanged plan doc therefore yields DIFFERENT
+    /// `Task` records than it did before that change, which is exactly
+    /// what this generation declares to the plan-import cursor
+    /// (`canon-cli::plans::plan_source_cursor_id`) so the source is
+    /// re-parsed rather than reported `skipped unchanged`.
+    fn parse_version(&self) -> u32 {
+        2
     }
 
     fn resolve_source(&self, config: &PlanSourceConfig) -> Option<PlanSourceHandle> {
@@ -580,7 +585,7 @@ fn parse_plan_doc(path: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
         if let Some(consumes) = section.consumes {
             pending_deps.push((tasks.len(), consumes));
         }
-        let envelope = Envelope::new(SCHEMA_VERSION, RecordKind::Task, at, actor());
+        let envelope = Envelope::current(RecordKind::Task, at, actor());
         tasks.push(Task::new(envelope, task_id, section.name, status, None));
     }
 
@@ -600,7 +605,7 @@ fn parse_plan_doc(path: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
     // No archive convention (design D4): `derive_status` shared
     // verbatim with the openspec dialect, `archived: false` always.
     let status = derive_status(false, done_count, open_count);
-    let envelope = Envelope::new(SCHEMA_VERSION, RecordKind::Change, at, actor());
+    let envelope = Envelope::current(RecordKind::Change, at, actor());
     outcome.changes.push(Change::new(envelope, change_id, title, summary, status));
     outcome.tasks.extend(tasks);
 }
@@ -638,6 +643,17 @@ mod tests {
         let config = PlanSourceConfig { root: Some(root.to_path_buf()) };
         let handle = adapter.resolve_source(&config).expect("configured root resolves");
         adapter.parse(&handle)
+    }
+
+    /// `s38-evidence-bearing-memory`: this dialect gained `- Consumes:
+    /// … from Task <n>` dependency extraction, so its parse output for
+    /// an IDENTICAL plan doc changed and its generation must be past
+    /// `1` — otherwise `canon-cli::plans`'s cursor id is unchanged and
+    /// `canon ingest plans` reports `skipped unchanged` instead of
+    /// re-parsing.
+    #[test]
+    fn parse_version_is_two_because_dependency_extraction_changed_this_dialects_output() {
+        assert_eq!(SuperpowersPlanAdapter.parse_version(), 2);
     }
 
     fn find_change<'a>(outcome: &'a PlanParseOutcome, change_id: &str) -> &'a Change {
@@ -969,10 +985,15 @@ mod tests {
     /// populates all six correctly. The split came from the READ path —
     /// a superpowers `Task`'s `at` is the plan doc's mtime, which a
     /// canon CODE change does not advance, so a pre-s37 record and its
-    /// post-s37 replacement carry an IDENTICAL `at` and
-    /// `canon_store::fold::fold_latest_by_key`'s `(at, digest)`
-    /// supersession fold decides between them by LEXICOGRAPHIC DIGEST,
-    /// which is arbitrary per row.
+    /// post-s37 replacement carried an IDENTICAL `at` and
+    /// `canon_store::fold::fold_latest_by_key` had only a LEXICOGRAPHIC
+    /// DIGEST to decide between them, which is arbitrary per row.
+    ///
+    /// `s38-evidence-bearing-memory` closed both halves:
+    /// [`SuperpowersPlanAdapter::parse_version`] forces the re-parse the
+    /// content-digest cursor could not detect, and the fold now orders
+    /// an equal-`at` tie by `Envelope.schema` (`Task` is generation `2`)
+    /// before it ever reaches the digest.
     ///
     /// Every `- Consumes:` line below is copied byte-for-byte from
     /// `docs/superpowers/plans/2026-07-14-red-panda-ridge-v2.md`

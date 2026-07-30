@@ -76,20 +76,24 @@ struct GreenCell {
 }
 
 /// One `ctx.evidence` record folded to its (subject, role) cell — the
-/// input [`fold_latest_by_key`] (design D11/s21 D3) folds to the
-/// greatest-`(at, digest)` winner per cell, mirroring
+/// input [`fold_latest_by_key`] (design D11/s21 D3,
+/// `s38-evidence-bearing-memory`) folds to the
+/// greatest-`(at, schema, digest)` winner per cell, mirroring
 /// [`crate::ledger::latest_verdicts`]'s identical shape and total,
 /// machine-independent tie-break.
 struct Candidate<'a> {
     subject: String,
     role: Option<String>,
     at: DateTime<Utc>,
+    /// The record's own `envelope.schema` — the equal-`at` generation
+    /// discriminator, read off `record` rather than assumed.
+    schema: u32,
     digest: String,
     record: &'a EvidenceRecord,
 }
 
 /// Folds `ctx.evidence` to the LATEST record per (subject, role) cell
-/// FIRST — the exact last-wins-by-`(at, digest)` discipline
+/// FIRST — the exact last-wins-by-`(at, schema, digest)` discipline
 /// [`crate::ledger::latest_verdicts`] applies, via the SAME hoisted
 /// [`fold_latest_by_key`] (design D11/s21 D3) — THEN keeps only the
 /// cells whose WINNING record's verdict is `Faithful`. Filtering out
@@ -108,10 +112,10 @@ fn fold_latest_green_cells(ctx: &GateContext) -> Vec<GreenCell> {
         let subject = CellSubject::of(record)?;
         let role = record.envelope.actor.role.as_ref().map(|r| r.as_str().to_string());
         let digest = canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default());
-        Some(Candidate { subject: subject.as_str().to_string(), role, at: record.envelope.at, digest, record })
+        Some(Candidate { subject: subject.as_str().to_string(), role, at: record.envelope.at, schema: record.envelope.schema, digest, record })
     });
 
-    fold_latest_by_key(candidates, |c| (c.subject.clone(), c.role.clone()), |c| c.at, |c| c.digest.as_str())
+    fold_latest_by_key(candidates, |c| (c.subject.clone(), c.role.clone()), |c| c.at, |c| c.schema, |c| c.digest.as_str())
         .into_values()
         .filter(|c| matches!(c.record.verdict, EvidenceVerdict::Faithful))
         .map(|c| GreenCell {

@@ -335,7 +335,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
         // Validated at `resolve_sources`/`load_plan_sources_from_config`
         // time — every `src.dialect` is a registered id by construction.
         let entry = plan_registry::find(&src.dialect).expect("dialect validated before the scan loop");
-        let cursor_id = plan_source_cursor_id(&src.dialect, &src.root);
+        let cursor_id = plan_source_cursor_id(&src.dialect, entry.adapter.parse_version(), &src.root);
 
         let files = scan_dir(&src.root, |path| !excluded_dirs.iter().any(|dir| canonicalize_or(path).starts_with(dir)));
         let mut present_digests: BTreeMap<String, String> = BTreeMap::new();
@@ -584,16 +584,29 @@ fn validate_source_roots(sources: &[PlanSource]) -> Result<(), PlansError> {
     Ok(())
 }
 
-/// One `SourceCursor` id per configured `(dialect, root)` source (task
-/// 3.4) -- `plan-<dialect>-<digest12>`, where `<digest12>` is
-/// `canon_ingest::normalize::content_digest` of the root's own path
-/// string: two sources naming the same dialect at DIFFERENT roots (or
-/// vice versa) never collide on one cursor file, and the id stays a
-/// safe bare filename component regardless of what the root path
-/// itself contains.
-fn plan_source_cursor_id(dialect: &str, root: &Path) -> String {
+/// One `SourceCursor` id per configured `(dialect, parse_version, root)`
+/// source (task 3.4) -- `plan-<dialect>-v<parse_version>-<digest12>`,
+/// where `<digest12>` is `canon_ingest::normalize::content_digest` of
+/// the root's own path string: two sources naming the same dialect at
+/// DIFFERENT roots (or vice versa) never collide on one cursor file, and
+/// the id stays a safe bare filename component regardless of what the
+/// root path itself contains.
+///
+/// `parse_version` ([`canon_ingest::PlanAdapter::parse_version`]) joins
+/// the identity because of what this cursor's gate actually compares
+/// (`s38-evidence-bearing-memory`): per-file CONTENT digests. Those are
+/// byte-stable by design — an unchanged plan re-imports idempotently —
+/// which means a change to the PARSER is invisible to the gate and the
+/// source is reported `skipped unchanged` even though its records would
+/// now parse differently. Folding the dialect's parse generation into
+/// the cursor ID rather than into its per-file digests is what makes a
+/// bump behave EXACTLY like editing every file in the source: the
+/// lookup finds no cursor at the new id at all, so every file is
+/// re-read, re-parsed, and re-persisted, and the stale cursor is simply
+/// orphaned rather than mutated.
+fn plan_source_cursor_id(dialect: &str, parse_version: u32, root: &Path) -> String {
     let digest = canon_ingest::normalize::content_digest(&serde_json::json!(root.to_string_lossy()));
-    format!("plan-{dialect}-{digest}")
+    format!("plan-{dialect}-v{parse_version}-{digest}")
 }
 
 /// A file's `(mtime_ms, size)` for the cursor's informational summary
@@ -709,4 +722,46 @@ pub fn format_unwritten_json(outcome: &PlansOutcome) -> Option<String> {
     }
     let body = UnwrittenBody { changes: &outcome.unwritten_changes, tasks: &outcome.unwritten_tasks };
     Some(serde_json::to_string_pretty(&body).expect("unwritten body always serializes"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The `s38-evidence-bearing-memory` fix: the cursor's own gate
+    /// compares byte-stable per-file content digests, so a PARSER change
+    /// is invisible to it. Folding the dialect's parse generation into
+    /// the cursor ID is what forces a full re-parse — a bumped
+    /// `parse_version` must land on a DIFFERENT id, so `cursors.read`
+    /// finds nothing and every file is re-read.
+    #[test]
+    fn a_bumped_parse_version_yields_a_different_cursor_id_for_the_same_source() {
+        let root = Path::new("/tmp/plans/openspec");
+        let before = plan_source_cursor_id("openspec", 1, root);
+        let after = plan_source_cursor_id("openspec", 2, root);
+        assert_ne!(before, after, "a parse-version bump must not reuse the prior cursor id, or the source is reported `skipped unchanged`");
+    }
+
+    /// The pre-existing collision guarantee (task 3.4), unweakened by
+    /// the added version segment: two roots under one dialect, and two
+    /// dialects over one root, still never share a cursor file.
+    #[test]
+    fn cursor_ids_stay_distinct_per_dialect_and_per_root() {
+        let one = plan_source_cursor_id("openspec", 2, Path::new("/tmp/plans/a"));
+        let other_root = plan_source_cursor_id("openspec", 2, Path::new("/tmp/plans/b"));
+        let other_dialect = plan_source_cursor_id("superpowers", 2, Path::new("/tmp/plans/a"));
+        assert_ne!(one, other_root);
+        assert_ne!(one, other_dialect);
+    }
+
+    /// A cursor id is used as a bare filename component
+    /// ([`plan_source_cursor_id`]'s own contract), so the version
+    /// segment must not introduce a path separator or any other
+    /// filename-hostile character.
+    #[test]
+    fn a_cursor_id_stays_a_safe_bare_filename_component() {
+        let id = plan_source_cursor_id("openspec", 2, Path::new("/tmp/plans/../weird path/openspec"));
+        assert!(id.starts_with("plan-openspec-v2-"), "expected the dialect and version segments up front, got `{id}`");
+        assert!(id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'), "cursor id `{id}` must stay filename-safe");
+    }
 }

@@ -463,7 +463,7 @@ mod tests {
     use crate::ids::RoleId;
 
     fn sample_envelope() -> Envelope {
-        Envelope::new(1, RecordKind::Handoff, Utc::now(), Actor::new("codex-cli", RoleId::parse("implementer").unwrap()))
+        Envelope::current(RecordKind::Handoff, Utc::now(), Actor::new("codex-cli", RoleId::parse("implementer").unwrap()))
     }
 
     fn sample_body(fields: serde_json::Value) -> HandoffBody {
@@ -570,7 +570,11 @@ mod tests {
         );
         assert_eq!(handoff.from_role, None, "Handoff::new leaves the endpoints unset — only with_roles sets them");
         assert_eq!(handoff.to_role, None);
-        assert_eq!(handoff.envelope.schema, 1, "an additive Option field never bumps the envelope schema");
+        assert_eq!(
+            handoff.envelope.schema,
+            1,
+            "`Handoff` gained the role endpoints and correctly stayed at generation 1: a `Handoff`'s `at` is derivation-time, so two generations of one `handoff_id` can never tie on `at` and the fold needs no discriminator between them (`RecordKind::schema_version`'s bump rule, `s38-evidence-bearing-memory`) — additive-ness alone is NOT the reason"
+        );
 
         let json = serde_json::to_value(&handoff).unwrap();
         let obj = json.as_object().unwrap();
