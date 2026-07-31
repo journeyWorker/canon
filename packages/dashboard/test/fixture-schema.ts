@@ -20,16 +20,13 @@
 // bun test FAILURE here — writer (`canon-report`) == fixture is
 // enforced on the dashboard side too, not just "renders a row".
 
-import { spawnSync } from "node:child_process";
+import { duckdbAvailable, queryJson, sqlLiteral } from "./duckdb-cli";
+
+export { duckdbAvailable };
 
 export interface ParquetColumn {
   name: string;
   type: string;
-}
-
-/** True when the native `duckdb` CLI is reachable on PATH. */
-export function duckdbAvailable(): boolean {
-  return spawnSync("duckdb", ["--version"]).status === 0;
 }
 
 /**
@@ -40,15 +37,9 @@ export function duckdbAvailable(): boolean {
  * declare.
  */
 export function describeParquetSchema(path: string): ParquetColumn[] {
-  const escaped = path.replace(/'/g, "''");
-  const result = spawnSync("duckdb", ["-json", "-c", `DESCRIBE SELECT * FROM read_parquet('${escaped}')`], {
-    encoding: "utf-8",
-  });
-  if (result.status !== 0) {
-    throw new Error(`duckdb DESCRIBE failed for ${path}: ${result.stderr}`);
-  }
-  const trimmed = result.stdout.trim();
-  const rows = (trimmed ? JSON.parse(trimmed) : []) as Array<{ column_name: string; column_type: string }>;
+  const rows = queryJson<{ column_name: string; column_type: string }>(
+    `DESCRIBE SELECT * FROM read_parquet(${sqlLiteral(path)})`,
+  );
   return rows.map((r) => ({ name: r.column_name, type: r.column_type }));
 }
 

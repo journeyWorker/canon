@@ -2,6 +2,9 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { spawn, type Subprocess } from "bun";
 import { existsSync } from "node:fs";
 import puppeteer, { type Browser } from "puppeteer-core";
+import { COLUMNS as FUNNEL_COLUMNS, NOTE as FUNNEL_NOTE } from "../src/panels/flywheel-funnel";
+import { NOTE as ROLE_MEMORY_NOTE } from "../src/panels/role-memory";
+import { NOTE as BURNDOWN_NOTE } from "../src/panels/review-burndown";
 
 // End-to-end proof of task 5.6 / design.md D4: the built app instantiates
 // DuckDB-Wasm (self-hosted mvp/eh bundle + self-hosted `parquet` core
@@ -104,7 +107,12 @@ beforeAll(async () => {
       "--proxy-bypass-list=127.0.0.1,localhost",
     ],
   });
-});
+  // bun's default 5s hook budget is not a real budget for this hook: it
+  // spawns `vite preview` AND cold-launches Chrome, both genuine
+  // external-process latency. On a warm machine it finishes in ~2s and
+  // on a cold one it does not, which made the whole suite flake on
+  // first run. The test body's own budget stays 30s.
+}, 60_000);
 
 afterAll(async () => {
   await browser?.close();
@@ -135,6 +143,33 @@ test("renders all 5 panels from the fixture snapshot with zero third-party netwo
     const rowCount = await page.$$eval(`#${panelId} tbody tr`, (rows) => rows.length);
     expect(rowCount).toBeGreaterThan(0);
   }
+
+  // s42 (`close-the-open-loops`) re-review: three panels state, in
+  // prose, the exact computation their columns carry — the same
+  // statement `.canon/REPORT.md` prints. `panel-copy.test.ts` pins the
+  // wording; this asserts it actually REACHES the DOM, because a
+  // caveat that never renders annotates nothing. `renderTable` turns
+  // backticked spans into `<code>`, so the rendered text is the note
+  // with its backticks removed.
+  const annotated = [
+    { panelId: "panel-role-memory", note: ROLE_MEMORY_NOTE },
+    { panelId: "panel-flywheel-funnel", note: FUNNEL_NOTE },
+    { panelId: "panel-review-burndown", note: BURNDOWN_NOTE },
+  ];
+  for (const { panelId, note } of annotated) {
+    const noteText = await page.$eval(`#${panelId} .panel-note`, (el) => el.textContent ?? "");
+    expect({ panelId, noteText }).toEqual({ panelId, noteText: note.replaceAll("`", "") });
+  }
+
+  // Every column carrying a `description` must reach the reader as a
+  // real header tooltip, with the dotted-underline affordance that says
+  // one is there.
+  const funnelHeaders = await page.$$eval("#panel-flywheel-funnel th.col-annotated", (ths) =>
+    ths.map((th) => th.getAttribute("title") ?? ""),
+  );
+  expect(funnelHeaders).toEqual(
+    FUNNEL_COLUMNS.filter((column) => column.description).map((column) => column.description as string),
+  );
 
   const nonLocalUrls = requestedUrls.filter((url) => {
     const hostname = new URL(url).hostname;

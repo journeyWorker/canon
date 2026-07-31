@@ -32,7 +32,12 @@ SELECT * FROM (
         ('sess-0003', 'claude-code', 'reviewer',     'canon-wt/review', 3::BIGINT, 0.902100::DOUBLE, 140012::BIGINT, TIMESTAMP '2026-07-10 17:30:00', TIMESTAMP '2026-07-10 19:10:00')
 ) AS t(session_id, client, role, workspace_label, run_count, total_cost, total_tokens, first_event_at, last_event_at);
 
--- Panel 3: mart_role_memory (crates/canon-store/sql/views.sql)
+-- Panel 3: mart_role_memory (crates/canon-store/sql/views.sql).
+-- `hit_rate` is the view's `round(active_count::DOUBLE / strategy_count,
+-- 4)` — NOT a retrieval hit rate — so every row here must carry that
+-- exact value, and `active_count + demoted_count = strategy_count`.
+-- One demoted-carrying row and one all-active row keep the column from
+-- reading like a constant.
 CREATE OR REPLACE TABLE mart_role_memory AS
 SELECT * FROM (
     VALUES
@@ -59,7 +64,10 @@ SELECT * FROM (
 -- Panel 5: mart_review_burndown (crates/canon-store/sql/views.sql).
 -- `day` is `date_trunc('day', "at")` over a TIMESTAMP column, so it stays
 -- TIMESTAMP (not DATE) — matched here. `divergence_open_running_total` is
--- the running sum of (opened - resolved); verified by hand below.
+-- the running sum of (opened - resolved) EVENTS, not the count open now,
+-- so at least one day must resolve more than it opens: a monotonically
+-- rising fixture would read exactly like the current state the panel
+-- says it is not.
 CREATE OR REPLACE TABLE mart_review_burndown AS
 SELECT * FROM (
     VALUES

@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:31:13.741808Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "python3 -c '...'  # cross-check every s42 task box against the committed evidence ledger; source in the summary of this change's tasks.md 4.3"
+  },
+  "evidence_note": {
+    "command_result": "task boxes=17 each with a committed EvidenceRecord=17 missing=[]",
+    "summary": "every one of s42's 17 task boxes has a committed EvidenceRecord bearing that exact task id, so none was flipped by hand: `canon gate task` requires a promoted record before it will flip a box. The captured reading was taken with this record's own predecessor committed - the check covers task-id coverage, not file identity, so re-authoring this one record does not change what it reports"
+  },
+  "kind": "evidence_record",
+  "run_seq": 22,
+  "schema": 1,
+  "staging_id": "07da234f0345",
+  "task_id": "s42-close-the-open-loops#4.3",
+  "verdict": "faithful"
+}

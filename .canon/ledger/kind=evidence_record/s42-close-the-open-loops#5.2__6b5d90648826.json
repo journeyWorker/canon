@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:30:33.352928Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test marts"
+  },
+  "evidence_note": {
+    "command_result": "test subjects_matches_the_fixture_corpus_exactly ... ok\ntest flywheel_funnel_matches_the_fixture_corpus_exactly ... ok\ntest trust_matrix_matches_the_fixture_corpus_exactly ... ok\ntest scope_status_matches_the_fixture_corpus_exactly ... ok\ntest role_memory_matches_the_fixture_corpus_exactly ... ok\ntest applied_attribution_is_what_counts_a_resolved_trajectory_joined_to_its_own_run ... ok\ntest flywheel_funnel_never_widens ... ok\ntest result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s",
+    "summary": "a run whose injected guidance is stamped is admitted by ATTRIBUTION not the proxy, and applied == applied_attributed + applied_proxy on every row - enforced by marts.rs:169 and marts.rs:222, which a naive split fails"
+  },
+  "kind": "evidence_record",
+  "run_seq": 21,
+  "schema": 1,
+  "staging_id": "f58e0e6b5425",
+  "task_id": "s42-close-the-open-loops#5.2",
+  "verdict": "faithful"
+}

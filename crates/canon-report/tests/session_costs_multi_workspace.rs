@@ -1,11 +1,13 @@
 //! Acceptance: "a session spanning two workspaces yields distinct
 //! rows, not one row with an arbitrary label" — the P2 regression
 //! guard for `crates/canon-store/sql/views.sql`'s `mart_session_costs`,
-//! which is labeled "session costs by role/repo/session" but used to
-//! GROUP BY `session_id`/`client`/`role` only, picking the `repo`
-//! proxy (`workspace_label`) via `any_value()` — silently merging two
-//! workspaces' costs into one row under whichever workspace happened
-//! to be picked.
+//! which was then labeled "session costs by role/repo/session" and
+//! used to GROUP BY `session_id`/`client`/`role` only, picking the
+//! `repo` proxy (`workspace_label`) via `any_value()` — silently
+//! merging two workspaces' costs into one row under whichever
+//! workspace happened to be picked. Both halves of that are now fixed:
+//! `workspace_label` is in the GROUP BY, and the view no longer claims
+//! a `repo` grouping it never had.
 //!
 //! Deliberately builds a standalone two-workspace corpus (a session
 //! with two runs, each carrying one `token_usage` event under a

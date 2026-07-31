@@ -109,7 +109,9 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     render_table(&mut out, &marts.trust_matrix);
 
     out.push_str("## Session costs\n\n");
-    out.push_str("Token/cost by role/repo/session (`mart_session_costs`).\n\n");
+    out.push_str(
+        "Token/cost grouped by session/client/role/`workspace_label` (`mart_session_costs`). No repo column exists: `workspace_label` is the `token_usage` event's own field, the closest available stand-in.\n\n",
+    );
     render_table(&mut out, &marts.session_costs);
 
     out.push_str("## Role memory\n\n");

@@ -924,10 +924,33 @@ fn close_version_at(recorded: DateTime<Utc>, observed: DateTime<Utc>) -> DateTim
 ///
 /// 1. [`persist_run`]'s per-backend note: a hot rung appends a second
 ///    `records_history` version at the same `(kind, id)` and a
-///    git/s3 rung writes a second Hive object; NEITHER is a second
-///    logical row, because `crate::query`'s fold reduces a kind's
-///    versions to one winner per natural key before any reader sees
-///    them.
+///    git/s3 rung writes a second Hive object. `crate::query`'s fold
+///    reduces those versions to one winner per natural key, so for
+///    every reader that goes THROUGH it — `canon query --kind run`,
+///    `canon report`'s Rust-side reads, [`reconcile_runs`] — the two
+///    versions are one logical row.
+///
+///    That fold is NOT inherited by every reader, and this comment
+///    used to claim it was ("before any reader sees them"), which was
+///    false. `crates/canon-store/sql/views.sql` reads the physical
+///    files directly: `stg_records` is a plain `UNION ALL` over both
+///    roots and folds nothing, so a mart sees BOTH versions of this
+///    run. Left alone that multiplied `mart_session_costs`'
+///    `total_cost`/`total_tokens` by the version count — one closed
+///    dispatch doubled a session's billed cost. The mart-side rule
+///    that now handles it is stated in that file's own
+///    "Multi-version records" header section and applied per view:
+///    every view whose join or aggregate needs CURRENT state folds
+///    its own key with `arg_max(body, "at")` (`mart_session_costs`'
+///    `runs`, `mart_session_run_handoff`'s `runs`, and four others),
+///    while the views for which a version IS the event being counted
+///    — `mart_records_by_kind`'s physical census,
+///    `mart_review_burndown`'s opened/resolved curve — deliberately
+///    read the raw stream. `mart_flywheel_funnel` needs neither: its
+///    `count(DISTINCT strategy_id)` grain absorbs a run stored twice.
+///    So the two versions ARE reconciled for every reader, but by two
+///    different mechanisms, and a NEW mart over `kind = 'run'` gets
+///    the fold only by asking for it.
 /// 2. That fold's winner is the greatest `(at, schema, digest)`
 ///    (`canon_store::fold_latest_by_key`), and `at` is
 ///    `envelope.at` — which is why this function ADVANCES

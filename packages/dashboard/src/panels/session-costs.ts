@@ -1,10 +1,16 @@
 import type { AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
 import { renderTable, type ColumnDef } from "../render-table";
 
-// Panel 2: session costs by role/repo/session — thin SELECT over
-// mart_session_costs (crates/canon-store/sql/views.sql).
-// `workspace_label` is the view's own honestly-named repo proxy (see the
-// view's comment); this panel does not rename or reinterpret it.
+// Panel 2: session costs — thin SELECT over the `mart_session_costs`
+// view (`crates/canon-store/sql/views.sql`).
+//
+// s42 (`close-the-open-loops`) re-review: this header used to read
+// "session costs by role/repo/session". The view has no repo column.
+// It groups by `(session_id, client, role, workspace_label)`, and
+// `workspace_label` is the `token_usage` event's own field standing in
+// for the repo the mart cannot name — the view's own comment says so.
+// The column keeps that honest name here; this panel does not rename or
+// reinterpret it.
 const QUERY = `
   SELECT
     session_id,

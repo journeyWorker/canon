@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:30:33.324935Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "./target/release/canon report --repo . && sed -n '/## Flywheel funnel/,/^## /p' .canon/REPORT.md | grep '^|' | head -5"
+  },
+  "evidence_note": {
+    "command_result": "| role | verdicts | distilled | retrieved | applied | applied_attributed | applied_proxy |\n|---|---|---|---|---|---|---|\n| review | 6 | 6 | 0 | 0 | 0 | 0 |\n| test | 24 | 16 | 0 | 0 | 0 | 0 |",
+    "summary": "the rendered funnel carries the applied_attributed / applied_proxy split as its own columns; both are 0 on this repo because `run` routes to the hot tier that `canon report`'s local roots deliberately do not read"
+  },
+  "kind": "evidence_record",
+  "run_seq": 20,
+  "schema": 1,
+  "staging_id": "6bf03eac9788",
+  "task_id": "s42-close-the-open-loops#3.3",
+  "verdict": "faithful"
+}

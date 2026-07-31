@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:30:33.293839Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "./target/release/canon query --kind run --json --repo . | python3 -c \"import json,sys; rs=json.load(sys.stdin)['records']; d=[r for r in rs if r.get('task_id') or r.get('injected_guidance')]; print(f'runs={len(rs)} carrying a dispatch binding={len(d)}')\""
+  },
+  "evidence_note": {
+    "command_result": "runs=5147 carrying a dispatch binding=2",
+    "summary": "a dispatched run is readable through canon query --kind run: 2 of this repo's runs now carry a dispatch binding, where 0 of 5079 did before s42"
+  },
+  "kind": "evidence_record",
+  "run_seq": 19,
+  "schema": 1,
+  "staging_id": "9f7c1f24e269",
+  "task_id": "s42-close-the-open-loops#1.4",
+  "verdict": "faithful"
+}

@@ -66,6 +66,14 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* Cells are `nowrap`, so a table whose honest column labels are wider
+   than the viewport scrolls inside its own wrapper rather than bleeding
+   through the panel border. The wrapper is the table's alone: a panel's
+   note must stay put and wrap. */
+.panel-body .table-scroll {
+  overflow-x: auto;
+}
+
 .panel-body table {
   width: 100%;
   border-collapse: collapse;
@@ -83,6 +91,12 @@ body {
 .panel-body th {
   color: var(--muted);
   font-weight: 600;
+  /* Data cells stay `nowrap` so a value is never broken across lines,
+     but a header label states a column's exact computation and is
+     allowed to be long — wrapping keeps it fully visible instead of
+     pushing it behind the scroll edge. */
+  white-space: normal;
+  vertical-align: bottom;
 }
 
 .panel-body .empty {
@@ -97,4 +111,30 @@ body {
 
 .bool-false {
   color: #c0392b;
+}
+
+/* A column whose header carries a `title` tooltip stating its exact
+   computation (render-table.ts's ColumnDef.description). The dotted
+   underline is the discoverability affordance — a tooltip nobody knows
+   is there annotates nothing. */
+.panel-body th.col-annotated {
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+
+/* A panel's caveat: the same statement of what the panel computes that
+   `.canon/REPORT.md` prints as prose. Quieter than the table, never
+   hidden behind an interaction. */
+.panel-note {
+  margin: 0.75rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--muted);
+  white-space: normal;
+}
+
+.panel-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.95em;
 }
