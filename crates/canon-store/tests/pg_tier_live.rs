@@ -257,3 +257,56 @@ fn write_batch_is_a_resubmission_no_op_and_matches_loop_write_semantics() {
         assert_eq!(count, 1, "the loop-written corpus is untouched by the batch resubmission");
     }
 }
+
+/// Two `canon` processes reaching a FRESH schema at the same time must
+/// both come up.
+///
+/// `PgTier::connect` bootstraps with `CREATE SCHEMA/TABLE/INDEX IF NOT
+/// EXISTS`, and Postgres's `IF NOT EXISTS` is NOT atomic against a
+/// concurrent creator: both sessions pass the existence check, both
+/// insert the catalog row, and the loser gets `duplicate key value
+/// violates unique constraint "pg_type_typname_nsp_index"`. That is a
+/// startup failure for a real operator, not just a test artifact —
+/// team-scale concurrency is the whole reason the `hot` rung can be
+/// postgres (s32 `sqlite-hot-backend`). CI surfaced it first as this
+/// file's own two tests racing on two threads.
+///
+/// The schema name is unique per run so the DDL is genuinely executed
+/// rather than short-circuiting on an already-bootstrapped schema —
+/// without that, this test passes even with the fix reverted.
+#[test]
+fn a_fresh_schema_survives_concurrent_bootstrap() {
+    let dsn = std::env::var("CANON_PG_DSN").unwrap_or_else(|_| "postgres://canon:canon@127.0.0.1:55432/canon_v1".to_string());
+    let (host, port) = dsn_host_port(&dsn);
+
+    if !tcp_reachable(&host, port) {
+        if require_live() {
+            panic!(
+                "CANON_REQUIRE_LIVE=1 but Postgres at {host}:{port} is unreachable — \
+                 run `docker compose up -d --wait postgres minio` (repo root) first"
+            );
+        }
+        eprintln!("skipping: Postgres at {host}:{port} is unreachable (set CANON_REQUIRE_LIVE=1 to make this a hard failure)");
+        return;
+    }
+
+    let nonce = Utc::now().timestamp_nanos_opt().unwrap_or_default().unsigned_abs();
+    let schema = format!("canon_boot_{nonce}");
+
+    let failures: Vec<String> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..8)
+            .map(|_| {
+                let dsn = dsn.clone();
+                let schema = schema.clone();
+                scope.spawn(move || PgTier::connect(&dsn, &schema).err().map(|e| e.to_string()))
+            })
+            .collect();
+        handles.into_iter().filter_map(|h| h.join().expect("bootstrap thread must not panic")).collect()
+    });
+
+    assert!(
+        failures.is_empty(),
+        "every concurrent bootstrap of a fresh schema must succeed; got {} failure(s): {failures:#?}",
+        failures.len()
+    );
+}

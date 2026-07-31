@@ -77,6 +77,28 @@ pub fn validate_schema_ident(schema: &str) -> Result<(), StoreError> {
     }
 }
 
+/// The advisory-lock key that serializes [`PgTier::connect`]'s bootstrap
+/// DDL, derived from the schema name so two different schemas never
+/// block each other.
+///
+/// Postgres's `IF NOT EXISTS` is NOT atomic against a concurrent
+/// creator: two sessions both pass the existence check, both try to
+/// insert the catalog row, and the loser gets `duplicate key value
+/// violates unique constraint "pg_type_typname_nsp_index"`. Since every
+/// `connect` runs the three DDL statements, two `canon` processes
+/// reaching a FRESH schema at the same time make one of them fail at
+/// startup — and team-scale concurrency is the entire reason the `hot`
+/// rung can be postgres at all (s32 `sqlite-hot-backend`: sqlite covers
+/// the single operator, postgres is the swap for a real server). CI hit
+/// this as a flake in `pg_tier_live.rs`, which is the same race with two
+/// test threads rather than two operators.
+fn bootstrap_lock_key(schema: &str) -> i64 {
+    // Stable across processes and machines — never `DefaultHasher`,
+    // whose output is not guaranteed between builds.
+    let digest = <sha2::Sha256 as sha2::Digest>::digest(schema.as_bytes());
+    i64::from_be_bytes(digest[..8].try_into().expect("sha256 yields at least 8 bytes"))
+}
+
 fn create_schema_sql(schema: &str) -> String {
     format!("CREATE SCHEMA IF NOT EXISTS {schema}")
 }
@@ -237,9 +259,22 @@ impl PgTier {
                 .connect(dsn)
                 .await
                 .map_err(|e| StoreError::tier_unavailable(Rung::Hot, Some(Backend::Postgres), e.to_string()))?;
-            sqlx::query(sqlx::AssertSqlSafe(create_schema_sql(schema))).execute(&pool).await.map_err(|e| StoreError::Sql(e.to_string()))?;
-            sqlx::query(sqlx::AssertSqlSafe(create_table_sql(schema))).execute(&pool).await.map_err(|e| StoreError::Sql(e.to_string()))?;
-            sqlx::query(sqlx::AssertSqlSafe(create_index_sql(schema))).execute(&pool).await.map_err(|e| StoreError::Sql(e.to_string()))?;
+            // All three DDL statements run inside ONE transaction
+            // holding `pg_advisory_xact_lock`, so a concurrent
+            // bootstrap of the same schema waits instead of racing the
+            // catalog (see `bootstrap_lock_key`). The lock is
+            // transaction-scoped, so it is released by commit OR by a
+            // failed/aborted connect — never leaked to the pool.
+            let mut tx = pool.begin().await.map_err(|e| StoreError::Sql(e.to_string()))?;
+            sqlx::query("SELECT pg_advisory_xact_lock($1)")
+                .bind(bootstrap_lock_key(schema))
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| StoreError::Sql(e.to_string()))?;
+            sqlx::query(sqlx::AssertSqlSafe(create_schema_sql(schema))).execute(&mut *tx).await.map_err(|e| StoreError::Sql(e.to_string()))?;
+            sqlx::query(sqlx::AssertSqlSafe(create_table_sql(schema))).execute(&mut *tx).await.map_err(|e| StoreError::Sql(e.to_string()))?;
+            sqlx::query(sqlx::AssertSqlSafe(create_index_sql(schema))).execute(&mut *tx).await.map_err(|e| StoreError::Sql(e.to_string()))?;
+            tx.commit().await.map_err(|e| StoreError::Sql(e.to_string()))?;
             Ok::<_, StoreError>(pool)
         })?;
         Ok(Self { schema: schema.to_string(), pool, rt })
