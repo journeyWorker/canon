@@ -66,21 +66,135 @@
 -- `task_id` reading both `open` and `done`). It is CORRECT when the
 -- version itself IS the event being counted.
 --
---   FOLD to the latest version — `arg_max(body, "at")` at the view's
---   own key, the same last-wins-by-`at` rule `canon-gate::ledger::
---   latest_verdicts` and `mart_trust_matrix`'s `green` already use.
---   `arg_max` folds the WHOLE `body` and every column is projected
---   off that one winner, never `arg_max` per column: a per-column
---   `arg_max(body ->> '$.x', "at")` silently SKIPS versions where
---   that one key is absent, so emptying an optional field on a later
---   write (a `scenario_refs` list, an `ended_at`) would resurrect the
---   older version's value for that column alone and mint a row no
---   stored version ever held.
---     `int_task_scenario_refs` (task_id) · `mart_trust_matrix`'s
---     `tasks` (task_id) · `mart_scope_status`'s `cov` (scenario_id) ·
---     `mart_session_costs`'s `runs` (run_id) ·
---     `mart_session_run_handoff`'s `runs`/`handoffs` (run_id / id) ·
---     `mart_subjects`'s `subjects` (subject_id).
+-- ── How a folding view folds ─────────────────────────────────────────
+--
+-- Every folding view below does it the SAME one way:
+--
+--   QUALIFY row_number() OVER (
+--       PARTITION BY <this view's own natural key>
+--       ORDER BY version_rank DESC
+--   ) = 1
+--
+-- `version_rank` is defined ONCE, in `stg_records`, as the
+-- `(at, schema, digest)` triple `canon_store::fold::fold_latest_by_key`
+-- compares, materialized as a DuckDB STRUCT. Struct comparison is
+-- field-by-field lexicographic — verified directly against this
+-- DuckDB, and the same total order that function's own
+-- `(at, schema, digest) < item_order` tuple comparison performs — so
+-- `ORDER BY version_rank DESC` IS the Rust fold's ordering, written in
+-- one place rather than re-spelled at each of the twelve fold sites,
+-- where one could silently drift from the rest.
+--
+-- Ordering by `at` ALONE (what the first cut of these folds did) is
+-- not a weaker form of that rule, it is a DIFFERENT rule, and it
+-- disagrees with `canon query` on ordinary corpora. Equal `at` is
+-- ROUTINE here, not theoretical: a plan-derived record stamps `at`
+-- from its SOURCE DOCUMENT's mtime (s20 D7 — byte-stable, which is
+-- what makes re-importing an unchanged plan idempotent), and a canon
+-- PARSER change does not touch that mtime, so the stale and fresh
+-- record for one key tie on `at`. `RecordKind::Task`'s
+-- `schema_version` is `2` for exactly this reason
+-- (`canon_model::records::Task::depends_on`'s own doc comment:
+-- without the bump the fold "surfaced this field on an arbitrary
+-- SUBSET of one file's rows"). And only a DISPATCHED `run` gets s42's
+-- strictly-greater version-`at` (`canon-cli::dispatch::
+-- close_version_at`) — `task`, `session`, `handoff`, `subject`,
+-- `event` and the `porting.coverage` overlay get nothing of the kind.
+-- On such a corpus an `at`-only fold retains the STALE body while
+-- `canon query --kind <k>` returns the fresh one, from the same files.
+--
+-- `row_number()` over the whole row (rather than `arg_max` per column)
+-- is also what keeps a folded row HONEST: `arg_max(x, …)` SKIPS rows
+-- whose `x` is NULL, so a per-column fold emitting `arg_max(body ->>
+-- '$.a', …), arg_max(body ->> '$.b', …)` can take `a` from the winner
+-- and `b` from an older version whenever the winner emptied an
+-- optional field (a `scenario_refs` list, an `ended_at`, an
+-- `actor.agent_id`) — minting a row no stored version ever held.
+-- `QUALIFY` selects one physical ROW, so every column, `"at"`
+-- included, necessarily comes off that single version.
+--
+-- ── The one place the SQL cannot mirror the Rust exactly ─────────────
+--
+-- `digest`. `crate::query`'s readers RECOMPUTE
+-- `partition::content_digest12` from the body; `stg_git_records` reads
+-- the value out of the record's FILENAME instead, because
+-- canonical-form hashing is not expressible here — `content_digest12`
+-- hashes serde_json's alphabetical-key, compact serialization of the
+-- value, and DuckDB has no recursive JSON key-sorting canonicalizer
+-- that could reproduce those exact bytes to hash.
+--
+-- It is nonetheless the SAME number, not a proxy: `GitTier::write`
+-- names the file from `content_digest12` (`git_tier.rs`), and
+-- `GitTier::scan_kind_where` REJECTS as a `layout` violation any file
+-- whose path is not the one its own content resolves to (its
+-- `expected != relative` check), as `scan_namespaced_kind` does for
+-- overlay records via that filename's own `__{digest12}` suffix. So
+-- for every record the Rust reader will HAND YOU, filename digest ==
+-- content digest by enforcement.
+--
+-- The residual difference is therefore exactly the corpus Rust
+-- refuses to read: a hand-planted file whose name disagrees with its
+-- body is invisible to `canon query` (dropped as a violation), while
+-- these views run no layout gate and would fold it by its filename
+-- digest. This is the ONE thing this file derives from `record_path`,
+-- and it is narrow on purpose — the digest suffix is
+-- kind-INDEPENDENT (one end-anchored regex serves all 13 kinds and
+-- every namespaced overlay), unlike the natural key, whose grammar is
+-- per-kind and is precisely the second implementation the last
+-- section below refuses to write. An unreadable suffix reads `''`,
+-- which sorts below every real 12-hex digest — the same posture
+-- `canon_store::tier::raw_record_schema` documents for its own `0`
+-- fallback ("a record whose `schema` is missing or non-integer can
+-- never out-rank a well-formed record of the same key"), which
+-- `version_rank` applies to `schema` for the identical reason.
+--
+-- ── Fold inventory: all twelve fold sites, and each one's key ────────
+--
+-- Each key below is `resolve_partition`'s natural key for that kind,
+-- re-verified field by field against `partition.rs`:
+--
+--   `mart_trust_matrix`'s `evidence_current` — `task_id`, the key
+--     `partition.rs`'s `EvidenceRecord` arm resolves for a task-scoped
+--     attestation. Reads `version_rank` through `int_task_evidence`,
+--     which passes the column through but does NOT itself fold (it is
+--     on the raw-stream list below, because its grain is one row per
+--     attestation).
+--   `int_task_scenario_refs`'s `task_latest` — `task_id`.
+--   `mart_trust_matrix`'s `tasks` — `task_id`.
+--   `mart_scope_status`'s `cov` — `(project_id, scenario_id)`. NOT
+--     `scenario_id` alone: that is the `porting.coverage` overlay's
+--     own declared `join_key` (`.canon/plugins/porting/plugin.yaml`),
+--     and the pair is what `GitTier::write_namespaced` builds its
+--     `{project_id}__{scenario_id}` natural key from. Keying
+--     `scenario_id` alone MERGES two spec roots that share a scenario
+--     id and then returns an arbitrary winner — reporting one
+--     project's coverage under another's, which is worse than the
+--     double-count folding replaced.
+--   `mart_session_costs`'s `token_usage` — `(run_id, seq)`, the two
+--     fields `Event`'s `{run_id}-{seq:010}` key is built from.
+--   `mart_session_costs`'s `runs` · `mart_session_run_handoff`'s
+--     `runs` — `run_id`.
+--   `mart_session_costs`'s `sessions` ·
+--     `mart_session_run_handoff`'s `sessions` — the body's own
+--     `session_id`. This is the one key that is deliberately NOT
+--     literally `resolve_partition`'s output: that arm keys `Session`
+--     by `sanitize_component(session_id)` (`/` -> `_`, so the key is
+--     filename-safe). These folds group by the raw SEMANTIC id, one
+--     rung FINER — sanitizing is many-to-one, so two distinct session
+--     ids can share a filename key, and a fold at the finer key can
+--     therefore never merge two records the coarser key would keep
+--     apart. Finer is the safe direction; the reverse would not be.
+--   `mart_session_run_handoff`'s `handoffs` — `id`.
+--   `mart_subjects`'s `subjects` — `subject_id`.
+--   `mart_subjects`'s `scenario_latest_verdict` — `scenario_id`, the
+--     `partition.rs` `EvidenceRecord` arm's second fallback. Like
+--     `evidence_current` this is a current-verdict pick, not a
+--     natural-key fold: an attestation carrying BOTH a `task_id` and
+--     a `scenario_id` partitions under the `task_id`, so grouping by
+--     `scenario_id` deliberately spans every attestation ABOUT that
+--     scenario — the same `(subject, role)` cell grain
+--     `canon-gate::ledger::latest_verdicts` folds, which is the
+--     function this pick and `mart_trust_matrix`'s `green` both cite.
 --
 --   READ THE RAW VERSION STREAM, deliberately — never "not yet
 --   folded":
@@ -95,17 +209,19 @@
 --       `+1` then `-1`; folding to its latest version contributes
 --       only the `-1` and drives `divergence_open_running_total`
 --       NEGATIVE.
---     `int_evidence_verdicts` and `int_task_evidence`'s
---       `evidence_count` — an `EvidenceRecord` is keyed BY its own
---       join key (`partition.rs`'s three-way `task_id`/`scenario_id`/
---       `change_id` fallback), so canon cannot hold two DISTINCT
---       attestations for one subject at all: a re-attestation is
---       necessarily a new version, and counting it counts the
---       attestation that actually happened. Every consumer needing
---       current state instead of history (`mart_trust_matrix`'s
---       `green`/`latest_who`, `mart_subjects`'s
---       `scenario_latest_verdict`) already reads it through
---       `arg_max`.
+--     `int_evidence_verdicts` and `int_task_evidence` (including
+--       `mart_trust_matrix`'s `evidence_count`/`latest_at` over it) —
+--       an `EvidenceRecord` is keyed BY its own join key
+--       (`partition.rs`'s three-way fallback, in this precedence
+--       order: `task_id`, then `scenario_id`, then `run_id`, and
+--       `"unscoped"` when it carries none of the three), so canon
+--       cannot hold two DISTINCT attestations for one subject at all:
+--       a re-attestation is necessarily a new version, and counting
+--       it counts the attestation that actually happened. Every
+--       consumer needing current state instead of history
+--       (`mart_trust_matrix`'s `green`/`who` via `evidence_current`,
+--       `mart_subjects`'s `scenario_latest_verdict`) picks the winner
+--       by `version_rank`, listed in the fold inventory above.
 --     `mart_flywheel_funnel` — structurally immune, and verified so
 --       against a two-version run: its retrieval stages are
 --       `count(DISTINCT strategy_id)` over `retrieved_guidance` and a
@@ -117,26 +233,29 @@
 --       `rebuild_namespace` rather than appended).
 --
 -- Why per-view folds and NOT one shared `stg_latest_records`: such a
--- view needs a `natural_key` column `stg_records` cannot honestly
--- supply. The git side derives NOTHING from `record_path` (this
--- header's own "provenance only, never trusted as the source of those
--- columns" contract) even though the key does sit in the filename,
--- while `stg_r2_records` HAS the column materialized — the two
--- sources cannot supply it by one mechanism. The only source-agnostic
--- alternative is re-deriving the key from `body` in a 13-arm `CASE`
--- reimplementing `resolve_partition` (`Event`'s
--- `{run_id}-{seq:010}`, the composite `scenario`/`review`/
--- `divergence` keys, `Session`'s `sanitize_component`,
--- `EvidenceRecord`'s three-way fallback): a SECOND implementation of
--- the join-spine key grammar that drifts silently the moment
--- `partition.rs` changes — the exact second-derivation risk design D1
--- exists to prevent, and the same reason `mart_trust_matrix` refuses
--- to replicate `TrustRung::green()`. It could not be a drop-in
--- `stg_records` replacement either, because the raw-stream readers
--- above must NOT fold, so every consumer would still have to pick a
--- posture — which is the actual work. A per-view fold needs no key
--- grammar at all (each view already knows its own key) and forces
--- that pick to be written down where the view is read.
+-- view needs a `natural_key` column, and supplying it means
+-- re-deriving the key from `body` in a 13-arm `CASE` reimplementing
+-- `resolve_partition` (`Event`'s `{run_id}-{seq:010}`, the composite
+-- `scenario`/`review`/`divergence` keys, `Session`'s
+-- `sanitize_component`, `EvidenceRecord`'s three-way fallback) — a
+-- SECOND implementation of the join-spine key grammar that drifts
+-- silently the moment `partition.rs` changes, the exact
+-- second-derivation risk design D1 exists to prevent and the same
+-- reason `mart_trust_matrix` refuses to replicate `TrustRung::
+-- green()`. Parsing it back out of the git filename instead (where it
+-- does sit, ahead of the `__{digest12}` suffix this file DOES read)
+-- trades that drift for a different one: `{natural_key}__{digest12}`
+-- is only unambiguously splittable from the RIGHT, so the recovered
+-- key is an opaque string that no longer knows which fields it was
+-- built from — enough to group by, useless for the per-field
+-- reasoning `mart_scope_status`'s `(project_id, scenario_id)` fix
+-- above required, and still a second key derivation to keep in sync.
+-- It could not be a drop-in `stg_records` replacement either, because
+-- the raw-stream readers above must NOT fold, so every consumer would
+-- still have to pick a posture — which is the actual work. A per-view
+-- fold needs no key grammar at all (each view already knows its own
+-- key, in the fields it actually joins on) and forces that pick to be
+-- written down where the view is read.
 
 INSTALL json;
 LOAD json;
@@ -146,9 +265,22 @@ LOAD json;
 -- Thin, content-trusted extraction over the git tier's Hive-laid-out
 -- JSON files — `read_text` + JSON-payload column pulls, NEVER
 -- `hive_partitioning=true` (design doc's Risk section: the donor's
--- ACTUAL mechanism, not the aspirational one). `kind`/`at`/`scenario_id`
--- come from the record's own body; `record_path` is kept for provenance
--- only, never trusted as the source of those columns.
+-- ACTUAL mechanism, not the aspirational one). `schema`/`kind`/`at`/
+-- `scenario_id` come from the record's own body.
+--
+-- `record_path` is kept for provenance, and `digest` is the ONE column
+-- derived from it: the filename's own `__{digest12}` suffix, which
+-- `GitTier::write` writes from `partition::content_digest12` and
+-- `GitTier::scan_kind_where`/`scan_namespaced_kind` reject the record
+-- outright for disagreeing with. It is the third rung of
+-- `fold_latest_by_key`'s `(at, schema, digest)` order and cannot be
+-- recomputed in SQL (no canonical-form JSON hashing in DuckDB) — see
+-- this file's header for the enforcement chain that makes the
+-- filename value identical to the content-derived one, and for the
+-- exact residual gap. `''` when the suffix is absent or malformed,
+-- which sorts below every real digest. NOTHING ELSE is taken from
+-- `record_path`: `kind`/`at`/`scenario_id` in particular are never
+-- read from the path, however legible it is.
 CREATE OR REPLACE VIEW stg_git_records AS
 WITH raw AS (
     SELECT
@@ -158,25 +290,34 @@ WITH raw AS (
 )
 SELECT
     record_path,
-    try_cast(j ->> '$.schema' AS BIGINT) AS schema,
-    j ->> '$.kind'                       AS kind,
-    try_cast(j ->> '$.at' AS TIMESTAMP)  AS "at",
-    j ->> '$.scenario_id'                AS scenario_id,
-    j                                    AS body
+    try_cast(j ->> '$.schema' AS BIGINT)                      AS schema,
+    j ->> '$.kind'                                            AS kind,
+    try_cast(j ->> '$.at' AS TIMESTAMP)                       AS "at",
+    j ->> '$.scenario_id'                                     AS scenario_id,
+    regexp_extract(record_path, '__([0-9a-f]{12})\.json$', 1) AS digest,
+    j                                                         AS body
 FROM raw;
 
 -- Thin extraction over the r2 tier's parquet exports. Unlike the git
 -- tier, `kind`/`natural_key`/`at`/`digest` are already real typed
 -- parquet columns (materialized at write time by `canon-store`'s
--- `R2Tier`, not re-derived here) — `body` is still the JSON source of
--- truth for anything this view doesn't already surface as a column.
+-- `R2Tier`, not re-derived here) — and its `digest` is the SAME
+-- `partition::content_digest12` value the git filename carries,
+-- re-validated against the body on every read
+-- (`r2_tier.rs::validate_row`: "a stale/tampered `digest` column is
+-- exactly as much a violation as a stale/tampered `body`"), so the two
+-- tiers' `digest` columns are directly comparable in one fold.
+-- `schema` is the one fold rung r2 does NOT materialize, so it is
+-- pulled from `body` here — `body` remains the JSON source of truth
+-- for anything this view doesn't already surface as a column.
 CREATE OR REPLACE VIEW stg_r2_records AS
 SELECT
     kind,
     natural_key,
-    CAST("at" AS TIMESTAMP) AS "at",
+    CAST("at" AS TIMESTAMP)                              AS "at",
+    try_cast(CAST(body AS JSON) ->> '$.schema' AS BIGINT) AS schema,
     digest,
-    CAST(body AS JSON)      AS body
+    CAST(body AS JSON)                                   AS body
 FROM read_parquet(getenv('CANON_R2_ROOT') || '/kind=*/**/*.parquet');
 
 -- One normalized, source-tagged view over BOTH physical local roots —
@@ -209,10 +350,35 @@ FROM read_parquet(getenv('CANON_R2_ROOT') || '/kind=*/**/*.parquet');
 -- matching this file's own established "name every stub/proxy/gap it
 -- contains" convention (`int_evidence_verdicts`'s STUB note below is
 -- the direct precedent).
+--
+-- `version_rank` is defined here and NOWHERE else: the `(at, schema,
+-- digest)` triple `canon_store::fold::fold_latest_by_key` compares,
+-- as a STRUCT, so every folding view downstream orders by ONE
+-- expression instead of restating three rungs it could get wrong
+-- (header's "How a folding view folds"). Each member is coalesced to
+-- the value that LOSES to every well-formed record — `-infinity`,
+-- `0`, `''` — mirroring `canon_store::tier::raw_record_schema`'s own
+-- documented `0` fallback, so no member is ever NULL and the order is
+-- total without depending on DuckDB's `default_null_order` setting.
 CREATE OR REPLACE VIEW stg_records AS
-SELECT kind, "at", scenario_id, 'git' AS source_tier, body FROM stg_git_records
-UNION ALL
-SELECT kind, "at", body ->> '$.scenario_id' AS scenario_id, 'r2' AS source_tier, body FROM stg_r2_records;
+SELECT
+    kind,
+    "at",
+    scenario_id,
+    source_tier,
+    schema,
+    digest,
+    body,
+    {
+        'at':     coalesce("at", '-infinity'::TIMESTAMP),
+        'schema': coalesce(schema, 0),
+        'digest': coalesce(digest, '')
+    } AS version_rank
+FROM (
+    SELECT kind, "at", scenario_id, 'git' AS source_tier, schema, digest, body FROM stg_git_records
+    UNION ALL
+    SELECT kind, "at", body ->> '$.scenario_id' AS scenario_id, 'r2' AS source_tier, schema, digest, body FROM stg_r2_records
+);
 
 -- S9 addition: `canon-learn`'s (S6/S7/S8) own operator-local parquet
 -- stores — `ParquetStrategyStore`/`ParquetTrajectoryStore`
@@ -269,12 +435,24 @@ GROUP BY 1;
 -- layer so a future S5 real trust-ladder derivation (see
 -- `int_evidence_verdicts`'s own STUB note above) has one obvious place
 -- to extend rather than a second copy of this same join.
+--
+-- Deliberately UNFOLDED (header's raw-stream list): the grain is one
+-- row per ATTESTATION, which is what `mart_trust_matrix`'s
+-- `evidence_count` counts. `version_rank` is carried through so the
+-- consumers that DO need the current attestation
+-- (`mart_trust_matrix`'s `evidence_current`) pick their winner by the
+-- same `(at, schema, digest)` order `canon-gate::ledger::
+-- latest_verdicts` folds this same evidence by, rather than by `at`
+-- alone — which would decide an equal-`at` pair of verdicts
+-- arbitrarily while the gate it claims to mirror decided it by
+-- generation.
 CREATE OR REPLACE VIEW int_task_evidence AS
 SELECT
     body ->> '$.task_id'               AS task_id,
     "at"                               AS evidence_at,
     body ->> '$.verdict'               AS verdict,
-    body -> '$.actor' ->> '$.agent_id' AS who
+    body -> '$.actor' ->> '$.agent_id' AS who,
+    version_rank
 FROM stg_records
 WHERE kind = 'evidence_record' AND (body ->> '$.task_id') IS NOT NULL;
 
@@ -299,11 +477,11 @@ WHERE kind = 'evidence_record' AND (body ->> '$.task_id') IS NOT NULL;
 CREATE OR REPLACE VIEW int_task_scenario_refs AS
 WITH task_latest AS (
     SELECT
-        body ->> '$.task_id'   AS task_id,
-        arg_max(body, "at")    AS body
+        body ->> '$.task_id' AS task_id,
+        body
     FROM stg_records
     WHERE kind = 'task'
-    GROUP BY 1
+    QUALIFY row_number() OVER (PARTITION BY body ->> '$.task_id' ORDER BY version_rank DESC) = 1
 )
 SELECT
     t.task_id            AS task_id,
@@ -354,138 +532,220 @@ ORDER BY 1, 2;
 -- emit TWO rows for one task — one reading `task_status open`, one
 -- `done`, each repeating the same `evidence_count` — i.e. a
 -- contradictory current-state answer, and a doubled denominator for
--- any caller counting rows. `evidence_count` itself stays a count of
--- ATTESTATIONS, versions included (header's raw-stream list): an
--- `EvidenceRecord` is keyed by its `task_id`, so a re-attestation can
--- only ever arrive as a new version, and `green`/`who` already fold it
--- via `arg_max` below.
+-- any caller counting rows.
+--
+-- The evidence side is split in two on purpose, because the two halves
+-- ask opposite questions of the same relation:
+--   `evidence_counts`  — HISTORY. `evidence_count` counts
+--                        ATTESTATIONS, versions included (header's
+--                        raw-stream list): an `EvidenceRecord` is
+--                        keyed by its `task_id`, so a re-attestation
+--                        can only ever arrive as a new version, and
+--                        counting it counts the attestation that
+--                        actually happened. `latest_at` is that
+--                        stream's high-water mark.
+--   `evidence_current` — CURRENT STATE, feeding `green`/`who`. One
+--                        WHOLE winner row per `task_id`, picked by
+--                        `version_rank`. This was a pair of
+--                        per-column `arg_max(…, evidence_at)` calls,
+--                        wrong twice over: `arg_max(who, …)` SKIPS
+--                        rows whose `who` is NULL (an actor with no
+--                        `agent_id`), so it could report an older
+--                        attestation's author beside the newer one's
+--                        verdict — a pairing no stored record ever
+--                        held — and ordering by `evidence_at` alone
+--                        decided an equal-`at` pair of verdicts
+--                        arbitrarily, while `canon-gate::ledger::
+--                        latest_verdicts`, the fold this mart's
+--                        `green` claims to mirror, decides it by
+--                        `(at, schema, digest)`.
 CREATE OR REPLACE VIEW mart_trust_matrix AS
 WITH tasks AS (
     SELECT
-        task_id,
-        body ->> '$.title'  AS title,
-        body ->> '$.status' AS task_status
-    FROM (
-        SELECT body ->> '$.task_id' AS task_id, arg_max(body, "at") AS body
-        FROM stg_records
-        WHERE kind = 'task'
-        GROUP BY 1
-    )
+        body ->> '$.task_id' AS task_id,
+        body ->> '$.title'   AS title,
+        body ->> '$.status'  AS task_status
+    FROM stg_records
+    WHERE kind = 'task'
+    QUALIFY row_number() OVER (PARTITION BY body ->> '$.task_id' ORDER BY version_rank DESC) = 1
 ),
-evidence_latest AS (
+evidence_counts AS (
     SELECT
         task_id,
-        count(*)                      AS evidence_count,
-        arg_max(verdict, evidence_at) AS latest_verdict,
-        arg_max(who, evidence_at)     AS latest_who,
-        max(evidence_at)              AS latest_at
+        count(*)         AS evidence_count,
+        max(evidence_at) AS latest_at
     FROM int_task_evidence
     GROUP BY task_id
+),
+evidence_current AS (
+    SELECT
+        task_id,
+        verdict AS latest_verdict,
+        who     AS latest_who
+    FROM int_task_evidence
+    QUALIFY row_number() OVER (PARTITION BY task_id ORDER BY version_rank DESC) = 1
 ),
 subjects AS (
     SELECT task_id FROM tasks
     UNION
-    SELECT task_id FROM evidence_latest
+    SELECT task_id FROM evidence_counts
 )
 SELECT
     s.task_id,
-    split_part(s.task_id, '#', 1)                AS change_id,
+    split_part(s.task_id, '#', 1)                  AS change_id,
     t.title,
     t.task_status,
-    coalesce(el.evidence_count, 0) > 0           AS covered,
-    coalesce(el.latest_verdict, '') = 'faithful' AS green,
-    el.latest_who                                AS who,
-    coalesce(el.evidence_count, 0)               AS evidence_count,
-    el.latest_at
+    coalesce(ec.evidence_count, 0) > 0             AS covered,
+    coalesce(ecur.latest_verdict, '') = 'faithful' AS green,
+    ecur.latest_who                                AS who,
+    coalesce(ec.evidence_count, 0)                 AS evidence_count,
+    ec.latest_at
 FROM subjects s
-LEFT JOIN tasks t            USING (task_id)
-LEFT JOIN evidence_latest el USING (task_id)
+LEFT JOIN tasks t               USING (task_id)
+LEFT JOIN evidence_counts ec    USING (task_id)
+LEFT JOIN evidence_current ecur USING (task_id)
 ORDER BY change_id, s.task_id;
 
 -- s20 addition (task-scenario-join spec, design D3): unifies
 -- `mart_trust_matrix`'s evidence-PRESENCE `covered` (keyed `task_id`)
 -- against `porting.coverage`'s spec-AUTHORSHIP `covered` (keyed
--- `scenario_id`) over `int_task_scenario_refs`' declared join table —
--- one row per declared `(task_id, scenario_id)` pair, answering
--- "is this scope DONE (checkbox), VERIFIED (evidence-covered), and
--- SPEC-COVERED (scenario-covered)" in a single query. A `Task` with no
--- `scenario_refs` never appears here (nothing declared to unify) but
--- still appears in `mart_trust_matrix` unchanged — this view is
--- additive, never a replacement. `LEFT JOIN` on both sides so an
--- absent evidence record or absent `porting.coverage` overlay row
--- surfaces as an honest `NULL`, never a dropped row or an invented
--- `false` (mirrors `mart_trust_matrix`'s own `LEFT JOIN` posture for a
--- task with no evidence). `porting.coverage` is read generically by its
--- `kind` string — this view never depends on the `porting` plugin being
--- installed; a repo with no coverage overlay simply gets
--- `spec_covered = NULL` throughout. This is an interim, explicitly-
--- named coupling to the ONE `porting.coverage` overlay identity — the
--- same "explicit STUB, never silently load-bearing" posture
--- `int_evidence_verdicts` already establishes for its own S5-shaped
--- stand-in; a repo using a DIFFERENT overlay identity for spec-coverage
--- gets no `spec_covered` signal from this view until a follow-up
--- generalizes the join to `canon.yaml`-declared overlay identities
--- (named non-goal, s20 design.md R3). Read-only reporting ONLY — never a
--- `canon-gate` input; `canon gate check` verdicts are byte-identical
--- before and after this view exists (s20 acceptance).
+-- `(project_id, scenario_id)`) over `int_task_scenario_refs`' declared
+-- join table — answering "is this scope DONE (checkbox), VERIFIED
+-- (evidence-covered), and SPEC-COVERED (scenario-authored)" in a single
+-- query. A `Task` with no `scenario_refs` never appears here (nothing
+-- declared to unify) but still appears in `mart_trust_matrix`
+-- unchanged — this view is additive, never a replacement.
 --
--- Both joined sides are now folded to one row per key (header's fold
--- list): `int_task_scenario_refs` and `mart_trust_matrix` fold their
--- own `task_id`, and the `cov` subquery below folds `scenario_id`.
--- Unfolded, this view was QUADRATIC in stored versions — a task
--- flipped once by `canon gate task` crossed with its own re-derived
--- coverage overlay emitted four rows for ONE declared pair, two of
--- them reading a `task_status` the plan no longer holds. `cov`'s fold
--- keys `scenario_id` alone, matching the join this view already makes:
+-- GRAIN: one row per declared `(task_id, scenario_id)` pair per
+-- COVERING PROJECT. The task side of the join carries no project at
+-- all — `Task.scenario_refs` is a bare list of `ScenarioId`s — while
+-- the coverage side is keyed `(project_id, scenario_id)`, so when two
+-- spec roots each author the same scenario id there are genuinely TWO
+-- coverage answers for one declared pair and this view reports both,
+-- each under its own `spec_project_id`. It cannot pick one: nothing in
+-- the plan says which project the task meant. Emitting the pair ONCE
+-- with an arbitrarily-chosen `spec_covered` (what a `scenario_id`-only
+-- fold did) reports one project's coverage under another's name;
+-- emitting it twice with no `spec_project_id` would be two
+-- indistinguishable rows disagreeing about `spec_covered`, the same
+-- contradictory-row defect folding `tasks` exists to remove.
+--
+-- `LEFT JOIN` on both sides so an absent evidence record or absent
+-- `porting.coverage` overlay row surfaces as an honest `NULL`, never a
+-- dropped row or an invented `false` (mirrors `mart_trust_matrix`'s own
+-- `LEFT JOIN` posture for a task with no evidence). Read
+-- `spec_project_id IS NULL` as "NO overlay row exists for this
+-- scenario", which is a DIFFERENT state from an overlay row that
+-- exists and says `covered = false` — the first is unauthored, the
+-- second is authored-and-not-covered, and `canon report` renders both.
+-- A NULL `spec_covered` alongside a non-NULL `spec_project_id` is a
+-- third, narrower state: that project's overlay row exists but its own
+-- `covered` field is absent or non-boolean.
+--
+-- `porting.coverage` is read generically by its `kind` string — this
+-- view never depends on the `porting` plugin being installed; a repo
+-- with no coverage overlay simply gets `spec_project_id`/`spec_covered`
+-- NULL throughout. This is an interim, explicitly-named coupling to the
+-- ONE `porting.coverage` overlay identity — the same "explicit STUB,
+-- never silently load-bearing" posture `int_evidence_verdicts` already
+-- establishes for its own S5-shaped stand-in; a repo using a DIFFERENT
+-- overlay identity for spec-coverage gets no `spec_covered` signal from
+-- this view until a follow-up generalizes the join to
+-- `canon.yaml`-declared overlay identities (named non-goal, s20
+-- design.md R3). Read-only reporting ONLY — never a `canon-gate` input;
+-- `canon gate check` verdicts are byte-identical before and after this
+-- view exists (s20 acceptance).
+--
+-- Every joined side is folded to one row per key (header's fold
+-- inventory): `int_task_scenario_refs` and `mart_trust_matrix` fold
+-- their own `task_id`, and `cov` below folds the overlay's OWN declared
+-- `join_key` — `(project_id, scenario_id)` per
+-- `.canon/plugins/porting/plugin.yaml`, the same pair
+-- `GitTier::write_namespaced` builds the `{project_id}__{scenario_id}`
+-- natural key from. The fold is still needed at that full key:
 -- `write_namespaced` appends a new object whenever an overlay row's
--- content changes (`GitTier::write_namespaced`'s own "logically
--- different body, same join key, appends never overwrites"), and two
--- declaring specs roots would collide here too — either way the
--- latest-wins pick is deterministic, where duplicating the pair row
--- was not.
+-- content changes (its own "logically different body, same join key,
+-- appends never overwrites"), so one project re-syncing its coverage is
+-- two physical rows at one key. Unfolded AND unprojected, this view was
+-- QUADRATIC in stored versions — a task flipped once by `canon gate
+-- task` crossed with its own re-synced coverage overlay emitted four
+-- rows for ONE declared pair, two of them reading a `task_status` the
+-- plan no longer holds.
 CREATE OR REPLACE VIEW mart_scope_status AS
 SELECT
     r.task_id,
     r.scenario_id,
     tm.task_status,
-    tm.covered   AS evidence_covered,
+    tm.covered      AS evidence_covered,
     tm.green,
-    cov.covered  AS spec_covered
+    cov.project_id  AS spec_project_id,
+    cov.covered     AS spec_covered
 FROM int_task_scenario_refs r
 LEFT JOIN mart_trust_matrix tm ON tm.task_id = r.task_id
 LEFT JOIN (
-    SELECT scenario_id,
-           (body ->> '$.covered')::BOOLEAN AS covered
-    FROM (
-        SELECT body ->> '$.scenario_id' AS scenario_id, arg_max(body, "at") AS body
-        FROM stg_records
-        WHERE kind = 'porting.coverage'
-        GROUP BY 1
-    )
+    SELECT
+        body ->> '$.project_id'         AS project_id,
+        body ->> '$.scenario_id'        AS scenario_id,
+        (body ->> '$.covered')::BOOLEAN AS covered
+    FROM stg_records
+    WHERE kind = 'porting.coverage'
+    QUALIFY row_number() OVER (
+        PARTITION BY body ->> '$.project_id', body ->> '$.scenario_id'
+        ORDER BY version_rank DESC
+    ) = 1
 ) cov ON cov.scenario_id = r.scenario_id
-ORDER BY r.task_id, r.scenario_id;
+ORDER BY r.task_id, r.scenario_id, cov.project_id;
 
 -- Panel 2: session costs grouped by `(session_id, client, role,
 -- workspace_label)` (S3 ingest, the donor's `session_id` join key).
 -- There is no `repo` column and this panel never claims one. Neither
--- `Session` nor `Run` carries a native `role`/`repo` field yet —
--- verified against `crates/canon-ingest/src/
--- normalize.rs`, 2026-07-11: every actor `canon-ingest` constructs is
--- `Actor::new_unattributed` (`role` always `NULL`), and no record kind
--- has a `repo` field at all today. This mart groups by the nearest
--- AVAILABLE proxies instead of silently asserting fields that do not
--- exist: `role` reads the session actor's own `actor.role` (currently
--- always `NULL`, surfaced honestly as `'unattributed'` rather than
--- hidden); `workspace_label` (the `token_usage` event's own field,
--- S3's closest analog to a repo identifier) stands in for `repo` under
--- its own honest column name, not renamed to `repo` — and, being the
--- `repo` proxy, is part of the GROUP BY, not merely an `any_value()`
--- pick: a session whose runs span two workspaces must yield two
--- distinct rows, never one row with an arbitrary workspace label
--- silently standing in for the other. Cost/tokens come from
--- `canon_ingest::normalize::TOKEN_USAGE_LABEL` (`"token_usage"`)
--- events, keyed `run_id` -> `session_id` (design D5's `Session`/`Run`
--- keyed by `session_id`).
+-- `Session` nor `Run` carries a native `role` field yet — verified
+-- against `crates/canon-ingest/src/normalize.rs`, 2026-07-11: every
+-- actor `canon-ingest` constructs is `Actor::new_unattributed` (`role`
+-- always `NULL`), surfaced honestly here as `'unattributed'` rather
+-- than hidden.
+--
+-- `workspace_label` is NOT a repo identity, and specifically is not
+-- "the closest available" one — an earlier version of this comment
+-- claimed that and it was wrong twice over (s42 gate re-review). What
+-- it actually is: `canon_ingest::normalize::workspace_label_from_key`'s
+-- output, i.e. the LAST non-empty path segment of the normalized
+-- workspace key, and nothing more. Two concrete failure modes follow
+-- directly from that definition — it SPLITS one repo whose main and
+-- linked `git worktree`s sit in differently-named directories
+-- (`/w/canon` + `/w/canon-feat` -> two rows for one repo), and it
+-- MERGES two genuinely different repos that share a directory name
+-- (`~/a/canon` + `~/b/canon` -> one row).
+--
+-- Two STRONGER fields exist today and this mart reads neither, which is
+-- the honest framing rather than calling this one the best available:
+--   `Session.project_key` — the field with actual repo semantics.
+--     `canon-cli`'s ingest pass stamps it to the MAIN worktree's
+--     normalized key (`crates/canon-cli/src/ingest.rs`'s
+--     `project_key_for`), and `canon_model::records::Session`'s own doc
+--     states the purpose: "so queries can aggregate a repo's main
+--     worktree and its linked `git worktree`s as one project". The
+--     `sessions` CTE below does not select it.
+--   the `token_usage` event's own `workspace_key` — the full
+--     normalized path, at THIS panel's exact grain (it sits in the same
+--     `detail` object `workspace_label` is read from), so it
+--     distinguishes same-named repos under different parents.
+--
+-- Why the label is nonetheless what this panel groups by: `project_key`
+-- is session-level, and this GROUP BY is deliberately event-level so a
+-- session whose runs span two workspaces yields two distinct rows
+-- rather than one row with an arbitrary workspace silently standing in
+-- for the other (pinned by `session_costs_multi_workspace.rs`).
+-- Switching the column would collapse that split, so the gap stays a
+-- NAMED one under this file's existing convention — the column is
+-- called `workspace_label`, never renamed to `repo`, and a caller
+-- needing repo-level truth must read `project_key`, not this. Replace
+-- this derivation wholesale (not patch around it) if the panel ever
+-- grows a genuine repo grain.
+--
+-- Cost/tokens come from `canon_ingest::normalize::TOKEN_USAGE_LABEL`
+-- (`"token_usage"`) events, keyed `run_id` -> `session_id` (design D5's
+-- `Session`/`Run` keyed by `session_id`).
 --
 -- BLOCKER FIXED HERE (s42 re-review). All three CTEs are folded to one
 -- row per natural key (header's fold list), because every one of them
@@ -519,38 +779,34 @@ ORDER BY r.task_id, r.scenario_id;
 CREATE OR REPLACE VIEW mart_session_costs AS
 WITH token_usage AS (
     SELECT
-        body ->> '$.run_id'                                             AS run_id,
+        body ->> '$.run_id'                                            AS run_id,
         "at",
-        CAST(body -> '$.detail' ->> '$.cost' AS DOUBLE)                 AS cost,
-        body -> '$.detail' ->> '$.workspace_label'                      AS workspace_label,
-        CAST(body -> '$.detail' -> '$.tokens' ->> '$.total' AS BIGINT)  AS tokens_total
-    FROM (
-        SELECT arg_max(body, "at") AS body, max("at") AS "at"
-        FROM stg_records
-        WHERE kind = 'event' AND (body ->> '$.label') = 'token_usage'
-        GROUP BY body ->> '$.run_id', body ->> '$.seq'
-    )
+        CAST(body -> '$.detail' ->> '$.cost' AS DOUBLE)                AS cost,
+        body -> '$.detail' ->> '$.workspace_label'                     AS workspace_label,
+        CAST(body -> '$.detail' -> '$.tokens' ->> '$.total' AS BIGINT) AS tokens_total
+    FROM stg_records
+    WHERE kind = 'event' AND (body ->> '$.label') = 'token_usage'
+    QUALIFY row_number() OVER (
+        PARTITION BY body ->> '$.run_id', body ->> '$.seq'
+        ORDER BY version_rank DESC
+    ) = 1
 ),
 runs AS (
-    SELECT body ->> '$.run_id' AS run_id, body ->> '$.session_id' AS session_id
-    FROM (
-        SELECT arg_max(body, "at") AS body
-        FROM stg_records
-        WHERE kind = 'run'
-        GROUP BY body ->> '$.run_id'
-    )
+    SELECT
+        body ->> '$.run_id'     AS run_id,
+        body ->> '$.session_id' AS session_id
+    FROM stg_records
+    WHERE kind = 'run'
+    QUALIFY row_number() OVER (PARTITION BY body ->> '$.run_id' ORDER BY version_rank DESC) = 1
 ),
 sessions AS (
     SELECT
         body ->> '$.session_id'        AS session_id,
         body ->> '$.client'            AS client,
         body -> '$.actor' ->> '$.role' AS actor_role
-    FROM (
-        SELECT arg_max(body, "at") AS body
-        FROM stg_records
-        WHERE kind = 'session'
-        GROUP BY body ->> '$.session_id'
-    )
+    FROM stg_records
+    WHERE kind = 'session'
+    QUALIFY row_number() OVER (PARTITION BY body ->> '$.session_id' ORDER BY version_rank DESC) = 1
 )
 SELECT
     s.session_id,
@@ -944,44 +1200,47 @@ ORDER BY day;
 -- event's own `at`.
 CREATE OR REPLACE VIEW mart_session_run_handoff AS
 WITH runs AS (
-    SELECT
-        body ->> '$.run_id'     AS run_id,
-        body ->> '$.session_id' AS session_id,
-        body ->> '$.status'     AS run_status
+    -- Fold FIRST, filter second: the `session_id IS NOT NULL` test
+    -- belongs to the surviving version, so it sits outside the folding
+    -- subquery. Inlined into the `WHERE` it would run BEFORE the window
+    -- function and resurrect a superseded version of a run whose
+    -- CURRENT version carries no `session_id`.
+    SELECT run_id, session_id, run_status
     FROM (
-        SELECT arg_max(body, "at") AS body
+        SELECT
+            body ->> '$.run_id'     AS run_id,
+            body ->> '$.session_id' AS session_id,
+            body ->> '$.status'     AS run_status
         FROM stg_records
         WHERE kind = 'run'
-        GROUP BY body ->> '$.run_id'
+        QUALIFY row_number() OVER (PARTITION BY body ->> '$.run_id' ORDER BY version_rank DESC) = 1
     )
-    WHERE (body ->> '$.session_id') IS NOT NULL
+    WHERE session_id IS NOT NULL
 ),
 sessions AS (
     SELECT
         body ->> '$.session_id' AS session_id,
         body ->> '$.client'     AS client,
         "at"                    AS session_at
-    FROM (
-        SELECT arg_max(body, "at") AS body, max("at") AS "at"
-        FROM stg_records
-        WHERE kind = 'session'
-        GROUP BY body ->> '$.session_id'
-    )
+    FROM stg_records
+    WHERE kind = 'session'
+    QUALIFY row_number() OVER (PARTITION BY body ->> '$.session_id' ORDER BY version_rank DESC) = 1
 ),
 handoffs AS (
-    SELECT
-        body ->> '$.id'                      AS handoff_id,
-        body -> '$.actor' ->> '$.session_id' AS session_id,
-        body ->> '$.state'                   AS handoff_state,
-        body ->> '$.title'                   AS handoff_title,
-        "at"                                 AS handoff_at
+    -- Fold FIRST, filter second, for the same reason `runs` does.
+    SELECT handoff_id, session_id, handoff_state, handoff_title, handoff_at
     FROM (
-        SELECT arg_max(body, "at") AS body, max("at") AS "at"
+        SELECT
+            body ->> '$.id'                      AS handoff_id,
+            body -> '$.actor' ->> '$.session_id' AS session_id,
+            body ->> '$.state'                   AS handoff_state,
+            body ->> '$.title'                   AS handoff_title,
+            "at"                                 AS handoff_at
         FROM stg_records
         WHERE kind = 'handoff'
-        GROUP BY body ->> '$.id'
+        QUALIFY row_number() OVER (PARTITION BY body ->> '$.id' ORDER BY version_rank DESC) = 1
     )
-    WHERE (body -> '$.actor' ->> '$.session_id') IS NOT NULL
+    WHERE session_id IS NOT NULL
 )
 SELECT
     s.session_id,
@@ -1027,17 +1286,14 @@ ORDER BY s.session_id, r.run_id, h.handoff_id;
 CREATE OR REPLACE VIEW mart_subjects AS
 WITH subjects AS (
     SELECT
-        subject_id,
+        body ->> '$.subject_id'  AS subject_id,
         body ->> '$.domain'      AS domain,
         body ->> '$.title'       AS title,
         body ->> '$.status'      AS status,
         body -> '$.scenario_ids' AS scenario_ids
-    FROM (
-        SELECT body ->> '$.subject_id' AS subject_id, arg_max(body, "at") AS body
-        FROM stg_records
-        WHERE kind = 'subject'
-        GROUP BY 1
-    )
+    FROM stg_records
+    WHERE kind = 'subject'
+    QUALIFY row_number() OVER (PARTITION BY body ->> '$.subject_id' ORDER BY version_rank DESC) = 1
 ),
 subject_scenarios AS (
     SELECT
@@ -1046,19 +1302,25 @@ subject_scenarios AS (
     FROM subjects s, UNNEST(from_json(s.scenario_ids, '["JSON"]')) AS u(g)
     WHERE s.scenario_ids IS NOT NULL
 ),
+-- The CURRENT verdict about each scenario, as one WHOLE winner row
+-- ordered by `version_rank` — the `(at, schema, digest)` triple
+-- `canon-gate::ledger::latest_verdicts` (the `verifying -> shipped`
+-- gate this panel's `covered_scenarios` cites) folds by. Ordering by
+-- `at` alone, as this did, decided an equal-`at` pair of verdicts
+-- arbitrarily while the gate it claims to mirror decided it by format
+-- generation. NOT a natural-key fold and deliberately so: an
+-- attestation carrying BOTH a `task_id` and a `scenario_id` partitions
+-- under its `task_id` (`partition.rs`'s fallback order), so grouping by
+-- `scenario_id` spans every attestation ABOUT that scenario — which is
+-- the `(subject, role)` cell grain `latest_verdicts` folds, not the
+-- storage key.
 scenario_latest_verdict AS (
     SELECT
-        scenario_id,
-        arg_max(verdict, evidence_at) AS latest_verdict
-    FROM (
-        SELECT
-            body ->> '$.scenario_id' AS scenario_id,
-            "at"                     AS evidence_at,
-            body ->> '$.verdict'     AS verdict
-        FROM stg_records
-        WHERE kind = 'evidence_record' AND (body ->> '$.scenario_id') IS NOT NULL
-    )
-    GROUP BY scenario_id
+        body ->> '$.scenario_id' AS scenario_id,
+        body ->> '$.verdict'     AS latest_verdict
+    FROM stg_records
+    WHERE kind = 'evidence_record' AND (body ->> '$.scenario_id') IS NOT NULL
+    QUALIFY row_number() OVER (PARTITION BY body ->> '$.scenario_id' ORDER BY version_rank DESC) = 1
 ),
 coverage AS (
     SELECT

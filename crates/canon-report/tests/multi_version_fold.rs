@@ -22,14 +22,38 @@
 //! and this crate's precedent (`session_costs_multi_workspace.rs`) is
 //! one purpose-built corpus per documented scenario.
 //!
-//! The last test is a NEGATIVE guard: `mart_review_burndown` MUST keep
+//! One test is a NEGATIVE guard: `mart_review_burndown` MUST keep
 //! reading the raw version stream, because for a divergence the
 //! transition IS the curve. It fails if someone "generalizes" the fold
 //! into `stg_records` for every reader.
+//!
+//! The last two tests guard the two ways a fold can be WRONG rather
+//! than absent, both of which the s42 gate re-review found in the
+//! original fix:
+//!
+//! - Wrong KEY. `scope_status_reports_each_projects_own_coverage_…`
+//!   folds `porting.coverage` at `(project_id, scenario_id)`, its own
+//!   declared `join_key`. Keyed `scenario_id` alone, two spec roots
+//!   authoring one scenario id MERGE into one row whose `spec_covered`
+//!   is an arbitrary pick — one project's coverage reported under
+//!   another's name, which is worse than the double-count the fold
+//!   replaced.
+//! - Wrong ORDER. `trust_matrix_breaks_an_equal_at_task_tie_…` pins
+//!   the fold's winner to the one `canon_store::fold_latest_by_key`
+//!   picks — greatest `(at, schema, digest)`, not greatest `at`. Equal
+//!   `at` is routine, not exotic: a plan-derived record stamps `at`
+//!   from its source document's mtime, and `RecordKind::Task`'s
+//!   `schema_version` is `2` precisely because a parser change
+//!   produced a fresh record tied on `at` with the stale one it
+//!   supersedes. That test computes its expectation by CALLING the
+//!   Rust fold rather than hardcoding a winner, so it fails on any
+//!   future divergence between the two implementations, in either
+//!   direction.
 
 mod support;
 
 use canon_model::envelope::{Actor, Envelope, RecordKind};
+use canon_model::evidence::RawRecord;
 use canon_model::ids::{ProjectId, RoleId, RunId, ScenarioId, Sha, SessionId, SubjectId, TaskId, TotalOrder};
 use canon_model::records::{
     Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Run, RunStatus, Session, Subject, SubjectStatus, Task, TaskStatus,
@@ -37,8 +61,10 @@ use canon_model::records::{
 use canon_report::marts;
 use canon_report::query;
 use canon_report::roots::Roots;
+use canon_store::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
-use canon_store::tier::Tier;
+use canon_store::partition::{content_digest12, resolve_partition};
+use canon_store::tier::{raw_record_at, raw_record_schema, Tier, TierQuery};
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::json;
 
@@ -314,4 +340,194 @@ fn review_burndown_still_reads_every_divergence_version_as_its_own_event() {
     assert_eq!(result.rows[1]["divergence_opened"], 0);
     assert_eq!(result.rows[1]["divergence_resolved"], 1);
     assert_eq!(result.rows[1]["divergence_open_running_total"], 0, "burnt down to zero — never negative");
+}
+
+/// The one scenario id TWO different spec roots both author coverage
+/// for. `porting.coverage`'s `join_key` is `(project_id, scenario_id)`
+/// (`.canon/plugins/porting/plugin.yaml`), so the two overlay rows
+/// below are DISTINCT records at distinct natural keys — never two
+/// versions of one record.
+const SHARED_SCENARIO: &str = "fold.cov.01";
+
+/// A well-formed `porting.coverage` overlay body — hand-built JSON
+/// rather than a typed record, exactly as `fixtures/corpus.rs` does it,
+/// because an overlay kind has no `canon-model` type at all.
+fn coverage_overlay(project_id: &str, scenario_id: &str, covered: bool) -> RawRecord {
+    RawRecord(json!({
+        "schema": 1,
+        "kind": "porting.coverage",
+        "at": at(2026, 5, 5, 11).to_rfc3339(),
+        "actor": {"agent_id": "porting-sync", "role": "implementer"},
+        "project_id": project_id,
+        "scenario_id": scenario_id,
+        "covered": covered,
+        "surface_ref": [],
+    }))
+}
+
+#[test]
+fn scope_status_reports_each_projects_own_coverage_for_a_shared_scenario_id() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let git_root = dir.path().join("ledger");
+    let tier = GitTier::new(&git_root);
+
+    let task_id = TaskId::parse("fold-cov#1").unwrap();
+    tier.write(
+        &Task::new(
+            Envelope::new(RecordKind::Task.schema_version(), RecordKind::Task, at(2026, 5, 5, 9), actor("planner")),
+            task_id.clone(),
+            "coverage fan-out task",
+            TaskStatus::Done,
+            None,
+        )
+        .with_scenario_refs(vec![ScenarioId::parse(SHARED_SCENARIO).unwrap()]),
+    )
+    .unwrap();
+
+    // Two spec roots, ONE version each, disagreeing about coverage. The
+    // disagreement is the point: it makes an arbitrary winner visible,
+    // where two `true` rows would hide it.
+    for (project_id, covered) in [("alpha", true), ("beta", false)] {
+        let natural_key = format!("{project_id}__{}", SHARED_SCENARIO);
+        tier.write_namespaced("porting.coverage", &natural_key, coverage_overlay(project_id, SHARED_SCENARIO, covered)).unwrap();
+    }
+
+    let roots = Roots::new(git_root, dir.path().join("r2"), dir.path().join("learn"));
+    let scope = marts::fetch_scope_status(&roots).unwrap();
+
+    // Folded at `scenario_id` alone this was ONE row — the two overlay
+    // rows collapsed into a single group and `arg_max` returned
+    // whichever the scan reached first, so `spec_covered` reported one
+    // project's answer with nothing naming the project it came from.
+    assert_eq!(scope.rows.len(), 2, "one row per COVERING PROJECT for the shared scenario id, got {:?}", scope.rows);
+
+    let spec_covered_for = |project_id: &str| {
+        scope
+            .rows
+            .iter()
+            .find(|r| r.get("spec_project_id").and_then(|v| v.as_str()) == Some(project_id))
+            .unwrap_or_else(|| panic!("no row reports {project_id}'s own coverage: {:?}", scope.rows))["spec_covered"]
+            .clone()
+    };
+    assert_eq!(spec_covered_for("alpha"), json!(true), "alpha authored covered = true");
+    assert_eq!(spec_covered_for("beta"), json!(false), "beta authored covered = false, and must not read alpha's answer");
+
+    for row in &scope.rows {
+        assert_eq!(row["task_id"], "fold-cov#1");
+        assert_eq!(row["scenario_id"], SHARED_SCENARIO);
+        assert_eq!(row["task_status"], "done", "the task side is a single version and must be unaffected by the coverage fan-out");
+    }
+}
+
+#[test]
+fn trust_matrix_breaks_an_equal_at_task_tie_the_same_way_canon_query_does() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let git_root = dir.path().join("ledger");
+    let tier = GitTier::new(&git_root);
+
+    let task_id = TaskId::parse("fold-tie#1").unwrap();
+    let scenario_id = ScenarioId::parse("fold.tie.01").unwrap();
+    // The SAME `at` for both versions — a `Task`'s `at` is
+    // `file_modified_at(<source plan doc>)` (s20 D7), and a canon PARSER
+    // change does not touch that mtime. `Task` is the kind whose
+    // `schema_version` was bumped to `2` for exactly this collision, so
+    // this is that kind's real history, not a contrived corpus.
+    let tied_at = at(2026, 5, 6, 9);
+
+    // Generation 1: pre-s37, no `depends_on`.
+    tier.write(
+        &Task::new(Envelope::new(1, RecordKind::Task, tied_at, actor("planner")), task_id.clone(), "generation tie task", TaskStatus::Open, None)
+            .with_scenario_refs(vec![scenario_id.clone()]),
+    )
+    .unwrap();
+    // Generation 2: the current one, carrying the field the bump exists
+    // for, at the IDENTICAL `at`.
+    tier.write(
+        &Task::new(
+            Envelope::new(RecordKind::Task.schema_version(), RecordKind::Task, tied_at, actor("planner")),
+            task_id.clone(),
+            "generation tie task",
+            TaskStatus::Done,
+            None,
+        )
+        .with_scenario_refs(vec![scenario_id.clone()])
+        .with_depends_on(vec![TaskId::parse("fold-tie#0").unwrap()]),
+    )
+    .unwrap();
+
+    // The expectation is COMPUTED by the Rust fold, never hardcoded:
+    // this test's whole claim is "the view agrees with
+    // `canon_store::fold_latest_by_key`", so hardcoding a winner would
+    // let the two drift apart while the test still passed. Same
+    // `(key, at, schema, digest)` extraction `canon-cli::query`'s
+    // `fold_latest_by_natural_key` performs.
+    struct Candidate {
+        key: String,
+        at: DateTime<Utc>,
+        schema: u32,
+        digest: String,
+        status: String,
+    }
+    let stored = tier.read(&TierQuery::kind(RecordKind::Task)).unwrap();
+    assert!(stored.violations.is_empty(), "both generations must store cleanly: {:?}", stored.violations);
+    assert_eq!(stored.records.len(), 2, "two generations at one task_id must be two physical objects, got {:?}", stored.records);
+
+    let candidates: Vec<Candidate> = stored
+        .records
+        .iter()
+        .map(|record| Candidate {
+            key: resolve_partition(RecordKind::Task, &record.0).unwrap().natural_key,
+            at: raw_record_at(record),
+            schema: raw_record_schema(record),
+            digest: content_digest12(&record.0),
+            status: record.0["status"].as_str().expect("a stored Task always carries a string status").to_string(),
+        })
+        .collect();
+
+    // The fixture property that makes this test a GUARD rather than a
+    // coincidence: the STALE generation's digest sorts first, so it is
+    // also the first file a filename-ordered scan reaches. An `at`-only
+    // fold therefore retains it and reports `open`. If a future
+    // `Task` field flips this ordering, retune the fixture (vary the
+    // title) — otherwise the test would still pass while no longer
+    // distinguishing the two fold rules.
+    let stale = candidates.iter().find(|c| c.schema == 1).expect("generation 1 is stored");
+    let fresh = candidates.iter().find(|c| c.schema == RecordKind::Task.schema_version()).expect("generation 2 is stored");
+    assert_eq!(stale.at, fresh.at, "the two generations must TIE on `at` — that is the whole scenario");
+    assert!(
+        stale.digest < fresh.digest,
+        "fixture must arrange the STALE body to sort first ({} < {}), so an `at`-only fold demonstrably keeps the wrong one",
+        stale.digest,
+        fresh.digest
+    );
+
+    let expected_status = fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str())
+        .into_values()
+        .next()
+        .expect("one natural key, one winner")
+        .status;
+    assert_eq!(expected_status, "done", "`fold_latest_by_key` breaks the `at` tie by the greater `schema`, i.e. generation 2");
+
+    let roots = Roots::new(git_root, dir.path().join("r2"), dir.path().join("learn"));
+
+    let trust = marts::fetch_trust_matrix(&roots).unwrap();
+    assert_eq!(trust.rows.len(), 1, "one task must yield exactly one trust-matrix row, got {:?}", trust.rows);
+    assert_eq!(
+        trust.rows[0]["task_status"], expected_status,
+        "`mart_trust_matrix` must pick the version `canon query` picks; ordering by `at` alone picked the superseded generation"
+    );
+
+    // `int_task_scenario_refs` folds the same key, so the same tie
+    // decides which version's declared refs `mart_scope_status` reads.
+    let scope = marts::fetch_scope_status(&roots).unwrap();
+    assert_eq!(scope.rows.len(), 1, "one declared pair must yield exactly one row, got {:?}", scope.rows);
+    assert_eq!(scope.rows[0]["task_status"], expected_status);
 }

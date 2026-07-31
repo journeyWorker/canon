@@ -36,7 +36,10 @@ const EXPECTED_CONTRACT: &[(&str, &[&str])] = &[
         "mart_review_burndown",
         &["day", "evidence_faithful", "evidence_divergent", "evidence_not_applicable", "divergence_opened", "divergence_resolved", "divergence_open_running_total"],
     ),
-    ("mart_scope_status", &["task_id", "scenario_id", "task_status", "evidence_covered", "green", "spec_covered"]),
+    (
+        "mart_scope_status",
+        &["task_id", "scenario_id", "task_status", "evidence_covered", "green", "spec_project_id", "spec_covered"],
+    ),
     ("mart_subjects", &["domain", "subject_id", "title", "status", "scenario_count", "covered_scenarios"]),
 ];
 

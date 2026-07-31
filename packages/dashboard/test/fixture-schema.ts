@@ -108,6 +108,12 @@ export const EXPECTED_MART_SCHEMA: Record<string, ParquetColumn[]> = {
     { name: "task_status", type: "VARCHAR" },
     { name: "evidence_covered", type: "BOOLEAN" },
     { name: "green", type: "BOOLEAN" },
+    // `porting.coverage` is keyed `(project_id, scenario_id)`, so one
+    // scenario id can be covered by more than one spec root and the
+    // mart emits a row per covering project. `spec_project_id` is that
+    // discriminator, NULL alongside a NULL `spec_covered` when no
+    // overlay exists for the scenario at all.
+    { name: "spec_project_id", type: "VARCHAR" },
     { name: "spec_covered", type: "BOOLEAN" },
   ],
   mart_subjects: [

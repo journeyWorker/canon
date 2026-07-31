@@ -22,6 +22,64 @@ use crate::tier_boundary;
 /// convention (`DEFAULT_LEARN_ROOT`, `DEFAULT_STRATEGIES_ROOT`).
 pub const DEFAULT_REPORT_PATH: &str = canon_model::paths::REPORT_FILE;
 
+/// The `## Session costs` panel's prose.
+///
+/// s42 (`close-the-open-loops`) round-9 re-review, two corrections:
+///
+/// 1. The fold. All three of `mart_session_costs`' CTEs are folded to
+///    the latest version per natural key precisely so a re-ingested
+///    CORRECTION supersedes the figure it corrects instead of being
+///    summed with it. That is the panel's headline number changing
+///    meaning, and it had reached only a SQL comment.
+/// 2. `workspace_label`. This paragraph used to call it "the closest
+///    available stand-in" for a repo. It is not, and it is not even
+///    the strongest field available here. It is
+///    `canon_ingest::normalize::workspace_label_from_key` — the last
+///    non-empty path segment of the `token_usage` event's workspace
+///    key and nothing more — so it SPLITS one repo whose worktrees sit
+///    in differently-named directories (`/a/canon` vs
+///    `/a/canon-wt/review`) and MERGES two different repos sharing a
+///    directory name (`/a/canon` vs `/b/canon`). Two stronger fields
+///    are in reach and neither is read: the same event's own
+///    `workspace_key` (the full key, at this panel's exact grain), and
+///    `Session.project_key`, which `canon-cli` stamps to the MAIN
+///    worktree's key precisely so linked worktrees aggregate as one
+///    project (`crates/canon-model/src/records.rs`' `Session` doc).
+///    Naming the better fields is the honest ending; softening the
+///    adjective would not be. The GROUP BY deliberately stays on
+///    `workspace_label` — `mart_session_costs`' multi-workspace row
+///    split is pinned by its own test — so this is a named, explicit
+///    gap, not a pending change.
+pub const SESSION_COSTS_PANEL: &str = "Token/cost grouped by session/client/role/`workspace_label` (`mart_session_costs`). Totals fold each `run`/`session`/`token_usage` record to its latest version first, so a re-ingested corrected cost REPLACES the superseded figure instead of being summed with it. `workspace_label` is NOT a repo identity: it is the last non-empty path segment of the `token_usage` event's workspace key and nothing more, so it SPLITS one repo whose worktrees sit in differently-named directories and MERGES two different repos sharing a directory name. Two stronger fields exist and this mart reads neither: the same event's own `workspace_key`, at this panel's exact grain, and `Session.project_key`, which `canon-cli` stamps to the main worktree's key so a repo's linked worktrees aggregate as one project.\n\n";
+
+/// The `## Role memory` panel's prose.
+///
+/// s42 (`close-the-open-loops`) re-review: the one-liner used to read
+/// "Strategies, hit rate, effect per role namespace", which names two
+/// quantities the view does not compute. `hit_rate` is the NOT-demoted
+/// fraction of a namespace's distilled rows, and there is no effect
+/// column at all — `avg_source_trajectories` stands in for one. The
+/// view's own comment (`crates/canon-store/sql/views.sql`, panel 3)
+/// already said so; the panel a reader actually sees did not, which is
+/// the same defect class as the funnel below.
+pub const ROLE_MEMORY_PANEL: &str = "Per-`(role, regime_key)` strategy counts (`mart_role_memory`). `hit_rate` is NOT a retrieval hit rate: it is the fraction of that namespace's distilled strategies carrying no `demotion` flag, i.e. exactly `active_count / strategy_count`. `avg_source_trajectories` is the mean number of source trajectories a strategy was distilled from — an explicitly-named stand-in, because canon records no per-strategy reward or effect metric.\n\n";
+
+/// The `## Review burn-down` panel's prose.
+///
+/// s39 (`joined-evidence-grounding`): the panel is a per-day TREND over
+/// raw `Divergence.status` events, and `divergence_open_running_total`
+/// is a running `opened - resolved` count of those events — NOT how
+/// many divergences are open now. The two differ whenever one
+/// `resolved` record closes several findings on a scenario, which is
+/// normal: `fold_to_current_state` ranks a scenario's records by
+/// `run_seq`, so the latest wins per `(project_id, scenario_id)`. On
+/// canon's own corpus this panel reads `2` while every scenario is in
+/// fact resolved. The column name alone invites reading the trend as
+/// current state, so the pointer to the surface that answers that
+/// question ships in the panel itself rather than only in
+/// `canon_report::divergence`'s module doc.
+pub const REVIEW_BURNDOWN_PANEL: &str = "Review-feedback burn-down over time (`mart_review_burndown`) — a per-day trend over raw `Divergence.status` events, so `divergence_open_running_total` is a running `opened - resolved` event count, NOT the number open now. For current state per scenario, run `canon divergence status`.\n\n";
+
 /// The `## Flywheel funnel` panel's prose, named so the honesty
 /// property this string carries is testable on its own rather than
 /// only through a fixture-backed full render (s42
@@ -109,23 +167,11 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     render_table(&mut out, &marts.trust_matrix);
 
     out.push_str("## Session costs\n\n");
-    out.push_str(
-        "Token/cost grouped by session/client/role/`workspace_label` (`mart_session_costs`). No repo column exists: `workspace_label` is the `token_usage` event's own field, the closest available stand-in.\n\n",
-    );
+    out.push_str(SESSION_COSTS_PANEL);
     render_table(&mut out, &marts.session_costs);
 
     out.push_str("## Role memory\n\n");
-    // s42 (`close-the-open-loops`) re-review: the one-liner used to read
-    // "Strategies, hit rate, effect per role namespace", which names two
-    // quantities the view does not compute. `hit_rate` is the
-    // NOT-demoted fraction of a namespace's distilled rows, and there is
-    // no effect column at all — `avg_source_trajectories` stands in for
-    // one. The view's own comment (`crates/canon-store/sql/views.sql`,
-    // panel 3) already said so; the panel a reader actually sees did
-    // not, which is the same defect class as the funnel below.
-    out.push_str(
-        "Per-`(role, regime_key)` strategy counts (`mart_role_memory`). `hit_rate` is NOT a retrieval hit rate: it is the fraction of that namespace's distilled strategies carrying no `demotion` flag, i.e. exactly `active_count / strategy_count`. `avg_source_trajectories` is the mean number of source trajectories a strategy was distilled from — an explicitly-named stand-in, because canon records no per-strategy reward or effect metric.\n\n",
-    );
+    out.push_str(ROLE_MEMORY_PANEL);
     render_table(&mut out, &marts.role_memory);
 
     out.push_str("## Flywheel funnel\n\n");
@@ -176,21 +222,7 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     render_table(&mut out, &marts.flywheel_funnel);
 
     out.push_str("## Review burn-down\n\n");
-    // s39 (`joined-evidence-grounding`): the panel is a per-day TREND
-    // over raw `Divergence.status` events, and `divergence_open_running_
-    // total` is a running `opened - resolved` count of those events --
-    // NOT how many divergences are open now. The two differ whenever one
-    // `resolved` record closes several findings on a scenario, which is
-    // normal: `fold_to_current_state` ranks a scenario's records by
-    // `run_seq`, so the latest wins per `(project_id, scenario_id)`. On
-    // canon's own corpus this panel reads `2` while every scenario is in
-    // fact resolved. The column name alone invites reading the trend as
-    // current state, so the pointer to the surface that answers that
-    // question ships in the panel itself rather than only in
-    // `canon_report::divergence`'s module doc.
-    out.push_str(
-        "Review-feedback burn-down over time (`mart_review_burndown`) — a per-day trend over raw `Divergence.status` events, so `divergence_open_running_total` is a running `opened - resolved` event count, NOT the number open now. For current state per scenario, run `canon divergence status`.\n\n",
-    );
+    out.push_str(REVIEW_BURNDOWN_PANEL);
     render_table(&mut out, &marts.review_burndown);
 
     out.push_str("## Scope status\n\n");
@@ -290,5 +322,55 @@ mod tests {
         assert!(report.contains("`hit_rate` is NOT a retrieval hit rate"), "the role memory panel must correct the `hit_rate` reading");
         assert!(report.contains("exactly `active_count / strategy_count`"), "the role memory panel must give `hit_rate`'s exact formula");
         assert!(report.contains("canon records no per-strategy reward or effect metric"), "the role memory panel must say no effect metric exists");
+    }
+
+    /// The named panel constants are the bridge the dashboard's
+    /// cross-surface test (`packages/dashboard/test/panel-copy.test.ts`)
+    /// binds to, and that binding is only worth anything if every
+    /// constant is actually EMITTED. Keeping a constant while dropping
+    /// its `push_str` would otherwise leave both surfaces agreeing about
+    /// text no reader ever sees.
+    #[test]
+    fn every_named_panel_constant_reaches_the_rendered_report_verbatim() {
+        let report = rendered();
+        for (name, panel) in [
+            ("SESSION_COSTS_PANEL", SESSION_COSTS_PANEL),
+            ("ROLE_MEMORY_PANEL", ROLE_MEMORY_PANEL),
+            ("FLYWHEEL_FUNNEL_PANEL", FLYWHEEL_FUNNEL_PANEL),
+            ("REVIEW_BURNDOWN_PANEL", REVIEW_BURNDOWN_PANEL),
+        ] {
+            assert!(report.contains(panel), "{name} is declared but never rendered");
+        }
+    }
+
+    /// `workspace_label` is `workspace_label_from_key`'s last non-empty
+    /// path segment, so it SPLITS one repo across differently-named
+    /// worktree directories and MERGES two repos sharing a directory
+    /// name. It is not "the closest available stand-in" for a repo and
+    /// not even the strongest field on this join: the same `token_usage`
+    /// event carries `workspace_key` at the identical grain, and
+    /// `Session.project_key` carries repo identity outright. The panel
+    /// must also state the fold, which is what makes its totals a
+    /// corrected figure rather than a sum over superseded versions.
+    #[test]
+    fn session_costs_panel_never_calls_workspace_label_a_repo_identity() {
+        let report = rendered();
+        assert!(!report.contains("the closest available stand-in"), "the session costs panel must not rank `workspace_label` as the best available repo proxy");
+        assert!(report.contains("`workspace_label` is NOT a repo identity"), "the session costs panel must deny `workspace_label` repo identity");
+        assert!(
+            report.contains("SPLITS one repo whose worktrees sit in differently-named directories"),
+            "the session costs panel must name the split limitation, and condition it on the directory names"
+        );
+        assert!(report.contains("MERGES two different repos sharing a directory name"), "the session costs panel must name the merge limitation");
+        assert!(report.contains("Two stronger fields exist and this mart reads neither"), "the session costs panel must say better fields are in reach and unread");
+        assert!(report.contains("the same event's own `workspace_key`, at this panel's exact grain"), "the session costs panel must name `workspace_key`, the stronger field at this grain");
+        assert!(
+            report.contains("`Session.project_key`, which `canon-cli` stamps to the main worktree's key"),
+            "the session costs panel must name the field that carries repo identity outright"
+        );
+        assert!(
+            report.contains("a re-ingested corrected cost REPLACES the superseded figure"),
+            "the session costs panel must state the fold that makes its totals a corrected figure"
+        );
     }
 }

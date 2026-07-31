@@ -80,13 +80,17 @@ SELECT * FROM (
 
 -- Panel 6: mart_scope_status (crates/canon-store/sql/views.sql, s24
 -- task-scenario-join). `spec_covered` is a nullable BOOLEAN (an honest
--- NULL when no porting.coverage overlay exists for the scenario).
+-- NULL when no porting.coverage overlay exists for the scenario), and
+-- `spec_project_id` is the covering spec root: `porting.coverage` is
+-- keyed `(project_id, scenario_id)`, so one scenario id covered by two
+-- roots yields two rows here rather than an arbitrary winner. NULL
+-- wherever `spec_covered` is NULL — no overlay, no project.
 CREATE OR REPLACE TABLE mart_scope_status AS
 SELECT * FROM (
     VALUES
-        ('add-json-export#1.1', 'export.json.01', 'done',        true,  true,  true),
-        ('add-json-export#2.1', 'export.json.02', 'in_progress', false, false, CAST(NULL AS BOOLEAN))
-) AS t(task_id, scenario_id, task_status, evidence_covered, green, spec_covered);
+        ('add-json-export#1.1', 'export.json.01', 'done',        true,  true,  'root',                 true),
+        ('add-json-export#2.1', 'export.json.02', 'in_progress', false, false, CAST(NULL AS VARCHAR),  CAST(NULL AS BOOLEAN))
+) AS t(task_id, scenario_id, task_status, evidence_covered, green, spec_project_id, spec_covered);
 
 -- Panel 7: mart_subjects (crates/canon-store/sql/views.sql, s36
 -- subject-domain-loop). Per-domain rollup: subject status x scenario

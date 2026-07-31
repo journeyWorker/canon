@@ -5,6 +5,7 @@ import puppeteer, { type Browser } from "puppeteer-core";
 import { COLUMNS as FUNNEL_COLUMNS, NOTE as FUNNEL_NOTE } from "../src/panels/flywheel-funnel";
 import { NOTE as ROLE_MEMORY_NOTE } from "../src/panels/role-memory";
 import { NOTE as BURNDOWN_NOTE } from "../src/panels/review-burndown";
+import { NOTE as SESSION_COSTS_NOTE } from "../src/panels/session-costs";
 
 // End-to-end proof of task 5.6 / design.md D4: the built app instantiates
 // DuckDB-Wasm (self-hosted mvp/eh bundle + self-hosted `parquet` core
@@ -144,14 +145,19 @@ test("renders all 5 panels from the fixture snapshot with zero third-party netwo
     expect(rowCount).toBeGreaterThan(0);
   }
 
-  // s42 (`close-the-open-loops`) re-review: three panels state, in
-  // prose, the exact computation their columns carry — the same
-  // statement `.canon/REPORT.md` prints. `panel-copy.test.ts` pins the
-  // wording; this asserts it actually REACHES the DOM, because a
+  // s42 (`close-the-open-loops`) re-review: every annotated panel
+  // states, in prose, the exact computation its columns carry — the
+  // same statement `.canon/REPORT.md` prints. `panel-copy.test.ts` pins
+  // the wording; this asserts it actually REACHES the DOM, because a
   // caveat that never renders annotates nothing. `renderTable` turns
   // backticked spans into `<code>`, so the rendered text is the note
   // with its backticks removed.
+  //
+  // Round-9 re-review added session costs: its correction had reached
+  // only a source comment, so it was the one panel whose reader learned
+  // nothing the markdown report tells them.
   const annotated = [
+    { panelId: "panel-session-costs", note: SESSION_COSTS_NOTE },
     { panelId: "panel-role-memory", note: ROLE_MEMORY_NOTE },
     { panelId: "panel-flywheel-funnel", note: FUNNEL_NOTE },
     { panelId: "panel-review-burndown", note: BURNDOWN_NOTE },

@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T16:09:17.914793Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon dispatch begin/end + ingest artifacts --run + query --kind run + report, over this repo's own .canon corpus with the `run` rung routed local so canon report's local roots can read it"
+  },
+  "evidence_note": {
+    "command_result": "dispatched run visible to canon query --kind run: True\n| role | verdicts | distilled | retrieved | applied | applied_attributed | applied_proxy |\n| review | 12 | 12 | 1 | 1 | 1 | 0 |",
+    "summary": "end to end on this repo's corpus: a dispatch is visible to `canon query --kind run` and the funnel reports a non-zero `retrieved`, admitted by ATTRIBUTION not the proxy (retrieved 1 / applied 1 / applied_attributed 1 / applied_proxy 0). Only the `run` routing rung was changed to local; canon report deliberately reads local roots only, which is why the committed REPORT.md renders 0 while `run` routes to hot"
+  },
+  "kind": "evidence_record",
+  "run_seq": 23,
+  "schema": 1,
+  "staging_id": "0fe5b1b34fec",
+  "task_id": "s42-close-the-open-loops#5.2",
+  "verdict": "faithful"
+}

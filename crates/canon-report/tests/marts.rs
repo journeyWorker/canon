@@ -267,6 +267,11 @@ fn scope_status_matches_the_fixture_corpus_exactly() {
     assert_eq!(fully_green["task_status"], corpus::scope_status::FULLY_GREEN_TASK_STATUS);
     assert_eq!(fully_green["evidence_covered"], corpus::scope_status::FULLY_GREEN_EVIDENCE_COVERED);
     assert_eq!(fully_green["green"], corpus::scope_status::FULLY_GREEN_GREEN);
+    assert_eq!(
+        fully_green["spec_project_id"],
+        corpus::scope_status::FULLY_GREEN_SPEC_PROJECT_ID,
+        "the row must name WHOSE coverage it reports — `porting.coverage` is keyed (project_id, scenario_id)"
+    );
     assert_eq!(fully_green["spec_covered"], corpus::scope_status::FULLY_GREEN_SPEC_COVERED);
 
     let unauthored = row(corpus::scope_status::UNAUTHORED_TASK_ID, corpus::scope_status::UNAUTHORED_SCENARIO_ID);
@@ -277,6 +282,11 @@ fn scope_status_matches_the_fixture_corpus_exactly() {
         unauthored.get("spec_covered").is_none_or(|v| v.is_null()),
         "spec_covered must be an honest NULL when no porting.coverage overlay exists, got {:?}",
         unauthored.get("spec_covered")
+    );
+    assert!(
+        unauthored.get("spec_project_id").is_none_or(|v| v.is_null()),
+        "spec_project_id must be NULL too — there is no overlay row to attribute, got {:?}",
+        unauthored.get("spec_project_id")
     );
 }
 

@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T16:09:17.886108Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence 2>&1 | grep -E '^test |test result:' | tail -8"
+  },
+  "evidence_note": {
+    "command_result": "test evidence_add_refuses_a_newline_that_would_forge_a_second_checked_row ... ok\ntest evidence_add_help_states_it_is_an_attestation_and_names_what_the_gate_skips ... ok\ntest evidence_add_refuses_a_repo_that_configures_no_plan_sources ... ok\ntest evidence_add_refuses_a_newline_in_the_actor_id ... ok\ntest evidence_add_refuses_a_task_the_plan_corpus_does_not_carry ... ok\ntest evidence_add_refuses_a_fabricated_summary_before_staging_anything ... ok\ntest the_three_command_loop_flips_a_checkbox_on_authored_evidence ... ok\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.52s",
+    "summary": "s42's 17 task boxes each have a committed EvidenceRecord bearing that exact task id, and `canon gate task` cannot flip a box without one - the suite pins that it refuses while evidence is only staged and leaves the document untouched (crates/canon-cli/tests/evidence.rs:111-116). Coverage plus a gate that fails closed is what this attests; the ledger cannot by itself prove a human never edited the file"
+  },
+  "kind": "evidence_record",
+  "run_seq": 22,
+  "schema": 1,
+  "staging_id": "4d0a58c0bb3f",
+  "task_id": "s42-close-the-open-loops#4.3",
+  "verdict": "faithful"
+}

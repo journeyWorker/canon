@@ -126,16 +126,31 @@ pub fn fetch_review_burndown(roots: &Roots) -> Result<MartResult, ReportError> {
     fetch(roots, "mart_review_burndown", "day", REVIEW_BURNDOWN_COLUMNS)
 }
 
-pub const SCOPE_STATUS_COLUMNS: &[&str] = &["task_id", "scenario_id", "task_status", "evidence_covered", "green", "spec_covered"];
+pub const SCOPE_STATUS_COLUMNS: &[&str] =
+    &["task_id", "scenario_id", "task_status", "evidence_covered", "green", "spec_project_id", "spec_covered"];
 
 /// `mart_scope_status` (s20 `task-scenario-join`, surfaced by s24): one
-/// row per declared `(task_id, scenario_id)` pair, unifying `task_status`
-/// (done — the checkbox) x `evidence_covered`/`green` (verified — evidence-
-/// side) x `spec_covered` (scenario-authored — spec-side). Exactly the
-/// view's own `SELECT` list (`crates/canon-store/sql/views.sql:271-287`),
-/// no renaming/reordering (design D1).
+/// row per declared `(task_id, scenario_id)` pair PER COVERING PROJECT,
+/// unifying `task_status` (done — the checkbox) x
+/// `evidence_covered`/`green` (verified — evidence-side) x
+/// `spec_project_id`/`spec_covered` (scenario-authored — spec-side).
+///
+/// `spec_project_id` names WHOSE coverage each row reports.
+/// `porting.coverage` is keyed `(project_id, scenario_id)` while
+/// `Task::scenario_refs` carries no project, so two spec roots
+/// authoring one scenario id give a declared pair two coverage answers
+/// and the view emits both rather than picking one arbitrarily (the
+/// view's own GRAIN note carries the full argument). NULL means no
+/// overlay row exists for that scenario at all — distinct from an
+/// overlay row present and saying `spec_covered = false`.
+///
+/// The `ORDER BY` includes `spec_project_id` for the same reason: with
+/// more than one row per pair, `(task_id, scenario_id)` alone is no
+/// longer a total order and the rendered table's row order would not be
+/// stable. Exactly the view's own `SELECT` list, no
+/// renaming/reordering (design D1).
 pub fn fetch_scope_status(roots: &Roots) -> Result<MartResult, ReportError> {
-    fetch(roots, "mart_scope_status", "task_id, scenario_id", SCOPE_STATUS_COLUMNS)
+    fetch(roots, "mart_scope_status", "task_id, scenario_id, spec_project_id", SCOPE_STATUS_COLUMNS)
 }
 
 pub const SUBJECTS_COLUMNS: &[&str] = &["domain", "subject_id", "title", "status", "scenario_count", "covered_scenarios"];

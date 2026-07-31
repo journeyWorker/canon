@@ -188,21 +188,33 @@ pub mod review_burndown {
 /// `mart_scope_status`'s expected two rows (s24 task 5.1): task 1
 /// (already `done` + `Faithful` evidence in `trust_matrix`, above)
 /// declares a scenario ref that ALSO has a `porting.coverage` overlay
-/// row -> a fully-known, non-NULL row (`done`, `true`, `true`,
+/// row -> a fully-known, non-NULL row (`done`, `true`, `true`, `root`,
 /// `true`). Task 2 (already `done` + `Divergent` evidence -> covered
 /// but not green) declares a DIFFERENT scenario ref with NO
-/// `porting.coverage` overlay at all -> `spec_covered` is an honest
-/// NULL, never a dropped row or an invented `false`. Task 3 (no
-/// evidence at all) deliberately keeps its default empty
-/// `scenario_refs` -> contributes NO row to `mart_scope_status`,
-/// proving the view's additive-only, declared-refs-only posture holds
-/// end-to-end through the Rust fetch (tasks.md 5.6).
+/// `porting.coverage` overlay at all -> `spec_project_id` AND
+/// `spec_covered` are both an honest NULL, never a dropped row or an
+/// invented `false`. Task 3 (no evidence at all) deliberately keeps its
+/// default empty `scenario_refs` -> contributes NO row to
+/// `mart_scope_status`, proving the view's additive-only,
+/// declared-refs-only posture holds end-to-end through the Rust fetch
+/// (tasks.md 5.6).
+///
+/// This corpus writes exactly ONE covering project, so it pins the
+/// single-project shape of `spec_project_id`. The MULTI-project fan-out
+/// (two spec roots authoring one scenario id, one row each) is pinned
+/// separately by `tests/multi_version_fold.rs`, which needs its own
+/// corpus for it.
 pub mod scope_status {
     pub const FULLY_GREEN_TASK_ID: &str = "s9-fixture#1";
     pub const FULLY_GREEN_SCENARIO_ID: &str = "s9.fixture.03";
     pub const FULLY_GREEN_TASK_STATUS: &str = "done";
     pub const FULLY_GREEN_EVIDENCE_COVERED: bool = true;
     pub const FULLY_GREEN_GREEN: bool = true;
+    /// The `project_id` of the ONE `porting.coverage` overlay row this
+    /// corpus authors — `porting.coverage`'s join key is
+    /// `(project_id, scenario_id)`, so the mart names whose coverage
+    /// each row reports.
+    pub const FULLY_GREEN_SPEC_PROJECT_ID: &str = "root";
     pub const FULLY_GREEN_SPEC_COVERED: bool = true;
 
     pub const UNAUTHORED_TASK_ID: &str = "s9-fixture#2";
