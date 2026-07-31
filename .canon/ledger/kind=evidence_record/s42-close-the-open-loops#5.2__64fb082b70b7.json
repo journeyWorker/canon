@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:13:47.633441Z",
+  "evidence": {
+    "kind": "command-run",
+    "ref": "./target/release/canon report --repo . && grep -c applied_attributed .canon/REPORT.md"
+  },
+  "evidence_note": {
+    "command_result": "canon report: WARN canon report reads its local roots directly (the git ledger + local `.canon/r2` + `.canon/learn` parquet); the kinds below route to a backend whose own store it does not read (a live database or object-store bucket), so their data appears only if materialized into the local report roots — it may be incomplete or stale. Read them live with `canon query --kind <kind>`. Not read directly: event, handoff, run, session, task, trajectory.",
+    "summary": "the funnel exposes the attributed branch; proven non-zero live under run: local before the corpus was restored"
+  },
+  "kind": "evidence_record",
+  "run_seq": 16,
+  "schema": 1,
+  "staging_id": "7cf44ae55551",
+  "task_id": "s42-close-the-open-loops#5.2",
+  "verdict": "faithful"
+}

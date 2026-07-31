@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:10:57.640330Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib evidence::"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 256 filtered out; finished in 0.06s",
+    "summary": "canon evidence add stages an EvidenceRecord and refuses line breaks in fields that reach the plan document"
+  },
+  "kind": "evidence_record",
+  "run_seq": 12,
+  "schema": 1,
+  "staging_id": "7462a16c22b7",
+  "task_id": "s42-close-the-open-loops#4.1",
+  "verdict": "faithful"
+}

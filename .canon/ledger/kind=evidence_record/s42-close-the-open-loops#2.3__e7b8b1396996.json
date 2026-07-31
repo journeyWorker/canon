@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:10:48.721420Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib artifact_ingest::"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 209 filtered out; finished in 0.03s",
+    "summary": "two same-derivation rows converge to exactly one raw file; a repeat pass writes and deletes nothing"
+  },
+  "kind": "evidence_record",
+  "run_seq": 7,
+  "schema": 1,
+  "staging_id": "c7e276c65bb6",
+  "task_id": "s42-close-the-open-loops#2.3",
+  "verdict": "faithful"
+}

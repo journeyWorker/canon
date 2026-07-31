@@ -73,7 +73,7 @@ pub use artifact_registry::{ArtifactAdapterEntry, registry as artifact_adapter_r
 pub use normalize::{NormalizeOutcome, NormalizedSession, normalize_rows};
 pub use plan_adapter::{PlanAdapter, PlanParseOutcome, PlanSourceConfig, PlanSourceHandle};
 pub use plan_registry::{PlanAdapterEntry, find as find_plan_adapter, registry as plan_adapter_registry};
-pub use plan_writeback::{FlipDocOutcome, PlanTaskLocation, PlanWriteBack, WriteBackError};
+pub use plan_writeback::{FlipDocOutcome, PlanTaskLocation, PlanWriteBack, WriteBackError, reject_multi_line_note};
 pub use registry::{AdapterEntry, AdapterScanResult, enumerate, parse_files, registry, scan_and_parse};
 pub use selftest::selftest;
 pub use verdict::{Becomes, Polarity, Verdict, VerdictRow, attach_regime_key, derive_verdict};

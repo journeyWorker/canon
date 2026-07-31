@@ -146,22 +146,92 @@
 //! SUPERSEDED. [`plan_trajectory`] keeps the canonical row current — it
 //! skips a pass only when the CANONICAL row itself already carries the
 //! freshly rendered identity, never because a sibling does — and
-//! [`rebuild_namespace_converged`] hands the distiller the namespace
-//! MINUS the superseded rows, so one logical verdict set distills into
-//! one strategy set instead of one per stored copy. One pass converges
-//! any number of copies: the rule is a pure function of the stored rows,
-//! so both halves pick the same canonical row without passing state.
+//! [`rebuild_namespace_converged`] distills what supersession left and
+//! removes the superseded rows it is allowed to remove, so one logical
+//! verdict set becomes one strategy set instead of one per stored copy.
+//! One pass converges any number of copies: the rule is a pure function
+//! of the stored rows, so both halves pick the same canonical row
+//! without passing any state.
 //!
-//! Superseded rows are NOT deleted: `canon_learn::TrajectoryStore`
-//! exposes no deletion at all (design decision 3 — the raw tier is an
-//! append-only evidence log; `delete_for_regime_key` exists only on the
-//! distilled `canon_learn::StrategyStore`), so an upgraded namespace's
-//! raw row COUNT cannot shrink from here, and their bytes stay as the
-//! audit trail of what an earlier canon derived. What converges is every
-//! tier a reader consumes: the canonical row carries the current text,
-//! and a superseded sibling's prose never reaches `canon retrieve`,
-//! `mart_role_memory`, or a promotion again. Dropping those bytes
-//! outright would need a new raw-tier removal primitive in `canon-learn`.
+//! ## …and the superseded rows are removed, not merely withheld
+//! s41 could only withhold them. `canon_learn::TrajectoryStore` had no
+//! deletion primitive at all, so an upgraded namespace's raw row COUNT
+//! could never shrink and N stored copies of one verdict set stayed N
+//! files forever — every tier a reader consumed converged while the raw
+//! layer accumulated. s42 (`close-the-open-loops`) added
+//! `canon_learn::TrajectoryStore::delete_by_id` and
+//! [`rebuild_namespace_converged`] uses it, so the raw layer converges
+//! too.
+//!
+//! That destroys something, which is worth naming plainly. A superseded
+//! row's bytes were the audit trail of what an EARLIER canon rendered for
+//! this verdict set, and once deleted three things stop resolving: a
+//! `source_trajectory_ids` provenance pointer in a strategy promoted
+//! (git-tracked, front-matter) before this convergence rule existed, back
+//! when a superseded copy could still be distilled; a
+//! `canon_learn::mark_trajectory_verdict` aimed at that id from the S7
+//! webhook path, which now fails loud rather than marking a row nothing
+//! reads; and the row's own line in S9's `stg_trajectories`, so the
+//! funnel's verdict count stops counting one logical verdict set once per
+//! stored copy.
+//!
+//! ### The derivation key is NOT enough to authorize that delete
+//! Being superseded means only that the canonical row answers the same
+//! QUESTION: same `regime_key`, same ordered `VerdictRow`s (that IS
+//! [`trajectory_derivation_key`]), same [`ARTIFACT_INGEST_TAG`]. It says
+//! nothing about the two fields a stored row carries that no derivation
+//! determines, because both are written independently and LATER
+//! ([`RowProvenance`]): S7's rolled-up `verdict_record` (outcome+reward,
+//! written back by `canon_learn::mark_trajectory_verdict` — this
+//! driver's own persist loop, or the S7 webhook receiver) and the
+//! `run_id` a `--run` pass stamped. Both are deliberately outside
+//! [`trajectory_content_digest`] AND [`trajectory_derivation_key`], for
+//! reasons stated at each, so two rows CAN share a derivation key and
+//! still disagree about them.
+//!
+//! Deleting on the derivation key alone would therefore destroy real
+//! evidence, not an old rendering. `canon learn promote` reads exactly
+//! these fields off `query_by_regime_key`'s rows — `OccurrencePromotionGate`
+//! folds `verdict_record.outcome` (one `Failure` resets its success
+//! streak) and `CrnPromotionGate` folds `verdict_record.reward` — so
+//! dropping a losing row recorded `Failure` while the canonical row holds
+//! `Success` removes the contradiction the gate was refusing on, and
+//! turns a refusal into a promotion. And dropping a losing row's `run_id`
+//! can remove this regime's last trajectory attributing that run, which
+//! is the row `mart_flywheel_funnel`'s attribution stage joins on
+//! (`(run_id, role)`) — the canonical row does not answer for it, because
+//! attribution is stamped per WRITE, not per verdict set.
+//!
+//! So the delete carries a SECOND bar, on top of supersession
+//! ([`RawConvergence`]): a superseded row is removed only when every
+//! independently-written field it carries is also carried by the
+//! canonical row — either unset on the loser (`Pending` at the default
+//! reward; no `run_id`), i.e. no claim at all, or byte-for-byte the
+//! canonical row's own value. For those rows, and only those, the
+//! original statement holds exactly: no verdict evidence is lost, only an
+//! older RENDERING of evidence the canonical row still carries verbatim.
+//!
+//! A superseded row that fails the bar is KEPT — not merged, not
+//! deleted, and reported
+//! ([`ArtifactIngestOutcome::convergence_conflicts`]). Keeping it is the
+//! conservative direction on purpose: a `Failure` and a `Success` for one
+//! verdict set have no lossless merge, so any automatic resolution is a
+//! choice about promotion evidence made by a garbage collector, whereas
+//! the cost of keeping the row is one parquet file and one standing
+//! report line an operator can act on. It stays withheld from the
+//! distiller exactly as s41 left it, so its stale prose is still served
+//! to nobody; the raw file simply survives until a human decides which
+//! verdict is true. The convergence is a fixpoint either way — a kept
+//! conflict is re-reported, never re-deleted, and the distilled tier it
+//! rebuilds is byte-identical every pass.
+//!
+//! And s41 had already denied superseded rows every tier a reader
+//! consumes, so nothing served to an agent could cite them before the
+//! delete either; what changes is that the deletable ones stop costing
+//! bytes and stop inflating a raw-tier count. A row this driver did not
+//! write is never a candidate ([`canonical_driver_row`] rung 2), so no
+//! fixture, no webhook write and no future writer's evidence is reachable
+//! down this path.
 //!
 //! # Documented seam
 //! A `Records`-source adapter's read genuinely CAN fail — no live
@@ -246,6 +316,31 @@
 //! Nothing about verdict derivation moves. An open finding still mints
 //! no verdict, no reward and no trajectory of its own — it contributes
 //! evidence TEXT to a trajectory some OTHER event's verdict created.
+//!
+//! # s42: attributing a trajectory to its dispatched run
+//! [`run`] takes an OPTIONAL [`RunId`] — `canon ingest artifacts --run`,
+//! s42 (`close-the-open-loops`) task 3.2 — and stamps it onto every
+//! trajectory this pass WRITES ([`plan_trajectory`]). That closes s40
+//! task 3.1, which asked `mart_flywheel_funnel`'s `applied` stage to
+//! count "a resolved trajectory joined to its own run" and was left open
+//! as unimplementable: this driver mints a trajectory from an ARTIFACT,
+//! so it had no run in hand, and `canon_learn::Trajectory` carried no
+//! run id to put one in.
+//!
+//! The value is PASSED, never derived. Nothing here consults the wall
+//! clock, the authoring role, or the newest file in `.canon/dispatch/` to
+//! decide which run an artifact "probably" belongs to — an ingest outside
+//! a dispatched run leaves the field absent and the mart falls back to
+//! its labelled proxy. A `Some` is admitted against this repo's own
+//! dispatch manifests ([`resolve_dispatched_run`]) before any adapter
+//! read runs, so a typo'd run id fails the pass rather than stamping an
+//! attribution that silently joins to nothing.
+//!
+//! Attribution is outside BOTH write-identity digests
+//! ([`trajectory_content_digest`], [`trajectory_derivation_key`]) — it
+//! describes the write, not what the trajectory says, and folding it in
+//! would break the idempotence this module's own contract rests on.
+//! [`plan_trajectory`] states that in full.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -254,11 +349,14 @@ use canon_ingest::artifact_adapter::{ArtifactEvent, ArtifactJoinKey, ArtifactSou
 use canon_ingest::artifact_registry::{ArtifactDispatchOutcome, ArtifactSourceKind};
 use canon_ingest::normalize::content_digest;
 use canon_ingest::verdict::{VerdictRow, attach_regime_key, derive_native_divergence_verdict, derive_native_review_verdict, derive_verdict};
-use canon_learn::{LearnConfig, LearnError, ParquetStrategyStore, ParquetTrajectoryStore, RewardRegistry, RoleRegistry, StrategyItem, StrategyStore, Trajectory, TrajectoryId, TrajectoryStore, VerdictOutcome, distill_namespace, mark_trajectory_verdict, store_trajectory};
+use canon_learn::{
+    LearnConfig, LearnError, ParquetStrategyStore, ParquetTrajectoryStore, RewardRegistry, RoleRegistry, StrategyItem, StrategyStore, Trajectory,
+    TrajectoryId, TrajectoryStore, TrajectoryVerdict, VerdictOutcome, distill_namespace, mark_trajectory_verdict, store_trajectory,
+};
 use canon_model::envelope::RecordKind;
 use canon_model::evidence::RawRecord;
-use canon_model::ids::{ProjectId, RegimeKey};
-use canon_model::records::DivergenceStatus;
+use canon_model::ids::{ProjectId, RegimeKey, RunId};
+use canon_model::records::{DivergenceStatus, RunStatus};
 use canon_store::fold_latest_by_key;
 use canon_store::policy::{BackendConfig, Rung, TierPolicy};
 use canon_store::registry::TierRegistry;
@@ -267,6 +365,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::context::resolve_repo_root;
+use crate::dispatch::DispatchError;
 use crate::tiers::{self, TierCliError};
 
 #[derive(Debug, thiserror::Error)]
@@ -292,6 +391,72 @@ pub enum ArtifactIngestError {
     /// `main.rs` as a nonzero exit exactly like `Learn`/`RegimeKey`.
     #[error("canon.yaml artifacts config: {0}")]
     ConfigXor(String),
+    /// `--run <RunId>` (s42 (`close-the-open-loops`) task 3.2) names a
+    /// run this repo has no dispatch manifest for — rejected by
+    /// [`resolve_dispatched_run`] BEFORE any adapter read runs.
+    ///
+    /// The same admission bar, against the same path, that `canon
+    /// dispatch end` applies (`crate::dispatch::DispatchError::
+    /// NoSuchRun`): only a run this repo actually dispatched can be
+    /// attributed. Accepting a well-formed-but-unknown ULID would let a
+    /// typo stamp every trajectory of the pass with an attribution
+    /// pointing at nothing, which `mart_flywheel_funnel` would then
+    /// silently drop on the join — a wrong claim that reads exactly like
+    /// no claim, and the one failure mode this whole field exists to
+    /// avoid.
+    #[error(
+        "--run `{run_id}` has no dispatch manifest at {path} — only a run begun by `canon dispatch begin` on this repo can be attributed; omit --run to ingest without attribution"
+    )]
+    UnknownRun { run_id: String, path: String },
+    /// `--run <RunId>` names a manifest that exists but is not a `Run`
+    /// record this driver can read — s42 (`close-the-open-loops`)
+    /// re-review (`ReviewAttribution` finding 1). Covers every way
+    /// `crate::dispatch::read_dispatched_manifest`'s first two rungs can
+    /// fail: an entry at that path that is a DIRECTORY, a permission or
+    /// I/O failure, and bytes that do not deserialize as a `Run`
+    /// (truncated, hand-edited, or a foreign JSON document that merely
+    /// happens to be named `<run_id>.json`).
+    ///
+    /// Deliberately NOT folded into [`ArtifactIngestError::UnknownRun`]:
+    /// "this repo never began that run" and "the record of that run is
+    /// damaged" are different operator problems with different fixes,
+    /// and the pre-hardening code could not tell them apart at all
+    /// because it probed with `metadata` and never opened the file.
+    #[error(
+        "--run `{run_id}`'s dispatch manifest at {path} is not a readable Run record ({detail}) — attribution is only ever taken from the manifest `canon dispatch begin` wrote; repair or remove it, or omit --run to ingest without attribution"
+    )]
+    UnreadableRunManifest { run_id: String, path: String, detail: String },
+    /// `--run <RunId>` names a manifest whose OWN `run_id` is a
+    /// different run — `crate::dispatch::read_dispatched_manifest`'s
+    /// third rung, the same `DispatchError::RunIdMismatch` `canon
+    /// dispatch end` refuses a close on.
+    ///
+    /// The filename is the dispatch side-channel's only index, so a
+    /// copied or hand-renamed manifest would otherwise let one run's
+    /// identity answer for another's — and here that answer is stamped
+    /// onto EVERY trajectory the pass writes, which is a false
+    /// attribution rather than a failed one.
+    #[error(
+        "--run `{run_id}`'s dispatch manifest at {path} records run_id `{found}` — the filename is that side-channel's only index, so admitting it would attribute every trajectory of this pass to a run you did not name"
+    )]
+    MisfiledRunManifest { run_id: String, path: String, found: String },
+    /// `--run <RunId>` names a readable, correctly-filed manifest whose
+    /// run was never DISPATCHED: `canon_model::records::RunStatus::
+    /// Pending`, the one state that means no execution ever started.
+    ///
+    /// This driver's lifecycle rung is deliberately WEAKER than `canon
+    /// dispatch end`'s, which admits only `(Running, ended_at: None)`.
+    /// `end` MUTATES the run, so it needs the single closeable state;
+    /// this pass only reads an attribution target, and a run that
+    /// already closed (or was aborted) genuinely executed — trajectories
+    /// derived inside it belong to it, and refusing them would make a
+    /// wrapper that closes its run before a final ingest unable to
+    /// attribute anything. `Pending` is the one status where attributing
+    /// would assert an execution that never happened.
+    #[error(
+        "--run `{run_id}` records status `pending` at {path} — a pending run was never dispatched, so no execution exists for this pass's trajectories to belong to; begin the run with `canon dispatch begin`, or omit --run to ingest without attribution"
+    )]
+    RunNeverDispatched { run_id: String, path: String },
 }
 
 /// One registered adapter's contribution to this pass — mirrors
@@ -333,6 +498,35 @@ pub struct PersistedTrajectory {
     pub superseded: bool,
 }
 
+/// One superseded copy the raw convergence KEPT rather than deleted,
+/// because it carries an independently-written field the canonical row
+/// does not (module doc, "The derivation key is NOT enough to authorize
+/// that delete"). s42 (`close-the-open-loops`) re-review, `ReviewRuns`
+/// finding 1.
+///
+/// A report, never a resolution. Both rows stay exactly as they are, so
+/// `canon learn promote` keeps reading the contradiction off
+/// `query_by_regime_key` — which is the whole point: the alternative
+/// this replaced silently deleted the loser and changed what the gate
+/// saw.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ConvergenceConflict {
+    /// The namespace both rows sit under.
+    pub regime_key: String,
+    /// The row the smallest-id rule keeps
+    /// ([`canonical_driver_row`]) — the one whose provenance the kept
+    /// row was compared against.
+    pub canonical_id: String,
+    /// The superseded row that survived the delete. Still withheld from
+    /// the distiller exactly as s41 left it: kept is not served.
+    pub retained_id: String,
+    /// Every claim `retained_id` makes that `canonical_id` does not,
+    /// one line per disagreeing field in [`RowProvenance`]'s fixed field
+    /// order ([`RowProvenance::claims_beyond`]). Never empty — an empty
+    /// list IS the deletable case, and no conflict is constructed for it.
+    pub claims: Vec<String>,
+}
+
 /// One `canon ingest artifacts` pass's outcome.
 #[derive(Debug, Clone, Serialize)]
 pub struct ArtifactIngestOutcome {
@@ -354,10 +548,42 @@ pub struct ArtifactIngestOutcome {
     /// matches but whose TEXT does not is not this: it is superseded in
     /// place, see [`PersistedTrajectory::superseded`].
     pub trajectories_skipped_duplicate: usize,
+    /// Raw `Trajectory` rows this pass DELETED as this driver's own
+    /// superseded copies whose independently-written provenance the
+    /// canonical row also carries ([`RawConvergence::deletable`]) — s42
+    /// (`close-the-open-loops`).
+    ///
+    /// Reported rather than left silent, on the same "reported, never
+    /// silent" discipline every other degrade and skip in this outcome
+    /// follows. It is the only counter here that names bytes that no
+    /// longer exist, so an operator seeing it non-zero should read the
+    /// module doc's account of what a deleted row makes unresolvable. It
+    /// is non-zero at most ONCE per namespace per upgrade: a namespace a
+    /// post-s38 canon produced on its own has no superseded copies to
+    /// remove, and one converging pass empties an upgraded one of every
+    /// copy it is allowed to remove — the rest are reported in
+    /// [`ArtifactIngestOutcome::convergence_conflicts`] and never
+    /// counted here.
+    pub trajectories_converged_deleted: usize,
+    /// Superseded copies this pass REFUSED to delete because they carry
+    /// a `verdict_record` or `run_id` the canonical row does not — s42
+    /// (`close-the-open-loops`) re-review (`ReviewRuns` finding 1). One
+    /// entry per kept row, ordered by regime key then by the kept row's
+    /// own id, so a repeat pass prints byte-identical lines.
+    ///
+    /// Empty for every store this driver produced on its own, and for
+    /// every ordinary upgrade: the losing copies a pre-s38 pass appended
+    /// were never marked and never attributed, so they claim nothing.
+    /// A non-empty entry means two stored rows disagree about a fact
+    /// `canon learn promote` reads (module doc), and the disagreement is
+    /// STANDING — it is re-reported every pass until an operator removes
+    /// the row they judge wrong, because this driver will not pick for
+    /// them.
+    pub convergence_conflicts: Vec<ConvergenceConflict>,
     /// Sum of every regime's freshly-distilled `StrategyItem` count
-    /// ([`rebuild_namespace_converged`]'s return value) — the count that
-    /// actually lands in `stg_strategy_items`, i.e. what makes S9's
-    /// `mart_role_memory` non-empty.
+    /// ([`NamespaceConvergence::items`]) — the count that actually lands
+    /// in `stg_strategy_items`, i.e. what makes S9's `mart_role_memory`
+    /// non-empty.
     pub strategy_items_rebuilt: usize,
     /// Trajectories whose covering verdict+reward was RESOLVED and
     /// written back in this same pass
@@ -1476,14 +1702,32 @@ enum PersistPlan {
     SkipDuplicate,
     /// Same: nothing to WRITE, the canonical row is already current. But
     /// this driver's own superseded rows ([`superseded_driver_ids`]) still
-    /// sit in the namespace, so the distilled tier must still be
-    /// re-derived from the CONVERGED row set
+    /// sit in the namespace, so the pass must still converge it
     /// ([`rebuild_namespace_converged`]) — otherwise a stale sibling's
     /// `StrategyItem` keeps being served beside the fresh one until the
     /// corpus happens to change (s41 (`review-hardening`), re-review
     /// finding 1). Counted as a skipped duplicate exactly like
     /// [`PersistPlan::SkipDuplicate`], never as a persist: no `Trajectory`
     /// row is written.
+    ///
+    /// Since s42 (`close-the-open-loops`) this arm is normally ONE-SHOT
+    /// per namespace rather than a standing state. Convergence now
+    /// DELETES the superseded rows ([`rebuild_namespace_converged`])
+    /// instead of stepping around them, so the next pass over an
+    /// unchanged corpus finds [`superseded_driver_ids`] empty and takes
+    /// [`PersistPlan::SkipDuplicate`] — writing nothing and deleting
+    /// nothing.
+    ///
+    /// With ONE deliberate exception: a superseded row whose
+    /// independently-written provenance the canonical row does not carry
+    /// is KEPT ([`RowProvenance`], module doc), so
+    /// [`superseded_driver_ids`] stays non-empty and this arm stands
+    /// until an operator resolves the disagreement. That is the intended
+    /// reading — the condition really has not been converged — and it
+    /// costs nothing: the rebuild it drives is a fixpoint that rewrites
+    /// byte-identical strategy rows, and the pass re-reports the conflict
+    /// ([`ArtifactIngestOutcome::convergence_conflicts`]) instead of
+    /// quietly forgetting it.
     ConvergeDistilled,
     /// A first derivation of this logical verdict set — a new row
     /// beside whatever the namespace already holds.
@@ -1547,6 +1791,16 @@ fn canonical_driver_row(existing: &[Trajectory], derivation: &str) -> Option<Tra
 /// (`review-hardening`), re-review finding 1 — the earlier slice assumed
 /// that set was always a singleton, which no such store honours).
 ///
+/// s42 (`close-the-open-loops`): these ids are the CANDIDATES for
+/// deletion from the raw tier ([`plan_raw_convergence`]), not merely rows
+/// kept out of the distiller's input. The set this function names is
+/// unchanged — rows carrying [`ARTIFACT_INGEST_TAG`] that lost the
+/// smallest-id tie-break inside their own derivation group — and it is
+/// still exactly the set the distiller is denied. What deletion needs on
+/// top of it is [`RowProvenance`]'s bar: sharing a derivation key proves
+/// the rows answer the same question, never that they carry the same
+/// independently-written verdict or attribution.
+///
 /// Quadratic in a namespace's row count, over a handful of rows per
 /// regime and only inside a persist step that already does file I/O per
 /// row — cheaper than the `BTreeMap` that would avoid it, and it keeps
@@ -1560,49 +1814,278 @@ fn superseded_driver_ids(existing: &[Trajectory]) -> Vec<TrajectoryId> {
         .collect()
 }
 
-/// `canon_learn::rebuild_namespace` over the CONVERGED row set: this
-/// regime's rows MINUS the ones this driver superseded
-/// ([`superseded_driver_ids`]), so one logical verdict set distills into
-/// one strategy set instead of one per stored copy.
+/// The two independently-written fields a stored
+/// [`canon_learn::Trajectory`] carries that this driver's DERIVATION does
+/// not determine — written after it, by someone else, and therefore free
+/// to differ between two rows [`trajectory_derivation_key`] calls equal.
 ///
-/// Why the filter lives here rather than in `canon-learn`: it is stated
-/// in [`ARTIFACT_INGEST_TAG`] and [`trajectory_derivation_key`], which are
-/// THIS driver's semantics. `canon-learn` cannot name the rows one of its
-/// callers superseded without importing them, so its own
+/// - `verdict_record`: S7's rolled-up outcome+reward. Every freshly
+///   constructed row starts `TrajectoryVerdict::pending()`; a covering
+///   value arrives later through
+///   [`canon_learn::mark_trajectory_verdict`] — [`run`]'s own persist
+///   loop, or the S7 webhook receiver, aimed at ONE id.
+/// - `run_id`: the dispatched run a `--run` pass was executing inside,
+///   stamped by [`plan_trajectory`] onto the row that pass writes and
+///   onto no other. Two passes under two runs therefore attribute two
+///   different rows.
+///
+/// A named pair rather than two comparisons at the call site, and
+/// [`RowProvenance::of`] destructures `Trajectory` EXHAUSTIVELY, so a
+/// field added to that type later fails to compile here until someone
+/// answers "is this independently written, and must the delete bar see
+/// it?". The bar it feeds is irreversible, and silently defaulting that
+/// question to "no" is exactly how this defect class was introduced.
+#[derive(Debug, Clone, PartialEq)]
+struct RowProvenance {
+    verdict_record: TrajectoryVerdict,
+    run_id: Option<RunId>,
+}
+
+impl RowProvenance {
+    fn of(row: &Trajectory) -> Self {
+        // Exhaustive on purpose (see this type's doc) — never a
+        // two-field pick that a new `Trajectory` field slips past.
+        let Trajectory { id: _, regime_key: _, task: _, context: _, verdicts: _, recorded_at: _, tags: _, verdict_record, run_id } = row;
+        Self { verdict_record: *verdict_record, run_id: *run_id }
+    }
+
+    /// Every claim `self` makes that `canonical` does not also make —
+    /// empty exactly when deleting the row `self` describes destroys
+    /// nothing the canonical row still carries.
+    ///
+    /// A field is NOT a claim when it holds its unset value: the exact
+    /// `TrajectoryVerdict::pending()` default (`Pending` at reward 0.5,
+    /// which is what a row nobody ever marked reads back as — see
+    /// `ParquetTrajectoryStore`'s `None`-outcome decode), or no `run_id`
+    /// at all. Otherwise it must equal the canonical row's value
+    /// EXACTLY, reward included: `CrnPromotionGate` folds
+    /// `verdict_record.reward` as its sample value, so two rows agreeing
+    /// on `Success` at different rewards are two different pieces of
+    /// promotion evidence.
+    ///
+    /// The comparison is deliberately asymmetric. A canonical row that
+    /// carries MORE than the loser is fine — the loser then claims
+    /// nothing the store loses — while a loser carrying more is the
+    /// conflict. That asymmetry is the whole safety property:
+    /// `claims_beyond` is empty only when the canonical row subsumes the
+    /// row about to be deleted.
+    ///
+    /// Rendered as lines rather than a bool so the report names WHICH
+    /// fact disagrees and what each row holds, in this fixed field order
+    /// — the output is operator-facing bytes, so its order is the
+    /// source's, never a map's iteration.
+    fn claims_beyond(&self, canonical: &Self) -> Vec<String> {
+        let mut claims = Vec::new();
+        if self.verdict_record != TrajectoryVerdict::pending() && self.verdict_record != canonical.verdict_record {
+            claims.push(format!(
+                "verdict_record `{}` at reward {:.3}, where the canonical row records `{}` at reward {:.3}",
+                self.verdict_record.outcome, self.verdict_record.reward, canonical.verdict_record.outcome, canonical.verdict_record.reward
+            ));
+        }
+        match (self.run_id, canonical.run_id) {
+            (Some(mine), Some(theirs)) if mine != theirs => {
+                claims.push(format!("run_id `{mine}`, where the canonical row records `{theirs}`"));
+            }
+            (Some(mine), None) => claims.push(format!("run_id `{mine}`, where the canonical row records no run")),
+            // Agreeing ids, or no attribution of my own to lose.
+            (Some(_), Some(_)) | (None, _) => {}
+        }
+        claims
+    }
+}
+
+/// Decides — without writing anything — what the raw tier's convergence
+/// for one regime should do: which rows the distiller may see, which
+/// superseded copies may be deleted, and which must be kept and reported.
+///
+/// s42 (`close-the-open-loops`) task 2.2, hardened by its own re-review
+/// (`ReviewRuns` finding 1). s41 computed [`superseded_driver_ids`] and
+/// only filtered it out of the distiller's input, because
+/// `canon_learn::TrajectoryStore` held no deletion primitive; now that
+/// `delete_by_id` exists the raw layer can converge too — but supersession
+/// alone does not authorize a delete. The module doc's "The derivation key
+/// is NOT enough to authorize that delete" states why; [`RowProvenance`]
+/// states the bar; this function applies it.
+///
+/// PURE with respect to the store: the only call it makes is the read.
+/// Separating the decision from the writes is what lets
+/// [`rebuild_namespace_converged`] order those writes safely — a planner
+/// that deleted as it went could not be run before the strategy rebuild.
+///
+/// Every s41 invariant survives, because the superseded SET is unchanged
+/// and the new bar only ever shrinks what is deleted:
+///
+/// 1. a row this driver did not write is NEVER deleted and NEVER
+///    withheld — an untagged row, or one whose
+///    [`trajectory_derivation_key`] differs, is not in the set at all
+///    ([`canonical_driver_row`] rungs 2 and 3);
+/// 2. the canonical id is stable across passes — deletion only ever
+///    removes NON-minimal ids from a derivation group, so the group's
+///    minimum, which is exactly what [`canonical_driver_row`] returns, is
+///    the same id before and after, and a KEPT conflict cannot move it
+///    either (it too is non-minimal); and
+/// 3. a converged namespace deletes nothing — one pass empties the
+///    deletable set, and the pass after it takes
+///    [`PersistPlan::SkipDuplicate`] unless a conflict was kept, in which
+///    case [`PersistPlan::ConvergeDistilled`] stands and this function
+///    re-reports the same conflict over a byte-identical rebuild.
+///
+/// Both output lists are sorted by [`canon_learn::TrajectoryId`], which
+/// identifies a row and so is a TOTAL order over a namespace.
+/// `query_by_regime_key` reads a directory, whose order is the
+/// filesystem's: unsorted, the reported conflict lines would differ
+/// between two passes over identical bytes, and a partially-failed delete
+/// would leave a different survivor set each attempt.
+fn plan_raw_convergence(trajectory_store: &dyn TrajectoryStore, regime_key: &RegimeKey) -> Result<RawConvergence, LearnError> {
+    let mut rows = trajectory_store.query_by_regime_key(regime_key)?;
+    let superseded = superseded_driver_ids(&rows);
+    let mut deletable = Vec::new();
+    let mut conflicts = Vec::new();
+    for losing in rows.iter().filter(|row| superseded.contains(&row.id)) {
+        let derivation = trajectory_derivation_key(&losing.regime_key, &losing.verdicts);
+        // Unreachable by construction: `superseded_driver_ids` selected
+        // this row precisely BECAUSE `canonical_driver_row` over this same
+        // slice returned a different id for this same derivation, so both
+        // lookups resolve. Written as a skip rather than an `expect`
+        // because `rows` is store-supplied data, and the safe reading of
+        // "I cannot find this row's canonical partner" is to leave the row
+        // alone — it stays withheld from the distiller either way.
+        let Some(canonical) = canonical_driver_row(&rows, &derivation).and_then(|id| rows.iter().find(|row| row.id == id)) else {
+            continue;
+        };
+        let claims = RowProvenance::of(losing).claims_beyond(&RowProvenance::of(canonical));
+        if claims.is_empty() {
+            deletable.push(losing.id);
+        } else {
+            conflicts.push(ConvergenceConflict {
+                regime_key: regime_key.as_str().to_string(),
+                canonical_id: canonical.id.to_string(),
+                retained_id: losing.id.to_string(),
+                claims,
+            });
+        }
+    }
+    deletable.sort_unstable();
+    conflicts.sort_by(|left, right| left.retained_id.cmp(&right.retained_id));
+    rows.retain(|row| !superseded.contains(&row.id));
+    Ok(RawConvergence { retained: rows, deletable, conflicts })
+}
+
+/// What [`plan_raw_convergence`] decided, as a named triple rather than a
+/// positional tuple: the three lists mean entirely different things to
+/// the caller — one is distiller input, one is a delete list, one is an
+/// operator report — and a bare tuple would let a caller distill the
+/// wrong one.
+struct RawConvergence {
+    /// The regime's rows the distiller may see: every row that is NOT
+    /// superseded, in `query_by_regime_key` order. Superseded rows are
+    /// excluded whether or not they were deletable — s41's rule, unchanged
+    /// by s42: a kept conflict is kept, not served.
+    retained: Vec<Trajectory>,
+    /// The superseded ids whose provenance the canonical row subsumes, so
+    /// deleting them destroys nothing the store still holds
+    /// ([`RowProvenance::claims_beyond`] empty). Sorted by id. Empty for
+    /// every namespace a post-s38 canon produced on its own.
+    deletable: Vec<TrajectoryId>,
+    /// The superseded rows the bar REFUSED to delete, one report each,
+    /// sorted by the kept row's id.
+    conflicts: Vec<ConvergenceConflict>,
+}
+
+/// The same, one tier up: what a full [`rebuild_namespace_converged`]
+/// pass left in each tier.
+#[cfg_attr(test, derive(Debug))]
+struct NamespaceConvergence {
+    /// The freshly distilled items now in the strategy tier.
+    items: Vec<StrategyItem>,
+    /// How many raw rows the pass actually deleted
+    /// ([`RawConvergence::deletable`]'s length, reached only after the
+    /// strategy rebuild committed) — the raw tier's own convergence is
+    /// not a distilled-tier concern, but this is the boundary `run`
+    /// reports from.
+    rows_deleted: usize,
+    /// [`RawConvergence::conflicts`], passed straight through to
+    /// [`ArtifactIngestOutcome::convergence_conflicts`].
+    conflicts: Vec<ConvergenceConflict>,
+}
+
+/// `canon_learn::rebuild_namespace` over the CONVERGED row set
+/// ([`plan_raw_convergence`]), so one logical verdict set distills into
+/// one strategy set instead of one per stored copy — and then, and only
+/// then, removes the raw copies that convergence made redundant.
+///
+/// Why the convergence lives here rather than in `canon-learn`: it is
+/// stated in [`ARTIFACT_INGEST_TAG`] and [`trajectory_derivation_key`],
+/// which are THIS driver's semantics. `canon-learn` cannot name the rows
+/// one of its callers superseded without importing them, so its own
 /// `rebuild_namespace` necessarily distills every row it is given; this
 /// function is that same delete-rebuild with the caller's own convergence
-/// applied to its INPUT. Nothing else changes: the raw tier is only READ
-/// (design decision 3 — `canon_learn::TrajectoryStore` exposes no
-/// deletion at all), only the distilled tier is deleted and re-derived,
-/// and `canon_learn::distill_namespace` still derives every field
-/// including the `canon_learn::StrategyId`, so repeated calls rewrite
-/// byte-identical `<id>.parquet` rows and stay a fixpoint.
+/// applied first — to its own input, and then to the raw tier.
 ///
-/// The superseded rows THEMSELVES stay in the store, untouched: this
-/// driver holds no primitive that could remove a raw row, and their bytes
-/// are the audit trail of what an earlier canon derived. What changes is
-/// that they no longer reach the distilled tier, so a stale
-/// `StrategyItem` can no longer sit beside the fresh one in `canon
-/// retrieve`, `mart_role_memory`, or a promotion. A `StrategyRef` some
-/// `Run` recorded against such an item stops resolving — the same,
-/// already-documented consequence any re-derivation from changed evidence
-/// has (`canon-report`'s `mart_flywheel_funnel` notes it), and the price
-/// of not serving stale guidance.
+/// # The order of the three writes is the retry contract
+/// Plan, then rebuild the strategy namespace, then delete the raw
+/// duplicates. s42 shipped that last step FIRST and made the operation
+/// non-retriable (`ReviewRuns` finding 2): the raw duplicate is the ONLY
+/// condition that selects [`PersistPlan::ConvergeDistilled`], so deleting
+/// it before the rebuild committed meant a failed
+/// `delete_for_regime_key` or `append` returned with the trigger already
+/// gone — an unchanged retry then took [`PersistPlan::SkipDuplicate`] and
+/// left the strategy namespace empty or half-rebuilt forever, with
+/// nothing in the store to say so.
+///
+/// In this order every failure point leaves a store an unchanged retry
+/// still converges:
+///
+/// - the read or the plan fails: nothing was written at all;
+/// - `delete_for_regime_key` or any `append` fails: the raw duplicates
+///   are all still there, so the next pass plans the identical
+///   convergence and rebuilds from scratch (the rebuild is a
+///   delete-then-append over the whole namespace, so a half-written
+///   strategy tier is fully replaced, not appended to);
+/// - a `delete_by_id` fails partway: the strategy tier is already correct
+///   and the remaining duplicates keep selecting `ConvergeDistilled`, so
+///   the retry re-runs a byte-identical rebuild and deletes the rest.
+///
+/// Both halves are fixpoints, which is what makes those retries free:
+/// `delete_for_regime_key` then re-append, with
+/// `canon_learn::distill_namespace` deriving every field including the
+/// `canon_learn::StrategyId`, rewrites byte-identical `<id>.parquet`
+/// rows; and the raw half converges one step later — the first call
+/// deletes the deletable superseded rows, every call after it finds
+/// nothing left to delete (a kept conflict is re-reported, never
+/// re-deleted).
+///
+/// The `?` on each delete is a genuine failure, never a routine miss:
+/// every id came out of `query_by_regime_key` for THIS `regime_key` in
+/// this same call, so `delete_by_id`'s loud
+/// `canon_learn::LearnError::UnknownTrajectoryRow` can only mean the store
+/// changed underneath the pass.
+///
+/// A `StrategyRef` some `Run` recorded against an item that leaves the
+/// distilled tier stops resolving — the same, already-documented
+/// consequence any re-derivation from changed evidence has
+/// (`canon-report`'s `mart_flywheel_funnel` notes it), and the price of
+/// not serving stale guidance.
 fn rebuild_namespace_converged(
     trajectory_store: &dyn TrajectoryStore,
     strategy_store: &dyn StrategyStore,
     regime_key: &RegimeKey,
-) -> Result<Vec<StrategyItem>, LearnError> {
-    let mut rows = trajectory_store.query_by_regime_key(regime_key)?;
-    let superseded = superseded_driver_ids(&rows);
-    rows.retain(|row| !superseded.contains(&row.id));
+) -> Result<NamespaceConvergence, LearnError> {
+    let raw = plan_raw_convergence(trajectory_store, regime_key)?;
 
     strategy_store.delete_for_regime_key(regime_key)?;
-    let items = distill_namespace(regime_key, &rows);
+    let items = distill_namespace(regime_key, &raw.retained);
     for item in &items {
         strategy_store.append(item)?;
     }
-    Ok(items)
+
+    // Last, and only now. Until this loop runs, the duplicates are what
+    // makes an unchanged retry converge again; after it, the strategy
+    // namespace they were needed for is already committed.
+    for id in &raw.deletable {
+        trajectory_store.delete_by_id(regime_key, id)?;
+    }
+    Ok(NamespaceConvergence { items, rows_deleted: raw.deletable.len(), conflicts: raw.conflicts })
 }
 
 /// Renders one regime group's text and decides how it lands in the
@@ -1633,12 +2116,56 @@ fn rebuild_namespace_converged(
 /// Reusing the canonical id is what makes the write REPLACE instead of
 /// append: the shipped `canon_learn::ParquetTrajectoryStore` keys one file
 /// per `<regime_key>/<id>.parquet`, so `canon_learn::store_trajectory`
-/// lands on the same row. That is the only mutation this driver performs:
-/// the raw tier stays append-only across DISTINCT derivations (design
-/// decision 3), and the copies an older canon already appended for one
-/// verdict set are converged at the distill boundary instead
-/// ([`rebuild_namespace_converged`]), since no primitive can remove them.
-fn plan_trajectory(existing: &[Trajectory], regime_key: &RegimeKey, evidence: &RegimeEvidence) -> Result<PersistPlan, LearnError> {
+/// lands on the same row. The raw tier still stays append-only across
+/// DISTINCT derivations (design decision 3) — a genuinely new verdict set
+/// is always a new row, and the only bytes a write here overwrites are
+/// this driver's own previous answer to the identical question. What s42
+/// (`close-the-open-loops`) changed is the other direction: the extra
+/// copies an OLDER canon appended for a SINGLE verdict set are now removed
+/// by [`rebuild_namespace_converged`] rather than left in place and
+/// stepped around, so after one pass this plan runs against a namespace
+/// holding at most one row of its own per verdict set — except for a copy
+/// the delete refused because it carries provenance the canonical row
+/// does not ([`RowProvenance`]), which stays until an operator resolves
+/// it. Either way the plan is unaffected: it only ever reads and writes
+/// the CANONICAL row.
+///
+/// # `run_id` is stamped here, and only from `run_id`
+/// `run_id` is the DISPATCHED RUN this pass was told it is executing
+/// inside (s42 (`close-the-open-loops`) task 3.2, `canon ingest
+/// artifacts --run`), stamped onto the candidate and onto nothing else.
+/// It is never derived from a timestamp, a role, or the newest manifest
+/// in `.canon/dispatch/`: `mart_flywheel_funnel`'s attribution stage
+/// reads this field as a claim that the run carried the guidance this
+/// trajectory answers, and a guessed run would make the mart assert a
+/// relationship the corpus does not hold.
+///
+/// It is deliberately absent from both digests above, so it changes
+/// NOTHING about this function's decision. Two consequences, both
+/// intended:
+///
+/// - Write-time idempotence is unaffected. A pass inside a dispatch and
+///   a pass outside one, over the same corpus, still recognize each
+///   other's rows as duplicates — if attribution joined
+///   [`trajectory_content_digest`], every dispatched ingest would derive
+///   a fresh identity for unchanged evidence and rewrite the whole
+///   namespace. [`trajectory_derivation_key`] must exclude it for a
+///   second, stronger reason: that key is UNVERSIONED so it can still
+///   recognize rows written by any earlier canon, and widening it would
+///   orphan every trajectory an upgrading user holds.
+/// - Only a row this pass actually WRITES gets stamped. A
+///   [`PersistPlan::SkipDuplicate`]/[`PersistPlan::ConvergeDistilled`]
+///   pass returns before the candidate is built, so a stored row keeps
+///   whatever attribution it already had. That is the honest reading: a
+///   pass that derived nothing new did not produce that trajectory, and
+///   overwriting a real earlier attribution with the current run would
+///   be a fabrication in the opposite direction.
+fn plan_trajectory(
+    existing: &[Trajectory],
+    regime_key: &RegimeKey,
+    evidence: &RegimeEvidence,
+    run_id: Option<&RunId>,
+) -> Result<PersistPlan, LearnError> {
     let (task, context) = evidence.trajectory_text(regime_key);
     let identity = trajectory_content_digest(regime_key, &evidence.rows, &task, &context);
     let carries_identity =
@@ -1651,17 +2178,20 @@ fn plan_trajectory(existing: &[Trajectory], regime_key: &RegimeKey, evidence: &R
         None => existing.iter().any(|stored| carries_identity(stored)),
     };
     if already_persisted {
-        // A superseded row is undeletable, so this arm keeps firing for an
-        // upgraded namespace: every later pass re-derives its distilled
-        // tier from the converged row set. That re-derivation is a fixpoint
-        // (byte-identical rows under identical filenames), and it is the
-        // only thing that converges a namespace whose canonical row was
-        // ALREADY current when the duplicate arrived.
+        // Two arms, because the namespace can still hold this driver's own
+        // superseded copies even when the canonical row is already
+        // current: a pre-s38 pass appended a second row for one verdict
+        // set whenever the renderer changed under it. Those copies are
+        // DELETED by the convergence `ConvergeDistilled` asks for (s42
+        // (`close-the-open-loops`)), so this arm fires at most once per
+        // namespace — the pass after it sees a clean set, returns
+        // `SkipDuplicate`, and writes and deletes nothing.
         //
         // The trigger asks about the whole NAMESPACE, not just this verdict
-        // set, because the rebuild it asks for is regime-wide: whichever of
-        // a regime's groups notices the duplicates converges all of them,
-        // and a group whose own set is clean pays one `is_empty` check.
+        // set, because the convergence it asks for is regime-wide:
+        // whichever of a regime's groups notices the duplicates converges
+        // all of them, and a group whose own set is clean pays one
+        // `is_empty` check.
         return Ok(if superseded_driver_ids(existing).is_empty() { PersistPlan::SkipDuplicate } else { PersistPlan::ConvergeDistilled });
     }
 
@@ -1673,17 +2203,110 @@ fn plan_trajectory(existing: &[Trajectory], regime_key: &RegimeKey, evidence: &R
         evidence.rows.clone(),
         evidence.latest_at,
         vec![ARTIFACT_INGEST_TAG.to_string()],
-    )?;
+    )?
+    .with_run_id(run_id.copied());
     Ok(if canonical.is_some() { PersistPlan::Supersede(trajectory) } else { PersistPlan::Fresh(trajectory) })
+}
+
+/// Admits `--run <RunId>` (s42 (`close-the-open-loops`) task 3.2) by
+/// resolving the dispatch manifest [`crate::dispatch::begin`] wrote for
+/// it, at the SAME `<repo>/.canon/dispatch/<run_id>.json` path
+/// [`crate::dispatch::end`] resolves a close through, and holding it to
+/// the SAME typed admission contract — literally the same function,
+/// [`crate::dispatch::read_dispatched_manifest`], not a second statement
+/// of it here.
+///
+/// That function's three rungs, restated only in terms of what each one
+/// means for ATTRIBUTION (it states them in full):
+///
+/// 1. the manifest must be readable — absence alone is
+///    [`ArtifactIngestError::UnknownRun`] ("this repo never began that
+///    run"); a DIRECTORY at that path, a permission failure, or bytes
+///    that are not a `Run` document are
+///    [`ArtifactIngestError::UnreadableRunManifest`];
+/// 2. it must deserialize as a typed
+///    [`canon_model::records::Run`] — same variant; and
+/// 3. its OWN `run_id` must equal the id the operator typed, else
+///    [`ArtifactIngestError::MisfiledRunManifest`].
+///
+/// Then ONE rung of this driver's own: the run must have been DISPATCHED,
+/// i.e. anything but [`RunStatus::Pending`]
+/// ([`ArtifactIngestError::RunNeverDispatched`]). Deliberately weaker
+/// than `dispatch end`'s `(Running, ended_at: None)` predicate, and the
+/// variant's own doc says why: `end` mutates the run and so needs the
+/// single closeable state, while this pass only reads an attribution
+/// target, and a closed or aborted run genuinely executed.
+///
+/// Until s42's re-review (`ReviewAttribution` finding 1) this was a bare
+/// `std::fs::metadata` probe, which succeeds for all three of a
+/// directory, a truncated JSON file, and a valid `Run` filed under
+/// somebody else's id — and the unchecked id was then stamped onto every
+/// trajectory the pass wrote. A false attribution is worse than none:
+/// `mart_flywheel_funnel` would assert a relationship the corpus does not
+/// hold, which is the one failure mode this whole field exists to avoid.
+/// Reading the file is affordable precisely because it is read once, per
+/// pass, before any adapter runs.
+///
+/// Still a filesystem read rather than a tier read, for the reason it
+/// always was: the manifest is written unconditionally by `dispatch
+/// begin` and survives `dispatch end` (which rewrites it in place),
+/// whereas the tier write s42 task 1.1 adds is documented as degrading to
+/// manifest-only when the hot rung is down. Gating attribution on the
+/// tier would make a correct `--run` fail on exactly the repos that
+/// degraded.
+fn resolve_dispatched_run(repo: &Path, run_id: Option<&RunId>) -> Result<(), ArtifactIngestError> {
+    let Some(run_id) = run_id else { return Ok(()) };
+    let manifest_path = repo.join(crate::dispatch::DISPATCH_DIR).join(format!("{run_id}.json"));
+    let run = match crate::dispatch::read_dispatched_manifest(&manifest_path, *run_id) {
+        Ok(run) => run,
+        Err(DispatchError::NoSuchRun { run_id: named, path }) => return Err(ArtifactIngestError::UnknownRun { run_id: named, path }),
+        Err(DispatchError::RunIdMismatch { path, expected, found }) => {
+            return Err(ArtifactIngestError::MisfiledRunManifest { run_id: expected, path, found });
+        }
+        Err(DispatchError::Unreadable { path, detail }) => {
+            return Err(ArtifactIngestError::UnreadableRunManifest { run_id: run_id.to_string(), path, detail });
+        }
+        // `Io` — a directory at the manifest path, a permission failure —
+        // plus, exhaustively, any variant `read_dispatched_manifest` does
+        // not construct today. A manifest whose bytes cannot be turned
+        // into a `Run` is unusable for attribution however it failed, and
+        // the wrapped error carries the diagnosis verbatim.
+        Err(other) => {
+            return Err(ArtifactIngestError::UnreadableRunManifest {
+                run_id: run_id.to_string(),
+                path: manifest_path.display().to_string(),
+                detail: other.to_string(),
+            });
+        }
+    };
+    if run.status == RunStatus::Pending {
+        return Err(ArtifactIngestError::RunNeverDispatched { run_id: run_id.to_string(), path: manifest_path.display().to_string() });
+    }
+    Ok(())
 }
 
 /// One scan -> derive-verdict -> persist pass over every registered
 /// `ArtifactAdapter` (module doc).
-pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
+///
+/// `run_id` is the dispatched run this pass is executing inside, from
+/// `canon ingest artifacts --run` (s42 (`close-the-open-loops`) task
+/// 3.2). `None` — the overwhelming case, and every pre-s42 invocation —
+/// means the trajectories this pass writes record NO run, rather than one
+/// guessed from the clock or from `.canon/dispatch/`'s newest entry. A
+/// `Some` is admitted against this repo's own dispatch manifests
+/// ([`resolve_dispatched_run`], which reads and validates the manifest as
+/// a typed `Run` through `dispatch end`'s own contract) BEFORE any
+/// adapter read runs, so an unknown, damaged, misfiled or never-dispatched
+/// run fails the whole pass loud instead of stamping an attribution that
+/// joins to nothing — or, worse, one that joins to the wrong run.
+/// [`plan_trajectory`] states where the value lands and why it is outside
+/// both write-identity digests.
+pub fn run(repo: &Path, run_id: Option<&RunId>) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = repo.join("canon.yaml");
     let canon_yaml_text = std::fs::read_to_string(&canon_yaml_path).unwrap_or_default();
 
+    resolve_dispatched_run(&repo, run_id)?;
     let artifact_config = load_artifact_source_config(&repo, &canon_yaml_text);
     validate_artifact_source_config(&artifact_config)?;
     // `LearnConfig::from_manifest`'s own contract (crates/canon-learn/
@@ -1882,13 +2505,20 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
     let mut trajectories_persisted = Vec::new();
     let mut trajectories_skipped_unregistered_role = 0usize;
     let mut trajectories_skipped_duplicate = 0usize;
+    let mut trajectories_converged_deleted = 0usize;
+    // `by_regime` is a `BTreeMap`, so this accumulates in regime-key
+    // order, and each regime's own contribution is already sorted by the
+    // kept row's id (`plan_raw_convergence`) — the whole list is
+    // data-ordered, and two passes over one unchanged store print
+    // byte-identical lines.
+    let mut convergence_conflicts: Vec<ConvergenceConflict> = Vec::new();
     let mut strategy_items_rebuilt = 0usize;
     let mut trajectories_marked = 0usize;
     let mut trajectories_left_pending = 0usize;
     for (regime_key, evidence) in by_regime {
         let verdict_count = evidence.rows.len();
         let existing = trajectory_store.query_by_regime_key(&regime_key)?;
-        let (trajectory, superseded) = match plan_trajectory(&existing, &regime_key, &evidence)? {
+        let (trajectory, superseded) = match plan_trajectory(&existing, &regime_key, &evidence, run_id)? {
             PersistPlan::SkipDuplicate => {
                 trajectories_skipped_duplicate += 1;
                 continue;
@@ -1896,21 +2526,33 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
             PersistPlan::ConvergeDistilled => {
                 // Nothing to write — the row this pass would have rewritten
                 // already carries this exact text — but this driver's own
-                // superseded copies are still in the namespace, so the
-                // distilled tier is re-derived from the CONVERGED row set.
-                // Without this the stale sibling's strategy keeps being
-                // served for as long as the corpus happens not to change.
+                // superseded copies are still in the namespace, so the pass
+                // converges it anyway: the copies whose provenance the
+                // canonical row also carries are deleted from the raw
+                // tier, the rest are kept and reported, and the distilled
+                // tier is re-derived from what supersession left. Without
+                // this the stale sibling's strategy keeps being served for
+                // as long as the corpus happens not to change, and its
+                // bytes never go away at all.
                 //
                 // Deliberately NOT behind `store_trajectory`'s role-registry
-                // gate, unlike the persist path below: that gate exists to
+                // gate, unlike the persist path below. That gate exists to
                 // reject WRITING a trajectory for an unregistered role
                 // ("fail loud at write time", `canon_learn::RoleRegistry`),
-                // and this arm writes none. It re-derives the distilled tier
-                // from rows the store already accepted — which this arm can
-                // only reach when ≥2 of them carry this driver's own tag, so
-                // the namespace is demonstrably one it wrote.
+                // and this arm writes none. The deletion s42
+                // (`close-the-open-loops`) added is not a write either: it
+                // removes rows the store ALREADY accepted, which this arm
+                // can only reach when ≥2 of them carry this driver's own
+                // tag under this regime — so the namespace is demonstrably
+                // one it wrote, and the role in question is the one those
+                // rows were already stored under. Gating garbage collection
+                // on a registry the rows predate would strand exactly the
+                // upgraded namespaces this path exists for.
                 trajectories_skipped_duplicate += 1;
-                strategy_items_rebuilt += rebuild_namespace_converged(&trajectory_store, &strategy_store, &regime_key)?.len();
+                let converged = rebuild_namespace_converged(&trajectory_store, &strategy_store, &regime_key)?;
+                trajectories_converged_deleted += converged.rows_deleted;
+                convergence_conflicts.extend(converged.conflicts);
+                strategy_items_rebuilt += converged.items.len();
                 continue;
             }
             PersistPlan::Fresh(trajectory) => (trajectory, false),
@@ -1950,8 +2592,10 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
                         trajectories_marked += 1;
                     }
                 }
-                let items = rebuild_namespace_converged(&trajectory_store, &strategy_store, &regime_key)?;
-                strategy_items_rebuilt += items.len();
+                let converged = rebuild_namespace_converged(&trajectory_store, &strategy_store, &regime_key)?;
+                trajectories_converged_deleted += converged.rows_deleted;
+                convergence_conflicts.extend(converged.conflicts);
+                strategy_items_rebuilt += converged.items.len();
             }
             Err(LearnError::UnregisteredRole(_)) => {
                 trajectories_skipped_unregistered_role += 1;
@@ -1966,6 +2610,8 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
         trajectories_persisted,
         trajectories_skipped_unregistered_role,
         trajectories_skipped_duplicate,
+        trajectories_converged_deleted,
+        convergence_conflicts,
         strategy_items_rebuilt,
         trajectories_marked,
         trajectories_left_pending,
@@ -2007,6 +2653,25 @@ pub fn format_human(outcome: &ArtifactIngestOutcome) -> String {
     out.push_str(&format!("trajectories superseded (re-derived onto the existing row): {superseded}\n"));
     out.push_str(&format!("trajectories skipped (unregistered role): {}\n", outcome.trajectories_skipped_unregistered_role));
     out.push_str(&format!("trajectories skipped (duplicate, already persisted): {}\n", outcome.trajectories_skipped_duplicate));
+    out.push_str(&format!("trajectories deleted (superseded copies converged): {}\n", outcome.trajectories_converged_deleted));
+    out.push_str(&format!(
+        "trajectories retained (superseded copy carrying provenance the canonical row does not): {}\n",
+        outcome.convergence_conflicts.len()
+    ));
+    // Every kept conflict is named in full, never summarized to a count:
+    // the operator has to know WHICH rows disagree and about WHAT before
+    // they can decide which one is wrong, and this driver deliberately
+    // will not decide for them (module doc). One line per disagreeing
+    // field, so a row conflicting on both prints both.
+    for conflict in &outcome.convergence_conflicts {
+        for claim in &conflict.claims {
+            out.push_str(&format!("  - {} row {} records {}\n", conflict.regime_key, conflict.retained_id, claim));
+        }
+        out.push_str(&format!(
+            "    kept beside canonical row {} and withheld from the distiller; remove the row you judge wrong to converge it\n",
+            conflict.canonical_id
+        ));
+    }
     out.push_str(&format!("strategy items rebuilt (distilled): {}\n", outcome.strategy_items_rebuilt));
     out.push_str(&format!("trajectories marked (covering verdict resolved): {}\n", outcome.trajectories_marked));
     out.push_str(&format!("trajectories left pending (awaiting a covering signal): {}\n", outcome.trajectories_left_pending));
@@ -2096,6 +2761,8 @@ pub fn selftest() -> Result<usize, Vec<String>> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use canon_ingest::artifact_adapter::ArtifactEventKind as Kind;
 
     use super::*;
@@ -2962,7 +3629,7 @@ mod tests {
         let stale_id = stale.id;
         store.append(&stale).unwrap();
 
-        let plan = plan_trajectory(&store.query_by_regime_key(&key).unwrap(), &key, evidence).unwrap();
+        let plan = plan_trajectory(&store.query_by_regime_key(&key).unwrap(), &key, evidence, None).unwrap();
         let PersistPlan::Supersede(fresh) = plan else {
             panic!("a stored pre-s38 derivation of this exact verdict set must be superseded — not skipped as a duplicate, not appended beside")
         };
@@ -2984,7 +3651,94 @@ mod tests {
 
         // …and the pass AFTER that writes nothing at all: supersession
         // is a one-time upgrade, never a rewrite on every ingest.
-        assert!(matches!(plan_trajectory(&after, &key, evidence).unwrap(), PersistPlan::SkipDuplicate));
+        assert!(matches!(plan_trajectory(&after, &key, evidence, None).unwrap(), PersistPlan::SkipDuplicate));
+    }
+
+    /// s42 (`close-the-open-loops`) task 3.2: a pass told which run it is
+    /// executing inside stamps that run onto the trajectory it writes, and
+    /// a pass told nothing stamps nothing. The absent case is the one that
+    /// matters most — it is what makes the field a claim rather than
+    /// decoration.
+    #[test]
+    fn a_dispatched_run_is_stamped_onto_the_written_trajectory_and_only_when_given() {
+        let key = regime("platformer", "41fdd8c5");
+        let by_regime = resolved_divergence_evidence(&key);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+        let run_id = RunId::new();
+
+        let PersistPlan::Fresh(attributed) = plan_trajectory(&[], &key, evidence, Some(&run_id)).unwrap() else {
+            panic!("an empty namespace mints a fresh row")
+        };
+        assert_eq!(attributed.run_id, Some(run_id));
+
+        let PersistPlan::Fresh(unattributed) = plan_trajectory(&[], &key, evidence, None).unwrap() else {
+            panic!("an empty namespace mints a fresh row")
+        };
+        assert_eq!(unattributed.run_id, None, "an ingest outside a dispatch must record no run, never a guessed one");
+    }
+
+    /// Attribution must not perturb write-time idempotence. If `run_id`
+    /// reached [`trajectory_content_digest`], a dispatched pass over an
+    /// UNCHANGED corpus would derive a fresh identity for evidence it had
+    /// already persisted and rewrite the whole namespace on every
+    /// dispatch — and a pass under a DIFFERENT run would keep doing so
+    /// forever. Both digests are asserted directly, because that is where
+    /// the mistake would live; the plan's own decision is asserted too,
+    /// because that is what a reader cares about.
+    #[test]
+    fn attribution_is_outside_both_write_identity_digests() {
+        let key = regime("platformer", "41fdd8c5");
+        let by_regime = resolved_divergence_evidence(&key);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+
+        let PersistPlan::Fresh(stored) = plan_trajectory(&[], &key, evidence, Some(&RunId::new())).unwrap() else {
+            panic!("an empty namespace mints a fresh row")
+        };
+        let unattributed = stored.clone().with_run_id(None);
+
+        let digest = |t: &Trajectory| trajectory_content_digest(&t.regime_key, &t.verdicts, &t.task, &t.context);
+        assert_eq!(digest(&stored), digest(&unattributed), "the full identity must not see run_id");
+        assert_eq!(
+            trajectory_derivation_key(&stored.regime_key, &stored.verdicts),
+            trajectory_derivation_key(&unattributed.regime_key, &unattributed.verdicts),
+            "the UNVERSIONED derivation key must not see run_id either — widening it would orphan every upgrading user's rows"
+        );
+
+        // The consequence, stated as behaviour: a second pass under a
+        // DIFFERENT run recognizes the stored row and writes nothing.
+        let existing = [stored];
+        assert!(
+            matches!(plan_trajectory(&existing, &key, evidence, Some(&RunId::new())).unwrap(), PersistPlan::SkipDuplicate),
+            "a re-ingest of unchanged evidence under another run must stay a no-op"
+        );
+    }
+
+    /// `--run` is admitted against this repo's own dispatch manifests, at
+    /// the same path `canon dispatch end` resolves a close through. A
+    /// well-formed ULID naming no dispatch is a LOUD failure: stamping it
+    /// would produce an attribution `mart_flywheel_funnel` drops on the
+    /// join, which reads exactly like no attribution at all.
+    #[test]
+    fn an_unknown_run_is_rejected_and_an_absent_flag_is_not() {
+        let dir = tempfile::tempdir().unwrap();
+        let unknown = RunId::new();
+
+        let err = resolve_dispatched_run(dir.path(), Some(&unknown)).expect_err("no manifest exists for this run");
+        let ArtifactIngestError::UnknownRun { run_id, path } = &err else { panic!("expected UnknownRun, got {err:?}") };
+        assert_eq!(run_id, &unknown.to_string(), "the error names the run the operator typed");
+        assert!(path.ends_with(&format!("{unknown}.json")), "and the exact path consulted: {path}");
+
+        resolve_dispatched_run(dir.path(), None).expect("no --run at all is the ordinary, always-admissible case");
+
+        // A manifest that really is this run's dispatch record admits it.
+        // A bare `"{}"` used to be enough — the bar was `metadata`, so
+        // any entry at that path passed — which is the hole
+        // `a_run_manifest_is_admitted_only_after_it_deserializes_as_that_exact_dispatched_run`
+        // covers.
+        let dispatch_dir = dir.path().join(crate::dispatch::DISPATCH_DIR);
+        std::fs::create_dir_all(&dispatch_dir).unwrap();
+        std::fs::write(dispatch_dir.join(format!("{unknown}.json")), run_manifest(unknown, RunStatus::Running)).unwrap();
+        resolve_dispatched_run(dir.path(), Some(&unknown)).expect("a dispatched run is admissible");
     }
 
     /// Two ids whose ORDER is pinned rather than left to the clock —
@@ -3041,9 +3795,10 @@ mod tests {
         strategy_store: &ParquetStrategyStore,
         key: &RegimeKey,
         evidence: &RegimeEvidence,
+        run_id: Option<&RunId>,
     ) -> PersistPlan {
         let existing = trajectory_store.query_by_regime_key(key).expect("a real parquet store reads back what it wrote");
-        let plan = plan_trajectory(&existing, key, evidence).expect("a dev-role trajectory under a dev regime");
+        let plan = plan_trajectory(&existing, key, evidence, run_id).expect("a dev-role trajectory under a dev regime");
         match &plan {
             PersistPlan::SkipDuplicate => {}
             PersistPlan::ConvergeDistilled => {
@@ -3076,7 +3831,7 @@ mod tests {
         trajectory_store.append(&pre_s38_trajectory(canonical_id, &key, evidence.rows.clone())).unwrap();
         trajectory_store.append(&pre_s38_trajectory(losing_id, &key, evidence.rows.clone())).unwrap();
 
-        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
+        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence, None);
         assert!(
             matches!(&plan, PersistPlan::Supersede(fresh) if fresh.id == canonical_id),
             "the smallest-id row of the candidate set is the one rewritten"
@@ -3085,19 +3840,18 @@ mod tests {
         let rows = rows_by_id(&trajectory_store, &key);
         assert_eq!(
             rows.len(),
-            2,
-            "both raw rows stay: `TrajectoryStore` exposes no deletion, so convergence is at the distill boundary, not by removing evidence"
+            1,
+            "the raw layer converges too (s42): the superseded copy is DELETED, not left beside the canonical row — {rows:#?}"
         );
-        assert_eq!(rows[0].id, canonical_id);
+        assert_eq!(rows[0].id, canonical_id, "and the row that survives is the canonical one, the smallest id");
         assert!(
             rows[0].context.contains(RESOLUTION) && rows[0].context.contains(APP_FINDING),
             "the canonical row carries this release's evidence text: {}",
             rows[0].context
         );
         assert!(
-            rows[1].id == losing_id && rows[1].task.contains("canon-ingest artifact adapters"),
-            "the superseded sibling's own bytes are left exactly as an earlier canon wrote them: {:?}",
-            (&rows[1].task, &rows[1].context)
+            trajectory_store.find_by_id(&losing_id).unwrap().is_none(),
+            "the superseded sibling is gone from the store entirely, not merely withheld from the distiller"
         );
 
         // The distilled tier is the ONLY tier `canon retrieve`,
@@ -3120,14 +3874,15 @@ mod tests {
             );
         }
 
-        // Two further passes write nothing and supersede nothing: the
-        // canonical row already says this. The undeletable sibling keeps
-        // the plan on `ConvergeDistilled`, whose re-derivation is a
-        // fixpoint — byte-identical rows in BOTH tiers.
+        // Two further passes write nothing, supersede nothing and delete
+        // nothing: the canonical row already says this and the namespace
+        // holds no superseded sibling any more, so the plan settles on
+        // `SkipDuplicate` — the s42 convergence is one-shot, not a rebuild
+        // this driver pays on every pass forever.
         for pass in 2..=3 {
-            let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
-            assert!(matches!(plan, PersistPlan::ConvergeDistilled), "pass {pass} must write no raw row");
-            assert_eq!(rows_by_id(&trajectory_store, &key), rows, "pass {pass} rewrote a raw row");
+            let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence, None);
+            assert!(matches!(plan, PersistPlan::SkipDuplicate), "pass {pass} must write no raw row and converge nothing");
+            assert_eq!(rows_by_id(&trajectory_store, &key), rows, "pass {pass} perturbed the raw tier");
             assert_eq!(items_by_id(&strategy_store, &key), distilled, "pass {pass} perturbed the distilled tier");
         }
     }
@@ -3149,35 +3904,37 @@ mod tests {
         trajectory_store.append(&pre_s38_trajectory(canonical_id, &key, evidence.rows.clone())).unwrap();
         trajectory_store.append(&current_trajectory(current_sibling_id, &key, evidence)).unwrap();
 
-        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
+        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence, None);
         assert!(
             matches!(&plan, PersistPlan::Supersede(fresh) if fresh.id == canonical_id),
             "a sibling's current text answers for itself, never for the canonical row"
         );
 
         let rows = rows_by_id(&trajectory_store, &key);
+        assert_eq!(rows.len(), 1, "the current-text sibling is this driver's own superseded copy, so it is deleted too: {rows:#?}");
+        assert_eq!(rows[0].id, canonical_id, "the smallest id survives whichever copy happened to hold the fresh text");
         assert!(
-            rows.iter().all(|row| row.context.contains(RESOLUTION)),
-            "no stale text is left under this verdict set: {:#?}",
-            rows.iter().map(|row| &row.context).collect::<Vec<_>>()
+            rows[0].context.contains(RESOLUTION),
+            "no stale text is left under this verdict set: {}",
+            rows[0].context
         );
 
         let distilled = items_by_id(&strategy_store, &key);
         assert_eq!(
             distilled.len(),
             evidence.rows.len(),
-            "the logical verdict set distills ONCE even though two copies of it are stored: {distilled:#?}"
+            "the logical verdict set distills ONCE even though two copies of it were stored: {distilled:#?}"
         );
         assert_eq!(distilled[0].source_trajectory_ids, vec![canonical_id]);
 
-        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
-        assert!(matches!(plan, PersistPlan::ConvergeDistilled), "the converged store persists and supersedes nothing");
+        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence, None);
+        assert!(matches!(plan, PersistPlan::SkipDuplicate), "the converged store persists, supersedes and deletes nothing");
         assert_eq!(rows_by_id(&trajectory_store, &key), rows);
         assert_eq!(items_by_id(&strategy_store, &key), distilled);
     }
 
     #[test]
-    fn an_already_distilled_stale_sibling_leaves_the_strategy_tier_with_no_raw_write_at_all() {
+    fn an_already_distilled_stale_sibling_is_deleted_and_leaves_the_strategy_tier_with_no_raw_write() {
         // The seeding where nothing needs WRITING and everything still needs
         // converging: the canonical row is already current (a store whose
         // ids are not in append order, or one an earlier pass already
@@ -3203,9 +3960,13 @@ mod tests {
         }
         assert_eq!(items_by_id(&strategy_store, &key).len(), 2, "the tier starts polluted, which is the whole premise");
 
-        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
+        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence, None);
         assert!(matches!(plan, PersistPlan::ConvergeDistilled), "there is nothing to write — and still something to converge");
-        assert_eq!(rows_by_id(&trajectory_store, &key), rows_before, "no raw row is written or rewritten on this path");
+        assert_eq!(
+            rows_by_id(&trajectory_store, &key),
+            vec![rows_before[0].clone()],
+            "the stale sibling is deleted; the canonical row's own bytes are neither written nor rewritten on this path"
+        );
 
         let distilled = items_by_id(&strategy_store, &key);
         assert_eq!(distilled.len(), evidence.rows.len(), "the stale sibling's strategy left the tier: {distilled:#?}");
@@ -3218,12 +3979,13 @@ mod tests {
     }
 
     #[test]
-    fn convergence_never_withholds_a_row_this_driver_did_not_write_from_the_distiller() {
-        // The filter's boundary: it drops only THIS driver's own
-        // non-canonical copies. An untagged row sharing the verdict set is
-        // someone else's evidence — never rewritten (the plan's rung 2),
-        // and never silently dropped from the distilled tier either, which
-        // would delete guidance this driver does not own.
+    fn convergence_never_deletes_or_withholds_a_row_this_driver_did_not_write() {
+        // The filter's boundary, and since s42 (`close-the-open-loops`) the
+        // boundary of an IRREVERSIBLE operation: convergence touches only
+        // THIS driver's own non-canonical copies. An untagged row sharing
+        // the verdict set is someone else's evidence — never rewritten (the
+        // plan's rung 2), never dropped from the distilled tier, and never
+        // deleted from the raw one.
         let dir = tempfile::tempdir().unwrap();
         let trajectory_store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
         let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
@@ -3246,7 +4008,7 @@ mod tests {
         .unwrap();
         trajectory_store.append(&foreign).unwrap();
 
-        drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
+        drive_one_pass(&trajectory_store, &strategy_store, &key, evidence, None);
 
         let distilled = items_by_id(&strategy_store, &key);
         assert_eq!(distilled.len(), 2, "one strategy for the canonical row and one for the foreign row, and nothing else: {distilled:#?}");
@@ -3254,10 +4016,107 @@ mod tests {
         assert!(sources.contains(&&foreign.id), "the untagged row still distills: {distilled:#?}");
         assert!(sources.contains(&&canonical_id), "the canonical row still distills: {distilled:#?}");
         assert!(!sources.contains(&&losing_id), "only this driver's superseded copy is withheld: {distilled:#?}");
+
+        let rows = rows_by_id(&trajectory_store, &key);
+        assert!(rows.contains(&foreign), "the untagged row's own bytes survive the pass byte for byte: {rows:#?}");
         assert!(
-            rows_by_id(&trajectory_store, &key).contains(&foreign),
-            "the untagged row's own bytes are untouched by the pass"
+            !rows.iter().any(|row| row.id == losing_id),
+            "…while this driver's own superseded copy is deleted, so the two outcomes are genuinely distinguished: {rows:#?}"
         );
+    }
+
+    /// Every `*.parquet` file under a store root, as `(path, bytes)`
+    /// sorted by path. The RAW-TIER observable s42
+    /// (`close-the-open-loops`) task 2.3 is about: decoded rows cannot
+    /// tell a namespace that DELETED its duplicates from one that merely
+    /// withheld them from the distiller, and neither can a distilled-item
+    /// count. Files can.
+    fn parquet_files(root: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+        let mut out = Vec::new();
+        collect_parquet_files(root, &mut out);
+        out.sort_by(|left, right| left.0.cmp(&right.0));
+        out
+    }
+
+    fn collect_parquet_files(dir: &Path, out: &mut Vec<(PathBuf, Vec<u8>)>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries {
+            let path = entry.expect("a readable tempdir entry").path();
+            if path.is_dir() {
+                collect_parquet_files(&path, out);
+            } else if path.extension().is_some_and(|ext| ext == "parquet") {
+                let bytes = std::fs::read(&path).expect("a readable parquet file");
+                out.push((path, bytes));
+            }
+        }
+    }
+
+    #[test]
+    fn two_stored_copies_of_one_verdict_set_converge_to_exactly_one_raw_file() {
+        // s42 (`close-the-open-loops`) task 2.3. s41 converged every tier a
+        // reader consumes while the raw layer kept N files for N copies
+        // forever, because `TrajectoryStore` had no deletion primitive at
+        // all. The observable that separates "withheld" from "removed" is
+        // the file count, not the distilled-item count — so this asserts on
+        // files, against a real `ParquetTrajectoryStore`.
+        let dir = tempfile::tempdir().unwrap();
+        let traj_root = dir.path().join("trajectories");
+        let trajectory_store = ParquetTrajectoryStore::open(&traj_root);
+        let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
+        let key = regime("platformer", "41fdd8c5");
+        let by_regime = resolved_divergence_evidence(&key);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+
+        let (canonical_id, losing_id) = (seeded_id(1), seeded_id(2));
+        trajectory_store.append(&pre_s38_trajectory(canonical_id, &key, evidence.rows.clone())).unwrap();
+        trajectory_store.append(&pre_s38_trajectory(losing_id, &key, evidence.rows.clone())).unwrap();
+        assert_eq!(parquet_files(&traj_root).len(), 2, "two files is the premise: an upgraded store really does hold both copies");
+
+        drive_one_pass(&trajectory_store, &strategy_store, &key, evidence, None);
+
+        let converged = parquet_files(&traj_root);
+        assert_eq!(converged.len(), 1, "the raw layer converges to ONE file per logical verdict set, not merely to one distilled item");
+        let canonical_stem = canonical_id.to_string();
+        assert_eq!(
+            converged[0].0.file_stem().and_then(|stem| stem.to_str()),
+            Some(canonical_stem.as_str()),
+            "and the surviving file is the canonical row's — the smallest id, unchanged by the deletion"
+        );
+
+        // A repeat pass over an unchanged corpus writes and deletes NOTHING:
+        // byte-identical files under identical names. Comparing the bytes
+        // rather than the count is what makes "writes nothing" mean it — a
+        // rewrite with fresh content would keep the count at one.
+        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence, None);
+        assert!(matches!(plan, PersistPlan::SkipDuplicate), "a converged namespace has nothing left to converge");
+        assert_eq!(parquet_files(&traj_root), converged, "a repeat pass perturbed the raw layer");
+    }
+
+    #[test]
+    fn a_convergence_pass_reports_the_raw_rows_it_deleted_rather_than_destroying_them_silently() {
+        // Deletion is the one thing this driver does that an operator
+        // cannot undo, so it is counted and printed on the same "reported,
+        // never silent" discipline every other skip and degrade here
+        // follows (s42 (`close-the-open-loops`)).
+        let dir = tempfile::tempdir().unwrap();
+        let trajectory_store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
+        let key = regime("platformer", "41fdd8c5");
+        let by_regime = resolved_divergence_evidence(&key);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+
+        for nth in 1..=3 {
+            trajectory_store.append(&pre_s38_trajectory(seeded_id(nth), &key, evidence.rows.clone())).unwrap();
+        }
+
+        let first = rebuild_namespace_converged(&trajectory_store, &strategy_store, &key).expect("the namespace converges");
+        assert_eq!(first.rows_deleted, 2, "three copies of one verdict set converge to one, and the two removals are reported");
+
+        let second = rebuild_namespace_converged(&trajectory_store, &strategy_store, &key).expect("the namespace converges");
+        assert_eq!(second.rows_deleted, 0, "a converged namespace reports no further deletion — the count is not a running total");
+        assert_eq!(second.items, first.items, "…and re-derives a byte-identical distilled tier, so the raw delete is a fixpoint too");
     }
 
     #[test]
@@ -3283,7 +4142,7 @@ mod tests {
         .unwrap();
         let foreign_id = foreign.id;
 
-        let PersistPlan::Fresh(minted) = plan_trajectory(std::slice::from_ref(&foreign), &key, evidence).unwrap() else {
+        let PersistPlan::Fresh(minted) = plan_trajectory(std::slice::from_ref(&foreign), &key, evidence, None).unwrap() else {
             panic!("an untagged row is not this driver's to replace")
         };
         assert_ne!(minted.id, foreign_id, "a fresh row lands beside it, leaving the untagged row's bytes untouched");
@@ -3420,5 +4279,293 @@ mod tests {
             title.capacity(),
             SCENARIO_TITLE_MAX_CHARS
         );
+    }
+
+    // ── s42 re-review: provenance-preserving convergence, a retriable
+    //    rebuild order, and a typed `--run` admission ──
+
+    /// A `Run` manifest of exactly the shape `canon dispatch begin`
+    /// writes — serialized through the real `canon_model::records::Run`,
+    /// so a test cannot accidentally assert against a JSON shape the
+    /// record type does not produce.
+    fn run_manifest(run_id: RunId, status: RunStatus) -> String {
+        let at: DateTime<Utc> = "2026-07-14T21:38:36Z".parse().expect("a fixed RFC3339 instant");
+        let actor = canon_model::envelope::Actor::new("canon".to_string(), canon_model::ids::RoleId::parse("dev").unwrap());
+        let run = canon_model::records::Run::new(
+            canon_model::envelope::Envelope::current(RecordKind::Run, at, actor),
+            run_id,
+            None,
+            None,
+            status,
+            at,
+            None,
+        );
+        serde_json::to_string_pretty(&run).expect("a Run is always serializable")
+    }
+
+    #[test]
+    fn a_superseded_copy_carrying_its_own_verdict_is_kept_and_reported_never_deleted() {
+        // BLOCKER regression (s42 re-review, `ReviewRuns` finding 1).
+        // `verdict_record` is written back AFTER derivation, so two rows
+        // sharing a derivation key can carry OPPOSITE outcomes. Deleting
+        // the loser removed the contradiction `canon learn promote`
+        // refuses on — `OccurrencePromotionGate` resets its success
+        // streak on one `Failure` — turning a refusal into a promotion.
+        let dir = tempfile::tempdir().unwrap();
+        let trajectory_store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
+        let key = regime("platformer", "41fdd8c5");
+        let by_regime = resolved_divergence_evidence(&key);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+
+        let (canonical_id, dissenting_id, silent_id) = (seeded_id(1), seeded_id(2), seeded_id(3));
+        trajectory_store
+            .append(
+                &pre_s38_trajectory(canonical_id, &key, evidence.rows.clone())
+                    .with_verdict_record(TrajectoryVerdict::new(VerdictOutcome::Success, 0.9)),
+            )
+            .unwrap();
+        trajectory_store
+            .append(
+                &pre_s38_trajectory(dissenting_id, &key, evidence.rows.clone())
+                    .with_verdict_record(TrajectoryVerdict::new(VerdictOutcome::Failure, 0.3)),
+            )
+            .unwrap();
+        // …and a copy claiming nothing at all: never marked, never
+        // attributed. That one really IS only an older rendering, so it
+        // is still deleted — the bar narrows the delete, it does not
+        // disable it.
+        trajectory_store.append(&pre_s38_trajectory(silent_id, &key, evidence.rows.clone())).unwrap();
+
+        let converged = rebuild_namespace_converged(&trajectory_store, &strategy_store, &key).expect("the namespace converges");
+
+        assert_eq!(converged.rows_deleted, 1, "only the copy whose provenance the canonical row subsumes may be deleted");
+        let surviving: Vec<TrajectoryId> = rows_by_id(&trajectory_store, &key).into_iter().map(|row| row.id).collect();
+        assert_eq!(surviving, vec![canonical_id, dissenting_id], "the dissenting row survives; the silent duplicate does not");
+
+        // The observable a promotion gate reads: `query_by_regime_key`
+        // still returns BOTH outcomes, so the contradiction is still
+        // there to refuse on.
+        let outcomes: Vec<VerdictOutcome> = rows_by_id(&trajectory_store, &key).iter().map(|row| row.verdict_record.outcome).collect();
+        assert_eq!(
+            outcomes,
+            vec![VerdictOutcome::Success, VerdictOutcome::Failure],
+            "deleting the losing Failure would turn this regime's refusal into a promotion"
+        );
+
+        // Kept is not served: the retained loser is still withheld from
+        // the distiller, exactly as s41 left it.
+        let canonical_row = rows_by_id(&trajectory_store, &key).into_iter().find(|row| row.id == canonical_id).expect("it survives");
+        assert_eq!(
+            converged.items,
+            distill_namespace(&key, std::slice::from_ref(&canonical_row)),
+            "a kept conflict is kept, not served — the distiller still sees the canonical row alone"
+        );
+
+        // And it is REPORTED, naming both rows and the disagreeing fact:
+        // this driver refuses to pick, so an operator has to be able to.
+        assert_eq!(converged.conflicts.len(), 1, "{:#?}", converged.conflicts);
+        let conflict = &converged.conflicts[0];
+        assert_eq!(conflict.retained_id, dissenting_id.to_string());
+        assert_eq!(conflict.canonical_id, canonical_id.to_string());
+        assert_eq!(conflict.regime_key, key.as_str());
+        assert_eq!(conflict.claims.len(), 1, "one disagreeing field, one line: {:#?}", conflict.claims);
+        assert!(
+            conflict.claims[0].contains("failure") && conflict.claims[0].contains("success"),
+            "the report must name BOTH verdicts, or the operator cannot tell which row to remove: {}",
+            conflict.claims[0]
+        );
+
+        // A repeat pass re-reports the identical conflict over a
+        // byte-identical rebuild and deletes nothing further: a kept row
+        // is a STANDING condition, never a one-shot warning that is then
+        // forgotten.
+        let again = rebuild_namespace_converged(&trajectory_store, &strategy_store, &key).expect("the namespace converges");
+        assert_eq!(again.rows_deleted, 0);
+        assert_eq!(again.conflicts, converged.conflicts);
+        assert_eq!(again.items, converged.items);
+    }
+
+    #[test]
+    fn a_superseded_copy_carrying_its_own_run_attribution_is_kept_and_reported() {
+        // The other independently-written field, same blocker.
+        // `plan_trajectory` stamps `run_id` onto the row a `--run` pass
+        // WRITES and onto no other, so a namespace really can hold an
+        // attributed loser beside an unattributed canonical row —
+        // and deleting it erases that run's only line in
+        // `mart_flywheel_funnel`'s attribution stage.
+        let dir = tempfile::tempdir().unwrap();
+        let trajectory_store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
+        let key = regime("platformer", "41fdd8c5");
+        let by_regime = resolved_divergence_evidence(&key);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+
+        let (canonical_id, attributed_id) = (seeded_id(1), seeded_id(2));
+        let run_id = RunId::new();
+        trajectory_store.append(&pre_s38_trajectory(canonical_id, &key, evidence.rows.clone())).unwrap();
+        trajectory_store
+            .append(&pre_s38_trajectory(attributed_id, &key, evidence.rows.clone()).with_run_id(Some(run_id)))
+            .unwrap();
+
+        let converged = rebuild_namespace_converged(&trajectory_store, &strategy_store, &key).expect("the namespace converges");
+
+        assert_eq!(converged.rows_deleted, 0, "the only superseded copy carries an attribution the canonical row does not");
+        assert_eq!(
+            rows_by_id(&trajectory_store, &key).into_iter().map(|row| row.run_id).collect::<Vec<_>>(),
+            vec![None, Some(run_id)],
+            "the attributed row survives verbatim"
+        );
+        assert_eq!(converged.conflicts.len(), 1, "{:#?}", converged.conflicts);
+        assert!(
+            converged.conflicts[0].claims[0].contains(&run_id.to_string()) && converged.conflicts[0].claims[0].contains("no run"),
+            "the report names the run that would have been erased, and that the canonical row records none: {:#?}",
+            converged.conflicts[0].claims
+        );
+
+        // An AGREEING attribution is not a conflict: subsumption, not
+        // equality, is the bar, so the ordinary converged case still
+        // deletes.
+        let agreeing = seeded_id(4);
+        trajectory_store.append(&pre_s38_trajectory(agreeing, &key, evidence.rows.clone())).unwrap();
+        let converged = rebuild_namespace_converged(&trajectory_store, &strategy_store, &key).expect("the namespace converges");
+        assert_eq!(converged.rows_deleted, 1, "an unattributed copy beside an unattributed canonical row claims nothing");
+        assert_eq!(converged.conflicts.len(), 1, "…and the attributed one is still kept and still reported");
+    }
+
+    /// A `StrategyStore` whose `delete_for_regime_key` — the FIRST write
+    /// [`rebuild_namespace_converged`] makes — fails on demand.
+    /// Everything else delegates to a real `ParquetStrategyStore`, so
+    /// clearing the fault and retrying exercises the genuine path rather
+    /// than a second stub.
+    struct FlakyStrategyStore {
+        inner: ParquetStrategyStore,
+        fail: std::cell::Cell<bool>,
+    }
+
+    impl StrategyStore for FlakyStrategyStore {
+        fn append(&self, item: &StrategyItem) -> Result<(), LearnError> {
+            self.inner.append(item)
+        }
+
+        fn query_by_regime_key(&self, regime_key: &RegimeKey) -> Result<Vec<StrategyItem>, LearnError> {
+            self.inner.query_by_regime_key(regime_key)
+        }
+
+        fn delete_for_regime_key(&self, regime_key: &RegimeKey) -> Result<usize, LearnError> {
+            if self.fail.get() {
+                return Err(LearnError::Parquet("simulated strategy-tier outage".into()));
+            }
+            self.inner.delete_for_regime_key(regime_key)
+        }
+
+        fn find_by_id(&self, id: &canon_learn::StrategyId) -> Result<Option<StrategyItem>, LearnError> {
+            self.inner.find_by_id(id)
+        }
+
+        fn mark_demoted(&self, id: &canon_learn::StrategyId, demotion: canon_learn::DemotionEvidence) -> Result<(), LearnError> {
+            self.inner.mark_demoted(id, demotion)
+        }
+    }
+
+    #[test]
+    fn a_failed_strategy_rebuild_leaves_a_store_an_unchanged_retry_still_converges() {
+        // BLOCKER regression (s42 re-review, `ReviewRuns` finding 2). The
+        // raw duplicate is the ONLY condition that selects
+        // `ConvergeDistilled`. s42 shipped the raw delete FIRST, so a
+        // failed strategy rebuild returned with the trigger already gone:
+        // an unchanged retry took `SkipDuplicate` and never repaired the
+        // empty or half-rebuilt distilled tier — permanently, with
+        // nothing in the store to say so.
+        let dir = tempfile::tempdir().unwrap();
+        let traj_root = dir.path().join("trajectories");
+        let trajectory_store = ParquetTrajectoryStore::open(&traj_root);
+        let strategy_store =
+            FlakyStrategyStore { inner: ParquetStrategyStore::open(dir.path().join("strategies")), fail: std::cell::Cell::new(true) };
+        let key = regime("platformer", "41fdd8c5");
+        let by_regime = resolved_divergence_evidence(&key);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+
+        // The canonical row is already CURRENT and a stale sibling sits
+        // beside it — the exact seeding whose only remaining work is
+        // convergence, so `ConvergeDistilled` is what the plan must keep
+        // selecting across the failure.
+        let (canonical_id, losing_id) = (seeded_id(1), seeded_id(2));
+        trajectory_store.append(&current_trajectory(canonical_id, &key, evidence)).unwrap();
+        trajectory_store.append(&pre_s38_trajectory(losing_id, &key, evidence.rows.clone())).unwrap();
+        let before = parquet_files(&traj_root);
+        assert_eq!(before.len(), 2, "two copies of one verdict set is the premise");
+
+        rebuild_namespace_converged(&trajectory_store, &strategy_store, &key).expect_err("the strategy tier is down");
+
+        assert_eq!(
+            parquet_files(&traj_root),
+            before,
+            "a failed rebuild must not have deleted a raw byte — the duplicate IS what makes the retry converge"
+        );
+        let existing = trajectory_store.query_by_regime_key(&key).unwrap();
+        assert!(
+            matches!(plan_trajectory(&existing, &key, evidence, None).unwrap(), PersistPlan::ConvergeDistilled),
+            "an UNCHANGED retry must still select convergence, never skip as an already-converged duplicate"
+        );
+
+        // Fault cleared, same corpus, nothing else changed: the retry
+        // rebuilds the distilled tier AND finishes the raw convergence.
+        strategy_store.fail.set(false);
+        let repaired = rebuild_namespace_converged(&trajectory_store, &strategy_store, &key).expect("the retry converges");
+        assert_eq!(repaired.rows_deleted, 1, "the duplicate kept for exactly this reason is deleted once the rebuild committed");
+        assert!(!repaired.items.is_empty(), "…and the distilled tier the whole convergence exists to repair is populated");
+        assert_eq!(parquet_files(&traj_root).len(), 1, "the raw layer converges on the retry, not before it");
+    }
+
+    #[test]
+    fn a_run_manifest_is_admitted_only_after_it_deserializes_as_that_exact_dispatched_run() {
+        // SHOULD-FIX regression (s42 re-review, `ReviewAttribution`
+        // finding 1). The bar was `std::fs::metadata`, which succeeds for
+        // a DIRECTORY, for truncated or foreign JSON, and for a valid
+        // `Run` filed under somebody else's id — and the unchecked id was
+        // then stamped onto every trajectory the pass wrote. A false
+        // attribution is worse than none.
+        let dir = tempfile::tempdir().unwrap();
+        let dispatch_dir = dir.path().join(crate::dispatch::DISPATCH_DIR);
+        std::fs::create_dir_all(&dispatch_dir).unwrap();
+
+        let as_dir = RunId::new();
+        std::fs::create_dir(dispatch_dir.join(format!("{as_dir}.json"))).unwrap();
+        let err = resolve_dispatched_run(dir.path(), Some(&as_dir)).expect_err("a directory is not a dispatch manifest");
+        assert!(matches!(err, ArtifactIngestError::UnreadableRunManifest { .. }), "expected UnreadableRunManifest, got {err:?}");
+
+        // The exact bytes the pre-hardening admission accepted verbatim.
+        let malformed = RunId::new();
+        std::fs::write(dispatch_dir.join(format!("{malformed}.json")), "{}").unwrap();
+        let err = resolve_dispatched_run(dir.path(), Some(&malformed)).expect_err("an empty JSON object is not a Run");
+        let ArtifactIngestError::UnreadableRunManifest { run_id, path, .. } = &err else {
+            panic!("expected UnreadableRunManifest, got {err:?}")
+        };
+        assert_eq!(run_id, &malformed.to_string(), "the error names the run the operator typed");
+        assert!(path.ends_with(&format!("{malformed}.json")), "and the exact path consulted: {path}");
+
+        let filed_under = RunId::new();
+        let impostor = RunId::new();
+        std::fs::write(dispatch_dir.join(format!("{filed_under}.json")), run_manifest(impostor, RunStatus::Running)).unwrap();
+        let err = resolve_dispatched_run(dir.path(), Some(&filed_under)).expect_err("a misfiled manifest must not be admitted");
+        let ArtifactIngestError::MisfiledRunManifest { found, .. } = &err else { panic!("expected MisfiledRunManifest, got {err:?}") };
+        assert_eq!(found, &impostor.to_string(), "the error names the run the manifest actually records, not the one asked for");
+
+        let never_ran = RunId::new();
+        std::fs::write(dispatch_dir.join(format!("{never_ran}.json")), run_manifest(never_ran, RunStatus::Pending)).unwrap();
+        let err = resolve_dispatched_run(dir.path(), Some(&never_ran)).expect_err("a pending run never executed");
+        assert!(matches!(err, ArtifactIngestError::RunNeverDispatched { .. }), "expected RunNeverDispatched, got {err:?}");
+
+        // The two states that ARE admissible: the run this pass is
+        // executing inside, and one a wrapper closed before its final
+        // ingest. `dispatch end`'s stricter `(Running, ended_at: None)`
+        // predicate is deliberately NOT this driver's bar — `end`
+        // mutates the run, this only reads an attribution target.
+        for status in [RunStatus::Running, RunStatus::Succeeded] {
+            let admissible = RunId::new();
+            std::fs::write(dispatch_dir.join(format!("{admissible}.json")), run_manifest(admissible, status)).unwrap();
+            resolve_dispatched_run(dir.path(), Some(&admissible)).expect("a dispatched run is admissible");
+        }
     }
 }

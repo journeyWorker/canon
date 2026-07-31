@@ -15,8 +15,8 @@
 //! caller" step LanceDB's own donor never completed: an operator-local
 //! parquet file IS the durable store the moment it's written, no
 //! separate Layer-composition step to forget. Both trait below are
-//! deliberately narrow (`append`/`query_by_regime_key`[/`delete_for_
-//! regime_key`]) — no embedding/vector-similarity method leaks into the
+//! deliberately narrow (`append`/`query_by_regime_key`/a fully KEYED
+//! `delete_*`) — no embedding/vector-similarity method leaks into the
 //! trait surface — so a later `LanceDbTrajectoryStore`/
 //! `LanceDbStrategyStore` adapter is a pure ADDITIVE impl of the same
 //! trait, never a call-site rewrite (mirrors the design doc's own
@@ -39,10 +39,18 @@ use crate::strategy::StrategyItem;
 use crate::trajectory::Trajectory;
 use crate::verdict_outcome::TrajectoryVerdict;
 
-/// The raw, cold-tier trajectory store: append-only, immutable
-/// (design decision 3 — nothing in this crate ever mutates or deletes
-/// a stored `Trajectory`; [`crate::rebuild::rebuild_namespace`] only
-/// ever touches [`StrategyStore`]).
+/// The raw, cold-tier trajectory store.
+///
+/// Design decision 3 made this tier append-only and immutable, and two
+/// changes have since carved ONE named exception each out of that rule
+/// rather than reopening it: [`TrajectoryStore::mark_verdict`] (S7)
+/// layers a verdict on top of a row without touching its evidence, and
+/// [`TrajectoryStore::delete_by_id`] (s42 (`close-the-open-loops`))
+/// removes a row its caller has established to be a superseded duplicate
+/// of another. Neither is reachable from
+/// [`crate::rebuild::rebuild_namespace`], which still only ever touches
+/// [`StrategyStore`] — the rebuild path has not gained the power to
+/// destroy raw evidence.
 ///
 /// **Documented seam for a future vector-backed impl**: a
 /// `LanceDbTrajectoryStore` implementing this same trait (embedding +
@@ -108,6 +116,47 @@ pub trait TrajectoryStore {
     /// verdict-write, per the donor's documented dev-reward
     /// backfill failure mode).
     fn mark_verdict(&self, id: &TrajectoryId, verdict: TrajectoryVerdict) -> Result<(), LearnError>;
+
+    /// Removes the ONE row stored at `(regime_key, id)` — the raw-tier
+    /// deletion primitive s42 (`close-the-open-loops`) added so a caller
+    /// that has converged a namespace onto one canonical row can reclaim
+    /// the copies it superseded, instead of leaving N ids as N rows
+    /// forever.
+    ///
+    /// # Why the regime key is a parameter and not a scan
+    /// [`TrajectoryStore::find_by_id`] and
+    /// [`TrajectoryStore::mark_verdict`] resolve an id by walking every
+    /// namespace, so a by-id delete COULD have too. It deliberately does
+    /// not. [`TrajectoryStore::append`]'s key is `(regime_key, id)`, and
+    /// its own contract spells out the consequence: re-appending one id
+    /// under a DIFFERENT regime leaves both files present, and a scan
+    /// then resolves that id to whichever the directory walk reaches
+    /// first — an order the filesystem chooses, not canon. For a read
+    /// that is a wrong answer the caller can notice and discard; for
+    /// [`TrajectoryStore::mark_verdict`] it stamps a verdict a later pass
+    /// can restate. For a DELETE it is an unrecoverable removal of the
+    /// wrong evidence, picked by `read_dir` order. So deletion is
+    /// addressed by exactly the key `append` writes under — which also
+    /// makes [`ParquetTrajectoryStore`]'s implementation one
+    /// `remove_file` on a computed path instead of a tree walk.
+    ///
+    /// No caller is inconvenienced by that: the only production caller
+    /// (`canon ingest artifacts`' convergence) reads the ids it deletes
+    /// out of [`TrajectoryStore::query_by_regime_key`] for the very
+    /// regime it deletes from, so the key is always already in hand.
+    ///
+    /// Returns `Err(LearnError::UnknownTrajectoryRow)` when
+    /// `(regime_key, id)` matches nothing — never a silent no-op, the
+    /// same fail-loud discipline [`TrajectoryStore::mark_verdict`]
+    /// established. An id stored under a different regime is a miss HERE
+    /// and reports as one; that is the point, since deleting the row the
+    /// caller did not name would be strictly worse than refusing.
+    ///
+    /// Unlike [`StrategyStore::delete_for_regime_key`], which returns the
+    /// count it removed because a regime legitimately holds any number of
+    /// items (zero included), this addresses exactly one row — so a count
+    /// would carry nothing the `Result` does not already say.
+    fn delete_by_id(&self, regime_key: &RegimeKey, id: &TrajectoryId) -> Result<(), LearnError>;
 }
 
 /// The distilled, warm-tier strategy store: the ONLY store

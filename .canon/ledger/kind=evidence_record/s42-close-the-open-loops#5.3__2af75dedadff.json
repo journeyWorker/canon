@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:13:49.428657Z",
+  "evidence": {
+    "kind": "command-run",
+    "ref": "./target/release/canon gate check --repo . && ./target/release/canon report --check --repo . && ./target/release/canon format examples/platformer/specs --repo . && python3 scripts/check-release-workflow-safety.py"
+  },
+  "evidence_note": {
+    "command_result": "canon format: 6 file(s) checked, 0 violation(s)\ncheck-release-workflow-safety: OK — build/publish matrices, env, and manifests are coherent\ncanon report --check: no drift",
+    "summary": "gate clean, no report drift, zero format violations, release-safety checker coherent"
+  },
+  "kind": "evidence_record",
+  "run_seq": 17,
+  "schema": 1,
+  "staging_id": "b5016bbc1917",
+  "task_id": "s42-close-the-open-loops#5.3",
+  "verdict": "faithful"
+}

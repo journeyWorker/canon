@@ -284,6 +284,61 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
     assert_eq!(dev_funnel.get("distilled").and_then(|v| v.as_i64()), Some(1));
 }
 
+/// s42 (`close-the-open-loops`) task 3.2, end to end through the actual
+/// binary: `canon ingest artifacts --run <RunId>` stamps that run onto
+/// the trajectory it writes, and the value survives all the way into
+/// canon-learn's parquet `body` — which is where
+/// `mart_flywheel_funnel`'s attribution stage reads it from.
+///
+/// The run id is not invented by the test: it comes from a real `canon
+/// dispatch begin`, because that is the only thing that writes the
+/// dispatch manifest `--run` is admitted against. The rejection half is
+/// asserted in the same test so the two halves cannot drift: a
+/// well-formed ULID naming no dispatch must fail the pass LOUD rather
+/// than stamp an attribution that joins to nothing.
+#[test]
+fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_was_not() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo = build_fixture_repo(tmp.path());
+
+    // A well-formed ULID that no `canon dispatch begin` ever minted here.
+    let unknown_run = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+    let rejected = run_canon(&["ingest", "artifacts", "--repo", ".", "--run", unknown_run], &repo);
+    assert!(!rejected.status.success(), "an unknown --run must fail the whole pass; stdout: {}", stdout(&rejected));
+    assert!(
+        stderr(&rejected).contains(unknown_run) && stderr(&rejected).contains("dispatch"),
+        "the error must name the run and the manifest path consulted: {}",
+        stderr(&rejected)
+    );
+    assert!(
+        !repo.join(".canon/learn").exists(),
+        "a rejected attribution must leave no trajectory behind — the check runs before any adapter read"
+    );
+
+    // Now a real dispatch, and its real run id.
+    let regime = canon_model::regime_key("dev", "acme-repo", "world", "abc123");
+    let begun = run_canon(&["dispatch", "begin", "--role", "dev", "--regime", &regime, "--repo", ".", "--json"], &repo);
+    assert!(begun.status.success(), "canon dispatch begin must exit 0; stderr: {}", stderr(&begun));
+    let begun_payload: Value = serde_json::from_str(stdout(&begun).trim()).expect("--json prints one JSON document");
+    let run_id = begun_payload["run_id"].as_str().expect("run_id string").to_string();
+
+    let ingested = run_canon(&["ingest", "artifacts", "--repo", ".", "--run", &run_id, "--json"], &repo);
+    assert!(ingested.status.success(), "canon ingest artifacts --run must exit 0; stderr: {}", stderr(&ingested));
+    let payload: Value = serde_json::from_str(stdout(&ingested).trim()).expect("--json prints one JSON document");
+    let persisted = payload["trajectories_persisted"].as_array().expect("trajectories_persisted array");
+    assert_eq!(persisted.len(), 1, "one regime-keyed trajectory persisted: {payload}");
+    let regime_key = RegimeKey::parse(persisted[0]["regime_key"].as_str().expect("regime_key string")).unwrap();
+
+    let trajectory_store = ParquetTrajectoryStore::open(repo.join(".canon/learn").join("trajectories"));
+    let rows = trajectory_store.query_by_regime_key(&regime_key).expect("query_by_regime_key must not error");
+    assert_eq!(rows.len(), 1, "exactly one trajectory row: {rows:#?}");
+    assert_eq!(
+        rows[0].run_id.map(|id| id.to_string()),
+        Some(run_id),
+        "the dispatched run must be readable back off the persisted parquet row"
+    );
+}
+
 /// S4 tasks.md group 6 (write-time idempotence): a SECOND `canon
 /// ingest artifacts` pass over an UNCHANGED corpus must persist ZERO
 /// new trajectories — `crate::artifact_ingest::run`'s existence check

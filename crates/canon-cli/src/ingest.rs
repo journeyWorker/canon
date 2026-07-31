@@ -819,7 +819,15 @@ fn base_session_cursor(cursors: &CursorStore, cursor_id: &str, full_rescan: bool
 /// report `WriteReceipt::deduped` and never raise `DuplicatePath` at
 /// all, so this helper is safe unconditionally, not git-tier-specific
 /// by construction.
-fn persist_idempotent<T: canon_model::envelope::CanonRecord>(store: &TierRegistry, record: &T) -> Result<(), StoreError> {
+///
+/// s42 (`close-the-open-loops`) made it `pub(crate)`: `canon dispatch
+/// begin`/`end` now persist their `Run` through the SAME
+/// `TierRegistry` this module writes sessions/runs/events through
+/// (`crate::dispatch::persist_run`), and reuse this one
+/// duplicate-tolerance decision rather than restating it — so the two
+/// run writers can never disagree about whether an already-stored
+/// record is an error.
+pub(crate) fn persist_idempotent<T: canon_model::envelope::CanonRecord>(store: &TierRegistry, record: &T) -> Result<(), StoreError> {
     match store.persist(record) {
         Ok(_) => Ok(()),
         Err(StoreError::DuplicatePath { .. }) => Ok(()),

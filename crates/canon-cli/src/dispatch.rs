@@ -11,27 +11,57 @@
 //! strategies are edited or demoted (the whole point of the snapshot
 //! field, `Run::injected_guidance`'s own doc).
 //!
-//! # Why a private side-channel, not canon-store's git tier
-//! `canon-ingest`'s own `Run` constructor (`normalize.rs`) is a
-//! POST-HOC reconstruction from an already-completed session transcript,
-//! written through `canon-store`'s `GitTier` at a canonical Hive-keyed
-//! path — and a git-tier duplicate-path write is a HARD ERROR
-//! (`canon-store::tier`'s own doc), not an idempotent dedup. A live
-//! dispatch-time `Run` and the later post-hoc ingest `Run` for the same
-//! session would therefore collide on that path. So the dispatch record
-//! lands in a private, non-canonical side-channel
-//! (`<repo>/.canon/dispatch/<run_id>.json`), keyed by the freshly-minted
-//! `RunId` (unique per dispatch, never colliding), for a future
-//! reconciliation step to fold into the canonical tier — never fed
-//! through `GitTier`'s Hive scheme here. This is exactly the seam S8's
-//! own tasks.md note called "a live run-manifest write seam that does
-//! not exist yet".
+//! # Two homes for one run: the manifest AND the tier
+//! Until s42 (`close-the-open-loops`) the dispatch record lived ONLY
+//! in a private, non-canonical side-channel
+//! (`<repo>/.canon/dispatch/<run_id>.json`), keyed by the
+//! freshly-minted `RunId`, and NOTHING ingested it. Three visible
+//! consequences: a dispatched run — still the only run that carries a
+//! `task_id` — was invisible to every tier-backed read, [`diff`]
+//! scanned that directory as a SECOND source purely to work around
+//! that, and `mart_flywheel_funnel` reported `retrieved 0` on this
+//! repo immediately after a dispatch that had just recorded guidance
+//! into `injected_guidance`.
 //!
-//! FAIL-SOFT retrieval, FAIL-LOUD write: the retrieval half reuses
-//! `canon_learn::retrieve_guidance`'s own fail-soft contract (a store
-//! outage yields empty guidance, never an error); only a `--role`/
-//! `--regime` usage mismatch (exit `2`) or a filesystem write failure
-//! (exit `1`) is surfaced.
+//! s42 tasks 1.1/1.2 close it: [`begin`] and [`end`] persist the SAME
+//! `Run` through `canon_store::registry::TierRegistry` — the one write
+//! path every other record uses — reached through
+//! [`crate::tiers::build_lenient_tiers_for_kinds`] and
+//! [`crate::ingest::persist_idempotent`], the exact machinery `canon
+//! ingest sessions` writes its own `Run`s with, never a second write
+//! convention for one kind. [`persist_run`] holds that whole contract:
+//! which rung, what a re-write at one `run_id` does there, and why an
+//! unreachable rung degrades instead of failing the dispatch.
+//!
+//! The manifest STAYS, and stays load-bearing: it is the live,
+//! human-readable artifact and the replay input, its `<run_id>.json`
+//! filename is the only index [`end`] can resolve a close through, and
+//! it is the fallback [`diff`] still reads for a run whose tier write
+//! degraded or that predates s42 ([`reconcile_runs`]).
+//!
+//! The pre-s42 text here justified the side-channel by claiming a
+//! git-tier write would collide with the later post-hoc ingest `Run`
+//! for the same session. It would not, and that claim is retracted
+//! rather than quietly dropped: the git tier's Hive path is
+//! `{natural_key}__{digest12}`
+//! (`canon_store::partition::hive_object_key`), so only a
+//! BYTE-IDENTICAL body occupies an already-taken path — two runs
+//! differing in any field, `RunId` included, resolve to two distinct
+//! paths. [`persist_run`] tolerates `DuplicatePath` regardless,
+//! through the same shared helper ingest uses.
+//!
+//! FAIL-SOFT retrieval, FAIL-LOUD MANIFEST write: the retrieval half
+//! reuses `canon_learn::retrieve_guidance`'s own fail-soft contract (a
+//! store outage yields empty guidance, never an error); only a
+//! `--role`/`--regime` usage mismatch (exit `2`) or a filesystem write
+//! failure on the MANIFEST (exit `1`) is surfaced.
+//!
+//! s42's tier write joins the FAIL-SOFT half, on the retrieval half's
+//! own reasoning rather than a new one: it is a SECOND home for bytes
+//! the manifest already holds in full, so losing it costs a
+//! reconciliation convenience, while failing the command over it would
+//! lose the entire provenance of a run that is happening right now.
+//! [`persist_run`] names every degrade instead of swallowing it.
 //!
 //! # s40 (`plan-vs-actual-diff`): the two edges, and closing a run
 //! Until s40 this seam wrote `None, None` for `session_id, task_id` and
@@ -63,10 +93,10 @@
 //! into satisfied / declared-not-observed / observed-not-declared. It
 //! READS both halves and it never gates — see [`run_diff`]'s own doc
 //! for why an undeclared edge is information rather than a violation.
-//! It reads the private side-channel alongside the canonical tier,
-//! because a dispatched run — still the only run that carries a
-//! `task_id` — lives only in the former until the reconciliation step
-//! this module's own doc anticipates exists.
+//! It reads the canonical tier FIRST and the private side-channel as a
+//! fallback, reconciling the two by `run_id` and reporting any
+//! disagreement between them in [`PlanActualDiff::notes`] rather than
+//! silently preferring one — see [`reconcile_runs`].
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -79,14 +109,19 @@ use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::ids::{ChangeId, RunId, TaskId};
 use canon_model::records::{Run, RunStatus};
 use canon_model::{RegimeKey, RoleId};
+use canon_store::registry::TierRegistry;
 use canon_store::write_atomic;
+use chrono::{DateTime, TimeDelta, Utc};
 use serde_json::Value;
 
-use crate::context::resolve_repo_root;
+use crate::context::{resolve_canon_yaml, resolve_repo_root};
 
 /// The private side-channel directory a dispatch record lands under,
-/// relative to the repo root (module doc: never `canon-store`'s git
-/// tier).
+/// relative to the repo root. NOT the record's only home since s42
+/// (`close-the-open-loops`) — [`persist_run`] also writes it to the
+/// rung `canon.yaml` routes `run` to — but still the live artifact,
+/// the replay input, and the index [`end`] resolves a close through
+/// (module doc).
 pub const DISPATCH_DIR: &str = ".canon/dispatch";
 
 #[derive(Debug, thiserror::Error)]
@@ -210,7 +245,13 @@ impl DispatchError {
     /// match so a variant added later has to declare its class here
     /// rather than silently inherit `1` from a catch-all arm in a
     /// wrapper.
-    fn is_usage(&self) -> bool {
+    /// `pub(crate)` since s42 (`close-the-open-loops`): `canon evidence
+    /// add` admits its `--task` through this module's own
+    /// `validate_task_binding`, so it surfaces `DispatchError` and must
+    /// classify it by the SAME exhaustive match rather than restating
+    /// the split in a second wrapper that a later variant could drift
+    /// from.
+    pub(crate) fn is_usage(&self) -> bool {
         match self {
             Self::RoleRegimeMismatch { .. }
             | Self::TaskNotFound { .. }
@@ -229,13 +270,134 @@ impl DispatchError {
     }
 }
 
+/// Whether a dispatch record reached the rung `canon.yaml` routes
+/// `run` to (s42 (`close-the-open-loops`), task 1.1) — a named
+/// two-state result rather than a bare `Option<String>`, so a caller
+/// reading `Persisted` cannot mistake it for "no reason was
+/// available" and every degrade is forced to carry one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TierPersist {
+    /// The `Run` landed in (or was already byte-identically present
+    /// in) its routed rung.
+    Persisted,
+    /// The tier write did not happen and the manifest is this run's
+    /// only home for now. `reason` is the failure's own text — an
+    /// unset `dsn_env`, an unrouted `run` kind, an unreadable or
+    /// malformed `canon.yaml` — never a generic "tier unavailable"
+    /// guess, because a reader has to be able to tell a hot rung that
+    /// is down (retry later) from a `canon.yaml` that never routed
+    /// `run` at all (fix the config).
+    Degraded { reason: String },
+}
+
+impl TierPersist {
+    /// The degrade reason, or `None` when the record landed. The one
+    /// accessor both CLI wrappers render from, so the human line and
+    /// the `--json` key can never disagree about whether a dispatch
+    /// degraded.
+    pub fn degrade_reason(&self) -> Option<&str> {
+        match self {
+            Self::Persisted => None,
+            Self::Degraded { reason } => Some(reason.as_str()),
+        }
+    }
+}
+
+/// Persist `run` through the SAME `TierRegistry` write path every
+/// other canon record uses (s42 task 1.1): `crate::tiers::
+/// build_lenient_tiers_for_kinds` for the rung `run` routes to, then
+/// [`crate::ingest::persist_idempotent`] — literally the helper
+/// `canon ingest sessions` persists its own `Run`s with, so a
+/// dispatched run and an ingested run cannot drift into two write
+/// conventions for one kind.
+///
+/// # What a re-write at one `run_id` does, per backend
+/// `Run`'s partition natural key IS its `run_id`
+/// (`canon_store::partition::resolve_partition`), so [`end`]'s
+/// re-write targets the row [`begin`] wrote — but "targets" means
+/// different physical things per backend, and NONE of them is an
+/// in-place `UPDATE`:
+///
+/// - **hot (postgres/sqlite)** — `INSERT … ON CONFLICT (kind, id,
+///   digest) DO NOTHING`: the closed version lands as a second
+///   `records_history` row at the same `(kind, id)`, and the read
+///   side folds the two to ONE current row
+///   (`crate::query::fold_pg_routed_kind`). This is canon's
+///   supersession, not a duplicate.
+/// - **local/cold (git/s3)** — the Hive key is
+///   `{natural_key}__{digest12}`, so the closed version's changed
+///   body resolves to a DIFFERENT object than the running one; both
+///   files exist and the same read-side fold picks the later. A
+///   git-routed `run` therefore does NOT hit
+///   `StoreError::DuplicatePath`: that error needs a byte-identical
+///   body, which a close never produces (the status changes, and
+///   [`end`] advances `envelope.at` — see [`end`] for why that
+///   advance is what makes the fold pick the close deterministically
+///   rather than by digest coin-flip).
+///
+/// `run` routes to `hot` by CONVENTION (`canon init`'s template, this
+/// repo's own `canon.yaml`), never by law, which is exactly why the
+/// git-routed case above is spelled out rather than assumed away.
+/// `DuplicatePath` is tolerated regardless, via the shared helper —
+/// unreachable here today, but a local decision to re-raise it would
+/// be a silent divergence from ingest's idempotence contract.
+///
+/// # Every failure degrades, and every degrade is NAMED
+/// Returns [`TierPersist::Degraded`] — never an `Err` — for an
+/// unroutable kind, an unreachable rung, and an unreadable or
+/// malformed `canon.yaml` alike. The last one is a deliberate
+/// departure from `crate::ingest`, where a malformed `canon.yaml`
+/// fails the command loud: there, the tier write IS the output, so
+/// writing nothing must be loud. Here the manifest — already written,
+/// carrying every field this record has — is the primary artifact and
+/// [`reconcile_runs`] reads it back, so the whole cost of a degrade
+/// is that one run is reconciled from the side-channel instead of the
+/// tier. Failing a LIVE dispatch over a config typo would instead
+/// lose the run's provenance outright, which is the failure mode this
+/// module exists to prevent.
+///
+/// A degrade reason names the CONFIGURED cause where one exists: the
+/// registry's own error is backend-generic ("hot tier (postgres) is
+/// not attached (no live DSN)"), while
+/// [`crate::tiers::LoadedTiers::unavailable_reasons`] carries the
+/// build-time detail (s29 design D6 — "`CANON_PG_DSN` is unset").
+/// Both are appended, in that order, because the first says WHICH
+/// rung refused and the second says WHY, and an operator needs both
+/// to act. The routed rung is resolved before `policy` moves into the
+/// registry, which is the only reason the lookup happens where it
+/// does.
+pub fn persist_run(repo: &Path, run: &Run) -> TierPersist {
+    let canon_yaml = resolve_canon_yaml(repo, None);
+    let loaded = match crate::tiers::build_lenient_tiers_for_kinds(&canon_yaml, &[RecordKind::Run]) {
+        Ok(loaded) => loaded,
+        Err(err) => return TierPersist::Degraded { reason: err.to_string() },
+    };
+    let configured_reason = loaded.policy.tier_for(RecordKind::Run).ok().and_then(|rung| loaded.unavailable_reasons.get(&rung).cloned());
+    let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
+    match crate::ingest::persist_idempotent(&registry, run) {
+        Ok(()) => TierPersist::Persisted,
+        Err(err) => TierPersist::Degraded {
+            reason: match configured_reason {
+                Some(configured) => format!("{err} — {configured}"),
+                None => err.to_string(),
+            },
+        },
+    }
+}
+
 /// What [`begin`] produced: the minted run id, the side-channel path the
-/// manifest was written to, and the guidance snapshot recorded into it.
+/// manifest was written to, the guidance snapshot recorded into it, and
+/// whether the record also reached its routed tier.
 #[derive(Debug, Clone)]
 pub struct Begun {
     pub run_id: RunId,
     pub manifest_path: PathBuf,
     pub run: Run,
+    /// s42 task 1.1: [`TierPersist::Persisted`] when the `Run` also
+    /// landed in its routed rung, [`TierPersist::Degraded`] when the
+    /// manifest is (for now) its only home. Never an error — the
+    /// dispatch succeeded either way.
+    pub tier: TierPersist,
 }
 
 /// Resolve `<repo>`'s configured learn root and open the `strategies`
@@ -352,7 +514,14 @@ pub struct DispatchBinding {
 /// Read-only by construction: `PlanAdapter::parse` is the same pure
 /// scan+parse `canon ingest plans` runs before its persist step, and
 /// nothing here touches a tier or rewrites a plan document.
-fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(), DispatchError> {
+///
+/// s42 (`close-the-open-loops`) made it `pub(crate)` so `canon
+/// evidence add --task` refuses an unknown task through THIS one
+/// admission decision (s42 task 4.1's "the same plan-corpus admission
+/// `canon dispatch begin --task` uses") rather than a second copy
+/// that could drift from the D8 ownership rule above. Body and
+/// signature are untouched by that change.
+pub(crate) fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(), DispatchError> {
     let named = || task_id.as_str().to_string();
     let sources = crate::plans::load_plan_sources_from_config(&repo.join("canon.yaml"), repo)
         .map_err(|e| DispatchError::PlanCorpus { task_id: named(), detail: e.to_string() })?;
@@ -394,9 +563,17 @@ fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(), DispatchEr
 }
 
 /// Mint a `Run` (status `Running`), retrieve the role+regime guidance,
-/// record it into the run's `injected_guidance`, and persist the
-/// manifest to `<repo>/.canon/dispatch/<run_id>.json`. Returns the
-/// [`Begun`] record (run id + path + the in-memory `Run`).
+/// record it into the run's `injected_guidance`, persist the manifest
+/// to `<repo>/.canon/dispatch/<run_id>.json`, and persist the same
+/// `Run` through its routed tier ([`persist_run`], s42 task 1.1).
+/// Returns the [`Begun`] record (run id + path + the in-memory `Run` +
+/// the tier outcome).
+///
+/// The MANIFEST is written first and the tier write is best-effort, in
+/// that order for a reason: the manifest is the artifact a replay and
+/// [`end`] both need, so it must exist before anything that can fail
+/// silently is attempted, and a degraded tier leaves a dispatch that
+/// is complete on disk rather than half-recorded.
 ///
 /// `binding` carries s40's two optional edges. `binding.task_id` is
 /// validated FIRST — before the guidance retrieval, the mint, and the
@@ -423,7 +600,7 @@ pub fn begin(repo: &Path, role: &RoleId, regime_key: &RegimeKey, agent_id: &str,
     let guidance = retrieve_guidance(&store, role, regime_key, None);
 
     let run_id = RunId::new();
-    let now = chrono::Utc::now();
+    let now = Utc::now();
     let actor = Actor::new(agent_id.to_string(), role.clone());
     let run =
         Run::new(Envelope::current(RecordKind::Run, now, actor), run_id, None, binding.task_id.clone(), RunStatus::Running, now, None)
@@ -444,13 +621,20 @@ pub fn begin(repo: &Path, role: &RoleId, regime_key: &RegimeKey, agent_id: &str,
     // kill must never leave a torn `.canon/dispatch/<run_id>.json`.
     write_atomic(&manifest_path, json.as_bytes())?;
 
-    Ok(Begun { run_id, manifest_path, run })
+    Ok(Begun { tier: persist_run(&repo, &run), run_id, manifest_path, run })
 }
 
 /// `canon dispatch begin`'s CLI wrapper: `0` on a written manifest, `2`
 /// on a usage failure (a `--role`/`--regime` mismatch, or a `--task`
 /// naming no task / no plan corpus to name one in), `1` on a
 /// write/serialize failure.
+///
+/// A degraded tier write (s42 task 1.1) is NOT one of those: it prints
+/// a note on stderr and still exits `0`, because the dispatch itself
+/// succeeded — [`persist_run`] explains why. `--json` gains a
+/// `tier_degraded` key ONLY when it degraded, mirroring the same
+/// omit-when-unset discipline the binding keys below keep, so a
+/// healthy dispatch's `--json` shape is byte-identical to pre-s42.
 pub fn run_begin(repo: &Path, role: &RoleId, regime_key: &RegimeKey, agent_id: &str, binding: &DispatchBinding, json: bool) -> ExitCode {
     match begin(repo, role, regime_key, agent_id, binding) {
         Ok(begun) => {
@@ -470,6 +654,9 @@ pub fn run_begin(repo: &Path, role: &RoleId, regime_key: &RegimeKey, agent_id: &
                 if let Some(parent) = begun.run.parent_run_id {
                     summary.insert("parent_run_id".to_string(), serde_json::json!(parent.to_string()));
                 }
+                if let Some(reason) = begun.tier.degrade_reason() {
+                    summary.insert("tier_degraded".to_string(), serde_json::json!(reason));
+                }
                 println!("{}", serde_json::to_string_pretty(&summary).expect("summary is always serializable"));
             } else {
                 println!(
@@ -485,6 +672,16 @@ pub fn run_begin(repo: &Path, role: &RoleId, regime_key: &RegimeKey, agent_id: &
                 if let Some(parent) = begun.run.parent_run_id {
                     println!("  dispatched by run {parent}");
                 }
+            }
+            // stderr in BOTH render modes, so stdout stays a clean
+            // report — `run_diff`'s own note discipline, applied to
+            // the one degrade a dispatch can carry.
+            if let Some(reason) = begun.tier.degrade_reason() {
+                eprintln!(
+                    "canon dispatch begin: run {} was NOT persisted to its routed tier ({reason}) — the manifest at {} is its only home; `canon dispatch diff` still reads it from there",
+                    begun.run_id,
+                    begun.manifest_path.display()
+                );
             }
             ExitCode::SUCCESS
         }
@@ -543,12 +740,20 @@ fn status_slug(status: RunStatus) -> &'static str {
 }
 
 /// What [`end`] produced: the closed run id, the manifest rewritten in
-/// place, and the updated `Run`.
+/// place, the updated `Run`, and whether the close also reached the
+/// routed tier.
 #[derive(Debug, Clone)]
 pub struct Ended {
     pub run_id: RunId,
     pub manifest_path: PathBuf,
     pub run: Run,
+    /// s42 task 1.2, the same contract [`Begun::tier`] carries. A
+    /// degraded close leaves the manifest holding the closed run and
+    /// the tier holding whatever [`begin`] left there — the RUNNING
+    /// version, or nothing at all if that write degraded too. The
+    /// first of those two is exactly the divergence
+    /// [`reconcile_runs`] reports rather than hides.
+    pub tier: TierPersist,
 }
 
 /// The exclusive per-run sidecar [`end`] holds across its whole
@@ -615,14 +820,172 @@ impl Drop for EndLock {
     }
 }
 
+/// Reads `<repo>/.canon/dispatch/<run_id>.json` as a TYPED [`Run`] and
+/// establishes that the manifest is the one `run_id` names: the
+/// admission half of [`end`]'s contract, factored out so a second
+/// caller reuses the rule rather than restating it.
+///
+/// Three rungs, in order, each a distinct diagnosis rather than a
+/// shared "bad manifest":
+///
+/// 1. the file must be READABLE — only [`std::io::ErrorKind::NotFound`]
+///    is [`DispatchError::NoSuchRun`] ("this repo never began that
+///    run"); a permission or I/O failure, and an entry that is a
+///    DIRECTORY rather than a file, are real failures
+///    ([`DispatchError::Io`]), never reported as an unknown run;
+/// 2. its bytes must deserialize as a `Run`
+///    ([`DispatchError::Unreadable`]) — a truncated, hand-edited or
+///    foreign JSON document is not a dispatch record, however plausibly
+///    it is named; and
+/// 3. the `Run`'s OWN `run_id` must equal the id it is filed under
+///    ([`DispatchError::RunIdMismatch`]) — the filename is a path, the
+///    embedded id is the record, and a misfiled manifest would
+///    otherwise let one run's identity answer for another's.
+///
+/// Deliberately stops there. The LIFECYCLE rung — which states a run
+/// may be in — is each caller's own: [`end`] admits exactly
+/// `(RunStatus::Running, ended_at: None)` because it MUTATES the run,
+/// while a read-only caller (`crate::artifact_ingest`'s `--run`
+/// attribution) only needs the run to have been dispatched at all. Both
+/// share this function's identity rungs, which is where a false
+/// attribution would actually come from.
+pub(crate) fn read_dispatched_manifest(manifest_path: &Path, run_id: RunId) -> Result<Run, DispatchError> {
+    let text = match std::fs::read_to_string(manifest_path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(DispatchError::NoSuchRun { run_id: run_id.to_string(), path: manifest_path.display().to_string() });
+        }
+        Err(e) => return Err(DispatchError::Io(e)),
+    };
+    let run: Run = serde_json::from_str(&text)
+        .map_err(|e| DispatchError::Unreadable { path: manifest_path.display().to_string(), detail: e.to_string() })?;
+    if run.run_id != run_id {
+        return Err(DispatchError::RunIdMismatch {
+            path: manifest_path.display().to_string(),
+            expected: run_id.to_string(),
+            found: run.run_id.to_string(),
+        });
+    }
+    Ok(run)
+}
+
+/// The record-VERSION timestamp a close stamps into `envelope.at`
+/// (s42 `close-the-open-loops`): the later of `observed` — the wall
+/// clock read at the close — and the smallest instant STRICTLY after
+/// `recorded`, the `envelope.at` the manifest being closed already
+/// carries.
+///
+/// [`end`]'s latest-version guarantee is that the closed version
+/// out-ranks the `running` one under
+/// `canon_store::fold_latest_by_key`'s `(at, schema, digest)` order.
+/// Two versions of one run share a `schema`, so that reduces to `at`
+/// — and a bare `Utc::now()` DELIVERS a greater `at` without
+/// ENFORCING one. Taking the max makes the ordering a property of the
+/// DATA rather than of the host clock, and costs the common case
+/// nothing: while the clock is monotone `observed` wins and the
+/// version stamp IS the close instant.
+///
+/// One nanosecond is chrono's smallest representable step, and it
+/// survives the round trip both homes take: a `DateTime<Utc>`
+/// serializes as RFC3339 under `SecondsFormat::AutoSi`, which emits
+/// all nine fractional digits as soon as any of them is non-zero, and
+/// `canon_store::tier::raw_record_at` parses them back at full
+/// precision. The order the fold sees on disk is therefore the order
+/// computed here, never a rounded one.
+///
+/// `recorded` comes off a hand-editable manifest, so it is
+/// caller-supplied data and gets no `expect`: the successor is
+/// computed with `checked_add_signed` and saturates at
+/// `DateTime::<Utc>::MAX_UTC`. Only an input already AT `MAX_UTC`
+/// reaches that saturation, and there the result equals `recorded`
+/// because no strictly greater instant is representable at all —
+/// every other input yields a strict successor.
+fn close_version_at(recorded: DateTime<Utc>, observed: DateTime<Utc>) -> DateTime<Utc> {
+    let successor = recorded.checked_add_signed(TimeDelta::nanoseconds(1)).unwrap_or(DateTime::<Utc>::MAX_UTC);
+    observed.max(successor)
+}
+
 /// Close a dispatched run: read `<repo>/.canon/dispatch/<run_id>.json`,
-/// stamp a terminal [`RunStatus`] and `ended_at`, and rewrite the
-/// manifest through the SAME atomic write [`begin`] used to create it
-/// (s40). Before this, `begin` minted `RunStatus::Running` and nothing
-/// in the CLI ever closed it — only session ingest, reconstructing a
-/// finished transcript post hoc, ever wrote a terminal status — so
-/// every dispatched run stayed `Running` forever and the flywheel
-/// funnel's last stage had nothing to compute from.
+/// stamp a terminal [`RunStatus`] and `ended_at`, rewrite the manifest
+/// through the SAME atomic write [`begin`] used to create it (s40),
+/// and re-persist the closed `Run` through the SAME [`persist_run`]
+/// path `begin` used (s42 task 1.2). Before s40, `begin` minted
+/// `RunStatus::Running` and nothing in the CLI ever closed it — only
+/// session ingest, reconstructing a finished transcript post hoc, ever
+/// wrote a terminal status — so every dispatched run stayed `Running`
+/// forever and the flywheel funnel's last stage had nothing to compute
+/// from.
+///
+/// # The close lands on the row `begin` wrote, not a second row
+/// `Run`'s partition natural key IS its `run_id`, so both writes
+/// resolve to the same key and `canon query --kind run` returns
+/// exactly ONE row for this run — the closed one. Two things make
+/// that true rather than hoped for:
+///
+/// 1. [`persist_run`]'s per-backend note: a hot rung appends a second
+///    `records_history` version at the same `(kind, id)` and a
+///    git/s3 rung writes a second Hive object; NEITHER is a second
+///    logical row, because `crate::query`'s fold reduces a kind's
+///    versions to one winner per natural key before any reader sees
+///    them.
+/// 2. That fold's winner is the greatest `(at, schema, digest)`
+///    (`canon_store::fold_latest_by_key`), and `at` is
+///    `envelope.at` — which is why this function ADVANCES
+///    `run.envelope.at`, to a value [`close_version_at`] DERIVES to
+///    be strictly greater than the one the manifest being closed
+///    already carries. Leaving the envelope at `begin`'s instant
+///    would tie the two versions on `at` AND on `schema`, handing the
+///    decision to a lexicographic content digest that is uncorrelated
+///    with which version is newer — i.e. `canon query --kind run`
+///    would show the run still `running` on roughly half of all
+///    closes, with no diagnostic. Merely re-reading the wall clock
+///    does not close that hole: it DELIVERS a greater `at` without
+///    ENFORCING one, and a close is routinely minutes-to-hours after
+///    its begin — ample room for an NTP step back, a restore onto a
+///    host whose clock is behind, or a `begin` that ran while the
+///    clock was fast. Under any of those the fresh reading is `<=`
+///    the stored one, and the fold then deterministically keeps the
+///    `running` row: the exact failure this advance exists to remove.
+///    This is the same re-stamp `canon subject adopt`/`status` make
+///    before re-persisting a subject at its existing key, with the
+///    ordering made unconditional rather than clock-dependent.
+///
+/// The manifest is rewritten with that same advanced envelope, so the
+/// two homes stay byte-comparable and [`reconcile_runs`] has nothing
+/// spurious to report.
+///
+/// # `ended_at` and `envelope.at` are two different clocks
+/// `envelope.at` is the record VERSION's timestamp; `ended_at` is the
+/// RUN's, as is `started_at`, which stays untouched. On a monotone
+/// clock a close's two stamps are the same instant, which is exactly
+/// what makes the distinction easy to lose. They DIVERGE when
+/// [`close_version_at`] has to bound the version stamp away from a
+/// stored `at` the wall clock has not reached: `ended_at` keeps the
+/// honest observation — when THIS process saw the run close — while
+/// `envelope.at` becomes the derived successor, a monotone version
+/// counter that asserts nothing about wall time.
+///
+/// So a reader asking WHEN THE RUN ENDED reads `ended_at`; a reader
+/// asking WHICH VERSION OF THIS RECORD SUPERSEDES WHICH reads
+/// `envelope.at`. Stamping the derived value into `ended_at` as well
+/// would be the cheaper fix and the wrong one — `ended_at` is
+/// PROVENANCE (the rejection paths below exist to defend it), and a
+/// future-dated manifest would make the CLI assert a close that has
+/// not happened yet.
+///
+/// Nothing else reads a dispatched run's `envelope.at` as wall clock,
+/// which is what makes the derived stamp safe to write: its only
+/// consumers are the supersession fold above, `TierRegistry::query`'s
+/// native `at`-merge order, and `canon tier age`'s cutoff (both via
+/// `canon_store::tier::raw_record_at`) — the first two want precisely
+/// the version stamp, and the third is a days-to-months threshold no
+/// nanosecond can move. Every reader that reports run TIME reads a
+/// different field: `mart_session_costs`' bounds are the
+/// `token_usage` EVENT's own `at`, `mart_session_run_handoff` reads
+/// the session's and the handoff's, `mart_flywheel_funnel` reads no
+/// timestamp at all, and `canon dispatch diff` compares the two homes
+/// of the SAME record, which carry an identical value
+/// ([`reconcile_runs`]).
 ///
 /// # Exactly ONE transition, taken under an exclusive lock
 /// The predicate is `(RunStatus::Running, ended_at: None)` -> the
@@ -672,26 +1035,14 @@ pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, Dispa
     }
     let _lock = EndLock::acquire(&manifest_path, run_id)?;
 
-    let text = match std::fs::read_to_string(&manifest_path) {
-        Ok(text) => text,
-        // Still reachable under the lock: the manifest can be removed
-        // between the probe and here by something that is not another
-        // `dispatch end` (an operator deleting a wrongly-closed run,
-        // this module's documented remedy).
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Err(DispatchError::NoSuchRun { run_id: run_id.to_string(), path: manifest_path.display().to_string() });
-        }
-        Err(e) => return Err(DispatchError::Io(e)),
-    };
-    let mut run: Run = serde_json::from_str(&text)
-        .map_err(|e| DispatchError::Unreadable { path: manifest_path.display().to_string(), detail: e.to_string() })?;
-    if run.run_id != run_id {
-        return Err(DispatchError::RunIdMismatch {
-            path: manifest_path.display().to_string(),
-            expected: run_id.to_string(),
-            found: run.run_id.to_string(),
-        });
-    }
+    // The read, the typed parse and the filed-under-the-right-id check
+    // are [`read_dispatched_manifest`]'s, shared with every other caller
+    // that has to establish a manifest really is the run it names. A
+    // `NoSuchRun` here is still reachable under the lock: the manifest
+    // can be removed between the probe and this read by something that
+    // is not another `dispatch end` (an operator deleting a wrongly-
+    // closed run, this module's documented remedy).
+    let mut run = read_dispatched_manifest(&manifest_path, run_id)?;
     match (run.status, run.ended_at) {
         // The one closeable state.
         (RunStatus::Running, None) => {}
@@ -710,15 +1061,25 @@ pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, Dispa
         }
     }
 
+    // TWO clocks, deliberately kept apart (see this function's doc):
+    // `observed` is when THIS process saw the run close and is what
+    // `ended_at` — provenance — records; `version_at` is the record
+    // VERSION's stamp, DERIVED to out-rank the running version the
+    // read-side fold is choosing against even when the wall clock
+    // cannot be trusted to. On a monotone clock they are one instant.
+    // `started_at` is the run's own clock and is left alone.
+    let observed = Utc::now();
+    let version_at = close_version_at(run.envelope.at, observed);
     run.status = status;
-    run.ended_at = Some(chrono::Utc::now());
+    run.ended_at = Some(observed);
+    run.envelope.at = version_at;
     let json = serde_json::to_string_pretty(&run).map_err(|e| DispatchError::Serialize(e.to_string()))?;
     // Same atomicity argument `begin` makes: a mid-write kill must
     // never leave a torn manifest, and here it would additionally
     // destroy the only record of a run that DID happen.
     write_atomic(&manifest_path, json.as_bytes())?;
 
-    Ok(Ended { run_id, manifest_path, run })
+    Ok(Ended { tier: persist_run(&repo, &run), run_id, manifest_path, run })
 }
 
 /// `canon dispatch end`'s CLI wrapper: `0` on a rewritten manifest, `2`
@@ -727,19 +1088,39 @@ pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, Dispa
 /// the wrong run id, an unreadable manifest), `1` on a write/serialize
 /// failure or a close another process is already holding — the same
 /// three-way contract [`run_begin`] and `canon gate` use.
+///
+/// A degraded tier write is none of those and still exits `0`, on
+/// [`run_begin`]'s identical terms: stderr note in both render modes,
+/// a `tier_degraded` key present in `--json` only when it degraded.
+/// The note is worth reading here in particular — a close that misses
+/// the tier leaves the routed rung holding the `running` version.
 pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> ExitCode {
     match end(repo, run_id, status) {
         Ok(ended) => {
             if json {
-                let summary = serde_json::json!({
-                    "run_id": ended.run_id.to_string(),
-                    "manifest": ended.manifest_path.display().to_string(),
-                    "status": status_slug(ended.run.status),
-                    "ended_at": ended.run.ended_at,
-                });
+                // A `Map` rather than one `json!` literal, for the
+                // reason `run_begin` builds its own the same way: the
+                // s42 degrade key is OMITTED on the healthy path, so
+                // an existing consumer's parse of a successful close
+                // is unchanged.
+                let mut summary = serde_json::Map::new();
+                summary.insert("run_id".to_string(), serde_json::json!(ended.run_id.to_string()));
+                summary.insert("manifest".to_string(), serde_json::json!(ended.manifest_path.display().to_string()));
+                summary.insert("status".to_string(), serde_json::json!(status_slug(ended.run.status)));
+                summary.insert("ended_at".to_string(), serde_json::json!(ended.run.ended_at));
+                if let Some(reason) = ended.tier.degrade_reason() {
+                    summary.insert("tier_degraded".to_string(), serde_json::json!(reason));
+                }
                 println!("{}", serde_json::to_string_pretty(&summary).expect("summary is always serializable"));
             } else {
                 println!("dispatch {} ended `{}` -> {}", ended.run_id, status_slug(ended.run.status), ended.manifest_path.display());
+            }
+            if let Some(reason) = ended.tier.degrade_reason() {
+                eprintln!(
+                    "canon dispatch end: the close of run {} was NOT persisted to its routed tier ({reason}) — the tier still holds whatever `dispatch begin` left there (the `running` version, or nothing if that write degraded too); the closed manifest at {} is the current record",
+                    ended.run_id,
+                    ended.manifest_path.display()
+                );
             }
             ExitCode::SUCCESS
         }
@@ -832,11 +1213,14 @@ pub struct PlanActualDiff {
     /// that order, so every rendered per-class list is sorted by
     /// `(from, to)` without a second sort that could drift from it.
     pub edges: Vec<ClassifiedEdge>,
-    /// Degrade diagnostics: a tier that could not be read
-    /// (`read_kind`), a dispatch manifest that would not parse
-    /// (`read_dispatch_manifests`). Each one only NARROWS a side;
-    /// none is an error, and [`run_diff`] prints them on stderr and
-    /// still exits `0`.
+    /// Degrade diagnostics AND source disagreements: a tier that
+    /// could not be read (`read_kind`), a dispatch manifest that
+    /// would not parse (`read_dispatch_manifests`), and — s42
+    /// (`close-the-open-loops`), task 1.3 — a `run_id` whose tier and
+    /// manifest copies disagree ([`reconcile_runs`]). A degrade only
+    /// NARROWS a side and a divergence narrows nothing at all; none
+    /// is an error, and [`run_diff`] prints them on stderr and still
+    /// exits `0`.
     pub notes: Vec<String>,
 }
 
@@ -962,10 +1346,12 @@ fn declared_edges(tasks: &[Value]) -> BTreeSet<TaskEdge> {
 /// it too.
 fn observed_edges(runs: &[Value]) -> BTreeSet<TaskEdge> {
     // run_id -> the task that run served, for every run that names
-    // one. FIRST writer wins, and `diff` reads the canonical tier
-    // before the dispatch side-channel, so a run_id present in both
-    // resolves to its canonical binding rather than to whichever
-    // source happened to be scanned last.
+    // one. Since s42 (`close-the-open-loops`) [`reconcile_runs`] has
+    // already collapsed the two sources to one record per `run_id`
+    // before this runs, so no `run_id` can appear twice here; the
+    // first-writer-wins `or_insert` is kept as the total, order-free
+    // rule for a caller that hands over an unreconciled list
+    // (`tests` builds such lists directly).
     let mut task_of: BTreeMap<&str, TaskId> = BTreeMap::new();
     for run in runs {
         let (Some(run_id), Some(task)) = (str_field(run, "run_id"), task_id_field(run, "task_id")) else { continue };
@@ -1009,15 +1395,17 @@ fn read_kind(repo: &Path, kind: RecordKind, notes: &mut Vec<String>) -> Vec<Valu
 /// Read `<repo>/.canon/dispatch/*.json` (this module's own private
 /// side-channel, [`DISPATCH_DIR`]) as additional `Run` manifests.
 ///
-/// Necessary, not belt-and-braces: [`begin`] deliberately writes a
-/// live dispatch manifest OUTSIDE `canon-store`'s git tier (module
-/// doc — a hive-path collision with the later post-hoc ingest `Run`
-/// would be a hard error), and the reconciliation step that would fold
-/// it into the canonical tier does not exist yet. So a freshly
-/// dispatched run — the ONLY kind of run that carries a `task_id` at
-/// all — is invisible to [`read_kind`], and a diff that read only the
-/// tier would report zero observed edges no matter how many runs were
-/// dispatched with `--task`/`--parent-run`.
+/// A FALLBACK since s42 (`close-the-open-loops`, task 1.3), not the
+/// primary source it used to be: [`begin`]/[`end`] now persist the
+/// `Run` through its routed tier, so [`read_kind`] sees a dispatched
+/// run like any other record. The directory is still read, because
+/// two populations of run exist that the tier does not hold — a run
+/// dispatched BEFORE s42, and a run whose tier write degraded
+/// ([`TierPersist::Degraded`]) — and a dispatched run is still the
+/// only run that carries a `task_id` at all, so dropping this side
+/// would silently empty the observed half of the diff for exactly
+/// those repos. [`reconcile_runs`] decides what happens where both
+/// sources answer for one `run_id`.
 ///
 /// # Every degrade is NAMED, and only `Run` bytes get in
 /// Paths are sorted so the scan order is data-derived rather than
@@ -1116,17 +1504,139 @@ fn read_dispatch_manifests(repo: &Path, notes: &mut Vec<String>) -> Vec<Value> {
     runs
 }
 
+/// Fold the two run sources into ONE run per `run_id` (s42 task 1.3):
+/// the TIER's copy wins, the side-channel manifest fills in a
+/// `run_id` the tier does not hold, and a `run_id` both sources carry
+/// with DIFFERENT content produces a note naming the fields that
+/// disagree.
+///
+/// # Why prefer the tier, and why say so out loud
+/// The tier is the reconciled record every other canon reader
+/// (`canon query --kind run`, the DuckDB marts, the funnel) already
+/// resolves through, and its rows have been through
+/// `crate::query`'s supersession fold — so preferring it is what
+/// keeps `canon dispatch diff` agreeing with every other surface
+/// rather than being a fourth opinion.
+///
+/// But preferring SILENTLY is what produced the funnel/burn-down
+/// confusion s42 exists to close: the two sources disagreeing is a
+/// real, diagnosable state — a close whose tier write degraded leaves
+/// the tier holding `status: running` while the manifest holds
+/// `succeeded` — and a report that quietly showed one of them gave an
+/// operator no way to find out. So the divergence is REPORTED, in
+/// `notes`, with the differing field names, and the report still
+/// succeeds: this surface degrades and informs, it never gates
+/// ([`run_diff`]).
+///
+/// # Determinism
+/// Keyed by a `BTreeMap` over the `run_id` string, so the output is
+/// ordered by run id rather than by which source was scanned first,
+/// and each divergence note lists its differing field names sorted —
+/// both orders are functions of the data alone. A record carrying no
+/// string `run_id` cannot be keyed and is passed through unchanged
+/// (it contributes no edge either way: [`observed_edges`] needs the
+/// field); it is never dropped, because narrowing a corpus silently
+/// is the failure this whole function exists to avoid.
+///
+/// `tier` holds at most one entry per `run_id` by construction —
+/// `read_kind` goes through `crate::query::run`, whose fold reduces a
+/// kind's versions to one winner per natural key — and `manifests`
+/// likewise, since a manifest is filed under (and re-checked against)
+/// its own `run_id`. A duplicate arriving anyway keeps the FIRST and
+/// notes the rest, rather than letting scan order pick.
+fn reconcile_runs(tier: Vec<Value>, manifests: Vec<Value>, notes: &mut Vec<String>) -> Vec<Value> {
+    /// One `run_id`'s winning record plus the source it came from —
+    /// named so the divergence note can say WHICH copy is being
+    /// reported, rather than a bare bool.
+    struct Winner {
+        record: Value,
+        source: &'static str,
+    }
+
+    let mut by_run: BTreeMap<String, Winner> = BTreeMap::new();
+    let mut unkeyed: Vec<Value> = Vec::new();
+    let mut divergences: Vec<String> = Vec::new();
+
+    // Tier first so it is the incumbent every manifest is compared
+    // against; the manifest pass below never replaces one.
+    for (source, records) in [("tier", tier), ("dispatch manifest", manifests)] {
+        for record in records {
+            // Keyed in its own statement, so the shared borrow of
+            // `record` is over before either branch below MOVES it —
+            // a `let ... else` on the borrow directly would keep the
+            // initializer's temporaries alive across the `else`.
+            let keyed = str_field(&record, "run_id").map(|run_id| run_id.to_string());
+            let Some(run_id) = keyed else {
+                unkeyed.push(record);
+                continue;
+            };
+            if let Some(incumbent) = by_run.get(&run_id) {
+                if incumbent.record != record {
+                    divergences.push(format!(
+                        "run `{run_id}` differs between its {} copy (used) and its {source} copy (ignored) on: {} — the two sources are out of sync; re-run `canon dispatch end` (or `canon ingest sessions`) to bring them back together",
+                        incumbent.source,
+                        describe_divergence(&incumbent.record, &record)
+                    ));
+                }
+                continue;
+            }
+            by_run.insert(run_id, Winner { record, source });
+        }
+    }
+
+    // Sorted: `divergences` is built in (tier, then manifest) scan
+    // order, which is `BTreeMap` order for neither source.
+    divergences.sort();
+    notes.append(&mut divergences);
+
+    let mut runs: Vec<Value> = by_run.into_values().map(|winner| winner.record).collect();
+    runs.append(&mut unkeyed);
+    runs
+}
+
+/// The sorted, comma-joined names of the top-level fields two records
+/// for one `run_id` disagree on — the payload of a
+/// [`reconcile_runs`] divergence note.
+///
+/// Field NAMES, never values: a `Run` carries a whole
+/// `injected_guidance` snapshot, and pasting two copies of it into a
+/// stderr note would bury the one fact an operator needs (WHICH
+/// fields moved) under kilobytes of strategy text. A field present in
+/// one record and absent in the other counts as differing, which is
+/// how a manifest closed while the tier still says `running` reports
+/// `ended_at` alongside `at`/`status`.
+///
+/// A non-object record (structurally impossible for a `Run`, but
+/// these values come off disk and out of a tier) yields
+/// `"the whole record"` rather than an empty list, so a note can
+/// never claim a divergence with nothing named.
+fn describe_divergence(left: &Value, right: &Value) -> String {
+    let (Some(left), Some(right)) = (left.as_object(), right.as_object()) else {
+        return "the whole record".to_string();
+    };
+    let differing: BTreeSet<&str> =
+        left.keys().chain(right.keys()).map(|field| field.as_str()).filter(|field| left.get(*field) != right.get(*field)).collect();
+    if differing.is_empty() {
+        // Two objects that compare unequal must differ on some key,
+        // so this is unreachable — but a note reading "differs on: "
+        // would be worse than one that says it could not tell.
+        return "no field (the two bodies compare unequal but share every field)".to_string();
+    }
+    differing.into_iter().collect::<Vec<_>>().join(", ")
+}
+
 /// Build the plan-vs-actual comparison for `repo` (tasks 2.1/2.2):
-/// DECLARED from every `Task`'s `depends_on`, OBSERVED from every
-/// `Run` the canonical tier holds PLUS every live dispatch manifest
-/// the side-channel holds. Every read degrades rather than fails, so
-/// this function is total — it always produces a report.
+/// DECLARED from every `Task`'s `depends_on`, OBSERVED from the `Run`s
+/// the canonical tier holds RECONCILED (s42 task 1.3) against the
+/// dispatch side-channel's manifests. Every read degrades rather than
+/// fails, so this function is total — it always produces a report.
 pub fn diff(repo: &Path) -> PlanActualDiff {
     let repo = resolve_repo_root(repo);
     let mut notes = Vec::new();
     let tasks = read_kind(&repo, RecordKind::Task, &mut notes);
-    let mut runs = read_kind(&repo, RecordKind::Run, &mut notes);
-    runs.extend(read_dispatch_manifests(&repo, &mut notes));
+    let tier_runs = read_kind(&repo, RecordKind::Run, &mut notes);
+    let manifest_runs = read_dispatch_manifests(&repo, &mut notes);
+    let runs = reconcile_runs(tier_runs, manifest_runs, &mut notes);
     PlanActualDiff::new(declared_edges(&tasks), observed_edges(&runs), notes)
 }
 
@@ -1219,7 +1729,11 @@ fn format_json(diff: &PlanActualDiff) -> String {
 /// is a corpus whose tiers cannot be read at all (`read_kind`
 /// degrades each side independently and [`diff`] carries the reason
 /// into [`PlanActualDiff::notes`], printed here on stderr so stdout
-/// stays a clean report in both render modes).
+/// stays a clean report in both render modes). So, s42
+/// (`close-the-open-loops`) task 1.3, is a run whose tier and
+/// manifest copies DISAGREE: [`reconcile_runs`] reports it as a note
+/// and this still exits `0`, because a stale copy of a record is a
+/// fact to surface, not a rule anything broke.
 pub fn run_diff(repo: &Path, json: bool) -> ExitCode {
     let report = diff(repo);
     for note in &report.notes {
@@ -1269,7 +1783,7 @@ mod tests {
     /// typed parse exists to refuse.
     fn run_manifest(run_id: RunId, task_id: Option<&str>, parent_run_id: Option<RunId>) -> Run {
         let actor = Actor::new("canon".to_string(), RoleId::parse("implementer").expect("a literal role slug"));
-        let now = chrono::Utc::now();
+        let now = Utc::now();
         let run = Run::new(
             Envelope::current(RecordKind::Run, now, actor),
             run_id,
@@ -1585,11 +2099,15 @@ mod begin_tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn role() -> RoleId {
+    /// `pub(super)`, like [`regime`] and [`write_openspec_change`]
+    /// below, so s42's `tier_tests` composes the SAME dispatch inputs
+    /// this module already uses instead of a second, silently
+    /// drifting copy of them.
+    pub(super) fn role() -> RoleId {
         RoleId::parse("implementer").expect("a literal role slug")
     }
 
-    fn regime() -> RegimeKey {
+    pub(super) fn regime() -> RegimeKey {
         RegimeKey::parse("implementer/canon/dispatch/abc123").expect("a literal regime key")
     }
 
@@ -1597,7 +2115,7 @@ mod begin_tests {
     /// openspec dialect's own admission bar — a change dir without one
     /// is not a change the importer recognizes at all) plus the given
     /// `tasks.md` rows.
-    fn write_openspec_change(root: &Path, change_id: &str, rows: &str) {
+    pub(super) fn write_openspec_change(root: &Path, change_id: &str, rows: &str) {
         let change_dir = root.join(change_id);
         std::fs::create_dir_all(&change_dir).expect("creating the change dir");
         std::fs::write(change_dir.join("proposal.md"), format!("# {change_id}\n\n## Why\n\nTo exercise --task resolution.\n"))
@@ -2074,5 +2592,432 @@ mod begin_tests {
         assert!(parse_task_id("missing-the-separator").is_err());
         assert!(parse_run_id("01ARZ3NDEKTSV4RRFFQ69G5FAV").is_ok());
         assert!(parse_run_id("not-a-ulid").is_err());
+    }
+}
+
+/// s42 (`close-the-open-loops`) task group 1: a dispatched run is a
+/// real record. A third module rather than more cases in
+/// `begin_tests` (s40's binding + close half) or `tests` (s40's diff
+/// half), because the subject here is the TIER seam both of those
+/// predate — and because every case below needs a repo whose
+/// `canon.yaml` actually ROUTES `run`, which neither of those
+/// fixtures does.
+#[cfg(test)]
+mod tier_tests {
+    use super::begin_tests::{regime, role, write_openspec_change};
+    use super::*;
+    use tempfile::TempDir;
+
+    /// A repo routing `run` and `task` to a GIT-backed `local` rung,
+    /// plus the openspec plan corpus `--task` binds against.
+    ///
+    /// Git rather than postgres/sqlite is deliberate on two counts.
+    /// It needs no server, so these are ordinary offline unit tests.
+    /// And it is the HARDER case for task 1.2: a git tier rejects a
+    /// duplicate path outright where a hot rung dedups, and `run`
+    /// routes to `hot` only by convention ([`persist_run`]) — a close
+    /// that resolves to one row here resolves to one row on a hot
+    /// rung too.
+    fn repo_with_git_routed_runs() -> TempDir {
+        let tmp = tempfile::tempdir().expect("a temp dir");
+        std::fs::write(
+            tmp.path().join("canon.yaml"),
+            "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  run: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: plans\n",
+        )
+        .expect("writing canon.yaml");
+        write_openspec_change(
+            &tmp.path().join("plans"),
+            "demo-change",
+            "# demo-change — tasks\n\n- [ ] 1.1 Persist the dispatched run\n- [ ] 1.2 Upsert it on close\n",
+        );
+        tmp
+    }
+
+    /// The env var `repo_with_a_dead_hot_rung` points its `dsn_env`
+    /// at. Unique to this file and set by nothing, so the "hot rung is
+    /// down" case needs no `remove_var` — which would be a
+    /// process-global mutation racing every other test in the binary.
+    const DEAD_DSN_ENV: &str = "CANON_PG_DSN_S42_DISPATCH_NEVER_SET";
+
+    /// A repo whose `run` routes to a postgres `hot` rung whose
+    /// `dsn_env` is never set — the hot-rung-is-down case, with no
+    /// live database anywhere near the test.
+    fn repo_with_a_dead_hot_rung() -> TempDir {
+        let tmp = tempfile::tempdir().expect("a temp dir");
+        std::fs::write(
+            tmp.path().join("canon.yaml"),
+            format!(
+                "tiers:\n  local: {{ backend: git, root: .canon/ledger }}\n  hot: {{ backend: postgres, dsn_env: {DEAD_DSN_ENV}, schema: canon_v1 }}\nrouting:\n  run: hot\n"
+            ),
+        )
+        .expect("writing canon.yaml");
+        tmp
+    }
+
+    /// A repo with a perfectly healthy git rung that simply never
+    /// routed `run` — a DIFFERENT operator problem from a rung that
+    /// is down, which is the whole reason [`TierPersist::Degraded`]
+    /// carries a reason string rather than a bool.
+    fn repo_with_run_unrouted() -> TempDir {
+        let tmp = tempfile::tempdir().expect("a temp dir");
+        std::fs::write(tmp.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n")
+            .expect("writing canon.yaml");
+        tmp
+    }
+
+    /// Every `Run` `canon query --kind run` resolves in `repo` —
+    /// literally `crate::query::run`, the subcommand's own backing
+    /// call, so these tests assert the surface an operator reads
+    /// rather than a tier-internal detail (task 1.4).
+    fn queried_runs(repo: &Path) -> Vec<Value> {
+        crate::query::run(repo, None, RecordKind::Run, None, None, None, None)
+            .expect("a routed, reachable tier answers a run query")
+            .records
+            .into_iter()
+            .map(|record| record.0)
+            .collect()
+    }
+
+    /// The git tier's PHYSICAL `kind=run/` objects. Read only to show
+    /// that the read-side fold is what collapses a close to one row,
+    /// rather than a write that happened to overwrite.
+    fn run_objects(repo: &Path) -> Vec<PathBuf> {
+        let dir = repo.join(".canon/ledger/kind=run");
+        let mut paths: Vec<PathBuf> = match std::fs::read_dir(&dir) {
+            Ok(entries) => entries.filter_map(Result::ok).map(|entry| entry.path()).collect(),
+            Err(_) => Vec::new(),
+        };
+        paths.sort();
+        paths
+    }
+
+    fn binding_to(task_id: &str, parent: Option<RunId>) -> DispatchBinding {
+        DispatchBinding { task_id: Some(TaskId::parse(task_id).expect("a literal task id")), parent_run_id: parent }
+    }
+
+    /// Task 1.1 + 1.4: the acceptance criterion in one test — a
+    /// dispatch against a healthy tier writes BOTH homes, and the
+    /// record is readable through the same query path `canon query
+    /// --kind run` uses.
+    #[test]
+    fn a_dispatch_lands_in_both_the_manifest_and_the_routed_tier() {
+        let tmp = repo_with_git_routed_runs();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None)).expect("the dispatch begins");
+
+        assert_eq!(begun.tier, TierPersist::Persisted, "a routed, reachable rung must actually take the record");
+        assert!(begun.manifest_path.is_file(), "the manifest is still written, tier or no tier");
+
+        let rows = queried_runs(tmp.path());
+        assert_eq!(rows.len(), 1, "exactly the dispatched run is queryable: {rows:?}");
+        assert_eq!(rows[0]["run_id"], serde_json::json!(begun.run_id.to_string()));
+        assert_eq!(rows[0]["task_id"], serde_json::json!("demo-change#1.1"), "the binding travels into the tier, not just the manifest");
+        assert_eq!(rows[0]["status"], serde_json::json!("running"));
+    }
+
+    /// Task 1.1's degrade half: a dispatch must NOT fail because the
+    /// hot rung is down. The manifest is complete, the command
+    /// succeeded, and the reason names the configured env var so an
+    /// operator can fix the right thing.
+    #[test]
+    fn a_dead_hot_rung_leaves_a_manifest_only_dispatch_that_still_succeeds() {
+        let tmp = repo_with_a_dead_hot_rung();
+        let begun =
+            begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("a dead hot rung must never fail a dispatch");
+
+        let reason = match &begun.tier {
+            TierPersist::Degraded { reason } => reason.clone(),
+            TierPersist::Persisted => panic!("an unset dsn_env cannot have persisted anything"),
+        };
+        assert!(reason.contains(DEAD_DSN_ENV), "the reason must name the configured env var, not just `no live DSN`: {reason}");
+        assert!(reason.contains("hot"), "the reason must name the rung that refused: {reason}");
+
+        // The whole record survives in the manifest — nothing about
+        // the run is lost by the degrade.
+        let manifest = std::fs::read_to_string(&begun.manifest_path).expect("the manifest was written");
+        let round_tripped: Run = serde_json::from_str(&manifest).expect("the manifest deserializes as a Run");
+        assert_eq!(round_tripped.run_id, begun.run_id);
+        assert_eq!(round_tripped.status, RunStatus::Running);
+    }
+
+    /// "Your rung is down" and "you never routed `run`" are different
+    /// operator problems with different fixes, so they must not
+    /// collapse into one indistinguishable degrade.
+    #[test]
+    fn an_unrouted_run_kind_degrades_with_its_own_distinct_reason() {
+        let unrouted = repo_with_run_unrouted();
+        let begun =
+            begin(unrouted.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("an unrouted kind must not fail a dispatch");
+        let unrouted_reason = begun.tier.degrade_reason().expect("an unrouted kind cannot have persisted").to_string();
+        assert!(unrouted_reason.contains("routing"), "the reason must point at the missing routing entry: {unrouted_reason}");
+
+        let dead = repo_with_a_dead_hot_rung();
+        let dead_reason = begin(dead.path(), &role(), &regime(), "canon", &DispatchBinding::default())
+            .expect("a dead rung must not fail a dispatch")
+            .tier
+            .degrade_reason()
+            .expect("an unset dsn_env cannot have persisted")
+            .to_string();
+
+        assert_ne!(unrouted_reason, dead_reason, "two different fixes must read differently");
+        assert!(!unrouted_reason.contains(DEAD_DSN_ENV), "an unrouted kind is not an unreachable rung: {unrouted_reason}");
+    }
+
+    /// Task 1.2's acceptance criterion: the close lands on the row
+    /// `begin` wrote. Both physical versions are asserted precisely
+    /// so this cannot pass by accident — if a future change made the
+    /// tier overwrite in place, the object count would drop and this
+    /// test would say so rather than silently keep passing.
+    #[test]
+    fn closing_a_run_leaves_exactly_one_row_at_that_run_id() {
+        let tmp = repo_with_git_routed_runs();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None)).expect("the dispatch begins");
+        assert_eq!(begun.tier, TierPersist::Persisted);
+
+        let ended = end(tmp.path(), begun.run_id, RunStatus::Succeeded).expect("a running run closes");
+        assert_eq!(ended.tier, TierPersist::Persisted, "the close must reach the tier too, or the row stays `running`");
+
+        let objects = run_objects(tmp.path());
+        assert_eq!(objects.len(), 2, "the git tier keeps both VERSIONS (its Hive key carries a content digest): {objects:?}");
+
+        let rows = queried_runs(tmp.path());
+        assert_eq!(rows.len(), 1, "but the reader resolves ONE row per run_id, never two: {rows:?}");
+        assert_eq!(rows[0]["run_id"], serde_json::json!(begun.run_id.to_string()));
+        assert_eq!(rows[0]["status"], serde_json::json!("succeeded"), "and it is the CLOSED version that wins the fold");
+        assert_eq!(rows[0]["ended_at"], serde_json::json!(ended.run.ended_at), "the close's own timestamp, not a re-derived one");
+    }
+
+    /// What makes the fold above DECIDABLE rather than a coin flip.
+    /// `canon_store::fold_latest_by_key` orders by `(at, schema,
+    /// digest)`; the two versions of one run share a `schema`, so
+    /// leaving `envelope.at` at `begin`'s instant would hand the
+    /// decision to a content digest uncorrelated with recency — and
+    /// `canon query --kind run` would report a closed run as still
+    /// `running` about half the time, with no diagnostic.
+    #[test]
+    fn a_close_advances_the_record_version_timestamp_but_never_started_at() {
+        let tmp = repo_with_git_routed_runs();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let ended = end(tmp.path(), begun.run_id, RunStatus::Succeeded).expect("a running run closes");
+
+        let ended_at = ended.run.ended_at.expect("end always stamps ended_at");
+        assert_eq!(
+            ended.run.envelope.at, ended_at,
+            "on a monotone clock the two stamps ARE one instant — they part only where `close_version_at` has to bound the version away from a stored `at` the wall clock has not reached"
+        );
+        assert!(
+            ended.run.envelope.at > begun.run.envelope.at,
+            "strictly later, so the fold is decided by data: {} vs {}",
+            ended.run.envelope.at,
+            begun.run.envelope.at
+        );
+        assert_eq!(ended.run.started_at, begun.run.started_at, "the RUN's own clock is provenance and is never restamped");
+
+        // Both homes carry the same advanced envelope, so
+        // `reconcile_runs` has nothing spurious to report.
+        let manifest = std::fs::read_to_string(&ended.manifest_path).expect("the manifest was rewritten");
+        let round_tripped: Run = serde_json::from_str(&manifest).expect("the manifest deserializes as a Run");
+        assert_eq!(round_tripped.envelope.at, ended_at);
+        assert_eq!(round_tripped.started_at, begun.run.started_at);
+    }
+
+    /// SHOULD-FIX regression (`ReviewRuns`, s42
+    /// `close-the-open-loops`): the latest-version guarantee above
+    /// must not be a property of the HOST CLOCK. A manifest whose
+    /// recorded `envelope.at` is AHEAD of the wall clock — an NTP
+    /// step back between the two commands, a restore onto a host
+    /// whose clock is behind, a `begin` that ran while the clock was
+    /// fast — used to make the close's fresh reading `<=` the running
+    /// version's `at`, and the fold then deterministically kept
+    /// `running`: a finished run reported as live, with no
+    /// diagnostic. [`close_version_at`] DERIVES the stamp from the
+    /// stored one instead of merely observing a new one.
+    #[test]
+    fn a_close_out_ranks_a_future_dated_running_version() {
+        let tmp = repo_with_git_routed_runs();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+
+        // The running version as a clock 30 days fast would have left
+        // it — in BOTH homes, since that is the state a real
+        // future-dated `begin` produces and the tier copy is the one
+        // the fold actually ranks. `begin`'s original object stays
+        // behind and loses either way; only the newest `at` matters.
+        let future = Utc::now() + TimeDelta::days(30);
+        let mut ahead = begun.run.clone();
+        ahead.envelope.at = future;
+        std::fs::write(&begun.manifest_path, serde_json::to_string_pretty(&ahead).expect("a Run is always serializable"))
+            .expect("re-dating the running manifest");
+        assert_eq!(persist_run(tmp.path(), &ahead), TierPersist::Persisted, "the future-dated running version must reach the tier");
+
+        let ended = end(tmp.path(), begun.run_id, RunStatus::Succeeded).expect("a running run closes");
+        assert_eq!(
+            ended.run.envelope.at,
+            future + TimeDelta::nanoseconds(1),
+            "the version stamp is the smallest instant that out-ranks the stored one, not a fresh reading of a clock that is behind it"
+        );
+
+        let rows = queried_runs(tmp.path());
+        assert_eq!(rows.len(), 1, "one run_id still resolves to one row: {rows:?}");
+        assert_eq!(rows[0]["status"], serde_json::json!("succeeded"), "and the fold resolves the CLOSED row, not the future-dated running one");
+
+        // The two clocks part here, and each stays honest: the
+        // version stamp is derived, `ended_at` is what was observed.
+        let ended_at = ended.run.ended_at.expect("end always stamps ended_at");
+        assert!(
+            ended_at < ended.run.envelope.at,
+            "`ended_at` records the observed close, never the derived version stamp: {ended_at} vs {}",
+            ended.run.envelope.at
+        );
+
+        // The nanosecond step has to survive the RFC3339 round trip
+        // both homes take, or the order on disk is not the one
+        // computed above.
+        let manifest = std::fs::read_to_string(&ended.manifest_path).expect("the manifest was rewritten");
+        let round_tripped: Run = serde_json::from_str(&manifest).expect("the manifest deserializes as a Run");
+        assert_eq!(round_tripped.envelope.at, ended.run.envelope.at, "RFC3339 `AutoSi` keeps all nine fractional digits");
+        assert_eq!(round_tripped.ended_at, Some(ended_at));
+    }
+
+    /// [`close_version_at`]'s whole contract, including the two
+    /// inputs a bare wall-clock reading gets wrong.
+    #[test]
+    fn a_close_version_is_derived_to_out_rank_the_version_it_supersedes() {
+        let recorded = Utc::now();
+
+        // Monotone clock: the observation wins outright and the
+        // version stamp IS the close instant — the common case,
+        // deliberately unchanged.
+        let later = recorded + TimeDelta::seconds(5);
+        assert_eq!(close_version_at(recorded, later), later, "a clock that moved forward needs no correction");
+
+        // A regressed clock, and the exact tie: both still yield a
+        // STRICTLY greater version than the one being superseded.
+        for observed in [recorded, recorded - TimeDelta::hours(3)] {
+            let version_at = close_version_at(recorded, observed);
+            assert!(version_at > recorded, "{version_at} must out-rank the version it supersedes, {recorded}");
+            assert_eq!(version_at, recorded + TimeDelta::nanoseconds(1), "and by the smallest step that does");
+        }
+
+        // `recorded` is hand-editable manifest data, so the top of
+        // the representable range saturates rather than panicking —
+        // there is no strictly greater instant to return.
+        assert_eq!(close_version_at(DateTime::<Utc>::MAX_UTC, recorded), DateTime::<Utc>::MAX_UTC);
+    }
+
+    /// One run's diff-relevant body, as either source would carry it.
+    /// Deliberately a hand-built object rather than a serialized
+    /// [`Run`]: [`reconcile_runs`] compares whole bodies and names
+    /// differing FIELDS, so a three-key record makes the assertion
+    /// about the reconciliation rule rather than about `Run`'s shape.
+    fn run_body(run_id: &str, status: &str) -> Value {
+        serde_json::json!({ "run_id": run_id, "status": status, "at": "2026-07-31T00:00:00Z" })
+    }
+
+    /// Task 1.3: a run only the side-channel holds — a pre-s42
+    /// dispatch, or one whose tier write degraded — still reaches the
+    /// report. Dropping the fallback would silently empty the
+    /// observed half of the diff for exactly those repos.
+    #[test]
+    fn a_manifest_only_run_still_reaches_the_report() {
+        let run_id = RunId::new().to_string();
+        let manifest = run_body(&run_id, "running");
+        let mut notes = Vec::new();
+
+        let runs = reconcile_runs(Vec::new(), vec![manifest.clone()], &mut notes);
+        assert_eq!(runs, vec![manifest]);
+        assert!(notes.is_empty(), "a run the tier simply does not hold is not a divergence: {notes:?}");
+    }
+
+    /// The healthy steady state after a dispatch: both homes hold the
+    /// same bytes. One record out, no note — otherwise every ordinary
+    /// dispatch would emit noise.
+    #[test]
+    fn a_run_both_sources_carry_identically_produces_no_note() {
+        let run_id = RunId::new().to_string();
+        let record = run_body(&run_id, "running");
+        let mut notes = Vec::new();
+
+        let runs = reconcile_runs(vec![record.clone()], vec![record.clone()], &mut notes);
+        assert_eq!(runs, vec![record], "one run_id yields one record, never two");
+        assert!(notes.is_empty(), "identical copies are agreement, not divergence: {notes:?}");
+    }
+
+    /// Task 1.3's core claim: where the two sources disagree the tier
+    /// wins, and the disagreement is REPORTED. Silently preferring one
+    /// while the other says something else is how the funnel /
+    /// burn-down confusion started.
+    #[test]
+    fn a_run_whose_two_copies_disagree_is_reported_not_silently_preferred() {
+        let run_id = RunId::new().to_string();
+        let tier = run_body(&run_id, "running");
+        let manifest = serde_json::json!({
+            "run_id": run_id,
+            "status": "succeeded",
+            "at": "2026-07-31T01:00:00Z",
+            "ended_at": "2026-07-31T01:00:00Z",
+        });
+        let mut notes = Vec::new();
+
+        let runs = reconcile_runs(vec![tier.clone()], vec![manifest], &mut notes);
+        assert_eq!(runs, vec![tier], "the tier copy is the one the report reads");
+        assert_eq!(notes.len(), 1, "exactly one divergence note: {notes:?}");
+        let note = &notes[0];
+        assert!(note.contains(&run_id), "the note must name the run: {note}");
+        assert!(note.contains("at, ended_at, status"), "the differing fields, sorted and named: {note}");
+        assert!(note.contains("(used)") && note.contains("(ignored)"), "the note must say which copy the report used: {note}");
+    }
+
+    /// Task 1.3 end to end through [`diff`]: with the run in BOTH
+    /// homes, the reconciliation counts it once and says nothing —
+    /// the regression this guards is a dispatched run being read
+    /// twice now that it lives in two places.
+    #[test]
+    fn a_dispatched_run_is_counted_once_across_tier_and_side_channel() {
+        let tmp = repo_with_git_routed_runs();
+        let parent = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None)).expect("the parent dispatch begins");
+        let child = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.2", Some(parent.run_id)))
+            .expect("the child dispatch begins");
+        assert_eq!(parent.tier, TierPersist::Persisted);
+        assert_eq!(child.tier, TierPersist::Persisted);
+
+        let report = diff(tmp.path());
+        assert!(report.notes.is_empty(), "two agreeing homes produce no diagnostic at all: {:?}", report.notes);
+        assert_eq!(report.observed, 1, "one lineage hop, counted once");
+        assert_eq!(
+            report.edges,
+            vec![ClassifiedEdge {
+                edge: TaskEdge {
+                    from: TaskId::parse("demo-change#1.1").expect("a literal task id"),
+                    to: TaskId::parse("demo-change#1.2").expect("a literal task id"),
+                },
+                class: EdgeClass::ObservedNotDeclared,
+            }]
+        );
+    }
+
+    /// Task 1.3 end to end, the unhappy path: exactly the state a
+    /// degraded close leaves behind — the manifest closed, the tier
+    /// still `running`. Simulated by closing the manifest by hand,
+    /// because a real degrade needs the rung to fail between the two
+    /// writes.
+    #[test]
+    fn a_stale_tier_copy_of_a_closed_run_surfaces_as_a_divergence_note() {
+        let tmp = repo_with_git_routed_runs();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None)).expect("the dispatch begins");
+        assert_eq!(begun.tier, TierPersist::Persisted);
+
+        let closed_at = Utc::now();
+        let mut closed = begun.run.clone();
+        closed.status = RunStatus::Succeeded;
+        closed.ended_at = Some(closed_at);
+        closed.envelope.at = closed_at;
+        std::fs::write(&begun.manifest_path, serde_json::to_string_pretty(&closed).expect("a Run is always serializable"))
+            .expect("rewriting the manifest by hand");
+
+        let report = diff(tmp.path());
+        let divergences: Vec<&String> = report.notes.iter().filter(|note| note.contains("differs between")).collect();
+        assert_eq!(divergences.len(), 1, "the disagreement must be reported, never hidden: {:?}", report.notes);
+        assert!(divergences[0].contains(&begun.run_id.to_string()), "the note names the run: {}", divergences[0]);
+        assert!(divergences[0].contains("ended_at"), "and the fields that moved: {}", divergences[0]);
+        assert!(divergences[0].contains("status"), "and the fields that moved: {}", divergences[0]);
     }
 }

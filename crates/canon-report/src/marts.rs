@@ -46,12 +46,15 @@ pub fn fetch_role_memory(roots: &Roots) -> Result<MartResult, ReportError> {
     fetch(roots, "mart_role_memory", "role, regime_key", ROLE_MEMORY_COLUMNS)
 }
 
-pub const FLYWHEEL_FUNNEL_COLUMNS: &[&str] = &["role", "verdicts", "distilled", "retrieved", "applied"];
+pub const FLYWHEEL_FUNNEL_COLUMNS: &[&str] =
+    &["role", "verdicts", "distilled", "retrieved", "applied", "applied_attributed", "applied_proxy"];
 
 /// `mart_flywheel_funnel`: one row per role, `verdicts → distilled →
-/// retrieved → applied`. What each column counts, restated here because
-/// the four bare names read like a funnel long before the SQL actually
-/// computed one (s40 `plan-vs-actual-diff`, tasks 3.1/3.2):
+/// retrieved → applied`, with `applied` broken out by the RULE that
+/// admitted each count. What each column counts, restated here because
+/// the bare names read like a funnel long before the SQL actually
+/// computed one (s40 `plan-vs-actual-diff`, tasks 3.1/3.2; s42
+/// `close-the-open-loops`, task 3.3):
 ///
 /// - `verdicts` — `VerdictRow`s across this role's raw trajectories,
 ///   the evidence the distiller consumes. The one stage not counted in
@@ -72,11 +75,42 @@ pub const FLYWHEEL_FUNNEL_COLUMNS: &[&str] = &["role", "verdicts", "distilled", 
 ///   leaves this stage — correctly, since the cited strategy no longer
 ///   exists.
 /// - `applied` — that same distinct set, restricted to strategies whose
-///   recipient run reached a terminal `RunStatus`
-///   (`succeeded`/`failed`/`aborted`). It asserts both halves —
-///   guidance in context AND a run that finished — and is deliberately
-///   NOT "resolved trajectories", which is what it counted before s40,
-///   with no reference to retrieval at all.
+///   recipient run has SOMETHING recorded about how it ended, under
+///   exactly one of the two rules below. Deliberately NOT "resolved
+///   trajectories", which is what it counted before s40, with no
+///   reference to retrieval at all.
+/// - `applied_attributed` / `applied_proxy` — WHICH rule admitted each
+///   part of `applied`, because a column that silently mixes two rules
+///   asserts more than its data carries. Both are CO-OCCURRENCE within
+///   one run, never causation.
+///   `attributed` is s40 task 3.1's original wording, finally
+///   implementable in s42: the strategy appears in some run's
+///   `injected_guidance`, and that SAME run has at least one
+///   trajectory of the SAME role stamped with that run's own id
+///   (`canon_learn::Trajectory::run_id`, set only by an explicit
+///   `canon ingest artifacts --run`) whose `outcome` is one of the
+///   resolved variants (`success`/`failure`/`rolled-back`).
+///   `proxy` is s40's retained fallback when no such trajectory
+///   exists: all that is recorded is the recipient run's own terminal
+///   `Run.status`.
+///
+///   Attribution is the STRONGER of the two — it needs a judged
+///   outcome out of that run, not merely that the run reached a
+///   terminal state — and is still WEAKER than attributing the
+///   outcome to the guidance. The join is `(run_id, role)` and nothing
+///   else, so every still-distilled strategy of that role injected
+///   into that run is admitted alike, whether it was followed or
+///   ignored; no record kind carries an edge from a `StrategyId` to
+///   the verdict decided alongside it. Making the causal claim would
+///   require adding that edge — a `StrategyId` stamped on
+///   `Trajectory`/`VerdictRow` at judgment time, joined here in place
+///   of `run_id` alone — not re-wording this column (s42
+///   `close-the-open-loops` re-review; the same defect class as s39's
+///   model-level ceiling, s40's funnel columns and s41's burn-down).
+///
+///   The two PARTITION `applied` — `applied == applied_attributed +
+///   applied_proxy` — because the view assigns each counted strategy
+///   exactly one rule, attribution winning.
 ///
 /// So `applied <= retrieved <= distilled` holds by construction (the
 /// view's own comment carries the proof). Exactly the view's own

@@ -21,7 +21,7 @@ use arrow::array::{Array, ArrayRef, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
-use canon_model::ids::{RegimeKey, RoleId};
+use canon_model::ids::{RegimeKey, RoleId, RunId};
 use chrono::{DateTime, Utc};
 use parquet::arrow::ArrowWriter;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
@@ -86,6 +86,21 @@ struct TrajectoryWire {
     /// reads as `None`, not `0.0`.
     #[serde(default)]
     reward: Option<f64>,
+    /// The dispatched run this trajectory was derived inside (s42
+    /// (`close-the-open-loops`) task 3.1,
+    /// [`Trajectory::run_id`](crate::trajectory::Trajectory::run_id)).
+    ///
+    /// `skip_serializing_if` is as load-bearing here as `default`, and
+    /// for a DIFFERENT reason than `outcome`/`reward` above. Those two
+    /// are always written from now on, so they only need to READ an
+    /// older row. This key must also stay ABSENT from the body of a row
+    /// that has no run — the ordinary case — because that body is
+    /// hashed: `canon-store`'s write identity and `canon report
+    /// --check`'s drift gate both compare serialized bytes, and a
+    /// gratuitous `"run_id": null` would change the digest of every row
+    /// canon has ever written while asserting nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    run_id: Option<RunId>,
 }
 
 impl TrajectoryWire {
@@ -100,6 +115,7 @@ impl TrajectoryWire {
             tags: t.tags.clone(),
             outcome: Some(t.verdict_record.outcome),
             reward: Some(t.verdict_record.reward),
+            run_id: t.run_id,
         }
     }
 
@@ -116,7 +132,7 @@ impl TrajectoryWire {
             None => TrajectoryVerdict::pending(),
         };
         Trajectory::new(id, regime_key, self.task, self.context, verdicts, self.recorded_at, self.tags)
-            .map(|t| t.with_verdict_record(verdict_record))
+            .map(|t| t.with_verdict_record(verdict_record).with_run_id(self.run_id))
             .map_err(|e| LearnError::MalformedRow(e.to_string()))
     }
 }
@@ -221,6 +237,26 @@ impl TrajectoryStore for ParquetTrajectoryStore {
         fs::write(&path, bytes)?;
         Ok(())
     }
+
+    fn delete_by_id(&self, regime_key: &RegimeKey, id: &TrajectoryId) -> Result<(), LearnError> {
+        // O(1), not the tree walk `find_by_id`/`mark_verdict` pay: the
+        // trait requires the regime precisely so a delete resolves to a
+        // path rather than to whatever `read_dir` reached first.
+        let path = self.file_path(regime_key, id)?;
+        // One syscall decides both outcomes. An `is_file` pre-check would
+        // race the removal, and would also fold a permission or I/O
+        // failure into "unknown id" — only `NotFound` means the row is
+        // absent; every other errno is a genuine I/O failure and stays
+        // one, so a store this process cannot write to fails loud instead
+        // of reporting a phantom missing row.
+        match fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                Err(LearnError::UnknownTrajectoryRow { regime_key: regime_key.as_str().to_string(), id: id.to_string() })
+            }
+            Err(err) => Err(err.into()),
+        }
+    }
 }
 
 /// Recursively finds the ONE trajectory file matching `id` under
@@ -301,6 +337,61 @@ mod tests {
         assert_eq!(found, vec![t]);
     }
 
+    /// s42 (`close-the-open-loops`) task 3.1: a stamped run survives the
+    /// parquet round trip. Without the `TrajectoryWire` field the value
+    /// is silently dropped on write, so `Trajectory::run_id` would be a
+    /// field no reader — least of all `mart_flywheel_funnel`, which
+    /// reads it out of this very `body` blob — could ever observe.
+    #[test]
+    fn a_stamped_run_id_round_trips_through_the_parquet_body() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let run_id = RunId::new();
+        let t = trajectory("dev", "fix the bug").with_run_id(Some(run_id));
+        store.append(&t).unwrap();
+
+        assert_eq!(store.query_by_regime_key(&regime("dev")).unwrap(), vec![t.clone()]);
+        assert_eq!(store.find_by_id(&t.id).unwrap().and_then(|found| found.run_id), Some(run_id));
+    }
+
+    /// The additive-field discipline, asserted on the BYTES rather than
+    /// trusted to the attribute: an unattributed trajectory's body must
+    /// carry no `run_id` key at all. A bare `#[serde(default)]` would
+    /// emit `"run_id": null` and change the serialized body of every row
+    /// canon has ever written, perturbing the digests the trajectory
+    /// store's own write identity and `canon report --check`'s drift
+    /// gate compare.
+    #[test]
+    fn an_unattributed_trajectory_serializes_no_run_id_key_at_all() {
+        let body = serde_json::to_string(&TrajectoryWire::from_trajectory(&trajectory("dev", "fix the bug"))).unwrap();
+        assert!(!body.contains("run_id"), "an absent run must leave the key absent, not null:\n{body}");
+
+        // And the reverse direction: a body written before this field
+        // existed still decodes, reading as unattributed.
+        let legacy: TrajectoryWire = serde_json::from_str(&body).unwrap();
+        assert_eq!(legacy.into_trajectory().unwrap().run_id, None);
+    }
+
+    /// `mark_verdict` is the one path allowed to rewrite a stored
+    /// trajectory in place. It decodes, mutates the verdict, and
+    /// re-encodes — so a field it does not know about is exactly what
+    /// such a path drops. Attribution must survive the reward write-back
+    /// `canon ingest artifacts` performs immediately after every persist.
+    #[test]
+    fn marking_a_verdict_preserves_the_stamped_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let run_id = RunId::new();
+        let t = trajectory("dev", "fix the bug").with_run_id(Some(run_id));
+        store.append(&t).unwrap();
+
+        store.mark_verdict(&t.id, TrajectoryVerdict::new(VerdictOutcome::Success, 0.9)).unwrap();
+
+        let found = store.find_by_id(&t.id).unwrap().expect("the row survives the verdict write");
+        assert_eq!(found.run_id, Some(run_id), "the verdict write-back must not drop attribution");
+        assert_eq!(found.verdict_record.outcome, VerdictOutcome::Success);
+    }
+
     #[test]
     fn a_different_regime_key_never_sees_another_regimes_trajectories() {
         let dir = tempfile::tempdir().unwrap();
@@ -373,6 +464,60 @@ mod tests {
         let store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
         let err = store.mark_verdict(&TrajectoryId::new(), TrajectoryVerdict::pending()).unwrap_err();
         assert!(matches!(err, LearnError::UnknownTrajectoryId(_)));
+    }
+
+    #[test]
+    fn delete_by_id_removes_the_named_row_and_leaves_its_siblings() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let doomed = trajectory("dev", "a superseded copy");
+        let kept = trajectory("dev", "the canonical row");
+        store.append(&doomed).unwrap();
+        store.append(&kept).unwrap();
+
+        store.delete_by_id(&regime("dev"), &doomed.id).unwrap();
+
+        assert_eq!(store.find_by_id(&doomed.id).unwrap(), None, "the row is gone from the store, not merely hidden");
+        assert_eq!(store.query_by_regime_key(&regime("dev")).unwrap(), vec![kept], "its sibling in the same namespace is untouched");
+    }
+
+    #[test]
+    fn delete_by_id_removes_only_the_copy_under_the_named_regime() {
+        // The whole reason this method takes a regime key. `append` is
+        // `(regime_key, id)`-keyed, so one id legitimately has a file
+        // under two regimes; `find_by_id` resolves such an id to whichever
+        // the directory walk reaches first, so a scan-based delete would
+        // destroy a row chosen by filesystem order.
+        let dir = tempfile::tempdir().unwrap();
+        let store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let dev = trajectory("dev", "the dev copy");
+        let mut content = trajectory("content", "the content copy");
+        content.id = dev.id;
+        store.append(&dev).unwrap();
+        store.append(&content).unwrap();
+
+        store.delete_by_id(&regime("dev"), &dev.id).unwrap();
+
+        assert_eq!(store.query_by_regime_key(&regime("dev")).unwrap(), Vec::new(), "the named regime's copy is the one removed");
+        assert_eq!(store.query_by_regime_key(&regime("content")).unwrap(), vec![content], "the same id under another regime survives");
+    }
+
+    #[test]
+    fn delete_by_id_on_an_unknown_row_is_an_error_not_a_silent_no_op() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let stored = trajectory("dev", "stored under dev");
+        store.append(&stored).unwrap();
+
+        // Never stored at all.
+        let err = store.delete_by_id(&regime("dev"), &TrajectoryId::new()).unwrap_err();
+        assert!(matches!(err, LearnError::UnknownTrajectoryRow { .. }), "an absent row must fail loud, exactly as mark_verdict does: {err}");
+
+        // Stored, but under a DIFFERENT regime: a miss HERE, and the row
+        // survives. A scan-based delete would have found and destroyed it.
+        let err = store.delete_by_id(&regime("content"), &stored.id).unwrap_err();
+        assert!(matches!(err, LearnError::UnknownTrajectoryRow { .. }), "an id under another regime is a miss, never a redirect: {err}");
+        assert_eq!(store.find_by_id(&stored.id).unwrap(), Some(stored), "…and refusing left the row where it was");
     }
 
     /// Hand-builds an S6-era trajectory parquet file — the exact JSON

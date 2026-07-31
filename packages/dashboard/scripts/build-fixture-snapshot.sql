@@ -41,14 +41,20 @@ SELECT * FROM (
         ('fixer',       'review-finding-remediation',3::BIGINT, 2::BIGINT, 1::BIGINT, 0.6667::DOUBLE, 1.67::DOUBLE, TIMESTAMP '2026-07-11 07:45:00')
 ) AS t(role, regime_key, strategy_count, active_count, demoted_count, hit_rate, avg_source_trajectories, latest_recorded_at);
 
--- Panel 4: mart_flywheel_funnel (crates/canon-store/sql/views.sql)
+-- Panel 4: mart_flywheel_funnel (crates/canon-store/sql/views.sql).
+-- s42 (`close-the-open-loops`) task 3.3 split `applied` by the RULE
+-- that admitted each count, and the two parts PARTITION it:
+-- `applied = applied_attributed + applied_proxy` must hold for every
+-- row here, exactly as the view guarantees. `implementer` is mixed,
+-- `reviewer` is all-proxy (the shape of a repo that never passes
+-- `canon ingest artifacts --run`), `fixer` is all-attributed.
 CREATE OR REPLACE TABLE mart_flywheel_funnel AS
 SELECT * FROM (
     VALUES
-        ('implementer', 18::BIGINT, 6::BIGINT, 5::BIGINT, 3::BIGINT),
-        ('reviewer',    11::BIGINT, 4::BIGINT, 3::BIGINT, 2::BIGINT),
-        ('fixer',        7::BIGINT, 3::BIGINT, 2::BIGINT, 1::BIGINT)
-) AS t(role, verdicts, distilled, retrieved, applied);
+        ('implementer', 18::BIGINT, 6::BIGINT, 5::BIGINT, 3::BIGINT, 2::BIGINT, 1::BIGINT),
+        ('reviewer',    11::BIGINT, 4::BIGINT, 3::BIGINT, 2::BIGINT, 0::BIGINT, 2::BIGINT),
+        ('fixer',        7::BIGINT, 3::BIGINT, 2::BIGINT, 1::BIGINT, 1::BIGINT, 0::BIGINT)
+) AS t(role, verdicts, distilled, retrieved, applied, applied_attributed, applied_proxy);
 
 -- Panel 5: mart_review_burndown (crates/canon-store/sql/views.sql).
 -- `day` is `date_trunc('day', "at")` over a TIMESTAMP column, so it stays

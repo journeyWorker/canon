@@ -134,6 +134,12 @@ impl PlanAdapter for SuperpowersPlanAdapter {
 /// silently no-op'ing a flip an operator believes landed.
 /// [`typed_atoms_path`] is `None`: this dialect has no S10
 /// typed-vocabulary convention.
+///
+/// Exempt from the trait's `reject_multi_line_note` requirement
+/// (`PlanWriteBack::flip_task`'s own doc): this impl embeds
+/// `evidence_note` nowhere, so the unconditional `Unsupported` is
+/// already a stronger refusal than a complaint about the note's shape,
+/// for every note.
 impl PlanWriteBack for SuperpowersPlanAdapter {
     fn locate_task(&self, root: &Path, task_id: &TaskId) -> Option<PlanTaskLocation> {
         // The plan doc whose slugified filename stem IS this task's

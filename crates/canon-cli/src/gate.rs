@@ -68,6 +68,23 @@
 //! gate-red `1` (the same class of "the gate ran and found the task
 //! isn't ready" outcome the free path's `unevidenced-flip` already is) —
 //! never a usage failure, since the repo/CLI invocation itself is fine.
+//!
+//! # s42 (`close-the-open-loops`): the authoring half exists now
+//! Until s42 the ONLY production writer of an `EvidenceRecord` was
+//! `crate::demo`, so [`run_task`]'s `unevidenced-flip` refusal was
+//! unsatisfiable outside the demo: this repo's plan corpus carried
+//! hundreds of checked task boxes against exactly ONE committed
+//! `EvidenceRecord`. [`crate::evidence`] is the
+//! missing seam — it stages a record into [`evidence_staging_dir`],
+//! [`run_promote`] commits it, and [`run_task`] then flips on it with
+//! no `--force` anywhere in the path. Three pieces of THIS module are
+//! shared with it rather than copied, so the author and the gate cannot
+//! drift: [`evidence_staging_dir`] (one path literal), [`locate_task`]
+//! (one plan-source resolution), and
+//! [`typed_evidence_contract_for_task`] (one reading of a task's typed
+//! `{kind, ref}` contract). The authoring command grades a refusal with
+//! the SAME exit code this module's contract above assigns the same
+//! condition — see [`TypedContractError`].
 
 use std::path::{Path, PathBuf};
 
@@ -136,6 +153,56 @@ fn format_gate_report(report: &GateReport) -> String {
     out
 }
 
+/// The plan source that owns `task_id`'s document: the winning
+/// dialect's write-back, the document itself, and THAT source's root —
+/// the typed-atoms file is resolved against the same root, never a
+/// neighbouring source's.
+///
+/// Named fields, not the positional `(&dyn PlanWriteBack, PathBuf,
+/// PathBuf)` triple [`run_task`] used to destructure: the two
+/// `PathBuf`s are same-typed, so swapping them at a call site would
+/// compile while silently resolving the typed-atoms file against the
+/// document path.
+pub(crate) struct LocatedTask {
+    pub write_back: &'static dyn PlanWriteBack,
+    pub document_path: PathBuf,
+    pub source_root: PathBuf,
+}
+
+/// Resolve `task_id`'s plan document across the configured sources,
+/// first-hit-wins (module doc). Extracted out of [`run_task`]'s body by
+/// s42 (`close-the-open-loops`) so `canon evidence add`'s typed-contract
+/// pre-flight ([`typed_evidence_contract_for_task`]) predicts the flip
+/// against the SAME resolution the flip itself performs — a second copy
+/// could pick a different source's typed-atoms file and pre-approve a
+/// record this function's caller then refuses.
+///
+/// `Err` carries the operator-facing message ALREADY formed, including
+/// the sources consulted, minus the `canon gate task: ` prefix: every
+/// location failure is a usage failure (exit `2`) for the flip, so the
+/// caller needs no further discrimination between them.
+fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
+    let sources = crate::plans::load_plan_sources_for_gate(repo).map_err(|e| e.to_string())?;
+    let mut consulted: Vec<String> = Vec::new();
+    for src in &sources {
+        consulted.push(format!("{} @ {}", src.dialect(), src.root().display()));
+        let Some(entry) = find_plan_adapter(src.dialect()) else {
+            return Err(format!("`{}` is not a registered plan dialect", src.dialect()));
+        };
+        // A dialect that registered no write-back capability at all
+        // cannot own a flip — skip it for location (a later source may
+        // still hold the task); it stays in `consulted` for the loud
+        // not-found message.
+        let Some(write_back) = entry.write_back else {
+            continue;
+        };
+        if let Some(location) = write_back.locate_task(src.root(), task_id) {
+            return Ok(LocatedTask { write_back, document_path: location.document_path, source_root: src.root().to_path_buf() });
+        }
+    }
+    Err(format!("no plan source locates {task_id} (consulted: {})", consulted.join("; ")))
+}
+
 /// `canon gate task <task_id> [--repo]` (task 3.2's CLI wiring, extended
 /// by S10 part2 task 4.4, made dialect-agnostic by s35 `gate-plan-
 /// dialect-seam`): resolves the task's plan document via the configured
@@ -159,39 +226,16 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
     };
 
     // Resolve + locate the task's plan document across the configured
-    // sources, first-hit-wins (module doc). `located` carries the
-    // winning dialect's write-back, its document path, and that source's
-    // root (the typed-atoms file is resolved from the SAME source).
-    let sources = match crate::plans::load_plan_sources_for_gate(&repo) {
-        Ok(s) => s,
+    // sources, first-hit-wins ([`locate_task`], module doc). `located`
+    // carries the winning dialect's write-back, its document path, and
+    // that source's root (the typed-atoms file is resolved from the
+    // SAME source).
+    let LocatedTask { write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
+        Ok(located) => located,
         Err(e) => {
             eprintln!("canon gate task: {e}");
             return 2;
         }
-    };
-    let mut consulted: Vec<String> = Vec::new();
-    let mut located: Option<(&'static dyn PlanWriteBack, PathBuf, PathBuf)> = None;
-    for src in &sources {
-        consulted.push(format!("{} @ {}", src.dialect(), src.root().display()));
-        let Some(entry) = find_plan_adapter(src.dialect()) else {
-            eprintln!("canon gate task: `{}` is not a registered plan dialect", src.dialect());
-            return 2;
-        };
-        // A dialect that registered no write-back capability at all
-        // cannot own a flip — skip it for location (a later source may
-        // still hold the task); it stays in `consulted` for the loud
-        // not-found message.
-        let Some(write_back) = entry.write_back else {
-            continue;
-        };
-        if let Some(location) = write_back.locate_task(src.root(), &task_id) {
-            located = Some((write_back, location.document_path, src.root().to_path_buf()));
-            break;
-        }
-    }
-    let Some((write_back, document_path, source_root)) = located else {
-        eprintln!("canon gate task: no plan source locates {task_id} (consulted: {})", consulted.join("; "));
-        return 2;
     };
 
     let document = match std::fs::read_to_string(&document_path) {
@@ -276,6 +320,18 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
             eprintln!("canon gate task: {e}");
             return 1;
         }
+        // Gate-red, not usage (the variant's own doc): the offending
+        // text came from an already-COMMITTED ledger record's approved
+        // note, so it is evidence that cannot support a flip — the same
+        // grade `fabricated-evidence` and `unevidenced-flip` get. s42
+        // (`close-the-open-loops`) review: `canon evidence add` refuses a
+        // line separator at authoring time, and this arm is why a record
+        // authored some other way still cannot forge a second checked
+        // row.
+        Err(e @ WriteBackError::MultiLineEvidenceNote { .. }) => {
+            eprintln!("canon gate task: {e}");
+            return 1;
+        }
         Err(e @ WriteBackError::Unsupported { .. }) => {
             eprintln!("canon gate task: {e}");
             return 2;
@@ -351,26 +407,58 @@ fn typed_atom_for_task(path: Option<&Path>, task_id: &TaskId) -> Result<Option<c
     Ok(atoms.into_iter().find(|a| a.id == task_id.as_str()))
 }
 
-/// D4's typed-evidence path proper: resolve THIS repo's vocabulary
-/// snapshot fresh (module doc — never the authoring-time snapshot),
-/// compile `atom` against it (validates + produces the S1 `Task` the
-/// design's own "given a task compiled from a typed atom" language
-/// names — an atom that fails vocabulary validation, e.g. an
-/// `evidence.kind` outside the policy-derived domain, yields `Err` here,
-/// never a `Task`), then narrow `raw_records` to exactly the ones whose
-/// own `evidence: {kind, ref}` companion ([`raw_evidence_kind_ref`])
-/// matches the compiled task's declared kind/ref — and build BOTH the
-/// returned `EvidenceRecord`s AND their `EvidenceNote` companions from
-/// that SAME matched set ([`notes_of`]), never from every raw record
-/// sharing `task_id` (S10 part2 fix, `ReviewS10Part2` finding: the old
-/// shape let a stale/wrong-kind record's note pair with a narrowed
-/// evidence slice it never matched into, or block a valid typed flip).
-fn typed_path_evidence(
-    repo: &Path,
-    atom: &canon_vocab::AtomRecord,
-    raw_records: &[RawRecord],
-    task_id: &TaskId,
-) -> Result<(Vec<canon_model::EvidenceRecord>, Vec<EvidenceNote>), String> {
+/// The `{kind, ref}` pair a task's TYPED atom declares its evidence must
+/// carry — the gate's narrowing key on the typed path
+/// ([`typed_path_evidence`]) and, since s42 (`close-the-open-loops`),
+/// the contract `canon evidence add` checks `--kind`/`--ref` against
+/// before it stages anything. Named fields, not the `(String, String)`
+/// tuple this used to be threaded around as: both halves are strings,
+/// so a swap would compile and silently narrow the evidence slice to
+/// nothing.
+pub(crate) struct TypedEvidenceContract {
+    pub kind: String,
+    pub evidence_ref: String,
+}
+
+/// Why [`typed_evidence_contract_for_task`] could not decide, split by
+/// the exit code [`run_task`] itself grades the SAME condition with
+/// (module doc's exit-code contract) — so `canon evidence add` reports
+/// the identical verdict two commands earlier instead of inventing its
+/// own grading for a condition the gate already classifies.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum TypedContractError {
+    /// A PRESENT typed-atoms file that fails to PARSE: an authoring
+    /// mistake in the plan corpus, not in the record being staged —
+    /// usage/infra, exit `2`, exactly as [`typed_atom_for_task`]'s own
+    /// doc specifies.
+    #[error("{0}")]
+    Corpus(String),
+    /// The atom parsed but fails vocabulary validation (e.g. an
+    /// `evidence.kind` outside the policy-derived domain), or compiled
+    /// with no `evidence` to gate against at all: gate-red `1`, the
+    /// same grade [`run_task`] gives a `typed_path_evidence` failure.
+    #[error("{0}")]
+    Invalid(String),
+}
+
+impl TypedContractError {
+    /// `true` when this is a fixable INVOCATION/corpus problem (exit
+    /// `2`) rather than a gate-red refusal (`1`), mirroring
+    /// `crate::dispatch::DispatchError::is_usage`'s established shape.
+    pub(crate) fn is_usage(&self) -> bool {
+        matches!(self, Self::Corpus(_))
+    }
+}
+
+/// Compile `atom` against a FRESH vocabulary snapshot (module doc —
+/// never the authoring-time snapshot) and read the `{kind, ref}` it
+/// declares. Split out of [`typed_path_evidence`] by s42
+/// (`close-the-open-loops`) so `canon evidence add` reads the contract
+/// through the same compile, never a second raw read of the atom's
+/// `attrs`: the compile is what VALIDATES the declared kind against the
+/// policy-derived domain, so a reader that skipped it would happily
+/// pre-approve a record against an atom the gate itself rejects.
+fn typed_evidence_contract(repo: &Path, atom: &canon_vocab::AtomRecord) -> Result<TypedEvidenceContract, String> {
     let (snapshot, _resolve_diags) = canon_vocab::resolve_snapshot(repo, None);
     // A record canon itself originates on the fly, purely to extract the
     // atom's own validated `evidence.kind`/`ref` — never an agent-authored
@@ -388,11 +476,69 @@ fn typed_path_evidence(
     let Some((kind, evidence_ref)) = task_evidence_kind_ref(&task) else {
         return Err(format!("typed task atom `{}` compiled with no `evidence.kind`/`ref` to gate against", atom.id));
     };
+    Ok(TypedEvidenceContract { kind, evidence_ref })
+}
+
+/// Whatever typed evidence contract binds `task_id`, resolved exactly as
+/// [`run_task`] will resolve it at flip time — s42
+/// (`close-the-open-loops`) task 4.2's half of the loop: a record that
+/// stages cleanly but that the gate then refuses is a worse outcome than
+/// no authoring command at all, and a `--kind`/`--ref` disagreeing with
+/// the task's atom is the ONE way an authored record can be narrowed
+/// out of [`typed_path_evidence`]'s matched set and reported back as a
+/// bare `unevidenced-flip` with no hint of why.
+///
+/// `Ok(None)` is the free path — the gate accepts any non-`Divergent`
+/// record for `task_id` regardless of kind, so there is no contract to
+/// enforce. It covers all four fall-through cases [`run_task`] itself
+/// treats identically (the winning dialect has no typed-vocabulary
+/// convention, the change never opted in, the file carries no atom for
+/// this id) plus one more: no source LOCATES the task under the gate's
+/// resolution. That last collapses into `None` rather than an error
+/// because `canon evidence add` reaches here only after
+/// `crate::dispatch::validate_task_binding` has already proved the
+/// configured corpus both parses and carries the task — what remains is
+/// a dialect whose write-back cannot locate a document, and such a
+/// dialect has no typed-atoms file to declare a contract in either.
+pub(crate) fn typed_evidence_contract_for_task(repo: &Path, task_id: &TaskId) -> Result<Option<TypedEvidenceContract>, TypedContractError> {
+    let Ok(located) = locate_task(repo, task_id) else {
+        return Ok(None);
+    };
+    let atoms_path = located.write_back.typed_atoms_path(&located.source_root, &task_id.change_id());
+    let Some(atom) = typed_atom_for_task(atoms_path.as_deref(), task_id).map_err(TypedContractError::Corpus)? else {
+        return Ok(None);
+    };
+    typed_evidence_contract(repo, &atom).map(Some).map_err(TypedContractError::Invalid)
+}
+
+/// D4's typed-evidence path proper: read the atom's declared
+/// `{kind, ref}` contract ([`typed_evidence_contract`] — an atom that
+/// fails vocabulary validation, e.g. an `evidence.kind` outside the
+/// policy-derived domain, yields `Err` there, never a contract), then
+/// narrow `raw_records` to exactly the ones whose own
+/// `evidence: {kind, ref}` companion ([`raw_evidence_kind_ref`]) matches
+/// it — and build BOTH the returned `EvidenceRecord`s AND their
+/// `EvidenceNote` companions from that SAME matched set ([`notes_of`]),
+/// never from every raw record sharing `task_id` (S10 part2 fix,
+/// `ReviewS10Part2` finding: the old shape let a stale/wrong-kind
+/// record's note pair with a narrowed evidence slice it never matched
+/// into, or block a valid typed flip).
+fn typed_path_evidence(
+    repo: &Path,
+    atom: &canon_vocab::AtomRecord,
+    raw_records: &[RawRecord],
+    task_id: &TaskId,
+) -> Result<(Vec<canon_model::EvidenceRecord>, Vec<EvidenceNote>), String> {
+    let contract = typed_evidence_contract(repo, atom)?;
+    // Built ONCE, outside the filter: the pair is the same for every
+    // candidate, so cloning it per raw record would allocate twice per
+    // ledger row to answer one equality.
+    let expected = (contract.kind, contract.evidence_ref);
 
     let matching: Vec<RawRecord> = raw_records
         .iter()
         .filter(|raw| raw.0.get("task_id").and_then(|v| v.as_str()) == Some(task_id.as_str()))
-        .filter(|raw| raw_evidence_kind_ref(&raw.0).as_ref() == Some(&(kind.clone(), evidence_ref.clone())))
+        .filter(|raw| raw_evidence_kind_ref(&raw.0).as_ref() == Some(&expected))
         .cloned()
         .collect();
 
@@ -425,12 +571,33 @@ fn raw_evidence_kind_ref(raw: &serde_json::Value) -> Option<(String, String)> {
     Some((evidence.get("kind")?.as_str()?.to_string(), evidence.get("ref")?.as_str()?.to_string()))
 }
 
+/// The staging [`GitTier`] root `canon evidence add` writes to and
+/// [`run_promote`] drains: `<ledger_root>/_staging`, a SIBLING of the
+/// committed `kind=<k>/` tree — a committed read walks
+/// `<ledger_root>/kind=evidence_record/`, so a staged record is
+/// invisible to `canon gate task`/`canon gate check` until promotion
+/// (the same sibling-directory arrangement `canon_gate::
+/// divergence_staging_dir`'s `_staging_divergence` already uses).
+///
+/// One function since s42 (`close-the-open-loops`) gave the directory
+/// its first writer: the author and the promoter disagreeing by one
+/// path literal would strand every staged record silently, with both
+/// commands reporting success.
+pub(crate) fn evidence_staging_dir(ledger_root: &Path) -> PathBuf {
+    ledger_root.join("_staging")
+}
+
 /// `canon gate promote [--repo] [--dry-run]` (task 2.2/2.3's CLI wiring):
 /// `_staging/` → committed, monotonic per-(role, surface) `run_seq`.
+///
+/// Safe to retry after an interrupted run: `canon_gate::promote` is
+/// idempotent per staged candidate (its own recovery section), so a
+/// re-run drains a candidate whose record already landed instead of
+/// committing it twice, and still exits `0`.
 pub fn run_promote(repo: &Path, dry_run: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let ctx = GateCtx::from_repo(&repo);
-    let staging = GitTier::new(ctx.ledger_root.join("_staging"));
+    let staging = GitTier::new(evidence_staging_dir(&ctx.ledger_root));
     let committed = GitTier::new(ctx.ledger_root.clone());
     match gate_promote(&staging, &committed, dry_run) {
         Ok(report) => {
@@ -450,14 +617,28 @@ pub fn run_promote(repo: &Path, dry_run: bool) -> i32 {
 
 fn format_promote_report(report: &PromoteReport, dry_run: bool) -> String {
     let verb = if dry_run { "would promote" } else { "promoted" };
+    let drain_verb = if dry_run { "would drain" } else { "drained" };
     let mut out = String::new();
     for p in &report.promoted {
         out.push_str(&format!("{verb} {}/{} run_seq={} -> {}\n", p.role.as_str(), p.surface, p.run_seq, p.target.display()));
     }
+    // Reported distinctly from `promoted`, never folded into it: the
+    // record already existed, this call only finished the interrupted
+    // run's staging cleanup, and an operator comparing promote output
+    // against the ledger has to be able to tell which happened.
+    for p in &report.recovered {
+        out.push_str(&format!(
+            "{drain_verb} {}/{} run_seq={} -> {} (already committed by an interrupted promote; not re-committed)\n",
+            p.role.as_str(),
+            p.surface,
+            p.run_seq,
+            p.target.display()
+        ));
+    }
     for r in &report.refused {
         out.push_str(&format!("refused: {}\n", r.violation.line()));
     }
-    if report.promoted.is_empty() && report.refused.is_empty() {
+    if report.promoted.is_empty() && report.recovered.is_empty() && report.refused.is_empty() {
         out.push_str("canon gate promote: nothing staged\n");
     }
     out

@@ -86,10 +86,13 @@ pub mod session_costs {
     pub const TOTAL_TOKENS: i64 = 120;
 }
 
-/// `mart_role_memory`'s expected two rows: `dev/acme/auth/abc123` has
+/// `mart_role_memory`'s expected four rows: `dev/acme/auth/abc123` has
 /// two strategies (one active, one demoted → `hit_rate` `0.5`);
-/// `content/acme/auth/abc123` has one active strategy (`hit_rate`
-/// `1.0`).
+/// `content`, `reviewer` and `fixer` (same repo/area/hash) each have one
+/// active strategy (`hit_rate` `1.0`). `reviewer` and `fixer` exist for
+/// the funnel's attribution cases below and are incidental here — they
+/// are asserted anyway, so adding a role can never silently change this
+/// panel's shape unnoticed.
 pub mod role_memory {
     pub const DEV_STRATEGY_COUNT: i64 = 2;
     pub const DEV_ACTIVE_COUNT: i64 = 1;
@@ -97,37 +100,80 @@ pub mod role_memory {
     pub const DEV_HIT_RATE: f64 = 0.5;
     pub const CONTENT_STRATEGY_COUNT: i64 = 1;
     pub const CONTENT_HIT_RATE: f64 = 1.0;
+    pub const REVIEWER_STRATEGY_COUNT: i64 = 1;
+    pub const REVIEWER_HIT_RATE: f64 = 1.0;
+    pub const FIXER_STRATEGY_COUNT: i64 = 1;
+    pub const FIXER_HIT_RATE: f64 = 1.0;
 }
 
-/// `mart_flywheel_funnel`'s expected two rows. `dev` carries 3 verdict
-/// rows across two trajectories and 2 distilled strategies; `content`
-/// carries 1 verdict row and 1 distilled strategy. Both roles show
-/// `retrieved = 1`: each has exactly one strategy cited by some run's
-/// `injected_guidance`.
+/// `mart_flywheel_funnel`'s expected four rows. `dev` carries 3 verdict
+/// rows across two trajectories and 2 distilled strategies; `content`,
+/// `reviewer` and `fixer` each carry 1 verdict row and 1 distilled
+/// strategy. All four roles show `retrieved = 1`: each has exactly one
+/// strategy cited by at least one run's `injected_guidance`.
 ///
-/// The two roles differ ONLY in the recipient run's own lifecycle (s40
-/// `plan-vs-actual-diff`, task 3.1) — the `dev` strategy went into the
-/// `Succeeded` session run, so it is `applied = 1`; the `content`
-/// strategy went into a run still `Running` (a dispatched run nobody
-/// closed, the real-world case), so it is `applied = 0`. That pairing
-/// is the whole point of the fixture: `applied` must move with the
-/// run's terminal status and nothing else.
+/// The four roles are one case per RULE the `applied` stage admits, plus
+/// their boundary and their precedence:
 ///
-/// `content`'s trajectory is deliberately marked RESOLVED for this
-/// reason: under the pre-s40 definition (`applied` = resolved
-/// trajectories, no reference to retrieval) `content` would read
-/// `applied = 1`, so `CONTENT_APPLIED = 0` is exactly the assertion a
-/// regression to that definition trips. `dev`'s second trajectory stays
-/// pending so the corpus still carries a mixed-outcome role.
+/// - `dev` — the s40 PROXY. Its strategy went into the `Succeeded`
+///   session run, and no trajectory names that run, so it counts under
+///   `applied_proxy` (`DEV_APPLIED_ATTRIBUTED = 0`).
+/// - `content` — NEITHER rule. Its strategy went into a run still
+///   `Running` (a dispatched run nobody closed) and no trajectory names
+///   that run either, so `applied = 0`. `content`'s trajectory is
+///   deliberately marked RESOLVED: under the pre-s40 definition
+///   (`applied` = resolved trajectories, no reference to retrieval)
+///   `content` would read `applied = 1`, so `CONTENT_APPLIED = 0` is
+///   exactly the assertion a regression to that definition trips. It is
+///   ALSO unstamped on purpose, so it cannot pass by attribution either
+///   — this row is what keeps `applied` from becoming "any resolved
+///   trajectory" again by either route.
+/// - `reviewer` — ATTRIBUTION, s42 (`close-the-open-loops`) task 3.3,
+///   closing s40 task 3.1's original wording. Its recipient run is ALSO
+///   still `Running`, so the proxy alone would score it `0` exactly like
+///   `content`; it reads `applied = 1` solely because a RESOLVED
+///   `reviewer` trajectory carries that run's own `run_id`. The pairing
+///   with `content` is the whole point: the two rows differ only in
+///   whether the trajectory was stamped, so `REVIEWER_APPLIED = 1`
+///   cannot be produced by the proxy and `CONTENT_APPLIED = 0` cannot be
+///   produced by attribution.
+/// - `fixer` — BOTH rules at once, which is what makes the split's
+///   partition property testable rather than vacuous. Its ONE strategy
+///   is cited by TWO runs: one still `Running` with a stamped resolved
+///   `fixer` trajectory, and one `Succeeded` with none. Attribution wins,
+///   so the strategy is counted ONCE, under `applied_attributed`
+///   (`FIXER_APPLIED_PROXY = 0`). Two independently-filtered
+///   `count(DISTINCT strategy_id)`s would report `1 + 1` here and make
+///   the parts sum above `applied` — the widening
+///   `flywheel_funnel_never_widens` exists to catch.
+///
+/// `dev`'s second trajectory stays pending so the corpus still carries a
+/// mixed-outcome role.
 pub mod flywheel_funnel {
     pub const DEV_VERDICTS: i64 = 3;
     pub const DEV_DISTILLED: i64 = 2;
     pub const DEV_RETRIEVED: i64 = 1;
     pub const DEV_APPLIED: i64 = 1;
+    pub const DEV_APPLIED_ATTRIBUTED: i64 = 0;
+    pub const DEV_APPLIED_PROXY: i64 = 1;
     pub const CONTENT_VERDICTS: i64 = 1;
     pub const CONTENT_DISTILLED: i64 = 1;
     pub const CONTENT_RETRIEVED: i64 = 1;
     pub const CONTENT_APPLIED: i64 = 0;
+    pub const CONTENT_APPLIED_ATTRIBUTED: i64 = 0;
+    pub const CONTENT_APPLIED_PROXY: i64 = 0;
+    pub const REVIEWER_VERDICTS: i64 = 1;
+    pub const REVIEWER_DISTILLED: i64 = 1;
+    pub const REVIEWER_RETRIEVED: i64 = 1;
+    pub const REVIEWER_APPLIED: i64 = 1;
+    pub const REVIEWER_APPLIED_ATTRIBUTED: i64 = 1;
+    pub const REVIEWER_APPLIED_PROXY: i64 = 0;
+    pub const FIXER_VERDICTS: i64 = 1;
+    pub const FIXER_DISTILLED: i64 = 1;
+    pub const FIXER_RETRIEVED: i64 = 1;
+    pub const FIXER_APPLIED: i64 = 1;
+    pub const FIXER_APPLIED_ATTRIBUTED: i64 = 1;
+    pub const FIXER_APPLIED_PROXY: i64 = 0;
 }
 
 /// `mart_review_burndown`'s expected running total: one `divergence`
@@ -357,6 +403,60 @@ fn build_git_tier(git_root: &Path) {
     unfinished_run.injected_guidance = vec![StrategyRef::new(content_strategy_id(), "content strategy", "content")];
     tier.write(&unfinished_run).unwrap();
 
+    // ── flywheel funnel's ATTRIBUTION case (s42
+    // (`close-the-open-loops`) task 3.3, closing s40 task 3.1): a THIRD
+    // run, byte-for-byte the same shape as `unfinished_run` above —
+    // guidance carried, still `Running`, session-less and event-less —
+    // differing ONLY in that a resolved `reviewer` trajectory in the
+    // learn store carries this run's `run_id` (`reviewer_run_id`, fixed
+    // so both halves of the corpus can name it). The proxy scores this
+    // run 0 exactly like `content`; `applied = 1` for `reviewer` is
+    // therefore attributable to nothing but the stamped trajectory.
+    let mut attributed_run = Run::new(
+        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 12), Actor::new_unattributed(session_costs::CLIENT)),
+        reviewer_run_id(),
+        None,
+        None,
+        RunStatus::Running,
+        at(2026, 1, 4, 12),
+        None,
+    );
+    attributed_run.injected_guidance = vec![StrategyRef::new(reviewer_strategy_id(), "reviewer strategy", "content")];
+    tier.write(&attributed_run).unwrap();
+
+    // ── flywheel funnel's PRECEDENCE case (s42
+    // (`close-the-open-loops`) task 3.3/3.4): the ONE `fixer` strategy is
+    // cited by TWO runs, one admitted by each rule — a `Running` run with
+    // a stamped resolved `fixer` trajectory, and a `Succeeded` run with
+    // none. Attribution must WIN so the strategy is counted once, which is
+    // what makes `applied == applied_attributed + applied_proxy` a real
+    // assertion rather than a vacuous one on this corpus. Both are
+    // session-less and event-less, so neither perturbs
+    // `mart_session_costs`.
+    let mut fixer_attributed_run = Run::new(
+        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 13), Actor::new_unattributed(session_costs::CLIENT)),
+        fixer_run_id(),
+        None,
+        None,
+        RunStatus::Running,
+        at(2026, 1, 4, 13),
+        None,
+    );
+    fixer_attributed_run.injected_guidance = vec![StrategyRef::new(fixer_strategy_id(), "fixer strategy", "content")];
+    tier.write(&fixer_attributed_run).unwrap();
+
+    let mut fixer_terminal_run = Run::new(
+        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 14), Actor::new_unattributed(session_costs::CLIENT)),
+        RunId::new(),
+        None,
+        None,
+        RunStatus::Succeeded,
+        at(2026, 1, 4, 14),
+        Some(at(2026, 1, 4, 15)),
+    );
+    fixer_terminal_run.injected_guidance = vec![StrategyRef::new(fixer_strategy_id(), "fixer strategy", "content")];
+    tier.write(&fixer_terminal_run).unwrap();
+
     tier.write(&Event::new(
         Envelope::new(1, RecordKind::Event, at_min(2026, 1, 4, 9, 30), Actor::new_unattributed(session_costs::CLIENT)),
         run_id,
@@ -447,6 +547,31 @@ fn dev_trajectory_2_id() -> canon_learn::ids::TrajectoryId {
 }
 fn content_trajectory_id() -> canon_learn::ids::TrajectoryId {
     canon_learn::ids::TrajectoryId::parse("01ARZ3NDEKTSV4RRFFQ69G5FB2").unwrap()
+}
+fn reviewer_strategy_id() -> canon_learn::ids::StrategyId {
+    canon_learn::ids::StrategyId::parse("01ARZ3NDEKTSV4RRFFQ69G5FAY").unwrap()
+}
+fn reviewer_trajectory_id() -> canon_learn::ids::TrajectoryId {
+    canon_learn::ids::TrajectoryId::parse("01ARZ3NDEKTSV4RRFFQ69G5FB3").unwrap()
+}
+fn fixer_strategy_id() -> canon_learn::ids::StrategyId {
+    canon_learn::ids::StrategyId::parse("01ARZ3NDEKTSV4RRFFQ69G5FAZ").unwrap()
+}
+fn fixer_trajectory_id() -> canon_learn::ids::TrajectoryId {
+    canon_learn::ids::TrajectoryId::parse("01ARZ3NDEKTSV4RRFFQ69G5FB4").unwrap()
+}
+/// The only two RUN ids this corpus fixes, for the same reason the ids
+/// above are fixed and no other run needs to be: the funnel's attribution
+/// rule (s42 (`close-the-open-loops`) task 3.3) is a JOIN between a `Run`
+/// the git-tier half writes and a `Trajectory` the learn-store half
+/// writes, so the two halves must name the identical value. Every other
+/// fixture run is referenced only within `build_git_tier`, where a local
+/// `RunId::new()` binding suffices.
+fn reviewer_run_id() -> RunId {
+    RunId::parse("01ARZ3NDEKTSV4RRFFQ69G5FC0").unwrap()
+}
+fn fixer_run_id() -> RunId {
+    RunId::parse("01ARZ3NDEKTSV4RRFFQ69G5FC1").unwrap()
 }
 
 fn build_learn_store(learn_root: &Path) {
@@ -545,11 +670,82 @@ fn build_learn_store(learn_root: &Path) {
                 vec![],
             )
             .unwrap()
-            // Resolved on purpose: the pre-s40 `applied` counted
-            // resolved trajectories, so that definition would render
-            // `content` as `applied = 1`. `CONTENT_APPLIED = 0` is the
-            // assertion it trips — this run was never closed.
+            // Resolved on purpose, and deliberately NOT stamped with a
+            // run: the pre-s40 `applied` counted resolved trajectories,
+            // so that definition would render `content` as
+            // `applied = 1`, and s42's attribution rule would too if
+            // this row named `unfinished_run`. `CONTENT_APPLIED = 0` is
+            // the assertion both regressions trip.
             .with_verdict_record(TrajectoryVerdict::new(VerdictOutcome::Success, 0.8)),
+        )
+        .unwrap();
+
+    // ── flywheel funnel's ATTRIBUTION case (s42
+    // (`close-the-open-loops`) task 3.3): one `reviewer` strategy, cited
+    // by `attributed_run` (still `Running`), plus one RESOLVED `reviewer`
+    // trajectory stamped with that run's own id. This is the pair s40
+    // task 3.1 asked for and could not express, because
+    // `canon_learn::Trajectory` carried no run id at all.
+    strategy_store
+        .append(&LearnStrategyItem::new(
+            reviewer_strategy_id(),
+            regime("reviewer"),
+            RoleId::parse("reviewer").unwrap(),
+            "reviewer strategy (active)",
+            "d",
+            "content",
+            vec![reviewer_trajectory_id()],
+            at(2026, 1, 3, 9),
+        ))
+        .unwrap();
+    trajectory_store
+        .append(
+            &LearnTrajectory::new(
+                reviewer_trajectory_id(),
+                regime("reviewer"),
+                "review the change",
+                "context",
+                vec![VerdictRow { role: RoleId::parse("reviewer").unwrap(), polarity: Polarity::Success, becomes: Becomes::StrategyCandidate }],
+                at(2026, 1, 3, 8),
+                vec![],
+            )
+            .unwrap()
+            .with_verdict_record(TrajectoryVerdict::new(VerdictOutcome::Success, 0.85))
+            .with_run_id(Some(reviewer_run_id())),
+        )
+        .unwrap();
+
+    // ── flywheel funnel's PRECEDENCE case (s42
+    // (`close-the-open-loops`) task 3.3/3.4): one `fixer` strategy cited
+    // by BOTH `fixer_attributed_run` (still `Running`, stamped below) and
+    // a `Succeeded` run with no trajectory of its own. Attribution wins,
+    // so this strategy is counted once — see `flywheel_funnel`'s own doc.
+    strategy_store
+        .append(&LearnStrategyItem::new(
+            fixer_strategy_id(),
+            regime("fixer"),
+            RoleId::parse("fixer").unwrap(),
+            "fixer strategy (active)",
+            "d",
+            "content",
+            vec![fixer_trajectory_id()],
+            at(2026, 1, 3, 9),
+        ))
+        .unwrap();
+    trajectory_store
+        .append(
+            &LearnTrajectory::new(
+                fixer_trajectory_id(),
+                regime("fixer"),
+                "remediate the finding",
+                "context",
+                vec![VerdictRow { role: RoleId::parse("fixer").unwrap(), polarity: Polarity::Corrective, becomes: Becomes::GuardrailWhatTheSampleCaught }],
+                at(2026, 1, 3, 8),
+                vec![],
+            )
+            .unwrap()
+            .with_verdict_record(TrajectoryVerdict::new(VerdictOutcome::Success, 0.7))
+            .with_run_id(Some(fixer_run_id())),
         )
         .unwrap();
 }

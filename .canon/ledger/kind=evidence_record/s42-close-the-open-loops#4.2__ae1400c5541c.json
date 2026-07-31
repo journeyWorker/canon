@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:11:03.187527Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.52s",
+    "summary": "the add -> promote -> task loop flips a checkbox with no --force"
+  },
+  "kind": "evidence_record",
+  "run_seq": 13,
+  "schema": 1,
+  "staging_id": "fb3b605268e0",
+  "task_id": "s42-close-the-open-loops#4.2",
+  "verdict": "faithful"
+}

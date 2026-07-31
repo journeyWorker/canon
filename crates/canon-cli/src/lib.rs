@@ -8,6 +8,7 @@ pub mod dashboard;
 pub mod demo;
 pub mod dispatch;
 pub mod divergence;
+pub mod evidence;
 pub mod fmt;
 pub mod gate;
 pub mod ingest;

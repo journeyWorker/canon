@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:13:46.946336Z",
+  "evidence": {
+    "kind": "command-run",
+    "ref": "./target/release/canon evidence add --task s42-close-the-open-loops#4.3 --kind command-run --ref '<this invocation>' --role implementer --repo ."
+  },
+  "evidence_note": {
+    "command_result": "self-referential: this record was itself staged by `canon evidence add` and committed by `canon gate promote`",
+    "summary": "s42's own tasks are closed through evidence add -> gate promote -> gate task, never by hand"
+  },
+  "kind": "evidence_record",
+  "run_seq": 14,
+  "schema": 1,
+  "staging_id": "01087f1df679",
+  "task_id": "s42-close-the-open-loops#4.3",
+  "verdict": "faithful"
+}

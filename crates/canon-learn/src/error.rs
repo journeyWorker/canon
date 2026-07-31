@@ -77,6 +77,17 @@ pub enum LearnError {
     #[error("mark_trajectory_verdict: no stored trajectory matches id {0:?}")]
     UnknownTrajectoryId(String),
 
+    /// `TrajectoryStore::delete_by_id` was handed a `(regime_key, id)`
+    /// pair matching no stored row — s42 (`close-the-open-loops`)'s
+    /// raw-tier deletion primitive, whose unknown-target contract is
+    /// [`LearnError::UnknownTrajectoryId`]'s verbatim ("fail loud, never
+    /// silently no-op"). A SEPARATE variant because deletion is keyed by
+    /// BOTH coordinates: the likeliest way to reach it is an id that DOES
+    /// exist, under a different regime, and an error naming only the id
+    /// would send its reader hunting for a row sitting right there.
+    #[error("delete_by_id: no stored trajectory matches id {id:?} under regime_key {regime_key:?}")]
+    UnknownTrajectoryRow { regime_key: String, id: String },
+
     /// `demote_strategy` (or `StrategyStore::find_by_id`/`mark_demoted`)
     /// was called with a `strategy_id` that matches no stored row —
     /// same "fail loud, never silently no-op" discipline as

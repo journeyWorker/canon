@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:10:57.327882Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test marts"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.04s",
+    "summary": "applied <= retrieved <= distilled holds by construction"
+  },
+  "kind": "evidence_record",
+  "run_seq": 11,
+  "schema": 1,
+  "staging_id": "1a7ee596939f",
+  "task_id": "s42-close-the-open-loops#3.4",
+  "verdict": "faithful"
+}

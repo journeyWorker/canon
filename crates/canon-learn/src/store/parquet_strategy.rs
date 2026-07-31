@@ -1,10 +1,14 @@
 //! [`ParquetStrategyStore`]: the distilled-tier `StrategyStore` impl —
 //! same operator-local, Hive-nested, one-file-per-row shape as
 //! [`crate::store::parquet_trajectory::ParquetTrajectoryStore`], under
-//! a sibling `<learn_root>/strategies` directory. Unlike the raw
-//! store, this one supports [`StrategyStore::delete_for_regime_key`] —
-//! the ONLY deletion this crate's two stores ever perform, and only
-//! ever on this (distilled) tier (design decision 3).
+//! a sibling `<learn_root>/strategies` directory. This store's deletion
+//! is WHOLESALE — [`StrategyStore::delete_for_regime_key`] clears a
+//! regime, the delete half of `crate::rebuild::rebuild_namespace`'s
+//! non-destructive delete-rebuild (design decision 3). The raw store's
+//! `crate::store::TrajectoryStore::delete_by_id` (s42
+//! (`close-the-open-loops`)) is the deliberately narrower counterpart:
+//! one fully-keyed row at a time, for a caller that has established the
+//! row is a superseded duplicate.
 //!
 //! [`crate::strategy::StrategyItem`] is directly `Serialize`/
 //! `Deserialize` (no non-serde external type embedded, unlike

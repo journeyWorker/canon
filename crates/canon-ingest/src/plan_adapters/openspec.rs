@@ -32,7 +32,7 @@ use canon_model::records::{Change, ChangeStatus, Task, TaskStatus};
 use chrono::{DateTime, TimeZone, Utc};
 
 use crate::task_rows::{self, TaskRow, format_line, parse_line};
-use crate::plan_writeback::{FlipDocOutcome, PlanTaskLocation, PlanWriteBack, WriteBackError};
+use crate::plan_writeback::{FlipDocOutcome, PlanTaskLocation, PlanWriteBack, WriteBackError, reject_multi_line_note};
 use crate::plan_adapter::{PlanAdapter, PlanParseOutcome, PlanSourceConfig, PlanSourceHandle, resolve_path_source};
 use crate::scanner::scan_dir;
 
@@ -134,6 +134,16 @@ impl PlanWriteBack for OpenspecPlanAdapter {
     }
 
     fn flip_task(&self, document: &str, task_id: &TaskId, evidence_note: &str) -> Result<FlipDocOutcome, WriteBackError> {
+        // FIRST, before the document is even split (trait-method doc):
+        // `evidence_note` is untrusted caller-supplied text, and a line
+        // separator inside it would not lengthen this row — `lines.join`
+        // below would emit a SECOND document line carrying whatever the
+        // caller put after the separator, including a fully `- [x] ` row
+        // no evidence record backs. Refused here independently of
+        // `canon evidence add`'s own authoring-time refusal, so a
+        // different caller (or a record authored before that refusal
+        // existed) cannot reintroduce it.
+        reject_multi_line_note(task_id, evidence_note)?;
         let want_id = row_number(task_id);
         let mut lines: Vec<String> = document.split('\n').map(str::to_string).collect();
         let row_idx = lines.iter().position(|line| parse_line(line).is_some_and(|row| row.id == want_id));

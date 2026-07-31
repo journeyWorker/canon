@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:10:48.432417Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib artifact_ingest::"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 209 filtered out; finished in 0.03s",
+    "summary": "convergence deletes superseded siblings, refusing any whose provenance the canonical row does not subsume"
+  },
+  "kind": "evidence_record",
+  "run_seq": 6,
+  "schema": 1,
+  "staging_id": "7f067b921460",
+  "task_id": "s42-close-the-open-loops#2.2",
+  "verdict": "faithful"
+}

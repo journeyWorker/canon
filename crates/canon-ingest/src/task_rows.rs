@@ -47,6 +47,22 @@
 //! (`plan_writeback::PlanWriteBack::flip_task`) rewrites exactly one
 //! row. All read/write the SAME [`parse_line`]/[`format_line`]/
 //! [`task_id_for`] below — one grammar, several consumers.
+//!
+//! # One row is ONE line — the injection boundary
+//! Every consumer above addresses a row by its LINE: `parse_line` reads
+//! one, `format_line` writes one, and the write-back splits its document
+//! on `\n`, rewrites one element, and re-joins. So any line separator
+//! inside a row's variable content ([`TaskRow::evidence`], the one
+//! segment built from caller-supplied text) does not produce a longer
+//! row — it produces a SECOND document line that no longer passes
+//! through this grammar at all, and that a reader will happily parse as
+//! an independent row. s42 (`close-the-open-loops`) shipped the first
+//! writer that feeds this suffix from a CLI flag, and a review of it
+//! found exactly that: `--summary $'ok\n- [x] 9.9 Forged'` appended a
+//! fully CHECKED row backed by no evidence record. [`ROW_LINE_BREAKS`]
+//! and [`first_row_line_break`] are that boundary's single definition,
+//! so the authoring command and the write-back reject the identical
+//! character set instead of two drifting copies.
 
 use std::collections::BTreeSet;
 
@@ -62,6 +78,39 @@ const EVIDENCE_MARKER: &str = " — ✅ ";
 /// against text that may have arbitrary internal spacing before the
 /// first scenario id token.
 const COVERS_PREFIX: &str = "[covers:";
+
+/// Every character that ends a line for SOME consumer of a plan
+/// document, and therefore every character that would split one
+/// [`TaskRow`] into two (module doc) — Unicode's MANDATORY-break set,
+/// UAX #14 classes BK/CR/LF/NL: `U+000A` LINE FEED, `U+000B` LINE
+/// TABULATION, `U+000C` FORM FEED, `U+000D` CARRIAGE RETURN, `U+0085`
+/// NEXT LINE, `U+2028` LINE SEPARATOR, `U+2029` PARAGRAPH SEPARATOR.
+///
+/// Deliberately WIDER than the one separator canon's own writer splits
+/// on. `crate::plan_adapters::openspec`'s `flip_task` splits on `\n`
+/// alone, so `\n` is the only character that forges a row for THAT
+/// reader — but a plan document is also read by CommonMark (which ends
+/// a line on `\r` alone and on `\r\n`), by editors, and by whatever
+/// renders a repo's plans. A refusal set matched to one writer's
+/// `split` call would be a refusal set that stops describing the
+/// document the moment a second reader looks at it, so this is the
+/// standardized mandatory-break set instead of canon's implementation
+/// detail.
+pub const ROW_LINE_BREAKS: [char; 7] = ['\u{000A}', '\u{000B}', '\u{000C}', '\u{000D}', '\u{0085}', '\u{2028}', '\u{2029}'];
+
+/// The FIRST [`ROW_LINE_BREAKS`] character in `text` — its byte offset
+/// and the character itself, so a caller's refusal can name exactly
+/// what it rejected and where. `None` means `text` is safe to embed in
+/// a single row.
+///
+/// First-by-byte-offset, not "some match": the scan is over
+/// [`str::char_indices`], so the same input always names the same
+/// character at the same offset regardless of how many separators it
+/// carries — a refusal message is a diff-stable fact, not a set-order
+/// artifact.
+pub fn first_row_line_break(text: &str) -> Option<(usize, char)> {
+    text.char_indices().find(|(_, c)| ROW_LINE_BREAKS.contains(c))
+}
 
 /// A row's scheduling annotation, immediately after the row's id token
 /// — `**DROPPED**` or `**DEFERRED to §<to>**`. `None` for a plain row
@@ -501,6 +550,44 @@ pub(crate) fn list_separator(bytes: &[u8], i: usize) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── ROW_LINE_BREAKS / first_row_line_break: the injection boundary ──
+
+    /// The set is the standardized UAX #14 mandatory-break set (its own
+    /// doc), pinned by codepoint so a later edit cannot silently narrow
+    /// the refusal every consumer of this predicate depends on.
+    #[test]
+    fn row_line_breaks_is_the_unicode_mandatory_break_set() {
+        let codepoints: Vec<u32> = ROW_LINE_BREAKS.iter().copied().map(u32::from).collect();
+        assert_eq!(codepoints, vec![0x000A, 0x000B, 0x000C, 0x000D, 0x0085, 0x2028, 0x2029]);
+    }
+
+    /// Every member is detected, at the byte offset where it starts —
+    /// including the multi-byte `U+2028`/`U+2029`, whose offsets a
+    /// char-count-based scan would get wrong.
+    #[test]
+    fn first_row_line_break_finds_every_member_at_its_byte_offset() {
+        for separator in ROW_LINE_BREAKS {
+            let text = format!("héllo{separator}forged");
+            assert_eq!(first_row_line_break(&text), Some((6, separator)), "separator {separator:?}");
+        }
+    }
+
+    /// FIRST by byte offset (its own doc), not whichever set member the
+    /// scan happens to reach first.
+    #[test]
+    fn first_row_line_break_reports_the_earliest_separator() {
+        assert_eq!(first_row_line_break("a\u{2028}b\nc"), Some((1, '\u{2028}')));
+        assert_eq!(first_row_line_break("a\nb\u{2028}c"), Some((1, '\n')));
+    }
+
+    /// A row's ordinary content — including the ` — ✅ ` marker, em
+    /// dashes, and tabs — is never mistaken for a line break.
+    #[test]
+    fn first_row_line_break_accepts_ordinary_row_content() {
+        assert_eq!(first_row_line_break("cargo test -p canon-cli — ✅ 42 passed\tclean"), None);
+        assert_eq!(first_row_line_break(""), None);
+    }
 
     // ── parse_line: base shapes ──
 

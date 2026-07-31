@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:16:00.634584Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test --workspace"
+  },
+  "evidence_note": {
+    "command_result": "86 test result lines | 1715 passed | 0 failed",
+    "summary": "the workspace suite passes with zero failures"
+  },
+  "kind": "evidence_record",
+  "run_seq": 18,
+  "schema": 1,
+  "staging_id": "86d605319050",
+  "task_id": "s42-close-the-open-loops#5.1",
+  "verdict": "faithful"
+}

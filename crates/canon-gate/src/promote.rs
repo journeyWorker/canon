@@ -73,6 +73,42 @@
 //! run the gate would reject" guarantee two paragraphs up already states,
 //! now enforced at ONE validation point instead of two.
 //!
+//! # Retry after an INTERRUPTED promotion is recovery, never a duplicate
+//! Each candidate's two side effects — `committed.write` then
+//! `remove_file(<staging source>)` — are two syscalls with no
+//! transaction around them, and no filesystem gives us one. So the
+//! window is real: the committed record lands, the removal fails (or the
+//! process dies), and the staging file survives. Before s42
+//! (`close-the-open-loops`)'s review found this, the retry that
+//! operators are explicitly told to run then re-scanned `committed`,
+//! saw the higher partition maximum, and appended the SAME attestation
+//! again at the next `run_seq` — permanently, into an append-only
+//! ledger, once per retry. A best-effort "try harder to delete" would
+//! not have fixed it; the duplicate came from the retry being unable to
+//! RECOGNIZE its own earlier work.
+//!
+//! So a candidate carries a stable identity across the window:
+//! `staging_candidate_id`, the content digest of its staged body — the
+//! same digest its staging filename already ends in, promoted from an
+//! implicit path detail to an explicit `staging_id` field
+//! (`committed_body` stamps it alongside `run_seq`). [`promote`] indexes
+//! `committed` by that field, and a candidate whose identity is already
+//! committed is treated as COMPLETE: no second write, no `run_seq`
+//! consumed, the staging source drained, and the outcome reported in
+//! [`PromoteReport::recovered`] rather than [`PromoteReport::promoted`],
+//! carrying the `run_seq` the interrupted call already assigned. Retrying
+//! until it succeeds is therefore safe by construction, and the number of
+//! committed records equals the number of distinct staged bodies no matter
+//! how many times the removal failed.
+//!
+//! Identity is the STAGED body, before `run_seq`/`staging_id` are stamped
+//! on, so it is computable from the surviving staging file alone — the
+//! only artifact a retry still has. Two byte-identical staged bodies
+//! share one identity because they already share one staging FILE (the
+//! digest is that filename); distinct attestations differ in `at` and so
+//! never collide (`canon evidence add`'s own "not idempotent,
+//! deliberately" contract).
+//!
 //! # Extended to `Divergence` (s15 P3b, design D10)
 //! [`promote`] stays hardcoded to `EvidenceRecord` — its `(role, surface)`
 //! axis is UNCHANGED. `Divergence` gets its OWN, separate promote path
@@ -109,19 +145,25 @@ use serde::{Deserialize, Serialize};
 
 use crate::failure_class::{FailureClass, Violation};
 
-/// One candidate successfully promoted from `_staging/` to the
-/// committed ledger — the `run_seq` this call assigned it, and the
-/// `(role, surface)` partition key that `run_seq` is monotonic within
-/// (module doc).
+/// One candidate that reached the committed ledger — the `run_seq` it
+/// carries there, and the `(role, surface)` partition key that `run_seq`
+/// is monotonic within (module doc). Reported under
+/// [`PromoteReport::promoted`] when THIS call wrote it, and under
+/// [`PromoteReport::recovered`] when an earlier, interrupted call already
+/// had (module doc's recovery section) — same facts either way, so the
+/// two lists share one type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Promoted {
     pub role: RoleId,
     pub surface: String,
     pub run_seq: u64,
-    /// The committed-tier-relative path the record now lives at —
-    /// content-derived, resolved AFTER `run_seq` is stamped onto the
-    /// body (stamping changes the content-digest suffix, so this is
-    /// never the same path the staging copy resolved to).
+    /// The committed-tier-relative path the record lives at —
+    /// content-derived, resolved AFTER `run_seq`/`staging_id` are stamped
+    /// onto the body (stamping changes the content-digest suffix, so this
+    /// is never the same path the staging copy resolved to). For a
+    /// RECOVERED candidate it is resolved from the committed record found
+    /// on disk, never re-derived from the staged body, so the reported
+    /// path is the one that actually exists.
     pub target: PathBuf,
 }
 
@@ -135,18 +177,88 @@ pub struct Refused {
 }
 
 /// One [`promote`] call's outcome — every candidate lands in exactly
-/// one of `promoted`/`refused`, never both, and refusal never shrinks
-/// or reorders another candidate's assigned `run_seq`.
+/// one of `promoted`/`recovered`/`refused`, never two, and refusal never
+/// shrinks or reorders another candidate's assigned `run_seq`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PromoteReport {
+    /// Candidates THIS call wrote into the committed ledger.
     pub promoted: Vec<Promoted>,
+    /// Candidates already committed under their own `staging_id` by an
+    /// earlier call whose staging removal did not land (module doc's
+    /// recovery section) — no second write, no `run_seq` consumed, the
+    /// staging source drained. Not a failure: it is the retry doing
+    /// exactly what it was run for, so it does not affect
+    /// [`PromoteReport::is_clean`].
+    ///
+    /// Only [`promote`] populates this. [`promote_divergence`] has its own
+    /// staging representation and its own (still unaddressed) window;
+    /// this list stays empty there rather than pretending otherwise.
+    pub recovered: Vec<Promoted>,
     pub refused: Vec<Refused>,
 }
 
 impl PromoteReport {
+    /// Whether every candidate this call saw ended up committed —
+    /// `refused` empty. A `recovered` candidate IS committed, so it never
+    /// makes a report unclean: `canon gate promote`'s retry after an
+    /// interrupted run has to be able to exit `0`, or the recovery is
+    /// unusable.
     pub fn is_clean(&self) -> bool {
         self.refused.is_empty()
     }
+}
+
+/// The committed body's companion key carrying a promoted record's
+/// originating staging identity (module doc's recovery section) — read
+/// back by [`promote`] to recognize its own interrupted work.
+///
+/// A companion key, exactly like `evidence`/`evidence_note`:
+/// `EvidenceRecord`'s own `Deserialize` is not
+/// `deny_unknown_fields`, so it survives every read that re-parses a
+/// committed body while staying invisible to the typed model — the
+/// established "re-read the raw ledger JSON for a companion key" pattern
+/// `crate::markers::evidence_note_of` and `crate::trust`'s
+/// `trust_ladder`/`evidence_sha` readers already use.
+const STAGING_ID_KEY: &str = "staging_id";
+
+/// One staging candidate's stable identity: the content digest of its
+/// STAGED body, before `run_seq`/`staging_id` are stamped on (module
+/// doc's recovery section).
+///
+/// Deliberately the same `content_digest12` the candidate's own staging
+/// FILENAME already ends in (`canon_store::partition`'s Hive object key)
+/// — the identity is not a new invented token, it is the one the staging
+/// layout already assigned, made explicit so a committed record can carry
+/// it forward.
+fn staging_candidate_id(staged_body: &serde_json::Value) -> String {
+    content_digest12(staged_body)
+}
+
+/// The EXACT committed body a staged candidate promotes to: its staged
+/// body plus `run_seq` and [`STAGING_ID_KEY`].
+///
+/// One function so the write path and the identity it records can never
+/// disagree — the whole recovery guarantee rests on a later call being
+/// able to find, by that field, the record an earlier call wrote here.
+fn committed_body(staged_body: &serde_json::Value, run_seq: u64, staging_id: &str) -> serde_json::Value {
+    let mut body = staged_body.clone();
+    let object = body.as_object_mut().expect("an EvidenceRecord's raw body is always a JSON object");
+    object.insert("run_seq".to_string(), serde_json::json!(run_seq));
+    object.insert(STAGING_ID_KEY.to_string(), serde_json::Value::String(staging_id.to_string()));
+    body
+}
+
+/// Where one already-committed `staging_id` landed — the `run_seq` the
+/// interrupted call assigned it and the committed path it wrote.
+///
+/// A named struct rather than a `(u64, PathBuf)` pair: the index it lives
+/// in is read back a hundred lines from where it is built, and both halves
+/// are copied verbatim into a [`Promoted`] an operator reads as
+/// `run_seq=N -> <path>`.
+#[derive(Debug)]
+struct RecoveredCommit {
+    run_seq: u64,
+    target: PathBuf,
 }
 
 /// This candidate's `(role, surface)` run_seq-partition key (module
@@ -184,9 +296,17 @@ fn refuse(subject: impl Into<String>, detail: impl Into<String>) -> Refused {
 /// Promote every well-formed `_staging/` candidate to the committed
 /// ledger (module doc). `dry_run` computes and returns the FULL plan
 /// (assigned `run_seq`, target path) WITHOUT touching disk —
-/// `canon gate promote --dry-run`'s printer (task 2.3, CLI wave, not
-/// implemented here) is the intended caller of that mode; this
-/// function only guarantees the plan itself is side-effect free.
+/// `canon gate promote --dry-run`'s printer is the intended caller of
+/// that mode; this function only guarantees the plan itself is
+/// side-effect free.
+///
+/// IDEMPOTENT across an interrupted call (module doc's recovery section):
+/// a candidate whose `staging_id` is already committed is drained from
+/// staging and reported under [`PromoteReport::recovered`], never written
+/// again and never consuming a `run_seq`. So `canon gate promote` may be
+/// retried until it reports success, and the committed record count
+/// equals the number of distinct staged bodies regardless of how many
+/// retries that took.
 pub fn promote(staging: &GitTier, committed: &GitTier, dry_run: bool) -> Result<PromoteReport, StoreError> {
     let mut report = PromoteReport::default();
 
@@ -207,13 +327,31 @@ pub fn promote(staging: &GitTier, committed: &GitTier, dry_run: bool) -> Result<
     // candidate.
     let committed_read = committed.read(&TierQuery::kind(RecordKind::EvidenceRecord))?;
     let mut next_seq: HashMap<(RoleId, String), u64> = HashMap::new();
+    // The SAME scan also indexes every committed record by the
+    // `staging_id` it was promoted under (module doc's recovery section),
+    // so the per-candidate loop below can recognize an attestation an
+    // interrupted earlier call already committed instead of appending it a
+    // second time. One pass, not two: the recovery index and the
+    // partition maxima are both facts about the committed corpus.
+    let mut already_committed: HashMap<String, RecoveredCommit> = HashMap::new();
     for raw in &committed_read.records {
         let Ok(record) = serde_json::from_value::<EvidenceRecord>(raw.0.clone()) else { continue };
         let Some(key) = partition_key(&record) else { continue };
-        if let Some(seq) = raw.0.get("run_seq").and_then(serde_json::Value::as_u64) {
-            let slot = next_seq.entry(key).or_insert(0);
-            *slot = (*slot).max(seq);
+        let Some(seq) = raw.0.get("run_seq").and_then(serde_json::Value::as_u64) else { continue };
+        let slot = next_seq.entry(key).or_insert(0);
+        *slot = (*slot).max(seq);
+
+        let Some(staging_id) = raw.0.get(STAGING_ID_KEY).and_then(serde_json::Value::as_str) else { continue };
+        // LOWEST `run_seq` wins when one identity somehow appears twice
+        // (a corpus that already carries duplicates from before this
+        // recovery existed): the earliest commit is the original, and
+        // "earliest" is a total order over the data rather than an
+        // artifact of directory-walk order.
+        if already_committed.get(staging_id).is_some_and(|existing| existing.run_seq <= seq) {
+            continue;
         }
+        let target = expected_relative_path(RecordKind::EvidenceRecord, &raw.0).map_err(StoreError::Layout)?;
+        already_committed.insert(staging_id.to_string(), RecoveredCommit { run_seq: seq, target });
     }
 
     // Parse every well-formed staging candidate up front so processing
@@ -245,19 +383,41 @@ pub fn promote(staging: &GitTier, committed: &GitTier, dry_run: bool) -> Result<
             continue;
         };
 
+        // The identity this candidate would be (or already was) committed
+        // under — computed from the STAGED body, the only artifact a retry
+        // after an interrupted call still has (module doc).
+        let staging_id = staging_candidate_id(&raw.0);
+
+        if let Some(existing) = already_committed.get(&staging_id) {
+            // This exact attestation is already in the append-only
+            // committed ledger: an earlier call wrote it and did not get
+            // to remove the staging source. Completing that call means
+            // draining staging — NOT writing a second copy, and NOT
+            // consuming a `run_seq`, which would also shift every later
+            // candidate in this batch.
+            if !dry_run {
+                let staging_relative = expected_relative_path(RecordKind::EvidenceRecord, &raw.0).map_err(StoreError::Layout)?;
+                std::fs::remove_file(staging.root().join(&staging_relative))?;
+            }
+            report.recovered.push(Promoted { role, surface, run_seq: existing.run_seq, target: existing.target.clone() });
+            continue;
+        }
+
         let seq = {
             let slot = next_seq.entry((role.clone(), surface.clone())).or_insert(0);
             *slot += 1;
             *slot
         };
 
-        let mut body = raw.0.clone();
-        body.as_object_mut().expect("an EvidenceRecord's raw body is always a JSON object").insert("run_seq".to_string(), serde_json::json!(seq));
-
+        let body = committed_body(&raw.0, seq, &staging_id);
         let target = expected_relative_path(RecordKind::EvidenceRecord, &body).map_err(StoreError::Layout)?;
 
         if !dry_run {
             committed.write(&RawWrite(RawRecord(body)))?;
+            // The window (module doc): if this removal does not land, the
+            // record above is committed and the staging file survives. A
+            // retry then finds `staging_id` in `already_committed` and
+            // takes the recovery branch instead of promoting again.
             let staging_relative = expected_relative_path(RecordKind::EvidenceRecord, &raw.0).map_err(StoreError::Layout)?;
             std::fs::remove_file(staging.root().join(&staging_relative))?;
         }
@@ -747,5 +907,105 @@ mod tests {
         // The unrelated staged candidate is still sitting there, untouched.
         assert_eq!(std::fs::read_dir(&staging_dir).unwrap().count(), 1);
         assert_eq!(committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap().records.len(), 1);
+    }
+
+    /// The `ReviewEvidence` BLOCKER (module doc's recovery section): the
+    /// committed write lands, the staging removal does not, and the retry
+    /// operators are told to run used to append the SAME attestation
+    /// again at the next `run_seq` — permanently, into an append-only
+    /// ledger.
+    ///
+    /// Re-writing the identical record reproduces the surviving staging
+    /// file byte-for-byte (its path AND its contents are content-derived),
+    /// which is precisely the on-disk state a killed process or a failed
+    /// `remove_file` leaves behind — so this exercises the real recovery
+    /// input, not a stand-in for it.
+    #[test]
+    fn a_retried_promote_after_an_interrupted_one_recovers_instead_of_duplicating() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+        let record = evidence("implementer", Some("world.firstbuy-hotdeal.14"));
+
+        staging.write(&record).unwrap();
+        let first = promote(&staging, &committed, false).unwrap();
+        assert_eq!(first.promoted.len(), 1);
+        assert!(first.recovered.is_empty(), "nothing to recover on a first, uninterrupted promote");
+        assert_eq!(first.promoted[0].run_seq, 1);
+
+        // The interruption.
+        staging.write(&record).unwrap();
+        assert_eq!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1);
+
+        let retry = promote(&staging, &committed, false).unwrap();
+        assert!(retry.is_clean(), "a recovery must exit clean or the retry is unusable: {:?}", retry.refused);
+        assert!(retry.promoted.is_empty(), "the retry must not write a second record: {:?}", retry.promoted);
+        assert_eq!(retry.recovered.len(), 1);
+        assert_eq!(retry.recovered[0].run_seq, 1, "the recovery reports the run_seq the interrupted call already assigned");
+        assert_eq!(retry.recovered[0].target, first.promoted[0].target, "and the committed path that call actually wrote");
+
+        assert_eq!(
+            committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(),
+            1,
+            "exactly one committed record survives the retry"
+        );
+        assert!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.is_empty(), "the retry drains staging");
+
+        // The identity is per-CANDIDATE, not per-(role, surface): a
+        // different attestation in the SAME run_seq partition
+        // (`world.firstbuy-hotdeal.26` shares `surface_key()` with `.14`)
+        // still promotes, at the next run_seq. Without this the recovery
+        // would silently swallow every later record for the surface.
+        // Distinguished by scenario rather than by `at`, so the assertion
+        // does not depend on two `Utc::now()` calls landing in different
+        // serialized timestamps.
+        staging.write(&evidence("implementer", Some("world.firstbuy-hotdeal.26"))).unwrap();
+        let third = promote(&staging, &committed, false).unwrap();
+        assert_eq!(third.promoted.len(), 1, "a distinct attestation is not a recovery: {third:?}");
+        assert_eq!(third.promoted[0].run_seq, 2);
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 2);
+    }
+
+    /// `--dry-run` stays side-effect free on the recovery path too: it
+    /// reports what the retry WOULD drain without removing the staging
+    /// file, so an operator can inspect the situation before acting.
+    #[test]
+    fn a_dry_run_retry_reports_the_recovery_without_draining_staging() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+        let record = evidence("implementer", Some("world.firstbuy-hotdeal.14"));
+
+        staging.write(&record).unwrap();
+        promote(&staging, &committed, false).unwrap();
+        staging.write(&record).unwrap();
+
+        let dry = promote(&staging, &committed, true).unwrap();
+        assert_eq!(dry.recovered.len(), 1);
+        assert!(dry.promoted.is_empty());
+        assert_eq!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1, "--dry-run removes nothing");
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1, "--dry-run writes nothing");
+    }
+
+    /// The identity is carried by the committed record itself, so it
+    /// survives a fresh process: `promote` recovers by READING
+    /// `staging_id` back off the committed ledger, never from in-memory
+    /// state a crash would have taken with it.
+    #[test]
+    fn the_committed_record_carries_the_staging_identity_it_was_promoted_under() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+        let record = evidence("implementer", Some("world.firstbuy-hotdeal.14"));
+        let staged_body = serde_json::to_value(&record).unwrap();
+
+        staging.write(&record).unwrap();
+        promote(&staging, &committed, false).unwrap();
+
+        let landed = committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap();
+        assert_eq!(landed.records.len(), 1);
+        assert_eq!(
+            landed.records[0].0.get(STAGING_ID_KEY).and_then(serde_json::Value::as_str),
+            Some(staging_candidate_id(&staged_body).as_str()),
+            "the committed record must carry the digest of the staged body it came from: {:?}",
+            landed.records[0].0
+        );
     }
 }

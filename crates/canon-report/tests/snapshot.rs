@@ -28,7 +28,10 @@ const EXPECTED_CONTRACT: &[(&str, &[&str])] = &[
         "mart_role_memory",
         &["role", "regime_key", "strategy_count", "active_count", "demoted_count", "hit_rate", "avg_source_trajectories", "latest_recorded_at"],
     ),
-    ("mart_flywheel_funnel", &["role", "verdicts", "distilled", "retrieved", "applied"]),
+    (
+        "mart_flywheel_funnel",
+        &["role", "verdicts", "distilled", "retrieved", "applied", "applied_attributed", "applied_proxy"],
+    ),
     (
         "mart_review_burndown",
         &["day", "evidence_faithful", "evidence_divergent", "evidence_not_applicable", "divergence_opened", "divergence_resolved", "divergence_open_running_total"],

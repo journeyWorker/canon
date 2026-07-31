@@ -11,9 +11,14 @@
 //! - [`role`] — the open role registry (design decision 1): built-in
 //!   `planning|design|dev|test|review|content|sim`, `canon.yaml`-
 //!   extensible, never a closed Rust `enum`.
-//! - [`trajectory`] — the raw, cold, immutable tier: one captured trace
+//! - [`trajectory`] — the raw, cold tier: one captured trace
 //!   ([`canon_ingest::verdict::VerdictRow`]s + the reasoning/context
-//!   that produced them), keyed by `regime_key`.
+//!   that produced them), keyed by `regime_key`. A stored trace's
+//!   evidence is immutable — the two exceptions
+//!   ([`store::TrajectoryStore::mark_verdict`], which only layers a
+//!   verdict on top, and [`store::TrajectoryStore::delete_by_id`], which
+//!   removes a caller-established superseded duplicate whole) are named
+//!   on that trait, and neither is reachable from [`rebuild_namespace`].
 //! - [`strategy`] — the distilled, warm tier: title/description/
 //!   content strategy items with `source_trajectory_ids` provenance.
 //! - [`store`] — [`store::TrajectoryStore`]/[`store::StrategyStore`],

@@ -371,9 +371,11 @@ JOIN token_usage tu ON tu.run_id = r.run_id
 GROUP BY s.session_id, s.client, s.actor_role, tu.workspace_label
 ORDER BY s.session_id, tu.workspace_label;
 
--- Panel 3: role memory (strategies, hit rate, effect per role
--- namespace), over `stg_strategy_items` (S6's `StrategyItem` store,
--- one row per distilled strategy). `hit_rate` = the fraction of a
+-- Panel 3: role memory (per-namespace strategy counts, plus the
+-- not-demoted share design D5 named "hit rate, effect"), over
+-- `stg_strategy_items` (S6's `StrategyItem` store, one row per
+-- distilled strategy). `hit_rate` is NOT a retrieval hit rate and no
+-- effect is measured anywhere: `hit_rate` = the fraction of a
 -- role/`regime_key` namespace's strategies NOT yet demoted (S7's
 -- `demotion` soft-flag, `crates/canon-learn/src/strategy.rs`) — the
 -- nearest available "did this hold up" signal; there is no separate
@@ -398,16 +400,21 @@ ORDER BY role, regime_key;
 
 -- Panel 4: flywheel health funnel (verdicts -> distilled -> retrieved
 -- -> applied), over `stg_trajectories` (S4's already-derived
--- `VerdictRow`s each raw trajectory carries), `stg_strategy_items`
--- (S6's distill step), and `stg_records`' `run.injected_guidance`
--- (S8's retrieval-injection snapshot, `canon_model::records::Run::
--- injected_guidance` — the ONE physically-persisted "a strategy was
--- retrieved and shown to an agent" signal; `canon-learn::retrieve` is
--- itself a pure, unlogged function, that crate's own module doc).
+-- `VerdictRow`s each raw trajectory carries, its S7 rolled-up
+-- `outcome`, and -- since s42 -- its own `run_id` attribution),
+-- `stg_strategy_items` (S6's distill step), and `stg_records`'
+-- `run.injected_guidance` (S8's retrieval-injection snapshot,
+-- `canon_model::records::Run::injected_guidance` -- the ONE
+-- physically-persisted "a strategy was retrieved and recorded as this
+-- run's input" signal, written by `canon dispatch begin`;
+-- `canon-learn::retrieve` is itself a pure, unlogged function (that
+-- crate's own module doc), and nothing records whether the dispatched
+-- agent ever read the snapshot).
 --
 -- What each column counts, and in WHICH unit (s40
--- (`plan-vs-actual-diff`) tasks 3.1/3.2). The last three stages are all
--- counted in STRATEGIES, so the funnel reads as one narrowing set:
+-- (`plan-vs-actual-diff`) tasks 3.1/3.2; s42 (`close-the-open-loops`)
+-- task 3.3). The last three stages are all counted in STRATEGIES, so
+-- the funnel reads as one narrowing set:
 --
 --   verdicts  — `VerdictRow`s across this role's raw trajectories: the
 --               evidence the distiller consumes. The one stage NOT
@@ -427,25 +434,96 @@ ORDER BY role, regime_key;
 --               a distilled row. Both halves are load-bearing; see
 --               the rebuild note below.
 --   applied   — that same distinct set, restricted to strategies whose
---               recipient run reached a TERMINAL `Run.status`. So
---               "applied" asserts BOTH halves: the guidance was in an
---               agent's context, AND the run it was injected into
---               actually finished.
+--               recipient run has SOMETHING recorded about how it
+--               ended, under exactly one of the two rules below. So
+--               "applied" asserts BOTH halves: the strategy is named
+--               in that run's recorded `injected_guidance`, AND
+--               something is recorded about how that run ended.
+--
+-- Which rule admitted a count is NOT left to the reader to guess (s42
+-- task 3.3). `applied` is broken out by rule, and the two parts
+-- PARTITION it — `applied = applied_attributed + applied_proxy`
+-- exactly, because `applied_strategies` below assigns each counted
+-- `(role, strategy)` pair ONE rule with attribution winning, rather
+-- than tallying two overlapping sets. BOTH rules are CO-OCCURRENCE
+-- inside one run; neither is causation (see "what this panel cannot
+-- say" below):
+--
+--   applied_attributed
+--             — SAME-RUN, SAME-ROLE EVIDENCE. The strategy is named
+--               in some run's `injected_guidance`, and that SAME run
+--               has at least one trajectory of the SAME role stamped
+--               with that run's own `run_id`
+--               (`canon_learn::Trajectory::run_id`, stamped only by
+--               an explicit `canon ingest artifacts --run`) whose
+--               `outcome` is one of the resolved variants. This is
+--               s40 task 3.1's ORIGINAL wording — "a resolved
+--               trajectory joined to its own run" — which s40 left
+--               open as unimplementable, because the trajectory
+--               feeding this panel carried no run id at all.
+--   applied_proxy
+--             — the s40 PROXY, retained and now LABELLED. The
+--               recipient run has no such trajectory, so the panel
+--               falls back to that run's own terminal `Run.status`.
+--               Weaker on purpose: all it records is that the run
+--               reached a terminal state. A repo that never passes
+--               `--run` reads `applied_attributed 0` and every count
+--               under `applied_proxy`, which is the honest
+--               description of what its corpus supports.
+--
+-- What this panel CANNOT say, stated here because three earlier
+-- panels on this release line shipped exactly this defect (s39's
+-- model-level ceiling, s40's funnel columns, s41's burn-down read as
+-- current state) and the s42 re-review caught the fourth. The join
+-- below is `(run_id, role)` and NOTHING else. So one resolved
+-- trajectory of a role admits EVERY still-distilled strategy of that
+-- role injected into that run, alike — the one an agent followed and
+-- the one it never read are indistinguishable here, and both are
+-- indistinguishable from a run that would have reached the same
+-- outcome with no guidance at all. `applied_attributed` is therefore
+-- STRONGER than the proxy (it requires a judged outcome out of that
+-- run, not merely a terminal state) and WEAKER than attributing the
+-- outcome TO the guidance, which canon cannot compute at all: no
+-- record kind carries a strategy -> outcome edge. Making the causal
+-- claim requires ADDING that edge — a `StrategyId` stamped on the
+-- `Trajectory`/`VerdictRow` at judgment time, joined here in place of
+-- `run_id` alone — never a re-reading of this relation.
+--
+-- Why attribution requires the trajectory's ROLE to match the cited
+-- strategy's, and not merely its run: this panel's grain IS the role.
+-- A run dispatched with `dev` guidance out of which only a resolved
+-- `content` trajectory came is evidence about `content`, and counting
+-- it for `dev` would report same-run evidence for a role that has
+-- none. Such a run falls back to the proxy for `dev` — the
+-- documented, labelled degrade — rather than borrowing another role's
+-- outcome.
+--
+-- Why the trajectory must be RESOLVED, by an allowlist of
+-- `canon_learn::VerdictOutcome`'s non-`pending` variants (serialized
+-- kebab-case) rather than `<> 'pending'`: every trajectory is minted
+-- `pending` and only `canon-learn::mark_trajectory_verdict` writes a
+-- covering outcome, so `pending` is "no judgment yet", not a
+-- judgment. An S6-era row predating the field carries no `outcome`
+-- key at all and reads NULL, which the allowlist excludes; a future
+-- variant must not silently start counting as applied.
 --
 -- `applied <= retrieved <= distilled` holds BY CONSTRUCTION, not by
--- luck: `applied_counts` is a `WHERE`-restriction of the exact rows
--- `retrieved_counts` counts, over the same `count(DISTINCT
--- strategy_id)`; and every strategy either one counts IS one
--- `stg_strategy_items` row of that role. Both properties were false
--- before s40 — `applied` was `count(*)` over resolved trajectories
--- with no reference to retrieval at all (canon's own corpus rendered
--- `retrieved 0 / applied 16`, unreadable as a funnel), and `retrieved`
--- was `count(*)` over injection EVENTS, which exceeds `distilled` the
--- moment one strategy is injected into two runs. A stage that can
--- exceed the stage above it measures nothing about the stage above it,
--- the same defect class s39 (`joined-evidence-grounding`) fixed in
--- `mart_review_burndown`'s panel: a column name asserting a
--- relationship the SQL never computed.
+-- luck: `applied_strategies` groups a `WHERE`-restriction of the exact
+-- rows `retrieved_counts` counts, over the same `(role, strategy_id)`
+-- grain, so its `count(*)` cannot exceed that relation's
+-- `count(DISTINCT strategy_id)`; and every strategy either stage
+-- counts IS one `stg_strategy_items` row of that role. Adding the
+-- attribution rule cannot widen the funnel. It DOES admit strategies
+-- the proxy alone would refuse — that is the point of it — but only
+-- ones `retrieved_guidance` already holds: it introduces no new row and
+-- no second relation, so the ceiling `retrieved` counts is untouched.
+-- Both properties were false before s40 — `applied` was `count(*)` over
+-- resolved trajectories with no reference to retrieval at all (canon's
+-- own corpus rendered `retrieved 0 / applied 16`, unreadable as a
+-- funnel), and `retrieved` was `count(*)` over injection EVENTS, which
+-- exceeds `distilled` the moment one strategy is injected into two runs.
+-- A stage that can exceed the stage above it measures nothing about the
+-- stage above it.
 --
 -- Why `retrieved` does not evaporate on a rebuild. This stage joins a
 -- recorded `StrategyRef` — a snapshot frozen into `Run.
@@ -464,26 +542,18 @@ ORDER BY role, regime_key;
 -- stops counting, which is the honest answer: that strategy no longer
 -- exists.
 --
--- Why terminal `Run.status`, and not the raw trajectory's resolved
--- `outcome` (the pre-s40 signal): `stg_trajectories` is canon-learn's
--- parquet row (`crates/canon-learn/src/store/parquet_trajectory.rs`'s
--- `TrajectoryWire`), which carries NO run id at all — `canon ingest
--- artifacts` mints it from an ARTIFACT, with no run in hand — so it
--- cannot be conditioned on the run that received the guidance.
--- `canon_model::records::Trajectory` IS keyed by `run_id`
--- (`crates/canon-store/src/partition.rs`), but has zero production
--- writers, so conditioning on it would ship a column structurally
--- pinned at `0` forever — worse than the wrong column it replaced.
--- `Run.status` is the one retrieval-conditional completion signal a
--- user can actually move: `canon dispatch begin` mints the run
--- `running` and `canon dispatch end` (s40 task group 1) closes it.
---
--- On canon's own corpus this panel reads `retrieved 0` / `applied 0`
--- for every role: no `Run` here carries `injected_guidance`, so there
--- is no `StrategyRef` to join in the first place. With ids stable
--- across rebuilds, `retrieved 0` now means what it says — nothing has
--- been retrieved into a run's context here — rather than "something
--- was, and the last rebuild forgot it".
+-- Both rules depend on `stg_records` actually CONTAINING the run that
+-- carried the guidance, which is a s42 change too: before it, `canon
+-- dispatch begin` wrote a `Run` only to the private
+-- `<repo>/.canon/dispatch/<run_id>.json` side-channel and nothing
+-- reconciled it into a tier, so a freshly dispatched run — the only
+-- kind that carries `injected_guidance` — was invisible here and this
+-- panel read `retrieved 0` on canon's own corpus no matter how many
+-- dispatches had happened. `canon dispatch begin`/`end` now persist
+-- the run through the same `TierRegistry` as every other record (s42
+-- task group 1), so a dispatch is joinable from this view. A
+-- `retrieved 0` now means what it says: no run's recorded guidance
+-- names a strategy that exists today.
 CREATE OR REPLACE VIEW mart_flywheel_funnel AS
 WITH verdict_counts AS (
     SELECT role, CAST(sum(json_array_length(body -> '$.verdicts')) AS BIGINT) AS n
@@ -496,11 +566,12 @@ distilled_counts AS (
     GROUP BY role
 ),
 -- One row per (run, strategy actually injected into that run). Both
--- retrieval stages below are `count(DISTINCT strategy_id)` over THIS
--- single relation, `applied_counts` differing only by a `WHERE` — that
--- shared grain is what makes `applied <= retrieved` structural.
+-- retrieval stages below are counted over THIS single relation,
+-- `applied_*` differing only by a `WHERE` — that shared grain is what
+-- makes `applied <= retrieved` structural.
 retrieved_guidance AS (
     SELECT
+        r.body ->> '$.run_id' AS run_id,
         r.body ->> '$.status' AS run_status,
         si.id                 AS strategy_id,
         si.role               AS role
@@ -508,19 +579,62 @@ retrieved_guidance AS (
     JOIN stg_strategy_items si ON si.id = (g ->> '$.strategy_id')
     WHERE r.kind = 'run'
 ),
+-- s42 task 3.3, the ATTRIBUTION side: `(run, role)` pairs for which
+-- some RESOLVED trajectory of that role names that run. `DISTINCT`
+-- because a run may legitimately have derived several trajectories;
+-- this relation answers a membership question, never a count.
+attributed_runs AS (
+    SELECT DISTINCT
+        t.body ->> '$.run_id' AS run_id,
+        t.role                AS role
+    FROM stg_trajectories t
+    WHERE (t.body ->> '$.run_id') IS NOT NULL
+      AND (t.body ->> '$.outcome') IN ('success', 'failure', 'rolled-back')
+),
+applied_scored AS (
+    SELECT
+        rg.role,
+        rg.strategy_id,
+        -- Attribution FIRST, the proxy only as a fallback, `NULL` (not
+        -- applied) when neither holds. The terminal
+        -- `canon_model::records::RunStatus` variants (serialized
+        -- `snake_case`) are an allowlist, never `<> 'running'`:
+        -- `pending` is non-terminal too, and a future non-terminal
+        -- variant must not silently start counting as applied.
+        CASE
+            WHEN ar.run_id IS NOT NULL THEN 'attributed'
+            WHEN rg.run_status IN ('succeeded', 'failed', 'aborted') THEN 'proxy'
+        END AS rule
+    FROM retrieved_guidance rg
+    LEFT JOIN attributed_runs ar ON ar.run_id = rg.run_id AND ar.role = rg.role
+),
+-- One row per counted `(role, strategy)`, carrying the ONE rule that
+-- earned it. Attribution WINS over the proxy for a strategy injected
+-- into several runs, so the two split columns PARTITION `applied`
+-- instead of overlapping — a plain pair of filtered
+-- `count(DISTINCT strategy_id)`s would double-count exactly that
+-- strategy and make the two parts sum above the whole.
+applied_strategies AS (
+    SELECT
+        role,
+        strategy_id,
+        CASE WHEN bool_or(rule = 'attributed') THEN 'attributed' ELSE 'proxy' END AS rule
+    FROM applied_scored
+    WHERE rule IS NOT NULL
+    GROUP BY role, strategy_id
+),
 retrieved_counts AS (
     SELECT role, count(DISTINCT strategy_id) AS n
     FROM retrieved_guidance
     GROUP BY role
 ),
 applied_counts AS (
-    -- The terminal `canon_model::records::RunStatus` variants
-    -- (serialized `snake_case`). An allowlist, never `<> 'running'`:
-    -- `pending` is non-terminal too, and a future non-terminal variant
-    -- must not silently start counting as applied.
-    SELECT role, count(DISTINCT strategy_id) AS n
-    FROM retrieved_guidance
-    WHERE run_status IN ('succeeded', 'failed', 'aborted')
+    SELECT
+        role,
+        count(*)                                    AS n,
+        count(*) FILTER (WHERE rule = 'attributed') AS n_attributed,
+        count(*) FILTER (WHERE rule = 'proxy')      AS n_proxy
+    FROM applied_strategies
     GROUP BY role
 ),
 roles AS (
@@ -531,10 +645,12 @@ roles AS (
 )
 SELECT
     r.role,
-    coalesce(vc.n, 0) AS verdicts,
-    coalesce(dc.n, 0) AS distilled,
-    coalesce(rc.n, 0) AS retrieved,
-    coalesce(ac.n, 0) AS applied
+    coalesce(vc.n, 0)            AS verdicts,
+    coalesce(dc.n, 0)            AS distilled,
+    coalesce(rc.n, 0)            AS retrieved,
+    coalesce(ac.n, 0)            AS applied,
+    coalesce(ac.n_attributed, 0) AS applied_attributed,
+    coalesce(ac.n_proxy, 0)      AS applied_proxy
 FROM roles r
 LEFT JOIN verdict_counts   vc USING (role)
 LEFT JOIN distilled_counts dc USING (role)

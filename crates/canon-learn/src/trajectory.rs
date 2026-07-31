@@ -10,7 +10,7 @@
 //! `success|failure|pending` enum.
 
 use canon_ingest::verdict::VerdictRow;
-use canon_model::ids::{RegimeKey, RoleId};
+use canon_model::ids::{RegimeKey, RoleId, RunId};
 use chrono::{DateTime, Utc};
 
 use crate::error::LearnError;
@@ -55,6 +55,36 @@ pub struct Trajectory {
     /// [`Trajectory::with_verdict_record`] to seed a non-default value
     /// (e.g. test fixtures).
     pub verdict_record: TrajectoryVerdict,
+    /// The DISPATCHED RUN this trajectory was derived inside, when the
+    /// deriving pass was told one — s42 (`close-the-open-loops`) task
+    /// 3.1, closing s40 task 3.1, which asked
+    /// `mart_flywheel_funnel`'s `applied` stage to count "a resolved
+    /// trajectory joined to its own run" and could not be implemented
+    /// because this type carried no run at all. (The `canon-model`
+    /// record kind that does — `canon_model::records::Trajectory`, whose
+    /// partition natural key IS its run id — has zero production
+    /// writers, so conditioning the mart on it would have shipped a
+    /// column structurally pinned at `0`.)
+    ///
+    /// `None` is the honest, and overwhelmingly common, value. It is
+    /// NEVER inferred: `canon ingest artifacts` stamps this only from
+    /// its own explicit `--run <RunId>`, never from a timestamp, a
+    /// role, or the most recent dispatch manifest, because a wrong
+    /// attribution is worse than none — the mart would then assert a
+    /// relationship the corpus does not carry, the exact defect class
+    /// s39/s40/s41 spent three changes removing.
+    ///
+    /// Deliberately OUTSIDE the trajectory identity this crate's
+    /// callers digest. `crates/canon-cli/src/artifact_ingest.rs`'s
+    /// `trajectory_content_digest` folds what a trajectory SAYS (its
+    /// `regime_key`, ordered [`VerdictRow`]s and rendered
+    /// `task`/`context`) — the bytes a distilled strategy is built
+    /// from. A run id is provenance ABOUT the write, distils into
+    /// nothing, and folding it in would break write-time idempotence:
+    /// two passes over one unchanged corpus, one inside a dispatch and
+    /// one outside, would stop recognizing each other. See that
+    /// function's own doc comment.
+    pub run_id: Option<RunId>,
 }
 
 impl Trajectory {
@@ -89,7 +119,17 @@ impl Trajectory {
                 });
             }
         }
-        Ok(Self { id, regime_key, task: task.into(), context: context.into(), verdicts, recorded_at, tags, verdict_record: TrajectoryVerdict::pending() })
+        Ok(Self {
+            id,
+            regime_key,
+            task: task.into(),
+            context: context.into(),
+            verdicts,
+            recorded_at,
+            tags,
+            verdict_record: TrajectoryVerdict::pending(),
+            run_id: None,
+        })
     }
 
     pub fn role(&self) -> Result<RoleId, LearnError> {
@@ -103,6 +143,24 @@ impl Trajectory {
     /// trip.
     pub fn with_verdict_record(mut self, verdict_record: TrajectoryVerdict) -> Self {
         self.verdict_record = verdict_record;
+        self
+    }
+
+    /// Builder-style setter for [`Trajectory::run_id`] (s42
+    /// (`close-the-open-loops`) task 3.2) — the constructor always seeds
+    /// `None`, because attribution is knowledge the DERIVING PASS has
+    /// and the trace itself does not.
+    ///
+    /// Takes the caller's own `Option` verbatim rather than a bare
+    /// [`RunId`], deliberately. Every caller's attribution is itself
+    /// optional (`canon ingest artifacts` has a run only when invoked
+    /// with `--run`), so a `RunId`-taking setter would push an
+    /// `if let`/`map` branch onto each call site — and a branch that
+    /// has to decide "is there a run here" is exactly where a `None`
+    /// becomes a fabricated `Some`. Passing the `Option` through makes
+    /// absence the trivial path.
+    pub fn with_run_id(mut self, run_id: Option<RunId>) -> Self {
+        self.run_id = run_id;
         self
     }
 }
@@ -140,5 +198,27 @@ mod tests {
         let trajectory =
             Trajectory::new(TrajectoryId::new(), regime("dev"), "t", "c", vec![verdict("dev")], Utc::now(), vec![]).unwrap();
         assert_eq!(trajectory.role().unwrap(), RoleId::parse("dev").unwrap());
+    }
+
+    /// s42 (`close-the-open-loops`) task 3.1: the field is ADDITIVE and
+    /// ABSENT when unset. `new` must never invent a run — the whole
+    /// point of the field is that an unattributed trajectory says so.
+    #[test]
+    fn a_freshly_constructed_trajectory_carries_no_run() {
+        let trajectory =
+            Trajectory::new(TrajectoryId::new(), regime("dev"), "t", "c", vec![verdict("dev")], Utc::now(), vec![]).unwrap();
+        assert_eq!(trajectory.run_id, None, "attribution is never minted by the constructor");
+    }
+
+    /// The setter records exactly what it was handed, both ways — a
+    /// `None` handed in stays `None` (the ingest-outside-a-dispatch
+    /// case) rather than degrading into a fabricated id.
+    #[test]
+    fn with_run_id_records_the_callers_option_verbatim() {
+        let run_id = RunId::new();
+        let build = || Trajectory::new(TrajectoryId::new(), regime("dev"), "t", "c", vec![verdict("dev")], Utc::now(), vec![]).unwrap();
+
+        assert_eq!(build().with_run_id(Some(run_id)).run_id, Some(run_id));
+        assert_eq!(build().with_run_id(None).run_id, None);
     }
 }

@@ -99,6 +99,8 @@ export const EXPECTED_MART_SCHEMA: Record<string, ParquetColumn[]> = {
     { name: "distilled", type: "BIGINT" },
     { name: "retrieved", type: "BIGINT" },
     { name: "applied", type: "BIGINT" },
+    { name: "applied_attributed", type: "BIGINT" },
+    { name: "applied_proxy", type: "BIGINT" },
   ],
   mart_review_burndown: [
     { name: "day", type: "TIMESTAMP" },

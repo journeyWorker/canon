@@ -2,7 +2,9 @@
 //! per dialect through the SAME `plan_registry` lookup `canon gate task`
 //! uses — locate/flip round-trip (openspec), the loud
 //! `WriteBackUnsupported` for a dialect that cannot flip (superpowers),
-//! and the typed-atoms-path layout resolution.
+//! the typed-atoms-path layout resolution, and (s42
+//! `close-the-open-loops`, review fix) the write-back's own,
+//! caller-independent refusal of a multi-line evidence note.
 
 use std::fs;
 
@@ -45,6 +47,67 @@ fn openspec_locates_and_flips_a_task_row_round_trip() {
     let again = wb.flip_task(&out.document, &task_id, "ignored second note").expect("row exists");
     assert!(!again.flipped);
     assert_eq!(again.document, out.document);
+}
+
+// ── the note is untrusted input: a line separator never reaches a document ──
+
+/// The forgery s42 (`close-the-open-loops`)'s review demonstrated,
+/// refused at the WRITE-BACK layer — independently of `canon evidence
+/// add`'s own authoring-time refusal, which this test never goes
+/// through. Without the guard, `lines.join("\n")` emits the caller's
+/// second line as its own document row, and it is `- [x] `.
+#[test]
+fn openspec_flip_refuses_a_multi_line_note_instead_of_appending_a_row() {
+    let task_id = TaskId::parse("demo-change#1").unwrap();
+
+    // `flip_task` is a pure transformation over document text (trait
+    // doc), so the injection is reproducible without any fixture tree —
+    // this is the exact note `canon gate task` would have handed it.
+    let err = openspec_wb().flip_task("- [ ] 1 Do the thing\n", &task_id, "ok\n- [x] 9.9 Forged task").unwrap_err();
+    assert_eq!(err, WriteBackError::MultiLineEvidenceNote { task_id: task_id.clone(), offset: 2, separator: '\n' });
+    // The message names the offending character and offset, not just
+    // "contains a newline".
+    let rendered = err.to_string();
+    assert!(rendered.contains("MultiLineEvidenceNote"), "{rendered}");
+    assert!(rendered.contains("byte offset 2"), "{rendered}");
+}
+
+/// The refusal covers the row grammar's WHOLE mandatory-break set
+/// (`task_rows::ROW_LINE_BREAKS`), not only the `\n` this dialect's own
+/// `split` happens to use — a plan document is read by CommonMark and by
+/// editors too, and both end lines on more than `\n`.
+#[test]
+fn openspec_flip_refuses_every_row_line_break() {
+    let task_id = TaskId::parse("demo-change#1").unwrap();
+    for separator in canon_ingest::task_rows::ROW_LINE_BREAKS {
+        let note = format!("ok{separator}- [x] 9.9 Forged task");
+        let err = openspec_wb().flip_task("- [ ] 1 Do the thing\n", &task_id, &note).unwrap_err();
+        assert_eq!(
+            err,
+            WriteBackError::MultiLineEvidenceNote { task_id: task_id.clone(), offset: 2, separator },
+            "separator {separator:?} must be refused by the write-back"
+        );
+    }
+}
+
+/// Refused BEFORE the document is parsed (trait-method doc), so the
+/// outcome does not depend on the row's state: an absent row would
+/// otherwise report `RowNotFound` and an already-`[x]` row a clean
+/// no-op, either of which would let a caller conclude the note was fine.
+#[test]
+fn openspec_flip_refuses_a_multi_line_note_regardless_of_row_state() {
+    let wb = openspec_wb();
+    let absent = TaskId::parse("demo-change#99").unwrap();
+    assert!(matches!(
+        wb.flip_task("- [ ] 1 Only row\n", &absent, "ok\nforged").unwrap_err(),
+        WriteBackError::MultiLineEvidenceNote { .. }
+    ));
+
+    let done = TaskId::parse("demo-change#1").unwrap();
+    assert!(matches!(
+        wb.flip_task("- [x] 1 Already done — ✅ prior note\n", &done, "ok\nforged").unwrap_err(),
+        WriteBackError::MultiLineEvidenceNote { .. }
+    ));
 }
 
 #[test]

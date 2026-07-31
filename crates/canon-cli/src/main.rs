@@ -29,14 +29,19 @@
 //! (`corpus-authoring-scaffold`, INDEPENDENT of s16's plugin
 //! machinery) adds `canon scenario new <tag> --title <label>
 //! --feature <path>` and `canon feature new <area>.<surface> --title
-//! <label>` — see `canon_cli::scaffold`'s module doc. Every other
-//! subcommand is a later spec's responsibility.
+//! <label>` — see `canon_cli::scaffold`'s module doc. s42
+//! (`close-the-open-loops`) adds `canon evidence add` — the missing
+//! AUTHORING half of the gate loop `canon gate promote`/`canon gate
+//! task` already implemented (see `canon_cli::evidence`'s module doc) —
+//! and `canon ingest artifacts --run <RUN_ID>`, the explicit trajectory
+//! attribution edge. Every other subcommand is a later spec's
+//! responsibility.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use canon_model::envelope::RecordKind;
-use canon_model::{regime_key, ChangeId, ProjectId, RegimeKey, RoleId, RunId, RunStatus, ScenarioId, Sha, SubjectId, TaskId};
+use canon_model::{regime_key, ChangeId, EvidenceVerdict, ProjectId, RegimeKey, RoleId, RunId, RunStatus, ScenarioId, Sha, SubjectId, TaskId};
 use canon_learn::StrategyId;
 use canon_cli::scaffold::AreaSurface;
 use chrono::{DateTime, Utc};
@@ -137,6 +142,12 @@ enum Command {
     Gate {
         #[command(subcommand)]
         action: GateCommand,
+    },
+    /// Author a staged, attributed evidence attestation for a plan task
+    #[command(after_help = "Examples:\n  canon evidence add --task my-change#3.1 --kind test-run --ref 'cargo test -p canon-cli' --role implementer\n\nThe loop:\n  canon evidence add ...    Stage an EvidenceRecord\n  canon gate promote        Commit it (assigns run_seq)\n  canon gate task <id>      Flip the checkbox on it\n\nATTESTATION, NOT PROOF — canon never runs or resolves --ref.\nSee `canon evidence add --help` for exactly what the gate does and does not check.")]
+    Evidence {
+        #[command(subcommand)]
+        action: EvidenceCommand,
     },
     /// Record an attributed review verdict
     Review {
@@ -407,6 +418,9 @@ enum IngestCommand {
         /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
+        /// Attribute this pass's trajectories to a dispatched run (a RunId minted by `canon dispatch begin`)
+        #[arg(long, value_name = "RUN_ID", value_parser = canon_cli::dispatch::parse_run_id)]
+        run: Option<RunId>,
     },
     /// Import a plan corpus (openspec, superpowers) as Change/Task records
     Plans {
@@ -473,6 +487,47 @@ enum GateCommand {
     },
     /// Run the gate's self-contained fixture self-test
     Selftest,
+}
+
+#[derive(Subcommand)]
+enum EvidenceCommand {
+    /// Stage one attributed EvidenceRecord for a task (commit it with `canon gate promote`)
+    #[command(after_help = "ATTESTATION, NOT PROOF. canon never runs, resolves, or checks --ref.\nThis records that a named actor, in a named role, at a stamped time, CLAIMED\nthe named evidence supports the task — the same record whether the command\npassed, failed, or was never run.\n\nAn agent that can run this command can authorize its own checkbox: there is\nno separation between the author of an attestation and its beneficiary, no\nsignature, and no second party. What you get is attribution and an auditable\ntrail, which is what a hand-flipped checkbox left none of.\n\nWhat `canon gate task <id>` then CHECKS:\n  - a non-divergent evidence record exists for that task\n  - its note passes the fabrication-marker scan (and is a single line)\n  - on the typed path, its kind/ref equals the task atom's declared contract\n  - the plan document carries an open row for the task\n\nWhat it does NOT check:\n  - whether --ref names anything real, let alone anything that ran\n  - staleness, trust-ladder, or release-trust: none of `canon gate check`'s\n    registered checks run on this path\n  - divergence: an open divergence on the surface does not block the flip\n\nPass --command-result with the real captured output to make the claim\nauditable against something concrete. It is scanned for fabrication markers\ntoo, and it is still text you supplied.\n\nLine breaks are refused in --summary and --actor-id: both are written into\nthe plan document as ONE checkbox row.")]
+    Add {
+        /// Plan task this evidence attests to (<change_id>#<n>); validated against the plan corpus
+        #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
+        task: TaskId,
+        /// What CLASS of evidence is attested to (test-run, review, ...) — the `evidence.kind` companion
+        #[arg(long)]
+        kind: String,
+        /// The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon
+        #[arg(long = "ref", value_name = "REF")]
+        evidence_ref: String,
+        /// faithful / not-applicable / divergent
+        #[arg(long, default_value = "faithful", value_parser = canon_cli::evidence::parse_verdict)]
+        verdict: EvidenceVerdict,
+        /// One-line note; becomes the flipped row's ✅ suffix (scanned for fabrication markers; line breaks refused)
+        #[arg(long)]
+        summary: Option<String>,
+        /// The real captured output backing --summary (requires --summary; scanned for fabrication markers)
+        #[arg(long)]
+        command_result: Option<String>,
+        /// Scenario this evidence also joins to
+        #[arg(long, value_parser = canon_cli::review::parse_scenario_id)]
+        scenario_id: Option<ScenarioId>,
+        /// RunId (ULID) of the run that produced this evidence
+        #[arg(long, value_parser = canon_cli::dispatch::parse_run_id)]
+        run_id: Option<RunId>,
+        /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
+        #[arg(long, default_value = "canon")]
+        actor_id: String,
+        /// Required: `canon gate promote` derives its run_seq partition key from it
+        #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
+        role: RoleId,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -770,7 +825,7 @@ fn main() -> ExitCode {
         Command::Context { repo, json } => run_context(&repo, json),
         Command::Ingest { action } => match action {
             IngestCommand::Sessions { watch, interval_secs, home, canon_yaml, full, all_workspaces } => run_ingest_sessions(&canon_yaml, home.as_deref(), watch, interval_secs, full, all_workspaces),
-            IngestCommand::Artifacts { watch, interval_secs, repo, json } => run_ingest_artifacts(&repo, watch, interval_secs, json),
+            IngestCommand::Artifacts { watch, interval_secs, repo, json, run } => run_ingest_artifacts(&repo, watch, interval_secs, json, run.as_ref()),
             IngestCommand::Plans { dialect, source, repo, json } => run_ingest_plans(&repo, dialect.as_deref(), source.as_deref(), json),
         },
         Command::Gate { action } => match action {
@@ -781,6 +836,14 @@ fn main() -> ExitCode {
                 ExitCode::from(canon_cli::gate::run_install_hooks(&repo, &event, matcher.as_deref(), &command, timeout) as u8)
             }
             GateCommand::Selftest => ExitCode::from(canon_cli::gate::run_selftest() as u8),
+        },
+        Command::Evidence { action } => match action {
+            EvidenceCommand::Add { task, kind, evidence_ref, verdict, summary, command_result, scenario_id, run_id, actor_id, role, repo } => ExitCode::from(
+                canon_cli::evidence::run_add(
+                    &repo,
+                    &canon_cli::evidence::EvidenceArgs { task_id: task, kind, evidence_ref, verdict, summary, command_result, scenario_id, run_id, actor_id, role },
+                ) as u8,
+            ),
         },
         Command::Review { action } => match action {
             ReviewCommand::Add { project_id, scenario_id, reviewer, pin, upstream_ref, original_spec_ref, actor_id, role, repo } => ExitCode::from(
@@ -1110,9 +1173,13 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
 /// `canon_cli::artifact_ingest`'s module doc — the artifact/verdict
 /// half of canon's join spine, mirroring `run_ingest_sessions`'s
 /// scan-loop shape one level up (`--repo`-resolved, never `--home`).
-fn run_ingest_artifacts(repo: &std::path::Path, watch: bool, interval_secs: u64, json: bool) -> ExitCode {
+///
+/// `--run` is the explicit attribution edge (s42
+/// `close-the-open-loops`, task 3.2) — omitted, a trajectory records no
+/// run rather than a guessed one.
+fn run_ingest_artifacts(repo: &std::path::Path, watch: bool, interval_secs: u64, json: bool, run_id: Option<&RunId>) -> ExitCode {
     loop {
-        match canon_cli::artifact_ingest::run(repo) {
+        match canon_cli::artifact_ingest::run(repo, run_id) {
             Ok(outcome) => {
                 if json {
                     println!("{}", canon_cli::artifact_ingest::format_json(&outcome));

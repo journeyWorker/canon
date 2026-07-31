@@ -74,7 +74,7 @@ fn role_memory_matches_the_fixture_corpus_exactly() {
     let dir = tempfile::tempdir().unwrap();
     let result = marts::fetch_role_memory(&inputs(dir.path()).roots).unwrap();
 
-    assert_eq!(result.rows.len(), 2, "dev + content role rows, got {:?}", result.rows);
+    assert_eq!(result.rows.len(), 4, "dev + content + reviewer + fixer role rows, got {:?}", result.rows);
     let row = |role: &str| result.rows.iter().find(|r| r.get("role").and_then(|v| v.as_str()) == Some(role)).unwrap_or_else(|| panic!("missing row for role {role}"));
 
     let dev = row("dev");
@@ -86,6 +86,14 @@ fn role_memory_matches_the_fixture_corpus_exactly() {
     let content = row("content");
     assert_eq!(content["strategy_count"], corpus::role_memory::CONTENT_STRATEGY_COUNT);
     assert!((content["hit_rate"].as_f64().unwrap() - corpus::role_memory::CONTENT_HIT_RATE).abs() < 1e-9);
+
+    let reviewer = row("reviewer");
+    assert_eq!(reviewer["strategy_count"], corpus::role_memory::REVIEWER_STRATEGY_COUNT);
+    assert!((reviewer["hit_rate"].as_f64().unwrap() - corpus::role_memory::REVIEWER_HIT_RATE).abs() < 1e-9);
+
+    let fixer = row("fixer");
+    assert_eq!(fixer["strategy_count"], corpus::role_memory::FIXER_STRATEGY_COUNT);
+    assert!((fixer["hit_rate"].as_f64().unwrap() - corpus::role_memory::FIXER_HIT_RATE).abs() < 1e-9);
 }
 
 #[test]
@@ -97,7 +105,7 @@ fn flywheel_funnel_matches_the_fixture_corpus_exactly() {
     let dir = tempfile::tempdir().unwrap();
     let result = marts::fetch_flywheel_funnel(&inputs(dir.path()).roots).unwrap();
 
-    assert_eq!(result.rows.len(), 2, "dev + content role rows, got {:?}", result.rows);
+    assert_eq!(result.rows.len(), 4, "dev + content + reviewer + fixer role rows, got {:?}", result.rows);
     let row = |role: &str| result.rows.iter().find(|r| r.get("role").and_then(|v| v.as_str()) == Some(role)).unwrap_or_else(|| panic!("missing row for role {role}"));
 
     let dev = row("dev");
@@ -105,23 +113,96 @@ fn flywheel_funnel_matches_the_fixture_corpus_exactly() {
     assert_eq!(dev["distilled"], corpus::flywheel_funnel::DEV_DISTILLED);
     assert_eq!(dev["retrieved"], corpus::flywheel_funnel::DEV_RETRIEVED);
     assert_eq!(dev["applied"], corpus::flywheel_funnel::DEV_APPLIED);
+    assert_eq!(dev["applied_attributed"], corpus::flywheel_funnel::DEV_APPLIED_ATTRIBUTED);
+    assert_eq!(dev["applied_proxy"], corpus::flywheel_funnel::DEV_APPLIED_PROXY);
 
     let content = row("content");
     assert_eq!(content["verdicts"], corpus::flywheel_funnel::CONTENT_VERDICTS);
     assert_eq!(content["distilled"], corpus::flywheel_funnel::CONTENT_DISTILLED);
     assert_eq!(content["retrieved"], corpus::flywheel_funnel::CONTENT_RETRIEVED);
     assert_eq!(content["applied"], corpus::flywheel_funnel::CONTENT_APPLIED);
+    assert_eq!(content["applied_attributed"], corpus::flywheel_funnel::CONTENT_APPLIED_ATTRIBUTED);
+    assert_eq!(content["applied_proxy"], corpus::flywheel_funnel::CONTENT_APPLIED_PROXY);
+
+    let reviewer = row("reviewer");
+    assert_eq!(reviewer["verdicts"], corpus::flywheel_funnel::REVIEWER_VERDICTS);
+    assert_eq!(reviewer["distilled"], corpus::flywheel_funnel::REVIEWER_DISTILLED);
+    assert_eq!(reviewer["retrieved"], corpus::flywheel_funnel::REVIEWER_RETRIEVED);
+    assert_eq!(reviewer["applied"], corpus::flywheel_funnel::REVIEWER_APPLIED);
+    assert_eq!(reviewer["applied_attributed"], corpus::flywheel_funnel::REVIEWER_APPLIED_ATTRIBUTED);
+    assert_eq!(reviewer["applied_proxy"], corpus::flywheel_funnel::REVIEWER_APPLIED_PROXY);
+
+    let fixer = row("fixer");
+    assert_eq!(fixer["verdicts"], corpus::flywheel_funnel::FIXER_VERDICTS);
+    assert_eq!(fixer["distilled"], corpus::flywheel_funnel::FIXER_DISTILLED);
+    assert_eq!(fixer["retrieved"], corpus::flywheel_funnel::FIXER_RETRIEVED);
+    assert_eq!(fixer["applied"], corpus::flywheel_funnel::FIXER_APPLIED);
+    assert_eq!(fixer["applied_attributed"], corpus::flywheel_funnel::FIXER_APPLIED_ATTRIBUTED);
+    assert_eq!(fixer["applied_proxy"], corpus::flywheel_funnel::FIXER_APPLIED_PROXY);
 }
 
-/// s40 (`plan-vs-actual-diff`, task 3.2): the panel's whole claim is
-/// that it NARROWS. `applied <= retrieved <= distilled` is structural
-/// in the view — all three stages count strategies, and each is a
-/// restriction of the one above it — so it must hold for every row of
-/// any corpus, not just for the fixture's hand-checked numbers above.
-/// The `content` row is the one that earns this test: its trajectory is
-/// resolved (exactly what the pre-s40 `applied` counted) while the run
-/// its guidance went into never finished, the shape that used to render
-/// `applied` above `retrieved`.
+/// s42 (`close-the-open-loops`) task 3.3: the ATTRIBUTION rule is what
+/// closes s40 task 3.1's original wording, and it must be provably the
+/// thing producing `reviewer`'s count — not the proxy wearing a new
+/// column name.
+///
+/// `reviewer` and `content` are the SAME shape in every respect the proxy
+/// can see: one distilled strategy, cited by one run, that run still
+/// `Running`, and a RESOLVED trajectory in the store. They differ in
+/// exactly one bit — `reviewer`'s trajectory carries that run's
+/// `run_id`. So `reviewer.applied_attributed == 1` while
+/// `content.applied == 0` is a difference no `Run.status` rule could
+/// produce, and `reviewer.applied_proxy == 0` states positively that the
+/// weaker rule contributed nothing.
+#[test]
+fn applied_attribution_is_what_counts_a_resolved_trajectory_joined_to_its_own_run() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let result = marts::fetch_flywheel_funnel(&inputs(dir.path()).roots).unwrap();
+    let row = |role: &str| result.rows.iter().find(|r| r.get("role").and_then(|v| v.as_str()) == Some(role)).unwrap_or_else(|| panic!("missing row for role {role}"));
+
+    let reviewer = row("reviewer");
+    assert_eq!(reviewer["applied"], 1, "the attributed run must count as applied: {reviewer:?}");
+    assert_eq!(reviewer["applied_attributed"], 1, "and by ATTRIBUTION, not the proxy: {reviewer:?}");
+    assert_eq!(reviewer["applied_proxy"], 0, "its run never reached a terminal status, so the proxy admits nothing: {reviewer:?}");
+
+    // The control: identical in every respect the proxy can observe,
+    // differing only in the absent stamp.
+    let content = row("content");
+    assert_eq!(content["retrieved"], reviewer["retrieved"], "the control must match on the stage above");
+    assert_eq!(content["applied"], 0, "an UNSTAMPED resolved trajectory must not be attributed: {content:?}");
+
+    // And the other direction: the proxy still works where it always
+    // did, and never masquerades as attribution.
+    let dev = row("dev");
+    assert_eq!(dev["applied"], 1);
+    assert_eq!(dev["applied_proxy"], 1, "dev's terminal run is the s40 proxy: {dev:?}");
+    assert_eq!(dev["applied_attributed"], 0, "nothing stamped dev's run, so attribution admits nothing: {dev:?}");
+}
+
+/// s40 (`plan-vs-actual-diff`, task 3.2) / s42 task 3.4: the panel's
+/// whole claim is that it NARROWS. `applied <= retrieved <= distilled` is
+/// structural in the view — all three stages count strategies, and each
+/// is a restriction of the one above it — so it must hold for every row
+/// of any corpus, not just for the fixture's hand-checked numbers above.
+/// The `content` row is the one that earns the first inequality: its
+/// trajectory is resolved (exactly what the pre-s40 `applied` counted)
+/// while the run its guidance went into never finished, the shape that
+/// used to render `applied` above `retrieved`.
+///
+/// s42 adds the second half of "by construction, not by luck": splitting
+/// `applied` by rule can only widen the stage if the two rules are
+/// tallied as separate overlapping sets, so the split must PARTITION the
+/// total — `applied == applied_attributed + applied_proxy` on every row.
+/// The fixture's `fixer` role is the row that earns the partition
+/// assertion: its ONE strategy is injected into an attributed run AND a
+/// merely-terminal one, which is exactly where a naive pair of
+/// independently-filtered `count(DISTINCT strategy_id)`s would report
+/// `1 + 1` against an `applied` of `1`. The view resolves each strategy
+/// to ONE rule instead, attribution winning.
 #[test]
 fn flywheel_funnel_never_widens() {
     if !support::duckdb_available() {
@@ -136,6 +217,11 @@ fn flywheel_funnel_never_widens() {
         let count = |column: &str| row.get(column).and_then(|v| v.as_i64()).unwrap_or_else(|| panic!("missing `{column}` in {row:?}"));
         assert!(count("applied") <= count("retrieved"), "applied must never exceed retrieved: {row:?}");
         assert!(count("retrieved") <= count("distilled"), "retrieved must never exceed distilled: {row:?}");
+        assert_eq!(
+            count("applied"),
+            count("applied_attributed") + count("applied_proxy"),
+            "the two rules must PARTITION applied, never overlap: {row:?}"
+        );
     }
 }
 

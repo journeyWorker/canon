@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:10:46.990448Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib dispatch::"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 221 filtered out; finished in 0.22s",
+    "summary": "dispatch begin persists the Run through TierRegistry; a dead tier degrades to manifest-only"
+  },
+  "kind": "evidence_record",
+  "run_seq": 1,
+  "schema": 1,
+  "staging_id": "59f4ee5325af",
+  "task_id": "s42-close-the-open-loops#1.1",
+  "verdict": "faithful"
+}

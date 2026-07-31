@@ -22,6 +22,14 @@ use crate::tier_boundary;
 /// convention (`DEFAULT_LEARN_ROOT`, `DEFAULT_STRATEGIES_ROOT`).
 pub const DEFAULT_REPORT_PATH: &str = canon_model::paths::REPORT_FILE;
 
+/// The `## Flywheel funnel` panel's prose, named so the honesty
+/// property this string carries is testable on its own rather than
+/// only through a fixture-backed full render (s42
+/// (`close-the-open-loops`) re-review). Every sentence describes the
+/// EXACT relation `mart_flywheel_funnel` computes — see the call site
+/// in [`render`] for why the earlier, causal wording was wrong.
+pub const FLYWHEEL_FUNNEL_PANEL: &str = "Verdicts → distilled → retrieved → applied (`mart_flywheel_funnel`) — the last three stages count STRATEGIES, so the funnel narrows by construction. `retrieved` counts the distinct strategies some run recorded in its `injected_guidance` that are still distilled today; strategy ids are derived from a strategy's own content, so re-ingesting unchanged evidence re-derives the same ids and leaves this stage intact. `applied` is that same set narrowed to the ones whose recipient run has something recorded about how it ended — NOT how many trajectories were resolved — and `applied_attributed`/`applied_proxy` say WHICH rule earned each count, partitioning `applied` exactly. Both rules are CO-OCCURRENCE inside one run, never causation. `applied_attributed`: the strategy is named in some run's `injected_guidance`, and that SAME run has at least one trajectory of the SAME role stamped with that run id (`Trajectory.run_id`, set only by `canon ingest artifacts --run`) whose `outcome` is resolved (`success`/`failure`/`rolled-back`). `applied_proxy`: no such trajectory exists, so all that is recorded is the recipient run's own terminal `Run.status` (`succeeded`/`failed`/`aborted`). Attribution is the stronger of the two — it requires a judged outcome out of that run, not merely that the run reached a terminal state — and is still weaker than tying the outcome TO the guidance: canon stores no edge from a strategy to a verdict, so this join cannot separate guidance that was followed from guidance that was ignored in an otherwise identical run, and a second still-distilled strategy of the same role injected into the same run counts identically. Closing that gap needs a record change canon has not made — a `StrategyId` stamped on the `Trajectory`/`VerdictRow` at judgment time, joined here instead of `run_id` alone — not a re-reading of this one. A repo that never passes `canon ingest artifacts --run` reads its whole `applied` under `applied_proxy`. `applied` can never exceed `retrieved`, and `retrieved 0` means no run's recorded guidance names a strategy that exists now.\n\n";
+
 fn cell(row: &crate::query::Row, column: &str) -> String {
     match row.get(column) {
         None | Some(serde_json::Value::Null) => "—".to_string(),
@@ -105,7 +113,17 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     render_table(&mut out, &marts.session_costs);
 
     out.push_str("## Role memory\n\n");
-    out.push_str("Strategies, hit rate, effect per role namespace (`mart_role_memory`).\n\n");
+    // s42 (`close-the-open-loops`) re-review: the one-liner used to read
+    // "Strategies, hit rate, effect per role namespace", which names two
+    // quantities the view does not compute. `hit_rate` is the
+    // NOT-demoted fraction of a namespace's distilled rows, and there is
+    // no effect column at all — `avg_source_trajectories` stands in for
+    // one. The view's own comment (`crates/canon-store/sql/views.sql`,
+    // panel 3) already said so; the panel a reader actually sees did
+    // not, which is the same defect class as the funnel below.
+    out.push_str(
+        "Per-`(role, regime_key)` strategy counts (`mart_role_memory`). `hit_rate` is NOT a retrieval hit rate: it is the fraction of that namespace's distilled strategies carrying no `demotion` flag, i.e. exactly `active_count / strategy_count`. `avg_source_trajectories` is the mean number of source trajectories a strategy was distilled from — an explicitly-named stand-in, because canon records no per-strategy reward or effect metric.\n\n",
+    );
     render_table(&mut out, &marts.role_memory);
 
     out.push_str("## Flywheel funnel\n\n");
@@ -113,10 +131,36 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     // trajectories with no reference to retrieval at all, so it could
     // — and on canon's own corpus did — exceed `retrieved`, which is
     // an impossible reading for a funnel. It is now the retrieved set
-    // narrowed by the recipient run's own completion, and the last
-    // three stages share one unit (strategies). The panel says so
-    // itself rather than leaving the reader to infer it from four bare
+    // narrowed by what is recorded about the recipient run, and the
+    // last three stages share one unit (strategies). The panel says so
+    // itself rather than leaving the reader to infer it from bare
     // column names, the same posture as the burn-down panel below.
+    //
+    // s42 (`close-the-open-loops`, task 3.3): s40 could only offer the
+    // recipient run's terminal status, because the trajectory feeding
+    // this panel carried no run id — so s40 task 3.1's own wording ("a
+    // resolved trajectory joined to its own run") stayed open. It is
+    // closed now, and the prose has to distinguish the two rules
+    // rather than let one `applied` number stand for both: an
+    // attribution and a proxy make DIFFERENT claims, and quietly
+    // adding them is the same defect class as the burn-down panel that
+    // read as current state. The split is quantified in the table's own
+    // `applied_attributed`/`applied_proxy` columns, so this paragraph
+    // only has to say what each rule means and which is the weaker.
+    //
+    // s42 re-review: the first wording of that split still overreached
+    // — it said a stamped trajectory showed "the guidance was in
+    // context AND that context produced a judged outcome". The SQL
+    // joins `(run_id, role)` and nothing else, so ANY resolved
+    // trajectory of a role admits EVERY still-distilled strategy of
+    // that role injected into that run; there is no strategy→outcome
+    // edge in any record kind, hence no basis for a causal reading.
+    // This is the fourth panel on this release line to assert a
+    // relationship its query never computed (s39's model-level
+    // ceiling, s40's funnel columns, s41's burn-down-as-current-state),
+    // so the fix is not a softer adjective: the prose below states the
+    // exact join, ranks it against the proxy, and names the record
+    // change real attribution would require. Keep it that way.
     //
     // The two retrieval stages join a `Run.injected_guidance` snapshot
     // against the CURRENT distilled rows, so the prose may claim no
@@ -126,9 +170,7 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     // `StrategyId` is content-derived (`crates/canon-learn/src/ids.rs`);
     // a strategy re-derived from CHANGED evidence still lands under a
     // new id and drops out, which the wording has to leave room for.
-    out.push_str(
-        "Verdicts → distilled → retrieved → applied (`mart_flywheel_funnel`) — the last three stages count STRATEGIES, so the funnel narrows by construction. `retrieved` counts the distinct strategies some run recorded in its `injected_guidance` that are still distilled today; strategy ids are derived from a strategy's own content, so re-ingesting unchanged evidence re-derives the same ids and leaves this stage intact. `applied` is that same set narrowed to the ones whose run then reached a terminal `Run.status`, i.e. guidance was in context AND the run actually finished — NOT how many trajectories were resolved. `applied` can therefore never exceed `retrieved`, and `retrieved 0` means no run's recorded guidance names a strategy that exists now.\n\n",
-    );
+    out.push_str(FLYWHEEL_FUNNEL_PANEL);
     render_table(&mut out, &marts.flywheel_funnel);
 
     out.push_str("## Review burn-down\n\n");
@@ -158,4 +200,93 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     render_table(&mut out, &marts.subjects);
 
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::marts;
+
+    /// Phrases that assert the injected guidance DROVE the run's
+    /// outcome. `mart_flywheel_funnel` joins `(run_id, role)` and holds
+    /// no strategy -> outcome edge, so none of these may appear in a
+    /// panel a reader takes as the view's meaning (s42
+    /// (`close-the-open-loops`) re-review).
+    const CAUSAL_PHRASES: &[&str] =
+        &["produced", "caused", "acted on", "led to", "resulted in", "drove", "thanks to", "influenced", "brought about", "was effective"];
+
+    fn empty(columns: &'static [&'static str]) -> MartResult {
+        MartResult { columns, rows: Vec::new() }
+    }
+
+    fn empty_marts() -> ReportMarts {
+        ReportMarts {
+            trust_matrix: empty(marts::TRUST_MATRIX_COLUMNS),
+            session_costs: empty(marts::SESSION_COSTS_COLUMNS),
+            role_memory: empty(marts::ROLE_MEMORY_COLUMNS),
+            flywheel_funnel: empty(marts::FLYWHEEL_FUNNEL_COLUMNS),
+            review_burndown: empty(marts::REVIEW_BURNDOWN_COLUMNS),
+            scope_status: empty(marts::SCOPE_STATUS_COLUMNS),
+            subjects: empty(marts::SUBJECTS_COLUMNS),
+        }
+    }
+
+    fn rendered() -> String {
+        let digest = DigestHeader { corpus_hash: "c".to_string(), policy_hash: "p".to_string(), ledger_hash: "l".to_string() };
+        render(&digest, &empty_marts(), &[])
+    }
+
+    /// The panel must describe the join the SQL actually performs —
+    /// injection into a run PLUS a resolved trajectory of the same role
+    /// stamped with that same run — and must not imply the guidance
+    /// drove the outcome. The prose it replaced said a stamped
+    /// trajectory showed "that context produced a judged outcome",
+    /// which this test would have failed on.
+    #[test]
+    fn flywheel_funnel_panel_states_the_join_and_never_claims_causation() {
+        // Space-prefixed so a phrase only matches at a word boundary:
+        // "distilled today" contains "led to" as a substring, and a
+        // false positive there would make this test unmaintainable.
+        let panel = format!(" {}", FLYWHEEL_FUNNEL_PANEL.to_ascii_lowercase());
+        for phrase in CAUSAL_PHRASES {
+            assert!(!panel.contains(&format!(" {phrase}")), "flywheel funnel panel implies causation via {phrase:?}: {FLYWHEEL_FUNNEL_PANEL}");
+        }
+        for required in [
+            "co-occurrence",
+            "same run has at least one trajectory of the same role",
+            "trajectory.run_id",
+            "canon stores no edge from a strategy to a verdict",
+        ] {
+            assert!(panel.contains(required), "flywheel funnel panel omits {required:?}");
+        }
+        assert!(rendered().contains(FLYWHEEL_FUNNEL_PANEL), "the rendered report must carry the funnel panel verbatim");
+    }
+
+    /// Ranking is part of the claim: attribution is STRONGER than the
+    /// terminal-status proxy and WEAKER than attributing the outcome to
+    /// the guidance, and the panel has to name the record change the
+    /// stronger claim would require rather than leave it as a mood.
+    #[test]
+    fn flywheel_funnel_panel_ranks_both_rules_and_names_what_real_attribution_needs() {
+        let panel = FLYWHEEL_FUNNEL_PANEL.to_ascii_lowercase();
+        assert!(panel.contains("stronger of the two"), "the panel must rank attribution above the proxy");
+        assert!(panel.contains("weaker than tying the outcome to the guidance"), "the panel must rank attribution below real attribution");
+        assert!(
+            panel.contains("`strategyid` stamped on the `trajectory`/`verdictrow` at judgment time"),
+            "the panel must name the record change real attribution requires"
+        );
+    }
+
+    /// `mart_role_memory` has no effect column and its `hit_rate` is the
+    /// not-demoted share, never a retrieval hit rate. The one-liner used
+    /// to advertise both ("Strategies, hit rate, effect per role
+    /// namespace"); the panel now says what the view computes.
+    #[test]
+    fn role_memory_panel_describes_hit_rate_as_the_not_demoted_share() {
+        let report = rendered();
+        assert!(!report.contains("hit rate, effect per role namespace"), "the role memory panel must not advertise an effect column the view lacks");
+        assert!(report.contains("`hit_rate` is NOT a retrieval hit rate"), "the role memory panel must correct the `hit_rate` reading");
+        assert!(report.contains("exactly `active_count / strategy_count`"), "the role memory panel must give `hit_rate`'s exact formula");
+        assert!(report.contains("canon records no per-strategy reward or effect metric"), "the role memory panel must say no effect metric exists");
+    }
 }

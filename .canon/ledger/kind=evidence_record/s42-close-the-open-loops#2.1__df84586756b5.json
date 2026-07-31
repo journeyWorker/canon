@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T15:10:48.145377Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-learn --lib store::parquet_trajectory::"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 183 filtered out; finished in 0.02s",
+    "summary": "TrajectoryStore::delete_by_id removes the named row and fails loud on an unknown one"
+  },
+  "kind": "evidence_record",
+  "run_seq": 5,
+  "schema": 1,
+  "staging_id": "e5405a8d212f",
+  "task_id": "s42-close-the-open-loops#2.1",
+  "verdict": "faithful"
+}
