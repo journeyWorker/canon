@@ -28,8 +28,11 @@
 //! digests, so an adapter's normalization could change and every
 //! transcript still reported `skipped unchanged (watermark)`; a
 //! version bump now moves the identity and re-reads the source in
-//! full. Every shipped adapter is at version 1, whose id IS the
-//! pre-s40 id, so installing this invalidated nothing.
+//! full. Three of the four shipped adapters are at version 1, whose id
+//! IS the pre-s40 id, so installing this invalidated nothing;
+//! `claude-code` is at 2 because s37 (`execution-graph-topology`)
+//! genuinely changed its sidechain output, and that one adapter
+//! re-reads once to backfill the lineage.
 //!
 //! **s31 D3 (project scope).** [`ProjectScope`] resolves "this
 //! project" as the repo's main `git worktree` root plus every linked
@@ -766,6 +769,24 @@ fn file_stat(path: &Path) -> (i64, u64) {
 /// `<client_id>-v0`): it is a distinct declared generation, and
 /// colliding it with 1 would be exactly the false-equality this
 /// function otherwise avoids.
+///
+/// ## Why this rendering is injective and filename-safe
+///
+/// Both properties rest on a precondition held by the ADAPTER ID, not
+/// by this function: `canon_ingest::session_adapter_id_violation`'s
+/// grammar (lowercase `[a-z0-9-]`, no outer `-`, and neither the
+/// reserved `-v<digits>` suffix nor the `plan-` prefix), asserted over
+/// the real static registry by `canon_ingest::registry`'s tests. Given
+/// it, `(client_id, parse_version) -> id` is one-to-one — see that
+/// function's doc for the proof, and for why `omp-v2` as an adapter
+/// name is the concrete collision it rules out (`("omp", 2)` renders
+/// the same string, so the two adapters would share one watermark file
+/// and each report the other's transcripts `unchanged`). The same
+/// grammar is what makes the result a bare filename component with no
+/// separator, no `..`, no empty stem, and no case-only alias that
+/// macOS's case-insensitive default volume would collapse into one
+/// cursor — which matters because `CursorStore::path_for` joins this
+/// string onto its root verbatim.
 fn session_source_cursor_id(client_id: &str, parse_version: u32) -> String {
     if parse_version == 1 { client_id.to_string() } else { format!("{client_id}-v{parse_version}") }
 }
@@ -1370,21 +1391,114 @@ mod tests {
     }
 
     /// A cursor id is used as a bare filename component
-    /// (`CursorStore::path_for`), and one adapter must never resolve to
-    /// another's cursor. The `-v<n>` suffix makes the second property
-    /// depend on client_id shape: an adapter literally named `omp-v2`
-    /// would steal `omp`'s bumped cursor, so the shipped set is checked
-    /// for that shape rather than assumed safe.
+    /// (`CursorStore::path_for` joins it onto the cursor root
+    /// verbatim), and one adapter must never resolve to another's
+    /// cursor. Both properties are consequences of the adapter-id
+    /// grammar (`canon_ingest::session_adapter_id_violation`), so this
+    /// drives the REAL registry through the rendering and asserts the
+    /// consequences directly rather than the grammar again: every id
+    /// lowercase `[a-z0-9-]` with no outer `-` and a non-empty stem
+    /// (an empty id would render the stemless dotfile `.json`), and
+    /// every `(adapter, version)` pair landing on its OWN filename
+    /// across a version range wide enough to cross digit lengths
+    /// (`-v9` vs `-v10`, where a careless concatenation could alias).
     #[test]
     fn cursor_ids_stay_distinct_per_adapter_and_safe_as_bare_filenames() {
-        let mut seen: BTreeSet<String> = BTreeSet::new();
+        let mut seen: BTreeMap<String, (&str, u32)> = BTreeMap::new();
         for entry in registry() {
-            for version in [0u32, 1, 2, 17] {
+            assert_eq!(
+                canon_ingest::session_adapter_id_violation(entry.client_id()),
+                None,
+                "adapter id `{}` breaks the grammar this rendering's injectivity depends on",
+                entry.client_id()
+            );
+            for version in 0u32..=20 {
                 let id = session_source_cursor_id(entry.client_id(), version);
-                assert!(id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'), "cursor id `{id}` must stay a safe bare filename component");
-                assert!(seen.insert(id.clone()), "cursor id `{id}` is claimed by two (adapter, version) pairs");
+                assert!(!id.is_empty(), "an empty cursor id renders the stemless dotfile `.json`");
+                assert!(!id.starts_with('-') && !id.ends_with('-'), "cursor id `{id}` must not start or end with `-`");
+                assert!(
+                    id.bytes().all(|byte| matches!(byte, b'a'..=b'z' | b'0'..=b'9' | b'-')),
+                    "cursor id `{id}` must stay a lowercase, separator-free bare filename component"
+                );
+                if let Some(prior) = seen.insert(id.clone(), (entry.client_id(), version)) {
+                    panic!("cursor id `{id}` is claimed by both {prior:?} and ({:?}, {version})", entry.client_id());
+                }
             }
         }
+    }
+
+    /// The grammar rule that CARRIES the injectivity, stated as the
+    /// collision it prevents rather than as a property: an adapter named
+    /// `omp-v2` at version 1 renders exactly the id `omp` renders at
+    /// version 2. Nothing inside [`session_source_cursor_id`] can detect
+    /// that — both adapters would gate on `omp-v2.json`, find the
+    /// other's per-file digests there, and report their own transcripts
+    /// `unchanged`. The reserved `-v<digits>` suffix (and, for the same
+    /// reason against `plans::plan_source_cursor_id`'s family, the
+    /// reserved `plan-` prefix) is what makes such an adapter
+    /// unregisterable.
+    #[test]
+    fn the_reserved_suffix_and_prefix_are_what_stop_two_sources_sharing_one_cursor() {
+        assert_eq!(
+            session_source_cursor_id("omp-v2", 1),
+            session_source_cursor_id("omp", 2),
+            "the collision is real — which is exactly why the id grammar must forbid the name"
+        );
+        assert_eq!(
+            canon_ingest::session_adapter_id_violation("omp-v2"),
+            Some(canon_ingest::SessionAdapterIdViolation::ReservedVersionSuffix),
+            "an adapter that could steal another's bumped cursor must not be registerable"
+        );
+        assert_eq!(
+            canon_ingest::session_adapter_id_violation("plan-openspec"),
+            Some(canon_ingest::SessionAdapterIdViolation::ReservedPlanNamespace),
+            "session and plan cursors share one directory, so the plan family's prefix is not a legal session id"
+        );
+    }
+
+    /// s37 (`execution-graph-topology`), the case a blanket "every
+    /// adapter is at 1" hid: the Claude adapter's parse output CHANGED
+    /// for identical bytes — sidechain rows and directives now carry
+    /// `agent_id`/`parent_agent_id`, which `canon_ingest::normalize`
+    /// turns into child runs — so the `claude-code.json` cursor every
+    /// existing installation already holds must NOT gate this build's
+    /// parse. Drives the production composition (`registry()`'s DECLARED
+    /// `parse_version` → [`session_source_cursor_id`] →
+    /// [`base_session_cursor`] → [`SourceCursor::diff`], exactly as
+    /// [`run`] composes them) against a stored legacy cursor that
+    /// already covers the transcript. With the adapter left at `1` this
+    /// fails on the `changed_or_new` assertion: the legacy cursor IS the
+    /// v1 cursor, every untouched sidechain returns `unchanged`, and the
+    /// lineage this change ships is never backfilled.
+    #[test]
+    fn a_pre_s37_claude_cursor_cannot_suppress_the_lineage_backfill() {
+        let dir = tempfile::tempdir().unwrap();
+        let cursors = CursorStore::open(dir.path().join(paths::INGEST_CURSORS_DIR));
+        let transcript = dir.path().join(".claude/projects/-tmp-proj/sidechain.jsonl");
+        let digest = "a".repeat(64);
+        let present = BTreeMap::from([(transcript.to_string_lossy().into_owned(), digest.clone())]);
+
+        // The cursor in the field: written at the unsuffixed v1 id by
+        // the PRE-s37 normalization, already covering this transcript at
+        // the very digest it still has.
+        let mut legacy = SourceCursor::empty("claude-code");
+        legacy.record(&transcript, 0, 0, digest);
+        legacy.refresh_summary();
+        cursors.write(&legacy).unwrap();
+        assert_eq!(
+            base_session_cursor(&cursors, "claude-code", false).diff(&present).unchanged.len(),
+            1,
+            "control: the legacy cursor really does cover this transcript, so only the identity can save the backfill"
+        );
+
+        let entry = canon_ingest::registry::find("claude-code").expect("the claude-code adapter is registered");
+        let cursor_id = session_source_cursor_id(entry.client_id(), entry.adapter.parse_version());
+        assert_ne!(cursor_id, "claude-code", "changed normalization must not reuse the identity the old cursors were computed under");
+
+        let diff = base_session_cursor(&cursors, &cursor_id, false).diff(&present);
+        assert_eq!(diff.changed_or_new.len(), 1, "an untouched sidechain must be re-read once so its agent lineage is backfilled");
+        assert!(diff.unchanged.is_empty());
+        assert!(dir.path().join(".canon/ingest/cursors/claude-code.json").exists(), "the pre-s37 cursor is ORPHANED, never deleted or mutated");
     }
 
     /// s40 task 4.2, end to end on the REAL cursor a real pass wrote:

@@ -250,7 +250,11 @@ pub struct ArtifactEvent {
 ///   the whole evidentiary content of a promotion.
 /// - `evidence` — an openspec `tasks.md` checkbox flip's evidence note
 ///   (`crate::artifact_adapters::openspec_task`).
-/// - `reason` — a deferral/exemption rationale.
+/// - `reason` — a deferral/exemption rationale. Resolved through
+///   [`ArtifactEvent::prose_field`], which reads the top-level key OR
+///   the typed nested location a serialized
+///   `canon_model::records::DivergenceStatus::Deferred` puts it in
+///   (see [`ArtifactEvent::deferred_reason`]).
 /// - `title` — an openspec task row's human title: for a flip with no
 ///   evidence note this is the only prose the row has.
 /// - `disposition` — a divergence remediation's "what was done about
@@ -356,9 +360,11 @@ impl ArtifactEvent {
 
     /// Whether [`Self::evidence_line`] will carry genuine NARRATIVE —
     /// i.e. whether [`Self::salient_prose`] finds one of
-    /// `EVIDENCE_PROSE_FIELDS` — rather than degrading to the bare
-    /// [`Self::display_label`] or to the `<label>: status <token>`
-    /// fallback (s39 `joined-evidence-grounding`).
+    /// `EVIDENCE_PROSE_FIELDS` (each resolved through
+    /// [`Self::prose_field`], so a deferral's nested `reason` counts)
+    /// — rather than degrading to the bare [`Self::display_label`] or
+    /// to the `<label>: status <token>` fallback (s39
+    /// `joined-evidence-grounding`).
     ///
     /// `canon-cli::artifact_ingest`'s antecedent join needs exactly this
     /// distinction: a NON-verdict event contributes its prose as
@@ -381,16 +387,57 @@ impl ArtifactEvent {
         self.salient_prose().is_some()
     }
 
-    /// The first present, non-blank `EVIDENCE_PROSE_FIELDS` string,
-    /// compacted ([`compact_evidence_text`]). Scans in the constant's
+    /// The first present, non-blank `EVIDENCE_PROSE_FIELDS` value,
+    /// compacted ([`compact_evidence_text`]). Each field is resolved
+    /// through [`Self::prose_field`]; the scan runs in the constant's
     /// declared order and stops at the first hit, so at most one
     /// allocation ever happens.
     fn salient_prose(&self) -> Option<String> {
-        EVIDENCE_PROSE_FIELDS
-            .iter()
-            .filter_map(|field| self.detail.get(*field)?.as_str())
-            .find(|raw| !raw.trim().is_empty())
-            .map(compact_evidence_text)
+        EVIDENCE_PROSE_FIELDS.into_iter().filter_map(|field| self.prose_field(field)).find(|raw| !raw.trim().is_empty()).map(compact_evidence_text)
+    }
+
+    /// One `EVIDENCE_PROSE_FIELDS` entry's value: this event's own
+    /// top-level `detail` key, or — for `reason` alone — the typed
+    /// nested location [`Self::deferred_reason`] names.
+    ///
+    /// Taught HERE rather than flattened when the native divergence
+    /// adapter emits the event (ReviewCore offered both). Three reasons
+    /// the read side wins. `EVIDENCE_PROSE_FIELDS`' priority order is
+    /// stated exactly once, as this type's whole contract for "what
+    /// prose does this record carry" — a flatten would move half that
+    /// contract into an adapter. A flattened key is content the SOURCE
+    /// RECORD does not have, so `detail["reason"]` would stop meaning
+    /// "the record said `reason`". And every future adapter emitting a
+    /// `DivergenceStatus` would have to repeat the flatten or silently
+    /// regress; reading the typed location covers all of them at once.
+    fn prose_field(&self, field: &str) -> Option<&str> {
+        match self.detail.get(field).and_then(serde_json::Value::as_str) {
+            Some(text) => Some(text),
+            None if field == "reason" => self.deferred_reason(),
+            None => None,
+        }
+    }
+
+    /// `detail["status"]["deferred"]["reason"]` — where serde's
+    /// externally-tagged encoding of
+    /// `canon_model::records::DivergenceStatus::Deferred { reason,
+    /// expiry }` puts a deferral's rationale.
+    ///
+    /// This is the ONLY sentence a deferral has: `Divergence.detail` is
+    /// `#[serde(default, skip_serializing_if = "String::is_empty")]`,
+    /// so a deferred record with no separate narrative serializes with
+    /// no top-level prose field at all. Before this, `has_salient_prose`
+    /// answered `false` for it and `canon-cli::artifact_ingest`'s
+    /// antecedent filter dropped a record that states exactly WHY
+    /// review was postponed (ReviewCore).
+    ///
+    /// One known, typed path — never a search of arbitrary nesting.
+    /// `DivergenceStatus` is a closed enum and `reason` is a plain
+    /// `String` field on one of its variants; walking `detail` looking
+    /// for prose is how blob serialization creeps back in, which is the
+    /// exact regression `s38-evidence-bearing-memory` removed.
+    fn deferred_reason(&self) -> Option<&str> {
+        self.detail.get("status")?.get("deferred")?.get("reason")?.as_str()
     }
 }
 
@@ -400,10 +447,12 @@ impl ArtifactEvent {
 /// single-key object is serde's externally-tagged enum form
 /// (`canon_model::records::DivergenceStatus::Deferred` serializes as
 /// `{"deferred": {"reason": …, "expiry": …}}`), whose ONE key is the
-/// variant tag — the payload stays unread on purpose, because rendering
-/// it means serializing a blob. Anything else (a number, an array, a
-/// multi-key object) has no honest one-token rendering and yields
-/// `None`.
+/// variant tag. The payload stays unread HERE — rendering it means
+/// serializing a blob — which is why a deferral's `reason` is mined by
+/// [`ArtifactEvent::deferred_reason`] one step earlier, as prose, and
+/// never reaches this token fallback with anything to say. Anything
+/// else (a number, an array, a multi-key object) has no honest
+/// one-token rendering and yields `None`.
 fn state_token(value: &serde_json::Value) -> Option<&str> {
     match value {
         serde_json::Value::String(s) => Some(s.trim()).filter(|s| !s.is_empty()),
@@ -418,16 +467,47 @@ fn state_token(value: &serde_json::Value) -> Option<&str> {
 /// bytes — canon's corpora carry Korean prose, and a byte cut would
 /// split a codepoint), marking a cut with a trailing `…`
 /// (`s38-evidence-bearing-memory`).
+///
+/// Appends only THROUGH the budget instead of normalizing the whole
+/// field and truncating afterwards (ReviewCore). `detail` is
+/// caller-supplied artifact content of unbounded size, so building the
+/// full normalized copy first made a 512-char preview cost an
+/// allocation proportional to the SOURCE: the advertised bound held for
+/// the output while the peak allocation did not. The scan still walks
+/// the whole input — that is what `split_whitespace` is — but nothing
+/// past the budget is ever copied, so the returned `String`'s capacity
+/// stays bounded by the cap.
 fn compact_evidence_text(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len().min(EVIDENCE_TEXT_MAX_CHARS + 4));
+    // At most `EVIDENCE_TEXT_MAX_CHARS` chars (4 bytes each at worst)
+    // plus the 3-byte cut marker can ever land here, so the reserve is
+    // an upper bound and no growth reallocation happens.
+    let mut out = String::with_capacity(raw.len().min(EVIDENCE_TEXT_MAX_CHARS * 4 + 4));
+    let mut taken = 0usize;
+    let mut cut = false;
     for word in raw.split_whitespace() {
         if !out.is_empty() {
+            if taken == EVIDENCE_TEXT_MAX_CHARS {
+                cut = true;
+                break;
+            }
             out.push(' ');
+            taken += 1;
         }
-        out.push_str(word);
+        for c in word.chars() {
+            if taken == EVIDENCE_TEXT_MAX_CHARS {
+                cut = true;
+                break;
+            }
+            out.push(c);
+            taken += 1;
+        }
+        if cut {
+            break;
+        }
     }
-    if let Some((cut, _)) = out.char_indices().nth(EVIDENCE_TEXT_MAX_CHARS) {
-        out.truncate(cut);
+    if cut {
+        // A separator pushed just before the budget ran out is the one
+        // way `out` can end in whitespace; `…` must never follow it.
         let trimmed = out.trim_end().len();
         out.truncate(trimmed);
         out.push('…');
@@ -726,13 +806,80 @@ mod tests {
         let status = serde_json::json!({"native_kind": "divergence", "status": "still_divergent", "run_seq": 3});
         assert_eq!(event_with(ArtifactEventKind::NonVerdict, status).evidence_line(), "non-verdict: status still_divergent");
 
-        // `DivergenceStatus::Deferred`'s externally-tagged form: the
-        // variant tag is named, its payload deliberately unread.
-        let tagged = serde_json::json!({"status": {"deferred": {"reason": "waiting on design", "expiry": "2026-08-01T00:00:00Z"}}});
+        // `DivergenceStatus::Deferred`'s externally-tagged form with no
+        // reason to mine: the variant tag is named, and the rest of the
+        // payload stays unread.
+        let tagged = serde_json::json!({"status": {"deferred": {"expiry": "2026-08-01T00:00:00Z"}}});
         assert_eq!(event_with(ArtifactEventKind::NonVerdict, tagged).evidence_line(), "non-verdict: status deferred");
 
         let state = serde_json::json!({"transition": "claimed", "state": "in_review"});
         assert_eq!(event_with(ArtifactEventKind::NonVerdict, state).evidence_line(), "non-verdict: state in_review");
+    }
+
+    #[test]
+    fn a_deferred_status_reason_is_mined_as_prose_not_reduced_to_its_variant_tag() {
+        // `DivergenceStatus::Deferred { reason, expiry }` carries the
+        // ONLY sentence a deferral has, nested inside the status object,
+        // and `Divergence.detail` is skipped when empty — so this record
+        // has genuine rationale while carrying no top-level prose field
+        // at all. `has_salient_prose` answering `false` here is what made
+        // `canon-cli::artifact_ingest`'s antecedent filter drop it.
+        let deferred = serde_json::json!({
+            "native_kind": "divergence",
+            "status": {"deferred": {"reason": "waiting on the platform team's teardown decision", "expiry": "2026-08-01T00:00:00Z"}},
+        });
+        let event = native_event("divergence-native", deferred);
+        assert!(event.has_salient_prose(), "a deferral's reason is a reviewer's rationale, not canon's own vocabulary");
+        assert_eq!(event.evidence_line(), "deferred divergence: waiting on the platform team's teardown decision");
+    }
+
+    #[test]
+    fn a_deferred_status_with_a_blank_reason_is_still_no_evidence() {
+        // The nested read takes the SAME blank-is-absent posture every
+        // top-level prose field takes: a whitespace-only reason must not
+        // produce a dangling `"<label>: "` or pass the antecedent filter.
+        let deferred = serde_json::json!({"status": {"deferred": {"reason": "  \n ", "expiry": "2026-08-01T00:00:00Z"}}});
+        let event = event_with(ArtifactEventKind::NonVerdict, deferred);
+        assert!(!event.has_salient_prose());
+        assert_eq!(event.evidence_line(), "non-verdict: status deferred");
+    }
+
+    #[test]
+    fn the_nested_deferral_reason_is_a_fallback_for_its_own_slot_never_a_new_priority() {
+        // It fills the `reason` slot only when the top-level key is
+        // absent, so `EVIDENCE_PROSE_FIELDS`' declared order is
+        // untouched: `detail` still outranks `reason`, and a top-level
+        // `reason` still outranks the nested one.
+        let both = serde_json::json!({
+            "reason": "top-level rationale",
+            "status": {"deferred": {"reason": "nested rationale", "expiry": "2026-08-01T00:00:00Z"}},
+        });
+        assert_eq!(event_with(ArtifactEventKind::NonVerdict, both).evidence_line(), "non-verdict: top-level rationale");
+
+        let with_detail = serde_json::json!({
+            "detail": "SHIP-BLOCKER teardown races HMR",
+            "status": {"deferred": {"reason": "nested rationale", "expiry": "2026-08-01T00:00:00Z"}},
+        });
+        assert_eq!(event_with(ArtifactEventKind::NonVerdict, with_detail).evidence_line(), "non-verdict: SHIP-BLOCKER teardown races HMR");
+    }
+
+    #[test]
+    fn compacting_a_multi_megabyte_field_allocates_only_the_capped_prefix() {
+        // The 512-char bound applied to the OUTPUT while the peak
+        // allocation stayed proportional to the INPUT: the whole
+        // normalized artifact string was built first and truncated
+        // afterwards. `capacity` is the observable that separates the
+        // two, since `String::truncate` never gives memory back.
+        let fat = "word ".repeat(200_000);
+        let line = compact_evidence_text(&fat);
+        assert_eq!(line.chars().count(), EVIDENCE_TEXT_MAX_CHARS + 1, "the cap plus its one-char cut marker");
+        assert!(line.ends_with('…'), "a cut is marked, never silent");
+        assert!(
+            line.capacity() <= EVIDENCE_TEXT_MAX_CHARS * 4 + 8,
+            "artifact ingest must never allocate the discarded suffix of a caller-supplied field: {} bytes held for a {}-char preview",
+            line.capacity(),
+            EVIDENCE_TEXT_MAX_CHARS
+        );
     }
 
     #[test]

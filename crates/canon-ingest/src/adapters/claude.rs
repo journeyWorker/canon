@@ -166,16 +166,35 @@ impl SessionAdapter for ClaudeCodeAdapter {
         "claude-code"
     }
 
-    /// `1` — this adapter's normalization is unchanged since it
-    /// shipped, so `1` is the value that re-reads nothing: every
-    /// session cursor already on disk was computed against exactly
-    /// this parse output. Bump it the moment a change in this file
-    /// alters what an UNCHANGED `.jsonl` transcript normalizes to
-    /// (a new field, a changed sidechain/`dedup_key` rule, a
-    /// different usage gate) — see
-    /// [`SessionAdapter::parse_version`].
+    /// `2` — bumped by s37 (`execution-graph-topology`), and the ONLY
+    /// shipped session adapter above `1`. This file's parse output for
+    /// a BYTE-IDENTICAL `.jsonl` transcript changed: a sidechain
+    /// transcript's rows and directives now carry
+    /// `agent_id`/`parent_agent_id` (see the module doc's
+    /// execution-lineage paragraph and `parse_claude_file` below), and
+    /// those are precisely the fields `canon_ingest::normalize` reads
+    /// to mint a child `Run` and its `parent_run_id` edge. So an
+    /// unchanged sidechain now normalizes to strictly MORE records than
+    /// before.
+    ///
+    /// That is what makes `1` wrong here rather than merely
+    /// conservative. Every existing installation holds an unsuffixed
+    /// `claude-code.json` cursor whose per-file digests were computed
+    /// against the OLD normalization; at `1` the cursor id is that same
+    /// unsuffixed name, `SourceCursor::diff` reports every untouched
+    /// sidechain `unchanged`, and the execution lineage this change
+    /// ships is never backfilled — invisibly, with no `--full` to
+    /// suggest otherwise. `2` moves the identity to
+    /// `claude-code-v2.json`, so the lookup misses, the source re-reads
+    /// in full exactly once, and the stale cursor is orphaned rather
+    /// than mutated. The one-time re-read is the cost of the fields
+    /// being real; the alternative is shipping them dark.
+    ///
+    /// omp/codex/hermes stay at `1`: s37 gave them the same two fields
+    /// as a constant `None`, which changes no byte of their output —
+    /// see [`SessionAdapter::parse_version`].
     fn parse_version(&self) -> u32 {
-        1
+        2
     }
 
     fn scan_roots(&self, home: &Path, use_env_roots: bool) -> Vec<PathBuf> {

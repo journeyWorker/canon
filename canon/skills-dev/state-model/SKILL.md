@@ -113,7 +113,7 @@ three can never drift relative to each other because they come from the
 same macro-invocation literal. `crate::join_spine_doc::rows()` reads
 those same constants to build the generated `JOIN_SPINE.md`.
 
-Adding a ninth key (should the design ever call for one) means: a new
+Adding a tenth key (should the design ever call for one) means: a new
 `join_key_newtype!` invocation, a hand-written `parse`/grammar-check
 `impl` block below it (kept out of the macro so grammars stay ordinary,
 testable Rust), unit tests for accept/reject cases, and a new row added

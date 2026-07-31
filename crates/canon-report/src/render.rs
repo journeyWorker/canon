@@ -117,8 +117,17 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     // three stages share one unit (strategies). The panel says so
     // itself rather than leaving the reader to infer it from four bare
     // column names, the same posture as the burn-down panel below.
+    //
+    // The two retrieval stages join a `Run.injected_guidance` snapshot
+    // against the CURRENT distilled rows, so the prose may claim no
+    // more than "still distilled today" — it deliberately does NOT say
+    // "ever injected". That stronger reading was false while a rebuild
+    // re-keyed the strategy layer, and is only near-true now that
+    // `StrategyId` is content-derived (`crates/canon-learn/src/ids.rs`);
+    // a strategy re-derived from CHANGED evidence still lands under a
+    // new id and drops out, which the wording has to leave room for.
     out.push_str(
-        "Verdicts → distilled → retrieved → applied (`mart_flywheel_funnel`) — the last three stages count STRATEGIES, so the funnel narrows by construction. `retrieved` is how many distilled strategies were ever injected into a run's context; `applied` is that same set narrowed to the ones whose run then reached a terminal `Run.status`, i.e. guidance was in context AND the run actually finished — NOT how many trajectories were resolved. `applied` can therefore never exceed `retrieved`, and `retrieved 0` means the retrieval loop has never closed here.\n\n",
+        "Verdicts → distilled → retrieved → applied (`mart_flywheel_funnel`) — the last three stages count STRATEGIES, so the funnel narrows by construction. `retrieved` counts the distinct strategies some run recorded in its `injected_guidance` that are still distilled today; strategy ids are derived from a strategy's own content, so re-ingesting unchanged evidence re-derives the same ids and leaves this stage intact. `applied` is that same set narrowed to the ones whose run then reached a terminal `Run.status`, i.e. guidance was in context AND the run actually finished — NOT how many trajectories were resolved. `applied` can therefore never exceed `retrieved`, and `retrieved 0` means no run's recorded guidance names a strategy that exists now.\n\n",
     );
     render_table(&mut out, &marts.flywheel_funnel);
 

@@ -72,7 +72,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use canon_ingest::{find_plan_adapter, WriteBackError};
+use canon_ingest::{find_plan_adapter, PlanSourceConfig};
 use canon_learn::guidance::retrieve_guidance;
 use canon_learn::{LearnConfig, ParquetStrategyStore};
 use canon_model::envelope::{Actor, Envelope, RecordKind};
@@ -128,11 +128,14 @@ pub enum DispatchError {
     )]
     NoPlanSources { task_id: String },
 
-    /// The plan corpus could not be consulted at all — a malformed
-    /// `canon.yaml` `plans:` section (which `crate::plans` already
-    /// fails loud on) or an unreadable located plan document. Never
-    /// collapsed into "task not found": a corpus that cannot be read
-    /// has not answered the question either way.
+    /// The plan corpus could not be CONSULTED at all — a malformed
+    /// `canon.yaml` `plans:` section, which `crate::plans` already
+    /// fails loud on. Never collapsed into "task not found": a
+    /// configuration that cannot be read has not answered the question
+    /// either way. An individual unreadable/broken document INSIDE a
+    /// readable source is not this: the adapter names it in
+    /// `PlanParseOutcome::malformed` and the scan continues
+    /// ([`validate_task_binding`]).
     #[error("resolving --task `{task_id}` against the plan corpus: {detail}")]
     PlanCorpus { task_id: String, detail: String },
 
@@ -153,6 +156,46 @@ pub enum DispatchError {
         "--run `{run_id}` already ended at {ended_at} with status `{status}` — ended_at is provenance and re-closing would silently rewrite it; remove the manifest deliberately if the first close was wrong"
     )]
     AlreadyEnded { run_id: String, ended_at: String, status: &'static str },
+
+    /// `canon dispatch end` on a manifest that is not in the ONE
+    /// closeable lifecycle state ([`end`]'s transition predicate:
+    /// `Running` with no `ended_at`). Distinct from
+    /// [`DispatchError::AlreadyEnded`], which reports a close that
+    /// genuinely happened and is dated: this reports a manifest whose
+    /// recorded state cannot be the origin of the requested
+    /// transition at all — a `pending` run that was never dispatched
+    /// live, or a hand-edited manifest carrying a TERMINAL status with
+    /// no `ended_at` to prove when it closed. Collapsing the two would
+    /// let an internally inconsistent manifest be silently stamped
+    /// with a fresh timestamp and a possibly different status, which
+    /// is precisely the provenance rewrite `AlreadyEnded` exists to
+    /// refuse.
+    #[error(
+        "--run `{run_id}` records status `{status}`, which is not a run this command can close — `dispatch end` performs exactly one transition, `running` (with no ended_at) -> a terminal status; repair or remove the manifest deliberately"
+    )]
+    NotRunning { run_id: String, status: &'static str },
+
+    /// The manifest at `<run_id>.json` names a DIFFERENT `run_id`
+    /// inside. The filename is the side-channel's only index, so a
+    /// disagreement means the close would stamp a terminal status onto
+    /// a run the operator did not name — a copied or hand-renamed
+    /// manifest, never something to guess through.
+    #[error(
+        "the dispatch manifest at {path} records run_id `{found}` but is filed under `{expected}` — the filename is this side-channel's only index, so closing it would stamp a terminal status onto a run you did not name"
+    )]
+    RunIdMismatch { path: String, expected: String, found: String },
+
+    /// Another `canon dispatch end` holds this run's exclusive lock
+    /// sidecar. NOT a usage error (exit `1`): the invocation is
+    /// perfectly well-formed and the correct response is to retry once
+    /// the other close finishes. A sidecar left behind by a KILLED
+    /// process is reported by path here, so an operator can remove it
+    /// deliberately — the same posture [`DispatchError::AlreadyEnded`]
+    /// takes toward a manifest the CLI will not guess about.
+    #[error(
+        "--run `{run_id}` is being closed by another process (lock held at {lock_path}) — retry once it finishes, or remove that sidecar if the holder was killed"
+    )]
+    EndInProgress { run_id: String, lock_path: String },
 
     /// The manifest exists but does not deserialize as a `Run`.
     #[error("the dispatch manifest at {path} is not a readable Run record: {detail}")]
@@ -175,8 +218,13 @@ impl DispatchError {
             | Self::PlanCorpus { .. }
             | Self::NoSuchRun { .. }
             | Self::AlreadyEnded { .. }
+            | Self::NotRunning { .. }
+            | Self::RunIdMismatch { .. }
             | Self::Unreadable { .. } => true,
-            Self::Io(_) | Self::Serialize(_) => false,
+            // A concurrent close and a filesystem failure are both
+            // "the invocation was fine, the machine was busy or
+            // broken" — exit `1`, retryable, never a flag to fix.
+            Self::EndInProgress { .. } | Self::Io(_) | Self::Serialize(_) => false,
         }
     }
 }
@@ -227,16 +275,14 @@ pub struct DispatchBinding {
 }
 
 /// Resolve `task_id` against the repo's configured plan corpus (s40
-/// task 1.2), reusing the EXACT path `canon gate task` resolves a flip
-/// through (`crate::gate::run_task`): `canon.yaml`'s `plans:` sources,
-/// each dialect looked up in `canon_ingest::plan_registry`, and the
-/// first source whose [`PlanWriteBack::locate_task`] finds the change's
-/// document wins. Never a second resolution convention — a task
-/// bindable here but unflippable by the gate (or the reverse) would be
-/// its own divergence.
+/// task 1.2), through the SAME `canon.yaml` `plans:` sources and the
+/// SAME `canon_ingest::plan_registry` dialect lookup `canon gate task`
+/// resolves a flip through (`crate::gate::run_task`). Never a second
+/// resolution convention — a task bindable here but unflippable by
+/// the gate (or the reverse) would be its own divergence.
 ///
-/// Two deliberate departures from `canon gate task`, both because this
-/// is a READ:
+/// Three deliberate departures from `canon gate task`, all because
+/// this is a READ:
 ///
 /// 1. **No compat default.** `crate::plans::load_plan_sources_for_gate`
 ///    substitutes `[{ dialect: openspec, root: <repo> }]` when `plans:`
@@ -245,17 +291,38 @@ pub struct DispatchBinding {
 ///    in openspec @ <repo>" against a source the operator never
 ///    configured is misleading. Zero configured sources is therefore
 ///    its own error, [`DispatchError::NoPlanSources`].
-/// 2. **Row-level, not file-level.** `locate_task` is FILE existence
-///    only (its own doc): a `<change_id>` resolves to a document
-///    whether or not row `<n>` is inside it. So the winning dialect's
-///    PURE [`PlanWriteBack::flip_task`] serves as the row probe and its
-///    output is DISCARDED — it is the only row-existence check the
-///    trait exposes, it takes the already-read document text and
-///    returns a new `String`, and this function performs no write of
-///    any kind. A dialect that cannot flip at all
-///    ([`WriteBackError::Unsupported`], or no registered write-back)
-///    can only answer at document granularity, and that answer is
-///    accepted rather than inflated into a false "unknown task".
+/// 2. **The PARSED task set, never the write-back.** Membership is
+///    `task_id ∈ PlanParseOutcome::tasks` — the very `Task` candidates
+///    `canon ingest plans` would persist for this source, so a
+///    bindable id is by construction an id the corpus actually
+///    carries. The write-back trait cannot answer this question:
+///    [`canon_ingest::PlanWriteBack::locate_task`] is FILE existence
+///    only (its own doc), and `flip_task` — the one row-level probe
+///    the trait exposes — returns
+///    [`canon_ingest::WriteBackError::Unsupported`] for EVERY id in
+///    the shipped superpowers dialect, which would accept
+///    `<real-change>#999` and persist exactly the dangling
+///    `Run.task_id` this validation exists to prevent.
+/// 3. **Every source is searched.** A change id may legitimately
+///    appear in more than one configured source (the plan-import
+///    driver's own `duplicate_change_id` diagnostic exists because
+///    that happens), and the row may live in the second one. So the
+///    first source CARRYING THE ROW wins and rejection happens only
+///    after the whole list is exhausted — never on the first source
+///    that merely owns the change document.
+///
+/// The bar is therefore the IMPORTER's, not the flipper's: a
+/// construct the dialect adapter rejects wholesale (an openspec change
+/// dir with no `proposal.md`, a markdown file the superpowers dialect
+/// reads as a docs README) yields no `Task` candidate, so no id under
+/// it is bindable — which is the right answer, because no `Task`
+/// record for that id exists in the ledger or ever will, and a
+/// `Run.task_id` pointing at one is the dangling binding s40 exists to
+/// refuse.
+///
+/// Read-only by construction: `PlanAdapter::parse` is the same pure
+/// scan+parse `canon ingest plans` runs before its persist step, and
+/// nothing here touches a tier or rewrites a plan document.
 fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(), DispatchError> {
     let named = || task_id.as_str().to_string();
     let sources = crate::plans::load_plan_sources_from_config(&repo.join("canon.yaml"), repo)
@@ -272,30 +339,21 @@ fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(), DispatchEr
         // same reasoning (and the same `expect`) `crate::plans`' own
         // scan loop already states.
         let entry = find_plan_adapter(src.dialect()).expect("dialect validated by load_plan_sources_from_config");
-        // No write-back capability at all: this source cannot answer
-        // the row question. A LATER source may still hold the task, so
-        // move on rather than decide here.
-        let Some(write_back) = entry.write_back else {
+        // `None` only when the root is unconfigured, which
+        // `load_plan_sources_from_config` cannot produce; a source
+        // that cannot resolve simply contributes no tasks, exactly as
+        // it contributes no candidates to an import pass.
+        let Some(handle) = entry.adapter.resolve_source(&PlanSourceConfig { root: Some(src.root().to_path_buf()) }) else {
             continue;
         };
-        let Some(location) = write_back.locate_task(src.root(), task_id) else {
-            continue;
-        };
-        // First source locating the change wins, exactly as the gate's
-        // resolution does — the decision is made HERE, never deferred
-        // to a later source that happens to carry the same change id.
-        let document = std::fs::read_to_string(&location.document_path).map_err(|e| DispatchError::PlanCorpus {
-            task_id: named(),
-            detail: format!("cannot read {}: {e}", location.document_path.display()),
-        })?;
-        return match write_back.flip_task(&document, task_id, "") {
-            // The row exists (whether still `[ ]` or already `[x]`).
-            // The rewritten document is dropped unread — probe only,
-            // never a write.
-            Ok(_) => Ok(()),
-            Err(WriteBackError::RowNotFound(_)) => Err(DispatchError::TaskNotFound { task_id: named(), consulted: consulted.join("; ") }),
-            Err(WriteBackError::Unsupported { .. }) => Ok(()),
-        };
+        // A malformed construct inside the source is skipped-and-named
+        // by the adapter itself (`PlanParseOutcome::malformed`), never
+        // a panic and never a corpus-level failure — so an unreadable
+        // neighbouring document cannot make a perfectly good task id
+        // unbindable.
+        if entry.adapter.parse(&handle).tasks.iter().any(|task| task.task_id == *task_id) {
+            return Ok(());
+        }
     }
     Err(DispatchError::TaskNotFound { task_id: named(), consulted: consulted.join("; ") })
 }
@@ -458,6 +516,70 @@ pub struct Ended {
     pub run: Run,
 }
 
+/// The exclusive per-run sidecar [`end`] holds across its whole
+/// read -> validate -> replace sequence: `<run_id>.json.lock`, beside
+/// the manifest it guards.
+///
+/// # Why a lock at all, and why THIS one
+/// Without it the close is a read/check/write TOCTOU: two concurrent
+/// `canon dispatch end` processes both observe `ended_at: None`, both
+/// pass the transition check, and both replace the manifest — the
+/// later writer silently overwriting the first close's status and
+/// timestamp. [`write_atomic`] cannot help: it makes ONE write
+/// all-or-nothing, it does not make read-then-write exclusive.
+///
+/// `create_new` is the mechanism because it is the one exclusion
+/// primitive `std::fs` already exposes — an `O_CREAT|O_EXCL` create,
+/// atomic on every filesystem canon targets — so no new dependency
+/// (`fs2`, `fd-lock`) joins the tree for a single call site. It is a
+/// separate FILE rather than a lock on the manifest itself because
+/// `write_atomic` replaces the manifest by rename: any handle-based
+/// lock would be attached to the inode that rename discards.
+///
+/// The `.lock` suffix keeps the sidecar out of
+/// [`read_dispatch_manifests`]' `*.json` scan by construction.
+///
+/// Released on Drop, so BOTH the success path and every rejection
+/// return unlock. A sidecar surviving that only means the holder was
+/// killed outright; [`DispatchError::EndInProgress`] names its path so
+/// an operator removes it deliberately — never auto-reaped on a
+/// guessed age, which would reintroduce exactly the race it exists to
+/// close.
+struct EndLock {
+    path: PathBuf,
+}
+
+impl EndLock {
+    /// Take the lock for `manifest_path`, or report who holds it.
+    /// Callers MUST already have established the manifest's directory
+    /// exists (a `dispatch end` that mints `.canon/dispatch/` for a run
+    /// that was never begun would be its own defect).
+    fn acquire(manifest_path: &Path, run_id: RunId) -> Result<Self, DispatchError> {
+        // `<run_id>.json` -> `<run_id>.json.lock`. Total by
+        // construction: a `RunId`'s Display is a ULID (26 alphanumeric
+        // characters, never a dot), so the manifest's extension is
+        // always exactly `json`.
+        let path = manifest_path.with_extension("json.lock");
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(_) => Ok(Self { path }),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                Err(DispatchError::EndInProgress { run_id: run_id.to_string(), lock_path: path.display().to_string() })
+            }
+            Err(e) => Err(DispatchError::Io(e)),
+        }
+    }
+}
+
+impl Drop for EndLock {
+    fn drop(&mut self) {
+        // Best-effort by necessity: a destructor cannot report, and
+        // panicking here would replace a recoverable stale sidecar
+        // with an abort. A removal that fails leaves a lock the NEXT
+        // `end` names by path, which is strictly the better failure.
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
 /// Close a dispatched run: read `<repo>/.canon/dispatch/<run_id>.json`,
 /// stamp a terminal [`RunStatus`] and `ended_at`, and rewrite the
 /// manifest through the SAME atomic write [`begin`] used to create it
@@ -467,23 +589,60 @@ pub struct Ended {
 /// every dispatched run stayed `Running` forever and the flywheel
 /// funnel's last stage had nothing to compute from.
 ///
-/// # Re-closing is a LOUD failure, never a silent overwrite
-/// A run already carrying `ended_at` is rejected
-/// ([`DispatchError::AlreadyEnded`]). `ended_at` and the terminal
-/// status are PROVENANCE — the observed close of a real run — so a
-/// second `end` would rewrite that history in place, at a later
-/// instant and possibly under a different status, leaving no trace the
-/// first close happened. An operator who genuinely closed the wrong
-/// run removes the manifest deliberately; the CLI never guesses that
-/// for them.
+/// # Exactly ONE transition, taken under an exclusive lock
+/// The predicate is `(RunStatus::Running, ended_at: None)` -> the
+/// requested terminal status, and nothing else — the status is
+/// checked, not merely the timestamp. Reading `ended_at` alone would
+/// accept an internally inconsistent manifest whose status is already
+/// `succeeded`/`failed` but whose `ended_at` is absent (a hand edit, a
+/// partial restore) and stamp it with a fresh instant, inventing a
+/// close time for a run that did not close then. Every other state is
+/// rejected: an already-dated close as
+/// [`DispatchError::AlreadyEnded`], any other origin status as
+/// [`DispatchError::NotRunning`], and a manifest whose own `run_id`
+/// disagrees with the filename it is filed under as
+/// [`DispatchError::RunIdMismatch`].
+///
+/// The read, the validation, and the replacement all happen while
+/// [`EndLock`] is held, so the whole sequence is exclusive per run:
+/// the second of two concurrent closes fails on the lock
+/// ([`DispatchError::EndInProgress`]) or, if it arrives after the
+/// first released, on `AlreadyEnded` — never by silently overwriting.
+///
+/// # A rejected end leaves the manifest BYTE-IDENTICAL
+/// Every rejection returns before the single [`write_atomic`] call,
+/// which is the only write in this function; nothing is opened for
+/// writing and no field is mutated in a `Run` that is ever serialized
+/// on a rejection path. `ended_at` and the terminal status are
+/// PROVENANCE — the observed close of a real run — so rewriting them
+/// at a later instant under a possibly different status would leave
+/// no trace the first close happened. An operator who genuinely closed
+/// the wrong run removes the manifest deliberately; the CLI never
+/// guesses that for them.
 pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, DispatchError> {
     let repo = resolve_repo_root(repo);
     let manifest_path = repo.join(DISPATCH_DIR).join(format!("{run_id}.json"));
+    // Probe BEFORE taking the lock, purely so an unknown run never
+    // causes `.canon/dispatch/` (and a sidecar inside it) to be minted
+    // for a run that was never begun. Only ABSENCE is "no such run": a
+    // permission or I/O failure on a manifest that does exist stays a
+    // real failure (exit `1`), never reported as a run the operator
+    // never began.
+    match std::fs::metadata(&manifest_path) {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(DispatchError::NoSuchRun { run_id: run_id.to_string(), path: manifest_path.display().to_string() });
+        }
+        Err(e) => return Err(DispatchError::Io(e)),
+    }
+    let _lock = EndLock::acquire(&manifest_path, run_id)?;
+
     let text = match std::fs::read_to_string(&manifest_path) {
         Ok(text) => text,
-        // Only ABSENCE is "no such run". A permission or I/O failure on
-        // a manifest that does exist stays a real failure (exit `1`),
-        // never reported as a run the operator never began.
+        // Still reachable under the lock: the manifest can be removed
+        // between the probe and here by something that is not another
+        // `dispatch end` (an operator deleting a wrongly-closed run,
+        // this module's documented remedy).
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             return Err(DispatchError::NoSuchRun { run_id: run_id.to_string(), path: manifest_path.display().to_string() });
         }
@@ -491,12 +650,29 @@ pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, Dispa
     };
     let mut run: Run = serde_json::from_str(&text)
         .map_err(|e| DispatchError::Unreadable { path: manifest_path.display().to_string(), detail: e.to_string() })?;
-    if let Some(ended_at) = run.ended_at {
-        return Err(DispatchError::AlreadyEnded {
-            run_id: run_id.to_string(),
-            ended_at: ended_at.to_rfc3339(),
-            status: status_slug(run.status),
+    if run.run_id != run_id {
+        return Err(DispatchError::RunIdMismatch {
+            path: manifest_path.display().to_string(),
+            expected: run_id.to_string(),
+            found: run.run_id.to_string(),
         });
+    }
+    match (run.status, run.ended_at) {
+        // The one closeable state.
+        (RunStatus::Running, None) => {}
+        // A dated close already exists — the provenance case.
+        (recorded, Some(ended_at)) => {
+            return Err(DispatchError::AlreadyEnded {
+                run_id: run_id.to_string(),
+                ended_at: ended_at.to_rfc3339(),
+                status: status_slug(recorded),
+            });
+        }
+        // Undated, but not a running run: `pending`, or a terminal
+        // status with no timestamp to prove when it closed.
+        (recorded, None) => {
+            return Err(DispatchError::NotRunning { run_id: run_id.to_string(), status: status_slug(recorded) });
+        }
     }
 
     run.status = status;
@@ -511,8 +687,10 @@ pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, Dispa
 }
 
 /// `canon dispatch end`'s CLI wrapper: `0` on a rewritten manifest, `2`
-/// on a usage failure (unknown run id, an already-ended run, an
-/// unreadable manifest), `1` on a write/serialize failure — the same
+/// on a usage failure (unknown run id, an already-ended run, a
+/// manifest that is not in the one closeable state or is filed under
+/// the wrong run id, an unreadable manifest), `1` on a write/serialize
+/// failure or a close another process is already holding — the same
 /// three-way contract [`run_begin`] and `canon gate` use.
 pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> ExitCode {
     match end(repo, run_id, status) {
@@ -806,21 +984,98 @@ fn read_kind(repo: &Path, kind: RecordKind, notes: &mut Vec<String>) -> Vec<Valu
 /// tier would report zero observed edges no matter how many runs were
 /// dispatched with `--task`/`--parent-run`.
 ///
+/// # Every degrade is NAMED, and only `Run` bytes get in
 /// Paths are sorted so the scan order is data-derived rather than
-/// directory order. An absent directory is the ordinary
-/// never-dispatched-here case and produces no note; a manifest that
-/// will not read or parse is skipped WITH one.
+/// directory order, and so are the notes this produces.
+///
+/// An ABSENT directory is the ordinary never-dispatched-here case and
+/// produces no note. Any OTHER `read_dir` failure (a permission
+/// change, a mount that went away) does produce one: silently
+/// returning empty there is indistinguishable from "nothing was ever
+/// dispatched", so every live observed edge would vanish from the
+/// report with no diagnostic at all.
+///
+/// Each file is deserialized as a TYPED [`Run`], never as a bare
+/// `serde_json::Value`. [`observed_edges`] reads four strings off a
+/// record; against untyped JSON, any hand-written or stray file in
+/// this directory that happens to carry `run_id`/`task_id`/
+/// `parent_run_id` would invent an edge indistinguishable from a real
+/// dispatch. The typed parse makes the whole `Run` shape the
+/// admission bar. The manifest's own `run_id` must ALSO agree with the
+/// filename it is filed under — the filename is this side-channel's
+/// only index ([`end`] resolves a close through it), so a copied or
+/// renamed manifest is ambiguous evidence, not extra evidence.
+///
+/// Anything skipped — an unreadable entry, a non-`Run` body, a
+/// misfiled `run_id` — is skipped WITH a note. Notes reach stderr via
+/// [`run_diff`]; the report itself still succeeds, because this is a
+/// read-only surface that degrades rather than gates.
 fn read_dispatch_manifests(repo: &Path, notes: &mut Vec<String>) -> Vec<Value> {
-    let Ok(entries) = std::fs::read_dir(repo.join(DISPATCH_DIR)) else { return Vec::new() };
-    let mut paths: Vec<PathBuf> =
-        entries.filter_map(Result::ok).map(|entry| entry.path()).filter(|path| path.extension().is_some_and(|ext| ext == "json")).collect();
+    let dir = repo.join(DISPATCH_DIR);
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Vec::new(),
+        Err(e) => {
+            notes.push(format!(
+                "dispatch side-channel {} could not be listed ({e}) — no live dispatch run contributes an observed edge",
+                dir.display()
+            ));
+            return Vec::new();
+        }
+    };
+
+    let mut paths: Vec<PathBuf> = Vec::new();
+    // Collected and sorted rather than pushed straight through: a
+    // dirent error carries no path, so directory-iteration order is
+    // the only order available and it is not data-derived.
+    let mut entry_errors: Vec<String> = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(entry) => {
+                let path = entry.path();
+                if path.extension().is_some_and(|ext| ext == "json") {
+                    paths.push(path);
+                }
+            }
+            Err(e) => entry_errors.push(format!("a dispatch side-channel entry under {} could not be read ({e}) — skipped", dir.display())),
+        }
+    }
     paths.sort();
+    entry_errors.sort();
+    notes.append(&mut entry_errors);
 
     let mut runs = Vec::with_capacity(paths.len());
     for path in paths {
-        match std::fs::read_to_string(&path).ok().and_then(|text| serde_json::from_str::<Value>(&text).ok()) {
-            Some(manifest) => runs.push(manifest),
-            None => notes.push(format!("unreadable dispatch manifest {} — skipped", path.display())),
+        let text = match std::fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(e) => {
+                notes.push(format!("unreadable dispatch manifest {} ({e}) — skipped", path.display()));
+                continue;
+            }
+        };
+        let run: Run = match serde_json::from_str(&text) {
+            Ok(run) => run,
+            Err(e) => {
+                notes.push(format!("dispatch manifest {} is not a readable Run record ({e}) — skipped", path.display()));
+                continue;
+            }
+        };
+        let filed_under = path.file_stem().and_then(|stem| stem.to_str()).and_then(|stem| RunId::parse(stem).ok());
+        if filed_under != Some(run.run_id) {
+            notes.push(format!(
+                "dispatch manifest {} records run_id `{}` but is not filed under that id — skipped rather than counted as an observed run",
+                path.display(),
+                run.run_id
+            ));
+            continue;
+        }
+        match serde_json::to_value(&run) {
+            Ok(value) => runs.push(value),
+            // Structurally unreachable (`Run`'s fields are all
+            // string-keyed), but a `.expect()` on artifact-derived
+            // content is exactly what this read-only surface must not
+            // do — degrade with a note instead.
+            Err(e) => notes.push(format!("dispatch manifest {} will not re-serialize ({e}) — skipped", path.display())),
         }
     }
     runs
@@ -971,6 +1226,36 @@ mod tests {
 
     fn edge(from: &str, to: &str) -> TaskEdge {
         TaskEdge { from: TaskId::parse(from).expect("test task id"), to: TaskId::parse(to).expect("test task id") }
+    }
+
+    /// A FULL `Run` manifest, exactly as [`begin`] writes one — the
+    /// shape [`read_dispatch_manifests`] now demands, since a bare
+    /// four-string object is precisely the invented-edge input its
+    /// typed parse exists to refuse.
+    fn run_manifest(run_id: RunId, task_id: Option<&str>, parent_run_id: Option<RunId>) -> Run {
+        let actor = Actor::new("canon".to_string(), RoleId::parse("implementer").expect("a literal role slug"));
+        let now = chrono::Utc::now();
+        let run = Run::new(
+            Envelope::current(RecordKind::Run, now, actor),
+            run_id,
+            None,
+            task_id.map(|id| TaskId::parse(id).expect("test task id")),
+            RunStatus::Running,
+            now,
+            None,
+        );
+        match parent_run_id {
+            Some(parent) => run.with_parent_run_id(parent),
+            None => run,
+        }
+    }
+
+    /// Write `run` to the side-channel under `filename`, creating the
+    /// directory on first use.
+    fn write_manifest(repo: &Path, filename: &str, body: &str) {
+        let manifests = repo.join(DISPATCH_DIR);
+        std::fs::create_dir_all(&manifests).expect("side-channel dir");
+        std::fs::write(manifests.join(filename), body).expect("write manifest");
     }
 
     /// A corpus carrying exactly one edge of each class: `c#1.1 ->
@@ -1164,22 +1449,96 @@ mod tests {
     #[test]
     fn dispatch_side_channel_manifests_are_read_as_runs() {
         let dir = TempDir::new().expect("tempdir");
-        let manifests = dir.path().join(DISPATCH_DIR);
-        std::fs::create_dir_all(&manifests).expect("side-channel dir");
-        let (parent, child) = (RunId::new().to_string(), RunId::new().to_string());
-        for (run_id, task_id, parent_run_id) in [(&parent, "c#6.1", None), (&child, "c#6.2", Some(parent.as_str()))] {
-            let record = run_record(run_id, Some(task_id), parent_run_id);
-            std::fs::write(manifests.join(format!("{run_id}.json")), serde_json::to_string(&record).expect("manifest")).expect("write manifest");
+        let (parent, child) = (RunId::new(), RunId::new());
+        for run in [run_manifest(parent, Some("c#6.1"), None), run_manifest(child, Some("c#6.2"), Some(parent))] {
+            write_manifest(dir.path(), &format!("{}.json", run.run_id), &serde_json::to_string(&run).expect("manifest"));
         }
         // A file that is not JSON at all is skipped WITH a note, never
         // aborting the read.
-        std::fs::write(manifests.join("torn.json"), b"{not json").expect("write torn manifest");
+        write_manifest(dir.path(), "torn.json", "{not json");
 
         let mut notes = Vec::new();
         let runs = read_dispatch_manifests(dir.path(), &mut notes);
         assert_eq!(runs.len(), 2);
         assert_eq!(notes.len(), 1, "the torn manifest is the only note: {notes:?}");
         assert_eq!(observed_edges(&runs), BTreeSet::from([edge("c#6.1", "c#6.2")]));
+    }
+
+    /// [`observed_edges`] reads four strings off a record, so untyped
+    /// admission let ANY syntactically valid JSON object carrying them
+    /// mint an execution edge — a hand-written note, a stray export, a
+    /// half-written tool scratch file — indistinguishable in the
+    /// report from a real dispatch and with no diagnostic at all. The
+    /// typed `Run` parse is the admission bar.
+    #[test]
+    fn non_run_json_in_the_side_channel_cannot_invent_an_observed_edge() {
+        let dir = TempDir::new().expect("tempdir");
+        let (parent, child) = (RunId::new().to_string(), RunId::new().to_string());
+        // Exactly the four strings the edge builder reads, in valid
+        // JSON — and nothing else a `Run` requires.
+        for (run_id, task_id, parent_run_id) in [(&parent, "c#7.1", None), (&child, "c#7.2", Some(parent.as_str()))] {
+            let record = run_record(run_id, Some(task_id), parent_run_id);
+            write_manifest(dir.path(), &format!("{run_id}.json"), &serde_json::to_string(&record).expect("record"));
+        }
+
+        let mut notes = Vec::new();
+        let runs = read_dispatch_manifests(dir.path(), &mut notes);
+        assert!(runs.is_empty(), "a bare four-string object is not a Run: {runs:?}");
+        assert!(observed_edges(&runs).is_empty(), "non-Run JSON must not mint an edge");
+        assert_eq!(notes.len(), 2, "each rejected file is named: {notes:?}");
+        assert!(notes.iter().all(|note| note.contains("not a readable Run record")), "{notes:?}");
+    }
+
+    /// The filename is this side-channel's only index ([`end`] resolves
+    /// a close through it), so a manifest copied or renamed under
+    /// another id is ambiguous evidence — counted, it would attribute
+    /// one run's task binding to a second run id and mint an edge that
+    /// never ran.
+    #[test]
+    fn a_manifest_filed_under_the_wrong_run_id_is_skipped_with_a_note() {
+        let dir = TempDir::new().expect("tempdir");
+        let (parent, child) = (RunId::new(), RunId::new());
+        let parent_run = run_manifest(parent, Some("c#8.1"), None);
+        write_manifest(dir.path(), &format!("{parent}.json"), &serde_json::to_string(&parent_run).expect("manifest"));
+        // A real `Run`, but copied under a run id that is not its own.
+        let impostor = run_manifest(child, Some("c#8.2"), Some(parent));
+        write_manifest(dir.path(), &format!("{}.json", RunId::new()), &serde_json::to_string(&impostor).expect("manifest"));
+
+        let mut notes = Vec::new();
+        let runs = read_dispatch_manifests(dir.path(), &mut notes);
+        assert_eq!(runs.len(), 1, "only the correctly-filed manifest is admitted: {runs:?}");
+        assert!(observed_edges(&runs).is_empty(), "the misfiled child must contribute no edge");
+        assert_eq!(notes.len(), 1, "the misfiled manifest is named: {notes:?}");
+        assert!(notes[0].contains("is not filed under that id"), "{}", notes[0]);
+    }
+
+    /// A directory that cannot be listed is NOT the same fact as a
+    /// directory that was never created: the first makes every live
+    /// observed edge vanish, and reporting it as a clean zero-edge
+    /// diff is a silent, unattributable data loss.
+    ///
+    /// The unlistable case here is a `.canon/dispatch` that exists as
+    /// a regular FILE — the one `read_dir` failure reproducible on
+    /// every platform and under every uid (a dropped read bit is a
+    /// no-op for root, so it would silently stop testing anything in a
+    /// container).
+    #[test]
+    fn an_unlistable_side_channel_degrades_with_a_note_not_in_silence() {
+        // An ABSENT directory stays the silent normal case.
+        let absent = TempDir::new().expect("tempdir");
+        let mut absent_notes = Vec::new();
+        assert!(read_dispatch_manifests(absent.path(), &mut absent_notes).is_empty());
+        assert!(absent_notes.is_empty(), "never-dispatched-here is not a degrade: {absent_notes:?}");
+
+        let dir = TempDir::new().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join(".canon")).expect("the .canon dir");
+        std::fs::write(dir.path().join(DISPATCH_DIR), b"not a directory").expect("occupy the side-channel path");
+
+        let mut notes = Vec::new();
+        let runs = read_dispatch_manifests(dir.path(), &mut notes);
+        assert!(runs.is_empty());
+        assert_eq!(notes.len(), 1, "an unlistable side-channel is reported, never silent: {notes:?}");
+        assert!(notes[0].contains("could not be listed"), "{}", notes[0]);
     }
 }
 
@@ -1199,6 +1558,18 @@ mod begin_tests {
         RegimeKey::parse("implementer/canon/dispatch/abc123").expect("a literal regime key")
     }
 
+    /// One openspec change dir under `root`: a `proposal.md` (the
+    /// openspec dialect's own admission bar — a change dir without one
+    /// is not a change the importer recognizes at all) plus the given
+    /// `tasks.md` rows.
+    fn write_openspec_change(root: &Path, change_id: &str, rows: &str) {
+        let change_dir = root.join(change_id);
+        std::fs::create_dir_all(&change_dir).expect("creating the change dir");
+        std::fs::write(change_dir.join("proposal.md"), format!("# {change_id}\n\n## Why\n\nTo exercise --task resolution.\n"))
+            .expect("writing proposal.md");
+        std::fs::write(change_dir.join("tasks.md"), rows).expect("writing tasks.md");
+    }
+
     /// A repo configuring ONE openspec plan source that carries one
     /// change with an open row (`1.1`) and an already-done row (`1.2`)
     /// — the smallest tree [`validate_task_binding`] can actually
@@ -1207,13 +1578,29 @@ mod begin_tests {
         let tmp = tempfile::tempdir().expect("a temp dir");
         std::fs::write(tmp.path().join("canon.yaml"), "plans:\n  sources:\n    - dialect: openspec\n      root: plans\n")
             .expect("writing canon.yaml");
-        let change_dir = tmp.path().join("plans").join("demo-change");
-        std::fs::create_dir_all(&change_dir).expect("creating the change dir");
-        std::fs::write(
-            change_dir.join("tasks.md"),
+        write_openspec_change(
+            &tmp.path().join("plans"),
+            "demo-change",
             "# demo-change — tasks\n\n- [ ] 1.1 Bind a dispatched run to its plan task\n- [x] 1.2 Already flipped\n",
+        );
+        tmp
+    }
+
+    /// A repo configuring ONE `superpowers` plan source holding a
+    /// single `writing-plans`-shaped doc with exactly one
+    /// `### Task 1:` section — the dialect whose `flip_task` is
+    /// `Unsupported`, so it is the one where a write-back-based probe
+    /// cannot tell a real row from an invented one.
+    fn repo_with_superpowers_corpus() -> TempDir {
+        let tmp = tempfile::tempdir().expect("a temp dir");
+        std::fs::write(tmp.path().join("canon.yaml"), "plans:\n  sources:\n    - dialect: superpowers\n      root: plans\n")
+            .expect("writing canon.yaml");
+        std::fs::create_dir_all(tmp.path().join("plans")).expect("creating the plans dir");
+        std::fs::write(
+            tmp.path().join("plans").join("sp-plan.md"),
+            "# SP Implementation Plan\n\n**Goal:** Prove superpowers row membership.\n\n### Task 1: Adapter\n- [x] wire it up\n",
         )
-        .expect("writing tasks.md");
+        .expect("writing the plan doc");
         tmp
     }
 
@@ -1275,9 +1662,11 @@ mod begin_tests {
         assert_eq!(round_tripped.parent_run_id, Some(parent));
     }
 
-    /// The row probe asks whether the row EXISTS, never whether it is
+    /// Membership asks whether the row EXISTS, never whether it is
     /// still open: a run may legitimately be dispatched against an
-    /// already-flipped task (a follow-up, a re-run).
+    /// already-flipped task (a follow-up, a re-run). The parsed `Task`
+    /// set carries both states, so a `[x]` row is as bindable as a
+    /// `[ ]` one.
     #[test]
     fn an_already_flipped_row_is_still_a_bindable_task() {
         let tmp = repo_with_plan_corpus();
@@ -1287,8 +1676,9 @@ mod begin_tests {
         assert_eq!(begun.run.task_id, Some(task_id));
     }
 
-    /// The probe must not write: `flip_task` is used purely as a
-    /// row-existence oracle and its rewritten document is discarded.
+    /// Resolution must not write: it is a pure `PlanAdapter::parse`,
+    /// the same scan `canon ingest plans` performs before its persist
+    /// step, and nothing here touches a plan document.
     #[test]
     fn validating_a_task_never_mutates_the_plan_document() {
         let tmp = repo_with_plan_corpus();
@@ -1298,7 +1688,7 @@ mod begin_tests {
         let binding = DispatchBinding { task_id: Some(TaskId::parse("demo-change#1.1").expect("a literal task id")), parent_run_id: None };
         begin(tmp.path(), &role(), &regime(), "canon", &binding).expect("the dispatch succeeds");
 
-        assert_eq!(std::fs::read_to_string(&tasks_md).expect("tasks.md still readable"), before, "the row probe must leave the document byte-identical");
+        assert_eq!(std::fs::read_to_string(&tasks_md).expect("tasks.md still readable"), before, "resolving a task must leave the document byte-identical");
     }
 
     /// Task 1.2: loud, naming the id, and — the point of validating
@@ -1343,6 +1733,76 @@ mod begin_tests {
         assert!(!message.contains("names no task"), "must not be confusable with the unknown-task message: {message}");
         assert!(err.is_usage());
         assert!(!tmp.path().join(DISPATCH_DIR).exists(), "a rejected binding must leave no dispatch record behind");
+    }
+
+    /// BLOCKER regression (`ReviewDispatch`): the superpowers dialect's
+    /// `flip_task` returns `WriteBackError::Unsupported` for EVERY id,
+    /// so a write-back-based probe accepted `<real-change>#<anything>`
+    /// the moment `locate_task` found the change's document — and
+    /// persisted exactly the dangling `Run.task_id` this validation
+    /// exists to prevent. Membership now comes from the parsed task
+    /// set, which knows `sp-plan` has a `Task 1` and no `Task 9`.
+    #[test]
+    fn a_nonexistent_superpowers_row_is_rejected_even_though_its_change_doc_exists() {
+        let tmp = repo_with_superpowers_corpus();
+        let binding = DispatchBinding { task_id: Some(TaskId::parse("sp-plan#9").expect("a literal task id")), parent_run_id: None };
+        let err = begin(tmp.path(), &role(), &regime(), "canon", &binding)
+            .expect_err("a section the plan doc does not have is not a bindable task");
+
+        assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
+        let message = err.to_string();
+        assert!(message.contains("sp-plan#9"), "the message must name the rejected id: {message}");
+        assert!(message.contains("superpowers @ "), "the message must name the sources consulted: {message}");
+        assert!(!tmp.path().join(DISPATCH_DIR).exists(), "a rejected binding must leave no dispatch record behind");
+    }
+
+    /// The other half of the same blocker: tightening the check must
+    /// not cost the dialect its genuinely valid ids. A `### Task 1:`
+    /// section IS a `Task` candidate, so `sp-plan#1` binds — in the
+    /// dialect that cannot flip at all.
+    #[test]
+    fn a_real_superpowers_row_is_bindable_in_the_dialect_that_cannot_flip() {
+        let tmp = repo_with_superpowers_corpus();
+        let task_id = TaskId::parse("sp-plan#1").expect("a literal task id");
+        let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None };
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding).expect("a section the plan doc DOES have is bindable");
+        assert_eq!(begun.run.task_id, Some(task_id));
+    }
+
+    /// BLOCKER regression (`ReviewDispatch`): one change id carried by
+    /// TWO configured sources. Deciding at the first source that
+    /// merely LOCATES the change document rejected a row that plainly
+    /// exists in the second — the plan-import driver has a
+    /// `duplicate_change_id` diagnostic precisely because this shape
+    /// occurs. Rejection is now only valid once every source has been
+    /// searched.
+    #[test]
+    fn a_row_in_a_later_source_sharing_the_change_id_still_binds() {
+        let tmp = tempfile::tempdir().expect("a temp dir");
+        std::fs::write(
+            tmp.path().join("canon.yaml"),
+            "plans:\n  sources:\n    - dialect: openspec\n      root: first\n    - dialect: openspec\n      root: second\n",
+        )
+        .expect("writing canon.yaml");
+        write_openspec_change(&tmp.path().join("first"), "shared-change", "- [ ] 1.1 Only in the first source\n");
+        write_openspec_change(&tmp.path().join("second"), "shared-change", "- [ ] 2.1 Only in the second source\n");
+
+        // The first source owns a `shared-change` document, but not
+        // this row.
+        let task_id = TaskId::parse("shared-change#2.1").expect("a literal task id");
+        let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None };
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding).expect("a row a LATER source carries is still a real task");
+        assert_eq!(begun.run.task_id, Some(task_id));
+
+        // And a row NEITHER source carries is still rejected, with
+        // both sources named.
+        let missing = DispatchBinding { task_id: Some(TaskId::parse("shared-change#9.9").expect("a literal task id")), parent_run_id: None };
+        let err = begin(tmp.path(), &role(), &regime(), "canon", &missing).expect_err("a row no source carries must be rejected");
+        let message = err.to_string();
+        for root in ["first", "second"] {
+            let consulted = format!("openspec @ {}", tmp.path().join(root).display());
+            assert!(message.contains(&consulted), "every source must be named before rejecting; missing `{consulted}` in: {message}");
+        }
     }
 
     #[test]
@@ -1394,6 +1854,117 @@ mod begin_tests {
         let round_tripped: Run = serde_json::from_str(&manifest).expect("the manifest deserializes as a Run");
         assert_eq!(round_tripped.status, RunStatus::Succeeded, "the rejected close must not have rewritten the status");
         assert_eq!(round_tripped.ended_at, first.run.ended_at, "the rejected close must not have rewritten ended_at");
+    }
+
+    /// The exclusive sidecar [`end`] holds, by the same construction
+    /// [`EndLock::acquire`] uses.
+    fn lock_path_for(repo: &Path, run_id: RunId) -> PathBuf {
+        repo.join(DISPATCH_DIR).join(format!("{run_id}.json.lock"))
+    }
+
+    /// BLOCKER regression (`ReviewDispatch`): the close was a
+    /// read/check/write TOCTOU, so two concurrent `dispatch end` runs
+    /// could both observe `ended_at: None` and both write, the later
+    /// silently replacing the first terminal status and timestamp.
+    /// A close in flight is now visible to the second process, which
+    /// refuses rather than overwrites — and refuses without touching a
+    /// byte of the manifest.
+    #[test]
+    fn a_close_already_in_flight_blocks_a_second_end_instead_of_overwriting_it() {
+        let tmp = repo_without_plan_sources();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let before = std::fs::read(&begun.manifest_path).expect("the begun manifest");
+
+        // Stand in for the other process: it holds the sidecar across
+        // its own read -> validate -> replace.
+        let lock = lock_path_for(tmp.path(), begun.run_id);
+        std::fs::write(&lock, b"").expect("simulate a held lock");
+
+        let err = end(tmp.path(), begun.run_id, RunStatus::Failed).expect_err("a close already in flight must not be raced");
+        assert!(matches!(err, DispatchError::EndInProgress { .. }), "expected EndInProgress, got {err:?}");
+        assert!(err.to_string().contains(&lock.display().to_string()), "the message must name the sidecar to remove: {err}");
+        assert!(!err.is_usage(), "a concurrent close is retryable machinery, exit 1 — never a flag to fix");
+        assert_eq!(std::fs::read(&begun.manifest_path).expect("the manifest survives"), before, "a blocked close must not touch a byte");
+
+        // Once the holder is gone the close proceeds normally, and
+        // leaves no sidecar of its own behind.
+        std::fs::remove_file(&lock).expect("release the simulated lock");
+        let ended = end(tmp.path(), begun.run_id, RunStatus::Failed).expect("the close succeeds once the lock is free");
+        assert_eq!(ended.run.status, RunStatus::Failed);
+        assert!(!lock.exists(), "the lock is released on the success path");
+    }
+
+    /// A rejected close must release the lock too — otherwise one bad
+    /// `dispatch end` would wedge that run's manifest permanently.
+    #[test]
+    fn a_rejected_close_still_releases_the_lock() {
+        let tmp = repo_without_plan_sources();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        end(tmp.path(), begun.run_id, RunStatus::Succeeded).expect("the first close succeeds");
+
+        end(tmp.path(), begun.run_id, RunStatus::Failed).expect_err("the second close is rejected");
+        assert!(!lock_path_for(tmp.path(), begun.run_id).exists(), "a rejected close must not leave its sidecar behind");
+    }
+
+    /// BLOCKER regression (`ReviewDispatch`): checking `ended_at`
+    /// ALONE accepted an internally inconsistent manifest whose status
+    /// was already terminal but whose timestamp was absent, stamping it
+    /// with a fresh instant and inventing a close time for a run that
+    /// did not close then. The predicate is the STATUS: only
+    /// `running` (undated) is closeable.
+    #[test]
+    fn a_terminal_status_with_no_ended_at_is_not_a_closeable_run() {
+        let tmp = repo_without_plan_sources();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        // A hand edit / partial restore: terminal status, no timestamp.
+        let mut inconsistent = begun.run.clone();
+        inconsistent.status = RunStatus::Succeeded;
+        inconsistent.ended_at = None;
+        let body = serde_json::to_string_pretty(&inconsistent).expect("a Run is always serializable");
+        std::fs::write(&begun.manifest_path, &body).expect("write the inconsistent manifest");
+
+        let err = end(tmp.path(), begun.run_id, RunStatus::Failed).expect_err("a terminal manifest is not a running run");
+        assert!(matches!(err, DispatchError::NotRunning { .. }), "expected NotRunning, got {err:?}");
+        assert!(err.to_string().contains("succeeded"), "the message must name the status recorded: {err}");
+        assert!(err.is_usage(), "a manifest to repair is a fixable invocation, exit 2");
+        assert_eq!(std::fs::read_to_string(&begun.manifest_path).expect("the manifest survives"), body, "a rejected close must not touch a byte");
+    }
+
+    /// A `pending` run was never dispatched live by this CLI, so it has
+    /// no close to record either — the same one-transition predicate,
+    /// exercised from the other side of `running`.
+    #[test]
+    fn a_pending_run_is_not_a_closeable_run() {
+        let tmp = repo_without_plan_sources();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let mut pending = begun.run.clone();
+        pending.status = RunStatus::Pending;
+        std::fs::write(&begun.manifest_path, serde_json::to_string_pretty(&pending).expect("serializable")).expect("write");
+
+        let err = end(tmp.path(), begun.run_id, RunStatus::Succeeded).expect_err("a pending run has no live dispatch to close");
+        assert!(matches!(err, DispatchError::NotRunning { .. }), "expected NotRunning, got {err:?}");
+        assert!(err.to_string().contains("pending"), "{err}");
+    }
+
+    /// The filename is this side-channel's only index, so a manifest
+    /// whose own `run_id` disagrees with it would have a terminal
+    /// status stamped onto a run the operator never named.
+    #[test]
+    fn a_manifest_filed_under_another_run_id_is_not_closeable() {
+        let tmp = repo_without_plan_sources();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let mut impostor = begun.run.clone();
+        impostor.run_id = RunId::new();
+        let body = serde_json::to_string_pretty(&impostor).expect("a Run is always serializable");
+        std::fs::write(&begun.manifest_path, &body).expect("write the misfiled manifest");
+
+        let err = end(tmp.path(), begun.run_id, RunStatus::Succeeded).expect_err("a misfiled manifest must not be closed");
+        assert!(matches!(err, DispatchError::RunIdMismatch { .. }), "expected RunIdMismatch, got {err:?}");
+        let message = err.to_string();
+        assert!(message.contains(&begun.run_id.to_string()), "the message must name the id asked for: {message}");
+        assert!(message.contains(&impostor.run_id.to_string()), "the message must name the id found: {message}");
+        assert!(err.is_usage());
+        assert_eq!(std::fs::read_to_string(&begun.manifest_path).expect("the manifest survives"), body, "a rejected close must not touch a byte");
     }
 
     #[test]

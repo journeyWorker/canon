@@ -287,8 +287,9 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
 /// S4 tasks.md group 6 (write-time idempotence): a SECOND `canon
 /// ingest artifacts` pass over an UNCHANGED corpus must persist ZERO
 /// new trajectories — `crate::artifact_ingest::run`'s existence check
-/// (`trajectory_content_digest`, the `regime_key` + ordered
-/// `VerdictRow` contents) recognizes the identical digest and skips
+/// (`trajectory_content_digest`: the identity-shape version, the
+/// `regime_key`, the ordered `VerdictRow` contents, and the RENDERED
+/// `task`/`context`) recognizes the identical identity and skips
 /// the write, rather than minting a fresh random `TrajectoryId` and
 /// double-writing the SAME evidence into `ParquetTrajectoryStore` —
 /// the genuine data-corruption bug this test guards against (an

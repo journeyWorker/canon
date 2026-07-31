@@ -71,29 +71,63 @@
 //!
 //! `regime_key`'s `<hash>` component is
 //! [`canon_ingest::normalize::content_digest`] of the source event's
-//! own join key (`scenario:<id>` / `handoff:<id>` / `task:<id>`) — the
-//! SAME digest primitive S3 session-ingest already uses for its own
-//! write-identity, reused here (not a new hashing scheme) to give
-//! related events sharing one join key (e.g. an open review finding and
-//! its later remediation) the identical `regime_key`, folding them onto
-//! ONE trajectory exactly as [`canon_learn::Trajectory`]'s own doc
-//! comment describes. Write-time idempotence (S4 tasks.md group 6) IS
-//! enforced here: before persisting a regime's trajectory, [`run`]
-//! checks whether an existing trajectory already recorded under the
-//! EXACT SAME `regime_key` carries the identical (`regime_key` + the
-//! ordered `VerdictRow` contents) digest ([`trajectory_content_digest`],
-//! reusing the SAME [`content_digest`] primitive `regime_key`'s own
-//! `<hash>` component uses — not a new hashing scheme) and skips the
-//! persist (counted,
+//! own [`event_identity`] (`scenario:<id>@<project_id>` /
+//! `scenario:<id>@-` when the event names no project /
+//! `handoff:<id>` / `task:<id>`) — the SAME digest primitive S3
+//! session-ingest already uses for its own write-identity, reused here
+//! (not a new hashing scheme) to give related events sharing one
+//! identity (e.g. an open review finding and its later remediation on
+//! ONE project's scenario) the identical `regime_key`, folding them
+//! onto ONE trajectory exactly as [`canon_learn::Trajectory`]'s own doc
+//! comment describes. The project half is load-bearing: a `Scenario`'s
+//! identity is the PAIR `(project_id, scenario_id)`, so without it two
+//! projects defining one scenario id folded onto one regime (see
+//! [`join_key_identity`]).
+//!
+//! Write-time idempotence (S4 tasks.md group 6) IS
+//! enforced here, over the trajectory's FULL identity
+//! ([`trajectory_content_digest`]: an identity-shape version, the
+//! `regime_key`, the ordered `VerdictRow` contents, AND the rendered
+//! `task`/`context` — reusing the SAME [`content_digest`] primitive
+//! `regime_key`'s own `<hash>` component uses, not a new hashing
+//! scheme). Before persisting, [`run`] compares that identity against
+//! every trajectory already recorded under the EXACT SAME `regime_key`
+//! and skips the persist when one matches (counted,
 //! `ArtifactIngestOutcome::trajectories_skipped_duplicate`) rather than
 //! double-writing — a repeat `canon ingest artifacts` pass over an
-//! UNCHANGED corpus re-derives the identical digest
+//! UNCHANGED corpus re-derives the identical identity
 //! (`canon_ingest::scanner::scan_dir`'s deterministic byte-lexical file
-//! order means the SAME `VerdictRow` sequence every pass) and persists
-//! nothing new. A genuinely CHANGED corpus (a new/different verdict
-//! folded onto that same `regime_key`) still persists a FRESH
-//! trajectory alongside the untouched prior rows — the raw tier stays
-//! append-only (design decision 3), never overwritten or deduped away.
+//! order, plus [`group_by_regime`]'s total data-derived sort, means the
+//! SAME `VerdictRow` sequence AND the same rendered bytes every pass)
+//! and persists nothing new.
+//!
+//! # A rebuild supersedes this driver's own older derivation
+//! Folding the RENDERED text into that identity is what makes an
+//! UPGRADE converge. The pre-s38 digest covered only `regime_key` +
+//! ordered verdict rows and was compared BEFORE the text was rendered,
+//! so every trajectory written before s38/s39 kept its digest across
+//! the text change, was skipped as a duplicate on the next pass, and
+//! re-distilled its old ingest-driver prose forever — an upgrading user
+//! never gained evidence lines, antecedents, or joined scenario titles
+//! unless they deleted `.canon/learn` by hand. Hand-deleting a store is
+//! not an upgrade path, so it is not this driver's contract.
+//!
+//! A fresher identity ALONE would only double the corpus, though: the
+//! stale row still sits in the namespace and
+//! [`canon_learn::rebuild_namespace`] distills every row it finds. So
+//! the identity is split in two. [`trajectory_derivation_key`] names
+//! the LOGICAL verdict set (`regime_key` + the ordered rows — the
+//! pre-s38 digest's exact shape, deliberately unversioned so it still
+//! recognizes rows written by any earlier canon), and a re-derivation
+//! of a logical verdict set this driver already wrote REPLACES that row
+//! rather than landing beside it, by reusing the stored row's own
+//! [`canon_learn::TrajectoryId`]. [`plan_trajectory`] states the rule
+//! and why that id is the stable choice. A genuinely NEW verdict set (a
+//! different or additional verdict folded onto the same `regime_key`)
+//! is still a FRESH row alongside the untouched prior ones — the raw
+//! tier stays append-only across DISTINCT derivations (design decision
+//! 3); the only bytes this driver ever overwrites are its own previous
+//! answer to the identical question.
 //!
 //! # Documented seam
 //! A `Records`-source adapter's read genuinely CAN fail — no live
@@ -164,9 +198,13 @@
 //! s39 (`joined-evidence-grounding`) closes that read-side, over the
 //! join spine, with no new record kind and no extra tier read:
 //! [`index_antecedents`] indexes every prose-bearing NON-verdict event
-//! by its [`join_key_identity`] before the accumulation loop runs, and
+//! by its [`event_identity`] before the accumulation loop runs, and
 //! each verdict-bearing event absorbs ([`antecedents_before`]) the
-//! indexed events on its OWN join key at or before it in time. A
+//! indexed events on its OWN identity at or before it in time. That
+//! identity carries the `project_id` for a scenario-keyed event, and it
+//! is the SAME string [`regime_hash`] digests — so "shares my join key"
+//! and "would have folded onto my regime" can never disagree, and one
+//! project's finding can never attach to another project's verdict. A
 //! `resolved` divergence therefore distills together with the `open`
 //! findings it closed, rendered as a visibly distinct block in the
 //! trajectory's `context` ([`RegimeEvidence::trajectory_text`]).
@@ -185,7 +223,7 @@ use canon_ingest::verdict::{VerdictRow, attach_regime_key, derive_native_diverge
 use canon_learn::{LearnConfig, LearnError, ParquetStrategyStore, ParquetTrajectoryStore, RewardRegistry, RoleRegistry, Trajectory, TrajectoryId, TrajectoryStore, VerdictOutcome, mark_trajectory_verdict, rebuild_namespace, store_trajectory};
 use canon_model::envelope::RecordKind;
 use canon_model::evidence::RawRecord;
-use canon_model::ids::RegimeKey;
+use canon_model::ids::{ProjectId, RegimeKey};
 use canon_model::records::DivergenceStatus;
 use canon_store::fold_latest_by_key;
 use canon_store::policy::{BackendConfig, Rung, TierPolicy};
@@ -251,6 +289,14 @@ pub struct ArtifactAdapterSummary {
 pub struct PersistedTrajectory {
     pub regime_key: String,
     pub verdict_count: usize,
+    /// `true` when this write REPLACED this driver's own earlier
+    /// derivation of the same logical verdict set in place
+    /// ([`plan_trajectory`]) rather than appending a new row — the
+    /// upgrade path the module doc describes. Reported per row rather
+    /// than as a second top-level counter, so the tally
+    /// [`format_human`] prints can never desync from the rows it
+    /// describes.
+    pub superseded: bool,
 }
 
 /// One `canon ingest artifacts` pass's outcome.
@@ -265,11 +311,14 @@ pub struct ArtifactIngestOutcome {
     /// "documented seam"), never a fatal error for the rest of the
     /// batch.
     pub trajectories_skipped_unregistered_role: usize,
-    /// A trajectory whose (`regime_key` + ordered `VerdictRow`
-    /// contents) digest already matches a trajectory this exact
-    /// `regime_key` already holds ([`trajectory_content_digest`]) —
-    /// skipped and counted (module doc's write-time idempotence),
-    /// never a double-write of an unchanged corpus.
+    /// A trajectory whose FULL identity (identity-shape version +
+    /// `regime_key` + ordered `VerdictRow` contents + the rendered
+    /// `task`/`context`) already matches a trajectory this exact
+    /// `regime_key` holds ([`trajectory_content_digest`]) — skipped and
+    /// counted (module doc's write-time idempotence), never a
+    /// double-write of an unchanged corpus. A row whose verdict set
+    /// matches but whose TEXT does not is not this: it is superseded in
+    /// place, see [`PersistedTrajectory::superseded`].
     pub trajectories_skipped_duplicate: usize,
     /// Sum of every regime's freshly-distilled `StrategyItem` count
     /// (`rebuild_namespace`'s return value) — the count that actually
@@ -525,12 +574,25 @@ struct ScenarioTitleIndex {
     titles: BTreeMap<String, BTreeMap<String, IndexedScenarioTitle>>,
 }
 
-/// One indexed title plus the `at` that earned it its slot — see
-/// [`ScenarioTitleIndex::absorb_record`]'s newest-wins rule.
+/// One indexed title plus the `(at, schema, digest)` triple that earned
+/// it its slot — see [`ScenarioTitleIndex::absorb_record`]'s
+/// supersession rule.
 #[derive(Debug)]
 struct IndexedScenarioTitle {
     at: DateTime<Utc>,
+    schema: u32,
+    digest: String,
     title: String,
+}
+
+impl IndexedScenarioTitle {
+    /// The total supersession order — the SAME `(at, schema, digest)`
+    /// triple `canon_store::fold_latest_by_key` compares, spelled out
+    /// here because this index folds into a two-level `BTreeMap` slot
+    /// rather than that helper's flat one-winner-per-key map.
+    fn order(&self) -> (DateTime<Utc>, u32, &str) {
+        (self.at, self.schema, self.digest.as_str())
+    }
 }
 
 impl ScenarioTitleIndex {
@@ -554,39 +616,57 @@ impl ScenarioTitleIndex {
         index
     }
 
-    /// Folds one record in, newest `at` winning its
-    /// `(project_id, scenario_id)` slot.
+    /// Folds one record in, the greatest `(at, schema, digest)` triple
+    /// winning its `(project_id, scenario_id)` slot.
     ///
     /// The ledger's own file naming (`<project>__<scenario>__<digest>`)
     /// means a RETITLED scenario lands as a SECOND record beside its
     /// predecessor rather than replacing it, and a `LiveDb`-class rung
     /// retains historical versions outright (s21 P3) — so "which title
-    /// is current" is a real question, not a hypothetical. Comparing
-    /// `at` answers it, and makes this index independent of the order
-    /// the tier yielded records in: a strictly newer record replaces the
-    /// slot, an equal-or-older one leaves it alone. Determinism is
-    /// load-bearing here — the title reaches `Trajectory::task`, and the
+    /// is current" is a real question, not a hypothetical. Determinism
+    /// is load-bearing: the title reaches `Trajectory::task`, and the
     /// write-time idempotence skip only fires when a second pass derives
     /// byte-identical text.
+    ///
+    /// `at` ALONE does not answer it. A ledger record's `at` is
+    /// deliberately byte-stable rather than wall-clock, so two versions
+    /// of one `(project_id, scenario_id)` routinely carry the IDENTICAL
+    /// timestamp — and a strictly-greater-`at` rule then leaves the slot
+    /// to whichever version the tier happened to return first, which for
+    /// a live database read is unordered. This is precisely the
+    /// supersession case `s38-evidence-bearing-memory` fixed for every
+    /// other multi-version reader, so it takes the same triple:
+    /// `Envelope.schema` (the per-kind FORMAT GENERATION, so the newer
+    /// parser's row wins a tie by stating so) between `at` and the
+    /// content `digest`, which remains the final tie-break. All three
+    /// rungs are the record's OWN data, so the resolved title is a pure
+    /// function of the input SET (ReviewCore).
     ///
     /// Reads that timestamp through [`raw_record_at_or_min`] rather than
     /// `canon_store::tier::raw_record_at`, which `expect`s a
     /// well-formed `at` and would PANIC on a hand-edited ledger file —
     /// unacceptable for a join whose whole contract is that it can only
-    /// ever fail to enrich, never fail a run.
+    /// ever fail to enrich, never fail a run. `raw_record_schema`
+    /// already takes that posture for ITS field (a missing/invalid
+    /// `schema` floors to `0`, below every real generation).
     fn absorb_record(&mut self, record: &RawRecord) {
         let (Some(scenario_id), Some(project_id), Some(title)) =
             (raw_field(record, "scenario_id"), raw_field(record, "project_id"), raw_field(record, "title").map(compact_scenario_title))
         else {
             return;
         };
-        let at = raw_record_at_or_min(record);
+        let candidate = IndexedScenarioTitle {
+            at: raw_record_at_or_min(record),
+            schema: canon_store::tier::raw_record_schema(record),
+            digest: canon_store::partition::content_digest12(&record.0),
+            title,
+        };
         match self.titles.entry(scenario_id.to_string()).or_default().entry(project_id.to_string()) {
             std::collections::btree_map::Entry::Vacant(slot) => {
-                slot.insert(IndexedScenarioTitle { at, title });
+                slot.insert(candidate);
             }
-            std::collections::btree_map::Entry::Occupied(mut slot) if at > slot.get().at => {
-                slot.insert(IndexedScenarioTitle { at, title });
+            std::collections::btree_map::Entry::Occupied(mut slot) if slot.get().order() < candidate.order() => {
+                slot.insert(candidate);
             }
             std::collections::btree_map::Entry::Occupied(_) => {}
         }
@@ -626,8 +706,8 @@ fn raw_field<'a>(record: &'a RawRecord, field: &str) -> Option<&'a str> {
 }
 
 /// A bare `RawRecord`'s `at`, or `DateTime::<Utc>::MIN_UTC` when it is
-/// absent or not RFC-3339 — the newest-wins discriminator
-/// [`ScenarioTitleIndex::absorb_record`] compares.
+/// absent or not RFC-3339 — the first rung of the `(at, schema,
+/// digest)` triple [`ScenarioTitleIndex::absorb_record`] compares.
 ///
 /// `canon_store::tier::raw_record_at` is the shared accessor for this
 /// field, but it `expect`s the parse to succeed ("already passed
@@ -658,17 +738,42 @@ fn raw_record_at_or_min(record: &RawRecord) -> DateTime<Utc> {
 /// rather than a new public export from that crate: the two caps answer
 /// different questions (a strategy TITLE versus its CONTENT, see
 /// [`SCENARIO_TITLE_MAX_CHARS`]), and widening `canon-ingest`'s API to
-/// share fifteen lines would couple them into moving together.
+/// share fifteen lines would couple them into moving together. The twin
+/// tracks its original in shape too: it appends only THROUGH the budget
+/// instead of normalizing the whole field first, so an artifact-supplied
+/// title of unbounded size costs no copy of its discarded tail
+/// (ReviewCore).
 fn compact_scenario_title(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len().min(SCENARIO_TITLE_MAX_CHARS + 4));
+    // At most `SCENARIO_TITLE_MAX_CHARS` chars (4 bytes each at worst)
+    // plus the 3-byte cut marker can ever land here, so the reserve is
+    // an upper bound and no growth reallocation happens.
+    let mut out = String::with_capacity(raw.len().min(SCENARIO_TITLE_MAX_CHARS * 4 + 4));
+    let mut taken = 0usize;
+    let mut cut = false;
     for word in raw.split_whitespace() {
         if !out.is_empty() {
+            if taken == SCENARIO_TITLE_MAX_CHARS {
+                cut = true;
+                break;
+            }
             out.push(' ');
+            taken += 1;
         }
-        out.push_str(word);
+        for c in word.chars() {
+            if taken == SCENARIO_TITLE_MAX_CHARS {
+                cut = true;
+                break;
+            }
+            out.push(c);
+            taken += 1;
+        }
+        if cut {
+            break;
+        }
     }
-    if let Some((cut, _)) = out.char_indices().nth(SCENARIO_TITLE_MAX_CHARS) {
-        out.truncate(cut);
+    if cut {
+        // A separator pushed just before the budget ran out is the one
+        // way `out` can end in whitespace; `…` must never follow it.
         let trimmed = out.trim_end().len();
         out.truncate(trimmed);
         out.push('…');
@@ -701,38 +806,144 @@ fn repo_label(repo: &Path) -> String {
     repo.file_name().and_then(|s| s.to_str()).unwrap_or("repo").to_string()
 }
 
+/// The token an event identity uses in place of a scenario's
+/// `project_id` when the event does not name one, or names one that is
+/// not a well-formed [`ProjectId`] (ReviewCore).
+///
+/// `-` is unreachable as a real project id by grammar, not by
+/// convention: `ProjectId` is `[a-z0-9][a-z0-9-]*`, so its FIRST
+/// character can never be a hyphen. A missing project therefore cannot
+/// silently collide with a real one.
+const UNKNOWN_PROJECT: &str = "-";
+
 /// A stable, source-kind-tagged identity string for one
-/// [`ArtifactJoinKey`] — the input to [`regime_hash`]'s digest, never
-/// itself the `regime_key` hash (module doc: two events sharing a join
-/// key fold onto the SAME trajectory).
-fn join_key_identity(key: &ArtifactJoinKey) -> String {
+/// [`ArtifactJoinKey`] plus — for a `Scenario` key — the `project_id`
+/// of the event that carried it. This is the input to [`regime_hash`]'s
+/// digest and the [`AntecedentIndex`]'s bucket key; it is never itself
+/// the `regime_key` hash (module doc: two events sharing an identity
+/// fold onto the SAME trajectory).
+///
+/// The project half is REQUIRED for correctness, not enrichment
+/// (ReviewCore). A `Scenario`'s identity in canon is the PAIR
+/// `(project_id, scenario_id)` — `Review`, `Divergence`, and this
+/// index's own two-level key all say so, and this module already
+/// supports one scenario id being defined by several projects
+/// ([`ScenarioTitleIndex::title_for`]). Keyed on the bare scenario id,
+/// project A's `open` finding attached itself to project B's later
+/// `resolved` verdict, and `regime_hash` folded both projects' events
+/// onto ONE regime — distilling a claim neither corpus supports.
+///
+/// Exact forms, and why they cannot be confused with each other:
+/// - `scenario:<scenario_id>@<project_id>`
+/// - `scenario:<scenario_id>@-` — no project, or one that is not a
+///   well-formed [`ProjectId`] ([`UNKNOWN_PROJECT`])
+/// - `handoff:<handoff_id>` / `task:<task_id>` — neither key names a
+///   project, so neither form changes
+///
+/// `project_id` reaches here from adapter-emitted `detail`
+/// ([`event_project_id`]), i.e. artifact-supplied text of arbitrary
+/// shape, so it is admitted only after [`ProjectId::parse`] accepts it.
+/// That is what makes the `@` split total: `ScenarioId`'s grammar
+/// (`[a-z0-9-]+\.[a-z0-9-]+\.\d{2,}`) contains no `@`, and a parsed
+/// `ProjectId` contains none either, so no pair of distinct
+/// `(project, scenario)` inputs can render the same string. A malformed
+/// project id reads as UNKNOWN rather than being pasted in verbatim:
+/// malformed evidence is no evidence, and the cost of the stricter
+/// reading is a missed fold, never a wrong one. (The title lookup keeps
+/// the raw string — a wrong title costs prose, a wrong identity costs a
+/// join.)
+fn join_key_identity(key: &ArtifactJoinKey, project_id: Option<&str>) -> String {
     match key {
-        ArtifactJoinKey::Scenario(id) => format!("scenario:{}", id.as_str()),
+        ArtifactJoinKey::Scenario(id) => {
+            let parsed = project_id.and_then(|raw| ProjectId::parse(raw).ok());
+            let project = parsed.as_ref().map_or(UNKNOWN_PROJECT, ProjectId::as_str);
+            format!("scenario:{}@{project}", id.as_str())
+        }
         ArtifactJoinKey::Handoff(id) => format!("handoff:{}", id.as_str()),
         ArtifactJoinKey::Task(id) => format!("task:{}", id.as_str()),
     }
 }
 
-/// `regime_key`'s `<hash>` component (module doc): reuses S3's
-/// `content_digest` primitive over the join key's own identity string,
-/// never a new hashing scheme.
-fn regime_hash(key: &ArtifactJoinKey) -> String {
-    content_digest(&serde_json::json!(join_key_identity(key)))
+/// ONE event's [`join_key_identity`] — the single place both the
+/// antecedent lookup and [`regime_hash`] resolve an event to its
+/// identity string, so the two can never be computed differently
+/// (ReviewCore).
+fn event_identity(event: &ArtifactEvent) -> String {
+    join_key_identity(&event.join_key, event_project_id(event))
 }
 
-/// A stable content digest for one regime-keyed trajectory candidate —
-/// `regime_key` + the ORDERED `VerdictRow` contents (`role`/`polarity`/
-/// `becomes`, the only fields the type carries) — reusing the SAME
-/// [`content_digest`] primitive [`regime_hash`] already uses (not a new
-/// hashing scheme). [`run`]'s existence check calls this identically
-/// for a freshly-derived candidate and for every already-persisted
-/// trajectory under the same `regime_key`: an unchanged corpus
-/// re-derives the identical digest (module doc's write-time
-/// idempotence), a genuinely changed one a different one.
-fn trajectory_content_digest(regime_key: &RegimeKey, verdicts: &[VerdictRow]) -> String {
-    let verdict_json: Vec<serde_json::Value> =
-        verdicts.iter().map(|v| serde_json::json!({"role": v.role.as_str(), "polarity": v.polarity.as_str(), "becomes": v.becomes.as_str()})).collect();
-    content_digest(&serde_json::json!({"regime_key": regime_key.as_str(), "verdicts": verdict_json}))
+/// `regime_key`'s `<hash>` component (module doc): reuses S3's
+/// `content_digest` primitive over an [`event_identity`] string, never
+/// a new hashing scheme.
+fn regime_hash(identity: &str) -> String {
+    content_digest(&serde_json::json!(identity))
+}
+
+/// The generation of [`trajectory_content_digest`]'s input SHAPE.
+///
+/// `1` was the implicit pre-s38 shape (`regime_key` + ordered verdict
+/// rows only). `2` adds the rendered `task`/`context`. Carried in the
+/// digest input rather than left implicit so a future change to what
+/// "the same trajectory" means is a deliberate, greppable bump that
+/// reconverges every stored row exactly once — instead of depending on
+/// the new renderer happening to emit different bytes for every corpus.
+const TRAJECTORY_IDENTITY_VERSION: u32 = 2;
+
+/// The tag every trajectory THIS driver writes carries, and the marker
+/// [`plan_trajectory`] uses to scope supersession to rows it is
+/// entitled to replace: a trajectory seeded by a fixture, a webhook, or
+/// any future writer is never overwritten by an artifact-ingest pass,
+/// however closely its verdict rows match.
+const ARTIFACT_INGEST_TAG: &str = "artifact-ingest";
+
+/// The ordered `VerdictRow` contents both digests below fold — the only
+/// three fields the type carries.
+fn verdict_rows_json(verdicts: &[VerdictRow]) -> Vec<serde_json::Value> {
+    verdicts.iter().map(|v| serde_json::json!({"role": v.role.as_str(), "polarity": v.polarity.as_str(), "becomes": v.becomes.as_str()})).collect()
+}
+
+/// The LOGICAL verdict set a trajectory records: `regime_key` + the
+/// ORDERED `VerdictRow` contents. NOT an identity — two trajectories
+/// sharing this key are two derivations of the same question, whose
+/// answers may differ in TEXT ([`trajectory_content_digest`] is what
+/// tells those apart).
+///
+/// [`plan_trajectory`] uses it to find the row a rebuild supersedes.
+/// Deliberately UNVERSIONED, and deliberately byte-identical to the
+/// pre-s38 digest's input shape: it is computed from a STORED row's own
+/// `regime_key`/`verdicts` at read time, and its whole job is to
+/// recognize a row written by an older canon. Changing this shape would
+/// orphan every trajectory an upgrading user already holds.
+fn trajectory_derivation_key(regime_key: &RegimeKey, verdicts: &[VerdictRow]) -> String {
+    content_digest(&serde_json::json!({"regime_key": regime_key.as_str(), "verdicts": verdict_rows_json(verdicts)}))
+}
+
+/// The FULL identity of one regime-keyed trajectory — the identity
+/// shape version, `regime_key`, the ordered `VerdictRow` contents, and
+/// the RENDERED `task`/`context` — reusing the SAME [`content_digest`]
+/// primitive [`regime_hash`] already uses (not a new hashing scheme).
+///
+/// The rendered text is in here because it is what a trajectory
+/// actually SAYS, and what `canon_learn::distill_trajectory` turns into
+/// a retrieved strategy's title and content. An identity that ignored
+/// it (the pre-s38 shape) declared a stored row "already persisted"
+/// while this pass had derived materially different prose for it —
+/// which is exactly how an upgrade silently kept re-distilling
+/// pre-s38 ingest-driver text (module doc, ReviewCore).
+///
+/// [`plan_trajectory`] calls this identically for a freshly-derived
+/// candidate and for every already-persisted trajectory under the same
+/// `regime_key`: an unchanged corpus re-derives the identical identity
+/// (write-time idempotence), a changed corpus — or a changed RENDERER —
+/// a different one.
+fn trajectory_content_digest(regime_key: &RegimeKey, verdicts: &[VerdictRow], task: &str, context: &str) -> String {
+    content_digest(&serde_json::json!({
+        "identity_version": TRAJECTORY_IDENTITY_VERSION,
+        "regime_key": regime_key.as_str(),
+        "verdicts": verdict_rows_json(verdicts),
+        "task": task,
+        "context": context,
+    }))
 }
 
 /// One derived verdict PLUS the salient evidence of the event it came
@@ -770,6 +981,47 @@ struct DerivedVerdict {
     antecedents: Vec<String>,
 }
 
+impl DerivedVerdict {
+    /// A TOTAL, data-derived order over every field of this struct that
+    /// can reach persisted bytes or rendered text — the sort
+    /// [`group_by_regime`] applies before any absorption runs
+    /// (ReviewCore).
+    ///
+    /// `at` alone is not enough. A `Records`-source read orders rows by
+    /// `at` only (that is all the Pg/SQLite read path asks for), and a
+    /// ledger record's `at` is byte-stable rather than wall-clock, so
+    /// two records for one regime routinely carry the IDENTICAL
+    /// timestamp and can arrive in either order. Everything downstream
+    /// is order-sensitive — `rows` is an ORDERED list inside
+    /// [`trajectory_content_digest`], and `kind_labels`/`evidence_lines`
+    /// render in first-seen order — so arrival order would decide the
+    /// persisted bytes, and a repeat ingest of an unchanged record set
+    /// would append another trajectory instead of skipping a duplicate.
+    ///
+    /// Spelled out rung by rung rather than returned as a wide tuple:
+    /// the rungs' ORDER is the contract, and a ten-element positional
+    /// key is exactly the shape [`DerivedVerdict`]'s own doc comment
+    /// says this struct exists to avoid. Every rung is the verdict's own
+    /// DATA, never its provenance, so the result is a pure function of
+    /// the input SET (the discipline `canon_store::fold_latest_by_key`
+    /// states for its own triple). The last rungs are total by
+    /// construction: two verdicts equal through `antecedents` render
+    /// byte-identically and dedupe into one line anyway.
+    fn cmp_stable(&self, other: &Self) -> std::cmp::Ordering {
+        self.at
+            .cmp(&other.at)
+            .then_with(|| self.regime_key.as_str().cmp(other.regime_key.as_str()))
+            .then_with(|| self.join_key.cmp(&other.join_key))
+            .then_with(|| self.row.role.as_str().cmp(other.row.role.as_str()))
+            .then_with(|| self.row.polarity.as_str().cmp(other.row.polarity.as_str()))
+            .then_with(|| self.row.becomes.as_str().cmp(other.row.becomes.as_str()))
+            .then_with(|| self.kind_label.cmp(other.kind_label))
+            .then_with(|| self.scenario_title.cmp(&other.scenario_title))
+            .then_with(|| self.evidence_line.cmp(&other.evidence_line))
+            .then_with(|| self.antecedents.cmp(&other.antecedents))
+    }
+}
+
 /// One regime group's accumulated verdicts and evidence — the value
 /// side of [`group_by_regime`]'s map (`s38-evidence-bearing-memory`).
 struct RegimeEvidence {
@@ -803,12 +1055,20 @@ struct RegimeEvidence {
     /// [`antecedents_before`] hands them over, and capped by
     /// [`MAX_ANTECEDENT_LINES`]/[`MAX_ANTECEDENT_CHARS`].
     antecedent_lines: Vec<String>,
-    /// How many eligible antecedents those caps turned away. Rendered
-    /// as one short marker line rather than vanishing: this module
-    /// reports every degrade it performs (module doc's "documented
-    /// seam"), and a strategy quoting three of five findings without
-    /// saying so reads as though there were only three.
-    antecedents_omitted: usize,
+    /// The DISTINCT eligible antecedents those caps turned away, in
+    /// first-seen order. Rendered as one short marker line (its
+    /// `.len()`) rather than vanishing: this module reports every
+    /// degrade it performs (module doc's "documented seam"), and a
+    /// strategy quoting three of five findings without saying so reads
+    /// as though there were only three.
+    ///
+    /// The rejected LINES are kept, not just a count (ReviewCore). A
+    /// regime holding several verdicts absorbs the same indexed
+    /// findings once per verdict; the kept ones dedupe against
+    /// `antecedent_lines`, so without the same memory for rejections a
+    /// counter re-counted the identical drop on every later verdict and
+    /// the marker read "+4", then "+6", for two distinct omissions.
+    antecedents_omitted: Vec<String>,
 }
 
 impl Default for RegimeEvidence {
@@ -826,7 +1086,7 @@ impl Default for RegimeEvidence {
             kind_labels: Vec::new(),
             evidence_lines: Vec::new(),
             antecedent_lines: Vec::new(),
-            antecedents_omitted: 0,
+            antecedents_omitted: Vec::new(),
         }
     }
 }
@@ -890,7 +1150,11 @@ impl RegimeEvidence {
     /// a rejection is COUNTED rather than dropped.
     fn absorb_antecedents(&mut self, antecedents: Vec<String>) {
         for line in antecedents {
-            if self.evidence_lines.contains(&line) || self.antecedent_lines.contains(&line) {
+            // All THREE lists: a line already rendered as an outcome,
+            // already kept as an antecedent, or already rejected once is
+            // the same sentence in every case, and the marker counts
+            // DISTINCT omissions.
+            if self.evidence_lines.contains(&line) || self.antecedent_lines.contains(&line) || self.antecedents_omitted.contains(&line) {
                 continue;
             }
             // Recomputed rather than carried as a running field: at
@@ -899,7 +1163,7 @@ impl RegimeEvidence {
             // state that can desync from the vector it describes.
             let budget: usize = self.antecedent_lines.iter().map(|kept| kept.chars().count()).sum::<usize>() + line.chars().count();
             if self.antecedent_lines.len() >= MAX_ANTECEDENT_LINES || budget > MAX_ANTECEDENT_CHARS {
-                self.antecedents_omitted += 1;
+                self.antecedents_omitted.push(line);
                 continue;
             }
             self.antecedent_lines.push(line);
@@ -956,8 +1220,8 @@ impl RegimeEvidence {
                 context.push_str("\n  - ");
                 context.push_str(line);
             }
-            if self.antecedents_omitted > 0 {
-                context.push_str(&format!("\n  (+{} more omitted at the antecedent cap)", self.antecedents_omitted));
+            if !self.antecedents_omitted.is_empty() {
+                context.push_str(&format!("\n  (+{} more omitted at the antecedent cap)", self.antecedents_omitted.len()));
             }
         }
         (task, context)
@@ -1061,7 +1325,7 @@ fn index_antecedents(events: &[ArtifactEvent]) -> AntecedentIndex {
         if derive_verdict_for_event(event).is_some() || !event.has_salient_prose() {
             continue;
         }
-        index.entry(join_key_identity(&event.join_key)).or_default().push(AntecedentEvent { at: event.at, line: event.evidence_line() });
+        index.entry(event_identity(event)).or_default().push(AntecedentEvent { at: event.at, line: event.evidence_line() });
     }
     for bucket in index.values_mut() {
         bucket.sort_by(|a, b| (a.at, &a.line).cmp(&(b.at, &b.line)));
@@ -1101,7 +1365,17 @@ fn antecedents_before(index: &AntecedentIndex, identity: &str, at: DateTime<Utc>
 /// evidence accumulation this drives is unit-testable without a live
 /// store. `BTreeMap` (not a hash map) keeps the persist loop's regime
 /// order deterministic, as it was before.
-fn group_by_regime(derived: Vec<DerivedVerdict>) -> BTreeMap<RegimeKey, RegimeEvidence> {
+///
+/// The input is sorted by [`DerivedVerdict::cmp_stable`] FIRST — the one
+/// choke point every verdict passes through on its way to
+/// [`RegimeEvidence::absorb`], which is why the guarantee lives here
+/// rather than at each call site (ReviewCore). Absorption preserves
+/// arrival order for the ordered `rows` list and both first-seen dedup
+/// lists, and all three reach persisted bytes; a records-source read
+/// orders only by `at`, so without this the bytes would depend on how
+/// a database happened to return two same-`at` rows.
+fn group_by_regime(mut derived: Vec<DerivedVerdict>) -> BTreeMap<RegimeKey, RegimeEvidence> {
+    derived.sort_by(DerivedVerdict::cmp_stable);
     let mut by_regime: BTreeMap<RegimeKey, RegimeEvidence> = BTreeMap::new();
     for verdict in derived {
         // `entry` needs an owned key while `absorb` consumes the rest
@@ -1154,6 +1428,93 @@ fn derive_verdict_for_event(event: &ArtifactEvent) -> Option<VerdictRow> {
         }
         _ => derive_verdict(event.kind, event.authoring_role.as_ref()),
     }
+}
+
+/// What [`run`] does with one freshly-derived regime group — resolved
+/// BEFORE any store write by [`plan_trajectory`], so the decision is
+/// unit-testable against a plain slice of already-stored trajectories.
+enum PersistPlan {
+    /// This regime already holds a trajectory with the identical FULL
+    /// identity ([`trajectory_content_digest`]): the module doc's
+    /// write-time idempotence, an unchanged corpus writing nothing.
+    SkipDuplicate,
+    /// A first derivation of this logical verdict set — a new row
+    /// beside whatever the namespace already holds.
+    Fresh(Trajectory),
+    /// A RE-derivation of a logical verdict set this driver already
+    /// wrote, whose text has changed — the SAME row, rewritten.
+    Supersede(Trajectory),
+}
+
+/// Renders one regime group's text and decides how it lands in the
+/// store (ReviewCore).
+///
+/// The rendering happens HERE, before the duplicate check, which is
+/// the half of the upgrade fix that is easy to lose: the pre-s38 code
+/// compared digests first and returned early, so the text it was about
+/// to write never entered the comparison at all.
+///
+/// # The supersession rule
+/// A candidate supersedes the stored trajectory that
+///
+/// 1. sits under the SAME `regime_key` — `existing` is exactly that
+///    namespace's rows, from
+///    [`canon_learn::TrajectoryStore::query_by_regime_key`];
+/// 2. carries the [`ARTIFACT_INGEST_TAG`]: this driver overwrites only
+///    its OWN derivations, never a fixture, a webhook write, or a
+///    future writer's row, however closely the verdicts match;
+/// 3. shares its [`trajectory_derivation_key`] — the same logical
+///    verdict set, i.e. an answer to the same question; and
+/// 4. among those, carries the smallest [`canon_learn::TrajectoryId`].
+///
+/// Rung 4 is the one that needs an argument. This driver never writes
+/// two rows for one `(regime_key, derivation key)` — before this change
+/// a second one was skipped as a duplicate, after it a second one is
+/// superseded onto the first — so the candidate set is a singleton in
+/// every store this code produced, and rung 4 only decides a case that
+/// should not arise (a hand-seeded store, or a corpus written by two
+/// canon versions at once). It keys on the ID rather than
+/// `recorded_at` because the id is IMMUTABLE across rewrites while
+/// `recorded_at` is overwritten with this pass's `latest_at`: a
+/// timestamp rule could hand the slot to a DIFFERENT row next pass and
+/// oscillate between two, each keeping stale text forever, whereas
+/// picking the smallest id is a fixed point by construction. No tie is
+/// possible — a `TrajectoryId` identifies the row.
+///
+/// Reusing that id is what makes the write REPLACE instead of append:
+/// the shipped `canon_learn::ParquetTrajectoryStore` keys one file per
+/// `<id>.parquet`, so `canon_learn::store_trajectory` lands on the same
+/// row and `rebuild_namespace` then distills ONE trajectory for this
+/// verdict set rather than the fresh answer beside the stale one. That
+/// is the only mutation this driver performs: the raw tier stays
+/// append-only across DISTINCT derivations (design decision 3).
+fn plan_trajectory(existing: &[Trajectory], regime_key: &RegimeKey, evidence: &RegimeEvidence) -> Result<PersistPlan, LearnError> {
+    let (task, context) = evidence.trajectory_text(regime_key);
+    let identity = trajectory_content_digest(regime_key, &evidence.rows, &task, &context);
+    let already_persisted = existing
+        .iter()
+        .any(|stored| trajectory_content_digest(&stored.regime_key, &stored.verdicts, &stored.task, &stored.context) == identity);
+    if already_persisted {
+        return Ok(PersistPlan::SkipDuplicate);
+    }
+
+    let derivation = trajectory_derivation_key(regime_key, &evidence.rows);
+    let superseded = existing
+        .iter()
+        .filter(|stored| stored.tags.iter().any(|tag| tag == ARTIFACT_INGEST_TAG))
+        .filter(|stored| trajectory_derivation_key(&stored.regime_key, &stored.verdicts) == derivation)
+        .map(|stored| stored.id)
+        .min();
+    let trajectory = Trajectory::new(
+        superseded.unwrap_or_else(TrajectoryId::new),
+        regime_key.clone(),
+        task,
+        context,
+        evidence.rows.clone(),
+        evidence.latest_at,
+        vec![ARTIFACT_INGEST_TAG.to_string()],
+    )?;
+    Ok(if superseded.is_some() { PersistPlan::Supersede(trajectory) } else { PersistPlan::Fresh(trajectory) })
 }
 
 /// One scan -> derive-verdict -> persist pass over every registered
@@ -1329,7 +1690,8 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
     for event in &all_events {
         let Some(row) = derive_verdict_for_event(event) else { continue };
         let area = event.area.clone().unwrap_or_else(|| "unscoped".to_string());
-        let hash = regime_hash(&event.join_key);
+        let identity = event_identity(event);
+        let hash = regime_hash(&identity);
         let verdict = attach_regime_key(row, event.join_key.clone(), &label, &area, &hash, event.trust_level.clone())?;
         derived.push(DerivedVerdict {
             regime_key: verdict.regime_key,
@@ -1341,7 +1703,7 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
             scenario_title: scenario_titles.title_for(&event.join_key, event_project_id(event)).map(str::to_string),
             kind_label: event.display_label(),
             evidence_line: event.evidence_line(),
-            antecedents: antecedents_before(&antecedent_index, &join_key_identity(&event.join_key), event.at),
+            antecedents: antecedents_before(&antecedent_index, &identity, event.at),
         });
     }
     let verdicts_derived = derived.len();
@@ -1365,23 +1727,19 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
     let mut trajectories_left_pending = 0usize;
     for (regime_key, evidence) in by_regime {
         let verdict_count = evidence.rows.len();
-        let digest = trajectory_content_digest(&regime_key, &evidence.rows);
-        let already_persisted = trajectory_store
-            .query_by_regime_key(&regime_key)?
-            .iter()
-            .any(|existing| trajectory_content_digest(&existing.regime_key, &existing.verdicts) == digest);
-        if already_persisted {
-            trajectories_skipped_duplicate += 1;
-            continue;
-        }
-        let (task, context) = evidence.trajectory_text(&regime_key);
-        let at = evidence.latest_at;
-        let trajectory =
-            Trajectory::new(TrajectoryId::new(), regime_key.clone(), task, context, evidence.rows, at, vec!["artifact-ingest".to_string()])?;
+        let existing = trajectory_store.query_by_regime_key(&regime_key)?;
+        let (trajectory, superseded) = match plan_trajectory(&existing, &regime_key, &evidence)? {
+            PersistPlan::SkipDuplicate => {
+                trajectories_skipped_duplicate += 1;
+                continue;
+            }
+            PersistPlan::Fresh(trajectory) => (trajectory, false),
+            PersistPlan::Supersede(trajectory) => (trajectory, true),
+        };
 
         match store_trajectory(&role_registry, &trajectory_store, &trajectory) {
             Ok(()) => {
-                trajectories_persisted.push(PersistedTrajectory { regime_key: regime_key.as_str().to_string(), verdict_count });
+                trajectories_persisted.push(PersistedTrajectory { regime_key: regime_key.as_str().to_string(), verdict_count, superseded });
                 // Resolve the covering verdict+reward from the SAME
                 // `VerdictRow`(s) this trajectory was just built from,
                 // then write it back — closing S7 design D2's two-phase
@@ -1460,8 +1818,13 @@ pub fn format_human(outcome: &ArtifactIngestOutcome) -> String {
     out.push_str(&format!("verdicts derived: {}\n", outcome.verdicts_derived));
     out.push_str(&format!("trajectories persisted: {}\n", outcome.trajectories_persisted.len()));
     for trajectory in &outcome.trajectories_persisted {
-        out.push_str(&format!("  - {} ({} verdict(s))\n", trajectory.regime_key, trajectory.verdict_count));
+        let how = if trajectory.superseded { ", superseded in place" } else { "" };
+        out.push_str(&format!("  - {} ({} verdict(s){how})\n", trajectory.regime_key, trajectory.verdict_count));
     }
+    // Derived from the rows above rather than carried as its own
+    // counter, so the tally and the list it summarizes cannot disagree.
+    let superseded = outcome.trajectories_persisted.iter().filter(|t| t.superseded).count();
+    out.push_str(&format!("trajectories superseded (re-derived onto the existing row): {superseded}\n"));
     out.push_str(&format!("trajectories skipped (unregistered role): {}\n", outcome.trajectories_skipped_unregistered_role));
     out.push_str(&format!("trajectories skipped (duplicate, already persisted): {}\n", outcome.trajectories_skipped_duplicate));
     out.push_str(&format!("strategy items rebuilt (distilled): {}\n", outcome.strategy_items_rebuilt));
@@ -1477,12 +1840,13 @@ pub fn format_json(outcome: &ArtifactIngestOutcome) -> String {
 
 /// canon artifact-ingest's shared-contract selftest entry point (Wave-3
 /// `canon selftest` aggregator, per-crate registration — unblocks S4
-/// 7.4). Wraps this driver's pure write-identity invariants — `regime_hash`
-/// (12-hex, deterministic, join-key-sensitive) and
+/// 7.4). Wraps this driver's pure write-identity invariants —
+/// `regime_hash` (12-hex, deterministic, sensitive to the whole
+/// `event_identity` including its project half) and
 /// `trajectory_content_digest` (deterministic, regime-key-sensitive,
-/// verdict-content-and-order-sensitive) — as in-memory checks over
-/// synthetic keys/verdicts. No filesystem or network read,
-/// side-effect-free against the real repo.
+/// verdict-content-and-order-sensitive, and rendered-text-sensitive) —
+/// as in-memory checks over synthetic keys/verdicts. No filesystem or
+/// network read, side-effect-free against the real repo.
 ///
 /// `Ok(n)` = checks passed; `Err(_)` = one line per failure, never panics.
 pub fn selftest() -> Result<usize, Vec<String>> {
@@ -1494,35 +1858,57 @@ pub fn selftest() -> Result<usize, Vec<String>> {
 
     let scen_a = ArtifactJoinKey::Scenario(ScenarioId::parse("world.firstbuy-hotdeal.26").expect("valid scenario id"));
     let scen_b = ArtifactJoinKey::Scenario(ScenarioId::parse("world.firstbuy-hotdeal.27").expect("valid scenario id"));
-    let h = regime_hash(&scen_a);
-    if h.len() == 12 && h == regime_hash(&scen_a) && regime_hash(&scen_a) != regime_hash(&scen_b) {
+    let ident = |key: &ArtifactJoinKey, project: Option<&str>| regime_hash(&join_key_identity(key, project));
+    let h = ident(&scen_a, Some("world"));
+    if h.len() == 12
+        && h == ident(&scen_a, Some("world"))
+        && h != ident(&scen_b, Some("world"))
+        // Two projects defining one scenario id are two regimes, and a
+        // project-less event is a third — never silently either.
+        && h != ident(&scen_a, Some("acme"))
+        && h != ident(&scen_a, None)
+    {
         passed += 1;
     } else {
-        failures.push("regime-hash: not a deterministic 12-hex digest sensitive to the join key".to_string());
+        failures.push("regime-hash: not a deterministic 12-hex digest sensitive to the full event identity".to_string());
     }
 
     let key = RegimeKey::parse(canon_model::ids::regime_key("dev", "acme-repo", "world", "abc123")).expect("valid regime key");
     let key2 = RegimeKey::parse(canon_model::ids::regime_key("dev", "acme-repo", "world", "def456")).expect("valid regime key");
     let vr = |role: &str, p: Polarity, b: Becomes| VerdictRow { role: RoleId::parse(role).expect("valid role"), polarity: p, becomes: b };
+    let guardrail = || vec![vr("dev", Polarity::Failure, Becomes::GuardrailCandidate)];
+    let strategy = || vec![vr("dev", Polarity::Success, Becomes::StrategyCandidate)];
 
-    if trajectory_content_digest(&key, &[vr("dev", Polarity::Failure, Becomes::GuardrailCandidate)])
-        == trajectory_content_digest(&key, &[vr("dev", Polarity::Failure, Becomes::GuardrailCandidate)])
-        && trajectory_content_digest(&key, &[vr("dev", Polarity::Failure, Becomes::GuardrailCandidate)])
-            != trajectory_content_digest(&key2, &[vr("dev", Polarity::Failure, Becomes::GuardrailCandidate)])
+    let guard = guardrail();
+    let strat = strategy();
+    let mut both = guardrail();
+    both.extend(strategy());
+    let mut reversed = strategy();
+    reversed.extend(guardrail());
+
+    if trajectory_content_digest(&key, &guard, "t", "c") == trajectory_content_digest(&key, &guard, "t", "c")
+        && trajectory_content_digest(&key, &guard, "t", "c") != trajectory_content_digest(&key2, &guard, "t", "c")
     {
         passed += 1;
     } else {
         failures.push("trajectory-digest-determinism: not deterministic or not regime-key-sensitive".to_string());
     }
 
-    let content_differs = trajectory_content_digest(&key, &[vr("dev", Polarity::Failure, Becomes::GuardrailCandidate)])
-        != trajectory_content_digest(&key, &[vr("dev", Polarity::Success, Becomes::StrategyCandidate)]);
-    let order_differs = trajectory_content_digest(&key, &[vr("dev", Polarity::Failure, Becomes::GuardrailCandidate), vr("dev", Polarity::Success, Becomes::StrategyCandidate)])
-        != trajectory_content_digest(&key, &[vr("dev", Polarity::Success, Becomes::StrategyCandidate), vr("dev", Polarity::Failure, Becomes::GuardrailCandidate)]);
-    if content_differs && order_differs {
+    let content_differs = trajectory_content_digest(&key, &guard, "t", "c") != trajectory_content_digest(&key, &strat, "t", "c");
+    let order_differs = trajectory_content_digest(&key, &both, "t", "c") != trajectory_content_digest(&key, &reversed, "t", "c");
+    // The upgrade half (ReviewCore): a rebuild that changes ONLY the
+    // rendered text must mint a different identity, or the stale row is
+    // skipped as a duplicate and re-distilled forever.
+    let text_differs = trajectory_content_digest(&key, &guard, "t", "c") != trajectory_content_digest(&key, &guard, "t", "c2")
+        && trajectory_content_digest(&key, &guard, "t", "c") != trajectory_content_digest(&key, &guard, "t2", "c");
+    // …while the derivation key stays blind to it, which is what lets
+    // the rebuild find the row it replaces.
+    let derivation_stable =
+        trajectory_derivation_key(&key, &guard) == trajectory_derivation_key(&key, &guard) && trajectory_derivation_key(&key, &guard) != trajectory_derivation_key(&key, &strat);
+    if content_differs && order_differs && text_differs && derivation_stable {
         passed += 1;
     } else {
-        failures.push("trajectory-digest-sensitivity: not sensitive to verdict content or order".to_string());
+        failures.push("trajectory-digest-sensitivity: not sensitive to verdict content, order, or rendered text".to_string());
     }
 
     if failures.is_empty() { Ok(passed) } else { Err(failures) }
@@ -1540,20 +1926,61 @@ mod tests {
         assert_eq!(repo_label(Path::new("/tmp/acme-repo")), "acme-repo");
     }
 
+    /// One scenario-keyed event identity's `regime_key` hash component
+    /// — the exact composition [`run`] performs
+    /// ([`event_identity`] -> [`regime_hash`]), over a
+    /// [`scenario_key`] and the `project_id` the event carried.
+    fn identity_hash(id: &str, project: Option<&str>) -> String {
+        regime_hash(&join_key_identity(&scenario_key(id), project))
+    }
+
     #[test]
     fn regime_hash_is_a_twelve_char_lowercase_hex_digest_and_is_deterministic() {
-        let key = ArtifactJoinKey::Scenario(canon_model::ids::ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap());
-        let hash = regime_hash(&key);
+        let hash = identity_hash("world.firstbuy-hotdeal.26", Some("world"));
         assert_eq!(hash.len(), 12);
         assert!(hash.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
-        assert_eq!(hash, regime_hash(&key), "same join key must always hash to the same regime_key hash component");
+        assert_eq!(hash, identity_hash("world.firstbuy-hotdeal.26", Some("world")), "the same event identity must always hash to the same regime_key hash component");
     }
 
     #[test]
     fn regime_hash_differs_across_distinct_join_keys() {
-        let a = ArtifactJoinKey::Scenario(canon_model::ids::ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap());
-        let b = ArtifactJoinKey::Scenario(canon_model::ids::ScenarioId::parse("world.firstbuy-hotdeal.27").unwrap());
-        assert_ne!(regime_hash(&a), regime_hash(&b));
+        assert_ne!(identity_hash("world.firstbuy-hotdeal.26", Some("world")), identity_hash("world.firstbuy-hotdeal.27", Some("world")));
+    }
+
+    #[test]
+    fn an_event_identity_names_its_project_and_cannot_collide_with_a_missing_one() {
+        // ReviewCore: a `Scenario`'s identity is `(project_id,
+        // scenario_id)`, and this module already supports one scenario
+        // id being defined by several projects. Keyed on the bare id,
+        // project A's finding attached to project B's verdict.
+        let key = scenario_key("platformer.moving.01");
+        assert_eq!(join_key_identity(&key, Some("platformer")), "scenario:platformer.moving.01@platformer");
+        assert_eq!(join_key_identity(&key, Some("world")), "scenario:platformer.moving.01@world");
+        assert_eq!(join_key_identity(&key, None), "scenario:platformer.moving.01@-");
+        // `-` cannot begin a `ProjectId`, so the unknown form is
+        // unreachable from any real project — and a project string that
+        // is not a well-formed `ProjectId` reads as unknown rather than
+        // being pasted in verbatim, which is what keeps the `@` split
+        // total.
+        assert_eq!(join_key_identity(&key, Some("-")), join_key_identity(&key, None));
+        assert_eq!(join_key_identity(&key, Some("Not A Project")), join_key_identity(&key, None));
+        assert_eq!(join_key_identity(&key, Some("a@b")), join_key_identity(&key, None));
+
+        assert_ne!(identity_hash("platformer.moving.01", Some("platformer")), identity_hash("platformer.moving.01", Some("world")));
+        assert_ne!(identity_hash("platformer.moving.01", Some("platformer")), identity_hash("platformer.moving.01", None));
+    }
+
+    #[test]
+    fn a_non_scenario_identity_carries_no_project_segment() {
+        // A handoff- or task-keyed event names no project, so its
+        // identity must be byte-identical whatever `detail` happens to
+        // carry — otherwise s37/s40 handoff regimes would re-key.
+        let handoff = ArtifactJoinKey::Handoff(canon_model::ids::HandoffId::parse("20260710-1432-fix-a1b2").unwrap());
+        let task = ArtifactJoinKey::Task(canon_model::ids::TaskId::parse("frozen-fixture-change#1.4").unwrap());
+        assert_eq!(join_key_identity(&handoff, None), "handoff:20260710-1432-fix-a1b2");
+        assert_eq!(join_key_identity(&handoff, Some("platformer")), "handoff:20260710-1432-fix-a1b2");
+        assert_eq!(join_key_identity(&task, None), "task:frozen-fixture-change#1.4");
+        assert_eq!(join_key_identity(&task, Some("platformer")), "task:frozen-fixture-change#1.4");
     }
 
     #[test]
@@ -1581,11 +2008,15 @@ mod tests {
         RegimeKey::parse(canon_model::ids::regime_key("dev", "acme-repo", area, hash)).unwrap()
     }
 
+    /// The rendered `(task, context)` pair the digest tests hold
+    /// constant while varying the verdict half.
+    const TEXT: (&str, &str) = ("platformer.moving.01: review attestation", "review attestation: 9c93d024b");
+
     #[test]
     fn trajectory_content_digest_is_deterministic_for_identical_input() {
         let key = regime("world", "abc123");
         let rows = vec![verdict_row("dev", canon_ingest::verdict::Polarity::Failure, canon_ingest::verdict::Becomes::GuardrailCandidate)];
-        assert_eq!(trajectory_content_digest(&key, &rows), trajectory_content_digest(&key, &rows));
+        assert_eq!(trajectory_content_digest(&key, &rows, TEXT.0, TEXT.1), trajectory_content_digest(&key, &rows, TEXT.0, TEXT.1));
     }
 
     #[test]
@@ -1593,7 +2024,7 @@ mod tests {
         let rows = vec![verdict_row("dev", canon_ingest::verdict::Polarity::Failure, canon_ingest::verdict::Becomes::GuardrailCandidate)];
         let a = regime("world", "abc123");
         let b = regime("world", "def456");
-        assert_ne!(trajectory_content_digest(&a, &rows), trajectory_content_digest(&b, &rows));
+        assert_ne!(trajectory_content_digest(&a, &rows, TEXT.0, TEXT.1), trajectory_content_digest(&b, &rows, TEXT.0, TEXT.1));
     }
 
     #[test]
@@ -1601,7 +2032,7 @@ mod tests {
         let key = regime("world", "abc123");
         let a = vec![verdict_row("dev", canon_ingest::verdict::Polarity::Failure, canon_ingest::verdict::Becomes::GuardrailCandidate)];
         let b = vec![verdict_row("dev", canon_ingest::verdict::Polarity::Success, canon_ingest::verdict::Becomes::StrategyCandidate)];
-        assert_ne!(trajectory_content_digest(&key, &a), trajectory_content_digest(&key, &b));
+        assert_ne!(trajectory_content_digest(&key, &a, TEXT.0, TEXT.1), trajectory_content_digest(&key, &b, TEXT.0, TEXT.1));
     }
 
     #[test]
@@ -1612,12 +2043,39 @@ mod tests {
         let forward = vec![first.clone(), second.clone()];
         let reversed = vec![second, first];
         assert_ne!(
-            trajectory_content_digest(&key, &forward),
-            trajectory_content_digest(&key, &reversed),
+            trajectory_content_digest(&key, &forward, TEXT.0, TEXT.1),
+            trajectory_content_digest(&key, &reversed, TEXT.0, TEXT.1),
             "the digest folds ORDERED verdict contents — module doc's write-time idempotence relies on \
-             `scan_dir`'s deterministic file order producing the SAME sequence every pass, so two different \
-             orderings must never collide"
+             `scan_dir`'s deterministic file order plus `group_by_regime`'s total sort producing the SAME \
+             sequence every pass, so two different orderings must never collide"
         );
+    }
+
+    #[test]
+    fn trajectory_content_digest_is_sensitive_to_the_rendered_text_it_names() {
+        // ReviewCore's BLOCKER: the pre-s38 identity folded only the
+        // verdict rows, so a trajectory whose `task`/`context` this
+        // release renders differently kept its old digest, was skipped
+        // as a duplicate, and re-distilled pre-s38 ingest-driver prose
+        // forever.
+        let key = regime("world", "abc123");
+        let rows = vec![verdict_row("dev", canon_ingest::verdict::Polarity::Failure, canon_ingest::verdict::Becomes::GuardrailCandidate)];
+        let base = trajectory_content_digest(&key, &rows, TEXT.0, TEXT.1);
+        assert_ne!(base, trajectory_content_digest(&key, &rows, TEXT.0, "review attestation: 9c93d024b\npreceded on this artifact by:\n  - open divergence: SHIP-BLOCKER"));
+        assert_ne!(base, trajectory_content_digest(&key, &rows, "platformer.moving.01: review attestation — A moving platform carries the standing player", TEXT.1));
+    }
+
+    #[test]
+    fn the_derivation_key_names_the_verdict_set_alone_and_ignores_the_text() {
+        // The other half of the same fix: the key that FINDS the row a
+        // rebuild replaces must be blind to exactly the thing that
+        // changed, or supersession could never match anything.
+        let key = regime("world", "abc123");
+        let rows = vec![verdict_row("dev", canon_ingest::verdict::Polarity::Failure, canon_ingest::verdict::Becomes::GuardrailCandidate)];
+        let other = vec![verdict_row("dev", canon_ingest::verdict::Polarity::Success, canon_ingest::verdict::Becomes::StrategyCandidate)];
+        assert_eq!(trajectory_derivation_key(&key, &rows), trajectory_derivation_key(&key, &rows));
+        assert_ne!(trajectory_derivation_key(&key, &rows), trajectory_derivation_key(&key, &other));
+        assert_ne!(trajectory_derivation_key(&key, &rows), trajectory_derivation_key(&regime("world", "def456"), &rows));
     }
 
     #[test]
@@ -1849,7 +2307,7 @@ mod tests {
             scenario_title: None,
             kind_label: event.display_label(),
             evidence_line: event.evidence_line(),
-            antecedents: antecedents_before(index, &join_key_identity(&event.join_key), event.at),
+            antecedents: antecedents_before(index, &event_identity(event), event.at),
         }
     }
 
@@ -1941,11 +2399,11 @@ mod tests {
             native_divergence(scenario, "resolved", Some(RESOLUTION), "2026-07-14T21:38:36Z"),
         ];
         let index = index_antecedents(&events);
-        assert_eq!(index[&format!("scenario:{scenario}")].len(), 1, "deduped by line text at index time, earliest copy kept");
+        assert_eq!(index[&format!("scenario:{scenario}@-")].len(), 1, "deduped by line text at index time, earliest copy kept");
         let grouped = group_by_regime(vec![derived_from(&index, &key, &events[2])]);
         let evidence = grouped.get(&key).unwrap();
         assert_eq!(evidence.antecedent_lines.len(), 1);
-        assert_eq!(evidence.antecedents_omitted, 0, "a dedupe is not a cap drop and must never be reported as one");
+        assert!(evidence.antecedents_omitted.is_empty(), "a dedupe is not a cap drop and must never be reported as one");
     }
 
     #[test]
@@ -1957,11 +2415,11 @@ mod tests {
         events.push(native_divergence(scenario, "resolved", Some(RESOLUTION), "2026-07-14T21:38:36Z"));
 
         let index = index_antecedents(&events);
-        assert_eq!(index[&format!("scenario:{scenario}")].len(), 7, "all seven are indexed — the cap is an absorb-time bound on the RENDERED block");
+        assert_eq!(index[&format!("scenario:{scenario}@-")].len(), 7, "all seven are indexed — the cap is an absorb-time bound on the RENDERED block");
         let grouped = group_by_regime(vec![derived_from(&index, &key, events.last().unwrap())]);
         let evidence = grouped.get(&key).unwrap();
         assert_eq!(evidence.antecedent_lines.len(), MAX_ANTECEDENT_LINES);
-        assert_eq!(evidence.antecedents_omitted, 3);
+        assert_eq!(evidence.antecedents_omitted.len(), 3);
 
         let (_, context) = evidence.trajectory_text(&key);
         assert!(context.ends_with("\n  (+3 more omitted at the antecedent cap)"), "a capped block says so rather than silently quoting four of seven: {context}");
@@ -1984,7 +2442,7 @@ mod tests {
         let evidence = grouped.get(&key).unwrap();
         assert_eq!(evidence.antecedent_lines.len(), 2, "two full-cap lines fit the budget, the third does not");
         assert!(evidence.antecedent_lines.len() < MAX_ANTECEDENT_LINES, "the CHAR budget bound this block, not the line count");
-        assert_eq!(evidence.antecedents_omitted, 1);
+        assert_eq!(evidence.antecedents_omitted.len(), 1);
         assert!(evidence.antecedent_lines.iter().map(|line| line.chars().count()).sum::<usize>() <= MAX_ANTECEDENT_CHARS);
         assert!(
             evidence.antecedent_lines.iter().all(|line| line.starts_with("open divergence: ")),
@@ -1995,10 +2453,10 @@ mod tests {
     #[test]
     fn trajectory_text_is_byte_identical_across_two_passes_with_antecedents_present() {
         // s38's idempotence guarantee has to survive the s39 join:
-        // `trajectory_content_digest` folds only the verdict ROWS, so a
-        // trajectory whose text wobbled between passes would be skipped
-        // as a duplicate while carrying different content — silent drift
-        // into `.canon/learn`.
+        // `trajectory_content_digest` now folds the rendered text, so a
+        // trajectory whose text wobbled between passes would be written
+        // afresh every pass — an ever-growing corpus of near-identical
+        // rows in `.canon/learn`, each distilled beside the others.
         let key = regime("platformer", "41fdd8c5");
         let scenario = "platformer.session.04";
         let pass = || {
@@ -2265,9 +2723,9 @@ mod tests {
     #[test]
     fn a_joined_title_is_byte_identical_across_two_passes_over_the_same_events() {
         // s38's idempotence guarantee has to survive this join too:
-        // `trajectory_content_digest` folds only the verdict ROWS, so text
-        // that wobbled between passes would be skipped as a duplicate and
-        // never corrected.
+        // `trajectory_content_digest` folds the rendered text, so a title
+        // that wobbled between passes would supersede its own row on
+        // every ingest instead of skipping as a duplicate.
         let key = regime("platformer", "41fdd8c5");
         let titles = moving_platform_index();
         let pass = || {
@@ -2283,6 +2741,234 @@ mod tests {
         assert_eq!(
             rendered_task(&key, pass()),
             "platformer.moving.01: review attestation, code-review finding — A moving platform carries the standing player"
+        );
+    }
+
+    // ── ReviewCore: identity, supersession, and total order ──
+
+    /// The exact shape a PRE-s38 `canon ingest artifacts` pass left in
+    /// a store: this release's `regime_key` and its ordered verdict
+    /// rows, under text that described the DRIVER rather than the
+    /// evidence.
+    fn pre_s38_trajectory(key: &RegimeKey, rows: Vec<VerdictRow>) -> Trajectory {
+        Trajectory::new(
+            TrajectoryId::new(),
+            key.clone(),
+            format!("{} verdict(s) derived from canon-ingest artifact adapters for regime {}", rows.len(), key.as_str()),
+            format!("{} verdict(s) derived from canon-ingest artifact adapters", rows.len()),
+            rows,
+            "2026-07-14T21:38:36Z".parse().unwrap(),
+            vec![ARTIFACT_INGEST_TAG.to_string()],
+        )
+        .expect("a dev-role trajectory under a dev regime")
+    }
+
+    #[test]
+    fn an_upgraded_store_converges_onto_the_new_text_without_deleting_anything() {
+        // The BLOCKER, end to end over a REAL store. `rm -rf
+        // .canon/learn` was the development workaround for this; it is
+        // not the contract, so an upgrade has to converge on its own.
+        let dir = tempfile::tempdir().unwrap();
+        let store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let key = regime("platformer", "41fdd8c5");
+        let scenario = "platformer.session.04";
+
+        let events = vec![
+            native_divergence(scenario, "open", Some(APP_FINDING), "2026-07-14T20:50:34Z"),
+            native_divergence(scenario, "resolved", Some(RESOLUTION), "2026-07-14T21:38:36Z"),
+        ];
+        let index = index_antecedents(&events);
+        let by_regime = group_by_regime(vec![derived_from(&index, &key, &events[1])]);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+
+        let stale = pre_s38_trajectory(&key, evidence.rows.clone());
+        let stale_id = stale.id;
+        store.append(&stale).unwrap();
+
+        let plan = plan_trajectory(&store.query_by_regime_key(&key).unwrap(), &key, evidence).unwrap();
+        let PersistPlan::Supersede(fresh) = plan else {
+            panic!("a stored pre-s38 derivation of this exact verdict set must be superseded — not skipped as a duplicate, not appended beside")
+        };
+        assert_eq!(fresh.id, stale_id, "supersession reuses the stored row's own id: that is what makes the write REPLACE it");
+        store.append(&fresh).unwrap();
+
+        let after = store.query_by_regime_key(&key).unwrap();
+        assert_eq!(after.len(), 1, "the namespace converged rather than doubling — a second row would be distilled beside the first: {after:#?}");
+        assert!(
+            after[0].context.contains(RESOLUTION) && after[0].context.contains(APP_FINDING),
+            "the s38/s39 evidence text replaced the driver-describing prose: {}",
+            after[0].context
+        );
+        assert!(
+            !after[0].task.contains("canon-ingest artifact adapters") && !after[0].context.contains("canon-ingest artifact adapters"),
+            "no pre-s38 prose survives to be re-distilled: {:?}",
+            (&after[0].task, &after[0].context)
+        );
+
+        // …and the pass AFTER that writes nothing at all: supersession
+        // is a one-time upgrade, never a rewrite on every ingest.
+        assert!(matches!(plan_trajectory(&after, &key, evidence).unwrap(), PersistPlan::SkipDuplicate));
+    }
+
+    #[test]
+    fn a_trajectory_this_driver_did_not_write_is_never_superseded() {
+        // Rung 2 of the supersession rule. A fixture-seeded or
+        // webhook-written row carrying the same verdict set belongs to
+        // someone else; overwriting it would destroy evidence this
+        // driver never produced.
+        let key = regime("platformer", "41fdd8c5");
+        let resolution = native_divergence("platformer.session.04", "resolved", Some(RESOLUTION), "2026-07-14T21:38:36Z");
+        let by_regime = group_by_regime(vec![derived_from(&AntecedentIndex::new(), &key, &resolution)]);
+        let evidence = by_regime.get(&key).unwrap();
+
+        let foreign = Trajectory::new(
+            TrajectoryId::new(),
+            key.clone(),
+            "seeded by a fixture",
+            "prose this driver never wrote",
+            evidence.rows.clone(),
+            "2026-07-14T21:38:36Z".parse().unwrap(),
+            vec!["fixture".to_string()],
+        )
+        .unwrap();
+        let foreign_id = foreign.id;
+
+        let PersistPlan::Fresh(minted) = plan_trajectory(std::slice::from_ref(&foreign), &key, evidence).unwrap() else {
+            panic!("an untagged row is not this driver's to replace")
+        };
+        assert_ne!(minted.id, foreign_id, "a fresh row lands beside it, leaving the untagged row's bytes untouched");
+    }
+
+    #[test]
+    fn two_same_instant_verdicts_render_identically_whichever_order_they_arrive_in() {
+        // A records-source read orders by `at` ALONE, and a ledger `at`
+        // is byte-stable rather than wall-clock, so two rows for one
+        // regime routinely tie with no database tie-break. Arrival order
+        // must reach neither the rendered text nor the ordered verdict
+        // list the persisted identity folds.
+        let key = regime("platformer", "41fdd8c5");
+        let scenario = "platformer.session.04";
+        let at = "2026-07-14T21:38:36Z";
+        let a = native_divergence(scenario, "resolved", Some(RESOLUTION), at);
+        let b = native_divergence(scenario, "still_divergent", Some(APP_FINDING), at);
+        let empty = AntecedentIndex::new();
+
+        let forward = group_by_regime(vec![derived_from(&empty, &key, &a), derived_from(&empty, &key, &b)]);
+        let reversed = group_by_regime(vec![derived_from(&empty, &key, &b), derived_from(&empty, &key, &a)]);
+        let (task_f, context_f) = forward.get(&key).unwrap().trajectory_text(&key);
+        let (task_r, context_r) = reversed.get(&key).unwrap().trajectory_text(&key);
+        assert_eq!((&task_f, &context_f), (&task_r, &context_r), "same-`at` arrival order must never reach the rendered text");
+        assert_eq!(
+            trajectory_content_digest(&key, &forward.get(&key).unwrap().rows, &task_f, &context_f),
+            trajectory_content_digest(&key, &reversed.get(&key).unwrap().rows, &task_r, &context_r),
+            "…nor the persisted identity, or a repeat ingest of an UNCHANGED record set writes another trajectory"
+        );
+    }
+
+    #[test]
+    fn equal_at_scenario_titles_resolve_by_schema_then_digest_never_by_read_order() {
+        // A ledger `at` is byte-stable, so a canon parser change emits a
+        // fresh record whose `at` is IDENTICAL to the stale one it
+        // supersedes. `at` alone then leaves the slot to whichever row
+        // the tier returned first — and a live database read does not
+        // order equal-`at` rows at all.
+        let at = "2026-07-14T19:27:35Z";
+        let mut old_gen = scenario_record("platformer", "platformer.moving.01", "An older sentence", at);
+        old_gen.0["schema"] = serde_json::json!(1);
+        let mut new_gen = scenario_record("platformer", "platformer.moving.01", "A moving platform carries the standing player", at);
+        new_gen.0["schema"] = serde_json::json!(2);
+
+        let key = scenario_key("platformer.moving.01");
+        let forward = ScenarioTitleIndex::from_records(&[old_gen.clone(), new_gen.clone()]);
+        let reversed = ScenarioTitleIndex::from_records(&[new_gen, old_gen]);
+        assert_eq!(
+            forward.title_for(&key, Some("platformer")),
+            Some("A moving platform carries the standing player"),
+            "the newer FORMAT GENERATION wins an `at` tie — that is what `schema` is"
+        );
+        assert_eq!(forward.title_for(&key, Some("platformer")), reversed.title_for(&key, Some("platformer")));
+
+        // Equal `at` AND equal `schema`: the content digest is the final
+        // rung, and it too is the records' own data — never the order
+        // they were handed over in.
+        let a = scenario_record("platformer", "platformer.moving.01", "Sentence A", at);
+        let b = scenario_record("platformer", "platformer.moving.01", "Sentence B", at);
+        let ab = ScenarioTitleIndex::from_records(&[a.clone(), b.clone()]);
+        let ba = ScenarioTitleIndex::from_records(&[b, a]);
+        assert_eq!(ab.title_for(&key, Some("platformer")), ba.title_for(&key, Some("platformer")));
+    }
+
+    #[test]
+    fn one_omitted_finding_is_counted_once_however_many_verdicts_reject_it() {
+        // Every verdict in a regime absorbs the SAME indexed findings.
+        // The kept lines dedupe against `antecedent_lines`; before this
+        // fix the rejected ones did not, so the rendered marker read
+        // "+3", then "+6", for three distinct omissions.
+        let key = regime("platformer", "41fdd8c5");
+        let scenario = "platformer.session.04";
+        let mut events: Vec<ArtifactEvent> =
+            (0..7).map(|n| native_divergence(scenario, "open", Some(&format!("SHIP-BLOCKER finding {n}")), &format!("2026-07-14T20:5{n}:00Z"))).collect();
+        events.push(native_divergence(scenario, "resolved", Some(RESOLUTION), "2026-07-14T21:38:36Z"));
+        events.push(native_divergence(scenario, "still_divergent", Some(APP_FINDING), "2026-07-14T21:40:00Z"));
+
+        let index = index_antecedents(&events);
+        let grouped = group_by_regime(vec![derived_from(&index, &key, &events[7]), derived_from(&index, &key, &events[8])]);
+        let evidence = grouped.get(&key).unwrap();
+        assert_eq!(evidence.antecedent_lines.len(), MAX_ANTECEDENT_LINES, "the same four survive both absorptions");
+        assert_eq!(evidence.antecedents_omitted.len(), 3, "seven findings, four kept: three DISTINCT omissions, counted once each");
+
+        let (_, context) = evidence.trajectory_text(&key);
+        assert!(context.ends_with("\n  (+3 more omitted at the antecedent cap)"), "the marker counts findings, not rejections: {context}");
+    }
+
+    #[test]
+    fn a_finding_from_another_project_never_attaches_to_this_projects_verdict() {
+        // BLOCKER: a `Scenario`'s identity is `(project_id,
+        // scenario_id)` and one scenario id genuinely lives in several
+        // projects. Keyed on the bare id, project `world`'s open finding
+        // attached itself to project `platformer`'s later resolution.
+        let key = regime("platformer", "41fdd8c5");
+        let scenario = "platformer.session.04";
+        let mut theirs = native_divergence(scenario, "open", Some(APP_FINDING), "2026-07-14T20:50:34Z");
+        theirs.detail["project_id"] = serde_json::json!("world");
+        let mut ours = native_divergence(scenario, "resolved", Some(RESOLUTION), "2026-07-14T21:38:36Z");
+        ours.detail["project_id"] = serde_json::json!("platformer");
+
+        let index = index_antecedents(&[theirs.clone(), ours.clone()]);
+        let grouped = group_by_regime(vec![derived_from(&index, &key, &ours)]);
+        let (_, context) = grouped.get(&key).unwrap().trajectory_text(&key);
+        assert_eq!(context, format!("resolved divergence: {RESOLUTION}"));
+        assert!(!context.contains(APP_FINDING), "another project's finding must never be quoted as this one's antecedent: {context}");
+
+        // The SAME identity drives the regime hash, so the two projects
+        // cannot fold onto one trajectory either.
+        assert_ne!(regime_hash(&event_identity(&theirs)), regime_hash(&event_identity(&ours)));
+
+        // …and the join still works WITHIN one project, so this is a
+        // correction, not a disabling.
+        let mut same_project = theirs.clone();
+        same_project.detail["project_id"] = serde_json::json!("platformer");
+        let joined = index_antecedents(&[same_project, ours.clone()]);
+        let grouped = group_by_regime(vec![derived_from(&joined, &key, &ours)]);
+        let (_, context) = grouped.get(&key).unwrap().trajectory_text(&key);
+        assert!(context.contains(APP_FINDING), "a same-project finding still attaches: {context}");
+    }
+
+    #[test]
+    fn a_pathological_title_allocates_only_the_capped_prefix() {
+        // The 160-char bound applied to the OUTPUT while the peak
+        // allocation stayed proportional to the artifact-supplied INPUT.
+        // `capacity` is the observable that separates the two, since
+        // `String::truncate` never gives memory back.
+        let fat = "x".repeat(400_000);
+        let title = compact_scenario_title(&fat);
+        assert_eq!(title.chars().count(), SCENARIO_TITLE_MAX_CHARS + 1, "the cap plus its one-char cut marker");
+        assert!(title.ends_with('…'), "a cut is marked, never silent");
+        assert!(
+            title.capacity() <= SCENARIO_TITLE_MAX_CHARS * 4 + 8,
+            "a joined title must never allocate the discarded tail of a record: {} bytes held for a {}-char title",
+            title.capacity(),
+            SCENARIO_TITLE_MAX_CHARS
         );
     }
 }

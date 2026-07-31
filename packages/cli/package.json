@@ -1,6 +1,6 @@
 {
   "name": "@journeykit/canon",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "canon — harness knowledge substrate. JS launcher: platform detection + native binary resolution.",
   "license": "MIT",
   "type": "module",

@@ -207,6 +207,118 @@ impl ParseOutcome {
     }
 }
 
+/// The prefix `canon-cli`'s `plans::plan_source_cursor_id` claims for
+/// every PLAN-import cursor (`plan-<dialect>-v<n>-<digest12>`). Session
+/// and plan cursors share one `.canon/ingest/cursors/` directory, so a
+/// session adapter whose `client_id` began with this would render a
+/// filename inside the plan family's namespace — hence the grammar
+/// below reserves it (s40 (`plan-vs-actual-diff`) review follow-up).
+pub const PLAN_CURSOR_ID_PREFIX: &str = "plan-";
+
+/// The single way a [`SessionAdapter::client_id`] can violate the
+/// adapter-id grammar — a named cause rather than a bare `bool`, so the
+/// registry-wide assertion that enforces it can say WHICH rule an id
+/// broke (see [`session_adapter_id_violation`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionAdapterIdViolation {
+    /// An empty id renders the cursor filename `.json` — a dotfile with
+    /// no stem, shared by every empty-id adapter.
+    Empty,
+    /// Anything outside `[a-z0-9-]`. This is what rules out a path
+    /// separator, `.` (hence `..`), whitespace, NUL, and — because
+    /// uppercase is excluded rather than folded — any case-only alias
+    /// that two adapters could otherwise resolve to one file on a
+    /// case-insensitive filesystem.
+    IllegalByte { byte: u8 },
+    /// A leading or trailing `-`: not unsafe by itself, but it makes an
+    /// id that reads as an option flag and one whose rendered cursor
+    /// filename differs from its id only in a character no reader sees.
+    OuterHyphen,
+    /// The id itself ends `-v<digits>` — the exact suffix
+    /// `canon-cli`'s `ingest::session_source_cursor_id` appends for
+    /// version ≠ 1, so such an id would collide with ANOTHER adapter's
+    /// bumped cursor (`omp-v2` at version 1 versus `omp` at version 2).
+    ReservedVersionSuffix,
+    /// The id starts with [`PLAN_CURSOR_ID_PREFIX`].
+    ReservedPlanNamespace,
+}
+
+impl std::fmt::Display for SessionAdapterIdViolation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => f.write_str("must not be empty"),
+            Self::IllegalByte { byte } => write!(f, "contains byte {byte:#04x}, outside the lowercase `[a-z0-9-]` grammar"),
+            Self::OuterHyphen => f.write_str("must not start or end with `-`"),
+            Self::ReservedVersionSuffix => f.write_str("must not end with the reserved `-v<digits>` parse-version suffix"),
+            Self::ReservedPlanNamespace => write!(f, "must not start with the reserved `{PLAN_CURSOR_ID_PREFIX}` plan-cursor prefix"),
+        }
+    }
+}
+
+/// The adapter-id grammar, as the violation `client_id` commits or
+/// `None` — a **declared precondition of the cursor identity**, not
+/// cosmetics. `canon-cli`'s `ingest::session_source_cursor_id` renders
+/// `client_id` at version 1 and `<client_id>-v<version>` from 2 on, and
+/// `canon_store::cursor::CursorStore` then joins that straight onto its
+/// root as `<id>.json`. Two properties therefore have to hold of the
+/// id, and both are properties of its SHAPE:
+///
+/// 1. **Bare-filename safety.** `[a-z0-9-]` with no outer `-` admits no
+///    separator, no `.`/`..`, no whitespace, no NUL, and no uppercase —
+///    so the rendered id is a single path component on any filesystem
+///    canon targets, and no two ids can case-fold together (which on
+///    macOS's default case-insensitive volume would be one file, i.e.
+///    one shared watermark).
+/// 2. **Injectivity of `(client_id, version) -> id`.** Forbidding an id
+///    that ends `-v<digits>` is exactly what makes the rendering
+///    one-to-one. Proof: suppose `render(x, m) == render(y, n)`. If
+///    `m == n == 1` then `x == y`. If both differ from 1 then
+///    `x ++ "-v" ++ m == y ++ "-v" ++ n`; were `|x| < |y|`, the shorter
+///    string's `"-v"` marker would have to reappear at some index ≥ 1
+///    of `"-v" ++ digits(m)`, whose only `-` sits at index 0 — so
+///    `|x| == |y|`, hence `x == y` and `m == n`. The mixed case needs
+///    `x == y ++ "-v" ++ digits(n)`, i.e. `x` ends `-v<digits>`, which
+///    this grammar rejects. Drop the rule and two adapters silently
+///    share one cursor, each skipping the other's transcripts as
+///    `unchanged`.
+///
+/// Enforcement is a registry-wide assertion
+/// (`crate::registry`'s tests) rather than a runtime branch, and
+/// deliberately so: [`crate::registry::registry`] is a closed static
+/// table linked into the binary, so an id that violates this grammar is
+/// a compile-time fact about the source tree, not a condition a run can
+/// encounter. A runtime check would be unreachable code claiming to
+/// guard something a test already decided.
+pub fn session_adapter_id_violation(client_id: &str) -> Option<SessionAdapterIdViolation> {
+    if client_id.is_empty() {
+        return Some(SessionAdapterIdViolation::Empty);
+    }
+    if let Some(byte) = client_id.bytes().find(|byte| !matches!(*byte, b'a'..=b'z' | b'0'..=b'9' | b'-')) {
+        return Some(SessionAdapterIdViolation::IllegalByte { byte });
+    }
+    if client_id.starts_with('-') || client_id.ends_with('-') {
+        return Some(SessionAdapterIdViolation::OuterHyphen);
+    }
+    if client_id.starts_with(PLAN_CURSOR_ID_PREFIX) {
+        return Some(SessionAdapterIdViolation::ReservedPlanNamespace);
+    }
+    if ends_with_version_suffix(client_id) {
+        return Some(SessionAdapterIdViolation::ReservedVersionSuffix);
+    }
+    None
+}
+
+/// `true` iff `id` ends with `-v` followed by at least one digit and
+/// nothing else — the rendering `session_source_cursor_id` produces for
+/// a version ≠ 1, matched with `rsplit_once` so `a-v1-v2` (which DOES
+/// end that way) is caught too.
+fn ends_with_version_suffix(id: &str) -> bool {
+    match id.rsplit_once("-v") {
+        Some((_, digits)) => !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit()),
+        None => false,
+    }
+}
+
 /// One session-source adapter (S3 design D1's "trait + static table",
 /// frozen for Wave 2). `client_id()` names the adapter
 /// (`"claude-code"` | `"codex"` | `"omp"` | `"hermes"`); `scan_roots`
@@ -221,7 +333,13 @@ impl ParseOutcome {
 /// generation of that parse output (s40 amendment — see its own doc).
 pub trait SessionAdapter: Send + Sync {
     /// The adapter's stable identity — also `UnifiedRow.client`'s
-    /// value for every row this adapter emits.
+    /// value for every row this adapter emits, and the stem of the
+    /// session-ingest cursor's filename. It MUST satisfy
+    /// [`session_adapter_id_violation`]'s grammar (lowercase
+    /// `[a-z0-9-]`, no outer `-`, and neither the reserved `-v<digits>`
+    /// suffix nor the `plan-` prefix); that is what keeps the rendered
+    /// cursor id a safe bare filename AND keeps `(client_id, version)`
+    /// one-to-one, so no two adapters can ever share one watermark.
     fn client_id(&self) -> &'static str;
 
     /// This adapter's PARSE-OUTPUT generation (s40
@@ -258,14 +376,21 @@ pub trait SessionAdapter: Send + Sync {
     /// from "this adapter has never changed its output" — a claim only
     /// its author can make.
     ///
-    /// All four shipped adapters return `1`. Unlike s38's plan
-    /// dialects — whose `depends_on` extraction genuinely changed, so
-    /// they went to `2` — no session adapter's normalization changed
-    /// in s40. `1` is therefore not a placeholder awaiting a real
-    /// value: it is the correct one, being the only value that leaves
-    /// every cursor already on disk valid and re-reads nothing. This
-    /// mechanism is installed now so the NEXT normalization change is
-    /// safe, not to force a re-read today.
+    /// The shipped adapters are at `1` EXCEPT `claude-code`, which is
+    /// at `2` (s37 (`execution-graph-topology`)): its sidechain parse
+    /// now populates `agent_id`/`parent_agent_id`, the very fields
+    /// [`crate::normalize`] turns into child runs, so an unchanged
+    /// `.jsonl` transcript genuinely normalizes to something new and a
+    /// stored `claude-code` cursor would hide the whole lineage
+    /// backfill behind its watermark. omp/codex/hermes gained the same
+    /// two fields as a constant `None` — a `skip_serializing_if`-elided
+    /// `Option` no downstream consumer can distinguish from its
+    /// absence — so for them `1` is not a placeholder awaiting a real
+    /// value but the correct one: the only value that leaves every
+    /// cursor already on disk valid and re-reads nothing. Unlike s38's
+    /// plan dialects (whose `depends_on` extraction changed, so both
+    /// went to `2`), a version here moves per adapter, never in
+    /// lockstep.
     fn parse_version(&self) -> u32;
 
     /// Resolve this adapter's scan root(s) under `home`.

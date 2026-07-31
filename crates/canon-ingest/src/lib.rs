@@ -62,7 +62,10 @@ pub mod selftest;
 pub mod scanner;
 pub mod verdict;
 
-pub use adapter::{CostSource, DirectiveRow, ParseOutcome, SessionAdapter, TokenBreakdown, UnifiedRow};
+pub use adapter::{
+    CostSource, DirectiveRow, PLAN_CURSOR_ID_PREFIX, ParseOutcome, SessionAdapter, SessionAdapterIdViolation, TokenBreakdown, UnifiedRow,
+    session_adapter_id_violation,
+};
 pub use artifact_adapter::{
     ArtifactAdapter, ArtifactEvent, ArtifactEventKind, ArtifactJoinKey, ArtifactParseOutcome, ArtifactSourceConfig, ArtifactSourceHandle,
 };

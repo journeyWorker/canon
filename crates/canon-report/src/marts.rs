@@ -55,12 +55,22 @@ pub const FLYWHEEL_FUNNEL_COLUMNS: &[&str] = &["role", "verdicts", "distilled", 
 ///
 /// - `verdicts` — `VerdictRow`s across this role's raw trajectories,
 ///   the evidence the distiller consumes. The one stage not counted in
-///   strategies, and the natural upper bound on `distilled`.
+///   strategies, and the natural upper bound on `distilled` — strictly
+///   above it when a trajectory repeats a byte-identical verdict,
+///   which distils to one strategy rather than two indistinguishable
+///   copies of it.
 /// - `distilled` — this role's `canon-learn` `StrategyItem` rows.
 /// - `retrieved` — DISTINCT strategies appearing in at least one
-///   `Run::injected_guidance`, never injection EVENTS: counting events
-///   let `retrieved` exceed `distilled` as soon as one strategy was
-///   injected into two runs.
+///   `Run::injected_guidance` AND still present as a distilled row,
+///   never injection EVENTS: counting events let `retrieved` exceed
+///   `distilled` as soon as one strategy was injected into two runs.
+///   The "still present" half is not a leak: `canon-learn`'s
+///   `StrategyId` is derived from a strategy's own content, so
+///   `rebuild_namespace` re-derives the same id and a recorded
+///   `StrategyRef` keeps resolving across an ordinary re-ingest. Only
+///   a strategy re-derived from CHANGED evidence gets a new id and
+///   leaves this stage — correctly, since the cited strategy no longer
+///   exists.
 /// - `applied` — that same distinct set, restricted to strategies whose
 ///   recipient run reached a terminal `RunStatus`
 ///   (`succeeded`/`failed`/`aborted`). It asserts both halves —

@@ -12,7 +12,8 @@ relationship its data does not actually carry.
 runs: `task_id` on **0**, `parent_run_id` on **6**, `injected_guidance`
 on **0**. The two production `Run` writers are session ingest
 (`normalize.rs`, which cannot know a task) and `canon dispatch begin`
-(`dispatch.rs:111`), which passes `None, None`. So the execution tree
+(`dispatch::run_begin`, as of `14a03681`, which passed `None, None` to
+`Run::new` for `session_id, task_id`). So the execution tree
 exists and the plan DAG exists, and there is no edge between them. The
 diff is not implementable as shipped; the claim was wrong.
 
@@ -55,10 +56,20 @@ it — the missing edge.
 dependencies, and undeclared edges that executed anyway. Read-only; it
 reports, it never gates.
 
-**Make the funnel a funnel.** `applied` becomes retrieval-conditional:
-a resolved trajectory counts only when its own run actually carried
-injected guidance. `Trajectory` is keyed by `run_id`, so the join
-exists. `applied <= retrieved <= distilled` then holds by construction.
+**Make the funnel a funnel.** All three trailing stages count
+STRATEGIES over one relation, so the chain narrows by construction:
+`retrieved` is the distinct strategies ever injected into a run's
+context, and `applied` is that same set restricted to the ones whose
+recipient run reached a terminal `Run.status`.
+
+This is a PROXY, and the reason it is a proxy matters. The obvious
+definition — a resolved trajectory joined to its own run — is not
+available: the trajectory feeding this mart is canon-learn's parquet
+row, which carries no `run_id`, and the `Trajectory` record kind that
+does carry one has no production writer. So "applied" means guidance was
+in context AND the run finished, not that the outcome was attributed to
+the guidance. Attribution needs a trajectory that knows its run, and
+that record does not exist yet.
 
 **Version the session cursor.** A session adapter declares a parse
 version folded into its cursor identity, exactly as s38 did for plan

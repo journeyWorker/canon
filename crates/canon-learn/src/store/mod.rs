@@ -52,11 +52,21 @@ use crate::verdict_outcome::TrajectoryVerdict;
 /// trait changing — see this module's doc comment for the OQ2
 /// rationale.
 pub trait TrajectoryStore {
-    /// Persists one trajectory. Never silently drops or dedups —
-    /// two `append` calls with the same `id` are a caller error the
-    /// concrete impl is free to reject or overwrite; this crate's own
-    /// callers always mint a fresh [`crate::ids::TrajectoryId`] per
-    /// trajectory.
+    /// Persists one trajectory as an ID-KEYED REPLACE: a second
+    /// `append` under the same [`crate::ids::TrajectoryId`] overwrites
+    /// the first rather than appending a second row. Never silently
+    /// drops or dedups anything else.
+    ///
+    /// s41 tightened this from "a caller error the concrete impl is
+    /// free to reject or overwrite". The shipped
+    /// [`crate::store::ParquetTrajectoryStore`] always overwrote (one
+    /// `fs::write` per id), and `canon ingest artifacts` now RELIES on
+    /// that: superseding a stale trajectory whose rendered text
+    /// predates s38/s39 reuses the stored row's own id so the
+    /// replacement takes its place, instead of leaving both to be
+    /// distilled side by side. Calling that a caller error while a
+    /// production caller depends on it is the kind of stale contract
+    /// this branch keeps finding, so it is now the documented one.
     fn append(&self, trajectory: &Trajectory) -> Result<(), LearnError>;
 
     /// Every trajectory recorded under EXACTLY this `regime_key` (the

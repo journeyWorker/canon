@@ -19,6 +19,16 @@ use crate::strategy::StrategyItem;
 /// trajectory for it, deletes every existing strategy item for it,
 /// re-distills from the (just-read, unmodified) trajectories, and
 /// stores the freshly-distilled items. Returns the newly-stored items.
+///
+/// A FIXPOINT over unchanged evidence, not merely a refresh:
+/// [`distill_namespace`] derives every field — the [`crate::ids::
+/// StrategyId`] included — from the retained raw trajectory, so
+/// re-running this over the same trajectories rewrites byte-identical
+/// rows under identical `<id>.parquet` filenames. That is what lets a
+/// recorded `Run.injected_guidance` `StrategyRef`, a promoted
+/// `.canon/strategies/<role>/<id>.md`, and `mart_flywheel_funnel`'s
+/// `retrieved`/`applied` stages survive the ordinary `canon ingest
+/// artifacts` that calls this function (`crate::ids` module doc).
 pub fn rebuild_namespace(
     trajectory_store: &dyn TrajectoryStore,
     strategy_store: &dyn StrategyStore,
@@ -95,6 +105,100 @@ mod tests {
         let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
         let items = rebuild_namespace(&trajectory_store, &strategy_store, &regime()).unwrap();
         assert!(items.is_empty());
+    }
+
+    /// The acceptance property for `mart_flywheel_funnel`'s
+    /// `retrieved`/`applied` stages
+    /// (`crates/canon-store/sql/views.sql`): those stages inner-join a
+    /// recorded `Run.injected_guidance` `StrategyRef` against the
+    /// CURRENT `stg_strategy_items`, so a rebuild that re-keyed the
+    /// distilled layer dropped every historical retrieval and both
+    /// stages fell to zero. This test performs exactly that join —
+    /// snapshot the ids, rebuild, resolve the snapshot again — so it
+    /// fails on any regression back to a minted id.
+    #[test]
+    fn a_rebuild_preserves_every_recorded_strategy_reference() {
+        let dir = tempfile::tempdir().unwrap();
+        let trajectory_store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
+
+        trajectory_store.append(&trajectory("first task")).unwrap();
+        trajectory_store.append(&trajectory("second task")).unwrap();
+
+        // The `Run.injected_guidance` snapshot a dispatch would have
+        // recorded: strategy ids, frozen at retrieval time.
+        let injected: Vec<crate::ids::StrategyId> =
+            rebuild_namespace(&trajectory_store, &strategy_store, &regime()).unwrap().iter().map(|i| i.id).collect();
+        assert_eq!(injected.len(), 2, "fixture distilled two strategies");
+
+        // A routine later `canon ingest artifacts` over the same regime.
+        rebuild_namespace(&trajectory_store, &strategy_store, &regime()).unwrap();
+
+        let current: Vec<crate::ids::StrategyId> = strategy_store.query_by_regime_key(&regime()).unwrap().iter().map(|i| i.id).collect();
+        for id in &injected {
+            assert!(current.contains(id), "recorded StrategyRef {id} no longer resolves after a rebuild — `retrieved`/`applied` would fall to 0");
+        }
+    }
+
+    /// The second bug the derived id closes: `canon learn promote
+    /// <ULID>` used to target a value that changed under the operator's
+    /// feet, so a promoted `.canon/strategies/<role>/<id>.md` was
+    /// orphaned by the next ingest and `canon learn demote` could no
+    /// longer resolve its subject.
+    #[test]
+    fn a_promoted_strategy_id_still_resolves_after_a_rebuild() {
+        let dir = tempfile::tempdir().unwrap();
+        let git_tier = tempfile::tempdir().unwrap();
+        let trajectory_store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
+
+        trajectory_store.append(&trajectory("first task")).unwrap();
+        rebuild_namespace(&trajectory_store, &strategy_store, &regime()).unwrap();
+
+        let promoted = strategy_store.query_by_regime_key(&regime()).unwrap().remove(0).id;
+        let promotion = crate::promotion::promote_strategy(&strategy_store, &promoted, git_tier.path()).unwrap();
+        assert!(promotion.path.exists(), "promotion wrote its git-tier file");
+
+        rebuild_namespace(&trajectory_store, &strategy_store, &regime()).unwrap();
+
+        assert!(
+            strategy_store.find_by_id(&promoted).unwrap().is_some(),
+            "the promoted id {promoted} must still name a distilled row, or its git-tier file is orphaned"
+        );
+        assert_eq!(
+            crate::promotion::plan_promotion(&strategy_store, &promoted, git_tier.path()).unwrap().path,
+            promotion.path,
+            "re-promoting after a rebuild must target the same git-tier file, never a second one"
+        );
+    }
+
+    /// Rebuild is a FIXPOINT over the whole row, not just over its id:
+    /// no wall clock enters distillation, so unchanged evidence
+    /// re-derives identical `recorded_at`, `source_trajectory_ids` and
+    /// text as well. Compared on decoded rows rather than parquet
+    /// bytes — this asserts canon's own determinism, never the arrow
+    /// writer's encoding stability.
+    #[test]
+    fn rebuilding_unchanged_evidence_reproduces_identical_strategy_rows() {
+        let dir = tempfile::tempdir().unwrap();
+        let trajectory_store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
+
+        trajectory_store.append(&trajectory("first task")).unwrap();
+        trajectory_store.append(&trajectory("second task")).unwrap();
+
+        let sorted_rows = || {
+            let mut rows = strategy_store.query_by_regime_key(&regime()).unwrap();
+            rows.sort_by_key(|item| item.id);
+            rows
+        };
+
+        rebuild_namespace(&trajectory_store, &strategy_store, &regime()).unwrap();
+        let before = sorted_rows();
+        assert_eq!(before.len(), 2, "fixture distilled two strategies");
+
+        rebuild_namespace(&trajectory_store, &strategy_store, &regime()).unwrap();
+        assert_eq!(before, sorted_rows());
     }
 
     fn read_all_files_sorted(root: &std::path::Path) -> Vec<Vec<u8>> {

@@ -414,10 +414,18 @@ ORDER BY role, regime_key;
 --               counted in strategies, and the natural upper bound —
 --               a trajectory carries 1..n verdicts and
 --               `canon-learn::distill_trajectory` emits at most one
---               item per verdict.
+--               item per verdict. Strictly fewer when one trajectory
+--               repeats a byte-identical verdict: the two distil to
+--               the same content, hence (ids being content-derived)
+--               to one strategy, not two indistinguishable copies of
+--               it. So a `distilled` below `verdicts` is duplicate
+--               evidence collapsing, never the distiller dropping a
+--               verdict on the floor.
 --   distilled — this role's `stg_strategy_items` rows.
---   retrieved — DISTINCT strategies of this role appearing in at least
---               one `Run.injected_guidance`.
+--   retrieved — DISTINCT strategies of this role that appear in at
+--               least one `Run.injected_guidance` AND still exist as
+--               a distilled row. Both halves are load-bearing; see
+--               the rebuild note below.
 --   applied   — that same distinct set, restricted to strategies whose
 --               recipient run reached a TERMINAL `Run.status`. So
 --               "applied" asserts BOTH halves: the guidance was in an
@@ -439,6 +447,23 @@ ORDER BY role, regime_key;
 -- `mart_review_burndown`'s panel: a column name asserting a
 -- relationship the SQL never computed.
 --
+-- Why `retrieved` does not evaporate on a rebuild. This stage joins a
+-- recorded `StrategyRef` — a snapshot frozen into `Run.
+-- injected_guidance` at dispatch time — against the CURRENT
+-- `stg_strategy_items`. Every `canon ingest artifacts` calls
+-- `canon-learn`'s `rebuild_namespace`, which deletes a regime's whole
+-- distilled layer and re-distills it, so that join only holds if a
+-- re-derived strategy keeps its id. It does: `StrategyId` is a pure
+-- function of the distilled row's own content
+-- (`crates/canon-learn/src/ids.rs`'s `StrategyId::derive`), not a
+-- freshly-minted ULID, so re-distilling unchanged evidence reproduces
+-- the same id and the citation still resolves. What the stage
+-- therefore counts is precisely "retrieved, and still derivable from
+-- today's evidence" — a strategy whose source trajectory's own text
+-- later changes is re-derived under a NEW id, and the old citation
+-- stops counting, which is the honest answer: that strategy no longer
+-- exists.
+--
 -- Why terminal `Run.status`, and not the raw trajectory's resolved
 -- `outcome` (the pre-s40 signal): `stg_trajectories` is canon-learn's
 -- parquet row (`crates/canon-learn/src/store/parquet_trajectory.rs`'s
@@ -454,9 +479,11 @@ ORDER BY role, regime_key;
 -- `running` and `canon dispatch end` (s40 task group 1) closes it.
 --
 -- On canon's own corpus this panel reads `retrieved 0` / `applied 0`
--- for every role, because no `Run` here carries `injected_guidance` at
--- all. That is the honest reading, not a gap to paper over: the
--- retrieval loop has never closed on this repo.
+-- for every role: no `Run` here carries `injected_guidance`, so there
+-- is no `StrategyRef` to join in the first place. With ids stable
+-- across rebuilds, `retrieved 0` now means what it says — nothing has
+-- been retrieved into a run's context here — rather than "something
+-- was, and the last rebuild forgot it".
 CREATE OR REPLACE VIEW mart_flywheel_funnel AS
 WITH verdict_counts AS (
     SELECT role, CAST(sum(json_array_length(body -> '$.verdicts')) AS BIGINT) AS n
