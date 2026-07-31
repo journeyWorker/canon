@@ -58,13 +58,13 @@
 //! `learn.root`, `canon_learn::LearnConfig::root`) that `canon
 //! retrieve` and `canon-report`'s marts already read — no second store,
 //! no new seam in `canon-learn` was needed (`store_trajectory`/
-//! `Trajectory::new`/`rebuild_namespace` are already public API,
+//! `Trajectory::new`/`distill_namespace` are already public API,
 //! `crates/canon-learn/tests/fixture_round_trip.rs` already proves the
 //! exact store->distill->rebuild->search round trip this module drives
 //! with SYNTHETIC data; this module is the real-data caller that test's
 //! own doc comment names as the deferred residual). Immediately after a
-//! successful persist, [`canon_learn::rebuild_namespace`] re-derives
-//! that regime's distilled `StrategyItem`s too — without this, S9's
+//! successful persist, [`rebuild_namespace_converged`] re-derives that
+//! regime's distilled `StrategyItem`s too — without this, S9's
 //! `mart_role_memory` (which reads ONLY the distilled tier,
 //! `stg_strategy_items`) would stay empty even after a successful
 //! ingest, defeating this whole change's purpose.
@@ -113,21 +113,55 @@
 //! not an upgrade path, so it is not this driver's contract.
 //!
 //! A fresher identity ALONE would only double the corpus, though: the
-//! stale row still sits in the namespace and
-//! [`canon_learn::rebuild_namespace`] distills every row it finds. So
-//! the identity is split in two. [`trajectory_derivation_key`] names
-//! the LOGICAL verdict set (`regime_key` + the ordered rows — the
-//! pre-s38 digest's exact shape, deliberately unversioned so it still
-//! recognizes rows written by any earlier canon), and a re-derivation
-//! of a logical verdict set this driver already wrote REPLACES that row
-//! rather than landing beside it, by reusing the stored row's own
-//! [`canon_learn::TrajectoryId`]. [`plan_trajectory`] states the rule
-//! and why that id is the stable choice. A genuinely NEW verdict set (a
-//! different or additional verdict folded onto the same `regime_key`)
-//! is still a FRESH row alongside the untouched prior ones — the raw
-//! tier stays append-only across DISTINCT derivations (design decision
-//! 3); the only bytes this driver ever overwrites are its own previous
-//! answer to the identical question.
+//! stale row still sits in the namespace and a distill pass folds every
+//! row handed to it. So the identity is split in two.
+//! [`trajectory_derivation_key`] names the LOGICAL verdict set
+//! (`regime_key` + the ordered rows — the pre-s38 digest's exact shape,
+//! deliberately unversioned so it still recognizes rows written by any
+//! earlier canon), and a re-derivation of a logical verdict set this
+//! driver already wrote REPLACES that row rather than landing beside it,
+//! by reusing the stored row's own [`canon_learn::TrajectoryId`].
+//! [`plan_trajectory`] states the rule and why that id is the stable
+//! choice. A genuinely NEW verdict set (a different or additional
+//! verdict folded onto the same `regime_key`) is still a FRESH row
+//! alongside the untouched prior ones — the raw tier stays append-only
+//! across DISTINCT derivations (design decision 3); the only bytes this
+//! driver ever overwrites are its own previous answer to the identical
+//! question.
+//!
+//! ## Two stored copies of one verdict set converge too
+//! s41 (`review-hardening`) first stated that rule for a SINGLE stale
+//! row, arguing the candidate set could never be larger because this
+//! driver writes one row per verdict set. The re-review rejected the
+//! argument, and rightly: a pre-s38 pass appended a SECOND row whenever
+//! the renderer changed under it (its digest ignored rendered text), so
+//! an upgrading user really can hold two rows for one verdict set — and
+//! then whichever sibling happened to carry the fresh text made the
+//! duplicate check return before supersession ran, stranding the other
+//! row's pre-s38 prose in the distilled tier forever.
+//!
+//! So the whole candidate set converges, on ONE rule stated in ONE place
+//! ([`canonical_driver_row`]): among this driver's own rows sharing a
+//! derivation key, the SMALLEST id is CANONICAL and every other is
+//! SUPERSEDED. [`plan_trajectory`] keeps the canonical row current — it
+//! skips a pass only when the CANONICAL row itself already carries the
+//! freshly rendered identity, never because a sibling does — and
+//! [`rebuild_namespace_converged`] hands the distiller the namespace
+//! MINUS the superseded rows, so one logical verdict set distills into
+//! one strategy set instead of one per stored copy. One pass converges
+//! any number of copies: the rule is a pure function of the stored rows,
+//! so both halves pick the same canonical row without passing state.
+//!
+//! Superseded rows are NOT deleted: `canon_learn::TrajectoryStore`
+//! exposes no deletion at all (design decision 3 — the raw tier is an
+//! append-only evidence log; `delete_for_regime_key` exists only on the
+//! distilled `canon_learn::StrategyStore`), so an upgraded namespace's
+//! raw row COUNT cannot shrink from here, and their bytes stay as the
+//! audit trail of what an earlier canon derived. What converges is every
+//! tier a reader consumes: the canonical row carries the current text,
+//! and a superseded sibling's prose never reaches `canon retrieve`,
+//! `mart_role_memory`, or a promotion again. Dropping those bytes
+//! outright would need a new raw-tier removal primitive in `canon-learn`.
 //!
 //! # Documented seam
 //! A `Records`-source adapter's read genuinely CAN fail — no live
@@ -177,8 +211,8 @@
 //! [`canon_ingest::verdict::derive_native_divergence_verdict`] instead
 //! of [`canon_ingest::verdict::derive_verdict`], then rejoins the SAME
 //! `attach_regime_key` + grouping + `trajectory_content_digest` +
-//! `store_trajectory` + `rebuild_namespace` path every other event
-//! already uses.
+//! `store_trajectory` + [`rebuild_namespace_converged`] path every
+//! other event already uses.
 //!
 //! # s39: the antecedent join (`joined-evidence-grounding`)
 //! The verdict derivation above is a FILTER. An event
@@ -220,7 +254,7 @@ use canon_ingest::artifact_adapter::{ArtifactEvent, ArtifactJoinKey, ArtifactSou
 use canon_ingest::artifact_registry::{ArtifactDispatchOutcome, ArtifactSourceKind};
 use canon_ingest::normalize::content_digest;
 use canon_ingest::verdict::{VerdictRow, attach_regime_key, derive_native_divergence_verdict, derive_native_review_verdict, derive_verdict};
-use canon_learn::{LearnConfig, LearnError, ParquetStrategyStore, ParquetTrajectoryStore, RewardRegistry, RoleRegistry, Trajectory, TrajectoryId, TrajectoryStore, VerdictOutcome, mark_trajectory_verdict, rebuild_namespace, store_trajectory};
+use canon_learn::{LearnConfig, LearnError, ParquetStrategyStore, ParquetTrajectoryStore, RewardRegistry, RoleRegistry, StrategyItem, StrategyStore, Trajectory, TrajectoryId, TrajectoryStore, VerdictOutcome, distill_namespace, mark_trajectory_verdict, store_trajectory};
 use canon_model::envelope::RecordKind;
 use canon_model::evidence::RawRecord;
 use canon_model::ids::{ProjectId, RegimeKey};
@@ -321,8 +355,8 @@ pub struct ArtifactIngestOutcome {
     /// place, see [`PersistedTrajectory::superseded`].
     pub trajectories_skipped_duplicate: usize,
     /// Sum of every regime's freshly-distilled `StrategyItem` count
-    /// (`rebuild_namespace`'s return value) — the count that actually
-    /// lands in `stg_strategy_items`, i.e. what makes S9's
+    /// ([`rebuild_namespace_converged`]'s return value) — the count that
+    /// actually lands in `stg_strategy_items`, i.e. what makes S9's
     /// `mart_role_memory` non-empty.
     pub strategy_items_rebuilt: usize,
     /// Trajectories whose covering verdict+reward was RESOLVED and
@@ -1434,16 +1468,141 @@ fn derive_verdict_for_event(event: &ArtifactEvent) -> Option<VerdictRow> {
 /// BEFORE any store write by [`plan_trajectory`], so the decision is
 /// unit-testable against a plain slice of already-stored trajectories.
 enum PersistPlan {
-    /// This regime already holds a trajectory with the identical FULL
-    /// identity ([`trajectory_content_digest`]): the module doc's
-    /// write-time idempotence, an unchanged corpus writing nothing.
+    /// The row this pass would write to already carries the identical
+    /// FULL identity ([`trajectory_content_digest`]), and this driver has
+    /// no superseded duplicate left in the namespace: the module doc's
+    /// write-time idempotence, an unchanged corpus writing nothing at all
+    /// — no raw write, no distilled-tier re-derivation.
     SkipDuplicate,
+    /// Same: nothing to WRITE, the canonical row is already current. But
+    /// this driver's own superseded rows ([`superseded_driver_ids`]) still
+    /// sit in the namespace, so the distilled tier must still be
+    /// re-derived from the CONVERGED row set
+    /// ([`rebuild_namespace_converged`]) — otherwise a stale sibling's
+    /// `StrategyItem` keeps being served beside the fresh one until the
+    /// corpus happens to change (s41 (`review-hardening`), re-review
+    /// finding 1). Counted as a skipped duplicate exactly like
+    /// [`PersistPlan::SkipDuplicate`], never as a persist: no `Trajectory`
+    /// row is written.
+    ConvergeDistilled,
     /// A first derivation of this logical verdict set — a new row
     /// beside whatever the namespace already holds.
     Fresh(Trajectory),
     /// A RE-derivation of a logical verdict set this driver already
     /// wrote, whose text has changed — the SAME row, rewritten.
     Supersede(Trajectory),
+}
+
+/// The row this driver treats as CANONICAL for one logical verdict set
+/// under one regime: the smallest [`canon_learn::TrajectoryId`] among the
+/// rows in `existing` that
+///
+/// 1. sit under the SAME `regime_key` — `existing` is exactly that
+///    namespace's rows, from
+///    [`canon_learn::TrajectoryStore::query_by_regime_key`];
+/// 2. carry the [`ARTIFACT_INGEST_TAG`]: this driver overwrites only its
+///    OWN derivations, never a fixture, a webhook write, or a future
+///    writer's row, however closely the verdicts match; and
+/// 3. share `derivation` ([`trajectory_derivation_key`]) — the same
+///    logical verdict set, i.e. an answer to the same question.
+///
+/// `None` when this driver has never written this verdict set into the
+/// namespace: nothing of its own to replace, so the plan mints a row.
+///
+/// Rung 3's tie-break — smallest id — keys on the ID rather than
+/// `recorded_at` because the id is IMMUTABLE across rewrites while
+/// `recorded_at` is overwritten with each pass's `latest_at`: a timestamp
+/// rule could hand the slot to a DIFFERENT row next pass and oscillate
+/// between two, each keeping stale text forever, whereas picking the
+/// smallest id is a fixed point by construction. No tie is possible — a
+/// `TrajectoryId` identifies the row.
+///
+/// A pure function of the STORED rows, never of the pass's freshly
+/// rendered text. That is what lets the write side ([`plan_trajectory`])
+/// and the distill side ([`rebuild_namespace_converged`]) agree on which
+/// row is canonical without passing any state between them — and what
+/// makes the choice recomputable by any later reader of the namespace.
+fn canonical_driver_row(existing: &[Trajectory], derivation: &str) -> Option<TrajectoryId> {
+    existing
+        .iter()
+        .filter(|stored| stored.tags.iter().any(|tag| tag == ARTIFACT_INGEST_TAG))
+        .filter(|stored| trajectory_derivation_key(&stored.regime_key, &stored.verdicts) == derivation)
+        .map(|stored| stored.id)
+        .min()
+}
+
+/// Every row in `existing` the canonical rule SUPERSEDES: a row this
+/// driver wrote that is not the canonical member of its own logical
+/// verdict set. Expressed as the exact negation of
+/// [`canonical_driver_row`] rather than by restating the smallest-id rule,
+/// so the row the plan writes to and the rows the distiller is denied can
+/// never drift apart.
+///
+/// Empty for every namespace a post-s38 canon produced on its own — this
+/// driver writes ONE row per `(regime_key, derivation key)` and supersedes
+/// it in place — so the ordinary path pays one `is_empty` check. It is
+/// non-empty for an UPGRADED store: a pre-s38 pass compared a digest that
+/// ignored rendered text, so a renderer change appended a second row for
+/// one verdict set instead of replacing the first (s41
+/// (`review-hardening`), re-review finding 1 — the earlier slice assumed
+/// that set was always a singleton, which no such store honours).
+///
+/// Quadratic in a namespace's row count, over a handful of rows per
+/// regime and only inside a persist step that already does file I/O per
+/// row — cheaper than the `BTreeMap` that would avoid it, and it keeps
+/// ONE statement of the rule.
+fn superseded_driver_ids(existing: &[Trajectory]) -> Vec<TrajectoryId> {
+    existing
+        .iter()
+        .filter(|stored| stored.tags.iter().any(|tag| tag == ARTIFACT_INGEST_TAG))
+        .filter(|stored| canonical_driver_row(existing, &trajectory_derivation_key(&stored.regime_key, &stored.verdicts)) != Some(stored.id))
+        .map(|stored| stored.id)
+        .collect()
+}
+
+/// `canon_learn::rebuild_namespace` over the CONVERGED row set: this
+/// regime's rows MINUS the ones this driver superseded
+/// ([`superseded_driver_ids`]), so one logical verdict set distills into
+/// one strategy set instead of one per stored copy.
+///
+/// Why the filter lives here rather than in `canon-learn`: it is stated
+/// in [`ARTIFACT_INGEST_TAG`] and [`trajectory_derivation_key`], which are
+/// THIS driver's semantics. `canon-learn` cannot name the rows one of its
+/// callers superseded without importing them, so its own
+/// `rebuild_namespace` necessarily distills every row it is given; this
+/// function is that same delete-rebuild with the caller's own convergence
+/// applied to its INPUT. Nothing else changes: the raw tier is only READ
+/// (design decision 3 — `canon_learn::TrajectoryStore` exposes no
+/// deletion at all), only the distilled tier is deleted and re-derived,
+/// and `canon_learn::distill_namespace` still derives every field
+/// including the `canon_learn::StrategyId`, so repeated calls rewrite
+/// byte-identical `<id>.parquet` rows and stay a fixpoint.
+///
+/// The superseded rows THEMSELVES stay in the store, untouched: this
+/// driver holds no primitive that could remove a raw row, and their bytes
+/// are the audit trail of what an earlier canon derived. What changes is
+/// that they no longer reach the distilled tier, so a stale
+/// `StrategyItem` can no longer sit beside the fresh one in `canon
+/// retrieve`, `mart_role_memory`, or a promotion. A `StrategyRef` some
+/// `Run` recorded against such an item stops resolving — the same,
+/// already-documented consequence any re-derivation from changed evidence
+/// has (`canon-report`'s `mart_flywheel_funnel` notes it), and the price
+/// of not serving stale guidance.
+fn rebuild_namespace_converged(
+    trajectory_store: &dyn TrajectoryStore,
+    strategy_store: &dyn StrategyStore,
+    regime_key: &RegimeKey,
+) -> Result<Vec<StrategyItem>, LearnError> {
+    let mut rows = trajectory_store.query_by_regime_key(regime_key)?;
+    let superseded = superseded_driver_ids(&rows);
+    rows.retain(|row| !superseded.contains(&row.id));
+
+    strategy_store.delete_for_regime_key(regime_key)?;
+    let items = distill_namespace(regime_key, &rows);
+    for item in &items {
+        strategy_store.append(item)?;
+    }
+    Ok(items)
 }
 
 /// Renders one regime group's text and decides how it lands in the
@@ -1455,58 +1614,59 @@ enum PersistPlan {
 /// to write never entered the comparison at all.
 ///
 /// # The supersession rule
-/// A candidate supersedes the stored trajectory that
+/// A candidate supersedes the CANONICAL row for its logical verdict set
+/// ([`canonical_driver_row`] states the three rungs and why the tie-break
+/// is the smallest id), and the duplicate skip is scoped to that same row:
+/// a pass writes nothing only when the row it WOULD have rewritten already
+/// carries the freshly rendered identity.
 ///
-/// 1. sits under the SAME `regime_key` — `existing` is exactly that
-///    namespace's rows, from
-///    [`canon_learn::TrajectoryStore::query_by_regime_key`];
-/// 2. carries the [`ARTIFACT_INGEST_TAG`]: this driver overwrites only
-///    its OWN derivations, never a fixture, a webhook write, or a
-///    future writer's row, however closely the verdicts match;
-/// 3. shares its [`trajectory_derivation_key`] — the same logical
-///    verdict set, i.e. an answer to the same question; and
-/// 4. among those, carries the smallest [`canon_learn::TrajectoryId`].
+/// Scoping it that way is the whole of s41's re-review fix. Asking
+/// whether ANY stored row carried the identity let a sibling that already
+/// held the current text answer for a canonical row that did not — so the
+/// stale canonical row was never rewritten, and (since the skip returns
+/// before any rebuild) the distilled tier kept both. When this driver has
+/// no row of its own for the verdict set, the question stays "any row",
+/// deliberately: a row it may NOT replace (a fixture, a webhook write)
+/// already saying exactly this is still a duplicate, and appending a
+/// second copy beside it would distill the same strategy twice.
 ///
-/// Rung 4 is the one that needs an argument. This driver never writes
-/// two rows for one `(regime_key, derivation key)` — before this change
-/// a second one was skipped as a duplicate, after it a second one is
-/// superseded onto the first — so the candidate set is a singleton in
-/// every store this code produced, and rung 4 only decides a case that
-/// should not arise (a hand-seeded store, or a corpus written by two
-/// canon versions at once). It keys on the ID rather than
-/// `recorded_at` because the id is IMMUTABLE across rewrites while
-/// `recorded_at` is overwritten with this pass's `latest_at`: a
-/// timestamp rule could hand the slot to a DIFFERENT row next pass and
-/// oscillate between two, each keeping stale text forever, whereas
-/// picking the smallest id is a fixed point by construction. No tie is
-/// possible — a `TrajectoryId` identifies the row.
-///
-/// Reusing that id is what makes the write REPLACE instead of append:
-/// the shipped `canon_learn::ParquetTrajectoryStore` keys one file per
-/// `<id>.parquet`, so `canon_learn::store_trajectory` lands on the same
-/// row and `rebuild_namespace` then distills ONE trajectory for this
-/// verdict set rather than the fresh answer beside the stale one. That
-/// is the only mutation this driver performs: the raw tier stays
-/// append-only across DISTINCT derivations (design decision 3).
+/// Reusing the canonical id is what makes the write REPLACE instead of
+/// append: the shipped `canon_learn::ParquetTrajectoryStore` keys one file
+/// per `<regime_key>/<id>.parquet`, so `canon_learn::store_trajectory`
+/// lands on the same row. That is the only mutation this driver performs:
+/// the raw tier stays append-only across DISTINCT derivations (design
+/// decision 3), and the copies an older canon already appended for one
+/// verdict set are converged at the distill boundary instead
+/// ([`rebuild_namespace_converged`]), since no primitive can remove them.
 fn plan_trajectory(existing: &[Trajectory], regime_key: &RegimeKey, evidence: &RegimeEvidence) -> Result<PersistPlan, LearnError> {
     let (task, context) = evidence.trajectory_text(regime_key);
     let identity = trajectory_content_digest(regime_key, &evidence.rows, &task, &context);
-    let already_persisted = existing
-        .iter()
-        .any(|stored| trajectory_content_digest(&stored.regime_key, &stored.verdicts, &stored.task, &stored.context) == identity);
-    if already_persisted {
-        return Ok(PersistPlan::SkipDuplicate);
-    }
+    let carries_identity =
+        |stored: &Trajectory| trajectory_content_digest(&stored.regime_key, &stored.verdicts, &stored.task, &stored.context) == identity;
 
     let derivation = trajectory_derivation_key(regime_key, &evidence.rows);
-    let superseded = existing
-        .iter()
-        .filter(|stored| stored.tags.iter().any(|tag| tag == ARTIFACT_INGEST_TAG))
-        .filter(|stored| trajectory_derivation_key(&stored.regime_key, &stored.verdicts) == derivation)
-        .map(|stored| stored.id)
-        .min();
+    let canonical = canonical_driver_row(existing, &derivation);
+    let already_persisted = match canonical {
+        Some(id) => existing.iter().any(|stored| stored.id == id && carries_identity(stored)),
+        None => existing.iter().any(|stored| carries_identity(stored)),
+    };
+    if already_persisted {
+        // A superseded row is undeletable, so this arm keeps firing for an
+        // upgraded namespace: every later pass re-derives its distilled
+        // tier from the converged row set. That re-derivation is a fixpoint
+        // (byte-identical rows under identical filenames), and it is the
+        // only thing that converges a namespace whose canonical row was
+        // ALREADY current when the duplicate arrived.
+        //
+        // The trigger asks about the whole NAMESPACE, not just this verdict
+        // set, because the rebuild it asks for is regime-wide: whichever of
+        // a regime's groups notices the duplicates converges all of them,
+        // and a group whose own set is clean pays one `is_empty` check.
+        return Ok(if superseded_driver_ids(existing).is_empty() { PersistPlan::SkipDuplicate } else { PersistPlan::ConvergeDistilled });
+    }
+
     let trajectory = Trajectory::new(
-        superseded.unwrap_or_else(TrajectoryId::new),
+        canonical.unwrap_or_else(TrajectoryId::new),
         regime_key.clone(),
         task,
         context,
@@ -1514,7 +1674,7 @@ fn plan_trajectory(existing: &[Trajectory], regime_key: &RegimeKey, evidence: &R
         evidence.latest_at,
         vec![ARTIFACT_INGEST_TAG.to_string()],
     )?;
-    Ok(if superseded.is_some() { PersistPlan::Supersede(trajectory) } else { PersistPlan::Fresh(trajectory) })
+    Ok(if canonical.is_some() { PersistPlan::Supersede(trajectory) } else { PersistPlan::Fresh(trajectory) })
 }
 
 /// One scan -> derive-verdict -> persist pass over every registered
@@ -1733,6 +1893,26 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
                 trajectories_skipped_duplicate += 1;
                 continue;
             }
+            PersistPlan::ConvergeDistilled => {
+                // Nothing to write — the row this pass would have rewritten
+                // already carries this exact text — but this driver's own
+                // superseded copies are still in the namespace, so the
+                // distilled tier is re-derived from the CONVERGED row set.
+                // Without this the stale sibling's strategy keeps being
+                // served for as long as the corpus happens not to change.
+                //
+                // Deliberately NOT behind `store_trajectory`'s role-registry
+                // gate, unlike the persist path below: that gate exists to
+                // reject WRITING a trajectory for an unregistered role
+                // ("fail loud at write time", `canon_learn::RoleRegistry`),
+                // and this arm writes none. It re-derives the distilled tier
+                // from rows the store already accepted — which this arm can
+                // only reach when ≥2 of them carry this driver's own tag, so
+                // the namespace is demonstrably one it wrote.
+                trajectories_skipped_duplicate += 1;
+                strategy_items_rebuilt += rebuild_namespace_converged(&trajectory_store, &strategy_store, &regime_key)?.len();
+                continue;
+            }
             PersistPlan::Fresh(trajectory) => (trajectory, false),
             PersistPlan::Supersede(trajectory) => (trajectory, true),
         };
@@ -1760,17 +1940,17 @@ pub fn run(repo: &Path) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
                     // receiver's PR/CI path) and count it.
                     (VerdictOutcome::Pending, _) => trajectories_left_pending += 1,
                     (outcome, reward) => {
-                        // Marked BEFORE `rebuild_namespace` deliberately:
-                        // `mark_verdict` is the ONLY path allowed to
-                        // rewrite a stored trajectory, and
-                        // `rebuild_namespace` must leave those bytes
-                        // untouched (asserted by
-                        // `parquet_trajectory`'s own round-trip test).
+                        // Marked BEFORE the distilled-tier rebuild
+                        // deliberately: `mark_verdict` is the ONLY path
+                        // allowed to rewrite a stored trajectory, and a
+                        // rebuild must leave those bytes untouched
+                        // (asserted by `parquet_trajectory`'s own
+                        // round-trip test).
                         mark_trajectory_verdict(&trajectory_store, &trajectory.id, outcome, reward)?;
                         trajectories_marked += 1;
                     }
                 }
-                let items = rebuild_namespace(&trajectory_store, &strategy_store, &regime_key)?;
+                let items = rebuild_namespace_converged(&trajectory_store, &strategy_store, &regime_key)?;
                 strategy_items_rebuilt += items.len();
             }
             Err(LearnError::UnregisteredRole(_)) => {
@@ -2750,9 +2930,13 @@ mod tests {
     /// a store: this release's `regime_key` and its ordered verdict
     /// rows, under text that described the DRIVER rather than the
     /// evidence.
-    fn pre_s38_trajectory(key: &RegimeKey, rows: Vec<VerdictRow>) -> Trajectory {
+    ///
+    /// `id` is a parameter because the canonical-row rule keys on the
+    /// SMALLEST id: a test seeding two of these has to pin which one is
+    /// canonical rather than leave it to `TrajectoryId::new()`'s clock.
+    fn pre_s38_trajectory(id: TrajectoryId, key: &RegimeKey, rows: Vec<VerdictRow>) -> Trajectory {
         Trajectory::new(
-            TrajectoryId::new(),
+            id,
             key.clone(),
             format!("{} verdict(s) derived from canon-ingest artifact adapters for regime {}", rows.len(), key.as_str()),
             format!("{} verdict(s) derived from canon-ingest artifact adapters", rows.len()),
@@ -2771,17 +2955,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
         let key = regime("platformer", "41fdd8c5");
-        let scenario = "platformer.session.04";
-
-        let events = vec![
-            native_divergence(scenario, "open", Some(APP_FINDING), "2026-07-14T20:50:34Z"),
-            native_divergence(scenario, "resolved", Some(RESOLUTION), "2026-07-14T21:38:36Z"),
-        ];
-        let index = index_antecedents(&events);
-        let by_regime = group_by_regime(vec![derived_from(&index, &key, &events[1])]);
+        let by_regime = resolved_divergence_evidence(&key);
         let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
 
-        let stale = pre_s38_trajectory(&key, evidence.rows.clone());
+        let stale = pre_s38_trajectory(TrajectoryId::new(), &key, evidence.rows.clone());
         let stale_id = stale.id;
         store.append(&stale).unwrap();
 
@@ -2808,6 +2985,279 @@ mod tests {
         // …and the pass AFTER that writes nothing at all: supersession
         // is a one-time upgrade, never a rewrite on every ingest.
         assert!(matches!(plan_trajectory(&after, &key, evidence).unwrap(), PersistPlan::SkipDuplicate));
+    }
+
+    /// Two ids whose ORDER is pinned rather than left to the clock —
+    /// `seeded_id(1) < seeded_id(2)`, so a test can say which row the
+    /// canonical rule must pick.
+    fn seeded_id(nth: u8) -> TrajectoryId {
+        TrajectoryId::parse(&format!("01JZ{}{nth}", "0".repeat(21))).expect("a 26-char Crockford-base32 ULID")
+    }
+
+    /// The s39-joined evidence group every supersession test here derives
+    /// from: one `divergence-native` resolution carrying its own antecedent.
+    fn resolved_divergence_evidence(key: &RegimeKey) -> BTreeMap<RegimeKey, RegimeEvidence> {
+        let scenario = "platformer.session.04";
+        let events = vec![
+            native_divergence(scenario, "open", Some(APP_FINDING), "2026-07-14T20:50:34Z"),
+            native_divergence(scenario, "resolved", Some(RESOLUTION), "2026-07-14T21:38:36Z"),
+        ];
+        let index = index_antecedents(&events);
+        group_by_regime(vec![derived_from(&index, key, &events[1])])
+    }
+
+    /// A row already carrying EXACTLY what this pass renders — the
+    /// sibling whose presence used to short-circuit the whole plan.
+    fn current_trajectory(id: TrajectoryId, key: &RegimeKey, evidence: &RegimeEvidence) -> Trajectory {
+        let (task, context) = evidence.trajectory_text(key);
+        Trajectory::new(id, key.clone(), task, context, evidence.rows.clone(), evidence.latest_at, vec![ARTIFACT_INGEST_TAG.to_string()])
+            .expect("a dev-role trajectory under a dev regime")
+    }
+
+    /// Both stores read back in `read_dir` order, so every cross-pass
+    /// comparison sorts by id first — an unsorted `assert_eq!` would fail
+    /// on filesystem ordering rather than on content.
+    fn rows_by_id(store: &ParquetTrajectoryStore, key: &RegimeKey) -> Vec<Trajectory> {
+        let mut rows = store.query_by_regime_key(key).expect("a real parquet store reads back what it wrote");
+        rows.sort_by_key(|row| row.id);
+        rows
+    }
+
+    fn items_by_id(store: &ParquetStrategyStore, key: &RegimeKey) -> Vec<StrategyItem> {
+        let mut items = store.query_by_regime_key(key).expect("a real parquet store reads back what it wrote");
+        items.sort_by_key(|item| item.id);
+        items
+    }
+
+    /// One persist pass of [`run`]'s own loop against a REAL store pair:
+    /// plan against what the store actually holds, write only when the
+    /// plan says to, then re-derive the distilled tier through
+    /// [`rebuild_namespace_converged`] on exactly the branches `run` does.
+    /// `append` stands in for `canon_learn::store_trajectory`, which only
+    /// adds the role-registry check — identical for these registered-role
+    /// rows, and it keeps the test free of a `canon.yaml`.
+    fn drive_one_pass(
+        trajectory_store: &ParquetTrajectoryStore,
+        strategy_store: &ParquetStrategyStore,
+        key: &RegimeKey,
+        evidence: &RegimeEvidence,
+    ) -> PersistPlan {
+        let existing = trajectory_store.query_by_regime_key(key).expect("a real parquet store reads back what it wrote");
+        let plan = plan_trajectory(&existing, key, evidence).expect("a dev-role trajectory under a dev regime");
+        match &plan {
+            PersistPlan::SkipDuplicate => {}
+            PersistPlan::ConvergeDistilled => {
+                rebuild_namespace_converged(trajectory_store, strategy_store, key).expect("the distilled tier re-derives");
+            }
+            PersistPlan::Fresh(trajectory) | PersistPlan::Supersede(trajectory) => {
+                trajectory_store.append(trajectory).expect("a real parquet store accepts the write");
+                rebuild_namespace_converged(trajectory_store, strategy_store, key).expect("the distilled tier re-derives");
+            }
+        }
+        plan
+    }
+
+    #[test]
+    fn two_stale_copies_of_one_verdict_set_converge_to_one_current_distilled_strategy() {
+        // ReReviewCore on s41: the smallest-id rule only ever converged a
+        // SINGLE stale row. A pre-s38 pass appended a second row for one
+        // verdict set whenever the renderer changed under it (its digest
+        // ignored rendered text), and the pass after that rewrote the
+        // smallest row and then skipped forever — leaving the sibling's
+        // driver-describing prose to be distilled beside the fresh answer.
+        let dir = tempfile::tempdir().unwrap();
+        let trajectory_store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
+        let key = regime("platformer", "41fdd8c5");
+        let by_regime = resolved_divergence_evidence(&key);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+
+        let (canonical_id, losing_id) = (seeded_id(1), seeded_id(2));
+        trajectory_store.append(&pre_s38_trajectory(canonical_id, &key, evidence.rows.clone())).unwrap();
+        trajectory_store.append(&pre_s38_trajectory(losing_id, &key, evidence.rows.clone())).unwrap();
+
+        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
+        assert!(
+            matches!(&plan, PersistPlan::Supersede(fresh) if fresh.id == canonical_id),
+            "the smallest-id row of the candidate set is the one rewritten"
+        );
+
+        let rows = rows_by_id(&trajectory_store, &key);
+        assert_eq!(
+            rows.len(),
+            2,
+            "both raw rows stay: `TrajectoryStore` exposes no deletion, so convergence is at the distill boundary, not by removing evidence"
+        );
+        assert_eq!(rows[0].id, canonical_id);
+        assert!(
+            rows[0].context.contains(RESOLUTION) && rows[0].context.contains(APP_FINDING),
+            "the canonical row carries this release's evidence text: {}",
+            rows[0].context
+        );
+        assert!(
+            rows[1].id == losing_id && rows[1].task.contains("canon-ingest artifact adapters"),
+            "the superseded sibling's own bytes are left exactly as an earlier canon wrote them: {:?}",
+            (&rows[1].task, &rows[1].context)
+        );
+
+        // The distilled tier is the ONLY tier `canon retrieve`,
+        // `mart_role_memory` and promotion read, and it converged: one
+        // strategy per verdict, sourced from the canonical row, with no
+        // pre-s38 prose anywhere in it.
+        let distilled = items_by_id(&strategy_store, &key);
+        assert_eq!(
+            distilled.len(),
+            evidence.rows.len(),
+            "one distilled strategy per verdict — not one per stored copy of the verdict set: {distilled:#?}"
+        );
+        for item in &distilled {
+            assert_eq!(item.source_trajectory_ids, vec![canonical_id], "every distilled item cites the canonical row");
+            assert!(item.content.contains(RESOLUTION), "the distilled content is this release's evidence text: {}", item.content);
+            assert!(
+                !item.title.contains("canon-ingest artifact adapters") && !item.content.contains("canon-ingest artifact adapters"),
+                "no pre-s38 prose reaches a retrieved strategy: {:?}",
+                (&item.title, &item.content)
+            );
+        }
+
+        // Two further passes write nothing and supersede nothing: the
+        // canonical row already says this. The undeletable sibling keeps
+        // the plan on `ConvergeDistilled`, whose re-derivation is a
+        // fixpoint — byte-identical rows in BOTH tiers.
+        for pass in 2..=3 {
+            let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
+            assert!(matches!(plan, PersistPlan::ConvergeDistilled), "pass {pass} must write no raw row");
+            assert_eq!(rows_by_id(&trajectory_store, &key), rows, "pass {pass} rewrote a raw row");
+            assert_eq!(items_by_id(&strategy_store, &key), distilled, "pass {pass} perturbed the distilled tier");
+        }
+    }
+
+    #[test]
+    fn a_sibling_carrying_the_fresh_text_no_longer_shadows_a_stale_canonical_row() {
+        // The half of ReReviewCore's finding the duplicate check caused
+        // directly: with one of the two copies already current, `any stored
+        // row carries this identity` returned before supersession ran, so
+        // the STALE row was never rewritten and no rebuild ever ran.
+        let dir = tempfile::tempdir().unwrap();
+        let trajectory_store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
+        let key = regime("platformer", "41fdd8c5");
+        let by_regime = resolved_divergence_evidence(&key);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+
+        let (canonical_id, current_sibling_id) = (seeded_id(1), seeded_id(2));
+        trajectory_store.append(&pre_s38_trajectory(canonical_id, &key, evidence.rows.clone())).unwrap();
+        trajectory_store.append(&current_trajectory(current_sibling_id, &key, evidence)).unwrap();
+
+        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
+        assert!(
+            matches!(&plan, PersistPlan::Supersede(fresh) if fresh.id == canonical_id),
+            "a sibling's current text answers for itself, never for the canonical row"
+        );
+
+        let rows = rows_by_id(&trajectory_store, &key);
+        assert!(
+            rows.iter().all(|row| row.context.contains(RESOLUTION)),
+            "no stale text is left under this verdict set: {:#?}",
+            rows.iter().map(|row| &row.context).collect::<Vec<_>>()
+        );
+
+        let distilled = items_by_id(&strategy_store, &key);
+        assert_eq!(
+            distilled.len(),
+            evidence.rows.len(),
+            "the logical verdict set distills ONCE even though two copies of it are stored: {distilled:#?}"
+        );
+        assert_eq!(distilled[0].source_trajectory_ids, vec![canonical_id]);
+
+        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
+        assert!(matches!(plan, PersistPlan::ConvergeDistilled), "the converged store persists and supersedes nothing");
+        assert_eq!(rows_by_id(&trajectory_store, &key), rows);
+        assert_eq!(items_by_id(&strategy_store, &key), distilled);
+    }
+
+    #[test]
+    fn an_already_distilled_stale_sibling_leaves_the_strategy_tier_with_no_raw_write_at_all() {
+        // The seeding where nothing needs WRITING and everything still needs
+        // converging: the canonical row is already current (a store whose
+        // ids are not in append order, or one an earlier pass already
+        // rewrote), while a stale sibling's strategy is ALREADY sitting in
+        // the distilled tier. The pre-fix skip returned before any rebuild,
+        // so that strategy was served until the corpus happened to change.
+        let dir = tempfile::tempdir().unwrap();
+        let trajectory_store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
+        let key = regime("platformer", "41fdd8c5");
+        let by_regime = resolved_divergence_evidence(&key);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+
+        let (canonical_id, stale_sibling_id) = (seeded_id(1), seeded_id(2));
+        trajectory_store.append(&current_trajectory(canonical_id, &key, evidence)).unwrap();
+        trajectory_store.append(&pre_s38_trajectory(stale_sibling_id, &key, evidence.rows.clone())).unwrap();
+
+        // What an earlier canon's unfiltered rebuild left behind: BOTH rows
+        // distilled, side by side.
+        let rows_before = rows_by_id(&trajectory_store, &key);
+        for item in distill_namespace(&key, &rows_before) {
+            strategy_store.append(&item).unwrap();
+        }
+        assert_eq!(items_by_id(&strategy_store, &key).len(), 2, "the tier starts polluted, which is the whole premise");
+
+        let plan = drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
+        assert!(matches!(plan, PersistPlan::ConvergeDistilled), "there is nothing to write — and still something to converge");
+        assert_eq!(rows_by_id(&trajectory_store, &key), rows_before, "no raw row is written or rewritten on this path");
+
+        let distilled = items_by_id(&strategy_store, &key);
+        assert_eq!(distilled.len(), evidence.rows.len(), "the stale sibling's strategy left the tier: {distilled:#?}");
+        assert_eq!(distilled[0].source_trajectory_ids, vec![canonical_id]);
+        assert!(
+            !distilled[0].title.contains("canon-ingest artifact adapters") && !distilled[0].content.contains("canon-ingest artifact adapters"),
+            "no pre-s38 prose is retrievable any more: {:?}",
+            (&distilled[0].title, &distilled[0].content)
+        );
+    }
+
+    #[test]
+    fn convergence_never_withholds_a_row_this_driver_did_not_write_from_the_distiller() {
+        // The filter's boundary: it drops only THIS driver's own
+        // non-canonical copies. An untagged row sharing the verdict set is
+        // someone else's evidence — never rewritten (the plan's rung 2),
+        // and never silently dropped from the distilled tier either, which
+        // would delete guidance this driver does not own.
+        let dir = tempfile::tempdir().unwrap();
+        let trajectory_store = ParquetTrajectoryStore::open(dir.path().join("trajectories"));
+        let strategy_store = ParquetStrategyStore::open(dir.path().join("strategies"));
+        let key = regime("platformer", "41fdd8c5");
+        let by_regime = resolved_divergence_evidence(&key);
+        let evidence = by_regime.get(&key).expect("the group is keyed by the regime it was built with");
+
+        let (canonical_id, losing_id) = (seeded_id(1), seeded_id(2));
+        trajectory_store.append(&pre_s38_trajectory(canonical_id, &key, evidence.rows.clone())).unwrap();
+        trajectory_store.append(&pre_s38_trajectory(losing_id, &key, evidence.rows.clone())).unwrap();
+        let foreign = Trajectory::new(
+            TrajectoryId::new(),
+            key.clone(),
+            "seeded by a fixture",
+            "prose this driver never wrote",
+            evidence.rows.clone(),
+            "2026-07-14T21:38:36Z".parse().unwrap(),
+            vec!["fixture".to_string()],
+        )
+        .unwrap();
+        trajectory_store.append(&foreign).unwrap();
+
+        drive_one_pass(&trajectory_store, &strategy_store, &key, evidence);
+
+        let distilled = items_by_id(&strategy_store, &key);
+        assert_eq!(distilled.len(), 2, "one strategy for the canonical row and one for the foreign row, and nothing else: {distilled:#?}");
+        let sources: Vec<&TrajectoryId> = distilled.iter().flat_map(|item| &item.source_trajectory_ids).collect();
+        assert!(sources.contains(&&foreign.id), "the untagged row still distills: {distilled:#?}");
+        assert!(sources.contains(&&canonical_id), "the canonical row still distills: {distilled:#?}");
+        assert!(!sources.contains(&&losing_id), "only this driver's superseded copy is withheld: {distilled:#?}");
+        assert!(
+            rows_by_id(&trajectory_store, &key).contains(&foreign),
+            "the untagged row's own bytes are untouched by the pass"
+        );
     }
 
     #[test]

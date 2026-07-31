@@ -52,21 +52,30 @@ use crate::verdict_outcome::TrajectoryVerdict;
 /// trait changing — see this module's doc comment for the OQ2
 /// rationale.
 pub trait TrajectoryStore {
-    /// Persists one trajectory as an ID-KEYED REPLACE: a second
-    /// `append` under the same [`crate::ids::TrajectoryId`] overwrites
-    /// the first rather than appending a second row. Never silently
-    /// drops or dedups anything else.
+    /// Persists one trajectory as a `(regime_key, id)`-KEYED REPLACE: a
+    /// second `append` of the same [`crate::ids::TrajectoryId`] UNDER THE
+    /// SAME `regime_key` overwrites the first rather than appending a
+    /// second row. Never silently drops or dedups anything else.
     ///
-    /// s41 tightened this from "a caller error the concrete impl is
-    /// free to reject or overwrite". The shipped
-    /// [`crate::store::ParquetTrajectoryStore`] always overwrote (one
-    /// `fs::write` per id), and `canon ingest artifacts` now RELIES on
-    /// that: superseding a stale trajectory whose rendered text
-    /// predates s38/s39 reuses the stored row's own id so the
+    /// The regime half of that key is load-bearing, not incidental.
+    /// [`crate::store::ParquetTrajectoryStore`] lays rows out at
+    /// `<regime_key>/<id>.parquet`, so re-appending one id under a
+    /// DIFFERENT regime leaves both files present and
+    /// [`TrajectoryStore::find_by_id`] then resolves to whichever the
+    /// directory scan reaches first. s41 first wrote this contract as an
+    /// unqualified "id-keyed replace", which the shipped implementation
+    /// does not provide; the re-review caught the overpromise. Callers
+    /// needing replacement MUST hold the regime fixed \u2014 `canon ingest
+    /// artifacts`' supersession does, by construction: it only ever
+    /// reuses an id it read back from `query_by_regime_key` for the very
+    /// regime it is writing.
+    ///
+    /// The pre-s41 wording ("a caller error the concrete impl is free to
+    /// reject or overwrite") was replaced because a production caller now
+    /// depends on the overwrite: superseding a trajectory whose rendered
+    /// text predates s38/s39 reuses the stored row's own id so the
     /// replacement takes its place, instead of leaving both to be
-    /// distilled side by side. Calling that a caller error while a
-    /// production caller depends on it is the kind of stale contract
-    /// this branch keeps finding, so it is now the documented one.
+    /// distilled side by side.
     fn append(&self, trajectory: &Trajectory) -> Result<(), LearnError>;
 
     /// Every trajectory recorded under EXACTLY this `regime_key` (the

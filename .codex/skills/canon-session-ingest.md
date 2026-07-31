@@ -101,9 +101,14 @@ the whole source back through parse/persist.
 - A cursor's identity carries its adapter's PARSE VERSION as well as its
   files, so changing an adapter's normalization re-reads that adapter's
   transcripts instead of reporting them unchanged — no `--full`, no
-  cursor deletion. All four shipped adapters are at version `1`, whose
-  cursor id is the bare `client_id` (`omp.json`), so nothing already on
-  disk was invalidated by installing this.
+  cursor deletion. Version `1` IS the bare `client_id` (`omp.json`), so a
+  cursor already on disk is never invalidated just by installing the
+  mechanism; a bump appends the suffix (`claude-code-v2.json`) and that
+  adapter re-reads once. `omp`, `hermes`, and `codex` are at `1`;
+  `claude-code` is at `2`, because s37 changed its sidechain parse output
+  (it now carries `agent_id`/`parent_agent_id`, which is what mints child
+  runs), so it re-reads once to backfill execution lineage that the old
+  watermark would otherwise hide forever.
 
 **`--full`** ignores the cursors and re-parses every present in-scope
 file (a full rescan / cursor reset) — safe because a byte-identical

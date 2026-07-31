@@ -238,14 +238,26 @@ def main() -> int:
     if not m:
         fail("Cargo.toml has no [workspace.package] version")
     workspace_version = m.group(1)
-    manifests = [ROOT / "package.json"] + sorted(
-        p for p in (ROOT / "packages").rglob("package.json") if "node_modules" not in p.parts
+    # Scan from ROOT, not just packages/ — the first cut missed tracked
+    # `examples/platformer/package.json`, so the rule claimed "every
+    # package.json" while a manifest sat at 0.0.0 and the check passed.
+    # Excluded paths are dependency/build output, never source.
+    excluded = {"node_modules", "dist", ".astro", "target", "vendors", ".git"}
+    manifests = sorted(
+        p for p in ROOT.rglob("package.json") if excluded.isdisjoint(p.parts)
     )
+    check(bool(manifests), "no package.json found to version-check — the scan is broken, not the tree")
     for manifest in manifests:
-        found = json.loads(manifest.read_text()).get("version")
+        rel = manifest.relative_to(ROOT)
+        try:
+            found = json.loads(manifest.read_text()).get("version")
+        except (OSError, json.JSONDecodeError) as e:
+            # An unreadable manifest must FAIL, never pass vacuously.
+            ERRORS.append(f"cannot read {rel} for the version check: {e}")
+            continue
         check(
             found == workspace_version,
-            f"version drift in {manifest.relative_to(ROOT)}: package.json={found!r} vs Cargo.toml [workspace.package]={workspace_version!r}",
+            f"version drift in {rel}: package.json={found!r} vs Cargo.toml [workspace.package]={workspace_version!r}",
         )
 
     if ERRORS:

@@ -76,7 +76,7 @@ use canon_ingest::{find_plan_adapter, PlanSourceConfig};
 use canon_learn::guidance::retrieve_guidance;
 use canon_learn::{LearnConfig, ParquetStrategyStore};
 use canon_model::envelope::{Actor, Envelope, RecordKind};
-use canon_model::ids::{RunId, TaskId};
+use canon_model::ids::{ChangeId, RunId, TaskId};
 use canon_model::records::{Run, RunStatus};
 use canon_model::{RegimeKey, RoleId};
 use canon_store::write_atomic;
@@ -278,8 +278,9 @@ pub struct DispatchBinding {
 /// task 1.2), through the SAME `canon.yaml` `plans:` sources and the
 /// SAME `canon_ingest::plan_registry` dialect lookup `canon gate task`
 /// resolves a flip through (`crate::gate::run_task`). Never a second
-/// resolution convention — a task bindable here but unflippable by
-/// the gate (or the reverse) would be its own divergence.
+/// source-resolution convention: both reach the operator's configured
+/// corpus through the one registry, so neither can consult a plan tree
+/// the other cannot see.
 ///
 /// Three deliberate departures from `canon gate task`, all because
 /// this is a READ:
@@ -303,13 +304,32 @@ pub struct DispatchBinding {
 ///    the shipped superpowers dialect, which would accept
 ///    `<real-change>#999` and persist exactly the dangling
 ///    `Run.task_id` this validation exists to prevent.
-/// 3. **Every source is searched.** A change id may legitimately
-///    appear in more than one configured source (the plan-import
-///    driver's own `duplicate_change_id` diagnostic exists because
-///    that happens), and the row may live in the second one. So the
-///    first source CARRYING THE ROW wins and rejection happens only
-///    after the whole list is exhausted — never on the first source
-///    that merely owns the change document.
+/// 3. **Every source is considered — under the IMPORTER's admission,
+///    not "somebody parsed it".** A change id may legitimately appear
+///    in more than one configured source (the plan-import driver's own
+///    `duplicate_change_id` diagnostic exists because that happens),
+///    so rejection happens only after the whole list is exhausted —
+///    never on the first source that merely owns the change document.
+///    But mere membership in SOME source's parsed set is the wrong
+///    predicate: design D8 gives the FIRST configured occurrence of a
+///    `change_id` ownership for the pass and drops every `Task` under a
+///    later duplicate, so a row only a later duplicate carries is a row
+///    `canon ingest plans` never persists. s41 (`review-hardening`):
+///    that laxer rule accepted `shared-change#2.1` out of a second
+///    source and wrote it into the dispatched `Run`, recreating exactly
+///    the dangling binding this validation exists to prevent. The rule
+///    now comes from ONE place —
+///    [`crate::plans::admit_source_candidates`], the same call the
+///    importer's own scan loop makes, threading one pass-wide
+///    `seen_change_ids` across the sources in config order — so a
+///    `--task` is bindable IFF an import pass would persist it, and the
+///    two cannot silently drift again.
+///
+///    `canon gate task` deliberately keeps its own, laxer rule here and
+///    flips the row in whichever source's document carries it: a flip
+///    edits a plan DOCUMENT, which exists on disk regardless of which
+///    source won the ownership contest, while a binding asserts a
+///    `Task` RECORD — and only the winner's records are ever written.
 ///
 /// The bar is therefore the IMPORTER's, not the flipper's: a
 /// construct the dialect adapter rejects wholesale (an openspec change
@@ -319,6 +339,15 @@ pub struct DispatchBinding {
 /// record for that id exists in the ledger or ever will, and a
 /// `Run.task_id` pointing at one is the dangling binding s40 exists to
 /// refuse.
+///
+/// One deliberate asymmetry inside that shared rule: the importer's
+/// watermark cursor may skip an UNCHANGED source before it claims its
+/// `change_id`s, so an incremental pass can persist a row a full pass
+/// disowns. This read holds no cursor state and therefore always
+/// decides as a FULL re-import would — the conservative direction,
+/// since a full pass is the durable authority on D8 ownership and the
+/// cost of the disagreement is a loud, fixable exit `2` rather than a
+/// silently dangling `Run.task_id`.
 ///
 /// Read-only by construction: `PlanAdapter::parse` is the same pure
 /// scan+parse `canon ingest plans` runs before its persist step, and
@@ -332,6 +361,10 @@ fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(), DispatchEr
     }
 
     let mut consulted: Vec<String> = Vec::new();
+    // The pass-wide D8 accumulator, threaded across sources in config
+    // order exactly as `crate::plans::run` threads its own: order IS
+    // the ownership rule, so this may never be reset per source.
+    let mut seen_change_ids: BTreeSet<ChangeId> = BTreeSet::new();
     for src in &sources {
         consulted.push(format!("{} @ {}", src.dialect(), src.root().display()));
         // `load_plan_sources_from_config` rejects an unregistered
@@ -339,19 +372,21 @@ fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(), DispatchEr
         // same reasoning (and the same `expect`) `crate::plans`' own
         // scan loop already states.
         let entry = find_plan_adapter(src.dialect()).expect("dialect validated by load_plan_sources_from_config");
-        // `None` only when the root is unconfigured, which
-        // `load_plan_sources_from_config` cannot produce; a source
-        // that cannot resolve simply contributes no tasks, exactly as
-        // it contributes no candidates to an import pass.
-        let Some(handle) = entry.adapter.resolve_source(&PlanSourceConfig { root: Some(src.root().to_path_buf()) }) else {
-            continue;
-        };
-        // A malformed construct inside the source is skipped-and-named
-        // by the adapter itself (`PlanParseOutcome::malformed`), never
-        // a panic and never a corpus-level failure — so an unreadable
-        // neighbouring document cannot make a perfectly good task id
-        // unbindable.
-        if entry.adapter.parse(&handle).tasks.iter().any(|task| task.task_id == *task_id) {
+        // An unresolvable source (only possible for an unconfigured
+        // root, which `load_plan_sources_from_config` cannot produce)
+        // contributes no candidates AND claims no `change_id`, exactly
+        // as it contributes nothing to an import pass — the same
+        // `resolve_source(...).map(parse).unwrap_or_default()` shape
+        // `crate::plans::run` uses, so the two agree even here. A
+        // malformed construct INSIDE a resolvable source is
+        // skipped-and-named by the adapter itself
+        // (`PlanParseOutcome::malformed`), never a panic and never a
+        // corpus-level failure — so an unreadable neighbouring
+        // document cannot make a perfectly good task id unbindable.
+        let handle = entry.adapter.resolve_source(&PlanSourceConfig { root: Some(src.root().to_path_buf()) });
+        let parsed = handle.map(|h| entry.adapter.parse(&h)).unwrap_or_default();
+        let admitted = crate::plans::admit_source_candidates(&mut seen_change_ids, parsed.changes, parsed.tasks);
+        if admitted.tasks.iter().any(|task| task.task_id == *task_id) {
             return Ok(());
         }
     }
@@ -1769,15 +1804,12 @@ mod begin_tests {
         assert_eq!(begun.run.task_id, Some(task_id));
     }
 
-    /// BLOCKER regression (`ReviewDispatch`): one change id carried by
-    /// TWO configured sources. Deciding at the first source that
-    /// merely LOCATES the change document rejected a row that plainly
-    /// exists in the second — the plan-import driver has a
-    /// `duplicate_change_id` diagnostic precisely because this shape
-    /// occurs. Rejection is now only valid once every source has been
-    /// searched.
-    #[test]
-    fn a_row_in_a_later_source_sharing_the_change_id_still_binds() {
+    /// Two configured openspec sources that BOTH carry a
+    /// `shared-change` document, each with a row the other lacks — the
+    /// exact shape design D8's `duplicate_change_id` diagnostic exists
+    /// for, and the shape s41 (`review-hardening`) caught `--task`
+    /// admitting wrongly.
+    fn repo_with_a_duplicated_change_id() -> TempDir {
         let tmp = tempfile::tempdir().expect("a temp dir");
         std::fs::write(
             tmp.path().join("canon.yaml"),
@@ -1786,16 +1818,75 @@ mod begin_tests {
         .expect("writing canon.yaml");
         write_openspec_change(&tmp.path().join("first"), "shared-change", "- [ ] 1.1 Only in the first source\n");
         write_openspec_change(&tmp.path().join("second"), "shared-change", "- [ ] 2.1 Only in the second source\n");
+        tmp
+    }
 
-        // The first source owns a `shared-change` document, but not
-        // this row.
-        let task_id = TaskId::parse("shared-change#2.1").expect("a literal task id");
+    /// Every `TaskId` the openspec dialect ACTUALLY parses out of one
+    /// source root, with no cross-source admission applied — the raw
+    /// `PlanAdapter::parse` set, so a test can tell "the row is not
+    /// there" apart from "the row is there and D8 disowns it".
+    fn parsed_task_ids(root: &Path) -> Vec<TaskId> {
+        let entry = find_plan_adapter("openspec").expect("the openspec dialect is registered");
+        let handle =
+            entry.adapter.resolve_source(&PlanSourceConfig { root: Some(root.to_path_buf()) }).expect("a configured root resolves");
+        entry.adapter.parse(&handle).tasks.into_iter().map(|task| task.task_id).collect()
+    }
+
+    /// BLOCKER regression (`ReReviewDispatch`, s41 `review-hardening`)
+    /// — and the INVERSION of what this case asserted in s40, when it
+    /// was named for a later source's row STILL BINDING. Searching every
+    /// configured source is the right shape for the NOT-FOUND message
+    /// and the wrong rule for admission: design D8 gives the FIRST
+    /// configured occurrence of `shared-change` ownership of the whole
+    /// pass, so a real `canon ingest plans` persists `shared-change#1.1`
+    /// and drops `shared-change#2.1` along with its disowned `Change`.
+    /// Binding the dropped row wrote precisely the dangling
+    /// `Run.task_id` this validation exists to refuse — a task edge
+    /// pointing at a `Task` record that exists nowhere and never will.
+    #[test]
+    fn a_row_only_a_later_duplicate_of_the_change_id_carries_is_refused_as_the_importer_skips_it() {
+        let tmp = repo_with_a_duplicated_change_id();
+        // The row is unambiguously THERE in the second source: what
+        // follows is an admission refusal, not a parse miss.
+        let refused = TaskId::parse("shared-change#2.1").expect("a literal task id");
+        assert!(
+            parsed_task_ids(&tmp.path().join("second")).contains(&refused),
+            "the fixture's second source must really carry the row this test expects to be DISOWNED, not missing"
+        );
+
+        let binding = DispatchBinding { task_id: Some(refused), parent_run_id: None };
+        let err =
+            begin(tmp.path(), &role(), &regime(), "canon", &binding).expect_err("a row no import pass would persist is not bindable");
+        assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
+        let message = err.to_string();
+        assert!(message.contains("shared-change#2.1"), "the message must name the rejected id: {message}");
+        assert!(err.is_usage(), "an unbindable --task is a fixable invocation, exit 2");
+        assert!(!tmp.path().join(DISPATCH_DIR).exists(), "a rejected binding must leave no dispatch record behind");
+    }
+
+    /// The other half of that inversion: mirroring the importer must
+    /// not cost the FIRST-configured source its rows. `shared-change#1.1`
+    /// is exactly what a real pass persists out of this corpus, so it
+    /// stays bindable — the predicate is "would `canon ingest plans`
+    /// persist this task", never the blunter "is its change id
+    /// duplicated".
+    #[test]
+    fn the_first_sources_row_still_binds_when_a_later_source_duplicates_its_change_id() {
+        let tmp = repo_with_a_duplicated_change_id();
+        let task_id = TaskId::parse("shared-change#1.1").expect("a literal task id");
         let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None };
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding).expect("a row a LATER source carries is still a real task");
+        let begun =
+            begin(tmp.path(), &role(), &regime(), "canon", &binding).expect("the row an import pass DOES persist is bindable");
         assert_eq!(begun.run.task_id, Some(task_id));
+    }
 
-        // And a row NEITHER source carries is still rejected, with
-        // both sources named.
+    /// Rejection still happens only once the WHOLE source list has been
+    /// considered: a row neither source carries names both, even though
+    /// the second source lost its `shared-change` ownership contest and
+    /// contributed no candidate at all.
+    #[test]
+    fn a_row_no_source_carries_names_every_source_consulted_across_a_duplicate() {
+        let tmp = repo_with_a_duplicated_change_id();
         let missing = DispatchBinding { task_id: Some(TaskId::parse("shared-change#9.9").expect("a literal task id")), parent_run_id: None };
         let err = begin(tmp.path(), &role(), &regime(), "canon", &missing).expect_err("a row no source carries must be rejected");
         let message = err.to_string();

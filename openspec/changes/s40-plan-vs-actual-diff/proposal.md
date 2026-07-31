@@ -58,9 +58,18 @@ reports, it never gates.
 
 **Make the funnel a funnel.** All three trailing stages count
 STRATEGIES over one relation, so the chain narrows by construction:
-`retrieved` is the distinct strategies ever injected into a run's
-context, and `applied` is that same set restricted to the ones whose
-recipient run reached a terminal `Run.status`.
+`retrieved` is the distinct strategies injected into a run's context AND
+still distilled today, and `applied` is that same set restricted to the
+ones whose recipient run reached a terminal `Run.status`.
+
+The "still distilled today" half is not a hedge. The view inner-joins
+each recorded `StrategyRef` against the current strategy items, so a
+strategy re-derived from CHANGED evidence takes a new content-derived id
+and its earlier injection stops counting. s41 made that id a pure
+function of the distilled content, so an unchanged strategy survives
+every rebuild — but a genuinely changed one is a different strategy, and
+the funnel says so rather than crediting the new text with the old
+text's retrievals.
 
 This is a PROXY, and the reason it is a proxy matters. The obvious
 definition — a resolved trajectory joined to its own run — is not
