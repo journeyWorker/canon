@@ -99,6 +99,12 @@ the whole source back through parse/persist.
 - Correctness never depends on the cursor: a missing/corrupt cursor
   treats every present file as new, and the digest-idempotent write path
   keeps any rescan from double-writing.
+- A cursor's identity carries its adapter's PARSE VERSION as well as its
+  files, so changing an adapter's normalization re-reads that adapter's
+  transcripts instead of reporting them unchanged — no `--full`, no
+  cursor deletion. All four shipped adapters are at version `1`, whose
+  cursor id is the bare `client_id` (`omp.json`), so nothing already on
+  disk was invalidated by installing this.
 
 **`--full`** ignores the cursors and re-parses every present in-scope
 file (a full rescan / cursor reset) — safe because a byte-identical

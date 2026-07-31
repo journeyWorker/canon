@@ -255,6 +255,18 @@ impl SessionAdapter for CodexAdapter {
         "codex"
     }
 
+    /// `1` — this adapter's normalization is unchanged since it
+    /// shipped, so `1` is the value that re-reads nothing: every
+    /// session cursor already on disk was computed against exactly
+    /// this parse output. Bump it the moment a change in this file
+    /// alters what an UNCHANGED rollout transcript normalizes to
+    /// (a new field, a changed cumulative-delta or fork-detection
+    /// rule, a different usage gate) — see
+    /// [`SessionAdapter::parse_version`].
+    fn parse_version(&self) -> u32 {
+        1
+    }
+
     /// Live+archived root union — ported from `scanner.rs:1101-1136`
     /// (design D5). `${CODEX_HOME:-~/.codex}/sessions` is Codex CLI's
     /// live transcript dir; `archived_sessions` is Codex CLI's own

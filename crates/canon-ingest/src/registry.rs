@@ -30,8 +30,11 @@ use crate::scanner;
 /// One registered adapter: its [`SessionAdapter`] handle plus the file
 /// glob `scanner::scan_dir`/`scanner::scan_roots` matches scan-root
 /// contents against. The glob lives here, NOT on [`SessionAdapter`]
-/// itself (design Contract freezes the trait at exactly three
-/// methods) — `SessionAdapter::parse` already self-rejects a
+/// itself (design Contract froze the trait at exactly three methods;
+/// s40 (`plan-vs-actual-diff`) amended it to four by adding
+/// `parse_version`, which describes the adapter's PARSE OUTPUT and so
+/// genuinely belongs on the adapter — a scan glob still does not)
+/// — `SessionAdapter::parse` already self-rejects a
 /// non-matching file by returning an empty `Vec` (e.g. omp/pi's header
 /// probe), so the glob here is a scan-efficiency filter, not a
 /// correctness dependency.
@@ -176,5 +179,21 @@ mod tests {
         let entry = &registry()[0];
         assert!(entry.file_matches(Path::new("/home/x/.omp/agent/sessions/abc/one.jsonl")));
         assert!(!entry.file_matches(Path::new("/home/x/.omp/agent/sessions/abc/notes.txt")));
+    }
+
+    /// s40 (`plan-vs-actual-diff`) task 4.1: every shipped adapter
+    /// declares a parse generation, and every one of them is at `1`
+    /// because no session adapter's normalization changed in s40.
+    /// That is the value which leaves every session cursor already on
+    /// disk valid, so installing the mechanism re-reads nothing —
+    /// see [`SessionAdapter::parse_version`] and `canon-cli`'s
+    /// `ingest::session_source_cursor_id`. A future adapter whose
+    /// output genuinely changes bumps ITS OWN version (and this
+    /// assertion with it, deliberately).
+    #[test]
+    fn every_shipped_adapter_is_at_parse_version_one_so_no_cursor_is_invalidated() {
+        for entry in registry() {
+            assert_eq!(entry.adapter.parse_version(), 1, "adapter `{}` changed its parse generation without a recorded reason", entry.client_id());
+        }
     }
 }

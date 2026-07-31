@@ -15,6 +15,11 @@ packages/core-*/bin/*
 .canon/learn/
 .canon/r2/
 .canon/ingest/
+# Live run manifests written by `canon dispatch begin`/`end` (s8; s40
+# added the task/parent binding). One file per dispatched run, local
+# runtime state -- never committed, and not yet reconciled into the
+# record store (s40 proposal's "does NOT do").
+.canon/dispatch/
 .canon/REPORT.md
 .env
 .env.*

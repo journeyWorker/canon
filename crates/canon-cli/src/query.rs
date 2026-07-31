@@ -169,21 +169,30 @@ fn matches_domain(raw: &RawRecord, domain: &str) -> bool {
     raw.0.get("domain").and_then(Value::as_str) == Some(domain)
 }
 
+/// A `Task`'s natural key (its `task_id` string) decomposed into
+/// `(owning change, dot-separated task number parsed as integers)`, so
+/// `1.2` sorts before `1.10` (never a lexicographic string compare of
+/// the whole id, which would order them the other way).
+///
+/// `pub(crate)` because s40 (`plan-vs-actual-diff`) orders plan-graph
+/// EDGES — pairs of bare [`TaskId`]s, not whole records — by this same
+/// key (`crate::dispatch::task_sort_key`). Extracted rather than
+/// re-derived there so the two orderings can never drift into two
+/// conventions for reading one id.
+pub(crate) fn task_number_key(task_id: &str) -> (String, Vec<u64>) {
+    let (change, number) = task_id.split_once('#').unwrap_or((task_id, ""));
+    (change.to_string(), number.split('.').filter_map(|s| s.parse().ok()).collect())
+}
+
 /// `--kind change`/`--kind task`'s deterministic sort key (design D6):
 /// `(change_id, task-number-segments)`, reusing the SAME natural key
 /// [`canon_store::partition::resolve_partition`] already derives for
-/// these two kinds (`format_human`'s own per-row call) — `Task`'s
-/// natural key IS its `task_id` string, split once on `#` into the
-/// owning change plus its dot-separated task number, parsed as
-/// integers so `1.2` sorts before `1.10` (never a lexicographic string
-/// compare, which would order them the other way).
+/// these two kinds (`format_human`'s own per-row call) — a `Task`'s
+/// own decomposition is [`task_number_key`]'s.
 fn scope_sort_key(kind: RecordKind, raw: &RawRecord) -> (String, Vec<u64>) {
     let natural_key = canon_store::partition::resolve_partition(kind, &raw.0).map(|p| p.natural_key).unwrap_or_default();
     match kind {
-        RecordKind::Task => {
-            let (change, number) = natural_key.split_once('#').unwrap_or((natural_key.as_str(), ""));
-            (change.to_string(), number.split('.').filter_map(|s| s.parse().ok()).collect())
-        }
+        RecordKind::Task => task_number_key(&natural_key),
         _ => (natural_key, Vec::new()),
     }
 }

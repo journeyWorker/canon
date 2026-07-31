@@ -99,12 +99,26 @@ pub mod role_memory {
     pub const CONTENT_HIT_RATE: f64 = 1.0;
 }
 
-/// `mart_flywheel_funnel`'s expected two rows: `dev` carries 3 verdict
-/// rows across two trajectories (2 distilled strategies, 1 applied —
-/// `t1`'s `success` outcome), `content` carries 1 verdict row (1
-/// distilled strategy, 0 applied — `t3` stays `pending`). Both roles
-/// show `retrieved = 1` (one run's `injected_guidance` cites one
-/// strategy from each role).
+/// `mart_flywheel_funnel`'s expected two rows. `dev` carries 3 verdict
+/// rows across two trajectories and 2 distilled strategies; `content`
+/// carries 1 verdict row and 1 distilled strategy. Both roles show
+/// `retrieved = 1`: each has exactly one strategy cited by some run's
+/// `injected_guidance`.
+///
+/// The two roles differ ONLY in the recipient run's own lifecycle (s40
+/// `plan-vs-actual-diff`, task 3.1) — the `dev` strategy went into the
+/// `Succeeded` session run, so it is `applied = 1`; the `content`
+/// strategy went into a run still `Running` (a dispatched run nobody
+/// closed, the real-world case), so it is `applied = 0`. That pairing
+/// is the whole point of the fixture: `applied` must move with the
+/// run's terminal status and nothing else.
+///
+/// `content`'s trajectory is deliberately marked RESOLVED for this
+/// reason: under the pre-s40 definition (`applied` = resolved
+/// trajectories, no reference to retrieval) `content` would read
+/// `applied = 1`, so `CONTENT_APPLIED = 0` is exactly the assertion a
+/// regression to that definition trips. `dev`'s second trajectory stays
+/// pending so the corpus still carries a mixed-outcome role.
 pub mod flywheel_funnel {
     pub const DEV_VERDICTS: i64 = 3;
     pub const DEV_DISTILLED: i64 = 2;
@@ -297,9 +311,8 @@ fn build_git_tier(git_root: &Path) {
     ))
     .unwrap();
 
-    // ── session costs: 1 session, 1 run (with retrieved guidance
-    // pointing at both role-memory strategies below), 2 token_usage
-    // events ──────────────────────────────────────────────────────
+    // ── session costs: 1 session, 1 run (carrying the `dev` strategy
+    // as retrieved guidance), 2 token_usage events ─────────────────
     let session_id = SessionId::parse(session_costs::SESSION_ID).unwrap();
     tier.write(&Session::new(
         Envelope::new(1, RecordKind::Session, at(2026, 1, 4, 9), actor("fixture-session-actor", session_costs::ROLE)),
@@ -320,11 +333,29 @@ fn build_git_tier(git_root: &Path) {
         at(2026, 1, 4, 9),
         Some(at(2026, 1, 4, 10)),
     );
-    run.injected_guidance = vec![
-        StrategyRef::new(dev_strategy_active_id(), "dev strategy", "content"),
-        StrategyRef::new(content_strategy_id(), "content strategy", "content"),
-    ];
+    run.injected_guidance = vec![StrategyRef::new(dev_strategy_active_id(), "dev strategy", "content")];
     tier.write(&run).unwrap();
+
+    // ── flywheel funnel's negative case (s40 `plan-vs-actual-diff`,
+    // task 3.1): a SECOND run carrying the `content` strategy as
+    // retrieved guidance and left `Running` — a dispatched run nobody
+    // ever closed, which is the state every guidance-carrying run in a
+    // real repo sits in until `canon dispatch end` runs. `retrieved`
+    // counts it, `applied` must not. Deliberately session-less and
+    // event-less: `mart_session_costs` inner-joins runs to their
+    // `token_usage` events through a `Session`, so this run cannot
+    // perturb that panel's expected single row.
+    let mut unfinished_run = Run::new(
+        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 11), Actor::new_unattributed(session_costs::CLIENT)),
+        RunId::new(),
+        None,
+        None,
+        RunStatus::Running,
+        at(2026, 1, 4, 11),
+        None,
+    );
+    unfinished_run.injected_guidance = vec![StrategyRef::new(content_strategy_id(), "content strategy", "content")];
+    tier.write(&unfinished_run).unwrap();
 
     tier.write(&Event::new(
         Envelope::new(1, RecordKind::Event, at_min(2026, 1, 4, 9, 30), Actor::new_unattributed(session_costs::CLIENT)),
@@ -463,8 +494,12 @@ fn build_learn_store(learn_root: &Path) {
         ))
         .unwrap();
 
-    // ── flywheel funnel: dev (2 trajectories / 3 verdict rows, 1
-    // applied), content (1 trajectory / 1 verdict row, still pending) ──
+    // ── flywheel funnel: dev (2 trajectories / 3 verdict rows), content
+    // (1 trajectory / 1 verdict row). A trajectory's own outcome no
+    // longer feeds `applied` at all (s40 `plan-vs-actual-diff`, task
+    // 3.1 — the recipient run's terminal status does), so the outcomes
+    // below exist to make a regression to the old definition VISIBLE,
+    // not to drive the expected counts. ──
     trajectory_store
         .append(
             &LearnTrajectory::new(
@@ -495,7 +530,7 @@ fn build_learn_store(learn_root: &Path) {
                 vec![],
             )
             .unwrap(),
-            // stays pending — never marked, proving `applied` excludes it.
+            // stays pending — the corpus keeps one unresolved sample.
         )
         .unwrap();
     trajectory_store
@@ -509,7 +544,12 @@ fn build_learn_store(learn_root: &Path) {
                 at(2026, 1, 3, 8),
                 vec![],
             )
-            .unwrap(),
+            .unwrap()
+            // Resolved on purpose: the pre-s40 `applied` counted
+            // resolved trajectories, so that definition would render
+            // `content` as `applied = 1`. `CONTENT_APPLIED = 0` is the
+            // assertion it trips — this run was never closed.
+            .with_verdict_record(TrajectoryVerdict::new(VerdictOutcome::Success, 0.8)),
         )
         .unwrap();
 }

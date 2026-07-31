@@ -127,6 +127,17 @@ impl SessionAdapter for OmpAdapter {
         "omp"
     }
 
+    /// `1` — this adapter's normalization is unchanged since it
+    /// shipped, so `1` is the value that re-reads nothing: every
+    /// session cursor already on disk was computed against exactly
+    /// this parse output. Bump it the moment a change in this file
+    /// alters what an UNCHANGED transcript normalizes to (a new
+    /// field, a changed header probe, a different usage gate) — see
+    /// [`SessionAdapter::parse_version`].
+    fn parse_version(&self) -> u32 {
+        1
+    }
+
     fn scan_roots(&self, home: &Path, use_env_roots: bool) -> Vec<PathBuf> {
         // Dual-root union: `.omp` (Oh My Pi fork) and `.pi`
         // (badlogic/pi-mono upstream) — ported precedent from

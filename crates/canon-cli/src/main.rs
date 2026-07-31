@@ -36,7 +36,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use canon_model::envelope::RecordKind;
-use canon_model::{regime_key, ChangeId, ProjectId, RegimeKey, RoleId, ScenarioId, Sha, SubjectId};
+use canon_model::{regime_key, ChangeId, ProjectId, RegimeKey, RoleId, RunId, RunStatus, ScenarioId, Sha, SubjectId, TaskId};
 use canon_learn::StrategyId;
 use canon_cli::scaffold::AreaSurface;
 use chrono::{DateTime, Utc};
@@ -171,7 +171,7 @@ enum Command {
         #[arg(long, value_parser = canon_cli::retrieve::parse_subject)]
         subject: Option<SubjectId>,
         /// Top-k cap (default: canon's DEFAULT_K)
-        #[arg(long)]
+        #[arg(short, long)]
         k: Option<usize>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
@@ -331,6 +331,36 @@ enum DispatchCommand {
         /// The dispatching agent's id (recorded as the run's actor)
         #[arg(long, default_value = "canon")]
         agent_id: String,
+        /// Plan task this run serves (<change_id>#<n>); validated against the plan corpus
+        #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
+        task: Option<TaskId>,
+        /// RunId (ULID) of the run that dispatched this one
+        #[arg(long, value_parser = canon_cli::dispatch::parse_run_id)]
+        parent_run: Option<RunId>,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
+    /// Close a dispatched run with a terminal status and an ended_at
+    End {
+        /// The RunId (ULID) minted by `canon dispatch begin`
+        #[arg(long, value_parser = canon_cli::dispatch::parse_run_id)]
+        run: RunId,
+        /// Terminal outcome: succeeded or failed
+        #[arg(long, value_parser = canon_cli::dispatch::parse_run_status)]
+        status: RunStatus,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
+    /// Diff the declared plan DAG against the observed execution graph
+    Diff {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -808,7 +838,12 @@ fn main() -> ExitCode {
             LearnCommand::Promote { strategy_id, repo, dry_run } => canon_cli::learn::run_promote(&repo, &strategy_id, dry_run),
         },
         Command::Dispatch { action } => match action {
-            DispatchCommand::Begin { role, regime, agent_id, repo, json } => canon_cli::dispatch::run_begin(&repo, &role, &regime, &agent_id, json),
+            DispatchCommand::Begin { role, regime, agent_id, task, parent_run, repo, json } => {
+                let binding = canon_cli::dispatch::DispatchBinding { task_id: task, parent_run_id: parent_run };
+                canon_cli::dispatch::run_begin(&repo, &role, &regime, &agent_id, &binding, json)
+            }
+            DispatchCommand::End { run, status, repo, json } => canon_cli::dispatch::run_end(&repo, run, status, json),
+            DispatchCommand::Diff { repo, json } => canon_cli::dispatch::run_diff(&repo, json),
         },
         Command::Selftest { json } => canon_cli::selftest::run_selftest(json),
     }

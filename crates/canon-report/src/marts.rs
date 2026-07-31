@@ -48,6 +48,29 @@ pub fn fetch_role_memory(roots: &Roots) -> Result<MartResult, ReportError> {
 
 pub const FLYWHEEL_FUNNEL_COLUMNS: &[&str] = &["role", "verdicts", "distilled", "retrieved", "applied"];
 
+/// `mart_flywheel_funnel`: one row per role, `verdicts → distilled →
+/// retrieved → applied`. What each column counts, restated here because
+/// the four bare names read like a funnel long before the SQL actually
+/// computed one (s40 `plan-vs-actual-diff`, tasks 3.1/3.2):
+///
+/// - `verdicts` — `VerdictRow`s across this role's raw trajectories,
+///   the evidence the distiller consumes. The one stage not counted in
+///   strategies, and the natural upper bound on `distilled`.
+/// - `distilled` — this role's `canon-learn` `StrategyItem` rows.
+/// - `retrieved` — DISTINCT strategies appearing in at least one
+///   `Run::injected_guidance`, never injection EVENTS: counting events
+///   let `retrieved` exceed `distilled` as soon as one strategy was
+///   injected into two runs.
+/// - `applied` — that same distinct set, restricted to strategies whose
+///   recipient run reached a terminal `RunStatus`
+///   (`succeeded`/`failed`/`aborted`). It asserts both halves —
+///   guidance in context AND a run that finished — and is deliberately
+///   NOT "resolved trajectories", which is what it counted before s40,
+///   with no reference to retrieval at all.
+///
+/// So `applied <= retrieved <= distilled` holds by construction (the
+/// view's own comment carries the proof). Exactly the view's own
+/// `SELECT` list, no renaming/reordering (design D1).
 pub fn fetch_flywheel_funnel(roots: &Roots) -> Result<MartResult, ReportError> {
     fetch(roots, "mart_flywheel_funnel", "role", FLYWHEEL_FUNNEL_COLUMNS)
 }

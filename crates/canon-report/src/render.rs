@@ -109,7 +109,17 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     render_table(&mut out, &marts.role_memory);
 
     out.push_str("## Flywheel funnel\n\n");
-    out.push_str("Verdicts → distilled → retrieved → applied (`mart_flywheel_funnel`).\n\n");
+    // s40 (`plan-vs-actual-diff`): `applied` used to count resolved
+    // trajectories with no reference to retrieval at all, so it could
+    // — and on canon's own corpus did — exceed `retrieved`, which is
+    // an impossible reading for a funnel. It is now the retrieved set
+    // narrowed by the recipient run's own completion, and the last
+    // three stages share one unit (strategies). The panel says so
+    // itself rather than leaving the reader to infer it from four bare
+    // column names, the same posture as the burn-down panel below.
+    out.push_str(
+        "Verdicts → distilled → retrieved → applied (`mart_flywheel_funnel`) — the last three stages count STRATEGIES, so the funnel narrows by construction. `retrieved` is how many distilled strategies were ever injected into a run's context; `applied` is that same set narrowed to the ones whose run then reached a terminal `Run.status`, i.e. guidance was in context AND the run actually finished — NOT how many trajectories were resolved. `applied` can therefore never exceed `retrieved`, and `retrieved 0` means the retrieval loop has never closed here.\n\n",
+    );
     render_table(&mut out, &marts.flywheel_funnel);
 
     out.push_str("## Review burn-down\n\n");

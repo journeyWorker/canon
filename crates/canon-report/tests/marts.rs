@@ -113,6 +113,32 @@ fn flywheel_funnel_matches_the_fixture_corpus_exactly() {
     assert_eq!(content["applied"], corpus::flywheel_funnel::CONTENT_APPLIED);
 }
 
+/// s40 (`plan-vs-actual-diff`, task 3.2): the panel's whole claim is
+/// that it NARROWS. `applied <= retrieved <= distilled` is structural
+/// in the view — all three stages count strategies, and each is a
+/// restriction of the one above it — so it must hold for every row of
+/// any corpus, not just for the fixture's hand-checked numbers above.
+/// The `content` row is the one that earns this test: its trajectory is
+/// resolved (exactly what the pre-s40 `applied` counted) while the run
+/// its guidance went into never finished, the shape that used to render
+/// `applied` above `retrieved`.
+#[test]
+fn flywheel_funnel_never_widens() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let result = marts::fetch_flywheel_funnel(&inputs(dir.path()).roots).unwrap();
+
+    assert!(!result.rows.is_empty(), "an empty funnel would satisfy the invariant vacuously");
+    for row in &result.rows {
+        let count = |column: &str| row.get(column).and_then(|v| v.as_i64()).unwrap_or_else(|| panic!("missing `{column}` in {row:?}"));
+        assert!(count("applied") <= count("retrieved"), "applied must never exceed retrieved: {row:?}");
+        assert!(count("retrieved") <= count("distilled"), "retrieved must never exceed distilled: {row:?}");
+    }
+}
+
 #[test]
 fn review_burndown_matches_the_fixture_corpus_exactly() {
     if !support::duckdb_available() {

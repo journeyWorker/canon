@@ -217,11 +217,56 @@ impl ParseOutcome {
 /// violation rather than panicking (design §7) — and COUNTING it,
 /// rather than dropping it silently (Wave 2 amendment: the frozen
 /// Wave-1 `Vec<UnifiedRow>` return type undercounted malformed
-/// evidence by never surfacing it).
+/// evidence by never surfacing it); `parse_version()` declares the
+/// generation of that parse output (s40 amendment — see its own doc).
 pub trait SessionAdapter: Send + Sync {
     /// The adapter's stable identity — also `UnifiedRow.client`'s
     /// value for every row this adapter emits.
     fn client_id(&self) -> &'static str;
+
+    /// This adapter's PARSE-OUTPUT generation (s40
+    /// (`plan-vs-actual-diff`), task 4.1) — bumped whenever this
+    /// adapter's parse output changes for IDENTICAL input bytes: a
+    /// newly-extracted field, a corrected mapping, a changed
+    /// role/usage gate, a different `dedup_key`. NOT a version of the
+    /// foreign transcript format itself, and NOT bumped for a refactor
+    /// that leaves every emitted [`UnifiedRow`]/[`DirectiveRow`]
+    /// byte-identical.
+    ///
+    /// It exists because of what the session-ingest cursor's gate
+    /// actually compares: per-file CONTENT digests, under a cursor
+    /// identity that named this adapter's `client_id` and nothing
+    /// else. Transcript bytes are byte-stable by design — an
+    /// already-ingested session re-ingests idempotently — so a change
+    /// to THIS code was invisible to that gate: every unchanged
+    /// transcript was still reported `skipped unchanged (watermark)`
+    /// and the corpus went silently stale under the new
+    /// normalization. `canon-cli`'s `ingest::session_source_cursor_id`
+    /// folds this value into the cursor IDENTITY (never into a
+    /// per-file digest), so a bump lands on a DIFFERENT cursor id,
+    /// finds no cursor there at all, and re-reads the whole source
+    /// exactly as if every transcript had been edited — with no
+    /// `--full` and no cursor deletion, the stale cursor simply
+    /// orphaned rather than mutated. This is the session-side half of
+    /// the fix s38 (`evidence-bearing-memory`) shipped for
+    /// [`crate::PlanAdapter::parse_version`] and explicitly left open
+    /// as its own task 5.3.
+    ///
+    /// REQUIRED, never defaulted, for s38's stated reason: a new
+    /// adapter must decide its own generation deliberately, because a
+    /// silent `1` inherited from a trait default is indistinguishable
+    /// from "this adapter has never changed its output" — a claim only
+    /// its author can make.
+    ///
+    /// All four shipped adapters return `1`. Unlike s38's plan
+    /// dialects — whose `depends_on` extraction genuinely changed, so
+    /// they went to `2` — no session adapter's normalization changed
+    /// in s40. `1` is therefore not a placeholder awaiting a real
+    /// value: it is the correct one, being the only value that leaves
+    /// every cursor already on disk valid and re-reads nothing. This
+    /// mechanism is installed now so the NEXT normalization change is
+    /// safe, not to force a re-read today.
+    fn parse_version(&self) -> u32;
 
     /// Resolve this adapter's scan root(s) under `home`.
     /// `use_env_roots` gates whether adapter-specific environment

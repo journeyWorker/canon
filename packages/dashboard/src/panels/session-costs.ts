@@ -2,7 +2,7 @@ import type { AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
 import { renderTable, type ColumnDef } from "../render-table";
 
 // Panel 2: session costs by role/repo/session — thin SELECT over
-// mart_session_costs (crates/canon-store/sql/views.sql:247-285).
+// mart_session_costs (crates/canon-store/sql/views.sql).
 // `workspace_label` is the view's own honestly-named repo proxy (see the
 // view's comment); this panel does not rename or reinterpret it.
 const QUERY = `

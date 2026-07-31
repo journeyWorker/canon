@@ -21,6 +21,16 @@
 //! exactly one file) despite [`canon_store::cursor`]'s module doc
 //! still describing source-granularity as the general-purpose default.
 //!
+//! **s40 4.1 (parse-versioned cursor identity).** A cursor is keyed on
+//! [`session_source_cursor_id`] — the adapter's `client_id` PLUS its
+//! [`canon_ingest::SessionAdapter::parse_version`] — not on the
+//! `client_id` alone. The gate compares byte-stable transcript
+//! digests, so an adapter's normalization could change and every
+//! transcript still reported `skipped unchanged (watermark)`; a
+//! version bump now moves the identity and re-reads the source in
+//! full. Every shipped adapter is at version 1, whose id IS the
+//! pre-s40 id, so installing this invalidated nothing.
+//!
 //! **s31 D3 (project scope).** [`ProjectScope`] resolves "this
 //! project" as the repo's main `git worktree` root plus every linked
 //! one (fail-soft to the repo root alone outside a git repo) and
@@ -153,7 +163,9 @@ pub struct IngestOutcome {
 /// adapter's OWN env-override + documented-default resolution
 /// (`SessionAdapter::scan_roots`). This override lives entirely at the
 /// canon-cli layer — parsing is still the adapter's (`parse_files`),
-/// so S3's frozen three-method `SessionAdapter` contract is untouched.
+/// so the `SessionAdapter` contract itself is untouched (S3 froze it
+/// at three methods; s40 added `parse_version`, and this override
+/// touches neither).
 ///
 /// Fail-soft ONLY for a missing / unreadable / non-YAML `canon.yaml`,
 /// or one with no `ingest:` section (→ zero overrides). A PRESENT
@@ -516,10 +528,15 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
             }
         }
 
-        // s31 D1: per-file diff. `full_rescan` / no persisted cursor
-        // both degrade to an EMPTY base cursor, whose `diff` puts every
-        // present key in `changed_or_new`.
-        let base_cursor = if full_rescan { SourceCursor::empty(entry.client_id()) } else { cursors.read(entry.client_id()).unwrap_or_else(|| SourceCursor::empty(entry.client_id())) };
+        // s31 D1: per-file diff, against the cursor stored at THIS
+        // source's identity (s40 task 4.1: `client_id` + the adapter's
+        // `parse_version`, see `session_source_cursor_id`).
+        // `full_rescan` / no persisted cursor / a cursor id this
+        // adapter has never written at (a version bump) all degrade to
+        // an EMPTY base cursor, whose `diff` puts every present key in
+        // `changed_or_new`.
+        let cursor_id = session_source_cursor_id(entry.client_id(), entry.adapter.parse_version());
+        let base_cursor = base_session_cursor(&cursors, &cursor_id, full_rescan);
         let diff = base_cursor.diff(&present_digests);
 
         let to_parse: Vec<PathBuf> = readable.iter().filter(|(_, key, ..)| diff.changed_or_new.contains(key)).map(|(path, ..)| path.clone()).collect();
@@ -564,9 +581,12 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
 
         // s31 D1: the fresh cursor records EVERY readable present file
         // (unchanged AND changed_or_new alike), never gated on whether
-        // this pass changed anything.
+        // this pass changed anything. It is written at the SAME
+        // identity the gate above read from, so a version bump's
+        // re-read lands its cursor at the new id and the pre-bump one
+        // is left orphaned, never mutated (s40 task 4.2).
         if !readable.is_empty() {
-            let mut fresh = SourceCursor::empty(entry.client_id());
+            let mut fresh = SourceCursor::empty(cursor_id.as_str());
             for (path, _, mtime_ms, size, digest) in &readable {
                 fresh.record(path, *mtime_ms, *size, digest.clone());
             }
@@ -703,6 +723,66 @@ fn file_stat(path: &Path) -> (i64, u64) {
         }
         Err(_) => (0, 0),
     }
+}
+
+/// One [`SourceCursor`] id per `(client_id, parse_version)` session
+/// source (s40 (`plan-vs-actual-diff`), task 4.1) — the counterpart of
+/// `crate::plans::plan_source_cursor_id` for session ingest, and the
+/// session-side half of the cursor fix s38
+/// (`evidence-bearing-memory`) left open as its task 5.3.
+///
+/// `parse_version` ([`canon_ingest::SessionAdapter::parse_version`])
+/// joins the identity because of what this cursor's gate actually
+/// compares: per-file CONTENT digests. Transcript bytes are
+/// byte-stable by design — an already-ingested session re-ingests
+/// idempotently — so a change to the ADAPTER is invisible to the gate
+/// and every transcript is reported `skipped unchanged (watermark)`
+/// even though it would now normalize differently. Folding the
+/// adapter's parse generation into the cursor IDENTITY rather than
+/// into its per-file digests is what makes a bump behave EXACTLY like
+/// editing every transcript in the source: the lookup finds no cursor
+/// at the new id at all, so every file is re-read, re-parsed and
+/// re-persisted, and the stale cursor is simply orphaned rather than
+/// mutated — no `--full`, no cursor deletion.
+///
+/// ## Why version 1 carries no suffix
+///
+/// The id is the bare `client_id` at version 1 and
+/// `<client_id>-v<parse_version>` from 2 on. This is NOT a legacy
+/// carve-out to be tidied away later: the version records WHICH
+/// normalization produced a cursor's skip decision, and every session
+/// cursor written before s40 was produced by the normalization that is
+/// now version 1. A pre-s40 cursor and a v1 cursor are therefore not
+/// merely compatible, they are the SAME cursor, and giving them
+/// different ids would assert a difference that does not exist —
+/// imposing a full re-read of every transcript on every existing
+/// checkout to gain exactly zero information. So the unsuffixed form
+/// IS the correct id for version 1, and the suffix begins at 2 because
+/// 2 is the first version whose output can differ from what a stored
+/// cursor was computed against. Normalizing v1 to `-v1` later would
+/// silently orphan every cursor in the field; do not.
+///
+/// Version `0` is not folded into the unsuffixed form (it yields
+/// `<client_id>-v0`): it is a distinct declared generation, and
+/// colliding it with 1 would be exactly the false-equality this
+/// function otherwise avoids.
+fn session_source_cursor_id(client_id: &str, parse_version: u32) -> String {
+    if parse_version == 1 { client_id.to_string() } else { format!("{client_id}-v{parse_version}") }
+}
+
+/// The cursor this pass gates a source against: the one persisted at
+/// `cursor_id`, or an EMPTY cursor (every present file classified
+/// `changed_or_new`) when `full_rescan` is set, when this source has
+/// never been ingested, or when nothing is stored AT THIS IDENTITY.
+/// That last case is the whole mechanism behind s40 task 4.2: an
+/// adapter's `parse_version` bump moves its cursor id, so the read
+/// misses and the source re-reads in full — reached without `--full`
+/// and without deleting anything.
+fn base_session_cursor(cursors: &CursorStore, cursor_id: &str, full_rescan: bool) -> SourceCursor {
+    if full_rescan {
+        return SourceCursor::empty(cursor_id);
+    }
+    cursors.read(cursor_id).unwrap_or_else(|| SourceCursor::empty(cursor_id))
 }
 
 /// Persist `record`, treating an already-identical git-tier record
@@ -1254,5 +1334,94 @@ mod tests {
         assert_eq!(second.runs_written, 0, "steady state: nothing new to persist");
         let total_reparsed: usize = second.adapters.iter().map(|a| a.reparsed).sum();
         assert_eq!(total_reparsed, 0, "every present in-scope file was unchanged this pass");
+    }
+
+    /// s40 (`plan-vs-actual-diff`) task 4.1, the migration decision:
+    /// version 1's id is the pre-s40 id VERBATIM. Every session cursor
+    /// written before s40 was produced by the normalization that is now
+    /// version 1, so a pre-s40 cursor and a v1 cursor are the same
+    /// cursor; suffixing v1 would orphan every cursor in the field to
+    /// gain nothing. This asserts the shape the rest of the suite
+    /// depends on (`.canon/ingest/cursors/omp.json` in
+    /// `routed_policy_persists_through_canon_store_git_tier`).
+    #[test]
+    fn version_one_keeps_the_pre_s40_cursor_id_verbatim() {
+        assert_eq!(session_source_cursor_id("omp", 1), "omp");
+        assert_eq!(session_source_cursor_id("claude-code", 1), "claude-code");
+    }
+
+    /// The bump must LAND SOMEWHERE ELSE — that is the entire
+    /// mechanism (s40 task 4.2): a different id means `cursors.read`
+    /// finds nothing and every transcript is re-read.
+    #[test]
+    fn a_bumped_parse_version_yields_a_different_cursor_id_for_the_same_adapter() {
+        assert_ne!(session_source_cursor_id("omp", 1), session_source_cursor_id("omp", 2));
+        assert_ne!(session_source_cursor_id("omp", 2), session_source_cursor_id("omp", 3));
+        assert_eq!(session_source_cursor_id("omp", 2), "omp-v2");
+    }
+
+    /// Version `0` is a declared generation of its own, not a synonym
+    /// for 1 — folding it into the unsuffixed form would make two
+    /// different declarations share one cursor.
+    #[test]
+    fn version_zero_is_not_folded_into_version_ones_id() {
+        assert_ne!(session_source_cursor_id("omp", 0), session_source_cursor_id("omp", 1));
+        assert_eq!(session_source_cursor_id("omp", 0), "omp-v0");
+    }
+
+    /// A cursor id is used as a bare filename component
+    /// (`CursorStore::path_for`), and one adapter must never resolve to
+    /// another's cursor. The `-v<n>` suffix makes the second property
+    /// depend on client_id shape: an adapter literally named `omp-v2`
+    /// would steal `omp`'s bumped cursor, so the shipped set is checked
+    /// for that shape rather than assumed safe.
+    #[test]
+    fn cursor_ids_stay_distinct_per_adapter_and_safe_as_bare_filenames() {
+        let mut seen: BTreeSet<String> = BTreeSet::new();
+        for entry in registry() {
+            for version in [0u32, 1, 2, 17] {
+                let id = session_source_cursor_id(entry.client_id(), version);
+                assert!(id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'), "cursor id `{id}` must stay a safe bare filename component");
+                assert!(seen.insert(id.clone()), "cursor id `{id}` is claimed by two (adapter, version) pairs");
+            }
+        }
+    }
+
+    /// s40 task 4.2, end to end on the REAL cursor a real pass wrote:
+    /// ingest at the shipped version, ingest again (watermark skip),
+    /// then read the same corpus at version N+1 and watch every
+    /// transcript come back as `changed_or_new` — with no `--full` and
+    /// no cursor deletion. The registry is static, so the third pass
+    /// drives the production gate
+    /// ([`session_source_cursor_id`] + [`base_session_cursor`] +
+    /// [`SourceCursor::diff`], exactly as [`run`] composes them)
+    /// against the bumped identity rather than mutating the registry.
+    #[test]
+    fn a_parse_version_bump_re_reads_a_source_the_watermark_would_have_skipped() {
+        let dir = tempfile::tempdir().unwrap();
+        write_fixture_home(dir.path());
+        let canon_yaml = write_canon_yaml(dir.path(), true);
+
+        let first = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        assert_eq!(first.adapters[0].client_id, "omp");
+        assert_eq!(first.runs_written, 1, "pass 1 parses and persists");
+
+        let second = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        assert_eq!(second.adapters[0].reparsed, 0, "pass 2 at the SAME parse version is watermark-skipped");
+        assert!(second.adapters[0].skipped_unchanged >= 1);
+
+        let cursors = CursorStore::open(dir.path().join(paths::INGEST_CURSORS_DIR));
+        let transcript = dir.path().join(".omp/agent/sessions/-tmp-proj/s1.jsonl");
+        let present = BTreeMap::from([(transcript.to_string_lossy().into_owned(), file_digest(&std::fs::read(&transcript).unwrap()))]);
+
+        let at_shipped = base_session_cursor(&cursors, &session_source_cursor_id("omp", 1), false).diff(&present);
+        assert_eq!(at_shipped.unchanged.len(), 1, "control: at the shipped version the transcript is still skipped");
+        assert!(at_shipped.changed_or_new.is_empty());
+
+        let at_bumped = base_session_cursor(&cursors, &session_source_cursor_id("omp", 2), false).diff(&present);
+        assert_eq!(at_bumped.changed_or_new.len(), 1, "a bumped parse version must re-read the transcript with no --full and no cursor deletion");
+        assert!(at_bumped.unchanged.is_empty());
+
+        assert!(dir.path().join(".canon/ingest/cursors/omp.json").exists(), "the pre-bump cursor is ORPHANED, never deleted or mutated");
     }
 }
