@@ -44,7 +44,7 @@ import { CardGrid, Card, Aside } from "@astrojs/starlight/components";
 
 ## `canon.yaml` 설정
 
-canon의 열두 개 레코드 종류는 각각 `routing:` 항목이 반드시 있어야
+canon의 열세 개 레코드 종류는 각각 `routing:` 항목이 반드시 있어야
 합니다 — 라우팅되지 않은 종류는 첫 쓰기/조회 시도에서 곧바로
 `StoreError::UnroutedKind`가 발생합니다. 이 레포 자신의 설정입니다:
 
@@ -56,6 +56,7 @@ tiers:
 
 routing:
   change: local
+  subject: local
   scenario: local
   review: local
   divergence: local

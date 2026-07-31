@@ -30,13 +30,20 @@ toolchain required.
 ```
 
 - **canon-model** — canon's closed, versioned artifact-family types: the
-  envelope, the twelve record kinds, the join-spine key newtypes, and
-  generated JSON-schema + join-spine doc output.
+  envelope, the thirteen record kinds, the nine join-spine key newtypes, and
+  generated JSON-schema + join-spine doc output. It also carries execution
+  lineage: `Run.parent_run_id` links a subagent run to its parent and
+  `Handoff.from_role`/`to_role` type a handoff's endpoints, while
+  `Task.depends_on` holds **declared** plan intent extracted from the plan
+  corpus — canon records the dependency, never schedules or executes from
+  it.
 - **canon-store** — one storage trait behind git / Postgres / R2 tier
   adapters.
 - **canon-ingest** — the adapter registry that turns raw agent-CLI session
   transcripts and artifact evidence (ledger, divergences, openspec tasks,
-  handoffs) into canon-model records.
+  handoffs) into canon-model records. Its session adapters write one root
+  run per session plus one child run per subagent, so a delegation tree is
+  a queryable shape rather than a flat run list.
 - **canon-gate** — the trust spine: covered/green evidence gating,
   `FAILURE_CLASSES`, the trust ladder, and policy resolution.
 - **canon-learn** — role-namespaced strategy memory: trace → verdict →

@@ -127,7 +127,7 @@ mod tests {
     }
 
     fn envelope() -> Envelope {
-        Envelope::new(1, RecordKind::Task, Utc::now(), Actor::new("test-agent", RoleId::parse("implementer").unwrap()))
+        Envelope::current(RecordKind::Task, Utc::now(), Actor::new("test-agent", RoleId::parse("implementer").unwrap()))
     }
 
     fn valid_atom() -> AtomRecord {

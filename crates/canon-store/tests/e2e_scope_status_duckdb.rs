@@ -63,7 +63,7 @@ fn a_declared_covered_evidenced_scenario_resolves_fully_green_in_one_query() {
     let task_id = TaskId::parse("e2e-join-change#1.1").unwrap();
     let covered_scenario = ScenarioId::parse("e2e.join.01").unwrap();
     let uncovered_scenario = ScenarioId::parse("e2e.join.02").unwrap();
-    let task = Task::new(Envelope::new(1, RecordKind::Task, Utc::now(), actor()), task_id.clone(), "wire the join fixture", TaskStatus::Done, None)
+    let task = Task::new(Envelope::current(RecordKind::Task, Utc::now(), actor()), task_id.clone(), "wire the join fixture", TaskStatus::Done, None)
         .with_scenario_refs(vec![covered_scenario.clone(), uncovered_scenario.clone()]);
     git.write(&task).expect("persist task");
 
@@ -115,7 +115,7 @@ fn a_declared_covered_evidenced_scenario_resolves_fully_green_in_one_query() {
 
     // ── a Task with no scenario_refs is absent from the join mart but unaffected in mart_trust_matrix ──
     let unrelated_task_id = TaskId::parse("e2e-join-change#1.2").unwrap();
-    let unrelated_task = Task::new(Envelope::new(1, RecordKind::Task, Utc::now(), actor()), unrelated_task_id.clone(), "an ordinary covers-free task", TaskStatus::Open, None);
+    let unrelated_task = Task::new(Envelope::current(RecordKind::Task, Utc::now(), actor()), unrelated_task_id.clone(), "an ordinary covers-free task", TaskStatus::Open, None);
     git.write(&unrelated_task).expect("persist covers-free task");
     let join_mart_absent = run_query(&format!("SELECT count(*) FROM mart_scope_status WHERE task_id = '{unrelated_task_id}';"));
     assert!(join_mart_absent.trim_end().ends_with('0'), "a covers-free task must produce zero rows in mart_scope_status, got:\n{join_mart_absent}");

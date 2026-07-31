@@ -44,7 +44,7 @@ below is this repo's own team-scale config (`hot: postgres`).
 
 ## Configuring `canon.yaml`
 
-Every one of canon's twelve record kinds needs a `routing:` entry — an
+Every one of canon's thirteen record kinds needs a `routing:` entry — an
 unrouted kind is a hard `StoreError::UnroutedKind` at the first
 write/query attempt, never a silently-dropped record. This repo's own
 config:
@@ -57,6 +57,7 @@ tiers:
 
 routing:
   change: local
+  subject: local
   scenario: local
   review: local
   divergence: local

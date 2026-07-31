@@ -48,6 +48,8 @@
 //! row. All read/write the SAME [`parse_line`]/[`format_line`]/
 //! [`task_id_for`] below — one grammar, several consumers.
 
+use std::collections::BTreeSet;
+
 use canon_model::ids::{ChangeId, ScenarioId, TaskId};
 
 const DROPPED_MARKER: &str = "**DROPPED**";
@@ -358,6 +360,144 @@ pub fn task_id_for(change_id: &ChangeId, row_id: &str) -> Option<TaskId> {
     TaskId::parse(format!("{}#{}", change_id.as_str(), row_id)).ok()
 }
 
+/// Resolve one dialect's raw DECLARED dependency reference tokens into
+/// join-spine [`TaskId`]s, against the change's OWN complete row-id set
+/// (s37 `execution-graph-topology`, subject `flywheel-execution-
+/// graph`). Returns `(resolved, unresolvable)`: the well-formed
+/// dependencies in first-seen order (deduplicated), plus every raw
+/// token that named no row this change actually has — dropped from the
+/// first list and handed back so the caller can surface a NAMED
+/// per-row diagnostic, exactly as a malformed `[covers: …]` token is
+/// handled ([`TaskRow::malformed_scenario_refs`]). A reference is never
+/// an import failure: every dialect's dependency expression is PROSE
+/// (see `plan_adapters::openspec::dependency_refs` and
+/// `plan_adapters::superpowers::consumes_refs`), so a mis-read
+/// candidate is expected and must fail soft.
+///
+/// `known` holds the `<n>` tokens of the rows the change actually
+/// emitted as `Task` records — membership in it IS the validation, and
+/// the reason this step can only run once the caller has read the
+/// change's whole row set (a reference may point forward). A token
+/// naming `self_id`'s own row is dropped SILENTLY, not counted: a row
+/// citing its own number is a self-reference, never an operator
+/// mistake worth a diagnostic.
+///
+/// Shared by every plan dialect for the same reason [`task_id_for`]
+/// itself is (design s17 D5's "two readers, one join"): the resolution
+/// and drop semantics must never drift between dialects, only the
+/// per-dialect grammar that produces `refs` may differ.
+pub fn resolve_declared_deps(change_id: &ChangeId, self_id: &TaskId, refs: &[String], known: &BTreeSet<String>) -> (Vec<TaskId>, Vec<String>) {
+    let mut resolved: Vec<TaskId> = Vec::new();
+    let mut unresolvable: Vec<String> = Vec::new();
+    for raw in refs {
+        match task_id_for(change_id, raw) {
+            Some(dep) if dep == *self_id => {}
+            Some(dep) if known.contains(raw.as_str()) => {
+                if !resolved.contains(&dep) {
+                    resolved.push(dep);
+                }
+            }
+            // Either the token fails the `<n>` grammar outright, or it
+            // names a row this change does not have — both are the
+            // same drop-and-count outcome for the caller.
+            _ => unresolvable.push(raw.clone()),
+        }
+    }
+    (resolved, unresolvable)
+}
+
+// ── shared byte-lexer primitives for the dialects' dependency prose ──
+//
+// s37 `execution-graph-topology`: BOTH plan dialects express a task
+// dependency in PROSE, and neither expression is the other's
+// (`plan_adapters::openspec` scans a row's `depends on <n>`/`after <n>`
+// marker prose; `plan_adapters::superpowers` scans an
+// `- Consumes: … from Task <n>` interface line). What they share is the
+// LEXING underneath: word boundaries, whitespace, a `<n>` token, and a
+// list separator. Those live here — beside [`task_id_for`], for the
+// same "one derivation, several consumers, never a silent drift"
+// reason (design s17 D5) — while each dialect keeps only its own
+// marker/label vocabulary. `pub(crate)`, never `pub`: this is an
+// implementation seam between this module and the dialect adapters,
+// not part of canon's row grammar.
+//
+// Every primitive here works on BYTES of an already-ASCII-lowercased
+// haystack, never on `&str` slices: plan prose is full of multi-byte
+// characters (`—`, `✅`, `§`) that a byte-indexed `&str` slice would
+// panic on mid-character.
+
+/// `true` when `b` continues a word — the boundary test every marker/
+/// keyword match below is gated on, so `hereafter` never matches
+/// `after` and `tasks` never half-matches `task`.
+fn is_word_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+/// `true` when `i` is inside a word (past its first byte) — i.e. a
+/// match ENDING at `i` would be a partial word.
+pub(crate) fn is_word_byte_at(bytes: &[u8], i: usize) -> bool {
+    bytes.get(i).is_some_and(|b| is_word_byte(*b))
+}
+
+/// `true` when a word may START at `i` (start of input, or preceded by
+/// a non-word byte).
+pub(crate) fn word_start_boundary(bytes: &[u8], i: usize) -> bool {
+    i == 0 || !is_word_byte(bytes[i - 1])
+}
+
+/// The byte length of whichever entry of `words` occurs at `i` followed
+/// by a word-END boundary, or `None` when none does. Order matters only
+/// for entries that prefix one another, and the end-boundary check
+/// resolves those correctly on its own (`task` against `tasks 1.1`
+/// fails the boundary, so `tasks` still matches).
+pub(crate) fn word_at(bytes: &[u8], i: usize, words: &[&str]) -> Option<usize> {
+    words.iter().find_map(|word| (bytes[i..].starts_with(word.as_bytes()) && !is_word_byte_at(bytes, i + word.len())).then_some(word.len()))
+}
+
+/// Advance past ASCII whitespace from `i`.
+pub(crate) fn skip_ws(bytes: &[u8], mut i: usize) -> usize {
+    while bytes.get(i).is_some_and(|b| b.is_ascii_whitespace()) {
+        i += 1;
+    }
+    i
+}
+
+/// The `<n>`-shaped token at `i` plus the byte offset just past it
+/// (past any trailing `.`, which is sentence punctuation — "depends on
+/// 6.2." — never part of the token). `None` when no digit run starts
+/// there or the run fails [`is_task_number`] (`1..2`, `.1`), so a
+/// malformed candidate is dropped at the lexer rather than handed on as
+/// a token that could never resolve.
+pub(crate) fn number_token_at(bytes: &[u8], i: usize) -> Option<(String, usize)> {
+    let mut end = i;
+    while bytes.get(end).is_some_and(|b| b.is_ascii_digit() || *b == b'.') {
+        end += 1;
+    }
+    let mut token_end = end;
+    while token_end > i && bytes[token_end - 1] == b'.' {
+        token_end -= 1;
+    }
+    if token_end == i {
+        return None;
+    }
+    // ASCII digits and dots only, so this is always valid UTF-8.
+    let token = std::str::from_utf8(&bytes[i..token_end]).ok()?;
+    is_task_number(token).then(|| (token.to_string(), end))
+}
+
+/// The separator between two references in a list — `,`, `/`, `+`, `&`,
+/// or the word `and` ("after 4.2/4.3", "depends on tasks 1.1, 1.2 and
+/// 1.3", "Consumes: … (Tasks 2, 3 and 4)") — returning the byte offset
+/// just past it, or `None` when the list ends here.
+pub(crate) fn list_separator(bytes: &[u8], i: usize) -> Option<usize> {
+    let start = skip_ws(bytes, i);
+    match bytes.get(start).copied() {
+        Some(b',' | b'/' | b'+' | b'&') => Some(start + 1),
+        _ if bytes[start..].starts_with(b"and") && !is_word_byte_at(bytes, start + 3) => Some(start + 3),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -598,5 +738,53 @@ mod tests {
     fn marker_text_round_trips_through_parse_annotation() {
         assert_eq!(Annotation::Dropped.marker_text(), "**DROPPED**");
         assert_eq!(Annotation::Deferred { to: "4.2".to_string() }.marker_text(), "**DEFERRED to §4.2**");
+    }
+
+    // ── resolve_declared_deps (s37 execution-graph-topology) ──
+
+    fn known_rows(rows: &[&str]) -> BTreeSet<String> {
+        rows.iter().map(|r| r.to_string()).collect()
+    }
+
+    #[test]
+    fn resolve_declared_deps_maps_known_row_tokens_onto_join_spine_task_ids() {
+        let change_id = ChangeId::parse("add-widget").unwrap();
+        let self_id = task_id_for(&change_id, "6.3").unwrap();
+        let known = known_rows(&["6.1", "6.2", "6.3"]);
+
+        let (resolved, unresolvable) = resolve_declared_deps(&change_id, &self_id, &["6.2".to_string(), "6.1".to_string()], &known);
+        assert_eq!(resolved.iter().map(|t| t.as_str()).collect::<Vec<_>>(), vec!["add-widget#6.2", "add-widget#6.1"], "first-seen order, never re-sorted");
+        assert!(unresolvable.is_empty());
+    }
+
+    #[test]
+    fn resolve_declared_deps_drops_a_token_naming_no_row_this_change_has_and_hands_it_back() {
+        let change_id = ChangeId::parse("add-widget").unwrap();
+        let self_id = task_id_for(&change_id, "1.1").unwrap();
+        let known = known_rows(&["1.1", "1.2"]);
+
+        let (resolved, unresolvable) = resolve_declared_deps(&change_id, &self_id, &["1.2".to_string(), "9.9".to_string()], &known);
+        assert_eq!(resolved.iter().map(|t| t.as_str()).collect::<Vec<_>>(), vec!["add-widget#1.2"], "the well-formed sibling still resolves");
+        assert_eq!(unresolvable, vec!["9.9".to_string()], "the unresolvable token is handed back for a named diagnostic, never silently swallowed");
+    }
+
+    #[test]
+    fn resolve_declared_deps_drops_a_self_reference_silently_and_deduplicates() {
+        let change_id = ChangeId::parse("add-widget").unwrap();
+        let self_id = task_id_for(&change_id, "2.1").unwrap();
+        let known = known_rows(&["2.1", "2.4"]);
+
+        let (resolved, unresolvable) = resolve_declared_deps(&change_id, &self_id, &["2.1".to_string(), "2.4".to_string(), "2.4".to_string()], &known);
+        assert_eq!(resolved.iter().map(|t| t.as_str()).collect::<Vec<_>>(), vec!["add-widget#2.4"], "a repeated reference is carried once");
+        assert!(unresolvable.is_empty(), "a row citing its own number is not an operator mistake, so never a diagnostic");
+    }
+
+    #[test]
+    fn resolve_declared_deps_over_no_refs_is_an_empty_vec_and_no_diagnostic() {
+        let change_id = ChangeId::parse("add-widget").unwrap();
+        let self_id = task_id_for(&change_id, "1.1").unwrap();
+        let (resolved, unresolvable) = resolve_declared_deps(&change_id, &self_id, &[], &known_rows(&["1.1"]));
+        assert!(resolved.is_empty());
+        assert!(unresolvable.is_empty());
     }
 }

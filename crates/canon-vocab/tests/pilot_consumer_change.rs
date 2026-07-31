@@ -42,7 +42,7 @@ fn the_pilot_atom_compiles_to_the_s1_task_model_and_round_trips() {
     assert_eq!(atom.id, "s10-vocab-pilot#1");
     assert_eq!(atom.tag, "task");
 
-    let envelope = Envelope::new(1, RecordKind::Task, chrono::Utc::now(), Actor::new("test-runner", RoleId::parse("implementer").unwrap()));
+    let envelope = Envelope::current(RecordKind::Task, chrono::Utc::now(), Actor::new("test-runner", RoleId::parse("implementer").unwrap()));
     let task = canon_vocab::compile_task(atom, &snapshot, envelope.clone()).expect("the pilot atom compiles to an S1 Task");
     assert_eq!(task.task_id.to_string(), "s10-vocab-pilot#1");
     assert_eq!(task.title, "author canon/policy.yaml declaring the evidence-kind domain canon's typed authoring vocabulary resolves Type::Evidence against");

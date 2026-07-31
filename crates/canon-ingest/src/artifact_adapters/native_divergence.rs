@@ -59,6 +59,18 @@
 //! `authoring_role`) to dispatch to
 //! `crate::verdict::derive_native_divergence_verdict` instead of
 //! `derive_verdict`.
+//!
+//! `s38-evidence-bearing-memory` adds one more copied field:
+//! `detail["detail"]`, the record's OWN review narrative (the
+//! "SHIP-BLOCKER `<file>:<line>` … `<remedy>`" finding text canon's
+//! divergence corpus actually carries). It is the highest-priority
+//! field [`ArtifactEvent::evidence_line`] mines, and without it a
+//! `Failure`/`Corrective` verdict distilled from this adapter had no
+//! actionable prose to quote at all — the pitfall in a retrieved
+//! guardrail could only describe canon's own ingest plumbing. It is
+//! omitted when the record's narrative is blank, exactly as the model's
+//! own `skip_serializing_if` omits it, so a prose-less record still
+//! emits a byte-identical `detail` to its pre-s38 one.
 
 use canon_model::envelope::RecordKind;
 use canon_model::records::Divergence;
@@ -76,6 +88,21 @@ impl NativeDivergenceFlywheelAdapter {
     /// `Divergence` row IS one review-round observation already.
     fn event(record: &Divergence) -> ArtifactEvent {
         let status = serde_json::to_value(&record.status).expect("DivergenceStatus always serializes");
+        let mut detail = serde_json::json!({
+            "native_kind": "divergence",
+            "status": status,
+            "scenario_id": record.scenario_id.as_str(),
+            "project_id": record.project_id.as_str(),
+            "run_seq": record.run_seq,
+            "round": record.round,
+            "reviewer": record.reviewer,
+        });
+        if !record.detail.trim().is_empty() {
+            detail
+                .as_object_mut()
+                .expect("object literal always serializes to a JSON object")
+                .insert("detail".to_string(), serde_json::Value::String(record.detail.clone()));
+        }
         ArtifactEvent {
             adapter_id: "divergence-native",
             join_key: ArtifactJoinKey::Scenario(record.scenario_id.clone()),
@@ -87,15 +114,7 @@ impl NativeDivergenceFlywheelAdapter {
             area: Some(record.scenario_id.area().to_string()),
             trust_level: None,
             at: record.envelope.at,
-            detail: serde_json::json!({
-                "native_kind": "divergence",
-                "status": status,
-                "scenario_id": record.scenario_id.as_str(),
-                "project_id": record.project_id.as_str(),
-                "run_seq": record.run_seq,
-                "round": record.round,
-                "reviewer": record.reviewer,
-            }),
+            detail,
         }
     }
 }
@@ -207,6 +226,35 @@ mod tests {
         let outcome = NativeDivergenceFlywheelAdapter.parse(&records(&[d]));
         let detail_status = &outcome.events[0].detail["status"];
         assert_eq!(detail_status["deferred"]["reason"], "waiting on design");
+    }
+
+    #[test]
+    fn a_divergence_narrative_reaches_the_event_detail_and_its_evidence_line() {
+        // s38-evidence-bearing-memory: the record's own review prose is
+        // what a distilled guardrail quotes; before this it was dropped
+        // and the pitfall could only describe canon's ingest plumbing.
+        let mut d = divergence("world.firstbuy-hotdeal.26", Some("dev"), DivergenceStatus::StillDivergent, 2);
+        d.detail = "SHIP-BLOCKER PixiStage.tsx:28-32 assigns app before awaiting loadTextures.".to_string();
+        let outcome = NativeDivergenceFlywheelAdapter.parse(&records(&[d]));
+        let event = &outcome.events[0];
+        assert_eq!(event.detail["detail"], serde_json::json!("SHIP-BLOCKER PixiStage.tsx:28-32 assigns app before awaiting loadTextures."));
+        assert_eq!(
+            event.evidence_line(),
+            "still-divergent divergence: SHIP-BLOCKER PixiStage.tsx:28-32 assigns app before awaiting loadTextures.",
+            "the finding text, not a `detail` blob, is what a strategy carries"
+        );
+    }
+
+    #[test]
+    fn a_narrative_less_divergence_omits_the_detail_key_entirely() {
+        // Byte-identical `detail` to the pre-s38 shape (mirrors the
+        // model's own `skip_serializing_if`), so re-ingesting an
+        // unchanged prose-less corpus stays idempotent.
+        let d = divergence("world.firstbuy-hotdeal.26", Some("dev"), DivergenceStatus::Open, 2);
+        let outcome = NativeDivergenceFlywheelAdapter.parse(&records(&[d]));
+        let event = &outcome.events[0];
+        assert!(event.detail.get("detail").is_none());
+        assert_eq!(event.evidence_line(), "open divergence", "no prose -> name the record and its status, never dump the record");
     }
 
     #[test]

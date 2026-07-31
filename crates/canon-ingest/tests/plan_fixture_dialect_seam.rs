@@ -27,8 +27,6 @@ use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::ids::ChangeId;
 use canon_model::records::{Change, ChangeStatus};
 
-const SCHEMA_VERSION: u32 = 1;
-
 /// The fixture dialect (module doc): one `PlanAdapter` impl, nothing
 /// else touched.
 struct FixtureLineDialectAdapter;
@@ -36,6 +34,16 @@ struct FixtureLineDialectAdapter;
 impl PlanAdapter for FixtureLineDialectAdapter {
     fn dialect_id(&self) -> &'static str {
         "fixture-line"
+    }
+
+    /// `1` — this out-of-tree fixture dialect has never changed its
+    /// parse output. `PlanAdapter::parse_version` is REQUIRED precisely
+    /// so a new dialect states this deliberately rather than inheriting
+    /// a default (`s38-evidence-bearing-memory`), and this seam test is
+    /// where that "a fresh dialect implements the whole trait and
+    /// nothing else changes" claim is exercised.
+    fn parse_version(&self) -> u32 {
+        1
     }
 
     fn resolve_source(&self, config: &PlanSourceConfig) -> Option<PlanSourceHandle> {
@@ -79,7 +87,7 @@ impl PlanAdapter for FixtureLineDialectAdapter {
                 outcome.record_unmapped("fixture-line-unknown-status");
                 continue;
             };
-            let envelope = Envelope::new(SCHEMA_VERSION, RecordKind::Change, at, actor.clone());
+            let envelope = Envelope::current(RecordKind::Change, at, actor.clone());
             outcome.changes.push(Change::new(envelope, change_id, title, "", status));
         }
         outcome

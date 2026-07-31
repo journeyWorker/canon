@@ -3,7 +3,7 @@ import { renderTable, type ColumnDef } from "../render-table";
 
 // Panel 4: flywheel health funnel (verdicts -> distilled -> retrieved ->
 // applied) — thin SELECT over mart_flywheel_funnel
-// (crates/canon-store/sql/views.sql:327-368). One row per role; the
+// (crates/canon-store/sql/views.sql). One row per role; the
 // funnel counts are already fully aggregated by the view.
 const QUERY = `
   SELECT role, verdicts, distilled, retrieved, applied

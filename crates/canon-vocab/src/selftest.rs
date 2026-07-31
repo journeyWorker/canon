@@ -169,7 +169,7 @@ pub fn selftest() -> Result<usize, Vec<String>> {
                 failures.push("task round-trip: RoleId::parse(\"implementer\") failed".to_string());
                 break;
             };
-            let envelope = Envelope::new(1, RecordKind::Task, chrono::Utc::now(), Actor::new("selftest-agent", role));
+            let envelope = Envelope::current(RecordKind::Task, chrono::Utc::now(), Actor::new("selftest-agent", role));
             let task1 = match crate::compile_task(atom, &snap, envelope.clone()) {
                 Ok(t) => t,
                 Err(d) => {

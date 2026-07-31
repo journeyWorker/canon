@@ -169,21 +169,30 @@ fn matches_domain(raw: &RawRecord, domain: &str) -> bool {
     raw.0.get("domain").and_then(Value::as_str) == Some(domain)
 }
 
+/// A `Task`'s natural key (its `task_id` string) decomposed into
+/// `(owning change, dot-separated task number parsed as integers)`, so
+/// `1.2` sorts before `1.10` (never a lexicographic string compare of
+/// the whole id, which would order them the other way).
+///
+/// `pub(crate)` because s40 (`plan-vs-actual-diff`) orders plan-graph
+/// EDGES — pairs of bare [`TaskId`]s, not whole records — by this same
+/// key (`crate::dispatch::task_sort_key`). Extracted rather than
+/// re-derived there so the two orderings can never drift into two
+/// conventions for reading one id.
+pub(crate) fn task_number_key(task_id: &str) -> (String, Vec<u64>) {
+    let (change, number) = task_id.split_once('#').unwrap_or((task_id, ""));
+    (change.to_string(), number.split('.').filter_map(|s| s.parse().ok()).collect())
+}
+
 /// `--kind change`/`--kind task`'s deterministic sort key (design D6):
 /// `(change_id, task-number-segments)`, reusing the SAME natural key
 /// [`canon_store::partition::resolve_partition`] already derives for
-/// these two kinds (`format_human`'s own per-row call) — `Task`'s
-/// natural key IS its `task_id` string, split once on `#` into the
-/// owning change plus its dot-separated task number, parsed as
-/// integers so `1.2` sorts before `1.10` (never a lexicographic string
-/// compare, which would order them the other way).
+/// these two kinds (`format_human`'s own per-row call) — a `Task`'s
+/// own decomposition is [`task_number_key`]'s.
 fn scope_sort_key(kind: RecordKind, raw: &RawRecord) -> (String, Vec<u64>) {
     let natural_key = canon_store::partition::resolve_partition(kind, &raw.0).map(|p| p.natural_key).unwrap_or_default();
     match kind {
-        RecordKind::Task => {
-            let (change, number) = natural_key.split_once('#').unwrap_or((natural_key.as_str(), ""));
-            (change.to_string(), number.split('.').filter_map(|s| s.parse().ok()).collect())
-        }
+        RecordKind::Task => task_number_key(&natural_key),
         _ => (natural_key, Vec::new()),
     }
 }
@@ -201,7 +210,7 @@ fn scope_sort_key(kind: RecordKind, raw: &RawRecord) -> (String, Vec<u64>) {
 /// `canon-report::divergence`), keyed by the SAME natural key
 /// [`scope_sort_key`]/[`format_human`] already derive
 /// (`canon_store::partition::resolve_partition`), winner = greatest
-/// `(at, content_digest12)`. A no-op for every kind routed to a
+/// `(at, envelope.schema, content_digest12)`. A no-op for every kind routed to a
 /// local/cold (GitTier/R2Tier-backed) rung (returned untouched)
 /// and for a corpus with no supersession (row-count parity, design.md
 /// R3's own mitigation).
@@ -238,27 +247,39 @@ fn fold_subject_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord
     fold_latest_by_natural_key(kind, records)
 }
 
-/// The shared fold-to-latest-per-natural-key body (design D11/s21 D3):
-/// winner per natural key ([`canon_store::partition::resolve_partition`])
-/// is the greatest `(at, content_digest12)` pair, via the SAME
+/// The shared fold-to-latest-per-natural-key body (design D11/s21 D3,
+/// `s38-evidence-bearing-memory`): winner per natural key
+/// ([`canon_store::partition::resolve_partition`]) is the greatest
+/// `(at, envelope.schema, content_digest12)` triple, via the SAME
 /// [`fold_latest_by_key`] `canon-gate::ledger` and `canon-report`
 /// already use. Called by both [`fold_pg_routed_kind`] (hot-routed
 /// multi-version kinds) and [`fold_subject_kind`] (git-routed but
 /// re-written), so the two can never drift in fold rule.
+///
+/// This is the reader where the `schema` rung EARNS its place: a plan
+/// `Task`'s `at` is `file_modified_at(<source doc>)` (s20 D7,
+/// byte-stable so an unchanged plan re-imports idempotently), so a canon
+/// PARSER change — which does not touch the source document's mtime —
+/// leaves the stale and fresh record for one `task_id` tied on `at`.
+/// Before the `schema` rung, the lexicographic digest decided that tie,
+/// which meant `canon query --kind task` surfaced a newly-parsed field
+/// on an ARBITRARY SUBSET of rows from one file, with no diagnostic.
 fn fold_latest_by_natural_key(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
     struct Candidate {
         key: String,
         at: DateTime<Utc>,
+        schema: u32,
         digest: String,
         record: RawRecord,
     }
     let candidates = records.into_iter().map(|record| {
         let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
         let at = canon_store::tier::raw_record_at(&record);
+        let schema = canon_store::tier::raw_record_schema(&record);
         let digest = canon_store::partition::content_digest12(&record.0);
-        Candidate { key, at, digest, record }
+        Candidate { key, at, schema, digest, record }
     });
-    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.digest.as_str()).into_values().map(|c| c.record).collect()
+    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| c.record).collect()
 }
 
 /// Post-tier-merge scope application (design D5/D6, tasks 3.4/3.6;

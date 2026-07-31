@@ -87,6 +87,65 @@ impl RecordKind {
         }
     }
 
+    /// This kind's CURRENT [`Envelope::schema`] format generation — the
+    /// ONE value every writer of this kind stamps, and the
+    /// `s38-evidence-bearing-memory` supersession discriminator
+    /// `canon_store::fold::fold_latest_by_key` compares on an equal
+    /// `at`. Before this registry the version lived as a hand-written
+    /// `SCHEMA_VERSION` const inside each writer (`canon-ingest`'s
+    /// normalizer, EACH plan adapter, `canon-cli`'s dispatch and gate
+    /// paths), which could not even EXPRESS a per-kind bump — one
+    /// adapter's single const stamped both its `Change` and its `Task`
+    /// — and which `canon-cli::dispatch`'s own doc already flagged as a
+    /// must-agree-by-hand drift hazard. `canon-model` owns the record
+    /// formats, so it owns their generations; `canon context`'s
+    /// per-kind `schema_version` reads this same function, so the
+    /// authoring surface can never advertise a generation nothing
+    /// writes.
+    ///
+    /// # When to bump
+    /// Bump a kind IFF two generations of ONE of its records can carry
+    /// an IDENTICAL `Envelope.at`, because that is exactly when the
+    /// fold needs a generation signal to order them. The rule is NOT
+    /// "bump on every field addition":
+    /// - **`Task` is `2`** — it gained `depends_on`
+    ///   (`s37-execution-graph-topology`) and its `at` is
+    ///   `file_modified_at(<source plan doc>)` (s20 D7, byte-stable so
+    ///   an unchanged plan re-imports idempotently). A canon PARSER
+    ///   change does not move that mtime, so the pre-change and
+    ///   post-change record for one `task_id` tie on `at` exactly, and
+    ///   without this bump the fold resolved that tie by lexicographic
+    ///   digest — arbitrarily, per row.
+    /// - **`Run` and `Handoff` stay `1`** even though they ALSO gained
+    ///   fields on the same branch (`Run.parent_run_id`,
+    ///   `Run.injected_guidance`, the handoff role fields). Their `at`
+    ///   is stamped at DERIVATION time (`Utc::now()` at the dispatch
+    ///   boundary, or the ingested transcript's own instant), so a
+    ///   re-derivation always advances `at` and the two generations can
+    ///   never tie. No tie, no discriminator needed, no bump owed.
+    ///
+    /// A field addition that is additive on the wire (`#[serde(default,
+    /// skip_serializing_if)]`) still leaves the pre-change corpus
+    /// byte-identical and digest-stable — that is what makes this a
+    /// generation MARKER for the fold, not a migration trigger.
+    pub const fn schema_version(self) -> u32 {
+        match self {
+            RecordKind::Task => 2,
+            RecordKind::Change
+            | RecordKind::Scenario
+            | RecordKind::Session
+            | RecordKind::Run
+            | RecordKind::Event
+            | RecordKind::Handoff
+            | RecordKind::Review
+            | RecordKind::Divergence
+            | RecordKind::Trajectory
+            | RecordKind::StrategyItem
+            | RecordKind::EvidenceRecord
+            | RecordKind::Subject => 1,
+        }
+    }
+
     /// The Hive-style path TEMPLATE this kind's git-tier files follow
     /// (S2 design D2, task 1.2) — a pure, storage-agnostic path
     /// template string; `canon-model` never resolves `{area}`/`{id}`
@@ -177,9 +236,15 @@ impl Actor {
 /// every record struct, never duplicated per type.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Envelope {
-    /// Per-kind schema version, bumped on any breaking field change to
-    /// that kind (design D2; `canon fmt`/`canon migrate`, S11, key off
-    /// it).
+    /// Per-kind FORMAT GENERATION — the value
+    /// [`RecordKind::schema_version`] defines and every writer stamps
+    /// via [`Envelope::current`] (design D2; `canon fmt`/`canon
+    /// migrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`
+    /// orders an equal-`at` supersession tie by it,
+    /// `s38-evidence-bearing-memory`). See
+    /// [`RecordKind::schema_version`] for the bump rule — it is "bump
+    /// when two generations of one record can tie on `at`", not "bump on
+    /// every field addition".
     pub schema: u32,
     pub kind: RecordKind,
     pub at: DateTime<Utc>,
@@ -187,8 +252,23 @@ pub struct Envelope {
 }
 
 impl Envelope {
+    /// Construct an envelope at an EXPLICIT generation — for a test or
+    /// compat fixture that deliberately models an OLDER generation of a
+    /// kind. Production writers use [`Envelope::current`] instead, so no
+    /// writer can stamp a generation [`RecordKind::schema_version`] does
+    /// not define.
     pub fn new(schema: u32, kind: RecordKind, at: DateTime<Utc>, actor: Actor) -> Self {
         Self { schema, kind, at, actor }
+    }
+
+    /// Construct an envelope at `kind`'s CURRENT generation
+    /// ([`RecordKind::schema_version`]) — the one constructor every
+    /// production writer uses (`s38-evidence-bearing-memory`). It
+    /// replaces the per-writer `SCHEMA_VERSION` consts that previously
+    /// each hand-maintained their own copy of this integer, which could
+    /// not express a per-kind bump and had to agree by convention.
+    pub fn current(kind: RecordKind, at: DateTime<Utc>, actor: Actor) -> Self {
+        Self { schema: kind.schema_version(), kind, at, actor }
     }
 }
 
@@ -214,6 +294,34 @@ mod tests {
         let mut seen = std::collections::HashSet::new();
         for kind in RecordKind::ALL {
             assert!(seen.insert(kind), "{kind:?} listed twice in RecordKind::ALL");
+        }
+    }
+
+    /// The `s38-evidence-bearing-memory` bump, asserted structurally so
+    /// a future field addition cannot quietly bump a kind whose `at` is
+    /// derivation-time (and therefore cannot tie) — see
+    /// [`RecordKind::schema_version`]'s bump rule. `Run` and `Handoff`
+    /// are named explicitly because both DID gain fields on the same
+    /// branch that bumped `Task` and both deliberately stayed at `1`.
+    #[test]
+    fn only_task_carries_the_bumped_schema_generation() {
+        assert_eq!(RecordKind::Task.schema_version(), 2, "Task gained `depends_on` and its byte-stable `at` can tie");
+        assert_eq!(RecordKind::Run.schema_version(), 1, "Run's `at` is derivation-time, so its generations can never tie on `at`");
+        assert_eq!(RecordKind::Handoff.schema_version(), 1, "Handoff's `at` is derivation-time, so its generations can never tie on `at`");
+        for kind in RecordKind::ALL {
+            if kind == RecordKind::Task {
+                continue;
+            }
+            assert_eq!(kind.schema_version(), 1, "{kind:?} must stay at generation 1 until its records can tie on `at`");
+        }
+    }
+
+    #[test]
+    fn envelope_current_stamps_the_kinds_own_generation() {
+        for kind in RecordKind::ALL {
+            let envelope = Envelope::current(kind, DateTime::UNIX_EPOCH, Actor::new_unattributed("test"));
+            assert_eq!(envelope.schema, kind.schema_version());
+            assert_eq!(envelope.kind, kind);
         }
     }
 

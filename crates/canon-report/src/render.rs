@@ -109,11 +109,44 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     render_table(&mut out, &marts.role_memory);
 
     out.push_str("## Flywheel funnel\n\n");
-    out.push_str("Verdicts → distilled → retrieved → applied (`mart_flywheel_funnel`).\n\n");
+    // s40 (`plan-vs-actual-diff`): `applied` used to count resolved
+    // trajectories with no reference to retrieval at all, so it could
+    // — and on canon's own corpus did — exceed `retrieved`, which is
+    // an impossible reading for a funnel. It is now the retrieved set
+    // narrowed by the recipient run's own completion, and the last
+    // three stages share one unit (strategies). The panel says so
+    // itself rather than leaving the reader to infer it from four bare
+    // column names, the same posture as the burn-down panel below.
+    //
+    // The two retrieval stages join a `Run.injected_guidance` snapshot
+    // against the CURRENT distilled rows, so the prose may claim no
+    // more than "still distilled today" — it deliberately does NOT say
+    // "ever injected". That stronger reading was false while a rebuild
+    // re-keyed the strategy layer, and is only near-true now that
+    // `StrategyId` is content-derived (`crates/canon-learn/src/ids.rs`);
+    // a strategy re-derived from CHANGED evidence still lands under a
+    // new id and drops out, which the wording has to leave room for.
+    out.push_str(
+        "Verdicts → distilled → retrieved → applied (`mart_flywheel_funnel`) — the last three stages count STRATEGIES, so the funnel narrows by construction. `retrieved` counts the distinct strategies some run recorded in its `injected_guidance` that are still distilled today; strategy ids are derived from a strategy's own content, so re-ingesting unchanged evidence re-derives the same ids and leaves this stage intact. `applied` is that same set narrowed to the ones whose run then reached a terminal `Run.status`, i.e. guidance was in context AND the run actually finished — NOT how many trajectories were resolved. `applied` can therefore never exceed `retrieved`, and `retrieved 0` means no run's recorded guidance names a strategy that exists now.\n\n",
+    );
     render_table(&mut out, &marts.flywheel_funnel);
 
     out.push_str("## Review burn-down\n\n");
-    out.push_str("Review-feedback burn-down over time (`mart_review_burndown`).\n\n");
+    // s39 (`joined-evidence-grounding`): the panel is a per-day TREND
+    // over raw `Divergence.status` events, and `divergence_open_running_
+    // total` is a running `opened - resolved` count of those events --
+    // NOT how many divergences are open now. The two differ whenever one
+    // `resolved` record closes several findings on a scenario, which is
+    // normal: `fold_to_current_state` ranks a scenario's records by
+    // `run_seq`, so the latest wins per `(project_id, scenario_id)`. On
+    // canon's own corpus this panel reads `2` while every scenario is in
+    // fact resolved. The column name alone invites reading the trend as
+    // current state, so the pointer to the surface that answers that
+    // question ships in the panel itself rather than only in
+    // `canon_report::divergence`'s module doc.
+    out.push_str(
+        "Review-feedback burn-down over time (`mart_review_burndown`) — a per-day trend over raw `Divergence.status` events, so `divergence_open_running_total` is a running `opened - resolved` event count, NOT the number open now. For current state per scenario, run `canon divergence status`.\n\n",
+    );
     render_table(&mut out, &marts.review_burndown);
 
     out.push_str("## Scope status\n\n");

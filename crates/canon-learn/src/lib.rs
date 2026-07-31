@@ -22,12 +22,20 @@
 //!   parquet-first, `store` module doc) behind a trait a future
 //!   vector-backed impl can implement without a caller rewrite.
 //! - [`distill`] — the deterministic (non-LLM) distiller: raw
-//!   trajectories -> distilled strategy items.
+//!   trajectories -> distilled strategy items. Deterministic in the
+//!   strong sense: a [`StrategyId`] is DERIVED from the distilled
+//!   row's own content ([`ids::StrategyIdentity`],
+//!   [`ids::StrategyId::derive`]) and `recorded_at` is the source
+//!   trajectory's own timestamp, so re-distillation is a fixpoint —
+//!   see [`ids`]'s module doc for the three joins a re-keyed strategy
+//!   layer used to break.
 //! - [`rebuild_namespace`] — the non-destructive delete-rebuild
 //!   primitive (design decision 3): re-derives ONE regime's strategy
-//!   items from its retained, untouched raw trajectories.
+//!   items from its retained, untouched raw trajectories, reproducing
+//!   the same ids.
 //! - [`retrieve`] — the read side of the apply loop: a namespace's
-//!   strategy items, deterministically ordered.
+//!   strategy items in a total, data-derived order (`recorded_at`
+//!   descending, ties broken by [`StrategyId`]).
 //! - [`write::store_trajectory`] — the role-registry-gated write path.
 //! - [`guidance`] — S8 (`retrieve-before-task`)'s library core:
 //!   [`guidance::retrieve_guidance`], a fail-soft-at-the-type-level
@@ -124,7 +132,7 @@ pub use config::{DemotionConfig, LearnConfig, PromotionMode, PromotionRoleConfig
 pub use distill::{distill_namespace, distill_trajectory};
 pub use error::LearnError;
 pub use guidance::{DEFAULT_K, manifest_guidance_for_replay, retrieve_first_nonempty, retrieve_guidance};
-pub use ids::{StrategyId, TrajectoryId};
+pub use ids::{StrategyId, StrategyIdentity, TrajectoryId};
 pub use mark_verdict::mark_trajectory_verdict;
 pub use promotion::{
     CrnPromotionGate, DemotionPolicy, DemotionRecord, OccurrencePromotionGate, Promotion, PromotionDecision, PromotionGate,

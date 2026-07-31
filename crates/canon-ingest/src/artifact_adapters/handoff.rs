@@ -122,7 +122,15 @@ impl HandoffAdapter {
     /// (mirrors `ArtifactEvent.detail`'s doc comment: copied verbatim
     /// into the eventual `canon_model::records::Event` conversion).
     /// `change_id` (task 3.2) is present only when the source row
-    /// carries an `openspec_change_slug`.
+    /// carries an `openspec_change_slug`; `from_role`/`to_role`
+    /// (s37-execution-graph-topology) are likewise present only when the
+    /// row types its edge's endpoints, so an endpoint-less legacy row
+    /// emits a byte-identical `detail` to the one it emitted pre-s37 —
+    /// the idempotence bar this module's doc names. The endpoints ride
+    /// in `detail` rather than `authoring_role` on purpose: a handoff is
+    /// never a verdict (see [`Self::event`]), and `authoring_role` is a
+    /// verdict-emission field, so populating it would mean claiming the
+    /// handoff authored a verdict it deliberately does not.
     fn detail(record: &Handoff, transition: &'static str) -> serde_json::Value {
         let mut detail = serde_json::json!({
             "transition": transition,
@@ -137,6 +145,12 @@ impl HandoffAdapter {
         }
         if let Some(change) = &record.openspec_change_slug {
             obj.insert("change_id".to_string(), serde_json::Value::String(change.as_str().to_string()));
+        }
+        if let Some(from_role) = &record.from_role {
+            obj.insert("from_role".to_string(), serde_json::Value::String(from_role.as_str().to_string()));
+        }
+        if let Some(to_role) = &record.to_role {
+            obj.insert("to_role".to_string(), serde_json::Value::String(to_role.as_str().to_string()));
         }
         if let Some(claimed_by) = &record.claimed_by {
             obj.insert("claimed_by".to_string(), serde_json::Value::String(claimed_by.clone()));
@@ -212,6 +226,13 @@ mod tests {
             research_vendor_slug: None,
             tags: Vec::new(),
             title: "fixture handoff".to_string(),
+            // The endpoint-less legacy shape by default
+            // (s37-execution-graph-topology) — the roles are set
+            // explicitly only by the test that asserts they surface, so
+            // every other assertion here keeps proving the pre-s37
+            // detail payload unchanged.
+            from_role: None,
+            to_role: None,
             body: HandoffBody { domain: DomainId::parse("planning").unwrap(), template_version: 1, fields: serde_json::json!({}) },
         }
     }
@@ -281,6 +302,57 @@ mod tests {
         h.openspec_change_slug = Some(canon_model::ids::ChangeId::parse("s4-artifact-ingest").unwrap());
         let outcome = HandoffAdapter.parse(&records(&[h]));
         assert_eq!(outcome.events[0].detail["change_id"], "s4-artifact-ingest");
+    }
+
+    /// s37-execution-graph-topology: the typed edge endpoints reach the
+    /// event `detail` on EVERY transition the row implies, not just
+    /// `created` — a consumer joining a role's handoff chain reads any
+    /// one of them.
+    #[test]
+    fn role_endpoints_are_carried_into_detail_on_every_event_when_present() {
+        let mut h = handoff("20260701-0910-s4-done-d1a3", HandoffState::Done, Some("s4handoff-agent"));
+        h.from_role = Some(canon_model::ids::RoleId::parse("implementer").unwrap());
+        h.to_role = Some(canon_model::ids::RoleId::parse("reviewer").unwrap());
+        let outcome = HandoffAdapter.parse(&records(&[h]));
+        assert_eq!(outcome.events.len(), 3, "created + claimed + done");
+        for event in &outcome.events {
+            assert_eq!(event.detail["from_role"], "implementer");
+            assert_eq!(event.detail["to_role"], "reviewer");
+            // Untouched by s37: a handoff transition is still never a
+            // verdict, so the roles ride in `detail` and the
+            // verdict-emission fields stay `None`.
+            assert_eq!(event.kind, ArtifactEventKind::NonVerdict);
+            assert_eq!(event.authoring_role, None);
+        }
+    }
+
+    /// The conditional-insert half (mirrors
+    /// `abandoned.json`'s absent `change_id`): an endpoint-less row
+    /// omits the keys entirely rather than emitting `null`s, so a
+    /// pre-s37 row's `detail` is byte-identical to what it was before
+    /// the fields existed.
+    #[test]
+    fn a_handoff_with_no_role_endpoints_omits_them_from_detail() {
+        let h = handoff("20260701-0900-s4-pending-t1a1", HandoffState::Pending, None);
+        let outcome = HandoffAdapter.parse(&records(&[h]));
+        let detail = &outcome.events[0].detail;
+        assert!(detail.get("from_role").is_none(), "an unset endpoint must be absent, never a null: {detail}");
+        assert!(detail.get("to_role").is_none(), "an unset endpoint must be absent, never a null: {detail}");
+    }
+
+    /// A half-typed edge is representable and is carried verbatim — the
+    /// adapter never invents the missing end (e.g. from `claimed_by` or
+    /// the envelope actor's role), because a guessed endpoint would make
+    /// the eventual plan-vs-actual graph diff read a fabricated edge.
+    #[test]
+    fn only_the_set_half_of_a_partial_role_edge_reaches_detail() {
+        let mut h = handoff("20260701-0905-s4-claim-c1a2", HandoffState::InProgress, Some("s4handoff-agent"));
+        h.to_role = Some(canon_model::ids::RoleId::parse("reviewer").unwrap());
+        let outcome = HandoffAdapter.parse(&records(&[h]));
+        for event in &outcome.events {
+            assert_eq!(event.detail["to_role"], "reviewer");
+            assert!(event.detail.get("from_role").is_none(), "the unset half must stay absent: {}", event.detail);
+        }
     }
 
     #[test]

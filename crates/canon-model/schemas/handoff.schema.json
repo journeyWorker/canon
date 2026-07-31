@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Handoff",
-  "description": "The `handoffs` state machine (S1 design D4): each field below except\n`envelope` and `body` maps 1:1 to a same-named column of the donor\nhandoff queue's `handoffs` Postgres table — the 13 fields the\nhandoff-state-machine spec fixes, on which a canon-written row and a\ndonor-CLI-written row agree exactly. This is\nstate-machine-core compatibility, not a full-row mapping onto the\nlive table: the donor's `trigger` column (`NOT NULL`, no default) has no\nanalog here, the donor's `created_at`/`created_by_*`/`refs_extra` columns\nhave no `Handoff` field, and `envelope` (`schema`/`kind`/`at`/`actor`)\nis canon-only with no donor column — see the module doc comment for\nthe full gap and S4's ownership of bridging it. `body` is likewise\nnot a column itself — canon's own typed staging area for the table's\n`body_text` column, rendered via [`TemplateRegistry::render_body`].",
+  "description": "The `handoffs` state machine (S1 design D4): each field below except\n`envelope`, `body`, and the `from_role`/`to_role` pair maps 1:1 to a\nsame-named column of the donor\nhandoff queue's `handoffs` Postgres table — the 13 fields the\nhandoff-state-machine spec fixes, on which a canon-written row and a\ndonor-CLI-written row agree exactly. This is\nstate-machine-core compatibility, not a full-row mapping onto the\nlive table: the donor's `trigger` column (`NOT NULL`, no default) has no\nanalog here, the donor's `created_at`/`created_by_*`/`refs_extra` columns\nhave no `Handoff` field, and `envelope` (`schema`/`kind`/`at`/`actor`)\nis canon-only with no donor column — see the module doc comment for\nthe full gap and S4's ownership of bridging it. `body` is likewise\nnot a column itself — canon's own typed staging area for the table's\n`body_text` column, rendered via [`TemplateRegistry::render_body`].\n`from_role`/`to_role` (s37-execution-graph-topology) are the third\ncanon-only group: the edge endpoints this state machine's\n`chain_id`/`parent_handoff_id`/`seq` edge never carried, additive\n(`Option` + `#[serde(default, skip_serializing_if =\n\"Option::is_none\")]`, so an unset endpoint is an absent key and an\nalready-stored handoff's bytes never change) — the donor-compatible\ncore is untouched and no `Envelope.schema` bump is needed.",
   "type": "object",
   "properties": {
     "abandoned_at": {
@@ -49,6 +49,17 @@
       "format": "date-time",
       "default": null
     },
+    "from_role": {
+      "description": "The role this handoff's work came FROM — the edge's source\nendpoint (s37-execution-graph-topology). `chain_id`/\n`parent_handoff_id`/`seq` already make a handoff a directed edge\nin a chain, but that edge had no endpoints: `claimed_by` names\nwhoever picked the work up (a claimant, set by\n[`Handoff::transition_to`], absent until `in-progress`) and\n`envelope.actor.role` names whoever WROTE the record, and\nneither is a source→target pair. Without these two, a chain of\nhandoffs cannot answer \"which role handed to which\" — the\nrole-scoped question the flywheel's strategy memory\n(`canon retrieve --role`) and the trust matrix are both keyed on.\n\nCanon-only, like `envelope`/`body`: the donor `handoffs` table\nhas no `from_role`/`to_role` column, so these are NOT part of\nthis type's column-for-column state-machine core (see the\nstruct doc above and `every_field_maps_to_a_handoffs_ts_column`,\nwhich asserts them separately from the donor column table).\n`Option` + `#[serde(default, skip_serializing_if =\n\"Option::is_none\")]`: a handoff written before this field\nexisted, or by the donor CLI (which cannot supply it),\ndeserializes unchanged with `None` — an additive field, no\n`Envelope.schema` bump. The `skip_serializing_if` half is\nload-bearing, not cosmetic, and is why this pair does NOT follow\nthe always-`null` shape of its donor-column siblings\n(`parent_handoff_id`/`claimed_by`, which mirror columns that\nalways exist): a bare `#[serde(default)]` would make every\nalready-stored handoff reserialize with two new `null` keys,\nchanging its content digest and so breaking the write-time\nidempotence that `canon report --check`'s drift gate and ingest\nwatermarks both rest on. An unset endpoint is an ABSENT key,\nbyte-identical to a pre-s37 row — the same discipline\n[`crate::records::Change::subject_id`] and `Actor::role` already\nfollow.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RoleId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "id": {
       "$ref": "#/$defs/HandoffId"
     },
@@ -85,7 +96,7 @@
       "default": null
     },
     "schema": {
-      "description": "Per-kind schema version, bumped on any breaking field change to\nthat kind (design D2; `canon fmt`/`canon migrate`, S11, key off\nit).",
+      "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
       "type": "integer",
       "format": "uint32",
       "minimum": 0
@@ -106,6 +117,17 @@
     },
     "title": {
       "type": "string"
+    },
+    "to_role": {
+      "description": "The role this handoff's work is destined FOR — the edge's target\nendpoint, the `from_role` counterpart (same\ns37-execution-graph-topology reasoning, same additive\n`Option`/`#[serde(default, skip_serializing_if =\n\"Option::is_none\")]` shape). Deliberately independent of\n`claimed_by`: `to_role` is the INTENDED recipient role at\ncreation time, `claimed_by` is the agent that actually claimed\nit later — a handoff addressed to `reviewer` and claimed by\nnobody is a real, representable state, and the gap between the\ntwo is exactly what a plan-vs-actual graph diff reads.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RoleId"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [

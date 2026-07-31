@@ -87,3 +87,28 @@ specs:
   roots:
     - id: platformer
       root: examples/platformer/specs
+
+# s37 (`execution-graph-topology`): this repo's own `canon ingest
+# artifacts` source. Absent until now — which is why every
+# artifact adapter reported `0 event(s) parsed` and `canon report`'s
+# Role-memory / Flywheel-funnel panels rendered `_No rows._`:
+# `load_artifact_source_config` degrades a missing `artifacts:` section
+# to `ArtifactSourceConfig::default()` (every field `None`, no source
+# scanned), so the repo was never feeding its own flywheel.
+#
+# `native_records: true` selects the s15-P4 NATIVE verdict family
+# (`review` + `divergence-native`), which reads canon's OWN tiers —
+# this repo's `.canon/ledger/kind=review/` (24 records) and
+# `kind=divergence/` (14) — rather than a foreign donor ledger layout.
+# That is the correct self-hosting choice: canon attests through its own
+# `canon review add` / `canon divergence` lifecycle, so its own native
+# records ARE its evidence of record.
+#
+# DELIBERATELY the only key here: `native_records` is XOR-exclusive with
+# `ledger_root`/`divergences_root`/`openspec_root` (design D7). The two
+# families' verdict rows differ slightly, so `trajectory_content_digest`
+# would not dedupe them and the same underlying evidence would be
+# double-counted; `canon ingest artifacts` rejects a config that sets
+# both BEFORE any read runs, rather than silently inflating the corpus.
+artifacts:
+  native_records: true

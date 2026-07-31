@@ -24,7 +24,7 @@ Scaffold `canon.yaml`, then validate and index a spec corpus.
    Writes a working `canon.yaml`. `canon init` uses Git for durable,
    reviewable records and local SQLite for high-volume operational
    records. PostgreSQL and S3-compatible storage are optional scale-up
-   backends. Seven of canon-model's twelve record kinds route to the
+   backends. Eight of canon-model's thirteen record kinds route to the
    zero-env-var `local` (git-backed) rung; `task`, `handoff`, `session`,
    `run`, and `event` route to `hot` (SQLite by default, at
    `.canon/hot.db`, gitignored). Commented `postgres`/`s3` stanzas show
@@ -60,6 +60,7 @@ Scaffold `canon.yaml`, then validate and index a spec corpus.
      trajectory: local
      strategy_item: local
      evidence_record: local
+     subject: local
    specs:
      roots:
        - id: root

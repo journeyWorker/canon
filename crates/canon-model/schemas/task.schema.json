@@ -11,6 +11,13 @@
       "type": "string",
       "format": "date-time"
     },
+    "depends_on": {
+      "description": "Optional, declaratively-authored DEPENDENCY references (s37\n`execution-graph-topology`, subject `flywheel-execution-graph`)\n— which sibling `Task`(s) in the SAME change this task's own\nplan text declares it comes after. Populated ONLY from a\ndependency expression the dialect's corpus demonstrably uses\n(the openspec dialect's in-row `depends on <n>`/`after <n>`\nmarker prose; the superpowers dialect's `- Consumes: … from\nTask <n>` interface line), never from a syntax invented for\ncanon's convenience and never from dotted-numbering nesting —\n`<change>#6.2` does NOT implicitly depend on `<change>#6`. A\nreference that fails to resolve to a real sibling row is\nDROPPED with a named import diagnostic, never an import\nfailure, because prose is ambiguous and \"malformed evidence is\nno evidence\".\n\nDECLARED INTENT ONLY: canon never schedules, orders, blocks, or\nexecutes anything from this field. It is the PLAN-side half of\nthe execution graph — the half s37's plan-vs-actual diff reads\nagainst `Run.parent_run_id`'s OBSERVED dispatch lineage, which\nis what makes a declared-but-never-honored ordering visible to\nthe reward flywheel at all.\n\nEmpty by default, mirroring [`Task::scenario_refs`]'s own\nadditive-field shape (and, like it, `skip_serializing_if` so an\nempty vec never introduces a spurious key — every pre-s37\n`Task` stays byte-identical on the wire, and its content digest\nwith it).\n\nThis field IS nonetheless what bumped `Task` to\n[`RecordKind::schema_version`] `2`\n(`s38-evidence-bearing-memory`), and NOT because the wire form\nbroke — it did not. A `Task`'s `Envelope.at` is\n`file_modified_at(<source plan doc>)` (s20 D7), byte-stable so an\nunchanged plan re-imports idempotently; adding this field changed\nthe PARSER, not the source document's mtime, so the stale and\nfresh record for one `task_id` carry an IDENTICAL `at` and\n`canon_store::fold::fold_latest_by_key` needs a generation signal\nto order them. Without the bump it fell through to the\nlexicographic digest tie-break and surfaced this field on an\narbitrary SUBSET of one file's rows. See\n[`RecordKind::schema_version`] for why `Run`/`Handoff` gained\nfields on the same branch and correctly stayed at `1`.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TaskId"
+      }
+    },
     "evidence_note": {
       "type": [
         "string",
@@ -28,7 +35,7 @@
       }
     },
     "schema": {
-      "description": "Per-kind schema version, bumped on any breaking field change to\nthat kind (design D2; `canon fmt`/`canon migrate`, S11, key off\nit).",
+      "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
       "type": "integer",
       "format": "uint32",
       "minimum": 0

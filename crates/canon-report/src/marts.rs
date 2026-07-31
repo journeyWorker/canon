@@ -48,6 +48,39 @@ pub fn fetch_role_memory(roots: &Roots) -> Result<MartResult, ReportError> {
 
 pub const FLYWHEEL_FUNNEL_COLUMNS: &[&str] = &["role", "verdicts", "distilled", "retrieved", "applied"];
 
+/// `mart_flywheel_funnel`: one row per role, `verdicts → distilled →
+/// retrieved → applied`. What each column counts, restated here because
+/// the four bare names read like a funnel long before the SQL actually
+/// computed one (s40 `plan-vs-actual-diff`, tasks 3.1/3.2):
+///
+/// - `verdicts` — `VerdictRow`s across this role's raw trajectories,
+///   the evidence the distiller consumes. The one stage not counted in
+///   strategies, and the natural upper bound on `distilled` — strictly
+///   above it when a trajectory repeats a byte-identical verdict,
+///   which distils to one strategy rather than two indistinguishable
+///   copies of it.
+/// - `distilled` — this role's `canon-learn` `StrategyItem` rows.
+/// - `retrieved` — DISTINCT strategies appearing in at least one
+///   `Run::injected_guidance` AND still present as a distilled row,
+///   never injection EVENTS: counting events let `retrieved` exceed
+///   `distilled` as soon as one strategy was injected into two runs.
+///   The "still present" half is not a leak: `canon-learn`'s
+///   `StrategyId` is derived from a strategy's own content, so
+///   `rebuild_namespace` re-derives the same id and a recorded
+///   `StrategyRef` keeps resolving across an ordinary re-ingest. Only
+///   a strategy re-derived from CHANGED evidence gets a new id and
+///   leaves this stage — correctly, since the cited strategy no longer
+///   exists.
+/// - `applied` — that same distinct set, restricted to strategies whose
+///   recipient run reached a terminal `RunStatus`
+///   (`succeeded`/`failed`/`aborted`). It asserts both halves —
+///   guidance in context AND a run that finished — and is deliberately
+///   NOT "resolved trajectories", which is what it counted before s40,
+///   with no reference to retrieval at all.
+///
+/// So `applied <= retrieved <= distilled` holds by construction (the
+/// view's own comment carries the proof). Exactly the view's own
+/// `SELECT` list, no renaming/reordering (design D1).
 pub fn fetch_flywheel_funnel(roots: &Roots) -> Result<MartResult, ReportError> {
     fetch(roots, "mart_flywheel_funnel", "role", FLYWHEEL_FUNNEL_COLUMNS)
 }

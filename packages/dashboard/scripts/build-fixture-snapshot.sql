@@ -12,7 +12,7 @@
 -- CREATE TABLE statements below and re-running the build script; the
 -- generated .parquet files are committed binary artifacts.
 
--- Panel 1: mart_trust_matrix (crates/canon-store/sql/views.sql:189-226)
+-- Panel 1: mart_trust_matrix (crates/canon-store/sql/views.sql)
 CREATE OR REPLACE TABLE mart_trust_matrix AS
 SELECT * FROM (
     VALUES
@@ -23,7 +23,7 @@ SELECT * FROM (
         ('fix-retry-backoff#1.2',    'fix-retry-backoff',  'Circuit breaker after 5 failures','done',        true,  true,  'agent-s3',  1::BIGINT, TIMESTAMP '2026-07-10 19:02:00')
 ) AS t(task_id, change_id, title, task_status, covered, green, who, evidence_count, latest_at);
 
--- Panel 2: mart_session_costs (crates/canon-store/sql/views.sql:247-285)
+-- Panel 2: mart_session_costs (crates/canon-store/sql/views.sql)
 CREATE OR REPLACE TABLE mart_session_costs AS
 SELECT * FROM (
     VALUES
@@ -32,7 +32,7 @@ SELECT * FROM (
         ('sess-0003', 'claude-code', 'reviewer',     'canon-wt/review', 3::BIGINT, 0.902100::DOUBLE, 140012::BIGINT, TIMESTAMP '2026-07-10 17:30:00', TIMESTAMP '2026-07-10 19:10:00')
 ) AS t(session_id, client, role, workspace_label, run_count, total_cost, total_tokens, first_event_at, last_event_at);
 
--- Panel 3: mart_role_memory (crates/canon-store/sql/views.sql:298-310)
+-- Panel 3: mart_role_memory (crates/canon-store/sql/views.sql)
 CREATE OR REPLACE TABLE mart_role_memory AS
 SELECT * FROM (
     VALUES
@@ -41,16 +41,16 @@ SELECT * FROM (
         ('fixer',       'review-finding-remediation',3::BIGINT, 2::BIGINT, 1::BIGINT, 0.6667::DOUBLE, 1.67::DOUBLE, TIMESTAMP '2026-07-11 07:45:00')
 ) AS t(role, regime_key, strategy_count, active_count, demoted_count, hit_rate, avg_source_trajectories, latest_recorded_at);
 
--- Panel 4: mart_flywheel_funnel (crates/canon-store/sql/views.sql:327-368)
+-- Panel 4: mart_flywheel_funnel (crates/canon-store/sql/views.sql)
 CREATE OR REPLACE TABLE mart_flywheel_funnel AS
 SELECT * FROM (
     VALUES
-        ('implementer', 18::BIGINT, 6::BIGINT, 9::BIGINT, 14::BIGINT),
-        ('reviewer',    11::BIGINT, 4::BIGINT, 5::BIGINT,  9::BIGINT),
-        ('fixer',        7::BIGINT, 3::BIGINT, 4::BIGINT,  5::BIGINT)
+        ('implementer', 18::BIGINT, 6::BIGINT, 5::BIGINT, 3::BIGINT),
+        ('reviewer',    11::BIGINT, 4::BIGINT, 3::BIGINT, 2::BIGINT),
+        ('fixer',        7::BIGINT, 3::BIGINT, 2::BIGINT, 1::BIGINT)
 ) AS t(role, verdicts, distilled, retrieved, applied);
 
--- Panel 5: mart_review_burndown (crates/canon-store/sql/views.sql:377-402).
+-- Panel 5: mart_review_burndown (crates/canon-store/sql/views.sql).
 -- `day` is `date_trunc('day', "at")` over a TIMESTAMP column, so it stays
 -- TIMESTAMP (not DATE) — matched here. `divergence_open_running_total` is
 -- the running sum of (opened - resolved); verified by hand below.

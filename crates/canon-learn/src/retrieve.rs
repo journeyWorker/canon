@@ -18,9 +18,22 @@ use crate::strategy::StrategyItem;
 /// "most recently distilled", the only ordering this change owns;
 /// S7/S8 may layer reward-weighted ranking on top without changing
 /// this function's contract).
+///
+/// The order is TOTAL and data-derived: `recorded_at` descending, ties
+/// broken by [`crate::ids::StrategyId`]. The tiebreak is load-bearing,
+/// not decorative — [`crate::store::StrategyStore::query_by_regime_key`]
+/// yields rows in filesystem `read_dir` order, and
+/// [`crate::distill::distill_trajectory`] stamps every item distilled
+/// from one trajectory with that trajectory's single `recorded_at`, so
+/// ties are the COMMON case here, not the exotic one. Without the
+/// tiebreak, `retrieve_guidance`'s `take(k)` would pick a different
+/// k-subset per machine, and the `Run.injected_guidance` snapshot it
+/// writes — persisted bytes — would not be reproducible. Sorting by
+/// the derived id keeps the choice a pure function of the stored
+/// content.
 pub fn retrieve(strategy_store: &dyn StrategyStore, regime_key: &RegimeKey, limit: Option<usize>) -> Result<Vec<StrategyItem>, LearnError> {
     let mut items = strategy_store.query_by_regime_key(regime_key)?;
-    items.sort_by_key(|item| std::cmp::Reverse(item.recorded_at));
+    items.sort_by(|a, b| b.recorded_at.cmp(&a.recorded_at).then_with(|| a.id.cmp(&b.id)));
     if let Some(limit) = limit {
         items.truncate(limit);
     }
@@ -67,5 +80,25 @@ mod tests {
         }
         let items = retrieve(&store, &regime("dev"), Some(2)).unwrap();
         assert_eq!(items.len(), 2);
+    }
+
+    /// Ties on `recorded_at` are the common case (every item distilled
+    /// from one trajectory shares its timestamp), so the order must
+    /// still be total and data-derived — otherwise `read_dir` order
+    /// decides which strategies `retrieve_guidance`'s `take(k)` writes
+    /// into a `Run.injected_guidance` snapshot.
+    #[test]
+    fn items_sharing_a_recorded_at_are_ordered_by_id_not_by_read_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = ParquetStrategyStore::open(dir.path());
+        let at = Utc::now();
+        for i in 0..6 {
+            store.append(&strategy_at("dev", &format!("tied-{i}"), at)).unwrap();
+        }
+
+        let ids: Vec<StrategyId> = retrieve(&store, &regime("dev"), None).unwrap().into_iter().map(|i| i.id).collect();
+        let mut sorted = ids.clone();
+        sorted.sort();
+        assert_eq!(ids, sorted, "tied rows must come back in ascending id order");
     }
 }

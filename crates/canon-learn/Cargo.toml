@@ -26,6 +26,11 @@ chrono = { version = "0.4.45", features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_yaml = "0.9"
+# `StrategyId::derive`'s content hash (`ids` module doc): the same
+# sha256-into-`Ulid::from_parts` deterministic-id construction
+# `canon-ingest::normalize::deterministic_run_id` already uses for
+# `RunId`, never a second hashing scheme.
+sha2.workspace = true
 thiserror.workspace = true
 ulid = { version = "1.2.1", features = ["serde"] }
 

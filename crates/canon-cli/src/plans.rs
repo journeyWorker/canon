@@ -335,7 +335,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
         // Validated at `resolve_sources`/`load_plan_sources_from_config`
         // time — every `src.dialect` is a registered id by construction.
         let entry = plan_registry::find(&src.dialect).expect("dialect validated before the scan loop");
-        let cursor_id = plan_source_cursor_id(&src.dialect, &src.root);
+        let cursor_id = plan_source_cursor_id(&src.dialect, entry.adapter.parse_version(), &src.root);
 
         let files = scan_dir(&src.root, |path| !excluded_dirs.iter().any(|dir| canonicalize_or(path).starts_with(dir)));
         let mut present_digests: BTreeMap<String, String> = BTreeMap::new();
@@ -380,21 +380,13 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
         let changes_parsed = changes.len();
         let tasks_parsed = tasks.len();
 
-        // Design D8: first-configured occurrence of a `change_id`
-        // wins THIS pass; every later one is skipped + counted, and
-        // every `Task` under a skipped `change_id` goes with it.
-        let mut skipped_change_ids: BTreeSet<ChangeId> = BTreeSet::new();
-        let mut accepted_changes = Vec::with_capacity(changes.len());
-        for change in changes {
-            if seen_change_ids.contains(&change.change_id) {
-                skipped_change_ids.insert(change.change_id.clone());
-            } else {
-                seen_change_ids.insert(change.change_id.clone());
-                accepted_changes.push(change);
-            }
-        }
-        let duplicate_change_id = skipped_change_ids.len();
-        let accepted_tasks: Vec<Task> = tasks.into_iter().filter(|t| !skipped_change_ids.contains(&t.task_id.change_id())).collect();
+        // Design D8's first-source-wins rule, applied by the ONE
+        // shared decision `crate::dispatch`'s `--task` admission also
+        // calls ([`admit_source_candidates`], extracted in s41
+        // (`review-hardening`)) — never a second local copy of it.
+        let SourceAdmission { changes: accepted_changes, tasks: accepted_tasks, duplicate_change_ids } =
+            admit_source_candidates(&mut seen_change_ids, changes, tasks);
+        let duplicate_change_id = duplicate_change_ids.len();
 
         let mut changes_persisted = 0usize;
         let mut changes_unwritten = 0usize;
@@ -480,6 +472,77 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
     }
 
     Ok(outcome)
+}
+
+/// One plan source's [`admit_source_candidates`] verdict. Named, not a
+/// positional `(Vec<Change>, Vec<Task>, BTreeSet<ChangeId>)` triple:
+/// two of the three are same-shaped collections whose swap at a call
+/// site would compile and silently persist the wrong half.
+#[derive(Debug)]
+pub(crate) struct SourceAdmission {
+    /// The `Change`s this source is the FIRST to carry — exactly the
+    /// ones an import pass offers to a tier.
+    pub(crate) changes: Vec<Change>,
+    /// The `Task`s that survive the rule — exactly the ones an import
+    /// pass offers to a tier, and therefore exactly the ids a
+    /// `Run.task_id` binding may name (`crate::dispatch`).
+    pub(crate) tasks: Vec<Task>,
+    /// The `change_id`s this source re-declared after an
+    /// earlier-configured source already owned them, deduplicated (one
+    /// source may repeat an id across documents) — the
+    /// [`PlanSourceSummary::duplicate_change_id`] diagnostic's count.
+    pub(crate) duplicate_change_ids: BTreeSet<ChangeId>,
+}
+
+/// Design D8's cross-source `change_id` admission (module doc), for ONE
+/// source's parsed candidates: the first configured occurrence of a
+/// `change_id` owns it for the whole pass, and every later occurrence
+/// is skipped — its `Change` AND every `Task` sitting under that
+/// `change_id`.
+///
+/// # Why this is a shared function and not an inline loop
+/// s41 (`review-hardening`): this rule had a SECOND, laxer copy.
+/// `crate::dispatch`'s `--task` validation admitted a row as soon as
+/// ANY configured source parsed it, so a row under a later duplicate
+/// of a change id — a row this driver drops on the floor and never
+/// persists — was written into a dispatched `Run.task_id` as precisely
+/// the dangling edge s40 exists to refuse. A `--task` is bindable IFF
+/// `canon ingest plans` would persist that task, so both callers must
+/// decide by the same predicate; two copies of an admission rule is
+/// how that defect arose in the first place.
+///
+/// # Contract
+/// `seen_change_ids` is the PASS-WIDE accumulator, threaded across
+/// sources in strict config order by the caller — order is the rule
+/// here, so this is deliberately not commutative — and is extended with
+/// every `change_id` this source is the first to carry.
+///
+/// A `Task` whose `change_id` NO source produced a `Change` for is
+/// never skipped: only an id observed twice as a `Change` can enter
+/// [`SourceAdmission::duplicate_change_ids`]. Ownership keys on the
+/// change document, and a change id with no earlier owner has nothing
+/// to lose to.
+pub(crate) fn admit_source_candidates(
+    seen_change_ids: &mut BTreeSet<ChangeId>,
+    changes: Vec<Change>,
+    tasks: Vec<Task>,
+) -> SourceAdmission {
+    let mut duplicate_change_ids: BTreeSet<ChangeId> = BTreeSet::new();
+    let mut accepted_changes = Vec::with_capacity(changes.len());
+    for change in changes {
+        if seen_change_ids.contains(&change.change_id) {
+            duplicate_change_ids.insert(change.change_id.clone());
+        } else {
+            seen_change_ids.insert(change.change_id.clone());
+            accepted_changes.push(change);
+        }
+    }
+    // Filtered only AFTER the whole change list is classified: a
+    // source's tasks may precede the duplicate `Change` that disowns
+    // them, so a streaming filter would admit half of them by ordering
+    // accident.
+    let accepted_tasks: Vec<Task> = tasks.into_iter().filter(|t| !duplicate_change_ids.contains(&t.task_id.change_id())).collect();
+    SourceAdmission { changes: accepted_changes, tasks: accepted_tasks, duplicate_change_ids }
 }
 
 /// `(--dialect, --source)` one-shot override (design D2, task 3.3) or
@@ -584,16 +647,29 @@ fn validate_source_roots(sources: &[PlanSource]) -> Result<(), PlansError> {
     Ok(())
 }
 
-/// One `SourceCursor` id per configured `(dialect, root)` source (task
-/// 3.4) -- `plan-<dialect>-<digest12>`, where `<digest12>` is
-/// `canon_ingest::normalize::content_digest` of the root's own path
-/// string: two sources naming the same dialect at DIFFERENT roots (or
-/// vice versa) never collide on one cursor file, and the id stays a
-/// safe bare filename component regardless of what the root path
-/// itself contains.
-fn plan_source_cursor_id(dialect: &str, root: &Path) -> String {
+/// One `SourceCursor` id per configured `(dialect, parse_version, root)`
+/// source (task 3.4) -- `plan-<dialect>-v<parse_version>-<digest12>`,
+/// where `<digest12>` is `canon_ingest::normalize::content_digest` of
+/// the root's own path string: two sources naming the same dialect at
+/// DIFFERENT roots (or vice versa) never collide on one cursor file, and
+/// the id stays a safe bare filename component regardless of what the
+/// root path itself contains.
+///
+/// `parse_version` ([`canon_ingest::PlanAdapter::parse_version`]) joins
+/// the identity because of what this cursor's gate actually compares
+/// (`s38-evidence-bearing-memory`): per-file CONTENT digests. Those are
+/// byte-stable by design — an unchanged plan re-imports idempotently —
+/// which means a change to the PARSER is invisible to the gate and the
+/// source is reported `skipped unchanged` even though its records would
+/// now parse differently. Folding the dialect's parse generation into
+/// the cursor ID rather than into its per-file digests is what makes a
+/// bump behave EXACTLY like editing every file in the source: the
+/// lookup finds no cursor at the new id at all, so every file is
+/// re-read, re-parsed, and re-persisted, and the stale cursor is simply
+/// orphaned rather than mutated.
+fn plan_source_cursor_id(dialect: &str, parse_version: u32, root: &Path) -> String {
     let digest = canon_ingest::normalize::content_digest(&serde_json::json!(root.to_string_lossy()));
-    format!("plan-{dialect}-{digest}")
+    format!("plan-{dialect}-v{parse_version}-{digest}")
 }
 
 /// A file's `(mtime_ms, size)` for the cursor's informational summary
@@ -709,4 +785,46 @@ pub fn format_unwritten_json(outcome: &PlansOutcome) -> Option<String> {
     }
     let body = UnwrittenBody { changes: &outcome.unwritten_changes, tasks: &outcome.unwritten_tasks };
     Some(serde_json::to_string_pretty(&body).expect("unwritten body always serializes"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The `s38-evidence-bearing-memory` fix: the cursor's own gate
+    /// compares byte-stable per-file content digests, so a PARSER change
+    /// is invisible to it. Folding the dialect's parse generation into
+    /// the cursor ID is what forces a full re-parse — a bumped
+    /// `parse_version` must land on a DIFFERENT id, so `cursors.read`
+    /// finds nothing and every file is re-read.
+    #[test]
+    fn a_bumped_parse_version_yields_a_different_cursor_id_for_the_same_source() {
+        let root = Path::new("/tmp/plans/openspec");
+        let before = plan_source_cursor_id("openspec", 1, root);
+        let after = plan_source_cursor_id("openspec", 2, root);
+        assert_ne!(before, after, "a parse-version bump must not reuse the prior cursor id, or the source is reported `skipped unchanged`");
+    }
+
+    /// The pre-existing collision guarantee (task 3.4), unweakened by
+    /// the added version segment: two roots under one dialect, and two
+    /// dialects over one root, still never share a cursor file.
+    #[test]
+    fn cursor_ids_stay_distinct_per_dialect_and_per_root() {
+        let one = plan_source_cursor_id("openspec", 2, Path::new("/tmp/plans/a"));
+        let other_root = plan_source_cursor_id("openspec", 2, Path::new("/tmp/plans/b"));
+        let other_dialect = plan_source_cursor_id("superpowers", 2, Path::new("/tmp/plans/a"));
+        assert_ne!(one, other_root);
+        assert_ne!(one, other_dialect);
+    }
+
+    /// A cursor id is used as a bare filename component
+    /// ([`plan_source_cursor_id`]'s own contract), so the version
+    /// segment must not introduce a path separator or any other
+    /// filename-hostile character.
+    #[test]
+    fn a_cursor_id_stays_a_safe_bare_filename_component() {
+        let id = plan_source_cursor_id("openspec", 2, Path::new("/tmp/plans/../weird path/openspec"));
+        assert!(id.starts_with("plan-openspec-v2-"), "expected the dialect and version segments up front, got `{id}`");
+        assert!(id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'), "cursor id `{id}` must stay filename-safe");
+    }
 }

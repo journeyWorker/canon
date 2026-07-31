@@ -12,7 +12,7 @@ use canon_model::ids::{RegimeKey, RoleId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::ids::{StrategyId, TrajectoryId};
+use crate::ids::{StrategyId, StrategyIdentity, TrajectoryId};
 
 /// Durable evidence a [`StrategyItem`] was demoted (S7 design D4, task
 /// group 4) — S1-envelope-shaped: composes
@@ -123,6 +123,52 @@ impl StrategyItem {
         }
     }
 
+    /// Constructs a distilled item whose `id` is DERIVED from the rest
+    /// of its own content ([`StrategyId::derive`]) rather than minted.
+    /// The constructor [`crate::distill::distill_trajectory`] uses, and
+    /// the reason a [`crate::rebuild::rebuild_namespace`] that
+    /// re-derives the same strategy reproduces the same id instead of
+    /// orphaning every `Run.injected_guidance` snapshot and promoted
+    /// `.canon/strategies/<role>/<id>.md` file that cited the old one
+    /// (`crate::ids` module doc).
+    ///
+    /// [`StrategyItem::new`] is retained for callers that already HOLD
+    /// an id — a fixture, or a decode path reconstructing a stored row
+    /// — and is not a second identity scheme: an item built here
+    /// satisfies `item.id == StrategyId::derive(&item.identity())`, an
+    /// equation any holder of the row can check.
+    pub fn from_identity(identity: StrategyIdentity<'_>) -> Self {
+        Self {
+            id: StrategyId::derive(&identity),
+            regime_key: identity.regime_key.clone(),
+            role: identity.role.clone(),
+            title: identity.title.to_string(),
+            description: identity.description.to_string(),
+            content: identity.content.to_string(),
+            source_trajectory_ids: identity.source_trajectory_ids.to_vec(),
+            recorded_at: identity.recorded_at,
+            demotion: None,
+        }
+    }
+
+    /// This row's own content-identity — the exact preimage
+    /// [`StrategyId::derive`] consumed. Makes a derived [`StrategyId`]
+    /// AUDITABLE: every field here is carried by both the parquet row's
+    /// JSON body and a promoted markdown file's front matter + body, so
+    /// a reader can recompute the id and confirm the row was not
+    /// hand-edited away from its own name.
+    pub fn identity(&self) -> StrategyIdentity<'_> {
+        StrategyIdentity {
+            regime_key: &self.regime_key,
+            role: &self.role,
+            title: &self.title,
+            description: &self.description,
+            content: &self.content,
+            source_trajectory_ids: &self.source_trajectory_ids,
+            recorded_at: self.recorded_at,
+        }
+    }
+
     /// Builder-style override for [`StrategyItem::demotion`] — the
     /// constructor always seeds `None`; this is the escape hatch a
     /// test fixture (or [`crate::store::StrategyStore::mark_demoted`]'s
@@ -194,5 +240,50 @@ mod tests {
         );
         let item: StrategyItem = serde_json::from_str(&json).unwrap();
         assert!(item.demotion.is_none());
+    }
+
+    /// The equation `from_identity`'s doc promises: an item names
+    /// itself. A reader holding only the persisted row (or a promoted
+    /// markdown file's front matter + body) can recompute the id.
+    #[test]
+    fn a_derived_item_names_itself() {
+        let ids = vec![TrajectoryId::new()];
+        let role = RoleId::parse("dev").unwrap();
+        let rk = regime();
+        let item = StrategyItem::from_identity(StrategyIdentity {
+            regime_key: &rk,
+            role: &role,
+            title: "batch the writes",
+            description: "Validated strategy.",
+            content: "ctx text",
+            source_trajectory_ids: &ids,
+            recorded_at: Utc::now(),
+        });
+        assert_eq!(item.id, StrategyId::derive(&item.identity()));
+    }
+
+    /// Demotion is a soft-flag written IN PLACE by
+    /// `StrategyStore::mark_demoted`, so it must not sit in the
+    /// identity — a demoted row that re-keyed itself would dangle every
+    /// reference to it, the failure `crate::ids`' module doc exists to
+    /// close.
+    #[test]
+    fn demoting_an_item_does_not_move_its_derived_id() {
+        let ids = vec![TrajectoryId::new()];
+        let role = RoleId::parse("dev").unwrap();
+        let rk = regime();
+        let item = StrategyItem::from_identity(StrategyIdentity {
+            regime_key: &rk,
+            role: &role,
+            title: "t",
+            description: "d",
+            content: "c",
+            source_trajectory_ids: &ids,
+            recorded_at: Utc::now(),
+        });
+        let before = item.id;
+        let demoted = item.with_demotion(DemotionEvidence::new(TrajectoryId::new(), "contradicting failure", Utc::now()));
+        assert_eq!(demoted.id, before);
+        assert_eq!(StrategyId::derive(&demoted.identity()), before);
     }
 }

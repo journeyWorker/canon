@@ -255,6 +255,26 @@ impl SessionAdapter for CodexAdapter {
         "codex"
     }
 
+    /// `1` — this adapter's OUTPUT is unchanged since it shipped, so
+    /// `1` is the value that re-reads nothing: every session cursor
+    /// already on disk was computed against exactly this parse output.
+    /// s37 (`execution-graph-topology`) touched this file but did not
+    /// change that: it added `agent_id`/`parent_agent_id` as a constant
+    /// `None`, because Codex's `session_forked_from_id` marks a FORK,
+    /// never a dispatch (see the two comment sites below), and a
+    /// `skip_serializing_if`-elided `None` is indistinguishable from the
+    /// field's absence to every downstream consumer — an unchanged
+    /// rollout still normalizes to byte-identical records. Contrast
+    /// `claude-code`, whose s37 change DID populate them and which is
+    /// therefore at `2`. Bump this the moment a change in this file
+    /// alters what an UNCHANGED rollout transcript normalizes to (a
+    /// newly POPULATED field, a changed cumulative-delta or
+    /// fork-detection rule, a different usage gate) — see
+    /// [`SessionAdapter::parse_version`].
+    fn parse_version(&self) -> u32 {
+        1
+    }
+
     /// Live+archived root union — ported from `scanner.rs:1101-1136`
     /// (design D5). `${CODEX_HOME:-~/.codex}/sessions` is Codex CLI's
     /// live transcript dir; `archived_sessions` is Codex CLI's own
@@ -477,6 +497,14 @@ fn parse_codex_reader<R: BufRead>(mut reader: R, session_id: &str, fallback_time
                     text,
                     workspace_key: state.session_workspace_key.clone(),
                     workspace_label: state.session_workspace_label.clone(),
+                    // `None`: Codex's rollout format marks a FORK
+                    // (`session_forked_from_id`, a replay of one
+                    // agent's own history into a sibling file), never a
+                    // dispatch of a distinct subagent, so it carries no
+                    // agent-delegation edge to record
+                    // (s37-execution-graph-topology).
+                    agent_id: None,
+                    parent_agent_id: None,
                 });
             }
         }
@@ -578,6 +606,10 @@ fn parse_codex_reader<R: BufRead>(mut reader: R, session_id: &str, fallback_time
                 duration_ms,
                 dedup_key: None,
                 is_turn_start: false,
+                // `None` — see the directive path above: a fork is not
+                // a dispatch (s37-execution-graph-topology).
+                agent_id: None,
+                parent_agent_id: None,
             };
 
             if state.pending_turn_start {

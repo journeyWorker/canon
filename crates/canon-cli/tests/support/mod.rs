@@ -100,7 +100,7 @@ impl Fixture {
     /// `query-scope-filters` fixtures).
     pub fn plant_task_in_git(&self, task_id: &str, title: &str, status: TaskStatus, at: DateTime<Utc>) -> WriteReceipt {
         let git = GitTier::new(self.git_root());
-        let record = Task::new(Envelope::new(1, RecordKind::Task, at, actor()), TaskId::parse(task_id).unwrap(), title, status, None);
+        let record = Task::new(Envelope::current(RecordKind::Task, at, actor()), TaskId::parse(task_id).unwrap(), title, status, None);
         git.write(&record).unwrap()
     }
 

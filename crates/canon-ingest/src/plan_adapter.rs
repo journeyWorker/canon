@@ -203,6 +203,31 @@ pub trait PlanAdapter: Send + Sync {
     /// looks up.
     fn dialect_id(&self) -> &'static str;
 
+    /// This dialect's PARSE-OUTPUT generation
+    /// (`s38-evidence-bearing-memory`) — bumped whenever the adapter's
+    /// parse output changes for IDENTICAL input bytes: a newly-extracted
+    /// field, a corrected mapping, a changed diagnostic classification.
+    /// NOT a version of the foreign dialect itself, and not bumped for a
+    /// refactor that leaves every emitted record byte-identical.
+    ///
+    /// It exists because a plan record's `Envelope.at` is
+    /// `file_modified_at(<source doc>)` (s20 D7) and the plan-import
+    /// cursor is keyed on the source's digests — both deliberately
+    /// byte-stable, so an unchanged plan re-imports idempotently. The
+    /// flip side is that a change to THIS code is invisible to both: the
+    /// cursor reports `skipped unchanged` and never re-parses, and even
+    /// forced past that, the stale and fresh record for one `task_id`
+    /// tie on `at`. `canon-cli`'s `plan_source_cursor_id` folds this
+    /// value into the cursor IDENTITY, so a bump yields a different
+    /// cursor id, finds no prior cursor, and re-parses the source in
+    /// full exactly as if it had been edited.
+    ///
+    /// REQUIRED, never defaulted: a new dialect must decide its own
+    /// generation deliberately, because a silent `1` inherited from a
+    /// default is indistinguishable from "this dialect has never changed
+    /// its output" — a claim only its author can make.
+    fn parse_version(&self) -> u32;
+
     /// Resolve this adapter's source from the generic config surface.
     /// `None` when `config.root` is unset — never a hardcoded fallback
     /// path.
@@ -283,6 +308,10 @@ mod tests {
     impl PlanAdapter for StubAdapter {
         fn dialect_id(&self) -> &'static str {
             "stub"
+        }
+
+        fn parse_version(&self) -> u32 {
+            1
         }
 
         fn resolve_source(&self, config: &PlanSourceConfig) -> Option<PlanSourceHandle> {

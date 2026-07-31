@@ -460,10 +460,13 @@ fn sync_one_root(tier: &GitTier, spec_root: &SpecRoot, actor: &Actor) -> Result<
     }
 
     let existing = tier.read(&TierQuery::kind(RecordKind::Scenario))?;
-    // Keep each record's OWN content digest alongside its typed
-    // `Scenario` (s21 D3: the fold's tie-break needs a real digest,
-    // never just `at`) — `content_digest12` over the record's raw
-    // JSON, the same digest `GitTier`/`PgTier` writes already compute.
+    // Keep each record's OWN content digest and format generation
+    // alongside its typed `Scenario` (s21 D3: the fold's tie-break needs
+    // a real digest, never just `at`; `s38-evidence-bearing-memory`: an
+    // equal-`at` tie is decided by `envelope.schema` FIRST, so a
+    // `Scenario` schema bump supersedes deterministically rather than by
+    // digest luck) — `content_digest12` over the record's raw JSON, the
+    // same digest `GitTier`/`PgTier` writes already compute.
     struct ExistingScenario {
         scenario: Scenario,
         digest: String,
@@ -477,6 +480,7 @@ fn sync_one_root(tier: &GitTier, spec_root: &SpecRoot, actor: &Actor) -> Result<
         existing_scenarios,
         |e: &ExistingScenario| (e.scenario.project_id.clone(), e.scenario.scenario_id.clone()),
         |e: &ExistingScenario| e.scenario.envelope.at,
+        |e: &ExistingScenario| e.scenario.envelope.schema,
         |e: &ExistingScenario| e.digest.as_str(),
     );
 
@@ -957,6 +961,7 @@ mod tests {
             result.records.iter().filter_map(|r| serde_json::from_value::<Scenario>(r.0.clone()).ok()).collect::<Vec<_>>(),
             |s: &Scenario| (s.project_id.clone(), s.scenario_id.clone()),
             |s: &Scenario| s.envelope.at,
+            |s: &Scenario| s.envelope.schema,
             |_: &Scenario| "",
         );
         let key = (ProjectId::parse("root").unwrap(), ScenarioId::parse("world.hotdeal.01").unwrap());

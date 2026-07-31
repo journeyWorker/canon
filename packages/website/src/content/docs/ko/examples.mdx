@@ -24,7 +24,7 @@ import { Steps } from "@astrojs/starlight/components";
    바로 동작하는 `canon.yaml`을 씁니다. `canon init`은 내구성 있고
    리뷰 가능한 레코드에는 Git을, 대량으로 발생하는 운영 레코드에는
    로컬 SQLite를 사용합니다. PostgreSQL과 S3 호환 스토리지는 선택적
-   스케일업 백엔드입니다. canon-model의 12개 레코드 종류 중 7개는
+   스케일업 백엔드입니다. canon-model의 13개 레코드 종류 중 8개는
    환경 변수가 필요 없는 `local`(git 백엔드) rung으로 라우팅되고,
    `task`, `handoff`, `session`, `run`, `event`는 `hot`(기본값
    SQLite, `.canon/hot.db`, gitignore 처리됨)으로 라우팅됩니다.
@@ -61,6 +61,7 @@ import { Steps } from "@astrojs/starlight/components";
      trajectory: local
      strategy_item: local
      evidence_record: local
+     subject: local
    specs:
      roots:
        - id: root

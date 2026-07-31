@@ -2,7 +2,7 @@ import type { AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
 import { renderTable, type ColumnDef } from "../render-table";
 
 // Panel 5: review-feedback burn-down over time — thin SELECT over
-// mart_review_burndown (crates/canon-store/sql/views.sql:377-402).
+// mart_review_burndown (crates/canon-store/sql/views.sql).
 // `divergence_open_running_total` is already the view's own running-sum
 // window column; this panel does not recompute it.
 const QUERY = `

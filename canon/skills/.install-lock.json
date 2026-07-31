@@ -21,8 +21,8 @@
       "version": 6
     },
     "canon-learn": {
-      "contentHash": "sha256:5d48349d80d7ef6ba6b537608218b1e2386504315f22c79b44c5ad82a6d32253",
-      "version": 5
+      "contentHash": "sha256:36fef7076004a0bcc75a849b7c43f7575a6b0efc02e04c7b8639e8715ac5c7bb",
+      "version": 6
     },
     "canon-plan-import": {
       "contentHash": "sha256:843b337d7981693bfbb670483b091518eb74028dad327eff07a402155bd64bf9",
@@ -45,8 +45,8 @@
       "version": 7
     },
     "canon-session-ingest": {
-      "contentHash": "sha256:764a618d5c39ac28052c9c763d886fdf0c3573eac11a449b3b4825f6335d446c",
-      "version": 7
+      "contentHash": "sha256:90fd679e56232294c28f256f1b1d10ddeb42cc18863298585cb6b03c56c20440",
+      "version": 9
     },
     "canon-storage": {
       "contentHash": "sha256:4e9bdcf04e1df0d241acd6c357098c6a07d901ab88b838499afed0face7b97c4",

@@ -223,6 +223,43 @@ def main() -> int:
         f"npm-publish step drift:\n  publishes={sorted(published)}\n  expected ={sorted(expected_dirs)}",
     )
 
+    # 6. Every package.json in the repo carries the Cargo workspace version.
+    #    publish.yml rewrites the three PUBLISHED manifests from
+    #    `[workspace.package].version` at release time, so a stale committed
+    #    version never reaches npm — which is exactly why it can rot
+    #    unnoticed in the tree (found at v0.2.1 with all three still on
+    #    0.1.0, and two more numbers across the private packages). A
+    #    committed manifest that disagrees with the tag being cut is a
+    #    reader-facing lie, so it is asserted here rather than left to the
+    #    rewrite. Private packages are included deliberately: one repo, one
+    #    version, one rule to check.
+    cargo_text = read(ROOT / "Cargo.toml")
+    m = re.search(r'\[workspace\.package\](?:(?!^\[).|\n)*?^version = "([^"]+)"', cargo_text, re.MULTILINE)
+    if not m:
+        fail("Cargo.toml has no [workspace.package] version")
+    workspace_version = m.group(1)
+    # Scan from ROOT, not just packages/ — the first cut missed tracked
+    # `examples/platformer/package.json`, so the rule claimed "every
+    # package.json" while a manifest sat at 0.0.0 and the check passed.
+    # Excluded paths are dependency/build output, never source.
+    excluded = {"node_modules", "dist", ".astro", "target", "vendors", ".git"}
+    manifests = sorted(
+        p for p in ROOT.rglob("package.json") if excluded.isdisjoint(p.parts)
+    )
+    check(bool(manifests), "no package.json found to version-check — the scan is broken, not the tree")
+    for manifest in manifests:
+        rel = manifest.relative_to(ROOT)
+        try:
+            found = json.loads(manifest.read_text()).get("version")
+        except (OSError, json.JSONDecodeError) as e:
+            # An unreadable manifest must FAIL, never pass vacuously.
+            ERRORS.append(f"cannot read {rel} for the version check: {e}")
+            continue
+        check(
+            found == workspace_version,
+            f"version drift in {rel}: package.json={found!r} vs Cargo.toml [workspace.package]={workspace_version!r}",
+        )
+
     if ERRORS:
         print("check-release-workflow-safety: DRIFT DETECTED\n", file=sys.stderr)
         for e in ERRORS:

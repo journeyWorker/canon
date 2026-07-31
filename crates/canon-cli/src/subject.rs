@@ -16,11 +16,14 @@
 //! different record sharing one natural key resolves to a NEW path), so
 //! each stamps a FRESH envelope `at = Utc::now()` and persists a new
 //! record whose greater `at` deterministically wins `canon query`'s
-//! `fold_latest_by_key` (winner = greatest `(at, digest)`) — the SAME
-//! fold `canon-gate::ledger` and `canon query`'s pg-routed reader
+//! `fold_latest_by_key` (winner = greatest `(at, schema, digest)`) — the
+//! SAME fold `canon-gate::ledger` and `canon query`'s pg-routed reader
 //! already apply, so adopt/status re-writes read back as ONE latest
-//! row. A same-`at` digest tiebreak would be nondeterministic, so the
-//! bumped `at` is load-bearing, not cosmetic.
+//! row. `Subject`'s `at` is wall-clock, so its two re-writes never tie
+//! and the `schema`/`digest` rungs below `at` never engage here — the
+//! bumped `at` is load-bearing, not cosmetic. (The `schema` rung exists
+//! for the kinds whose `at` is byte-stable and therefore CAN tie —
+//! plan-derived `Task`/`Change`, `s38-evidence-bearing-memory`.)
 //!
 //! # `verifying → shipped` is evidence-gated, fail-closed
 //! That ONE transition additionally requires every linked
@@ -129,25 +132,30 @@ fn registry_for(canon_yaml_path: &Path, kinds: &[RecordKind]) -> Result<TierRegi
 }
 
 /// Fold every retained version of `kind` to one latest row per natural
-/// key — winner = greatest `(at, content_digest12)`, via the shared
-/// [`canon_store::fold_latest_by_key`] every multi-version reader uses,
-/// keyed by the SAME `resolve_partition` natural key `canon query`
-/// derives. This is how an `adopt`/`status` re-write (a new append at a
-/// bumped `at`) reads back as the one current record.
+/// key — winner = greatest `(at, envelope.schema, content_digest12)`,
+/// via the shared [`canon_store::fold_latest_by_key`] every
+/// multi-version reader uses, keyed by the SAME `resolve_partition`
+/// natural key `canon query` derives. This is how an `adopt`/`status`
+/// re-write (a new append at a bumped `at`) reads back as the one
+/// current record; the `schema` rung
+/// (`s38-evidence-bearing-memory`) is what keeps a same-`at` pair of
+/// format generations from resolving by digest luck.
 fn fold_latest(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
     struct Candidate {
         key: String,
         at: DateTime<Utc>,
+        schema: u32,
         digest: String,
         record: RawRecord,
     }
     let candidates = records.into_iter().map(|record| {
         let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
         let at = canon_store::tier::raw_record_at(&record);
+        let schema = canon_store::tier::raw_record_schema(&record);
         let digest = canon_store::partition::content_digest12(&record.0);
-        Candidate { key, at, digest, record }
+        Candidate { key, at, schema, digest, record }
     });
-    canon_store::fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.digest.as_str())
+    canon_store::fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str())
         .into_values()
         .map(|c| c.record)
         .collect()

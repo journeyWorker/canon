@@ -98,7 +98,7 @@ Gherkin `.feature` 스펙 코퍼스를 검증하고 확장합니다.
 
 | Command | Description |
 |---|---|
-| `canon learn promote <STRATEGY_ID> [--repo <dir>] [--dry-run]` | 증류된 `StrategyItem` 하나(ULID 기준)를 `.canon/strategies/<role>/<id>.md`의 git 티어로 승급시키고, advisory promote lint(내용 길이, 리터럴 절대 경로)를 non-blocking 경고로 실행합니다. |
+| `canon learn promote <STRATEGY_ID> [--repo <dir>] [--dry-run]` | 증류된 `StrategyItem` 하나(ULID 기준)를 `.canon/strategies/<role>/<id>.md`의 git 티어로 승급시킵니다. **증거 기반 게이트이며 fail-closed입니다:** 먼저 해당 전략 자신의 regime trajectory에 대해 역할별로 설정된 승급 게이트를 평가하고, 코로보레이션이 부족한 전략은 이유가 명시된 채 거부되며 종료 코드 `1`로 끝납니다 — `--force`는 없습니다. 게이트는 각 trajectory의 **해소된** outcome을 읽으므로, `pending` 상태를 해소하려면 먼저 `canon ingest artifacts`를 실행하세요. 게이트를 통과한 뒤에는 advisory promote lint(내용 길이, 리터럴 절대 경로)를 non-blocking 경고로 실행합니다. |
 | `canon retrieve --role <role> (--regime <regime_key> \| --domain <d> [--subject <id>]) [--k <n>] [--repo <dir>] [--json]` | 역할+regime 범위의 전략 retrieval입니다. `--regime`을 직접 주거나 `--domain`/`--subject`로부터 도출합니다 — retrieval은 area 후보를 `<domain>-<subject_id>` 다음 `<domain>` 순서(폴백)로 시도합니다. `--role`은 `--regime`의 선행 세그먼트와 같아야 합니다(불일치 시 종료 코드 `2`). fail-soft: 그 전제조건이 성립하면 항상 `0`으로 종료하며, 스토어 장애는 빈 목록으로 저하됩니다. |
 | `canon dispatch begin --role <role> --regime <regime_key> [--agent-id <id>] [--repo <dir>] [--json]` | `Run`(status `Running`)을 발급하고, `--role`/`--regime`에 대한 guidance를 retrieve하여 run의 `injected_guidance`에 기록한 뒤, 매니페스트를 `<repo>/.canon/dispatch/<run_id>.json`에 씁니다. |
 | `canon regime-key --role <r> --repo <r> --area <a> --hash <h>` | 원본 세그먼트로부터 하나의 정규 `regime_key` (`<role>/<repo>/<area>/<hash>`)를 직렬화 + 검증합니다 — 모든 write/read 경로가 공유하는 Rust 직렬화기의 셸 대응물입니다. 키를 출력하고 `0`으로 종료하며, 형식이 잘못되면 `2`로 종료합니다. |

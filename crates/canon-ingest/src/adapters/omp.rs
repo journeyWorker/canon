@@ -75,6 +75,21 @@ const PRE_SESSION_METADATA_TYPES: &[&str] = &["title"];
 
 /// Pi session entry (subsequent lines of JSONL). Ported from
 /// `pi.rs:42-54`.
+///
+/// **`parentId` is deliberately NOT modeled
+/// (s37-execution-graph-topology).** Every omp/pi record — `message`,
+/// `model_change`, `thinking_level_change`, `mode_change`, … — carries
+/// an `id`/`parentId` pair chaining it to the PRECEDING record of any
+/// type in the same transcript (a `thinking_level_change` whose
+/// `parentId` is the `model_change` before it is the normal shape).
+/// That is intra-session record threading — the source's own
+/// branch/undo chain — not an agent-delegation edge, and this format
+/// carries no subagent marker at all (nothing like Claude Code's
+/// `isSidechain`). So this adapter leaves
+/// [`crate::adapter::UnifiedRow::agent_id`] and `parent_agent_id`
+/// `None` on every row it emits: a fabricated lineage edge would make
+/// `crate::normalize` mint one bogus child `Run` per assistant turn,
+/// which is strictly worse than representing no topology.
 #[derive(Debug, Deserialize)]
 struct PiSessionEntry {
     #[serde(rename = "type")]
@@ -110,6 +125,25 @@ struct PiUsage {
 impl SessionAdapter for OmpAdapter {
     fn client_id(&self) -> &'static str {
         "omp"
+    }
+
+    /// `1` — this adapter's OUTPUT is unchanged since it shipped, so
+    /// `1` is the value that re-reads nothing: every session cursor
+    /// already on disk was computed against exactly this parse output.
+    /// s37 (`execution-graph-topology`) touched this file but did not
+    /// change that: it added `agent_id`/`parent_agent_id` as a constant
+    /// `None` (omp/pi carries no agent-delegation edge — see
+    /// `PiSessionEntry`'s doc), and a `skip_serializing_if`-elided
+    /// `None` is indistinguishable from the field's absence to every
+    /// downstream consumer, so an unchanged transcript still normalizes
+    /// to byte-identical records. Contrast `claude-code`, whose s37
+    /// change DID populate them and which is therefore at `2`. Bump
+    /// this the moment a change in this file alters what an UNCHANGED
+    /// transcript normalizes to (a newly POPULATED field, a changed
+    /// header probe, a different usage gate) — see
+    /// [`SessionAdapter::parse_version`].
+    fn parse_version(&self) -> u32 {
+        1
     }
 
     fn scan_roots(&self, home: &Path, use_env_roots: bool) -> Vec<PathBuf> {
@@ -265,6 +299,10 @@ fn parse_pi_file(path: &Path) -> ParseOutcome {
                     text,
                     workspace_key: workspace_key.clone(),
                     workspace_label: workspace_label.clone(),
+                    // `None`: omp/pi carries no agent-delegation edge
+                    // — see `PiSessionEntry`'s doc comment.
+                    agent_id: None,
+                    parent_agent_id: None,
                 });
             }
             continue;
@@ -305,6 +343,11 @@ fn parse_pi_file(path: &Path) -> ParseOutcome {
             // call anywhere in the donor) — ported behavior, not an
             // omission; a future enhancement, not invented here.
             is_turn_start: false,
+            // `None`: omp/pi carries no agent-delegation edge — see
+            // `PiSessionEntry`'s doc comment for why `parentId` is not
+            // one.
+            agent_id: None,
+            parent_agent_id: None,
         });
     }
 

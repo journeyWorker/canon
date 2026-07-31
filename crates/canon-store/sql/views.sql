@@ -404,13 +404,86 @@ ORDER BY role, regime_key;
 -- injected_guidance` — the ONE physically-persisted "a strategy was
 -- retrieved and shown to an agent" signal; `canon-learn::retrieve` is
 -- itself a pure, unlogged function, that crate's own module doc).
--- `applied` = the count of trajectories whose S7 roll-up verdict was
--- actually written back (`outcome` present and not `pending`,
--- `crates/canon-learn/src/mark_verdict.rs`) — i.e. the guidance-
--- informed run's real-world consequence was recorded, the nearest
--- available "the retrieved guidance's effect was judged" signal (no
--- direct run_id<->trajectory_id join exists yet to require the SAME
--- run that received guidance also produced the trajectory).
+--
+-- What each column counts, and in WHICH unit (s40
+-- (`plan-vs-actual-diff`) tasks 3.1/3.2). The last three stages are all
+-- counted in STRATEGIES, so the funnel reads as one narrowing set:
+--
+--   verdicts  — `VerdictRow`s across this role's raw trajectories: the
+--               evidence the distiller consumes. The one stage NOT
+--               counted in strategies, and the natural upper bound —
+--               a trajectory carries 1..n verdicts and
+--               `canon-learn::distill_trajectory` emits at most one
+--               item per verdict. Strictly fewer when one trajectory
+--               repeats a byte-identical verdict: the two distil to
+--               the same content, hence (ids being content-derived)
+--               to one strategy, not two indistinguishable copies of
+--               it. So a `distilled` below `verdicts` is duplicate
+--               evidence collapsing, never the distiller dropping a
+--               verdict on the floor.
+--   distilled — this role's `stg_strategy_items` rows.
+--   retrieved — DISTINCT strategies of this role that appear in at
+--               least one `Run.injected_guidance` AND still exist as
+--               a distilled row. Both halves are load-bearing; see
+--               the rebuild note below.
+--   applied   — that same distinct set, restricted to strategies whose
+--               recipient run reached a TERMINAL `Run.status`. So
+--               "applied" asserts BOTH halves: the guidance was in an
+--               agent's context, AND the run it was injected into
+--               actually finished.
+--
+-- `applied <= retrieved <= distilled` holds BY CONSTRUCTION, not by
+-- luck: `applied_counts` is a `WHERE`-restriction of the exact rows
+-- `retrieved_counts` counts, over the same `count(DISTINCT
+-- strategy_id)`; and every strategy either one counts IS one
+-- `stg_strategy_items` row of that role. Both properties were false
+-- before s40 — `applied` was `count(*)` over resolved trajectories
+-- with no reference to retrieval at all (canon's own corpus rendered
+-- `retrieved 0 / applied 16`, unreadable as a funnel), and `retrieved`
+-- was `count(*)` over injection EVENTS, which exceeds `distilled` the
+-- moment one strategy is injected into two runs. A stage that can
+-- exceed the stage above it measures nothing about the stage above it,
+-- the same defect class s39 (`joined-evidence-grounding`) fixed in
+-- `mart_review_burndown`'s panel: a column name asserting a
+-- relationship the SQL never computed.
+--
+-- Why `retrieved` does not evaporate on a rebuild. This stage joins a
+-- recorded `StrategyRef` — a snapshot frozen into `Run.
+-- injected_guidance` at dispatch time — against the CURRENT
+-- `stg_strategy_items`. Every `canon ingest artifacts` calls
+-- `canon-learn`'s `rebuild_namespace`, which deletes a regime's whole
+-- distilled layer and re-distills it, so that join only holds if a
+-- re-derived strategy keeps its id. It does: `StrategyId` is a pure
+-- function of the distilled row's own content
+-- (`crates/canon-learn/src/ids.rs`'s `StrategyId::derive`), not a
+-- freshly-minted ULID, so re-distilling unchanged evidence reproduces
+-- the same id and the citation still resolves. What the stage
+-- therefore counts is precisely "retrieved, and still derivable from
+-- today's evidence" — a strategy whose source trajectory's own text
+-- later changes is re-derived under a NEW id, and the old citation
+-- stops counting, which is the honest answer: that strategy no longer
+-- exists.
+--
+-- Why terminal `Run.status`, and not the raw trajectory's resolved
+-- `outcome` (the pre-s40 signal): `stg_trajectories` is canon-learn's
+-- parquet row (`crates/canon-learn/src/store/parquet_trajectory.rs`'s
+-- `TrajectoryWire`), which carries NO run id at all — `canon ingest
+-- artifacts` mints it from an ARTIFACT, with no run in hand — so it
+-- cannot be conditioned on the run that received the guidance.
+-- `canon_model::records::Trajectory` IS keyed by `run_id`
+-- (`crates/canon-store/src/partition.rs`), but has zero production
+-- writers, so conditioning on it would ship a column structurally
+-- pinned at `0` forever — worse than the wrong column it replaced.
+-- `Run.status` is the one retrieval-conditional completion signal a
+-- user can actually move: `canon dispatch begin` mints the run
+-- `running` and `canon dispatch end` (s40 task group 1) closes it.
+--
+-- On canon's own corpus this panel reads `retrieved 0` / `applied 0`
+-- for every role: no `Run` here carries `injected_guidance`, so there
+-- is no `StrategyRef` to join in the first place. With ids stable
+-- across rebuilds, `retrieved 0` now means what it says — nothing has
+-- been retrieved into a run's context here — rather than "something
+-- was, and the last rebuild forgot it".
 CREATE OR REPLACE VIEW mart_flywheel_funnel AS
 WITH verdict_counts AS (
     SELECT role, CAST(sum(json_array_length(body -> '$.verdicts')) AS BIGINT) AS n
@@ -422,17 +495,32 @@ distilled_counts AS (
     FROM stg_strategy_items
     GROUP BY role
 ),
-retrieved_counts AS (
-    SELECT si.role AS role, count(*) AS n
+-- One row per (run, strategy actually injected into that run). Both
+-- retrieval stages below are `count(DISTINCT strategy_id)` over THIS
+-- single relation, `applied_counts` differing only by a `WHERE` — that
+-- shared grain is what makes `applied <= retrieved` structural.
+retrieved_guidance AS (
+    SELECT
+        r.body ->> '$.status' AS run_status,
+        si.id                 AS strategy_id,
+        si.role               AS role
     FROM stg_records r, unnest(from_json(r.body -> '$.injected_guidance', '["JSON"]')) AS u(g)
     JOIN stg_strategy_items si ON si.id = (g ->> '$.strategy_id')
     WHERE r.kind = 'run'
-    GROUP BY si.role
+),
+retrieved_counts AS (
+    SELECT role, count(DISTINCT strategy_id) AS n
+    FROM retrieved_guidance
+    GROUP BY role
 ),
 applied_counts AS (
-    SELECT role, count(*) AS n
-    FROM stg_trajectories
-    WHERE (body ->> '$.outcome') IS NOT NULL AND (body ->> '$.outcome') <> 'pending'
+    -- The terminal `canon_model::records::RunStatus` variants
+    -- (serialized `snake_case`). An allowlist, never `<> 'running'`:
+    -- `pending` is non-terminal too, and a future non-terminal variant
+    -- must not silently start counting as applied.
+    SELECT role, count(DISTINCT strategy_id) AS n
+    FROM retrieved_guidance
+    WHERE run_status IN ('succeeded', 'failed', 'aborted')
     GROUP BY role
 ),
 roles AS (
@@ -509,8 +597,10 @@ ORDER BY day;
 -- no dedicated `session_id` field of its own today — verified against
 -- `crates/canon-model/src/handoff.rs`, 2026-07-11: its own fields are
 -- `id`/`state`/`chain_id`/`parent_handoff_id`/`seq`/`claimed_by`/
--- `openspec_change_slug`/`tags`/`title`/`body`, none of them a session
--- key. The one currently-available, honest join key is every record's
+-- `openspec_change_slug`/`tags`/`title`/`body`, plus s37's
+-- `from_role`/`to_role` edge endpoints — the endpoints type WHICH ROLE
+-- handed to which, still not WHICH SESSION, so none of these is a
+-- session key. The one currently-available, honest join key is every record's
 -- OWN envelope `actor.session_id` (S1's structured-actor design,
 -- `canon_model::envelope::Actor::session_id` — the "no artifact can
 -- join to the session… that produced it" gap this exact field exists

@@ -10,10 +10,14 @@ trajectories into retrievable, promotable insight — role-namespaced:
 `planning`, `design`, `dev`, `test`, `review`, and others share one
 backbone but evolve separately.
 
+canon's position is that strategy memory is only worth retrieving if its
+text is grounded in artifacts outside the model — otherwise a retrieval
+loop just recycles the model's own output back into itself.
+
 ## The flywheel
 
 ```
-ingest (sessions, reviews, handoffs) → trajectories + verdicts (per role)
+ingest (sessions, reviews, divergences, handoffs, task flips) → trajectories + verdicts (per role)
     → distill: success → strategy, review finding → guardrail
     → statistical promotion gate — no noise distilled
     → promote to git tier (versioned, PR-reviewed)
@@ -24,16 +28,67 @@ ingest (sessions, reviews, handoffs) → trajectories + verdicts (per role)
 ## Two tiers, two stores
 
 - **Warm — trajectories (Parquet).** `ParquetTrajectoryStore` under
-  `<repo>/.canon/learn/trajectories/`: raw, verdict-keyed rows written
-  by ingest. Local, rebuildable, `.gitignore`d — never hand-committed.
+  `<repo>/.canon/learn/trajectories/`: verdict-keyed rows written by
+  ingest. Local, rebuildable, `.gitignore`d — never hand-committed.
 - **Durable — strategies (git).** `ParquetStrategyStore` plus
   git-tracked `<repo>/.canon/strategies/<role>/<id>.md` files: the
   distilled, PR-reviewable `StrategyItem`s a promotion writes into and
   a demotion soft-flags.
 
+A trajectory names its concrete artifact — the scenario, handoff, or
+task it was derived from — and carries the prose the underlying evidence
+record actually holds: a reviewer's pin, a divergence finding's
+narrative, a task's evidence note. So a distilled strategy quotes real
+evidence instead of a summary of canon's own ingest:
+
+```
+# before — the trajectory described the adapters that produced it
+2 verdict(s) derived from canon-ingest artifact adapters for regime test/canon/platformer/41fdd8c50ee6
+
+# now — the title names the artifact, the content quotes the evidence
+platformer.session.04: resolved divergence
+resolved divergence: Fixed and independently re-verified+attested at 505a668efedaed6dfb5e125a0d927f118b2dfad1 (dev-fix wave 8d3c1506..505a668e; movement.03/session.03 at ea77374)
+```
+
+A record carrying no prose is not a ceiling, because canon's join spine
+exists so a record does not have to hold every fact about itself. Two
+joins supply the text the event itself lacks:
+
+- **Antecedent findings.** A verdict-bearing event distills together with
+  the prose-bearing non-verdict events on the same artifact that preceded
+  it. A `resolved` divergence therefore carries the `open` ship-blockers
+  it closed — the pitfall and its demonstrated fix in one item, which is
+  the most useful shape a strategy can take. Open findings stay
+  non-verdict: they never mint a verdict, reward, or trajectory of their
+  own.
+- **Scenario titles.** A trajectory whose artifact is a scenario names it
+  in human terms, so an attestation says what it attested.
+
+```
+platformer.session.04: resolved divergence — Idle and resize sessions stay error-free
+    resolved divergence: Fixed and independently re-verified+attested at 505a668e...
+    preceded on this artifact by:
+      - open divergence: SHIP-BLOCKER src/render/PixiStage.tsx:28-32 assigns app before
+        awaiting loadTextures ... Centralize teardown behind an idempotent owner.
+      - open divergence: SHIP-BLOCKER src/App.tsx:45-46 calls sim.setPaused() inside a
+        React updater ... Compute the next pause state outside the updater.
+```
+
+<Aside type="note">
+  `records::Review` really does carry no prose — only `reviewer`, `pin`,
+  and `provenance_ref`. Its attestations read as evidence anyway because
+  they are joined to the scenario they attest and to the findings filed
+  against it, not because the record grew a field. Antecedents are
+  ordered by `(at, line)`, deduped, and capped, so this text stays
+  deterministic.
+</Aside>
+
 Strategy memory is **rebuilt, not recomputed once**: `canon ingest
 artifacts` re-derives distilled strategies from the current trajectory
-set (`rebuild_namespace`) every time it runs. The rebuild is
+set (`rebuild_namespace`) every time it runs. That re-derivation is
+deterministic — a second ingest pass over the same artifacts derives
+byte-identical trajectory content, so the duplicate skip the rebuild
+rests on still fires and repeated runs don't churn. The rebuild is
 non-destructive — it never deletes a strategy the raw trajectory rows
 don't touch, so a rebuild can't silently drop a hand-promoted strategy.
 There is no standalone `canon learn` rebuild command; the only `canon
@@ -94,10 +149,26 @@ canon learn promote 01J...ULID --dry-run # preview: lint + resolve, no write
 `canon learn promote` graduates a distilled `StrategyItem` (by its ULID)
 from the warm parquet tier into `.canon/strategies/<role>/<id>.md`, with
 YAML front matter (`status`, `regime_key`, `role`, `title`,
-`source_trajectory_ids`, `recorded_at`). It runs advisory lints
-(content-length ceiling, literal-absolute-path rejection) —
-non-blocking — and rewrites the whole file idempotently, so a later
-manual edit to a promoted file doesn't survive a re-promote.
+`source_trajectory_ids`, `recorded_at`).
+
+Promotion is **evidence-gated and fails closed**. Before writing
+anything, canon reads the strategy's own regime trajectories and
+evaluates the role's configured gate; a strategy without enough
+corroboration is refused with a named reason and exit `1`, and nothing is
+written. There is no `--force` — a refusal means the evidence is not
+there yet.
+
+The gate reads each trajectory's **resolved** outcome, not its raw
+verdict rows, so trajectories still sitting at `pending` never
+corroborate a promotion. `canon ingest artifacts` resolves them (it
+computes each trajectory's covering verdict and reward in the same pass),
+which makes the working order `canon ingest artifacts` → `canon learn
+promote`.
+
+Beyond the gate it runs advisory lints (content-length ceiling,
+literal-absolute-path rejection) — non-blocking — and rewrites the whole
+file idempotently, so a later manual edit to a promoted file doesn't
+survive a re-promote.
 
 A strategy that later collects a **contradicting** trajectory is
 demoted, not deleted: a soft-flag merges `status: demoted` and a

@@ -6,7 +6,7 @@
   "at": "2026-07-10T12:00:00Z",
   "evidence_note": "EXPECTED-violations.json covers all four malformed variants",
   "kind": "task",
-  "schema": 1,
+  "schema": 2,
   "status": "done",
   "task_id": "s1-state-model-join-spine#6.2",
   "title": "fixture corpus"

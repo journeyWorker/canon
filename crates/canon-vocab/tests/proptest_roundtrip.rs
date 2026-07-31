@@ -37,7 +37,7 @@ fn snapshot() -> CapabilitySnapshot {
 }
 
 fn envelope() -> Envelope {
-    Envelope::new(1, RecordKind::Task, chrono::Utc::now(), Actor::new("proptest-agent", RoleId::parse("implementer").unwrap()))
+    Envelope::current(RecordKind::Task, chrono::Utc::now(), Actor::new("proptest-agent", RoleId::parse("implementer").unwrap()))
 }
 
 /// A valid task atom, generated from independently-arbitrary field values —

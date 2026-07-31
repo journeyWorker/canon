@@ -30,8 +30,11 @@ use crate::scanner;
 /// One registered adapter: its [`SessionAdapter`] handle plus the file
 /// glob `scanner::scan_dir`/`scanner::scan_roots` matches scan-root
 /// contents against. The glob lives here, NOT on [`SessionAdapter`]
-/// itself (design Contract freezes the trait at exactly three
-/// methods) — `SessionAdapter::parse` already self-rejects a
+/// itself (design Contract froze the trait at exactly three methods;
+/// s40 (`plan-vs-actual-diff`) amended it to four by adding
+/// `parse_version`, which describes the adapter's PARSE OUTPUT and so
+/// genuinely belongs on the adapter — a scan glob still does not)
+/// — `SessionAdapter::parse` already self-rejects a
 /// non-matching file by returning an empty `Vec` (e.g. omp/pi's header
 /// probe), so the glob here is a scan-efficiency filter, not a
 /// correctness dependency.
@@ -176,5 +179,92 @@ mod tests {
         let entry = &registry()[0];
         assert!(entry.file_matches(Path::new("/home/x/.omp/agent/sessions/abc/one.jsonl")));
         assert!(!entry.file_matches(Path::new("/home/x/.omp/agent/sessions/abc/notes.txt")));
+    }
+
+    /// Each shipped adapter's parse generation is pinned to the value
+    /// its own rustdoc argues for, as a DECLARED table rather than a
+    /// blanket "all at 1" — the blanket form is what let s37
+    /// (`execution-graph-topology`) change the Claude adapter's output
+    /// while its assertion still passed.
+    ///
+    /// `claude-code` is at `2` because its sidechain parse now populates
+    /// `agent_id`/`parent_agent_id`, which `crate::normalize` turns into
+    /// child runs: an unchanged `.jsonl` normalizes to strictly more
+    /// records, so a stored unsuffixed `claude-code` cursor would report
+    /// every sidechain `unchanged` and the lineage would never backfill.
+    /// The other three gained the same two fields as a constant `None`
+    /// (elided by `skip_serializing_if`), so their output is
+    /// byte-identical and `1` — the value whose cursor id is the
+    /// unsuffixed `client_id` — is what re-reads nothing. Changing a
+    /// number here without changing this table is the mistake this test
+    /// exists to make loud; see [`SessionAdapter::parse_version`] and
+    /// `canon-cli`'s `ingest::session_source_cursor_id`.
+    #[test]
+    fn every_shipped_adapters_parse_generation_matches_its_declared_value() {
+        let declared: &[(&str, u32)] = &[("omp", 1), ("hermes", 1), ("claude-code", 2), ("codex", 1)];
+
+        for entry in registry() {
+            let expected = declared.iter().find(|(id, _)| *id == entry.client_id()).map(|(_, version)| *version);
+            assert_eq!(
+                Some(entry.adapter.parse_version()),
+                expected,
+                "adapter `{}` reports parse generation {} — declare it here WITH the reason its output changed (or did not)",
+                entry.client_id(),
+                entry.adapter.parse_version()
+            );
+        }
+
+        for (client_id, _) in declared {
+            assert!(find(client_id).is_some(), "declared adapter `{client_id}` is no longer registered — drop it from the table or restore it");
+        }
+    }
+
+    /// The registry-wide enforcement point for
+    /// [`crate::adapter::session_adapter_id_violation`]'s grammar, which
+    /// is a precondition of the session cursor's identity rather than
+    /// cosmetics: `canon-cli`'s `ingest::session_source_cursor_id`
+    /// renders a `client_id` straight into a `<id>.json` filename, and
+    /// its `(client_id, version) -> id` mapping is one-to-one ONLY over
+    /// ids that do not themselves end `-v<digits>`. Because this table
+    /// is a closed static set linked into the binary, this assertion —
+    /// not a runtime branch — is what makes the property hold of every
+    /// adapter that will ever ship.
+    #[test]
+    fn every_registered_adapter_id_satisfies_the_cursor_filename_grammar() {
+        for entry in registry() {
+            let client_id = entry.client_id();
+            assert_eq!(
+                crate::adapter::session_adapter_id_violation(client_id),
+                None,
+                "adapter id `{client_id}` breaks the cursor-filename grammar: it {}",
+                crate::adapter::session_adapter_id_violation(client_id).map(|violation| violation.to_string()).unwrap_or_default()
+            );
+        }
+    }
+
+    /// The grammar's rules, each witnessed by the id it exists to
+    /// reject. `omp-v2` is the load-bearing one: it is a perfectly
+    /// plausible adapter name that would render the SAME cursor id as
+    /// `omp` at parse version 2, so the two adapters would share one
+    /// watermark and each report the other's transcripts `unchanged`.
+    #[test]
+    fn the_adapter_id_grammar_rejects_every_unsafe_or_ambiguous_shape() {
+        use crate::adapter::{SessionAdapterIdViolation as Violation, session_adapter_id_violation as violation};
+
+        assert_eq!(violation("claude-code"), None);
+        assert_eq!(violation("omp2"), None);
+        assert_eq!(violation("omp-v2x"), None, "`-v` followed by a non-digit tail is not the reserved suffix");
+        assert_eq!(violation("omp-v"), None, "a bare `-v` with no digits cannot be a rendered version suffix");
+
+        assert_eq!(violation(""), Some(Violation::Empty));
+        assert_eq!(violation("omp-v2"), Some(Violation::ReservedVersionSuffix));
+        assert_eq!(violation("omp-v1-v10"), Some(Violation::ReservedVersionSuffix), "the suffix is matched at the END, not at the first `-v`");
+        assert_eq!(violation("plan-openspec"), Some(Violation::ReservedPlanNamespace));
+        assert_eq!(violation("-omp"), Some(Violation::OuterHyphen));
+        assert_eq!(violation("omp-"), Some(Violation::OuterHyphen));
+        assert_eq!(violation("OMP"), Some(Violation::IllegalByte { byte: b'O' }), "uppercase is rejected, not folded: on a case-insensitive volume `OMP` and `omp` are ONE cursor file");
+        assert_eq!(violation(".."), Some(Violation::IllegalByte { byte: b'.' }));
+        assert_eq!(violation("a/b"), Some(Violation::IllegalByte { byte: b'/' }));
+        assert_eq!(violation("a b"), Some(Violation::IllegalByte { byte: b' ' }));
     }
 }

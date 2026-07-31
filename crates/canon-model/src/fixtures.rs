@@ -94,6 +94,18 @@ fn round_trip_all() {
             .find(|k| k.as_str() == kind_str)
             .unwrap_or_else(|| panic!("{:?} fixture's kind `{kind_str}` is not one of the twelve closed kinds", entry.path()));
         assert!(seen_kinds.insert(kind), "{kind:?} has more than one well-formed fixture");
+        // A well-formed fixture must model a CURRENT record, so its
+        // `schema` must equal its kind's own generation
+        // (`s38-evidence-bearing-memory`: `Task` is `2`, every other
+        // kind `1`). Without this, bumping a kind silently leaves its
+        // fixture advertising a generation no writer stamps — the
+        // malformed/ and compat fixtures that DELIBERATELY model older
+        // generations live elsewhere and are not walked here.
+        assert_eq!(
+            json.get("schema").and_then(serde_json::Value::as_u64),
+            Some(u64::from(kind.schema_version())),
+            "{kind:?}'s well-formed fixture must carry its kind's current schema generation"
+        );
         round_trip_well_formed(kind, &json);
     }
     for kind in RecordKind::ALL {

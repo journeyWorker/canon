@@ -1,7 +1,7 @@
 {
   "name": "@canon-dev/dashboard",
-  "version": "0.1.0",
-  "description": "canon — zero-network DuckDB-Wasm dashboard rendering the 5 canon report panels from a `canon report --snapshot` parquet snapshot.",
+  "version": "0.3.0",
+  "description": "canon \u2014 zero-network DuckDB-Wasm dashboard rendering the 5 canon report panels from a `canon report --snapshot` parquet snapshot.",
   "license": "MIT",
   "private": true,
   "type": "module",

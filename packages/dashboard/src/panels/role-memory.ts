@@ -2,7 +2,7 @@ import type { AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
 import { renderTable, type ColumnDef } from "../render-table";
 
 // Panel 3: role memory (strategies, hit rate, effect) — thin SELECT over
-// mart_role_memory (crates/canon-store/sql/views.sql:298-310).
+// mart_role_memory (crates/canon-store/sql/views.sql).
 // `avg_source_trajectories` is the view's own named "effect" proxy; kept
 // under its honest column name, not relabeled "effect" here.
 const QUERY = `

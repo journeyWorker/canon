@@ -2,7 +2,7 @@ import type { AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
 import { renderTable, type ColumnDef } from "../render-table";
 
 // Panel 1: change/task trust matrix — thin SELECT over mart_trust_matrix
-// (crates/canon-store/sql/views.sql:189-226). No mart re-derivation:
+// (crates/canon-store/sql/views.sql). No mart re-derivation:
 // `covered`/`green`/`who` are computed columns of the view itself, not
 // recomputed here. `latest_at` is cast to text in SQL to sidestep Arrow
 // timestamp-unit ambiguity in the JS layer (display formatting, not

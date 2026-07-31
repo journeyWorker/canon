@@ -66,6 +66,12 @@ fn live_bindings_of(evidence: Vec<EvidenceRecord>) -> BTreeMap<(ProjectId, Scena
     struct Candidate {
         key: (ProjectId, ScenarioId),
         at: DateTime<Utc>,
+        /// The evidence record's own `envelope.schema` — the fold's
+        /// equal-`at` generation discriminator
+        /// (`s38-evidence-bearing-memory`), threaded from the record
+        /// rather than assumed, so a schema bump on `EvidenceRecord`
+        /// supersedes deterministically instead of by digest luck.
+        schema: u32,
         digest: String,
         snapshot: BindingSnapshot,
     }
@@ -75,11 +81,12 @@ fn live_bindings_of(evidence: Vec<EvidenceRecord>) -> BTreeMap<(ProjectId, Scena
         let scenario_id = record.scenario_id.clone()?;
         let app_sha = record.evidence_sha.clone()?;
         let at = record.envelope.at;
+        let schema = record.envelope.schema;
         let digest = canon_store::partition::content_digest12(&serde_json::to_value(&record).unwrap_or_default());
-        Some(Candidate { key: (project_id, scenario_id), at, digest, snapshot: BindingSnapshot { app_sha, reserved_digest: None } })
+        Some(Candidate { key: (project_id, scenario_id), at, schema, digest, snapshot: BindingSnapshot { app_sha, reserved_digest: None } })
     });
 
-    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.digest.as_str()).into_values().map(|c| (c.key, c.snapshot)).collect()
+    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| (c.key, c.snapshot)).collect()
 }
 
 /// Every current `(project_id, scenario_id)` divergence state, folded

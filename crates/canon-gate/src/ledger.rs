@@ -87,9 +87,10 @@ impl LedgerEntry {
 
 /// Fold `ctx.evidence` to the latest matching record per (subject,
 /// role) cell (module doc) — a thin caller of the hoisted
-/// [`canon_store::fold_latest_by_key`] (design D11/s21 D3): winner
-/// per cell is the greatest `(envelope.at, content_digest)` pair — a
-/// total, machine-independent order, never corpus/iteration order.
+/// [`canon_store::fold_latest_by_key`] (design D11/s21 D3,
+/// `s38-evidence-bearing-memory`): winner per cell is the greatest
+/// `(envelope.at, envelope.schema, content_digest)` triple — a total,
+/// machine-independent order, never corpus/iteration order.
 /// Records with neither `task_id` nor `scenario_id` carry no cell
 /// identity ([`CellSubject::of`]) and are excluded, mirroring
 /// [`crate::coverage::CoverageCheck`]'s identical interface-gap
@@ -97,6 +98,11 @@ impl LedgerEntry {
 pub fn latest_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
     struct Candidate {
         entry: LedgerEntry,
+        /// The record's own `envelope.schema` — the fold's equal-`at`
+        /// generation discriminator, carried alongside `entry` because
+        /// [`LedgerEntry`] is a caller-facing cell projection and has no
+        /// business growing a storage-format field.
+        schema: u32,
         digest: String,
     }
     let candidates = ctx.evidence.iter().filter_map(|record| {
@@ -104,9 +110,9 @@ pub fn latest_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
         let role = record.envelope.actor.role.as_ref().map(|r| r.as_str().to_string());
         let entry = LedgerEntry { subject: subject.as_str().to_string(), role, verdict: record.verdict, agent_id: record.envelope.actor.agent_id.clone(), at: record.envelope.at };
         let digest = canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default());
-        Some(Candidate { entry, digest })
+        Some(Candidate { entry, schema: record.envelope.schema, digest })
     });
-    fold_latest_by_key(candidates, |c| (c.entry.subject.clone(), c.entry.role.clone()), |c| c.entry.at, |c| c.digest.as_str())
+    fold_latest_by_key(candidates, |c| (c.entry.subject.clone(), c.entry.role.clone()), |c| c.entry.at, |c| c.schema, |c| c.digest.as_str())
         .into_iter()
         .map(|(key, c)| (key, c.entry))
         .collect()

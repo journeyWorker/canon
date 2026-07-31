@@ -21,6 +21,7 @@
 //! the two outputs join on that key without ever double-counting each
 //! other — see that module's doc comment for the reciprocal
 //! cross-reference.
+use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -30,16 +31,10 @@ use canon_model::ids::{ChangeId, TaskId};
 use canon_model::records::{Change, ChangeStatus, Task, TaskStatus};
 use chrono::{DateTime, TimeZone, Utc};
 
-use crate::task_rows::{self, format_line, parse_line};
+use crate::task_rows::{self, TaskRow, format_line, parse_line};
 use crate::plan_writeback::{FlipDocOutcome, PlanTaskLocation, PlanWriteBack, WriteBackError};
 use crate::plan_adapter::{PlanAdapter, PlanParseOutcome, PlanSourceConfig, PlanSourceHandle, resolve_path_source};
 use crate::scanner::scan_dir;
-
-/// canon-model's envelope schema version every record this adapter
-/// constructs carries (mirrors `crate::normalize::SCHEMA_VERSION`'s own
-/// doc comment: "per-kind schema version, bumped on any breaking field
-/// change to that kind").
-const SCHEMA_VERSION: u32 = 1;
 
 /// The fixed, per-dialect unattributed actor every `Change`/`Task` this
 /// adapter emits carries (design D7: "provenance visible in every
@@ -71,12 +66,39 @@ pub(crate) const DIAG_DESIGN_DOC: &str = "design-doc";
 /// .unmapped` is keyed by construct NAME (design D3), so the task_id
 /// rides in the name itself rather than a second bookkeeping field.
 pub(crate) const DIAG_MALFORMED_SCENARIO_REF: &str = "malformed-scenario-ref";
+/// Named diagnostic (s37 `execution-graph-topology`, subject
+/// `flywheel-execution-graph`) for one DECLARED dependency reference
+/// that named no row the change actually has — dropped from the
+/// imported `Task.depends_on`, counted once per unresolvable token,
+/// never sinking the row's other well-formed dependencies or the row's
+/// own `Task` import. Recorded under the composite key
+/// `"<DIAG_UNRESOLVABLE_TASK_DEP>:<task_id>"` for exactly the reason
+/// [`DIAG_MALFORMED_SCENARIO_REF`] is: `PlanParseOutcome.unmapped` is
+/// keyed by construct NAME (design D3), and a flat count cannot tell an
+/// operator WHICH row's prose was mis-read. This diagnostic is the
+/// price of extracting dependencies from PROSE rather than a bracket
+/// segment: it is how an operator sees that the marker scan read
+/// something the corpus did not mean.
+pub(crate) const DIAG_UNRESOLVABLE_TASK_DEP: &str = "unresolvable-task-dep";
 
 pub struct OpenspecPlanAdapter;
 
 impl PlanAdapter for OpenspecPlanAdapter {
     fn dialect_id(&self) -> &'static str {
         "openspec"
+    }
+
+    /// `2` — this dialect's parse output changed for identical input
+    /// when `s37-execution-graph-topology` taught
+    /// [`parse_tasks_md`] to extract `depends_on` from the in-row
+    /// `depends on <n>`/`after <n>` marker prose. An unchanged
+    /// `tasks.md` therefore yields DIFFERENT `Task` records than it did
+    /// before that change, which is exactly what this generation
+    /// declares to the plan-import cursor
+    /// (`canon-cli::plans::plan_source_cursor_id`) so the source is
+    /// re-parsed rather than reported `skipped unchanged`.
+    fn parse_version(&self) -> u32 {
+        2
     }
 
     fn resolve_source(&self, config: &PlanSourceConfig) -> Option<PlanSourceHandle> {
@@ -138,8 +160,36 @@ impl PlanWriteBack for OpenspecPlanAdapter {
 /// `<root>/openspec/changes/<change_id>` — the openspec dialect's
 /// change-dir layout (s35 D1), the SAME path `canon ingest plans` reads
 /// and `canon gate task` hardcoded before s35.
+///
+/// Resolves with the SAME preference order [`discover_change_dirs`]
+/// already uses (s37 `execution-graph-topology`): the canonical
+/// `<root>/openspec/changes/` substructure wins whenever it exists,
+/// falling back to `<root>/<change_id>` only when a changes dir was
+/// passed DIRECTLY as `root`. Before this, discovery had that fallback
+/// and this function did not, so ONE `plans.sources[].root` value was
+/// interpreted two incompatible ways by two consumers in this same
+/// module: with canon's own `root: openspec/changes` (the
+/// direct-changes-dir shape `discover_change_dirs` deliberately
+/// tolerates), `canon ingest plans` imported fine while
+/// [`PlanWriteBack::locate_task`] resolved
+/// `openspec/changes/openspec/changes/<id>` and located NOTHING — which
+/// silently disabled `canon gate task`, canon's only hard-block control
+/// point, for every repo using that documented shape.
+///
+/// Existence-based, canonical-first, so a fresh/empty `root` still
+/// answers with the canonical layout rather than inventing a sibling
+/// path (what [`PlanWriteBack::typed_atoms_path`]'s own contract needs:
+/// it returns a path for a file that may not exist yet).
 fn change_dir(root: &Path, change_id: &ChangeId) -> PathBuf {
-    root.join("openspec").join("changes").join(change_id.as_str())
+    let canonical = root.join("openspec").join("changes").join(change_id.as_str());
+    if canonical.is_dir() {
+        return canonical;
+    }
+    let direct = root.join(change_id.as_str());
+    if direct.is_dir() {
+        return direct;
+    }
+    canonical
 }
 
 fn tasks_md_path(root: &Path, change_id: &ChangeId) -> PathBuf {
@@ -263,7 +313,7 @@ fn parse_change_dir(dir: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
     let (tasks, done_count, open_count, change_at) = parse_tasks_file(dir, root, &change_id, proposal_mtime, outcome);
 
     let status = derive_status(archived, done_count, open_count);
-    let envelope = Envelope::new(SCHEMA_VERSION, RecordKind::Change, change_at, actor());
+    let envelope = Envelope::current(RecordKind::Change, change_at, actor());
     outcome.changes.push(Change::new(envelope, change_id, basename, summary, status));
     outcome.tasks.extend(tasks);
 
@@ -278,6 +328,13 @@ fn parse_change_dir(dir: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
 /// counted malformed (whole file skipped, never a crash) but the
 /// `Change` itself still imports with zero tasks — the directory as a
 /// whole is not thereby invalid, only its task list is unavailable.
+///
+/// TWO passes, not one (s37 `execution-graph-topology`): a declared
+/// dependency reference ([`dependency_refs`]) resolves against the
+/// change's COMPLETE row set, and the corpus references rows in both
+/// directions (`s16-plugin-extensibility#2.1` declares `after 2.4`,
+/// pointing FORWARD), so no row can be finalized until every row has
+/// been read. Pass 1 collects rows + tallies; pass 2 emits `Task`s.
 fn parse_tasks_file(
     dir: &Path,
     root: &Path,
@@ -296,28 +353,27 @@ fn parse_tasks_file(
     let tasks_mtime = file_modified_at(&tasks_path);
     let change_at = proposal_mtime.max(tasks_mtime);
 
+    let pending = collect_rows(&text);
+    let done_count = pending.iter().filter(|p| p.row.checked).count();
+    // Status tallying is a pure function of every row `parse_line`
+    // recognizes as a checkbox row (design D6's "parseable
+    // checkbox rows") — independent of whether the row's `<n>`
+    // token itself is a valid task number, since `parse_line`
+    // deliberately does not check that grammar (its own doc
+    // comment: "checked by a consumer deriving task_id"). A bad
+    // `<n>` skips the row's TASK emission below, never its
+    // contribution to the tally.
+    let open_count = pending.len() - done_count;
+
+    // The `<n>` tokens that will actually emit a `Task` — the set a
+    // declared dependency reference is resolved against (s37).
+    // Membership IS the validation, so it must be complete before the
+    // first `Task` is built.
+    let known_rows: BTreeSet<String> =
+        pending.iter().filter(|p| task_rows::task_id_for(change_id, &p.row.id).is_some()).map(|p| p.row.id.clone()).collect();
+
     let mut tasks = Vec::new();
-    let mut done_count = 0usize;
-    let mut open_count = 0usize;
-
-    for line in text.lines() {
-        let Some(row) = parse_line(line) else {
-            continue; // not a checkbox row at all — ordinary prose/headers, never counted
-        };
-        // Status tallying is a pure function of every row `parse_line`
-        // recognizes as a checkbox row (design D6's "parseable
-        // checkbox rows") — independent of whether the row's `<n>`
-        // token itself is a valid task number, since `parse_line`
-        // deliberately does not check that grammar (its own doc
-        // comment: "checked by a consumer deriving task_id"). A bad
-        // `<n>` skips the row's TASK emission below, never its
-        // contribution to the tally.
-        if row.checked {
-            done_count += 1;
-        } else {
-            open_count += 1;
-        }
-
+    for RowWithBody { row, dep_text } in pending {
         let Some(task_id) = task_rows::task_id_for(change_id, &row.id) else {
             // A row whose `<n>` fails the task-number grammar is
             // skipped and counted (task 2.4) — never emitted as a Task.
@@ -335,11 +391,197 @@ fn parse_tasks_file(
             // Task import, both still succeed.
             outcome.record_unmapped(&format!("{DIAG_MALFORMED_SCENARIO_REF}:{}", task_id.as_str()));
         }
-        let envelope = Envelope::new(SCHEMA_VERSION, RecordKind::Task, tasks_mtime, actor());
-        tasks.push(Task::new(envelope, task_id, title, status, evidence_note).with_scenario_refs(row.scenario_refs));
+        let (depends_on, unresolvable) = task_rows::resolve_declared_deps(change_id, &task_id, &dependency_refs(&dep_text), &known_rows);
+        for _ in &unresolvable {
+            // One dependency reference naming no row this change has —
+            // dropped, counted against THIS row's task_id, and never an
+            // import failure (s37: prose is ambiguous, so a mis-read
+            // candidate must fail soft and stay visible).
+            outcome.record_unmapped(&format!("{DIAG_UNRESOLVABLE_TASK_DEP}:{}", task_id.as_str()));
+        }
+        let envelope = Envelope::current(RecordKind::Task, tasks_mtime, actor());
+        tasks.push(Task::new(envelope, task_id, title, status, evidence_note).with_scenario_refs(row.scenario_refs).with_depends_on(depends_on));
     }
 
     (tasks, done_count, open_count, change_at)
+}
+
+/// One recognized `tasks.md` row plus the CONTINUATION-line prose that
+/// belongs to it (s37 `execution-graph-topology`). An openspec row's
+/// dependency marker sits in its wrapped continuation lines about as
+/// often as in the row line itself — `s3-session-ingest#6.3`'s
+/// "depends on 6.2" is three lines below its own checkbox — so
+/// `dep_text` is the row's title PLUS every following non-blank,
+/// non-heading line, joined by single spaces, up to the next row.
+struct RowWithBody {
+    row: TaskRow,
+    dep_text: String,
+}
+
+/// Split `text` into every [`parse_line`]-recognized row plus its own
+/// continuation-line body ([`RowWithBody`]), in document order.
+///
+/// A blank line or ANY markdown heading closes the current row's body.
+/// That boundary is load-bearing, not incidental: it is what keeps a
+/// `tasks.md`'s PHASE-level sequencing preamble — "P1 (fold digest
+/// tie-break) lands before P3 … P7 (closure) depends on all of P1-P6",
+/// by far the corpus's most common dependency prose — attached to NO
+/// row, because it follows a heading. A phase is not a `TaskId`, canon
+/// has no phase record, and inventing a mapping from `P1` onto "every
+/// row under section 1" would be a guess. The same boundary keeps one
+/// row's prose out of its neighbor's `depends_on`.
+fn collect_rows(text: &str) -> Vec<RowWithBody> {
+    let mut pending: Vec<RowWithBody> = Vec::new();
+    let mut body_open = false;
+    for line in text.lines() {
+        if let Some(row) = parse_line(line) {
+            let dep_text = row.title.clone();
+            pending.push(RowWithBody { row, dep_text });
+            body_open = true;
+            continue;
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            body_open = false;
+            continue;
+        }
+        if body_open {
+            if let Some(last) = pending.last_mut() {
+                last.dep_text.push(' ');
+                last.dep_text.push_str(trimmed);
+            }
+        }
+    }
+    pending
+}
+
+/// The dependency-marker vocabulary the openspec corpus DEMONSTRABLY
+/// uses (s37 `execution-graph-topology`) — nothing invented for
+/// canon's convenience. Every marker below is attested in
+/// `openspec/changes/**/tasks.md`; the four real in-row occurrences at
+/// authoring time are `s3-session-ingest#6.3` ("depends on 6.2"),
+/// `s16-plugin-extensibility#2.1` ("immediately after 2.4's validation
+/// succeeds"), and `s20-plan-corpus-join#4.4`/`#4.5` ("immediately
+/// after 4.2/4.3", "before and after the 4.2 import pass"). Matched
+/// case-insensitively and only on both-side word boundaries, so
+/// `hereafter` is not `after`.
+const DEP_MARKERS: [&str; 8] = ["depends on", "depends upon", "depend on", "blocked by", "blocked on", "requires", "needs", "after"];
+
+/// Filler words tolerated between a marker and the reference it
+/// governs — "after THE 4.2 import pass", "depends on TASKS 1.1, 1.2".
+/// Deliberately short: every extra word widens what counts as a
+/// dependency claim, and the marker must still be followed by a real
+/// reference or the whole match is abandoned.
+const DEP_FILLER_WORDS: [&str; 5] = ["task", "tasks", "step", "steps", "the"];
+
+/// The `§` sigil a reference may carry (`**DEFERRED to §4.2**`'s own
+/// convention, [`crate::task_rows`]) — 2 bytes in UTF-8, hence a
+/// constant rather than a `char` comparison against a byte.
+const SECTION_SIGIL: &str = "§";
+
+/// Extract every DECLARED dependency reference token from one row's
+/// text + continuation body (s37 `execution-graph-topology`). Returns
+/// raw `<n>` tokens in first-seen order — resolution against the
+/// change's own rows, and the drop of anything that does not resolve,
+/// is [`task_rows::resolve_declared_deps`]'s job.
+///
+/// The grammar is deliberately narrow, because this reads PROSE: a
+/// [`DEP_MARKERS`] word on both-side word boundaries, then optional
+/// [`DEP_FILLER_WORDS`]/`§`/`#`, then a DOTTED reference
+/// (`\d+(\.\d+)+`) — optionally a `,`/`/`/`+`/`&`/`and`-separated list
+/// of them. Two guards carry the precision:
+///
+/// 1. **The reference must be dotted.** `after 0.5 seconds` is the
+///    price; `depends on P1` (a phase, not a task) and `needs only P1`
+///    are correctly ignored, and a flat `after 3 retries` never
+///    fabricates a `#3`.
+/// 2. **Nothing may sit between the marker and the reference** except
+///    a filler word. This is what excludes the corpus's version-number
+///    prose — `depends on \`cel\` 0.14.0`, `transitively depends on
+///    \`cel-parser\` 0.10.1` — which a laxer "marker anywhere near a
+///    number" scan would happily mis-read as dependencies on `#0.14.0`.
+///
+/// Dotted NESTING is never a dependency: `6.2` does not implicitly
+/// depend on `6`. Nothing in the corpus says a parent row must land
+/// first (a parent is a grouping, and openspec's own phase preamble is
+/// where real ordering is written), so inferring it would manufacture
+/// edges an author never declared.
+fn dependency_refs(text: &str) -> Vec<String> {
+    let lower = text.to_ascii_lowercase();
+    let bytes = lower.as_bytes();
+    let mut refs: Vec<String> = Vec::new();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        let Some(marker_len) = marker_at(bytes, i) else {
+            i += 1;
+            continue;
+        };
+        // A marker with no reference behind it is ordinary prose
+        // ("after the migration"): abandon the match and keep scanning
+        // from just past the marker word itself.
+        i = scan_ref_list(bytes, i + marker_len, &mut refs).unwrap_or(i + marker_len);
+    }
+    refs
+}
+
+/// The byte length of the [`DEP_MARKERS`] entry starting at `i`, or
+/// `None` when no marker starts there. Requires a word boundary on
+/// BOTH sides (`hereafter` is not `after`). `bytes` is the row text
+/// ASCII-lowercased, per [`task_rows`]'s shared-lexer contract.
+fn marker_at(bytes: &[u8], i: usize) -> Option<usize> {
+    if !task_rows::word_start_boundary(bytes, i) {
+        return None;
+    }
+    task_rows::word_at(bytes, i, &DEP_MARKERS)
+}
+
+/// Consume the reference LIST that must follow a marker, pushing each
+/// token onto `refs`. `None` when no reference follows at all (the
+/// marker was ordinary prose); otherwise the byte offset just past the
+/// last token actually consumed, so the caller never rescans a
+/// reference it already read.
+fn scan_ref_list(bytes: &[u8], start: usize, refs: &mut Vec<String>) -> Option<usize> {
+    let (first, mut end) = dotted_ref_at(bytes, skip_ref_prefix(bytes, start))?;
+    refs.push(first);
+    while let Some(after_sep) = task_rows::list_separator(bytes, end) {
+        let Some((token, token_end)) = dotted_ref_at(bytes, skip_ref_prefix(bytes, after_sep)) else {
+            break;
+        };
+        refs.push(token);
+        end = token_end;
+    }
+    Some(end)
+}
+
+/// Skip the whitespace, [`DEP_FILLER_WORDS`], and optional
+/// `§`/`#` sigil that may sit between a marker (or a list separator)
+/// and the reference token itself.
+fn skip_ref_prefix(bytes: &[u8], mut i: usize) -> usize {
+    loop {
+        let after_ws = task_rows::skip_ws(bytes, i);
+        let Some(len) = task_rows::word_at(bytes, after_ws, &DEP_FILLER_WORDS) else {
+            i = after_ws;
+            break;
+        };
+        i = after_ws + len;
+    }
+    if bytes[i..].starts_with(SECTION_SIGIL.as_bytes()) {
+        i + SECTION_SIGIL.len()
+    } else if bytes.get(i) == Some(&b'#') {
+        i + 1
+    } else {
+        i
+    }
+}
+
+/// The DOTTED reference token at `i` plus the byte offset just past it
+/// — [`task_rows::number_token_at`] plus [`dependency_refs`]'s guard 1:
+/// a FLAT number is never a reference in this dialect, so `after 3
+/// retries` can never fabricate a `#3` and `needs only P1` stays
+/// prose. `None` when no token is there or it is flat.
+fn dotted_ref_at(bytes: &[u8], i: usize) -> Option<(String, usize)> {
+    let (token, end) = task_rows::number_token_at(bytes, i)?;
+    token.contains('.').then_some((token, end))
 }
 
 /// `ChangeStatus` as a pure function of the snapshot (design D6): an
@@ -453,6 +695,16 @@ mod tests {
     #[test]
     fn dialect_id_is_openspec() {
         assert_eq!(OpenspecPlanAdapter.dialect_id(), "openspec");
+    }
+
+    /// `s38-evidence-bearing-memory`: this dialect gained `depends_on`
+    /// extraction, so its parse output for an IDENTICAL `tasks.md`
+    /// changed and its generation must be past `1` — otherwise
+    /// `canon-cli::plans`'s cursor id is unchanged and `canon ingest
+    /// plans` reports `skipped unchanged` instead of re-parsing.
+    #[test]
+    fn parse_version_is_two_because_dependency_extraction_changed_this_dialects_output() {
+        assert_eq!(OpenspecPlanAdapter.parse_version(), 2);
     }
 
     #[test]
@@ -695,6 +947,205 @@ mod tests {
         let outcome = parse_fixture();
         let task = find_task(&outcome, "covers-change#1.3");
         assert!(task.scenario_refs.is_empty());
+    }
+
+    // ── declared dependencies -> Task.depends_on (s37 execution-graph-topology) ──
+
+    fn dep_ids(task: &Task) -> Vec<&str> {
+        task.depends_on.iter().map(|t| t.as_str()).collect()
+    }
+
+    #[test]
+    fn an_in_row_dependency_marker_populates_depends_on() {
+        let outcome = parse_fixture();
+        let task = find_task(&outcome, "deps-change#1.2");
+        assert_eq!(dep_ids(task), vec!["deps-change#1.1"]);
+        assert_eq!(task.title, "wire the extractor, depends on 1.1", "the marker prose stays in the title verbatim — extraction never rewrites the row");
+    }
+
+    #[test]
+    fn a_dependency_marker_in_a_continuation_line_populates_the_whole_separated_list() {
+        let outcome = parse_fixture();
+        // `Blocked by 1.1/1.2` sits in the row's WRAPPED continuation
+        // line, the shape the live corpus uses
+        // (`s3-session-ingest#6.3`'s own "depends on 6.2" is three lines
+        // below its checkbox).
+        assert_eq!(dep_ids(find_task(&outcome, "deps-change#1.3")), vec!["deps-change#1.1", "deps-change#1.2"]);
+    }
+
+    #[test]
+    fn a_row_with_no_dependency_prose_has_an_empty_depends_on() {
+        let outcome = parse_fixture();
+        let task = find_task(&outcome, "deps-change#1.4");
+        assert!(task.depends_on.is_empty());
+        // And the FIRST row of a dotted section depends on nothing
+        // either: `1.1` under section `1` is nesting, not a dependency.
+        assert!(find_task(&outcome, "deps-change#1.1").depends_on.is_empty());
+        assert!(
+            !outcome.unmapped.keys().any(|k| k.starts_with(DIAG_UNRESOLVABLE_TASK_DEP) && k.ends_with("#1.4")),
+            "a row with no dependency prose must produce no diagnostic at all"
+        );
+    }
+
+    #[test]
+    fn an_unresolvable_dependency_reference_is_dropped_and_counted_without_sinking_the_row() {
+        let outcome = parse_fixture();
+        let task = find_task(&outcome, "deps-change#1.5");
+        assert!(task.depends_on.is_empty(), "`depends on 9.9` names no row this change has, so nothing is carried");
+        assert_eq!(task.status, TaskStatus::Open, "the row itself still imports — a dropped reference is never an import failure");
+        assert_eq!(
+            outcome.unmapped.get(&format!("{DIAG_UNRESOLVABLE_TASK_DEP}:deps-change#1.5")),
+            Some(&1),
+            "the drop surfaces in the pass summary named per row (task_id embedded in the key), exactly like a malformed covers token"
+        );
+        assert!(
+            outcome.malformed.iter().all(|e| !e.path.contains("deps-change")),
+            "an unresolvable reference is an `unmapped` diagnostic, never a `malformed` construct: {:?}",
+            outcome.malformed
+        );
+    }
+
+    #[test]
+    fn version_numbers_flat_numbers_and_phase_labels_in_a_row_are_never_read_as_dependencies() {
+        let outcome = parse_fixture();
+        let task = find_task(&outcome, "deps-change#1.6");
+        assert!(task.depends_on.is_empty());
+        assert!(
+            !outcome.unmapped.keys().any(|k| k.starts_with(DIAG_UNRESOLVABLE_TASK_DEP) && k.ends_with("#1.6")),
+            "prose the grammar correctly declines to read must not even produce a diagnostic — a false-positive diagnostic is noise, not signal"
+        );
+    }
+
+    #[test]
+    fn phase_level_preamble_prose_becomes_no_rows_dependency() {
+        // `deps-change/tasks.md`'s preamble reads "P2 depends on 1.1"
+        // AFTER a `##` heading and BEFORE any row. A heading closes the
+        // body, so it attaches to no row — the corpus's most common
+        // dependency prose is phase-level, and canon has no phase
+        // record to map `P2` onto.
+        let outcome = parse_fixture();
+        let with_deps: Vec<&str> = outcome
+            .tasks
+            .iter()
+            .filter(|t| t.task_id.as_str().starts_with("deps-change#") && !t.depends_on.is_empty())
+            .map(|t| t.task_id.as_str())
+            .collect();
+        assert_eq!(
+            with_deps,
+            vec!["deps-change#1.2", "deps-change#1.3"],
+            "exactly the two rows whose OWN text carries a marker — the preamble's `P2 depends on 1.1` reaches no row at all"
+        );
+    }
+
+    // ── dependency_refs: the prose grammar itself ──
+
+    #[test]
+    fn dependency_refs_reads_every_marker_shape_the_live_corpus_uses() {
+        // Each string below is (a paraphrase of) a real
+        // `openspec/changes/**/tasks.md` occurrence — see DEP_MARKERS.
+        assert_eq!(dependency_refs("(Wave 2/whole-change scope — not implemented, depends on 6.2.)"), vec!["6.2"]);
+        assert_eq!(dependency_refs("the `natural_key` the caller derives immediately after 2.4's validation succeeds"), vec!["2.4"]);
+        assert_eq!(dependency_refs("Re-run `canon ingest plans` immediately after 4.2/4.3 with no"), vec!["4.2", "4.3"]);
+        assert_eq!(dependency_refs("Run `canon gate check` before and after the 4.2 import pass"), vec!["4.2"]);
+        assert_eq!(dependency_refs("Blocked by 3.1 and 3.2"), vec!["3.1", "3.2"]);
+        assert_eq!(dependency_refs("depends on tasks 1.1, 1.2 and 1.3"), vec!["1.1", "1.2", "1.3"]);
+        assert_eq!(dependency_refs("requires §4.1"), vec!["4.1"], "the `§` sigil `**DEFERRED to §<n>**` uses is tolerated too");
+    }
+
+    #[test]
+    fn dependency_refs_never_reads_a_version_number_a_flat_number_or_a_phase_label() {
+        assert!(dependency_refs("depends on `cel` 0.14.0, not the").is_empty(), "an intervening token between marker and number kills the match — this is the version-number guard");
+        assert!(dependency_refs("transitively depends on `cel-parser` 0.10.1, the EXACT").is_empty());
+        assert!(dependency_refs("P5 (tests) depends on P1-P3. P6 (closure) depends on all.").is_empty(), "a phase label is not a TaskId");
+        assert!(dependency_refs("gives up after 3 seconds").is_empty(), "a FLAT number is never a reference");
+        assert!(dependency_refs("before and after the migration").is_empty());
+        assert!(dependency_refs("hereafter 1.1 is the rule").is_empty(), "`after` matches only on a word boundary, never inside `hereafter`");
+        assert!(dependency_refs("depends on 1..2").is_empty(), "a token failing the `<n>` grammar is dropped at the lexer");
+    }
+
+    #[test]
+    fn dotted_nesting_alone_never_produces_a_dependency() {
+        assert!(
+            dependency_refs("refine the parser introduced under 6, reusing 6.1's fixture").is_empty(),
+            "a child row never implicitly depends on its parent (or on a sibling it merely mentions) — only an explicit marker declares a dependency"
+        );
+    }
+
+    /// s37 review finding, pinned against the corpus text VERBATIM.
+    ///
+    /// A live-store read reported `s20-plan-corpus-join#4.5` as
+    /// unpopulated while `#4.4` in the SAME file was populated. The
+    /// parser was never at fault (proven by re-importing the real
+    /// corpus into a fresh tier): a plan `Task`'s `at` is its
+    /// `tasks.md` mtime, which a canon CODE change does not advance, so
+    /// a pre-s37 record and its post-s37 replacement shared an
+    /// IDENTICAL `at`, and `canon query`'s supersession fold
+    /// (`canon_store::fold::fold_latest_by_key`) then had only a
+    /// LEXICOGRAPHIC DIGEST to choose by — picking the stale body for an
+    /// arbitrary subset of rows.
+    ///
+    /// `s38-evidence-bearing-memory` closed BOTH halves of that:
+    /// [`OpenspecPlanAdapter::parse_version`] forces the re-parse the
+    /// content-digest cursor could not detect, and the fold now orders
+    /// an equal-`at` tie by `Envelope.schema` (`Task` is generation `2`)
+    /// before it ever reaches the digest. This test defends the parse
+    /// side in CI so that diagnosis can never be re-litigated by
+    /// inspection.
+    ///
+    /// Rows `4.4` and `4.5` plus their continuation lines are copied
+    /// byte-for-byte from `openspec/changes/s20-plan-corpus-join/
+    /// tasks.md:92-115`; `4.2`/`4.3` are abbreviated stand-ins whose
+    /// only job is to be resolvable siblings. The continuation prose is
+    /// the load-bearing part: it carries `after the first import pass`
+    /// and `after the second (idempotent) pass` — markers with NO
+    /// dotted reference, which must contribute nothing — alongside the
+    /// real `after the 4.2 import pass` that must.
+    #[test]
+    fn the_verbatim_s20_corpus_rows_populate_depends_on_through_the_real_adapter() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("openspec/changes/s20-plan-corpus-join");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("proposal.md"), "# s20\n\n## Why\nSelf-hosted plan import.\n").unwrap();
+        fs::write(
+            dir.join("tasks.md"),
+            "## 4. Self-hosting\n\
+             \n\
+             - [x] 4.2 Run the first import pass against this repo's own corpus. DONE:\n\
+             \x20     `CANON_PG_DSN` unset in this environment -> all 498 parsed Task\n\
+             \x20     candidates reported via the `unwritten` seam (non-fatal).\n\
+             - [x] 4.3 Confirm the git-tier dedup holds across a second pass.\n\
+             - [x] 4.4 Re-run `canon ingest plans` immediately after 4.2/4.3 with no\n\
+             \x20     source-tree edits; verify zero new records (cursor-digest match,\n\
+             \x20     self-referential exclusion of `canon/ledger`/`canon/ingest/\n\
+             \x20     cursors` confirmed — the pass does not self-churn).\n\
+             - [x] 4.5 Run `canon gate check` before and after the 4.2 import pass;\n\
+             \x20     verify every verdict is byte-identical. DONE: `canon gate check`\n\
+             \x20     exits 0 clean before, after the first import pass, and after the\n\
+             \x20     second (idempotent) pass — `diff`'d byte-identical all three\n\
+             \x20     times.\n",
+        )
+        .unwrap();
+
+        let outcome = OpenspecPlanAdapter.parse(&PlanSourceHandle::Path(tmp.path().to_path_buf()));
+        assert_eq!(
+            dep_ids(find_task(&outcome, "s20-plan-corpus-join#4.4")),
+            vec!["s20-plan-corpus-join#4.2", "s20-plan-corpus-join#4.3"],
+            "`immediately after 4.2/4.3` on the row line"
+        );
+        assert_eq!(
+            dep_ids(find_task(&outcome, "s20-plan-corpus-join#4.5")),
+            vec!["s20-plan-corpus-join#4.2"],
+            "`before and after the 4.2 import pass` on the row line of a CHECKED row — the exact row a live-store read reported as unpopulated"
+        );
+        assert!(
+            dep_ids(find_task(&outcome, "s20-plan-corpus-join#4.2")).is_empty() && dep_ids(find_task(&outcome, "s20-plan-corpus-join#4.3")).is_empty(),
+            "neither stand-in row declares anything"
+        );
+        assert!(
+            outcome.unmapped.keys().all(|k| !k.starts_with(DIAG_UNRESOLVABLE_TASK_DEP)),
+            "`after the first import pass`/`after the second (idempotent) pass` must not even produce a diagnostic: {:?}",
+            outcome.unmapped
+        );
     }
 
     #[test]

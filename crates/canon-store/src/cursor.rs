@@ -106,8 +106,16 @@ pub struct FileSeen {
 /// soundness index (module doc deviation 2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SourceCursor {
-    /// The adapter's static `client_id` (`omp`/`claude`/`codex`/
-    /// `hermes`) — one cursor per source.
+    /// The source's cursor identity — one cursor per source, and the
+    /// `<source_id>.json` filename [`CursorStore`] stores it under.
+    /// NOT necessarily a bare adapter `client_id`: each caller COMPOSES
+    /// this from whatever distinguishes one source's ingest state from
+    /// another's, so that a source whose parse output can no longer be
+    /// compared against a stored cursor simply lands on a different id
+    /// (canon-cli's `ingest::session_source_cursor_id` — `omp`,
+    /// `omp-v2`; `plans::plan_source_cursor_id` —
+    /// `plan-openspec-v2-<digest12>`). Always a safe bare filename
+    /// component.
     pub source_id: String,
     /// The max `FileSeen.mtime_ms` across `files`, as a timestamp —
     /// 3.1's coarse "last_seen_at" high-water mark (informational; the
@@ -265,9 +273,9 @@ impl CursorStore {
     }
 
     fn path_for(&self, source_id: &str) -> PathBuf {
-        // `source_id` is a static adapter `client_id` (`omp`/`claude`/
-        // `codex`/`hermes`) — never attacker-controlled or path-bearing,
-        // so a plain `<source_id>.json` filename is safe.
+        // `source_id` is a caller-composed identity built from static
+        // adapter/dialect ids and digests (never attacker-controlled or
+        // path-bearing), so a plain `<source_id>.json` filename is safe.
         self.root.join(format!("{source_id}.json"))
     }
 

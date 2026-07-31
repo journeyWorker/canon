@@ -71,6 +71,24 @@ impl SessionAdapter for HermesAdapter {
         "hermes"
     }
 
+    /// `1` — this adapter's OUTPUT is unchanged since it shipped, so
+    /// `1` is the value that re-reads nothing: every session cursor
+    /// already on disk was computed against exactly this parse output.
+    /// s37 (`execution-graph-topology`) touched this file but did not
+    /// change that: it added `agent_id`/`parent_agent_id` as a constant
+    /// `None` (Hermes's `sessions` table has no parent/subagent column
+    /// at all), and a `skip_serializing_if`-elided `None` is
+    /// indistinguishable from the field's absence to every downstream
+    /// consumer, so an unchanged database still normalizes to
+    /// byte-identical records. Contrast `claude-code`, whose s37 change
+    /// DID populate them and which is therefore at `2`. Bump this the
+    /// moment a change in this file alters what an UNCHANGED transcript
+    /// normalizes to (a newly POPULATED field, a corrected mapping, a
+    /// different usage gate) — see [`SessionAdapter::parse_version`].
+    fn parse_version(&self) -> u32 {
+        1
+    }
+
     fn scan_roots(&self, home: &Path, use_env_roots: bool) -> Vec<PathBuf> {
         // Default root — ported from `scanner.rs:1265-1272`
         // (`ClientId::Hermes.data().resolve_path_with_env_strategy`'s
@@ -273,6 +291,13 @@ pub fn parse_hermes_sqlite(db_path: &Path) -> ParseOutcome {
                     duration_ms: None,
                     dedup_key: Some(session_id),
                     is_turn_start: false,
+                    // `None`: Hermes's SQLite schema has one
+                    // `sessions` row per agent session with no
+                    // parent/subagent column at all — no
+                    // agent-delegation edge exists to record
+                    // (s37-execution-graph-topology).
+                    agent_id: None,
+                    parent_agent_id: None,
                 }
             },
         )
