@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-31T16:45:46.291204Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "python3 -c \"import json,glob,re; boxes=re.findall(r'- \\[[x ]\\] ([0-9.]+)', open('openspec/changes/s42-close-the-open-loops/tasks.md').read()); refs={m.group(1) for f in glob.glob('.canon/ledger/kind=evidence_record/s42-*.json') for m in [re.search(r'#([0-9.]+)$', json.load(open(f)).get('task_id') or '')] if m}; print(f'task boxes={len(boxes)} each with a committed EvidenceRecord={len(set(boxes)&refs)} missing={[b for b in boxes if b not in refs]}')\" && cargo test -p canon-cli --test evidence 2>&1 | grep -E '^test result:'"
+  },
+  "evidence_note": {
+    "command_result": "task boxes=17 each with a committed EvidenceRecord=17 missing=[]\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.17s",
+    "summary": "s42's 17 task boxes each have a committed EvidenceRecord bearing that exact task id, and `canon gate task` cannot flip a box without one - the suite pins that it refuses while evidence is only staged and leaves the document untouched. The reading was taken with this record's own predecessor committed; the check covers task-id coverage, not file identity, so re-authoring this one record does not change what it reports. Coverage plus a gate that fails closed is what this attests - the ledger cannot by itself prove a human never edited the file"
+  },
+  "kind": "evidence_record",
+  "run_seq": 26,
+  "schema": 1,
+  "staging_id": "779e28cf4409",
+  "task_id": "s42-close-the-open-loops#4.3",
+  "verdict": "faithful"
+}

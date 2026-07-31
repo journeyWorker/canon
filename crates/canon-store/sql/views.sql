@@ -78,12 +78,16 @@
 -- `version_rank` is defined ONCE, in `stg_records`, as the
 -- `(at, schema, digest)` triple `canon_store::fold::fold_latest_by_key`
 -- compares, materialized as a DuckDB STRUCT. Struct comparison is
--- field-by-field lexicographic — verified directly against this
--- DuckDB, and the same total order that function's own
+-- field-by-field lexicographic, and RECURSIVELY so through the nested
+-- `at` member below — both verified directly against this DuckDB, and
+-- the same total order that function's own
 -- `(at, schema, digest) < item_order` tuple comparison performs — so
 -- `ORDER BY version_rank DESC` IS the Rust fold's ordering, written in
 -- one place rather than re-spelled at each of the twelve fold sites,
--- where one could silently drift from the rest.
+-- where one could silently drift from the rest. Two of the three
+-- rungs are exact by construction and the third, `digest`, carries a
+-- named residual on each root — the rung-by-rung section below states
+-- each one, and is the thing to read before changing a member.
 --
 -- Ordering by `at` ALONE (what the first cut of these folds did) is
 -- not a weaker form of that rule, it is a DIFFERENT rule, and it
@@ -113,40 +117,174 @@
 -- `QUALIFY` selects one physical ROW, so every column, `"at"`
 -- included, necessarily comes off that single version.
 --
--- ── The one place the SQL cannot mirror the Rust exactly ─────────────
+-- ── Rung by rung: what each mirrors, and where it cannot ─────────────
 --
--- `digest`. `crate::query`'s readers RECOMPUTE
--- `partition::content_digest12` from the body; `stg_git_records` reads
--- the value out of the record's FILENAME instead, because
--- canonical-form hashing is not expressible here — `content_digest12`
--- hashes serde_json's alphabetical-key, compact serialization of the
--- value, and DuckDB has no recursive JSON key-sorting canonicalizer
--- that could reproduce those exact bytes to hash.
+-- `schema` — EXACT, by construction. `version_rank`'s member is the
+-- `canon_store::tier::raw_record_schema` FUNCTION rewritten in SQL
+-- (see its definition below), not the raw stored integer: that
+-- function reads the field as a `u64` and then narrows to `u32`,
+-- flooring everything outside that domain to `0`, and DuckDB's own
+-- `BIGINT` domain is neither. Read it there; it is the one rung where
+-- there is nothing left over.
 --
--- It is nonetheless the SAME number, not a proxy: `GitTier::write`
--- names the file from `content_digest12` (`git_tier.rs`), and
--- `GitTier::scan_kind_where` REJECTS as a `layout` violation any file
--- whose path is not the one its own content resolves to (its
--- `expected != relative` check), as `scan_namespaced_kind` does for
--- overlay records via that filename's own `__{digest12}` suffix. So
--- for every record the Rust reader will HAND YOU, filename digest ==
--- content digest by enforcement.
+-- `digest` — a RESIDUAL on each root, and they are DIFFERENT residuals.
+-- `crate::query`'s readers RECOMPUTE `partition::content_digest12`
+-- from the body; no staging view can, because canonical-form hashing
+-- is not expressible here — `content_digest12` hashes serde_json's
+-- alphabetical-key, compact serialization of the value, and DuckDB has
+-- no recursive JSON key-sorting canonicalizer that could reproduce
+-- those exact bytes to hash. Each root instead reads a STORED copy of
+-- that number, and each copy is trustworthy for exactly the corpus its
+-- OWN Rust reader will hand you — a different enforcement point per
+-- root, so the claim has to be made twice, never once:
 --
--- The residual difference is therefore exactly the corpus Rust
--- refuses to read: a hand-planted file whose name disagrees with its
--- body is invisible to `canon query` (dropped as a violation), while
--- these views run no layout gate and would fold it by its filename
--- digest. This is the ONE thing this file derives from `record_path`,
--- and it is narrow on purpose — the digest suffix is
--- kind-INDEPENDENT (one end-anchored regex serves all 13 kinds and
--- every namespaced overlay), unlike the natural key, whose grammar is
--- per-kind and is precisely the second implementation the last
--- section below refuses to write. An unreadable suffix reads `''`,
--- which sorts below every real 12-hex digest — the same posture
+--   git — `stg_git_records.digest` is the FILENAME's `__{digest12}`
+--     suffix, which `GitTier::write` writes from `content_digest12`
+--     and `GitTier::scan_kind_where` REJECTS as a `layout` violation
+--     for any file whose path is not the one its own content resolves
+--     to (its `expected != relative` check), as `scan_namespaced_kind`
+--     does for overlay records. RESIDUAL: a hand-planted or renamed
+--     `.json` whose NAME disagrees with its body. `canon query` never
+--     returns it (soft-skipped as a violation); these views run no
+--     layout gate and fold it at whatever its filename claims.
+--
+--   r2 — `stg_r2_records.digest` is the parquet `digest` COLUMN,
+--     materialized by `R2Tier::write` from the same `content_digest12`
+--     call that names the object, and re-checked against the body on
+--     every read by `R2Tier::read`'s `validate_row` ("a stale/tampered
+--     `digest` column is exactly as much a violation as a stale/
+--     tampered `body`"), which soft-skips that ROW. RESIDUAL: a
+--     parquet row whose `digest` COLUMN disagrees with its own `body`.
+--     `canon query` never returns it; these views run no row validator
+--     and fold it at whatever the column claims.
+--
+-- The SHAPE is therefore the same on both roots — SQL reads the very
+-- value that root's Rust reader enforces against the content, so the
+-- two agree by enforcement for every record the reader HANDS YOU, and
+-- the residual is exactly the corpus that reader REFUSES — but the
+-- enforcing function, the granularity (a whole FILE vs one ROW) and
+-- the artifact a tamperer edits (a filename vs a parquet column) are
+-- all different. Do not carry the git sentence over to r2. Both
+-- residuals are pinned executably, not just asserted here, by
+-- `crates/canon-report/tests/multi_version_fold.rs::
+-- both_roots_fold_a_digest_the_rust_reader_refuses_to_return`.
+--
+-- Considered and REJECTED for r2: cross-checking the `digest` column
+-- against the `__{digest12}` suffix the OBJECT KEY also carries
+-- (`partition::hive_object_key` names r2 objects exactly as it names
+-- git files, from the same digest). It looks like the git-side gate,
+-- and it is not one. A check here only shrinks divergence when the
+-- Rust reader performs the SAME check, and `R2Tier::read` does not:
+-- it lists by the `kind=` prefix and hands the object path to
+-- `decode_rows` for VIOLATION MESSAGES ONLY, never validating the key
+-- against the row. Enforcing key == column in SQL would newly demote
+-- rows `canon query` reads happily (object renamed, column intact) in
+-- order to buy back rows it already refuses — one divergence class
+-- traded for another, in a note whose whole value is that its claim
+-- is exact.
+--
+-- `at` — EXACT, by construction, and deliberately NOT the `"at"`
+-- COLUMN sitting beside it. `canon_store::tier::raw_record_at` is
+-- `get("at").and_then(as_str).and_then(DateTime::parse_from_rfc3339)
+-- .map(|dt| dt.with_timezone(&Utc))`: it reads the record's own JSON
+-- `at` STRING, APPLIES the RFC3339 offset, and compares INSTANTS at
+-- nanosecond precision. `version_rank`'s member is that function
+-- rewritten in SQL over the same `body ->> '$.at'` string — on BOTH
+-- roots, because that string is what `raw_record_at` reads on both
+-- (an r2 `RawRecord` is the parquet `body` column parsed as JSON, not
+-- the `at` column beside it) — materialized as a nested
+-- `{parsed, sec, nano}` struct whose lexicographic order IS
+-- `DateTime<Utc>`'s.
+--
+-- The `"at"` COLUMN is a `TIMESTAMP` cast of that same text — a naive
+-- MICROSECOND wall clock, and WAS this rung until the s42 re-review.
+-- It is lossy twice over — verified directly against this DuckDB,
+-- 2026-08-01:
+--
+--   * The offset is DISCARDED, not applied.
+--     `'2026-01-01T12:00:00+05:00'::TIMESTAMP` is `12:00`, while
+--     `raw_record_at` makes it `07:00Z`. Two versions of one key at
+--     the SAME instant, one stamped with an offset, ranked in
+--     OPPOSITE orders here and in `canon query`. Every canon writer
+--     stamps a `DateTime<Utc>`, so the exposure is hand-authored or
+--     imported JSON — `validate_envelope_shape` asks only that `at`
+--     be SOME parseable RFC3339 string, never a UTC one.
+--   * Sub-microsecond precision is TRUNCATED, so two versions
+--     differing only below 1µs tied here and did not in Rust. That
+--     one is not hand-authored at all:
+--     `canon-cli::dispatch::close_version_at` bumps a closing run's
+--     version stamp by exactly ONE NANOSECOND whenever the host clock
+--     is not monotone, so a dispatched run's begin/close pair is
+--     precisely this case.
+--
+-- The COLUMN keeps its `TIMESTAMP` type, name and position — every
+-- downstream mart and the snapshot/dashboard column contract already
+-- read it as one, so it could not be re-typed for the rung's sake.
+-- The RUNG moved off it instead. `TIMESTAMPTZ` was rejected for the
+-- rung too: it reinterprets an OFFSET-LESS string in the session
+-- `TimeZone`, which would make `version_rank` depend on an
+-- environment setting this file is otherwise careful to exclude (see
+-- the `default_null_order` note below). The struct below reaches a
+-- UTC instant with no time-zone-sensitive type anywhere in it — a
+-- `DATE`, integer seconds, integer nanoseconds — and was probed
+-- byte-identical under `SET TimeZone` = `UTC`, `America/New_York`,
+-- `Asia/Kolkata` and `Pacific/Chatham` (a :45 zone), 2026-08-01.
+--
+-- The accepted SURFACE is chrono's, not DuckDB's, because a `CAST`
+-- and `parse_from_rfc3339` do not admit the same strings. The regex
+-- below is `chrono-0.4.45::format::parse::parse_rfc3339` read field
+-- by field, so a string that function accepts parses here and a
+-- string it rejects floors here:
+--
+--   * lowercase `t`/`z` and a SPACE date/time separator — chrono
+--     takes all three; a DuckDB `TIMESTAMP` cast takes the space and
+--     returns NULL for the lowercase forms, which under the old rung
+--     sank a record `canon query` reads fine to `-infinity`;
+--   * U+2212 MINUS SIGN as an offset sign
+--     (`scan::timezone_offset`'s `allow_tz_minus_sign`);
+--   * a fraction of ANY length, with digits past the 9th SKIPPED
+--     (`scan::nanosecond`), never rounded;
+--   * `:60` as a leap second — chrono stores it as `:59` plus a
+--     `nano` of `1_000_000_000`, which is why `nano` is a member of
+--     its OWN instead of being folded into `sec`: only the
+--     lexicographic pair puts `23:59:60Z` after `23:59:59Z` and still
+--     BEFORE the next day's `00:00:00Z`, which is what chrono's
+--     `(date, secs, frac)` comparison does. Summing them would
+--     silently INVERT that second pair;
+--   * a MANDATORY offset with a MANDATORY `:` — `…T07:00:00` and
+--     `…T07:00:00+0500` are both chrono errors, so both floor.
+--
+-- The range checks below are explicit for the same reason: DuckDB
+-- does not share chrono's. `'2026-01-01 24:00:00'::TIMESTAMP`
+-- silently rolls to the next day where `NaiveTime::from_hms_nano_opt`
+-- returns `None`, and the offset bound is `FixedOffset::east_opt`'s
+-- `|offset| < 24h`, not the two digits the grammar allows. Calendar
+-- validity is left to DuckDB's `DATE` cast, which does agree with
+-- `NaiveDate::from_ymd_opt` — probed across month `00`/`13`, day
+-- `00`/`32`, `2025-02-29` (rejected by both) and `2024-02-29`
+-- (accepted by both), plus year `0000`, which both read as the
+-- proleptic `1 BC` day at epoch second `-62167219200`.
+--
+-- RESIDUAL, and it is not an ordering one: where `at` is absent or is
+-- a non-string JSON value, `raw_record_at` PANICS on its own `expect`
+-- and this rung floors instead — `parsed: 0`, which loses to every
+-- well-formed record and so can only lose, never INVERT a pair.
+-- `canon_model::evidence::validate_envelope_shape` is what keeps that
+-- unreachable for any record either root's reader will hand you; the
+-- floor exists so a hand-planted file cannot decide a fold.
+--
+-- Every rung's fallback — `parsed: 0`, `0`, `''` — is the value that
+-- LOSES to every well-formed record, the posture
 -- `canon_store::tier::raw_record_schema` documents for its own `0`
--- fallback ("a record whose `schema` is missing or non-integer can
--- never out-rank a well-formed record of the same key"), which
--- `version_rank` applies to `schema` for the identical reason.
+-- ("a record whose `schema` is missing or non-integer can never
+-- out-rank a well-formed record of the same key"). An unreadable git
+-- filename suffix reads `''`, which sorts below every real 12-hex
+-- digest, for the identical reason. Reading that suffix is the ONE
+-- thing this file derives from `record_path`, and it is narrow on
+-- purpose — the digest suffix is kind-INDEPENDENT (one end-anchored
+-- regex serves all 13 kinds and every namespaced overlay), unlike the
+-- natural key, whose grammar is per-kind and is precisely the second
+-- implementation the last section below refuses to write.
 --
 -- ── Fold inventory: all twelve fold sites, and each one's key ────────
 --
@@ -266,7 +404,9 @@ LOAD json;
 -- JSON files — `read_text` + JSON-payload column pulls, NEVER
 -- `hive_partitioning=true` (design doc's Risk section: the donor's
 -- ACTUAL mechanism, not the aspirational one). `schema`/`kind`/`at`/
--- `scenario_id` come from the record's own body.
+-- `scenario_id` come from the record's own body, RAW — `schema` in
+-- particular is the stored integer, not the `u32` the fold compares;
+-- `stg_records`' `version_rank` is where that narrowing happens.
 --
 -- `record_path` is kept for provenance, and `digest` is the ONE column
 -- derived from it: the filename's own `__{digest12}` suffix, which
@@ -306,10 +446,13 @@ FROM raw;
 -- re-validated against the body on every read
 -- (`r2_tier.rs::validate_row`: "a stale/tampered `digest` column is
 -- exactly as much a violation as a stale/tampered `body`"), so the two
--- tiers' `digest` columns are directly comparable in one fold.
+-- tiers' `digest` columns are directly comparable in one fold — see
+-- this file's header for what that enforcement does and does NOT
+-- cover on THIS root, which is not what it covers on the git one.
 -- `schema` is the one fold rung r2 does NOT materialize, so it is
--- pulled from `body` here — `body` remains the JSON source of truth
--- for anything this view doesn't already surface as a column.
+-- pulled from `body` here, raw and unnarrowed exactly as the git view
+-- pulls it — `body` remains the JSON source of truth for anything
+-- this view doesn't already surface as a column.
 CREATE OR REPLACE VIEW stg_r2_records AS
 SELECT
     kind,
@@ -355,12 +498,83 @@ FROM read_parquet(getenv('CANON_R2_ROOT') || '/kind=*/**/*.parquet');
 -- digest)` triple `canon_store::fold::fold_latest_by_key` compares,
 -- as a STRUCT, so every folding view downstream orders by ONE
 -- expression instead of restating three rungs it could get wrong
--- (header's "How a folding view folds"). Each member is coalesced to
--- the value that LOSES to every well-formed record — `-infinity`,
--- `0`, `''` — mirroring `canon_store::tier::raw_record_schema`'s own
--- documented `0` fallback, so no member is ever NULL and the order is
--- total without depending on DuckDB's `default_null_order` setting.
+-- (header's "How a folding view folds"). Each member falls back to
+-- the value that LOSES to every well-formed record — `parsed: 0`,
+-- `0`, `''` — so no member is ever NULL and the order is total
+-- without depending on DuckDB's `default_null_order` setting. The
+-- header's rung-by-rung section states what each member does and does
+-- not guarantee against the Rust fold; read it before changing one.
+--
+-- The `schema` member is `canon_store::tier::raw_record_schema`
+-- rewritten, NOT the `schema` column beside it. That function is
+-- `get("schema").and_then(as_u64).and_then(u32::try_from).unwrap_or(0)`
+-- — a `u32` domain reached through a `u64` one — while the column is
+-- a DuckDB `BIGINT` pulled with `->>`, which is signed, 64-bit, and
+-- (because `->>` unquotes) also accepts JSON strings and rounds JSON
+-- doubles. Every value in the gap between those domains is a value
+-- the two folds ORDER DIFFERENTLY, and `validate_envelope_shape`
+-- guards none of it: it admits any `is_u64() || is_i64()` integer, so
+-- an overlay row may legally carry `schema: 4294967296` (Rust: `0`,
+-- the bare column: the largest rank in the corpus) or `schema: -1`
+-- (Rust: `0`, the bare column: below a malformed sibling's `0`).
+-- `json_type` is what closes it: `as_u64()` succeeds for exactly the
+-- JSON values DuckDB types `UBIGINT`, so the guard below floors the
+-- same set the function floors — negatives (`BIGINT`), doubles
+-- (`DOUBLE`), quoted numbers (`VARCHAR`), booleans, absence, and any
+-- `UBIGINT` past `u32::MAX` — and passes everything else through
+-- exactly, `u32::MAX` fitting `BIGINT` losslessly.
+--
+-- The bare `schema` COLUMN stays the raw stored value on purpose:
+-- `stg_git_records`/`stg_r2_records` are thin extractions and this
+-- view is where the fold semantics are added. Nothing may order by
+-- the column — `version_rank` is the only fold rung, and the twelve
+-- fold sites all inherit it from here.
 CREATE OR REPLACE VIEW stg_records AS
+WITH unioned AS (
+    SELECT kind, "at", scenario_id, 'git' AS source_tier, schema, digest, body FROM stg_git_records
+    UNION ALL
+    SELECT kind, "at", body ->> '$.scenario_id' AS scenario_id, 'r2' AS source_tier, schema, digest, body FROM stg_r2_records
+),
+-- `raw_record_at`'s RFC3339 grammar, read off chrono 0.4.45's
+-- `format::parse::parse_rfc3339` field by field (header's `at` rung
+-- note lists what that admits and what a DuckDB cast does not).
+-- Applied to `body ->> '$.at'` — the record's OWN JSON string, which
+-- is what `raw_record_at` reads on both roots — never the `"at"`
+-- column, which is already a lossy naive-microsecond cast of it. A
+-- non-match leaves every field `''`, which floors in `version_rank`.
+at_text AS (
+    SELECT
+        unioned.*,
+        regexp_extract(
+            body ->> '$.at',
+            '^(\d{4}-\d{2}-\d{2})[Tt ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:[Zz]|([-+\x{2212}])(\d{2}):(\d{2}))$',
+            ['ymd', 'hh', 'mi', 'ss', 'frac', 'sign', 'oh', 'om']
+        ) AS at_parts
+    FROM unioned
+),
+-- Every field of that match as the number chrono derives from it.
+-- `try_cast` for each one the regex leaves `''` on a non-match, so a
+-- non-match yields NULLs rather than a cast error and the guard in
+-- `version_rank` floors the row. `frac` needs none:
+-- `rpad(left(…, 9), 9, '0')` is always exactly nine digits —
+-- `'000000000'` when there is no fraction — which is also how chrono
+-- scales a SHORT fraction (`.5` is 500000000ns) and drops a long
+-- one's tenth digit onward. `ss` is left as the parsed `60` rather
+-- than clamped here, because `version_rank` needs to see the leap
+-- second to add chrono's `1_000_000_000` to `nano`.
+at_utc AS (
+    SELECT
+        at_text.* EXCLUDE (at_parts),
+        try_cast(at_parts['ymd'] AS DATE)                                AS at_date,
+        try_cast(at_parts['hh'] AS BIGINT)                               AS at_hh,
+        try_cast(at_parts['mi'] AS BIGINT)                               AS at_mi,
+        try_cast(at_parts['ss'] AS BIGINT)                               AS at_ss,
+        CAST(rpad(left(at_parts['frac'], 9), 9, '0') AS BIGINT)          AS at_frac_ns,
+        CASE at_parts['sign'] WHEN '' THEN 0 WHEN '+' THEN 1 ELSE -1 END AS at_off_sign,
+        coalesce(try_cast(at_parts['oh'] AS BIGINT), 0)                  AS at_off_hh,
+        coalesce(try_cast(at_parts['om'] AS BIGINT), 0)                  AS at_off_mi
+    FROM at_text
+)
 SELECT
     kind,
     "at",
@@ -370,15 +584,28 @@ SELECT
     digest,
     body,
     {
-        'at':     coalesce("at", '-infinity'::TIMESTAMP),
-        'schema': coalesce(schema, 0),
+        'at':     CASE
+                      WHEN at_date IS NOT NULL
+                       AND at_hh <= 23 AND at_mi <= 59 AND at_ss <= 60
+                       AND at_off_mi <= 59
+                       AND at_off_hh * 3600 + at_off_mi * 60 <= 86399
+                      THEN {
+                          'parsed': 1,
+                          'sec':    date_diff('second', DATE '1970-01-01', at_date)
+                                    + at_hh * 3600 + at_mi * 60 + least(at_ss, 59)
+                                    - at_off_sign * (at_off_hh * 3600 + at_off_mi * 60),
+                          'nano':   CASE WHEN at_ss = 60 THEN 1000000000 ELSE 0 END + at_frac_ns
+                      }
+                      ELSE { 'parsed': 0, 'sec': 0::BIGINT, 'nano': 0::BIGINT }
+                  END,
+        'schema': CASE
+                      WHEN json_type(body, '$.schema') = 'UBIGINT'
+                       AND schema BETWEEN 0 AND 4294967295 THEN schema
+                      ELSE 0
+                  END,
         'digest': coalesce(digest, '')
     } AS version_rank
-FROM (
-    SELECT kind, "at", scenario_id, 'git' AS source_tier, schema, digest, body FROM stg_git_records
-    UNION ALL
-    SELECT kind, "at", body ->> '$.scenario_id' AS scenario_id, 'r2' AS source_tier, schema, digest, body FROM stg_r2_records
-);
+FROM at_utc;
 
 -- S9 addition: `canon-learn`'s (S6/S7/S8) own operator-local parquet
 -- stores — `ParquetStrategyStore`/`ParquetTrajectoryStore`
