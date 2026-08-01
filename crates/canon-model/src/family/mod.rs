@@ -38,7 +38,7 @@ pub use ledger::LedgerKind;
 
 /// The artifact family's own kind identity — a strict superset of
 /// on-disk `kind`/root-directory identity beyond `RecordKind`'s closed
-/// twelve. A thirteenth-and-beyond wire value here is exactly as closed
+/// fourteen. A wire value here beyond that set is exactly as closed
 /// as `RecordKind` (adding one is a reviewed `canon-model` change, never
 /// an open string) — see [`FamilyKind::ALL`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

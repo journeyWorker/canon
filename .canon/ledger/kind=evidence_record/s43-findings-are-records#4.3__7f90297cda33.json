@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:14:18.212579Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "./target/release/canon query --kind finding --repo . --json | python3 /tmp/s43_probe.py dogfood"
+  },
+  "evidence_note": {
+    "command_result": "s43 findings recorded through the CLI during the change=2\n  r1.1 [should_fix] REVIEW_ROUNDS_PANEL calls fix_of_fix a FLOOR, but a resolution commit that also carries \n  r1.2 [note] A review round that finds nothing writes no Finding, so mart_review_rounds cannot report",
+    "summary": "s43's own review findings were recorded through canon finding add during the change, not backfilled at the end"
+  },
+  "kind": "evidence_record",
+  "run_seq": 14,
+  "schema": 1,
+  "staging_id": "3619f4b085e4",
+  "task_id": "s43-findings-are-records#4.3",
+  "verdict": "faithful"
+}

@@ -54,7 +54,17 @@ fn canon_gate_cargo_toml_never_depends_on_canon_report() {
 #[test]
 fn no_canon_gate_source_file_references_canon_report_or_its_marts() {
     let gate_src = canon_gate_src_dir();
-    let forbidden = ["canon_report", "canon-report", "mart_scope_status", "mart_trust_matrix", "mart_session_costs", "mart_role_memory", "mart_flywheel_funnel", "mart_review_burndown"];
+    let forbidden = [
+        "canon_report",
+        "canon-report",
+        "mart_scope_status",
+        "mart_trust_matrix",
+        "mart_session_costs",
+        "mart_role_memory",
+        "mart_flywheel_funnel",
+        "mart_review_burndown",
+        "mart_review_rounds",
+    ];
     for path in rust_files_under(&gate_src) {
         let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
         for needle in forbidden {

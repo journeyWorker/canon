@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:14:17.004519Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "./target/release/canon query --kind finding --repo . --json | python3 /tmp/s43_probe.py backfill"
+  },
+  "evidence_note": {
+    "command_result": "backfilled findings=30; rounds=[8, 9, 10, 11]; introduced_by unsourced=11; rounds reviewing an uncommitted worktree=10",
+    "summary": "v0.4.0's rounds are backfilled from the review artifacts, with introduced_by left unset where no commit could be sourced and reviewed_sha absent for the round that reviewed an uncommitted worktree"
+  },
+  "kind": "evidence_record",
+  "run_seq": 12,
+  "schema": 1,
+  "staging_id": "68d1cb9c6c4b",
+  "task_id": "s43-findings-are-records#4.1",
+  "verdict": "faithful"
+}

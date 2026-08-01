@@ -83,7 +83,7 @@
 -- the same total order that function's own
 -- `(at, schema, digest) < item_order` tuple comparison performs — so
 -- `ORDER BY version_rank DESC` IS the Rust fold's ordering, written in
--- one place rather than re-spelled at each of the twelve fold sites,
+-- one place rather than re-spelled at each of the thirteen fold sites,
 -- where one could silently drift from the rest. Two of the three
 -- rungs are exact by construction and the third, `digest`, carries a
 -- named residual on each root — the rung-by-rung section below states
@@ -282,11 +282,11 @@
 -- digest, for the identical reason. Reading that suffix is the ONE
 -- thing this file derives from `record_path`, and it is narrow on
 -- purpose — the digest suffix is kind-INDEPENDENT (one end-anchored
--- regex serves all 13 kinds and every namespaced overlay), unlike the
+-- regex serves all 14 kinds and every namespaced overlay), unlike the
 -- natural key, whose grammar is per-kind and is precisely the second
 -- implementation the last section below refuses to write.
 --
--- ── Fold inventory: all twelve fold sites, and each one's key ────────
+-- ── Fold inventory: all thirteen fold sites, and each one's key ──────
 --
 -- Each key below is `resolve_partition`'s natural key for that kind,
 -- re-verified field by field against `partition.rs`:
@@ -334,6 +334,26 @@
 --     `canon-gate::ledger::latest_verdicts` folds, which is the
 --     function this pick and `mart_trust_matrix`'s `green` both cite.
 --
+--   `mart_review_rounds`'s `finding_latest` — `(change_id, round,
+--     seq)`, the three fields `partition.rs`'s `Finding` arm builds
+--     its `{change_id}__{round:04}__{seq:04}` key from. Grouped in the
+--     raw text form `body ->> …` returns, exactly like
+--     `mart_session_costs`' `token_usage` fold: JSON forbids a leading
+--     zero on a number, so a well-formed `round` of 1 is the text `1`
+--     on every root and the padding `resolve_partition` adds is a
+--     filename concern, not a grouping one. `reviewed_sha` is
+--     deliberately NOT in the key — a round that reviewed an
+--     uncommitted worktree has none (canon-model's `Finding` doc), so
+--     keying on it would give one round two identities, or none.
+--     Folding matters here for the same reason it does on
+--     `mart_subjects`: a finding's DISPOSITION is a lifecycle
+--     (`open` -> `fixed`), so one finding re-authored as fixed is two
+--     versions at one key, and unfolded it would be counted twice in
+--     `findings` while appearing under BOTH `disposition_open` and
+--     `disposition_fixed` — and its superseded version's absent
+--     `introduced_by` would inflate the UNSOURCED bucket the panel
+--     reports as a known unknown.
+--
 --   READ THE RAW VERSION STREAM, deliberately — never "not yet
 --   folded":
 --     `stg_*` — source-shaped by definition (this header's own
@@ -372,9 +392,9 @@
 --
 -- Why per-view folds and NOT one shared `stg_latest_records`: such a
 -- view needs a `natural_key` column, and supplying it means
--- re-deriving the key from `body` in a 13-arm `CASE` reimplementing
+-- re-deriving the key from `body` in a 14-arm `CASE` reimplementing
 -- `resolve_partition` (`Event`'s `{run_id}-{seq:010}`, the composite
--- `scenario`/`review`/`divergence` keys, `Session`'s
+-- `scenario`/`review`/`divergence`/`finding` keys, `Session`'s
 -- `sanitize_component`, `EvidenceRecord`'s three-way fallback) — a
 -- SECOND implementation of the join-spine key grammar that drifts
 -- silently the moment `partition.rs` changes, the exact
@@ -527,7 +547,7 @@ FROM read_parquet(getenv('CANON_R2_ROOT') || '/kind=*/**/*.parquet');
 -- The bare `schema` COLUMN stays the raw stored value on purpose:
 -- `stg_git_records`/`stg_r2_records` are thin extractions and this
 -- view is where the fold semantics are added. Nothing may order by
--- the column — `version_rank` is the only fold rung, and the twelve
+-- the column — `version_rank` is the only fold rung, and the thirteen
 -- fold sites all inherit it from here.
 CREATE OR REPLACE VIEW stg_records AS
 WITH unioned AS (
@@ -1570,3 +1590,186 @@ SELECT
 FROM subjects s
 LEFT JOIN coverage c USING (subject_id)
 ORDER BY s.domain, s.subject_id;
+
+-- Panel 8 (s43 `findings-are-records`): one row per review round of a
+-- change THAT FOUND SOMETHING — `(change_id, round)` — over the
+-- fourteenth kind, `canon_model::records::Finding`. Eleven review
+-- rounds shipped v0.4.0 and canon recorded none of them; the release
+-- summary's "49 real issues, four of them defects in the previous
+-- round's fix" was then typed from memory and both numbers were wrong.
+-- This view exists so the numbers are DERIVED, and every column below
+-- is exactly one aggregate over the folded finding stream — nothing
+-- here reads git, prose, or a stored flag.
+--
+-- ── It cannot count the rounds RUN ───────────────────────────────────
+-- s43 round 1, seq 2. The source is `WHERE kind = 'finding'` and
+-- nothing else, so a round that found NOTHING wrote no record and has
+-- no row. s42's round 12 returned MERGEABLE with zero findings and is
+-- absent; four of v0.4.0's eleven rounds have rows, and the other
+-- seven are missing because nobody backfilled them, not because they
+-- were clean. Row count is therefore rounds-that-found-something, and
+-- a consumer must not read it as review effort or review coverage.
+-- canon has no record kind that marks a round as RUN — `Review` is a
+-- per-scenario attestation, not a round — so the rounds-run count is
+-- not derivable from this corpus by any query. It would take a
+-- round-completion record, and canon has none today.
+--
+-- `finding_latest` is folded to one row per natural key (header's fold
+-- list) BEFORE anything is counted, so a finding re-authored from
+-- `open` to `fixed` is one finding in one disposition bucket, not two.
+--
+-- ── `fix_of_fix` is DERIVED, and it BOUNDS NOTHING ──────────────────
+-- A finding is a fix-of-fix when its `introduced_by` equals the
+-- `resolution_sha` of an EARLIER finding of the SAME change. No record
+-- stores that relationship and none may: `canon_model::records::
+-- Finding`'s own doc forbids a stored flag, and its
+-- `fix_of_fix_is_derived_by_round_order_and_the_count_is_a_floor` test
+-- IS the reference derivation this `EXISTS` clause implements. (That
+-- test NAME predates s43 round 1, which retired the floor reading
+-- below; the derivation it pins is unchanged and correct.)
+--
+-- EARLIER is `(round, seq)` — the ordinal pair the natural key is
+-- built from — compared STRICTLY, and scoped to one `change_id`. Each
+-- of those three choices is load-bearing:
+--
+--   * NOT `reviewed_sha`. A review round usually reads an UNCOMMITTED
+--     working tree, so `reviewed_sha` is `Option` and absent is the
+--     COMMON case (v0.4.0's round 8 reviewed a worktree; its fixes
+--     landed as `f438c610`, which is a different thing). A
+--     sha-ordered derivation drops exactly those rounds — a third of
+--     the corpus this view exists to report.
+--   * NOT `at`. That is when the RECORD was written, not when the
+--     round happened. A backfill authors eleven rounds in one sitting,
+--     in whatever order the author walked them, so `at` carries no
+--     round order at all and ordering by it would be an assertion the
+--     data does not support.
+--   * STRICTLY. `(g.round, g.seq) < (f.round, f.seq)` is irreflexive,
+--     so a finding can never be matched against its own
+--     `resolution_sha` — the degenerate self-join a non-strict
+--     comparison would admit, and the one case that would make this
+--     count structurally meaningless.
+--
+-- Scoped to one change because `round` restarts at 1 per change, so
+-- `(round, seq)` orders nothing BETWEEN changes and canon holds no
+-- other round order it could substitute (`at` is authoring time, per
+-- above; commit ancestry would need git history this file cannot see).
+-- A fix in one change that breaks something first found while
+-- reviewing a DIFFERENT change is therefore NOT counted here. That is
+-- a real, named miss, not an oversight, and the panel says so — the
+-- alternative is a column called "fix-of-fix count" that reads as
+-- global while computing something narrower, which is the exact defect
+-- class this release line has shipped eight times.
+--
+-- `EXISTS`, never a `JOIN`: one finding may match several earlier
+-- resolutions, and a join would fan out and count that finding once
+-- per match. The semi-join counts FINDINGS, which is the unit the
+-- panel claims.
+--
+-- ── `introduced_by_unsourced` is the UNKNOWN bucket ──────────────────
+-- `introduced_by` is `None` when the introducing commit could not be
+-- SOURCED, and canon never infers one. So an unsourced finding is not
+-- evidence of "no earlier fix involved" — it is evidence of nothing,
+-- and folding it into "not a fix-of-fix" would silently convert a
+-- known unknown into a negative. It gets its own column instead.
+-- `introduced_by_sourced + introduced_by_unsourced = findings` and
+-- `fix_of_fix <= introduced_by_sourced`, both by construction, so a
+-- reader can size the unknown against the count.
+--
+-- ── The count bounds NOTHING, in EITHER direction ────────────────────
+-- s43 round 1, seq 1: this comment and the panel over it both called
+-- `fix_of_fix` a FLOOR, and the corpus they were written against
+-- disproves the direction. Two clauses above make it MISS — the
+-- `f.introduced_by IS NOT NULL` filter (unsourced findings) and the
+-- `g.change_id = f.change_id` scope (cross-change fixes). But the
+-- `EXISTS` predicate is `g.resolution_sha = f.introduced_by` and
+-- NOTHING else, and a `resolution_sha` commit may carry work BEYOND
+-- the fix, so it also OVER-counts: every finding recording that commit
+-- matches, whether the fix or the other work introduced the defect,
+-- and one commit id on each side cannot tell them apart. v0.4.0 has
+-- both live. `f438c610` closed s42's round 8 AND shipped s42's whole
+-- feature, so round 9's six matches are a commit-id coincidence rather
+-- than defects attributable to round 8's fixes; rounds 10 and 11 match
+-- on `49d3eb4f`/`b22fe8f5`, which were pure fix commits, so theirs
+-- are. The count is EXACT for what it joins and is a bound on nothing.
+--
+-- `reviewed_sha` is `max()` over the round's findings: it is per-
+-- finding provenance, the natural key does not include it, and this
+-- view neither requires a round's findings to agree on it nor claims
+-- they do — `max` is a deterministic pick. NULL means NO finding in
+-- the round recorded one. A round that reviewed an uncommitted working
+-- tree is the usual reason and the common case, but that is the
+-- direction it holds in: nothing here distinguishes it from a round
+-- whose findings simply left the field unset, so NULL is not evidence
+-- that the round reviewed a worktree.
+CREATE OR REPLACE VIEW mart_review_rounds AS
+WITH finding_latest AS (
+    SELECT
+        body ->> '$.change_id'                 AS change_id,
+        try_cast(body ->> '$.round' AS BIGINT) AS "round",
+        try_cast(body ->> '$.seq' AS BIGINT)   AS seq,
+        body ->> '$.reviewed_sha'              AS reviewed_sha,
+        body ->> '$.severity'                  AS severity,
+        body ->> '$.disposition'               AS disposition,
+        body ->> '$.resolution_sha'            AS resolution_sha,
+        body ->> '$.introduced_by'             AS introduced_by
+    FROM stg_records
+    WHERE kind = 'finding'
+    QUALIFY row_number() OVER (
+        PARTITION BY body ->> '$.change_id', body ->> '$.round', body ->> '$.seq'
+        ORDER BY version_rank DESC
+    ) = 1
+),
+-- `try_cast` above, not `CAST`: a hand-authored record with a
+-- non-integer `round`/`seq` must not abort every other panel in the
+-- same `duckdb -init` run. It reads NULL, and NULL fails every
+-- comparison below, so such a record can only ever be UNCOUNTED in
+-- `fix_of_fix` — never counted on a guess.
+fix_of_fix AS (
+    SELECT f.change_id, f."round", count(*) AS n
+    FROM finding_latest f
+    WHERE f.introduced_by IS NOT NULL
+      AND EXISTS (
+          SELECT 1
+          FROM finding_latest g
+          WHERE g.change_id      = f.change_id
+            AND g.resolution_sha = f.introduced_by
+            AND (g."round" < f."round" OR (g."round" = f."round" AND g.seq < f.seq))
+      )
+    GROUP BY f.change_id, f."round"
+),
+rounds AS (
+    SELECT
+        change_id,
+        "round",
+        max(reviewed_sha)                                 AS reviewed_sha,
+        count(*)                                          AS findings,
+        count(*) FILTER (WHERE severity = 'blocker')      AS severity_blocker,
+        count(*) FILTER (WHERE severity = 'should_fix')   AS severity_should_fix,
+        count(*) FILTER (WHERE severity = 'note')         AS severity_note,
+        count(*) FILTER (WHERE disposition = 'open')      AS disposition_open,
+        count(*) FILTER (WHERE disposition = 'fixed')     AS disposition_fixed,
+        count(*) FILTER (WHERE disposition = 'rejected')  AS disposition_rejected,
+        count(*) FILTER (WHERE disposition = 'deferred')  AS disposition_deferred,
+        count(*) FILTER (WHERE introduced_by IS NOT NULL) AS introduced_by_sourced,
+        count(*) FILTER (WHERE introduced_by IS NULL)     AS introduced_by_unsourced
+    FROM finding_latest
+    GROUP BY change_id, "round"
+)
+SELECT
+    r.change_id,
+    r."round",
+    r.reviewed_sha,
+    r.findings,
+    r.severity_blocker,
+    r.severity_should_fix,
+    r.severity_note,
+    r.disposition_open,
+    r.disposition_fixed,
+    r.disposition_rejected,
+    r.disposition_deferred,
+    CAST(coalesce(ff.n, 0) AS BIGINT) AS fix_of_fix,
+    r.introduced_by_sourced,
+    r.introduced_by_unsourced
+FROM rounds r
+LEFT JOIN fix_of_fix ff USING (change_id, "round")
+ORDER BY r.change_id, r."round";

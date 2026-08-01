@@ -109,11 +109,42 @@
 //! never collide (`canon evidence add`'s own "not idempotent,
 //! deliberately" contract).
 //!
-//! # Extended to `Divergence` (s15 P3b, design D10)
-//! [`promote`] stays hardcoded to `EvidenceRecord` — its `(role, surface)`
-//! axis is UNCHANGED. `Divergence` gets its OWN, separate promote path
-//! ([`promote_divergence`]/[`commit_divergence`]) rather than a shared
-//! generic function, because its staging shape is NOT a full `Divergence`
+//! # WHICH kinds are drained is DATA ([`STAGED_KINDS`]), not a match arm
+//! [`promote`] drains every kind registered in [`STAGED_KINDS`], and
+//! branches only on what promotion has to ASSIGN that kind
+//! ([`StagedAssignment`]) — the one axis on which its members actually
+//! differ. A kind absent from that list is INVISIBLE to promotion: an
+//! authoring command staging it would print "run `canon gate promote`"
+//! while promote printed "nothing staged", and the record would sit
+//! under `_staging/` forever, unreadable by every committed-tier query
+//! — a surface asserting something no query computes, which is the
+//! defect class s43 exists to stop. Registration is therefore the
+//! whole cost of adding a staged kind.
+//!
+//! # `Finding` stages for RE-VALIDATION and batch atomicity, not identity
+//! s43 registers `RecordKind::Finding` under
+//! [`StagedAssignment::Nothing`], and the distinction matters to anyone
+//! reading this after the `EvidenceRecord` section above.
+//! `EvidenceRecord` MUST be staged: its `run_seq` does not exist until
+//! promotion assigns it, so a record that skipped promotion would be
+//! incomplete. `Finding`'s natural key is
+//! `{change_id}__{round}__{seq}` — complete the moment it is authored,
+//! with nothing for promotion to compute. So staging buys it two
+//! different things: the re-validation guarantee two sections up (for
+//! a `Finding`, `staging.read()` runs
+//! `canon_store::partition::validate_body`, whose `Finding` arm is
+//! `Finding::check_coherence` — the identical call the committed read
+//! path makes), and batch atomicity for an author staging a whole
+//! review round before committing any of it. Do NOT read
+//! [`StagedAssignment::Nothing`] as a weaker `RunSeqPerRoleSurface`;
+//! it is a kind that needs no identity assigned, not one whose
+//! identity is skipped.
+//!
+//! # NOT extended to `Divergence` (s15 P3b, design D10)
+//! `Divergence` is deliberately absent from [`STAGED_KINDS`] and keeps
+//! its OWN, separate promote path
+//! ([`promote_divergence`]/[`commit_divergence`]) rather than joining
+//! the registry, because its staging shape is NOT a full `Divergence`
 //! record: `Divergence.run_seq: TotalOrder` stays REQUIRED (the committed-
 //! record invariant [`crate::fold`]'s ordering depends on), so a staged,
 //! run_seq-less candidate cannot even deserialize as one. [`DivergenceCandidate`]
@@ -133,6 +164,12 @@
 //! direct commit that never touches the batch staging directory at all,
 //! so a routine resolve/defer can never accidentally promote an unrelated
 //! candidate a reviewer is still mid-`stage`ing.
+//!
+//! That a third promotion path exists at all is a known wart, and s43
+//! did not untangle it: folding a divergence candidate in would mean
+//! reconciling a DIFFERENT staging representation, a different staging
+//! directory, and a different CLI surface, which is its own change.
+//! [`STAGED_KINDS`] is the seam that stops a FOURTH one appearing.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -145,26 +182,80 @@ use serde::{Deserialize, Serialize};
 
 use crate::failure_class::{FailureClass, Violation};
 
-/// One candidate that reached the committed ledger — the `run_seq` it
-/// carries there, and the `(role, surface)` partition key that `run_seq`
-/// is monotonic within (module doc). Reported under
-/// [`PromoteReport::promoted`] when THIS call wrote it, and under
-/// [`PromoteReport::recovered`] when an earlier, interrupted call already
-/// had (module doc's recovery section) — same facts either way, so the
-/// two lists share one type.
+/// One candidate that reached the committed ledger.
+///
+/// Reported under [`PromoteReport::promoted`] when THIS call wrote it,
+/// and under [`PromoteReport::recovered`] when an earlier, interrupted
+/// call already had (module doc's recovery section) — same facts either
+/// way, so the two lists share one type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Promoted {
+    /// Which staged kind this candidate is. Reported so a batch that
+    /// drained several kinds at once is readable PER KIND: "promoted
+    /// evidence_record=1, finding=6" is a claim an operator can check
+    /// against the ledger, where a bare "promoted 7" is not.
+    pub kind: RecordKind,
+    /// What promotion assigned this candidate — `None` for a kind it
+    /// assigns nothing to ([`StagedAssignment::Nothing`]).
+    ///
+    /// `None` is not "unknown" and not "failed to derive": it is a kind
+    /// that HAS no `run_seq` partition, and rendering a fabricated one
+    /// would report a value promotion never computed.
+    pub assigned: Option<RunSeqAssignment>,
+    /// The committed-tier-relative path the record lives at —
+    /// content-derived. Under [`StagedAssignment::RunSeqPerRoleSurface`]
+    /// it is resolved AFTER `run_seq`/`staging_id` are stamped onto the
+    /// body (stamping changes the content-digest suffix, so it is never
+    /// the path the staging copy resolved to); under
+    /// [`StagedAssignment::Nothing`] the body is unchanged, so it is the
+    /// SAME relative path under both roots. For a RECOVERED candidate it
+    /// is the path of the committed record actually found on disk.
+    pub target: PathBuf,
+}
+
+/// The `run_seq` promotion assigned a candidate, together with the
+/// `(role, surface)` partition that `run_seq` is monotonic within
+/// (module doc's first section).
+///
+/// One struct rather than three [`Promoted`] fields because the three
+/// co-vary absolutely: a `run_seq` without the partition it is
+/// monotonic within is a meaningless number, and this makes that pair
+/// unrepresentable rather than merely discouraged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunSeqAssignment {
     pub role: RoleId,
     pub surface: String,
     pub run_seq: u64,
-    /// The committed-tier-relative path the record lives at —
-    /// content-derived, resolved AFTER `run_seq`/`staging_id` are stamped
-    /// onto the body (stamping changes the content-digest suffix, so this
-    /// is never the same path the staging copy resolved to). For a
-    /// RECOVERED candidate it is resolved from the committed record found
-    /// on disk, never re-derived from the staged body, so the reported
-    /// path is the one that actually exists.
-    pub target: PathBuf,
+}
+
+impl Promoted {
+    /// The `run_seq` promotion assigned, or `None` for a kind it
+    /// assigns nothing to.
+    pub fn run_seq(&self) -> Option<u64> {
+        self.assigned.as_ref().map(|assigned| assigned.run_seq)
+    }
+
+    /// The `(role, surface)` partition's surface half, or `None` as
+    /// above.
+    pub fn surface(&self) -> Option<&str> {
+        self.assigned.as_ref().map(|assigned| assigned.surface.as_str())
+    }
+
+    /// This candidate's operator-facing label: the kind, then the
+    /// partition and `run_seq` only when promotion actually assigned
+    /// one.
+    ///
+    /// One function so every printer renders an unassigned kind
+    /// identically, instead of each inventing a placeholder
+    /// (`run_seq=0`, `-/-`) for a value that does not exist — a
+    /// placeholder in a promote line is indistinguishable from a real
+    /// assignment to the operator reading it.
+    pub fn label(&self) -> String {
+        match &self.assigned {
+            Some(assigned) => format!("{} {}/{} run_seq={}", self.kind.as_str(), assigned.role.as_str(), assigned.surface, assigned.run_seq),
+            None => self.kind.as_str().to_string(),
+        }
+    }
 }
 
 /// One staging candidate refused promotion — no `run_seq` was ever
@@ -293,23 +384,157 @@ fn refuse(subject: impl Into<String>, detail: impl Into<String>) -> Refused {
     Refused { violation: Violation::new(FailureClass::MalformedEvidence, subject, detail) }
 }
 
-/// Promote every well-formed `_staging/` candidate to the committed
-/// ledger (module doc). `dry_run` computes and returns the FULL plan
-/// (assigned `run_seq`, target path) WITHOUT touching disk —
-/// `canon gate promote --dry-run`'s printer is the intended caller of
-/// that mode; this function only guarantees the plan itself is
-/// side-effect free.
+/// What promotion has to ASSIGN a staged candidate before its body can
+/// be committed — the only axis on which [`STAGED_KINDS`]'s members
+/// differ, and therefore the only thing [`promote`] branches on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StagedAssignment {
+    /// A monotonic `run_seq` per `(role, surface)` (module doc's first
+    /// section). This is WHY `EvidenceRecord` must be staged: the value
+    /// does not exist until promotion computes it, so a record that
+    /// skipped promotion would carry none.
+    ///
+    /// The scheme is `EvidenceRecord`-specific by construction — it
+    /// reads `scenario_id`/`task_id`/`actor.role` off that concrete
+    /// type — so this variant has exactly one member and adding a
+    /// second would mean generalizing the partition key first.
+    RunSeqPerRoleSurface,
+    /// Nothing at all: the kind's natural key is complete the moment it
+    /// is authored, so the committed body is the staged body byte for
+    /// byte.
+    ///
+    /// Not a weaker `RunSeqPerRoleSurface` — a kind with nothing to
+    /// assign, which still gets the two things staging buys regardless
+    /// (module doc's `Finding` section): re-validation through the tier
+    /// read path, and batch atomicity.
+    Nothing,
+}
+
+/// One staged record kind [`promote`] drains, and what promotion owes
+/// it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StagedKind {
+    pub kind: RecordKind,
+    pub assignment: StagedAssignment,
+}
+
+/// Every kind `canon gate promote` drains from `<ledger_root>/_staging`
+/// (module doc). DATA, so registering a kind is the whole cost of
+/// making it promotable — and so the set of promotable kinds is
+/// enumerable from one place by an operator, a diagnostic, and the
+/// per-kind tally `canon gate promote` prints.
+pub const STAGED_KINDS: [StagedKind; 2] = [
+    StagedKind { kind: RecordKind::EvidenceRecord, assignment: StagedAssignment::RunSeqPerRoleSurface },
+    // s43: a review finding. Natural key `{change_id}__{round}__{seq}`,
+    // complete at authoring time — nothing for promotion to assign.
+    StagedKind { kind: RecordKind::Finding, assignment: StagedAssignment::Nothing },
+];
+
+/// Promote every well-formed `_staging/` candidate of every kind in
+/// [`STAGED_KINDS`] to the committed ledger (module doc). `dry_run`
+/// computes and returns the FULL plan (assigned `run_seq`, target path)
+/// WITHOUT touching disk — `canon gate promote --dry-run`'s printer is
+/// the intended caller of that mode; this function only guarantees the
+/// plan itself is side-effect free.
 ///
-/// IDEMPOTENT across an interrupted call (module doc's recovery section):
-/// a candidate whose `staging_id` is already committed is drained from
-/// staging and reported under [`PromoteReport::recovered`], never written
-/// again and never consuming a `run_seq`. So `canon gate promote` may be
-/// retried until it reports success, and the committed record count
-/// equals the number of distinct staged bodies regardless of how many
-/// retries that took.
+/// IDEMPOTENT across an interrupted call (module doc's recovery
+/// section), under BOTH assignment strategies: a candidate already
+/// committed by an earlier call is drained from staging and reported
+/// under [`PromoteReport::recovered`], never written twice and never
+/// consuming a `run_seq`. So `canon gate promote` may be retried until
+/// it reports success, and the committed record count equals the number
+/// of distinct staged bodies regardless of how many retries that took.
+///
+/// Kinds are drained in [`STAGED_KINDS`] order and each accumulates
+/// into the SAME report, so one call's outcome is one report an
+/// operator reads per kind ([`Promoted::kind`]) — never one report per
+/// kind the caller has to remember to ask for.
 pub fn promote(staging: &GitTier, committed: &GitTier, dry_run: bool) -> Result<PromoteReport, StoreError> {
     let mut report = PromoteReport::default();
+    for staged_kind in STAGED_KINDS {
+        match staged_kind.assignment {
+            StagedAssignment::RunSeqPerRoleSurface => promote_with_run_seq(staging, committed, dry_run, &mut report)?,
+            StagedAssignment::Nothing => promote_verbatim(staged_kind.kind, staging, committed, dry_run, &mut report)?,
+        }
+    }
+    Ok(report)
+}
 
+/// Drain every staged candidate of a kind promotion assigns NOTHING to
+/// ([`StagedAssignment::Nothing`]): re-validate, commit the staged body
+/// UNCHANGED, delete the staging source.
+///
+/// No `run_seq`, no `staging_id` companion, and no recovery index —
+/// none of which is a simplification of [`promote_with_run_seq`]'s
+/// scheme so much as a consequence of not needing one. Because the
+/// committed body IS the staged body, `expected_relative_path` (a pure
+/// function of `(kind, json)`) resolves the SAME tier-relative path
+/// under both roots, so an interrupted call's own work is recognizable
+/// by that path alone. `staging_id` exists precisely because promotion
+/// REWRITES an `EvidenceRecord` body and so cannot find it that way;
+/// here there is nothing to rewrite.
+///
+/// The existence check is load-bearing rather than an optimization:
+/// `GitTier::write` refuses an already-occupied path with
+/// `StoreError::DuplicatePath`, so without it a retry after a failed
+/// staging removal would abort the whole batch instead of completing it.
+fn promote_verbatim(kind: RecordKind, staging: &GitTier, committed: &GitTier, dry_run: bool, report: &mut PromoteReport) -> Result<(), StoreError> {
+    let staged = staging.read(&TierQuery::kind(kind))?;
+
+    // The same re-validation guarantee [`promote_with_run_seq`] states:
+    // `staging.read()` has already run
+    // `canon_store::partition::validate_body` over every candidate —
+    // for `Finding` that arm IS `Finding::check_coherence`, the
+    // identical call the committed read path makes — so a candidate the
+    // gate's own read would reject cannot reach the write below. A
+    // malformed candidate is refused with its staging file left in
+    // place, never deleted, so it can be fixed and re-promoted.
+    for violation in staged.violations {
+        report.refused.push(refuse(violation.subject, violation.detail));
+    }
+
+    // Paths resolved up front and sorted, so the same staging set drains
+    // in the same order every run rather than in filesystem-walk order —
+    // the determinism [`promote_with_run_seq`] gets from sorting by
+    // subject, over the only total order this path has.
+    let mut candidates: Vec<(PathBuf, RawRecord)> = Vec::with_capacity(staged.records.len());
+    for raw in staged.records {
+        candidates.push((expected_relative_path(kind, &raw.0).map_err(StoreError::Layout)?, raw));
+    }
+    candidates.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+    for (relative, raw) in candidates {
+        let recovered = committed.root().join(&relative).exists();
+        if !dry_run {
+            if !recovered {
+                committed.write(&RawWrite(raw))?;
+            }
+            // The same unprotected window as the run_seq path: if this
+            // removal does not land, the record above is committed and
+            // the staging file survives, and the next call takes the
+            // recovery branch above rather than writing a second copy.
+            std::fs::remove_file(staging.root().join(&relative))?;
+        }
+        let landed = Promoted { kind, assigned: None, target: relative };
+        if recovered {
+            report.recovered.push(landed);
+        } else {
+            report.promoted.push(landed);
+        }
+    }
+    Ok(())
+}
+
+/// Drain every staged `EvidenceRecord`, assigning each the monotonic
+/// per-`(role, surface)` `run_seq` it has none of until now
+/// ([`StagedAssignment::RunSeqPerRoleSurface`]).
+///
+/// Hardcoded to `EvidenceRecord`, and honestly so: the partition key it
+/// assigns within is read off that concrete type's own
+/// `scenario_id`/`task_id`/`actor.role` fields, so this is not a
+/// generic function with one caller — it is the one kind whose identity
+/// promotion mints.
+fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, dry_run: bool, report: &mut PromoteReport) -> Result<(), StoreError> {
     let staged = staging.read(&TierQuery::kind(RecordKind::EvidenceRecord))?;
 
     // Malformed/misfiled staging candidates never reach run_seq
@@ -399,7 +624,11 @@ pub fn promote(staging: &GitTier, committed: &GitTier, dry_run: bool) -> Result<
                 let staging_relative = expected_relative_path(RecordKind::EvidenceRecord, &raw.0).map_err(StoreError::Layout)?;
                 std::fs::remove_file(staging.root().join(&staging_relative))?;
             }
-            report.recovered.push(Promoted { role, surface, run_seq: existing.run_seq, target: existing.target.clone() });
+            report.recovered.push(Promoted {
+                kind: RecordKind::EvidenceRecord,
+                assigned: Some(RunSeqAssignment { role, surface, run_seq: existing.run_seq }),
+                target: existing.target.clone(),
+            });
             continue;
         }
 
@@ -422,10 +651,14 @@ pub fn promote(staging: &GitTier, committed: &GitTier, dry_run: bool) -> Result<
             std::fs::remove_file(staging.root().join(&staging_relative))?;
         }
 
-        report.promoted.push(Promoted { role, surface, run_seq: seq, target });
+        report.promoted.push(Promoted {
+            kind: RecordKind::EvidenceRecord,
+            assigned: Some(RunSeqAssignment { role, surface, run_seq: seq }),
+            target,
+        });
     }
 
-    Ok(report)
+    Ok(())
 }
 
 /// A staged `Divergence` candidate — every `Divergence` field except
@@ -571,7 +804,7 @@ fn commit_divergence_candidate(
         committed.write(&divergence)?;
     }
 
-    Ok(Ok(Promoted { role: key.1, surface: key.2, run_seq: seq, target }))
+    Ok(Ok(Promoted { kind: RecordKind::Divergence, assigned: Some(RunSeqAssignment { role: key.1, surface: key.2, run_seq: seq }), target }))
 }
 
 /// Batch-promote every staged [`DivergenceCandidate`] under `staging_dir`
@@ -632,6 +865,154 @@ mod tests {
         )
     }
 
+    fn finding(change_id: &str, round: u32, seq: u32) -> canon_model::Finding {
+        canon_model::Finding::new(
+            Envelope::new(1, RecordKind::Finding, chrono::Utc::now(), Actor::new("reviewer-1", RoleId::parse("reviewer").unwrap())),
+            canon_model::ChangeId::parse(change_id).unwrap(),
+            round,
+            seq,
+            canon_model::FindingSeverity::Blocker,
+            "reviewer-1",
+            "the count was typed from memory",
+        )
+    }
+
+    /// s43: a kind registered under [`StagedAssignment::Nothing`] is
+    /// drained by the SAME `canon gate promote` call, in the same
+    /// report. The regression this pins is the one that made the whole
+    /// registry necessary: before it, `promote` read one hardcoded
+    /// kind, so a staged `Finding` was invisible — `canon finding add`
+    /// printed "run `canon gate promote`", promote printed "nothing
+    /// staged", and the record sat in `_staging/` unreadable by every
+    /// committed-tier query, forever.
+    #[test]
+    fn promote_drains_a_registered_kind_it_assigns_nothing_to() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+
+        staging.write(&finding("s43-findings-are-records", 1, 1)).unwrap();
+        staging.write(&finding("s43-findings-are-records", 1, 2)).unwrap();
+        staging.write(&evidence("implementer", Some("world.firstbuy-hotdeal.14"))).unwrap();
+
+        let report = promote(&staging, &committed, false).unwrap();
+        assert!(report.is_clean(), "refused: {:?}", report.refused);
+
+        // One report, readable per kind — the property `canon gate
+        // promote`'s tally line is printed from.
+        let findings: Vec<&Promoted> = report.promoted.iter().filter(|p| p.kind == RecordKind::Finding).collect();
+        assert_eq!(findings.len(), 2, "both findings promoted: {:?}", report.promoted);
+        assert_eq!(report.promoted.iter().filter(|p| p.kind == RecordKind::EvidenceRecord).count(), 1);
+
+        // Nothing was assigned, and nothing is CLAIMED to have been —
+        // a fabricated `run_seq=0` here would be indistinguishable from
+        // a real assignment in the promote output.
+        assert!(findings.iter().all(|p| p.assigned.is_none()), "a finding has no run_seq partition to report");
+        assert!(findings.iter().all(|p| p.run_seq().is_none()));
+        assert_eq!(findings[0].label(), "finding", "an unassigned kind's label is the kind alone, never a placeholder");
+
+        assert!(staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.is_empty(), "promotion drains finding staging");
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 2);
+    }
+
+    /// The committed body of an unassigned kind is the staged body
+    /// BYTE FOR BYTE — nothing is stamped onto it, which is exactly why
+    /// it needs no `staging_id` to be recognizable later.
+    #[test]
+    fn promoting_an_unassigned_kind_rewrites_nothing_in_the_body() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+
+        let record = finding("s43-findings-are-records", 2, 1).fixed_by(Sha::parse("b".repeat(40)).unwrap());
+        let staged_path = staging.root().join(staging.write(&record).unwrap().location);
+        let staged_bytes = std::fs::read(&staged_path).unwrap();
+
+        let report = promote(&staging, &committed, false).unwrap();
+        let target = &report.promoted.iter().find(|p| p.kind == RecordKind::Finding).expect("the finding promoted").target;
+        assert_eq!(std::fs::read(committed.root().join(target)).unwrap(), staged_bytes, "the committed body must be the staged body, unmodified");
+        assert!(!staged_path.exists(), "the staging source is drained");
+    }
+
+    /// The re-validation guarantee, over the arm that is `Finding`'s:
+    /// `validate_body` runs `Finding::check_coherence`, so an incoherent
+    /// candidate (`fixed` naming no closing commit) is refused at
+    /// `staging.read()` and never reaches the committed ledger — with
+    /// its staging file left in place to be fixed, and a well-formed
+    /// sibling promoted anyway.
+    #[test]
+    fn promote_refuses_an_incoherent_finding_and_leaves_it_staged() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+
+        let mut incoherent = serde_json::to_value(finding("s43-findings-are-records", 3, 1)).unwrap();
+        incoherent.as_object_mut().unwrap().insert("disposition".to_string(), serde_json::json!("fixed"));
+        staging.write(&RawWrite(RawRecord(incoherent))).unwrap();
+        staging.write(&finding("s43-findings-are-records", 3, 2)).unwrap();
+
+        let report = promote(&staging, &committed, false).unwrap();
+        assert_eq!(report.promoted.len(), 1, "only the coherent sibling promotes: {:?}", report.promoted);
+        assert_eq!(report.refused.len(), 1);
+        assert_eq!(report.refused[0].violation.class, FailureClass::MalformedEvidence);
+
+        let staged_after = staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap();
+        assert!(staged_after.records.is_empty(), "the coherent one is drained");
+        assert_eq!(staged_after.violations.len(), 1, "the incoherent one stays on disk to be fixed");
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 1);
+    }
+
+    /// A retry after an interrupted promote of an unassigned kind
+    /// RECOVERS rather than aborting. Without the existence check,
+    /// `GitTier::write` would refuse the already-occupied path with
+    /// `DuplicatePath` and take the whole batch down with it.
+    #[test]
+    fn a_retried_promote_of_an_unassigned_kind_recovers_instead_of_erroring() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+
+        let record = finding("s43-findings-are-records", 4, 1);
+        staging.write(&record).unwrap();
+        let first = promote(&staging, &committed, false).unwrap();
+        assert_eq!(first.promoted.len(), 1);
+        assert!(first.recovered.is_empty());
+
+        // The interruption: the committed write landed, the staging
+        // removal did not.
+        staging.write(&record).unwrap();
+
+        let retry = promote(&staging, &committed, false).unwrap();
+        assert!(retry.promoted.is_empty(), "the retry must not write a second record: {:?}", retry.promoted);
+        assert_eq!(retry.recovered.len(), 1);
+        assert_eq!(retry.recovered[0].target, first.promoted[0].target);
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 1, "exactly one committed record, however many retries");
+        assert!(staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.is_empty());
+    }
+
+    /// `--dry-run` is side-effect free for an unassigned kind too.
+    #[test]
+    fn dry_run_over_an_unassigned_kind_writes_and_deletes_nothing() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+        staging.write(&finding("s43-findings-are-records", 5, 1)).unwrap();
+
+        let report = promote(&staging, &committed, true).unwrap();
+        assert_eq!(report.promoted.len(), 1, "the plan still names the candidate");
+        assert!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.is_empty(), "dry-run must not write");
+        assert_eq!(staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 1, "dry-run must not delete");
+    }
+
+    /// Every kind an authoring command can stage MUST be registered, or
+    /// its records are stranded (module doc). `Divergence` is the one
+    /// deliberate exclusion — it has its own staging directory and
+    /// promote path — so pinning the exact set makes adding a staging
+    /// writer without registering its kind a test failure rather than a
+    /// silent hole.
+    #[test]
+    fn the_staged_kind_registry_is_exactly_the_kinds_promote_drains() {
+        let kinds: Vec<RecordKind> = STAGED_KINDS.iter().map(|staged| staged.kind).collect();
+        assert_eq!(kinds, vec![RecordKind::EvidenceRecord, RecordKind::Finding]);
+        assert!(!kinds.contains(&RecordKind::Divergence), "Divergence promotes through `promote_divergence`, not this registry");
+    }
+
+
     #[test]
     fn promote_assigns_monotonic_gap_free_run_seq_within_one_invocation() {
         let dir = TempDir::new().unwrap();
@@ -648,9 +1029,9 @@ mod tests {
         let report = promote(&staging, &committed, false).unwrap();
         assert!(report.is_clean(), "refused: {:?}", report.refused);
         assert_eq!(report.promoted.len(), 2);
-        let mut seqs: Vec<u64> = report.promoted.iter().map(|p| p.run_seq).collect();
+        let mut seqs: Vec<Option<u64>> = report.promoted.iter().map(|p| p.run_seq()).collect();
         seqs.sort_unstable();
-        assert_eq!(seqs, vec![1, 2], "no gaps, strictly increasing");
+        assert_eq!(seqs, vec![Some(1), Some(2)], "no gaps, strictly increasing");
 
         // Staging is now empty (both candidates landed + were deleted).
         assert!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.is_empty());
@@ -664,7 +1045,7 @@ mod tests {
         staging.write(&evidence("implementer", Some("world.firstbuy-hotdeal.33"))).unwrap();
         let report2 = promote(&staging, &committed, false).unwrap();
         assert_eq!(report2.promoted.len(), 1);
-        assert_eq!(report2.promoted[0].run_seq, 3);
+        assert_eq!(report2.promoted[0].run_seq(), Some(3));
     }
 
     #[test]
@@ -687,7 +1068,7 @@ mod tests {
 
         let report = promote(&staging, &committed, false).unwrap();
         assert_eq!(report.promoted.len(), 1);
-        assert_eq!(report.promoted[0].run_seq, 1, "the malformed sibling must not have consumed run_seq 1");
+        assert_eq!(report.promoted[0].run_seq(), Some(1), "the malformed sibling must not have consumed run_seq 1");
         assert_eq!(report.refused.len(), 1);
         assert_eq!(report.refused[0].violation.class, FailureClass::MalformedEvidence);
 
@@ -725,7 +1106,7 @@ mod tests {
 
         let report = promote(&staging, &committed, false).unwrap();
         assert_eq!(report.promoted.len(), 1, "promoted: {:?}", report.promoted);
-        assert_eq!(report.promoted[0].run_seq, 1, "the malformed sibling must not have consumed run_seq 1");
+        assert_eq!(report.promoted[0].run_seq(), Some(1), "the malformed sibling must not have consumed run_seq 1");
         assert_eq!(report.refused.len(), 1);
         assert_eq!(report.refused[0].violation.class, FailureClass::MalformedEvidence);
 
@@ -769,7 +1150,7 @@ mod tests {
 
         let report = promote(&staging, &committed, true).unwrap();
         assert_eq!(report.promoted.len(), 1);
-        assert_eq!(report.promoted[0].run_seq, 1);
+        assert_eq!(report.promoted[0].run_seq(), Some(1));
 
         assert!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.is_empty(), "dry-run must not write");
         assert_eq!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1, "dry-run must not delete");
@@ -786,8 +1167,8 @@ mod tests {
         assert!(report.is_clean(), "refused: {:?}", report.refused);
         assert_eq!(report.promoted.len(), 2);
         // Different surfaces -> both independently start at run_seq 1.
-        assert!(report.promoted.iter().all(|p| p.run_seq == 1));
-        let surfaces: std::collections::HashSet<&str> = report.promoted.iter().map(|p| p.surface.as_str()).collect();
+        assert!(report.promoted.iter().all(|p| p.run_seq() == Some(1)));
+        let surfaces: std::collections::HashSet<&str> = report.promoted.iter().filter_map(|p| p.surface()).collect();
         assert_eq!(surfaces.len(), 2);
     }
 
@@ -817,9 +1198,9 @@ mod tests {
         let report = promote_divergence(&staging_dir, &committed, false).unwrap();
         assert!(report.is_clean(), "refused: {:?}", report.refused);
         assert_eq!(report.promoted.len(), 2);
-        let mut seqs: Vec<u64> = report.promoted.iter().map(|p| p.run_seq).collect();
+        let mut seqs: Vec<Option<u64>> = report.promoted.iter().map(|p| p.run_seq()).collect();
         seqs.sort_unstable();
-        assert_eq!(seqs, vec![1, 2], "no gaps, strictly increasing within one (project_id, role, surface) partition");
+        assert_eq!(seqs, vec![Some(1), Some(2)], "no gaps, strictly increasing within one (project_id, role, surface) partition");
 
         // Staging is empty afterward; both committed Divergence records exist.
         assert!(std::fs::read_dir(&staging_dir).unwrap().next().is_none());
@@ -830,7 +1211,7 @@ mod tests {
         stage_divergence(&staging_dir, &divergence_candidate("app-a", "world.firstbuy-hotdeal.33", "reviewer", DivergenceStatus::Open, 1)).unwrap();
         let report2 = promote_divergence(&staging_dir, &committed, false).unwrap();
         assert_eq!(report2.promoted.len(), 1);
-        assert_eq!(report2.promoted[0].run_seq, 3);
+        assert_eq!(report2.promoted[0].run_seq(), Some(3));
     }
 
     #[test]
@@ -848,7 +1229,7 @@ mod tests {
 
         let report = promote_divergence(&staging_dir, &committed, false).unwrap();
         assert_eq!(report.promoted.len(), 1, "promoted: {:?}", report.promoted);
-        assert_eq!(report.promoted[0].run_seq, 1, "the malformed sibling must not have consumed run_seq 1");
+        assert_eq!(report.promoted[0].run_seq(), Some(1), "the malformed sibling must not have consumed run_seq 1");
         assert_eq!(report.refused.len(), 1);
         assert_eq!(report.refused[0].violation.class, FailureClass::MalformedEvidence);
     }
@@ -885,7 +1266,7 @@ mod tests {
         let report = promote_divergence(&staging_dir, &committed, false).unwrap();
         assert!(report.is_clean(), "refused: {:?}", report.refused);
         assert_eq!(report.promoted.len(), 2);
-        assert!(report.promoted.iter().all(|p| p.run_seq == 1), "different project_id partitions both independently start at run_seq 1");
+        assert!(report.promoted.iter().all(|p| p.run_seq() == Some(1)), "different project_id partitions both independently start at run_seq 1");
     }
 
     #[test]
@@ -902,7 +1283,7 @@ mod tests {
         let resolved = divergence_candidate("app-a", "world.firstbuy-hotdeal.99", "reviewer", DivergenceStatus::Resolved, 1);
         let outcome = commit_divergence(&resolved, &committed).unwrap();
         let promoted = outcome.expect("resolve candidate should promote cleanly");
-        assert_eq!(promoted.run_seq, 1);
+        assert_eq!(promoted.run_seq(), Some(1));
 
         // The unrelated staged candidate is still sitting there, untouched.
         assert_eq!(std::fs::read_dir(&staging_dir).unwrap().count(), 1);
@@ -930,7 +1311,7 @@ mod tests {
         let first = promote(&staging, &committed, false).unwrap();
         assert_eq!(first.promoted.len(), 1);
         assert!(first.recovered.is_empty(), "nothing to recover on a first, uninterrupted promote");
-        assert_eq!(first.promoted[0].run_seq, 1);
+        assert_eq!(first.promoted[0].run_seq(), Some(1));
 
         // The interruption.
         staging.write(&record).unwrap();
@@ -940,7 +1321,7 @@ mod tests {
         assert!(retry.is_clean(), "a recovery must exit clean or the retry is unusable: {:?}", retry.refused);
         assert!(retry.promoted.is_empty(), "the retry must not write a second record: {:?}", retry.promoted);
         assert_eq!(retry.recovered.len(), 1);
-        assert_eq!(retry.recovered[0].run_seq, 1, "the recovery reports the run_seq the interrupted call already assigned");
+        assert_eq!(retry.recovered[0].run_seq(), Some(1), "the recovery reports the run_seq the interrupted call already assigned");
         assert_eq!(retry.recovered[0].target, first.promoted[0].target, "and the committed path that call actually wrote");
 
         assert_eq!(
@@ -961,7 +1342,7 @@ mod tests {
         staging.write(&evidence("implementer", Some("world.firstbuy-hotdeal.26"))).unwrap();
         let third = promote(&staging, &committed, false).unwrap();
         assert_eq!(third.promoted.len(), 1, "a distinct attestation is not a recovery: {third:?}");
-        assert_eq!(third.promoted[0].run_seq, 2);
+        assert_eq!(third.promoted[0].run_seq(), Some(2));
         assert_eq!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 2);
     }
 

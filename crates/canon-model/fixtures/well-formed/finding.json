@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "reviewer"
+  },
+  "at": "2026-07-30T09:15:00Z",
+  "change_id": "s42-close-the-open-loops",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-ingest/src/artifact_adapter.rs:120-134",
+  "introduced_by": "3f9a12c4b7de8051aa6c0f2d94e77b1358cc4d20",
+  "kind": "finding",
+  "resolution_sha": "b41d7e0925ca38f6ee1cb70d4a982f65173d0ce8",
+  "reviewed_sha": "8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552",
+  "reviewer": "review-voice",
+  "round": 11,
+  "schema": 1,
+  "seq": 4,
+  "severity": "blocker",
+  "summary": "CodeReviewFinding is classified during ingest and then dropped for want of a record kind"
+}

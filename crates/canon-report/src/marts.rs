@@ -1,4 +1,4 @@
-//! The six S9/S20/S24-owned marts (`crates/canon-store/sql/views.sql`'s
+//! The eight S9/S20/S24/S36/s43-owned marts (`crates/canon-store/sql/views.sql`'s
 //! addition" section, design D5) — one `fetch_*` per panel, each a
 //! bare `SELECT * FROM mart_x ORDER BY …` against
 //! [`crate::query::run_query`]. No aggregation happens here: every
@@ -166,4 +166,61 @@ pub const SUBJECTS_COLUMNS: &[&str] = &["domain", "subject_id", "title", "status
 /// own `SELECT` list, no renaming/reordering (design D1).
 pub fn fetch_subjects(roots: &Roots) -> Result<MartResult, ReportError> {
     fetch(roots, "mart_subjects", "domain, subject_id", SUBJECTS_COLUMNS)
+}
+
+pub const REVIEW_ROUNDS_COLUMNS: &[&str] = &[
+    "change_id",
+    "round",
+    "reviewed_sha",
+    "findings",
+    "severity_blocker",
+    "severity_should_fix",
+    "severity_note",
+    "disposition_open",
+    "disposition_fixed",
+    "disposition_rejected",
+    "disposition_deferred",
+    "fix_of_fix",
+    "introduced_by_sourced",
+    "introduced_by_unsourced",
+];
+
+/// `mart_review_rounds` (s43 `findings-are-records`): one row per
+/// `(change_id, round)` over the fourteenth kind,
+/// [`canon_model::records::Finding`] — the reviewed sha, the finding
+/// count, the per-severity and per-disposition splits, and the DERIVED
+/// fix-of-fix count. Exactly the view's own `SELECT` list, no
+/// renaming/reordering (design D1); every number is the view's.
+///
+/// The three columns whose bare names would otherwise assert more than
+/// the query computes:
+///
+/// - `reviewed_sha` — `max()` over the round's findings, because
+///   `reviewed_sha` is per-finding provenance and the natural key
+///   (`{change_id}__{round:04}__{seq:04}`) does not include it. NULL
+///   means no finding in the round recorded one, which is how canon
+///   records a round that reviewed an uncommitted working tree — the
+///   common case, and the reason the field is `Option` at all.
+/// - `fix_of_fix` — findings in this round whose SOURCED
+///   `introduced_by` equals the `resolution_sha` of a finding EARLIER
+///   in the SAME change, ordered strictly by the natural key's own
+///   `(round, seq)` pair. That is a commit-id equality join and
+///   nothing more: it reports that the commit which closed an earlier
+///   finding is the commit a later finding RECORDS as its introducing
+///   commit. Whether that record is right is a property of how the
+///   author sourced `introduced_by`, which canon requires to be
+///   sourced and never infers — so this column inherits the corpus's
+///   sourcing discipline and establishes no causal claim of its own.
+///   Strictness is what stops a finding matching its own resolution;
+///   the same-change scope is what keeps `(round, seq)` meaningful,
+///   since `round` restarts at 1 per change.
+/// - `introduced_by_unsourced` — the UNKNOWN bucket. `introduced_by`
+///   is `None` when the introducing commit could not be sourced, so
+///   such a finding is never counted as NOT-a-fix-of-fix; it is
+///   counted as unknown, here. `introduced_by_sourced +
+///   introduced_by_unsourced = findings` and `fix_of_fix <=
+///   introduced_by_sourced`, which is what makes `fix_of_fix` a
+///   readable FLOOR rather than a total.
+pub fn fetch_review_rounds(roots: &Roots) -> Result<MartResult, ReportError> {
+    fetch(roots, "mart_review_rounds", "change_id, \"round\"", REVIEW_ROUNDS_COLUMNS)
 }

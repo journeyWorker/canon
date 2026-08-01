@@ -32,9 +32,10 @@ use canon_learn::strategy::{DemotionEvidence, StrategyItem as LearnStrategyItem}
 use canon_learn::trajectory::Trajectory as LearnTrajectory;
 use canon_learn::verdict_outcome::{TrajectoryVerdict, VerdictOutcome};
 use canon_model::envelope::{Actor, Envelope, RecordKind};
-use canon_model::ids::{ProjectId, RegimeKey, RoleId, RunId, ScenarioId, Sha, SessionId, SubjectId, TaskId, TotalOrder};
+use canon_model::ids::{ChangeId, ProjectId, RegimeKey, RoleId, RunId, ScenarioId, Sha, SessionId, SubjectId, TaskId, TotalOrder};
 use canon_model::records::{
-    Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Review, ProvenanceRef, Run, RunStatus, Session, StrategyRef, Subject, SubjectStatus, Task, TaskStatus,
+    Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, Review, ProvenanceRef, Run, RunStatus, Session, StrategyRef, Subject,
+    SubjectStatus, Task, TaskStatus,
 };
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -247,6 +248,100 @@ pub mod subjects {
     pub const UNCOVERED_SCENARIO_ID: &str = "s9.subject.02";
 }
 
+/// `mart_review_rounds`'s expected four rows (s43
+/// `findings-are-records`). Three rounds on `s9-fixture` — the SAME
+/// `change_id` the trust-matrix tasks above hang off, so the corpus
+/// also exercises the finding → change → task spine — plus one round
+/// on a second change that exists only to pin what the derivation
+/// does NOT count.
+///
+/// The fix-of-fix derivation is the reason this corpus is shaped the
+/// way it is. `mart_review_rounds` counts a finding as a fix-of-fix
+/// when its `introduced_by` equals the `resolution_sha` of a finding
+/// EARLIER in the same change by `(round, seq)`, so a corpus of
+/// unsourced findings would render the column without ever
+/// demonstrating that it joins anything, and a corpus where every
+/// sourced finding happens to match would not distinguish "sourced"
+/// from "matched". Round 2 carries all three shapes at once:
+///
+/// - `seq 1` — the FIX OF FIX. Its `introduced_by` is round 1 `seq 1`'s
+///   `resolution_sha`, so it is the one finding the `EXISTS` clause
+///   admits.
+/// - `seq 2` — SOURCED, NOT MATCHED. Its `introduced_by` is a real,
+///   recorded commit that is no finding's `resolution_sha`. Counted in
+///   `introduced_by_sourced`, absent from `fix_of_fix`. Without this
+///   row the two columns could be the same query.
+/// - `seq 3` — UNSOURCED. No `introduced_by` at all, so it lands in
+///   `introduced_by_unsourced` — the UNKNOWN bucket, never in the
+///   not-a-fix-of-fix majority.
+///
+/// Two rows pin what must NOT count, because a fix-of-fix count that
+/// silently over-reports is the failure this whole change exists to
+/// stop:
+///
+/// - Round 3's single finding names its OWN `resolution_sha` as its
+///   `introduced_by`. The comparison is STRICT on `(round, seq)`, so it
+///   cannot match itself; a non-strict one would score this round `1`.
+/// - `s9-fixture-other` round 1 names `s9-fixture` round 1's
+///   `resolution_sha`. The join is scoped to one `change_id`, so it
+///   counts `0` — the documented cross-change miss the panel calls a
+///   second reason the count is a floor. If someone widens the scope
+///   without ordering the changes, this constant is what fails.
+///
+/// Round 1 is the only round carrying a `reviewed_sha`; rounds 2 and 3
+/// reviewed an uncommitted worktree, which is the common case and the
+/// reason `Finding::reviewed_sha` is `Option`. `ROUND_2_REVIEWED_SHA_IS_
+/// NULL` is asserted rather than skipped so a derivation that started
+/// ordering or grouping by that field fails here.
+pub mod review_rounds {
+    pub const CHANGE_ID: &str = "s9-fixture";
+    pub const OTHER_CHANGE_ID: &str = "s9-fixture-other";
+    /// Round 1's reviewed COMMIT — the only round in this corpus whose
+    /// reviewed state was committed at all.
+    pub const ROUND_1_REVIEWED_SHA: &str =
+        "cccccccccccccccccccccccccccccccccccccccc";
+    /// Round 1 `seq 1`'s `resolution_sha`: the commit round 2 `seq 1`
+    /// names as its introducing commit, which is the ONLY edge in this
+    /// corpus the fix-of-fix join admits.
+    pub const ROUND_1_RESOLUTION_SHA: &str =
+        "dddddddddddddddddddddddddddddddddddddddd";
+    /// A sourced introducing commit that is no finding's
+    /// `resolution_sha` — round 2 `seq 2`'s.
+    pub const UNMATCHED_INTRODUCED_BY_SHA: &str =
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    /// Round 3's finding is `fixed_by` this commit AND names it as its
+    /// own `introduced_by` — the self-match a non-strict comparison
+    /// would count.
+    pub const ROUND_3_SELF_SHA: &str =
+        "ffffffffffffffffffffffffffffffffffffffff";
+
+    // (findings, blocker, should_fix, note, open, fixed, rejected,
+    //  deferred, fix_of_fix, introduced_by_sourced,
+    //  introduced_by_unsourced)
+    pub const ROUND_1: Row = Row { findings: 2, blocker: 1, should_fix: 0, note: 1, open: 0, fixed: 1, rejected: 1, deferred: 0, fix_of_fix: 0, sourced: 0, unsourced: 2 };
+    pub const ROUND_2: Row = Row { findings: 3, blocker: 1, should_fix: 1, note: 1, open: 2, fixed: 0, rejected: 0, deferred: 1, fix_of_fix: 1, sourced: 2, unsourced: 1 };
+    pub const ROUND_3: Row = Row { findings: 1, blocker: 1, should_fix: 0, note: 0, open: 0, fixed: 1, rejected: 0, deferred: 0, fix_of_fix: 0, sourced: 1, unsourced: 0 };
+    pub const OTHER_ROUND_1: Row = Row { findings: 1, blocker: 0, should_fix: 0, note: 1, open: 1, fixed: 0, rejected: 0, deferred: 0, fix_of_fix: 0, sourced: 1, unsourced: 0 };
+
+    /// One expected `mart_review_rounds` row's every count, so a test
+    /// asserts the WHOLE row rather than the three columns it happens
+    /// to care about — a severity or disposition bucket that silently
+    /// changed meaning would otherwise pass.
+    pub struct Row {
+        pub findings: i64,
+        pub blocker: i64,
+        pub should_fix: i64,
+        pub note: i64,
+        pub open: i64,
+        pub fixed: i64,
+        pub rejected: i64,
+        pub deferred: i64,
+        pub fix_of_fix: i64,
+        pub sourced: i64,
+        pub unsourced: i64,
+    }
+}
+
 /// Builds the full fixture corpus (git tier + `canon-learn` parquet
 /// stores) under `dir`, returning the [`Roots`] a [`canon_report::
 /// ReportInputs`] can be constructed from directly.
@@ -367,6 +462,72 @@ fn build_git_tier(git_root: &Path) {
         "a".repeat(12),
         ProvenanceRef::UpstreamRef("s9-fixture-upstream-ref".to_string()),
     ))
+    .unwrap();
+
+    // ── mart_review_rounds: three rounds on `s9-fixture` plus one on a
+    // second change, covering every case the fix-of-fix derivation has
+    // to distinguish (see the `review_rounds` module doc for the row-
+    // by-row argument). ONE version per natural key, like the rest of
+    // this corpus — the multi-version fold is pinned separately by
+    // `tests/multi_version_fold.rs`, which builds its own corpus for
+    // it.
+    let finding_envelope = |h: u32, min: u32| Envelope::current(RecordKind::Finding, at_min(2026, 1, 5, h, min), actor("reviewer1", "reviewer"));
+    let change = || ChangeId::parse(review_rounds::CHANGE_ID).unwrap();
+    let sha = |hex: &str| Sha::parse(hex.to_string()).unwrap();
+
+    // Round 1 — the one round whose reviewed state was COMMITTED.
+    tier.write(
+        &Finding::new(finding_envelope(9, 0), change(), 1, 1, FindingSeverity::Blocker, "reviewer1", "round 1 blocker, later fixed")
+            .reviewing_sha(sha(review_rounds::ROUND_1_REVIEWED_SHA))
+            .fixed_by(sha(review_rounds::ROUND_1_RESOLUTION_SHA)),
+    )
+    .unwrap();
+    tier.write(
+        &Finding::new(finding_envelope(9, 1), change(), 1, 2, FindingSeverity::Note, "reviewer1", "round 1 note, rejected")
+            .reviewing_sha(sha(review_rounds::ROUND_1_REVIEWED_SHA))
+            .rejected(),
+    )
+    .unwrap();
+
+    // Round 2 — reviewed an uncommitted worktree, so no `reviewed_sha`
+    // on ANY of its findings. All three `introduced_by` shapes.
+    tier.write(
+        &Finding::new(finding_envelope(10, 0), change(), 2, 1, FindingSeverity::ShouldFix, "reviewer1", "defect in round 1's fix")
+            .with_introduced_by(sha(review_rounds::ROUND_1_RESOLUTION_SHA)),
+    )
+    .unwrap();
+    tier.write(
+        &Finding::new(finding_envelope(10, 1), change(), 2, 2, FindingSeverity::Note, "reviewer1", "sourced to a commit no finding resolved")
+            .with_introduced_by(sha(review_rounds::UNMATCHED_INTRODUCED_BY_SHA))
+            .deferred(),
+    )
+    .unwrap();
+    tier.write(&Finding::new(finding_envelope(10, 2), change(), 2, 3, FindingSeverity::Blocker, "reviewer1", "introducing commit could not be sourced")).unwrap();
+
+    // Round 3 — names its OWN closing commit as its introducing
+    // commit. Strict `(round, seq)` is the only thing keeping this out
+    // of `fix_of_fix`.
+    tier.write(
+        &Finding::new(finding_envelope(11, 0), change(), 3, 1, FindingSeverity::Blocker, "reviewer1", "its own resolution is its own introducing commit")
+            .with_introduced_by(sha(review_rounds::ROUND_3_SELF_SHA))
+            .fixed_by(sha(review_rounds::ROUND_3_SELF_SHA)),
+    )
+    .unwrap();
+
+    // A DIFFERENT change naming `s9-fixture` round 1's resolution: the
+    // cross-change case the same-change scope deliberately misses.
+    tier.write(
+        &Finding::new(
+            finding_envelope(12, 0),
+            ChangeId::parse(review_rounds::OTHER_CHANGE_ID).unwrap(),
+            1,
+            1,
+            FindingSeverity::Note,
+            "reviewer1",
+            "another change's finding, sourced to s9-fixture's fix",
+        )
+        .with_introduced_by(sha(review_rounds::ROUND_1_RESOLUTION_SHA)),
+    )
     .unwrap();
 
     // ── session costs: 1 session, 1 run (carrying the `dev` strategy

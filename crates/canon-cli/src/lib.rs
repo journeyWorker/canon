@@ -9,6 +9,7 @@ pub mod demo;
 pub mod dispatch;
 pub mod divergence;
 pub mod evidence;
+pub mod finding;
 pub mod fmt;
 pub mod gate;
 pub mod ingest;

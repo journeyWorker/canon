@@ -1,15 +1,25 @@
 ---
 name: canon-report-dashboard
-description: How to run canon report (the generated-never-edited markdown status report, its --check drift gate, and its --snapshot Parquet export) and canon dashboard (the zero-network web app that renders the same numbers from a snapshot). Use when you need the current trust-matrix/session-costs/role-memory/flywheel/review-burndown status of a canon-managed repo, when CI needs to gate on report drift, or when a snapshot needs regenerating for the dashboard.
+description: How to run canon report (the generated-never-edited markdown status report, its --check drift gate, and its --snapshot Parquet export) and canon dashboard (the zero-network web app that renders a subset of the same numbers from a snapshot). Use when you need the current trust-matrix/session-costs/role-memory/flywheel/review-burndown/scope-status/subjects/review-rounds status of a canon-managed repo, when CI needs to gate on report drift, or when a snapshot needs regenerating for the dashboard.
 ---
 
 # canon-report-dashboard
 
-canon's single status surface: `canon report` renders five panels to
-markdown, and `canon dashboard` serves a small zero-network web app that
-renders the SAME numbers from a Parquet snapshot. Neither computes
-aggregates itself — both read canon's precomputed views, so they can
-never disagree.
+canon's single status surface: `canon report` renders EIGHT panels to
+markdown, `canon report --snapshot` exports the same eight marts to
+Parquet, and `canon dashboard` serves a small zero-network web app that
+renders SIX of them from such a snapshot. Neither surface computes an
+aggregate itself — both read canon's precomputed
+`crates/canon-store/sql/views.sql` marts, so they can never disagree
+about a number.
+
+They can still disagree about what a number MEANS, and that is the
+failure this skill is written against: a friendly label or a paraphrase
+asserting something its query never computed. Every claim below is kept
+verbatim with the prose `canon report` actually renders
+(`canon_report::render`'s `pub const *_PANEL` literals and its inline
+one-liners), and `packages/dashboard/test/panel-copy.test.ts` pins this
+file to those literals. Copy a claim; do not paraphrase it.
 
 ## Generated, never hand-edited
 
@@ -26,7 +36,7 @@ drift-checked.
 
 ## `canon report [--repo <dir>]`
 
-Renders the current five-panel report to `<repo>/.canon/REPORT.md`.
+Renders the current eight-panel report to `<repo>/.canon/REPORT.md`.
 `--repo` resolves through the nearest-`canon.yaml`-ancestor walk every
 subcommand uses — omit it (or pass `.`) to run from any subdirectory.
 
@@ -34,6 +44,13 @@ subcommand uses — omit it (or pass `.`) to run from any subdirectory.
 canon report                 # writes .canon/REPORT.md
 canon report --repo /path/to/repo
 ```
+
+Between the digest header and the first panel, the report may also
+render a `## Kinds not read directly` section. It is config-derived
+(`canon.yaml`'s static `routing`/`tiers` tables), not a live backend
+probe, and an empty set renders NO section at all — so a repo routing
+nothing to a not-directly-readable backend renders exactly as before
+the section existed.
 
 ## `canon report --check` — the CI drift gate
 
@@ -57,8 +74,13 @@ directly wherever CI already runs those.
 
 ## `canon report --snapshot <dir>`
 
-Exports the same five views to `<dir>/<table>.parquet` plus a
-`<dir>/manifest.json`:
+Exports all eight views to `<dir>/<table>.parquet` plus a
+`<dir>/manifest.json`. One explicit `COPY` per view — the exported
+columns are each view's own `SELECT` list, wider than the curated column
+subset the markdown tables render. `file` is always
+`<table>.parquet`, and the table order is the report's own panel order,
+with `mart_scope_status`, `mart_subjects` and `mart_review_rounds`
+APPENDED last so an existing consumer's order never moves:
 
 ```json
 {
@@ -70,14 +92,19 @@ Exports the same five views to `<dir>/<table>.parquet` plus a
     { "table": "mart_session_costs", "file": "mart_session_costs.parquet" },
     { "table": "mart_role_memory", "file": "mart_role_memory.parquet" },
     { "table": "mart_flywheel_funnel", "file": "mart_flywheel_funnel.parquet" },
-    { "table": "mart_review_burndown", "file": "mart_review_burndown.parquet" }
+    { "table": "mart_review_burndown", "file": "mart_review_burndown.parquet" },
+    { "table": "mart_scope_status", "file": "mart_scope_status.parquet" },
+    { "table": "mart_subjects", "file": "mart_subjects.parquet" },
+    { "table": "mart_review_rounds", "file": "mart_review_rounds.parquet" }
   ]
 }
 ```
 
 This is where `source_git_sha`/`generated_at` live (never in the
 drift-checked markdown header) — a snapshot is output-inclusive
-provenance.
+provenance. `source_digest` is one 12-hex fingerprint over the same
+corpus/policy/ledger digests the report header renders, so a snapshot's
+provenance is comparable to a report's without re-deriving anything.
 
 ```bash
 canon report --snapshot /tmp/canon-snap
@@ -105,33 +132,134 @@ canon dashboard --snapshot /tmp/canon-snap --port 8080
 - Prints the URL to open, then serves until Ctrl-C. If the app is not
   built, `canon dashboard` fails with the exact build command to run.
 
+The dashboard renders SIX panels — trust matrix, session costs, role
+memory, flywheel funnel, review burn-down, review rounds. **Scope status
+and subjects are exported to the snapshot but have no dashboard panel**;
+for those two, read `.canon/REPORT.md` or query the Parquet directly.
+Do not read a missing dashboard panel as an empty mart.
+
 The dashboard's freshness banner shows the snapshot's
 `generated_at`/`source_git_sha`/`source_digest` with a "scoped to this
 snapshot, not necessarily the live checkout" note — treat "matches
 `canon report`" as "matches the inputs that produced THIS snapshot".
 
-## Reading the five panels
+## Reading the eight panels
 
-- **Trust matrix** (`mart_trust_matrix`) — change/task × `covered` ×
-  `green` × `who`. `covered` = required evidence exists per policy;
-  `green` = the latest verdict actually passed.
-- **Session costs** (`mart_session_costs`) — token/cost by
-  role/repo/session, `session_id`-keyed.
-- **Role memory** (`mart_role_memory`) — strategies, hit rate, and an
-  effect proxy per role namespace (see `canon-reward`).
+In `canon report`'s own render order. Each panel names the view that
+computes it; nothing here is derived a second time.
+
+- **Trust matrix** (`mart_trust_matrix`) — Change/task coverage × green × who.
+  `covered` means at least one `evidence_record` exists for this `task_id`,
+  NOT that policy's REQUIRED evidence is present — that is `canon gate
+  check`'s question, and this view deliberately does not answer it. `green`
+  is the plain `verdict = 'faithful'` proxy over the latest attestation, not
+  `canon-gate`'s multi-rung trust-ladder classifier, which the view refuses
+  to re-implement in SQL. `evidence_count` counts ATTESTATIONS, superseded
+  versions included, because a re-attestation can only arrive as a new
+  version; `green` and `who` are read off one whole winner row, so they can
+  never come from two different attestations.
+
+- **Session costs** (`mart_session_costs`) — token/cost per
+  `(session, client, role, workspace_label)`. Every `run`/`session`/
+  `token_usage` record is folded to its latest version first, so
+  a re-ingested corrected cost REPLACES the superseded figure instead of being summed with it.
+  `workspace_label` is NOT a repo identity: it is the last non-empty path
+  segment of the `token_usage` event's workspace key and nothing more, so it
+  SPLITS one repo whose worktrees sit in differently-named directories and
+  MERGES two different repos sharing a directory name. Two stronger fields
+  exist and this mart reads neither — the event's own `workspace_key`, and
+  `Session.project_key`, which `canon-cli` stamps to the main worktree's key.
+
+- **Role memory** (`mart_role_memory`) — per-`(role, regime_key)` strategy
+  counts. `hit_rate` is NOT a retrieval hit rate: it is the fraction of that
+  namespace's distilled strategies carrying no `demotion` flag, i.e.
+  exactly `active_count / strategy_count`.
+  `avg_source_trajectories` is the mean number of source trajectories a
+  strategy was distilled from — an explicitly-named stand-in, because
+  canon records no per-strategy reward or effect metric.
+  There is no effect column, and this panel measures no effect.
+
 - **Flywheel funnel** (`mart_flywheel_funnel`) — verdicts → distilled →
-  retrieved → applied counts. A large drop between two stages is the
-  actionable signal.
-- **Review burn-down** (`mart_review_burndown`) — per-day
-  evidence/divergence counts plus a running "divergences still open"
-  total. A running total that never trends down means feedback isn't
-  being closed out.
+  retrieved → applied, per role, where
+  the last three stages count STRATEGIES, so the funnel narrows by construction.
+  `applied` is the retrieved set narrowed to strategies whose recipient run
+  has something recorded about how it ended, split into
+  `applied_attributed` (a resolved trajectory of the same role stamped with
+  that run id) and `applied_proxy` (only the run's own terminal status).
+  Both rules are CO-OCCURRENCE inside one run, never causation:
+  canon stores no edge from a strategy to a verdict,
+  so neither column can separate guidance that was followed from guidance
+  that was ignored. A large drop between two stages is the actionable
+  signal; `retrieved 0` means no run's recorded guidance names a strategy
+  that exists now.
+
+- **Review burn-down** (`mart_review_burndown`) — a per-day trend over raw
+  `Divergence.status` events, with the `evidence_*` columns breaking the same
+  window down by `EvidenceRecord.verdict`. `divergence_open_running_total` is
+  a running `opened - resolved` event count, NOT the number open now —
+  the two differ whenever one `resolved` record closes several findings on a
+  scenario. For current state per scenario, run `canon divergence status`.
+
+- **Scope status** (`mart_scope_status`) —
+  Task done × evidence-verified × spec-covered, per declared scenario ref.
+  Grain is one row per declared `(task_id, scenario_id)` pair PER COVERING
+  PROJECT, because two spec roots may author one scenario id and the view
+  reports both rather than picking one. A task with no `scenario_refs` never
+  appears here at all. `spec_project_id IS NULL` means NO coverage overlay
+  row exists for that scenario — a different state from an overlay row that
+  exists and says `spec_covered = false`. Read-only reporting; never a
+  `canon gate` input.
+
+- **Subjects** (`mart_subjects`) —
+  Per-domain subject rollup: status × scenario coverage.
+  One row per `subject` record, folded to its latest version, so a subject
+  that walked proposed → shipped is still one row. `scenario_count` is how
+  many `scenario_ids` the subject links; `covered_scenarios` is how many of
+  those carry a latest NON-divergent evidence verdict (`faithful` or
+  `not_applicable`), the same last-wins fold the `verifying -> shipped` gate
+  uses. Read-only reporting; never a `canon gate` input. See `canon-subject`.
+
+- **Review rounds** (`mart_review_rounds`) — one row per `(change_id, round)`
+  over `Finding` records (`canon finding add`), folded to the latest version
+  of each `{change_id}__{round}__{seq}` finding first. A round that found
+  nothing wrote no `Finding` and so has no row: the table
+  counts the rounds that FOUND something, never the rounds RUN
+  (s42's round 12 returned MERGEABLE with zero findings and is absent),
+  and canon has no record kind that marks a round as run.
+  `fix_of_fix` counts
+  findings whose SOURCED `introduced_by` equals the `resolution_sha` of a
+  finding earlier in the SAME change, ordered strictly by `(round, seq)`.
+  That is
+  a commit-id equality join over two recorded fields and nothing more:
+  it reads no git history, computes no blame,
+  and establishes no causal claim.
+  `introduced_by_unsourced` is the UNKNOWN bucket —
+  a finding with no sourced `introduced_by` is counted there and NEVER as
+  not-a-fix-of-fix.
+  `fix_of_fix` therefore bounds NOTHING — not from below, not from above.
+  It misses: unsourced findings, and a fix in one change that breaks
+  something first found while reviewing a DIFFERENT change. It also
+  over-counts, because
+  a `resolution_sha` commit may carry work BEYOND the fix,
+  and then every finding recording that commit matches regardless —
+  `f438c610` closed s42's round 8 AND shipped s42's whole feature, so
+  round 9's six matches are a commit-id coincidence.
+  `reviewed_sha` is the greatest value any of
+  the round's findings recorded and reads `—` when none did; a round that
+  reviewed an uncommitted working tree is the usual reason, but the view
+  cannot distinguish that from findings that left the field unset.
+
+Two marts in `views.sql` are NOT report panels and are not exported by
+`--snapshot`: `mart_records_by_kind` and `mart_session_run_handoff`.
+Read them with DuckDB directly against `views.sql`.
 
 ## What this skill does NOT cover
 
 - The underlying view layer that computes the marts — see `canon-storage`.
 - `canon gate`'s evidence-gated checkbox flip / trust ladder — see
-  `canon-gate`. The trust-matrix panel READS the same corpus `canon
-  gate check` validates but never gates or flips anything.
-- Strategy distillation/promotion — see `canon-reward`; the role-memory
-  panel is a read-only view over that store.
+  `canon-gate`. The trust-matrix and scope-status panels READ the same
+  corpus `canon gate check` validates but never gate or flip anything.
+- Strategy distillation/promotion — see `canon-learn`; the role-memory and
+  flywheel panels are read-only views over that store.
+- Authoring subjects and their status lifecycle — see `canon-subject`; the
+  subjects panel is the read-only rollup over those records.

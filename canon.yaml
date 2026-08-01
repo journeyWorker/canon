@@ -15,7 +15,7 @@ handoff_templates:
 # S2 (`s2-tiered-storage`) TierPolicy (design D3), rekeyed to the
 # rung/backend split (s27 `tier-role-backend-split` design D1/D3):
 # `routing`/`aging` name a capability RUNG (`local`/`hot`/`cold`)
-# each of canon-model's twelve record kinds lands in; each `tiers.<rung>`
+# each of canon-model's fourteen record kinds lands in; each `tiers.<rung>`
 # block tags its own vendor `backend:`. Routing/aging keys are
 # `RecordKind::as_str()`'s stable snake_case wire strings — the same
 # string every record's own `kind` field already serializes to
@@ -40,6 +40,16 @@ routing:
   review: local
   divergence: local
   evidence_record: local
+  # finding (s43): one code-review finding. `local` for the same reason
+  # `divergence`/`review`/`evidence_record` are — it is durable,
+  # append-only review evidence that must be diffable in the repo,
+  # readable offline with zero operator credentials, and committed
+  # alongside the corpus it judges. It is also the SOURCE a release
+  # narrative's issue counts are derived from, so it belongs in the
+  # same git-backed tier the rest of that evidence already lives in.
+  # Not `hot` (a finding is not in-flight execution state) and not
+  # `cold` (it is read at every release, not bulk-archived).
+  finding: local
   strategy_item: local
   # hot (live-queryable, shared, postgres-backed): in-flight
   # task/handoff state + recent events.

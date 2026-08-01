@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:09:37.080793Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test marts"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.63s",
+    "summary": "fix_of_fix is an EXISTS semi-join of introduced_by against earlier resolution_sha, with no stored boolean in the path"
+  },
+  "kind": "evidence_record",
+  "run_seq": 9,
+  "schema": 1,
+  "staging_id": "cbaf339738cd",
+  "task_id": "s43-findings-are-records#3.2",
+  "verdict": "faithful"
+}

@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:08:41.289025Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-model --lib records::"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 83 filtered out; finished in 0.01s",
+    "summary": "RecordKind::Finding is the 14th kind with a fully typed body and no untyped escape hatch"
+  },
+  "kind": "evidence_record",
+  "run_seq": 1,
+  "schema": 1,
+  "staging_id": "90a966eaf2e2",
+  "task_id": "s43-findings-are-records#1.1",
+  "verdict": "faithful"
+}

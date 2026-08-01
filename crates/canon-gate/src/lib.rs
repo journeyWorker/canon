@@ -65,7 +65,10 @@ pub use hooks::{install_hooks, HookEntry, InstallOutcome, PRE_COMMIT_SCRIPT};
 pub use ledger::{latest_verdicts, CellKey, LedgerCheck, LedgerEntry};
 pub use markers::{evidence_note_of, scan_fake_markers, EvidenceNote, FABRICATION_BLOCKLIST};
 pub use policy::{FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError, StalenessPolicy};
-pub use promote::{commit_divergence, divergence_staging_dir, promote, promote_divergence, stage_divergence, DivergenceCandidate, Promoted, PromoteReport, Refused};
+pub use promote::{
+    commit_divergence, divergence_staging_dir, promote, promote_divergence, stage_divergence, DivergenceCandidate, Promoted, PromoteReport, Refused, RunSeqAssignment,
+    StagedAssignment, StagedKind, STAGED_KINDS,
+};
 pub use report::{GateFailureClass, GateReport, GateViolation};
 pub use selftest::{FixtureOutcome, SelftestReport};
 pub use staleness::StalenessCheck;

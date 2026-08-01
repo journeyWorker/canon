@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:09:06.678779Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo xtask check-generated"
+  },
+  "evidence_note": {
+    "command_result": "canon-model generated output is up to date (JOIN_SPINE.md + schemas/*.schema.json).",
+    "summary": "schema registered and generated output regenerates drift-free at fourteen kinds"
+  },
+  "kind": "evidence_record",
+  "run_seq": 3,
+  "schema": 1,
+  "staging_id": "93372b8e5661",
+  "task_id": "s43-findings-are-records#1.3",
+  "verdict": "faithful"
+}

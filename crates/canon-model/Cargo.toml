@@ -3,7 +3,7 @@ name = "canon-model"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "canon's closed, versioned artifact-family types (S1): envelope, the twelve record kinds, the join-spine key newtypes, evidence-integrity validation, and generated JSON-schema + join-spine doc output."
+description = "canon's closed, versioned artifact-family types (S1): envelope, the fourteen record kinds, the join-spine key newtypes, evidence-integrity validation, and generated JSON-schema + join-spine doc output."
 
 [lib]
 name = "canon_model"

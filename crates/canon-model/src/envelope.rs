@@ -1,6 +1,6 @@
 //! The shared record envelope (S1 design D2, task 1.1).
 //!
-//! Every one of canon-model's thirteen record kinds composes [`Envelope`]
+//! Every one of canon-model's fourteen record kinds composes [`Envelope`]
 //! via `#[serde(flatten)]` — no record type defines its own ad hoc
 //! actor/`by` field; the only path to attribution is `Envelope.actor`.
 
@@ -10,10 +10,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::ids::{RoleId, SessionId};
 
-/// The thirteen closed record kinds `canon-model` recognizes (design D1;
-/// `Subject` is the reviewed 13th kind, added by s36 — the "a new kind is
-/// a reviewed, breaking `canon-model` change" process design D1 mandates,
-/// exercised for real). A fourteenth kind is again a reviewed, breaking
+/// The fourteen closed record kinds `canon-model` recognizes (design D1;
+/// `Subject` is the reviewed 13th kind, added by s36, and `Finding` the
+/// reviewed 14th, added by s43 — the "a new kind is a reviewed, breaking
+/// `canon-model` change" process design D1 mandates, exercised twice for
+/// real). A fifteenth kind is again a reviewed, breaking
 /// change — never a `kind: String` escape hatch (design D1's explicitly
 /// rejected alternative: an untyped `payload: serde_json::Value` would
 /// silently recreate the "no documented join key" problem inside canon
@@ -41,15 +42,21 @@ pub enum RecordKind {
     // documented variant) instead of the flat `enum` canon-policy's
     // schema walker resolves into a CEL enum domain.
     Subject,
+    // One code-review finding (s43): the durable home for what used to
+    // live only in an agent transcript, so a release narrative's
+    // "N issues, M of them fix-of-fix" is DERIVED from records rather
+    // than hand-counted into a git tag. The reviewed 14th kind. Plain
+    // line comment, NOT a doc comment — see the `Subject` note above.
+    Finding,
 }
 
 impl RecordKind {
-    /// All thirteen kinds, in the same order the proposal/design docs
+    /// All fourteen kinds, in the same order the proposal/design docs
     /// list them — the one iteration point schema export (task 3.2) and
-    /// the fixture round-trip test (task 6.2) both walk, so "thirteen
-    /// kinds" is asserted structurally (`RecordKind::ALL.len() == 13`)
+    /// the fixture round-trip test (task 6.2) both walk, so "fourteen
+    /// kinds" is asserted structurally (`RecordKind::ALL.len() == 14`)
     /// rather than by a comment that can drift from the enum.
-    pub const ALL: [RecordKind; 13] = [
+    pub const ALL: [RecordKind; 14] = [
         RecordKind::Change,
         RecordKind::Task,
         RecordKind::Scenario,
@@ -63,6 +70,7 @@ impl RecordKind {
         RecordKind::StrategyItem,
         RecordKind::EvidenceRecord,
         RecordKind::Subject,
+        RecordKind::Finding,
     ];
 
     /// The wire string this kind serializes to (the `kind` field's
@@ -84,6 +92,7 @@ impl RecordKind {
             RecordKind::StrategyItem => "strategy_item",
             RecordKind::EvidenceRecord => "evidence_record",
             RecordKind::Subject => "subject",
+            RecordKind::Finding => "finding",
         }
     }
 
@@ -142,7 +151,8 @@ impl RecordKind {
             | RecordKind::Trajectory
             | RecordKind::StrategyItem
             | RecordKind::EvidenceRecord
-            | RecordKind::Subject => 1,
+            | RecordKind::Subject
+            | RecordKind::Finding => 1,
         }
     }
 
@@ -175,10 +185,11 @@ impl RecordKind {
     /// Whether this kind's [`Self::partition_template`] requires the
     /// Hive `area={area}/` segment — true for exactly the kinds whose
     /// `scenario_id` field is mandatory (non-`Option`), false for the
-    /// other nine (including [`RecordKind::EvidenceRecord`], whose
+    /// other eleven (including [`RecordKind::EvidenceRecord`], whose
     /// `scenario_id` is present-but-optional per S1 design — an
     /// evidence record without a scenario tie is still a flat, valid
-    /// record).
+    /// record, and [`RecordKind::Finding`], which is scoped to a
+    /// reviewed COMMIT rather than to a scenario at all).
     pub fn is_area_scoped(self) -> bool {
         matches!(self, RecordKind::Scenario | RecordKind::Review | RecordKind::Divergence)
     }
@@ -272,7 +283,7 @@ impl Envelope {
     }
 }
 
-/// Implemented by every one of the thirteen closed record kinds — the one
+/// Implemented by every one of the fourteen closed record kinds — the one
 /// dispatch point schema export, the fixture loader, and the round-trip
 /// tests use instead of re-deriving a kind ↔ type mapping per caller.
 pub trait CanonRecord: Serialize + for<'de> Deserialize<'de> + JsonSchema {
@@ -289,8 +300,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn all_thirteen_kinds_present_exactly_once() {
-        assert_eq!(RecordKind::ALL.len(), 13);
+    fn all_fourteen_kinds_present_exactly_once() {
+        assert_eq!(RecordKind::ALL.len(), 14);
         let mut seen = std::collections::HashSet::new();
         for kind in RecordKind::ALL {
             assert!(seen.insert(kind), "{kind:?} listed twice in RecordKind::ALL");

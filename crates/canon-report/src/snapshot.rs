@@ -17,13 +17,15 @@ use crate::manifest::{git_head_sha, Manifest, ManifestTable};
 use crate::query;
 use crate::ReportInputs;
 
-/// The S9/S24/S36-owned marts, in the order the report declares them —
-/// [`crate::render::ReportMarts`]'s own field order, duplicated here as
-/// a bare name list (this module never renders markdown, so it does not
-/// depend on [`crate::render`]). `mart_scope_status` (s20
-/// `task-scenario-join`, surfaced by s24 `scope-status-report`) then
-/// `mart_subjects` (s36 `subject-domain-loop`) are appended LAST, after
-/// the original five.
+/// The S9/S24/S36/s43-owned marts, in the order the report declares
+/// them — [`crate::render::ReportMarts`]'s own field order, duplicated
+/// here as a bare name list (this module never renders markdown, so it
+/// does not depend on [`crate::render`]). `mart_scope_status` (s20
+/// `task-scenario-join`, surfaced by s24 `scope-status-report`), then
+/// `mart_subjects` (s36 `subject-domain-loop`), then
+/// `mart_review_rounds` (s43 `findings-are-records`) are appended
+/// LAST, after the original five — each addition appends rather than
+/// reorders, so an existing consumer's table order never moves.
 pub const SNAPSHOT_TABLES: &[&str] = &[
     "mart_trust_matrix",
     "mart_session_costs",
@@ -32,6 +34,7 @@ pub const SNAPSHOT_TABLES: &[&str] = &[
     "mart_review_burndown",
     "mart_scope_status",
     "mart_subjects",
+    "mart_review_rounds",
 ];
 
 /// Escapes a path for embedding inside a single-quoted DuckDB SQL

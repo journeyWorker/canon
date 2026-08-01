@@ -1,4 +1,4 @@
--- Builds packages/dashboard's canonical fixture snapshot: seven small, hand-
+-- Builds packages/dashboard's canonical fixture snapshot: eight small, hand-
 -- authored tables whose column NAME + ORDER + TYPE match
 -- crates/canon-store/sql/views.sql's mart_* SELECT lists exactly (S9
 -- SHARED SNAPSHOT CONTRACT). Each is exported with the same
@@ -102,6 +102,42 @@ SELECT * FROM (
         ('planning', 'fix-retry-backoff', 'Retry backoff', 'shipped',  3::BIGINT, 3::BIGINT)
 ) AS t(domain, subject_id, title, status, scenario_count, covered_scenarios);
 
+-- Panel 8: mart_review_rounds (crates/canon-store/sql/views.sql, s43
+-- findings-are-records). `reviewed_sha` is nullable: a round that reviewed an
+-- uncommitted working tree has none, which is the COMMON case, so at least one
+-- row must carry NULL or the fixture would show a shape the model calls rare.
+--
+-- The arithmetic the panel asserts must hold on every row, or the dashboard's
+-- own screenshot is a counter-example to its own caveats:
+--   introduced_by_sourced + introduced_by_unsourced = findings
+--   fix_of_fix <= introduced_by_sourced
+--   severity_blocker + severity_should_fix + severity_note = findings
+--   disposition_open + fixed + rejected + deferred = findings
+--
+-- And the rows must exercise all three shapes `introduced_by` can take, or the
+-- columns render without demonstrating that they distinguish anything:
+--   add-json-export round 1 — sourced 5, unsourced 0, fix_of_fix 0: FULLY
+--              sourced and still no match, so a reader cannot read fix_of_fix
+--              as "the sourced ones".
+--   add-json-export round 2 — fix_of_fix 1 < sourced 3, unsourced 3: a MATCHED
+--              introducing commit beside sourced-but-unmatched ones and
+--              unsourced ones. This is the row that separates "matched" from
+--              "sourced".
+--   add-json-export round 3 — sourced 0, unsourced 4: an ALL-UNKNOWN round.
+--              fix_of_fix 0 here means "canon does not know", never "no
+--              fix-of-fix happened", which is exactly the floor the panel
+--              documents.
+-- fix-retry-backoff round 1 is a second change, so the table also shows the
+-- per-change grain the fix-of-fix scope depends on.
+CREATE OR REPLACE TABLE mart_review_rounds AS
+SELECT * FROM (
+    VALUES
+        ('add-json-export',   1::BIGINT, 'f438c610d9b4a71e0c53e2b8a19d7c46f0b3e185', 5::BIGINT, 1::BIGINT, 2::BIGINT, 2::BIGINT, 0::BIGINT, 4::BIGINT, 1::BIGINT, 0::BIGINT, 0::BIGINT, 5::BIGINT, 0::BIGINT),
+        ('add-json-export',   2::BIGINT, CAST(NULL AS VARCHAR),                      6::BIGINT, 2::BIGINT, 1::BIGINT, 3::BIGINT, 1::BIGINT, 4::BIGINT, 0::BIGINT, 1::BIGINT, 1::BIGINT, 3::BIGINT, 3::BIGINT),
+        ('add-json-export',   3::BIGINT, CAST(NULL AS VARCHAR),                      4::BIGINT, 0::BIGINT, 1::BIGINT, 3::BIGINT, 2::BIGINT, 1::BIGINT, 0::BIGINT, 1::BIGINT, 0::BIGINT, 0::BIGINT, 4::BIGINT),
+        ('fix-retry-backoff', 1::BIGINT, '9c1d0a7b4e6f28315d0ab9c7e4f1268a35bd90c2', 3::BIGINT, 1::BIGINT, 1::BIGINT, 1::BIGINT, 0::BIGINT, 3::BIGINT, 0::BIGINT, 0::BIGINT, 1::BIGINT, 2::BIGINT, 1::BIGINT)
+) AS t(change_id, "round", reviewed_sha, findings, severity_blocker, severity_should_fix, severity_note, disposition_open, disposition_fixed, disposition_rejected, disposition_deferred, fix_of_fix, introduced_by_sourced, introduced_by_unsourced);
+
 COPY "mart_trust_matrix"    TO 'fixtures/snapshot/mart_trust_matrix.parquet'    (FORMAT parquet);
 COPY "mart_session_costs"   TO 'fixtures/snapshot/mart_session_costs.parquet'   (FORMAT parquet);
 COPY "mart_role_memory"     TO 'fixtures/snapshot/mart_role_memory.parquet'     (FORMAT parquet);
@@ -109,3 +145,4 @@ COPY "mart_flywheel_funnel" TO 'fixtures/snapshot/mart_flywheel_funnel.parquet' 
 COPY "mart_review_burndown" TO 'fixtures/snapshot/mart_review_burndown.parquet' (FORMAT parquet);
 COPY "mart_scope_status"    TO 'fixtures/snapshot/mart_scope_status.parquet'    (FORMAT parquet);
 COPY "mart_subjects"        TO 'fixtures/snapshot/mart_subjects.parquet'        (FORMAT parquet);
+COPY "mart_review_rounds"   TO 'fixtures/snapshot/mart_review_rounds.parquet'   (FORMAT parquet);

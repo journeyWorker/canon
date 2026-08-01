@@ -134,3 +134,75 @@ test("mart_review_burndown fixture rows are a running opened - resolved event co
   // says it is not.
   expect(burndown.some((r) => r.divergence_resolved > r.divergence_opened)).toBe(true);
 });
+
+interface ReviewRoundsRow {
+  change_id: string;
+  round: number;
+  reviewed_sha: string | null;
+  findings: number;
+  severity_blocker: number;
+  severity_should_fix: number;
+  severity_note: number;
+  disposition_open: number;
+  disposition_fixed: number;
+  disposition_rejected: number;
+  disposition_deferred: number;
+  fix_of_fix: number;
+  introduced_by_sourced: number;
+  introduced_by_unsourced: number;
+}
+
+test("mart_review_rounds fixture rows satisfy the arithmetic the panel asserts", () => {
+  if (skipWithoutDuckdb()) return;
+  const rounds = rows<ReviewRoundsRow>("mart_review_rounds", "*");
+  expect(rounds.length).toBeGreaterThan(0);
+
+  for (const row of rounds) {
+    const label = `${row.change_id}#${row.round}`;
+    // `severity` and `disposition` are closed enums on `Finding`, so
+    // each set of FILTERed counts partitions the round's findings. A
+    // fixture violating this would render buckets that do not add up
+    // under prose claiming they do.
+    expect({ label, sum: row.severity_blocker + row.severity_should_fix + row.severity_note }).toEqual({ label, sum: row.findings });
+    expect({
+      label,
+      sum: row.disposition_open + row.disposition_fixed + row.disposition_rejected + row.disposition_deferred,
+    }).toEqual({ label, sum: row.findings });
+    // The identity that makes the UNKNOWN bucket readable against the
+    // count: every finding either carries a sourced `introduced_by` or
+    // does not.
+    expect({ label, sum: row.introduced_by_sourced + row.introduced_by_unsourced }).toEqual({ label, sum: row.findings });
+    // `fix_of_fix` is the sourced set NARROWED by the join, so it can
+    // never exceed it. A fixture where it did would make the panel's
+    // "floor" claim incoherent.
+    expect(row.fix_of_fix).toBeLessThanOrEqual(row.introduced_by_sourced);
+  }
+});
+
+test("mart_review_rounds fixture exercises all three shapes of introduced_by", () => {
+  if (skipWithoutDuckdb()) return;
+  const rounds = rows<ReviewRoundsRow>("mart_review_rounds", "*");
+  const shape = (r: ReviewRoundsRow) =>
+    r.introduced_by_sourced === 0
+      ? "all-unsourced"
+      : r.fix_of_fix === 0
+        ? "sourced-none-matched"
+        : "sourced-some-matched";
+  // Each shape carries a claim the columns would otherwise never
+  // demonstrate: `all-unsourced` is the round where `fix_of_fix 0`
+  // means "canon does not know" rather than "it did not happen";
+  // `sourced-none-matched` stops a reader equating `fix_of_fix` with
+  // "the sourced ones"; `sourced-some-matched` is the only shape that
+  // shows the join admitting anything at all.
+  expect([...new Set(rounds.map(shape))].sort()).toEqual(["all-unsourced", "sourced-none-matched", "sourced-some-matched"]);
+
+  // A round that reviewed an uncommitted worktree has no reviewed
+  // commit, and that is the COMMON case — a fixture with a sha on every
+  // row would show a shape the model calls rare, and would let a
+  // sha-ordered derivation look viable.
+  expect(rounds.some((r) => r.reviewed_sha === null)).toBe(true);
+  expect(rounds.some((r) => r.reviewed_sha !== null)).toBe(true);
+  // More than one change, so the per-change grain the fix-of-fix scope
+  // depends on is visible rather than implied.
+  expect(new Set(rounds.map((r) => r.change_id)).size).toBeGreaterThan(1);
+});

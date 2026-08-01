@@ -90,7 +90,7 @@ use std::path::{Path, PathBuf};
 
 use canon_gate::{
     evidence_note_of, gate_task, install_hooks, promote as gate_promote, selftest, EvidenceNote, FailureClass, GateContext, GateCtx, GateReport, HookEntry, InstallOutcome,
-    PromoteReport, TaskFlipDecision, FAILURE_CLASSES, PRE_COMMIT_SCRIPT,
+    Promoted, PromoteReport, TaskFlipDecision, FAILURE_CLASSES, PRE_COMMIT_SCRIPT, STAGED_KINDS,
 };
 use canon_ingest::{find_plan_adapter, PlanWriteBack, WriteBackError};
 use canon_model::paths;
@@ -587,8 +587,10 @@ pub(crate) fn evidence_staging_dir(ledger_root: &Path) -> PathBuf {
     ledger_root.join("_staging")
 }
 
-/// `canon gate promote [--repo] [--dry-run]` (task 2.2/2.3's CLI wiring):
-/// `_staging/` → committed, monotonic per-(role, surface) `run_seq`.
+/// `canon gate promote [--repo] [--dry-run]` (task 2.2/2.3's CLI wiring;
+/// s43 extends it to every kind in `canon_gate::STAGED_KINDS`):
+/// `_staging/` → committed, with a monotonic per-(role, surface)
+/// `run_seq` for the one kind that needs one.
 ///
 /// Safe to retry after an interrupted run: `canon_gate::promote` is
 /// idempotent per staged candidate (its own recovery section), so a
@@ -615,33 +617,69 @@ pub fn run_promote(repo: &Path, dry_run: bool) -> i32 {
     }
 }
 
+/// One [`PromoteReport`] as an operator reads it: a line per candidate,
+/// then a PER-KIND tally.
+///
+/// The tally is not decoration. `canon gate promote` drains several
+/// kinds in one call, and a batch that silently drained none of the
+/// kind you cared about is the failure mode this command has: a bare
+/// "promoted 7" cannot be checked against a ledger, where "promoted
+/// evidence_record=1, finding=6" can. Every registered kind appears
+/// with its count INCLUDING zero, so the output also answers "which
+/// kinds can be promoted at all" — the question an author whose
+/// records went nowhere is actually asking.
 fn format_promote_report(report: &PromoteReport, dry_run: bool) -> String {
     let verb = if dry_run { "would promote" } else { "promoted" };
     let drain_verb = if dry_run { "would drain" } else { "drained" };
     let mut out = String::new();
     for p in &report.promoted {
-        out.push_str(&format!("{verb} {}/{} run_seq={} -> {}\n", p.role.as_str(), p.surface, p.run_seq, p.target.display()));
+        out.push_str(&format!("{verb} {} -> {}\n", p.label(), p.target.display()));
     }
     // Reported distinctly from `promoted`, never folded into it: the
     // record already existed, this call only finished the interrupted
     // run's staging cleanup, and an operator comparing promote output
     // against the ledger has to be able to tell which happened.
     for p in &report.recovered {
-        out.push_str(&format!(
-            "{drain_verb} {}/{} run_seq={} -> {} (already committed by an interrupted promote; not re-committed)\n",
-            p.role.as_str(),
-            p.surface,
-            p.run_seq,
-            p.target.display()
-        ));
+        out.push_str(&format!("{drain_verb} {} -> {} (already committed by an interrupted promote; not re-committed)\n", p.label(), p.target.display()));
     }
     for r in &report.refused {
         out.push_str(&format!("refused: {}\n", r.violation.line()));
     }
+
     if report.promoted.is_empty() && report.recovered.is_empty() && report.refused.is_empty() {
-        out.push_str("canon gate promote: nothing staged\n");
+        // Named explicitly rather than left as silence: an author whose
+        // `add` command printed "run `canon gate promote`" and then saw
+        // a clean exit with no output has no way to tell success from a
+        // record that went nowhere.
+        out.push_str(&format!("canon gate promote: nothing staged — no records under `_staging/` for any promotable kind ({})\n", promotable_kinds()));
+        return out;
     }
+
+    out.push_str(&format!("canon gate promote: {verb} {}", kind_tally(&report.promoted)));
+    if !report.recovered.is_empty() {
+        out.push_str(&format!("; {drain_verb} {}", kind_tally(&report.recovered)));
+    }
+    if !report.refused.is_empty() {
+        out.push_str(&format!("; refused {}", report.refused.len()));
+    }
+    out.push('\n');
     out
+}
+
+/// `kind=N` for every kind in `canon_gate::STAGED_KINDS`, in that
+/// order — zeros included (see [`format_promote_report`]), and driven
+/// off the registry so a newly promotable kind appears here without a
+/// second list to remember to update.
+fn kind_tally(landed: &[Promoted]) -> String {
+    STAGED_KINDS
+        .iter()
+        .map(|staged| format!("{}={}", staged.kind.as_str(), landed.iter().filter(|p| p.kind == staged.kind).count()))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn promotable_kinds() -> String {
+    STAGED_KINDS.iter().map(|staged| staged.kind.as_str()).collect::<Vec<_>>().join(", ")
 }
 
 /// `canon gate install-hooks [--repo] [--event] [--matcher] [--command]

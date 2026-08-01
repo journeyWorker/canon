@@ -84,9 +84,9 @@ mod support;
 
 use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::evidence::RawRecord;
-use canon_model::ids::{ProjectId, RoleId, RunId, ScenarioId, Sha, SessionId, SubjectId, TaskId, TotalOrder};
+use canon_model::ids::{ChangeId, ProjectId, RoleId, RunId, ScenarioId, Sha, SessionId, SubjectId, TaskId, TotalOrder};
 use canon_model::records::{
-    Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Run, RunStatus, Session, Subject, SubjectStatus, Task, TaskStatus,
+    Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, Run, RunStatus, Session, Subject, SubjectStatus, Task, TaskStatus,
 };
 use canon_report::marts;
 use canon_report::query;
@@ -1092,4 +1092,96 @@ fn both_roots_fold_a_digest_the_rust_reader_refuses_to_return() {
         json!("open"),
         "documented r2 residual: `canon query` drops the tampered row via `validate_row`, these views fold it at its column digest"
     );
+}
+
+/// s43 (`findings-are-records`): a finding's DISPOSITION is a lifecycle
+/// — `canon finding add` raises it `open`, a later write closes it
+/// `fixed` — so one finding that got fixed is TWO versions at
+/// `{change_id}__{round:04}__{seq:04}`. Unfolded, `mart_review_rounds`
+/// would count that finding twice in `findings` and place it in BOTH
+/// `disposition_open` and `disposition_fixed`, which is the
+/// `mart_subjects` status double-count on the panel whose whole purpose
+/// is a defensible count.
+///
+/// The `introduced_by` half is the sharper failure and is why this test
+/// asserts the sourced/unsourced split too: the SUPERSEDED version here
+/// carries no `introduced_by`, so an unfolded read inflates
+/// `introduced_by_unsourced` — the UNKNOWN bucket the panel reports as
+/// a known unknown and uses to justify calling `fix_of_fix` a floor.
+/// Over-reporting the unknown makes that caveat itself wrong.
+#[test]
+fn review_rounds_counts_a_refixed_finding_once_at_its_latest_disposition() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let git_root = dir.path().join("ledger");
+    let tier = GitTier::new(&git_root);
+    let change = ChangeId::parse("fold-finding-change").unwrap();
+    let resolution = Sha::parse("d".repeat(40)).unwrap();
+
+    // Round 1 `seq 1`, raised `open` and then closed `fixed_by` at a
+    // strictly greater `envelope.at` — the two writes `canon finding
+    // add` produces across a round and its fix.
+    let raised = Finding::new(
+        Envelope::new(1, RecordKind::Finding, at(2026, 6, 1, 9), actor("reviewer")),
+        change.clone(),
+        1,
+        1,
+        FindingSeverity::Blocker,
+        "reviewer1",
+        "raised open, fixed later",
+    );
+    tier.write(&raised).unwrap();
+    tier.write(
+        &Finding::new(
+            Envelope::new(1, RecordKind::Finding, at(2026, 6, 1, 10), actor("reviewer")),
+            change.clone(),
+            1,
+            1,
+            FindingSeverity::Blocker,
+            "reviewer1",
+            "raised open, fixed later",
+        )
+        .fixed_by(resolution.clone()),
+    )
+    .unwrap();
+
+    // Round 2 `seq 1` names that resolution: the fix-of-fix edge, which
+    // must be found through the FOLDED winner (the superseded `open`
+    // version carries no `resolution_sha` at all).
+    tier.write(
+        &Finding::new(
+            Envelope::new(1, RecordKind::Finding, at(2026, 6, 2, 9), actor("reviewer")),
+            change.clone(),
+            2,
+            1,
+            FindingSeverity::ShouldFix,
+            "reviewer1",
+            "defect in that fix",
+        )
+        .with_introduced_by(resolution),
+    )
+    .unwrap();
+
+    let roots = Roots::new(git_root, dir.path().join("r2"), dir.path().join("learn"));
+    let result = marts::fetch_review_rounds(&roots).unwrap();
+    let row = |round: i64| {
+        result
+            .rows
+            .iter()
+            .find(|r| r.get("round").and_then(|v| v.as_i64()) == Some(round))
+            .unwrap_or_else(|| panic!("no review-rounds row for round {round}: {:?}", result.rows))
+    };
+
+    let round_1 = row(1);
+    assert_eq!(round_1["findings"], 1, "two versions of ONE finding are one finding, got {round_1:?}");
+    assert_eq!(round_1["disposition_fixed"], 1, "the latest version's disposition is the one reported");
+    assert_eq!(round_1["disposition_open"], 0, "the superseded `open` version must not also be counted");
+    assert_eq!(round_1["introduced_by_unsourced"], 1, "one finding, one unsourced slot — never one per version");
+
+    // The edge still resolves: `fix_of_fix` reads the FOLDED winner's
+    // `resolution_sha`, which only the latest version carries.
+    assert_eq!(row(2)["fix_of_fix"], 1, "the fix-of-fix join must see the folded winner's resolution_sha");
 }

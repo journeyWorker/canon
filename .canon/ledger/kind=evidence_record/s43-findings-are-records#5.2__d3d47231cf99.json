@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:14:20.593408Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "./target/release/canon gate check --repo . && ./target/release/canon report --check --repo . && ./target/release/canon format examples/platformer/specs --repo . && python3 scripts/check-release-workflow-safety.py"
+  },
+  "evidence_note": {
+    "command_result": "canon gate check: clean (0 violations)\ncanon format: 6 file(s) checked, 0 violation(s)\ncheck-release-workflow-safety: OK — build/publish matrices, env, and manifests are coherent\ncanon report: WARN canon report reads its local roots directly (the git ledger + local `.canon/r2` + `.canon/learn` parquet); the kinds below route to a backend whose own store it does not read (a live database or object-store bucket), so their data appears only if materialized into the local report roots — it may be incomplete or stale. Read them live with `canon query --kind <kind>`. Not read directly: event, handof",
+    "summary": "gate clean, report --check no drift, format 0 violations, release-safety checker coherent"
+  },
+  "kind": "evidence_record",
+  "run_seq": 16,
+  "schema": 1,
+  "staging_id": "fd6ff302a803",
+  "task_id": "s43-findings-are-records#5.2",
+  "verdict": "faithful"
+}

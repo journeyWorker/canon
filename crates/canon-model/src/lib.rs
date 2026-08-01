@@ -36,8 +36,9 @@ pub use ids::{
     SpecDigest, SubjectId, TaskId, TotalOrder, regime_key,
 };
 pub use records::{
-    Change, ChangeStatus, Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, ProvenanceRef, Review, Run,
-    RunStatus, Scenario, Session, StrategyItem, StrategyRef, Subject, SubjectStatus, Task, TaskStatus, Trajectory,
+    Change, ChangeStatus, Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Finding, FindingDisposition,
+    FindingSeverity, ProvenanceRef, Review, Run, RunStatus, Scenario, Session, StrategyItem, StrategyRef, Subject,
+    SubjectStatus, Task, TaskStatus, Trajectory,
 };
 pub use trust::{FlaggedOverlay, TrustLifecycle};
 

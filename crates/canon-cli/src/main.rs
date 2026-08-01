@@ -149,6 +149,12 @@ enum Command {
         #[command(subcommand)]
         action: EvidenceCommand,
     },
+    /// Record one code-review finding as a durable record
+    #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --reviewer review-voice \\\n      --summary 'the fix-of-fix count is asserted, never computed'\n\nThe loop:\n  canon finding add ...     Stage a Finding\n  canon gate promote        Commit it\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-by is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
+    Finding {
+        #[command(subcommand)]
+        action: FindingCommand,
+    },
     /// Record an attributed review verdict
     Review {
         #[command(subcommand)]
@@ -531,6 +537,56 @@ enum EvidenceCommand {
 }
 
 #[derive(Subcommand)]
+enum FindingCommand {
+    /// Stage one code-review finding (commit it with `canon gate promote`)
+    #[command(after_help = "RECORDED OBSERVATION, NOT PROOF. canon does not verify that the defect\nexisted, that it was real, that it was fixed, or that --introduced-by names\nthe commit that actually caused it. This records that a named reviewer, at a\nstamped time, RAISED this finding against this change.\n\nAn agent that can run this command can record its own review round, with its\nown severities: the author of a finding and its beneficiary are the same\nparty, with no signature and no second party — the same gap `canon evidence\nadd` states about attestations.\n\nWhat canon does NOT check:\n  - --summary, against the diff, the code, or the review transcript. The\n    record is identical whether the defect was real, misdiagnosed, or invented\n  - --resolution-sha: never resolved, never read. `--disposition fixed`\n    records that someone SAID this commit closed it, not that it did\n  - --introduced-by: never verified, and never guessed (below)\n  - --reviewed-sha: optional, because most rounds review an uncommitted\n    working tree. When absent, canon does not infer one\n  - nothing here is gated. No `canon gate check` check consumes findings, and\n    no checkbox flips on one\n\nWhat the record IS good for:\n  - attribution: an append-only row naming who raised what, in which round,\n    against which change, at which severity and disposition. Before this\n    command, a review round left nothing at all once its transcript was gone\n  - a DERIVED count that stops being typed from memory. v0.4.0's release note\n    claimed '49 real issues, four of them defects in the previous round's\n    fix'. The true fix-of-fix count is 2. That claim is in a published tag,\n    and it is why this command exists\n\n--introduced-by must be SOURCED:\n  Set it only when the introducing commit was actually established — someone\n  read the diff, or the fixing commit names it. Never from timing, commit\n  adjacency, or `git blame`. Leaving it UNSET is the correct record when it is\n  not known, not an incomplete one. Unset means UNSOURCED, so every count\n  derived from it is a FLOOR and never a total; a guessed value would inflate\n  the exact number this command exists to make trustworthy.\n\nFix-of-fix is DERIVED, never recorded: a finding is one when its\nintroduced_by equals an EARLIER finding's resolution_sha (lower round/seq in\nthe same change). There is no flag for it and there will not be one — a flag\nwould relocate the hand-typing from the release notes into the record.\n\n--seq is REQUIRED, never auto-assigned: two concurrent adds would read the\nsame highest seq and both pick the next one, landing two records under one\nfinding's identity and inflating the count. An already-occupied\n(--change-id, --round, --seq) is refused, naming it.\n\nRefused before anything is staged:\n  - --disposition fixed with no --resolution-sha, and --resolution-sha with\n    any other disposition\n  - a line separator in --summary, --reviewer, --file-ref or --actor-id: a\n    finding is rendered as ONE row, so a separator appends a second row that\n    no record backs\n\nThe loop:\n  canon finding add ...     Stage a Finding\n  canon gate promote        Commit it")]
+    Add {
+        /// The change under review (e.g. s43-findings-are-records) — first component of the natural key
+        #[arg(long, value_parser = canon_cli::finding::parse_change_id)]
+        change_id: ChangeId,
+        /// Which review round on this change raised it (1-based)
+        #[arg(long)]
+        round: u32,
+        /// This finding's index within the round (1-based). Required, never auto-assigned; a collision is refused
+        #[arg(long)]
+        seq: u32,
+        /// blocker / should-fix / note — the reviewer's own judgement, never a score canon derives
+        #[arg(long, value_parser = canon_cli::finding::parse_severity)]
+        severity: canon_model::FindingSeverity,
+        /// open / fixed / rejected / deferred (fixed requires --resolution-sha, and only fixed may carry one)
+        #[arg(long, default_value = "open", value_parser = canon_cli::finding::parse_disposition)]
+        disposition: canon_model::FindingDisposition,
+        /// Who raised it (line breaks refused)
+        #[arg(long)]
+        reviewer: String,
+        /// One line of what the finding IS, in the reviewer's own words. NEVER checked against the code (line breaks refused)
+        #[arg(long)]
+        summary: String,
+        /// The commit whose state this round reviewed. Omit when the round reviewed an uncommitted working tree — canon never infers one
+        #[arg(long, value_parser = canon_cli::finding::parse_sha)]
+        reviewed_sha: Option<Sha>,
+        /// The commit that closed it. Required by, and permitted only with, --disposition fixed
+        #[arg(long, value_parser = canon_cli::finding::parse_sha)]
+        resolution_sha: Option<Sha>,
+        /// The SOURCED introducing commit. Leave unset when it is not known — never guess (see --help)
+        #[arg(long, value_parser = canon_cli::finding::parse_sha)]
+        introduced_by: Option<Sha>,
+        /// Where in the tree, as path/to/file.rs:120-134 (line breaks refused)
+        #[arg(long)]
+        file_ref: Option<String>,
+        /// The authoring actor's id (recorded as the record's author; line breaks refused)
+        #[arg(long, default_value = "canon")]
+        actor_id: String,
+        /// Attribution only — unlike `canon evidence add`, no partition key derives from it
+        #[arg(long, default_value = "reviewer", value_parser = canon_cli::retrieve::parse_role)]
+        role: RoleId,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
 enum ReviewCommand {
     /// Write one attributed Review record (exactly one provenance ref required)
     Add {
@@ -844,6 +900,41 @@ fn main() -> ExitCode {
                     &canon_cli::evidence::EvidenceArgs { task_id: task, kind, evidence_ref, verdict, summary, command_result, scenario_id, run_id, actor_id, role },
                 ) as u8,
             ),
+        },
+        Command::Finding { action } => match action {
+            FindingCommand::Add {
+                change_id,
+                round,
+                seq,
+                severity,
+                disposition,
+                reviewer,
+                summary,
+                reviewed_sha,
+                resolution_sha,
+                introduced_by,
+                file_ref,
+                actor_id,
+                role,
+                repo,
+            } => ExitCode::from(canon_cli::finding::run_add(
+                &repo,
+                &canon_cli::finding::FindingArgs {
+                    change_id,
+                    reviewed_sha,
+                    round,
+                    seq,
+                    severity,
+                    disposition,
+                    reviewer,
+                    summary,
+                    resolution_sha,
+                    introduced_by,
+                    file_ref,
+                    actor_id,
+                    role,
+                },
+            ) as u8),
         },
         Command::Review { action } => match action {
             ReviewCommand::Add { project_id, scenario_id, reviewer, pin, upstream_ref, original_spec_ref, actor_id, role, repo } => ExitCode::from(

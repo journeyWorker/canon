@@ -467,7 +467,7 @@ fn parse_kind(s: &str) -> Result<RecordKind, PolicyError> {
     RecordKind::ALL
         .into_iter()
         .find(|k| k.as_str() == s)
-        .ok_or_else(|| PolicyError(format!("routing/aging key `{s}` is not one of canon-model's twelve record kinds")))
+        .ok_or_else(|| PolicyError(format!("routing/aging key `{s}` is not one of canon-model's fourteen record kinds")))
 }
 
 /// Decode one `tiers.<rung_key>` raw YAML value into a [`BackendConfig`]

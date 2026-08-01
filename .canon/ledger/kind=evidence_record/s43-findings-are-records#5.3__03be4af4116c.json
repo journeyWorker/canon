@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:14:20.637974Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "./target/release/canon gate task --help"
+  },
+  "evidence_note": {
+    "command_result": "Flip one task checkbox, gated on real evidence (fails closed)\n\nUsage: canon gate task [OPTIONS] <TASK_ID>\n\nArguments:\n  <TASK_ID>  The openspec task id (<change_id>#<n>)\n\nOptions:\n      --repo <REPO>  Repo root (default: nearest ancestor with a canon.yaml) [default: .]\n  -h, --help         Print help\n  -V, --version      Print version",
+    "summary": "every task box is closed through evidence add -> gate promote -> gate task; the gate refuses an unevidenced flip"
+  },
+  "kind": "evidence_record",
+  "run_seq": 17,
+  "schema": 1,
+  "staging_id": "2128e61230c0",
+  "task_id": "s43-findings-are-records#5.3",
+  "verdict": "faithful"
+}

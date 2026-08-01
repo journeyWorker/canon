@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:09:06.824372Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-model --lib fix_of_fix"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 124 filtered out; finished in 0.00s",
+    "summary": "the three invariants are in doc comments and the derivation test pins that fix-of-fix is computed, never stored"
+  },
+  "kind": "evidence_record",
+  "run_seq": 4,
+  "schema": 1,
+  "staging_id": "19e0aa7415dd",
+  "task_id": "s43-findings-are-records#1.4",
+  "verdict": "faithful"
+}

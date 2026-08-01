@@ -6,6 +6,7 @@ import { COLUMNS as FUNNEL_COLUMNS, NOTE as FUNNEL_NOTE } from "../src/panels/fl
 import { NOTE as ROLE_MEMORY_NOTE } from "../src/panels/role-memory";
 import { NOTE as BURNDOWN_NOTE } from "../src/panels/review-burndown";
 import { NOTE as SESSION_COSTS_NOTE } from "../src/panels/session-costs";
+import { NOTE as REVIEW_ROUNDS_NOTE } from "../src/panels/review-rounds";
 
 // End-to-end proof of task 5.6 / design.md D4: the built app instantiates
 // DuckDB-Wasm (self-hosted mvp/eh bundle + self-hosted `parquet` core
@@ -120,7 +121,7 @@ afterAll(async () => {
   server?.kill();
 });
 
-test("renders all 5 panels from the fixture snapshot with zero third-party network", async () => {
+test("renders all 6 panels from the fixture snapshot with zero third-party network", async () => {
   const page = await browser.newPage();
   const requestedUrls: string[] = [];
   page.on("request", (req) => requestedUrls.push(req.url()));
@@ -139,6 +140,7 @@ test("renders all 5 panels from the fixture snapshot with zero third-party netwo
     "panel-role-memory",
     "panel-flywheel-funnel",
     "panel-review-burndown",
+    "panel-review-rounds",
   ];
   for (const panelId of panelIds) {
     const rowCount = await page.$$eval(`#${panelId} tbody tr`, (rows) => rows.length);
@@ -156,11 +158,17 @@ test("renders all 5 panels from the fixture snapshot with zero third-party netwo
   // Round-9 re-review added session costs: its correction had reached
   // only a source comment, so it was the one panel whose reader learned
   // nothing the markdown report tells them.
+  //
+  // s43 (`findings-are-records`) added review rounds, which is the panel
+  // a release note gets copied FROM — a reader who sees its
+  // `fix_of_fix` number without the floor caveat beside it is exactly
+  // the reader this whole change exists for.
   const annotated = [
     { panelId: "panel-session-costs", note: SESSION_COSTS_NOTE },
     { panelId: "panel-role-memory", note: ROLE_MEMORY_NOTE },
     { panelId: "panel-flywheel-funnel", note: FUNNEL_NOTE },
     { panelId: "panel-review-burndown", note: BURNDOWN_NOTE },
+    { panelId: "panel-review-rounds", note: REVIEW_ROUNDS_NOTE },
   ];
   for (const { panelId, note } of annotated) {
     const noteText = await page.$eval(`#${panelId} .panel-note`, (el) => el.textContent ?? "");

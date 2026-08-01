@@ -11,16 +11,16 @@ respect.
 
 ## The record-kind set is closed — review before extending
 
-`RecordKind` (`src/envelope.rs`) has exactly thirteen variants (design
+`RecordKind` (`src/envelope.rs`) has exactly fourteen variants (design
 D1): `Change`, `Task`, `Scenario`, `Session`, `Run`, `Event`, `Handoff`,
 `Review`, `Divergence`, `Trajectory`, `StrategyItem`, `EvidenceRecord`,
-`Subject`.
+`Subject`, `Finding`.
 This is deliberate friction, not an oversight — an open `kind: String` +
 untyped `payload` escape hatch is exactly what let an internal monorepo accumulate three
 uncoordinated management systems before canon existed (design D1's
 rejected alternative).
 
-Before adding a fourteenth kind:
+Before adding a fifteenth kind:
 
 1. Confirm the new artifact family genuinely doesn't fit an existing
    kind's fields (extending an existing kind's `schema` version, below,
@@ -29,7 +29,7 @@ Before adding a fourteenth kind:
    `canon-model` change — not a drive-by addition inside an unrelated
    spec's implementation. Add the variant to `RecordKind` AND to
    `RecordKind::ALL` (both are asserted in sync by
-   `envelope::tests::all_thirteen_kinds_present_exactly_once`), add the
+   `envelope::tests::all_fourteen_kinds_present_exactly_once`), add the
    struct in `src/records.rs` (or its own module, for something
    `Handoff`-sized), implement `CanonRecord` for it, add it to
    `schema_export::record_schemas()`, and add a well-formed fixture

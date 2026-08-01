@@ -65,7 +65,7 @@ fn format_promote_report(report: &PromoteReport, dry_run: bool) -> String {
     let verb = if dry_run { "would promote" } else { "promoted" };
     let mut out = String::new();
     for p in &report.promoted {
-        out.push_str(&format!("{verb} {}/{} run_seq={} -> {}\n", p.role.as_str(), p.surface, p.run_seq, p.target.display()));
+        out.push_str(&format!("{verb} {} -> {}\n", p.label(), p.target.display()));
     }
     for r in &report.refused {
         out.push_str(&format!("refused: {}\n", r.violation.line()));
@@ -176,7 +176,7 @@ fn run_commit(
 
     match commit_divergence(&candidate, &committed) {
         Ok(Ok(promoted)) => {
-            println!("canon divergence {verb}: committed {}/{} run_seq={} -> {}", promoted.role.as_str(), promoted.surface, promoted.run_seq, promoted.target.display());
+            println!("canon divergence {verb}: committed {} -> {}", promoted.label(), promoted.target.display());
             0
         }
         Ok(Err(refused)) => {

@@ -1,4 +1,4 @@
-//! The eleven non-`Handoff` record kinds (task 1.2). `Handoff` itself
+//! The thirteen non-`Handoff` record kinds (task 1.2). `Handoff` itself
 //! lives in [`crate::handoff`] — its state machine and per-domain body
 //! template registry (design D4/D5) are large enough to earn their own
 //! module.
@@ -23,6 +23,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::envelope::{CanonRecord, Envelope, RecordKind};
+use crate::evidence::{EvidenceViolation, FailureClass};
 use crate::ids::{
     is_kebab_slug, ChangeId, PrNumber, ProjectId, RegimeKey, RoleId, RunId, ScenarioId, Sha, SessionId, SpecDigest, SubjectId,
     TaskId, TotalOrder,
@@ -889,6 +890,298 @@ impl CanonRecord for EvidenceRecord {
     }
 }
 
+/// How much a [`Finding`] blocks — the reviewer's own judgement at the
+/// moment they raised it, never a score canon derives. `Blocker` must
+/// be resolved before the reviewed line of work ships; `ShouldFix` is
+/// a real defect that may be scheduled; `Note` is an observation that
+/// carries no obligation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FindingSeverity {
+    Blocker,
+    ShouldFix,
+    Note,
+}
+
+/// What became of a [`Finding`]. `Open` is raised-and-outstanding;
+/// `Fixed` is closed BY A COMMIT (and is the only disposition that
+/// carries a [`Finding::resolution_sha`]); `Rejected` is closed by the
+/// reviewer withdrawing or the author declining, with no commit
+/// involved; `Deferred` is acknowledged and postponed. There is
+/// deliberately no `FixOfFix` variant — see [`Finding`]'s own doc for
+/// why that relationship is DERIVED by join and can never be stored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FindingDisposition {
+    Open,
+    Fixed,
+    Rejected,
+    Deferred,
+}
+
+impl FindingDisposition {
+    /// This disposition's wire string — the value
+    /// `#[serde(rename_all = "snake_case")]` above already produces,
+    /// exposed so a diagnostic can name a disposition in the same
+    /// spelling an operator will grep the corpus for (asserted
+    /// against serde by a test, mirroring
+    /// [`crate::envelope::RecordKind::as_str`]).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FindingDisposition::Open => "open",
+            FindingDisposition::Fixed => "fixed",
+            FindingDisposition::Rejected => "rejected",
+            FindingDisposition::Deferred => "deferred",
+        }
+    }
+}
+
+/// One code-review finding (s43, the reviewed 14th kind): the durable
+/// home for a single issue one reviewer raised in one review round on
+/// one change. Before this kind existed, canon already CLASSIFIED
+/// these during ingest
+/// (`canon_ingest::artifact_adapter::ArtifactEventKind::CodeReviewFinding`,
+/// a transient normalization enum) and then dropped them on the floor
+/// for want of a record kind to write them into — so a release
+/// narrative's issue counts could only ever be hand-typed into prose,
+/// which is exactly how v0.4.0's git tag shipped two wrong numbers in
+/// one sentence with nothing in canon able to contradict them.
+///
+/// Deliberately NOT a [`Review`] (a scenario-scoped parity attestation
+/// with no finding text, round, disposition, or resolution) and NOT a
+/// [`Divergence`] (which mandates a `scenario_id`, carries a single
+/// `sha` with no raised-vs-resolved distinction, and has no rejected
+/// disposition). A finding is scoped to the CHANGE under review, never
+/// to a scenario, so it is a flat, non-area-scoped kind
+/// ([`RecordKind::is_area_scoped`] is false for it) whose natural key
+/// is the composite `{change_id}__{round:04}__{seq:04}`
+/// (`canon_store::partition::resolve_partition`). No new join-spine
+/// newtype is owed: `change_id` is [`crate::ids::ChangeId`], already
+/// on the spine, so a finding joins finding → change → task through
+/// keys that exist — and nothing joins TO a finding by id, since
+/// [`Finding::introduced_by`] points at a SHA that [`crate::ids::Sha`]
+/// already spines. `ChangeId`'s kebab grammar forbids `_`, which keeps
+/// `__` an unambiguous split point in the composite.
+///
+/// # `reviewed_sha` is OPTIONAL, because most rounds review a worktree
+/// A review round usually examines UNCOMMITTED work: the reviewer
+/// reads a working tree, the author fixes what came back, and only the
+/// result gets committed. That round has no sha for what it saw.
+/// Round 8 of this very repo's v0.4.0 campaign was exactly that — ten
+/// findings against a tree whose reviewed state was never committed
+/// (its FIXES landed as `f438c610`, which is a different thing) — so a
+/// required `reviewed_sha` would have silently excluded a third of the
+/// backfill this kind exists to produce. `Some` means the reviewed
+/// state WAS committed and this names it; `None` means it was a
+/// worktree. `None` is never backfilled with "the commit nearest the
+/// round", which would fabricate a provenance nobody reviewed.
+/// Ordering rounds therefore uses `round`, never `reviewed_sha`.
+///
+/// # `resolution_sha` is the commit that CLOSED the finding
+/// It is present if and only if `disposition` is
+/// [`FindingDisposition::Fixed`]. `Fixed` without one, or one set
+/// while `Open`, is incoherent and canon never stores it. **The WRITER
+/// enforces that pairing, not the type**, and that is a deliberate
+/// trade: the wire form keeps `resolution_sha` a FLAT top-level field
+/// rather than folding it into a `Fixed { resolution_sha }` struct
+/// variant (the [`DivergenceStatus::Deferred`] idiom this crate
+/// otherwise reaches for) precisely because the fix-of-fix join below
+/// reads it as a top-level field, and a nested variant payload would
+/// bury the one query this kind exists to serve under
+/// `$.disposition.fixed.resolution_sha`. The writer-side enforcement is
+/// two-layered and total: [`Finding::fixed_by`] is the ONLY constructor
+/// path to `Fixed` and it cannot be called without the closing sha
+/// (while [`Finding::rejected`]/[`Finding::deferred`] clear it), and
+/// [`Finding::check_coherence`] re-checks the pairing on the READ path
+/// (`canon_store::partition::validate_body`'s `Finding` arm), so a
+/// hand-authored incoherent record is rejected as `malformed` and never
+/// enters a corpus.
+///
+/// # `introduced_by` is the commit that INTRODUCED the defect
+/// `None` means the introducing commit could not be SOURCED — never
+/// "there probably isn't one". It is never inferred from timing,
+/// adjacency, `git blame` heuristics, or whichever commit happens to
+/// precede the review round. The consequence is load-bearing and must
+/// be repeated wherever it is used: **any count derived from
+/// `introduced_by` is a FLOOR, not a total**, and every consumer that
+/// reports such a count states that it is a floor.
+///
+/// # Fix-of-fix is DERIVED, never stored
+/// A finding is a *fix-of-fix* when its `introduced_by` equals some
+/// EARLIER finding's `resolution_sha`. **EARLIER means lower
+/// `(round, seq)` within the same `change_id`** — never "an earlier
+/// `reviewed_sha`", because a round that reviewed a worktree has none,
+/// and never `Envelope.at`, which is authoring time and can be
+/// backfilled out of order. That relationship is computed by joining
+/// findings to each other, and it MUST never become a stored boolean,
+/// an `is_fix_of_fix` field, a severity variant, or a reviewer-set
+/// label. The whole reason this kind exists is that the number stopped
+/// being hand-typed; a stored flag would merely relocate the
+/// hand-typing from the release notes into the record.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Finding {
+    #[serde(flatten)]
+    pub envelope: Envelope,
+    /// The change under review — the finding's scope, the first
+    /// component of its natural key, and its join onto the existing
+    /// spine (finding → change → task).
+    pub change_id: ChangeId,
+    /// The commit whose state this round reviewed, when that state was
+    /// committed at all — see this type's doc: `None` is a round that
+    /// reviewed an uncommitted working tree, which is the common case,
+    /// and is never backfilled by guessing a nearby commit.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub reviewed_sha: Option<Sha>,
+    /// Which review round on this change raised it (1-based). This, not
+    /// `reviewed_sha`, is what orders rounds — a round that reviewed a
+    /// worktree has no sha to order by.
+    pub round: u32,
+    /// This finding's index WITHIN `round` (1-based) — `round` alone
+    /// does not identify a finding, so the two together with
+    /// `change_id` form the natural key.
+    pub seq: u32,
+    pub severity: FindingSeverity,
+    pub disposition: FindingDisposition,
+    /// Who raised it. A plain string for the same reason
+    /// [`Divergence::reviewer`] is one — a reviewer may be a human name
+    /// a canon [`crate::ids::RoleId`] does not model.
+    pub reviewer: String,
+    /// One line of what the finding IS, in the reviewer's own words.
+    pub summary: String,
+    /// The commit that closed it — see this type's doc: present iff
+    /// `disposition` is [`FindingDisposition::Fixed`].
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub resolution_sha: Option<Sha>,
+    /// The commit that introduced the defect — see this type's doc:
+    /// `None` means UNSOURCED, and every count derived from this field
+    /// is a floor.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub introduced_by: Option<Sha>,
+    /// Where in the tree, as `path/to/file.rs:120-134`. A plain string:
+    /// a line range is not a canon join key and inventing a newtype for
+    /// it would spine nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub file_ref: Option<String>,
+}
+
+impl Finding {
+    /// A freshly raised finding: `Open`, with no resolution, no sourced
+    /// introducing commit, no reviewed sha, and no file ref. A round
+    /// that reviewed a COMMITTED state adds it with
+    /// [`Self::reviewing_sha`]. Every closed state is reached through
+    /// [`Self::fixed_by`]/[`Self::rejected`]/[`Self::deferred`], which
+    /// is what makes the `disposition`/`resolution_sha` pairing
+    /// unconstructible-wrong through this API (see the type doc).
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        envelope: Envelope,
+        change_id: ChangeId,
+        round: u32,
+        seq: u32,
+        severity: FindingSeverity,
+        reviewer: impl Into<String>,
+        summary: impl Into<String>,
+    ) -> Self {
+        debug_assert_eq!(envelope.kind, RecordKind::Finding);
+        Self {
+            envelope,
+            change_id,
+            reviewed_sha: None,
+            round,
+            seq,
+            severity,
+            disposition: FindingDisposition::Open,
+            reviewer: reviewer.into(),
+            summary: summary.into(),
+            resolution_sha: None,
+            introduced_by: None,
+            file_ref: None,
+        }
+    }
+
+    /// Name the COMMITTED state this round reviewed. Only call it when
+    /// the reviewed state really was a commit — a round that read a
+    /// working tree leaves `reviewed_sha` absent rather than borrowing
+    /// an adjacent sha (type doc).
+    pub fn reviewing_sha(mut self, reviewed_sha: Sha) -> Self {
+        self.reviewed_sha = Some(reviewed_sha);
+        self
+    }
+
+    /// Close it as `Fixed` BY `resolution_sha` — the only path to
+    /// [`FindingDisposition::Fixed`], so the state can never exist
+    /// without the commit that produced it.
+    pub fn fixed_by(mut self, resolution_sha: Sha) -> Self {
+        self.disposition = FindingDisposition::Fixed;
+        self.resolution_sha = Some(resolution_sha);
+        self
+    }
+
+    /// Close it as `Rejected` — no commit closed it, so any
+    /// previously-set `resolution_sha` is cleared rather than left to
+    /// contradict the disposition.
+    pub fn rejected(mut self) -> Self {
+        self.disposition = FindingDisposition::Rejected;
+        self.resolution_sha = None;
+        self
+    }
+
+    /// Postpone it — same clearing rule as [`Self::rejected`].
+    pub fn deferred(mut self) -> Self {
+        self.disposition = FindingDisposition::Deferred;
+        self.resolution_sha = None;
+        self
+    }
+
+    /// Record the SOURCED introducing commit. There is deliberately no
+    /// "guess it" counterpart: if it cannot be sourced, the field stays
+    /// `None` and every derived count is a floor (type doc).
+    pub fn with_introduced_by(mut self, introduced_by: Sha) -> Self {
+        self.introduced_by = Some(introduced_by);
+        self
+    }
+
+    pub fn with_file_ref(mut self, file_ref: impl Into<String>) -> Self {
+        self.file_ref = Some(file_ref.into());
+        self
+    }
+
+    /// The `disposition` ⇔ `resolution_sha` biconditional, re-checked
+    /// on the READ path. `Finding`'s constructors already make an
+    /// incoherent pair unconstructible in Rust, but a record read back
+    /// from a tier was hand-authorable, so
+    /// `canon_store::partition::validate_body` calls this after the
+    /// concrete `Deserialize` succeeds — an incoherent record lands as
+    /// [`FailureClass::Malformed`] ("malformed evidence is no
+    /// evidence") instead of quietly counting as a fix nobody can point
+    /// at a commit for.
+    pub fn check_coherence(&self) -> Result<(), EvidenceViolation> {
+        match (self.disposition, &self.resolution_sha) {
+            (FindingDisposition::Fixed, None) => Err(EvidenceViolation::new(
+                FailureClass::Malformed,
+                "resolution_sha",
+                "disposition is `fixed` but no `resolution_sha` names the commit that closed it",
+            )),
+            (disposition, Some(_)) if disposition != FindingDisposition::Fixed => Err(EvidenceViolation::new(
+                FailureClass::Malformed,
+                "resolution_sha",
+                format!(
+                    "`resolution_sha` is set but disposition is `{}` — only a `fixed` finding was closed by a commit",
+                    disposition.as_str()
+                ),
+            )),
+            _ => Ok(()),
+        }
+    }
+}
+
+impl CanonRecord for Finding {
+    const KIND: RecordKind = RecordKind::Finding;
+    fn envelope(&self) -> &Envelope {
+        &self.envelope
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1415,6 +1708,155 @@ mod tests {
                 serde_json::from_value::<EvidenceRecord>(obj).is_err(),
                 "a present `{field}: null` must fail deserialize, never collapse to the absent default"
             );
+        }
+    }
+
+    fn sha(byte: char) -> Sha {
+        Sha::parse(std::iter::repeat_n(byte, 40).collect::<String>()).unwrap()
+    }
+
+    fn change_id() -> ChangeId {
+        ChangeId::parse("s42-close-the-open-loops").unwrap()
+    }
+
+    /// The COMMON case (s43): a round that reviewed an uncommitted
+    /// working tree, so it carries no `reviewed_sha` at all.
+    fn finding(round: u32, seq: u32) -> Finding {
+        Finding::new(envelope(RecordKind::Finding), change_id(), round, seq, FindingSeverity::Blocker, "review-voice", "teardown races HMR")
+    }
+
+    round_trip_test!(finding_reviewing_a_worktree_round_trips, finding(8, 10));
+
+    round_trip_test!(
+        finding_with_every_optional_round_trips,
+        finding(11, 4)
+            .reviewing_sha(sha('a'))
+            .fixed_by(sha('b'))
+            .with_introduced_by(sha('c'))
+            .with_file_ref("crates/canon-model/src/records.rs:120-134")
+    );
+
+    /// `reviewed_sha` is provenance, not identity: a round that read a
+    /// worktree simply omits it, and it is never backfilled with a
+    /// nearby commit. The v0.4.0 campaign's round 8 was exactly this
+    /// shape, and a required `reviewed_sha` would have excluded it.
+    #[test]
+    fn a_worktree_round_omits_reviewed_sha_and_a_committed_one_names_it() {
+        let worktree = serde_json::to_value(finding(8, 10)).unwrap();
+        assert!(worktree.get("reviewed_sha").is_none(), "a worktree round must not invent a reviewed_sha");
+        assert_eq!(worktree.get("change_id").and_then(|v| v.as_str()), Some("s42-close-the-open-loops"));
+
+        let committed = serde_json::to_value(finding(9, 1).reviewing_sha(sha('a'))).unwrap();
+        assert_eq!(committed.get("reviewed_sha").and_then(|v| v.as_str()), Some(sha('a').as_str()));
+    }
+
+    /// The additive-field discipline every canon optional follows: an
+    /// unset optional is ABSENT from the wire form, never a literal
+    /// `null` (which would change the record's `content_digest12` and
+    /// break write-time idempotence).
+    #[test]
+    fn finding_omits_its_unset_optionals_entirely() {
+        let json = serde_json::to_value(finding(1, 1)).unwrap();
+        for field in ["reviewed_sha", "resolution_sha", "introduced_by", "file_ref"] {
+            assert!(json.get(field).is_none(), "an unset `{field}` must be absent from the wire form, not null");
+        }
+    }
+
+    #[test]
+    fn finding_with_a_present_null_optional_fails_to_deserialize() {
+        let mut json = serde_json::to_value(finding(1, 1)).unwrap();
+        for field in ["reviewed_sha", "resolution_sha", "introduced_by", "file_ref"] {
+            json[field] = serde_json::Value::Null;
+            assert!(
+                serde_json::from_value::<Finding>(json.clone()).is_err(),
+                "a present `{field}: null` must fail deserialize, never collapse to the absent default"
+            );
+            json.as_object_mut().unwrap().remove(field);
+        }
+    }
+
+    /// `fixed_by` is the ONLY path to `Fixed`, and the two closed-
+    /// without-a-commit dispositions clear any resolution rather than
+    /// leaving one to contradict them — so the incoherent pair the read
+    /// path guards against is unconstructible through this API.
+    #[test]
+    fn only_fixed_by_produces_a_fixed_finding_and_it_always_names_its_commit() {
+        let raised = finding(1, 1);
+        assert_eq!(raised.disposition, FindingDisposition::Open);
+        assert_eq!(raised.resolution_sha, None);
+        raised.check_coherence().unwrap();
+
+        let fixed = finding(1, 1).fixed_by(sha('b'));
+        assert_eq!(fixed.disposition, FindingDisposition::Fixed);
+        assert_eq!(fixed.resolution_sha, Some(sha('b')));
+        fixed.check_coherence().unwrap();
+
+        for closed in [finding(1, 1).fixed_by(sha('b')).rejected(), finding(1, 1).fixed_by(sha('b')).deferred()] {
+            assert_eq!(closed.resolution_sha, None, "a disposition that no commit closed must not keep a resolution_sha");
+            closed.check_coherence().unwrap();
+        }
+    }
+
+    #[test]
+    fn check_coherence_rejects_both_incoherent_directions() {
+        let mut fixed_without_commit = finding(1, 1).fixed_by(sha('b'));
+        fixed_without_commit.resolution_sha = None;
+        let err = fixed_without_commit.check_coherence().unwrap_err();
+        assert_eq!(err.class, FailureClass::Malformed);
+        assert!(err.detail.contains("no `resolution_sha`"), "{}", err.detail);
+
+        let mut open_with_commit = finding(1, 1);
+        open_with_commit.resolution_sha = Some(sha('b'));
+        let err = open_with_commit.check_coherence().unwrap_err();
+        assert_eq!(err.class, FailureClass::Malformed);
+        assert!(err.detail.contains("disposition is `open`"), "{}", err.detail);
+    }
+
+    /// Fix-of-fix is DERIVED by joining findings to each other, never
+    /// stored. This test IS the derivation, and it deliberately orders
+    /// by `(round, seq)` rather than by `reviewed_sha`: the round that
+    /// raised the fix-of-fix reviewed an uncommitted worktree and has
+    /// no sha to order by, which is precisely the case a sha-ordered
+    /// derivation would drop.
+    #[test]
+    fn fix_of_fix_is_derived_by_round_order_and_the_count_is_a_floor() {
+        let closed_round_one = finding(1, 1).reviewing_sha(sha('a')).fixed_by(sha('b'));
+        let caused_by_that_fix = finding(2, 1).with_introduced_by(sha('b'));
+        let unsourced = finding(2, 2);
+
+        let mut corpus = vec![&caused_by_that_fix, &unsourced, &closed_round_one];
+        corpus.sort_by_key(|f| (f.round, f.seq));
+        assert!(corpus.iter().all(|f| f.change_id == change_id()), "the join is scoped to one change");
+
+        let mut resolved_so_far: std::collections::HashSet<&Sha> = std::collections::HashSet::new();
+        let mut fix_of_fix: Vec<(u32, u32)> = Vec::new();
+        for f in &corpus {
+            if f.introduced_by.as_ref().is_some_and(|sha| resolved_so_far.contains(sha)) {
+                fix_of_fix.push((f.round, f.seq));
+            }
+            if let Some(resolution) = f.resolution_sha.as_ref() {
+                resolved_so_far.insert(resolution);
+            }
+        }
+
+        assert_eq!(fix_of_fix, vec![(2, 1)], "only the finding whose introduced_by names an EARLIER round's resolution_sha joins");
+        assert_eq!(caused_by_that_fix.reviewed_sha, None, "the fix-of-fix round reviewed a worktree — sha ordering would have lost it");
+        assert_eq!(unsourced.introduced_by, None, "an unsourced finding stays None — never inferred from being in a later round");
+
+        // No stored flag anywhere on the wire form: the relationship
+        // exists only in the join above.
+        let json = serde_json::to_value(&caused_by_that_fix).unwrap();
+        let keys: Vec<&String> = json.as_object().unwrap().keys().collect();
+        assert!(!keys.iter().any(|k| k.contains("fix_of_fix")), "fix-of-fix must never become a stored field: {keys:?}");
+    }
+
+    #[test]
+    fn finding_disposition_as_str_matches_its_serde_encoding() {
+        for disposition in
+            [FindingDisposition::Open, FindingDisposition::Fixed, FindingDisposition::Rejected, FindingDisposition::Deferred]
+        {
+            let json = serde_json::to_string(&disposition).unwrap();
+            assert_eq!(json, format!("\"{}\"", disposition.as_str()), "{disposition:?} as_str() disagrees with its own serde encoding");
         }
     }
 }

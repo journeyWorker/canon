@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:09:38.962906Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test marts"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.62s",
+    "summary": "introduced_by_unsourced is its own UNKNOWN bucket, never folded into not-a-fix-of-fix"
+  },
+  "kind": "evidence_record",
+  "run_seq": 10,
+  "schema": 1,
+  "staging_id": "17eae73e4291",
+  "task_id": "s43-findings-are-records#3.3",
+  "verdict": "faithful"
+}

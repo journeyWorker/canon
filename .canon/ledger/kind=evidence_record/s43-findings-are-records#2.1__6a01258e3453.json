@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:09:21.994528Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test finding"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.56s",
+    "summary": "canon finding add stages a Finding and refuses every row-line-break separator before staging anything"
+  },
+  "kind": "evidence_record",
+  "run_seq": 5,
+  "schema": 1,
+  "staging_id": "a1db8e2582b6",
+  "task_id": "s43-findings-are-records#2.1",
+  "verdict": "faithful"
+}

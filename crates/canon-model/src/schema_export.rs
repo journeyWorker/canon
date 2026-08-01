@@ -14,9 +14,11 @@ use crate::family::ledger::{LedgerKind, LedgerReviewRecord, LedgerRunRecord};
 use crate::family::policy::PolicyFile;
 use crate::family::FamilyKind;
 use crate::handoff::Handoff;
-use crate::records::{Change, Divergence, Event, EvidenceRecord, Review, Run, Scenario, Session, StrategyItem, Subject, Task, Trajectory};
+use crate::records::{
+    Change, Divergence, Event, EvidenceRecord, Finding, Review, Run, Scenario, Session, StrategyItem, Subject, Task, Trajectory,
+};
 
-/// One `(kind, schema)` pair per one of the thirteen closed record kinds
+/// One `(kind, schema)` pair per one of the fourteen closed record kinds
 /// (`RecordKind::ALL`'s own order). Every schema is produced by
 /// `schemars::schema_for!` directly against that kind's Rust type — a
 /// field added to the type changes only that kind's output (spec
@@ -37,12 +39,13 @@ pub fn record_schemas() -> Vec<(RecordKind, schemars::Schema)> {
         (RecordKind::StrategyItem, schema_for!(StrategyItem)),
         (RecordKind::EvidenceRecord, schema_for!(EvidenceRecord)),
         (RecordKind::Subject, schema_for!(Subject)),
+        (RecordKind::Finding, schema_for!(Finding)),
     ]
 }
 
 /// One `(kind, schema)` pair per one of the eleven [`FamilyKind`]
 /// entries (S11 task 1.1) — the artifact-family registry ALONGSIDE
-/// `record_schemas()`'s closed twelve, never merged into it (see
+/// `record_schemas()`'s closed fourteen, never merged into it (see
 /// `crate::family`'s module doc for why). Ledger's `run`/`drill` share
 /// [`LedgerRunRecord`]'s Rust type; `review`/`clear`/`code-review`/
 /// `design-review` share [`LedgerReviewRecord`]'s; `divergence` exports
@@ -110,7 +113,7 @@ mod tests {
     #[test]
     fn emits_exactly_one_schema_per_record_kind() {
         let schemas = record_schemas();
-        assert_eq!(schemas.len(), 13);
+        assert_eq!(schemas.len(), 14);
         let mut seen = std::collections::HashSet::new();
         for (kind, _) in &schemas {
             assert!(seen.insert(*kind), "{kind:?} emitted twice");

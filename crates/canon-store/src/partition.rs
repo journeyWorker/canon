@@ -135,6 +135,22 @@ pub fn resolve_partition(kind: RecordKind, json: &Value) -> Result<PartitionKey,
         // (`RecordKind::is_area_scoped` is false for it). Natural key is
         // the `subject_id` slug.
         RecordKind::Subject => Ok(PartitionKey { area: None, natural_key: get_str(json, "subject_id")?.to_string() }),
+        // s43: `Finding` is scoped to the CHANGE under review, not to a
+        // scenario, so it is flat (`RecordKind::is_area_scoped` false).
+        // Its natural key is the composite
+        // `{change_id}__{round:04}__{seq:04}` — deliberately NOT keyed
+        // on `reviewed_sha`, which is `Option` because most review
+        // rounds examine an UNCOMMITTED working tree and have no sha at
+        // all (canon-model's `Finding` doc). `ChangeId`'s kebab grammar
+        // forbids `_`, so `__` stays an unambiguous split point, and the
+        // zero-padded widths keep a `kind=finding/` directory listing in
+        // round-then-seq order within a change.
+        RecordKind::Finding => {
+            let change_id = get_str(json, "change_id")?;
+            let round = get_int(json, "round")?;
+            let seq = get_int(json, "seq")?;
+            Ok(PartitionKey { area: None, natural_key: format!("{change_id}__{round:04}__{seq:04}") })
+        }
     }
 }
 
@@ -255,6 +271,18 @@ pub fn validate_body(kind: RecordKind, raw: &RawRecord) -> Result<(), EvidenceVi
         // scenario_id-grammar + verdict-enum checks a second time.
         RecordKind::EvidenceRecord => canon_model::validate_evidence(raw).map(|_| ()),
         RecordKind::Subject => try_deserialize!(Subject),
+        // s43: the concrete `Deserialize` cannot express `Finding`'s
+        // cross-field `disposition` ⇔ `resolution_sha` biconditional
+        // (canon-model keeps `resolution_sha` a FLAT field so the
+        // fix-of-fix join reads it top-level, rather than folding it
+        // into a `Fixed { .. }` variant), so the read path re-checks it
+        // here — an incoherent hand-authored record is `malformed`,
+        // never a fix nobody can name a closing commit for.
+        RecordKind::Finding => {
+            let finding = serde_json::from_value::<Finding>(raw.0.clone())
+                .map_err(|e| EvidenceViolation::new(FailureClass::Malformed, "<candidate>", e.to_string()))?;
+            finding.check_coherence()
+        }
     }
 }
 
@@ -407,6 +435,127 @@ mod tests {
             resolve_partition(RecordKind::Divergence, &divergence).unwrap().natural_key,
             "app-a__world.firstbuy-hotdeal.26__0000000003__000001"
         );
+    }
+
+    /// s43: a `Finding` has no single identifying field, so its natural
+    /// key is the composite `{change_id}__{round:04}__{seq:04}`. The
+    /// zero-padding is load-bearing for a directory listing: without
+    /// it, round 10 would sort before round 2.
+    #[test]
+    fn finding_natural_key_is_change_id_then_zero_padded_round_and_seq() {
+        let json = json!({"kind": "finding", "change_id": "s42-close-the-open-loops", "round": 11, "seq": 4});
+        let key = resolve_partition(RecordKind::Finding, &json).unwrap();
+        assert_eq!(key.area, None, "a finding is scoped to a change, never to a scenario area");
+        assert_eq!(key.natural_key, "s42-close-the-open-loops__0011__0004");
+    }
+
+    /// The reason the key is `change_id`-based and not `reviewed_sha`-
+    /// based: a review round usually reads an UNCOMMITTED working tree
+    /// and has no sha at all, so a sha-keyed finding could not be
+    /// stored for the common case.
+    #[test]
+    fn finding_with_no_reviewed_sha_still_resolves_a_key() {
+        let worktree_round = json!({"kind": "finding", "change_id": "s42-close-the-open-loops", "round": 8, "seq": 10});
+        let committed_round = json!({
+            "kind": "finding",
+            "change_id": "s42-close-the-open-loops",
+            "reviewed_sha": "8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552",
+            "round": 8,
+            "seq": 10
+        });
+        assert_eq!(
+            resolve_partition(RecordKind::Finding, &worktree_round).unwrap().natural_key,
+            "s42-close-the-open-loops__0008__0010",
+            "a round that reviewed a worktree must still resolve a partition"
+        );
+        assert_eq!(
+            resolve_partition(RecordKind::Finding, &committed_round).unwrap().natural_key,
+            resolve_partition(RecordKind::Finding, &worktree_round).unwrap().natural_key,
+            "`reviewed_sha` is provenance, never part of the identity"
+        );
+    }
+
+    #[test]
+    fn finding_keys_sort_by_round_then_seq_within_one_change() {
+        let key = |round: u32, seq: u32| {
+            resolve_partition(
+                RecordKind::Finding,
+                &json!({"kind": "finding", "change_id": "s42-close-the-open-loops", "round": round, "seq": seq}),
+            )
+            .unwrap()
+            .natural_key
+        };
+        let mut keys = vec![key(10, 1), key(2, 12), key(2, 3), key(1, 1)];
+        keys.sort();
+        assert_eq!(keys, vec![key(1, 1), key(2, 3), key(2, 12), key(10, 1)]);
+    }
+
+    #[test]
+    fn two_findings_in_one_round_resolve_to_distinct_keys() {
+        let change = "s42-close-the-open-loops";
+        let first = resolve_partition(RecordKind::Finding, &json!({"kind": "finding", "change_id": change, "round": 3, "seq": 1})).unwrap();
+        let second = resolve_partition(RecordKind::Finding, &json!({"kind": "finding", "change_id": change, "round": 3, "seq": 2})).unwrap();
+        assert_ne!(first.natural_key, second.natural_key, "`seq` is what distinguishes findings within one round");
+    }
+
+    #[test]
+    fn findings_of_two_changes_never_collapse_to_one_key() {
+        let key = |change: &str| {
+            resolve_partition(RecordKind::Finding, &json!({"kind": "finding", "change_id": change, "round": 1, "seq": 1}))
+                .unwrap()
+                .natural_key
+        };
+        assert_ne!(key("s42-close-the-open-loops"), key("s43-findings-are-records"));
+    }
+
+    #[test]
+    fn finding_missing_any_key_component_is_malformed() {
+        let change = "s42-close-the-open-loops";
+        for json in [
+            json!({"kind": "finding", "round": 1, "seq": 1}),
+            json!({"kind": "finding", "change_id": change, "seq": 1}),
+            json!({"kind": "finding", "change_id": change, "round": 1}),
+        ] {
+            let err = resolve_partition(RecordKind::Finding, &json).unwrap_err();
+            assert_eq!(err.class, FailureClass::Malformed, "an incomplete finding key must be malformed, never partially resolved");
+        }
+    }
+
+    /// s43: the `disposition` ⇔ `resolution_sha` biconditional is
+    /// re-checked on the READ path (canon-model's constructors already
+    /// make it unconstructible in Rust, but an on-disk record was
+    /// hand-authorable). Both incoherent directions land as malformed.
+    #[test]
+    fn finding_body_rejects_an_incoherent_disposition_resolution_pair() {
+        let body = |disposition: &str, resolution: Option<&str>| {
+            let mut json = json!({
+                "schema": 1,
+                "kind": "finding",
+                "at": "2026-07-30T09:15:00Z",
+                "actor": {"agent_id": "codex-cli"},
+                "change_id": "s42-close-the-open-loops",
+                "round": 1,
+                "seq": 1,
+                "severity": "blocker",
+                "disposition": disposition,
+                "reviewer": "review-voice",
+                "summary": "s"
+            });
+            if let Some(sha) = resolution {
+                json["resolution_sha"] = Value::String(sha.to_string());
+            }
+            RawRecord(json)
+        };
+        let closing = "b41d7e0925ca38f6ee1cb70d4a982f65173d0ce8";
+
+        validate_body(RecordKind::Finding, &body("fixed", Some(closing))).expect("a fixed finding naming its closing commit is coherent");
+        validate_body(RecordKind::Finding, &body("open", None)).expect("an open finding with no resolution is coherent");
+
+        for incoherent in [body("fixed", None), body("open", Some(closing)), body("rejected", Some(closing))] {
+            let err = validate_body(RecordKind::Finding, &incoherent).unwrap_err();
+            assert_eq!(err.class, FailureClass::Malformed);
+            assert_eq!(err.subject, "resolution_sha");
+        }
     }
 
     #[test]

@@ -124,4 +124,29 @@ export const EXPECTED_MART_SCHEMA: Record<string, ParquetColumn[]> = {
     { name: "scenario_count", type: "BIGINT" },
     { name: "covered_scenarios", type: "BIGINT" },
   ],
+  mart_review_rounds: [
+    { name: "change_id", type: "VARCHAR" },
+    // `round` is `try_cast(body ->> '$.round' AS BIGINT)`, so it is a
+    // BIGINT here rather than the `u32` the Rust record carries.
+    { name: "round", type: "BIGINT" },
+    // Nullable VARCHAR, and the NULL is meaningful: a round that
+    // reviewed an uncommitted working tree has no reviewed commit, and
+    // canon never borrows an adjacent sha for it.
+    { name: "reviewed_sha", type: "VARCHAR" },
+    { name: "findings", type: "BIGINT" },
+    { name: "severity_blocker", type: "BIGINT" },
+    { name: "severity_should_fix", type: "BIGINT" },
+    { name: "severity_note", type: "BIGINT" },
+    { name: "disposition_open", type: "BIGINT" },
+    { name: "disposition_fixed", type: "BIGINT" },
+    { name: "disposition_rejected", type: "BIGINT" },
+    { name: "disposition_deferred", type: "BIGINT" },
+    // DERIVED by the view's `EXISTS` semi-join over `introduced_by` vs
+    // an earlier finding's `resolution_sha` — there is deliberately no
+    // stored boolean anywhere in the path, so this count is the only
+    // place the relationship exists.
+    { name: "fix_of_fix", type: "BIGINT" },
+    { name: "introduced_by_sourced", type: "BIGINT" },
+    { name: "introduced_by_unsourced", type: "BIGINT" },
+  ],
 };

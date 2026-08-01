@@ -20,7 +20,7 @@ pub fn schemas_dir() -> PathBuf {
 }
 
 /// Every generated file this crate commits, paired with its
-/// freshly-regenerated expected content — the closed-twelve
+/// freshly-regenerated expected content — the closed-fourteen
 /// `RecordKind` schemas AND the S11 artifact-family schemas
 /// (`crate::schema_export::pretty_family_schemas`), both committed
 /// into the SAME `schemas/` directory (distinguished by the

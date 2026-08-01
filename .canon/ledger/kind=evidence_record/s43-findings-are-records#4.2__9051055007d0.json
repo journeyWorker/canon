@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:14:18.050966Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "./target/release/canon report --repo . >/dev/null 2>&1; sed -n '/## Review rounds/,/^## /p' .canon/REPORT.md | grep '^| s42'"
+  },
+  "evidence_note": {
+    "command_result": "| s42-close-the-open-loops | 8 | — | 10 | 4 | 6 | 0 | 0 | 10 | 0 | 0 | 0 | 0 | 10 |\n| s42-close-the-open-loops | 9 | f438c6103c5f513902173a06b777efbdc4712e13 | 7 | 1 | 6 | 0 | 0 | 7 | 0 | 0 | 6 | 6 | 1 |\n| s42-close-the-open-loops | 10 | 49d3eb4fdc09b70339273a55051a49b92a303d68 | 9 | 0 | 8 | 1 | 0 | 9 | 0 | 0 | 9 | 9 | 0 |\n| s42-close-the-open-loops | 11 | b22fe8f51f66c679162d4c89b861e44d665c5af9 | 4 | 0 | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 4 | 0 |",
+    "summary": "the fix-of-fix count is whatever the records produce, not a number carried in prose; my published `four` and my correction `two` were both wrong and the panel now states what the number means and in which directions it errs"
+  },
+  "kind": "evidence_record",
+  "run_seq": 13,
+  "schema": 1,
+  "staging_id": "4de0bc630ae6",
+  "task_id": "s43-findings-are-records#4.2",
+  "verdict": "faithful"
+}

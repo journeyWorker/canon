@@ -35,12 +35,27 @@ fn report_generation_on_a_completely_fresh_repo_succeeds_with_empty_panels() {
     );
 
     assert!(content.starts_with("# canon report\n"));
-    // Every one of the seven marts has zero rows over a corpus this
+    // Every one of the eight marts has zero rows over a corpus this
     // empty — each panel renders the documented "no rows" placeholder,
     // never a missing section or a panic.
-    assert_eq!(content.matches("_No rows._").count(), 7, "all seven mart panels must render empty, not crash:\n{content}");
+    assert_eq!(content.matches("_No rows._").count(), 8, "all eight mart panels must render empty, not crash:\n{content}");
     assert!(content.contains("## Role memory\n\n"));
     assert!(content.contains("## Flywheel funnel\n\n"));
     assert!(content.contains("## Scope status\n\n"));
     assert!(content.contains("## Subjects\n\n"));
+    // s43 (`findings-are-records`): a repo with no `finding` records at
+    // all must still render the panel and its caveats. The caveats
+    // describe the METRIC, so the reader most likely to misread an
+    // empty fix-of-fix column is exactly the one who sees zero rows —
+    // including the reader who assumes zero rows means zero rounds,
+    // which is the one reading a corpus this empty.
+    assert!(content.contains("## Review rounds\n\n"));
+    assert!(
+        content.contains("`fix_of_fix` therefore bounds NOTHING — not from below, not from above"),
+        "the empty review-rounds panel must still refuse the bound in both directions"
+    );
+    assert!(
+        content.contains("counts the rounds that FOUND something, never the rounds RUN"),
+        "the empty review-rounds panel must still say a clean round writes no row"
+    );
 }

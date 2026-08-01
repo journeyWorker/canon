@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Finding",
+  "description": "One code-review finding (s43, the reviewed 14th kind): the durable\nhome for a single issue one reviewer raised in one review round on\none change. Before this kind existed, canon already CLASSIFIED\nthese during ingest\n(`canon_ingest::artifact_adapter::ArtifactEventKind::CodeReviewFinding`,\na transient normalization enum) and then dropped them on the floor\nfor want of a record kind to write them into — so a release\nnarrative's issue counts could only ever be hand-typed into prose,\nwhich is exactly how v0.4.0's git tag shipped two wrong numbers in\none sentence with nothing in canon able to contradict them.\n\nDeliberately NOT a [`Review`] (a scenario-scoped parity attestation\nwith no finding text, round, disposition, or resolution) and NOT a\n[`Divergence`] (which mandates a `scenario_id`, carries a single\n`sha` with no raised-vs-resolved distinction, and has no rejected\ndisposition). A finding is scoped to the CHANGE under review, never\nto a scenario, so it is a flat, non-area-scoped kind\n([`RecordKind::is_area_scoped`] is false for it) whose natural key\nis the composite `{change_id}__{round:04}__{seq:04}`\n(`canon_store::partition::resolve_partition`). No new join-spine\nnewtype is owed: `change_id` is [`crate::ids::ChangeId`], already\non the spine, so a finding joins finding → change → task through\nkeys that exist — and nothing joins TO a finding by id, since\n[`Finding::introduced_by`] points at a SHA that [`crate::ids::Sha`]\nalready spines. `ChangeId`'s kebab grammar forbids `_`, which keeps\n`__` an unambiguous split point in the composite.\n\n# `reviewed_sha` is OPTIONAL, because most rounds review a worktree\nA review round usually examines UNCOMMITTED work: the reviewer\nreads a working tree, the author fixes what came back, and only the\nresult gets committed. That round has no sha for what it saw.\nRound 8 of this very repo's v0.4.0 campaign was exactly that — ten\nfindings against a tree whose reviewed state was never committed\n(its FIXES landed as `f438c610`, which is a different thing) — so a\nrequired `reviewed_sha` would have silently excluded a third of the\nbackfill this kind exists to produce. `Some` means the reviewed\nstate WAS committed and this names it; `None` means it was a\nworktree. `None` is never backfilled with \"the commit nearest the\nround\", which would fabricate a provenance nobody reviewed.\nOrdering rounds therefore uses `round`, never `reviewed_sha`.\n\n# `resolution_sha` is the commit that CLOSED the finding\nIt is present if and only if `disposition` is\n[`FindingDisposition::Fixed`]. `Fixed` without one, or one set\nwhile `Open`, is incoherent and canon never stores it. **The WRITER\nenforces that pairing, not the type**, and that is a deliberate\ntrade: the wire form keeps `resolution_sha` a FLAT top-level field\nrather than folding it into a `Fixed { resolution_sha }` struct\nvariant (the [`DivergenceStatus::Deferred`] idiom this crate\notherwise reaches for) precisely because the fix-of-fix join below\nreads it as a top-level field, and a nested variant payload would\nbury the one query this kind exists to serve under\n`$.disposition.fixed.resolution_sha`. The writer-side enforcement is\ntwo-layered and total: [`Finding::fixed_by`] is the ONLY constructor\npath to `Fixed` and it cannot be called without the closing sha\n(while [`Finding::rejected`]/[`Finding::deferred`] clear it), and\n[`Finding::check_coherence`] re-checks the pairing on the READ path\n(`canon_store::partition::validate_body`'s `Finding` arm), so a\nhand-authored incoherent record is rejected as `malformed` and never\nenters a corpus.\n\n# `introduced_by` is the commit that INTRODUCED the defect\n`None` means the introducing commit could not be SOURCED — never\n\"there probably isn't one\". It is never inferred from timing,\nadjacency, `git blame` heuristics, or whichever commit happens to\nprecede the review round. The consequence is load-bearing and must\nbe repeated wherever it is used: **any count derived from\n`introduced_by` is a FLOOR, not a total**, and every consumer that\nreports such a count states that it is a floor.\n\n# Fix-of-fix is DERIVED, never stored\nA finding is a *fix-of-fix* when its `introduced_by` equals some\nEARLIER finding's `resolution_sha`. **EARLIER means lower\n`(round, seq)` within the same `change_id`** — never \"an earlier\n`reviewed_sha`\", because a round that reviewed a worktree has none,\nand never `Envelope.at`, which is authoring time and can be\nbackfilled out of order. That relationship is computed by joining\nfindings to each other, and it MUST never become a stored boolean,\nan `is_fix_of_fix` field, a severity variant, or a reviewer-set\nlabel. The whole reason this kind exists is that the number stopped\nbeing hand-typed; a stored flag would merely relocate the\nhand-typing from the release notes into the record.",
+  "type": "object",
+  "properties": {
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "change_id": {
+      "description": "The change under review — the finding's scope, the first\ncomponent of its natural key, and its join onto the existing\nspine (finding → change → task).",
+      "$ref": "#/$defs/ChangeId"
+    },
+    "disposition": {
+      "$ref": "#/$defs/FindingDisposition"
+    },
+    "file_ref": {
+      "description": "Where in the tree, as `path/to/file.rs:120-134`. A plain string:\na line range is not a canon join key and inventing a newtype for\nit would spine nothing.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "introduced_by": {
+      "description": "The commit that introduced the defect — see this type's doc:\n`None` means UNSOURCED, and every count derived from this field\nis a floor.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Sha"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kind": {
+      "$ref": "#/$defs/RecordKind"
+    },
+    "resolution_sha": {
+      "description": "The commit that closed it — see this type's doc: present iff\n`disposition` is [`FindingDisposition::Fixed`].",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Sha"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reviewed_sha": {
+      "description": "The commit whose state this round reviewed, when that state was\ncommitted at all — see this type's doc: `None` is a round that\nreviewed an uncommitted working tree, which is the common case,\nand is never backfilled by guessing a nearby commit.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Sha"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reviewer": {
+      "description": "Who raised it. A plain string for the same reason\n[`Divergence::reviewer`] is one — a reviewer may be a human name\na canon [`crate::ids::RoleId`] does not model.",
+      "type": "string"
+    },
+    "round": {
+      "description": "Which review round on this change raised it (1-based). This, not\n`reviewed_sha`, is what orders rounds — a round that reviewed a\nworktree has no sha to order by.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "schema": {
+      "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "seq": {
+      "description": "This finding's index WITHIN `round` (1-based) — `round` alone\ndoes not identify a finding, so the two together with\n`change_id` form the natural key.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "severity": {
+      "$ref": "#/$defs/FindingSeverity"
+    },
+    "summary": {
+      "description": "One line of what the finding IS, in the reviewer's own words.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "at",
+    "actor",
+    "change_id",
+    "round",
+    "seq",
+    "severity",
+    "disposition",
+    "reviewer",
+    "summary"
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "ChangeId": {
+      "description": "openspec change slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the directory name under `openspec/changes/` — joins: change ↔ tasks ↔ specs",
+      "type": "string"
+    },
+    "FindingDisposition": {
+      "description": "What became of a [`Finding`]. `Open` is raised-and-outstanding;\n`Fixed` is closed BY A COMMIT (and is the only disposition that\ncarries a [`Finding::resolution_sha`]); `Rejected` is closed by the\nreviewer withdrawing or the author declining, with no commit\ninvolved; `Deferred` is acknowledged and postponed. There is\ndeliberately no `FixOfFix` variant — see [`Finding`]'s own doc for\nwhy that relationship is DERIVED by join and can never be stored.",
+      "type": "string",
+      "enum": [
+        "open",
+        "fixed",
+        "rejected",
+        "deferred"
+      ]
+    },
+    "FindingSeverity": {
+      "description": "How much a [`Finding`] blocks — the reviewer's own judgement at the\nmoment they raised it, never a score canon derives. `Blocker` must\nbe resolved before the reviewed line of work ships; `ShouldFix` is\na real defect that may be scheduled; `Note` is an observation that\ncarries no obligation.",
+      "type": "string",
+      "enum": [
+        "blocker",
+        "should_fix",
+        "note"
+      ]
+    },
+    "RecordKind": {
+      "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+      "type": "string",
+      "enum": [
+        "change",
+        "task",
+        "scenario",
+        "session",
+        "run",
+        "event",
+        "handoff",
+        "review",
+        "divergence",
+        "trajectory",
+        "strategy_item",
+        "evidence_record",
+        "subject",
+        "finding"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    },
+    "Sha": {
+      "description": "git commit SHA-1: exactly 40 lowercase hex characters — joins: reward signals ↔ trajectory",
+      "type": "string"
+    }
+  }
+}

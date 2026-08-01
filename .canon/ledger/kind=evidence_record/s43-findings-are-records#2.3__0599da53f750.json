@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:09:25.089208Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "./target/release/canon finding add --help"
+  },
+  "evidence_note": {
+    "command_result": "RECORDED OBSERVATION, NOT PROOF. canon does not verify that the defect",
+    "summary": "the help states RECORDED OBSERVATION, NOT PROOF and enumerates what canon does not verify"
+  },
+  "kind": "evidence_record",
+  "run_seq": 7,
+  "schema": 1,
+  "staging_id": "bed007613794",
+  "task_id": "s43-findings-are-records#2.3",
+  "verdict": "faithful"
+}

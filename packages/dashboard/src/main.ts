@@ -6,6 +6,7 @@ import { renderSessionCosts } from "./panels/session-costs";
 import { renderRoleMemory } from "./panels/role-memory";
 import { renderFlywheelFunnel } from "./panels/flywheel-funnel";
 import { renderReviewBurndown } from "./panels/review-burndown";
+import { renderReviewRounds } from "./panels/review-rounds";
 
 // Snapshot base defaults to this app's own committed fixture
 // (fixtures/snapshot/, served at /snapshot/ — see vite.config.ts's
@@ -32,13 +33,14 @@ async function main(): Promise<void> {
     // Sequential, not Promise.all: DuckDB-Wasm serializes commands over
     // one Worker message channel per connection, so overlapping queries
     // on the same AsyncDuckDBConnection are not a supported concurrency
-    // pattern — five small SELECTs have no meaningful latency cost from
+    // pattern — six small SELECTs have no meaningful latency cost from
     // running one after another.
     await renderTrustMatrix(conn, panelBody("panel-trust-matrix"));
     await renderSessionCosts(conn, panelBody("panel-session-costs"));
     await renderRoleMemory(conn, panelBody("panel-role-memory"));
     await renderFlywheelFunnel(conn, panelBody("panel-flywheel-funnel"));
     await renderReviewBurndown(conn, panelBody("panel-review-burndown"));
+    await renderReviewRounds(conn, panelBody("panel-review-rounds"));
 
     // Deterministic hook for the headless smoke test (test/smoke.test.ts)
     // to wait on instead of polling the DOM for table rows.

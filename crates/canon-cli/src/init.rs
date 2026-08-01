@@ -51,7 +51,8 @@ const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, Recor
 const GITIGNORE_LINE: &str = paths::HOT_DB_GITIGNORE;
 
 /// D8/D9's skeleton `canon.yaml` body: every one of `RecordKind::ALL`'s
-/// thirteen wire strings (s36: `subject` is the reviewed 13th kind)
+/// fourteen wire strings (s36: `subject` is the reviewed 13th kind;
+/// s43: `finding` the 14th)
 /// routed to either `local` (git-backed) or `hot`
 /// (sqlite-backed, [`HOT_KINDS`]) -- the two zero-env-var rungs (s32
 /// `sqlite-hot-backend`: sqlite needs no operator-supplied credential,

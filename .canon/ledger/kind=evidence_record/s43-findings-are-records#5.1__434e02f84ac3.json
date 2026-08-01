@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-01T16:13:27.882296Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test --workspace"
+  },
+  "evidence_note": {
+    "command_result": "test result: ok. 279 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.60s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.92s\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s\ntest result: ok. 7 passed; 0 faile",
+    "summary": "the workspace suite passes with zero failures at fourteen kinds"
+  },
+  "kind": "evidence_record",
+  "run_seq": 15,
+  "schema": 1,
+  "staging_id": "bc62e4aa1a4c",
+  "task_id": "s43-findings-are-records#5.1",
+  "verdict": "faithful"
+}

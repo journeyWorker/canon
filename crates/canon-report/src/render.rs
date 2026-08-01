@@ -88,6 +88,65 @@ pub const REVIEW_BURNDOWN_PANEL: &str = "Review-feedback burn-down over time (`m
 /// in [`render`] for why the earlier, causal wording was wrong.
 pub const FLYWHEEL_FUNNEL_PANEL: &str = "Verdicts → distilled → retrieved → applied (`mart_flywheel_funnel`) — the last three stages count STRATEGIES, so the funnel narrows by construction. `retrieved` counts the distinct strategies some run recorded in its `injected_guidance` that are still distilled today; strategy ids are derived from a strategy's own content, so re-ingesting unchanged evidence re-derives the same ids and leaves this stage intact. `applied` is that same set narrowed to the ones whose recipient run has something recorded about how it ended — NOT how many trajectories were resolved — and `applied_attributed`/`applied_proxy` say WHICH rule earned each count, partitioning `applied` exactly. Both rules are CO-OCCURRENCE inside one run, never causation. `applied_attributed`: the strategy is named in some run's `injected_guidance`, and that SAME run has at least one trajectory of the SAME role stamped with that run id (`Trajectory.run_id`, set only by `canon ingest artifacts --run`) whose `outcome` is resolved (`success`/`failure`/`rolled-back`). `applied_proxy`: no such trajectory exists, so all that is recorded is the recipient run's own terminal `Run.status` (`succeeded`/`failed`/`aborted`). Attribution is the stronger of the two — it requires a judged outcome out of that run, not merely that the run reached a terminal state — and is still weaker than tying the outcome TO the guidance: canon stores no edge from a strategy to a verdict, so this join cannot separate guidance that was followed from guidance that was ignored in an otherwise identical run, and a second still-distilled strategy of the same role injected into the same run counts identically. Closing that gap needs a record change canon has not made — a `StrategyId` stamped on the `Trajectory`/`VerdictRow` at judgment time, joined here instead of `run_id` alone — not a re-reading of this one. A repo that never passes `canon ingest artifacts --run` reads its whole `applied` under `applied_proxy`. `applied` can never exceed `retrieved`, and `retrieved 0` means no run's recorded guidance names a strategy that exists now.\n\n";
 
+/// The `## Review rounds` panel's prose (s43 `findings-are-records`).
+///
+/// This change exists because a hand-written release summary claimed
+/// "49 real issues, four of them defects in the previous round's fix"
+/// and both numbers were wrong. So this panel's ONE job is to be a
+/// number worth copying — which it only is if the prose beside it
+/// claims exactly what `mart_review_rounds` computes.
+///
+/// Written from the SQL, clause by clause:
+///
+/// - "one row per `(change_id, round)`" — the view's `GROUP BY
+///   change_id, "round"`.
+/// - "folded to the latest version of each … finding first" — the
+///   `QUALIFY row_number() … PARTITION BY change_id, round, seq`.
+/// - "`introduced_by` equals the `resolution_sha` of a finding earlier
+///   in the SAME change by `(round, seq)`" — the `EXISTS` clause,
+///   field for field, including its `g.change_id = f.change_id` scope.
+/// - "strictly" — `(g.round < f.round OR (g.round = f.round AND g.seq
+///   < f.seq))`, which is irreflexive.
+/// - "a commit-id equality join" — `g.resolution_sha =
+///   f.introduced_by` is the whole predicate; there is no git read, no
+///   blame, and no diff anywhere in the path.
+/// - "NOT counted … reviewing a different change" — the same-change
+///   scope again, stated as the cost it is.
+/// - "`introduced_by_unsourced` … never as not-a-fix-of-fix" — the two
+///   complementary `count(*) FILTER (WHERE introduced_by IS
+///   [NOT] NULL)` columns.
+/// - "bounds NOTHING" — follows from the clauses above, in BOTH
+///   directions. UNDER: an unsourced `introduced_by` fails
+///   `f.introduced_by IS NOT NULL`, and the `g.change_id = f.change_id`
+///   scope drops the cross-change case. OVER: the `EXISTS` predicate is
+///   `g.resolution_sha = f.introduced_by` and nothing else, so a
+///   resolution commit that ALSO carries work other than the fix
+///   matches every finding recording it, whether the fix or the other
+///   work introduced the defect. The count is exact; what it counts is
+///   a commit-id coincidence. This bullet used to read "FLOOR", which
+///   is the misreading the panel was written to prevent, shipped by the
+///   panel itself.
+/// - "counts the rounds that FOUND something, never the rounds RUN" —
+///   `FROM stg_records WHERE kind = 'finding'` is the only source. A
+///   round that found nothing wrote no `Finding` and cannot appear, and
+///   canon has no round-completion record to supply the missing rows.
+/// - "`reviewed_sha` is the greatest value any of the round's findings
+///   recorded" — `max(reviewed_sha)`, and the panel does NOT say the
+///   round's findings agree on it, nor that a blank one PROVES a
+///   worktree round, because the view checks neither.
+///
+/// What the panel deliberately does NOT say: that a counted finding
+/// was CAUSED by the earlier fix. The join reads two recorded SHA
+/// fields for equality; it cannot distinguish a correctly-sourced
+/// `introduced_by` from a careless one, and canon never infers the
+/// field. Asserting causation here would be the ninth surface on this
+/// release line to claim a relationship its query never computed
+/// (s39's model-level ceiling, s40's funnel columns, s41's
+/// burn-down-as-current-state, s42's applied split, and this panel's
+/// own retired FLOOR — s43 round 1, seq 1), which is
+/// precisely the failure this change exists to stop.
+pub const REVIEW_ROUNDS_PANEL: &str = "Findings per review round (`mart_review_rounds`) — one row per `(change_id, round)` over `Finding` records, folded to the latest version of each `{change_id}__{round}__{seq}` finding first, so a finding re-authored from `open` to `fixed` is counted once and in one disposition bucket. A round that found NOTHING wrote no `Finding` and so has no row here: this table counts the rounds that FOUND something, never the rounds RUN. s42's round 12 returned MERGEABLE with zero findings and is absent from canon's own rows. canon has no record kind for a review round — `Review` is a per-scenario attestation, not a round — so the number of rounds RUN is not derivable from this corpus at all; it would take a record written when a round completes, and canon has none today.\n\n`fix_of_fix` counts the findings in this round whose SOURCED `introduced_by` equals the `resolution_sha` of a finding earlier in the SAME change, ordered strictly by the natural key's own `(round, seq)` pair — strictly, so no finding is ever matched against its own `resolution_sha`. That is a commit-id equality join over two recorded fields and nothing more: it reports that the commit which closed an earlier finding is the commit a later finding RECORDS as its introducing commit. It reads no git history, computes no blame, and is exactly as sound as the sourcing of `introduced_by` — a field canon never infers and a reviewer may leave unsourced, which is a discipline canon asks for and cannot enforce. Rounds are ordered by `round`, never by `reviewed_sha` (a round that reviewed an uncommitted working tree has none, and that is the common case) and never by `at` (that is when the record was WRITTEN — a backfill authors many rounds in one sitting, in any order). `introduced_by_unsourced` is the UNKNOWN bucket: a finding with no sourced `introduced_by` is counted there and NEVER as not-a-fix-of-fix, because absence of a sourced commit is not evidence that no earlier fix was involved.\n\n`fix_of_fix` therefore bounds NOTHING — not from below, not from above. It is an EXACT count of a commit-id coincidence, and that coincidence errs in both directions. It UNDER-counts, because an unsourced finding could belong to it and is never counted, and a fix in one change that breaks something first found while reviewing a DIFFERENT change is not counted at all, since `round` restarts at 1 per change and canon holds no cross-change round order. It OVER-counts, because a `resolution_sha` commit may carry work BEYOND the fix, and every finding recording that commit is counted whether the fix or the other work introduced it — the join sees one commit id on both sides and cannot tell them apart. Both directions are live in canon's own v0.4.0 review rounds — the `s42-close-the-open-loops` rows, which are the rows below in canon's own report. Round 9's six counted findings record `f438c610`, which closed round 8 AND shipped s42's whole feature, so they are NOT attributable to round 8's fixes; rounds 10 and 11's introducing commits (`49d3eb4f`, `b22fe8f5`) were pure fix commits, so theirs are. Nothing in the table separates those two cases; only reading the commits does. Round 9 also carries one unsourced finding, which could belong to the count and does not. So read the number as exactly what it joins — findings whose recorded introducing commit is a recorded earlier resolution commit of the same change — and as no statement whatever about how many defects this change's fixes introduced.\n\n`introduced_by_sourced + introduced_by_unsourced = findings` and `fix_of_fix <= introduced_by_sourced`, both by construction, so the size of the unknown is readable against the count. `reviewed_sha` is the greatest value any of the round's findings recorded, and reads `—` when NO finding in the round recorded one; a round that reviewed an uncommitted working tree is the usual reason, but the view cannot distinguish that from a round whose findings simply left the field unrecorded, and it neither requires a round's findings to agree on the value nor claims they do.\n\n";
+
 fn cell(row: &crate::query::Row, column: &str) -> String {
     match row.get(column) {
         None | Some(serde_json::Value::Null) => "—".to_string(),
@@ -122,8 +181,9 @@ fn render_table(out: &mut String, mart: &MartResult) {
     out.push('\n');
 }
 
-/// The seven panels this report renders, in design D5's own declared
-/// order, with s24's `scope_status` and s36's `subjects` appended last.
+/// The eight panels this report renders, in design D5's own declared
+/// order, with s24's `scope_status`, s36's `subjects` and s43's
+/// `review_rounds` appended last.
 pub struct ReportMarts {
     pub trust_matrix: MartResult,
     pub session_costs: MartResult,
@@ -132,6 +192,7 @@ pub struct ReportMarts {
     pub review_burndown: MartResult,
     pub scope_status: MartResult,
     pub subjects: MartResult,
+    pub review_rounds: MartResult,
 }
 
 /// Renders the full report markdown. Pure formatting over already-
@@ -233,6 +294,31 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     out.push_str("Per-domain subject rollup: status × scenario coverage (`mart_subjects`).\n\n");
     render_table(&mut out, &marts.subjects);
 
+    out.push_str("## Review rounds\n\n");
+    // s43 (`findings-are-records`): the number this panel exists to
+    // replace was typed from memory into a published git tag ("49 real
+    // issues, four of them defects in the previous round's fix" — both
+    // wrong). A generated number only beats a remembered one if the
+    // prose beside it is exact, so `REVIEW_ROUNDS_PANEL` is written
+    // from the view's own clauses, not from what a fix-of-fix count is
+    // FOR: the join is commit-id equality between a recorded
+    // `introduced_by` and an earlier finding's recorded
+    // `resolution_sha`, scoped to one change and ordered strictly by
+    // `(round, seq)`. It reads no git history and establishes no
+    // causal claim, and the panel says both.
+    //
+    // It also says, since s43 round 1 found the panel claiming
+    // otherwise about itself, that the count bounds NOTHING. Calling it
+    // a FLOOR was true only of the two UNDER-counts (the UNSOURCED
+    // bucket, the uncounted cross-change case) and blind to the
+    // OVER-count sitting in the very table it introduces: `f438c610`
+    // closed s42's round 8 AND shipped s42's feature, so round 9's six
+    // counted findings are a commit-id coincidence, not defects
+    // attributable to round 8's fixes. A directional word is a claim
+    // like any other, and this one was the eighth on this release line.
+    out.push_str(REVIEW_ROUNDS_PANEL);
+    render_table(&mut out, &marts.review_rounds);
+
     out
 }
 
@@ -249,6 +335,39 @@ mod tests {
     const CAUSAL_PHRASES: &[&str] =
         &["produced", "caused", "acted on", "led to", "resulted in", "drove", "thanks to", "influenced", "brought about", "was effective"];
 
+    /// Phrases that assert `fix_of_fix` BOUNDS the number of defects a
+    /// change's fixes introduced. It bounds nothing: the same-change
+    /// scope and the UNSOURCED bucket make it miss, and a
+    /// `resolution_sha` commit carrying work other than the fix makes
+    /// it over-count (s43 `findings-are-records` round 1, seq 1 — the
+    /// panel shipped "FLOOR" while the corpus underneath it disproved
+    /// the direction). Same idea as `CAUSAL_PHRASES` one field up: a
+    /// word the query cannot earn, banned by spelling rather than left
+    /// to a reviewer's eye.
+    ///
+    /// Deliberately banned OUTRIGHT rather than only when asserted. A
+    /// panel that says "not a floor" invites the reader to weigh the
+    /// denial against the word, and the word wins — the honest sentence
+    /// names the two directions instead.
+    const DIRECTIONAL_PHRASES: &[&str] = &[
+        "floor",
+        "lower bound",
+        "lower-bound",
+        "bounds from below",
+        "minimum",
+        "at least",
+        "no fewer than",
+        "conservative",
+        "understates",
+        "underestimate",
+        "under-estimate",
+        "upper bound",
+        "ceiling",
+        "at most",
+        "no more than",
+        "overstates",
+    ];
+
     fn empty(columns: &'static [&'static str]) -> MartResult {
         MartResult { columns, rows: Vec::new() }
     }
@@ -262,6 +381,7 @@ mod tests {
             review_burndown: empty(marts::REVIEW_BURNDOWN_COLUMNS),
             scope_status: empty(marts::SCOPE_STATUS_COLUMNS),
             subjects: empty(marts::SUBJECTS_COLUMNS),
+            review_rounds: empty(marts::REVIEW_ROUNDS_COLUMNS),
         }
     }
 
@@ -338,9 +458,131 @@ mod tests {
             ("ROLE_MEMORY_PANEL", ROLE_MEMORY_PANEL),
             ("FLYWHEEL_FUNNEL_PANEL", FLYWHEEL_FUNNEL_PANEL),
             ("REVIEW_BURNDOWN_PANEL", REVIEW_BURNDOWN_PANEL),
+            ("REVIEW_ROUNDS_PANEL", REVIEW_ROUNDS_PANEL),
         ] {
             assert!(report.contains(panel), "{name} is declared but never rendered");
         }
+    }
+
+    /// The whole point of s43: `fix_of_fix` must read as what
+    /// `mart_review_rounds` computes — commit-id equality between a
+    /// recorded `introduced_by` and an EARLIER finding's recorded
+    /// `resolution_sha` — and never as proof that the earlier fix
+    /// caused the later defect. The join reads two stored SHA fields;
+    /// canon performs no blame analysis and never infers
+    /// `introduced_by`, so a causal reading is exactly the class of
+    /// claim this release line has shipped eight times.
+    #[test]
+    fn review_rounds_panel_states_the_join_and_never_claims_causation() {
+        // Space-prefixed for the same word-boundary reason the funnel
+        // check is.
+        let panel = format!(" {}", REVIEW_ROUNDS_PANEL.to_ascii_lowercase());
+        for phrase in CAUSAL_PHRASES {
+            assert!(!panel.contains(&format!(" {phrase}")), "review rounds panel implies causation via {phrase:?}: {REVIEW_ROUNDS_PANEL}");
+        }
+        for required in [
+            "commit-id equality join",
+            "the commit a later finding records as its introducing commit",
+            "reads no git history",
+            "as sound as the sourcing of `introduced_by`",
+        ] {
+            assert!(panel.contains(required), "review rounds panel omits {required:?}");
+        }
+    }
+
+    /// `introduced_by = None` is UNSOURCED, not "no earlier fix
+    /// involved". The panel must give that bucket its own name and
+    /// refuse the not-a-fix-of-fix reading outright. A count that reads
+    /// as global while computing something narrower is the defect, not
+    /// the narrowness.
+    #[test]
+    fn review_rounds_panel_names_the_unknown_bucket_rather_than_folding_it_into_a_zero() {
+        let report = rendered();
+        assert!(report.contains("`introduced_by_unsourced` is the UNKNOWN bucket"), "the panel must name the unsourced bucket as unknown");
+        assert!(
+            report.contains("counted there and NEVER as not-a-fix-of-fix"),
+            "the panel must refuse folding unsourced findings into not-a-fix-of-fix"
+        );
+        assert!(
+            report.contains("`introduced_by_sourced + introduced_by_unsourced = findings`"),
+            "the panel must state the arithmetic that makes the unknown readable against the count"
+        );
+    }
+
+    /// s43 round 1, seq 1 — found by reading this panel against the
+    /// corpus it renders. The panel said `fix_of_fix` was a FLOOR
+    /// "twice over", naming both UNDER-counts and neither OVER-count.
+    /// The corpus in the table disproves the direction: `f438c610`
+    /// closed s42's round 8 AND shipped s42's whole feature, so round
+    /// 9's six counted findings came from the feature, and the join —
+    /// commit-id equality, one id on each side — cannot separate them
+    /// from the fix. So the panel must name BOTH directions and claim
+    /// no bound at all.
+    #[test]
+    fn review_rounds_panel_calls_the_fix_of_fix_count_no_kind_of_bound() {
+        // Space-prefixed for the same word-boundary reason the causal
+        // check is.
+        let panel = format!(" {}", REVIEW_ROUNDS_PANEL.to_ascii_lowercase());
+        for phrase in DIRECTIONAL_PHRASES {
+            assert!(!panel.contains(&format!(" {phrase}")), "review rounds panel bounds `fix_of_fix` via {phrase:?}: {REVIEW_ROUNDS_PANEL}");
+        }
+
+        let report = rendered();
+        assert!(
+            report.contains("`fix_of_fix` therefore bounds NOTHING — not from below, not from above"),
+            "the panel must refuse the bound in both directions, not swap one directional word for another"
+        );
+        assert!(
+            report.contains("first found while reviewing a DIFFERENT change is not counted at all"),
+            "the panel must name the cross-change case its same-change scope misses"
+        );
+        assert!(
+            report.contains("a `resolution_sha` commit may carry work BEYOND the fix"),
+            "the panel must name the OVER-count: a resolution commit carrying non-fix work"
+        );
+        assert!(
+            report.contains("`f438c610`, which closed round 8 AND shipped s42's whole feature"),
+            "the panel must work the over-count through the live row a reader is looking at"
+        );
+    }
+
+    /// s43 round 1, seq 2. A review round that finds nothing writes no
+    /// `Finding`, so it has no row: the table's unit is rounds THAT
+    /// FOUND SOMETHING. s42's round 12 returned MERGEABLE with zero
+    /// findings and is absent. The panel must say so, and must not
+    /// imply canon can supply the missing rows — no record kind marks a
+    /// review round as run.
+    #[test]
+    fn review_rounds_panel_says_a_round_that_found_nothing_has_no_row() {
+        let report = rendered();
+        assert!(
+            report.contains("counts the rounds that FOUND something, never the rounds RUN"),
+            "the panel must state that its unit is rounds that found something"
+        );
+        assert!(
+            report.contains("s42's round 12 returned MERGEABLE with zero findings"),
+            "the panel must name the live clean round the table cannot show"
+        );
+        assert!(
+            report.contains("canon has no record kind for a review round"),
+            "the panel must say the rounds-run count is unavailable, not merely unrendered"
+        );
+    }
+
+    /// Round ORDER is the one ordinal this derivation has, and both
+    /// alternatives are actively wrong: `reviewed_sha` is absent for a
+    /// round that reviewed a worktree (the common case, and why the key
+    /// is not sha-based), and `at` is the record's authoring instant,
+    /// which a backfill sets in whatever order it walked the rounds.
+    /// The panel has to say which it uses and why, or a reader cannot
+    /// tell a strict derivation from a plausible one.
+    #[test]
+    fn review_rounds_panel_says_rounds_are_ordered_by_round_and_not_by_sha_or_at() {
+        let panel = REVIEW_ROUNDS_PANEL;
+        assert!(panel.contains("ordered strictly by the natural key's own `(round, seq)` pair"), "the panel must state the ordering the join uses");
+        assert!(panel.contains("no finding is ever matched against its own `resolution_sha`"), "the panel must state what strictness buys");
+        assert!(panel.contains("never by `reviewed_sha`"), "the panel must rule out sha ordering");
+        assert!(panel.contains("never by `at`"), "the panel must rule out `at` ordering");
     }
 
     /// `workspace_label` is `workspace_label_from_key`'s last non-empty

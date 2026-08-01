@@ -124,7 +124,16 @@ fn fresh_snapshot_matches_the_committed_dashboard_fixture_contract() {
     let repo = canon_repo_root();
     let fixture_dir = repo.join("packages/dashboard/fixtures/snapshot");
     let fixture_manifest = read_manifest(&fixture_dir);
-    assert_eq!(fixture_manifest.tables.len(), 7, "the committed dashboard fixture itself must declare exactly 7 tables (s36 added mart_subjects)");
+    // Derived, never a literal: a hand-typed count here drifted through s24,
+    // s36 and s43 before anyone noticed, which is the same defect class s43
+    // exists to close. Comparing against the generator makes "someone added a
+    // table and did not regenerate the fixture" the failure this reports.
+    let expected_tables = canon_report::snapshot::SNAPSHOT_TABLES.len();
+    assert_eq!(
+        fixture_manifest.tables.len(),
+        expected_tables,
+        "the committed dashboard fixture must declare every snapshot table ({expected_tables}); regenerate it with `bun run fixture:build` in packages/dashboard"
+    );
 
     let fresh_repo = tempfile::tempdir().unwrap();
     let snapshot_dir = fresh_repo.path().join("snap-out");

@@ -1,7 +1,8 @@
 //! Task 2.6 acceptance (extended by s24 `scope_status`, s36
-//! `subjects`): the fixture corpus (`crates/canon-report/fixtures/
-//! corpus.rs`) renders every one of the seven marts to its documented
-//! KNOWN expected values — never a "some rows came back" smoke check.
+//! `subjects`, s43 `review_rounds`): the fixture corpus
+//! (`crates/canon-report/fixtures/corpus.rs`) renders every one of the
+//! eight marts to its documented KNOWN expected values — never a "some
+//! rows came back" smoke check.
 
 mod support;
 
@@ -326,4 +327,133 @@ fn subjects_matches_the_fixture_corpus_exactly() {
         row["covered_scenarios"], corpus::subjects::COVERED_SCENARIOS,
         "one of the two linked scenarios carries a latest Faithful verdict; the other has no evidence"
     );
+}
+
+/// Every column of every `mart_review_rounds` row, against the
+/// documented corpus (s43 `findings-are-records`). Asserting the WHOLE
+/// row per round, not just `fix_of_fix`, is deliberate: a severity or
+/// disposition `FILTER` that started matching the wrong literal would
+/// otherwise pass while the panel's totals stopped adding up.
+#[test]
+fn review_rounds_matches_the_fixture_corpus_exactly() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let result = marts::fetch_review_rounds(&inputs(dir.path()).roots).unwrap();
+
+    assert_eq!(result.rows.len(), 4, "three `s9-fixture` rounds plus one on the second change, got {:?}", result.rows);
+
+    let row = |change_id: &str, round: i64| {
+        result
+            .rows
+            .iter()
+            .find(|r| r.get("change_id").and_then(|v| v.as_str()) == Some(change_id) && r.get("round").and_then(|v| v.as_i64()) == Some(round))
+            .unwrap_or_else(|| panic!("missing row for {change_id} round {round} in {:?}", result.rows))
+    };
+    let assert_row = |label: &str, r: &canon_report::query::Row, expected: &corpus::review_rounds::Row| {
+        assert_eq!(r["findings"], expected.findings, "{label}: findings");
+        assert_eq!(r["severity_blocker"], expected.blocker, "{label}: severity_blocker");
+        assert_eq!(r["severity_should_fix"], expected.should_fix, "{label}: severity_should_fix");
+        assert_eq!(r["severity_note"], expected.note, "{label}: severity_note");
+        assert_eq!(r["disposition_open"], expected.open, "{label}: disposition_open");
+        assert_eq!(r["disposition_fixed"], expected.fixed, "{label}: disposition_fixed");
+        assert_eq!(r["disposition_rejected"], expected.rejected, "{label}: disposition_rejected");
+        assert_eq!(r["disposition_deferred"], expected.deferred, "{label}: disposition_deferred");
+        assert_eq!(r["fix_of_fix"], expected.fix_of_fix, "{label}: fix_of_fix");
+        assert_eq!(r["introduced_by_sourced"], expected.sourced, "{label}: introduced_by_sourced");
+        assert_eq!(r["introduced_by_unsourced"], expected.unsourced, "{label}: introduced_by_unsourced");
+        // The two arithmetic identities the panel states as holding by
+        // construction. If either stops holding, the panel's claim that
+        // the unknown is readable against the count is false.
+        assert_eq!(expected.sourced + expected.unsourced, expected.findings, "{label}: sourced + unsourced must equal findings");
+        assert!(expected.fix_of_fix <= expected.sourced, "{label}: fix_of_fix can never exceed the sourced count");
+    };
+
+    let change = corpus::review_rounds::CHANGE_ID;
+    assert_row("round 1", row(change, 1), &corpus::review_rounds::ROUND_1);
+    assert_row("round 2", row(change, 2), &corpus::review_rounds::ROUND_2);
+    assert_row("round 3", row(change, 3), &corpus::review_rounds::ROUND_3);
+    assert_row("other change round 1", row(corpus::review_rounds::OTHER_CHANGE_ID, 1), &corpus::review_rounds::OTHER_ROUND_1);
+
+    // Round 1 committed what it reviewed; rounds 2 and 3 reviewed an
+    // uncommitted worktree, which is the common case and the reason
+    // `Finding::reviewed_sha` is `Option`. A round whose findings named
+    // no commit must still be a ROW here, with an honest NULL — never a
+    // dropped round, and never a borrowed adjacent sha.
+    assert_eq!(row(change, 1)["reviewed_sha"], corpus::review_rounds::ROUND_1_REVIEWED_SHA);
+    for round in [2, 3] {
+        assert!(
+            row(change, round)["reviewed_sha"].is_null(),
+            "round {round} reviewed a worktree, so its reviewed_sha must be NULL, got {:?}",
+            row(change, round)["reviewed_sha"]
+        );
+    }
+}
+
+/// The three shapes `introduced_by` can take, read off the same corpus
+/// row-by-row rather than only through the aggregate above — because
+/// `fix_of_fix` and `introduced_by_sourced` would be indistinguishable
+/// on a corpus where every sourced finding happened to match, and
+/// `introduced_by_unsourced` would be indistinguishable from zero on a
+/// corpus where every finding was sourced.
+#[test]
+fn review_rounds_separates_matched_sourced_and_unsourced_introducing_commits() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let result = marts::fetch_review_rounds(&inputs(dir.path()).roots).unwrap();
+    let round_2 = result
+        .rows
+        .iter()
+        .find(|r| r.get("change_id").and_then(|v| v.as_str()) == Some(corpus::review_rounds::CHANGE_ID) && r.get("round").and_then(|v| v.as_i64()) == Some(2))
+        .expect("round 2 row");
+
+    // Three findings, three distinct shapes: one matched, one sourced
+    // but unmatched, one unsourced. The gap between `fix_of_fix` and
+    // `introduced_by_sourced` is what proves the join filters rather
+    // than just counting non-NULLs.
+    assert_eq!(round_2["findings"], 3);
+    assert_eq!(round_2["fix_of_fix"], 1, "only the finding naming round 1's resolution_sha joins");
+    assert_eq!(round_2["introduced_by_sourced"], 2, "two findings carry a sourced introducing commit; only one of them matches");
+    assert_eq!(round_2["introduced_by_unsourced"], 1, "the unsourced finding is counted as UNKNOWN, never as not-a-fix-of-fix");
+}
+
+/// The two over-counting traps, asserted as ZEROES on rows that do
+/// carry a sourced `introduced_by` — so a `0` here means "the join
+/// refused it", not "there was nothing to refuse".
+#[test]
+fn review_rounds_never_counts_a_finding_against_itself_or_across_changes() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let result = marts::fetch_review_rounds(&inputs(dir.path()).roots).unwrap();
+    let row = |change_id: &str, round: i64| {
+        result
+            .rows
+            .iter()
+            .find(|r| r.get("change_id").and_then(|v| v.as_str()) == Some(change_id) && r.get("round").and_then(|v| v.as_i64()) == Some(round))
+            .unwrap_or_else(|| panic!("missing row for {change_id} round {round}"))
+    };
+
+    // Round 3's finding names its OWN `resolution_sha` as its
+    // `introduced_by`. Strict `(round, seq)` is the only thing keeping
+    // it out; a `<=` would score this `1`.
+    let self_caused = row(corpus::review_rounds::CHANGE_ID, 3);
+    assert_eq!(self_caused["introduced_by_sourced"], 1, "the trap only means something if the finding IS sourced");
+    assert_eq!(self_caused["fix_of_fix"], 0, "a finding may never be matched against its own resolution_sha");
+
+    // The other change's finding names `s9-fixture` round 1's
+    // resolution. Both are SHAs, so the equality holds — only the
+    // same-change scope excludes it. This is the documented
+    // cross-change miss; widening the scope without defining a
+    // cross-change order must fail here.
+    let other = row(corpus::review_rounds::OTHER_CHANGE_ID, 1);
+    assert_eq!(other["introduced_by_sourced"], 1);
+    assert_eq!(other["fix_of_fix"], 0, "the fix-of-fix join is scoped to one change_id; `round` orders nothing between changes");
 }
