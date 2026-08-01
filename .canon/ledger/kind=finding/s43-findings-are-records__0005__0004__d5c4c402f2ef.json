@@ -3,17 +3,18 @@
     "agent_id": "canon",
     "role": "reviewer"
   },
-  "at": "2026-08-01T18:43:16.804932Z",
+  "at": "2026-08-01T19:24:03.208842Z",
   "change_id": "s43-findings-are-records",
-  "disposition": "open",
-  "file_ref": "crates/canon-cli/tests/finding.rs",
+  "disposition": "fixed",
+  "file_ref": ".canon/ledger/kind=finding",
   "introduced_by": "ed946e958d85b1552008e2df9b930f72eeddbff6",
   "kind": "finding",
+  "resolution_sha": "2cff0129ece133863ad4322a7ec60bd17626759b",
   "reviewed_sha": "a85556ea406e604c290a38213fa2960a7004b85a",
   "reviewer": "R5Gate",
   "round": 5,
   "schema": 1,
-  "seq": 7,
+  "seq": 4,
   "severity": "should_fix",
-  "summary": "Shape 2 walks raw tokens where it claims to skip punctuation, so `Findings : - 3` puts the value at i+3 and passes"
+  "summary": "Round 4 seq1 says `six false provenance fields` but the diff changed introduced_by in all seven rows"
 }
