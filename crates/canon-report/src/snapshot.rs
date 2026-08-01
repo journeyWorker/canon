@@ -23,9 +23,11 @@ use crate::ReportInputs;
 /// does not depend on [`crate::render`]). `mart_scope_status` (s20
 /// `task-scenario-join`, surfaced by s24 `scope-status-report`), then
 /// `mart_subjects` (s36 `subject-domain-loop`), then
-/// `mart_review_rounds` (s43 `findings-are-records`) are appended
-/// LAST, after the original five — each addition appends rather than
-/// reorders, so an existing consumer's table order never moves.
+/// `mart_review_rounds` (s43 `findings-are-records`), then
+/// `mart_review_totals` (s43 round 5 — the per-change total that makes
+/// a release note a copy) are appended LAST, after the original five —
+/// each addition appends rather than reorders, so an existing
+/// consumer's table order never moves.
 pub const SNAPSHOT_TABLES: &[&str] = &[
     "mart_trust_matrix",
     "mart_session_costs",
@@ -35,6 +37,7 @@ pub const SNAPSHOT_TABLES: &[&str] = &[
     "mart_scope_status",
     "mart_subjects",
     "mart_review_rounds",
+    "mart_review_totals",
 ];
 
 /// Escapes a path for embedding inside a single-quoted DuckDB SQL

@@ -7,12 +7,13 @@ import { NOTE as ROLE_MEMORY_NOTE } from "../src/panels/role-memory";
 import { NOTE as BURNDOWN_NOTE } from "../src/panels/review-burndown";
 import { NOTE as SESSION_COSTS_NOTE } from "../src/panels/session-costs";
 import { NOTE as REVIEW_ROUNDS_NOTE } from "../src/panels/review-rounds";
+import { NOTE as REVIEW_TOTALS_NOTE } from "../src/panels/review-totals";
 
 // End-to-end proof of task 5.6 / design.md D4: the built app instantiates
 // DuckDB-Wasm (self-hosted mvp/eh bundle + self-hosted `parquet` core
 // extension, src/duckdb-bundles.ts + src/duckdb-extensions.ts), loads this
 // package's committed fixture snapshot (fixtures/snapshot/), and renders
-// non-empty data in all five panels — while every non-localhost host is
+// non-empty data in every panel — while every non-localhost host is
 // UNREACHABLE, not merely unobserved.
 //
 // Network isolation is enforced at the browser-process level via
@@ -121,7 +122,7 @@ afterAll(async () => {
   server?.kill();
 });
 
-test("renders all 6 panels from the fixture snapshot with zero third-party network", async () => {
+test("renders all 7 panels from the fixture snapshot with zero third-party network", async () => {
   const page = await browser.newPage();
   const requestedUrls: string[] = [];
   page.on("request", (req) => requestedUrls.push(req.url()));
@@ -141,6 +142,7 @@ test("renders all 6 panels from the fixture snapshot with zero third-party netwo
     "panel-flywheel-funnel",
     "panel-review-burndown",
     "panel-review-rounds",
+    "panel-review-totals",
   ];
   for (const panelId of panelIds) {
     const rowCount = await page.$$eval(`#${panelId} tbody tr`, (rows) => rows.length);
@@ -163,12 +165,18 @@ test("renders all 6 panels from the fixture snapshot with zero third-party netwo
   // a release note gets copied FROM — a reader who sees its
   // `fix_of_fix` number without the floor caveat beside it is exactly
   // the reader this whole change exists for.
+  //
+  // s43 round 5 added review totals, which is the panel that reader
+  // will actually copy a CELL from: the caveat saying `rounds_recorded`
+  // is not rounds run has to be on the page beside the number, not one
+  // panel up.
   const annotated = [
     { panelId: "panel-session-costs", note: SESSION_COSTS_NOTE },
     { panelId: "panel-role-memory", note: ROLE_MEMORY_NOTE },
     { panelId: "panel-flywheel-funnel", note: FUNNEL_NOTE },
     { panelId: "panel-review-burndown", note: BURNDOWN_NOTE },
     { panelId: "panel-review-rounds", note: REVIEW_ROUNDS_NOTE },
+    { panelId: "panel-review-totals", note: REVIEW_TOTALS_NOTE },
   ];
   for (const { panelId, note } of annotated) {
     const noteText = await page.$eval(`#${panelId} .panel-note`, (el) => el.textContent ?? "");

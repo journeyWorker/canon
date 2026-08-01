@@ -1,8 +1,18 @@
 //! Task 2.6 acceptance (extended by s24 `scope_status`, s36
-//! `subjects`, s43 `review_rounds`): the fixture corpus
-//! (`crates/canon-report/fixtures/corpus.rs`) renders every one of the
-//! eight marts to its documented KNOWN expected values — never a "some
-//! rows came back" smoke check.
+//! `subjects`, s43 `review_rounds`/`review_totals`): the fixture
+//! corpus (`crates/canon-report/fixtures/corpus.rs`) renders every one
+//! of the nine marts to its documented KNOWN expected values — never a
+//! "some rows came back" smoke check.
+//!
+//! `mart_review_totals` is the one exception to "documented KNOWN
+//! expected values", deliberately. Its whole claim is that it equals
+//! the sum of the `mart_review_rounds` rows a reader sees, and a
+//! literal in `corpus.rs` would be a THIRD place that number lives:
+//! the view could drift, the literal could be updated to match, and
+//! the test would stay green while the total stopped being the total.
+//! So the tests below assert the RELATION against whatever the rounds
+//! mart returns, plus a non-vacuity guard so an all-zero corpus can
+//! never satisfy them.
 
 mod support;
 
@@ -456,4 +466,135 @@ fn review_rounds_never_counts_a_finding_against_itself_or_across_changes() {
     let other = row(corpus::review_rounds::OTHER_CHANGE_ID, 1);
     assert_eq!(other["introduced_by_sourced"], 1);
     assert_eq!(other["fix_of_fix"], 0, "the fix-of-fix join is scoped to one change_id; `round` orders nothing between changes");
+}
+
+/// s43 round 5, the blocker. `mart_review_totals` must be exactly the
+/// per-change sum of the `mart_review_rounds` rows the report prints
+/// above it — every column, every change in the corpus. Asserted as an
+/// INVARIANT over the two marts rather than against literals: the
+/// point of the view is that the two can never disagree, and a literal
+/// would let them disagree with each other while both matched it.
+#[test]
+fn review_totals_are_exactly_the_per_change_sum_of_the_review_rounds_rows() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let roots = inputs(dir.path()).roots;
+    let rounds = marts::fetch_review_rounds(&roots).unwrap();
+    let totals = marts::fetch_review_totals(&roots).unwrap();
+
+    let n = |row: &canon_report::query::Row, column: &str| row.get(column).and_then(|v| v.as_i64()).unwrap_or_else(|| panic!("{column} is not an integer in {row:?}"));
+
+    // Same change set, no more and no fewer: a change with rounds but
+    // no totals row would leave a release note with nothing to copy,
+    // and a totals row for a change with no rounds would be a number
+    // out of thin air.
+    let changes = |m: &canon_report::marts::MartResult| {
+        m.rows.iter().map(|r| r["change_id"].as_str().expect("change_id").to_string()).collect::<std::collections::BTreeSet<_>>()
+    };
+    assert_eq!(changes(&totals), changes(&rounds), "every change with rounds needs a totals row and vice versa");
+    assert_eq!(totals.rows.len(), changes(&totals).len(), "mart_review_totals must be one row per change_id");
+
+    // The summed columns are every numeric column the rounds mart has;
+    // listing them here rather than the three the release note happens
+    // to use is the same reasoning as `review_rounds_matches_the_
+    // fixture_corpus_exactly` asserting whole rows.
+    const SUMMED: &[&str] = &[
+        "findings",
+        "severity_blocker",
+        "severity_should_fix",
+        "severity_note",
+        "disposition_open",
+        "disposition_fixed",
+        "disposition_rejected",
+        "disposition_deferred",
+        "fix_of_fix",
+        "introduced_by_sourced",
+        "introduced_by_unsourced",
+    ];
+
+    for total in &totals.rows {
+        let change = total["change_id"].as_str().expect("change_id");
+        let mine: Vec<_> = rounds.rows.iter().filter(|r| r["change_id"].as_str() == Some(change)).collect();
+        assert!(!mine.is_empty(), "{change}: totals row with no rounds behind it");
+
+        assert_eq!(n(total, "rounds_recorded"), mine.len() as i64, "{change}: rounds_recorded must be the number of rounds that recorded a finding");
+        assert_eq!(
+            n(total, "highest_round"),
+            mine.iter().map(|r| n(r, "round")).max().unwrap(),
+            "{change}: highest_round must be the greatest round number that recorded a finding"
+        );
+        for column in SUMMED {
+            let expected: i64 = mine.iter().map(|r| n(r, column)).sum();
+            assert_eq!(n(total, column), expected, "{change}: {column} must be the sum of the per-round values");
+        }
+
+        // The identities the panel prints beside the numbers, checked
+        // on the TOTAL row: a reader who copies one cell and sanity-
+        // checks it against its neighbours must not find them
+        // inconsistent.
+        let findings = n(total, "findings");
+        assert_eq!(n(total, "severity_blocker") + n(total, "severity_should_fix") + n(total, "severity_note"), findings, "{change}: the severity split must partition findings");
+        assert_eq!(
+            n(total, "disposition_open") + n(total, "disposition_fixed") + n(total, "disposition_rejected") + n(total, "disposition_deferred"),
+            findings,
+            "{change}: the disposition split must partition findings"
+        );
+        assert_eq!(n(total, "introduced_by_sourced") + n(total, "introduced_by_unsourced"), findings, "{change}: sourced + unsourced must equal findings");
+    }
+
+    // Non-vacuity. Every assertion above holds trivially over an empty
+    // or single-round corpus, so pin that the fixture actually
+    // exercises the summing: one change spans several rounds and its
+    // total exceeds every individual round's.
+    let multi = totals
+        .rows
+        .iter()
+        .find(|t| n(t, "rounds_recorded") > 1)
+        .expect("the corpus must contain a change reviewed over more than one round, or this test proves nothing");
+    let change = multi["change_id"].as_str().unwrap();
+    let biggest_round = rounds.rows.iter().filter(|r| r["change_id"].as_str() == Some(change)).map(|r| n(r, "findings")).max().unwrap();
+    assert!(n(multi, "findings") > biggest_round, "{change}: the fixture must have a total that no single round already equals");
+}
+
+/// The second number the wrong release note typed ("four of them
+/// defects in the previous round's fix"). It is derived per round, and
+/// the per-change total has to be the sum of those and nothing else —
+/// no re-derivation, no widened scope, no re-run of the semi-join at a
+/// coarser grain that would quietly start matching across rounds it
+/// previously could not.
+#[test]
+fn the_fix_of_fix_total_is_the_sum_of_the_per_round_fix_of_fix_values() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let roots = inputs(dir.path()).roots;
+    let rounds = marts::fetch_review_rounds(&roots).unwrap();
+    let totals = marts::fetch_review_totals(&roots).unwrap();
+    let n = |row: &canon_report::query::Row, column: &str| row.get(column).and_then(|v| v.as_i64()).unwrap();
+
+    for total in &totals.rows {
+        let change = total["change_id"].as_str().unwrap();
+        let expected: i64 = rounds.rows.iter().filter(|r| r["change_id"].as_str() == Some(change)).map(|r| n(r, "fix_of_fix")).sum();
+        assert_eq!(n(total, "fix_of_fix"), expected, "{change}: the fix-of-fix total must be the sum of the per-round counts");
+        // The bound the panel states beside the number, at this grain.
+        assert!(n(total, "fix_of_fix") <= n(total, "introduced_by_sourced"), "{change}: fix_of_fix can never exceed the sourced findings it narrows");
+    }
+
+    // Non-vacuity: `0 == 0` would satisfy the loop over a corpus where
+    // the join never fires. The fixture's `s9-fixture` round 2 carries
+    // the one edge the derivation admits, so the change's total is 1 —
+    // and the OTHER change, which names a `resolution_sha` from a
+    // different change, must still total 0.
+    let total_for = |change: &str| n(totals.rows.iter().find(|t| t["change_id"].as_str() == Some(change)).unwrap(), "fix_of_fix");
+    assert_eq!(total_for(corpus::review_rounds::CHANGE_ID), 1, "the fixture's one admitted fix-of-fix edge must reach the total");
+    assert_eq!(
+        total_for(corpus::review_rounds::OTHER_CHANGE_ID),
+        0,
+        "the same-change scope must survive the roll-up: a cross-change match counts zero at every grain"
+    );
 }

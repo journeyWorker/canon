@@ -45,9 +45,13 @@
 
 ## 4. Dogfood
 
-- [x] 4.1 v0.4.0's eleven rounds are backfilled from the review — ✅ v0.4.0's rounds are backfilled from the review artifacts, with introduced_by left unset where no commit could be sourced and reviewed_sha absent for the round that reviewed an uncommitted worktree
+- [x] 4.1 v0.4.0's FINDING-BEARING rounds are backfilled from the review — ✅ rounds 8-11 transcribed; introduced_by left unset where no commit could be sourced, reviewed_sha absent for the round that reviewed an uncommitted worktree
       artifacts, with `introduced_by` set only where a commit can be
-      sourced and left `None` otherwise.
+      sourced and left `None` otherwise. Originally worded "eleven
+      rounds", which this change cannot deliver and does not: a round
+      that finds nothing writes no record, so s42's rounds 1-7 and 12
+      leave no trace and the rounds-RUN count is not derivable at all.
+      The panel states plainly what it cannot count.
 - [x] 4.2 The derived fix-of-fix count is whatever the records produce, — ✅ the fix-of-fix count is whatever the records produce, not a number carried in prose; my published `four` and my correction `two` were both wrong and the panel now states what the number means and in which directions it errs
       and the release note states what that number MEANS rather than
       asserting a total. This task originally predicted it would read

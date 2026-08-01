@@ -1,4 +1,4 @@
-//! The eight S9/S20/S24/S36/s43-owned marts (`crates/canon-store/sql/views.sql`'s
+//! The nine S9/S20/S24/S36/s43-owned marts (`crates/canon-store/sql/views.sql`'s
 //! addition" section, design D5) — one `fetch_*` per panel, each a
 //! bare `SELECT * FROM mart_x ORDER BY …` against
 //! [`crate::query::run_query`]. No aggregation happens here: every
@@ -237,4 +237,84 @@ pub const REVIEW_ROUNDS_COLUMNS: &[&str] = &[
 /// work in that commit introduced the defect.
 pub fn fetch_review_rounds(roots: &Roots) -> Result<MartResult, ReportError> {
     fetch(roots, "mart_review_rounds", "change_id, \"round\"", REVIEW_ROUNDS_COLUMNS)
+}
+
+pub const REVIEW_TOTALS_COLUMNS: &[&str] = &[
+    "change_id",
+    "rounds_recorded",
+    "highest_round",
+    "findings",
+    "severity_blocker",
+    "severity_should_fix",
+    "severity_note",
+    "disposition_open",
+    "disposition_fixed",
+    "disposition_rejected",
+    "disposition_deferred",
+    "fix_of_fix",
+    "introduced_by_sourced",
+    "introduced_by_unsourced",
+];
+
+/// `mart_review_totals` (s43 `findings-are-records`, round 5): one row
+/// per `change_id` — the per-change total of everything
+/// [`fetch_review_rounds`] reports per round. Exactly the view's own
+/// `SELECT` list, no renaming/reordering (design D1); every number is
+/// the view's.
+///
+/// s43 exists so a release narrative's issue count is DERIVED rather
+/// than typed, and `mart_review_rounds` alone did not finish the job:
+/// the per-change sentence a release note actually contains ("N
+/// findings over R rounds") still meant adding the per-round table up
+/// by hand, which is the operation that put four wrong numbers into
+/// this release line's published notes. This view is the number, so a release note is a
+/// COPY rather than a computation.
+///
+/// The view's only `FROM` is `mart_review_rounds`: every column is a
+/// `sum()`/`count(*)`/`max()` over the rows a reader is looking at,
+/// never a second aggregate over `finding_latest`. One number, one
+/// implementation — two places to compute it is how this class
+/// recurs. Nothing is summed on the Rust side either; this function
+/// selects and renders.
+///
+/// The three columns whose bare names would otherwise assert more than
+/// the query computes:
+///
+/// - `rounds_recorded` — `count(*)` over `mart_review_rounds` rows,
+///   which exist only for rounds that RECORDED a finding. A round that
+///   found nothing wrote no `Finding` and is in neither table, so this
+///   is the count of rounds that found something, never the rounds
+///   RUN — and canon cannot supply the latter from any view, since
+///   `Review` is a per-scenario attestation and no record kind marks a
+///   round as run.
+/// - `highest_round` — `max("round")` over the same rows: the greatest
+///   round NUMBER that recorded a finding. Exceeding `rounds_recorded`
+///   says some round in between recorded nothing; equality says
+///   nothing either way, because a clean round at the END of a change
+///   leaves both untouched. It is a round NUMBER, not a count, and
+///   `round` is author-supplied — neither column is the rounds-run
+///   count.
+/// - `fix_of_fix` — `sum()` of the per-round derived counts. The
+///   round view's `EXISTS` semi-join is already scoped to one
+///   `change_id`, so summing changes the grain and nothing else.
+///
+/// What that count MEANS is one sentence, stated here exactly as every
+/// other surface states it ([`crate::render::FIX_OF_FIX_MEANING`]):
+///
+/// `fix_of_fix` bounds NOTHING — not from below, not from above: it
+/// UNDER-counts, because an unsourced finding is never counted and a
+/// fix in one change that breaks something first found while reviewing
+/// a DIFFERENT change is not counted at all; it OVER-counts, because a
+/// `resolution_sha` commit may carry work BEYOND the fix and every
+/// finding recording that commit is counted regardless; and for any
+/// individual match the data cannot say whether the fix or the other
+/// work in that commit introduced the defect.
+///
+/// No column here is a claim about the change: `findings` counts what
+/// reviewers RECORDED, `severity_blocker` is the severity a reviewer
+/// TYPED, and `disposition_rejected` records that a finding was
+/// rejected rather than that it was wrong. There is no defect rate and
+/// no quality score in this view.
+pub fn fetch_review_totals(roots: &Roots) -> Result<MartResult, ReportError> {
+    fetch(roots, "mart_review_totals", "change_id", REVIEW_TOTALS_COLUMNS)
 }

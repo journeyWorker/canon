@@ -149,4 +149,29 @@ export const EXPECTED_MART_SCHEMA: Record<string, ParquetColumn[]> = {
     { name: "introduced_by_sourced", type: "BIGINT" },
     { name: "introduced_by_unsourced", type: "BIGINT" },
   ],
+  // s43 round 5: the per-change roll-up of the table above, and the
+  // only fixture table this package derives rather than hand-authors
+  // (`scripts/build-fixture-snapshot.sql`, panel 9). No `reviewed_sha`
+  // — `max()` over one round's findings is a deterministic pick, over
+  // a whole change's it would stand for nothing.
+  mart_review_totals: [
+    { name: "change_id", type: "VARCHAR" },
+    // `count(*)` over `mart_review_rounds`, which has no row for a
+    // round that found nothing: rounds RECORDED, never rounds RUN.
+    { name: "rounds_recorded", type: "BIGINT" },
+    { name: "highest_round", type: "BIGINT" },
+    { name: "findings", type: "BIGINT" },
+    { name: "severity_blocker", type: "BIGINT" },
+    { name: "severity_should_fix", type: "BIGINT" },
+    { name: "severity_note", type: "BIGINT" },
+    { name: "disposition_open", type: "BIGINT" },
+    { name: "disposition_fixed", type: "BIGINT" },
+    { name: "disposition_rejected", type: "BIGINT" },
+    { name: "disposition_deferred", type: "BIGINT" },
+    // `sum()` of a column that is itself derived by the round view's
+    // `EXISTS` semi-join. Two derivations deep, zero stored booleans.
+    { name: "fix_of_fix", type: "BIGINT" },
+    { name: "introduced_by_sourced", type: "BIGINT" },
+    { name: "introduced_by_unsourced", type: "BIGINT" },
+  ],
 };

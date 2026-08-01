@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T18:43:16.625453Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": ".canon/ledger/kind=finding",
+  "introduced_by": "ed946e958d85b1552008e2df9b930f72eeddbff6",
+  "kind": "finding",
+  "reviewed_sha": "a85556ea406e604c290a38213fa2960a7004b85a",
+  "reviewer": "R5Gate",
+  "round": 5,
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "Round 4 seq1 says `six false provenance fields` but the diff changed introduced_by in all seven rows"
+}

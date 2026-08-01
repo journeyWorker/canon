@@ -64,6 +64,7 @@ fn no_canon_gate_source_file_references_canon_report_or_its_marts() {
         "mart_flywheel_funnel",
         "mart_review_burndown",
         "mart_review_rounds",
+        "mart_review_totals",
     ];
     for path in rust_files_under(&gate_src) {
         let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));

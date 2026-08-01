@@ -353,6 +353,9 @@
 --     `disposition_fixed` — and its superseded version's absent
 --     `introduced_by` would inflate the UNSOURCED bucket the panel
 --     reports as a known unknown.
+--     `mart_review_totals` reads THIS view, never `stg_records`, so
+--     it inherits this one fold and adds no fold site of its own —
+--     which is why it appears on neither list here.
 --
 --   READ THE RAW VERSION STREAM, deliberately — never "not yet
 --   folded":
@@ -1789,3 +1792,119 @@ SELECT
 FROM rounds r
 LEFT JOIN fix_of_fix ff USING (change_id, "round")
 ORDER BY r.change_id, r."round";
+
+-- ── mart_review_totals ──────────────────────────────────────────────
+--
+-- One row per `change_id`: the per-change total of everything
+-- `mart_review_rounds` reports per round. It exists for exactly one
+-- reason. s43 shipped `mart_review_rounds` so a release narrative's
+-- issue count would be DERIVED rather than typed, and then left the
+-- deriving half-done: the per-change sentence a release note contains
+-- ("N findings over R rounds") still needed someone to add the
+-- per-round table up by hand. Hand arithmetic over a generated table is the operation that
+-- put four wrong numbers into this release line's published notes. A
+-- number worth copying has to already be a number.
+--
+-- `FROM mart_review_rounds`, never a second pass over `stg_records`.
+-- Every column here is a `sum()` (or a `count(*)`/`max()`) over the
+-- rows the reader is looking at, so the total and the rows it totals
+-- are one computation with one implementation: they cannot disagree,
+-- because there is nothing for them to disagree WITH. A parallel
+-- aggregate over `finding_latest` would have been the second place to
+-- compute one number, which is how every defect on this line
+-- recurred. That also means this view adds NO fold site: it inherits
+-- `mart_review_rounds`'s `finding_latest` fold (the inventory in this
+-- file's header) and folds nothing of its own.
+--
+-- ── `rounds_recorded` is rounds that FOUND something ─────────────────
+-- `count(*)` over `mart_review_rounds`, which has one row per
+-- `(change_id, round)` for the rounds that recorded a finding and no
+-- row for the rounds that did not: a round that found nothing wrote
+-- no `Finding`, so it is in neither table. This column therefore
+-- counts the rounds that RECORDED a finding, never the rounds RUN,
+-- and canon cannot supply the second number from any view — `Review`
+-- is a per-scenario attestation, not a round, and no record kind
+-- marks a review round as run. Naming this column `rounds` would have
+-- been the whole defect in one word.
+--
+-- `highest_round` is `max("round")` over the same rows: the greatest
+-- round NUMBER that recorded a finding. It is the only signal in the
+-- corpus that a clean round happened at all, and it is one-directional
+-- in the honest sense — `highest_round` exceeding `rounds_recorded`
+-- says some round in between recorded nothing; the two being equal
+-- says nothing either way, because a clean round at the END of a
+-- change leaves both numbers untouched. And it is a round NUMBER, not
+-- a count: it equals the rounds RUN only if a change's rounds are
+-- numbered from 1 without gaps AND its last round found something,
+-- and `round` is author-supplied, so this view requires neither.
+-- Neither column is the rounds-run count.
+--
+-- ── The splits ───────────────────────────────────────────────────────
+-- `sum()` of the per-round `count(*) FILTER` columns. `severity` and
+-- `disposition` are closed enums on `Finding`, and the per-round
+-- columns partition each round's findings, so summing them partitions
+-- the change's:
+--   severity_blocker + severity_should_fix + severity_note = findings
+--   disposition_open + fixed + rejected + deferred        = findings
+--   introduced_by_sourced + introduced_by_unsourced       = findings
+-- The dispositions are the LATEST recorded state of each finding, not
+-- a history of it — the fold underneath keeps one version per
+-- `{change_id}__{round}__{seq}`, so `disposition_open` is what is open
+-- NOW and never what was ever opened.
+--
+-- ── `fix_of_fix` ─────────────────────────────────────────────────────
+-- `sum(fix_of_fix)`. The relationship is DERIVED and nowhere stored:
+-- no `Finding` carries a fix-of-fix field, and the only place the edge
+-- exists is `mart_review_rounds`'s `EXISTS` semi-join above. Summing
+-- it per change changes the grain and nothing else, because that join
+-- is ALREADY scoped to one `change_id` — the total counts exactly the
+-- findings the rows above count, and the cross-change case is no more
+-- visible here than it is there. What the count means is the one
+-- sentence every surface reporting it states verbatim
+-- (`canon_report::render::FIX_OF_FIX_MEANING`):
+--
+--   `fix_of_fix` bounds NOTHING — not from below, not from above: it
+--   UNDER-counts, because an unsourced finding is never counted and a
+--   fix in one change that breaks something first found while
+--   reviewing a DIFFERENT change is not counted at all; it
+--   OVER-counts, because a `resolution_sha` commit may carry work
+--   BEYOND the fix and every finding recording that commit is counted
+--   regardless; and for any individual match the data cannot say
+--   whether the fix or the other work in that commit introduced the
+--   defect.
+--
+-- ── No `reviewed_sha`, and no claim about the change ─────────────────
+-- `reviewed_sha` is deliberately absent. `max()` over one round's
+-- findings is a documented deterministic pick; `max()` over a whole
+-- change's would be a hex string with no meaning at all, and a column
+-- a reader could mistake for "the commit this change was reviewed at"
+-- when no such commit is recorded.
+--
+-- Nothing this view emits is a claim about the change. `findings` is
+-- how many findings reviewers RECORDED against it, which moves with
+-- how many rounds it got and how freely its reviewers wrote findings
+-- down; `severity_blocker` is the severity a reviewer TYPED, which
+-- canon stores and never checks; `disposition_rejected` records that a
+-- finding was rejected, not that it was wrong. There is no defect
+-- rate, no quality score and no comparison between changes here — a
+-- row is one change's review HISTORY, and the denominator that would
+-- turn any of it into a rate is not in this corpus.
+CREATE OR REPLACE VIEW mart_review_totals AS
+SELECT
+    change_id,
+    CAST(count(*) AS BIGINT)                     AS rounds_recorded,
+    CAST(max("round") AS BIGINT)                 AS highest_round,
+    CAST(sum(findings) AS BIGINT)                AS findings,
+    CAST(sum(severity_blocker) AS BIGINT)        AS severity_blocker,
+    CAST(sum(severity_should_fix) AS BIGINT)     AS severity_should_fix,
+    CAST(sum(severity_note) AS BIGINT)           AS severity_note,
+    CAST(sum(disposition_open) AS BIGINT)        AS disposition_open,
+    CAST(sum(disposition_fixed) AS BIGINT)       AS disposition_fixed,
+    CAST(sum(disposition_rejected) AS BIGINT)    AS disposition_rejected,
+    CAST(sum(disposition_deferred) AS BIGINT)    AS disposition_deferred,
+    CAST(sum(fix_of_fix) AS BIGINT)              AS fix_of_fix,
+    CAST(sum(introduced_by_sourced) AS BIGINT)   AS introduced_by_sourced,
+    CAST(sum(introduced_by_unsourced) AS BIGINT) AS introduced_by_unsourced
+FROM mart_review_rounds
+GROUP BY change_id
+ORDER BY change_id;

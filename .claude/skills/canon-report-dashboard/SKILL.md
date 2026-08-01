@@ -1,14 +1,14 @@
 ---
 name: canon-report-dashboard
-description: How to run canon report (the generated-never-edited markdown status report, its --check drift gate, and its --snapshot Parquet export) and canon dashboard (the zero-network web app that renders a subset of the same numbers from a snapshot). Use when you need the current trust-matrix/session-costs/role-memory/flywheel/review-burndown/scope-status/subjects/review-rounds status of a canon-managed repo, when CI needs to gate on report drift, or when a snapshot needs regenerating for the dashboard.
+description: How to run canon report (the generated-never-edited markdown status report, its --check drift gate, and its --snapshot Parquet export) and canon dashboard (the zero-network web app that renders a subset of the same numbers from a snapshot). Use when you need the current trust-matrix/session-costs/role-memory/flywheel/review-burndown/scope-status/subjects/review-rounds/review-totals status of a canon-managed repo, when CI needs to gate on report drift, or when a snapshot needs regenerating for the dashboard.
 ---
 
 # canon-report-dashboard
 
-canon's single status surface: `canon report` renders EIGHT panels to
-markdown, `canon report --snapshot` exports the same eight marts to
+canon's single status surface: `canon report` renders NINE panels to
+markdown, `canon report --snapshot` exports the same nine marts to
 Parquet, and `canon dashboard` serves a small zero-network web app that
-renders SIX of them from such a snapshot. Neither surface computes an
+renders SEVEN of them from such a snapshot. Neither surface computes an
 aggregate itself — both read canon's precomputed
 `crates/canon-store/sql/views.sql` marts, so they can never disagree
 about a number.
@@ -36,7 +36,7 @@ drift-checked.
 
 ## `canon report [--repo <dir>]`
 
-Renders the current eight-panel report to `<repo>/.canon/REPORT.md`.
+Renders the current nine-panel report to `<repo>/.canon/REPORT.md`.
 `--repo` resolves through the nearest-`canon.yaml`-ancestor walk every
 subcommand uses — omit it (or pass `.`) to run from any subdirectory.
 
@@ -74,13 +74,14 @@ directly wherever CI already runs those.
 
 ## `canon report --snapshot <dir>`
 
-Exports all eight views to `<dir>/<table>.parquet` plus a
+Exports all nine views to `<dir>/<table>.parquet` plus a
 `<dir>/manifest.json`. One explicit `COPY` per view — the exported
 columns are each view's own `SELECT` list, wider than the curated column
 subset the markdown tables render. `file` is always
 `<table>.parquet`, and the table order is the report's own panel order,
-with `mart_scope_status`, `mart_subjects` and `mart_review_rounds`
-APPENDED last so an existing consumer's order never moves:
+with `mart_scope_status`, `mart_subjects`, `mart_review_rounds` and
+`mart_review_totals` APPENDED last so an existing consumer's order
+never moves:
 
 ```json
 {
@@ -95,7 +96,8 @@ APPENDED last so an existing consumer's order never moves:
     { "table": "mart_review_burndown", "file": "mart_review_burndown.parquet" },
     { "table": "mart_scope_status", "file": "mart_scope_status.parquet" },
     { "table": "mart_subjects", "file": "mart_subjects.parquet" },
-    { "table": "mart_review_rounds", "file": "mart_review_rounds.parquet" }
+    { "table": "mart_review_rounds", "file": "mart_review_rounds.parquet" },
+    { "table": "mart_review_totals", "file": "mart_review_totals.parquet" }
   ]
 }
 ```
@@ -132,8 +134,9 @@ canon dashboard --snapshot /tmp/canon-snap --port 8080
 - Prints the URL to open, then serves until Ctrl-C. If the app is not
   built, `canon dashboard` fails with the exact build command to run.
 
-The dashboard renders SIX panels — trust matrix, session costs, role
-memory, flywheel funnel, review burn-down, review rounds. **Scope status
+The dashboard renders SEVEN panels — trust matrix, session costs, role
+memory, flywheel funnel, review burn-down, review rounds, review totals.
+**Scope status
 and subjects are exported to the snapshot but have no dashboard panel**;
 for those two, read `.canon/REPORT.md` or query the Parquet directly.
 Do not read a missing dashboard panel as an empty mart.
@@ -143,7 +146,7 @@ The dashboard's freshness banner shows the snapshot's
 snapshot, not necessarily the live checkout" note — treat "matches
 `canon report`" as "matches the inputs that produced THIS snapshot".
 
-## Reading the eight panels
+## Reading the nine panels
 
 In `canon report`'s own render order. Each panel names the view that
 computes it; nothing here is derived a second time.
@@ -253,6 +256,41 @@ computes it; nothing here is derived a second time.
   the round's findings recorded and reads `—` when none did; a round that
   reviewed an uncommitted working tree is the usual reason, but the view
   cannot distinguish that from findings that left the field unset.
+
+- **Review totals** (`mart_review_totals`) — one row per `change_id`,
+  and every column a `sum()`, `count(*)` or `max()` over the
+  `mart_review_rounds` rows above. This is the panel a release note is
+  copied from: the per-round table left "N findings across R rounds" as
+  hand arithmetic, and hand arithmetic over a generated table is what
+  put four wrong figures into this release line's published notes, so
+  this panel exists so a release note is a COPY rather than a
+  computation. The view's only `FROM` is `mart_review_rounds`, so the
+  total and the rows it totals are one computation with one
+  implementation.
+  `rounds_recorded` is `count(*)` over those rows, and that view holds a
+  row only for a round that RECORDED a finding, so
+  this column counts the rounds that FOUND something, never the rounds RUN;
+  canon has no record kind for a review round, so the rounds-RUN number
+  is not derivable from this corpus at all. `highest_round` is
+  `max(round)`: above `rounds_recorded` it witnesses a round in between
+  that recorded nothing, and equal to it, it witnesses nothing either
+  way. Neither column is the rounds-RUN count — `highest_round` is a
+  round NUMBER, not a count, and `round` is author-supplied. The splits sum the per-round `FILTER` counts, so
+  `severity_* = findings`, `disposition_* = findings` and
+  `introduced_by_sourced + introduced_by_unsourced = findings` all hold
+  at this grain too. `fix_of_fix` is `sum(fix_of_fix)` over a column
+  nothing records, and it means exactly what it means one panel up:
+  `fix_of_fix` bounds NOTHING — not from below, not from above: it
+  UNDER-counts, because an unsourced finding is never counted and a fix in
+  one change that breaks something first found while reviewing a DIFFERENT
+  change is not counted at all; it OVER-counts, because a `resolution_sha`
+  commit may carry work BEYOND the fix and every finding recording that
+  commit is counted regardless; and for any individual match the data
+  cannot say whether the fix or the other work in that commit introduced
+  the defect.
+  There is no defect rate, no quality score and no comparison between changes here:
+  a row is one change's review history, and `findings` moves with how
+  much reviewing happened rather than with the change.
 
 Two marts in `views.sql` are NOT report panels and are not exported by
 `--snapshot`: `mart_records_by_kind` and `mart_session_run_handoff`.

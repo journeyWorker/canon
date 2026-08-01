@@ -35,10 +35,10 @@ fn report_generation_on_a_completely_fresh_repo_succeeds_with_empty_panels() {
     );
 
     assert!(content.starts_with("# canon report\n"));
-    // Every one of the eight marts has zero rows over a corpus this
+    // Every one of the nine marts has zero rows over a corpus this
     // empty — each panel renders the documented "no rows" placeholder,
     // never a missing section or a panic.
-    assert_eq!(content.matches("_No rows._").count(), 8, "all eight mart panels must render empty, not crash:\n{content}");
+    assert_eq!(content.matches("_No rows._").count(), 9, "all nine mart panels must render empty, not crash:\n{content}");
     assert!(content.contains("## Role memory\n\n"));
     assert!(content.contains("## Flywheel funnel\n\n"));
     assert!(content.contains("## Scope status\n\n"));
@@ -57,5 +57,19 @@ fn report_generation_on_a_completely_fresh_repo_succeeds_with_empty_panels() {
     assert!(
         content.contains("counts the rounds that FOUND something, never the rounds RUN"),
         "the empty review-rounds panel must still say a clean round writes no row"
+    );
+    // s43 round 5: the totals panel is the one a release note copies
+    // from, so an empty corpus must still render it with the caveat
+    // that makes its headline column safe to copy — `rounds_recorded`
+    // is rounds that recorded a finding, and zero of them is not
+    // evidence that zero rounds ran.
+    assert!(content.contains("## Review totals\n\n"));
+    assert!(
+        content.contains("this column counts the rounds that FOUND something, never the rounds RUN"),
+        "the empty review-totals panel must still say `rounds_recorded` is not the rounds run"
+    );
+    assert!(
+        content.contains(canon_report::render::FIX_OF_FIX_MEANING),
+        "the empty review-totals panel must still state the one canonical sentence verbatim"
     );
 }

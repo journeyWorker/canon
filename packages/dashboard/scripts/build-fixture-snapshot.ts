@@ -13,7 +13,7 @@
 // clearly-synthetic placeholders (not tied to any real commit or wall
 // clock) — this manifest is never drift-checked (D3), it only has to be a
 // stable, reviewable dev/test fixture. `source_digest` IS real: sha256
-// over the concatenated bytes of the eight parquet files, in table order,
+// over the concatenated bytes of the nine parquet files, in table order,
 // 12 hex chars — the same `digest12` shape
 // `crates/canon-report/src/digest.rs` uses.
 
@@ -38,6 +38,7 @@ const TABLES = [
   "mart_scope_status",
   "mart_subjects",
   "mart_review_rounds",
+  "mart_review_totals",
 ] as const;
 
 function main(): void {

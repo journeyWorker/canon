@@ -80,6 +80,7 @@ pub fn report(inputs: &ReportInputs) -> Result<String, ReportError> {
         scope_status: marts::fetch_scope_status(&inputs.roots)?,
         subjects: marts::fetch_subjects(&inputs.roots)?,
         review_rounds: marts::fetch_review_rounds(&inputs.roots)?,
+        review_totals: marts::fetch_review_totals(&inputs.roots)?,
     };
     // Design D3: `canon-report` reads `<repo_root>/canon.yaml` itself
     // (mirroring `digest::DigestHeader::compute`'s own direct

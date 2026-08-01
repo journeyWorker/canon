@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T18:43:16.685899Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/finding.rs:644-646",
+  "introduced_by": "ed946e958d85b1552008e2df9b930f72eeddbff6",
+  "kind": "finding",
+  "reviewed_sha": "a85556ea406e604c290a38213fa2960a7004b85a",
+  "reviewer": "R5Gate",
+  "round": 5,
+  "schema": 1,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "Adding `numbers` as a counting marker rejects honest numbering prose: `Finding numbers start at 1.` fails though it describes numbering, not a tally"
+}

@@ -10,6 +10,10 @@ import {
   FIX_OF_FIX_MEANING,
   NOTE as REVIEW_ROUNDS_NOTE,
 } from "../src/panels/review-rounds";
+import {
+  COLUMNS as REVIEW_TOTALS_COLUMNS,
+  NOTE as REVIEW_TOTALS_NOTE,
+} from "../src/panels/review-totals";
 
 // s42 (`close-the-open-loops`) re-review: the dashboard is a SECOND
 // surface over the same marts as `.canon/REPORT.md`, and a reader must
@@ -152,6 +156,41 @@ const SHARED_CLAIMS: Record<string, { note: string; emittedFrom: string; claims:
       "canon has no record kind for a review round",
     ],
   },
+  // s43 round 5, the blocker: `mart_review_rounds` made the per-ROUND
+  // numbers generated and left the per-CHANGE one — the number a
+  // release note actually contains — as hand arithmetic over a
+  // generated table. This panel is that number. Its claims are pinned
+  // harder than most because a total is the cell someone pastes
+  // WITHOUT reading the paragraph under it: what it counts, what it
+  // pointedly does not count, and that it is not a verdict on the
+  // change.
+  "review totals": {
+    note: REVIEW_TOTALS_NOTE,
+    emittedFrom: "REVIEW_TOTALS_PANEL",
+    claims: [
+      // One number, one implementation — the structural answer to "two
+      // places to compute one number".
+      "every column a `sum()`, `count(*)` or `max()` over the `mart_review_rounds` rows above",
+      "a release note is a COPY rather than a computation",
+      // The load-bearing caveat: a total labelled `rounds` beside a
+      // table that omits clean rounds is a wrong number waiting to be
+      // pasted.
+      "this column counts the rounds that FOUND something, never the rounds RUN",
+      "canon has no record kind for a review round",
+      "witnesses a round in between that recorded nothing, while the two being equal witnesses nothing either way",
+      // Round 6 hardening: `highest_round` is the OTHER column a
+      // reader could paste as "rounds". It is a round number, not a
+      // count, and canon does not require rounds to be numbered from 1
+      // without gaps — so it is not the rounds-run figure either.
+      "Neither column is the rounds-RUN count",
+      // The fix-of-fix total: derived, nowhere stored, and inheriting
+      // the one canonical sentence (pinned whole, below).
+      "the relationship is DERIVED, never recorded",
+      // Not a quality claim.
+      "None of these columns is a claim about the change",
+      "There is no defect rate, no quality score and no comparison between changes here",
+    ],
+  },
 };
 
 test("every panel constant this file binds to is pushed into the report", () => {
@@ -267,6 +306,7 @@ test("dashboard sources cite views.sql by view name, never by line range", () =>
     "src/panels/role-memory.ts",
     "src/panels/review-burndown.ts",
     "src/panels/review-rounds.ts",
+    "src/panels/review-totals.ts",
     "src/panels/session-costs.ts",
     "src/panels/trust-matrix.ts",
     "src/render-table.ts",
@@ -417,6 +457,7 @@ test("the dashboard's canonical sentence is byte-identical to the Rust one", () 
 
 test("the one canonical sentence is identical on every surface that reports fix_of_fix", () => {
   const fixOfFix = REVIEW_ROUNDS_COLUMNS.find((c) => c.key === "fix_of_fix");
+  const totalsFixOfFix = REVIEW_TOTALS_COLUMNS.find((c) => c.key === "fix_of_fix");
   // Rust doc comments (`///`, `//!`), SQL comments (`--`) and markdown
   // soft wraps all break the sentence across lines without changing it,
   // and a `#[command(after_help = "…")]` literal wraps with escaped
@@ -434,11 +475,14 @@ test("the one canonical sentence is identical on every surface that reports fix_
 
   const surfaces: [string, string][] = [
     ["REVIEW_ROUNDS_PANEL", EMITTED_PANELS.get("REVIEW_ROUNDS_PANEL") ?? ""],
+    ["REVIEW_TOTALS_PANEL", EMITTED_PANELS.get("REVIEW_TOTALS_PANEL") ?? ""],
     ["dashboard NOTE", REVIEW_ROUNDS_NOTE],
+    ["dashboard totals NOTE", REVIEW_TOTALS_NOTE],
     // The tooltip renders literally, so it carries the sentence with
     // its backticks stripped — derived from the constant in the panel
     // module, never retyped.
     ["fix_of_fix tooltip", (fixOfFix?.description ?? "").replaceAll("`", "")],
+    ["fix_of_fix totals tooltip", (totalsFixOfFix?.description ?? "").replaceAll("`", "")],
     [SKILL_SOURCE, SKILL_MD],
     ["crates/canon-report/src/marts.rs", readFileSync(join(REPO_ROOT, "crates/canon-report/src/marts.rs"), "utf-8")],
     ["crates/canon-store/sql/views.sql", readFileSync(join(REPO_ROOT, "crates/canon-store/sql/views.sql"), "utf-8")],
@@ -447,7 +491,7 @@ test("the one canonical sentence is identical on every surface that reports fix_
     ["crates/canon-cli/src/finding.rs", readFileSync(join(REPO_ROOT, "crates/canon-cli/src/finding.rs"), "utf-8")],
   ];
   for (const [where, text] of surfaces) {
-    const carries = prose(text).includes(where === "fix_of_fix tooltip" ? expected.replaceAll("`", "") : expected);
+    const carries = prose(text).includes(where.endsWith("tooltip") ? expected.replaceAll("`", "") : expected);
     expect({ where, carries }).toEqual({ where, carries: true });
   }
 });
@@ -467,7 +511,7 @@ test("index.html's panel captions are bare view names, never claims", () => {
   // renders and the tests above pin against the report.
   const html = readFileSync(join(new URL("..", import.meta.url).pathname, "index.html"), "utf-8");
   const captions = [...html.matchAll(/<p class="panel-source">([\s\S]*?)<\/p>/g)].map(([, text]) => text.trim());
-  expect(captions.length).toBe(6);
+  expect(captions.length).toBe(7);
   for (const caption of captions) {
     expect({ caption, isBareTable: SNAPSHOT_TABLES.includes(caption) }).toEqual({ caption, isBareTable: true });
   }
@@ -485,6 +529,91 @@ test("the review rounds panel says a round that found nothing has no row", () =>
   ] as [string, string][]) {
     expect({ where, states: text.includes("counts the rounds that FOUND something, never the rounds RUN") }).toEqual({ where, states: true });
     expect({ where, states: text.includes("canon has no record kind for a review round") }).toEqual({ where, states: true });
+  }
+});
+
+test("the review totals panel says every number is a sum of the rows above, with no second implementation", () => {
+  // The blocker s43 round 5 raised: `mart_review_rounds` alone left
+  // "N findings across R rounds" as hand arithmetic over a generated
+  // table, which is the operation that produced the wrong published
+  // figures in the first place. The fix is only a fix if the reader can
+  // see that the total and the rows are one computation.
+  expect(REVIEW_TOTALS_NOTE).toContain("cannot disagree");
+  const query = readFileSync(join(new URL("..", import.meta.url).pathname, "src/panels/review-totals.ts"), "utf-8");
+  // The panel is a thin SELECT. Any arithmetic in TypeScript here would
+  // be the second place the number lives — the exact recurrence
+  // mechanism this change exists to close.
+  expect(query).toContain("FROM mart_review_totals");
+  expect(query).not.toMatch(/reduce\(|\+=|Math\.max/);
+});
+
+test("the review totals panel never labels rounds_recorded as rounds run", () => {
+  // A total labelled `rounds` beside a table that omits clean rounds is
+  // a wrong number waiting to be pasted into a release note. The column
+  // name carries the denial, the label repeats it, and the description
+  // says canon cannot supply the other number at all.
+  const recorded = REVIEW_TOTALS_COLUMNS.find((c) => c.key === "rounds_recorded");
+  expect(recorded).toBeDefined();
+  expect(REVIEW_TOTALS_COLUMNS.some((c) => c.key === "rounds")).toBe(false);
+  expect(recorded?.label).toContain("never rounds run");
+  expect(recorded?.description).toContain("never the rounds run");
+  expect(recorded?.description).toContain("canon has no record kind for a review round");
+  // The gap column reads in one direction only.
+  const highest = REVIEW_TOTALS_COLUMNS.find((c) => c.key === "highest_round");
+  expect(highest?.description).toContain("witnesses a round in between that recorded nothing");
+  expect(highest?.description).toContain("witnesses nothing either way");
+  expect(highest?.description).toContain("Neither column is the rounds-run count");
+  expect(highest?.description).toContain("a round NUMBER rather than a count");
+});
+
+test("the review totals panel refuses to read as a verdict on the change", () => {
+  // A per-change total is the shape most readily misread as a defect
+  // count. Nine surfaces on this line shipped a claim their query did
+  // not compute; this one says outright which claim it is not making.
+  expect(REVIEW_TOTALS_NOTE).toContain("None of these columns is a claim about the change");
+  const findings = REVIEW_TOTALS_COLUMNS.find((c) => c.key === "findings");
+  expect(findings?.label).toContain("not a defect count");
+  expect(findings?.description).toContain("a record of the review, not a measure of the change");
+  const rejected = REVIEW_TOTALS_COLUMNS.find((c) => c.key === "disposition_rejected");
+  expect(rejected?.description).toContain("not that it was wrong");
+});
+
+test("the review totals panel is neither causal nor directional, on either surface", () => {
+  // Same two bans the rounds panel carries — the totals panel makes the
+  // same claims at a coarser grain, and a coarser number is the one
+  // more likely to be quoted alone.
+  const causal = ["caused", "proves", "produced", "resulted in", "led to", "drove", "demonstrates that"];
+  const directional = [
+    "floor",
+    "lower bound",
+    "lower-bound",
+    "bounds from below",
+    "minimum",
+    "at least",
+    "no fewer than",
+    "conservative",
+    "understates",
+    "underestimate",
+    "under-estimate",
+    "upper bound",
+    "ceiling",
+    "at most",
+    "no more than",
+    "overstates",
+  ];
+  const fixOfFix = REVIEW_TOTALS_COLUMNS.find((c) => c.key === "fix_of_fix");
+  expect(fixOfFix?.label).toContain("not a bound");
+  const surfaces: [string, string][] = [
+    ["totals NOTE", REVIEW_TOTALS_NOTE],
+    ["totals fix_of_fix label", fixOfFix?.label ?? ""],
+    ["totals fix_of_fix description", fixOfFix?.description ?? ""],
+    ["REVIEW_TOTALS_PANEL", EMITTED_PANELS.get("REVIEW_TOTALS_PANEL") ?? ""],
+  ];
+  for (const [where, text] of surfaces) {
+    const haystack = ` ${text.toLowerCase()}`;
+    for (const phrase of [...causal, ...directional]) {
+      expect({ where, phrase, present: haystack.includes(` ${phrase}`) }).toEqual({ where, phrase, present: false });
+    }
   }
 });
 
@@ -635,6 +764,18 @@ const SKILL_CLAIMS: Record<string, string[]> = {
     "`introduced_by_unsourced` is the UNKNOWN bucket",
     "cannot be attributed either way",
     "counts the rounds that FOUND something, never the rounds RUN",
+  ],
+  // s43 round 5. The skill is the surface an agent reads to LEARN what
+  // the report says, and this is the panel a release note gets copied
+  // from — so the two corrections that make the copy safe (the total's
+  // source, and what `rounds_recorded` is not) have to reach it. The
+  // canonical fix-of-fix sentence is pinned whole on this surface by
+  // the block above, not clause-wise here.
+  "Review totals": [
+    "every column a `sum()`, `count(*)` or `max()` over the `mart_review_rounds` rows above",
+    "a release note is a COPY rather than a computation",
+    "this column counts the rounds that FOUND something, never the rounds RUN",
+    "There is no defect rate, no quality score and no comparison between changes here",
   ],
 };
 

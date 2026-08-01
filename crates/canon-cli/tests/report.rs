@@ -86,7 +86,7 @@ fn check_exit_codes_track_missing_no_drift_and_drift_across_the_full_lifecycle()
 }
 
 #[test]
-fn snapshot_writes_eight_parquet_files_and_a_manifest_under_the_given_dir() {
+fn snapshot_writes_nine_parquet_files_and_a_manifest_under_the_given_dir() {
     if !duckdb_available() {
         eprintln!("skipping: `duckdb` CLI not found on PATH");
         return;
@@ -97,12 +97,13 @@ fn snapshot_writes_eight_parquet_files_and_a_manifest_under_the_given_dir() {
     let output = run_canon(&["report", "--repo", ".", "--snapshot", snapshot_dir.to_str().unwrap()], dir.path());
 
     assert!(output.status.success(), "canon report --snapshot must exit 0; stderr: {}", stderr(&output));
-    assert!(stdout(&output).contains("8 table(s)"), "{}", stdout(&output));
+    assert!(stdout(&output).contains("9 table(s)"), "{}", stdout(&output));
 
     // s36 `subject-domain-loop`: `mart_subjects` is exported after
     // `mart_scope_status`; s43 `findings-are-records` appends
-    // `mart_review_rounds` LAST (`canon-report`'s `SNAPSHOT_TABLES`
-    // order — every addition appends rather than reorders).
+    // `mart_review_rounds` and then s43 round 5 `mart_review_totals`
+    // LAST (`canon-report`'s `SNAPSHOT_TABLES` order — every addition
+    // appends rather than reorders).
     for table in [
         "mart_trust_matrix",
         "mart_session_costs",
@@ -112,13 +113,14 @@ fn snapshot_writes_eight_parquet_files_and_a_manifest_under_the_given_dir() {
         "mart_scope_status",
         "mart_subjects",
         "mart_review_rounds",
+        "mart_review_totals",
     ] {
         assert!(snapshot_dir.join(format!("{table}.parquet")).is_file(), "missing {table}.parquet");
     }
     let manifest_path = snapshot_dir.join("manifest.json");
     assert!(manifest_path.is_file());
     let manifest: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&manifest_path).unwrap()).unwrap();
-    assert_eq!(manifest["tables"].as_array().unwrap().len(), 8);
+    assert_eq!(manifest["tables"].as_array().unwrap().len(), 9);
 
     // `--snapshot` never wrote/touched `.canon/REPORT.md` — it is a
     // distinct action from the default write mode.

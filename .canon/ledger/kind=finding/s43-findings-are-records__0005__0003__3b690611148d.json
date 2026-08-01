@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T18:43:16.567067Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": ".canon/ledger/kind=finding",
+  "introduced_by": "ed946e958d85b1552008e2df9b930f72eeddbff6",
+  "kind": "finding",
+  "reviewed_sha": "a85556ea406e604c290a38213fa2960a7004b85a",
+  "reviewer": "R5Gate",
+  "round": 5,
+  "schema": 1,
+  "seq": 3,
+  "severity": "blocker",
+  "summary": "Round 3 seq1's introduced_by is wrong for the third time: the overlay/digest gap predates s43 entirely - porting.coverage fed mart_scope_status and the digest hashed only core kinds from the initial public history"
+}

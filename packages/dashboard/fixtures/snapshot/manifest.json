@@ -1,7 +1,7 @@
 {
   "generated_at": "2026-07-11T00:00:00Z",
   "source_git_sha": "fixture0000",
-  "source_digest": "ccca47ccc895",
+  "source_digest": "f40ed7e04c40",
   "tables": [
     {
       "table": "mart_trust_matrix",
@@ -34,6 +34,10 @@
     {
       "table": "mart_review_rounds",
       "file": "mart_review_rounds.parquet"
+    },
+    {
+      "table": "mart_review_totals",
+      "file": "mart_review_totals.parquet"
     }
   ]
 }

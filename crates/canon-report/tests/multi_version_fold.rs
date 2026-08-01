@@ -1185,4 +1185,22 @@ fn review_rounds_counts_a_refixed_finding_once_at_its_latest_disposition() {
     // The edge still resolves: `fix_of_fix` reads the FOLDED winner's
     // `resolution_sha`, which only the latest version carries.
     assert_eq!(row(2)["fix_of_fix"], 1, "the fix-of-fix join must see the folded winner's resolution_sha");
+
+    // s43 round 5: the fold has to survive the roll-up. `mart_review_
+    // totals` reads `mart_review_rounds` and nothing else, so a total
+    // that counted the superseded version would mean the total stopped
+    // being the sum of the rows a reader sees — the exact failure a
+    // second aggregate over `finding_latest` would have introduced.
+    let totals = marts::fetch_review_totals(&roots).unwrap();
+    assert_eq!(totals.rows.len(), 1, "one change, one totals row: {:?}", totals.rows);
+    let total = &totals.rows[0];
+    assert_eq!(total["rounds_recorded"], 2, "two rounds recorded a finding; the three WRITES are not three rounds");
+    assert_eq!(total["findings"], 2, "two findings across two rounds — never three, which is the version count");
+    // Round 2's live finding is the only open one. The superseded
+    // round-1 `open` version would make this 2 — that is the number
+    // the fold is keeping out of the total.
+    assert_eq!(total["disposition_open"], 1, "the superseded `open` version must not reach the total either");
+    assert_eq!(total["disposition_fixed"], 1);
+    assert_eq!(total["fix_of_fix"], 1, "the derived edge must reach the per-change total exactly once");
+    assert_eq!(total["introduced_by_unsourced"], 1, "one unsourced finding, folded once, counted once");
 }

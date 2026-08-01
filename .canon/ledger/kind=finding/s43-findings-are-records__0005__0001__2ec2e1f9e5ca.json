@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T18:43:16.444829Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "openspec/changes/s43-findings-are-records/proposal.md:53-58",
+  "introduced_by": "aa9a4552c069bee5db982abe399e4a1341007e78",
+  "kind": "finding",
+  "reviewed_sha": "a85556ea406e604c290a38213fa2960a7004b85a",
+  "reviewer": "R5Gate",
+  "round": 5,
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "s43 does not deliver its own premise: mart_review_rounds emits only per-round rows, so writing a release note still requires summing 2+11+7+5 by hand - the exact arithmetic that produced four wrong published numbers"
+}

@@ -1,5 +1,5 @@
--- Builds packages/dashboard's canonical fixture snapshot: eight small, hand-
--- authored tables whose column NAME + ORDER + TYPE match
+-- Builds packages/dashboard's canonical fixture snapshot: nine small tables
+-- (eight hand-authored, one DERIVED — see panel 9) whose column NAME + ORDER + TYPE match
 -- crates/canon-store/sql/views.sql's mart_* SELECT lists exactly (S9
 -- SHARED SNAPSHOT CONTRACT). Each is exported with the same
 -- `COPY "<table>" TO '<table>.parquet' (FORMAT parquet)` shape
@@ -123,20 +123,58 @@ SELECT * FROM (
 --              introducing commit beside sourced-but-unmatched ones and
 --              unsourced ones. This is the row that separates "matched" from
 --              "sourced".
---   add-json-export round 3 — sourced 0, unsourced 4: an ALL-UNKNOWN round.
+--   add-json-export round 4 — sourced 0, unsourced 4: an ALL-UNKNOWN round.
 --              fix_of_fix 0 here means "canon does not know", never "no
 --              fix-of-fix happened", which is the first of the two
 --              UNDER-counts the panel's canonical sentence names.
 -- fix-retry-backoff round 1 is a second change, so the table also shows the
 -- per-change grain the fix-of-fix scope depends on.
+--
+-- add-json-export jumps from round 2 to round 4 ON PURPOSE. Round 3 returned
+-- MERGEABLE with zero findings, wrote no `Finding`, and so has no row — the
+-- live phenomenon both review panels describe (s42's round 12). Without the
+-- gap the fixture would render `highest_round` equal to `rounds_recorded` on
+-- every row, and the totals panel's claim that a gap witnesses a silent round
+-- would be a sentence the dashboard never demonstrates.
 CREATE OR REPLACE TABLE mart_review_rounds AS
 SELECT * FROM (
     VALUES
         ('add-json-export',   1::BIGINT, 'f438c610d9b4a71e0c53e2b8a19d7c46f0b3e185', 5::BIGINT, 1::BIGINT, 2::BIGINT, 2::BIGINT, 0::BIGINT, 4::BIGINT, 1::BIGINT, 0::BIGINT, 0::BIGINT, 5::BIGINT, 0::BIGINT),
         ('add-json-export',   2::BIGINT, CAST(NULL AS VARCHAR),                      6::BIGINT, 2::BIGINT, 1::BIGINT, 3::BIGINT, 1::BIGINT, 4::BIGINT, 0::BIGINT, 1::BIGINT, 1::BIGINT, 3::BIGINT, 3::BIGINT),
-        ('add-json-export',   3::BIGINT, CAST(NULL AS VARCHAR),                      4::BIGINT, 0::BIGINT, 1::BIGINT, 3::BIGINT, 2::BIGINT, 1::BIGINT, 0::BIGINT, 1::BIGINT, 0::BIGINT, 0::BIGINT, 4::BIGINT),
+        ('add-json-export',   4::BIGINT, CAST(NULL AS VARCHAR),                      4::BIGINT, 0::BIGINT, 1::BIGINT, 3::BIGINT, 2::BIGINT, 1::BIGINT, 0::BIGINT, 1::BIGINT, 0::BIGINT, 0::BIGINT, 4::BIGINT),
         ('fix-retry-backoff', 1::BIGINT, '9c1d0a7b4e6f28315d0ab9c7e4f1268a35bd90c2', 3::BIGINT, 1::BIGINT, 1::BIGINT, 1::BIGINT, 0::BIGINT, 3::BIGINT, 0::BIGINT, 0::BIGINT, 1::BIGINT, 2::BIGINT, 1::BIGINT)
 ) AS t(change_id, "round", reviewed_sha, findings, severity_blocker, severity_should_fix, severity_note, disposition_open, disposition_fixed, disposition_rejected, disposition_deferred, fix_of_fix, introduced_by_sourced, introduced_by_unsourced);
+
+-- Panel 9: mart_review_totals (crates/canon-store/sql/views.sql, s43
+-- findings-are-records round 5). The per-change total a release note copies
+-- instead of adding the rows above up by hand.
+--
+-- The ONLY table in this file that is not hand-authored, and deliberately so.
+-- The real view's whole claim is that every column is a sum over
+-- mart_review_rounds; a hand-typed VALUES list here would be a SECOND place
+-- the same number lives, which is the defect class the view exists to remove
+-- — the fixture would then be able to show a total that disagrees with the
+-- rows beside it, in a dashboard whose caveats say that cannot happen. So the
+-- statement below is the real view's own body, over the fixture rows above.
+CREATE OR REPLACE TABLE mart_review_totals AS
+SELECT
+    change_id,
+    CAST(count(*) AS BIGINT)                     AS rounds_recorded,
+    CAST(max("round") AS BIGINT)                 AS highest_round,
+    CAST(sum(findings) AS BIGINT)                AS findings,
+    CAST(sum(severity_blocker) AS BIGINT)        AS severity_blocker,
+    CAST(sum(severity_should_fix) AS BIGINT)     AS severity_should_fix,
+    CAST(sum(severity_note) AS BIGINT)           AS severity_note,
+    CAST(sum(disposition_open) AS BIGINT)        AS disposition_open,
+    CAST(sum(disposition_fixed) AS BIGINT)       AS disposition_fixed,
+    CAST(sum(disposition_rejected) AS BIGINT)    AS disposition_rejected,
+    CAST(sum(disposition_deferred) AS BIGINT)    AS disposition_deferred,
+    CAST(sum(fix_of_fix) AS BIGINT)              AS fix_of_fix,
+    CAST(sum(introduced_by_sourced) AS BIGINT)   AS introduced_by_sourced,
+    CAST(sum(introduced_by_unsourced) AS BIGINT) AS introduced_by_unsourced
+FROM mart_review_rounds
+GROUP BY change_id
+ORDER BY change_id;
 
 COPY "mart_trust_matrix"    TO 'fixtures/snapshot/mart_trust_matrix.parquet'    (FORMAT parquet);
 COPY "mart_session_costs"   TO 'fixtures/snapshot/mart_session_costs.parquet'   (FORMAT parquet);
@@ -146,3 +184,4 @@ COPY "mart_review_burndown" TO 'fixtures/snapshot/mart_review_burndown.parquet' 
 COPY "mart_scope_status"    TO 'fixtures/snapshot/mart_scope_status.parquet'    (FORMAT parquet);
 COPY "mart_subjects"        TO 'fixtures/snapshot/mart_subjects.parquet'        (FORMAT parquet);
 COPY "mart_review_rounds"   TO 'fixtures/snapshot/mart_review_rounds.parquet'   (FORMAT parquet);
+COPY "mart_review_totals"   TO 'fixtures/snapshot/mart_review_totals.parquet'   (FORMAT parquet);
