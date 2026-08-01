@@ -3,17 +3,18 @@
     "agent_id": "canon",
     "role": "reviewer"
   },
-  "at": "2026-08-01T17:36:39.444615Z",
+  "at": "2026-08-01T17:58:40.397107Z",
   "change_id": "s43-findings-are-records",
-  "disposition": "open",
+  "disposition": "fixed",
   "file_ref": ".canon/ledger/kind=finding",
   "introduced_by": "aa9a4552c069bee5db982abe399e4a1341007e78",
   "kind": "finding",
+  "resolution_sha": "e3c0860172352d284bb28bc6220edf8e7bad71e5",
   "reviewed_sha": "c8c67469f7cb2ffd5eaed16a4499f28feaaee286",
   "reviewer": "R3Honest",
   "round": 3,
   "schema": 1,
-  "seq": 7,
-  "severity": "should_fix",
-  "summary": "Round 2 finding 11 says 44 authored records sat untracked; the corpus is 43 and the 44th changed file was .gitignore - a commit file count typed into a permanent record about hand-typed numbers"
+  "seq": 6,
+  "severity": "blocker",
+  "summary": "Round 2 findings 9 and 11 record fea1bc8b as resolution_sha, but neither correction lands there - both first enter git in c8c67469"
 }
