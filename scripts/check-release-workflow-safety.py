@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -258,6 +259,37 @@ def main() -> int:
         check(
             found == workspace_version,
             f"version drift in {rel}: package.json={found!r} vs Cargo.toml [workspace.package]={workspace_version!r}",
+        )
+
+    # 7. Repo-root hygiene. An agent-authored patch fragment landed at the
+    #    repo root in s43 round 7 and was committed by a `git add -A`: a file
+    #    literally named `ord.split(.-.).all(digits),|true => ...`. Nothing
+    #    caught it — not the gate, not this checker, not any test — and it
+    #    would have shipped in the v0.5.0 source archive. The root is a small,
+    #    slow-moving set, so an allow-list is cheap and the failure is loud.
+    #    A NEW legitimate root file is one line here; a stray one is a red
+    #    build.
+    allowed_root = {
+        ".gitignore",
+        "Cargo.lock",
+        "Cargo.toml",
+        "README.md",
+        "bun.lock",
+        "canon.yaml",
+        "docker-compose.yml",
+        "package.json",
+    }
+    tracked_root = {
+        line
+        for line in subprocess.run(
+            ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=False
+        ).stdout.splitlines()
+        if line and "/" not in line
+    }
+    for stray in sorted(tracked_root - allowed_root):
+        ERRORS.append(
+            f"unexpected tracked file at the repo root: {stray!r} — "
+            "delete it, or add it to `allowed_root` if it is genuinely part of the repo"
         )
 
     if ERRORS:

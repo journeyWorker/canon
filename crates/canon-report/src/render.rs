@@ -232,7 +232,7 @@ pub const REVIEW_ROUNDS_PANEL: &str = "Findings per review round (`mart_review_r
 ///
 ///   Direction-neutral, because this string is read on two surfaces
 ///   whose digest order is opposite: `report()` digests then pins,
-///   [`crate::snapshot::write`] pins then digests, and
+///   [`crate::snapshot::snapshot`] pins then digests, and
 ///   `packages/dashboard` renders a snapshot. Naming only the
 ///   report's order would put a fresh false sentence on the other.
 /// - "`rounds_recorded` … counts the rounds that FOUND something,

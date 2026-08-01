@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T21:09:16.818149Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "ord.split(.-.).all(digits)",
+  "introduced_by": "980b2e6ac9288a77ddb235dc5a7d76acd439450a",
+  "kind": "finding",
+  "reviewed_sha": "1897e7dfaf4de0e226b9a5f7914e5808629dc0ac",
+  "reviewer": "R8Gate",
+  "round": 8,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "A patch fragment named `ord.split(.-.).all(digits),|true => ...` was committed at the repo root by a git add -A and would have shipped in the v0.5.0 source archive; nothing caught it - not the gate, not the release checker, not any test"
+}
