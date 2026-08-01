@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T18:09:03.745695Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": ".canon/ledger/kind=finding",
+  "introduced_by": "e3c0860172352d284bb28bc6220edf8e7bad71e5",
+  "kind": "finding",
+  "reviewed_sha": "e3c0860172352d284bb28bc6220edf8e7bad71e5",
+  "reviewer": "R4Final",
+  "round": 4,
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "All seven round-3 rows record introduced_by aa9a4552, but git proves seq1-5 were introduced by fea1bc8b and seq6-7 by c8c67469 - six false provenance fields in the corpus this change exists to make authoritative"
+}

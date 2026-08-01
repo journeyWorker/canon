@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T18:09:03.795194Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/finding.rs:571-580",
+  "introduced_by": "e3c0860172352d284bb28bc6220edf8e7bad71e5",
+  "kind": "finding",
+  "reviewed_sha": "e3c0860172352d284bb28bc6220edf8e7bad71e5",
+  "reviewer": "R4Final",
+  "round": 4,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "The count guard is directional: shape 1 only looks for a noun AFTER a quantity and shape 2 only for a value AFTER a counting word, so `Findings: 3` and `Findings: 3 total.` ship green"
+}

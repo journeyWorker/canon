@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T18:09:03.938145Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/finding.rs",
+  "introduced_by": "e3c0860172352d284bb28bc6220edf8e7bad71e5",
+  "kind": "finding",
+  "reviewed_sha": "e3c0860172352d284bb28bc6220edf8e7bad71e5",
+  "reviewer": "Main",
+  "round": 4,
+  "schema": 1,
+  "seq": 5,
+  "severity": "note",
+  "summary": "The round-3 commit message says its seven findings are `four defects round 2 introduced; three wrong facts I typed`, which omits seq1 and counts three wrong FIELDS as three findings - the fourth hand-typed miscount on this line, written while fixing the third"
+}

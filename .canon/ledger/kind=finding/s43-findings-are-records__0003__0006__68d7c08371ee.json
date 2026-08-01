@@ -3,11 +3,11 @@
     "agent_id": "canon",
     "role": "reviewer"
   },
-  "at": "2026-08-01T17:58:40.397107Z",
+  "at": "2026-08-01T18:07:15.730735Z",
   "change_id": "s43-findings-are-records",
   "disposition": "fixed",
   "file_ref": ".canon/ledger/kind=finding",
-  "introduced_by": "aa9a4552c069bee5db982abe399e4a1341007e78",
+  "introduced_by": "c8c67469f7cb2ffd5eaed16a4499f28feaaee286",
   "kind": "finding",
   "resolution_sha": "e3c0860172352d284bb28bc6220edf8e7bad71e5",
   "reviewed_sha": "c8c67469f7cb2ffd5eaed16a4499f28feaaee286",

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T18:09:03.839976Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/finding.rs:571-580",
+  "introduced_by": "e3c0860172352d284bb28bc6220edf8e7bad71e5",
+  "kind": "finding",
+  "reviewed_sha": "e3c0860172352d284bb28bc6220edf8e7bad71e5",
+  "reviewer": "R4Final",
+  "round": 4,
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "The same window logic rejects honest prose: `The finding count excludes round 3.` and `Round 3 review findings are recorded here.` both match, though a number after a singular noun is an index"
+}
