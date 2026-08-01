@@ -271,18 +271,17 @@ pub fn validate_body(kind: RecordKind, raw: &RawRecord) -> Result<(), EvidenceVi
         // scenario_id-grammar + verdict-enum checks a second time.
         RecordKind::EvidenceRecord => canon_model::validate_evidence(raw).map(|_| ()),
         RecordKind::Subject => try_deserialize!(Subject),
-        // s43: the concrete `Deserialize` cannot express `Finding`'s
-        // cross-field `disposition` ⇔ `resolution_sha` biconditional
-        // (canon-model keeps `resolution_sha` a FLAT field so the
-        // fix-of-fix join reads it top-level, rather than folding it
-        // into a `Fixed { .. }` variant), so the read path re-checks it
-        // here — an incoherent hand-authored record is `malformed`,
-        // never a fix nobody can name a closing commit for.
-        RecordKind::Finding => {
-            let finding = serde_json::from_value::<Finding>(raw.0.clone())
-                .map_err(|e| EvidenceViolation::new(FailureClass::Malformed, "<candidate>", e.to_string()))?;
-            finding.check_coherence()
-        }
+        // s43: the `disposition` ⇔ `resolution_sha` biconditional is
+        // enforced by `Finding`'s OWN `Deserialize` (canon-model keeps
+        // `resolution_sha` a FLAT field so the fix-of-fix join reads it
+        // top-level, rather than folding it into a `Fixed { .. }`
+        // variant, so the pair is checked rather than made
+        // unrepresentable). `from_body` is that same check with the
+        // STRUCTURED violation kept: an incoherent hand-authored record
+        // is `malformed` against `resolution_sha` BY NAME, never a
+        // generic deserialize-failed string, and never a fix nobody can
+        // name a closing commit for.
+        RecordKind::Finding => Finding::from_body(&raw.0).map(|_| ()),
     }
 }
 

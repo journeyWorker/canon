@@ -51,8 +51,8 @@ fn report_generation_on_a_completely_fresh_repo_succeeds_with_empty_panels() {
     // which is the one reading a corpus this empty.
     assert!(content.contains("## Review rounds\n\n"));
     assert!(
-        content.contains("`fix_of_fix` therefore bounds NOTHING — not from below, not from above"),
-        "the empty review-rounds panel must still refuse the bound in both directions"
+        content.contains(canon_report::render::FIX_OF_FIX_MEANING),
+        "the empty review-rounds panel must still state the one canonical sentence verbatim"
     );
     assert!(
         content.contains("counts the rounds that FOUND something, never the rounds RUN"),

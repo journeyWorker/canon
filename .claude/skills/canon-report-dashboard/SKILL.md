@@ -236,14 +236,19 @@ computes it; nothing here is derived a second time.
   `introduced_by_unsourced` is the UNKNOWN bucket —
   a finding with no sourced `introduced_by` is counted there and NEVER as
   not-a-fix-of-fix.
-  `fix_of_fix` therefore bounds NOTHING — not from below, not from above.
-  It misses: unsourced findings, and a fix in one change that breaks
-  something first found while reviewing a DIFFERENT change. It also
-  over-counts, because
-  a `resolution_sha` commit may carry work BEYOND the fix,
-  and then every finding recording that commit matches regardless —
+  What the count MEANS is one sentence, and every surface that reports it
+  states this sentence and no paraphrase of it:
+  `fix_of_fix` bounds NOTHING — not from below, not from above: it
+  UNDER-counts, because an unsourced finding is never counted and a fix in
+  one change that breaks something first found while reviewing a DIFFERENT
+  change is not counted at all; it OVER-counts, because a `resolution_sha`
+  commit may carry work BEYOND the fix and every finding recording that
+  commit is counted regardless; and for any individual match the data
+  cannot say whether the fix or the other work in that commit introduced
+  the defect.
+  Both directions are live in canon's own rows —
   `f438c610` closed s42's round 8 AND shipped s42's whole feature, so
-  round 9's six matches are a commit-id coincidence.
+  round 9's six matches cannot be attributed either way.
   `reviewed_sha` is the greatest value any of
   the round's findings recorded and reads `—` when none did; a round that
   reviewed an uncommitted working tree is the usual reason, but the view

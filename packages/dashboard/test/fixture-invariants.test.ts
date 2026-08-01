@@ -173,8 +173,8 @@ test("mart_review_rounds fixture rows satisfy the arithmetic the panel asserts",
     // does not.
     expect({ label, sum: row.introduced_by_sourced + row.introduced_by_unsourced }).toEqual({ label, sum: row.findings });
     // `fix_of_fix` is the sourced set NARROWED by the join, so it can
-    // never exceed it. A fixture where it did would make the panel's
-    // "floor" claim incoherent.
+    // never exceed it. A fixture where it did would contradict the
+    // arithmetic the panel states beside its canonical sentence.
     expect(row.fix_of_fix).toBeLessThanOrEqual(row.introduced_by_sourced);
   }
 });

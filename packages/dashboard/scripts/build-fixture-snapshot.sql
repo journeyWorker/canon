@@ -125,8 +125,8 @@ SELECT * FROM (
 --              "sourced".
 --   add-json-export round 3 — sourced 0, unsourced 4: an ALL-UNKNOWN round.
 --              fix_of_fix 0 here means "canon does not know", never "no
---              fix-of-fix happened", which is exactly the floor the panel
---              documents.
+--              fix-of-fix happened", which is the first of the two
+--              UNDER-counts the panel's canonical sentence names.
 -- fix-retry-backoff round 1 is a second change, so the table also shows the
 -- per-change grain the fix-of-fix scope depends on.
 CREATE OR REPLACE TABLE mart_review_rounds AS

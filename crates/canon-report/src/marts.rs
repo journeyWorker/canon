@@ -219,8 +219,22 @@ pub const REVIEW_ROUNDS_COLUMNS: &[&str] = &[
 ///   such a finding is never counted as NOT-a-fix-of-fix; it is
 ///   counted as unknown, here. `introduced_by_sourced +
 ///   introduced_by_unsourced = findings` and `fix_of_fix <=
-///   introduced_by_sourced`, which is what makes `fix_of_fix` a
-///   readable FLOOR rather than a total.
+///   introduced_by_sourced`, both by construction, so the size of the
+///   unknown is readable against the count.
+///
+/// What that count MEANS is one sentence, stated here exactly as every
+/// other surface states it ([`crate::render::FIX_OF_FIX_MEANING`],
+/// whose own doc records what each surface used to say instead — this
+/// one asserted a one-directional bound, s43 round 2 finding 5):
+///
+/// `fix_of_fix` bounds NOTHING — not from below, not from above: it
+/// UNDER-counts, because an unsourced finding is never counted and a
+/// fix in one change that breaks something first found while reviewing
+/// a DIFFERENT change is not counted at all; it OVER-counts, because a
+/// `resolution_sha` commit may carry work BEYOND the fix and every
+/// finding recording that commit is counted regardless; and for any
+/// individual match the data cannot say whether the fix or the other
+/// work in that commit introduced the defect.
 pub fn fetch_review_rounds(roots: &Roots) -> Result<MartResult, ReportError> {
     fetch(roots, "mart_review_rounds", "change_id, \"round\"", REVIEW_ROUNDS_COLUMNS)
 }

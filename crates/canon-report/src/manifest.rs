@@ -43,6 +43,18 @@ pub struct Manifest {
     /// fingerprint over the same corpus/policy/ledger-head digests the
     /// report header renders, so a snapshot's provenance can be
     /// compared against a report's without re-deriving anything.
+    ///
+    /// It is a fingerprint of the DIGESTED INPUTS, not of the exported
+    /// tables. `crate::digest`'s `digest_side` names the eight kinds it
+    /// covers and the six it does not, so a snapshot whose
+    /// `mart_session_costs`/`mart_role_memory`/`mart_flywheel_funnel`
+    /// rows moved — those are built from `session`/`run`/`event`/
+    /// `trajectory`/`strategy_item`, all excluded — can carry an
+    /// UNCHANGED `source_digest`. Read it as "which authored corpus and
+    /// which verdict ledger produced this", never as "these bytes are
+    /// unchanged". `Finding` and `Subject` were silently outside the
+    /// covered set until s43 round 2 (finding 8), which is the failure
+    /// this note now states rather than leaves to be rediscovered.
     pub source_digest: String,
     pub tables: Vec<ManifestTable>,
 }

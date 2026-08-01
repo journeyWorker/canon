@@ -284,9 +284,10 @@ pub mod subjects {
 ///   cannot match itself; a non-strict one would score this round `1`.
 /// - `s9-fixture-other` round 1 names `s9-fixture` round 1's
 ///   `resolution_sha`. The join is scoped to one `change_id`, so it
-///   counts `0` — the documented cross-change miss the panel calls a
-///   second reason the count is a floor. If someone widens the scope
-///   without ordering the changes, this constant is what fails.
+///   counts `0` — one of the two UNDER-counts the panel's canonical
+///   sentence names (`canon_report::render::FIX_OF_FIX_MEANING`). If
+///   someone widens the scope without ordering the changes, this
+///   constant is what fails.
 ///
 /// Round 1 is the only round carrying a `reviewed_sha`; rounds 2 and 3
 /// reviewed an uncommitted worktree, which is the common case and the

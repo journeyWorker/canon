@@ -176,7 +176,7 @@ use std::path::{Path, PathBuf};
 
 use canon_model::{Divergence, DivergenceStatus, EvidenceRecord, Envelope, ProjectId, RawRecord, RecordKind, RoleId, ScenarioId, Sha, TotalOrder};
 use canon_store::git_tier::GitTier;
-use canon_store::partition::{content_digest12, expected_relative_path};
+use canon_store::partition::{content_digest12, expected_relative_path, resolve_partition};
 use canon_store::tier::{RawWrite, StoreError, Tier, TierQuery};
 use serde::{Deserialize, Serialize};
 
@@ -410,12 +410,56 @@ pub enum StagedAssignment {
     Nothing,
 }
 
+/// How many COMMITTED records one natural key may carry — the axis
+/// [`promote_verbatim`] enforces on, orthogonal to
+/// [`StagedAssignment`]'s "what does promotion compute".
+///
+/// It cannot be inferred from the storage layout, which is why it has
+/// to be declared: `canon_store::partition`'s object key is
+/// `{natural_key}__{content_digest12}.json` for EVERY kind, so two
+/// different bodies at one natural key always resolve to two different
+/// paths and always both write. That is deliberate — it is how a
+/// re-emitted record appends instead of overwriting — and it means the
+/// storage layer structurally cannot tell a legitimate new version from
+/// a corrupting duplicate. Only the kind knows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NaturalKeyRule {
+    /// At most ONE committed record per natural key. A second, DIFFERENT
+    /// body at an occupied key is a corruption, not an append, and
+    /// [`promote_verbatim`] refuses it with both candidates left in
+    /// place rather than picking a winner.
+    ///
+    /// `Finding`'s rule. Its key is `{change_id}__{round}__{seq}` — a
+    /// reviewer's own numbering of their own round — so two distinct
+    /// findings under one key are two reviewers' work collapsed into
+    /// one identity, and every reader that folds by natural key
+    /// silently drops one of them. That the DROPPED one is chosen by
+    /// digest order rather than by anything meaningful is the whole
+    /// problem: the count s43 exists to make trustworthy would be short
+    /// by one, with nothing anywhere saying so. (Naming a specific
+    /// downstream reader here would invert the dependency this crate
+    /// deliberately does not have — see `gate_independence`.)
+    Unique,
+    /// Multiple committed records per natural key are EXPECTED, and the
+    /// readers that care fold them (`canon query`'s
+    /// `fold_latest_by_key`).
+    ///
+    /// `EvidenceRecord`'s rule, and not a weaker `Unique`: `canon
+    /// evidence add` is "not idempotent, deliberately" — two
+    /// attestations at two times are two pieces of evidence about the
+    /// same task, and promotion mints each a distinct `run_seq`.
+    Versioned,
+}
+
 /// One staged record kind [`promote`] drains, and what promotion owes
 /// it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StagedKind {
     pub kind: RecordKind,
     pub assignment: StagedAssignment,
+    /// How many committed records one natural key may carry — declared
+    /// here rather than derived, for [`NaturalKeyRule`]'s reason.
+    pub natural_key: NaturalKeyRule,
 }
 
 /// Every kind `canon gate promote` drains from `<ledger_root>/_staging`
@@ -424,10 +468,15 @@ pub struct StagedKind {
 /// enumerable from one place by an operator, a diagnostic, and the
 /// per-kind tally `canon gate promote` prints.
 pub const STAGED_KINDS: [StagedKind; 2] = [
-    StagedKind { kind: RecordKind::EvidenceRecord, assignment: StagedAssignment::RunSeqPerRoleSurface },
+    StagedKind {
+        kind: RecordKind::EvidenceRecord,
+        assignment: StagedAssignment::RunSeqPerRoleSurface,
+        natural_key: NaturalKeyRule::Versioned,
+    },
     // s43: a review finding. Natural key `{change_id}__{round}__{seq}`,
-    // complete at authoring time — nothing for promotion to assign.
-    StagedKind { kind: RecordKind::Finding, assignment: StagedAssignment::Nothing },
+    // complete at authoring time — nothing for promotion to assign, and
+    // exactly one record allowed to claim it.
+    StagedKind { kind: RecordKind::Finding, assignment: StagedAssignment::Nothing, natural_key: NaturalKeyRule::Unique },
 ];
 
 /// Promote every well-formed `_staging/` candidate of every kind in
@@ -445,6 +494,31 @@ pub const STAGED_KINDS: [StagedKind; 2] = [
 /// it reports success, and the committed record count equals the number
 /// of distinct staged bodies regardless of how many retries that took.
 ///
+/// # The window this function does NOT close, stated rather than implied
+/// [`promote_verbatim`] enforces [`NaturalKeyRule::Unique`] by reading
+/// both tiers and then writing, which makes it the place a durable
+/// duplicate is actually prevented — but read-then-write is not one
+/// operation, and nothing here takes a lock. TWO `canon gate promote`
+/// processes running against one ledger at the same instant can each
+/// scan a committed tier that does not yet hold the other's write, and
+/// each commit a different body under one natural key. That is the
+/// residual race, and it is the whole of it: a single promoter is safe
+/// against any number of concurrent AUTHORS (they all land in staging,
+/// and one promoter sees every one of them together), which is the
+/// configuration this repo actually runs — reviews are authored in
+/// parallel, `canon gate promote` is one operator or one CI step.
+///
+/// It is left open deliberately rather than papered over. Closing it
+/// needs a mutual-exclusion primitive canon does not have: a lockfile
+/// reintroduces stale-lock recovery (a killed promoter blocks every
+/// later one, and any expiry policy reopens the same window), and an
+/// exclusive-create claim keyed on the natural key means a second
+/// on-disk structure under the ledger whose lifecycle has to be kept in
+/// step with the records — both are worse than a named window. If a
+/// second promoter ever becomes a real configuration, `flock(2)` around
+/// this function is the fix, because the kernel releases it on process
+/// death and so has no stale state.
+///
 /// Kinds are drained in [`STAGED_KINDS`] order and each accumulates
 /// into the SAME report, so one call's outcome is one report an
 /// operator reads per kind ([`Promoted::kind`]) — never one report per
@@ -454,7 +528,7 @@ pub fn promote(staging: &GitTier, committed: &GitTier, dry_run: bool) -> Result<
     for staged_kind in STAGED_KINDS {
         match staged_kind.assignment {
             StagedAssignment::RunSeqPerRoleSurface => promote_with_run_seq(staging, committed, dry_run, &mut report)?,
-            StagedAssignment::Nothing => promote_verbatim(staged_kind.kind, staging, committed, dry_run, &mut report)?,
+            StagedAssignment::Nothing => promote_verbatim(staged_kind, staging, committed, dry_run, &mut report)?,
         }
     }
     Ok(report)
@@ -474,55 +548,220 @@ pub fn promote(staging: &GitTier, committed: &GitTier, dry_run: bool) -> Result<
 /// REWRITES an `EvidenceRecord` body and so cannot find it that way;
 /// here there is nothing to rewrite.
 ///
-/// The existence check is load-bearing rather than an optimization:
-/// `GitTier::write` refuses an already-occupied path with
-/// `StoreError::DuplicatePath`, so without it a retry after a failed
-/// staging removal would abort the whole batch instead of completing it.
-fn promote_verbatim(kind: RecordKind, staging: &GitTier, committed: &GitTier, dry_run: bool, report: &mut PromoteReport) -> Result<(), StoreError> {
+/// # Recovery is READ, never inferred from a path that exists
+/// s43 round 1 found the earlier shape of this: it took
+/// `target.exists()` as proof an interrupted call had committed the
+/// record, then DELETED the staging copy on that basis. An interrupted
+/// promotion that left a truncated, misfiled, or directory-shaped
+/// target therefore destroyed the only readable copy of the finding and
+/// reported `recovered` while doing it. `Path::exists` answers "is
+/// there a directory entry here", which is not the question; the
+/// question is "can a consumer read this record back", and only a read
+/// answers it.
+///
+/// So recovery now requires the committed tier's OWN read
+/// (`committed.read()`, the same layout + `validate_body` pass the gate
+/// applies) to have returned a record at exactly this path whose body
+/// EQUALS the staged one. Anything else at that path — a directory, an
+/// unreadable or truncated file, JSON the read rejected, or a body that
+/// is not this candidate — is a refusal that PRESERVES staging and
+/// names what was found ([`obstruction_at`]).
+///
+/// # One natural key, one committed record
+/// For a [`NaturalKeyRule::Unique`] kind, promotion is also where that
+/// rule is ENFORCED, because it is the only place it can be. The
+/// authoring command's preflight scan (`canon finding add`) refuses an
+/// occupied key and gives the good sequential diagnostic, but it cannot
+/// be the defence: its occupancy scan and its staged write are separate
+/// steps, and two concurrent adds that both observe a free key write
+/// two different bodies to two different paths (the content digest is
+/// in the filename) and both succeed. Promotion is the single point
+/// where a record becomes durable, and it already re-reads both tiers,
+/// so it is where "at most one" can actually hold.
+///
+/// The first candidate at a key — first in the deterministic
+/// sorted-path order this function already drains in — commits. Every
+/// later DISTINCT body at that key, whether it came from the same batch
+/// or was already committed, is REFUSED and left staged, named, and
+/// byte-unmodified. So the batch still makes progress and the corpus
+/// holds exactly one record per key, while the second author's work is
+/// held for a human to re-number instead of being dropped — which is
+/// what actually happened before: both committed, and every reader that
+/// folds by natural key discarded one of them by digest order, leaving
+/// the count short by one with nothing saying so.
+///
+/// Which one commits is therefore deliberately meaningless, and must
+/// not be read as promotion adjudicating between two reviewers. The
+/// refusal is the load-bearing half. The residual window — two
+/// CONCURRENT promoters — is named in [`promote`]'s own doc.
+fn promote_verbatim(
+    staged_kind: StagedKind,
+    staging: &GitTier,
+    committed: &GitTier,
+    dry_run: bool,
+    report: &mut PromoteReport,
+) -> Result<(), StoreError> {
+    let kind = staged_kind.kind;
     let staged = staging.read(&TierQuery::kind(kind))?;
 
     // The same re-validation guarantee [`promote_with_run_seq`] states:
     // `staging.read()` has already run
     // `canon_store::partition::validate_body` over every candidate —
-    // for `Finding` that arm IS `Finding::check_coherence`, the
-    // identical call the committed read path makes — so a candidate the
-    // gate's own read would reject cannot reach the write below. A
-    // malformed candidate is refused with its staging file left in
-    // place, never deleted, so it can be fixed and re-promoted.
+    // for `Finding` that arm IS `Finding::from_body`, whose
+    // `check_coherence` the committed read path runs identically — so a
+    // candidate the gate's own read would reject cannot reach the write
+    // below. A malformed candidate is refused with its staging file left
+    // in place, never deleted, so it can be fixed and re-promoted.
     for violation in staged.violations {
         report.refused.push(refuse(violation.subject, violation.detail));
+    }
+
+    // The committed corpus AS READ — every record here survived the
+    // layout check and `validate_body`, so its content-derived path IS
+    // its actual path and re-deriving one is not a second source of
+    // truth. This index is what replaces `Path::exists` for BOTH
+    // questions below: "did an earlier call already commit this exact
+    // body" and "is this natural key already claimed".
+    let mut committed_by_path: HashMap<PathBuf, RawRecord> = HashMap::new();
+    let mut committed_by_key: HashMap<String, PathBuf> = HashMap::new();
+    for raw in committed.read(&TierQuery::kind(kind))?.records {
+        let relative = expected_relative_path(kind, &raw.0).map_err(StoreError::Layout)?;
+        let natural_key = resolve_partition(kind, &raw.0).map_err(StoreError::Layout)?.natural_key;
+        // FIRST path wins on a corpus that already carries duplicates
+        // from before this rule existed: `scan_kind_where` walks
+        // `sort_by_file_name`, so "first" is a total order over the
+        // data, not an artifact of directory-walk order.
+        committed_by_key.entry(natural_key).or_insert_with(|| relative.clone());
+        committed_by_path.insert(relative, raw);
     }
 
     // Paths resolved up front and sorted, so the same staging set drains
     // in the same order every run rather than in filesystem-walk order —
     // the determinism [`promote_with_run_seq`] gets from sorting by
     // subject, over the only total order this path has.
-    let mut candidates: Vec<(PathBuf, RawRecord)> = Vec::with_capacity(staged.records.len());
+    let mut candidates: Vec<(PathBuf, String, RawRecord)> = Vec::with_capacity(staged.records.len());
     for raw in staged.records {
-        candidates.push((expected_relative_path(kind, &raw.0).map_err(StoreError::Layout)?, raw));
+        let relative = expected_relative_path(kind, &raw.0).map_err(StoreError::Layout)?;
+        let natural_key = resolve_partition(kind, &raw.0).map_err(StoreError::Layout)?.natural_key;
+        candidates.push((relative, natural_key, raw));
     }
-    candidates.sort_by(|(a, _), (b, _)| a.cmp(b));
+    candidates.sort_by(|(a, ..), (b, ..)| a.cmp(b));
 
-    for (relative, raw) in candidates {
-        let recovered = committed.root().join(&relative).exists();
-        if !dry_run {
-            if !recovered {
-                committed.write(&RawWrite(raw))?;
+    // Natural keys this call has itself claimed. Tracked even under
+    // `dry_run`, so the PLAN reports the same refusals a real run would
+    // — a dry run that showed two candidates promoting where a real one
+    // refuses the second would be worse than no plan.
+    let mut claimed_here: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for (relative, natural_key, raw) in candidates {
+        // Recovery, VERIFIED: a record the committed tier READ BACK at
+        // exactly this path, whose body is this candidate's. Both halves
+        // matter — the read proves a consumer can see it, the equality
+        // proves it is THIS record and not something else that resolved
+        // to the same path.
+        if committed_by_path.get(&relative).is_some_and(|existing| existing.0 == raw.0) {
+            if !dry_run {
+                std::fs::remove_file(staging.root().join(&relative))?;
             }
+            report.recovered.push(Promoted { kind, assigned: None, target: relative });
+            continue;
+        }
+
+        // Something is at the target path that is NOT a readable copy of
+        // this record. Refuse and PRESERVE staging: this is precisely the
+        // case where the staged file may be the only intact copy left.
+        if let Some(found) = obstruction_at(&committed.root().join(&relative)) {
+            report.refused.push(refuse(
+                natural_key,
+                format!(
+                    "committing `{}` would target a path that already holds {found}. Refusing rather than reading a path that merely EXISTS as proof an earlier promotion committed this record — the staged copy may be the only readable one left, so it is preserved. Repair or remove the committed path, then retry.",
+                    relative.display()
+                ),
+            ));
+            continue;
+        }
+
+        if staged_kind.natural_key == NaturalKeyRule::Unique {
+            if let Some(occupant) = committed_by_key.get(&natural_key) {
+                // WHICH copy commits is the sorted-path order above:
+                // deterministic, and deliberately meaningless. The pick
+                // is not the point and must never be read as a judgement
+                // between two authors — the REFUSAL is the point, and it
+                // leaves the other body staged, named, and intact for a
+                // human to re-number rather than dropping it the way a
+                // natural-key fold silently would.
+                let origin = if claimed_here.contains(&natural_key) {
+                    "a DIFFERENT staged body this same call already promoted"
+                } else {
+                    "an already-committed record with a DIFFERENT body"
+                };
+                report.refused.push(refuse(
+                    natural_key.clone(),
+                    format!(
+                        "natural key `{natural_key}` is held at `{}` by {origin}, so committing `{}` would put two {} records under one identity — the duplicate every natural-key fold then silently drops one half of, leaving a count short by one with nothing saying so. Left staged and unmodified; re-number or delete it, then retry.",
+                        occupant.display(),
+                        relative.display(),
+                        kind.as_str()
+                    ),
+                ));
+                continue;
+            }
+        }
+
+        if !dry_run {
+            committed.write(&RawWrite(raw))?;
             // The same unprotected window as the run_seq path: if this
             // removal does not land, the record above is committed and
             // the staging file survives, and the next call takes the
-            // recovery branch above rather than writing a second copy.
+            // VERIFIED recovery branch above rather than writing a
+            // second copy.
             std::fs::remove_file(staging.root().join(&relative))?;
         }
-        let landed = Promoted { kind, assigned: None, target: relative };
-        if recovered {
-            report.recovered.push(landed);
-        } else {
-            report.promoted.push(landed);
+        if staged_kind.natural_key == NaturalKeyRule::Unique {
+            committed_by_key.insert(natural_key.clone(), relative.clone());
+            claimed_here.insert(natural_key);
         }
+        report.promoted.push(Promoted { kind, assigned: None, target: relative });
     }
     Ok(())
+}
+
+/// What is sitting at a committed target path that is NOT the readable
+/// record a retry would be recovering — the phrase
+/// [`promote_verbatim`]'s refusal names. `None` when nothing is there at
+/// all, which is the ordinary "this is a fresh commit" case.
+///
+/// Deliberately observed DIRECTLY rather than looked up in
+/// `committed.read()`'s `violations`: a `TierReadResult` violation
+/// carries a subject that is sometimes the offending path and sometimes
+/// a field name (`layout`, `<candidate>`), so matching one back to a
+/// path is guesswork, and a guess is exactly the wrong thing in a
+/// diagnostic whose whole job is saying what was actually found. A
+/// directory, a symlink, an unreadable file and a truncated one are
+/// four different repairs, so they are four different sentences.
+///
+/// `symlink_metadata`, not `metadata`: a symlink pointing at a valid
+/// record elsewhere is still not a record the append-only committed tier
+/// wrote, and following it would report the target's shape instead of
+/// the obstruction's.
+fn obstruction_at(absolute: &Path) -> Option<String> {
+    let metadata = std::fs::symlink_metadata(absolute).ok()?;
+    if metadata.is_dir() {
+        return Some("a DIRECTORY".to_string());
+    }
+    if metadata.is_symlink() {
+        return Some("a SYMLINK, which no tier write ever creates".to_string());
+    }
+    if !metadata.is_file() {
+        return Some("neither a regular file nor a directory".to_string());
+    }
+    match std::fs::read(absolute) {
+        Err(e) => Some(format!("a file that cannot be read ({e})")),
+        Ok(bytes) => match serde_json::from_slice::<serde_json::Value>(&bytes) {
+            Err(e) => Some(format!("{} bytes that are not valid JSON ({e}) — a truncated or torn write", bytes.len())),
+            Ok(_) => Some("JSON that the committed tier's own read REJECTED as malformed or misfiled".to_string()),
+        },
+    }
 }
 
 /// Drain every staged `EvidenceRecord`, assigning each the monotonic
@@ -534,6 +773,18 @@ fn promote_verbatim(kind: RecordKind, staging: &GitTier, committed: &GitTier, dr
 /// `scenario_id`/`task_id`/`actor.role` fields, so this is not a
 /// generic function with one caller — it is the one kind whose identity
 /// promotion mints.
+///
+/// This path does NOT share [`promote_verbatim`]'s s43 recovery defect,
+/// and the difference is structural rather than lucky. It recognizes
+/// its own interrupted work by looking up a candidate's
+/// [`STAGING_ID_KEY`] in an index built from `committed.read()` — a
+/// full layout + `validate_body` pass — so an entry in that index is by
+/// construction a record a consumer can read back. A truncated,
+/// misfiled, or directory-shaped target never enters it, and the retry
+/// therefore promotes afresh instead of draining staging against
+/// something unreadable. No `Path::exists` appears on this path at all;
+/// staging is removed only after this call's own successful
+/// `committed.write`, or after a VALIDATED prior commit was found.
 fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, dry_run: bool, report: &mut PromoteReport) -> Result<(), StoreError> {
     let staged = staging.read(&TierQuery::kind(RecordKind::EvidenceRecord))?;
 
@@ -984,6 +1235,159 @@ mod tests {
         assert_eq!(retry.recovered[0].target, first.promoted[0].target);
         assert_eq!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 1, "exactly one committed record, however many retries");
         assert!(staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.is_empty());
+    }
+
+    /// s43 round 1, blocker 1 — the race the required-`--seq` rationale
+    /// CLAIMED to prevent and did not.
+    ///
+    /// `canon finding add`'s occupancy scan and its staged write are two
+    /// steps, so two concurrent adds for one `(change_id, round, seq)`
+    /// both observe a free key and both stage. Their bodies differ, so
+    /// the content digest in the filename differs, so the paths differ
+    /// and `GitTier::write`'s duplicate-PATH check waves both through.
+    /// The interleaving is simulated directly — two distinct staged
+    /// bodies at one key IS the state that race leaves behind, and
+    /// reproducing it by timing would test the scheduler rather than
+    /// promotion.
+    ///
+    /// Before the fix, promote drained both and the committed corpus
+    /// carried two findings claiming to be the same numbered finding.
+    #[test]
+    fn two_staged_bodies_at_one_natural_key_commit_exactly_one_and_refuse_the_other() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+
+        // Same (change_id, round, seq); different summaries, so different
+        // bodies, so different digest-suffixed paths.
+        let reviewer_a = finding("s43-findings-are-records", 2, 5);
+        let mut reviewer_b = finding("s43-findings-are-records", 2, 5);
+        reviewer_b.summary = "a completely different defect, same seq".to_string();
+        let path_a = staging.write(&reviewer_a).unwrap().location;
+        let path_b = staging.write(&reviewer_b).unwrap().location;
+        assert_ne!(path_a, path_b, "the premise: two bodies at one key are two paths, which is why the path check misses");
+
+        let report = promote(&staging, &committed, false).unwrap();
+
+        assert_eq!(report.promoted.len(), 1, "exactly one may become durable: {:?}", report.promoted);
+        assert_eq!(report.refused.len(), 1, "the other must be refused, not silently dropped: {:?}", report.refused);
+        assert_eq!(report.refused[0].violation.subject, "s43-findings-are-records__0002__0005");
+        assert!(
+            report.refused[0].violation.detail.contains("two finding records under one identity"),
+            "the refusal must say what the harm is: {}",
+            report.refused[0].violation.detail
+        );
+
+        let durable = committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap();
+        assert_eq!(durable.records.len(), 1, "the whole point: one natural key, one durable record");
+        assert!(durable.violations.is_empty());
+
+        // The loser is PRESERVED, byte-unmodified, for a human to
+        // re-number — refusing is not deleting.
+        let still_staged = staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap();
+        assert_eq!(still_staged.records.len(), 1, "the refused body stays staged");
+        assert_ne!(still_staged.records[0].0, durable.records[0].0, "and it is the OTHER body, not a copy of the committed one");
+    }
+
+    /// The same rule against a key the COMMITTED tier already holds — the
+    /// case a later add reaches when its racing partner was promoted
+    /// first.
+    #[test]
+    fn a_staged_body_at_an_already_committed_natural_key_is_refused_and_kept() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+
+        staging.write(&finding("s43-findings-are-records", 2, 6)).unwrap();
+        assert_eq!(promote(&staging, &committed, false).unwrap().promoted.len(), 1);
+
+        let mut latecomer = finding("s43-findings-are-records", 2, 6);
+        latecomer.summary = "raised by the other reviewer in the same round".to_string();
+        staging.write(&latecomer).unwrap();
+
+        let report = promote(&staging, &committed, false).unwrap();
+        assert!(report.promoted.is_empty(), "{:?}", report.promoted);
+        assert!(report.recovered.is_empty(), "a DIFFERENT body is not recovery of the committed one");
+        assert_eq!(report.refused.len(), 1);
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 1);
+        assert_eq!(staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 1, "the refused candidate is preserved");
+    }
+
+    /// A DIFFERENT `seq` in the same round is a different finding and must
+    /// still promote — the uniqueness rule must not become a per-round
+    /// refusal.
+    #[test]
+    fn distinct_natural_keys_in_one_round_all_promote() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+        for seq in 1..=3 {
+            staging.write(&finding("s43-findings-are-records", 7, seq)).unwrap();
+        }
+        let report = promote(&staging, &committed, false).unwrap();
+        assert!(report.is_clean(), "refused: {:?}", report.refused);
+        assert_eq!(report.promoted.len(), 3);
+    }
+
+    /// s43 round 1, blocker 2 — promotion must not treat a path that
+    /// merely EXISTS as proof an earlier call committed the record.
+    ///
+    /// The scenario is an interrupted promotion that left a TORN target:
+    /// the committed file is truncated (or a directory) while the staged
+    /// copy — the only readable one — survived. The old code read
+    /// `target.exists()`, reported `recovered`, and deleted that only
+    /// readable copy, leaving the committed tier with no readable finding
+    /// at all.
+    #[test]
+    fn a_retry_against_a_torn_committed_target_refuses_and_preserves_staging() {
+        let break_truncated: fn(&Path) = |p| std::fs::write(p, b"{\"kind\":\"fin").unwrap();
+        let break_directory: fn(&Path) = |p| std::fs::create_dir_all(p).unwrap();
+        let break_empty: fn(&Path) = |p| std::fs::write(p, b"").unwrap();
+
+        for (label, break_target) in [("truncated file", break_truncated), ("directory", break_directory), ("empty file", break_empty)] {
+            let dir = TempDir::new().unwrap();
+            let (staging, committed) = tiers(&dir);
+
+            let record = finding("s43-findings-are-records", 8, 1);
+            let relative = staging.write(&record).unwrap().location;
+            let target = committed.root().join(&relative);
+            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+            break_target(&target);
+
+            let report = promote(&staging, &committed, false).unwrap();
+
+            assert!(report.recovered.is_empty(), "{label}: a broken target is not a prior successful commit: {:?}", report.recovered);
+            assert!(report.promoted.is_empty(), "{label}: {:?}", report.promoted);
+            assert_eq!(report.refused.len(), 1, "{label}: {:?}", report.refused);
+            assert!(
+                report.refused[0].violation.detail.contains("already holds"),
+                "{label}: the refusal must name what it found: {}",
+                report.refused[0].violation.detail
+            );
+
+            assert_eq!(
+                staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(),
+                1,
+                "{label}: the only readable copy of the finding must survive the refusal"
+            );
+        }
+    }
+
+    /// The obstruction diagnostic names the SHAPE it found, because a
+    /// directory, a torn write and a rejected body are three different
+    /// repairs.
+    #[test]
+    fn the_obstruction_diagnostic_distinguishes_what_it_found() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+
+        assert_eq!(obstruction_at(&root.join("absent.json")), None, "nothing there is an ordinary fresh commit, not an obstruction");
+
+        std::fs::create_dir(root.join("a-dir")).unwrap();
+        assert!(obstruction_at(&root.join("a-dir")).unwrap().contains("DIRECTORY"));
+
+        std::fs::write(root.join("torn.json"), b"{\"kind\":\"fin").unwrap();
+        assert!(obstruction_at(&root.join("torn.json")).unwrap().contains("not valid JSON"));
+
+        std::fs::write(root.join("wrong.json"), b"{\"kind\":\"finding\"}").unwrap();
+        assert!(obstruction_at(&root.join("wrong.json")).unwrap().contains("REJECTED"));
     }
 
     /// `--dry-run` is side-effect free for an unassigned kind too.

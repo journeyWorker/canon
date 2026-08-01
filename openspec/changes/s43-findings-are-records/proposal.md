@@ -7,14 +7,18 @@ round, and every "this defect was introduced by the previous round's fix"
 relationship existed only in agent transcripts. Canon recorded none of it.
 
 Then I hand-wrote the release summary: *"49 real issues, four of them
-defects in the previous round's fix."* Both numbers are wrong. The true
-fix-of-fix count is **2** — rounds 10 and 11, whose findings were defects
-in the prior round's fix. Rounds 8 and 9 found defects in the ORIGINAL
-feature, which is what review is normally for; round 9's own commit title
-says `s42 itself introduced` and the summary still filed it under
-fix-of-fix. The `49` was a tally carried across prompts that does not
-reconcile: it was quoted as "rounds 1–7 = 33" and later as
-"rounds 1–8 = 38", but 33 + round 8's 10 findings is 43.
+defects in the previous round's fix."* Both numbers are wrong — and so
+was my first correction. I said the true count was **2**, meaning rounds
+10 and 11, whose findings were defects in the prior round's fix. The
+derived count reads **19**, and neither number is the honest answer: 13
+findings across rounds 10 and 11 name a pure fix commit, and 6 more name
+`f438c610`, which closed round 8 AND shipped s42's feature, so the join
+cannot say which of the two introduced them. `fix_of_fix` bounds nothing
+in either direction, which is the point — a number nobody can compute
+from memory is exactly the number that should not be typed from memory.
+The `49` was a tally carried across prompts that does not reconcile: it
+was quoted as "rounds 1–7 = 33" and later as "rounds 1–8 = 38", but
+33 + round 8's 10 findings is 43.
 
 That claim is now in a published git tag. Nothing caught it. Canon gates
 `EvidenceRecord`s and task checkboxes; a narrative claim in a commit, tag,
@@ -64,10 +68,12 @@ records rather than asserted in prose a second time.
 ## What This Change Deliberately Does NOT Do
 
 - **No inferred `introduced_by`.** A finding whose introducing commit
-  cannot be sourced carries `None`. The derived fix-of-fix count is
-  therefore a documented FLOOR, and the panel says so. Guessing from
-  timing or commit adjacency would manufacture exactly the kind of number
-  this change exists to stop manufacturing.
+  cannot be sourced carries `None`, counted in its own UNKNOWN bucket and
+  never as not-a-fix-of-fix. Guessing from timing or commit adjacency
+  would manufacture exactly the kind of number this change exists to stop
+  manufacturing. The panel states that `fix_of_fix` bounds nothing in
+  either direction — the first cut of this proposal called it a FLOOR,
+  which the backfilled corpus disproved within a day.
 - **No retroactive findings for review rounds whose findings were not
   captured.** Backfill covers v0.4.0's rounds because their findings
   survive in review artifacts with severity, file refs, and bodies —

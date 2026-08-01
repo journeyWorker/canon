@@ -941,8 +941,8 @@ impl FindingDisposition {
 /// one change. Before this kind existed, canon already CLASSIFIED
 /// these during ingest
 /// (`canon_ingest::artifact_adapter::ArtifactEventKind::CodeReviewFinding`,
-/// a transient normalization enum) and then dropped them on the floor
-/// for want of a record kind to write them into — so a release
+/// a transient normalization enum) and then discarded them for want of
+/// a record kind to write them into — so a release
 /// narrative's issue counts could only ever be hand-typed into prose,
 /// which is exactly how v0.4.0's git tag shipped two wrong numbers in
 /// one sentence with nothing in canon able to contradict them.
@@ -980,31 +980,73 @@ impl FindingDisposition {
 /// # `resolution_sha` is the commit that CLOSED the finding
 /// It is present if and only if `disposition` is
 /// [`FindingDisposition::Fixed`]. `Fixed` without one, or one set
-/// while `Open`, is incoherent and canon never stores it. **The WRITER
-/// enforces that pairing, not the type**, and that is a deliberate
-/// trade: the wire form keeps `resolution_sha` a FLAT top-level field
-/// rather than folding it into a `Fixed { resolution_sha }` struct
-/// variant (the [`DivergenceStatus::Deferred`] idiom this crate
-/// otherwise reaches for) precisely because the fix-of-fix join below
-/// reads it as a top-level field, and a nested variant payload would
-/// bury the one query this kind exists to serve under
-/// `$.disposition.fixed.resolution_sha`. The writer-side enforcement is
-/// two-layered and total: [`Finding::fixed_by`] is the ONLY constructor
-/// path to `Fixed` and it cannot be called without the closing sha
-/// (while [`Finding::rejected`]/[`Finding::deferred`] clear it), and
-/// [`Finding::check_coherence`] re-checks the pairing on the READ path
-/// (`canon_store::partition::validate_body`'s `Finding` arm), so a
-/// hand-authored incoherent record is rejected as `malformed` and never
-/// enters a corpus.
+/// while `Open`, is incoherent and canon never stores it. The wire
+/// form keeps `resolution_sha` a FLAT top-level field rather than
+/// folding it into a `Fixed { resolution_sha }` struct variant (the
+/// [`DivergenceStatus::Deferred`] idiom this crate otherwise reaches
+/// for) precisely because the fix-of-fix join below reads it as a
+/// top-level field, and a nested variant payload would bury the one
+/// query this kind exists to serve under
+/// `$.disposition.fixed.resolution_sha`.
+///
+/// A flat pair cannot make the incoherent state UNREPRESENTABLE, so
+/// the type makes it unREACHABLE instead — on EVERY construction path
+/// there is, because the claim is a biconditional and one open route
+/// falsifies it:
+///
+/// - **Constructors.** [`Finding::fixed_by`] is the only path to
+///   `Fixed` and it cannot be called without the closing sha, while
+///   [`Finding::rejected`]/[`Finding::deferred`] clear it.
+/// - **Mutation.** `disposition` and `resolution_sha` are the two
+///   PRIVATE fields of an otherwise-`pub` record, read through
+///   [`Finding::disposition`]/[`Finding::resolution_sha`]. While they
+///   were `pub`, a clone-and-mutate reached either invalid state in
+///   one line, so "the constructors are the only path" was a
+///   convention rather than a guarantee.
+/// - **Deserialization.** `Finding`'s [`Deserialize`] is hand-written,
+///   not derived, and runs [`Finding::check_coherence`] before it
+///   yields a value — so `serde_json::from_value` REFUSES an
+///   incoherent body instead of materializing one that no constructor
+///   could have produced.
+///
+/// The consequence worth stating plainly, because it is the property
+/// the round trip rests on: every `Finding` VALUE that exists is
+/// coherent, so a record canon itself wrote is always a record canon
+/// can read back. A hand-authored on-disk body is the only remaining
+/// way to express the incoherent pair, and [`Finding::from_body`] —
+/// the read path's own entry point
+/// (`canon_store::partition::validate_body`'s `Finding` arm) — reports
+/// it as [`FailureClass::Malformed`] against `resolution_sha` BY NAME
+/// rather than as an opaque deserialize failure, so it never quietly
+/// counts as a fix nobody can point at a commit for.
 ///
 /// # `introduced_by` is the commit that INTRODUCED the defect
 /// `None` means the introducing commit could not be SOURCED — never
 /// "there probably isn't one". It is never inferred from timing,
 /// adjacency, `git blame` heuristics, or whichever commit happens to
-/// precede the review round. The consequence is load-bearing and must
-/// be repeated wherever it is used: **any count derived from
-/// `introduced_by` is a FLOOR, not a total**, and every consumer that
-/// reports such a count states that it is a floor.
+/// precede the review round.
+///
+/// The consequence is load-bearing, and it is ONE sentence that every
+/// consumer repeats verbatim rather than paraphrasing. This doc used
+/// to assert a one-directional bound instead, which was wrong in the
+/// over-counting direction and had already been copied into the CLI
+/// help, the mart docs, the report panel, the dashboard and the skill
+/// before anyone checked it against a corpus (s43 round 1 seq 1, and
+/// round 2 findings 5 and 7 for the four surfaces the first correction
+/// missed). The retired word is deliberately not repeated here: a
+/// denial makes a reader weigh it against the word, and the word wins
+/// — `canon_report::render::FIX_OF_FIX_MEANING` is the one place that
+/// records the history, and this is its sentence, character for
+/// character:
+///
+/// `fix_of_fix` bounds NOTHING — not from below, not from above: it
+/// UNDER-counts, because an unsourced finding is never counted and a
+/// fix in one change that breaks something first found while reviewing
+/// a DIFFERENT change is not counted at all; it OVER-counts, because a
+/// `resolution_sha` commit may carry work BEYOND the fix and every
+/// finding recording that commit is counted regardless; and for any
+/// individual match the data cannot say whether the fix or the other
+/// work in that commit introduced the defect.
 ///
 /// # Fix-of-fix is DERIVED, never stored
 /// A finding is a *fix-of-fix* when its `introduced_by` equals some
@@ -1018,7 +1060,7 @@ impl FindingDisposition {
 /// label. The whole reason this kind exists is that the number stopped
 /// being hand-typed; a stored flag would merely relocate the
 /// hand-typing from the release notes into the record.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct Finding {
     #[serde(flatten)]
     pub envelope: Envelope,
@@ -1041,7 +1083,10 @@ pub struct Finding {
     /// `change_id` form the natural key.
     pub seq: u32,
     pub severity: FindingSeverity,
-    pub disposition: FindingDisposition,
+    /// PRIVATE, with [`Finding::disposition`] the reader (type doc):
+    /// half of the biconditional, and a `pub` half is a one-line route
+    /// around every constructor that upholds it.
+    disposition: FindingDisposition,
     /// Who raised it. A plain string for the same reason
     /// [`Divergence::reviewer`] is one — a reviewer may be a human name
     /// a canon [`crate::ids::RoleId`] does not model.
@@ -1049,12 +1094,14 @@ pub struct Finding {
     /// One line of what the finding IS, in the reviewer's own words.
     pub summary: String,
     /// The commit that closed it — see this type's doc: present iff
-    /// `disposition` is [`FindingDisposition::Fixed`].
+    /// `disposition` is [`FindingDisposition::Fixed`]. PRIVATE for the
+    /// same reason `disposition` is, and read through
+    /// [`Finding::resolution_sha`].
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
-    pub resolution_sha: Option<Sha>,
+    resolution_sha: Option<Sha>,
     /// The commit that introduced the defect — see this type's doc:
-    /// `None` means UNSOURCED, and every count derived from this field
-    /// is a floor.
+    /// `None` means UNSOURCED, never "no cause", and is one of the two
+    /// reasons a derived fix-of-fix count UNDER-counts.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub introduced_by: Option<Sha>,
     /// Where in the tree, as `path/to/file.rs:120-134`. A plain string:
@@ -1062,6 +1109,92 @@ pub struct Finding {
     /// it would spine nothing.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub file_ref: Option<String>,
+}
+
+/// [`Finding`]'s deserialize-only twin: the SAME wire shape, with no
+/// coherence rule attached.
+///
+/// It exists because `Finding`'s own [`Deserialize`] must run
+/// [`Finding::check_coherence`] before yielding a value (type doc), and
+/// a hand-written `Deserialize` that called itself would recurse. So
+/// the derive lives here, on a type nothing outside this module can
+/// name, and both entry points ([`Finding::deserialize`] and
+/// [`Finding::from_body`]) funnel through [`FindingWire::into_finding`]
+/// — ONE place where the wire form becomes a `Finding`, so the two can
+/// never disagree about what a valid body is.
+///
+/// The duplicated field list is compile-guarded rather than trusted:
+/// `into_finding` builds `Finding` with a struct literal, so a field
+/// added to `Finding` and not to this twin fails to compile. Serde
+/// ATTRIBUTE drift is caught by `finding_with_every_optional_round_trips`,
+/// which round-trips a fully-populated record through this exact path.
+/// `skip_serializing_if` is deliberately absent: this type is never
+/// serialized, and [`Finding`]'s own `Serialize` derive still owns the
+/// absent-vs-`null` wire rule.
+#[derive(Deserialize)]
+struct FindingWire {
+    #[serde(flatten)]
+    envelope: Envelope,
+    change_id: ChangeId,
+    #[serde(default, deserialize_with = "present_value")]
+    reviewed_sha: Option<Sha>,
+    round: u32,
+    seq: u32,
+    severity: FindingSeverity,
+    disposition: FindingDisposition,
+    reviewer: String,
+    summary: String,
+    #[serde(default, deserialize_with = "present_value")]
+    resolution_sha: Option<Sha>,
+    #[serde(default, deserialize_with = "present_value")]
+    introduced_by: Option<Sha>,
+    #[serde(default, deserialize_with = "present_value")]
+    file_ref: Option<String>,
+}
+
+impl FindingWire {
+    /// The one gate every wire body passes through on its way to being
+    /// a [`Finding`] value.
+    fn into_finding(self) -> Result<Finding, EvidenceViolation> {
+        let finding = Finding {
+            envelope: self.envelope,
+            change_id: self.change_id,
+            reviewed_sha: self.reviewed_sha,
+            round: self.round,
+            seq: self.seq,
+            severity: self.severity,
+            disposition: self.disposition,
+            reviewer: self.reviewer,
+            summary: self.summary,
+            resolution_sha: self.resolution_sha,
+            introduced_by: self.introduced_by,
+            file_ref: self.file_ref,
+        };
+        finding.check_coherence()?;
+        Ok(finding)
+    }
+}
+
+/// Hand-written so the `disposition` ⇔ `resolution_sha` biconditional
+/// holds for every `Finding` VALUE, not merely for every value some
+/// constructor produced (type doc). A derived `Deserialize` was the
+/// open route: `serde_json::from_value` built `Fixed` with no closing
+/// sha, and that value then serialized to a body the read path
+/// rejects — a record canon wrote and canon could not read.
+///
+/// The violation's own `detail` is carried into the serde error rather
+/// than a restated message, so a caller that only has the `Err` still
+/// reads the same sentence [`Finding::check_coherence`] produces.
+/// [`Finding::from_body`] is the entry point that keeps the STRUCTURED
+/// [`EvidenceViolation`] (subject `resolution_sha`, class
+/// [`FailureClass::Malformed`]) instead of flattening it to text.
+impl<'de> Deserialize<'de> for Finding {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        FindingWire::deserialize(deserializer)?.into_finding().map_err(|violation| serde::de::Error::custom(violation.detail))
+    }
 }
 
 impl Finding {
@@ -1108,6 +1241,20 @@ impl Finding {
         self
     }
 
+    /// What became of this finding. A reader, because the field is
+    /// private (type doc): the biconditional cannot survive a `pub`
+    /// half that a clone-and-mutate flips in one line.
+    pub fn disposition(&self) -> FindingDisposition {
+        self.disposition
+    }
+
+    /// The commit that closed it — `Some` if and only if
+    /// [`Self::disposition`] is [`FindingDisposition::Fixed`] (type
+    /// doc). Private for [`Self::disposition`]'s reason.
+    pub fn resolution_sha(&self) -> Option<&Sha> {
+        self.resolution_sha.as_ref()
+    }
+
     /// Close it as `Fixed` BY `resolution_sha` — the only path to
     /// [`FindingDisposition::Fixed`], so the state can never exist
     /// without the commit that produced it.
@@ -1135,7 +1282,8 @@ impl Finding {
 
     /// Record the SOURCED introducing commit. There is deliberately no
     /// "guess it" counterpart: if it cannot be sourced, the field stays
-    /// `None` and every derived count is a floor (type doc).
+    /// `None`, which is one of the two reasons a derived fix-of-fix
+    /// count UNDER-counts (type doc's canonical sentence).
     pub fn with_introduced_by(mut self, introduced_by: Sha) -> Self {
         self.introduced_by = Some(introduced_by);
         self
@@ -1172,6 +1320,24 @@ impl Finding {
             )),
             _ => Ok(()),
         }
+    }
+
+    /// The READ path's entry point: a raw ledger body to a validated
+    /// `Finding`, with a STRUCTURED [`EvidenceViolation`] for either
+    /// failure mode (`canon_store::partition::validate_body`'s
+    /// `Finding` arm is one call to this).
+    ///
+    /// Distinct from `serde_json::from_value::<Finding>` only in what
+    /// it reports, never in what it accepts — both run
+    /// [`FindingWire::into_finding`], so they cannot disagree about
+    /// validity. This one keeps the coherence failure's own subject
+    /// (`resolution_sha`) and class instead of collapsing it into a
+    /// serde error string, so the read path still names the field a
+    /// hand-authored record got wrong.
+    pub fn from_body(json: &serde_json::Value) -> Result<Self, EvidenceViolation> {
+        serde_json::from_value::<FindingWire>(json.clone())
+            .map_err(|e| EvidenceViolation::new(FailureClass::Malformed, "<candidate>", e.to_string()))?
+            .into_finding()
     }
 }
 
@@ -1782,17 +1948,17 @@ mod tests {
     #[test]
     fn only_fixed_by_produces_a_fixed_finding_and_it_always_names_its_commit() {
         let raised = finding(1, 1);
-        assert_eq!(raised.disposition, FindingDisposition::Open);
-        assert_eq!(raised.resolution_sha, None);
+        assert_eq!(raised.disposition(), FindingDisposition::Open);
+        assert_eq!(raised.resolution_sha(), None);
         raised.check_coherence().unwrap();
 
         let fixed = finding(1, 1).fixed_by(sha('b'));
-        assert_eq!(fixed.disposition, FindingDisposition::Fixed);
-        assert_eq!(fixed.resolution_sha, Some(sha('b')));
+        assert_eq!(fixed.disposition(), FindingDisposition::Fixed);
+        assert_eq!(fixed.resolution_sha(), Some(&sha('b')));
         fixed.check_coherence().unwrap();
 
         for closed in [finding(1, 1).fixed_by(sha('b')).rejected(), finding(1, 1).fixed_by(sha('b')).deferred()] {
-            assert_eq!(closed.resolution_sha, None, "a disposition that no commit closed must not keep a resolution_sha");
+            assert_eq!(closed.resolution_sha(), None, "a disposition that no commit closed must not keep a resolution_sha");
             closed.check_coherence().unwrap();
         }
     }
@@ -1812,6 +1978,58 @@ mod tests {
         assert!(err.detail.contains("disposition is `open`"), "{}", err.detail);
     }
 
+    /// The route the DERIVED `Deserialize` left open, and the reason
+    /// the type doc's biconditional was a claim stronger than the code:
+    /// `serde_json::from_value` happily built `Fixed` with no closing
+    /// sha, so `fixed_by` was not in fact the only path to `Fixed`, and
+    /// the resulting value re-serialized to a body the read path
+    /// rejects. Both directions are now refused BY DESERIALIZE, before
+    /// any value exists to be written.
+    #[test]
+    fn deserialize_refuses_an_incoherent_body_instead_of_materializing_one() {
+        let mut fixed_without_commit = serde_json::to_value(finding(1, 1)).unwrap();
+        fixed_without_commit["disposition"] = serde_json::json!("fixed");
+        let err = serde_json::from_value::<Finding>(fixed_without_commit.clone()).unwrap_err();
+        assert!(err.to_string().contains("no `resolution_sha`"), "{err}");
+
+        let mut open_with_commit = serde_json::to_value(finding(1, 1)).unwrap();
+        open_with_commit["resolution_sha"] = serde_json::to_value(sha('b')).unwrap();
+        let err = serde_json::from_value::<Finding>(open_with_commit.clone()).unwrap_err();
+        assert!(err.to_string().contains("disposition is `open`"), "{err}");
+
+        // `from_body` accepts EXACTLY the same bodies `from_value` does
+        // (one `into_finding`, two entry points) and keeps the
+        // STRUCTURED violation the read path reports — the diagnostic a
+        // flattened serde error string would have lost.
+        for incoherent in [fixed_without_commit, open_with_commit] {
+            let violation = Finding::from_body(&incoherent).unwrap_err();
+            assert_eq!(violation.class, FailureClass::Malformed);
+            assert_eq!(violation.subject, "resolution_sha", "the read path must still name the field, not merely fail");
+        }
+    }
+
+    /// The round-trip contract the sealed biconditional exists to make
+    /// TRUE: every `Finding` a constructor can produce serializes to a
+    /// body the read path accepts and returns unchanged. A record canon
+    /// itself wrote is never a record canon rejects.
+    #[test]
+    fn every_constructible_finding_round_trips_through_the_read_path() {
+        for constructed in [
+            finding(1, 1),
+            finding(1, 2).fixed_by(sha('b')),
+            finding(1, 3).rejected(),
+            finding(1, 4).deferred(),
+            finding(1, 5).fixed_by(sha('b')).rejected(),
+            finding(1, 6).fixed_by(sha('b')).deferred(),
+            finding(1, 7).reviewing_sha(sha('a')).fixed_by(sha('b')).with_introduced_by(sha('c')).with_file_ref("a.rs:1-2"),
+        ] {
+            let body = serde_json::to_value(&constructed).expect("a Finding always serializes");
+            let read_back = Finding::from_body(&body)
+                .unwrap_or_else(|v| panic!("canon wrote a body canon cannot read: {} — {}", v.subject, v.detail));
+            assert_eq!(read_back, constructed, "the read path must return the record that was written");
+        }
+    }
+
     /// Fix-of-fix is DERIVED by joining findings to each other, never
     /// stored. This test IS the derivation, and it deliberately orders
     /// by `(round, seq)` rather than by `reviewed_sha`: the round that
@@ -1819,7 +2037,7 @@ mod tests {
     /// no sha to order by, which is precisely the case a sha-ordered
     /// derivation would drop.
     #[test]
-    fn fix_of_fix_is_derived_by_round_order_and_the_count_is_a_floor() {
+    fn fix_of_fix_is_derived_by_round_order_and_the_count_bounds_nothing() {
         let closed_round_one = finding(1, 1).reviewing_sha(sha('a')).fixed_by(sha('b'));
         let caused_by_that_fix = finding(2, 1).with_introduced_by(sha('b'));
         let unsourced = finding(2, 2);
@@ -1848,6 +2066,86 @@ mod tests {
         let json = serde_json::to_value(&caused_by_that_fix).unwrap();
         let keys: Vec<&String> = json.as_object().unwrap().keys().collect();
         assert!(!keys.iter().any(|k| k.contains("fix_of_fix")), "fix-of-fix must never become a stored field: {keys:?}");
+    }
+
+    /// s43 round 2, finding 5. The round-1 correction reached the
+    /// report panel and stopped there; this type's own doc — the
+    /// upstream every other surface is written FROM, and the text
+    /// `schemas/finding.schema.json` embeds verbatim — still called an
+    /// `introduced_by`-derived count "a FLOOR, not a total". So the
+    /// guard that was only ever run against the panel now runs here
+    /// too, over the `Finding` type doc and the two field/builder docs
+    /// that restate it.
+    ///
+    /// Scoped to those doc blocks rather than the whole file on
+    /// purpose: "dropped them on the floor" a few lines above is an
+    /// idiom, and a guard that cannot tell the two apart gets widened
+    /// until it catches nothing.
+    #[test]
+    fn the_finding_docs_claim_no_bound_and_state_the_canonical_sentence() {
+        let source = include_str!("records.rs");
+        // Walks BACK from the item to the top of its unbroken `///`
+        // run (tolerating the `#[derive]`/`#[serde]` attributes that sit
+        // between doc and item), then restores source order so the
+        // canonical sentence is contiguous rather than reversed.
+        let doc_block = |anchor: &str| -> String {
+            let end = source.find(anchor).unwrap_or_else(|| panic!("{anchor} is no longer in records.rs"));
+            // Back up to the start of the anchor's own line: an indented
+            // anchor would otherwise leave its leading whitespace as a
+            // final "line" and stop the walk before it began.
+            let end = source[..end].rfind('\n').map_or(0, |newline| newline + 1);
+            let mut lines: Vec<&str> = source[..end]
+                .lines()
+                .rev()
+                .take_while(|line| line.trim_start().starts_with("///") || line.trim_start().starts_with("#["))
+                .filter(|line| line.trim_start().starts_with("///"))
+                .collect();
+            lines.reverse();
+            lines.iter().map(|line| line.trim_start().trim_start_matches("///").trim()).collect::<Vec<_>>().join(" ")
+        };
+        let surfaces = [
+            ("the `Finding` type doc", doc_block("pub struct Finding {")),
+            ("the `introduced_by` field doc", doc_block("pub introduced_by: Option<Sha>,")),
+            ("`with_introduced_by`'s doc", doc_block("pub fn with_introduced_by(")),
+        ];
+
+        // `crates/canon-report/src/render.rs`'s own DIRECTIONAL_PHRASES,
+        // which is the list the panel has been held to since round 1.
+        // Space-prefixed for the word boundary, exactly as there.
+        const DIRECTIONAL_PHRASES: &[&str] = &[
+            "floor",
+            "lower bound",
+            "lower-bound",
+            "bounds from below",
+            "minimum",
+            "at least",
+            "no fewer than",
+            "conservative",
+            "understates",
+            "underestimate",
+            "under-estimate",
+            "upper bound",
+            "ceiling",
+            "at most",
+            "no more than",
+            "overstates",
+        ];
+        for (where_, doc) in &surfaces {
+            assert!(!doc.is_empty(), "{where_} scanned as empty — the anchor moved and this guard stopped guarding");
+            let haystack = format!(" {}", doc.to_ascii_lowercase());
+            for phrase in DIRECTIONAL_PHRASES {
+                assert!(!haystack.contains(&format!(" {phrase}")), "{where_} bounds a derived count via {phrase:?}: {doc}");
+            }
+        }
+
+        // And the type doc states the whole sentence, not a clause of
+        // it. Whitespace-collapsed because `///` wraps it across lines;
+        // `packages/dashboard/test/panel-copy.test.ts` pins this same
+        // text against `canon_report::render::FIX_OF_FIX_MEANING` and
+        // every other surface (canon-model cannot depend on
+        // canon-report — the dependency runs the other way).
+        const CANONICAL: &str = "`fix_of_fix` bounds NOTHING — not from below, not from above: it UNDER-counts, because an unsourced finding is never counted and a fix in one change that breaks something first found while reviewing a DIFFERENT change is not counted at all; it OVER-counts, because a `resolution_sha` commit may carry work BEYOND the fix and every finding recording that commit is counted regardless; and for any individual match the data cannot say whether the fix or the other work in that commit introduced the defect.";
+        assert!(surfaces[0].1.contains(CANONICAL), "the `Finding` type doc must state the canonical sentence verbatim: {}", surfaces[0].1);
     }
 
     #[test]

@@ -126,8 +126,9 @@ fn the_two_command_loop_commits_a_finding_nobody_hand_wrote() {
     }
 
     // Said on the success path, not only in `--help`: an unsourced
-    // finding is why the derived count is a floor, and this is the
-    // moment the author still knows whether it was sourced.
+    // finding is one of the two reasons the derived count UNDER-counts,
+    // and this is the moment the author still knows whether it was
+    // sourced.
     assert!(stdout(&added).contains("UNSOURCED"), "an add with no --introduced-by must say so: {}", stdout(&added));
 }
 
@@ -394,7 +395,12 @@ fn finding_add_help_states_it_is_an_observation_and_names_what_canon_skips() {
     // at this command and nowhere else.
     assert!(help.contains("must be SOURCED"), "{help}");
     assert!(help.contains("Leaving it UNSET is the correct record"), "{help}");
-    assert!(help.contains("FLOOR"), "the help must state that a derived count is a floor: {help}");
+    // clap re-wraps `after_help` to the terminal width, so the sentence
+    // reaches a reader as several lines. Whitespace-collapse both sides
+    // and compare the prose: the pin is on the words, not the wrapping.
+    let flowed = help.split_whitespace().collect::<Vec<_>>().join(" ");
+    let canonical = canon_report::render::FIX_OF_FIX_MEANING.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(flowed.contains(&canonical), "the help must carry the one canonical fix-of-fix sentence verbatim: {help}");
 
     // Fix-of-fix stays derived: no flag, and the help says why.
     assert!(help.contains("Fix-of-fix is DERIVED, never recorded"), "{help}");
@@ -403,4 +409,62 @@ fn finding_add_help_states_it_is_an_observation_and_names_what_canon_skips() {
     // And it never claims proof of anything.
     assert!(!help.contains("proof of"), "the help must never claim proof: {help}");
     assert!(!help.contains("verifies that"), "{help}");
+}
+
+/// s43 round 2, finding 4. The help shipped "The true fix-of-fix count
+/// is 2." — a hand-typed release metric, on the command built to stop
+/// hand-typed release metrics, and the number was WRONG: the derived
+/// count is 19, and `tasks.md` 4.2 records that both the published
+/// `four` and the correction `two` were guesses. The module doc carried
+/// the same 2, plus "eleven code-review rounds" and "thirty findings",
+/// neither of which this corpus can supply — the panel these very docs
+/// point at says the rounds-RUN count is not derivable at all.
+///
+/// So: no count of findings, rounds, or fix-of-fixes may be asserted in
+/// the shipped help or in the module doc behind it. Banned by spelling,
+/// like the panel's own `DIRECTIONAL_PHRASES`/`CAUSAL_PHRASES` lists,
+/// because the failure mode is a plausible sentence rather than a
+/// detectable one. A number belongs in `mart_review_rounds`; prose gets
+/// to point at it and nothing else.
+#[test]
+fn no_shipped_finding_help_or_doc_asserts_a_hand_typed_count() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let add_help = stdout(&run_canon(&["finding", "add", "--help"], dir.path()));
+    let finding_help = stdout(&run_canon(&["finding", "--help"], dir.path()));
+    // The module docs BEHIND that help: the wrong `2` lived in both, and
+    // correcting only the string a user sees would leave the next
+    // author copying it back out of the source.
+    let module_doc = include_str!("../src/finding.rs");
+    let cli_surface = include_str!("../src/main.rs");
+
+    // Every count claim these surfaces have actually shipped, plus the
+    // shapes they were written in. Lowercased substring match: a new
+    // number in an old sentence is what this catches.
+    const BANNED: &[&str] = &[
+        "real issues",
+        "of them defects",
+        "fix-of-fix count is",
+        "count is 2",
+        "count is **2**",
+        "eleven code-review rounds",
+        "eleven rounds",
+        "thirty findings",
+        "the true fix-of-fix",
+    ];
+    for (where_, text) in [
+        ("`canon finding add --help`", add_help.as_str()),
+        ("`canon finding --help`", finding_help.as_str()),
+        ("crates/canon-cli/src/finding.rs", module_doc),
+        ("crates/canon-cli/src/main.rs", cli_surface),
+    ] {
+        let haystack = text.to_ascii_lowercase();
+        for phrase in BANNED {
+            assert!(!haystack.contains(&phrase.to_ascii_lowercase()), "{where_} asserts a hand-typed count via {phrase:?}");
+        }
+    }
+
+    // The positive half: having removed the number, the help must say
+    // where the real one lives, or it has simply dropped the subject.
+    assert!(add_help.contains("Review rounds"), "the help must point at the derived panel: {add_help}");
+    assert!(add_help.contains(".canon/REPORT.md"), "the help must name where that panel is rendered: {add_help}");
 }

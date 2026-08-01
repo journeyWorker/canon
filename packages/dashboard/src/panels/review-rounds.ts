@@ -25,16 +25,17 @@ import { renderTable, type ColumnDef } from "../render-table";
 //  2. `introduced_by_unsourced` is a KNOWN UNKNOWN, not a zero. A
 //     finding with no sourced introducing commit is never counted as
 //     not-a-fix-of-fix.
-//  3. `fix_of_fix` bounds NOTHING (s43 round 1, seq 1 — this panel and
-//     its markdown twin both shipped "FLOOR", and the corpus below
-//     them disproved the direction). It MISSES: unsourced findings,
-//     and a fix in one change that broke something first found while
-//     reviewing another. It also OVER-counts: a `resolution_sha`
-//     commit may carry work beyond the fix, and then every finding
-//     recording that commit matches regardless. Live in v0.4.0 —
-//     `f438c610` closed s42's round 8 AND shipped s42's feature, so
-//     round 9's six matches are a commit-id coincidence, while rounds
-//     10 and 11 matched pure fix commits.
+//  3. `fix_of_fix` bounds NOTHING, and says nothing about any
+//     INDIVIDUAL match either — the whole of that claim is
+//     `FIX_OF_FIX_MEANING` below, stated once and repeated verbatim
+//     rather than paraphrased here (s43 round 1 seq 1 shipped "FLOOR"
+//     on both this panel and its markdown twin; s43 round 2 finding 7
+//     found the replacement had quietly become a per-row attribution
+//     verdict the query cannot reach). Live in v0.4.0 — `f438c610`
+//     closed s42's round 8 AND shipped s42's feature, so round 9's six
+//     matches cannot be attributed either way, while rounds 10 and 11
+//     matched commits that held no work but the fix, which narrows
+//     what those commits contained and settles no match.
 //  4. A round that found nothing wrote no `Finding`, so it has no row
 //     (s43 round 1, seq 2). The table's unit is rounds THAT FOUND
 //     SOMETHING; nothing in canon records a round as merely RUN.
@@ -42,7 +43,8 @@ import { renderTable, type ColumnDef } from "../render-table";
 // The markdown report's Review rounds panel
 // (`crates/canon-report/src/render.rs`) carries the same statement;
 // `test/panel-copy.test.ts` pins the two together so neither surface
-// can drift.
+// can drift, and pins `FIX_OF_FIX_MEANING` below character-for-
+// character against the Rust constant of the same name.
 const QUERY = `
   SELECT
     change_id,
@@ -64,14 +66,33 @@ const QUERY = `
 `;
 
 /**
+ * The ONE sentence every surface states about `fix_of_fix`, verbatim.
+ *
+ * Character-for-character `canon_report::render::FIX_OF_FIX_MEANING`
+ * (`crates/canon-report/src/render.rs`), which is where the whole
+ * argument for having exactly one sentence is written down.
+ * `test/panel-copy.test.ts` reads that declaration out of the Rust
+ * source and asserts equality with this constant — not a substring
+ * match, so a surface cannot satisfy the pin by quoting half of it.
+ *
+ * Used twice below: verbatim inside `NOTE` (which `renderTable` splits
+ * on backticks into `<code>` spans), and backtick-stripped inside the
+ * `fix_of_fix` column tooltip, because a `title` attribute renders its
+ * text literally.
+ */
+export const FIX_OF_FIX_MEANING =
+  "`fix_of_fix` bounds NOTHING — not from below, not from above: it UNDER-counts, because an unsourced finding is never counted and a fix in one change that breaks something first found while reviewing a DIFFERENT change is not counted at all; it OVER-counts, because a `resolution_sha` commit may carry work BEYOND the fix and every finding recording that commit is counted regardless; and for any individual match the data cannot say whether the fix or the other work in that commit introduced the defect.";
+
+/**
  * The panel's caveat, exported so the honesty property this string
  * carries is testable on its own. Same claim as the markdown report's
  * Review rounds paragraph: what the join computes, what it does not
  * establish, that its unit is rounds that FOUND something, and that
- * the count bounds nothing in either direction.
+ * the count bounds nothing in either direction and settles no
+ * individual match either.
  */
 export const NOTE =
-  "One row per `(change_id, round)` over `Finding` records, folded to the latest version of each finding first. A round that found NOTHING wrote no `Finding` and so has no row: this table counts the rounds that FOUND something, never the rounds RUN. s42's round 12 returned MERGEABLE with zero findings and is absent. canon has no record kind for a review round, so the rounds-run count is not derivable from this corpus at all. `fix_of_fix` counts the findings in this round whose SOURCED `introduced_by` equals the `resolution_sha` of a finding earlier in the SAME change, ordered strictly by `(round, seq)` — a commit-id equality join over two recorded fields, which reads no git history and is exactly as sound as the sourcing of `introduced_by`, a field canon never infers and a reviewer may leave unsourced. `introduced_by_unsourced` is the UNKNOWN bucket: a finding with no sourced `introduced_by` is counted there and NEVER as not-a-fix-of-fix. `fix_of_fix` therefore bounds NOTHING — not from below, not from above. It UNDER-counts, because an unsourced finding could belong to it and is never counted, and a fix in one change that breaks something first found while reviewing a DIFFERENT change is not counted at all. It OVER-counts, because a `resolution_sha` commit may carry work BEYOND the fix, and every finding recording that commit is counted whether the fix or the other work introduced it. Both are live in canon's own v0.4.0 rows: round 9's six counted findings record `f438c610`, which closed round 8 AND shipped s42's whole feature, so they are NOT attributable to round 8's fixes, while rounds 10 and 11's introducing commits were pure fix commits, so theirs are.";
+  "One row per `(change_id, round)` over `Finding` records, folded to the latest version of each finding first. A round that found NOTHING wrote no `Finding` and so has no row: this table counts the rounds that FOUND something, never the rounds RUN. s42's round 12 returned MERGEABLE with zero findings and is absent. canon has no record kind for a review round, so the rounds-run count is not derivable from this corpus at all. `fix_of_fix` counts the findings in this round whose SOURCED `introduced_by` equals the `resolution_sha` of a finding earlier in the SAME change, ordered strictly by `(round, seq)` — a commit-id equality join over two recorded fields, which reads no git history and is exactly as sound as the sourcing of `introduced_by`, a field canon never infers and a reviewer may leave unsourced. `introduced_by_unsourced` is the UNKNOWN bucket: a finding with no sourced `introduced_by` is counted there and NEVER as not-a-fix-of-fix. " + FIX_OF_FIX_MEANING + " Both are live in canon's own v0.4.0 rows: round 9's six counted findings record `f438c610`, which closed round 8 AND shipped s42's whole feature, so they cannot be attributed either way, while rounds 10 and 11's introducing commits held no work but the fix — a narrower commit, and still not an attributable match, because the predicate compared two RECORDED ids and whether `introduced_by` names the true cause is the author's sourcing, which canon never checks.";
 
 export const COLUMNS: ColumnDef[] = [
   { key: "change_id", label: "Change" },
@@ -93,8 +114,13 @@ export const COLUMNS: ColumnDef[] = [
   {
     key: "fix_of_fix",
     label: "Fix-of-fix (same change, not a bound)",
+    // The per-column rule, then the canonical sentence — DERIVED from
+    // the constant rather than restated, because every restatement of
+    // it so far has drifted. `title` renders literally, so the
+    // backticks come out.
     description:
-      "Findings whose sourced introduced_by equals the resolution_sha of a finding earlier in the SAME change, ordered strictly by (round, seq). Commit-id equality between two recorded fields: no git history is read and no blame is computed, so this is not evidence the earlier fix caused the later defect. It bounds nothing in either direction. It misses — unsourced findings are excluded as unknown, and a cross-change fix-of-fix is not counted at all. It also over-counts — a resolution commit that carries work beyond the fix matches every finding recording it, fix-induced or not.",
+      "Findings whose sourced introduced_by equals the resolution_sha of a finding earlier in the SAME change, ordered strictly by (round, seq). Commit-id equality between two recorded fields: no git history is read and no blame is computed, so this is not evidence the earlier fix caused the later defect. " +
+      FIX_OF_FIX_MEANING.replaceAll("`", ""),
   },
   {
     key: "introduced_by_sourced",

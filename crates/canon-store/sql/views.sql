@@ -1623,10 +1623,8 @@ ORDER BY s.domain, s.subject_id;
 -- `resolution_sha` of an EARLIER finding of the SAME change. No record
 -- stores that relationship and none may: `canon_model::records::
 -- Finding`'s own doc forbids a stored flag, and its
--- `fix_of_fix_is_derived_by_round_order_and_the_count_is_a_floor` test
--- IS the reference derivation this `EXISTS` clause implements. (That
--- test NAME predates s43 round 1, which retired the floor reading
--- below; the derivation it pins is unchanged and correct.)
+-- `fix_of_fix_is_derived_by_round_order_and_the_count_bounds_nothing`
+-- test IS the reference derivation this `EXISTS` clause implements.
 --
 -- EARLIER is `(round, seq)` — the ordinal pair the natural key is
 -- built from — compared STRICTLY, and scoped to one `change_id`. Each
@@ -1678,19 +1676,37 @@ ORDER BY s.domain, s.subject_id;
 -- ── The count bounds NOTHING, in EITHER direction ────────────────────
 -- s43 round 1, seq 1: this comment and the panel over it both called
 -- `fix_of_fix` a FLOOR, and the corpus they were written against
--- disproves the direction. Two clauses above make it MISS — the
--- `f.introduced_by IS NOT NULL` filter (unsourced findings) and the
--- `g.change_id = f.change_id` scope (cross-change fixes). But the
+-- disproves the direction. s43 round 2, findings 5 and 7: the
+-- correction then drifted again — this comment upgraded the population
+-- claim into a PER-ROW verdict, saying round 9's mixed-commit matches
+-- were not attributable while rounds 10 and 11's pure-fix matches
+-- were. The predicate below establishes neither. So the claim is now
+-- ONE sentence, stated identically by every surface that reports this
+-- column (`canon_report::render::FIX_OF_FIX_MEANING`, which is where
+-- the cross-surface pin reads it from):
+--
+--   `fix_of_fix` bounds NOTHING — not from below, not from above: it
+--   UNDER-counts, because an unsourced finding is never counted and a
+--   fix in one change that breaks something first found while
+--   reviewing a DIFFERENT change is not counted at all; it
+--   OVER-counts, because a `resolution_sha` commit may carry work
+--   BEYOND the fix and every finding recording that commit is counted
+--   regardless; and for any individual match the data cannot say
+--   whether the fix or the other work in that commit introduced the
+--   defect.
+--
+-- Clause by clause, below: the UNDER-counts are the
+-- `f.introduced_by IS NOT NULL` filter and the
+-- `g.change_id = f.change_id` scope; the OVER-count is that the
 -- `EXISTS` predicate is `g.resolution_sha = f.introduced_by` and
--- NOTHING else, and a `resolution_sha` commit may carry work BEYOND
--- the fix, so it also OVER-counts: every finding recording that commit
--- matches, whether the fix or the other work introduced the defect,
--- and one commit id on each side cannot tell them apart. v0.4.0 has
--- both live. `f438c610` closed s42's round 8 AND shipped s42's whole
--- feature, so round 9's six matches are a commit-id coincidence rather
--- than defects attributable to round 8's fixes; rounds 10 and 11 match
--- on `49d3eb4f`/`b22fe8f5`, which were pure fix commits, so theirs
--- are. The count is EXACT for what it joins and is a bound on nothing.
+-- NOTHING else. v0.4.0 has both live. `f438c610` closed s42's round 8
+-- AND shipped s42's whole feature, so round 9's six matches cannot be
+-- attributed either way; rounds 10 and 11 match on
+-- `49d3eb4f`/`b22fe8f5`, which held no work but the fix — a narrower
+-- commit, and still not an attributable match, because the predicate
+-- compared two RECORDED ids and whether `introduced_by` names the true
+-- cause is the author's sourcing, which canon never checks. The count
+-- is EXACT for what it joins and is a bound on nothing.
 --
 -- `reviewed_sha` is `max()` over the round's findings: it is per-
 -- finding provenance, the natural key does not include it, and this

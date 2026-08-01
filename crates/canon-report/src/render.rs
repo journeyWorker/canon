@@ -88,6 +88,31 @@ pub const REVIEW_BURNDOWN_PANEL: &str = "Review-feedback burn-down over time (`m
 /// in [`render`] for why the earlier, causal wording was wrong.
 pub const FLYWHEEL_FUNNEL_PANEL: &str = "Verdicts → distilled → retrieved → applied (`mart_flywheel_funnel`) — the last three stages count STRATEGIES, so the funnel narrows by construction. `retrieved` counts the distinct strategies some run recorded in its `injected_guidance` that are still distilled today; strategy ids are derived from a strategy's own content, so re-ingesting unchanged evidence re-derives the same ids and leaves this stage intact. `applied` is that same set narrowed to the ones whose recipient run has something recorded about how it ended — NOT how many trajectories were resolved — and `applied_attributed`/`applied_proxy` say WHICH rule earned each count, partitioning `applied` exactly. Both rules are CO-OCCURRENCE inside one run, never causation. `applied_attributed`: the strategy is named in some run's `injected_guidance`, and that SAME run has at least one trajectory of the SAME role stamped with that run id (`Trajectory.run_id`, set only by `canon ingest artifacts --run`) whose `outcome` is resolved (`success`/`failure`/`rolled-back`). `applied_proxy`: no such trajectory exists, so all that is recorded is the recipient run's own terminal `Run.status` (`succeeded`/`failed`/`aborted`). Attribution is the stronger of the two — it requires a judged outcome out of that run, not merely that the run reached a terminal state — and is still weaker than tying the outcome TO the guidance: canon stores no edge from a strategy to a verdict, so this join cannot separate guidance that was followed from guidance that was ignored in an otherwise identical run, and a second still-distilled strategy of the same role injected into the same run counts identically. Closing that gap needs a record change canon has not made — a `StrategyId` stamped on the `Trajectory`/`VerdictRow` at judgment time, joined here instead of `run_id` alone — not a re-reading of this one. A repo that never passes `canon ingest artifacts --run` reads its whole `applied` under `applied_proxy`. `applied` can never exceed `retrieved`, and `retrieved 0` means no run's recorded guidance names a strategy that exists now.\n\n";
 
+/// The ONE sentence every surface states about `fix_of_fix`, verbatim.
+///
+/// s43 round 2, findings 5 and 7: seven surfaces described this count
+/// and each described it differently — `records.rs` and the CLI help
+/// called it a FLOOR, `marts.rs` called it "a readable FLOOR rather
+/// than a total", the dashboard's static markup called it "a derived
+/// floor", and this panel had already retired the word while quietly
+/// replacing it with a per-row attribution verdict the query cannot
+/// reach. Paraphrase is how that happens: each surface restates the
+/// claim in its own words and one of the restatements is wrong.
+///
+/// So there is exactly one sentence, and every surface repeats it
+/// character for character. It carries all four things the join
+/// supports — that the count bounds nothing, the two reasons it
+/// under-counts, the reason it over-counts, and that no INDIVIDUAL
+/// match is attributable either way — because a surface that quotes
+/// half of it is back to paraphrasing.
+///
+/// Pinned here (`review_rounds_panel_states_the_one_canonical_sentence`),
+/// in `canon-cli`'s help test, in `canon-model`'s own source guard, and
+/// across the dashboard/skill copies by
+/// `packages/dashboard/test/panel-copy.test.ts`, which reads this
+/// declaration out of this file and asserts it on every other surface.
+pub const FIX_OF_FIX_MEANING: &str = "`fix_of_fix` bounds NOTHING — not from below, not from above: it UNDER-counts, because an unsourced finding is never counted and a fix in one change that breaks something first found while reviewing a DIFFERENT change is not counted at all; it OVER-counts, because a `resolution_sha` commit may carry work BEYOND the fix and every finding recording that commit is counted regardless; and for any individual match the data cannot say whether the fix or the other work in that commit introduced the defect.";
+
 /// The `## Review rounds` panel's prose (s43 `findings-are-records`).
 ///
 /// This change exists because a hand-written release summary claimed
@@ -121,11 +146,22 @@ pub const FLYWHEEL_FUNNEL_PANEL: &str = "Verdicts → distilled → retrieved �
 ///   scope drops the cross-change case. OVER: the `EXISTS` predicate is
 ///   `g.resolution_sha = f.introduced_by` and nothing else, so a
 ///   resolution commit that ALSO carries work other than the fix
-///   matches every finding recording it, whether the fix or the other
-///   work introduced the defect. The count is exact; what it counts is
-///   a commit-id coincidence. This bullet used to read "FLOOR", which
-///   is the misreading the panel was written to prevent, shipped by the
-///   panel itself.
+///   matches every finding recording it. The count is exact; what it
+///   counts is a commit-id coincidence. This bullet used to read
+///   "FLOOR", which is the misreading the panel was written to
+///   prevent, shipped by the panel itself.
+/// - "for any individual match the data cannot say whether the fix or
+///   the other work in that commit introduced the defect" — the same
+///   `EXISTS` predicate, read one row at a time. s43 round 2: the
+///   panel had upgraded the population claim into a per-row verdict,
+///   saying round 9's mixed-commit matches were NOT attributable
+///   while rounds 10 and 11's pure-fix matches WERE. The SQL
+///   establishes neither. A fix-only `resolution_sha` narrows what the
+///   commit CONTAINED and still leaves the match unattributable,
+///   because the predicate compared two RECORDED ids and canon never
+///   checks that `introduced_by` names the true cause. `tasks.md` 4.2
+///   is the authoritative wording: a mixed commit's findings "cannot
+///   be attributed either way".
 /// - "counts the rounds that FOUND something, never the rounds RUN" —
 ///   `FROM stg_records WHERE kind = 'finding'` is the only source. A
 ///   round that found nothing wrote no `Finding` and cannot appear, and
@@ -145,7 +181,7 @@ pub const FLYWHEEL_FUNNEL_PANEL: &str = "Verdicts → distilled → retrieved �
 /// burn-down-as-current-state, s42's applied split, and this panel's
 /// own retired FLOOR — s43 round 1, seq 1), which is
 /// precisely the failure this change exists to stop.
-pub const REVIEW_ROUNDS_PANEL: &str = "Findings per review round (`mart_review_rounds`) — one row per `(change_id, round)` over `Finding` records, folded to the latest version of each `{change_id}__{round}__{seq}` finding first, so a finding re-authored from `open` to `fixed` is counted once and in one disposition bucket. A round that found NOTHING wrote no `Finding` and so has no row here: this table counts the rounds that FOUND something, never the rounds RUN. s42's round 12 returned MERGEABLE with zero findings and is absent from canon's own rows. canon has no record kind for a review round — `Review` is a per-scenario attestation, not a round — so the number of rounds RUN is not derivable from this corpus at all; it would take a record written when a round completes, and canon has none today.\n\n`fix_of_fix` counts the findings in this round whose SOURCED `introduced_by` equals the `resolution_sha` of a finding earlier in the SAME change, ordered strictly by the natural key's own `(round, seq)` pair — strictly, so no finding is ever matched against its own `resolution_sha`. That is a commit-id equality join over two recorded fields and nothing more: it reports that the commit which closed an earlier finding is the commit a later finding RECORDS as its introducing commit. It reads no git history, computes no blame, and is exactly as sound as the sourcing of `introduced_by` — a field canon never infers and a reviewer may leave unsourced, which is a discipline canon asks for and cannot enforce. Rounds are ordered by `round`, never by `reviewed_sha` (a round that reviewed an uncommitted working tree has none, and that is the common case) and never by `at` (that is when the record was WRITTEN — a backfill authors many rounds in one sitting, in any order). `introduced_by_unsourced` is the UNKNOWN bucket: a finding with no sourced `introduced_by` is counted there and NEVER as not-a-fix-of-fix, because absence of a sourced commit is not evidence that no earlier fix was involved.\n\n`fix_of_fix` therefore bounds NOTHING — not from below, not from above. It is an EXACT count of a commit-id coincidence, and that coincidence errs in both directions. It UNDER-counts, because an unsourced finding could belong to it and is never counted, and a fix in one change that breaks something first found while reviewing a DIFFERENT change is not counted at all, since `round` restarts at 1 per change and canon holds no cross-change round order. It OVER-counts, because a `resolution_sha` commit may carry work BEYOND the fix, and every finding recording that commit is counted whether the fix or the other work introduced it — the join sees one commit id on both sides and cannot tell them apart. Both directions are live in canon's own v0.4.0 review rounds — the `s42-close-the-open-loops` rows, which are the rows below in canon's own report. Round 9's six counted findings record `f438c610`, which closed round 8 AND shipped s42's whole feature, so they are NOT attributable to round 8's fixes; rounds 10 and 11's introducing commits (`49d3eb4f`, `b22fe8f5`) were pure fix commits, so theirs are. Nothing in the table separates those two cases; only reading the commits does. Round 9 also carries one unsourced finding, which could belong to the count and does not. So read the number as exactly what it joins — findings whose recorded introducing commit is a recorded earlier resolution commit of the same change — and as no statement whatever about how many defects this change's fixes introduced.\n\n`introduced_by_sourced + introduced_by_unsourced = findings` and `fix_of_fix <= introduced_by_sourced`, both by construction, so the size of the unknown is readable against the count. `reviewed_sha` is the greatest value any of the round's findings recorded, and reads `—` when NO finding in the round recorded one; a round that reviewed an uncommitted working tree is the usual reason, but the view cannot distinguish that from a round whose findings simply left the field unrecorded, and it neither requires a round's findings to agree on the value nor claims they do.\n\n";
+pub const REVIEW_ROUNDS_PANEL: &str = "Findings per review round (`mart_review_rounds`) — one row per `(change_id, round)` over `Finding` records, folded to the latest version of each `{change_id}__{round}__{seq}` finding first, so a finding re-authored from `open` to `fixed` is counted once and in one disposition bucket. A round that found NOTHING wrote no `Finding` and so has no row here: this table counts the rounds that FOUND something, never the rounds RUN. s42's round 12 returned MERGEABLE with zero findings and is absent from canon's own rows. canon has no record kind for a review round — `Review` is a per-scenario attestation, not a round — so the number of rounds RUN is not derivable from this corpus at all; it would take a record written when a round completes, and canon has none today.\n\n`fix_of_fix` counts the findings in this round whose SOURCED `introduced_by` equals the `resolution_sha` of a finding earlier in the SAME change, ordered strictly by the natural key's own `(round, seq)` pair — strictly, so no finding is ever matched against its own `resolution_sha`. That is a commit-id equality join over two recorded fields and nothing more: it reports that the commit which closed an earlier finding is the commit a later finding RECORDS as its introducing commit. It reads no git history, computes no blame, and is exactly as sound as the sourcing of `introduced_by` — a field canon never infers and a reviewer may leave unsourced, which is a discipline canon asks for and cannot enforce. Rounds are ordered by `round`, never by `reviewed_sha` (a round that reviewed an uncommitted working tree has none, and that is the common case) and never by `at` (that is when the record was WRITTEN — a backfill authors many rounds in one sitting, in any order). `introduced_by_unsourced` is the UNKNOWN bucket: a finding with no sourced `introduced_by` is counted there and NEVER as not-a-fix-of-fix, because absence of a sourced commit is not evidence that no earlier fix was involved.\n\n`fix_of_fix` bounds NOTHING — not from below, not from above: it UNDER-counts, because an unsourced finding is never counted and a fix in one change that breaks something first found while reviewing a DIFFERENT change is not counted at all; it OVER-counts, because a `resolution_sha` commit may carry work BEYOND the fix and every finding recording that commit is counted regardless; and for any individual match the data cannot say whether the fix or the other work in that commit introduced the defect. It is an EXACT count of a commit-id coincidence, and that coincidence errs in both directions — `round` restarts at 1 per change and canon holds no cross-change round order, and the join sees one commit id on both sides and cannot tell a fix-only commit from a commit that also carried the feature. Both directions are live in canon's own v0.4.0 review rounds — the `s42-close-the-open-loops` rows, which are the rows below in canon's own report. Round 9's six counted findings record `f438c610`, which closed round 8 AND shipped s42's whole feature, so they cannot be attributed either way; rounds 10 and 11's introducing commits (`49d3eb4f`, `b22fe8f5`) held no work but the fix, which narrows what those commits contained and still leaves their matches unattributable, because the predicate compared two RECORDED ids and whether `introduced_by` names the right commit is the author's sourcing, not the query's. Nothing in the table separates a mixed commit from a fix-only one, and reading the commits settles only what they contained. Round 9 also carries one unsourced finding, which could belong to the count and does not. So read the number as exactly what it joins — findings whose recorded introducing commit is a recorded earlier resolution commit of the same change — and as no statement whatever about how many defects this change's fixes introduced.\n\n`introduced_by_sourced + introduced_by_unsourced = findings` and `fix_of_fix <= introduced_by_sourced`, both by construction, so the size of the unknown is readable against the count. `reviewed_sha` is the greatest value any of the round's findings recorded, and reads `—` when NO finding in the round recorded one; a round that reviewed an uncommitted working tree is the usual reason, but the view cannot distinguish that from a round whose findings simply left the field unrecorded, and it neither requires a round's findings to agree on the value nor claims they do.\n\n";
 
 fn cell(row: &crate::query::Row, column: &str) -> String {
     match row.get(column) {
@@ -529,8 +565,8 @@ mod tests {
 
         let report = rendered();
         assert!(
-            report.contains("`fix_of_fix` therefore bounds NOTHING — not from below, not from above"),
-            "the panel must refuse the bound in both directions, not swap one directional word for another"
+            report.contains(FIX_OF_FIX_MEANING),
+            "the panel must state the one canonical sentence verbatim, not a paraphrase of it"
         );
         assert!(
             report.contains("first found while reviewing a DIFFERENT change is not counted at all"),
@@ -543,6 +579,42 @@ mod tests {
         assert!(
             report.contains("`f438c610`, which closed round 8 AND shipped s42's whole feature"),
             "the panel must work the over-count through the live row a reader is looking at"
+        );
+    }
+
+    /// s43 round 2, findings 5 and 7 — the round-1 correction reached
+    /// this panel and stopped there. `records.rs`, the CLI help,
+    /// `marts.rs` and the dashboard's static markup each kept their own
+    /// paraphrase, and this panel, having retired the word FLOOR,
+    /// replaced it with a per-row attribution verdict the query cannot
+    /// reach: round 9's mixed-commit matches were "NOT attributable"
+    /// while rounds 10 and 11's pure-fix matches were. The SQL
+    /// establishes neither. So the claim is now ONE sentence
+    /// ([`FIX_OF_FIX_MEANING`]) that every surface repeats verbatim —
+    /// asserted here on the markdown side, in `canon-cli`'s help test,
+    /// in `canon-model`'s source guard, and across the dashboard/skill
+    /// copies by `packages/dashboard/test/panel-copy.test.ts`.
+    #[test]
+    fn review_rounds_panel_states_the_one_canonical_sentence() {
+        assert!(
+            REVIEW_ROUNDS_PANEL.contains(FIX_OF_FIX_MEANING),
+            "REVIEW_ROUNDS_PANEL must carry FIX_OF_FIX_MEANING verbatim: {REVIEW_ROUNDS_PANEL}"
+        );
+
+        // The retired per-row verdict, banned by spelling for the same
+        // reason DIRECTIONAL_PHRASES are: a reader weighing "NOT
+        // attributable to round 8's fixes" against "cannot be
+        // attributed either way" takes the first as the finer-grained
+        // truth, and it is the false one.
+        for retired in ["NOT attributable to", "so theirs are", "therefore bounds NOTHING"] {
+            assert!(
+                !REVIEW_ROUNDS_PANEL.contains(retired),
+                "the panel re-acquired the retired wording {retired:?}: {REVIEW_ROUNDS_PANEL}"
+            );
+        }
+        assert!(
+            REVIEW_ROUNDS_PANEL.contains("cannot be attributed either way"),
+            "the panel must use `tasks.md` 4.2's authoritative wording for the mixed-commit rows"
         );
     }
 

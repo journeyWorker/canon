@@ -8,6 +8,24 @@
   </head>
   <body>
     <header id="banner" class="banner banner-loading">Loading snapshot…</header>
+    <!--
+      s43 round 2, finding 6. `panel-source` used to carry prose:
+      "mart_review_rounds (findings per round; fix-of-fix is a derived
+      floor)" and "mart_flywheel_funnel (verdicts → distilled →
+      retrieved → applied)". Both were CLAIMS — the first was the
+      retired FLOOR reading, still shipping here months after every
+      other surface had dropped it; the second reads as a causal
+      pipeline over a funnel whose own panel says it is co-occurrence.
+      Static markup is the one surface `test/panel-copy.test.ts` could
+      not reach, so a claim parked here was a claim no test checked.
+
+      So this file now carries the VIEW NAME and nothing else. Every
+      claim lives in a panel module's `NOTE`/`description`, which
+      `renderTable` puts on the page and `panel-copy.test.ts` pins
+      against the markdown report. `index_html_panel_sources_are_bare_
+      view_names` (same file) enforces the rule structurally: a
+      `panel-source` that is not exactly one snapshot table name fails.
+    -->
     <main id="panels">
       <section id="panel-trust-matrix" class="panel">
         <h2>Change / Task Trust Matrix</h2>
@@ -26,7 +44,7 @@
       </section>
       <section id="panel-flywheel-funnel" class="panel">
         <h2>Flywheel Funnel</h2>
-        <p class="panel-source">mart_flywheel_funnel (verdicts → distilled → retrieved → applied)</p>
+        <p class="panel-source">mart_flywheel_funnel</p>
         <div class="panel-body"></div>
       </section>
       <section id="panel-review-burndown" class="panel">
@@ -36,7 +54,7 @@
       </section>
       <section id="panel-review-rounds" class="panel">
         <h2>Review Rounds</h2>
-        <p class="panel-source">mart_review_rounds (findings per round; fix-of-fix is a derived floor)</p>
+        <p class="panel-source">mart_review_rounds</p>
         <div class="panel-body"></div>
       </section>
     </main>

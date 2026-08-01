@@ -5,7 +5,11 @@ import { COLUMNS as FUNNEL_COLUMNS, NOTE as FUNNEL_NOTE } from "../src/panels/fl
 import { COLUMNS as ROLE_MEMORY_COLUMNS, NOTE as ROLE_MEMORY_NOTE } from "../src/panels/role-memory";
 import { COLUMNS as BURNDOWN_COLUMNS, NOTE as BURNDOWN_NOTE } from "../src/panels/review-burndown";
 import { COLUMNS as SESSION_COSTS_COLUMNS, NOTE as SESSION_COSTS_NOTE } from "../src/panels/session-costs";
-import { COLUMNS as REVIEW_ROUNDS_COLUMNS, NOTE as REVIEW_ROUNDS_NOTE } from "../src/panels/review-rounds";
+import {
+  COLUMNS as REVIEW_ROUNDS_COLUMNS,
+  FIX_OF_FIX_MEANING,
+  NOTE as REVIEW_ROUNDS_NOTE,
+} from "../src/panels/review-rounds";
 
 // s42 (`close-the-open-loops`) re-review: the dashboard is a SECOND
 // surface over the same marts as `.canon/REPORT.md`, and a reader must
@@ -134,10 +138,13 @@ const SHARED_CLAIMS: Record<string, { note: string; emittedFrom: string; claims:
       "a fix in one change that breaks something first found while reviewing a DIFFERENT change is not counted at all",
       // Round 1, seq 1 — the count errs in BOTH directions, so it is
       // no kind of bound, and the over-count is worked through the
-      // live row.
-      "`fix_of_fix` therefore bounds NOTHING — not from below, not from above",
+      // live row. Round 2, findings 5 and 7 — the whole of that claim
+      // is now one sentence, pinned character-for-character by
+      // `the one canonical sentence is identical on every surface`
+      // below; what stays here are the clauses AROUND it.
       "a `resolution_sha` commit may carry work BEYOND the fix",
       "`f438c610`, which closed round 8 AND shipped s42's whole feature",
+      "cannot be attributed either way",
       // Round 1, seq 2 — a clean round writes no record, so the row
       // count is not the round count and canon cannot supply the rest.
       "counts the rounds that FOUND something, never the rounds RUN",
@@ -368,6 +375,104 @@ test("the review rounds panel calls fix_of_fix no kind of bound, on either surfa
   }
 });
 
+// ── One sentence, every surface, character for character ────────────
+//
+// s43 round 2, findings 5 and 7. Round 1 retired the word FLOOR from
+// the markdown panel and the dashboard NOTE, and the correction went
+// no further: `crates/canon-model/src/records.rs` still called any
+// `introduced_by`-derived count "a FLOOR, not a total", the
+// `canon finding add` help copied that word into shipped CLI text,
+// `crates/canon-report/src/marts.rs` called it "a readable FLOOR
+// rather than a total", and `index.html` shipped "fix-of-fix is a
+// derived floor" in static markup no test could see. Meanwhile the two
+// surfaces that HAD been corrected replaced the bound with a
+// finer-grained claim that is also false — that round 9's mixed-commit
+// matches are not attributable while rounds 10 and 11's pure-fix
+// matches are. `mart_review_rounds` establishes neither.
+//
+// Seven surfaces, seven paraphrases, and the paraphrasing is the
+// mechanism: each rewrite is locally reasonable and one of them is
+// wrong. So there is exactly ONE sentence now, declared as
+// `canon_report::render::FIX_OF_FIX_MEANING` and repeated verbatim.
+// This block reads that declaration out of the Rust source and asserts
+// it on every surface, by EQUALITY where the surface is a constant and
+// by containment where it is embedded in longer prose — never by
+// matching a clause of it, because quoting a clause is paraphrasing.
+const FIX_OF_FIX_MEANING_DECLARATION = REPORT_RENDER_RS.match(
+  /^pub const FIX_OF_FIX_MEANING: &str = ("(?:[^"\\]|\\.)*");$/m,
+);
+if (!FIX_OF_FIX_MEANING_DECLARATION) {
+  throw new Error("FIX_OF_FIX_MEANING is not a single-literal `pub const` in render.rs — the whole pin below reads it from there");
+}
+// Rust's escapes here (`\n`, `\"`, `\\`) are a subset of JSON's, same
+// as `emittedPanels` above.
+const RUST_FIX_OF_FIX_MEANING = JSON.parse(FIX_OF_FIX_MEANING_DECLARATION[1]) as string;
+
+test("the dashboard's canonical sentence is byte-identical to the Rust one", () => {
+  // Equality, not containment: this is the declaration every other
+  // assertion in this block is measured against, so a drift here would
+  // silently redefine "verbatim" for all of them.
+  expect(FIX_OF_FIX_MEANING).toBe(RUST_FIX_OF_FIX_MEANING);
+});
+
+test("the one canonical sentence is identical on every surface that reports fix_of_fix", () => {
+  const fixOfFix = REVIEW_ROUNDS_COLUMNS.find((c) => c.key === "fix_of_fix");
+  // Rust doc comments (`///`, `//!`), SQL comments (`--`) and markdown
+  // soft wraps all break the sentence across lines without changing it,
+  // and a `#[command(after_help = "…")]` literal wraps with escaped
+  // `\n`s that are newlines the moment clap prints them. Strip the
+  // markers, treat both kinds of line break as whitespace, collapse it,
+  // compare the prose. `crates/canon-cli/tests/finding.rs` additionally
+  // asserts the sentence on the help clap actually RENDERS, where those
+  // escapes are real newlines and nothing has to be normalized away.
+  const prose = (text: string) =>
+    text
+      .replace(/^[ \t]*(?:\/\/[!/]?|--)[ \t]?/gm, " ")
+      .replace(/\\n/g, " ")
+      .replace(/\s+/g, " ");
+  const expected = prose(RUST_FIX_OF_FIX_MEANING);
+
+  const surfaces: [string, string][] = [
+    ["REVIEW_ROUNDS_PANEL", EMITTED_PANELS.get("REVIEW_ROUNDS_PANEL") ?? ""],
+    ["dashboard NOTE", REVIEW_ROUNDS_NOTE],
+    // The tooltip renders literally, so it carries the sentence with
+    // its backticks stripped — derived from the constant in the panel
+    // module, never retyped.
+    ["fix_of_fix tooltip", (fixOfFix?.description ?? "").replaceAll("`", "")],
+    [SKILL_SOURCE, SKILL_MD],
+    ["crates/canon-report/src/marts.rs", readFileSync(join(REPO_ROOT, "crates/canon-report/src/marts.rs"), "utf-8")],
+    ["crates/canon-store/sql/views.sql", readFileSync(join(REPO_ROOT, "crates/canon-store/sql/views.sql"), "utf-8")],
+    ["crates/canon-model/src/records.rs", readFileSync(join(REPO_ROOT, "crates/canon-model/src/records.rs"), "utf-8")],
+    ["crates/canon-cli/src/main.rs", readFileSync(join(REPO_ROOT, "crates/canon-cli/src/main.rs"), "utf-8")],
+    ["crates/canon-cli/src/finding.rs", readFileSync(join(REPO_ROOT, "crates/canon-cli/src/finding.rs"), "utf-8")],
+  ];
+  for (const [where, text] of surfaces) {
+    const carries = prose(text).includes(where === "fix_of_fix tooltip" ? expected.replaceAll("`", "") : expected);
+    expect({ where, carries }).toEqual({ where, carries: true });
+  }
+});
+
+test("index.html's panel captions are bare view names, never claims", () => {
+  // s43 round 2, finding 6. `index.html` shipped "mart_review_rounds
+  // (findings per round; fix-of-fix is a derived floor)" — the retired
+  // FLOOR reading, in the one surface every pin in this file was blind
+  // to, because nothing here parsed static markup. The gap is the
+  // finding, not the wording: a claim that can be parked outside the
+  // pin will be.
+  //
+  // So the rule is structural rather than a list of banned phrases.
+  // A caption is exactly one snapshot table name; anything a reader
+  // could mistake for a statement about what a column MEANS has to
+  // live in a panel module's `NOTE`/`description`, which `renderTable`
+  // renders and the tests above pin against the report.
+  const html = readFileSync(join(new URL("..", import.meta.url).pathname, "index.html"), "utf-8");
+  const captions = [...html.matchAll(/<p class="panel-source">([\s\S]*?)<\/p>/g)].map(([, text]) => text.trim());
+  expect(captions.length).toBe(6);
+  for (const caption of captions) {
+    expect({ caption, isBareTable: SNAPSHOT_TABLES.includes(caption) }).toEqual({ caption, isBareTable: true });
+  }
+});
+
 test("the review rounds panel says a round that found nothing has no row", () => {
   // s43 round 1, seq 2. `WHERE kind = 'finding'` is the view's only
   // source, so a clean round is invisible — s42's round 12 returned
@@ -517,13 +622,18 @@ const SKILL_CLAIMS: Record<string, string[]> = {
   // place. That is the pin earning its keep — the correction now has
   // to land on all three at once, instead of one of them rotting for
   // three releases the way the role-memory wording did.
+  //
+  // Round 2: the sentence about what the count MEANS is no longer a
+  // clause in this list. It is pinned whole, on this surface and every
+  // other, by `the one canonical sentence is identical on every
+  // surface that reports fix_of_fix` above — clause-level pinning is
+  // what let each surface keep its own paraphrase of the rest.
   "Review rounds": [
     "a commit-id equality join over two recorded fields and nothing more",
     "reads no git history, computes no blame",
     "counted there and NEVER as not-a-fix-of-fix",
     "`introduced_by_unsourced` is the UNKNOWN bucket",
-    "`fix_of_fix` therefore bounds NOTHING — not from below, not from above",
-    "a `resolution_sha` commit may carry work BEYOND the fix",
+    "cannot be attributed either way",
     "counts the rounds that FOUND something, never the rounds RUN",
   ],
 };

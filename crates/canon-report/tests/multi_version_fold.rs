@@ -1107,8 +1107,9 @@ fn both_roots_fold_a_digest_the_rust_reader_refuses_to_return() {
 /// asserts the sourced/unsourced split too: the SUPERSEDED version here
 /// carries no `introduced_by`, so an unfolded read inflates
 /// `introduced_by_unsourced` — the UNKNOWN bucket the panel reports as
-/// a known unknown and uses to justify calling `fix_of_fix` a floor.
-/// Over-reporting the unknown makes that caveat itself wrong.
+/// a known unknown, and the first of the two UNDER-counts its
+/// canonical sentence names. Over-reporting the unknown makes that
+/// sentence itself wrong.
 #[test]
 fn review_rounds_counts_a_refixed_finding_once_at_its_latest_disposition() {
     if !support::duckdb_available() {
