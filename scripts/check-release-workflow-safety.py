@@ -279,13 +279,24 @@ def main() -> int:
         "docker-compose.yml",
         "package.json",
     }
-    tracked_root = {
-        line
-        for line in subprocess.run(
-            ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=False
-        ).stdout.splitlines()
-        if line and "/" not in line
-    }
+    # `check=False` + reading only stdout would pass VACUOUSLY: in a source
+    # tarball with git installed, `git ls-files` exits 128 with empty stdout,
+    # so `tracked_root` would be empty and every stray file would look absent.
+    # A hygiene check that reports success when it could not look is worse
+    # than no check at all.
+    ls = subprocess.run(
+        ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=False
+    )
+    if ls.returncode != 0:
+        ERRORS.append(
+            "cannot list tracked files for the repo-root check: "
+            f"`git ls-files` exited {ls.returncode} ({ls.stderr.strip() or 'no stderr'})"
+        )
+        tracked_root: set[str] = set()
+    else:
+        tracked_root = {
+            line for line in ls.stdout.splitlines() if line and "/" not in line
+        }
     for stray in sorted(tracked_root - allowed_root):
         ERRORS.append(
             f"unexpected tracked file at the repo root: {stray!r} — "

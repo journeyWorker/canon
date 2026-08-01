@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T21:27:36.588536Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "deferred",
+  "file_ref": "crates/canon-cli/src/artifact_ingest.rs",
+  "kind": "finding",
+  "reviewed_sha": "1897e7dfaf4de0e226b9a5f7914e5808629dc0ac",
+  "reviewer": "Main",
+  "round": 8,
+  "schema": 1,
+  "seq": 3,
+  "severity": "note",
+  "summary": "cargo doc --workspace emits 269 diagnostics (private-item links from public module docs, unclosed HTML tags from angle-bracket placeholders like <repo>); only 7 come from files s43 created, artifact_ingest.rs alone carries 45, so this is standing repo debt deferred rather than widened into a release gate. The first count of this said 280, which counted each target's own `generated N warnings` summary line"
+}

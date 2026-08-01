@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T21:27:52.028115Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": ".canon/ledger/kind=finding",
+  "introduced_by": "48c000c083e8189567af9c8a1fa902be4be80751",
+  "kind": "finding",
+  "reviewed_sha": "151409e90e246123e1ba0d66db0c59e258fea315",
+  "reviewer": "R9Final",
+  "round": 9,
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "Round 8's deliberately-deferred doc-warning finding was closed as `fixed` against 48c000c0, a commit that leaves the warnings in place, so the totals row falsely reported 44 fixed and 0 deferred"
+}

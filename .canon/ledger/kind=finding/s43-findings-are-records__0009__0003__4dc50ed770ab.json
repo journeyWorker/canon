@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T21:27:52.153696Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "scripts/check-release-workflow-safety.py:284-286",
+  "introduced_by": "48c000c083e8189567af9c8a1fa902be4be80751",
+  "kind": "finding",
+  "reviewed_sha": "151409e90e246123e1ba0d66db0c59e258fea315",
+  "reviewer": "R9Final",
+  "round": 9,
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "The repo-root hygiene check runs `git ls-files` with check=False and reads only stdout, so in a source tarball git exits 128, tracked_root is empty, and the check passes vacuously"
+}

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T21:27:52.090660Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": ".canon/ledger/kind=finding",
+  "introduced_by": "48c000c083e8189567af9c8a1fa902be4be80751",
+  "kind": "finding",
+  "reviewed_sha": "151409e90e246123e1ba0d66db0c59e258fea315",
+  "reviewer": "R9Final",
+  "round": 9,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "The doc-warning count of 280 included each target's own `generated N warnings` summary line; the real diagnostic count is 269 - the same hand-counted-number defect s43 exists to eliminate, inside the finding that records it"
+}
