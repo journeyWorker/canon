@@ -180,19 +180,25 @@
 //! `--reviewed-sha`, `--resolution-sha` and `--introduced-by` are
 //! refused when this repository does not hold the commit they name.
 //! [`parse_sha`] proves 40 hex characters and nothing else, and s43's
-//! own round 2 proved that is not enough: nine findings were authored
-//! with a short sha zero-padded to 40, all nine were accepted, and all
-//! nine cited a commit that has never existed — a fabricated provenance
-//! recorded, permanently, by the command built to stop fabricated
-//! release facts.
+//! own round 2 proved that is not enough: findings were authored with
+//! a short sha zero-padded to 40, all of them were accepted, and all
+//! of them cited a commit that has never existed — a fabricated
+//! provenance recorded, permanently, by the command built to stop
+//! fabricated release facts.
 //!
-//! EXISTENCE only, and deliberately nothing else. `git cat-file -e
-//! <sha>^{commit}` is the entire check. Canon still never reads the
-//! commit's message, its diff, or its files (the observation section
-//! above), because existence is a different question from content: a
+//! AN EXISTING COMMIT OBJECT, and deliberately nothing else. `git
+//! cat-file -t <sha>` must answer exactly `commit` — the object's OWN
+//! type, unpeeled. All three flags are commit-only by contract, and
+//! `<sha>^{commit}` would not enforce that: it peels RECURSIVELY, so
+//! an annotated TAG's own object id resolves through to the commit it
+//! points at and would be stored in a commit-only field. A tag, tree
+//! or blob object id is refused. Canon still never reads the commit's
+//! message, its diff, or its files (the observation section above),
+//! because existence is a different question from content: a
 //! resolvable `--introduced-by` is still only the author's sourced
 //! claim, and this check does not make it more than that. It only
-//! removes the case where the claim points at nothing at all.
+//! removes the case where the claim points at nothing at all, or at
+//! something that is not a commit.
 //!
 //! BEST-EFFORT, because a false refusal is worse than a missed check:
 //! - `git` not on PATH, or `repo` not a work tree → SKIPPED, not
@@ -206,8 +212,8 @@
 //!   merged branch, a partial clone, a dangling commit) → ACCEPTED.
 //!   This is the case worth stating explicitly, because the two answers
 //!   are genuinely different and the choice is deliberate: the question
-//!   asked is "does this object exist", which is exactly what
-//!   `cat-file -e` answers. Requiring REACHABILITY would refuse a
+//!   asked is "does this repository hold this commit object", which is
+//!   exactly what `cat-file -t` answers. Requiring REACHABILITY would refuse a
 //!   finding authored against the review branch it was raised on, which
 //!   is the normal mid-review case.
 //!
@@ -596,7 +602,7 @@ fn unresolvable_sha(repo: &Path, args: &FindingArgs) -> Option<String> {
             continue;
         }
         return Some(format!(
-            "canon finding add: refused — {flag} {sha} is well-formed but names no commit in this repository. Canon does not read the commit's message or diff and is not doing so now; it only refuses a record whose provenance points at nothing. Check the sha (a short sha padded to 40 characters is the way this has actually happened), or omit the flag."
+            "canon finding add: refused — {flag} {sha} is well-formed but names no commit in this repository. Canon does not read the commit's message or diff and is not doing so now; it only refuses a record whose provenance points at nothing. This flag is commit-only, so an object id that names a tag, a tree or a blob is refused here too. Check the sha (a short sha padded to 40 characters is the way this has actually happened), or omit the flag."
         ));
     }
     None
@@ -604,23 +610,30 @@ fn unresolvable_sha(repo: &Path, args: &FindingArgs) -> Option<String> {
 
 /// `true` iff `git -C repo <args>` succeeds and prints exactly
 /// `expected`. Any failure — `git` missing, a non-zero exit, non-UTF-8
-/// output — is `false`, which is what makes the two callers above SKIP
-/// rather than refuse.
+/// output — is `false`, which is what makes the two skip conditions
+/// above SKIP rather than refuse, and what makes [`commit_exists`]
+/// refuse an object it cannot type.
 fn git_answers(repo: &Path, args: &[&str], expected: &str) -> bool {
     git_command(repo).args(args).output().is_ok_and(|out| out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == expected)
 }
 
-/// `true` iff `repo` holds `sha` as a COMMIT object.
+/// `true` iff `repo` holds `sha` as a COMMIT object — the object's OWN
+/// type, unpeeled.
 ///
-/// `^{commit}` peels, so a sha naming a tag, tree or blob is not a
-/// commit and does not pass — `--reviewed-sha <a tree>` is as wrong as
-/// `--reviewed-sha <nothing>`. Existence, never reachability (module
-/// doc): `cat-file -e` asks the object database directly, so a commit on
-/// an unmerged review branch resolves, which is the normal mid-review
-/// case.
+/// `cat-file -t` reports the type of the named object and peels
+/// nothing, which is the whole reason it is used here instead of
+/// `cat-file -e <sha>^{commit}`: `^{commit}` peels RECURSIVELY, so an
+/// annotated TAG's own object id resolves through to the commit it
+/// points at and would pass. All three flags this backs are
+/// commit-only by contract, so a tag, tree or blob object id is as
+/// wrong as a sha naming nothing, and each answers a type that is not
+/// `commit`.
+///
+/// Existence, never reachability (module doc): the object database is
+/// asked directly, so a commit on an unmerged review branch resolves,
+/// which is the normal mid-review case.
 fn commit_exists(repo: &Path, sha: &Sha) -> bool {
-    let revision = format!("{sha}^{{commit}}");
-    git_command(repo).args(["cat-file", "-e", &revision]).output().is_ok_and(|out| out.status.success())
+    git_answers(repo, &["cat-file", "-t", &sha.to_string()], "commit")
 }
 
 /// The one place `git` is spawned for this module — `-C repo` so the
@@ -703,27 +716,72 @@ mod tests {
         (dir, head)
     }
 
-    /// s43 round 2, seq 10 — the input that got past authoring: a
-    /// well-formed 40-hex sha naming no commit. Nine records citing a
-    /// commit that never existed were accepted by the command built to
-    /// stop fabricated release facts.
-    #[test]
-    fn a_well_formed_sha_that_names_no_commit_is_refused_by_flag_name() {
-        // The literal shape that caused it: a short sha zero-padded to 40.
-        let fabricated = Sha::parse(format!("aa9a4552{}", "0".repeat(32))).unwrap();
+    /// An ANNOTATED tag on `HEAD`, and its OWN object id — the id
+    /// `git rev-parse <tag>` prints, which is the tag object, not the
+    /// commit it points at. The distinction is the whole test below.
+    fn annotated_tag(repo: &Path, name: &str) -> Sha {
+        let git = |args: &[&str]| {
+            let status = Command::new("git").arg("-C").arg(repo).args(args).status().expect("git must be on PATH for this test");
+            assert!(status.success(), "git {args:?} failed");
+        };
+        git(&["tag", "-a", name, "-m", "an annotated tag", "HEAD"]);
+        let out = Command::new("git").arg("-C").arg(repo).args(["rev-parse", name]).output().expect("git rev-parse");
+        let tag = Sha::parse(String::from_utf8(out.stdout).unwrap().trim()).expect("a tag object id is a 40-hex sha");
+        // The premise, asserted rather than assumed: if this fixture ever
+        // produced a lightweight tag, `rev-parse` would print the COMMIT
+        // and the test below would pass for the wrong reason.
+        let typed = Command::new("git").arg("-C").arg(repo).args(["cat-file", "-t", &tag.to_string()]).output().expect("git cat-file");
+        assert_eq!(String::from_utf8_lossy(&typed.stdout).trim(), "tag", "the fixture must produce a tag OBJECT");
+        tag
+    }
 
-        for (label, apply) in [
-            ("--reviewed-sha", (|a: &mut FindingArgs, s: Sha| a.reviewed_sha = Some(s)) as fn(&mut FindingArgs, Sha)),
+    /// The three commit-only sha flags with the mutation that sets each
+    /// one. `--resolution-sha` drags `--disposition fixed` along, or the
+    /// coherence refusal fires first and the sha check never runs.
+    fn sha_flags() -> [(&'static str, fn(&mut FindingArgs, Sha)); 3] {
+        [
+            ("--reviewed-sha", |a: &mut FindingArgs, s: Sha| a.reviewed_sha = Some(s)),
             ("--introduced-by", |a: &mut FindingArgs, s: Sha| a.introduced_by = Some(s)),
             ("--resolution-sha", |a: &mut FindingArgs, s: Sha| {
                 a.disposition = FindingDisposition::Fixed;
                 a.resolution_sha = Some(s);
             }),
-        ] {
+        ]
+    }
+
+    /// s43 round 2, seq 10 — the input that got past authoring: a
+    /// well-formed 40-hex sha naming no commit. Records citing a commit
+    /// that never existed were accepted by the command built to stop
+    /// fabricated release facts.
+    #[test]
+    fn a_well_formed_sha_that_names_no_commit_is_refused_by_flag_name() {
+        // The literal shape that caused it: a short sha zero-padded to 40.
+        let fabricated = Sha::parse(format!("aa9a4552{}", "0".repeat(32))).unwrap();
+
+        for (label, apply) in sha_flags() {
             let (dir, _head) = git_repo();
             let mut fabricating = args("s43-findings-are-records", 2, 10);
             apply(&mut fabricating, fabricated.clone());
             assert_eq!(run_add(dir.path(), &fabricating), 2, "{label} accepted a commit that does not exist");
+            assert!(staged_bodies(dir.path()).is_empty(), "{label}: a refused add must stage nothing");
+        }
+    }
+
+    /// s43 round 3, finding 2. All three flags are commit-only by
+    /// contract, and the check used to be `cat-file -e <sha>^{commit}`
+    /// — which peels RECURSIVELY, so an annotated TAG's own object id
+    /// resolved through to the commit it points at and was accepted
+    /// into a commit-only provenance field. The object EXISTS and is
+    /// not a commit, which is exactly the case the peeling check could
+    /// not distinguish.
+    #[test]
+    fn an_annotated_tags_own_object_id_is_refused_on_every_sha_flag() {
+        for (label, apply) in sha_flags() {
+            let (dir, _head) = git_repo();
+            let tag = annotated_tag(dir.path(), "v-review");
+            let mut tagged = args("s43-findings-are-records", 3, 2);
+            apply(&mut tagged, tag.clone());
+            assert_eq!(run_add(dir.path(), &tagged), 2, "{label} accepted a tag object id {tag} into a commit-only field");
             assert!(staged_bodies(dir.path()).is_empty(), "{label}: a refused add must stage nothing");
         }
     }

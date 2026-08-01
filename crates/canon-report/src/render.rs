@@ -11,7 +11,7 @@
 
 use canon_model::envelope::RecordKind;
 
-use crate::digest::DigestHeader;
+use crate::digest::{self, DigestHeader};
 use crate::marts::MartResult;
 use crate::tier_boundary;
 
@@ -251,9 +251,9 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
 
     out.push_str("## Inputs (digest)\n\n");
     out.push_str("| input | digest |\n|---|---|\n");
-    out.push_str(&format!("| corpus (change/task/scenario) | `{}` |\n", digest.corpus_hash));
+    out.push_str(&format!("| corpus ({}) | `{}` |\n", digest::corpus_coverage_label(), digest.corpus_hash));
     out.push_str(&format!("| policy | `{}` |\n", digest.policy_hash));
-    out.push_str(&format!("| ledger head (evidence/review/divergence) | `{}` |\n", digest.ledger_hash));
+    out.push_str(&format!("| ledger head ({}) | `{}` |\n", digest::ledger_coverage_label(), digest.ledger_hash));
     out.push('\n');
 
     if let Some(note) = tier_boundary::render_note(kinds_not_read_directly) {
@@ -424,6 +424,37 @@ mod tests {
     fn rendered() -> String {
         let digest = DigestHeader { corpus_hash: "c".to_string(), policy_hash: "p".to_string(), ledger_hash: "l".to_string() };
         render(&digest, &empty_marts(), &[])
+    }
+
+    /// s43 round 3, finding 5. The two `## Inputs (digest)` labels were
+    /// hand-typed and still read `change/task/scenario` and
+    /// `evidence/review/divergence` two kinds after `Subject` and
+    /// `Finding` joined the digest — a header naming a strict subset of
+    /// what it fingerprints. They are now generated from
+    /// `crate::digest`'s own partition, and this asserts the RENDERED
+    /// lines against that partition kind by kind: each digested kind
+    /// names itself on its own row and on no other, and each excluded
+    /// kind appears on neither. A subset, a superset, or a stale
+    /// spelling (`evidence` for `evidence_record`) all fail here.
+    #[test]
+    fn the_inputs_labels_state_exactly_what_the_digest_hashes() {
+        let report = rendered();
+        let corpus_line = report.lines().find(|line| line.starts_with("| corpus ")).expect("a corpus digest row");
+        let ledger_line = report.lines().find(|line| line.starts_with("| ledger head ")).expect("a ledger head digest row");
+
+        let corpus_kinds = digest::corpus_kinds();
+        let ledger_kinds = digest::ledger_kinds();
+        for kind in RecordKind::ALL {
+            let name = kind.as_str();
+            assert_eq!(corpus_line.contains(name), corpus_kinds.contains(&kind), "corpus label disagrees with the corpus digest about `{name}`: {corpus_line}");
+            assert_eq!(ledger_line.contains(name), ledger_kinds.contains(&kind), "ledger label disagrees with the ledger digest about `{name}`: {ledger_line}");
+        }
+
+        // The open half is not enumerable per-kind, so the label has to
+        // say it is covered rather than list it (`digest`'s
+        // `overlay_texts`).
+        assert!(corpus_line.contains("namespaced overlay"), "the corpus label must state that overlay kinds are hashed too: {corpus_line}");
+        assert!(!ledger_line.contains("overlay"), "overlays are corpus-side; the ledger label must not claim them: {ledger_line}");
     }
 
     /// The panel must describe the join the SQL actually performs —

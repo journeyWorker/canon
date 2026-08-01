@@ -31,6 +31,36 @@ fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
 
+/// A `--help` invocation's stdout, or WHY it may not be read.
+///
+/// A help assertion that is entirely NEGATIVE (`!help.contains(...)`)
+/// is satisfied by the empty string, so a help branch that never
+/// checks the invocation itself reports success having checked
+/// nothing — the vacuous-pass shape `panel-copy.test.ts` was rewritten
+/// twice to remove, and the shape s43 round 3 (finding 4) found here.
+/// Every caller goes through this: exit status and one stable POSITIVE
+/// marker first, negative assertions only afterwards.
+fn checked_help(output: &Output, marker: &str) -> Result<String, String> {
+    if !output.status.success() {
+        return Err(format!("--help exited {:?}: {}", output.status.code(), stderr(output)));
+    }
+    let help = stdout(output);
+    if !help.contains(marker) {
+        return Err(format!("--help printed no `{marker}` ({} bytes of stdout)", help.len()));
+    }
+    Ok(help)
+}
+
+fn help_stdout(args: &[&str], marker: &str, cwd: &Path) -> String {
+    checked_help(&run_canon(args, cwd), marker).unwrap_or_else(|why| panic!("`canon {}`: {why}", args.join(" ")))
+}
+
+/// The stable positive markers, one per help surface: clap's own usage
+/// line, which is present iff the command parsed and printed help at
+/// all, and which no `after_help` wording change can quietly remove.
+const ADD_HELP_MARKER: &str = "Usage: canon finding add";
+const PARENT_HELP_MARKER: &str = "Usage: canon finding <COMMAND>";
+
 /// A repo with nothing but a `canon.yaml`.
 ///
 /// Deliberately barer than `tests/evidence.rs`'s fixture, and the
@@ -374,9 +404,7 @@ fn gate_promote_tallies_per_kind_and_names_an_empty_staging_area() {
 #[test]
 fn finding_add_help_states_it_is_an_observation_and_names_what_canon_skips() {
     let dir = tempfile::tempdir().expect("a temp dir");
-    let output = run_canon(&["finding", "add", "--help"], dir.path());
-    assert!(output.status.success(), "--help must exit 0: {}", stderr(&output));
-    let help = stdout(&output);
+    let help = help_stdout(&["finding", "add", "--help"], ADD_HELP_MARKER, dir.path());
 
     assert!(help.contains("RECORDED OBSERVATION, NOT PROOF"), "{help}");
     assert!(help.contains("does not verify that the defect"), "{help}");
@@ -411,35 +439,182 @@ fn finding_add_help_states_it_is_an_observation_and_names_what_canon_skips() {
     assert!(!help.contains("verifies that"), "{help}");
 }
 
+/// The nouns whose COUNT is the banned claim, in the plural — a number
+/// before one of these is "how many", which is the claim.
+const METRIC_PLURALS: &[&str] = &["findings", "rounds", "issues", "fix-of-fixes"];
+
+/// The same nouns either way round, for the `<noun> count is <n>`
+/// shape, where the noun's number does not matter.
+const METRIC_NOUNS: &[&str] = &["finding", "findings", "round", "rounds", "issue", "issues", "fix-of-fix", "fix-of-fixes"];
+
+/// The words that turn an adjacent noun into a tally.
+const COUNTING_WORDS: &[&str] = &["count", "counts", "total", "totals", "tally", "tallies", "number"];
+
+/// Spelled cardinals, deliberately starting at `three`: see
+/// [`hand_typed_count`]'s doc for the line and why it sits there.
+const SPELLED_COUNTS: &[&str] = &[
+    "zero",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "sixty",
+    "seventy",
+    "eighty",
+    "ninety",
+    "hundred",
+    "thousand",
+    "dozen",
+    "dozens",
+];
+
+/// One whitespace-separated token, lowercased with surrounding
+/// punctuation and markup stripped. Hyphens and underscores survive
+/// INSIDE a token on purpose: `1-based`, `zero-padded` and
+/// `{change_id}__{round:04}__{seq:04}` must stay distinguishable from
+/// the bare numbers they contain, and `--round` must stay
+/// distinguishable from the noun `round`.
+fn word(raw: &str) -> String {
+    raw.to_ascii_lowercase().trim_matches(|c: char| !c.is_alphanumeric() && c != '-' && c != '_').to_string()
+}
+
+/// The two spelled cardinals mechanism prose is written in — "two
+/// concurrent adds", "one finding's identity". See [`hand_typed_count`]
+/// for where they are admitted and where they are deliberately not.
+const SMALL_SPELLED: &[&str] = &["one", "two"];
+
+/// `true` for a token that is entirely a cardinal quantity, EXCEPT a
+/// bare [`SMALL_SPELLED`] one: all digits (`3`, `19`), a spelled
+/// cardinal (`three`, `eleven`), or a hyphenated compound of those
+/// (`twenty-one`, whose `one` is part of a number rather than a word
+/// on its own). `1-based`, `zero-padded`, `v0.4.0` and `120-134` are
+/// NOT quantities — a number welded into a larger word is not an
+/// assertion of how many.
+fn quantity(word: &str) -> bool {
+    !word.is_empty()
+        && !SMALL_SPELLED.contains(&word)
+        && word.split('-').all(|part| !part.is_empty() && (part.chars().all(|c| c.is_ascii_digit()) || SPELLED_COUNTS.contains(&part) || SMALL_SPELLED.contains(&part)))
+}
+
+/// `true` when a raw token closes its clause — it ends the line, or
+/// carries clause-ending punctuation once trailing markup is stripped.
+/// `2.` and `two,` close; `one` in "one sentence" does not.
+fn clause_final(raw: &str, is_last: bool) -> bool {
+    is_last || raw.trim_end_matches(|c: char| c.is_alphanumeric()).contains(['.', ',', ';', ':', '!', '?'])
+}
+
+/// The offending span when `text` asserts a hand-typed count of
+/// findings, rounds, issues or fix-of-fixes; `None` otherwise.
+///
+/// Two shapes, and the guard claims exactly these two:
+///
+/// 1. a [`quantity`] within two words BEFORE a plural metric noun —
+///    "3 findings", "3 review rounds", "eleven code-review rounds",
+///    "thirty findings", "19 real issues";
+/// 2. a counting word bound to a metric noun (within three words,
+///    either side) carrying a value within four words after —
+///    "fix-of-fix count is 2", "fix-of-fix total: 3", "the count of
+///    findings is three".
+///
+/// # Where the line is drawn, and what is deliberately allowed
+/// A number AFTER a singular noun is an INDEX, not a count, and every
+/// such number on these surfaces is legitimate: `--round 1 --seq 1` in
+/// the flag example, "s43 round 2 (finding 4)" citing which round
+/// raised what, "(1-based)" in a flag's own help. Shape 1 therefore
+/// requires the noun to be PLURAL and the number to come BEFORE it,
+/// which is where English puts a quantifier and nowhere else.
+///
+/// Spelled `one` and `two` are the register mechanism prose is written
+/// in — "two concurrent adds", "two distinct findings under one
+/// finding's identity", "MEANS is one sentence" — and banning them
+/// outright would force a rewording of correct text, which is worse
+/// than the disease. So they count as a value only where they cannot
+/// be quantifying the next word: as the CLAUSE-FINAL value of a
+/// counting word, "the fix-of-fix count is two." A digit is a value at
+/// any magnitude and in either shape, because prose describing a
+/// mechanism spells its small numbers out and a metric claim reaches
+/// for a digit.
+///
+/// The hole this leaves, stated rather than papered over: "there are
+/// two findings" passes. "there are 2 findings", "there are three
+/// findings" and "the finding count is two." all fail. The guard also
+/// does not police the word `record`, which is too common in this
+/// command's own prose to quantify safely.
+fn hand_typed_count(text: &str) -> Option<String> {
+    let raw: Vec<&str> = text.split_whitespace().collect();
+    let words: Vec<String> = raw.iter().map(|token| word(token)).collect();
+    let at = |i: usize| words.get(i).map(String::as_str).unwrap_or("");
+    let span = |from: usize, to: usize| words[from..=to.min(words.len() - 1)].join(" ");
+    let value = |i: usize| match words.get(i) {
+        Some(word) => quantity(word) || (SMALL_SPELLED.contains(&word.as_str()) && clause_final(raw[i], i + 1 == raw.len())),
+        None => false,
+    };
+
+    for i in 0..words.len() {
+        if quantity(at(i)) {
+            if let Some(j) = (i + 1..=i + 2).find(|&j| METRIC_PLURALS.contains(&at(j))) {
+                return Some(span(i, j));
+            }
+        }
+        if COUNTING_WORDS.contains(&at(i)) {
+            let bound_to_a_metric = (i.saturating_sub(3)..=i + 3).any(|k| k != i && METRIC_NOUNS.contains(&at(k)));
+            if bound_to_a_metric {
+                if let Some(k) = (i + 1..=i + 4).find(|&k| value(k)) {
+                    return Some(span(i.saturating_sub(3), k));
+                }
+            }
+        }
+    }
+    None
+}
+
 /// s43 round 2, finding 4. The help shipped "The true fix-of-fix count
 /// is 2." — a hand-typed release metric, on the command built to stop
-/// hand-typed release metrics, and the number was WRONG: the derived
-/// count is 19, and `tasks.md` 4.2 records that both the published
-/// `four` and the correction `two` were guesses. The module doc carried
-/// the same 2, plus "eleven code-review rounds" and "thirty findings",
-/// neither of which this corpus can supply — the panel these very docs
-/// point at says the rounds-RUN count is not derivable at all.
+/// hand-typed release metrics, and the number was WRONG. `tasks.md`
+/// 4.2 records that both the published `four` and the correction `two`
+/// were guesses. The module doc carried the same claim, plus "eleven
+/// code-review rounds" and "thirty findings", neither of which this
+/// corpus can supply — the panel these very docs point at says the
+/// rounds-RUN count is not derivable at all.
 ///
-/// So: no count of findings, rounds, or fix-of-fixes may be asserted in
-/// the shipped help or in the module doc behind it. Banned by spelling,
-/// like the panel's own `DIRECTIONAL_PHRASES`/`CAUSAL_PHRASES` lists,
-/// because the failure mode is a plausible sentence rather than a
-/// detectable one. A number belongs in `mart_review_rounds`; prose gets
-/// to point at it and nothing else.
+/// So: no count of findings, rounds, issues or fix-of-fixes may be
+/// asserted in the shipped help or in the module docs behind it. s43
+/// round 3 (finding 3) replaced the substring blacklist this started
+/// as — which caught the nine sentences that had shipped and nothing
+/// else — with [`hand_typed_count`], which catches the SHAPE. The
+/// literal list stays as a second belt: it pins the exact strings that
+/// did ship, including the two ("real issues", "of them defects") whose
+/// nouns are outside the shape guard's vocabulary. A number belongs in
+/// `mart_review_rounds`; prose gets to point at it and nothing else.
 #[test]
 fn no_shipped_finding_help_or_doc_asserts_a_hand_typed_count() {
     let dir = tempfile::tempdir().expect("a temp dir");
-    let add_help = stdout(&run_canon(&["finding", "add", "--help"], dir.path()));
-    let finding_help = stdout(&run_canon(&["finding", "--help"], dir.path()));
-    // The module docs BEHIND that help: the wrong `2` lived in both, and
-    // correcting only the string a user sees would leave the next
+    let add_help = help_stdout(&["finding", "add", "--help"], ADD_HELP_MARKER, dir.path());
+    let finding_help = help_stdout(&["finding", "--help"], PARENT_HELP_MARKER, dir.path());
+    // The module docs BEHIND that help: the wrong number lived in both,
+    // and correcting only the string a user sees would leave the next
     // author copying it back out of the source.
     let module_doc = include_str!("../src/finding.rs");
     let cli_surface = include_str!("../src/main.rs");
 
-    // Every count claim these surfaces have actually shipped, plus the
-    // shapes they were written in. Lowercased substring match: a new
-    // number in an old sentence is what this catches.
+    // The exact sentences that shipped. Lowercased substring match.
     const BANNED: &[&str] = &[
         "real issues",
         "of them defects",
@@ -461,10 +636,87 @@ fn no_shipped_finding_help_or_doc_asserts_a_hand_typed_count() {
         for phrase in BANNED {
             assert!(!haystack.contains(&phrase.to_ascii_lowercase()), "{where_} asserts a hand-typed count via {phrase:?}");
         }
+        // Per LINE, so the span a failure names is the sentence to fix
+        // rather than a window spanning half a paragraph.
+        for (n, line) in text.lines().enumerate() {
+            if let Some(span) = hand_typed_count(line) {
+                panic!("{where_} line {} asserts a hand-typed count: {span:?}\n  {line}", n + 1);
+            }
+        }
     }
 
     // The positive half: having removed the number, the help must say
     // where the real one lives, or it has simply dropped the subject.
     assert!(add_help.contains("Review rounds"), "the help must point at the derived panel: {add_help}");
     assert!(add_help.contains(".canon/REPORT.md"), "the help must name where that panel is rendered: {add_help}");
+}
+
+/// The guard's own contract, both halves — it must catch the class it
+/// names, and it must spare every legitimate number these surfaces
+/// actually carry. Without the second half the guard would be one
+/// tightening away from forcing a rewording of correct help, which is
+/// the failure mode a shape guard has and a substring list does not.
+#[test]
+fn the_count_guard_catches_the_class_and_spares_the_indices() {
+    for claim in [
+        "there are 3 findings",
+        "3 review rounds",
+        "fix-of-fix total: 3",
+        "three findings",
+        "there are three findings on this change",
+        "the true fix-of-fix count is 2",
+        "the fix-of-fix count is **2**",
+        "the finding count is 19",
+        "the count of findings is three",
+        "eleven code-review rounds",
+        "thirty findings",
+        "19 real issues",
+        "twenty-one open findings",
+        "we closed 7 findings in 2 rounds",
+    ] {
+        assert!(hand_typed_count(claim).is_some(), "the guard must catch {claim:?}");
+    }
+
+    for legitimate in [
+        "canon finding add --change-id s43-findings-are-records --round 1 --seq 1",
+        "a finding's natural key is `{change_id}__{round:04}__{seq:04}`",
+        "Which review round on this change raised it (1-based)",
+        "This finding's index within the round (1-based)",
+        "s43 round 2 (finding 4) found this doc and the --help text below",
+        "v0.4.0 shipped after a long run of code-review rounds",
+        "two concurrent adds land two distinct findings under one finding's identity",
+        "a DERIVED count that stops being typed from memory",
+        "v0.4.0's release note hand-typed its issue counts into a published tag",
+        "Where in the tree, as path/to/file.rs:120-134 (line breaks refused)",
+        "a short sha zero-padded to 40, and all of them were accepted",
+        "the counts live in mart_review_rounds, off the 'Review rounds' panel",
+    ] {
+        assert_eq!(hand_typed_count(legitimate), None, "the guard must spare {legitimate:?}");
+    }
+}
+
+/// s43 round 3, finding 4: the branch above used to read
+/// `stdout(&run_canon(...))` and apply only `!contains(...)`
+/// assertions, so a help invocation that FAILED — printing nothing to
+/// stdout — satisfied every one of them and the guard reported success
+/// having inspected an empty string. This pins that the empty case is
+/// genuinely vacuous, and that [`checked_help`] refuses it.
+#[test]
+fn an_empty_help_invocation_is_refused_rather_than_passing_vacuously() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let broken = run_canon(&["finding", "--no-such-flag"], dir.path());
+
+    assert!(!broken.status.success(), "the premise: clap refuses an unknown flag");
+    assert!(stdout(&broken).is_empty(), "the premise: a clap error prints nothing to stdout: {}", stdout(&broken));
+    // Every negative assertion the old branch made passes on it, which
+    // is precisely why the positive check has to come first.
+    assert!(hand_typed_count(&stdout(&broken)).is_none());
+    assert!(!stdout(&broken).contains("--fix-of-fix"));
+
+    let refused = checked_help(&broken, PARENT_HELP_MARKER).expect_err("a failed --help must not be readable as help");
+    assert!(refused.contains("exited"), "the refusal must name the exit status: {refused}");
+
+    // And the ordinary invocation still reads, so this is not a blanket
+    // refusal: the marker is present in real help.
+    assert!(checked_help(&run_canon(&["finding", "--help"], dir.path()), PARENT_HELP_MARKER).is_ok());
 }

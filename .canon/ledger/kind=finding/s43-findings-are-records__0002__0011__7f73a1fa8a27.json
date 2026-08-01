@@ -3,18 +3,18 @@
     "agent_id": "canon",
     "role": "reviewer"
   },
-  "at": "2026-08-01T17:24:29.064581Z",
+  "at": "2026-08-01T17:36:19.273024Z",
   "change_id": "s43-findings-are-records",
   "disposition": "fixed",
   "file_ref": ".gitignore:26-27",
   "introduced_by": "aa9a4552c069bee5db982abe399e4a1341007e78",
   "kind": "finding",
-  "resolution_sha": "fea1bc8b3c0066e804398adf772842be1d82a733",
+  "resolution_sha": "c8c67469f7cb2ffd5eaed16a4499f28feaaee286",
   "reviewed_sha": "aa9a4552c069bee5db982abe399e4a1341007e78",
   "reviewer": "Main",
   "round": 2,
   "schema": 1,
   "seq": 11,
   "severity": "blocker",
-  "summary": "The whole finding corpus s43 exists to produce was written, promoted and silently NOT committed: .gitignore re-included only kind=evidence_record, the one kind s42 happened to need, so `git commit` reported a clean tree while 44 authored records sat untracked"
+  "summary": "The whole finding corpus s43 exists to produce was written, promoted and silently NOT committed: .gitignore re-included only kind=evidence_record, the one kind s42 happened to need, so `git commit` reported a clean tree while 43 authored records sat untracked"
 }

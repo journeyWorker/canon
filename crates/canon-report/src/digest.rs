@@ -25,8 +25,43 @@
 //! meaningful over content a `git diff` could actually show a
 //! reviewer, exactly parity.py's own model (its corpus/ledger are both
 //! plain git-tracked files, never a cache/cold-tier export).
+//!
+//! # The open half: namespaced overlay kinds
+//! `RecordKind` is closed; the git tier's `kind=<x>/` namespace is
+//! NOT. `GitTier::write_namespaced` stores plugin overlay records
+//! (`<namespace>.<kind>`, e.g. `porting.coverage`) in the same tier
+//! beside the core kinds; `canon-store`'s `stg_git_records` view globs
+//! `kind=*/**/*.json` without distinguishing them; and
+//! `mart_scope_status` selects `kind = 'porting.coverage'` straight
+//! out of the result, which the report RENDERS and `--snapshot`
+//! EXPORTS to `mart_scope_status.parquet`. A digest that partitions
+//! only `RecordKind::ALL` therefore let a corpus differing ONLY in a
+//! coverage overlay row ship DIFFERENT parquet bytes under an
+//! IDENTICAL `source_digest` (s43 round 3, finding 1).
+//!
+//! **Which overlays are digested: all of them.** Two readings were
+//! available. "Digest what this snapshot describes" would cover only
+//! the overlay kinds some exported mart reads today; "digest the
+//! corpus this snapshot came from" covers every overlay file the tier
+//! holds. The second is chosen, for two reasons. The mart→overlay
+//! coupling lives in SQL text (`sql/views.sql`'s literal
+//! `kind = 'porting.coverage'`), out of this crate's reach, so the
+//! first reading is not computable here without a SECOND hand-kept
+//! list — and a hand-kept list is the exact mechanism that produced
+//! this finding and finding 8 before it. And the two failure modes are
+//! not symmetric: over-covering costs a spurious digest change on an
+//! overlay nothing reads, while under-covering is a false provenance
+//! claim, which is the only thing this value exists to make.
+//!
+//! Overlays land on the CORPUS side. An overlay is authored,
+//! git-tracked, PR-reviewable declaration hanging off a core record
+//! (`porting.coverage`'s declared `core_kind` is `scenario`) — the
+//! module's own membership test for the declarative side. The ledger
+//! side stays exactly canon's four closed verdict kinds, so "ledger
+//! head" keeps meaning "canon's own attestations" rather than
+//! "whatever a plugin wrote".
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use canon_model::envelope::RecordKind;
 use canon_model::evidence::RawRecord;
@@ -43,7 +78,7 @@ use crate::error::ReportError;
 /// depends on `canon-model`/`canon-store` only, task 1.1).
 pub const POLICY_YAML_RELATIVE_PATH: &str = canon_model::paths::POLICY_FILE;
 
-/// Which digest a record kind feeds, or why it feeds neither.
+/// Which digest a CORE record kind feeds, or why it feeds neither.
 ///
 /// An exhaustive `match` rather than two hand-maintained arrays,
 /// because the arrays were wrong. The digest was written against
@@ -56,6 +91,13 @@ pub const POLICY_YAML_RELATIVE_PATH: &str = canon_model::paths::POLICY_FILE;
 /// adding a fifteenth stops compiling until someone says which side
 /// it lands on — the same "a new kind is a reviewed change, never a
 /// silent default" posture `canon-model` already takes.
+///
+/// This closes the CLOSED half only. A `match` over an enum cannot
+/// see the open `kind=<x>/` namespace beside it, which is precisely
+/// how the whole namespaced-overlay space slipped past a construct
+/// written to make slipping past impossible (s43 round 3, finding 1).
+/// The open half is covered by DISCOVERY instead — see
+/// [`overlay_kind_dirs`], which has no list to fall out of date.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DigestSide {
     /// The declarative "what exists to be verified" side
@@ -104,20 +146,119 @@ const fn digest_side(kind: RecordKind) -> DigestSide {
     }
 }
 
-/// The record kinds [`corpus_hash`] digests, derived from
-/// [`digest_side`] so the two can never disagree.
-fn corpus_kinds() -> Vec<RecordKind> {
+/// The CORE record kinds [`corpus_hash`] digests, derived from
+/// [`digest_side`] so the two can never disagree. The corpus digest
+/// additionally covers every namespaced overlay ([`overlay_texts`]),
+/// which no `RecordKind` list can name.
+pub(crate) fn corpus_kinds() -> Vec<RecordKind> {
     kinds_on(DigestSide::Corpus)
 }
 
 /// The record kinds [`ledger_hash`] digests, derived from
 /// [`digest_side`] so the two can never disagree.
-fn ledger_kinds() -> Vec<RecordKind> {
+pub(crate) fn ledger_kinds() -> Vec<RecordKind> {
     kinds_on(DigestSide::Ledger)
 }
 
 fn kinds_on(side: DigestSide) -> Vec<RecordKind> {
     RecordKind::ALL.into_iter().filter(|kind| digest_side(*kind) == side).collect()
+}
+
+/// Every namespaced-overlay `kind=<x>/` directory the git tier holds:
+/// every `kind=` directory whose `<x>` is not one of the closed core
+/// kinds (module doc, "the open half"), as `(kind, absolute path)`
+/// sorted by kind.
+///
+/// DISCOVERED from the tier's own directory listing, never enumerated
+/// from a list this module maintains, and deliberately mirroring
+/// `canon-store`'s `stg_git_records` glob (`kind=*/**/*.json`,
+/// `sql/views.sql`) rather than any Rust-side registry: that glob IS
+/// the read surface every mart is built over, so matching it is what
+/// makes "the digest covers what the report reads" a checkable
+/// statement instead of an aspiration. A future overlay kind cannot
+/// slip past the way `Subject`/`Finding` slipped past the hand-kept
+/// arrays, because nothing here has to be told the kind exists.
+fn overlay_kind_dirs(git_root: &Path) -> Vec<(String, PathBuf)> {
+    let Ok(entries) = std::fs::read_dir(git_root) else { return Vec::new() };
+    let mut dirs: Vec<(String, PathBuf)> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if !path.is_dir() {
+                return None;
+            }
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let kind = name.strip_prefix("kind=")?.to_string();
+            (!RecordKind::ALL.iter().any(|core| core.as_str() == kind)).then_some((kind, path))
+        })
+        .collect();
+    dirs.sort();
+    dirs
+}
+
+/// One corpus-digest input line per overlay FILE: its tier-relative
+/// path, then a full sha256 over the file's bytes.
+///
+/// Deliberately NOT `GitTier::scan_namespaced_kind`. That reader first
+/// validates the `<namespace>.<kind>` identity grammar — so a
+/// directory named `kind=weird` is an `Err` it never reads at all —
+/// and then drops an unparseable body as a violation. Both are files
+/// `stg_git_records`' glob still hands to `mart_scope_status`, so
+/// routing the digest through that reader would reintroduce the same
+/// hole one layer down. Hashing raw bytes covers exactly what the glob
+/// covers and needs no schema this crate does not have for a foreign
+/// namespace. The relative path is part of the input so a file moved
+/// between overlay kinds still moves the digest.
+fn overlay_texts(git_root: &Path) -> Vec<String> {
+    let mut texts = Vec::new();
+    let mut files = Vec::new();
+    for (_, dir) in overlay_kind_dirs(git_root) {
+        files.clear();
+        collect_json_files(&dir, &mut files);
+        for file in &files {
+            let Ok(bytes) = std::fs::read(file) else { continue };
+            let relative = file.strip_prefix(git_root).unwrap_or(file).to_string_lossy().replace('\\', "/");
+            let mut hasher = Sha256::new();
+            hasher.update(&bytes);
+            texts.push(format!("{relative}\n{}", hex_prefix(&hasher.finalize(), 64)));
+        }
+    }
+    texts
+}
+
+fn collect_json_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_json_files(&path, out);
+        } else if path.extension().is_some_and(|ext| ext == "json") {
+            out.push(path);
+        }
+    }
+}
+
+/// What the rendered header's corpus row claims to cover, GENERATED
+/// from [`corpus_kinds`] and the overlay rule rather than hand-typed
+/// beside them (s43 round 3, finding 5: the label still read
+/// `change/task/scenario` two kinds after `Subject` was added). A full
+/// statement of coverage, never a curated subset — every core kind on
+/// this side is named, and the open half is named as the open half,
+/// since its members are discovered per repo and cannot be listed
+/// here.
+pub(crate) fn corpus_coverage_label() -> String {
+    format!("{}, plus every namespaced overlay in the git tier", slashed(&corpus_kinds()))
+}
+
+/// What the rendered header's ledger row covers — same contract as
+/// [`corpus_coverage_label`]; no overlay clause, because overlays are
+/// corpus-side (module doc).
+pub(crate) fn ledger_coverage_label() -> String {
+    slashed(&ledger_kinds())
+}
+
+fn slashed(kinds: &[RecordKind]) -> String {
+    kinds.iter().map(|kind| kind.as_str()).collect::<Vec<_>>().join("/")
 }
 
 /// The three input digests every rendered report header embeds — no
@@ -159,26 +300,34 @@ fn hex_prefix(bytes: &[u8], chars: usize) -> String {
     out
 }
 
-/// Canonical, deterministic serialization of `records` for hashing:
-/// sorted by `(at, raw JSON text)` so two runs over identical content —
-/// regardless of on-disk file iteration order — hash identically
-/// (mirrors parity.py's `_ledger_digest`: `sorted(records, key=lambda
-/// r: str(r.get("at", "")))`, `sort_keys=True` on the JSON dump; this
-/// module additionally breaks same-`at` ties on the JSON text itself,
-/// since `serde_json::Value`'s own `Ord` is not implemented and
-/// per-record JSON text IS already canonical — `RawRecord` is read
-/// straight off disk, never re-serialized, so key order is exactly
-/// what `serde_json::to_string` on that same `Value` produces
-/// deterministically for a `Map` in `BTreeMap` mode — no
+/// Canonical, deterministic serialization of `records` as digest-input
+/// lines: one line per record, later sorted by [`digest_texts`] so two
+/// runs over identical content — regardless of on-disk file iteration
+/// order — hash identically (mirrors parity.py's `_ledger_digest`:
+/// `sorted(records, key=lambda r: str(r.get("at", "")))`,
+/// `sort_keys=True` on the JSON dump; this module sorts on the JSON
+/// text itself, since `serde_json::Value`'s own `Ord` is not
+/// implemented and per-record JSON text IS already canonical —
+/// `RawRecord` is read straight off disk, never re-serialized, so key
+/// order is exactly what `serde_json::to_string` on that same `Value`
+/// produces deterministically for a `Map` in `BTreeMap` mode — no
 /// `preserve_order` feature anywhere in this workspace, matching
 /// `canon-ingest::normalize`'s own documented assumption).
-fn canonical_blob(records: &[RawRecord]) -> Option<String> {
-    if records.is_empty() {
-        return None;
+fn record_texts(records: &[RawRecord]) -> Vec<String> {
+    records.iter().map(|r| serde_json::to_string(&r.0).unwrap_or_default()).collect()
+}
+
+/// One digest over a side's input lines, whatever produced them
+/// ([`record_texts`] for core kinds, [`overlay_texts`] for the open
+/// half): sorted, newline-joined, sha256, first 12 hex.
+fn digest_texts(mut texts: Vec<String>) -> String {
+    if texts.is_empty() {
+        // parity.py's own literal placeholder for "nothing to hash"
+        // (`_ledger_digest`: `if not records: return "—"`).
+        return "—".to_string();
     }
-    let mut texts: Vec<String> = records.iter().map(|r| serde_json::to_string(&r.0).unwrap_or_default()).collect();
     texts.sort();
-    Some(texts.join("\n"))
+    digest12(&texts.join("\n"))
 }
 
 fn read_kind(git_root: &Path, kind: RecordKind) -> Result<Vec<RawRecord>, ReportError> {
@@ -193,17 +342,12 @@ fn read_kind(git_root: &Path, kind: RecordKind) -> Result<Vec<RawRecord>, Report
     }
 }
 
-fn digest_kinds(git_root: &Path, kinds: &[RecordKind]) -> Result<String, ReportError> {
-    let mut all = Vec::new();
+fn kind_texts(git_root: &Path, kinds: &[RecordKind]) -> Result<Vec<String>, ReportError> {
+    let mut texts = Vec::new();
     for kind in kinds {
-        all.extend(read_kind(git_root, *kind)?);
+        texts.extend(record_texts(&read_kind(git_root, *kind)?));
     }
-    Ok(match canonical_blob(&all) {
-        Some(blob) => digest12(&blob),
-        // parity.py's own literal placeholder for "nothing to hash"
-        // (`_ledger_digest`: `if not records: return "—"`).
-        None => "—".to_string(),
-    })
+    Ok(texts)
 }
 
 impl DigestHeader {
@@ -212,8 +356,12 @@ impl DigestHeader {
     /// corpus/ledger record scan, module doc: git tier only, never
     /// r2/learn).
     pub fn compute(repo_root: &Path, git_root: &Path) -> Result<Self, ReportError> {
-        let corpus_hash = digest_kinds(git_root, &corpus_kinds())?;
-        let ledger_hash = digest_kinds(git_root, &ledger_kinds())?;
+        let mut corpus = kind_texts(git_root, &corpus_kinds())?;
+        // The open half (module doc): every namespaced overlay the
+        // tier holds, discovered rather than listed.
+        corpus.extend(overlay_texts(git_root));
+        let corpus_hash = digest_texts(corpus);
+        let ledger_hash = digest_texts(kind_texts(git_root, &ledger_kinds())?);
         let policy_path = repo_root.join(POLICY_YAML_RELATIVE_PATH);
         let policy_hash = match std::fs::read_to_string(&policy_path) {
             Ok(text) => digest12(&text),
@@ -252,9 +400,9 @@ mod tests {
     }
 
     #[test]
-    fn digest_kinds_over_an_empty_git_root_is_the_em_dash_placeholder() {
+    fn a_digest_side_over_an_empty_git_root_is_the_em_dash_placeholder() {
         let dir = tempfile::tempdir().unwrap();
-        let hash = digest_kinds(dir.path(), &corpus_kinds()).unwrap();
+        let hash = digest_texts(kind_texts(dir.path(), &corpus_kinds()).unwrap());
         assert_eq!(hash, "—");
     }
 
@@ -353,5 +501,150 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let header = DigestHeader::compute(dir.path(), &dir.path().join("ledger")).unwrap();
         assert_eq!(header.policy_hash, "—");
+    }
+
+    /// A well-formed overlay body for `namespaced_kind`, keyed
+    /// `{project_id}__{scenario_id}` exactly as
+    /// `GitTier::write_namespaced`'s own natural-key check requires —
+    /// hand-built JSON, because an overlay kind has no `canon-model`
+    /// type at all (that is the whole reason `digest_side`'s `match`
+    /// could not see it).
+    fn overlay_body(namespaced_kind: &str, project_id: &str, scenario_id: &str, covered: bool) -> RawRecord {
+        RawRecord(serde_json::json!({
+            "schema": 1,
+            "kind": namespaced_kind,
+            "at": "2026-01-02T12:00:00Z",
+            "actor": {"agent_id": "porting-sync", "role": "implementer"},
+            "project_id": project_id,
+            "scenario_id": scenario_id,
+            "covered": covered,
+        }))
+    }
+
+    /// s43 round 3, finding 1. `mart_scope_status` reads
+    /// `kind = 'porting.coverage'` straight out of `stg_records`, and
+    /// the report both RENDERS that mart and EXPORTS it to
+    /// `mart_scope_status.parquet` — but `digest_side` partitions only
+    /// `RecordKind::ALL`, so a corpus differing ONLY in a coverage
+    /// overlay row shipped different parquet bytes under an identical
+    /// `source_digest`. Asserted through `combined_digest`, the value
+    /// `manifest.json` actually carries.
+    #[test]
+    fn a_corpus_differing_only_in_a_porting_coverage_overlay_changes_the_source_digest() {
+        let dir = tempfile::tempdir().unwrap();
+        let git_root = dir.path().join("ledger");
+        let tier = GitTier::new(&git_root);
+        let digest = || DigestHeader::compute(dir.path(), &git_root).unwrap().combined_digest();
+
+        let baseline = digest();
+        tier.write_namespaced("porting.coverage", "root__s9.fixture.03", overlay_body("porting.coverage", "root", "s9.fixture.03", true))
+            .unwrap();
+        let with_overlay = digest();
+        assert_ne!(baseline, with_overlay, "an overlay-only change must move `source_digest`");
+
+        // And the row's own CONTENT counts, not merely its existence:
+        // flipping `covered` is exactly what moves a
+        // `mart_scope_status` cell.
+        tier.write_namespaced("porting.coverage", "root__s9.fixture.03", overlay_body("porting.coverage", "root", "s9.fixture.03", false))
+            .unwrap();
+        assert_ne!(with_overlay, digest(), "flipping an overlay row's `covered` must move `source_digest`");
+    }
+
+    /// The mechanism, exercised directly. Nothing in this crate has
+    /// ever heard of `future.widget`; the digest covers it anyway,
+    /// because [`overlay_kind_dirs`] DISCOVERS `kind=` directories
+    /// instead of consulting a list. This is the property that stops
+    /// the next namespaced kind repeating finding 1 — there is no list
+    /// for it to be missing from.
+    #[test]
+    fn an_overlay_kind_this_crate_has_never_heard_of_still_moves_the_source_digest() {
+        let dir = tempfile::tempdir().unwrap();
+        let git_root = dir.path().join("ledger");
+        let tier = GitTier::new(&git_root);
+        let digest = || DigestHeader::compute(dir.path(), &git_root).unwrap().combined_digest();
+
+        let baseline = digest();
+        tier.write_namespaced("future.widget", "root__w1", overlay_body("future.widget", "root", "w1", true)).unwrap();
+        assert_ne!(baseline, digest(), "an unknown overlay kind must still move `source_digest`");
+    }
+
+    /// The other half of the mechanism: a `kind=` directory whose name
+    /// is not a LEGAL overlay identity at all. `stg_git_records`' glob
+    /// (`kind=*/**/*.json`) reads its files into `stg_records`
+    /// regardless, so the digest must too — which is why
+    /// [`overlay_texts`] hashes bytes rather than routing through
+    /// `GitTier::scan_namespaced_kind`, whose grammar check (asserted
+    /// here) would have refused this directory outright.
+    #[test]
+    fn a_foreign_kind_directory_that_is_not_a_legal_overlay_identity_is_still_digested() {
+        let dir = tempfile::tempdir().unwrap();
+        let git_root = dir.path().join("ledger");
+        let digest = || DigestHeader::compute(dir.path(), &git_root).unwrap().combined_digest();
+
+        std::fs::create_dir_all(git_root.join("kind=weird")).unwrap();
+        let baseline = digest();
+        assert!(
+            GitTier::new(&git_root).scan_namespaced_kind("weird").is_err(),
+            "this test is only meaningful while `scan_namespaced_kind` refuses the name — if it starts accepting it, `overlay_texts` may be rerouted through it"
+        );
+
+        std::fs::write(git_root.join("kind=weird/thing__000000000000.json"), "{\"kind\":\"weird\"}\n").unwrap();
+        let with_file = digest();
+        assert_ne!(baseline, with_file, "a file under an ungrammatical foreign kind dir must move `source_digest`");
+
+        std::fs::write(git_root.join("kind=weird/thing__000000000000.json"), "{\"kind\":\"weird\",\"x\":1}\n").unwrap();
+        assert_ne!(with_file, digest(), "editing that file's bytes must move `source_digest`");
+    }
+
+    /// [`overlay_kind_dirs`] is exactly "every `kind=` directory that
+    /// is not a core kind" — no core kind leaks in (they are digested
+    /// through `digest_side`, and counting them twice would be a
+    /// silent double-hash), and no non-`kind=` directory does.
+    #[test]
+    fn overlay_kind_dirs_is_every_kind_directory_that_is_not_a_core_kind() {
+        let dir = tempfile::tempdir().unwrap();
+        for kind in RecordKind::ALL {
+            std::fs::create_dir_all(dir.path().join(format!("kind={}", kind.as_str()))).unwrap();
+        }
+        for foreign in ["porting.coverage", "future.widget", "weird"] {
+            std::fs::create_dir_all(dir.path().join(format!("kind={foreign}"))).unwrap();
+        }
+        std::fs::create_dir_all(dir.path().join("not-a-kind-dir")).unwrap();
+        std::fs::write(dir.path().join("kind=stray-file"), "").unwrap();
+
+        let found: Vec<String> = overlay_kind_dirs(dir.path()).into_iter().map(|(kind, _)| kind).collect();
+        assert_eq!(found, vec!["future.widget".to_string(), "porting.coverage".to_string(), "weird".to_string()]);
+    }
+
+    /// The exclusion half of `manifest.rs`'s account, asserted rather
+    /// than asserted-about: a record of an excluded kind must leave
+    /// `source_digest` alone. Without this, "excludes exactly six core
+    /// kinds" is a claim only the `match` arms support, and the two
+    /// findings above are both cases of a claim no test held down.
+    #[test]
+    fn a_record_of_an_excluded_kind_does_not_move_the_source_digest() {
+        use canon_model::envelope::{Actor, Envelope};
+        use canon_model::ids::{RoleId, SessionId};
+        use canon_model::records::Session;
+
+        let dir = tempfile::tempdir().unwrap();
+        let git_root = dir.path().join("ledger");
+        let tier = GitTier::new(&git_root);
+        let at = chrono::Utc::now();
+
+        let baseline = DigestHeader::compute(dir.path(), &git_root).unwrap().combined_digest();
+        tier.write(&Session::new(
+            Envelope::new(1, RecordKind::Session, at, Actor::new("agent1", RoleId::parse("dev").unwrap())),
+            SessionId::parse("11111111-1111-4111-8111-111111111111").unwrap(),
+            "omp",
+            at,
+            None,
+        ))
+        .unwrap();
+        assert_eq!(
+            baseline,
+            DigestHeader::compute(dir.path(), &git_root).unwrap().combined_digest(),
+            "`session` is a documented exclusion (manifest.rs); a session-only change must NOT move `source_digest`"
+        );
     }
 }

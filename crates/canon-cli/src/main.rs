@@ -562,13 +562,13 @@ enum FindingCommand {
         /// One line of what the finding IS, in the reviewer's own words. NEVER checked against the code (line breaks refused)
         #[arg(long)]
         summary: String,
-        /// The commit whose state this round reviewed. Omit when the round reviewed an uncommitted working tree — canon never infers one. Must EXIST in this repo (existence only; never its message or diff)
+        /// The commit whose state this round reviewed. Omit when the round reviewed an uncommitted working tree — canon never infers one. Must name a COMMIT object this repo holds (existence only; never its message or diff)
         #[arg(long, value_parser = canon_cli::finding::parse_sha)]
         reviewed_sha: Option<Sha>,
-        /// The commit that closed it. Required by, and permitted only with, --disposition fixed. Must EXIST in this repo (existence only; never its message or diff)
+        /// The commit that closed it. Required by, and permitted only with, --disposition fixed. Must name a COMMIT object this repo holds (existence only; never its message or diff)
         #[arg(long, value_parser = canon_cli::finding::parse_sha)]
         resolution_sha: Option<Sha>,
-        /// The SOURCED introducing commit. Leave unset when it is not known — never guess (see --help). Must EXIST in this repo (existence only; never its message or diff)
+        /// The SOURCED introducing commit. Leave unset when it is not known — never guess (see --help). Must name a COMMIT object this repo holds (existence only; never its message or diff)
         #[arg(long, value_parser = canon_cli::finding::parse_sha)]
         introduced_by: Option<Sha>,
         /// Where in the tree, as path/to/file.rs:120-134 (line breaks refused)

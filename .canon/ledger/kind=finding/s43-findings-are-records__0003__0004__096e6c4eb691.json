@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T17:36:39.304962Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/finding.rs:430-433",
+  "introduced_by": "aa9a4552c069bee5db982abe399e4a1341007e78",
+  "kind": "finding",
+  "reviewed_sha": "c8c67469f7cb2ffd5eaed16a4499f28feaaee286",
+  "reviewer": "R3Honest",
+  "round": 3,
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "The guard's parent finding --help branch is negative-only, so empty stdout satisfies every !contains and the branch reports success having checked nothing"
+}
