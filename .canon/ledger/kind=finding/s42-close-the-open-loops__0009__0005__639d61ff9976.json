@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-backfill",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T15:38:38.432941Z",
+  "change_id": "s42-close-the-open-loops",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-report/src/render.rs",
+  "kind": "finding",
+  "resolution_sha": "49d3eb4fdc09b70339273a55051a49b92a303d68",
+  "reviewed_sha": "f438c6103c5f513902173a06b777efbdc4712e13",
+  "reviewer": "FinalPanel",
+  "round": 9,
+  "schema": 1,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "The session-cost prose claims a repo grouping the mart never computes"
+}

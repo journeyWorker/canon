@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T17:22:53.104679Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "fixed",
+  "file_ref": "packages/dashboard/index.html:39",
+  "introduced_by": "aa9a4552c069bee5db982abe399e4a1341007e78",
+  "kind": "finding",
+  "resolution_sha": "fea1bc8b3c0066e804398adf772842be1d82a733",
+  "reviewed_sha": "aa9a4552c069bee5db982abe399e4a1341007e78",
+  "reviewer": "S43Derive",
+  "round": 2,
+  "schema": 1,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "packages/dashboard/index.html still calls fix_of_fix a derived floor, in static markup the panel-copy pin does not cover"
+}

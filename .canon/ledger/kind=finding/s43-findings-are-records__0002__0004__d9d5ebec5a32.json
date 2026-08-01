@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T17:22:52.988269Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/main.rs:542",
+  "introduced_by": "aa9a4552c069bee5db982abe399e4a1341007e78",
+  "kind": "finding",
+  "resolution_sha": "fea1bc8b3c0066e804398adf772842be1d82a733",
+  "reviewed_sha": "aa9a4552c069bee5db982abe399e4a1341007e78",
+  "reviewer": "S43Model",
+  "round": 2,
+  "schema": 1,
+  "seq": 4,
+  "severity": "blocker",
+  "summary": "canon finding add --help hard-codes `the true fix-of-fix count is 2` - a hand-typed false release metric on the command built to stop hand-typed release metrics"
+}

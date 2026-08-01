@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-backfill",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T16:29:39.644723Z",
+  "change_id": "s42-close-the-open-loops",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-report/src/render.rs:141-143",
+  "kind": "finding",
+  "resolution_sha": "f438c6103c5f513902173a06b777efbdc4712e13",
+  "reviewer": "ReviewAttribution",
+  "round": 8,
+  "schema": 1,
+  "seq": 8,
+  "severity": "should_fix",
+  "summary": "The flywheel panel asserts causation its query never computes"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T17:23:22.626957Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-store/sql/views.sql",
+  "kind": "finding",
+  "resolution_sha": "aa9a4552c069bee5db982abe399e4a1341007e78",
+  "reviewer": "Main",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "note",
+  "summary": "A review round that finds nothing writes no Finding, so mart_review_rounds cannot report the number of rounds RUN - s42's round 12 returned MERGEABLE with zero findings and is absent from the table"
+}

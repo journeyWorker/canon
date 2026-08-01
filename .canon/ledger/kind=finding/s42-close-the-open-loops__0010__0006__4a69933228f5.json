@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-backfill",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T15:38:38.538563Z",
+  "change_id": "s42-close-the-open-loops",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-report/src/render.rs",
+  "introduced_by": "49d3eb4fdc09b70339273a55051a49b92a303d68",
+  "kind": "finding",
+  "resolution_sha": "b22fe8f51f66c679162d4c89b861e44d665c5af9",
+  "reviewed_sha": "49d3eb4fdc09b70339273a55051a49b92a303d68",
+  "reviewer": "GateSurface",
+  "round": 10,
+  "schema": 1,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "`workspace_label` is called the closest repo stand-in although Session.project_key has repo semantics"
+}

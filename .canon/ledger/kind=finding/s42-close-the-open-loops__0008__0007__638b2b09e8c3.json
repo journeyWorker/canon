@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-backfill",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T16:29:39.620457Z",
+  "change_id": "s42-close-the-open-loops",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/gate.rs:583-587",
+  "kind": "finding",
+  "resolution_sha": "f438c6103c5f513902173a06b777efbdc4712e13",
+  "reviewer": "ReviewEvidence",
+  "round": 8,
+  "schema": 1,
+  "seq": 7,
+  "severity": "should_fix",
+  "summary": "Promotion is not idempotent after a partial commit and writes a second record at the next run_seq"
+}

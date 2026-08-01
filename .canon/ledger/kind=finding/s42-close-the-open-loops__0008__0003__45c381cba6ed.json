@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-backfill",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T15:38:38.277948Z",
+  "change_id": "s42-close-the-open-loops",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/artifact_ingest.rs",
+  "kind": "finding",
+  "resolution_sha": "f438c6103c5f513902173a06b777efbdc4712e13",
+  "reviewer": "ReviewRuns",
+  "round": 8,
+  "schema": 1,
+  "seq": 3,
+  "severity": "blocker",
+  "summary": "Deleting a superseded trajectory discards verdict provenance the canonical row does not carry"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-backfill",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T15:38:38.302526Z",
+  "change_id": "s42-close-the-open-loops",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/dispatch.rs",
+  "kind": "finding",
+  "resolution_sha": "f438c6103c5f513902173a06b777efbdc4712e13",
+  "reviewer": "ReviewRuns",
+  "round": 8,
+  "schema": 1,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "A regressed clock can leave a finished run reading `running` because the close version is not strictly newer"
+}

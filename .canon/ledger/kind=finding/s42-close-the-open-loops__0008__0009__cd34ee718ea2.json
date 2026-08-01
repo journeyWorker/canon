@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-backfill",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T15:38:38.354587Z",
+  "change_id": "s42-close-the-open-loops",
+  "disposition": "fixed",
+  "file_ref": ".canon/ledger/kind=evidence_record",
+  "kind": "finding",
+  "resolution_sha": "f438c6103c5f513902173a06b777efbdc4712e13",
+  "reviewer": "ReviewEvidence",
+  "round": 8,
+  "schema": 1,
+  "seq": 9,
+  "severity": "should_fix",
+  "summary": "Evidence record 5.1's captured result shows `0 passed` while its summary claims the workspace suite green"
+}

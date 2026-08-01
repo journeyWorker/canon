@@ -12,19 +12,31 @@ packages/core-*/bin/*
 # written by `canon ingest`/`sync` and tests; derived from committed
 # openspec/ + specs/ sources, regenerable, never committed).
 #
-# ONE exception, carved out by s42 (`close-the-open-loops`): an
-# `EvidenceRecord` is not regenerable from any committed source — it is
-# an authored attestation, and `canon-report`'s digest module treats the
-# evidence ledger as "the git-tracked, PR-reviewed tier". The single
-# pre-s42 record under `kind=evidence_record/` had to be `git add -f`'d
-# for exactly that reason; now that `canon evidence add` exists, every
-# record it authors and `canon gate promote` commits belongs in git
-# without a force-add. Written as `ledger/*` + a re-include because a
-# negation cannot resurrect a path whose PARENT directory is excluded.
-# `_staging/` is still matched by the `*` line, so a STAGED (unpromoted)
-# record stays local — only promoted evidence is tracked.
+# TWO exceptions, and both for the same reason: the record is not
+# regenerable from any committed source because it is AUTHORED.
+#
+# s42 (`close-the-open-loops`) carved out `EvidenceRecord` — an
+# attestation, which `canon-report`'s digest module treats as "the
+# git-tracked, PR-reviewed tier". The single pre-s42 record had to be
+# `git add -f`'d for exactly that reason; now that `canon evidence add`
+# exists, every record it authors and `canon gate promote` commits
+# belongs in git without a force-add.
+#
+# s43 (`findings-are-records`) carves out `Finding` on the identical
+# argument, and it was found the identical way: the whole corpus this
+# change exists to produce was written, promoted, and then silently NOT
+# committed, because the rule admitted only the kind s42 happened to
+# need. A review finding is a reviewer's own observation — no committed
+# source regenerates it, and the derived counts in `.canon/REPORT.md`
+# are drift-gated against a corpus that must therefore be in the repo.
+#
+# Written as `ledger/*` + re-includes because a negation cannot
+# resurrect a path whose PARENT directory is excluded. `_staging/` is
+# still matched by the `*` line, so a STAGED (unpromoted) record stays
+# local — only promoted records are tracked.
 .canon/ledger/*
 !.canon/ledger/kind=evidence_record/
+!.canon/ledger/kind=finding/
 .canon/learn/
 .canon/r2/
 .canon/ingest/
