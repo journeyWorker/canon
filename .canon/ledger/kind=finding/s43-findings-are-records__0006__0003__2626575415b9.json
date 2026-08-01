@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T19:34:06.022518Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/finding.rs:700-705",
+  "introduced_by": "2cff0129ece133863ad4322a7ec60bd17626759b",
+  "kind": "finding",
+  "reviewed_sha": "c4591fde71328dc1fa565db23db227faa1067b91",
+  "reviewer": "R6Gate",
+  "round": 6,
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "Shape 2's label_separator scans only i..j, excluding punctuation attached to the value token, so `Findings =3` and `Findings :3` pass where round 4 rejected them"
+}

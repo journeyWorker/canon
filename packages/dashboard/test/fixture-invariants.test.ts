@@ -278,19 +278,19 @@ test("mart_review_totals fixture rows are exactly the per-change sum of the mart
   }
 });
 
-test("mart_review_totals fixture shows both readings of highest_round, and a total no single round already equals", () => {
+test("mart_review_totals fixture shows both shapes of highest_round, and a total no single round already equals", () => {
   if (skipWithoutDuckdb()) return;
   const totals = rows<ReviewTotalsRow>("mart_review_totals", "*");
 
-  // The gap case. `highest_round` above `rounds_recorded` is the only
-  // signal in this corpus that a round found nothing — the live
-  // phenomenon both review panels describe. A fixture where the two
-  // columns always matched would render a column that never
-  // demonstrates the claim beside it.
+  // The gap shape. `highest_round` above `rounds_recorded` means some
+  // lower round LABEL has no row; in this fixture that is a round that
+  // found nothing, but the columns cannot say so and the panel does not
+  // (s43 round 6, finding 2 — the same gap comes of numbering a lone
+  // finding round 7). A fixture where the two columns always matched
+  // would render a column that never shows its own shape.
   expect(totals.some((t) => t.highest_round > t.rounds_recorded)).toBe(true);
-  // And the other reading: equal columns witness nothing either way,
-  // so the fixture has to show that shape too rather than let a reader
-  // infer a gap is mandatory.
+  // And the other shape: equal columns, which are just as silent, so
+  // the fixture must not let a reader infer a gap is mandatory.
   expect(totals.some((t) => t.highest_round === t.rounds_recorded)).toBe(true);
 
   // Non-vacuity for the summing itself: at one round per change every

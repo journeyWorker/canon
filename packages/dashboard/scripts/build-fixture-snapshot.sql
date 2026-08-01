@@ -132,10 +132,13 @@ SELECT * FROM (
 --
 -- add-json-export jumps from round 2 to round 4 ON PURPOSE. Round 3 returned
 -- MERGEABLE with zero findings, wrote no `Finding`, and so has no row — the
--- live phenomenon both review panels describe (s42's round 12). Without the
--- gap the fixture would render `highest_round` equal to `rounds_recorded` on
--- every row, and the totals panel's claim that a gap witnesses a silent round
--- would be a sentence the dashboard never demonstrates.
+-- live phenomenon both review panels describe (s42's round 12). The fixture
+-- carries it so `highest_round` and `rounds_recorded` are not equal on every
+-- row, which would leave the column's copy undemonstrated. What the fixture
+-- CANNOT show is why the label is missing: this gap comes from a silent
+-- round, and an identical gap comes from a change whose only finding is
+-- labelled round 7. That is exactly why the panel claims nothing from it
+-- (s43 round 6, finding 2).
 CREATE OR REPLACE TABLE mart_review_rounds AS
 SELECT * FROM (
     VALUES

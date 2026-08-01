@@ -2,14 +2,17 @@
 //! mis-escapes digit-containing table names. `crate::snapshot`'s
 //! export mechanism never uses `EXPORT DATABASE` — one explicit
 //! `COPY "<table>" TO '<table>.parquet' (FORMAT parquet)` per table
-//! instead (tasks.md 3.4). This test exercises the EXACT SQL shape
-//! `snapshot::export_view` builds against a digit-containing table
-//! name, proving the resulting filename is byte-identical to the
-//! table name, never an escaped/altered variant.
+//! instead (tasks.md 3.4). This test exercises the EXACT statement
+//! `snapshot::copy_statement` builds — the same function `snapshot()`
+//! itself calls, so there is no second spelling of the shape to drift
+//! from — against a digit-containing table name, proving the resulting
+//! filename is byte-identical to the table name, never an
+//! escaped/altered variant.
 
 mod support;
 
 use canon_report::query::run_command;
+use canon_report::snapshot::copy_statement;
 
 #[test]
 fn a_digit_containing_table_name_exports_with_a_byte_identical_filename() {
@@ -25,12 +28,11 @@ fn a_digit_containing_table_name_exports_with_a_byte_identical_filename() {
     // A table name containing digits — the exact shape D3 calls out
     // (`EXPORT DATABASE` historically mis-escaped these). Created +
     // exported in ONE `duckdb` session (each `run_command` invocation
-    // is a fresh in-memory database) using the identical
-    // `COPY "<table>" TO '<file>' (FORMAT parquet)` statement shape
-    // `snapshot::export_view` issues in production.
+    // is a fresh in-memory database), the `COPY` half built by the
+    // production function rather than restated here.
     let table = "mart_2fa_test";
     let dest = out_dir.join(format!("{table}.parquet"));
-    let sql = format!("CREATE OR REPLACE TABLE \"{table}\" AS SELECT 1 AS x; COPY \"{table}\" TO '{}' (FORMAT parquet);", dest.display());
+    let sql = format!("CREATE OR REPLACE TABLE \"{table}\" AS SELECT 1 AS x; {}", copy_statement(table, &dest));
 
     run_command(&roots, &sql).unwrap();
 

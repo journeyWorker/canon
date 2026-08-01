@@ -22,10 +22,16 @@
 //! [`ReportInputs::roots`] names the three physical sources
 //! `canon_store::VIEWS_SQL` reads (git tier, r2 tier, `canon-learn`'s
 //! operator-local store — [`roots::Roots`]); [`report`] shells out to
-//! the real `duckdb` CLI ([`query::run_query`]) with that view layer as
-//! its `-init` file, never a parallel Rust-side computation of any mart
-//! (design D1). [`snapshot`] shells out to the SAME `duckdb` CLI
-//! ([`query::run_command`]) to `COPY` those views straight to Parquet.
+//! the real `duckdb` CLI with that view layer as its `-init` file,
+//! never a parallel Rust-side computation of any mart (design D1).
+//! [`snapshot`] shells out to the SAME `duckdb` CLI to `COPY` those
+//! views straight to Parquet.
+//!
+//! Both take ONE process and ONE pinned read of the corpus
+//! ([`query::run_pinned_queries`] / [`query::run_pinned_command`],
+//! [`marts::fetch_all`]), because a live ledger read once per mart is
+//! read once per mart from a DIFFERENT corpus, and two panels a reader
+//! compares would then be entitled to disagree.
 
 pub mod check;
 pub mod digest;
@@ -68,20 +74,17 @@ impl ReportInputs {
 /// generation path [`write_report`]/[`check_report`] both call, so a
 /// write and a `--check` diff are guaranteed to compare against the
 /// EXACT same rendering logic, never two subtly different code paths.
+///
+/// Every panel comes from ONE pinned read of the corpus
+/// ([`marts::fetch_all`]): a record written to the ledger while this
+/// runs reaches every panel or none, so two panels a reader compares
+/// — the per-round table and its per-change totals, above all — can
+/// never be computed from different corpora. The
+/// [`digest::DigestHeader`] above is a separate, Rust-side read of the
+/// repo's own files and is not part of that pin.
 pub fn report(inputs: &ReportInputs) -> Result<String, ReportError> {
     let digest = digest::DigestHeader::compute(&inputs.repo_root, &inputs.roots.git_root)?;
-    let trust_matrix = marts::fetch_trust_matrix(&inputs.roots)?;
-    let marts = render::ReportMarts {
-        trust_matrix,
-        session_costs: marts::fetch_session_costs(&inputs.roots)?,
-        role_memory: marts::fetch_role_memory(&inputs.roots)?,
-        flywheel_funnel: marts::fetch_flywheel_funnel(&inputs.roots)?,
-        review_burndown: marts::fetch_review_burndown(&inputs.roots)?,
-        scope_status: marts::fetch_scope_status(&inputs.roots)?,
-        subjects: marts::fetch_subjects(&inputs.roots)?,
-        review_rounds: marts::fetch_review_rounds(&inputs.roots)?,
-        review_totals: marts::fetch_review_totals(&inputs.roots)?,
-    };
+    let marts = marts::fetch_all(&inputs.roots)?;
     // Design D3: `canon-report` reads `<repo_root>/canon.yaml` itself
     // (mirroring `digest::DigestHeader::compute`'s own direct
     // `.canon/policy.yaml` read) — an input `report()` DERIVES, never a

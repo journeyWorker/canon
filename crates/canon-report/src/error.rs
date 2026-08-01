@@ -22,6 +22,9 @@ pub enum ReportError {
     #[error("duckdb -json output was not valid JSON: {0}")]
     MalformedJson(#[from] serde_json::Error),
 
+    #[error("duckdb returned {got} result sets for a {want}-statement pinned batch — the batch and its parsed output must align one-to-one")]
+    ResultSetArity { want: usize, got: usize },
+
     #[error("report path {path:?} MISSING — run `canon report` first, then `--check` verifies freshness at the same inputs")]
     ReportMissing { path: PathBuf },
 

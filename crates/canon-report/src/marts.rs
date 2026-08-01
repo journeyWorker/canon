@@ -1,10 +1,15 @@
 //! The nine S9/S20/S24/S36/s43-owned marts (`crates/canon-store/sql/views.sql`'s
-//! addition" section, design D5) — one `fetch_*` per panel, each a
-//! bare `SELECT * FROM mart_x ORDER BY …` against
-//! [`crate::query::run_query`]. No aggregation happens here: every
-//! number this module returns is exactly what the DuckDB view already
-//! computed (design D1) — this is a thin, ordered-column typed wrapper
-//! over [`crate::query::Row`], nothing more.
+//! addition" section, design D5) — one [`MartSpec`] per panel, each a
+//! bare `SELECT * FROM mart_x ORDER BY …`. No aggregation happens
+//! here: every number this module returns is exactly what the DuckDB
+//! view already computed (design D1) — this is a thin, ordered-column
+//! typed wrapper over [`crate::query::Row`], nothing more.
+//!
+//! [`fetch_all`] is the read a report uses: all nine statements in one
+//! pinned batch, so no two panels can be computed from different
+//! corpora. The per-mart `fetch_*` functions run one statement each
+//! and exist for callers reading a SINGLE number, where there is
+//! nothing to be inconsistent with.
 
 use crate::error::ReportError;
 use crate::query::{self, Row};
@@ -20,34 +25,59 @@ pub struct MartResult {
     pub rows: Vec<Row>,
 }
 
-fn fetch(roots: &Roots, view: &str, order_by: &str, columns: &'static [&'static str]) -> Result<MartResult, ReportError> {
-    let sql = format!("SELECT * FROM {view} ORDER BY {order_by};");
-    let rows = query::run_query(roots, &sql)?;
-    Ok(MartResult { columns, rows })
+/// One mart's declared read: the view, the total `ORDER BY` that makes
+/// its row order stable, and the column order the markdown table
+/// renders. [`MartSpec::sql`] is the ONLY place a mart's statement is
+/// built, so the batched all-marts read ([`fetch_all`]) and a targeted
+/// single-mart read cannot issue different SQL for the same panel.
+#[derive(Clone, Copy)]
+pub struct MartSpec {
+    pub view: &'static str,
+    pub order_by: &'static str,
+    pub columns: &'static [&'static str],
+}
+
+impl MartSpec {
+    pub fn sql(&self) -> String {
+        format!("SELECT * FROM {} ORDER BY {};", self.view, self.order_by)
+    }
+}
+
+fn fetch(roots: &Roots, spec: &MartSpec) -> Result<MartResult, ReportError> {
+    let rows = query::run_query(roots, &spec.sql())?;
+    Ok(MartResult { columns: spec.columns, rows })
 }
 
 pub const TRUST_MATRIX_COLUMNS: &[&str] = &["change_id", "task_id", "title", "task_status", "covered", "green", "who", "evidence_count"];
 
+pub const TRUST_MATRIX: MartSpec = MartSpec { view: "mart_trust_matrix", order_by: "change_id, task_id", columns: TRUST_MATRIX_COLUMNS };
+
 pub fn fetch_trust_matrix(roots: &Roots) -> Result<MartResult, ReportError> {
-    fetch(roots, "mart_trust_matrix", "change_id, task_id", TRUST_MATRIX_COLUMNS)
+    fetch(roots, &TRUST_MATRIX)
 }
 
 pub const SESSION_COSTS_COLUMNS: &[&str] =
     &["session_id", "client", "role", "workspace_label", "run_count", "total_cost", "total_tokens", "first_event_at", "last_event_at"];
 
+pub const SESSION_COSTS: MartSpec = MartSpec { view: "mart_session_costs", order_by: "session_id", columns: SESSION_COSTS_COLUMNS };
+
 pub fn fetch_session_costs(roots: &Roots) -> Result<MartResult, ReportError> {
-    fetch(roots, "mart_session_costs", "session_id", SESSION_COSTS_COLUMNS)
+    fetch(roots, &SESSION_COSTS)
 }
 
 pub const ROLE_MEMORY_COLUMNS: &[&str] =
     &["role", "regime_key", "strategy_count", "active_count", "demoted_count", "hit_rate", "avg_source_trajectories", "latest_recorded_at"];
 
+pub const ROLE_MEMORY: MartSpec = MartSpec { view: "mart_role_memory", order_by: "role, regime_key", columns: ROLE_MEMORY_COLUMNS };
+
 pub fn fetch_role_memory(roots: &Roots) -> Result<MartResult, ReportError> {
-    fetch(roots, "mart_role_memory", "role, regime_key", ROLE_MEMORY_COLUMNS)
+    fetch(roots, &ROLE_MEMORY)
 }
 
 pub const FLYWHEEL_FUNNEL_COLUMNS: &[&str] =
     &["role", "verdicts", "distilled", "retrieved", "applied", "applied_attributed", "applied_proxy"];
+
+pub const FLYWHEEL_FUNNEL: MartSpec = MartSpec { view: "mart_flywheel_funnel", order_by: "role", columns: FLYWHEEL_FUNNEL_COLUMNS };
 
 /// `mart_flywheel_funnel`: one row per role, `verdicts → distilled →
 /// retrieved → applied`, with `applied` broken out by the RULE that
@@ -116,18 +146,23 @@ pub const FLYWHEEL_FUNNEL_COLUMNS: &[&str] =
 /// view's own comment carries the proof). Exactly the view's own
 /// `SELECT` list, no renaming/reordering (design D1).
 pub fn fetch_flywheel_funnel(roots: &Roots) -> Result<MartResult, ReportError> {
-    fetch(roots, "mart_flywheel_funnel", "role", FLYWHEEL_FUNNEL_COLUMNS)
+    fetch(roots, &FLYWHEEL_FUNNEL)
 }
 
 pub const REVIEW_BURNDOWN_COLUMNS: &[&str] =
     &["day", "evidence_faithful", "evidence_divergent", "evidence_not_applicable", "divergence_opened", "divergence_resolved", "divergence_open_running_total"];
 
+pub const REVIEW_BURNDOWN: MartSpec = MartSpec { view: "mart_review_burndown", order_by: "day", columns: REVIEW_BURNDOWN_COLUMNS };
+
 pub fn fetch_review_burndown(roots: &Roots) -> Result<MartResult, ReportError> {
-    fetch(roots, "mart_review_burndown", "day", REVIEW_BURNDOWN_COLUMNS)
+    fetch(roots, &REVIEW_BURNDOWN)
 }
 
 pub const SCOPE_STATUS_COLUMNS: &[&str] =
     &["task_id", "scenario_id", "task_status", "evidence_covered", "green", "spec_project_id", "spec_covered"];
+
+pub const SCOPE_STATUS: MartSpec =
+    MartSpec { view: "mart_scope_status", order_by: "task_id, scenario_id, spec_project_id", columns: SCOPE_STATUS_COLUMNS };
 
 /// `mart_scope_status` (s20 `task-scenario-join`, surfaced by s24): one
 /// row per declared `(task_id, scenario_id)` pair PER COVERING PROJECT,
@@ -150,10 +185,12 @@ pub const SCOPE_STATUS_COLUMNS: &[&str] =
 /// stable. Exactly the view's own `SELECT` list, no
 /// renaming/reordering (design D1).
 pub fn fetch_scope_status(roots: &Roots) -> Result<MartResult, ReportError> {
-    fetch(roots, "mart_scope_status", "task_id, scenario_id, spec_project_id", SCOPE_STATUS_COLUMNS)
+    fetch(roots, &SCOPE_STATUS)
 }
 
 pub const SUBJECTS_COLUMNS: &[&str] = &["domain", "subject_id", "title", "status", "scenario_count", "covered_scenarios"];
+
+pub const SUBJECTS: MartSpec = MartSpec { view: "mart_subjects", order_by: "domain, subject_id", columns: SUBJECTS_COLUMNS };
 
 /// `mart_subjects` (s36 `subject-domain-loop`): the per-domain subject
 /// rollup — one row per `subject` record (the reviewed 13th kind),
@@ -165,7 +202,7 @@ pub const SUBJECTS_COLUMNS: &[&str] = &["domain", "subject_id", "title", "status
 /// subject corpus yields zero rows, never an error. Exactly the view's
 /// own `SELECT` list, no renaming/reordering (design D1).
 pub fn fetch_subjects(roots: &Roots) -> Result<MartResult, ReportError> {
-    fetch(roots, "mart_subjects", "domain, subject_id", SUBJECTS_COLUMNS)
+    fetch(roots, &SUBJECTS)
 }
 
 pub const REVIEW_ROUNDS_COLUMNS: &[&str] = &[
@@ -185,6 +222,8 @@ pub const REVIEW_ROUNDS_COLUMNS: &[&str] = &[
     "introduced_by_unsourced",
 ];
 
+pub const REVIEW_ROUNDS: MartSpec = MartSpec { view: "mart_review_rounds", order_by: "change_id, \"round\"", columns: REVIEW_ROUNDS_COLUMNS };
+
 /// `mart_review_rounds` (s43 `findings-are-records`): one row per
 /// `(change_id, round)` over the fourteenth kind,
 /// [`canon_model::records::Finding`] — the reviewed sha, the finding
@@ -198,9 +237,14 @@ pub const REVIEW_ROUNDS_COLUMNS: &[&str] = &[
 /// - `reviewed_sha` — `max()` over the round's findings, because
 ///   `reviewed_sha` is per-finding provenance and the natural key
 ///   (`{change_id}__{round:04}__{seq:04}`) does not include it. NULL
-///   means no finding in the round recorded one, which is how canon
-///   records a round that reviewed an uncommitted working tree — the
-///   common case, and the reason the field is `Option` at all.
+///   means no finding in the round recorded one, and nothing more. A
+///   round that reviewed an uncommitted working tree is the usual
+///   reason and the reason the field is `Option` at all, but the view
+///   cannot tell that from a round whose findings simply left the
+///   field unset — so a blank is not evidence of a worktree review.
+///   (Every other surface already said so; this doc was the one that
+///   still read the NULL as the worktree case — s43 round 6, the same
+///   shape as finding 2's numbering gap.)
 /// - `fix_of_fix` — findings in this round whose SOURCED
 ///   `introduced_by` equals the `resolution_sha` of a finding EARLIER
 ///   in the SAME change, ordered strictly by the natural key's own
@@ -236,7 +280,7 @@ pub const REVIEW_ROUNDS_COLUMNS: &[&str] = &[
 /// individual match the data cannot say whether the fix or the other
 /// work in that commit introduced the defect.
 pub fn fetch_review_rounds(roots: &Roots) -> Result<MartResult, ReportError> {
-    fetch(roots, "mart_review_rounds", "change_id, \"round\"", REVIEW_ROUNDS_COLUMNS)
+    fetch(roots, &REVIEW_ROUNDS)
 }
 
 pub const REVIEW_TOTALS_COLUMNS: &[&str] = &[
@@ -255,6 +299,8 @@ pub const REVIEW_TOTALS_COLUMNS: &[&str] = &[
     "introduced_by_sourced",
     "introduced_by_unsourced",
 ];
+
+pub const REVIEW_TOTALS: MartSpec = MartSpec { view: "mart_review_totals", order_by: "change_id", columns: REVIEW_TOTALS_COLUMNS };
 
 /// `mart_review_totals` (s43 `findings-are-records`, round 5): one row
 /// per `change_id` — the per-change total of everything
@@ -316,5 +362,102 @@ pub const REVIEW_TOTALS_COLUMNS: &[&str] = &[
 /// rejected rather than that it was wrong. There is no defect rate and
 /// no quality score in this view.
 pub fn fetch_review_totals(roots: &Roots) -> Result<MartResult, ReportError> {
-    fetch(roots, "mart_review_totals", "change_id", REVIEW_TOTALS_COLUMNS)
+    fetch(roots, &REVIEW_TOTALS)
+}
+
+/// Every panel the report renders, in design D5's own declared order
+/// — the SINGLE declaration of that order, which
+/// [`crate::snapshot::SNAPSHOT_TABLES`] and [`crate::render::render`]
+/// both follow (pinned by `report_marts_are_the_snapshot_tables` below
+/// and by `packages/dashboard/test/panel-copy.test.ts`'s
+/// rendered-order check).
+pub const REPORT_MARTS: [MartSpec; 9] =
+    [TRUST_MATRIX, SESSION_COSTS, ROLE_MEMORY, FLYWHEEL_FUNNEL, REVIEW_BURNDOWN, SCOPE_STATUS, SUBJECTS, REVIEW_ROUNDS, REVIEW_TOTALS];
+
+/// The nine panels one report renders, fetched together.
+///
+/// Lives here rather than beside [`crate::render::render`] because the
+/// nine are one READ before they are nine panels: [`fetch_all`] is the
+/// only thing that builds this struct, and it builds it from one
+/// corpus.
+pub struct ReportMarts {
+    pub trust_matrix: MartResult,
+    pub session_costs: MartResult,
+    pub role_memory: MartResult,
+    pub flywheel_funnel: MartResult,
+    pub review_burndown: MartResult,
+    pub scope_status: MartResult,
+    pub subjects: MartResult,
+    pub review_rounds: MartResult,
+    pub review_totals: MartResult,
+}
+
+/// Fetches all nine marts from ONE materialized read of the corpus, in
+/// one `duckdb` process ([`query::run_pinned_queries`]).
+///
+/// This is what makes "the total and the rows it totals cannot
+/// disagree" true of the RENDERED report and not merely of the SQL.
+/// `mart_review_totals`' only `FROM` is `mart_review_rounds`, so the
+/// two agree by construction over any one input — but nine
+/// `run_query` calls are nine processes over a LIVE ledger, and a
+/// finding written between two of them lands in the later panel and
+/// not the earlier one. Pinning removes the between: a record written
+/// during a report run reaches every panel or none, and in practice
+/// none, since the pin is taken before the first mart is computed.
+///
+/// The guarantee is pairwise consistency ACROSS PANELS, which is the
+/// property a reader comparing two cells needs. It is not a claim that
+/// the four physical sources were captured at one instant — the pin
+/// materializes them with four statements — nor about
+/// [`crate::digest::DigestHeader`], which `report()` computes from its
+/// own direct file reads before this runs.
+pub fn fetch_all(roots: &Roots) -> Result<ReportMarts, ReportError> {
+    let statements: Vec<String> = REPORT_MARTS.iter().map(MartSpec::sql).collect();
+    let sets = query::run_pinned_queries(roots, &statements)?;
+
+    // `run_pinned_queries` already rejected any other length, so the
+    // zip is total and the binding order below is exactly
+    // `REPORT_MARTS`' declaration order.
+    let mut results = REPORT_MARTS.iter().zip(sets).map(|(spec, rows)| MartResult { columns: spec.columns, rows });
+    let mut next = || results.next().expect("one MartResult per REPORT_MARTS entry");
+    Ok(ReportMarts {
+        trust_matrix: next(),
+        session_costs: next(),
+        role_memory: next(),
+        flywheel_funnel: next(),
+        review_burndown: next(),
+        scope_status: next(),
+        subjects: next(),
+        review_rounds: next(),
+        review_totals: next(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// One declared panel order, three consumers. `fetch_all`'s batch,
+    /// `--snapshot`'s exports and the rendered markdown all walk this
+    /// list, and the dashboard's `panel-copy.test.ts` pins its own
+    /// surfaces to `SNAPSHOT_TABLES` — so this assertion is the link
+    /// that makes that pin cover the fetch as well.
+    #[test]
+    fn report_marts_are_the_snapshot_tables() {
+        let views: Vec<&str> = REPORT_MARTS.iter().map(|spec| spec.view).collect();
+        assert_eq!(views, crate::snapshot::SNAPSHOT_TABLES, "the fetch order and the snapshot order are one order");
+    }
+
+    /// The batch is parsed positionally, so a spec whose `columns` do
+    /// not belong to its `view` would mislabel a whole panel without
+    /// any query failing.
+    #[test]
+    fn every_spec_names_its_own_columns() {
+        for spec in &REPORT_MARTS {
+            let expected_prefix = spec.view.strip_prefix("mart_").expect("every mart view is `mart_`-prefixed");
+            assert!(spec.sql().contains(spec.view), "{}: sql must select from its own view", spec.view);
+            assert!(!spec.columns.is_empty(), "{expected_prefix}: a panel with no declared columns renders an empty table");
+            assert!(!spec.order_by.is_empty(), "{expected_prefix}: a panel with no ORDER BY has no stable row order");
+        }
+    }
 }

@@ -9,8 +9,12 @@ markdown, `canon report --snapshot` exports the same nine marts to
 Parquet, and `canon dashboard` serves a small zero-network web app that
 renders SEVEN of them from such a snapshot. Neither surface computes an
 aggregate itself — both read canon's precomputed
-`crates/canon-store/sql/views.sql` marts, so they can never disagree
-about a number.
+`crates/canon-store/sql/views.sql` marts, and each run reads the corpus
+ONCE (`crates/canon-report/src/query.rs`'s `PIN_CORPUS_SQL`), so no two
+panels within one report, or two files within one snapshot, can
+disagree. Across surfaces the input is what differs: a dashboard renders
+the snapshot it was given, so it matches a report only insofar as the
+two were generated from the same corpus.
 
 They can still disagree about what a number MEANS, and that is the
 failure this skill is written against: a friendly label or a paraphrase
@@ -263,18 +267,31 @@ computes it; nothing here is derived a second time.
   hand arithmetic, and hand arithmetic over a generated table is what
   put four wrong figures into this release line's published notes, so
   this panel exists so a release note is a COPY rather than a
-  computation. The view's only `FROM` is `mart_review_rounds`, so the
-  total and the rows it totals are one computation with one
-  implementation.
+  computation. The view's only `FROM` is `mart_review_rounds`, and
+  every panel in one report — or one `--snapshot` export — is computed
+  in a single DuckDB process over one materialized read of the corpus,
+  so the total and the rows it totals are one computation over one
+  input and cannot disagree: a record written to the ledger mid-run
+  reaches neither table, never one and not the other. (Both halves
+  matter. The SQL argument alone held while `canon report` ran one
+  `duckdb` process per mart against a live ledger, and a finding
+  written between two of them reached one panel and not the other —
+  s43 round 6's blocker. `crates/canon-report/src/query.rs`'s
+  `PIN_CORPUS_SQL` is the other half.)
   `rounds_recorded` is `count(*)` over those rows, and that view holds a
   row only for a round that RECORDED a finding, so
   this column counts the rounds that FOUND something, never the rounds RUN;
   canon has no record kind for a review round, so the rounds-RUN number
   is not derivable from this corpus at all. `highest_round` is
-  `max(round)`: above `rounds_recorded` it witnesses a round in between
-  that recorded nothing, and equal to it, it witnesses nothing either
-  way. Neither column is the rounds-RUN count — `highest_round` is a
-  round NUMBER, not a count, and `round` is author-supplied. The splits sum the per-round `FILTER` counts, so
+  `max(round)`, and it witnesses nothing about rounds: above
+  `rounds_recorded` it says only that some round number below it has no
+  row, and canon cannot say why — `round` is author-supplied and
+  nothing requires a change's rounds to be numbered from 1 or without
+  gaps, so a change whose only finding is labelled round 7 shows the
+  same gap six silent rounds would. Neither the gap nor its absence
+  evidences a round that RAN. Neither column is the rounds-RUN count —
+  `highest_round` is a round NUMBER, not a count, and `round` is
+  author-supplied. The splits sum the per-round `FILTER` counts, so
   `severity_* = findings`, `disposition_* = findings` and
   `introduced_by_sourced + introduced_by_unsourced = findings` all hold
   at this grain too. `fix_of_fix` is `sum(fix_of_fix)` over a column

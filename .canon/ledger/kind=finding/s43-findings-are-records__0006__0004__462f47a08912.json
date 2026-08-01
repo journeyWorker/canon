@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T19:34:06.069107Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/finding.rs:687-691",
+  "introduced_by": "2cff0129ece133863ad4322a7ec60bd17626759b",
+  "kind": "finding",
+  "reviewed_sha": "c4591fde71328dc1fa565db23db227faa1067b91",
+  "reviewer": "R6Gate",
+  "round": 6,
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "The `number of` phrase marker returns the phrase END, shifting the value window one token right, so `Number of rounds needs only 3 bytes.` is newly rejected"
+}

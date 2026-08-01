@@ -171,13 +171,28 @@ const SHARED_CLAIMS: Record<string, { note: string; emittedFrom: string; claims:
       // One number, one implementation — the structural answer to "two
       // places to compute one number".
       "every column a `sum()`, `count(*)` or `max()` over the `mart_review_rounds` rows above",
+      // Round 6, the blocker: the structural answer above is about the
+      // SQL, and the SQL was never the whole claim. `report()` fetched
+      // the two marts in two `duckdb` processes over a live ledger, so
+      // a finding written between them landed in one panel and not the
+      // other. Both halves of the guarantee are pinned, because either
+      // one alone leaves "cannot disagree" false.
+      "is computed in a single DuckDB process over one materialized read of the corpus",
+      "one computation over one input and cannot disagree",
+      "a record written to the ledger mid-run reaches neither table, never one and not the other",
       "a release note is a COPY rather than a computation",
       // The load-bearing caveat: a total labelled `rounds` beside a
       // table that omits clean rounds is a wrong number waiting to be
       // pasted.
       "this column counts the rounds that FOUND something, never the rounds RUN",
       "canon has no record kind for a review round",
-      "witnesses a round in between that recorded nothing, while the two being equal witnesses nothing either way",
+      // Round 6, finding 2: the gap between the two round columns
+      // witnesses a MISSING LABEL and nothing else. The retired
+      // sentence read it as a round that ran and found nothing, in the
+      // same paragraph that admits `round` is author-supplied.
+      "says only that some round number below it has no row",
+      "a change whose only finding is labelled round 7 shows the same gap six silent rounds would",
+      "Neither the gap nor its absence evidences a round that RAN",
       // Round 6 hardening: `highest_round` is the OTHER column a
       // reader could paste as "rounds". It is a round number, not a
       // count, and canon does not require rounds to be numbered from 1
@@ -532,13 +547,22 @@ test("the review rounds panel says a round that found nothing has no row", () =>
   }
 });
 
-test("the review totals panel says every number is a sum of the rows above, with no second implementation", () => {
+test("the review totals panel says every number is a sum of the rows above, read once", () => {
   // The blocker s43 round 5 raised: `mart_review_rounds` alone left
   // "N findings across R rounds" as hand arithmetic over a generated
   // table, which is the operation that produced the wrong published
   // figures in the first place. The fix is only a fix if the reader can
   // see that the total and the rows are one computation.
+  //
+  // Round 6 raised the other half as a blocker in turn: "one
+  // computation" was argued from the SQL while the READ was one
+  // `duckdb` process per mart over a live ledger, so the two panels
+  // could be — and between two writes were — computed from different
+  // corpora. Both halves have to be on the surface, and the
+  // SQL-only sentence must not come back.
   expect(REVIEW_TOTALS_NOTE).toContain("cannot disagree");
+  expect(REVIEW_TOTALS_NOTE).toContain("one materialized read of the corpus");
+  expect(REVIEW_TOTALS_NOTE).not.toContain("one computation with one implementation");
   const query = readFileSync(join(new URL("..", import.meta.url).pathname, "src/panels/review-totals.ts"), "utf-8");
   // The panel is a thin SELECT. Any arithmetic in TypeScript here would
   // be the second place the number lives — the exact recurrence
@@ -558,12 +582,40 @@ test("the review totals panel never labels rounds_recorded as rounds run", () =>
   expect(recorded?.label).toContain("never rounds run");
   expect(recorded?.description).toContain("never the rounds run");
   expect(recorded?.description).toContain("canon has no record kind for a review round");
-  // The gap column reads in one direction only.
+});
+
+test("no surface reads a round out of the gap between the two round columns", () => {
+  // s43 round 6, finding 2. `highest_round > rounds_recorded` was
+  // described as witnessing a round that ran and found nothing. It
+  // witnesses that some lower round LABEL has no row: `round` is
+  // author-supplied, canon enforces no contiguous numbering, and a
+  // change whose only finding is labelled round 7 makes the identical
+  // gap. `crates/canon-report/tests/one_corpus_per_report.rs` builds
+  // that corpus; this pins the wording across the surfaces.
   const highest = REVIEW_TOTALS_COLUMNS.find((c) => c.key === "highest_round");
-  expect(highest?.description).toContain("witnesses a round in between that recorded nothing");
-  expect(highest?.description).toContain("witnesses nothing either way");
+  expect(highest?.description).toContain("says only that some lower round number has no row");
+  expect(highest?.description).toContain("Neither the gap nor its absence evidences a round that RAN");
   expect(highest?.description).toContain("Neither column is the rounds-run count");
   expect(highest?.description).toContain("a round NUMBER rather than a count");
+  expect(highest?.label).not.toBe("Highest round number recorded");
+
+  // The retired inference, in every shape it was shipped in, on every
+  // surface this file can see — the dashboard's note and column copy,
+  // the emitted markdown panels, and the skill.
+  const retired = ["witnesses a round in between", "witnesses a silent round", "the only signal in the corpus that a clean round happened"];
+  const surfaces: [string, string][] = [
+    ["totals NOTE", REVIEW_TOTALS_NOTE],
+    ["totals highest_round description", highest?.description ?? ""],
+    ["REVIEW_TOTALS_PANEL", EMITTED_PANELS.get("REVIEW_TOTALS_PANEL") ?? ""],
+    ["REVIEW_ROUNDS_PANEL", EMITTED_PANELS.get("REVIEW_ROUNDS_PANEL") ?? ""],
+    ["rounds NOTE", REVIEW_ROUNDS_NOTE],
+    ["SKILL.md", SKILL_TEXT],
+  ];
+  for (const [where, text] of surfaces) {
+    for (const phrase of retired) {
+      expect({ where, phrase, present: text.includes(phrase) }).toEqual({ where, phrase, present: false });
+    }
+  }
 });
 
 test("the review totals panel refuses to read as a verdict on the change", () => {

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T19:34:05.969685Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "crates/canon-report/src/render.rs:256",
+  "introduced_by": "2cff0129ece133863ad4322a7ec60bd17626759b",
+  "kind": "finding",
+  "reviewed_sha": "c4591fde71328dc1fa565db23db227faa1067b91",
+  "reviewer": "R6Gate",
+  "round": 6,
+  "schema": 1,
+  "seq": 2,
+  "severity": "blocker",
+  "summary": "The totals panel says highest_round > rounds_recorded witnesses a round that ran and found nothing; round is author-supplied and numbering is not enforced contiguous, so it witnesses only that lower labels have no rows"
+}

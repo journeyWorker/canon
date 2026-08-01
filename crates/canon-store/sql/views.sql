@@ -1807,14 +1807,25 @@ ORDER BY r.change_id, r."round";
 --
 -- `FROM mart_review_rounds`, never a second pass over `stg_records`.
 -- Every column here is a `sum()` (or a `count(*)`/`max()`) over the
--- rows the reader is looking at, so the total and the rows it totals
--- are one computation with one implementation: they cannot disagree,
--- because there is nothing for them to disagree WITH. A parallel
--- aggregate over `finding_latest` would have been the second place to
--- compute one number, which is how every defect on this line
+-- rows the reader is looking at, so over any ONE read of the corpus
+-- the total and the rows it totals are one computation with one
+-- implementation: there is nothing for them to disagree WITH. A
+-- parallel aggregate over `finding_latest` would have been the second
+-- place to compute one number, which is how every defect on this line
 -- recurred. That also means this view adds NO fold site: it inherits
 -- `mart_review_rounds`'s `finding_latest` fold (the inventory in this
 -- file's header) and folds nothing of its own.
+--
+-- "One read of the corpus" is the reader's half of that guarantee and
+-- it does not come free: this file's four `read_text`/`read_parquet`
+-- globs are re-expanded per statement, so a caller that queries the
+-- two views in two statements over a LIVE ledger has queried two
+-- corpora and the structural argument above buys it nothing.
+-- `canon-report` closes that half by materializing the four staging
+-- views once per run and repointing them at the materialized copies
+-- (`crates/canon-report/src/query.rs`, `PIN_CORPUS_SQL`), before any
+-- mart is computed or exported. A different consumer of this file
+-- owes itself the same step.
 --
 -- ── `rounds_recorded` is rounds that FOUND something ─────────────────
 -- `count(*)` over `mart_review_rounds`, which has one row per
@@ -1828,16 +1839,20 @@ ORDER BY r.change_id, r."round";
 -- been the whole defect in one word.
 --
 -- `highest_round` is `max("round")` over the same rows: the greatest
--- round NUMBER that recorded a finding. It is the only signal in the
--- corpus that a clean round happened at all, and it is one-directional
--- in the honest sense — `highest_round` exceeding `rounds_recorded`
--- says some round in between recorded nothing; the two being equal
--- says nothing either way, because a clean round at the END of a
--- change leaves both numbers untouched. And it is a round NUMBER, not
--- a count: it equals the rounds RUN only if a change's rounds are
--- numbered from 1 without gaps AND its last round found something,
--- and `round` is author-supplied, so this view requires neither.
--- Neither column is the rounds-run count.
+-- round NUMBER that recorded a finding. It witnesses nothing about
+-- rounds. `highest_round` exceeding `rounds_recorded` says only that
+-- some round number below it has no row here, and this view cannot
+-- say why: `round` is author-supplied, nothing requires a change's
+-- rounds to be numbered from 1 or without gaps, so a change whose one
+-- finding is labelled round 7 shows the same gap six silent rounds
+-- would. The two being equal says nothing either way. Neither the gap
+-- nor its absence evidences a round that RAN — a round that found
+-- nothing wrote no `Finding`, and no record kind marks a round as
+-- run, so the corpus holds no signal of one at all. And it is a round
+-- NUMBER, not a count: it equals the rounds RUN only if a change's
+-- rounds are numbered from 1 without gaps AND its last round found
+-- something, and this view requires neither. Neither column is the
+-- rounds-run count.
 --
 -- ── The splits ───────────────────────────────────────────────────────
 -- `sum()` of the per-round `count(*) FILTER` columns. `severity` and

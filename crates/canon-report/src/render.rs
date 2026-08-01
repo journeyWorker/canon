@@ -12,7 +12,7 @@
 use canon_model::envelope::RecordKind;
 
 use crate::digest::{self, DigestHeader};
-use crate::marts::MartResult;
+use crate::marts::{MartResult, ReportMarts};
 use crate::tier_boundary;
 
 /// The path a rendered report is conventionally written to when a
@@ -207,9 +207,18 @@ pub const REVIEW_ROUNDS_PANEL: &str = "Findings per review round (`mart_review_r
 /// - "every column a `sum()`, `count(*)` or `max()` over the
 ///   `mart_review_rounds` rows above" — the view's `FROM
 ///   mart_review_rounds`, which is its ONLY source. There is no second
-///   aggregate over `finding_latest`, so the total and the rows it
-///   totals cannot disagree; that is a structural property of the
-///   query, not a discipline.
+///   aggregate over `finding_latest`.
+/// - "one computation over one input and cannot disagree" — the SQL
+///   half is the bullet above; the other half is
+///   [`crate::marts::fetch_all`], which computes every panel in one
+///   `duckdb` process over one materialized read of the corpus. s43
+///   round 6 finding 1: the panel asserted the guarantee while
+///   `report()` fetched the two marts with two `run_query` calls —
+///   two processes, two globs of a LIVE ledger — so a finding written
+///   between them landed in the totals row and not in the rounds
+///   table. The sentence was true of the query and false of the
+///   report. Both halves are named here because either one alone
+///   leaves it false.
 /// - "`rounds_recorded` … counts the rounds that FOUND something,
 ///   never the rounds RUN" — `count(*)` over a view whose only source
 ///   is `FROM stg_records WHERE kind = 'finding'`. A round that found
@@ -221,11 +230,18 @@ pub const REVIEW_ROUNDS_PANEL: &str = "Findings per review round (`mart_review_r
 ///   so the rounds-RUN number is unavailable rather than merely
 ///   unrendered.
 /// - "`highest_round` … the greatest round NUMBER that recorded a
-///   finding" — `max("round")`. The panel states the one direction it
-///   reads in and refuses the other: a gap between the two columns
-///   witnesses a silent round, equality witnesses nothing. And it is a
-///   round NUMBER, not a count — `round` is author-supplied, so
-///   nothing makes it a rounds-run figure either.
+///   finding" — `max("round")`, and the panel now claims NOTHING from
+///   the gap. s43 round 6 finding 2: the panel said a
+///   `highest_round` above `rounds_recorded` witnessed a round that
+///   ran and found nothing, in the same paragraph that admits `round`
+///   is author-supplied and canon enforces no contiguous numbering.
+///   `max("round") > count(*)` says exactly one thing — some round
+///   number below the maximum has no row — and a change whose sole
+///   finding is labelled round 7 produces it with no silent round
+///   anywhere. So the panel states the missing-label fact and stops.
+///   The true statement it keeps is the other one: a clean round
+///   writes no `Finding`, which is why neither column can count the
+///   rounds run.
 /// - the three `= findings` identities — each split is a `sum()` of
 ///   the per-round `count(*) FILTER` columns over a closed `Finding`
 ///   enum, so summing a partition of each round's findings partitions
@@ -253,7 +269,7 @@ pub const REVIEW_ROUNDS_PANEL: &str = "Findings per review round (`mart_review_r
 ///   `SELECT` list. `max()` over one round's findings is a documented
 ///   deterministic pick; over a whole change's it would be a hex
 ///   string standing for nothing.
-pub const REVIEW_TOTALS_PANEL: &str = "Per-change review totals (`mart_review_totals`) — one row per `change_id`, and every column a `sum()`, `count(*)` or `max()` over the `mart_review_rounds` rows above. That view is this one's only `FROM`, so the total and the rows it totals are one computation with one implementation and cannot disagree. This panel exists so a release note is a COPY rather than a computation: the sentence a release note wants — how many findings a change drew, over how many rounds — is two cells of one row here, and adding a per-round table up by hand is the operation that put four wrong figures into this release line's published notes.\n\n`rounds_recorded` is `count(*)` over those rows, and `mart_review_rounds` holds a row only for a round that RECORDED a finding — a round that found nothing wrote no `Finding` and is in neither table. So this column counts the rounds that FOUND something, never the rounds RUN, and a release note copying it has to say which: s42's round 12 returned MERGEABLE with zero findings and is absent from both. canon has no record kind for a review round — `Review` is a per-scenario attestation, not a round — so the rounds-RUN number is not derivable from this corpus, by this view or any other. `highest_round` is `max(round)` over the same rows, the greatest round NUMBER that recorded a finding: a `highest_round` above `rounds_recorded` witnesses a round in between that recorded nothing, while the two being equal witnesses nothing either way, since a clean round at the END of a change leaves both untouched. Neither column is the rounds-RUN count: `highest_round` is a round NUMBER rather than a count, and it equals the rounds run only if a change's rounds are numbered from 1 without gaps AND its last round found something — canon requires neither, because `round` is a number the author supplies.\n\nEach split is a `sum()` of the per-round `count(*) FILTER` columns over a closed `Finding` enum, so it partitions the change's findings exactly as the per-round columns partition each round's: `severity_blocker + severity_should_fix + severity_note = findings`, `disposition_open + disposition_fixed + disposition_rejected + disposition_deferred = findings`, and `introduced_by_sourced + introduced_by_unsourced = findings`, all by construction. The dispositions are the LATEST recorded state of each finding, never its history — the fold underneath keeps one version per `{change_id}__{round}__{seq}`, so `disposition_open` is what is open NOW and not what was ever opened.\n\n`fix_of_fix` is `sum(fix_of_fix)`, and the relationship is DERIVED, never recorded: no `Finding` carries a fix-of-fix field, and the only place the edge exists is the round view's commit-id equality join between a finding's SOURCED `introduced_by` and the `resolution_sha` of a finding earlier in the SAME change, ordered strictly by `(round, seq)`. That join is already scoped to one `change_id`, so summing it per change changes the grain and nothing else — the total counts exactly the findings the rows above count, and the cross-change case is as invisible here as it is there. `fix_of_fix` bounds NOTHING — not from below, not from above: it UNDER-counts, because an unsourced finding is never counted and a fix in one change that breaks something first found while reviewing a DIFFERENT change is not counted at all; it OVER-counts, because a `resolution_sha` commit may carry work BEYOND the fix and every finding recording that commit is counted regardless; and for any individual match the data cannot say whether the fix or the other work in that commit introduced the defect.\n\nNone of these columns is a claim about the change. `findings` is how many findings reviewers RECORDED against it, which moves with how many rounds it got and how freely its reviewers wrote findings down; this view cannot tell a change reviewed hard from a change barely reviewed. `severity_blocker` is the severity a reviewer TYPED, which canon stores and never checks. `disposition_rejected` records that a finding was rejected, not that it was wrong. There is no defect rate, no quality score and no comparison between changes here: a row is one change's review HISTORY, and the denominator that would turn any of it into a rate is not in this corpus. `reviewed_sha` is deliberately absent — `max()` over one round's findings is a documented deterministic pick, but over a whole change's it would be a hex string standing for nothing, and a column a reader could take for the commit the change was reviewed at.\n\n";
+pub const REVIEW_TOTALS_PANEL: &str = "Per-change review totals (`mart_review_totals`) — one row per `change_id`, and every column a `sum()`, `count(*)` or `max()` over the `mart_review_rounds` rows above. That view is this one's only `FROM`, and every panel in one report — or one `--snapshot` export — is computed in a single DuckDB process over one materialized read of the corpus, so the total and the rows it totals are one computation over one input and cannot disagree: a record written to the ledger mid-run reaches neither table, never one and not the other. This panel exists so a release note is a COPY rather than a computation: the sentence a release note wants — how many findings a change drew, over how many rounds — is two cells of one row here, and adding a per-round table up by hand is the operation that put four wrong figures into this release line's published notes.\n\n`rounds_recorded` is `count(*)` over those rows, and `mart_review_rounds` holds a row only for a round that RECORDED a finding — a round that found nothing wrote no `Finding` and is in neither table. So this column counts the rounds that FOUND something, never the rounds RUN, and a release note copying it has to say which: s42's round 12 returned MERGEABLE with zero findings and is absent from both. canon has no record kind for a review round — `Review` is a per-scenario attestation, not a round — so the rounds-RUN number is not derivable from this corpus, by this view or any other. `highest_round` is `max(round)` over the same rows, the greatest round NUMBER that recorded a finding, and it witnesses nothing about rounds. A `highest_round` above `rounds_recorded` says only that some round number below it has no row, and canon cannot say why: `round` is a number the author supplies and nothing requires a change's rounds to be numbered from 1 or without gaps, so a change whose only finding is labelled round 7 shows the same gap six silent rounds would. Neither the gap nor its absence evidences a round that RAN — a round that found nothing writes no `Finding`, and canon records nothing else about one. Neither column is the rounds-RUN count: `highest_round` is a round NUMBER rather than a count, and it equals the rounds run only if a change's rounds are numbered from 1 without gaps AND its last round found something — canon requires neither.\n\nEach split is a `sum()` of the per-round `count(*) FILTER` columns over a closed `Finding` enum, so it partitions the change's findings exactly as the per-round columns partition each round's: `severity_blocker + severity_should_fix + severity_note = findings`, `disposition_open + disposition_fixed + disposition_rejected + disposition_deferred = findings`, and `introduced_by_sourced + introduced_by_unsourced = findings`, all by construction. The dispositions are the LATEST recorded state of each finding, never its history — the fold underneath keeps one version per `{change_id}__{round}__{seq}`, so `disposition_open` is what is open NOW and not what was ever opened.\n\n`fix_of_fix` is `sum(fix_of_fix)`, and the relationship is DERIVED, never recorded: no `Finding` carries a fix-of-fix field, and the only place the edge exists is the round view's commit-id equality join between a finding's SOURCED `introduced_by` and the `resolution_sha` of a finding earlier in the SAME change, ordered strictly by `(round, seq)`. That join is already scoped to one `change_id`, so summing it per change changes the grain and nothing else — the total counts exactly the findings the rows above count, and the cross-change case is as invisible here as it is there. `fix_of_fix` bounds NOTHING — not from below, not from above: it UNDER-counts, because an unsourced finding is never counted and a fix in one change that breaks something first found while reviewing a DIFFERENT change is not counted at all; it OVER-counts, because a `resolution_sha` commit may carry work BEYOND the fix and every finding recording that commit is counted regardless; and for any individual match the data cannot say whether the fix or the other work in that commit introduced the defect.\n\nNone of these columns is a claim about the change. `findings` is how many findings reviewers RECORDED against it, which moves with how many rounds it got and how freely its reviewers wrote findings down; this view cannot tell a change reviewed hard from a change barely reviewed. `severity_blocker` is the severity a reviewer TYPED, which canon stores and never checks. `disposition_rejected` records that a finding was rejected, not that it was wrong. There is no defect rate, no quality score and no comparison between changes here: a row is one change's review HISTORY, and the denominator that would turn any of it into a rate is not in this corpus. `reviewed_sha` is deliberately absent — `max()` over one round's findings is a documented deterministic pick, but over a whole change's it would be a hex string standing for nothing, and a column a reader could take for the commit the change was reviewed at.\n\n";
 
 fn cell(row: &crate::query::Row, column: &str) -> String {
     match row.get(column) {
@@ -287,21 +303,6 @@ fn render_table(out: &mut String, mart: &MartResult) {
         out.push('\n');
     }
     out.push('\n');
-}
-
-/// The nine panels this report renders, in design D5's own declared
-/// order, with s24's `scope_status`, s36's `subjects`, s43's
-/// `review_rounds` and s43 round 5's `review_totals` appended last.
-pub struct ReportMarts {
-    pub trust_matrix: MartResult,
-    pub session_costs: MartResult,
-    pub role_memory: MartResult,
-    pub flywheel_funnel: MartResult,
-    pub review_burndown: MartResult,
-    pub scope_status: MartResult,
-    pub subjects: MartResult,
-    pub review_rounds: MartResult,
-    pub review_totals: MartResult,
 }
 
 /// Renders the full report markdown. Pure formatting over already-
@@ -435,14 +436,24 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     // meant summing the rows above by hand — the same hand arithmetic
     // that produced the wrong figures s43 was opened to stop. So the
     // total is a view (`mart_review_totals`), its only `FROM` is
-    // `mart_review_rounds`, and nothing here adds anything in Rust:
-    // one number, one implementation, no way for the two tables to
-    // disagree.
+    // `mart_review_rounds`, and nothing here adds anything in Rust.
+    //
+    // Round 6 finding 1: that argument covers the SQL and stopped at
+    // the process boundary. `report()` fetched the two marts with two
+    // `run_query` calls, each a fresh `duckdb` over a live ledger, so
+    // a finding written between them reached the totals row and not
+    // the rounds table — the panel's "cannot disagree" was true of the
+    // query and false of the report. `marts::fetch_all` now computes
+    // every panel in one process over one pinned corpus, and the panel
+    // says which two things it is resting on.
     //
     // `rounds_recorded` is the column a reader will copy fastest and
     // misread first, so the prose says what it is before it says
     // anything else: rounds that RECORDED a finding, never rounds RUN,
-    // and canon cannot supply the second number at all.
+    // and canon cannot supply the second number at all. Round 6
+    // finding 2 took the other round column's claim out: a gap between
+    // `highest_round` and `rounds_recorded` witnesses a MISSING LABEL,
+    // never a round that ran.
     out.push_str(REVIEW_TOTALS_PANEL);
     render_table(&mut out, &marts.review_totals);
 
@@ -796,8 +807,22 @@ mod tests {
             "the totals panel must say where every number comes from"
         );
         assert!(
-            report.contains("That view is this one's only `FROM`, so the total and the rows it totals are one computation with one implementation and cannot disagree"),
-            "the totals panel must state that there is only one implementation of the number"
+            report.contains(
+                "That view is this one's only `FROM`, and every panel in one report — or one `--snapshot` export — is computed in a single DuckDB process over one materialized read of the corpus, so the total and the rows it totals are one computation over one input and cannot disagree"
+            ),
+            "the totals panel must name BOTH halves of the guarantee: one query, and one read"
+        );
+        assert!(
+            report.contains("a record written to the ledger mid-run reaches neither table, never one and not the other"),
+            "the totals panel must say what the pinned read buys, in the terms a reader can check"
+        );
+        // s43 round 6 finding 1: the retired sentence claimed the SQL
+        // alone settled it. It did not — `report()` was two `duckdb`
+        // processes over a live ledger — so the words that stood for
+        // the missing half must not come back.
+        assert!(
+            !report.contains("one computation with one implementation and cannot disagree"),
+            "the SQL-only version of the guarantee is false of the rendered report"
         );
         assert!(
             report.contains("a release note is a COPY rather than a computation"),
@@ -825,12 +850,26 @@ mod tests {
             report.contains("canon has no record kind for a review round"),
             "the totals panel must say the rounds-run number is unavailable, not merely unrendered"
         );
-        // The gap column reads in ONE direction, and the panel has to
-        // refuse the other rather than leave a reader to assume
-        // equality means every round found something.
+        // s43 round 6 finding 2. The retired sentence read the gap as a
+        // witness to a round that ran and found nothing, in the same
+        // paragraph that says `round` is author-supplied and numbering
+        // is not enforced contiguous. `max(round) > count(*)` says only
+        // that some lower round label has no row.
         assert!(
-            report.contains("witnesses a round in between that recorded nothing, while the two being equal witnesses nothing either way"),
-            "the totals panel must state what `highest_round` does and does not witness"
+            report.contains("A `highest_round` above `rounds_recorded` says only that some round number below it has no row"),
+            "the totals panel must state the missing-label fact and nothing beyond it"
+        );
+        assert!(
+            report.contains("a change whose only finding is labelled round 7 shows the same gap six silent rounds would"),
+            "the totals panel must show the case that makes the gap uninformative"
+        );
+        assert!(
+            report.contains("Neither the gap nor its absence evidences a round that RAN"),
+            "the totals panel must refuse BOTH readings of the gap, not just the equality one"
+        );
+        assert!(
+            !report.contains("witnesses a round in between that recorded nothing"),
+            "the retired clean-round inference must be gone from every panel"
         );
         // Round 6 hardening: `highest_round` is the OTHER column a
         // reader could paste as "rounds". canon does not require a

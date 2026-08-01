@@ -466,8 +466,10 @@ const METRIC_SINGULARS: &[&str] = &["finding", "round", "issue", "record", "fix-
 /// because "the numbers of findings" is not a sentence anyone writes.
 const COUNTING_WORDS: &[&str] = &["count", "counts", "total", "totals", "tally", "tallies"];
 
-/// Counting markers whose first word is harmless on its own — "19 in
-/// all", "12 findings all told", "the number of findings is three".
+/// Counting markers whose first word is harmless on its own. Each
+/// example carries the metric noun the marker has to BIND to, because
+/// the marker alone catches nothing — "Findings: 19 in all.", "12
+/// findings all told", "the number of findings is three".
 /// Bare `all` is deliberately NOT a counting word: "a short sha
 /// zero-padded to 40, and all of them were accepted" is not a tally.
 /// Bare `number` is deliberately not one either: see
@@ -534,15 +536,25 @@ const SMALL_SPELLED: &[&str] = &["one", "two"];
 
 /// `true` for a token that is entirely a cardinal quantity, EXCEPT a
 /// bare [`SMALL_SPELLED`] one: all digits (`3`, `19`), a spelled
-/// cardinal (`three`, `eleven`), or a hyphenated compound of those
-/// (`twenty-one`, whose `one` is part of a number rather than a word
-/// on its own). `1-based`, `zero-padded`, `v0.4.0` and `120-134` are
-/// NOT quantities — a number welded into a larger word is not an
-/// assertion of how many.
+/// cardinal (`three`, `eleven`), or a hyphenated compound of SPELLED
+/// ones (`twenty-one`, whose `one` is part of a number rather than a
+/// word on its own). `1-based`, `zero-padded` and `v0.4.0` are NOT
+/// quantities — a number welded into a larger word is not an assertion
+/// of how many — and neither is `120-134`: a hyphen joins the parts of
+/// one SPELLED number, so a hyphenated run of DIGITS is a range, which
+/// is what these surfaces write it as ("path/to/file.rs:120-134").
+/// Round 6 found the code and this paragraph disagreeing here: the
+/// digit case was admitted per-part, so a bare `120-134` was a
+/// quantity and "Findings: 120-134 in src/finding.rs" would have been
+/// read as a tally of 120-134 findings.
 fn quantity(word: &str) -> bool {
+    let spelled = |part: &str| SPELLED_COUNTS.contains(&part) || SMALL_SPELLED.contains(&part);
     !word.is_empty()
         && !SMALL_SPELLED.contains(&word)
-        && word.split('-').all(|part| !part.is_empty() && (part.chars().all(|c| c.is_ascii_digit()) || SPELLED_COUNTS.contains(&part) || SMALL_SPELLED.contains(&part)))
+        && match word.contains('-') {
+            true => word.split('-').all(spelled),
+            false => word.chars().all(|c| c.is_ascii_digit()) || spelled(word),
+        }
 }
 
 /// `true` when a raw token closes its clause — it ends the line, or
@@ -552,6 +564,13 @@ fn clause_final(raw: &str, is_last: bool) -> bool {
     is_last || raw.trim_end_matches(|c: char| c.is_alphanumeric()).contains(['.', ',', ';', ':', '!', '?'])
 }
 
+/// A character belonging to a token's WORD rather than to the markup
+/// around it. Hyphens and underscores are inside for the reason
+/// [`word`] gives.
+fn word_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '-' || c == '_'
+}
+
 /// The punctuation that FOLLOWS a raw token's word characters: `":"`
 /// for `Findings:`, `"'"` for `rounds'`, the whole token for a
 /// punctuation-only `—` or `=`, and `""` for a bare `records`.
@@ -559,19 +578,53 @@ fn clause_final(raw: &str, is_last: bool) -> bool {
 /// Leading markup is skipped first, so `(findings` reports no trailing
 /// punctuation: an opening bracket sits before the word, not after it.
 fn trailing_punctuation(raw: &str) -> &str {
-    let word_char = |c: char| c.is_alphanumeric() || c == '-' || c == '_';
     let after_lead = raw.trim_start_matches(|c: char| !word_char(c));
     if after_lead.is_empty() { raw } else { after_lead.trim_start_matches(word_char) }
 }
 
-/// `true` when a raw token separates a LABEL from its value —
-/// `Findings:`, `findings,`, a bare `=`, `—` or `|`. Sentence-ending
-/// punctuation is deliberately excluded: in "two records. 3 of them
-/// were wrong" the `3` opens a new sentence and is not the label's
-/// value.
-fn label_separator(raw: &str) -> bool {
-    let tail = trailing_punctuation(raw);
-    !tail.is_empty() && !tail.contains(['.', '!', '?'])
+/// The mirror image — the punctuation that PRECEDES a raw token's word
+/// characters: `"="` for `=3`, `":"` for `:3`, `"("` for `(findings`,
+/// the whole token for a punctuation-only `—`, and `""` for a bare `3`.
+fn leading_punctuation(raw: &str) -> &str {
+    let after_lead = raw.trim_start_matches(|c: char| !word_char(c));
+    &raw[..raw.len() - after_lead.len()]
+}
+
+/// `true` when a run of punctuation LABELS: non-empty, and carrying no
+/// sentence terminator. Sentence-ending punctuation is deliberately
+/// excluded — in "two records. 3 of them were wrong" the `3` opens a
+/// new sentence and is not the label's value.
+fn labels(punctuation: &str) -> bool {
+    !punctuation.is_empty() && !punctuation.contains(['.', '!', '?'])
+}
+
+/// `true` when LABEL punctuation lies in the gap between the metric
+/// noun at `noun` and its candidate value at `value` — the span from
+/// the noun's last word character to the value's first, which is where
+/// a label's punctuation lives no matter which token happens to carry
+/// it: `Findings: 3` on the noun, `Findings : 3` on a token of its
+/// own, `Findings =3` on the VALUE, `Findings : — 3` on everything in
+/// between. Every token strictly inside the gap is wholly punctuation,
+/// because [`hand_typed_count`]'s `next_word` picked `value` as the
+/// first token after `noun` carrying any word characters at all.
+///
+/// s43 round 5 examined the half-open TOKEN range `noun..value`, which
+/// excludes the value token, so a separator welded to the front of the
+/// value — `Findings =3`, `Findings :3` — was invisible and the claim
+/// passed (round 6, finding 3). Reading the gap as characters rather
+/// than as a token range is what puts that miss out of reach: neither
+/// a count of tokens nor a choice of which end of a token to inspect
+/// enters the answer.
+fn labelled_gap(raw: &[&str], noun: usize, value: usize) -> bool {
+    (noun..=value).any(|k| {
+        labels(if k == noun {
+            trailing_punctuation(raw[k])
+        } else if k == value {
+            leading_punctuation(raw[k])
+        } else {
+            raw[k]
+        })
+    })
 }
 
 /// The offending span when `text` asserts a hand-typed count of
@@ -587,24 +640,42 @@ fn label_separator(raw: &str) -> bool {
 ///    real issues", "44 authored records";
 /// 2. a plural metric noun wearing LABEL punctuation, whose next
 ///    non-empty word is a value — "Findings: 3", "findings = 3",
-///    "findings — 3", "Findings : — 3". English puts a quantity on
-///    either side of its noun; this is the other side, and s43 round 4
-///    (finding 1) found the guard blind to it because only shape 1
-///    existed. The punctuation is REQUIRED evidence, not incidental:
-///    four of the five plural nouns here are also verbs, and bare
-///    `<noun> <value>` adjacency is the verb reading — "The importer
-///    records 3 commits.", "the command issues 3 warnings." (s43
-///    round 5, finding 6). A label wears punctuation; a verb does not.
-///    The scan walks NORMALIZED tokens, so any run of punctuation
-///    separates the label from its value (s43 round 5, finding 7 —
-///    the previous version claimed to skip punctuation while examining
-///    only the next two RAW tokens, so `Findings : — 3` passed);
-/// 3. a counting word or [`COUNTING_PHRASES`] marker bound to a metric
-///    noun (within three words, either side) carrying a value within
-///    four words AFTER it or two words BEFORE it — "fix-of-fix count is
-///    2", "fix-of-fix total: 3", "the count of findings is three", "3
-///    total", "19 in all". The BEFORE direction is the same round-4
-///    finding in its second dress: a label may follow what it labels.
+///    "findings — 3", "Findings : — 3", "Findings =3". English puts a
+///    quantity on either side of its noun; this is the other side, and
+///    s43 round 4 (finding 1) found the guard blind to it because only
+///    shape 1 existed. The punctuation is REQUIRED evidence, not
+///    incidental: four of the five plural nouns here are also verbs,
+///    and bare `<noun> <value>` adjacency is the verb reading — "The
+///    importer records 3 commits.", "the command issues 3 warnings."
+///    (s43 round 5, finding 6). A label wears punctuation; a verb does
+///    not. WHICH token carries that punctuation is not part of the
+///    rule: [`labelled_gap`] reads the whole character gap between
+///    noun and value, so the noun's own tail (`Findings: 3`), a token
+///    of pure punctuation (`Findings : — 3`, round 5 finding 7) and
+///    the value's own head (`Findings =3`, round 6 finding 3) are one
+///    case in three spellings rather than three rules;
+/// 3. a counting word or [`COUNTING_PHRASES`] marker BOUND to a metric
+///    noun — within three words of the whole marker, either side —
+///    carrying a value within four words AFTER the marker's FIRST
+///    token or two words BEFORE it: "fix-of-fix count is 2",
+///    "fix-of-fix total: 3", "the count of findings is three", "the
+///    records total 44", "Findings: 19 in all." The BEFORE direction
+///    is the same round-4 finding in its second dress: a label may
+///    follow what it labels. Every example here carries its noun
+///    because the binding is load-bearing, and round 6 found this
+///    list ignoring that: bare "3 total" and bare "19 in all", with
+///    no metric noun in reach, are NOT caught, and the doc claimed
+///    they were. The four-word value budget is measured from the
+///    marker's start and scanned from after its end, so a two-word
+///    marker reaches no FURTHER than a one-word one. Round 5 anchored
+///    it on the marker's END, which slid the window a token right for
+///    `number of` and read the `3` in "Number of rounds needs only 3
+///    bytes." as a count of rounds (round 6, finding 4). The BINDING
+///    window is the one span still measured from the marker's END,
+///    because a partitive's object sits after it, in "the number of
+///    findings"; failing to bind lets a claim through, so widening
+///    that side costs no honest prose. For the two-word markers this
+///    vocabulary has, both windows stop at the same token;
 ///
 /// # INDEX, not count
 /// A cardinal DIRECTLY after a SINGULAR metric noun is an index, and
@@ -627,6 +698,18 @@ fn label_separator(raw: &str) -> bool {
 /// small numbers out and a metric claim reaches for a digit.
 ///
 /// # Residual holes, stated rather than papered over
+///
+/// Every sentence quoted below as PASSING is a row in
+/// [`the_documented_holes_are_the_holes_the_guard_actually_has`], which
+/// is what keeps this section from drifting into fiction. Round 6 wrote
+/// that test after finding four claims here already false: `120-134`
+/// described as not a quantity when the code read it as one, bare "3
+/// total" and "19 in all" listed as CAUGHT when an unbound marker
+/// catches nothing, and "findings, 3 of them" listed as a spelling the
+/// guard does not know when shape 2, added a round later, catches it
+/// squarely. A hole claimed in prose is unfalsifiable; a hole claimed
+/// as a row fails the moment it stops being one.
+///
 /// - "there are two findings" passes. "there are 2 findings", "there
 ///   are three findings" and "the finding count is two." all fail.
 /// - The index rule is unconditional, so a count written as `<singular
@@ -638,23 +721,46 @@ fn label_separator(raw: &str) -> bool {
 ///   belt in
 ///   [`no_shipped_finding_help_or_doc_asserts_a_hand_typed_count`] is
 ///   what pins the one of those that actually shipped.
-/// - The windows are fixed — two words before a plural noun, four
-///   after or two before a counting word — so a value pushed further
-///   out, "findings, as of this round, 3", passes. Shape 2 has no
-///   window (it takes the next non-empty word), but pays for it with
-///   the punctuation requirement: bare "Findings 3", with no
-///   punctuation at all, passes. That is the price of not reading
-///   every "records 3 commits" as a tally, and prose does not write a
-///   label without its colon.
+/// - The windows are fixed — two words before a plural noun, and from
+///   a counting marker four words after its START or two before it —
+///   so a value pushed further out, "findings, as of this round, 3",
+///   passes. For a two-word marker that budget leaves three words
+///   after the phrase: "the number of rounds is 11" is caught on the
+///   edge and "the number of rounds is only 11" sits one word past it
+///   and passes. Letting the window slide instead is what shipped
+///   round 6's finding 4, so this miss is the chosen side of that
+///   trade.
+/// - A counting marker BINDS only within three words of a metric noun,
+///   so a tally whose subject sits further back — "the findings this
+///   session raised are 19 in all" — passes, as do bare "19 in all"
+///   and bare "3 total" with no noun at all. Reaching further to bind
+///   would start reading counting words in sentences that name no
+///   metric.
+/// - Shape 2 has no window (it takes the next non-empty word), but
+///   pays for it with the punctuation requirement: bare "Findings 3",
+///   with no punctuation at all, passes. That is the price of not
+///   reading every "records 3 commits" as a tally, and prose does not
+///   write a label without its colon.
 /// - Sentence-ending punctuation does not label: "two records. 3 of
 ///   them were wrong" passes shape 2, because the `3` opens a new
 ///   sentence.
+/// - Tokens are whitespace-separated, so a label WELDED to its value
+///   with no space — "Findings:3", "rounds=11" — arrives as ONE token
+///   that normalizes to neither a metric noun nor a quantity, and
+///   passes. It is the same welding rule that keeps "v0.4.0",
+///   "1-based" and `{round:04}` from reading as quantities, and
+///   splitting tokens on inner punctuation to close it would turn all
+///   three into numbers this guard then has an opinion about. No such
+///   spelling has shipped on these surfaces; adding a rule for a shape
+///   that has not appeared is what rounds 4 and 5 did, and stating the
+///   hole is what this round does instead.
 /// - Counting markers are [`COUNTING_WORDS`] plus `in all`, `all told`
-///   and `number of`. "findings, 3 of them" and "3 apiece" are
-///   spellings it does not know, and bare `number`/`numbers` is
-///   deliberately not a marker at all — see [`COUNTING_WORDS`] — so
-///   "the finding number is 19", meaning a tally, passes where "the
-///   finding count is 19" fails.
+///   and `number of`. "3 apiece" is a spelling it does not know, and
+///   bare `number`/`numbers` is deliberately not a marker at all — see
+///   [`COUNTING_WORDS`] — so "the finding number is 19", meaning a
+///   tally, passes where "the finding count is 19" fails. "findings, 3
+///   of them" is NOT in this list: it reads as an unknown marker but
+///   shape 2 catches it on the label punctuation alone.
 /// - The guard is not applied to THIS file, whose reject table is by
 ///   construction full of the shapes it bans.
 fn hand_typed_count(text: &str) -> Option<String> {
@@ -698,7 +804,7 @@ fn hand_typed_count(text: &str) -> Option<String> {
         // `records 3` / `issues 3` is the verb reading.
         if METRIC_PLURALS.contains(&at(i)) {
             if let Some(j) = next_word(i) {
-                if (i..j).any(|k| label_separator(raw[k])) && value(j) {
+                if labelled_gap(&raw, i, j) && value(j) {
                     return Some(span(i, j));
                 }
             }
@@ -706,7 +812,11 @@ fn hand_typed_count(text: &str) -> Option<String> {
         if let Some(end) = counting(i) {
             let bound_to_a_metric = (i.saturating_sub(3)..=end + 3).any(|k| !(i..=end).contains(&k) && metric_noun(at(k)));
             if bound_to_a_metric {
-                if let Some(k) = (end + 1..=end + 4).find(|&k| value(k)) {
+                // Four words of value budget from the marker's FIRST
+                // token, scanned from after its last: a two-word
+                // marker spends two of them on itself rather than
+                // sliding its window a token further out.
+                if let Some(k) = (end + 1..=i + 4).find(|&k| value(k)) {
                     return Some(span(i.saturating_sub(3), k));
                 }
                 if let Some(k) = (i.saturating_sub(2)..i).find(|&k| value(k)) {
@@ -787,13 +897,14 @@ fn no_shipped_finding_help_or_doc_asserts_a_hand_typed_count() {
 /// The guard's own contract, as two tables — it must catch the class it
 /// names, and it must spare every legitimate number these surfaces
 /// actually carry. Tables rather than prose so the next hole is a ROW
-/// rather than a rewrite, which is what s43 round 4 (findings 1 and 2)
-/// and round 5 (findings 5, 6 and 7) cost when it was neither.
+/// rather than a rewrite, which is what s43 round 4 (findings 1 and 2),
+/// round 5 (findings 5, 6 and 7) and round 6 (findings 3 and 4) cost
+/// when it was neither.
 ///
 /// Each row carries its provenance, and every row is real: the reject
-/// table is what has shipped wrong on this line plus what rounds 4 and
-/// 5 found the guard blind to, and the accept table is prose these four
-/// surfaces actually carry. A guard that forces a reword of an accept
+/// table is what has shipped wrong on this line plus what rounds 4, 5
+/// and 6 found the guard blind to, and the accept table is prose these
+/// four surfaces actually carry. A guard that forces a reword of an accept
 /// row has become the bug — that is the failure mode a shape guard has
 /// and a substring list does not.
 ///
@@ -832,6 +943,13 @@ fn the_count_guard_catches_the_class_and_spares_the_indices() {
         // a second punctuation mark pushed the value out of reach.
         ("round 5 finding 7", "Findings : — 3"),
         ("round 5 finding 7", "Findings :  —  11 total."),
+        // Round 6, finding 3: the separator welded to the FRONT of the
+        // value token. Round 5 scanned the half-open token range up to
+        // the value and so excluded the value's own punctuation,
+        // regressing these three from caught to passing.
+        ("round 6 finding 3", "Findings =3"),
+        ("round 6 finding 3", "Findings :3"),
+        ("round 6 finding 3", "Findings —3"),
         ("round 5 finding 7", "| Findings | 3 |"),
         // The noun sense of the four plural homographs still labels a
         // value; only the bare verb adjacency was given up for it.
@@ -839,6 +957,9 @@ fn the_count_guard_catches_the_class_and_spares_the_indices() {
         ("shape 2", "Issues: 49"),
         // Round 5, finding 5: dropping bare `number` must not drop the
         // partitive, which is the other spelling of "the count of".
+        // Both values sit exactly four words after `number` — the outer
+        // edge of the marker-START budget — so these two rows are also
+        // what pins that edge against the next retune.
         ("shape 3", "the number of findings is three"),
         ("shape 3", "the number of rounds is 11"),
         // The shapes round 3 caught, kept as rows so a tightening
@@ -889,8 +1010,15 @@ fn the_count_guard_catches_the_class_and_spares_the_indices() {
         ("src/finding.rs", "numbers its findings, so `--seq` is transcription rather than"),
         ("src/finding.rs", "the counts live in mart_review_rounds, off the 'Review rounds' panel"),
         // Numbers that are neither index nor count: line spans, sha
-        // widths, argument literals.
+        // widths, argument literals. The second row is round 6's: the
+        // `quantity` doc has claimed since round 3 that `120-134` is
+        // not a quantity, while the code admitted a hyphenated compound
+        // per PART and so read it as one. A range is never a count, but
+        // it sits exactly where shape 2 looks for one, so the first
+        // line span written as a label's value would have been called
+        // a tally of 120-134 findings.
         ("--file-ref help", "Where in the tree, as path/to/file.rs:120-134 (line breaks refused)"),
+        ("quantity doc", "Findings: 120-134 in src/finding.rs"),
         ("src/finding.rs", "Check the sha (a short sha padded to 40 characters is the way this has actually happened), or omit the flag."),
         ("src/finding.rs", "--round and --seq are 1-based (got --round 0 --seq 1); a 0 would sort ahead of the first real finding in a key whose whole job is ordering rounds"),
         ("src/finding.rs", "assert_eq!(read_back.records.len(), 4);"),
@@ -921,9 +1049,80 @@ fn the_count_guard_catches_the_class_and_spares_the_indices() {
         // next word is simply not a value — the path shape 2 walks on
         // most of these lines.
         ("src/finding.rs", "recorded none of their findings — `canon_ingest::artifact_adapter`'s"),
+        // Round 6, finding 4: `number of` is a TWO-token marker, and
+        // round 5 measured the value window from its end, sliding the
+        // window a token right. The `3` here counts BYTES and sits five
+        // words after `number`; the panel's own honest sentence below
+        // has no cardinal at all and must stay readable beside it.
+        ("round 6 finding 4", "Number of rounds needs only 3 bytes."),
+        ("round 6 finding 4", "the number of rounds is not derivable"),
     ] {
         assert_eq!(hand_typed_count(legitimate), None, "{provenance}: the guard must spare {legitimate:?}");
     }
+}
+
+/// The third table, and the one round 6 added: every hole
+/// [`hand_typed_count`]'s doc admits to, as a row that MUST pass.
+///
+/// The two tables above pin what the guard does. Nothing pinned what
+/// its doc says it does NOT do, so those claims drifted — round 6 found
+/// four of them false at once, two written before shape 2 existed and
+/// one contradicted by the very predicate it described. A hole stated
+/// in prose cannot fail; a hole stated as a row fails the moment a
+/// retune closes it or a rule change quietly widens somewhere else.
+///
+/// Which direction a failure here points matters. A row that starts
+/// getting CAUGHT is not automatically a bug — a hole may be closed on
+/// purpose — but it does mean the doc now overstates the guard's
+/// blindness, so the bullet goes and the row moves to the reject table.
+/// A row that cannot be written honestly at all is the signal that the
+/// hole was never real.
+#[test]
+fn the_documented_holes_are_the_holes_the_guard_actually_has() {
+    for (bullet, hole) in [
+        // "there are two findings" — the spelled-small register.
+        ("spelled small", "there are two findings"),
+        // The index rule is unconditional, so a count wearing a
+        // singular noun reads as an index.
+        ("index", "Finding 44"),
+        // The vocabulary is five nouns.
+        ("vocabulary", "four of them defects"),
+        ("vocabulary", "three blockers"),
+        ("vocabulary", "two verdicts"),
+        // The windows are fixed, in both shapes that have one.
+        ("windows", "findings, as of this round, 3"),
+        ("windows", "the number of rounds is only 11"),
+        // A counting marker binds only within three words of a noun.
+        ("binding", "the findings this session raised are 19 in all"),
+        ("binding", "19 in all"),
+        ("binding", "3 total"),
+        // Shape 2 requires punctuation, so bare adjacency passes.
+        ("shape 2 punctuation", "Findings 3"),
+        // A sentence boundary does not label.
+        ("sentence boundary", "two records. 3 of them were wrong"),
+        // Whitespace tokenization welds a label to its value.
+        ("welding", "Findings:3"),
+        ("welding", "rounds=11"),
+        // The marker vocabulary, and bare `number` deliberately out of
+        // it.
+        ("markers", "3 apiece"),
+        ("markers", "the finding number is 19"),
+    ] {
+        assert_eq!(hand_typed_count(hole), None, "the {bullet:?} hole is no longer a hole: the guard now catches {hole:?}, so its doc bullet overstates what the guard misses");
+    }
+
+    // Round 6's doc audit found one false claim in each direction, and
+    // both belong beside the holes: a bullet that grows a
+    // counter-example is how the previous four went stale.
+    assert!(
+        hand_typed_count("findings, 3 of them").is_some(),
+        "the marker bullet listed \"findings, 3 of them\" as a spelling the guard does not know, and shape 2 catches it on the label punctuation alone"
+    );
+    assert_eq!(
+        hand_typed_count("120-134 findings"),
+        None,
+        "`quantity`'s doc has said since round 3 that a digit range is not a quantity; round 6 made that true, so a bare line span must not read as a tally"
+    );
 }
 
 /// s43 round 3, finding 4: the branch above used to read

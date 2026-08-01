@@ -147,11 +147,13 @@ fn snapshot_writes_nine_parquet_files_and_a_manifest_listing_exactly_them() {
 /// Regression test for a `COPY "<table>" TO '<path>' (FORMAT parquet)`
 /// SQL-injection-shaped bug: an unescaped single quote INSIDE the
 /// destination path would terminate the `TO '<path>'` string literal
-/// early and corrupt the statement. `snapshot::export_view` now
+/// early and corrupt the statement. `snapshot::copy_statement`
 /// SQL-escapes the path (doubling every `'`) before embedding it —
 /// this proves the full `--snapshot` run still succeeds, writing all
 /// 9 parquet files + manifest.json, when the destination directory
-/// itself contains an apostrophe.
+/// itself contains an apostrophe. All nine `COPY`s go out as one
+/// pinned batch, so the escape has to hold for every statement in the
+/// script, not just the first.
 #[test]
 fn snapshot_into_a_directory_whose_path_contains_an_apostrophe_succeeds() {
     if !support::duckdb_available() {
