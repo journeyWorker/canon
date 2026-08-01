@@ -334,12 +334,15 @@ pub const REVIEW_TOTALS: MartSpec = MartSpec { view: "mart_review_totals", order
 ///   `Review` is a per-scenario attestation and no record kind marks a
 ///   round as run.
 /// - `highest_round` — `max("round")` over the same rows: the greatest
-///   round NUMBER that recorded a finding. Exceeding `rounds_recorded`
-///   says some round in between recorded nothing; equality says
-///   nothing either way, because a clean round at the END of a change
-///   leaves both untouched. It is a round NUMBER, not a count, and
-///   `round` is author-supplied — neither column is the rounds-run
-///   count.
+///   round NUMBER that recorded a finding, and it witnesses nothing
+///   about rounds. Exceeding `rounds_recorded` says only that some
+///   round number below it has no row, and this view cannot say why:
+///   `round` is author-supplied, nothing requires a change's rounds
+///   to be numbered from 1 or without gaps, so a change whose only
+///   finding is labelled round 7 shows the same gap six silent rounds
+///   would. Neither the gap nor its absence evidences a round that
+///   RAN. It is a round NUMBER, not a count — neither column is the
+///   rounds-run count.
 /// - `fix_of_fix` — `sum()` of the per-round derived counts. The
 ///   round view's `EXISTS` semi-join is already scoped to one
 ///   `change_id`, so summing changes the grain and nothing else.
@@ -402,15 +405,20 @@ pub struct ReportMarts {
 /// `run_query` calls are nine processes over a LIVE ledger, and a
 /// finding written between two of them lands in the later panel and
 /// not the earlier one. Pinning removes the between: a record written
-/// during a report run reaches every panel or none, and in practice
-/// none, since the pin is taken before the first mart is computed.
+/// during a report run reaches every panel or none.
 ///
-/// The guarantee is pairwise consistency ACROSS PANELS, which is the
-/// property a reader comparing two cells needs. It is not a claim that
-/// the four physical sources were captured at one instant — the pin
-/// materializes them with four statements — nor about
-/// [`crate::digest::DigestHeader`], which `report()` computes from its
-/// own direct file reads before this runs.
+/// The guarantee is BOTH-OR-NEITHER across panels, which is the
+/// property a reader comparing two cells needs — and nothing beyond
+/// it. s43 round 7 finding 5: this doc used to go further and claim
+/// that in practice a mid-run write landed in NOTHING, since the pin
+/// is taken before the first mart is computed. That is false — the
+/// pin is taken HERE, and [`crate::report`] computes
+/// [`crate::digest::DigestHeader`] BEFORE calling this, so a write
+/// landing after the digest and before this call reaches every panel
+/// while the header still describes the corpus before it.
+/// Digest/panel skew is possible; panel/panel skew is not. Nor is
+/// this a claim that the four physical sources were captured at one
+/// instant — the pin materializes them with four statements.
 pub fn fetch_all(roots: &Roots) -> Result<ReportMarts, ReportError> {
     let statements: Vec<String> = REPORT_MARTS.iter().map(MartSpec::sql).collect();
     let sets = query::run_pinned_queries(roots, &statements)?;

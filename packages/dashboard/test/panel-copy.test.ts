@@ -33,6 +33,37 @@ import {
 // drift got shipped in the first place.
 const REPO_ROOT = join(new URL("../../..", import.meta.url).pathname);
 const REPORT_RENDER_RS = readFileSync(join(REPO_ROOT, "crates/canon-report/src/render.rs"), "utf-8");
+const REPORT_MARTS_RS = readFileSync(join(REPO_ROOT, "crates/canon-report/src/marts.rs"), "utf-8");
+const STORE_VIEWS_SQL = readFileSync(join(REPO_ROOT, "crates/canon-store/sql/views.sql"), "utf-8");
+const CLAUDE_SKILL = ".claude/skills/canon-report-dashboard/SKILL.md";
+const CODEX_SKILL = ".codex/skills/canon-report-dashboard.md";
+
+/** Soft-wraps are not semantic; a claim spanning two source lines is the same claim. */
+const unwrap = (text: string) => text.replace(/\s+/g, " ");
+
+/**
+ * A Rust file's DOC-comment prose — the `//!` and `///` lines above
+ * the `#[cfg(test)]` boundary, unwrapped into one string.
+ *
+ * Doc comments rather than the whole file, for the reason
+ * `emittedPanels` exists: `render.rs`'s own `#[test]` bodies assert on
+ * the retired phrases as string literals, so a whole-file scan would
+ * report the guard as the defect and get deleted. Doc comments above
+ * that boundary are exactly the prose a maintainer reads on
+ * `docs.rs` or at the definition, which is the surface these sweeps
+ * are about.
+ */
+function rustDocs(source: string): string {
+  const end = source.indexOf("#[cfg(test)]");
+  const body = end === -1 ? source : source.slice(0, end);
+  return unwrap([...body.matchAll(/^[ \t]*\/\/[/!] ?(.*)$/gm)].map(([, text]) => text).join(" "));
+}
+
+/**
+ * `views.sql`'s own `--` comment prose. The view layer documents these
+ * same two round columns, so it is a surface the sweep below must see.
+ */
+const STORE_VIEWS_DOCS = unwrap([...STORE_VIEWS_SQL.matchAll(/^[ \t]*-- ?(.*)$/gm)].map(([, text]) => text).join(" "));
 
 /**
  * Round-9 re-review, the defect this replaced: the claim search ran
@@ -179,7 +210,7 @@ const SHARED_CLAIMS: Record<string, { note: string; emittedFrom: string; claims:
       // one alone leaves "cannot disagree" false.
       "is computed in a single DuckDB process over one materialized read of the corpus",
       "one computation over one input and cannot disagree",
-      "a record written to the ledger mid-run reaches neither table, never one and not the other",
+      "a record written to the ledger mid-run reaches BOTH tables or neither, never one and not the other — though the digest header beside these panels is a SEPARATE read outside that pin, taken before it in a report and after it in a `--snapshot`, so header and panels can still describe the corpus a moment apart",
       "a release note is a COPY rather than a computation",
       // The load-bearing caveat: a total labelled `rounds` beside a
       // table that omits clean rounds is a wrong number waiting to be
@@ -600,20 +631,91 @@ test("no surface reads a round out of the gap between the two round columns", ()
   expect(highest?.label).not.toBe("Highest round number recorded");
 
   // The retired inference, in every shape it was shipped in, on every
-  // surface this file can see — the dashboard's note and column copy,
-  // the emitted markdown panels, and the skill.
-  const retired = ["witnesses a round in between", "witnesses a silent round", "the only signal in the corpus that a clean round happened"];
+  // surface that can carry it.
+  //
+  // s43 round 7, finding 1: the round-6 version of this list ran over
+  // the dashboard copy, the emitted panels and ONE skill copy, and
+  // `crates/canon-report/src/marts.rs` kept the inference for a full
+  // round because nothing looked there. Worse, the phrase list would
+  // not have caught it if it had: `marts.rs` said "Exceeding
+  // `rounds_recorded` says some round in between recorded nothing",
+  // which contains none of the three shipped shapes. So the list is
+  // keyed on "round in between" — the clause common to both forms —
+  // and the surface list is every file that documents these two
+  // columns to a human.
+  //
+  // Rust sources contribute their DOC comments only (see `rustDocs`),
+  // for the same reason `emittedPanels` exists: `render.rs`'s own
+  // `#[test]` bodies assert on the retired phrases as literals, and a
+  // whole-file scan would flag the guard as the defect.
+  const retired = ["round in between", "witnesses a silent round", "the only signal in the corpus that a clean round happened"];
   const surfaces: [string, string][] = [
     ["totals NOTE", REVIEW_TOTALS_NOTE],
     ["totals highest_round description", highest?.description ?? ""],
+    ["review-totals.ts source", readFileSync(join(REPO_ROOT, "packages/dashboard/src/panels/review-totals.ts"), "utf-8")],
     ["REVIEW_TOTALS_PANEL", EMITTED_PANELS.get("REVIEW_TOTALS_PANEL") ?? ""],
     ["REVIEW_ROUNDS_PANEL", EMITTED_PANELS.get("REVIEW_ROUNDS_PANEL") ?? ""],
     ["rounds NOTE", REVIEW_ROUNDS_NOTE],
-    ["SKILL.md", SKILL_TEXT],
+    ["render.rs docs", rustDocs(REPORT_RENDER_RS)],
+    ["marts.rs docs", rustDocs(REPORT_MARTS_RS)],
+    ["views.sql comments", STORE_VIEWS_DOCS],
+    ...skillCopies(),
   ];
   for (const [where, text] of surfaces) {
     for (const phrase of retired) {
-      expect({ where, phrase, present: text.includes(phrase) }).toEqual({ where, phrase, present: false });
+      expect({ where, phrase, present: unwrap(text).includes(phrase) }).toEqual({ where, phrase, present: false });
+    }
+  }
+});
+
+test("the pinned-read guarantee is stated as both-or-neither, with the digest skew beside it", () => {
+  // s43 round 7, finding 5. Every surface said a mid-run ledger write
+  // "reaches neither table" / "in practice none". False: `report()`
+  // computes `DigestHeader` from its own direct file reads and only
+  // THEN calls `fetch_all`, so a write landing between the two reaches
+  // BOTH marts while the header still describes the earlier corpus.
+  // The change already documented that skew as an accepted residual —
+  // four paragraphs from the sentence contradicting it, which is the
+  // second time in this change that distance let a sentence and its
+  // caveat disagree. So the caveat now sits inside the same sentence,
+  // and this pins the pair together on every surface that states it.
+  //
+  // The caveat is written direction-neutrally because the same string
+  // is read on two surfaces whose digest order is OPPOSITE:
+  // `report()` digests then pins, while `snapshot::write`
+  // (`crates/canon-report/src/snapshot.rs`) pins then digests, and the
+  // dashboard renders a snapshot. Naming only the report's order would
+  // have been a fresh false sentence on the dashboard.
+  const claim = "reaches BOTH tables or neither, never one and not the other";
+  const caveat = "digest header beside these panels is a SEPARATE read outside that pin";
+  const stated: [string, string][] = [
+    ["totals NOTE", REVIEW_TOTALS_NOTE],
+    ["REVIEW_TOTALS_PANEL", EMITTED_PANELS.get("REVIEW_TOTALS_PANEL") ?? ""],
+    ...skillCopies(),
+  ];
+  for (const [where, text] of stated) {
+    const flat = unwrap(text);
+    expect({ where, claim: flat.includes(claim), caveat: flat.includes(caveat) }).toEqual({ where, claim: true, caveat: true });
+    // Adjacency is the point: a reader who stops at the first period
+    // must already have the caveat. Same sentence, so no `.` between.
+    expect({ where, adjacent: new RegExp(`${claim}[^.]*${caveat}`).test(flat) }).toEqual({ where, adjacent: true });
+  }
+
+  // The absolutised forms, on every surface including the Rust docs
+  // that are not themselves rendered copy.
+  const absolute = ["reaches neither table", "in practice none", "reaches no panel"];
+  const everywhere: [string, string][] = [
+    ...stated,
+    ["render.rs docs", rustDocs(REPORT_RENDER_RS)],
+    ["marts.rs docs", rustDocs(REPORT_MARTS_RS)],
+    ["lib.rs docs", rustDocs(readFileSync(join(REPO_ROOT, "crates/canon-report/src/lib.rs"), "utf-8"))],
+    ["snapshot.rs docs", rustDocs(readFileSync(join(REPO_ROOT, "crates/canon-report/src/snapshot.rs"), "utf-8"))],
+    ["query.rs docs", rustDocs(readFileSync(join(REPO_ROOT, "crates/canon-report/src/query.rs"), "utf-8"))],
+  ];
+  for (const [where, text] of everywhere) {
+    const flat = unwrap(text).toLowerCase();
+    for (const phrase of absolute) {
+      expect({ where, phrase, present: flat.includes(phrase) }).toEqual({ where, phrase, present: false });
     }
   }
 });
@@ -741,9 +843,32 @@ function snapshotTables(source: string): string[] {
 
 const SNAPSHOT_TABLES = snapshotTables(SNAPSHOT_RS);
 
-/** Markdown soft-wraps are not semantic; a claim spanning two source lines is the same claim. */
-const unwrap = (text: string) => text.replace(/\s+/g, " ");
 const SKILL_TEXT = unwrap(SKILL_MD);
+
+/**
+ * All THREE materialized copies of this skill, as flattened prose.
+ *
+ * s43 round 7, finding 1: the sweeps above used to take `SKILL_TEXT`
+ * alone and read as if they covered "the skill". They covered one of
+ * three files. `the installed skill mirrors carry the corrected
+ * source` below does pin the mirrors byte-for-byte to
+ * `canon/skills/`, so a drifted mirror is caught — but by a DIFFERENT
+ * test, whose failure message is about `canon skills install` rather
+ * than about the claim, and `.codex/` is only pinned to CONTAIN the
+ * body. Naming the three here makes each sweep say which copy failed.
+ *
+ * A function, not a const: `SKILL_MD` is declared in this section and
+ * the sweeps that call this sit above it. Declarations hoist; the
+ * bindings they close over are read at test time, after this module
+ * has finished evaluating.
+ */
+function skillCopies(): [string, string][] {
+  return [
+    [SKILL_SOURCE, SKILL_TEXT],
+    [CLAUDE_SKILL, unwrap(readFileSync(join(REPO_ROOT, CLAUDE_SKILL), "utf-8"))],
+    [CODEX_SKILL, unwrap(readFileSync(join(REPO_ROOT, CODEX_SKILL), "utf-8"))],
+  ];
+}
 
 /**
  * Clauses the skill must carry VERBATIM from the report's own prose,
@@ -874,12 +999,12 @@ test("the installed skill mirrors carry the corrected source", () => {
   // `canon/skills/` while `.claude/`/`.codex/` still serve the old
   // bytes is drift of exactly the kind this file exists to catch, one
   // copy further out.
-  const claude = readFileSync(join(REPO_ROOT, ".claude/skills/canon-report-dashboard/SKILL.md"), "utf-8");
+  const claude = readFileSync(join(REPO_ROOT, CLAUDE_SKILL), "utf-8");
   expect(claude).toBe(SKILL_MD);
 
   // `.codex/` is the flattened convention: frontmatter promoted to a
   // header block, body verbatim after it.
-  const codex = readFileSync(join(REPO_ROOT, ".codex/skills/canon-report-dashboard.md"), "utf-8");
+  const codex = readFileSync(join(REPO_ROOT, CODEX_SKILL), "utf-8");
   const body = SKILL_MD.split(/^---$/m)[2] ?? "";
   expect(codex).toContain(body.trimEnd());
 });

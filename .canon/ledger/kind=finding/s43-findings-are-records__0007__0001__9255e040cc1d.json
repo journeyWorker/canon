@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T20:30:45.658600Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "crates/canon-report/src/marts.rs:337-339",
+  "introduced_by": "4130878ca2de04b6293f325bc2b35aa079afd637",
+  "kind": "finding",
+  "reviewed_sha": "d25efb710663236956e447bd86b2f5a23d6d6523",
+  "reviewer": "R7Ship",
+  "round": 7,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "marts.rs:337-339 still says highest_round > rounds_recorded means an intervening round recorded nothing; round 6's sweep test omitted marts.rs and two of the three skill copies"
+}

@@ -273,12 +273,16 @@ computes it; nothing here is derived a second time.
   in a single DuckDB process over one materialized read of the corpus,
   so the total and the rows it totals are one computation over one
   input and cannot disagree: a record written to the ledger mid-run
-  reaches neither table, never one and not the other. (Both halves
-  matter. The SQL argument alone held while `canon report` ran one
-  `duckdb` process per mart against a live ledger, and a finding
-  written between two of them reached one panel and not the other —
-  s43 round 6's blocker. `crates/canon-report/src/query.rs`'s
-  `PIN_CORPUS_SQL` is the other half.)
+  reaches BOTH tables or neither, never one and not the other — though the
+  digest header beside these panels is a SEPARATE read outside that pin,
+  taken before it in a report and after it in a `--snapshot`, so header
+  and panels can still describe the corpus a moment apart. (Both halves
+  matter. The SQL
+  argument alone held while `canon report` ran one `duckdb` process per
+  mart against a live ledger, and a finding written between two of them
+  reached one panel and not the other — s43 round 6's blocker.
+  `crates/canon-report/src/query.rs`'s `PIN_CORPUS_SQL` is the other
+  half.)
   `rounds_recorded` is `count(*)` over those rows, and that view holds a
   row only for a round that RECORDED a finding, so
   this column counts the rounds that FOUND something, never the rounds RUN;

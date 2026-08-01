@@ -37,9 +37,11 @@
       against earlier findings' `resolution_sha` — no stored boolean
       anywhere in the path. Depends on 3.1.
 - [x] 3.3 A finding with `introduced_by = None` is counted as UNKNOWN, — ✅ introduced_by_unsourced is its own UNKNOWN bucket, never folded into not-a-fix-of-fix
-      never as not-a-fix-of-fix, and the panel states the count is a
-      floor. Depends on 3.2.
-- [x] 3.4 The panel reaches `.canon/REPORT.md`, the snapshot contract, — ✅ the panel reaches REPORT.md, the 8-table snapshot contract, and the dashboard twin
+      never as not-a-fix-of-fix, and the panel states what the count
+      MEANS. Originally worded "states the count is a floor"; the
+      backfilled corpus disproved the floor within a day, and the panel
+      now says it bounds nothing in either direction. Depends on 3.2.
+- [x] 3.4 The panel reaches `.canon/REPORT.md`, the snapshot contract, — ✅ the panel reaches REPORT.md, the snapshot contract (now nine tables, with mart_review_totals), and the dashboard twin
       and the dashboard twin, with the same claim on both surfaces.
       Depends on 3.1.
 

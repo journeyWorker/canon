@@ -235,11 +235,11 @@ fn a_lone_round_7_finding_makes_the_same_gap_six_silent_rounds_would() {
 
     // The rendered page may not tell a reader that six rounds ran, in
     // any of the shapes it used to.
-    for claim in [
-        "witnesses a round in between that recorded nothing",
-        "witnesses a silent round",
-        "the only signal in the corpus that a clean round happened",
-    ] {
+    // Keyed on "round in between" rather than the two panel-specific
+    // shapes: s43 round 7 finding 1 found the same inference alive in
+    // `marts.rs` as "says some round in between recorded nothing",
+    // which the narrower list missed.
+    for claim in ["round in between", "witnesses a silent round", "the only signal in the corpus that a clean round happened"] {
         assert!(!report.contains(claim), "the report still infers a round from a numbering gap: {claim:?}");
     }
     assert!(

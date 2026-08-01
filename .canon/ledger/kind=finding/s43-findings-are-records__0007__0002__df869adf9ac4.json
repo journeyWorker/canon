@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-01T20:30:45.724566Z",
+  "change_id": "s43-findings-are-records",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/finding.rs:550-557",
+  "introduced_by": "4130878ca2de04b6293f325bc2b35aa079afd637",
+  "kind": "finding",
+  "reviewed_sha": "d25efb710663236956e447bd86b2f5a23d6d6523",
+  "reviewer": "R7Ship",
+  "round": 7,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "The hyphen branch makes every all-digit range non-quantitative, so `120-134 findings` passes while the accept row calls that bare phrase a line span"
+}
