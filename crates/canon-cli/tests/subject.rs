@@ -252,3 +252,91 @@ fn domain_filter_is_rejected_on_a_non_subject_kind() {
     assert!(stderr(&out).contains("--domain"), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("--kind subject"), "must name the one supported kind: {}", stderr(&out));
 }
+
+// ── `--domain` membership against the repo's activated vocabulary ──
+
+/// Declare a `domain` enum in a consumer vocabulary plugin and activate
+/// it. A `kind: project` plugin is inert until a profile in
+/// `canon.project.yaml` names it — `canon.core` is the only plugin
+/// scanned unconditionally — so both files are required for the enum to
+/// reach the resolved snapshot.
+fn activate_domain_vocab(repo: &Path, members: &[&str]) {
+    std::fs::write(repo.join("canon.project.yaml"), "defaultProfile: default\nprofiles:\n  default:\n    plugins:\n      studio.game: {}\n")
+        .unwrap();
+    let plugin = repo.join(".canon/vocab/studio.game");
+    std::fs::create_dir_all(&plugin).unwrap();
+    std::fs::write(plugin.join("plugin.yaml"), "id: studio.game\nversion: \"0.1.0\"\nkind: project\nexports:\n  enums: enums.yaml\n").unwrap();
+    std::fs::write(plugin.join("enums.yaml"), format!("enums:\n  domain: [{}]\n", members.join(", "))).unwrap();
+}
+
+/// The team's own cut is what gets enforced — canon ships no opinion
+/// about how a repo slices its work. A studio declaring `combat`/
+/// `live-ops` authors against those and nothing else.
+#[test]
+fn a_domain_the_repos_own_vocabulary_declares_is_accepted() {
+    let dir = repo();
+    activate_domain_vocab(dir.path(), &["combat", "economy", "live-ops"]);
+
+    let out = run(dir.path(), &["subject", "new", "boss-rework", "--domain", "live-ops", "--title", "Boss rework"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("live-ops"), "stdout: {}", stdout(&out));
+}
+
+/// The defect this closes: a typo used to mint a new category silently,
+/// so every `--domain`-filtered read disagreed about how many the repo
+/// has. Refusal is exit `2` and names the legal set, the same
+/// "expected one of: …" grammar the typed-atom checker uses.
+#[test]
+fn a_domain_outside_the_activated_vocabulary_is_refused_naming_the_legal_set() {
+    let dir = repo();
+    activate_domain_vocab(dir.path(), &["combat", "economy", "live-ops"]);
+
+    let out = run(dir.path(), &["subject", "new", "typo", "--domain", "combatt", "--title", "Typo"]);
+    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
+    let err = stderr(&out);
+    assert!(err.contains("expected one of: combat, economy, live-ops"), "must name the legal set: {err}");
+    assert!(err.contains("combatt"), "must name the offender: {err}");
+
+    let listed = run(dir.path(), &["query", "--kind", "subject"]);
+    assert!(!stdout(&listed).contains("typo"), "the refused subject must not have been written: {}", stdout(&listed));
+}
+
+/// canon's OWN base vocabulary carries no authority in a repo that
+/// declared its own set — the enum is resolved per repo, never
+/// hardcoded. `dev` is a `canon.core` member and still refused here.
+#[test]
+fn canons_base_vocabulary_does_not_leak_into_a_repo_with_its_own() {
+    let dir = repo();
+    activate_domain_vocab(dir.path(), &["combat", "economy"]);
+
+    let out = run(dir.path(), &["subject", "new", "x", "--domain", "dev", "--title", "x"]);
+    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
+    assert!(stderr(&out).contains("expected one of: combat, economy"), "stderr: {}", stderr(&out));
+}
+
+/// Fail-soft when nothing is declared: `canon init` scaffolds no
+/// `.canon/vocab`, so a repo that never opted into a vocabulary must
+/// still be able to author its first Subject. Absent enum = no
+/// constraint, mirroring canon-gate's empty-`risk_routing` default.
+#[test]
+fn a_repo_declaring_no_domain_vocabulary_accepts_any_kebab_slug() {
+    let dir = repo();
+
+    let out = run(dir.path(), &["subject", "new", "loot", "--domain", "game-economy", "--title", "Loot"]);
+    assert!(out.status.success(), "an undeclared vocabulary must not block authoring: {}", stderr(&out));
+}
+
+/// Shape is a separate, earlier question: a non-slug is refused on its
+/// own grammar even where a vocabulary is active, so the two checks
+/// never collapse into one message.
+#[test]
+fn a_malformed_domain_is_refused_on_shape_before_membership() {
+    let dir = repo();
+    activate_domain_vocab(dir.path(), &["combat"]);
+
+    let out = run(dir.path(), &["subject", "new", "x", "--domain", "Combat Systems", "--title", "x"]);
+    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
+    let err = stderr(&out);
+    assert!(err.contains("kebab-case slug"), "shape must be the reported cause: {err}");
+    assert!(!err.contains("expected one of"), "membership must not also fire: {err}");
+}

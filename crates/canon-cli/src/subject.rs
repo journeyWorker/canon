@@ -206,15 +206,72 @@ fn report_subject(subject: &Subject, verb: &str, json: bool) {
     }
 }
 
+/// The `domain` enum name `canon.core` declares and a consumer repo
+/// extends — the SAME key `canon context` renders under `vocab.enums`.
+const DOMAIN_ENUM: &str = "domain";
+
+/// Is `domain` a member of this repo's ACTIVATED domain vocabulary?
+/// `None` = acceptable, `Some(message)` = the operator-facing refusal.
+///
+/// # Why this exists
+/// `canon.core`'s `enums.yaml` has always declared the `domain` set, and
+/// its own comment said it was "surfaced by `canon context` so an author
+/// can see the activated domain set before writing a Subject" — surfaced,
+/// never checked. No `Type::Domain` attr referenced it and this command
+/// did not read it, so `domain` was the one declared enum in the
+/// vocabulary that nothing enforced: a typo silently minted a new
+/// category, and every `--domain`-filtered read
+/// (`canon query --kind subject --domain …`, `canon report`'s Subjects
+/// panel) then disagreed about how many categories the repo has.
+/// `task-status` is checked through `Type::Domain` and `handoff-domain`
+/// through its directive tag plus `canon.yaml`'s `handoff_templates`;
+/// this closes the third case at its single write point.
+///
+/// # Why it stays dynamic
+/// The member set is resolved from the vocabulary, never hardcoded here
+/// — a team extends it in its own `.canon/vocab/<id>/enums.yaml` with no
+/// canon-model or canon-cli change, exactly as
+/// `canon_model::records::deserialize_domain_slug`'s doc promises
+/// ("canon-model deliberately does NOT encode which domains a repo
+/// activates"). A repo cutting categories by feature, by discipline, or
+/// by anything else declares its own set and gets it enforced.
+///
+/// # Fail-soft when nothing is declared
+/// A repo with no vocabulary plugin, or one whose plugins declare no
+/// `domain` enum, resolves to no constraint and every kebab slug is
+/// accepted. `canon init` scaffolds no `.canon/vocab`, so the alternative
+/// would make a freshly-inited repo unable to author its first Subject.
+/// This mirrors the empty-`risk_routing`-derives-zero-cells default
+/// canon-gate already uses for policy.
+///
+/// This is a WRITE-time check at the one place a domain is ever set
+/// (`adopt`/`status` never take one), so an already-persisted Subject
+/// whose domain predates its vocabulary is untouched and still reads
+/// back — the check tightens authoring, never invalidates history.
+fn domain_membership_violation(repo: &Path, domain: &str) -> Option<String> {
+    let (snapshot, _diags) = canon_vocab::resolve_snapshot(repo, None);
+    let members = snapshot.enums.get(DOMAIN_ENUM)?;
+    if members.is_empty() || members.iter().any(|m| m == domain) {
+        return None;
+    }
+    // The donor checker's verbatim "expected one of: …" shape
+    // (`canon_vocab::checker`), so one enum-rejection grammar covers the
+    // typed-atom path and this one.
+    Some(format!("`{domain}` is not a valid value for `{DOMAIN_ENUM}` (expected one of: {})", members.join(", ")))
+}
+
 /// `canon subject new <id> --domain <d> --title <t> [--summary <s>]
 /// [--owner-role <r>]` (module doc): author a fresh [`Subject`] at
 /// status `proposed`. The envelope is attributed to `actor_id` (default
 /// `canon`, the same source `canon review add` uses) in the role
-/// `owner_role`. `domain` is validated SHAPE-only here (kebab slug, the
-/// SAME grammar the model's `deserialize_domain_slug` enforces — reused
-/// via `SubjectId`'s identical grammar so the CLI never panics on the
-/// model's debug-assert). A `subject_id` already present in the store is
-/// a loud refusal (exit `2`), never a silent second append.
+/// `owner_role`. `domain` is validated in two independent steps: SHAPE
+/// here (kebab slug, the SAME grammar the model's
+/// `deserialize_domain_slug` enforces — reused via `SubjectId`'s
+/// identical grammar so the CLI never panics on the model's
+/// debug-assert), then MEMBERSHIP against the repo's activated `domain`
+/// enum ([`domain_membership_violation`]). A `subject_id` already
+/// present in the store is a loud refusal (exit `2`), never a silent
+/// second append.
 #[allow(clippy::too_many_arguments)]
 pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, summary: &str, owner_role: &RoleId, actor_id: &str, json: bool) -> i32 {
     // `domain` shares `SubjectId`'s kebab-slug grammar (design D2: the
@@ -226,7 +283,15 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
         return EXIT_REFUSED;
     }
 
+    // Membership is a SEPARATE question from shape, and needs the
+    // resolved repo root to find the vocabulary — so it runs after
+    // `resolve_repo_root` below, not here.
+
     let repo = resolve_repo_root(repo);
+    if let Some(violation) = domain_membership_violation(&repo, domain) {
+        eprintln!("canon subject new: refused — {violation}");
+        return EXIT_REFUSED;
+    }
     let canon_yaml_path = resolve_canon_yaml(&repo, None);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,

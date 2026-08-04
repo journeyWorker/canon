@@ -40,10 +40,20 @@ canon subject new subject-domain-loop \
 
 - `<id>` is a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`) — the durable
   `subject_id` join key, never renumbered once assigned.
-- `--domain <d>` is a kebab-case slug validated at write. The closed base
-  vocabulary (`planning`, `design`, `dev`, `data`, `test`) is extended in
-  the `.canon/vocab` plugin (see `canon-vocab`); run `canon
-  context` to see the domains a repo has activated.
+- `--domain <d>` is checked twice at write: SHAPE (a kebab-case slug),
+  then MEMBERSHIP against the domain set THIS repo has activated.
+  Canon ships no opinion about how a team slices its work — the set is
+  resolved from the vocabulary, so a studio declaring
+  `combat`/`economy`/`live-ops` authors against those and canon's base
+  set (`planning`, `design`, `dev`, `data`, `test`, from `canon.core`)
+  carries no authority there. Extend or replace it in your own
+  `.canon/vocab/<id>/enums.yaml` under the `domain` key, activated by a
+  `canon.project.yaml` profile (see `canon-vocab`) — never a canon code
+  change. A non-member is refused with the legal set named
+  (`expected one of: …`), so a typo cannot silently mint a category that
+  then splits every `--domain`-filtered read. A repo that declares no
+  `domain` enum has no constraint and accepts any slug. Run
+  `canon context` to see the set in force.
 - `--summary` is optional; `--owner-role` defaults to `implementer`;
   `--actor-id` defaults to `canon`. A freshly-authored Subject with no
   `change_ids`/`scenario_ids` is a valid minimal record and starts at
