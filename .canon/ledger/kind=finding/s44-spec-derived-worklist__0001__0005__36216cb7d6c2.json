@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-04T06:45:29.159841Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "open",
+  "file_ref": "crates/canon-store/sql/views.sql:494-496",
+  "kind": "finding",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 5,
+  "severity": "blocker",
+  "summary": "Phase 5 diagnosis wrong: _No rows._ is caused by task routing to an unread hot rung, not by plan-dialect ownership"
+}

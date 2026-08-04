@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-04T06:45:29.175215Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "open",
+  "file_ref": "crates/canon-store/sql/views.sql:1536-1593",
+  "kind": "finding",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 6,
+  "severity": "blocker",
+  "summary": "mart_subjects already performs the scenario left join, so the claimed gap is narrower than stated: only unsubjected scenarios"
+}

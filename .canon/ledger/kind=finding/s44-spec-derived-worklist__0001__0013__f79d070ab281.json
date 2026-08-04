@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-04T06:45:29.284403Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "open",
+  "file_ref": "crates/canon-report/tests/snapshot.rs:22",
+  "kind": "finding",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 13,
+  "severity": "should_fix",
+  "summary": "R4 under-scoped: changing the driving side changes the pinned Parquet column contract and the dashboard consumers"
+}

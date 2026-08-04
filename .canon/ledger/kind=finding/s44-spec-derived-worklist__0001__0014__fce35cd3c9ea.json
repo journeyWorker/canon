@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-04T06:45:29.300936Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "open",
+  "file_ref": "openspec/changes/s44-spec-derived-worklist/tasks.md:118-120",
+  "kind": "finding",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 14,
+  "severity": "note",
+  "summary": "Ten of 26 tasks are unfalsifiable and task 6.3 is already satisfied by existing assertions"
+}

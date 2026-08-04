@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-04T06:45:29.223529Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "open",
+  "file_ref": "crates/canon-model/src/fold.rs:82-86",
+  "kind": "finding",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 9,
+  "severity": "should_fix",
+  "summary": "canon_model::fold needs live_bindings whose only derivation is private to canon-report, which canon-gate may not depend on"
+}

@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-04T06:45:29.142963Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "open",
+  "file_ref": "openspec/changes/s44-spec-derived-worklist/tasks.md:19-22",
+  "kind": "finding",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 4,
+  "severity": "blocker",
+  "summary": "Blast radius wrong: six struct-literal compile breaks unbudgeted and canon evidence add named as a GateContext site it is not"
+}

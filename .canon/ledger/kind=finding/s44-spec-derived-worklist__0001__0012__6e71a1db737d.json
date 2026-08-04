@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-04T06:45:29.268890Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "open",
+  "file_ref": "openspec/changes/s44-spec-derived-worklist/tasks.md:79-82",
+  "kind": "finding",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 12,
+  "severity": "should_fix",
+  "summary": "Task 4.1's before-and-after byte-identity is not expressible in-tree; the s17 precedent is a within-run A/B at one commit"
+}

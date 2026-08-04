@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-04T06:45:29.109791Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "open",
+  "file_ref": "crates/canon-gate/src/ledger.rs:133-138",
+  "kind": "finding",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "blocker",
+  "summary": "R1's mitigation is false: ledger.rs maps every ctx.violations entry to MalformedEvidence, so unconditional new reads can turn a green repo red with no spec_coverage section"
+}
