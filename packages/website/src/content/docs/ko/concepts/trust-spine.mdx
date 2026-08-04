@@ -58,10 +58,12 @@ canon gate check --repo . --release  # + trust-below-required
 canon gate task s5-trust-spine-gate#5.2 --repo .
 ```
 
-`canon gate task <task_id>`는 change의 `tasks.md` plan 파일에서 체크박스 행
-하나를 증거 기반으로 플립합니다. `<task_id>`(`<change_id>#<n>`)를 해당
-change의 `tasks.md`로 해석하며(현재는 `openspec/changes/` 아래에서 해석됨 —
-plan-어댑터 seam 뒤로 옮겨질 예정인 plan-dialect 커플링),
+`canon gate task <task_id>`는 change의 plan 문서에서 체크박스 행 하나를
+증거 기반으로 플립합니다. `<task_id>`(`<change_id>#<n>`)는 `canon.yaml`의
+`plans:` 소스를 통해 해석됩니다 — 설정된 dialect 중 해당 태스크를 먼저
+찾아낸 쪽이 이기므로 플립은 plan-dialect에 중립적입니다(`openspec` change
+디렉터리, `superpowers` plan 문서). `plans:` 섹션이 없는 레포는 호환
+기본값 `[{ dialect: openspec, root: <repo> }]`로 폴백합니다.
 레저에서 대응하는 non-`Divergent` `EvidenceRecord`를 요구하며, 검사가
 깨끗할 때에만 `- [ ]` → `- [x]`로 플립하면서 증거 노트를 덧붙입니다.
 증거가 없거나, `Divergent` 판정이거나, 조작된 증거 노트인 경우 해당 행은

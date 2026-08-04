@@ -255,6 +255,30 @@ fn gate_task_reports_when_no_plan_source_locates_the_task() {
     assert!(stderr(&output).contains("no plan source locates"), "{}", stderr(&output));
 }
 
+/// The compat default is keyed on the `plans:` section's ABSENCE, not
+/// on "zero sources resolved". A repo that declares `plans.sources: []`
+/// — exactly what `canon init` scaffolds — has configured a plan corpus
+/// and declared it empty, so no openspec source may be synthesized
+/// under it: the failure must say "this repo configures no plan
+/// sources" rather than blaming a dialect the operator never named.
+/// Matches `canon dispatch begin --task`'s `NoPlanSources` refusal.
+#[test]
+fn gate_task_refuses_without_naming_openspec_when_plan_sources_is_explicitly_empty() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  git:\n    root: .canon/ledger\nplans:\n  sources: []\n").unwrap();
+    // A tasks.md sitting at the compat default's exact location: the
+    // pre-fix code synthesized `openspec @ <repo>` and would locate it.
+    let tasks_path = write_tasks_md(dir.path(), "it-empty-sources", "- [ ] 1 Do the thing\n");
+    write_evidence(&dir.path().join(".canon/ledger"), "it-empty-sources#1", "implementer", EvidenceVerdict::Faithful);
+
+    let output = run_canon(&["gate", "task", "it-empty-sources#1", "--repo", "."], dir.path());
+    assert_eq!(output.status.code(), Some(2), "an explicitly empty plan corpus is a usage failure; stdout: {}", stdout(&output));
+    let err = stderr(&output);
+    assert!(err.contains("configures no plan sources"), "must name the real cause: {err}");
+    assert!(!err.contains("openspec"), "must not blame an unconfigured dialect: {err}");
+    assert_eq!(std::fs::read_to_string(&tasks_path).unwrap(), "- [ ] 1 Do the thing\n", "the row must stay byte-unchanged");
+}
+
 // ── canon gate task: typed evidence path (S10 part2, design.md D4) ──
 
 fn write_tasks_vocab(repo: &Path, change_id: &str, yaml: &str) -> PathBuf {

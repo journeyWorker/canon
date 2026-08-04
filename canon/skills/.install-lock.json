@@ -13,8 +13,8 @@
       "version": 2
     },
     "canon-gate": {
-      "contentHash": "sha256:cf373b282a0f26718fdc8b3507256941bccfd7816cc0d124b196d4760de05e9d",
-      "version": 2
+      "contentHash": "sha256:f0d2064e9011f0195fea21d749d224a061f2ec50e89367339a54005121abb28f",
+      "version": 3
     },
     "canon-inventory": {
       "contentHash": "sha256:22ce37c74af91824e1c1c914e01e6867932e53c2d6cc2d1e8caedf1e21b4fbd9",
@@ -37,8 +37,8 @@
       "version": 3
     },
     "canon-report-dashboard": {
-      "contentHash": "sha256:4e4ec6115b797f325b79c8efa0f05b93ef01de5f9042952564f44c2158bda345",
-      "version": 15
+      "contentHash": "sha256:885e8e307e6633f5bd46c24c73f70ba596d4f7ed947a1844088344894f4e247e",
+      "version": 16
     },
     "canon-retrieve": {
       "contentHash": "sha256:7a58ad83f5d50355318cf3b8d431cbcf8edb025d8fd3cd0e1249470da78eef90",

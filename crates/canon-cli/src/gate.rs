@@ -183,6 +183,18 @@ pub(crate) struct LocatedTask {
 /// caller needs no further discrimination between them.
 fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
     let sources = crate::plans::load_plan_sources_for_gate(repo).map_err(|e| e.to_string())?;
+    if sources.is_empty() {
+        // Distinct from "consulted N sources, none held it": this repo
+        // declared `plans.sources: []` (what `canon init` scaffolds),
+        // so there is no plan corpus for ANY task id to live in.
+        // Naming a synthesized openspec source here would blame a
+        // dialect the operator never configured — the same refusal
+        // `crate::dispatch::DispatchError::NoPlanSources` already makes
+        // for `--task`.
+        return Err(format!(
+            "this repo configures no plan sources (canon.yaml has no `plans.sources` entries), so no plan document exists for {task_id} to live in — configure `plans:` with the dialect holding your plan corpus"
+        ));
+    }
     let mut consulted: Vec<String> = Vec::new();
     for src in &sources {
         consulted.push(format!("{} @ {}", src.dialect(), src.root().display()));

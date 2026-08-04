@@ -56,7 +56,13 @@ repo ROOT's `.canon/policy.yaml` and `.canon/ledger` from any subdirectory.
 ## `canon gate task <task_id> [--repo <dir>]`
 
 The evidence-gated task checkbox flip. Resolves `<task_id>`
-(`<change_id>#<n>`) to `openspec/changes/<change_id>/tasks.md`, requires
+(`<change_id>#<n>`) through `canon.yaml`'s `plans:` sources — the first
+configured dialect whose `PlanWriteBack` locates the task's document
+wins, so the flip is plan-dialect agnostic (`openspec` change dirs,
+`superpowers` plan docs). A repo with no `plans:` section falls back to
+the compat default `[{ dialect: openspec, root: <repo> }]`; no source
+locating the task at all is a loud failure naming every source consulted.
+It requires
 a matching non-`Divergent` evidence record, and flips `- [ ]` → `- [x]`
 with an appended evidence note ONLY on a clean check. Every other path —
 missing evidence, a `Divergent` verdict, a fabricated note — leaves the

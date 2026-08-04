@@ -613,6 +613,22 @@ pub(crate) fn load_plan_sources_from_config(canon_yaml_path: &Path, repo: &Path)
     Ok(sources)
 }
 
+/// Whether `canon.yaml` carries a `plans:` key AT ALL — the signal
+/// [`load_plan_sources_for_gate`] needs to tell "a pre-s35 repo that
+/// never knew about `plans:`" apart from "a repo that configured
+/// `plans.sources: []` on purpose". Both resolve to zero sources
+/// through [`load_plan_sources_from_config`], but only the former
+/// earns the openspec compat default. Unreadable/non-YAML both answer
+/// `false`; the loud parse error is
+/// [`load_plan_sources_from_config`]'s job, and this is only ever
+/// consulted after that call already returned `Ok`.
+fn plans_section_present(canon_yaml_path: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(canon_yaml_path) else {
+        return false;
+    };
+    serde_yaml::from_str::<serde_yaml::Value>(&text).is_ok_and(|doc| doc.get("plans").is_some())
+}
+
 /// The plan sources `canon gate task` resolves a flip through (s35
 /// `gate-plan-dialect-seam`, design "Compat default"). Loads
 /// `canon.yaml`'s `plans:` sources exactly like `canon ingest plans`
@@ -625,10 +641,20 @@ pub(crate) fn load_plan_sources_from_config(canon_yaml_path: &Path, repo: &Path)
 /// working — the dependence moves from hardcoded to configured-default,
 /// never removed. A PRESENT-but-malformed `plans:` section still fails
 /// loud here, exactly as for `canon ingest plans`.
+///
+/// The fallback is keyed on the section's ABSENCE
+/// ([`plans_section_present`]), never on "zero sources resolved". A
+/// repo that writes `plans:\n  sources: []` — which is exactly what
+/// `canon init` scaffolds — has configured a plan corpus and declared
+/// it empty, so synthesizing an openspec source under it would make
+/// `canon gate task` report `consulted: openspec @ <repo>` against a
+/// dialect the operator never named. That is the same misleading shape
+/// `crate::dispatch`'s `--task` validation already refuses via
+/// `DispatchError::NoPlanSources`; the two commands now agree.
 pub(crate) fn load_plan_sources_for_gate(repo: &Path) -> Result<Vec<PlanSource>, PlansError> {
     let canon_yaml_path = repo.join("canon.yaml");
     let mut sources = load_plan_sources_from_config(&canon_yaml_path, repo)?;
-    if sources.is_empty() {
+    if sources.is_empty() && !plans_section_present(&canon_yaml_path) {
         sources.push(PlanSource { dialect: "openspec".to_string(), root: repo.to_path_buf() });
     }
     Ok(sources)

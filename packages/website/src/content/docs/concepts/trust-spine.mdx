@@ -61,10 +61,12 @@ canon gate task s5-trust-spine-gate#5.2 --repo .
 ```
 
 `canon gate task <task_id>` is the evidence-gated flip of one checkbox row
-in a change's `tasks.md` plan file. It resolves `<task_id>`
-(`<change_id>#<n>`) to that change's `tasks.md` (currently resolved under
-`openspec/changes/` — a plan-dialect coupling slated to move behind the
-plan-adapter seam),
+in a change's plan document. It resolves `<task_id>` (`<change_id>#<n>`)
+through `canon.yaml`'s `plans:` sources — the first configured dialect
+whose write-back locates the task wins, so the flip is plan-dialect
+agnostic (`openspec` change dirs, `superpowers` plan docs). A repo with no
+`plans:` section falls back to the compat default
+`[{ dialect: openspec, root: <repo> }]`. It
 requires a matching, non-`Divergent` `EvidenceRecord` in the ledger, and
 flips `- [ ]` → `- [x]` with an appended evidence note **only** on a clean
 check. Missing evidence, a `Divergent` verdict, or a fabricated evidence
