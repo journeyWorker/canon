@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:56.966957Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon evidence add --scenario-id platformer.movement.01 --project-id platformer --kind test-run"
+  },
+  "evidence_note": {
+    "summary": "four scenario-keyed EvidenceRecords authored and promoted, none carrying a task_id"
+  },
+  "kind": "evidence_record",
+  "run_seq": 3,
+  "schema": 1,
+  "staging_id": "acf2ad7eb7cb",
+  "task_id": "s44-spec-derived-worklist#0.3",
+  "verdict": "faithful"
+}

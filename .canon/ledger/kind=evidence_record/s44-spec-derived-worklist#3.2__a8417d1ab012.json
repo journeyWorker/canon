@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.403472Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo check --workspace --tests"
+  },
+  "evidence_note": {
+    "summary": "live_bindings_of promoted into canon-store; canon-report now imports it instead of its own copy"
+  },
+  "kind": "evidence_record",
+  "run_seq": 15,
+  "schema": 1,
+  "staging_id": "ff90a2239779",
+  "task_id": "s44-spec-derived-worklist#3.2",
+  "verdict": "faithful"
+}

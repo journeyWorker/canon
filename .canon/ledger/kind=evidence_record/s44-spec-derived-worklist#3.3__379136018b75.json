@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.438933Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate an_open_divergence_on_an_evidenced_scenario_is_mismatched_work"
+  },
+  "evidence_note": {
+    "summary": "open, still-divergent and resolved-invalid report as mismatched; resolved does not"
+  },
+  "kind": "evidence_record",
+  "run_seq": 16,
+  "schema": 1,
+  "staging_id": "e9d84410afb9",
+  "task_id": "s44-spec-derived-worklist#3.3",
+  "verdict": "faithful"
+}

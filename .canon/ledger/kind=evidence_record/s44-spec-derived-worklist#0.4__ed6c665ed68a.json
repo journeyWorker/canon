@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.000183Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "python3 - <<'PY' (same measurement re-run)"
+  },
+  "evidence_note": {
+    "summary": "delta: with_subject_id 0 to 6 of 16, scenario_keyed_evidence 0 to 4 - a strict subset both ways"
+  },
+  "kind": "evidence_record",
+  "run_seq": 4,
+  "schema": 1,
+  "staging_id": "f852017ebd1b",
+  "task_id": "s44-spec-derived-worklist#0.4",
+  "verdict": "faithful"
+}

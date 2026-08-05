@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.661060Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate gate_check_output_is_byte_identical_without_a_spec_coverage_section"
+  },
+  "evidence_note": {
+    "summary": "within-run A/B at one commit over a corpus carrying a malformed row in each new kind"
+  },
+  "kind": "evidence_record",
+  "run_seq": 21,
+  "schema": 1,
+  "staging_id": "de82f3ad5742",
+  "task_id": "s44-spec-derived-worklist#4.1",
+  "verdict": "faithful"
+}

@@ -701,3 +701,21 @@ fn evidence_add_still_accepts_a_task_keyed_record() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(stdout(&out).contains("canon gate task it-task-keyed#1"), "the task path must still name the flip: {}", stdout(&out));
 }
+
+/// s44 task 4.2: canon's OWN `.canon/policy.yaml` must resolve to
+/// `spec_coverage: None`. Turning the check on for this repo is a
+/// separate, deliberate act; until then its own gate verdicts provably
+/// do not move, and this test fails the moment someone enables it
+/// without meaning to.
+#[test]
+fn canons_own_policy_does_not_enable_spec_coverage() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
+    let policy = std::fs::read_to_string(repo.join(".canon/policy.yaml")).expect("canon's own policy.yaml");
+    assert!(
+        !policy.contains("spec_coverage"),
+        "canon's own policy.yaml declares spec_coverage; enabling it for this repo is a deliberate act that must update this test and its rationale"
+    );
+
+    let resolution = canon_gate::PolicyResolution::resolve(repo, &canon_policy::SchemaRegistry::load());
+    assert_eq!(resolution.spec_coverage, None, "an absent section must resolve to None, never a poisoned or default-Active value");
+}

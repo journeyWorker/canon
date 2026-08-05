@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.520253Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate scope_narrows_to_subjects_in_the_named_statuses"
+  },
+  "evidence_note": {
+    "summary": "scope narrows by subject status; a dangling subject link is reported, not skipped"
+  },
+  "kind": "evidence_record",
+  "run_seq": 18,
+  "schema": 1,
+  "staging_id": "3c1a4407d58f",
+  "task_id": "s44-spec-derived-worklist#3.5",
+  "verdict": "faithful"
+}

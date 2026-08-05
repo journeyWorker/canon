@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.623642Z",
+  "evidence": {
+    "kind": "manual-review",
+    "ref": "crates/canon-gate/src/spec_coverage.rs module doc"
+  },
+  "evidence_note": {
+    "summary": "the three arguments for a separate check are stated: direction, contract, unanswerable requiredness"
+  },
+  "kind": "evidence_record",
+  "run_seq": 20,
+  "schema": 1,
+  "staging_id": "4feb59a6600a",
+  "task_id": "s44-spec-derived-worklist#3.7",
+  "verdict": "faithful"
+}

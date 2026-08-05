@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:56.886888Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "python3 - <<'PY' (scenario/subject_id/evidence/scenario-keyed counts over .canon/ledger)"
+  },
+  "evidence_note": {
+    "summary": "baseline measured: scenarios=16 with_subject_id=0 scenario_keyed_evidence=0"
+  },
+  "kind": "evidence_record",
+  "run_seq": 1,
+  "schema": 1,
+  "staging_id": "d069bdfe0339",
+  "task_id": "s44-spec-derived-worklist#0.1",
+  "verdict": "faithful"
+}

@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.032996Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate -p canon-cli"
+  },
+  "evidence_note": {
+    "summary": "GateContext carries scenarios/divergences/subjects read in load; 147 canon-gate tests pass"
+  },
+  "kind": "evidence_record",
+  "run_seq": 5,
+  "schema": 1,
+  "staging_id": "e22af3b156bc",
+  "task_id": "s44-spec-derived-worklist#1.1",
+  "verdict": "faithful"
+}

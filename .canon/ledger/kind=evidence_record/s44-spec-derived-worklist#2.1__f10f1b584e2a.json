@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.200998Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate a_well_formed_section_resolves_its_scope_to_typed_statuses"
+  },
+  "evidence_note": {
+    "summary": "spec_coverage resolves to typed SubjectStatus values; absent resolves to None"
+  },
+  "kind": "evidence_record",
+  "run_seq": 10,
+  "schema": 1,
+  "staging_id": "c0dcde66f793",
+  "task_id": "s44-spec-derived-worklist#2.1",
+  "verdict": "faithful"
+}

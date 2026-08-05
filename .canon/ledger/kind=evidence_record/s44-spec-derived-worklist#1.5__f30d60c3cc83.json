@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.167537Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo check --workspace --tests"
+  },
+  "evidence_note": {
+    "summary": "all three GateContext struct literals updated; workspace compiles with zero errors"
+  },
+  "kind": "evidence_record",
+  "run_seq": 9,
+  "schema": 1,
+  "staging_id": "652709cf9ad8",
+  "task_id": "s44-spec-derived-worklist#1.5",
+  "verdict": "faithful"
+}

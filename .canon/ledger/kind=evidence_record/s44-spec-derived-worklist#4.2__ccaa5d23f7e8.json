@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.699442Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate canons_own_policy_does_not_enable_spec_coverage"
+  },
+  "evidence_note": {
+    "summary": "canon's own policy.yaml declares no spec_coverage and resolves to None"
+  },
+  "kind": "evidence_record",
+  "run_seq": 22,
+  "schema": 1,
+  "staging_id": "b86403e52d58",
+  "task_id": "s44-spec-derived-worklist#4.2",
+  "verdict": "faithful"
+}

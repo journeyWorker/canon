@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.299777Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon context --repo ."
+  },
+  "evidence_note": {
+    "summary": "capabilityVersion is 2 and the surface prints spec_coverage, absent or summarized"
+  },
+  "kind": "evidence_record",
+  "run_seq": 13,
+  "schema": 1,
+  "staging_id": "2186e3a298f9",
+  "task_id": "s44-spec-derived-worklist#2.4",
+  "verdict": "faithful"
+}

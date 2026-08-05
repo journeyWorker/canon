@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.735159Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon selftest && cargo test -p canon-gate"
+  },
+  "evidence_note": {
+    "summary": "selftest passes with eleven ok fixtures; FAILURE_CLASSES stays at eight"
+  },
+  "kind": "evidence_record",
+  "run_seq": 23,
+  "schema": 1,
+  "staging_id": "529cfcf8a71e",
+  "task_id": "s44-spec-derived-worklist#4.3",
+  "verdict": "faithful"
+}

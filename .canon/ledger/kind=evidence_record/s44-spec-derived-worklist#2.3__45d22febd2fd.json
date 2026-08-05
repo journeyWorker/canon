@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.267627Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate an_unknown_scope_status_poisons_the_section_and_names_the_legal_set"
+  },
+  "evidence_note": {
+    "summary": "an unknown scope status names the offender and the six legal values"
+  },
+  "kind": "evidence_record",
+  "run_seq": 12,
+  "schema": 1,
+  "staging_id": "d775626eb51a",
+  "task_id": "s44-spec-derived-worklist#2.3",
+  "verdict": "faithful"
+}

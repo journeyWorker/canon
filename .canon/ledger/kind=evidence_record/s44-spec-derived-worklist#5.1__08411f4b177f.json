@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.844561Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon skills install --repo ."
+  },
+  "evidence_note": {
+    "summary": "canon-gate skill documents the check, the policy section and both refusals; regenerated as v4"
+  },
+  "kind": "evidence_record",
+  "run_seq": 26,
+  "schema": 1,
+  "staging_id": "c36a77ef7705",
+  "task_id": "s44-spec-derived-worklist#5.1",
+  "verdict": "faithful"
+}

@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:51:57.769955Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon gate check --repo . with spec_coverage temporarily enabled"
+  },
+  "evidence_note": {
+    "summary": "12 of 16 scenarios reported - strictly between zero and all, so neither all-red nor inert"
+  },
+  "kind": "evidence_record",
+  "run_seq": 24,
+  "schema": 1,
+  "staging_id": "ee191418645b",
+  "task_id": "s44-spec-derived-worklist#4.4",
+  "verdict": "faithful"
+}

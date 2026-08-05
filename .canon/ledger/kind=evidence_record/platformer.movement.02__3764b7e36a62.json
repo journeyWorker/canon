@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T07:48:45.681115Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate spec_coverage"
+  },
+  "kind": "evidence_record",
+  "project_id": "platformer",
+  "run_seq": 2,
+  "scenario_id": "platformer.movement.02",
+  "schema": 1,
+  "staging_id": "e40657bf7c57",
+  "verdict": "faithful"
+}
