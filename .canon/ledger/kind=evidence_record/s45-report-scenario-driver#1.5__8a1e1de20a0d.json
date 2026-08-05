@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:38:59.081885Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test marts two_overlay_projects_over_one_authored_scenario_yield_one_row"
+  },
+  "evidence_note": {
+    "summary": "the coverage join uses the full (project_id, scenario_id) pair, so a foreign project's overlay cannot attach"
+  },
+  "kind": "evidence_record",
+  "run_seq": 7,
+  "schema": 1,
+  "staging_id": "0f0279bc39fa",
+  "task_id": "s45-report-scenario-driver#1.5",
+  "verdict": "faithful"
+}

@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:39:01.675570Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test selftest_fixture"
+  },
+  "evidence_note": {
+    "summary": "the nine-table surface is unchanged; a fresh snapshot matches the committed fixture table list"
+  },
+  "kind": "evidence_record",
+  "run_seq": 13,
+  "schema": 1,
+  "staging_id": "c2dacdabd9f3",
+  "task_id": "s45-report-scenario-driver#2.5",
+  "verdict": "faithful"
+}

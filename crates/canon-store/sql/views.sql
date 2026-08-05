@@ -950,7 +950,10 @@ scenario_evidence AS (
 )
 SELECT
     s.project_id,
-    s.scenario_id,
+    -- Coalesced so the panel's identifying column is NEVER null: the
+    -- task side contributes rows the spec side does not, and vice
+    -- versa.
+    coalesce(s.scenario_id, t.scenario_id)                           AS scenario_id,
     s.title,
     s.subject_id,
     t.task_id,
@@ -962,15 +965,20 @@ SELECT
     coalesce(tm.green, se.verdict = 'faithful')                      AS green,
     se.verdict                                                       AS scenario_verdict,
     cov.covered                                                      AS spec_covered
+-- FULL OUTER, not a driver swap. Scenario-driven is the point, but a
+-- plan task declaring a ref to a scenario nobody authored is a corpus
+-- defect, and dropping its row would hide it exactly the way the
+-- task-driven grain hid unauthored scenarios. Such a row surfaces with
+-- a NULL `project_id` — the visible marker that no spec side exists.
 FROM scenario_latest s
-LEFT JOIN task_side t ON t.scenario_id = s.scenario_id
+FULL OUTER JOIN task_side t ON t.scenario_id = s.scenario_id
 LEFT JOIN mart_trust_matrix tm ON tm.task_id = t.task_id
 LEFT JOIN scenario_evidence se ON se.project_id = s.project_id AND se.scenario_id = s.scenario_id
 -- The FULL declared pair on both sides (s45): matching on
 -- `scenario_id` alone would report one spec root's coverage under
 -- another's name whenever two roots share an id.
 LEFT JOIN spec_cov cov ON cov.project_id = s.project_id AND cov.scenario_id = s.scenario_id
-ORDER BY s.project_id, s.scenario_id;
+ORDER BY s.project_id, coalesce(s.scenario_id, t.scenario_id);
 
 -- Panel 2: session costs grouped by `(session_id, client, role,
 -- workspace_label)` (S3 ingest, the donor's `session_id` join key).

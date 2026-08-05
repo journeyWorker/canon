@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:39:04.186304Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test --workspace"
+  },
+  "evidence_note": {
+    "summary": "90 test suites pass, zero failures"
+  },
+  "kind": "evidence_record",
+  "run_seq": 21,
+  "schema": 1,
+  "staging_id": "160d417bd966",
+  "task_id": "s45-report-scenario-driver#5.4",
+  "verdict": "faithful"
+}

@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:39:03.877859Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test byte_stability"
+  },
+  "evidence_note": {
+    "summary": "two consecutive renders of one fixture are byte-identical"
+  },
+  "kind": "evidence_record",
+  "run_seq": 20,
+  "schema": 1,
+  "staging_id": "4e0d4dcb025a",
+  "task_id": "s45-report-scenario-driver#5.3",
+  "verdict": "faithful"
+}

@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:38:57.170911Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "git show <pre>:crates/canon-store/sql/views.sql | awk '/mart_trust_matrix AS/,/ORDER BY change_id/' | sha256sum"
+  },
+  "evidence_note": {
+    "summary": "mart_trust_matrix SQL hash identical before and after: 6920419634bb1a84, 46 lines both"
+  },
+  "kind": "evidence_record",
+  "run_seq": 2,
+  "schema": 1,
+  "staging_id": "bd26e232a2d6",
+  "task_id": "s45-report-scenario-driver#0.2",
+  "verdict": "faithful"
+}

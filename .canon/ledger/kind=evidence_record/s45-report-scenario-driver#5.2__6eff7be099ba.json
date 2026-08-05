@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:39:03.798348Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test marts"
+  },
+  "evidence_note": {
+    "summary": "all three R5 deltas asserted: undeclared scenario gains a row, dangling ref keeps one, two overlay projects yield one row"
+  },
+  "kind": "evidence_record",
+  "run_seq": 19,
+  "schema": 1,
+  "staging_id": "d143619aaa63",
+  "task_id": "s45-report-scenario-driver#5.2",
+  "verdict": "faithful"
+}

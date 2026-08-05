@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:39:00.484629Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test snapshot"
+  },
+  "evidence_note": {
+    "summary": "the snapshot column contract matches; spec_project_id removed, scenario_verdict added"
+  },
+  "kind": "evidence_record",
+  "run_seq": 11,
+  "schema": 1,
+  "staging_id": "e51ae4256070",
+  "task_id": "s45-report-scenario-driver#2.3",
+  "verdict": "faithful"
+}

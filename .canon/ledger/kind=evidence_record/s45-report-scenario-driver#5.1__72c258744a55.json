@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:39:03.513886Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon report --repo . on canon's own corpus"
+  },
+  "evidence_note": {
+    "summary": "the panel lists all 16 scenarios with zero Task records in the ledger - kind=task does not exist here"
+  },
+  "kind": "evidence_record",
+  "run_seq": 18,
+  "schema": 1,
+  "staging_id": "2305f2e216cd",
+  "task_id": "s45-report-scenario-driver#5.1",
+  "verdict": "faithful"
+}

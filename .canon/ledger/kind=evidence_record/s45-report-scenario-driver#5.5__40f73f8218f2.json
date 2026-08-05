@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:39:04.387981Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon gate check --repo ."
+  },
+  "evidence_note": {
+    "summary": "gate verdicts unchanged: clean before and after, canon-gate reads nothing canon-report produces"
+  },
+  "kind": "evidence_record",
+  "run_seq": 22,
+  "schema": 1,
+  "staging_id": "824a4847e6bc",
+  "task_id": "s45-report-scenario-driver#5.5",
+  "verdict": "faithful"
+}

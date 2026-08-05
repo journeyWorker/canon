@@ -17,6 +17,7 @@
 mod support;
 
 use canon_report::{marts, ReportInputs};
+use canon_store::tier::Tier;
 use support::corpus;
 
 fn inputs(dir: &std::path::Path) -> ReportInputs {
@@ -600,4 +601,118 @@ fn the_fix_of_fix_total_is_the_sum_of_the_per_round_fix_of_fix_values() {
         0,
         "the same-change scope must survive the roll-up: a cross-change match counts zero at every grain"
     );
+}
+
+// ── s45: the two FULL OUTER shapes, and the row-set deltas ──
+
+/// s45 task 1.3 / 5.2(a): a scenario nobody's plan declares still gets a
+/// row. Under the s20 task-driven grain it could not appear at all,
+/// which is the defect that made the panel a plan report rather than a
+/// worklist.
+#[test]
+fn a_scenario_no_task_declares_still_gets_a_row_with_a_null_task_id() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let inputs = inputs(dir.path());
+    let git = canon_store::git_tier::GitTier::new(&inputs.roots.git_root);
+    let undeclared = "s9.fixture.99";
+    git.write(&canon_model::Scenario::new(
+        canon_model::Envelope::new(
+            1,
+            canon_model::RecordKind::Scenario,
+            chrono::Utc::now(),
+            canon_model::Actor::new("canon", canon_model::RoleId::parse("dev").unwrap()),
+        ),
+        canon_model::ProjectId::parse(corpus::scope_status::FULLY_GREEN_SPEC_PROJECT_ID).unwrap(),
+        canon_model::ScenarioId::parse(undeclared).unwrap(),
+        "a scenario no plan carries",
+        "",
+        canon_model::SpecDigest::of(undeclared.as_bytes()),
+    ))
+    .unwrap();
+
+    let rows = marts::fetch_scope_status(&inputs.roots).unwrap().rows;
+    let row = rows
+        .iter()
+        .find(|r| r.get("scenario_id").and_then(|v| v.as_str()) == Some(undeclared))
+        .unwrap_or_else(|| panic!("the undeclared scenario must still have a row: {rows:?}"));
+    assert!(row["task_id"].is_null(), "no plan task declares it, so `task_id` is the NULL side: {row:?}");
+    assert_eq!(row["project_id"], corpus::scope_status::FULLY_GREEN_SPEC_PROJECT_ID, "the spec side supplies the project");
+}
+
+/// s45 task 1.3 / 5.2(c): the mirror shape. A task declaring a ref to a
+/// scenario nobody authored keeps its row, with a NULL `project_id` —
+/// dropping it would hide a corpus defect exactly the way the old grain
+/// hid unauthored scenarios.
+#[test]
+fn a_task_declared_ref_with_no_scenario_record_keeps_its_row_with_a_null_project_id() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let inputs = inputs(dir.path());
+    let git = canon_store::git_tier::GitTier::new(&inputs.roots.git_root);
+    let dangling = "s9.fixture.98";
+    git.write(
+        &canon_model::Task::new(
+            canon_model::Envelope::new(
+                1,
+                canon_model::RecordKind::Task,
+                chrono::Utc::now(),
+                canon_model::Actor::new("planner", canon_model::RoleId::parse("dev").unwrap()),
+            ),
+            canon_model::TaskId::parse("s9-fixture#9").unwrap(),
+            "declares a scenario nobody authored",
+            canon_model::TaskStatus::Open,
+            None,
+        )
+        .with_scenario_refs(vec![canon_model::ScenarioId::parse(dangling).unwrap()]),
+    )
+    .unwrap();
+
+    let rows = marts::fetch_scope_status(&inputs.roots).unwrap().rows;
+    let row = rows
+        .iter()
+        .find(|r| r.get("scenario_id").and_then(|v| v.as_str()) == Some(dangling))
+        .unwrap_or_else(|| panic!("the dangling declared ref must keep its row: {rows:?}"));
+    assert!(row["project_id"].is_null(), "no Scenario record exists, so there is no project to report: {row:?}");
+    assert_eq!(row["task_id"], "s9-fixture#9", "the task side is what put the row there");
+}
+
+/// s45 task 5.2(b): one scenario id with overlay rows under TWO
+/// projects, but authored by only ONE, yields ONE row. Pre-s45 the
+/// `scenario_id`-only coverage join emitted two, reporting a project's
+/// coverage under a scenario it never authored.
+#[test]
+fn two_overlay_projects_over_one_authored_scenario_yield_one_row() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let inputs = inputs(dir.path());
+    let git = canon_store::git_tier::GitTier::new(&inputs.roots.git_root);
+    let scenario = corpus::scope_status::FULLY_GREEN_SCENARIO_ID;
+    // A SECOND overlay row for the same scenario id under a project
+    // that authored no `Scenario`.
+    git.write_namespaced(
+        "porting.coverage",
+        &format!("otherproj__{scenario}"),
+        canon_model::RawRecord(serde_json::json!({
+            "schema": 1, "kind": "porting.coverage",
+            "at": "2026-01-06T00:00:00Z",
+            "actor": {"agent_id": "porting", "role": "dev"},
+            "project_id": "otherproj", "scenario_id": scenario, "covered": false,
+        })),
+    )
+    .unwrap();
+
+    let rows = marts::fetch_scope_status(&inputs.roots).unwrap().rows;
+    let matching: Vec<_> = rows.iter().filter(|r| r.get("scenario_id").and_then(|v| v.as_str()) == Some(scenario)).collect();
+    assert_eq!(matching.len(), 1, "one authored scenario is one row, whatever other projects claim coverage: {matching:?}");
+    assert_eq!(matching[0]["spec_covered"], corpus::scope_status::FULLY_GREEN_SPEC_COVERED, "and it reports ITS OWN project's answer");
 }

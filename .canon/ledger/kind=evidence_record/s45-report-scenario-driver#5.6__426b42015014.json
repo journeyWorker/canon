@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:39:04.680950Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon format spec --repo ."
+  },
+  "evidence_note": {
+    "summary": "the spec corpus stays clean: 0 violations"
+  },
+  "kind": "evidence_record",
+  "run_seq": 23,
+  "schema": 1,
+  "staging_id": "98eeee557816",
+  "task_id": "s45-report-scenario-driver#5.6",
+  "verdict": "faithful"
+}

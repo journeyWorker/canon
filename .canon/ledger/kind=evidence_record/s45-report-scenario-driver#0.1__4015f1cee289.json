@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:38:56.575499Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "python3 - <<'PY' over .canon/ledger (scenario/evidence/task counts)"
+  },
+  "evidence_note": {
+    "summary": "baseline: 16 scenarios, kind=task absent, scope-status panel rendered _No rows._"
+  },
+  "kind": "evidence_record",
+  "run_seq": 1,
+  "schema": 1,
+  "staging_id": "4ab5ddbe6969",
+  "task_id": "s45-report-scenario-driver#0.1",
+  "verdict": "faithful"
+}

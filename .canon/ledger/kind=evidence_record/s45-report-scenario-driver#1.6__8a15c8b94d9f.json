@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:38:59.335075Z",
+  "evidence": {
+    "kind": "manual-review",
+    "ref": "crates/canon-store/sql/views.sql mart_scope_status GRAIN comment"
+  },
+  "evidence_note": {
+    "summary": "the grain block states one row per authored pair and why no per-project fan-out arises"
+  },
+  "kind": "evidence_record",
+  "run_seq": 8,
+  "schema": 1,
+  "staging_id": "e21a492297a2",
+  "task_id": "s45-report-scenario-driver#1.6",
+  "verdict": "faithful"
+}

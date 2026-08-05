@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:38:57.734226Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test multi_version_fold trust_matrix_and_scope_status_yield_one_row_per_task_after_a_checkbox_flip"
+  },
+  "evidence_note": {
+    "summary": "int_task_scenario_refs stays folded to each task_id's latest version across a checkbox flip"
+  },
+  "kind": "evidence_record",
+  "run_seq": 3,
+  "schema": 1,
+  "staging_id": "974c19fb2c24",
+  "task_id": "s45-report-scenario-driver#1.1",
+  "verdict": "faithful"
+}

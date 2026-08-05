@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:39:02.586262Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon report --repo ."
+  },
+  "evidence_note": {
+    "summary": "panel prose describes the spec-corpus grain and the NULL task_id worklist entry"
+  },
+  "kind": "evidence_record",
+  "run_seq": 16,
+  "schema": 1,
+  "staging_id": "8a8a1a8c6a62",
+  "task_id": "s45-report-scenario-driver#4.1",
+  "verdict": "faithful"
+}

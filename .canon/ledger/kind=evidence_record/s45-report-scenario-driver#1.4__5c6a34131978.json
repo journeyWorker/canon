@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:38:58.767811Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test core_body_residual"
+  },
+  "evidence_note": {
+    "summary": "the residual pin holds on the new grain via scope_status_carried_scenarios"
+  },
+  "kind": "evidence_record",
+  "run_seq": 6,
+  "schema": 1,
+  "staging_id": "ac899fc4ca52",
+  "task_id": "s45-report-scenario-driver#1.4",
+  "verdict": "faithful"
+}

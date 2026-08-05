@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:39:03.117617Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon report --repo . --check"
+  },
+  "evidence_note": {
+    "summary": "REPORT.md regenerated and committed; --check reports no drift"
+  },
+  "kind": "evidence_record",
+  "run_seq": 17,
+  "schema": 1,
+  "staging_id": "9a4040e714dd",
+  "task_id": "s45-report-scenario-driver#4.2",
+  "verdict": "faithful"
+}

@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T08:39:02.001171Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "awk extract + sha256sum over views.sql at both commits"
+  },
+  "evidence_note": {
+    "summary": "mart_trust_matrix is not extended: its SQL is byte-identical, 46 lines, hash 6920419634bb1a84"
+  },
+  "kind": "evidence_record",
+  "run_seq": 14,
+  "schema": 1,
+  "staging_id": "539f32bb6aa8",
+  "task_id": "s45-report-scenario-driver#3.1",
+  "verdict": "faithful"
+}
