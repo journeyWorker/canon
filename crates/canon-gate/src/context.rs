@@ -24,7 +24,7 @@
 
 use std::path::{Path, PathBuf};
 
-use canon_model::{validate_evidence_batch, EvidenceRecord, EvidenceViolation, RecordKind};
+use canon_model::{validate_evidence_batch, Divergence, EvidenceRecord, EvidenceViolation, RecordKind, Scenario, Subject};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{StoreError, Tier, TierQuery};
@@ -122,14 +122,52 @@ pub struct GateContext {
     pub ctx: GateCtx,
     pub policy: PolicyResolution,
     pub evidence: Vec<EvidenceRecord>,
+    /// The spec corpus `canon inventory sync` materializes — the
+    /// enumeration side of a coverage question `evidence` structurally
+    /// cannot answer. Grouping evidence can only ever surface artifacts
+    /// that already HAVE evidence (`crate::coverage`'s own interface-gap
+    /// note); a scenario nobody has attested to appears in no group, so
+    /// the corpus itself has to be in the context for
+    /// [`crate::spec_coverage`] to left-join against it.
+    pub scenarios: Vec<Scenario>,
+    /// Divergence lifecycle events, unfolded. `crate::spec_coverage`
+    /// folds them through `canon_model::fold` rather than reading
+    /// `status` off individual rows, so the gate and
+    /// `canon divergence status` cannot disagree about which scenarios
+    /// are open.
+    pub divergences: Vec<Divergence>,
+    /// Subjects, for the `spec_coverage.scope` status filter. Loaded
+    /// HERE rather than read by the check, because this struct is the
+    /// documented "loaded once per gate run" seam and a check that
+    /// opened its own tier would fork that contract.
+    pub subjects: Vec<Subject>,
     pub violations: Vec<EvidenceViolation>,
+    /// Read problems from the three corpus kinds above, kept OUT of
+    /// `violations` deliberately. [`crate::ledger`]'s `LedgerCheck`
+    /// maps every `violations` entry to
+    /// [`crate::FailureClass::MalformedEvidence`] and is
+    /// unconditionally in `crate::dispatch::check_set`, so folding
+    /// these in would turn a green repo red on upgrade with no policy
+    /// change — the opposite of `spec_coverage` being opt-in. Only
+    /// [`crate::spec_coverage`] reads this, and only when the policy
+    /// section is present.
+    pub corpus_violations: Vec<EvidenceViolation>,
+    /// Kinds whose configured routing sends them somewhere this
+    /// context's [`GitTier`] does not read, so their vector above is
+    /// empty for a reason that is NOT "the corpus is empty".
+    /// [`crate::spec_coverage`] refuses to run rather than reporting a
+    /// silently inert pass — the failure mode that already made `Task`
+    /// invisible to `canon report`.
+    pub unreadable_kinds: Vec<RecordKind>,
     pub now: DateTime<Utc>,
 }
 
 impl GateContext {
     /// Load everything an S5 wave-2 check needs: resolve `policy.yaml`
-    /// ([`PolicyResolution::resolve`]) and read every
-    /// `EvidenceRecord` off `ctx.ledger_root`'s [`GitTier`]
+    /// ([`PolicyResolution::resolve`]) and read the evidence corpus
+    /// plus the three spec-corpus kinds
+    /// ([`GateContext::scenarios`]/[`GateContext::divergences`]/
+    /// [`GateContext::subjects`]) off `ctx.ledger_root`'s [`GitTier`]
     /// (canon-store, S2). Fails only on a [`StoreError`] the tier
     /// itself cannot recover from (e.g. an unreadable ledger root) —
     /// per-record malformed content is never an `Err` here, it lands
@@ -138,6 +176,16 @@ impl GateContext {
     /// the CLI dispatch boundary (`canon-cli/src/gate.rs`) is the ONE
     /// place `Utc::now()` is ever called for a gate run, exactly once,
     /// and threads the result in here.
+    ///
+    /// The three corpus reads are UNCONDITIONAL — not gated on
+    /// `spec_coverage` being configured. That is deliberate and is the
+    /// same property `risk_routing` already documents
+    /// (`crate::coverage`: "A policy diff alone ... tightens coverage
+    /// for every existing artifact with zero corpus edits"): adding the
+    /// policy section must be sufficient by itself, with no second
+    /// switch and no corpus edit. Their read problems land in
+    /// [`GateContext::corpus_violations`], never `violations`, so the
+    /// widened read cannot change any existing check's verdict.
     pub fn load(ctx: GateCtx, registry: &SchemaRegistry, now: DateTime<Utc>) -> Result<Self, GateContextError> {
         let policy = PolicyResolution::resolve(&ctx.repo, registry);
 
@@ -148,8 +196,77 @@ impl GateContext {
         let mut violations = read.violations;
         violations.extend(validation_violations);
 
-        Ok(Self { ctx, policy, evidence, violations, now })
+        let mut corpus_violations = Vec::new();
+        let scenarios = read_corpus_kind(&tier, RecordKind::Scenario, &mut corpus_violations)?;
+        let divergences = read_corpus_kind(&tier, RecordKind::Divergence, &mut corpus_violations)?;
+        let subjects = read_corpus_kind(&tier, RecordKind::Subject, &mut corpus_violations)?;
+        let unreadable_kinds = unreadable_corpus_kinds(&ctx.repo);
+
+        Ok(Self { ctx, policy, evidence, scenarios, divergences, subjects, violations, corpus_violations, unreadable_kinds, now })
     }
+}
+
+/// Read one spec-corpus kind off `tier`, deserializing each row into
+/// `T`. A row that fails to deserialize is recorded in
+/// `corpus_violations` and SKIPPED — never an `Err`, mirroring
+/// `validate_evidence_batch`'s "malformed evidence is no evidence"
+/// discipline for the evidence corpus. canon-model ships no
+/// `validate_<kind>_batch` analog (`validate_evidence_batch` is the only
+/// one), so this is deserialization plus the tier's own layout check,
+/// not a semantic validation pass.
+fn read_corpus_kind<T: serde::de::DeserializeOwned>(
+    tier: &GitTier,
+    kind: RecordKind,
+    corpus_violations: &mut Vec<EvidenceViolation>,
+) -> Result<Vec<T>, GateContextError> {
+    let read = tier.read(&TierQuery::kind(kind))?;
+    corpus_violations.extend(read.violations);
+    let mut out = Vec::with_capacity(read.records.len());
+    for raw in &read.records {
+        match serde_json::from_value::<T>(raw.0.clone()) {
+            Ok(record) => out.push(record),
+            // `RawRecord` is a bare body with no path, so the subject is
+            // the kind itself — enough for an operator to know WHICH
+            // corpus is malformed, and this vector is diagnostic input
+            // to one check rather than a reported violation set.
+            Err(e) => corpus_violations.push(EvidenceViolation::new(
+                canon_model::FailureClass::Malformed,
+                kind.as_str(),
+                format!("{} row does not deserialize: {e}", kind.as_str()),
+            )),
+        }
+    }
+    Ok(out)
+}
+
+/// Which of the three spec-corpus kinds this repo routes somewhere the
+/// gate's [`GitTier`] does not read.
+///
+/// `GateContext` reads ONE tier — the `local` rung's git root — which is
+/// safe for `EvidenceRecord` only by convention. `routing` is per-repo
+/// configurable, so a consumer sending `scenario` to `hot` would hand
+/// [`crate::spec_coverage`] an empty corpus and get a check that passes
+/// because it saw nothing. That is precisely the failure that hid
+/// `Task` from `canon report` (`task: hot` routed to a rung with no SQL
+/// view), and an inert gate that reports clean is worse than one that
+/// refuses.
+///
+/// A repo with no readable `canon.yaml`, or one whose routing is absent
+/// for a kind, yields nothing here: [`GateCtx::from_repo`] already falls
+/// back to the default ledger path in that case, so the git tier IS
+/// where those records live.
+fn unreadable_corpus_kinds(repo: &Path) -> Vec<RecordKind> {
+    const CORPUS_KINDS: [RecordKind; 3] = [RecordKind::Scenario, RecordKind::Divergence, RecordKind::Subject];
+    let Ok(content) = std::fs::read_to_string(repo.join("canon.yaml")) else {
+        return Vec::new();
+    };
+    let Ok(tier_policy) = canon_store::policy::TierPolicy::from_yaml(&content) else {
+        return Vec::new();
+    };
+    CORPUS_KINDS
+        .into_iter()
+        .filter(|kind| matches!(tier_policy.routing.get(kind), Some(rung) if *rung != canon_store::policy::Rung::Local))
+        .collect()
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -173,7 +173,7 @@ use std::path::Path;
 
 use canon_gate::{scan_fake_markers, EvidenceNote, GateCtx};
 use canon_ingest::task_rows::first_row_line_break;
-use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, RawRecord, RecordKind, RoleId, RunId, ScenarioId, TaskId};
+use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, RunId, ScenarioId, TaskId};
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier};
 use chrono::Utc;
@@ -205,10 +205,22 @@ pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, String> {
 /// silently compile if transposed, and three of the five end up in the
 /// permanent ledger body.
 pub struct EvidenceArgs {
-    /// The plan task this evidence attests to. Validated against the
-    /// live plan corpus by [`crate::dispatch::validate_task_binding`],
-    /// never merely grammar-checked.
-    pub task_id: TaskId,
+    /// The plan task this evidence attests to, validated against the
+    /// live plan corpus by [`crate::dispatch::validate_task_binding`]
+    /// rather than merely grammar-checked. `None` for a SCENARIO-keyed
+    /// attestation (s44): the spec corpus is a first-class attestation
+    /// subject, not only a secondary join hanging off a task.
+    /// At least one of `task_id`/`scenario_id` is required — a record
+    /// with neither carries no coverage subject at all
+    /// (`canon_gate::coverage::CellSubject::of` returns `None`) and
+    /// could never be read back by any gate.
+    pub task_id: Option<TaskId>,
+    /// The spec corpus this evidence's `scenario_id` belongs to. Canon
+    /// keys a scenario by the COMPOSITE `(project_id, scenario_id)`
+    /// (`Scenario`'s own `project_id` is required), so a scenario-keyed
+    /// record without one cannot close that join — two spec roots may
+    /// carry the same scenario id.
+    pub project_id: Option<ProjectId>,
     /// The `evidence.kind` companion — what CLASS of evidence is being
     /// attested to (`test-run`, `review`, …). Free text on the untyped
     /// path; on the typed path it must match the task atom's declared
@@ -295,15 +307,55 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         return 2;
     }
 
-    // The SAME plan-corpus admission `canon dispatch begin --task` makes
-    // (module doc) — an id no import pass would persist as a `Task`
-    // record is not an id evidence may be attested against.
-    if let Err(e) = crate::dispatch::validate_task_binding(&repo, &args.task_id) {
-        eprintln!("canon evidence add: {e}");
-        return if e.is_usage() { 2 } else { 1 };
+    // At least one coverage subject, checked before anything else
+    // touches the corpus. A record with neither key is invisible to
+    // every gate (`canon_gate::coverage::CellSubject::of` yields
+    // `None`), so staging one would be writing an attestation nothing
+    // can ever read back.
+    if args.task_id.is_none() && args.scenario_id.is_none() {
+        eprintln!(
+            "canon evidence add: refused — give --task, --scenario-id, or both; a record with neither carries no coverage subject and no gate can read it back"
+        );
+        return 2;
     }
 
-    let note = args.summary.as_ref().map(|summary| EvidenceNote::new(args.task_id.clone(), summary.clone(), args.command_result.clone()));
+    // A scenario-keyed record needs the COMPOSITE key, because
+    // `Scenario`'s own `project_id` is required and two spec roots may
+    // carry the same scenario id. Refused rather than defaulted: there
+    // is no safe guess when `specs.roots[]` holds more than one entry.
+    if args.scenario_id.is_some() && args.project_id.is_none() {
+        eprintln!(
+            "canon evidence add: refused — --scenario-id needs --project-id; canon keys a scenario by the composite (project_id, scenario_id) and two spec roots may carry the same scenario id"
+        );
+        return 2;
+    }
+
+    // The SAME plan-corpus admission `canon dispatch begin --task` makes
+    // (module doc) — an id no import pass would persist as a `Task`
+    // record is not an id evidence may be attested against. Skipped
+    // entirely for a scenario-only record: there is no task to admit.
+    if let Some(task_id) = &args.task_id {
+        if let Err(e) = crate::dispatch::validate_task_binding(&repo, task_id) {
+            eprintln!("canon evidence add: {e}");
+            return if e.is_usage() { 2 } else { 1 };
+        }
+    }
+
+    // `EvidenceNote` is keyed by `TaskId` because its only consumer is
+    // the checkbox flip, which is a task-side operation. A
+    // scenario-only record therefore carries no note — and `--summary`
+    // on one would be silently dropped, so it is refused instead.
+    if args.task_id.is_none() && args.summary.is_some() {
+        eprintln!(
+            "canon evidence add: refused — --summary is the flipped checkbox row's suffix and is keyed by task; a scenario-only attestation has no row to flip"
+        );
+        return 2;
+    }
+    let note = args
+        .task_id
+        .as_ref()
+        .zip(args.summary.as_ref())
+        .map(|(task_id, summary)| EvidenceNote::new(task_id.clone(), summary.clone(), args.command_result.clone()));
     if let Some(note) = &note {
         // The gate's own scan, run here so a fabricated note is refused
         // while it is still a flag value — after `canon gate promote`
@@ -321,29 +373,35 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     // The typed `{kind, ref}` contract, read through the gate's own
     // resolution (module doc). `Ok(None)` = the free path, where the
     // gate accepts any non-`Divergent` record for this task regardless
-    // of kind, so there is nothing to check.
-    match typed_evidence_contract_for_task(&repo, &args.task_id) {
-        Ok(Some(contract)) if contract.kind != args.kind || contract.evidence_ref != args.evidence_ref => {
-            eprintln!(
-                "canon evidence add: refused — {} declares a typed evidence contract kind=`{}` ref=`{}`, but this record carries kind=`{}` ref=`{}`; `canon gate task` narrows to records matching the atom exactly, so this one would be refused as an unevidenced flip",
-                args.task_id, contract.kind, contract.evidence_ref, args.kind, args.evidence_ref
-            );
-            return 1;
-        }
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("canon evidence add: {e}");
-            return if e.is_usage() { 2 } else { 1 };
+    // of kind, so there is nothing to check. A scenario-only record has
+    // no task atom to bind a contract to, so the whole step is skipped.
+    if let Some(task_id) = &args.task_id {
+        match typed_evidence_contract_for_task(&repo, task_id) {
+            Ok(Some(contract)) if contract.kind != args.kind || contract.evidence_ref != args.evidence_ref => {
+                eprintln!(
+                    "canon evidence add: refused — {} declares a typed evidence contract kind=`{}` ref=`{}`, but this record carries kind=`{}` ref=`{}`; `canon gate task` narrows to records matching the atom exactly, so this one would be refused as an unevidenced flip",
+                    task_id, contract.kind, contract.evidence_ref, args.kind, args.evidence_ref
+                );
+                return 1;
+            }
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("canon evidence add: {e}");
+                return if e.is_usage() { 2 } else { 1 };
+            }
         }
     }
 
-    let record = EvidenceRecord::new(
+    let mut record = EvidenceRecord::new(
         Envelope::current(RecordKind::EvidenceRecord, Utc::now(), Actor::new(args.actor_id.as_str(), args.role.clone())),
-        Some(args.task_id.clone()),
+        args.task_id.clone(),
         args.scenario_id.clone(),
         args.run_id.clone(),
         args.verdict,
     );
+    if let Some(project_id) = &args.project_id {
+        record = record.with_project_id(project_id.clone());
+    }
 
     // `serde_json::to_value` on a record canon just constructed, and
     // `as_object_mut` on the object that produced — the identical pair
@@ -368,12 +426,23 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     let staging = GitTier::new(evidence_staging_dir(&GateCtx::from_repo(&repo).ledger_root));
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
+            // The next step differs by subject: a task-keyed record
+            // feeds a checkbox flip, a scenario-only one feeds
+            // `canon gate check`'s spec-coverage pass. Naming the wrong
+            // one would send an operator to a command that cannot apply.
+            let (subject, next) = match &args.task_id {
+                Some(task_id) => (task_id.to_string(), format!("then `canon gate task {task_id}`")),
+                None => {
+                    let scenario = args.scenario_id.as_ref().expect("one of --task/--scenario-id is required, checked above");
+                    (scenario.as_str().to_string(), "then `canon gate check`".to_string())
+                }
+            };
             println!(
-                "canon evidence add: staged {} for {} (verdict {}) — run `canon gate promote` to commit it, then `canon gate task {}`",
+                "canon evidence add: staged {} for {} (verdict {}) — run `canon gate promote` to commit it, {}",
                 receipt.location,
-                args.task_id,
+                subject,
                 verdict_slug(args.verdict),
-                args.task_id
+                next
             );
             0
         }
@@ -428,7 +497,8 @@ mod tests {
 
     fn args(summary: Option<&str>) -> EvidenceArgs {
         EvidenceArgs {
-            task_id: TaskId::parse("demo-change#1.1").expect("a literal task id"),
+            task_id: Some(TaskId::parse("demo-change#1.1").expect("a literal task id")),
+            project_id: None,
             kind: "test-run".to_string(),
             evidence_ref: "cargo test -p canon-cli evidence".to_string(),
             verdict: EvidenceVerdict::Faithful,
@@ -506,7 +576,7 @@ mod tests {
     fn an_unknown_task_is_refused_through_the_shared_admission_and_stages_nothing() {
         let tmp = repo_with_plan_corpus();
         let mut unknown = args(None);
-        unknown.task_id = TaskId::parse("demo-change#9.9").expect("a literal task id");
+        unknown.task_id = Some(TaskId::parse("demo-change#9.9").expect("a literal task id"));
 
         assert_eq!(run_add(tmp.path(), &unknown), 2, "an unknown task is a fixable invocation, exit 2");
         assert_eq!(staged_count(tmp.path()), 0, "a refused add must stage nothing");
@@ -519,7 +589,7 @@ mod tests {
     fn a_task_under_an_unknown_change_is_refused() {
         let tmp = repo_with_plan_corpus();
         let mut unknown = args(None);
-        unknown.task_id = TaskId::parse("no-such-change#1.1").expect("a literal task id");
+        unknown.task_id = Some(TaskId::parse("no-such-change#1.1").expect("a literal task id"));
 
         assert_eq!(run_add(tmp.path(), &unknown), 2);
         assert_eq!(staged_count(tmp.path()), 0);

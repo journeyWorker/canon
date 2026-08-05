@@ -500,9 +500,12 @@ enum EvidenceCommand {
     /// Stage one attributed EvidenceRecord for a task (commit it with `canon gate promote`)
     #[command(after_help = "ATTESTATION, NOT PROOF. canon never runs, resolves, or checks --ref.\nThis records that a named actor, in a named role, at a stamped time, CLAIMED\nthe named evidence supports the task — the same record whether the command\npassed, failed, or was never run.\n\nAn agent that can run this command can authorize its own checkbox: there is\nno separation between the author of an attestation and its beneficiary, no\nsignature, and no second party. What you get is attribution and an auditable\ntrail, which is what a hand-flipped checkbox left none of.\n\nWhat `canon gate task <id>` then CHECKS:\n  - a non-divergent evidence record exists for that task\n  - its note passes the fabrication-marker scan (and is a single line)\n  - on the typed path, its kind/ref equals the task atom's declared contract\n  - the plan document carries an open row for the task\n\nWhat it does NOT check:\n  - whether --ref names anything real, let alone anything that ran\n  - staleness, trust-ladder, or release-trust: none of `canon gate check`'s\n    registered checks run on this path\n  - divergence: an open divergence on the surface does not block the flip\n\nPass --command-result with the real captured output to make the claim\nauditable against something concrete. It is scanned for fabrication markers\ntoo, and it is still text you supplied.\n\nLine breaks are refused in --summary and --actor-id: both are written into\nthe plan document as ONE checkbox row.")]
     Add {
-        /// Plan task this evidence attests to (<change_id>#<n>); validated against the plan corpus
+        /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
-        task: TaskId,
+        task: Option<TaskId>,
+        /// Spec corpus id for --scenario-id (canon keys a scenario by the composite (project_id, scenario_id))
+        #[arg(long, value_parser = canon_cli::review::parse_project_id)]
+        project_id: Option<ProjectId>,
         /// What CLASS of evidence is attested to (test-run, review, ...) — the `evidence.kind` companion
         #[arg(long)]
         kind: String,
@@ -894,10 +897,22 @@ fn main() -> ExitCode {
             GateCommand::Selftest => ExitCode::from(canon_cli::gate::run_selftest() as u8),
         },
         Command::Evidence { action } => match action {
-            EvidenceCommand::Add { task, kind, evidence_ref, verdict, summary, command_result, scenario_id, run_id, actor_id, role, repo } => ExitCode::from(
+            EvidenceCommand::Add { task, project_id, kind, evidence_ref, verdict, summary, command_result, scenario_id, run_id, actor_id, role, repo } => ExitCode::from(
                 canon_cli::evidence::run_add(
                     &repo,
-                    &canon_cli::evidence::EvidenceArgs { task_id: task, kind, evidence_ref, verdict, summary, command_result, scenario_id, run_id, actor_id, role },
+                    &canon_cli::evidence::EvidenceArgs {
+                        task_id: task,
+                        project_id,
+                        kind,
+                        evidence_ref,
+                        verdict,
+                        summary,
+                        command_result,
+                        scenario_id,
+                        run_id,
+                        actor_id,
+                        role,
+                    },
                 ) as u8,
             ),
         },

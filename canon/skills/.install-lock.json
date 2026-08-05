@@ -13,8 +13,8 @@
       "version": 2
     },
     "canon-gate": {
-      "contentHash": "sha256:f0d2064e9011f0195fea21d749d224a061f2ec50e89367339a54005121abb28f",
-      "version": 3
+      "contentHash": "sha256:a93e924d8722bd4c34ce275237d1bf3ec69b24589f4d7ab06442fbab40974c52",
+      "version": 4
     },
     "canon-inventory": {
       "contentHash": "sha256:22ce37c74af91824e1c1c914e01e6867932e53c2d6cc2d1e8caedf1e21b4fbd9",
@@ -53,8 +53,8 @@
       "version": 2
     },
     "canon-subject": {
-      "contentHash": "sha256:125ed69752e877632dc17873029445aed8948f1553a8151e87ccb855aad5389a",
-      "version": 6
+      "contentHash": "sha256:4c151310d46eecf1e9afd8bb74d8180d4a52003c5901bbcaea728cc02240417f",
+      "version": 7
     },
     "canon-vocab": {
       "contentHash": "sha256:29837a83ff729bbec23b2a36542d3bf853f4cf3098998f4d901b72c79b4279e3",

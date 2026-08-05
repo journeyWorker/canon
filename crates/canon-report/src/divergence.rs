@@ -32,11 +32,10 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use canon_model::envelope::RecordKind;
-use canon_model::fold::{BindingSnapshot, FoldedState, fold_to_current_state};
+use canon_model::fold::{FoldedState, fold_to_current_state};
 use canon_model::ids::{ProjectId, ScenarioId};
 use canon_model::records::{Divergence, EvidenceRecord};
 use canon_store::git_tier::GitTier;
-use canon_store::fold_latest_by_key;
 use canon_store::tier::{Tier, TierQuery};
 use chrono::{DateTime, Utc};
 
@@ -48,46 +47,15 @@ fn read_kind_fail_soft<T: for<'de> serde::Deserialize<'de>>(git_root: &Path, kin
     read.records.into_iter().filter_map(|raw| serde_json::from_value(raw.0).ok()).collect()
 }
 
-/// Derives the live-binding re-check map [`fold_to_current_state`]
-/// needs, from the LATEST `EvidenceRecord` per `(project_id,
-/// scenario_id)` that carries BOTH a concrete `project_id` AND
-/// `evidence_sha`: the scenario's CURRENT app state is that latest
-/// evidence's `evidence_sha` — the SOLE live-checkable axis. The fold
-/// downgrades a `Resolved` divergence to `ResolvedInvalid` iff this
-/// current app sha has moved off the sha the divergence resolved
-/// against; WHO/WHEN the evidence was authored is deliberately NOT part
-/// of the snapshot (a divergence's own reviewer/at are immutable
-/// provenance, and a superseding resolution is handled by `run_seq`
-/// ranking). A group with no such evidence gets no re-check entry:
-/// absent input means `fold_to_current_state` trusts an existing
-/// `Resolved` claim as-is (no evidence of a mismatch is not evidence OF
-/// one — that function's own doc).
-fn live_bindings_of(evidence: Vec<EvidenceRecord>) -> BTreeMap<(ProjectId, ScenarioId), BindingSnapshot> {
-    struct Candidate {
-        key: (ProjectId, ScenarioId),
-        at: DateTime<Utc>,
-        /// The evidence record's own `envelope.schema` — the fold's
-        /// equal-`at` generation discriminator
-        /// (`s38-evidence-bearing-memory`), threaded from the record
-        /// rather than assumed, so a schema bump on `EvidenceRecord`
-        /// supersedes deterministically instead of by digest luck.
-        schema: u32,
-        digest: String,
-        snapshot: BindingSnapshot,
-    }
-
-    let candidates = evidence.into_iter().filter_map(|record| {
-        let project_id = record.project_id.clone()?;
-        let scenario_id = record.scenario_id.clone()?;
-        let app_sha = record.evidence_sha.clone()?;
-        let at = record.envelope.at;
-        let schema = record.envelope.schema;
-        let digest = canon_store::partition::content_digest12(&serde_json::to_value(&record).unwrap_or_default());
-        Some(Candidate { key: (project_id, scenario_id), at, schema, digest, snapshot: BindingSnapshot { app_sha, reserved_digest: None } })
-    });
-
-    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| (c.key, c.snapshot)).collect()
-}
+/// The live-binding re-check map [`fold_to_current_state`] needs.
+///
+/// s44 promoted the derivation into `canon-store` so `canon-gate`'s
+/// `spec_coverage` check reads the SAME map — a second copy would let
+/// the gate and `canon divergence status` disagree about which
+/// scenarios are open, which is precisely what one shared fold exists
+/// to prevent. See [`canon_store::fold::live_bindings_of`] for the
+/// semantics.
+use canon_store::fold::live_bindings_of;
 
 /// Every current `(project_id, scenario_id)` divergence state, folded
 /// from `ledger_root`'s committed `Divergence` records with a

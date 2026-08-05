@@ -25,7 +25,7 @@ Every violation carries one of these stable, grep-able strings:
 
 | Class | Meaning |
 |---|---|
-| `uncovered-cell` | A policy-required evidence cell (role × artifact) has no matching record. Coverage means "a test exists", not "a test passed" — even a `Divergent` verdict satisfies coverage. |
+| `uncovered-cell` | Either a policy-required evidence cell (role × artifact) with no matching record, or — with `spec_coverage` enabled — a spec scenario that is unimplemented or mismatched. The detail string distinguishes them. Coverage means "a test exists", not "a test passed": even a `Divergent` verdict satisfies the role-cell form. |
 | `unreviewed-promotion` | An artifact tagged `reviewed` has no matching ledger review record. |
 | `trust-below-required` | Achieved trust level is below `policy.yaml`'s `trust_required` for its class — RELEASE-scoped only (`canon gate check --release`); never fires on an ordinary run. |
 | `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. |
@@ -37,10 +37,11 @@ Every violation carries one of these stable, grep-able strings:
 ## `canon gate check [--repo <dir>] [--release]`
 
 Assembles coverage + ledger + staleness + the always-on trust-ladder
-check over the resolved repo's corpus and runs them, printing every
-violation grouped by failure class. `--release` additionally engages the
-release-scoped `trust-below-required` check; the trust-ladder check is
-never dropped when `--release` is passed.
+check, plus the opt-in spec-coverage check, over the resolved repo's
+corpus and runs them, printing every violation grouped by failure class.
+`--release` additionally engages the release-scoped
+`trust-below-required` check; the trust-ladder check is never dropped
+when `--release` is passed.
 
 ```bash
 canon gate check --repo .            # ordinary evaluation
@@ -51,6 +52,50 @@ Exit `0` clean, `1` gate-red (any violation), `2` usage/load failure
 (unreadable ledger, corrupt `canon.yaml`). `--repo` (or its omission)
 resolves through the nearest-ancestor `canon.yaml` walk, so it reads the
 repo ROOT's `.canon/policy.yaml` and `.canon/ledger` from any subdirectory.
+
+### The spec-derived worklist (`spec_coverage`, opt-in)
+
+Coverage groups the EVIDENCE corpus, so it can only ever enumerate
+artifacts that already have evidence. A `.feature` scenario nobody has
+attested to appears in no group and is invisible to it. `spec_coverage`
+adds the other direction: it starts from the Scenario corpus
+`canon inventory sync` materializes and left-joins evidence onto it, so
+an unimplemented or mismatched spec becomes a reported violation.
+
+```yaml
+# .canon/policy.yaml — ABSENT by default; absent means zero violations
+spec_coverage:
+  require_evidence: true
+  scope: [building, verifying]   # optional; omit for the whole corpus
+```
+
+- **Unimplemented** — no `EvidenceRecord` carries the scenario's
+  `(project_id, scenario_id)`. Author one with
+  `canon evidence add --scenario-id <id> --project-id <root-id>`; both
+  flags are required together, because two spec roots may carry the same
+  scenario id.
+- **Mismatched** — the folded divergence state is `open`,
+  `still-divergent`, or `resolved-invalid` (a resolution whose app sha
+  has moved), or the latest ledger verdict is `divergent`.
+- **`scope`** narrows blocking to scenarios whose `@subject:<id>` tag
+  links them to a Subject in one of the named statuses. With a `scope`
+  set, an untagged scenario is out of scope; with `scope` omitted, every
+  scenario is in scope. A tag naming no Subject record is reported as a
+  dangling link, never silently skipped.
+
+Two refusals rather than a silent pass, both surfacing as
+`uncovered-cell` on the subject `spec_coverage`:
+
+- A **malformed section** (unknown key, unknown `scope` status) refuses
+  at check time. It is never treated as absent — a typo must not be
+  silently equivalent to not opting in.
+- A **corpus kind routed off the gate's rung** (`scenario`,
+  `divergence`, or `subject` sent anywhere but `local`) refuses, because
+  the gate reads one tier and would otherwise pass by seeing nothing.
+
+Malformed rows in those three kinds do NOT surface as
+`malformed-evidence`; they are kept off the evidence violation set on
+purpose, so enabling nothing changes no existing verdict.
 
 ## `canon gate task <task_id> [--repo <dir>]`
 

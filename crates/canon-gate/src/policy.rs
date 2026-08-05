@@ -52,7 +52,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use canon_model::RecordKind;
+use canon_model::{RecordKind, SubjectStatus};
 use canon_policy::{bindings_for, compile, evaluate, BindingSet, CompiledPolicy, EvalBudget, PolicyValue, SchemaRegistry};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -206,6 +206,15 @@ pub enum PolicyDiagnostic {
     /// flat (non-CEL) value is unaffected — it never touches the
     /// registry.
     SchemaUnavailable { kind: RecordKind },
+    /// One whole SECTION was present but unusable (s44
+    /// `spec-derived-worklist`). Unlike [`Self::InvalidPredicate`],
+    /// which drops one field and lets the rest resolve, a section this
+    /// diagnostic names resolves to a POISONED value: `resolve()`'s
+    /// signature is frozen infallible so it cannot refuse here, and
+    /// degrading a present-but-broken section to "absent" would make a
+    /// typo silently equivalent to not opting in. The owning check
+    /// turns the poison into a violation at CHECK time instead.
+    InvalidSection { section: &'static str, detail: String },
 }
 
 impl std::fmt::Display for PolicyDiagnostic {
@@ -218,6 +227,9 @@ impl std::fmt::Display for PolicyDiagnostic {
             }
             PolicyDiagnostic::SchemaUnavailable { kind } => {
                 write!(f, "SchemaRegistry has no schema for {kind:?} — every {{cel: ...}} predicate falls back to its documented default")
+            }
+            PolicyDiagnostic::InvalidSection { section, detail } => {
+                write!(f, "{section}: section is present but unusable ({detail}) — the owning check refuses rather than treating it as absent")
             }
         }
     }
@@ -272,6 +284,106 @@ struct RawPolicy {
     staleness: RawStaleness,
     #[serde(default)]
     risk_routing: BTreeMap<String, RawField<bool>>,
+    /// Deliberately an untyped [`serde_yaml::Value`], not a typed
+    /// struct: a typed field would make a malformed `spec_coverage:`
+    /// fail the WHOLE `RawPolicy` deserialize, and
+    /// [`load_raw_policy`] degrades that to `RawPolicy::default()` —
+    /// so one typo in this section would silently discard every
+    /// `trust_required`/`risk_routing` entry in the file. Parsing it
+    /// separately in [`resolve_spec_coverage`] keeps the blast radius
+    /// to this section.
+    #[serde(default)]
+    spec_coverage: Option<serde_yaml::Value>,
+}
+
+/// `policy.yaml`'s optional `spec_coverage:` section (s44
+/// `spec-derived-worklist`), resolved. `None` on
+/// [`PolicyResolution::spec_coverage`] means the section is ABSENT and
+/// `crate::spec_coverage` derives zero violations — the same
+/// opt-in-by-omission default an empty `risk_routing` already gives
+/// `crate::coverage`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SpecCoverage {
+    /// A well-formed section. `require_evidence: false` is a real,
+    /// distinct state from an absent section: the repo opted in and
+    /// then turned the requirement off, which stays visible in
+    /// `canon context` where an absent section does not.
+    Active {
+        require_evidence: bool,
+        /// Restrict blocking to scenarios linked to a Subject in one of
+        /// these statuses. EMPTY means every scenario is in scope.
+        scope: Vec<SubjectStatus>,
+    },
+    /// Present but unusable — see [`PolicyDiagnostic::InvalidSection`].
+    /// `crate::spec_coverage` emits a violation carrying `detail`
+    /// rather than silently behaving like the absent case.
+    Invalid { detail: String },
+}
+
+/// The typed shape [`resolve_spec_coverage`] parses the untyped section
+/// into. `deny_unknown_fields` on purpose: a misspelled key in an
+/// opt-in security-adjacent section must be loud, not ignored.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+struct RawSpecCoverage {
+    #[serde(default)]
+    require_evidence: bool,
+    #[serde(default)]
+    scope: Vec<String>,
+}
+
+/// Parse the `spec_coverage:` section, poisoning it (never dropping it)
+/// when it is present and broken.
+///
+/// Absent → `None`, the opt-out default. Present and well-formed →
+/// `Some(Active)`. Present and broken → a
+/// [`PolicyDiagnostic::InvalidSection`] AND `Some(Invalid)`, because
+/// `resolve()` is frozen infallible and cannot refuse here: returning
+/// `None` would make a typo indistinguishable from never opting in,
+/// which is the one outcome an evidence gate must not produce.
+fn resolve_spec_coverage(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<PolicyDiagnostic>) -> Option<SpecCoverage> {
+    const SECTION: &str = "spec_coverage";
+    let raw = raw?;
+
+    let parsed: RawSpecCoverage = match serde_yaml::from_value(raw) {
+        Ok(p) => p,
+        Err(e) => {
+            let detail = e.to_string();
+            diagnostics.push(PolicyDiagnostic::InvalidSection { section: SECTION, detail: detail.clone() });
+            return Some(SpecCoverage::Invalid { detail });
+        }
+    };
+
+    let mut scope = Vec::with_capacity(parsed.scope.len());
+    for name in &parsed.scope {
+        match subject_status_from_str(name) {
+            Some(status) => scope.push(status),
+            None => {
+                let detail = format!("`{name}` is not a valid value for `scope` (expected one of: {})", SUBJECT_STATUS_NAMES.join(", "));
+                diagnostics.push(PolicyDiagnostic::InvalidSection { section: SECTION, detail: detail.clone() });
+                return Some(SpecCoverage::Invalid { detail });
+            }
+        }
+    }
+
+    Some(SpecCoverage::Active { require_evidence: parsed.require_evidence, scope })
+}
+
+/// The closed [`SubjectStatus`] wire vocabulary, in lifecycle order —
+/// named here so a `scope` rejection can print the legal set in the
+/// same "expected one of: …" grammar the typed-atom checker uses.
+const SUBJECT_STATUS_NAMES: [&str; 6] = ["proposed", "specced", "building", "verifying", "shipped", "retired"];
+
+fn subject_status_from_str(s: &str) -> Option<SubjectStatus> {
+    match s {
+        "proposed" => Some(SubjectStatus::Proposed),
+        "specced" => Some(SubjectStatus::Specced),
+        "building" => Some(SubjectStatus::Building),
+        "verifying" => Some(SubjectStatus::Verifying),
+        "shipped" => Some(SubjectStatus::Shipped),
+        "retired" => Some(SubjectStatus::Retired),
+        _ => None,
+    }
 }
 
 /// The resolved `policy.yaml`, S12 design D2's single shared object:
@@ -300,6 +412,11 @@ pub struct PolicyResolution {
     /// matching `canon_policy::PolicyValue`'s scalar-only evaluation
     /// contract.
     pub risk_routing: BTreeMap<String, PolicyField<bool>>,
+    /// s44's opt-in spec-corpus coverage requirement. `None` = the
+    /// section is absent and `crate::spec_coverage` is silent; see
+    /// [`SpecCoverage`] for why a BROKEN section resolves to
+    /// `Some(Invalid)` rather than `None`.
+    pub spec_coverage: Option<SpecCoverage>,
     /// Every load/compile problem `resolve()` encountered — see
     /// [`PolicyDiagnostic`].
     pub diagnostics: Vec<PolicyDiagnostic>,
@@ -351,8 +468,12 @@ impl PolicyResolution {
             surface_scoped: compile_single(raw.staleness.surface_scoped, "staleness.surface_scoped", DEFAULT_SURFACE_SCOPED, bindings, &mut diagnostics),
         };
         let risk_routing = compile_map(raw.risk_routing, "risk_routing", bindings, &mut diagnostics);
+        // Parsed, never CEL-compiled: `spec_coverage` carries no
+        // per-record predicate, so it needs no bindings and is
+        // unaffected by `SchemaUnavailable`.
+        let spec_coverage = resolve_spec_coverage(raw.spec_coverage, &mut diagnostics);
 
-        Self { trust_required, trust_sample, staleness, risk_routing, diagnostics }
+        Self { trust_required, trust_sample, staleness, risk_routing, spec_coverage, diagnostics }
     }
 
     /// The required [`TrustLevel`] for `key` (whatever vocabulary this
@@ -744,5 +865,75 @@ trust_required:
         // Every OTHER field still resolves to its documented default.
         assert_eq!(resolution.max_commits_behind(&record, now).unwrap(), DEFAULT_MAX_COMMITS_BEHIND);
         assert!(resolution.surface_scoped(&record, now).unwrap());
+    }
+
+    // ── s44: the `spec_coverage:` section ──
+
+    fn resolve_with(contents: &str) -> (PolicyResolution, TempDir) {
+        let dir = TempDir::new().unwrap();
+        write_policy(&dir, contents);
+        let resolution = PolicyResolution::resolve(dir.path(), &SchemaRegistry::load());
+        (resolution, dir)
+    }
+
+    /// Opt-in by omission: this is the default every existing consumer
+    /// upgrades into, and it must derive nothing.
+    #[test]
+    fn an_absent_spec_coverage_section_resolves_to_none() {
+        let (resolution, _dir) = resolve_with("trust_required:\n  test-run: agent\n");
+        assert_eq!(resolution.spec_coverage, None);
+        assert!(
+            !resolution.diagnostics.iter().any(|d| matches!(d, PolicyDiagnostic::InvalidSection { .. })),
+            "an absent section is not a problem: {:?}",
+            resolution.diagnostics
+        );
+    }
+
+    #[test]
+    fn a_well_formed_section_resolves_its_scope_to_typed_statuses() {
+        let (resolution, _dir) = resolve_with("spec_coverage:\n  require_evidence: true\n  scope: [building, verifying]\n");
+        assert_eq!(
+            resolution.spec_coverage,
+            Some(SpecCoverage::Active { require_evidence: true, scope: vec![SubjectStatus::Building, SubjectStatus::Verifying] })
+        );
+    }
+
+    /// An omitted `scope` means corpus-wide, not "nothing in scope" —
+    /// the opposite reading would make the section silently inert.
+    #[test]
+    fn an_omitted_scope_means_every_scenario() {
+        let (resolution, _dir) = resolve_with("spec_coverage:\n  require_evidence: true\n");
+        assert_eq!(resolution.spec_coverage, Some(SpecCoverage::Active { require_evidence: true, scope: Vec::new() }));
+    }
+
+    /// The frozen-infallible resolver cannot refuse, so a broken
+    /// section must POISON rather than vanish. If it resolved to `None`
+    /// a typo would be silently identical to never opting in.
+    #[test]
+    fn an_unknown_scope_status_poisons_the_section_and_names_the_legal_set() {
+        let (resolution, _dir) = resolve_with("spec_coverage:\n  require_evidence: true\n  scope: [buidling]\n");
+        let Some(SpecCoverage::Invalid { detail }) = &resolution.spec_coverage else {
+            panic!("expected a poisoned section, got {:?}", resolution.spec_coverage);
+        };
+        assert!(detail.contains("buidling"), "must name the offender: {detail}");
+        assert!(detail.contains("expected one of: proposed, specced, building, verifying, shipped, retired"), "must name the legal set: {detail}");
+        assert!(resolution.diagnostics.iter().any(|d| matches!(d, PolicyDiagnostic::InvalidSection { section: "spec_coverage", .. })));
+    }
+
+    #[test]
+    fn a_misspelled_key_poisons_the_section_rather_than_being_ignored() {
+        let (resolution, _dir) = resolve_with("spec_coverage:\n  require_evidenc: true\n");
+        assert!(matches!(resolution.spec_coverage, Some(SpecCoverage::Invalid { .. })), "got {:?}", resolution.spec_coverage);
+    }
+
+    /// The reason `RawPolicy::spec_coverage` is an untyped
+    /// `serde_yaml::Value`: a typed field would fail the whole-file
+    /// deserialize, and `load_raw_policy` degrades that to
+    /// `RawPolicy::default()` — silently discarding every OTHER section.
+    #[test]
+    fn a_broken_spec_coverage_section_does_not_discard_the_rest_of_the_file() {
+        let (resolution, _dir) = resolve_with("trust_required:\n  test-run: agent\nspec_coverage:\n  scope: [nonsense]\n");
+        assert!(matches!(resolution.spec_coverage, Some(SpecCoverage::Invalid { .. })));
+        assert!(resolution.trust_required.contains_key("test-run"), "the sibling section must survive: {:?}", resolution.trust_required.keys());
     }
 }

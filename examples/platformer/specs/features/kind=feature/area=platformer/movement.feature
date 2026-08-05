@@ -1,7 +1,7 @@
 Feature: Red panda movement and collision
   # canon: {"schema":1,"at":"2026-07-14T18:43:45.186397Z","actor":{"agent_id":"canon-scaffold"}}
 
-  @platformer.movement.01
+  @platformer.movement.01 @subject:platformer-traversal
   Scenario: Left world edge clamps the player
   # canon: {"schema":1,"at":"2026-07-14T18:43:48.830756Z","actor":{"agent_id":"canon-scaffold"}}
     Given the player stands at spawn near the world's left edge
@@ -9,7 +9,7 @@ Feature: Red panda movement and collision
     Then the player's x clamps at the world boundary
     And spamming jump against the wall produces no horizontal drift
 
-  @platformer.movement.02
+  @platformer.movement.02 @subject:platformer-traversal
   Scenario: Ceiling contact cancels upward motion without sticking
   # canon: {"schema":1,"at":"2026-07-14T18:43:50.116558Z","actor":{"agent_id":"canon-scaffold"}}
     Given the player stands under a platform tile
@@ -17,7 +17,7 @@ Feature: Red panda movement and collision
     Then vertical velocity cancels the instant the head makes contact
     And the player falls back without sticking or horizontal drift
 
-  @platformer.movement.03
+  @platformer.movement.03 @subject:platformer-traversal
   Scenario: No double jump; coyote and buffered jumps fire
   # canon: {"schema":1,"at":"2026-07-14T18:43:52.540391Z","actor":{"agent_id":"canon-scaffold"}}
     Given the player is airborne over a gap
@@ -26,7 +26,7 @@ Feature: Red panda movement and collision
     And a jump pressed within coyote time after leaving a ledge still fires
     And a jump buffered just before landing fires on the landing frame
 
-  @platformer.movement.04
+  @platformer.movement.04 @subject:platformer-traversal
   Scenario: Falling into a pit respawns without touching score
   # canon: {"schema":1,"at":"2026-07-14T18:43:54.971812Z","actor":{"agent_id":"canon-scaffold"}}
     Given the player has collected some acorns

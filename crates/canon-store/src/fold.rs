@@ -40,6 +40,8 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
+use canon_model::fold::BindingSnapshot;
+use canon_model::{EvidenceRecord, ProjectId, ScenarioId};
 
 /// Fold `items` into one winner per `key(item)`: the item with the
 /// greatest `(at(item), schema(item), digest(item))` triple wins,
@@ -84,6 +86,59 @@ where
         }
     }
     latest
+}
+
+/// Derive the live-binding re-check map
+/// [`canon_model::fold::fold_to_current_state`] needs, from the LATEST
+/// `EvidenceRecord` per `(project_id, scenario_id)` carrying BOTH a
+/// concrete `project_id` AND `evidence_sha`.
+///
+/// A scenario's CURRENT app state is that latest evidence's
+/// `evidence_sha` — the sole live-checkable axis. The fold downgrades a
+/// `Resolved` divergence to `ResolvedInvalid` iff this current sha has
+/// moved off the sha the divergence resolved against. WHO/WHEN the
+/// evidence was authored is deliberately NOT in the snapshot: a
+/// divergence's reviewer/`at` are immutable provenance, and a
+/// superseding resolution is handled by `run_seq` ranking. A group with
+/// no qualifying evidence gets no entry, so `fold_to_current_state`
+/// trusts an existing `Resolved` claim as-is — no evidence of a
+/// mismatch is not evidence OF one.
+///
+/// # Why this lives here
+/// It was private to `canon-report`, which `canon-gate` may not depend
+/// on (`canon-report/tests/gate_independence.rs` forbids it by name).
+/// s44's `spec_coverage` check needs the identical map, and a second
+/// copy in canon-gate would be exactly the divergent derivation the
+/// shared fold exists to prevent — the two surfaces would disagree
+/// about which scenarios are open, which is the one thing
+/// `canon divergence status` and the gate must never do. `canon-store`
+/// is the lowest crate both callers already depend on, and the only one
+/// holding both `fold_latest_by_key` and
+/// [`crate::partition::content_digest12`].
+pub fn live_bindings_of(evidence: Vec<EvidenceRecord>) -> BTreeMap<(ProjectId, ScenarioId), BindingSnapshot> {
+    struct Candidate {
+        key: (ProjectId, ScenarioId),
+        at: DateTime<Utc>,
+        /// The record's own `envelope.schema` — the fold's equal-`at`
+        /// generation discriminator (`s38-evidence-bearing-memory`),
+        /// threaded from the record rather than assumed, so a schema
+        /// bump supersedes deterministically instead of by digest luck.
+        schema: u32,
+        digest: String,
+        snapshot: BindingSnapshot,
+    }
+
+    let candidates = evidence.into_iter().filter_map(|record| {
+        let project_id = record.project_id.clone()?;
+        let scenario_id = record.scenario_id.clone()?;
+        let app_sha = record.evidence_sha.clone()?;
+        let at = record.envelope.at;
+        let schema = record.envelope.schema;
+        let digest = crate::partition::content_digest12(&serde_json::to_value(&record).unwrap_or_default());
+        Some(Candidate { key: (project_id, scenario_id), at, schema, digest, snapshot: BindingSnapshot { app_sha, reserved_digest: None } })
+    });
+
+    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| (c.key, c.snapshot)).collect()
 }
 
 #[cfg(test)]

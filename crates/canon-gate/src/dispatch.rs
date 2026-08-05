@@ -47,7 +47,16 @@ use crate::trust::{ReleaseTrustCheck, TrustLadderCheck};
 /// [`ReleaseTrustCheck`] — [`TrustLadderCheck`] is present in BOTH,
 /// never dropped when a release profile is engaged.
 pub fn check_set(release: bool) -> Vec<Box<dyn GateCheck>> {
-    let mut checks: Vec<Box<dyn GateCheck>> = vec![Box::new(CoverageCheck), Box::new(LedgerCheck), Box::new(StalenessCheck), Box::new(TrustLadderCheck)];
+    let mut checks: Vec<Box<dyn GateCheck>> = vec![
+        Box::new(CoverageCheck),
+        Box::new(LedgerCheck),
+        Box::new(StalenessCheck),
+        Box::new(TrustLadderCheck),
+        // Silent unless `policy.yaml` declares `spec_coverage:` — see
+        // that module's doc for why it is a separate check rather than
+        // an arm of `CoverageCheck`.
+        Box::new(crate::spec_coverage::SpecCoverageCheck),
+    ];
     if release {
         checks.push(Box::new(ReleaseTrustCheck));
     }
@@ -70,7 +79,8 @@ mod tests {
         let checks = check_set(false);
         assert!(checks.iter().any(|c| c.name() == "trust-ladder"));
         assert!(!checks.iter().any(|c| c.name() == "release-trust-required"));
-        assert_eq!(checks.len(), 4);
+        assert!(checks.iter().any(|c| c.name() == "spec-coverage"), "s44's check is unconditionally REGISTERED; it is silent by policy, not by omission");
+        assert_eq!(checks.len(), 5);
     }
 
     #[test]
@@ -78,7 +88,7 @@ mod tests {
         let checks = check_set(true);
         assert!(checks.iter().any(|c| c.name() == "trust-ladder"), "a release profile must never drop the always-on trust-ladder check");
         assert!(checks.iter().any(|c| c.name() == "release-trust-required"));
-        assert_eq!(checks.len(), 5);
+        assert_eq!(checks.len(), 6);
     }
 
     #[test]

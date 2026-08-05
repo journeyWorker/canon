@@ -1,7 +1,7 @@
 Feature: platformer moving
   # canon: {"schema":1,"at":"2026-07-14T19:26:44.232886Z","actor":{"agent_id":"canon-scaffold"}}
 
-  @platformer.moving.01
+  @platformer.moving.01 @subject:platformer-traversal
   Scenario: A moving platform carries the standing player
   # canon: {"schema":1,"at":"2026-07-14T19:26:44.232886Z","actor":{"agent_id":"canon-scaffold"}}
     Given a platform oscillates by one hundred twenty pixels at sixty pixels per second
@@ -10,7 +10,7 @@ Feature: platformer moving
     Then the player is displaced by the same delta as the platform
     And the player stays planted on the platform without sinking or sliding off
 
-  @platformer.moving.02
+  @platformer.moving.02 @subject:platformer-traversal
   Scenario: Stepping off a platform edge drops cleanly
   # canon: {"schema":1,"at":"2026-07-14T19:26:44.284750Z","actor":{"agent_id":"canon-scaffold"}}
     Given the player stands on a moving platform near its edge

@@ -295,6 +295,7 @@ mod tests {
             trust_sample: Default::default(),
             staleness: StalenessPolicy { max_commits_behind: PolicyField::Flat(max_commits_behind), surface_scoped: PolicyField::Flat(surface_scoped) },
             risk_routing: Default::default(),
+            spec_coverage: None,
             diagnostics: Vec::new(),
         }
     }
@@ -317,7 +318,18 @@ mod tests {
     fn ctx_for(repo: &Path, ledger_root: &Path, policy: PolicyResolution, now: DateTime<Utc>) -> GateContext {
         let read = GitTier::new(ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap_or_default();
         let (evidence, _validation_violations) = canon_model::validate_evidence_batch(&read.records);
-        GateContext { ctx: GateCtx { repo: repo.to_path_buf(), ledger_root: ledger_root.to_path_buf() }, policy, evidence, violations: read.violations, now }
+        GateContext {
+            ctx: GateCtx { repo: repo.to_path_buf(), ledger_root: ledger_root.to_path_buf() },
+            policy,
+            evidence,
+            scenarios: Vec::new(),
+            divergences: Vec::new(),
+            subjects: Vec::new(),
+            violations: read.violations,
+            corpus_violations: Vec::new(),
+            unreadable_kinds: Vec::new(),
+            now,
+        }
     }
 
     #[test]

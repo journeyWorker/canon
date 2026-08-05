@@ -52,7 +52,8 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use canon_gate::{PolicyField, PolicyResolution};
+use canon_gate::{PolicyField, PolicyResolution, SpecCoverage};
+use canon_model::SubjectStatus;
 use canon_policy::SchemaRegistry;
 use canon_vocab::CapabilitySnapshot;
 use serde::Serialize;
@@ -67,7 +68,11 @@ use serde::Serialize;
 /// can never advertise a generation nothing writes, while this constant
 /// keeps describing the CLI surface itself (design D1's "resolve, then
 /// render" split — the registry call site stays singular either way).
-const CURRENT_CAPABILITY_VERSION: u32 = 1;
+/// Bumped to `2` by s44 (`spec-derived-worklist`), which adds the
+/// `spec_coverage` policy section to [`PolicySurface`]. The field
+/// exists so a consumer can detect surface GROWTH; adding a section
+/// without bumping it would defeat the one thing it is for.
+const CURRENT_CAPABILITY_VERSION: u32 = 2;
 
 /// Resolution-time options beyond the repo root itself. Empty today —
 /// `canon context` takes only `--repo`/`--json`, and `--json` selects a
@@ -136,6 +141,11 @@ pub struct PolicySurface {
     pub trust_sample: BTreeMap<String, PolicyFieldSurface>,
     pub staleness: StalenessSurface,
     pub risk_routing: BTreeMap<String, PolicyFieldSurface>,
+    /// s44's opt-in spec-corpus requirement, rendered as a one-line
+    /// summary. `None` = the section is absent, which is a DIFFERENT
+    /// fact from `require_evidence: false` and stays distinguishable
+    /// here: an author needs to see whether the repo opted in at all.
+    pub spec_coverage: Option<String>,
     /// `PolicyResolution::is_clean()` — whether `policy.yaml` loaded with
     /// zero problems for this repo.
     pub clean: bool,
@@ -404,8 +414,32 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
             surface_scoped: summarize_field(&policy.staleness.surface_scoped),
         },
         risk_routing: policy.risk_routing.iter().map(|(k, v)| (k.clone(), summarize_field(v))).collect(),
+        spec_coverage: policy.spec_coverage.as_ref().map(|sc| match sc {
+            SpecCoverage::Active { require_evidence, scope } if scope.is_empty() => {
+                format!("require_evidence={require_evidence} scope=<every scenario>")
+            }
+            SpecCoverage::Active { require_evidence, scope } => {
+                format!("require_evidence={require_evidence} scope={}", scope.iter().map(subject_status_slug).collect::<Vec<_>>().join(", "))
+            }
+            SpecCoverage::Invalid { detail } => format!("INVALID — {detail}"),
+        }),
         clean: policy.is_clean(),
         diagnostics: policy.diagnostics.iter().map(ToString::to_string).collect(),
+    }
+}
+
+/// A [`SubjectStatus`]'s wire spelling — the same vocabulary
+/// `canon subject status` and `canon query --status` accept, so the
+/// surface prints values an operator can paste straight back into
+/// `policy.yaml`.
+fn subject_status_slug(status: &SubjectStatus) -> &'static str {
+    match status {
+        SubjectStatus::Proposed => "proposed",
+        SubjectStatus::Specced => "specced",
+        SubjectStatus::Building => "building",
+        SubjectStatus::Verifying => "verifying",
+        SubjectStatus::Shipped => "shipped",
+        SubjectStatus::Retired => "retired",
     }
 }
 
@@ -473,6 +507,12 @@ pub fn render_outline(surface: &AuthoringSurface) -> String {
         render_field_compact(&surface.policy.staleness.surface_scoped),
     );
     write_field_map(&mut out, "risk_routing", &surface.policy.risk_routing);
+    let _ = match &surface.policy.spec_coverage {
+        Some(summary) => writeln!(out, "  spec_coverage: {summary}"),
+        // Printed even when absent: "this repo has not opted in" is the
+        // fact an author most needs before writing a `.feature` file.
+        None => writeln!(out, "  spec_coverage: <absent — spec-corpus coverage is not enforced here>"),
+    };
     let _ = writeln!(out, "  clean: {}", surface.policy.clean);
     let _ = writeln!(out, "  diagnostics ({}):", surface.policy.diagnostics.len());
     for diag in &surface.policy.diagnostics {

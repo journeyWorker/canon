@@ -190,12 +190,28 @@ mod tests {
             trust_sample: BTreeMap::new(),
             staleness: StalenessPolicy { max_commits_behind: PolicyField::Flat(50), surface_scoped: PolicyField::Flat(true) },
             risk_routing,
+            spec_coverage: None,
             diagnostics: Vec::new(),
         }
     }
 
+    /// The three spec-corpus vectors are empty here on purpose: this
+    /// module's check reads `ctx.evidence` only, and a coverage test
+    /// that populated them would be asserting `crate::spec_coverage`'s
+    /// behavior instead of its own.
     fn ctx_with(policy: PolicyResolution, evidence: Vec<EvidenceRecord>) -> GateContext {
-        GateContext { ctx: GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/.canon/ledger".into() }, policy, evidence, violations: Vec::new(), now: Utc::now() }
+        GateContext {
+            ctx: GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/.canon/ledger".into() },
+            policy,
+            evidence,
+            scenarios: Vec::new(),
+            divergences: Vec::new(),
+            subjects: Vec::new(),
+            violations: Vec::new(),
+            corpus_violations: Vec::new(),
+            unreadable_kinds: Vec::new(),
+            now: Utc::now(),
+        }
     }
 
     #[test]

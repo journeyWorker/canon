@@ -114,6 +114,14 @@ On success the status updates in place; `--json` prints the updated
 record. On a gate block it prints violations by failure class to stderr,
 exits 1, and the record is unchanged.
 
+**Corpus-wide, the same join:** `canon gate check` with
+`.canon/policy.yaml`'s opt-in `spec_coverage` section generalizes this
+gate past one transition — it left-joins the WHOLE Scenario corpus
+against evidence, so an unimplemented or mismatched spec is reported
+whether or not a Subject links it. `spec_coverage.scope` narrows
+blocking to subjects in named statuses, and `@subject:<id>` tagging is
+what brings a scenario into that scope. See `canon-gate`.
+
 **The `verifying → shipped` evidence gate:** shipping additionally
 requires that EVERY linked `scenario_ids` entry carries a latest,
 non-`Divergent` verdict in the ledger (the same last-wins rule `canon

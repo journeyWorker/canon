@@ -159,12 +159,28 @@ mod tests {
             trust_sample: BTreeMap::new(),
             staleness: StalenessPolicy { max_commits_behind: PolicyField::Flat(50), surface_scoped: PolicyField::Flat(true) },
             risk_routing: BTreeMap::new(),
+            spec_coverage: None,
             diagnostics: Vec::new(),
         }
     }
 
+    /// `corpus_violations` stays empty and SEPARATE from `violations`:
+    /// this check maps `violations` onto `malformed-evidence`, and the
+    /// whole point of the corpus field is that it never reaches here.
+    /// `corpus_violations_are_not_surfaced_by_this_check` pins that.
     fn ctx_with(evidence: Vec<EvidenceRecord>, violations: Vec<EvidenceViolation>) -> GateContext {
-        GateContext { ctx: GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/.canon/ledger".into() }, policy: empty_policy(), evidence, violations, now: Utc::now() }
+        GateContext {
+            ctx: GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/.canon/ledger".into() },
+            policy: empty_policy(),
+            evidence,
+            scenarios: Vec::new(),
+            divergences: Vec::new(),
+            subjects: Vec::new(),
+            violations,
+            corpus_violations: Vec::new(),
+            unreadable_kinds: Vec::new(),
+            now: Utc::now(),
+        }
     }
 
     #[test]
@@ -177,6 +193,21 @@ mod tests {
         assert_eq!(out[0].class, FailureClass::MalformedEvidence);
         assert_eq!(out[0].subject, "kind=evidence-record/bad.json");
         assert!(out[0].detail.contains("missing field `at`"));
+    }
+
+    /// s44: the three spec-corpus reads `GateContext::load` performs are
+    /// unconditional, so a malformed `kind=scenario` row exists in every
+    /// gate run whether or not `spec_coverage` is configured. It MUST
+    /// NOT reach this check. If it did, widening the read would turn a
+    /// green repo red on upgrade with no policy change — the precise
+    /// opposite of the opt-in guarantee.
+    #[test]
+    fn corpus_violations_are_not_surfaced_by_this_check() {
+        let mut ctx = ctx_with(Vec::new(), Vec::new());
+        ctx.corpus_violations =
+            vec![EvidenceViolation::new(EvidenceFailureClass::Malformed, "scenario", "scenario row does not deserialize: missing field `title`")];
+
+        assert!(LedgerCheck.run(&ctx).is_empty(), "a corpus read problem is not an evidence-ledger violation");
     }
 
     #[test]

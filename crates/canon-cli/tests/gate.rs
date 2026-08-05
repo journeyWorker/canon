@@ -550,3 +550,154 @@ fn gate_selftest_exits_zero_against_the_shipped_fixture_corpus() {
         assert!(text.contains(&format!("ok    {class}")), "expected `{class}` to report ok:\n{text}");
     }
 }
+
+// ── s44 spec-derived worklist: `spec_coverage` ──
+
+/// A repo with a two-scenario spec corpus indexed into the ledger, and
+/// no `spec_coverage` section. `canon inventory sync` is invoked
+/// through the real binary so the Scenario rows are exactly what a
+/// consumer's would be, provenance comments and all.
+fn repo_with_spec_corpus() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("canon.yaml"),
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\n  subject: local\n  divergence: local\n  evidence_record: local\nspecs:\n  roots:\n    - id: core\n      root: specs\n",
+    )
+    .unwrap();
+    let features = dir.path().join("specs/features/kind=feature/area=core");
+    std::fs::create_dir_all(&features).unwrap();
+    const PROV: &str = r#"  # canon: {"schema":1,"at":"2026-07-14T19:26:44.332203Z","actor":{"agent_id":"canon-scaffold"}}"#;
+    std::fs::write(
+        features.join("login.feature"),
+        format!(
+            "Feature: core login\n{PROV}\n\n  @core.login.01\n  Scenario: A user signs in\n{PROV}\n    Given a registered user\n    When they submit valid credentials\n    Then they reach the dashboard\n\n  @core.login.02\n  Scenario: A wrong password is refused\n{PROV}\n    Given a registered user\n    When they submit a wrong password\n    Then they see an error\n"
+        ),
+    )
+    .unwrap();
+    let sync = run_canon(&["inventory", "sync", "--repo", "."], dir.path());
+    assert!(sync.status.success(), "fixture sync must succeed: {}", stderr(&sync));
+    dir
+}
+
+fn enable_spec_coverage(repo: &Path, body: &str) {
+    std::fs::create_dir_all(repo.join(".canon")).unwrap();
+    std::fs::write(repo.join(".canon/policy.yaml"), body).unwrap();
+}
+
+/// The regression that guards every existing consumer's upgrade: at ONE
+/// commit, `canon gate check` over a corpus with no `spec_coverage`
+/// section must produce byte-identical output to the same corpus after
+/// the section is added and removed again. The three unconditional
+/// corpus reads `GateContext::load` gained must be invisible without
+/// the policy section — including the malformed-row path, which would
+/// otherwise reach `LedgerCheck` as `malformed-evidence`.
+#[test]
+fn gate_check_output_is_byte_identical_without_a_spec_coverage_section() {
+    let dir = repo_with_spec_corpus();
+    // A malformed row in each new corpus kind. If any of them reached
+    // `ctx.violations` instead of `ctx.corpus_violations`, this repo
+    // would go gate-red with no policy change.
+    for kind in ["scenario", "subject", "divergence"] {
+        let d = dir.path().join(format!(".canon/ledger/kind={kind}"));
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("broken.json"), "{\"schema\":1,\"kind\":\"scenario\"}").unwrap();
+    }
+
+    let before = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    assert!(before.status.success(), "an opted-out repo must stay green: {}", stdout(&before));
+
+    enable_spec_coverage(dir.path(), "spec_coverage:\n  require_evidence: true\n");
+    let enabled = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    assert!(!enabled.status.success(), "the policy diff ALONE must tighten the gate, with zero corpus edits");
+
+    std::fs::remove_file(dir.path().join(".canon/policy.yaml")).unwrap();
+    let after = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    assert_eq!(stdout(&before), stdout(&after), "removing the section must restore byte-identical output");
+    assert_eq!(before.status.code(), after.status.code());
+}
+
+/// The whole point: a `.feature` scenario nobody attested to is work,
+/// and before this change no check could see it.
+#[test]
+fn spec_coverage_reports_every_unevidenced_scenario_in_the_corpus() {
+    let dir = repo_with_spec_corpus();
+    enable_spec_coverage(dir.path(), "spec_coverage:\n  require_evidence: true\n");
+
+    let out = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    assert_eq!(out.status.code(), Some(1), "gate-red, not a usage failure: {}", stdout(&out));
+    let text = stdout(&out);
+    assert!(text.contains("core.login.01"), "{text}");
+    assert!(text.contains("core.login.02"), "{text}");
+    assert!(text.contains("no evidence record"), "{text}");
+}
+
+/// End-to-end through the real authoring path: a scenario-keyed
+/// attestation clears exactly its own scenario. Before s44 this record
+/// was not authorable at all — `--task` was required and no
+/// `--project-id` existed, so the composite join could never close.
+#[test]
+fn a_scenario_keyed_attestation_clears_exactly_that_scenario() {
+    let dir = repo_with_spec_corpus();
+    enable_spec_coverage(dir.path(), "spec_coverage:\n  require_evidence: true\n");
+
+    let add = run_canon(
+        &["evidence", "add", "--scenario-id", "core.login.01", "--project-id", "core", "--kind", "test-run", "--ref", "cargo test login", "--role", "implementer", "--repo", "."],
+        dir.path(),
+    );
+    assert!(add.status.success(), "stderr: {}", stderr(&add));
+    let promote = run_canon(&["gate", "promote", "--repo", "."], dir.path());
+    assert!(promote.status.success(), "stderr: {}", stderr(&promote));
+
+    let out = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    let text = stdout(&out);
+    assert!(!text.contains("core.login.01"), "the attested scenario must clear: {text}");
+    assert!(text.contains("core.login.02"), "the unattested one must remain: {text}");
+}
+
+/// A record with neither key is invisible to every gate, so staging one
+/// would write an attestation nothing can read back.
+#[test]
+fn evidence_add_refuses_a_record_with_no_coverage_subject() {
+    let dir = repo_with_spec_corpus();
+    let out = run_canon(&["evidence", "add", "--kind", "test-run", "--ref", "x", "--role", "implementer", "--repo", "."], dir.path());
+    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
+    assert!(stderr(&out).contains("--task, --scenario-id, or both"), "stderr: {}", stderr(&out));
+}
+
+/// The composite key is the scenario's identity; a bare `--scenario-id`
+/// cannot close the join, so it is refused rather than written as a
+/// record the gate would silently ignore.
+#[test]
+fn evidence_add_refuses_a_scenario_id_without_a_project_id() {
+    let dir = repo_with_spec_corpus();
+    let out = run_canon(&["evidence", "add", "--scenario-id", "core.login.01", "--kind", "test-run", "--ref", "x", "--role", "implementer", "--repo", "."], dir.path());
+    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
+    assert!(stderr(&out).contains("--project-id"), "stderr: {}", stderr(&out));
+}
+
+/// `--task` stays fully supported and unchanged — this change widens
+/// the command, it does not migrate it.
+#[test]
+fn evidence_add_still_accepts_a_task_keyed_record() {
+    let dir = tempfile::tempdir().unwrap();
+    // `canon evidence add --task` admits the id through the PLAN
+    // corpus (`dispatch::validate_task_binding`), which has no compat
+    // default — a configured source is required, unlike `canon gate
+    // task`'s own resolution.
+    std::fs::write(
+        dir.path().join("canon.yaml"),
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  evidence_record: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec/changes\n",
+    )
+    .unwrap();
+    let change = dir.path().join("openspec/changes/it-task-keyed");
+    std::fs::create_dir_all(&change).unwrap();
+    std::fs::write(change.join("proposal.md"), "# it-task-keyed\n\n## Why\n\nTo exercise the task path.\n").unwrap();
+    std::fs::write(change.join("tasks.md"), "- [ ] 1 Do the thing\n").unwrap();
+
+    let out = run_canon(
+        &["evidence", "add", "--task", "it-task-keyed#1", "--kind", "test-run", "--ref", "cargo test", "--role", "implementer", "--repo", "."],
+        dir.path(),
+    );
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("canon gate task it-task-keyed#1"), "the task path must still name the flip: {}", stdout(&out));
+}

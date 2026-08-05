@@ -52,6 +52,7 @@ pub mod policy;
 pub mod promote;
 pub mod report;
 pub mod selftest;
+pub mod spec_coverage;
 pub mod staleness;
 pub mod trust;
 pub mod trust_ladder;
@@ -64,7 +65,7 @@ pub use failure_class::{FailureClass, Violation, FAILURE_CLASSES};
 pub use hooks::{install_hooks, HookEntry, InstallOutcome, PRE_COMMIT_SCRIPT};
 pub use ledger::{latest_verdicts, CellKey, LedgerCheck, LedgerEntry};
 pub use markers::{evidence_note_of, scan_fake_markers, EvidenceNote, FABRICATION_BLOCKLIST};
-pub use policy::{FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError, StalenessPolicy};
+pub use policy::{FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError, SpecCoverage, StalenessPolicy};
 pub use promote::{
     commit_divergence, divergence_staging_dir, promote, promote_divergence, stage_divergence, DivergenceCandidate, Promoted, PromoteReport, Refused, RunSeqAssignment,
     StagedAssignment, StagedKind, STAGED_KINDS,
