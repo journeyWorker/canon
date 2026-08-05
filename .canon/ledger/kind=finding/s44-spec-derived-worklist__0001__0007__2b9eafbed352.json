@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-05T14:17:12.376254Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-gate/src/coverage.rs:85-91",
+  "kind": "finding",
+  "resolution_sha": "57888a812ca339e27113f9d5bc9026263e9086fc",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 7,
+  "severity": "blocker",
+  "summary": "The join key is unpopulated: 0 of 35 evidence records carry scenario_id and 0 of 16 scenarios carry subject_id, so the check is all-red or inert"
+}

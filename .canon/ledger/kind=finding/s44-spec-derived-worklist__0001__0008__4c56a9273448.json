@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-05T14:17:12.414723Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-gate/src/selftest.rs:419-435",
+  "kind": "finding",
+  "resolution_sha": "3ffc59b81051fe242fed9819af613e742eae3690",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 8,
+  "severity": "blocker",
+  "summary": "Selftest fixture table is a bijection with FAILURE_CLASSES, so tasks 3.5 and 4.3 make canon gate selftest unpassable"
+}

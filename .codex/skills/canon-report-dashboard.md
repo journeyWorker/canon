@@ -227,8 +227,11 @@ computes it; nothing here is derived a second time.
   uses. Read-only reporting; never a `canon gate` input. See `canon-subject`.
 
 - **Review rounds** (`mart_review_rounds`) — one row per `(change_id, round)`
-  over `Finding` records (`canon finding add`), folded to the latest version
-  of each `{change_id}__{round}__{seq}` finding first. A round that found
+  over `Finding` records (`canon finding add`, then `canon finding close` to
+  move a finding's disposition), folded to the latest version
+  of each `{change_id}__{round}__{seq}` finding first, so a finding raised
+  `open` and later closed is counted once and in one disposition bucket.
+  A round that found
   nothing wrote no `Finding` and so has no row: the table
   counts the rounds that FOUND something, never the rounds RUN
   (s42's round 12 returned MERGEABLE with zero findings and is absent),

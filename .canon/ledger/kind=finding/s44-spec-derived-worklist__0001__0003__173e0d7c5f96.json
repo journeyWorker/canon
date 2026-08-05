@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-05T14:17:12.236859Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-gate/src/policy.rs:41-50",
+  "kind": "finding",
+  "resolution_sha": "3ffc59b81051fe242fed9819af613e742eae3690",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 3,
+  "severity": "blocker",
+  "summary": "Task 2.2 is impossible: PolicyResolution::resolve has a frozen infallible signature and cannot fail loud"
+}

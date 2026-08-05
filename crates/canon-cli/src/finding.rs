@@ -152,6 +152,37 @@
 //! which is far more common than the race — at the moment the author
 //! can still fix it, instead of two commands later.
 //!
+//! # A finding is raised open and CLOSED later: `canon finding close`
+//! The uniqueness rule above says what a second body at an occupied key
+//! must not be. It leaves open what a second body legitimately IS — and
+//! there is exactly one such body: the same finding, transitioned.
+//!
+//! A finding's life is `open` → `fixed`/`rejected`/`deferred`, and
+//! every reader folds by natural key to the LATEST version precisely so
+//! the disposition columns report the state NOW. Until [`run_close`]
+//! there was no way to author that second version at all, so a repo
+//! that recorded its findings at review time — the honest moment, while
+//! the reviewer still has them — could never record that it fixed them.
+//! The disposition columns could only ever report the state each
+//! finding was BORN in, and `.canon/REPORT.md`'s own prose about
+//! folding an `open` finding to `fixed` described a state the CLI
+//! structurally could not produce.
+//!
+//! [`run_close`] is a separate verb rather than a flag on [`run_add`]
+//! for one structural reason: it READS the committed record and copies
+//! every content field, so a close CANNOT alter the severity, the
+//! reviewer, the summary, or either sourced sha. Re-typing them on
+//! `add` would turn a typo into promote's "two records under one
+//! identity" refusal — the correct refusal for the wrong reason. A
+//! finding recorded wrongly stays wrongly recorded; that is the
+//! append-only ledger working, not a gap.
+//!
+//! The exemption is enforced at the AUTHORITY, not here:
+//! `canon_gate::promote` re-derives
+//! `canon_model::Finding::is_disposition_transition_of` against the
+//! CURRENT committed version before admitting the append, so a
+//! hand-written body must clear the same bar as this command's output.
+//!
 //! # Line breaks are refused, not escaped
 //! `--summary`, `--reviewer`, `--file-ref` and `--actor-id` are the
 //! free-text fields of this record — the ones with no grammar
@@ -254,8 +285,9 @@ use std::process::Command;
 use canon_gate::GateCtx;
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{Actor, ChangeId, Envelope, Finding, FindingDisposition, FindingSeverity, RawRecord, RecordKind, RoleId, Sha};
+use canon_store::fold::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
-use canon_store::partition::resolve_partition;
+use canon_store::partition::{content_digest12, resolve_partition};
 use canon_store::tier::{RawWrite, Tier, TierQuery};
 use chrono::Utc;
 
@@ -498,7 +530,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     match occupied_by(&natural_key, &staging, &committed) {
         Ok(Some(occupant)) => {
             eprintln!(
-                "canon finding add: refused — {} is already occupied by a {occupant} finding (`{}`, round {}, seq {}); pick the next free --seq rather than authoring a second record under one finding's identity",
+                "canon finding add: refused — {} is already occupied by a {occupant} finding (`{}`, round {}, seq {}); pick the next free --seq rather than authoring a second record under one finding's identity. To move THAT finding's disposition instead, use `canon finding close`.",
                 natural_key, args.change_id, args.round, args.seq
             );
             return 2;
@@ -538,6 +570,262 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
             2
         }
     }
+}
+
+/// `canon finding close`'s inputs — the natural key of an
+/// already-committed finding, plus the disposition to move it to.
+///
+/// Deliberately NOT [`FindingArgs`] with an extra flag. Every content
+/// field is READ from the committed record rather than re-typed, so a
+/// close structurally cannot alter the severity, the reviewer, the
+/// summary, or either sourced sha: the only thing this command can
+/// change is the one thing it is for. Re-typing them would turn a typo
+/// into `canon_gate::promote`'s "two records under one identity"
+/// refusal — the correct refusal for the wrong reason.
+#[derive(Debug, Clone)]
+pub struct FindingCloseArgs {
+    pub change_id: ChangeId,
+    pub round: u32,
+    pub seq: u32,
+    /// Where the finding lands. `open` is legal — a finding reopened
+    /// after a fix that did not hold is a real transition, and refusing
+    /// it would leave the ledger able to record only one direction.
+    pub disposition: FindingDisposition,
+    pub resolution_sha: Option<Sha>,
+    pub actor_id: String,
+    pub role: RoleId,
+}
+
+/// Stage the DISPOSITION TRANSITION of one already-committed finding
+/// (`canon finding close`).
+///
+/// # Why this is a second verb and not a flag on `add`
+/// [`run_add`] refuses an occupied natural key, and must: two different
+/// findings under one `{change_id}__{round}__{seq}` are two reviewers'
+/// work collapsed into one identity. But a finding's whole life is
+/// `open` → `fixed`/`rejected`/`deferred`, and every reader folds by
+/// natural key to the LATEST version precisely so the disposition
+/// columns report the state NOW. Before this verb there was no way to
+/// author that second version, so a repo that recorded its findings at
+/// review time — the honest moment, while the reviewer still has them —
+/// could never record that it fixed them. The disposition columns could
+/// only ever report the state a finding was BORN in.
+///
+/// # The append, and what stays
+/// This writes a NEW record; the committed one stays exactly where it
+/// is. The ledger is append-only and the pair IS the history: `open` at
+/// one instant, `fixed` at another, both attributable. `canon gate
+/// promote` admits the second only after re-deriving
+/// [`Finding::is_disposition_transition_of`] itself, so the exemption is
+/// enforced at the authority and a hand-written body must clear the
+/// same bar as this command's output.
+pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
+    let repo = resolve_repo_root(repo);
+
+    if args.round == 0 || args.seq == 0 {
+        eprintln!(
+            "canon finding close: refused — --round and --seq are 1-based (got --round {} --seq {}); no finding was ever authored under a 0",
+            args.round, args.seq
+        );
+        return 2;
+    }
+
+    // The same coherence pair `add` enforces, in this command's own
+    // voice. It runs BEFORE the lookup so a caller who named the wrong
+    // flags is told that, rather than being told a finding they spelled
+    // correctly does not exist.
+    match (args.disposition, &args.resolution_sha) {
+        (FindingDisposition::Fixed, None) => {
+            eprintln!(
+                "canon finding close: refused — --disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at"
+            );
+            return 2;
+        }
+        (disposition, Some(sha)) if disposition != FindingDisposition::Fixed => {
+            eprintln!(
+                "canon finding close: refused — --resolution-sha {sha} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the sha or set --disposition fixed",
+                disposition.as_str()
+            );
+            return 2;
+        }
+        _ => {}
+    }
+
+    if let Some(sha) = &args.resolution_sha {
+        if !commit_exists(&repo, sha) {
+            eprintln!(
+                "canon finding close: refused — --resolution-sha {sha} does not name a commit this repository holds; a resolution sha nobody can check out closes nothing"
+            );
+            return 2;
+        }
+    }
+
+    let ledger_root = GateCtx::from_repo(&repo).ledger_root;
+    let staging = GitTier::new(evidence_staging_dir(&ledger_root));
+    let committed = GitTier::new(&ledger_root);
+
+    // A STAGED occupant is refused rather than transitioned. The
+    // original was never committed, so there is nothing to supersede —
+    // and `canon gate promote` deliberately refuses two transitions of
+    // one key in a single drain, since they have no defined order
+    // between them. Editing the staged copy is the honest repair.
+    match find_finding(args, &staging) {
+        Ok(Some(_)) => {
+            eprintln!(
+                "canon finding close: refused — `{}` round {} seq {} is still STAGED, never committed, so there is no recorded disposition to move. Run `canon gate promote` first, or delete the staged copy and re-author it with `canon finding add --disposition {}`.",
+                args.change_id,
+                args.round,
+                args.seq,
+                args.disposition.as_str()
+            );
+            return 2;
+        }
+        Ok(None) => {}
+        Err(e) => {
+            eprintln!("canon finding close: {e}");
+            return 2;
+        }
+    }
+
+    let existing = match find_finding(args, &committed) {
+        Ok(Some(finding)) => finding,
+        Ok(None) => {
+            eprintln!(
+                "canon finding close: refused — no committed finding at (`{}`, round {}, seq {}). `close` moves an EXISTING finding's disposition; authoring a new one is `canon finding add`.",
+                args.change_id, args.round, args.seq
+            );
+            return 2;
+        }
+        Err(e) => {
+            eprintln!("canon finding close: {e}");
+            return 2;
+        }
+    };
+
+    if existing.disposition() == args.disposition {
+        // Not an error: re-running a close is how a caller recovers from
+        // a half-finished batch. But it stages NOTHING — an identical
+        // body at one key is not a transition, `promote` would refuse
+        // it, and saying so here is cheaper than a refusal two commands
+        // later.
+        println!(
+            "canon finding close: no-op — (`{}`, round {}, seq {}) is already `{}`; nothing staged.",
+            args.change_id,
+            args.round,
+            args.seq,
+            args.disposition.as_str()
+        );
+        return 0;
+    }
+
+    // Rebuilt FROM the committed record, so every content field survives
+    // byte-identically and only the disposition pair moves. The envelope
+    // is fresh: the transition happened NOW, authored by whoever ran
+    // this, and stamping the original author's `at` would lose exactly
+    // the fact that makes the pair a history.
+    let mut transitioned = Finding::new(
+        Envelope::current(RecordKind::Finding, Utc::now(), Actor::new(args.actor_id.as_str(), args.role.clone())),
+        existing.change_id.clone(),
+        existing.round,
+        existing.seq,
+        existing.severity,
+        existing.reviewer.as_str(),
+        existing.summary.as_str(),
+    );
+    transitioned = match (args.disposition, args.resolution_sha.clone()) {
+        (FindingDisposition::Fixed, Some(sha)) => transitioned.fixed_by(sha),
+        (FindingDisposition::Rejected, _) => transitioned.rejected(),
+        (FindingDisposition::Deferred, _) => transitioned.deferred(),
+        (FindingDisposition::Open, _) => transitioned,
+        // Unreachable: refused by the coherence pair above. Handled
+        // rather than assumed away, and never by fabricating a sha.
+        (FindingDisposition::Fixed, None) => {
+            eprintln!("canon finding close: refused — --disposition fixed requires --resolution-sha");
+            return 2;
+        }
+    };
+    if let Some(sha) = existing.reviewed_sha.clone() {
+        transitioned = transitioned.reviewing_sha(sha);
+    }
+    if let Some(sha) = existing.introduced_by.clone() {
+        transitioned = transitioned.with_introduced_by(sha);
+    }
+    if let Some(file_ref) = &existing.file_ref {
+        transitioned = transitioned.with_file_ref(file_ref.as_str());
+    }
+
+    // The predicate `canon gate promote` will re-derive, asserted here
+    // so a divergence between this construction and the exemption fails
+    // LOUDLY at authoring time rather than as a refusal the operator
+    // cannot act on.
+    debug_assert!(
+        transitioned.is_disposition_transition_of(&existing),
+        "a close must construct a body that `promote`'s exemption accepts"
+    );
+
+    let body = serde_json::to_value(&transitioned).expect("a Finding always serializes");
+    match staging.write(&RawWrite(RawRecord(body))) {
+        Ok(receipt) => {
+            println!(
+                "canon finding close: staged {} — {} round {} seq {} ({} → {}) — run `canon gate promote` to commit it",
+                receipt.location,
+                args.change_id,
+                args.round,
+                args.seq,
+                existing.disposition().as_str(),
+                args.disposition.as_str()
+            );
+            0
+        }
+        Err(e) => {
+            eprintln!("canon finding close: {e}");
+            2
+        }
+    }
+}
+
+/// The CURRENT [`Finding`] `tier` holds under `args`' natural key, if
+/// any — the latest version, never merely the first one read.
+///
+/// # Why a fold and not a first match
+/// A finding's key can legitimately carry more than one committed
+/// record now: that is exactly what a transition appends. Reading the
+/// first match would answer with whichever version the walk reached
+/// first, so a second close would compare against the ORIGINAL `open`
+/// body, miss the no-op, and stage a third record that says nothing new.
+/// The fold is `canon_store::fold::fold_latest_by_key` — the ONE
+/// supersession rule every reader of this corpus already uses, so this
+/// command's idea of "the current disposition" is the same one
+/// `.canon/REPORT.md` prints.
+///
+/// # What it matches on
+/// The PARSED record's own key fields, not a re-`format!`ed composite
+/// string — [`occupied_by`]'s "never a second `format!` of the
+/// composite" rule turned one step further. That function must compare
+/// key strings because it works from raw bodies; this one already
+/// deserializes to return a `Finding` at all, so comparing the three
+/// typed fields is both cheaper and immune to the key grammar changing
+/// underneath it.
+///
+/// A record too malformed to parse as a `Finding` is invisible here for
+/// [`occupied_by`]'s stated reason: it carries no readable body, every
+/// consumer of the corpus already skips it, and `canon gate promote`
+/// refuses it on its own.
+fn find_finding(args: &FindingCloseArgs, tier: &GitTier) -> Result<Option<Finding>, canon_store::tier::StoreError> {
+    let versions: Vec<(Finding, String)> = tier
+        .read(&TierQuery::kind(RecordKind::Finding))?
+        .records
+        .into_iter()
+        .filter_map(|raw| {
+            let finding = Finding::from_body(&raw.0).ok()?;
+            (finding.change_id == args.change_id && finding.round == args.round && finding.seq == args.seq)
+                .then(|| (finding, content_digest12(&raw.0)))
+        })
+        .collect();
+    Ok(fold_latest_by_key(versions, |_| (), |(f, _)| f.envelope.at, |(f, _)| f.envelope.schema, |(_, digest)| digest.as_str())
+        .into_values()
+        .map(|(finding, _)| finding)
+        .next())
 }
 
 /// Which tier, if either, already carries a readable finding at
@@ -995,5 +1283,209 @@ mod tests {
             assert_eq!(parse_disposition(disposition.as_str()), Ok(disposition), "{disposition:?}");
         }
         assert!(parse_disposition("fix-of-fix").is_err(), "fix-of-fix is DERIVED and must never be an authorable disposition");
+    }
+
+    fn close_args(change_id: &str, round: u32, seq: u32, disposition: FindingDisposition) -> FindingCloseArgs {
+        FindingCloseArgs {
+            change_id: ChangeId::parse(change_id).unwrap(),
+            round,
+            seq,
+            disposition,
+            resolution_sha: None,
+            actor_id: "canon".to_string(),
+            role: RoleId::parse("reviewer").unwrap(),
+        }
+    }
+
+    fn committed_bodies(repo: &Path) -> Vec<serde_json::Value> {
+        let committed = GitTier::new(GateCtx::from_repo(repo).ledger_root);
+        committed.read(&TierQuery::kind(RecordKind::Finding)).expect("reading ledger").records.into_iter().map(|raw| raw.0).collect()
+    }
+
+    /// Commit whatever is staged, the way `canon gate promote` would,
+    /// so the close path under test sees a COMMITTED occupant. Written
+    /// through the tier rather than by moving files, so the committed
+    /// copy lands at its own content-derived path.
+    fn promote_staged(repo: &Path) {
+        let ledger_root = GateCtx::from_repo(repo).ledger_root;
+        let staging = GitTier::new(evidence_staging_dir(&ledger_root));
+        let committed = GitTier::new(&ledger_root);
+        for raw in staging.read(&TierQuery::kind(RecordKind::Finding)).expect("reading staging").records {
+            committed.write(&RawWrite(raw)).expect("committing the staged finding");
+        }
+        std::fs::remove_dir_all(evidence_staging_dir(&ledger_root)).expect("draining staging");
+    }
+
+    /// The gap s46 closes. A finding raised `open` at review time — the
+    /// honest moment — must be closeable, and before `close` existed the
+    /// disposition columns could only ever report the state a finding
+    /// was BORN in.
+    #[test]
+    fn close_stages_a_transition_that_preserves_every_content_field() {
+        let (dir, head) = git_repo();
+        let mut raised = args("s44-spec-derived-worklist", 1, 1);
+        raised.file_ref = Some("crates/canon-cli/src/finding.rs:1-2".to_string());
+        raised.introduced_by = Some(head.clone());
+        raised.reviewed_sha = Some(head.clone());
+        assert_eq!(run_add(dir.path(), &raised), 0);
+        promote_staged(dir.path());
+
+        let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
+        close.resolution_sha = Some(head.clone());
+        close.actor_id = "someone-who-fixed-it".to_string();
+        assert_eq!(run_close(dir.path(), &close), 0);
+
+        let staged = staged_bodies(dir.path());
+        assert_eq!(staged.len(), 1);
+        let body = &staged[0];
+        assert_eq!(body["disposition"].as_str(), Some("fixed"));
+        assert_eq!(body["resolution_sha"].as_str(), Some(head.as_str()));
+        for (field, expected) in [
+            ("severity", "blocker"),
+            ("reviewer", "reviewer-1"),
+            ("summary", "the release count was typed from memory"),
+            ("file_ref", "crates/canon-cli/src/finding.rs:1-2"),
+        ] {
+            assert_eq!(body[field].as_str(), Some(expected), "`{field}` is READ from the committed record, never re-typed");
+        }
+        assert_eq!(body["introduced_by"].as_str(), Some(head.as_str()), "the sourced introducing commit survives the transition");
+        assert_eq!(body["reviewed_sha"].as_str(), Some(head.as_str()));
+        assert_eq!(body["actor"]["agent_id"].as_str(), Some("someone-who-fixed-it"), "the TRANSITION's author is recorded, not the original finding's");
+    }
+
+    /// The committed record is untouched: the ledger is append-only and
+    /// the pair IS the history.
+    #[test]
+    fn close_never_edits_the_record_it_supersedes() {
+        let (dir, head) = git_repo();
+        assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
+        promote_staged(dir.path());
+        let before = committed_bodies(dir.path());
+
+        let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
+        close.resolution_sha = Some(head);
+        assert_eq!(run_close(dir.path(), &close), 0);
+        assert_eq!(committed_bodies(dir.path()), before, "close appends; it must never rewrite the committed corpus");
+    }
+
+    /// Re-running a close is how a caller recovers from a half-finished
+    /// batch, so it exits 0 — but it must stage NOTHING, because an
+    /// identical disposition carries no new fact and `canon gate
+    /// promote` would refuse the append.
+    #[test]
+    fn closing_to_the_current_disposition_is_a_no_op_that_stages_nothing() {
+        let (dir, head) = git_repo();
+        assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
+        promote_staged(dir.path());
+
+        let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
+        close.resolution_sha = Some(head);
+        assert_eq!(run_close(dir.path(), &close), 0);
+        promote_staged(dir.path());
+
+        assert_eq!(run_close(dir.path(), &close), 0, "a repeated close is recovery, not an error");
+        assert!(staged_bodies(dir.path()).is_empty(), "the current disposition is already `fixed`, so there is nothing to append");
+    }
+
+    /// The no-op is judged against the CURRENT version. Reading the
+    /// first record at the key instead would compare a second close
+    /// against the original `open` body and stage a third record saying
+    /// nothing new.
+    #[test]
+    fn the_current_disposition_is_the_latest_version_not_the_first_read() {
+        let (dir, head) = git_repo();
+        assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
+        promote_staged(dir.path());
+        let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
+        close.resolution_sha = Some(head);
+        assert_eq!(run_close(dir.path(), &close), 0);
+        promote_staged(dir.path());
+        assert_eq!(committed_bodies(dir.path()).len(), 2, "the key legitimately carries two versions now");
+
+        assert_eq!(run_close(dir.path(), &close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Rejected)), 0);
+        let staged = staged_bodies(dir.path());
+        assert_eq!(staged.len(), 1);
+        assert_eq!(staged[0]["disposition"].as_str(), Some("rejected"));
+        assert!(staged[0].get("resolution_sha").is_none(), "moving off `fixed` clears the sha rather than leaving it to contradict the disposition");
+    }
+
+    /// `close` moves an EXISTING finding. Authoring a new one is `add`,
+    /// and conflating them would let a typo in `--seq` mint a finding
+    /// nobody raised.
+    #[test]
+    fn close_refuses_a_key_no_committed_finding_holds() {
+        let (dir, _) = git_repo();
+        assert_eq!(run_close(dir.path(), &close_args("s44-spec-derived-worklist", 9, 9, FindingDisposition::Rejected)), 2);
+        assert!(staged_bodies(dir.path()).is_empty());
+    }
+
+    /// A staged-but-unpromoted finding has no recorded disposition to
+    /// move, and `canon gate promote` refuses two transitions of one key
+    /// in a single drain. Editing the staged copy is the honest repair,
+    /// and the refusal says so.
+    #[test]
+    fn close_refuses_a_finding_that_was_never_committed() {
+        let (dir, head) = git_repo();
+        assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
+
+        let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
+        close.resolution_sha = Some(head);
+        assert_eq!(run_close(dir.path(), &close), 2);
+        assert_eq!(staged_bodies(dir.path()).len(), 1, "the staged original is left exactly as it was");
+    }
+
+    /// The `disposition` ⇔ `resolution_sha` biconditional, in `close`'s
+    /// own voice — checked BEFORE the lookup, so a caller who named the
+    /// wrong flags is told that rather than told their finding is missing.
+    #[test]
+    fn close_enforces_the_disposition_resolution_sha_pair() {
+        let (dir, head) = git_repo();
+        assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
+        promote_staged(dir.path());
+
+        assert_eq!(run_close(dir.path(), &close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed)), 2, "`fixed` with no sha is a fix nobody can go look at");
+
+        let mut with_sha = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Rejected);
+        with_sha.resolution_sha = Some(head);
+        assert_eq!(run_close(dir.path(), &with_sha), 2, "only a `fixed` finding was closed by a commit");
+        assert!(staged_bodies(dir.path()).is_empty(), "neither refusal stages anything");
+    }
+
+    /// A resolution sha nobody can check out closes nothing.
+    #[test]
+    fn close_refuses_a_resolution_sha_this_repo_does_not_hold() {
+        let (dir, _) = git_repo();
+        assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
+        promote_staged(dir.path());
+
+        let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
+        close.resolution_sha = Some(Sha::parse(&"b".repeat(40)).unwrap());
+        assert_eq!(run_close(dir.path(), &close), 2);
+        assert!(staged_bodies(dir.path()).is_empty());
+    }
+
+    /// Reopening is a real transition: a fix that did not hold is a fact
+    /// the ledger must be able to carry, and refusing it would leave the
+    /// corpus able to record only one direction.
+    #[test]
+    fn a_finding_can_be_reopened() {
+        let (dir, head) = git_repo();
+        assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
+        promote_staged(dir.path());
+        let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
+        close.resolution_sha = Some(head);
+        assert_eq!(run_close(dir.path(), &close), 0);
+        promote_staged(dir.path());
+
+        assert_eq!(run_close(dir.path(), &close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Open)), 0);
+        assert_eq!(staged_bodies(dir.path())[0]["disposition"].as_str(), Some("open"));
+    }
+
+    /// 1-based, like `add`'s: no finding was ever authored under a 0.
+    #[test]
+    fn close_refuses_a_zero_round_or_seq() {
+        let (dir, _) = git_repo();
+        assert_eq!(run_close(dir.path(), &close_args("s44-spec-derived-worklist", 0, 1, FindingDisposition::Rejected)), 2);
+        assert_eq!(run_close(dir.path(), &close_args("s44-spec-derived-worklist", 1, 0, FindingDisposition::Rejected)), 2);
     }
 }

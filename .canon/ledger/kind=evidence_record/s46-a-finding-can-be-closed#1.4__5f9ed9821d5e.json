@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T14:21:24.785519Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-model"
+  },
+  "kind": "evidence_record",
+  "run_seq": 6,
+  "schema": 1,
+  "staging_id": "9237d8db0f8e",
+  "task_id": "s46-a-finding-can-be-closed#1.4",
+  "verdict": "faithful"
+}

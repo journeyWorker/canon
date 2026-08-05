@@ -175,9 +175,11 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use canon_model::{Divergence, DivergenceStatus, EvidenceRecord, Envelope, ProjectId, RawRecord, RecordKind, RoleId, ScenarioId, Sha, TotalOrder};
+use canon_store::fold::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
 use canon_store::partition::{content_digest12, expected_relative_path, resolve_partition};
 use canon_store::tier::{RawWrite, StoreError, Tier, TierQuery};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::failure_class::{FailureClass, Violation};
@@ -424,10 +426,11 @@ pub enum StagedAssignment {
 /// a corrupting duplicate. Only the kind knows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NaturalKeyRule {
-    /// At most ONE committed record per natural key. A second, DIFFERENT
-    /// body at an occupied key is a corruption, not an append, and
-    /// [`promote_verbatim`] refuses it with both candidates left in
-    /// place rather than picking a winner.
+    /// One committed record per natural key, plus whatever SUPERSEDING
+    /// versions of that same record the kind itself recognizes. A
+    /// second, DIFFERENT body at an occupied key is a corruption, not
+    /// an append, and [`promote_verbatim`] refuses it with both
+    /// candidates left in place rather than picking a winner.
     ///
     /// `Finding`'s rule. Its key is `{change_id}__{round}__{seq}` — a
     /// reviewer's own numbering of their own round — so two distinct
@@ -439,6 +442,27 @@ pub enum NaturalKeyRule {
     /// by one, with nothing anywhere saying so. (Naming a specific
     /// downstream reader here would invert the dependency this crate
     /// deliberately does not have — see `gate_independence`.)
+    ///
+    /// # The one exemption, and why it is not a weaker rule
+    /// A finding is raised `open` and closed later, so its DISPOSITION
+    /// must be able to move; `canon finding close` appends that second
+    /// version. [`promote_verbatim`] admits it only when
+    /// `Finding::is_disposition_transition_of` holds against the
+    /// CURRENT committed version — every identity/content field
+    /// byte-equal, only the disposition and its coupled
+    /// `resolution_sha` moved. The predicate lives on the record
+    /// because only the kind knows which of its fields carry identity
+    /// and which carry state.
+    ///
+    /// This is narrower than [`Self::Versioned`], not a softer spelling
+    /// of it: `Versioned` admits ANY new body at an occupied key, so
+    /// the two-reviewers-one-seq collapse above would sail through it.
+    /// Under `Unique` that body is still refused, byte for byte, and
+    /// the count s43 protects stays honest. What the exemption buys is
+    /// the other half of the same honesty — without it a repo that
+    /// recorded its findings at review time could never record that it
+    /// FIXED them, and the disposition columns would report only the
+    /// state each finding was born in.
     Unique,
     /// Multiple committed records per natural key are EXPECTED, and the
     /// readers that care fold them (`canon query`'s
@@ -623,17 +647,39 @@ fn promote_verbatim(
     // questions below: "did an earlier call already commit this exact
     // body" and "is this natural key already claimed".
     let mut committed_by_path: HashMap<PathBuf, RawRecord> = HashMap::new();
-    let mut committed_by_key: HashMap<String, PathBuf> = HashMap::new();
+    let mut committed_versions: Vec<(String, PathBuf, RawRecord)> = Vec::new();
     for raw in committed.read(&TierQuery::kind(kind))?.records {
         let relative = expected_relative_path(kind, &raw.0).map_err(StoreError::Layout)?;
         let natural_key = resolve_partition(kind, &raw.0).map_err(StoreError::Layout)?.natural_key;
-        // FIRST path wins on a corpus that already carries duplicates
-        // from before this rule existed: `scan_kind_where` walks
-        // `sort_by_file_name`, so "first" is a total order over the
-        // data, not an artifact of directory-walk order.
-        committed_by_key.entry(natural_key).or_insert_with(|| relative.clone());
+        committed_versions.push((natural_key, relative.clone(), raw.clone()));
         committed_by_path.insert(relative, raw);
     }
+    // LATEST version wins per key, through the ONE supersession rule
+    // every reader of this corpus already folds by
+    // (`canon_store::fold::fold_latest_by_key`) — not the first path in
+    // walk order.
+    //
+    // Which version is "the occupant" became a real question the moment
+    // a key could legitimately carry more than one: `Unique`'s
+    // transition exemption below asks whether the candidate supersedes
+    // what is COMMITTED, and a corpus already holding `open` then
+    // `fixed` must answer with `fixed` — the state every consumer sees.
+    // Answering with `open` would re-admit an already-recorded
+    // transition on every subsequent promote, appending a third body
+    // that says nothing new.
+    //
+    // All three fold rungs are the record's own data, so the winner is
+    // independent of the order this vector was built in.
+    let mut committed_by_key: HashMap<String, PathBuf> = fold_latest_by_key(
+        committed_versions,
+        |(key, _, _)| key.clone(),
+        |(_, _, raw)| record_at(raw),
+        |(_, _, raw)| raw.0.get("schema").and_then(serde_json::Value::as_u64).unwrap_or(0) as u32,
+        |(_, relative, _)| relative.to_str().unwrap_or_default(),
+    )
+    .into_iter()
+    .map(|(key, (_, relative, _))| (key, relative))
+    .collect();
 
     // Paths resolved up front and sorted, so the same staging set drains
     // in the same order every run rather than in filesystem-walk order —
@@ -683,30 +729,54 @@ fn promote_verbatim(
 
         if staged_kind.natural_key == NaturalKeyRule::Unique {
             if let Some(occupant) = committed_by_key.get(&natural_key) {
-                // WHICH copy commits is the sorted-path order above:
-                // deterministic, and deliberately meaningless. The pick
-                // is not the point and must never be read as a judgement
-                // between two authors — the REFUSAL is the point, and it
-                // leaves the other body staged, named, and intact for a
-                // human to re-number rather than dropping it the way a
-                // natural-key fold silently would.
-                let origin = if claimed_here.contains(&natural_key) {
-                    "a DIFFERENT staged body this same call already promoted"
-                } else {
-                    "an already-committed record with a DIFFERENT body"
-                };
-                report.refused.push(refuse(
-                    natural_key.clone(),
-                    format!(
-                        "natural key `{natural_key}` is held at `{}` by {origin}, so committing `{}` would put two {} records under one identity — the duplicate every natural-key fold then silently drops one half of, leaving a count short by one with nothing saying so. Left staged and unmodified; re-number or delete it, then retry.",
-                        occupant.display(),
-                        relative.display(),
-                        kind.as_str()
-                    ),
-                ));
-                continue;
+                // The ONE exemption: the same finding, transitioned.
+                // Judged by `Finding::is_disposition_transition_of`,
+                // which lives on the record because only the kind knows
+                // which of its fields carry identity and which carry
+                // state — every identity/content field byte-equal, only
+                // the disposition (and its coupled `resolution_sha`)
+                // moved. Enforced HERE, at the authority, not merely in
+                // whichever CLI verb authored the candidate: a
+                // hand-written body must clear the same bar.
+                //
+                // Never for a body promoted earlier in THIS call: two
+                // staged transitions of one finding in one drain have no
+                // defined order between them, and picking by sorted path
+                // would be the meaningless judgement the refusal below
+                // exists to avoid.
+                let superseding = !claimed_here.contains(&natural_key) && is_disposition_transition(kind, &raw, occupant, committed);
+                if !superseding {
+                    // WHICH copy commits is the sorted-path order above:
+                    // deterministic, and deliberately meaningless. The pick
+                    // is not the point and must never be read as a judgement
+                    // between two authors — the REFUSAL is the point, and it
+                    // leaves the other body staged, named, and intact for a
+                    // human to re-number rather than dropping it the way a
+                    // natural-key fold silently would.
+                    let origin = if claimed_here.contains(&natural_key) {
+                        "a DIFFERENT staged body this same call already promoted"
+                    } else {
+                        "an already-committed record with a DIFFERENT body"
+                    };
+                    report.refused.push(refuse(
+                        natural_key.clone(),
+                        format!(
+                            "natural key `{natural_key}` is held at `{}` by {origin}, so committing `{}` would put two {} records under one identity — the duplicate every natural-key fold then silently drops one half of, leaving a count short by one with nothing saying so. Left staged and unmodified; re-number or delete it, then retry.",
+                            occupant.display(),
+                            relative.display(),
+                            kind.as_str()
+                        ),
+                    ));
+                    continue;
+                }
             }
         }
+
+        // A superseding transition intentionally leaves the occupant in
+        // place: the ledger is append-only, and the pair IS the
+        // history — `open` at one instant, `fixed` at another. Every
+        // reader folds by natural key to the latest version, so the
+        // count stays one.
 
         if !dry_run {
             committed.write(&RawWrite(raw))?;
@@ -724,6 +794,55 @@ fn promote_verbatim(
         report.promoted.push(Promoted { kind, assigned: None, target: relative });
     }
     Ok(())
+}
+
+/// A committed record's `Envelope::at`, for the supersession fold.
+///
+/// A body that reached this point already passed `validate_body`, so its
+/// `at` parses; `unwrap_or_default` is the unreachable arm, and it is
+/// the SAFE one — the epoch sorts before every real stamp, so a record
+/// that somehow lost its timestamp can never win a fold and be mistaken
+/// for the current state.
+fn record_at(raw: &RawRecord) -> DateTime<Utc> {
+    raw.0
+        .get("at")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|at| DateTime::parse_from_rfc3339(at).ok())
+        .map(|at| at.with_timezone(&Utc))
+        .unwrap_or_default()
+}
+
+/// Whether `candidate` supersedes the record committed at
+/// `occupant_relative` by a DISPOSITION TRANSITION and nothing else —
+/// the sole exemption [`NaturalKeyRule::Unique`] makes.
+///
+/// Both sides are deserialized through the kind's own typed reader, so
+/// the judgement is made on records, never on raw JSON: a body that
+/// does not parse as the kind is not a transition of anything, and
+/// falls through to the ordinary refusal. `Finding` is the only
+/// `Unique` kind today and the only one with a transition concept; any
+/// other kind answers `false`, which is the pre-exemption behavior.
+///
+/// An unreadable occupant also answers `false`. Refusing on "I could
+/// not read what is already there" is the safe direction: the
+/// alternative admits a second body at one identity on the strength of
+/// a failed read.
+fn is_disposition_transition(kind: RecordKind, candidate: &RawRecord, occupant_relative: &Path, committed: &GitTier) -> bool {
+    if kind != RecordKind::Finding {
+        return false;
+    }
+    let Ok(text) = std::fs::read_to_string(committed.root().join(occupant_relative)) else {
+        return false;
+    };
+    let Ok(occupant_body) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return false;
+    };
+    let (Ok(new), Ok(old)) =
+        (serde_json::from_value::<canon_model::Finding>(candidate.0.clone()), serde_json::from_value::<canon_model::Finding>(occupant_body))
+    else {
+        return false;
+    };
+    new.is_disposition_transition_of(&old)
 }
 
 /// What is sitting at a committed target path that is NOT the readable
@@ -1309,6 +1428,125 @@ mod tests {
         assert_eq!(report.refused.len(), 1);
         assert_eq!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 1);
         assert_eq!(staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 1, "the refused candidate is preserved");
+    }
+
+    /// The exemption `Unique` makes, at the authority: the SAME finding
+    /// with only its disposition moved commits alongside the record it
+    /// supersedes.
+    ///
+    /// Both stay. The ledger is append-only and the pair IS the
+    /// history — `open` at one instant, `fixed` at another — and every
+    /// reader folds by natural key to the latest, so the finding is
+    /// still counted once.
+    #[test]
+    fn a_disposition_transition_commits_alongside_the_record_it_supersedes() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+
+        let open = finding("s44-spec-derived-worklist", 1, 1);
+        staging.write(&open).unwrap();
+        assert_eq!(promote(&staging, &committed, false).unwrap().promoted.len(), 1);
+
+        let mut fixed = open.clone().fixed_by(Sha::parse(&"a".repeat(40)).unwrap());
+        fixed.envelope.at = open.envelope.at + chrono::Duration::hours(1);
+        staging.write(&fixed).unwrap();
+
+        let report = promote(&staging, &committed, false).unwrap();
+        assert!(report.refused.is_empty(), "a disposition transition is the one supersession `Unique` admits: {:?}", report.refused);
+        assert_eq!(report.promoted.len(), 1);
+        let dispositions: Vec<String> = committed
+            .read(&TierQuery::kind(RecordKind::Finding))
+            .unwrap()
+            .records
+            .iter()
+            .filter_map(|raw| raw.0.get("disposition").and_then(|d| d.as_str()).map(str::to_string))
+            .collect();
+        assert_eq!(dispositions.len(), 2, "the superseded record STAYS — the pair is the history");
+        assert!(dispositions.contains(&"open".to_string()) && dispositions.contains(&"fixed".to_string()));
+        assert!(staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.is_empty(), "an admitted transition drains like any promotion");
+    }
+
+    /// The exemption is judged against the CURRENT version, not the
+    /// first one read. Without the supersession fold over the committed
+    /// corpus, a key already holding `open` then `fixed` would compare a
+    /// re-submitted `fixed` against `open`, call it a transition, and
+    /// append a third body saying nothing new — forever, once per run.
+    #[test]
+    fn a_resubmitted_current_disposition_is_refused_against_the_latest_version() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+        let sha = Sha::parse(&"a".repeat(40)).unwrap();
+
+        let open = finding("s44-spec-derived-worklist", 1, 1);
+        staging.write(&open).unwrap();
+        promote(&staging, &committed, false).unwrap();
+
+        let mut fixed = open.clone().fixed_by(sha.clone());
+        fixed.envelope.at = open.envelope.at + chrono::Duration::hours(1);
+        staging.write(&fixed).unwrap();
+        promote(&staging, &committed, false).unwrap();
+
+        let mut again = open.clone().fixed_by(sha);
+        again.envelope.at = open.envelope.at + chrono::Duration::hours(2);
+        staging.write(&again).unwrap();
+
+        let report = promote(&staging, &committed, false).unwrap();
+        assert!(report.promoted.is_empty(), "the current disposition is already `fixed`, so this body carries no new fact");
+        assert_eq!(report.refused.len(), 1);
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 2, "no third body");
+    }
+
+    /// Two transitions of one key in a SINGLE drain have no defined
+    /// order between them, so the second is refused rather than
+    /// committed on the strength of sorted-path order — the same
+    /// meaningless judgement the duplicate refusal exists to avoid.
+    #[test]
+    fn two_transitions_of_one_key_in_one_drain_refuse_the_second() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+
+        let open = finding("s44-spec-derived-worklist", 1, 1);
+        staging.write(&open).unwrap();
+        promote(&staging, &committed, false).unwrap();
+
+        let mut fixed = open.clone().fixed_by(Sha::parse(&"a".repeat(40)).unwrap());
+        fixed.envelope.at = open.envelope.at + chrono::Duration::hours(1);
+        let mut rejected = open.clone().rejected();
+        rejected.envelope.at = open.envelope.at + chrono::Duration::hours(2);
+        staging.write(&fixed).unwrap();
+        staging.write(&rejected).unwrap();
+
+        let report = promote(&staging, &committed, false).unwrap();
+        assert_eq!(report.promoted.len(), 1, "exactly one of the two commits");
+        assert_eq!(report.refused.len(), 1, "the other is refused, not silently dropped");
+        assert_eq!(staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 1, "the refused candidate is preserved");
+    }
+
+    /// The exemption is narrow by field, not by kind: a body that moved
+    /// the disposition AND the summary is a DIFFERENT finding claiming
+    /// an occupied identity, and is refused exactly as before.
+    #[test]
+    fn a_body_that_moves_more_than_the_disposition_is_still_refused() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+
+        let open = finding("s44-spec-derived-worklist", 1, 1);
+        staging.write(&open).unwrap();
+        promote(&staging, &committed, false).unwrap();
+
+        let mut forged = open.clone().rejected();
+        forged.summary = "a defect the recorded reviewer never raised".to_string();
+        forged.envelope.at = open.envelope.at + chrono::Duration::hours(1);
+        staging.write(&forged).unwrap();
+
+        let report = promote(&staging, &committed, false).unwrap();
+        assert!(report.promoted.is_empty());
+        assert_eq!(report.refused.len(), 1);
+        assert!(
+            report.refused[0].violation.detail.contains("under one identity"),
+            "the refusal must still be the two-findings-one-identity one: {}",
+            report.refused[0].violation.detail
+        );
     }
 
     /// A DIFFERENT `seq` in the same round is a different finding and must

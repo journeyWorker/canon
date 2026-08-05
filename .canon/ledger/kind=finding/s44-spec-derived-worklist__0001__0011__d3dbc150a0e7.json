@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-05T14:17:12.533434Z",
+  "change_id": "s44-spec-derived-worklist",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-gate/src/context.rs:144",
+  "kind": "finding",
+  "resolution_sha": "57888a812ca339e27113f9d5bc9026263e9086fc",
+  "reviewer": "SpecCritic",
+  "round": 1,
+  "schema": 1,
+  "seq": 11,
+  "severity": "should_fix",
+  "summary": "Task 1.1 hardcodes GitTier while routing is per-repo configurable, so a consumer routing these kinds off local gets a silently inert check"
+}

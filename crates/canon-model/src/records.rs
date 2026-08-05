@@ -1294,6 +1294,46 @@ impl Finding {
         self
     }
 
+    /// Is `self` the SAME finding as `earlier`, differing only in how it
+    /// was DISPOSED of?
+    ///
+    /// This is the one exemption `canon_gate`'s natural-key uniqueness
+    /// rule makes, and it is stated here rather than there because only
+    /// this type knows which of its fields carry identity and which
+    /// carry state. Every identity/content field must be byte-equal;
+    /// only `disposition` and its coupled `resolution_sha` may move.
+    /// `Envelope` is excluded deliberately — a transition is authored at
+    /// a later instant by whoever closed it, and requiring the original
+    /// author's `at` would make closing a finding impossible.
+    ///
+    /// # Why an exemption exists at all
+    /// A finding is raised `Open` and later becomes `Fixed`/`Rejected`/
+    /// `Deferred`; every reader folds by natural key to the latest
+    /// version, which is what makes the derived dispositions "what is
+    /// open NOW". Without a way to write that second version the
+    /// disposition columns could only ever report the state a finding
+    /// was BORN in, and a repo that recorded its findings at review time
+    /// — rather than after fixing them — could never say it fixed
+    /// anything. The uniqueness rule still holds where it matters: two
+    /// DIFFERENT findings under one `{change_id}__{round}__{seq}` are
+    /// two reviewers' work collapsed into one identity, and this
+    /// predicate refuses that exactly as before.
+    pub fn is_disposition_transition_of(&self, earlier: &Finding) -> bool {
+        self.change_id == earlier.change_id
+            && self.round == earlier.round
+            && self.seq == earlier.seq
+            && self.severity == earlier.severity
+            && self.reviewer == earlier.reviewer
+            && self.summary == earlier.summary
+            && self.reviewed_sha == earlier.reviewed_sha
+            && self.introduced_by == earlier.introduced_by
+            && self.file_ref == earlier.file_ref
+            // A no-op resubmission is not a transition: it carries no
+            // new fact, and admitting it would let an identical body
+            // append forever at one key.
+            && self.disposition != earlier.disposition
+    }
+
     /// The `disposition` ⇔ `resolution_sha` biconditional, re-checked
     /// on the READ path. `Finding`'s constructors already make an
     /// incoherent pair unconstructible in Rust, but a record read back
@@ -1926,6 +1966,93 @@ mod tests {
         for field in ["reviewed_sha", "resolution_sha", "introduced_by", "file_ref"] {
             assert!(json.get(field).is_none(), "an unset `{field}` must be absent from the wire form, not null");
         }
+    }
+
+    /// The whole point of the predicate: `open` → `fixed` on an
+    /// otherwise byte-identical finding is the ONE shape
+    /// `canon_gate::promote` lets past `NaturalKeyRule::Unique`.
+    #[test]
+    fn a_disposition_only_change_is_a_transition() {
+        let open = finding(3, 2).reviewing_sha(sha('a')).with_introduced_by(sha('c')).with_file_ref("src/a.rs:1-2");
+        let fixed = open.clone().fixed_by(sha('b'));
+        assert!(fixed.is_disposition_transition_of(&open), "open -> fixed on an otherwise identical finding is the transition this exists for");
+        assert!(
+            open.is_disposition_transition_of(&fixed),
+            "and it is symmetric by construction: a fix that did not hold reopens, and a ledger that could only close would record half a life"
+        );
+    }
+
+    /// A resubmission carrying no new fact is not a transition. Without
+    /// this, an identical body could append forever at one key — each
+    /// copy a new `content_digest12` from its fresh envelope alone.
+    #[test]
+    fn an_unchanged_disposition_is_not_a_transition() {
+        let earlier = finding(3, 2);
+        assert!(!finding(3, 2).is_disposition_transition_of(&earlier), "same disposition carries no new fact, so it is an append with nothing in it");
+    }
+
+    /// Every identity/content field is load-bearing: two DIFFERENT
+    /// findings under one `{change_id}__{round}__{seq}` are two
+    /// reviewers' work collapsed into one identity, and the exemption
+    /// must never admit that. Each case below moves exactly ONE field
+    /// AND the disposition, so a predicate that checked only the
+    /// disposition would pass all of them.
+    #[test]
+    fn every_identity_field_defeats_the_transition() {
+        let base = finding(3, 2).reviewing_sha(sha('a')).with_introduced_by(sha('c')).with_file_ref("src/a.rs:1-2");
+        let cases: Vec<(&str, Finding)> = vec![
+            ("round", finding(4, 2).reviewing_sha(sha('a')).with_introduced_by(sha('c')).with_file_ref("src/a.rs:1-2").rejected()),
+            ("seq", finding(3, 9).reviewing_sha(sha('a')).with_introduced_by(sha('c')).with_file_ref("src/a.rs:1-2").rejected()),
+            (
+                "severity",
+                Finding::new(envelope(RecordKind::Finding), change_id(), 3, 2, FindingSeverity::Note, "review-voice", "teardown races HMR")
+                    .reviewing_sha(sha('a'))
+                    .with_introduced_by(sha('c'))
+                    .with_file_ref("src/a.rs:1-2")
+                    .rejected(),
+            ),
+            (
+                "reviewer",
+                Finding::new(envelope(RecordKind::Finding), change_id(), 3, 2, FindingSeverity::Blocker, "someone-else", "teardown races HMR")
+                    .reviewing_sha(sha('a'))
+                    .with_introduced_by(sha('c'))
+                    .with_file_ref("src/a.rs:1-2")
+                    .rejected(),
+            ),
+            (
+                "summary",
+                Finding::new(envelope(RecordKind::Finding), change_id(), 3, 2, FindingSeverity::Blocker, "review-voice", "a defect nobody raised")
+                    .reviewing_sha(sha('a'))
+                    .with_introduced_by(sha('c'))
+                    .with_file_ref("src/a.rs:1-2")
+                    .rejected(),
+            ),
+            ("reviewed_sha", finding(3, 2).reviewing_sha(sha('d')).with_introduced_by(sha('c')).with_file_ref("src/a.rs:1-2").rejected()),
+            ("introduced_by", finding(3, 2).reviewing_sha(sha('a')).with_introduced_by(sha('d')).with_file_ref("src/a.rs:1-2").rejected()),
+            ("file_ref", finding(3, 2).reviewing_sha(sha('a')).with_introduced_by(sha('c')).with_file_ref("src/b.rs:9-9").rejected()),
+        ];
+        for (field, moved) in cases {
+            assert!(
+                !moved.is_disposition_transition_of(&base),
+                "`{field}` moved as well as the disposition, so this is a DIFFERENT finding claiming an occupied identity — never a transition"
+            );
+        }
+    }
+
+    /// The envelope is excluded, and must be: a transition is authored
+    /// later, by whoever closed it. Requiring the original author's
+    /// stamp would make closing a finding impossible.
+    #[test]
+    fn a_later_author_at_a_later_instant_still_transitions() {
+        let open = finding(3, 2);
+        let mut fixed = open.clone().fixed_by(sha('b'));
+        fixed.envelope = Envelope::new(
+            RecordKind::Finding.schema_version(),
+            RecordKind::Finding,
+            open.envelope.at + chrono::Duration::hours(9),
+            Actor::new("someone-who-fixed-it", RoleId::parse("implementer").unwrap()),
+        );
+        assert!(fixed.is_disposition_transition_of(&open), "a transition is authored later, by whoever closed it — the envelope carries exactly that and must not be compared");
     }
 
     #[test]

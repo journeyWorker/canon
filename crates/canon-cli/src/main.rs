@@ -150,7 +150,7 @@ enum Command {
         action: EvidenceCommand,
     },
     /// Record one code-review finding as a durable record
-    #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --reviewer review-voice \\\n      --summary 'a release metric is asserted, never computed'\n\nThe loop:\n  canon finding add ...     Stage a Finding\n  canon gate promote        Commit it\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-by is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
+    #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --reviewer review-voice \\\n      --summary 'a release metric is asserted, never computed'\n  canon finding close --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n\nThe loop:\n  canon finding add ...     Stage a Finding\n  canon gate promote        Commit it\n  canon finding close ...   Stage its disposition TRANSITION, once fixed\n  canon gate promote        Commit that too\n\nThe committed finding STAYS when it is closed: the ledger is append-only and\nthe pair IS the history. Every reader folds by natural key to the latest\nversion, so the finding is still counted once.\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-by is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
     Finding {
         #[command(subcommand)]
         action: FindingCommand,
@@ -587,6 +587,34 @@ enum FindingCommand {
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
+    /// Move an already-committed finding's disposition (commit it with `canon gate promote`)
+    #[command(after_help = "A finding is raised `open` and later closed. This is the ONLY way to record\nthat second state: `canon finding add` refuses an occupied natural key,\nbecause two DIFFERENT findings under one (change, round, seq) are two\nreviewers' work collapsed into one identity.\n\nWhat it changes: the disposition, and `resolution_sha` with it. NOTHING else.\nSeverity, reviewer, summary, --reviewed-sha, --introduced-by and --file-ref\nare READ from the committed record and copied byte-identically — this command\ncannot edit them, and no command can. A finding recorded wrongly stays\nwrongly recorded; that is the append-only ledger working, not a gap.\n\nThe committed record STAYS. This appends a second version at the same\nnatural key, and the pair IS the history: `open` at one instant, `fixed` at\nanother, each with its own author and timestamp. Every reader folds by\nnatural key to the latest version, so the finding is still counted once.\n\n`canon gate promote` re-derives the transition rule itself before committing\nthe second version, so a hand-written body must clear the same bar.\n\nExamples:\n  canon finding close --change-id s44-spec-derived-worklist --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n  canon finding close --change-id s44-spec-derived-worklist --round 1 --seq 9 \\\n      --disposition rejected")]
+    Close {
+        /// The change under review — first component of the natural key
+        #[arg(long, value_parser = canon_cli::finding::parse_change_id)]
+        change_id: ChangeId,
+        /// Which review round raised it (1-based)
+        #[arg(long)]
+        round: u32,
+        /// The finding's index within the round (1-based)
+        #[arg(long)]
+        seq: u32,
+        /// Where it lands: fixed / rejected / deferred / open (reopening is a real transition). fixed requires --resolution-sha, and only fixed may carry one
+        #[arg(long, value_parser = canon_cli::finding::parse_disposition)]
+        disposition: canon_model::FindingDisposition,
+        /// The commit that closed it. Required by, and permitted only with, --disposition fixed. Must name a COMMIT object this repo holds
+        #[arg(long, value_parser = canon_cli::finding::parse_sha)]
+        resolution_sha: Option<Sha>,
+        /// The actor recorded as authoring the TRANSITION — not the original finding's author, which is preserved on the record this supersedes
+        #[arg(long, default_value = "canon")]
+        actor_id: String,
+        /// Attribution only — no partition key derives from it
+        #[arg(long, default_value = "reviewer", value_parser = canon_cli::retrieve::parse_role)]
+        role: RoleId,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -950,6 +978,12 @@ fn main() -> ExitCode {
                     role,
                 },
             ) as u8),
+            FindingCommand::Close { change_id, round, seq, disposition, resolution_sha, actor_id, role, repo } => {
+                ExitCode::from(canon_cli::finding::run_close(
+                    &repo,
+                    &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role },
+                ) as u8)
+            }
         },
         Command::Review { action } => match action {
             ReviewCommand::Add { project_id, scenario_id, reviewer, pin, upstream_ref, original_spec_ref, actor_id, role, repo } => ExitCode::from(

@@ -231,17 +231,30 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
     fold_latest_by_natural_key(kind, records)
 }
 
-/// s36 `subject-domain-loop`: `subject` is git-routed (local rung) but,
-/// unlike an authored-once `Review`, is RE-WRITTEN by `canon subject
-/// adopt`/`canon subject status` — each appends links / flips state at
-/// a bumped envelope `at`, a genuine new git-tier append at a new path
-/// (`canon_store::partition` module doc). A bare `TierRegistry::query`
-/// for `subject` therefore returns EVERY historical version; this
-/// folds them to one latest row per `subject_id`, so `canon query
-/// --kind subject` reads an adopt/status re-write as ONE current
-/// record. A no-op for every other kind.
-fn fold_subject_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
-    if kind != RecordKind::Subject {
+/// The git-routed kinds that are nonetheless RE-WRITTEN — each append
+/// is a genuine new git-tier record at a new path
+/// (`canon_store::partition` module doc), so a bare
+/// `TierRegistry::query` returns EVERY historical version and this
+/// folds them to one current row per natural key. A no-op for every
+/// other kind.
+///
+/// - `subject` (s36 `subject-domain-loop`): `canon subject adopt` /
+///   `canon subject status` append links / flip state at a bumped
+///   envelope `at`.
+/// - `finding` (s46): `canon finding close` appends the disposition
+///   TRANSITION of an already-committed finding — the second version
+///   is the whole point, since a finding is raised `open` and closed
+///   later, and this fold is what makes the pair read as ONE finding
+///   in its CURRENT state. Unlike `subject`, `finding` is additionally
+///   `NaturalKeyRule::Unique` at `canon_gate::promote`, which admits
+///   the second version ONLY when it is a transition — so the versions
+///   this fold collapses are always the same finding, never two.
+///
+/// KIND-gated for [`fold_pg_routed_kind`]'s stated reason, and by the
+/// same trade-off: a kind that gains a re-writing verb must be added
+/// here or its `canon query` result regresses to N-independent-versions.
+fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
+    if !matches!(kind, RecordKind::Subject | RecordKind::Finding) {
         return records;
     }
     fold_latest_by_natural_key(kind, records)
@@ -253,7 +266,7 @@ fn fold_subject_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord
 /// `(at, envelope.schema, content_digest12)` triple, via the SAME
 /// [`fold_latest_by_key`] `canon-gate::ledger` and `canon-report`
 /// already use. Called by both [`fold_pg_routed_kind`] (hot-routed
-/// multi-version kinds) and [`fold_subject_kind`] (git-routed but
+/// multi-version kinds) and [`fold_rewritten_kind`] (git-routed but
 /// re-written), so the two can never drift in fold rule.
 ///
 /// This is the reader where the `schema` rung EARNS its place: a plan
@@ -334,7 +347,7 @@ pub fn run(
     let result = registry.query(&query)?;
     let violation_count = result.violations.len();
     let records = fold_pg_routed_kind(kind, result.records);
-    let records = fold_subject_kind(kind, records);
+    let records = fold_rewritten_kind(kind, records);
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
     Ok(QueryOutcome { kind, since, records, violation_count, rollup })
@@ -552,7 +565,7 @@ pub fn run_with_plugin(
     let result = registry.query(&query)?;
     let violation_count = result.violations.len();
     let records = fold_pg_routed_kind(kind, result.records);
-    let records = fold_subject_kind(kind, records);
+    let records = fold_rewritten_kind(kind, records);
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
     let outcome = QueryOutcome { kind, since, records, violation_count, rollup };

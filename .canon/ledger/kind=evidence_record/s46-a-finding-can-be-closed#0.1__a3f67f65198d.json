@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T14:21:24.097762Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon report"
+  },
+  "kind": "evidence_record",
+  "run_seq": 1,
+  "schema": 1,
+  "staging_id": "fb0e9f5533a7",
+  "task_id": "s46-a-finding-can-be-closed#0.1",
+  "verdict": "faithful"
+}
