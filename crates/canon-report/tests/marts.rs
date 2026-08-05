@@ -264,7 +264,9 @@ fn scope_status_matches_the_fixture_corpus_exactly() {
     let dir = tempfile::tempdir().unwrap();
     let result = marts::fetch_scope_status(&inputs(dir.path()).roots).unwrap();
 
-    assert_eq!(result.rows.len(), 2, "exactly two declared (task_id, scenario_id) rows, got {:?}", result.rows);
+    // s45: one row per AUTHORED scenario, not per declared pair. The
+    // fixture authors exactly the two scenarios its tasks declare.
+    assert_eq!(result.rows.len(), 2, "exactly one row per authored scenario, got {:?}", result.rows);
 
     let row = |task_id: &str, scenario_id: &str| {
         result
@@ -279,11 +281,12 @@ fn scope_status_matches_the_fixture_corpus_exactly() {
     assert_eq!(fully_green["evidence_covered"], corpus::scope_status::FULLY_GREEN_EVIDENCE_COVERED);
     assert_eq!(fully_green["green"], corpus::scope_status::FULLY_GREEN_GREEN);
     assert_eq!(
-        fully_green["spec_project_id"],
+        fully_green["project_id"],
         corpus::scope_status::FULLY_GREEN_SPEC_PROJECT_ID,
-        "the row must name WHOSE coverage it reports — `porting.coverage` is keyed (project_id, scenario_id)"
+        "s45: the DRIVING side carries the project, so the coverage join matches the full (project_id, scenario_id) pair"
     );
     assert_eq!(fully_green["spec_covered"], corpus::scope_status::FULLY_GREEN_SPEC_COVERED);
+    assert_eq!(fully_green["declaring_task_count"], 1, "one task declares this scenario");
 
     let unauthored = row(corpus::scope_status::UNAUTHORED_TASK_ID, corpus::scope_status::UNAUTHORED_SCENARIO_ID);
     assert_eq!(unauthored["task_status"], corpus::scope_status::UNAUTHORED_TASK_STATUS);
@@ -294,10 +297,10 @@ fn scope_status_matches_the_fixture_corpus_exactly() {
         "spec_covered must be an honest NULL when no porting.coverage overlay exists, got {:?}",
         unauthored.get("spec_covered")
     );
-    assert!(
-        unauthored.get("spec_project_id").is_none_or(|v| v.is_null()),
-        "spec_project_id must be NULL too — there is no overlay row to attribute, got {:?}",
-        unauthored.get("spec_project_id")
+    assert_eq!(
+        unauthored["project_id"],
+        corpus::scope_status::FULLY_GREEN_SPEC_PROJECT_ID,
+        "the scenario is authored under a project even when no overlay row covers it — s45 removed `spec_project_id` because the driver supplies it"
     );
 }
 

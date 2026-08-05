@@ -207,14 +207,15 @@ computes it; nothing here is derived a second time.
   scenario. For current state per scenario, run `canon divergence status`.
 
 - **Scope status** (`mart_scope_status`) —
-  Task done × evidence-verified × spec-covered, per declared scenario ref.
-  Grain is one row per declared `(task_id, scenario_id)` pair PER COVERING
-  PROJECT, because two spec roots may author one scenario id and the view
-  reports both rather than picking one. A task with no `scenario_refs` never
-  appears here at all. `spec_project_id IS NULL` means NO coverage overlay
-  row exists for that scenario — a different state from an overlay row that
-  exists and says `spec_covered = false`. Read-only reporting; never a
-  `canon gate` input.
+  Every specified scenario × evidence-verified × plan-carried × spec-covered (`mart_scope_status`). Driven by the spec corpus, so a scenario no plan task declares still appears — with a NULL `task_id`, which is the worklist entry.
+  Grain is one row per authored `(project_id, scenario_id)`; the driving
+  side carries the project, so two spec roots authoring one scenario id
+  are two rows by construction. `evidence_covered`/`green` count either
+  side — the task the scenario is declared by, or scenario-keyed evidence
+  authored directly against it (`scenario_verdict`). `spec_covered IS
+  NULL` means NO coverage overlay row exists for that scenario — a
+  different state from an overlay row that exists and says
+  `spec_covered = false`. Read-only reporting; never a `canon gate` input.
 
 - **Subjects** (`mart_subjects`) —
   Per-domain subject rollup: status × scenario coverage.

@@ -1,7 +1,7 @@
 {
   "generated_at": "2026-07-11T00:00:00Z",
   "source_git_sha": "fixture0000",
-  "source_digest": "f40ed7e04c40",
+  "source_digest": "3cd66846f7ee",
   "tables": [
     {
       "table": "mart_trust_matrix",

@@ -67,6 +67,22 @@ fn a_declared_covered_evidenced_scenario_resolves_fully_green_in_one_query() {
         .with_scenario_refs(vec![covered_scenario.clone(), uncovered_scenario.clone()]);
     git.write(&task).expect("persist task");
 
+    // s45: `mart_scope_status` is driven by the SPEC corpus, so each
+    // declared ref needs its authored `Scenario` record — under the
+    // SAME project the coverage overlay is keyed by, or the full-pair
+    // coverage join cannot resolve.
+    for scenario_id in [&covered_scenario, &uncovered_scenario] {
+        git.write(&canon_model::Scenario::new(
+            Envelope::current(RecordKind::Scenario, Utc::now(), actor()),
+            canon_model::ProjectId::parse("e2e-join-project").unwrap(),
+            scenario_id.clone(),
+            "e2e scenario",
+            "",
+            canon_model::SpecDigest::of(scenario_id.as_str().as_bytes()),
+        ))
+        .expect("persist scenario");
+    }
+
     // Evidence-VERIFIED half: a Faithful EvidenceRecord for the task_id
     // — the exact `mart_trust_matrix` half this view reuses verbatim.
     let evidence = EvidenceRecord::new(Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor()), Some(task_id.clone()), None, None, EvidenceVerdict::Faithful);

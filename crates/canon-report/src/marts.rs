@@ -158,32 +158,50 @@ pub fn fetch_review_burndown(roots: &Roots) -> Result<MartResult, ReportError> {
     fetch(roots, &REVIEW_BURNDOWN)
 }
 
-pub const SCOPE_STATUS_COLUMNS: &[&str] =
-    &["task_id", "scenario_id", "task_status", "evidence_covered", "green", "spec_project_id", "spec_covered"];
+pub const SCOPE_STATUS_COLUMNS: &[&str] = &[
+    "project_id",
+    "scenario_id",
+    "title",
+    "subject_id",
+    "task_id",
+    "declaring_task_count",
+    "task_status",
+    "evidence_covered",
+    "green",
+    "scenario_verdict",
+    "spec_covered",
+];
 
-pub const SCOPE_STATUS: MartSpec =
-    MartSpec { view: "mart_scope_status", order_by: "task_id, scenario_id, spec_project_id", columns: SCOPE_STATUS_COLUMNS };
+pub const SCOPE_STATUS: MartSpec = MartSpec { view: "mart_scope_status", order_by: "project_id, scenario_id", columns: SCOPE_STATUS_COLUMNS };
 
-/// `mart_scope_status` (s20 `task-scenario-join`, surfaced by s24): one
-/// row per declared `(task_id, scenario_id)` pair PER COVERING PROJECT,
-/// unifying `task_status` (done — the checkbox) x
-/// `evidence_covered`/`green` (verified — evidence-side) x
-/// `spec_project_id`/`spec_covered` (scenario-authored — spec-side).
+/// `mart_scope_status` (s20 `task-scenario-join`, surfaced by s24,
+/// re-driven by s45 `report-scenario-driver`): one row per
+/// `(project_id, scenario_id)` in the SPEC corpus, unifying
+/// `task_status` (done — the checkbox) × `evidence_covered`/`green`
+/// (verified — evidence-side) × `spec_covered` (scenario-authored —
+/// overlay side).
 ///
-/// `spec_project_id` names WHOSE coverage each row reports.
-/// `porting.coverage` is keyed `(project_id, scenario_id)` while
-/// `Task::scenario_refs` carries no project, so two spec roots
-/// authoring one scenario id give a declared pair two coverage answers
-/// and the view emits both rather than picking one arbitrarily (the
-/// view's own GRAIN note carries the full argument). NULL means no
-/// overlay row exists for that scenario at all — distinct from an
-/// overlay row present and saying `spec_covered = false`.
+/// The driver is `Scenario`, not `Task.scenario_refs`. Under the s20
+/// grain a scenario no plan task declared could not appear at all, and
+/// the whole panel emptied whenever `Task` was routed off a rung this
+/// corpus reads — `canon.yaml`'s `task: hot` did exactly that to
+/// canon's own report. A worklist whose row set depends on where an
+/// unrelated kind is routed is not a worklist.
 ///
-/// The `ORDER BY` includes `spec_project_id` for the same reason: with
-/// more than one row per pair, `(task_id, scenario_id)` alone is no
-/// longer a total order and the rendered table's row order would not be
-/// stable. Exactly the view's own `SELECT` list, no
-/// renaming/reordering (design D1).
+/// `spec_project_id` is GONE: the driving side now carries
+/// `project_id`, so the coverage join matches on the full
+/// `(project_id, scenario_id)` pair and the per-project fan-out that
+/// column existed to disambiguate cannot arise. `(project_id,
+/// scenario_id)` is therefore a total order on its own.
+///
+/// `task_id`/`declaring_task_count` are the task side, LEFT JOINed and
+/// purely additive. NULL `task_id` is the panel's whole point — a
+/// specified scenario no plan is carrying. `declaring_task_count > 1`
+/// means several tasks declare the scenario; the row keeps one
+/// representative rather than multiplying the scenario's grain.
+/// `spec_covered` NULL still means no overlay row exists at all,
+/// distinct from one present and saying `false`. Exactly the view's own
+/// `SELECT` list, no renaming/reordering (design D1).
 pub fn fetch_scope_status(roots: &Roots) -> Result<MartResult, ReportError> {
     fetch(roots, &SCOPE_STATUS)
 }

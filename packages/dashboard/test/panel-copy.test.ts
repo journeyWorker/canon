@@ -899,7 +899,7 @@ const SKILL_CLAIMS: Record<string, string[]> = {
   // Thin panels: the report's whole line, minus its trailing view
   // reference, which the skill states in its own bullet header.
   "Trust matrix": ["Change/task coverage × green × who"],
-  "Scope status": ["Task done × evidence-verified × spec-covered, per declared scenario ref"],
+  "Scope status": ["Every specified scenario × evidence-verified × plan-carried × spec-covered"],
   Subjects: ["Per-domain subject rollup: status × scenario coverage"],
   "Session costs": [
     "a re-ingested corrected cost REPLACES the superseded figure instead of being summed with it",

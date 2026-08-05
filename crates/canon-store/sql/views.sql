@@ -856,83 +856,66 @@ LEFT JOIN evidence_counts ec    USING (task_id)
 LEFT JOIN evidence_current ecur USING (task_id)
 ORDER BY change_id, s.task_id;
 
--- s20 addition (task-scenario-join spec, design D3): unifies
--- `mart_trust_matrix`'s evidence-PRESENCE `covered` (keyed `task_id`)
--- against `porting.coverage`'s spec-AUTHORSHIP `covered` (keyed
--- `(project_id, scenario_id)`) over `int_task_scenario_refs`' declared
--- join table — answering "is this scope DONE (checkbox), VERIFIED
--- (evidence-covered), and SPEC-COVERED (scenario-authored)" in a single
--- query. A `Task` with no `scenario_refs` never appears here (nothing
--- declared to unify) but still appears in `mart_trust_matrix`
--- unchanged — this view is additive, never a replacement.
+-- s45 (`report-scenario-driver`): the worklist panel, driven by the
+-- SPEC corpus. Answers "what did this repo specify, and for each of
+-- those, is it evidence-verified, is a plan task carrying it, and is it
+-- spec-covered by the porting overlay".
 --
--- GRAIN: one row per declared `(task_id, scenario_id)` pair per
--- COVERING PROJECT. The task side of the join carries no project at
--- all — `Task.scenario_refs` is a bare list of `ScenarioId`s — while
--- the coverage side is keyed `(project_id, scenario_id)`, so when two
--- spec roots each author the same scenario id there are genuinely TWO
--- coverage answers for one declared pair and this view reports both,
--- each under its own `spec_project_id`. It cannot pick one: nothing in
--- the plan says which project the task meant. Emitting the pair ONCE
--- with an arbitrarily-chosen `spec_covered` (what a `scenario_id`-only
--- fold did) reports one project's coverage under another's name;
--- emitting it twice with no `spec_project_id` would be two
--- indistinguishable rows disagreeing about `spec_covered`, the same
--- contradictory-row defect folding `tasks` exists to remove.
+-- s20 built this over `int_task_scenario_refs`, so its row grain came
+-- entirely from `Task.scenario_refs`. That made the panel structurally
+-- unable to report a scenario no plan task declares — and worse,
+-- invisible whenever `Task` is routed off a rung this corpus reads.
+-- `canon.yaml` routing `task: hot` is exactly that case: the report
+-- corpus is `stg_git_records UNION ALL stg_r2_records` and nothing
+-- else, so canon's own panel rendered `_No rows._` while sixteen
+-- Scenario records sat in the git tier. A worklist whose row set
+-- depends on where an UNRELATED kind is routed is not a worklist.
 --
--- `LEFT JOIN` on both sides so an absent evidence record or absent
--- `porting.coverage` overlay row surfaces as an honest `NULL`, never a
--- dropped row or an invented `false` (mirrors `mart_trust_matrix`'s own
--- `LEFT JOIN` posture for a task with no evidence). Read
--- `spec_project_id IS NULL` as "NO overlay row exists for this
--- scenario", which is a DIFFERENT state from an overlay row that
--- exists and says `covered = false` — the first is unauthored, the
--- second is authored-and-not-covered, and `canon report` renders both.
--- A NULL `spec_covered` alongside a non-NULL `spec_project_id` is a
--- third, narrower state: that project's overlay row exists but its own
--- `covered` field is absent or non-boolean.
+-- `Scenario` is the right driver on both counts: it is the record
+-- `canon inventory sync` writes for every authored `.feature`
+-- scenario, independent of any plan, and it carries the
+-- `(project_id, scenario_id)` composite the coverage side is already
+-- keyed by. Both sides of that join now agree on a full key.
 --
--- `porting.coverage` is read generically by its `kind` string — this
--- view never depends on the `porting` plugin being installed; a repo
--- with no coverage overlay simply gets `spec_project_id`/`spec_covered`
--- NULL throughout. This is an interim, explicitly-named coupling to the
--- ONE `porting.coverage` overlay identity — the same "explicit STUB,
--- never silently load-bearing" posture `int_evidence_verdicts` already
--- establishes for its own S5-shaped stand-in; a repo using a DIFFERENT
--- overlay identity for spec-coverage gets no `spec_covered` signal from
--- this view until a follow-up generalizes the join to
--- `canon.yaml`-declared overlay identities (named non-goal, s20
--- design.md R3). Read-only reporting ONLY — never a `canon-gate` input;
--- `canon gate check` verdicts are byte-identical before and after this
--- view exists (s20 acceptance).
+-- GRAIN: exactly one row per `(project_id, scenario_id)` in the spec
+-- corpus, folded to each scenario's latest version. Unlike the s20
+-- grain this needs no per-project fan-out: the driving side now
+-- CARRIES the project, so a scenario id authored under two spec roots
+-- is two distinct rows by construction rather than one declared pair
+-- with two contradictory coverage answers.
 --
--- Every joined side is folded to one row per key (header's fold
--- inventory): `int_task_scenario_refs` and `mart_trust_matrix` fold
--- their own `task_id`, and `cov` below folds the overlay's OWN declared
--- `join_key` — `(project_id, scenario_id)` per
--- `.canon/plugins/porting/plugin.yaml`, the same pair
--- `GitTier::write_namespaced` builds the `{project_id}__{scenario_id}`
--- natural key from. The fold is still needed at that full key:
--- `write_namespaced` appends a new object whenever an overlay row's
--- content changes (its own "logically different body, same join key,
--- appends never overwrites"), so one project re-syncing its coverage is
--- two physical rows at one key. Unfolded AND unprojected, this view was
--- QUADRATIC in stored versions — a task flipped once by `canon gate
--- task` crossed with its own re-synced coverage overlay emitted four
--- rows for ONE declared pair, two of them reading a `task_status` the
--- plan no longer holds.
+-- The task side is a LEFT JOIN and therefore purely additive: a
+-- scenario no task declares still gets its row, with NULL
+-- `task_id`/`task_status`/`green`. That NULL is the panel's whole
+-- point — it is a specified scenario no plan is carrying.
 CREATE OR REPLACE VIEW mart_scope_status AS
-SELECT
-    r.task_id,
-    r.scenario_id,
-    tm.task_status,
-    tm.covered      AS evidence_covered,
-    tm.green,
-    cov.project_id  AS spec_project_id,
-    cov.covered     AS spec_covered
-FROM int_task_scenario_refs r
-LEFT JOIN mart_trust_matrix tm ON tm.task_id = r.task_id
-LEFT JOIN (
+WITH scenario_latest AS (
+    SELECT
+        body ->> '$.project_id'  AS project_id,
+        body ->> '$.scenario_id' AS scenario_id,
+        body ->> '$.title'       AS title,
+        body ->> '$.subject_id'  AS subject_id
+    FROM stg_records
+    WHERE kind = 'scenario'
+    QUALIFY row_number() OVER (
+        PARTITION BY body ->> '$.project_id', body ->> '$.scenario_id'
+        ORDER BY version_rank DESC
+    ) = 1
+),
+-- One row per scenario at most. `int_task_scenario_refs` may declare
+-- the same scenario from SEVERAL tasks; multiplying the driver by that
+-- would reintroduce the duplicate-row defect the s20 grain comment
+-- describes, so the task side is aggregated to a deterministic single
+-- representative plus a count that keeps the fan-out visible.
+task_side AS (
+    SELECT
+        r.scenario_id,
+        min(r.task_id)   AS task_id,
+        count(*)         AS declaring_task_count
+    FROM int_task_scenario_refs r
+    GROUP BY r.scenario_id
+),
+spec_cov AS (
     SELECT
         body ->> '$.project_id'         AS project_id,
         body ->> '$.scenario_id'        AS scenario_id,
@@ -943,8 +926,51 @@ LEFT JOIN (
         PARTITION BY body ->> '$.project_id', body ->> '$.scenario_id'
         ORDER BY version_rank DESC
     ) = 1
-) cov ON cov.scenario_id = r.scenario_id
-ORDER BY r.task_id, r.scenario_id, cov.project_id;
+),
+-- s44 made evidence authorable against a scenario directly
+-- (`canon evidence add --scenario-id --project-id`), keyed by the same
+-- composite this view is driven by. `mart_trust_matrix` cannot see
+-- those records — it is keyed `task_id` and `int_task_evidence` filters
+-- `task_id IS NOT NULL` — so a panel reading evidence only through the
+-- task join would report "no evidence" for a scenario that has been
+-- attested to directly. Latest verdict per scenario, same fold rule.
+scenario_evidence AS (
+    SELECT
+        body ->> '$.project_id'  AS project_id,
+        body ->> '$.scenario_id' AS scenario_id,
+        body ->> '$.verdict'     AS verdict
+    FROM stg_records
+    WHERE kind = 'evidence_record'
+      AND (body ->> '$.scenario_id') IS NOT NULL
+      AND (body ->> '$.project_id') IS NOT NULL
+    QUALIFY row_number() OVER (
+        PARTITION BY body ->> '$.project_id', body ->> '$.scenario_id'
+        ORDER BY version_rank DESC
+    ) = 1
+)
+SELECT
+    s.project_id,
+    s.scenario_id,
+    s.title,
+    s.subject_id,
+    t.task_id,
+    t.declaring_task_count,
+    tm.task_status,
+    -- Either side counts as attested: the task the scenario is declared
+    -- by, or the scenario itself.
+    coalesce(tm.covered, se.verdict IS NOT NULL)                     AS evidence_covered,
+    coalesce(tm.green, se.verdict = 'faithful')                      AS green,
+    se.verdict                                                       AS scenario_verdict,
+    cov.covered                                                      AS spec_covered
+FROM scenario_latest s
+LEFT JOIN task_side t ON t.scenario_id = s.scenario_id
+LEFT JOIN mart_trust_matrix tm ON tm.task_id = t.task_id
+LEFT JOIN scenario_evidence se ON se.project_id = s.project_id AND se.scenario_id = s.scenario_id
+-- The FULL declared pair on both sides (s45): matching on
+-- `scenario_id` alone would report one spec root's coverage under
+-- another's name whenever two roots share an id.
+LEFT JOIN spec_cov cov ON cov.project_id = s.project_id AND cov.scenario_id = s.scenario_id
+ORDER BY s.project_id, s.scenario_id;
 
 -- Panel 2: session costs grouped by `(session_id, client, role,
 -- workspace_label)` (S3 ingest, the donor's `session_id` join key).

@@ -38,7 +38,7 @@ const EXPECTED_CONTRACT: &[(&str, &[&str])] = &[
     ),
     (
         "mart_scope_status",
-        &["task_id", "scenario_id", "task_status", "evidence_covered", "green", "spec_project_id", "spec_covered"],
+        &["project_id", "scenario_id", "title", "subject_id", "task_id", "declaring_task_count", "task_status", "evidence_covered", "green", "scenario_verdict", "spec_covered"],
     ),
     ("mart_subjects", &["domain", "subject_id", "title", "status", "scenario_count", "covered_scenarios"]),
     (

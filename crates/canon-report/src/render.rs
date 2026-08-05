@@ -413,7 +413,7 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     render_table(&mut out, &marts.review_burndown);
 
     out.push_str("## Scope status\n\n");
-    out.push_str("Task done × evidence-verified × spec-covered, per declared scenario ref (`mart_scope_status`).\n\n");
+    out.push_str("Every specified scenario × evidence-verified × plan-carried × spec-covered (`mart_scope_status`). Driven by the spec corpus, so a scenario no plan task declares still appears — with a NULL `task_id`, which is the worklist entry.\n\n");
     render_table(&mut out, &marts.scope_status);
 
     out.push_str("## Subjects\n\n");

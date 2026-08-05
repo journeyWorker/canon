@@ -115,15 +115,39 @@ fn plant_refused_task(git_root: &std::path::Path) -> std::path::PathBuf {
     path
 }
 
-fn scope_status_task_ids(roots: &Roots) -> Vec<String> {
+/// The scenarios `mart_scope_status` reports as CARRIED by some plan
+/// task. Since s45 the mart is driven by the spec corpus, so every
+/// authored scenario has a row and `task_id` is the nullable side: a
+/// NULL means "specified, no plan task declares it". This helper is
+/// therefore the set of scenarios whose worklist row a task has
+/// claimed — which is exactly what a refused-but-globbed task moves.
+fn scope_status_carried_scenarios(roots: &Roots) -> Vec<String> {
     let mut ids: Vec<String> = marts::fetch_scope_status(roots)
         .unwrap()
         .rows
         .iter()
-        .map(|row| row["task_id"].as_str().expect("`task_id` is a non-null mart column").to_string())
+        .filter(|row| row["task_id"].as_str().is_some())
+        .map(|row| row["scenario_id"].as_str().expect("`scenario_id` is the mart's non-null driving key").to_string())
         .collect();
     ids.sort();
     ids
+}
+
+/// One `Scenario` per id the fixture's tasks declare. Required since
+/// s45: the mart is driven by the spec corpus, so a declared ref
+/// pointing at no authored scenario has no row to attach to.
+fn write_scenarios(tier: &GitTier) {
+    for id in [VALID_SCENARIO_ID, REFUSED_SCENARIO_ID] {
+        let record = canon_model::Scenario::new(
+            Envelope::new(RecordKind::Scenario.schema_version(), RecordKind::Scenario, at(), Actor::new("canon", RoleId::parse("dev").unwrap())),
+            canon_model::ProjectId::parse("core").unwrap(),
+            ScenarioId::parse(id).unwrap(),
+            "t",
+            "d",
+            canon_model::SpecDigest::of(id.as_bytes()),
+        );
+        tier.write(&record).unwrap();
+    }
 }
 
 /// s43 round 4, finding 3. `manifest.rs` claimed a snapshot whose
@@ -148,12 +172,13 @@ fn a_core_kind_body_the_rust_reader_refuses_moves_a_mart_under_an_unchanged_sour
     let git_root = dir.path().join("ledger");
     let tier = GitTier::new(&git_root);
     tier.write(&valid_task()).unwrap();
+    write_scenarios(&tier);
 
     let roots = Roots::new(git_root.clone(), dir.path().join("r2"), dir.path().join("learn"));
     let digest = || DigestHeader::compute(dir.path(), &git_root).unwrap().combined_digest();
 
     let baseline_digest = digest();
-    assert_eq!(scope_status_task_ids(&roots), vec![VALID_TASK_ID.to_string()], "the fixture starts at exactly one declared pair");
+    assert_eq!(scope_status_carried_scenarios(&roots), vec![VALID_SCENARIO_ID.to_string()], "the fixture starts with exactly one scenario carried by a task");
 
     plant_refused_task(&git_root);
 
@@ -170,10 +195,12 @@ fn a_core_kind_body_the_rust_reader_refuses_moves_a_mart_under_an_unchanged_sour
     assert_eq!(baseline_digest, digest(), "a record the validated read refuses contributes nothing to `source_digest` — this is the documented exception, not a wish");
 
     // …and the glob, which is not that read, hands it to the mart.
+    let mut expected = vec![VALID_SCENARIO_ID.to_string(), REFUSED_SCENARIO_ID.to_string()];
+    expected.sort();
     assert_eq!(
-        scope_status_task_ids(&roots),
-        vec![VALID_TASK_ID.to_string(), REFUSED_TASK_ID.to_string()],
-        "`mart_scope_status` must grow the refused task's declared pair — the exception `manifest.rs` names beside its guarantee"
+        scope_status_carried_scenarios(&roots),
+        expected,
+        "`mart_scope_status` must attach the refused task to its declared scenario — the exception `manifest.rs` names beside its guarantee"
     );
 }
 
@@ -204,7 +231,7 @@ fn a_whitespace_only_reformat_of_a_valid_core_record_moves_neither() {
     let digest = || DigestHeader::compute(dir.path(), &git_root).unwrap().combined_digest();
 
     let baseline_digest = digest();
-    let baseline_scope = scope_status_task_ids(&roots);
+    let baseline_scope = scope_status_carried_scenarios(&roots);
 
     // `GitTier::write` writes `to_vec_pretty`; rewrite the SAME value
     // compactly. Different bytes, identical content — and identical
@@ -221,5 +248,5 @@ fn a_whitespace_only_reformat_of_a_valid_core_record_moves_neither() {
     assert_eq!(read.records.len(), 1);
 
     assert_eq!(baseline_digest, digest(), "the core half hashes the canonical re-serialization of the validated record, so whitespace cannot move `source_digest`");
-    assert_eq!(baseline_scope, scope_status_task_ids(&roots), "…and DuckDB parses the same JSON, so whitespace cannot move a mart either");
+    assert_eq!(baseline_scope, scope_status_carried_scenarios(&roots), "…and DuckDB parses the same JSON, so whitespace cannot move a mart either");
 }

@@ -679,6 +679,25 @@ fn build_git_tier(git_root: &Path) {
         EvidenceVerdict::Faithful,
     ))
     .unwrap();
+    // s45: `mart_scope_status` is driven by the SPEC corpus, so the two
+    // scenarios the fixture's tasks declare must exist as `Scenario`
+    // records or they have no worklist row for a task to attach to.
+    // Authored under the same `project_id` as the one
+    // `porting.coverage` overlay row, so the mart's full-pair coverage
+    // join resolves for the fully-green scenario and honestly misses
+    // for the unauthored one.
+    for scenario_id in [scope_status::FULLY_GREEN_SCENARIO_ID, scope_status::UNAUTHORED_SCENARIO_ID] {
+        tier.write(&canon_model::Scenario::new(
+            Envelope::new(1, RecordKind::Scenario, at(2026, 1, 5, 8), actor("canon", "dev")),
+            canon_model::ProjectId::parse(scope_status::FULLY_GREEN_SPEC_PROJECT_ID).unwrap(),
+            ScenarioId::parse(scenario_id).unwrap(),
+            "fixture scenario",
+            "",
+            canon_model::SpecDigest::of(scenario_id.as_bytes()),
+        ))
+        .unwrap();
+    }
+
     tier.write(
         &Subject::new(
             Envelope::new(1, RecordKind::Subject, at(2026, 1, 5, 9), actor("planner1", "planner")),

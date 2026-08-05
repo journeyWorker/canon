@@ -103,6 +103,23 @@ fn at(y: i32, m: u32, d: u32, h: u32) -> DateTime<Utc> {
     Utc.with_ymd_and_hms(y, m, d, h, 0, 0).single().unwrap()
 }
 
+/// s45: `mart_scope_status` is driven by the SPEC corpus, so every
+/// scenario a fixture's tasks declare must exist as a `Scenario` record
+/// or there is no worklist row for the task side to attach to. Writes
+/// one per `(project_id, scenario_id)`.
+fn write_scenario(git_root: &std::path::Path, project_id: &str, scenario_id: &str) {
+    GitTier::new(git_root)
+        .write(&canon_model::Scenario::new(
+            Envelope::new(1, RecordKind::Scenario, at(2026, 1, 1, 0), actor("dev")),
+            canon_model::ProjectId::parse(project_id).unwrap(),
+            ScenarioId::parse(scenario_id).unwrap(),
+            "fixture scenario",
+            "",
+            canon_model::SpecDigest::of(scenario_id.as_bytes()),
+        ))
+        .unwrap();
+}
+
 fn actor(role: &str) -> Actor {
     Actor::new("fold-fixture", RoleId::parse(role).unwrap())
 }
@@ -289,6 +306,7 @@ fn trust_matrix_and_scope_status_yield_one_row_per_task_after_a_checkbox_flip() 
 
     let task_id = TaskId::parse("fold-change#1").unwrap();
     let scenario_id = ScenarioId::parse("fold.task.01").unwrap();
+    write_scenario(&git_root, "root", scenario_id.as_str());
 
     // `canon gate task` flipping a checkbox appends a second `task`
     // version at the same `task_id`.
@@ -444,8 +462,11 @@ fn scope_status_reports_each_projects_own_coverage_for_a_shared_scenario_id() {
 
     // Two spec roots, ONE version each, disagreeing about coverage. The
     // disagreement is the point: it makes an arbitrary winner visible,
-    // where two `true` rows would hide it.
+    // where two `true` rows would hide it. Since s45 each root also
+    // authors its OWN `Scenario`, which is what makes the two rows two
+    // rows — the driving side now carries the project.
     for (project_id, covered) in [("alpha", true), ("beta", false)] {
+        write_scenario(&git_root, project_id, SHARED_SCENARIO);
         let natural_key = format!("{project_id}__{}", SHARED_SCENARIO);
         tier.write_namespaced("porting.coverage", &natural_key, coverage_overlay(project_id, SHARED_SCENARIO, covered)).unwrap();
     }
@@ -457,13 +478,16 @@ fn scope_status_reports_each_projects_own_coverage_for_a_shared_scenario_id() {
     // rows collapsed into a single group and `arg_max` returned
     // whichever the scan reached first, so `spec_covered` reported one
     // project's answer with nothing naming the project it came from.
-    assert_eq!(scope.rows.len(), 2, "one row per COVERING PROJECT for the shared scenario id, got {:?}", scope.rows);
+    // s45: two rows because two spec roots AUTHOR the scenario, so the
+    // driving side supplies the project and `spec_project_id` is no
+    // longer needed to name whose coverage a row reports.
+    assert_eq!(scope.rows.len(), 2, "one row per AUTHORING PROJECT for the shared scenario id, got {:?}", scope.rows);
 
     let spec_covered_for = |project_id: &str| {
         scope
             .rows
             .iter()
-            .find(|r| r.get("spec_project_id").and_then(|v| v.as_str()) == Some(project_id))
+            .find(|r| r.get("project_id").and_then(|v| v.as_str()) == Some(project_id))
             .unwrap_or_else(|| panic!("no row reports {project_id}'s own coverage: {:?}", scope.rows))["spec_covered"]
             .clone()
     };
@@ -489,6 +513,7 @@ fn trust_matrix_breaks_an_equal_at_task_tie_the_same_way_canon_query_does() {
 
     let task_id = TaskId::parse("fold-tie#1").unwrap();
     let scenario_id = ScenarioId::parse("fold.tie.01").unwrap();
+    write_scenario(&git_root, "root", scenario_id.as_str());
     // The SAME `at` for both versions — a `Task`'s `at` is
     // `file_modified_at(<source plan doc>)` (s20 D7), and a canon PARSER
     // change does not touch that mtime. `Task` is the kind whose
@@ -626,6 +651,8 @@ fn scope_status_picks_the_schema_version_canon_query_picks_when_a_rung_overflows
     )
     .unwrap();
 
+    write_scenario(&git_root, PROJECT, SCENARIO);
+
     // Two versions of ONE overlay key (`write_namespaced` appends on a
     // changed body), tied on `at`, disagreeing about `covered` so the
     // winner is observable, and differing on the ONE rung under test.
@@ -740,6 +767,8 @@ impl AtRungCorpus {
             .with_scenario_refs(vec![ScenarioId::parse(scenario).unwrap()]),
         )
         .unwrap();
+
+        write_scenario(&git_root, AT_RUNG_PROJECT, scenario);
 
         let natural_key = format!("{AT_RUNG_PROJECT}__{scenario}");
         for (stamp, schema, covered) in versions {

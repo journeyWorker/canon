@@ -60,10 +60,11 @@ pub struct Manifest {
     /// `mart_flywheel_funnel` rows moved — those are built from the
     /// excluded six — can carry an UNCHANGED `source_digest`. A
     /// snapshot whose `mart_scope_status` rows moved cannot, over
-    /// VALIDATED core records and overlay inputs: that mart's two
-    /// inputs are `Task.scenario_refs` (a covered core kind) and
-    /// `porting.coverage` (a namespaced overlay), and both are
-    /// digested.
+    /// VALIDATED core records and overlay inputs: that mart's inputs
+    /// are `Scenario` (its driving side since s45), `Task.scenario_refs`
+    /// and the folded `task` rows behind `mart_trust_matrix` (both
+    /// covered core kinds), and `porting.coverage` (a namespaced
+    /// overlay) — all of them digested.
     ///
     /// The ONE exception belongs right here and not four paragraphs
     /// down, because a guarantee whose counterexample sits further

@@ -103,17 +103,22 @@ export const EXPECTED_MART_SCHEMA: Record<string, ParquetColumn[]> = {
     { name: "divergence_open_running_total", type: "BIGINT" },
   ],
   mart_scope_status: [
-    { name: "task_id", type: "VARCHAR" },
+    // s45: driven by the SPEC corpus, so `project_id`/`scenario_id` is
+    // the non-null grain and `task_id` is the nullable side — a NULL
+    // there is a specified scenario no plan task declares.
+    { name: "project_id", type: "VARCHAR" },
     { name: "scenario_id", type: "VARCHAR" },
+    { name: "title", type: "VARCHAR" },
+    { name: "subject_id", type: "VARCHAR" },
+    { name: "task_id", type: "VARCHAR" },
+    { name: "declaring_task_count", type: "BIGINT" },
     { name: "task_status", type: "VARCHAR" },
     { name: "evidence_covered", type: "BOOLEAN" },
     { name: "green", type: "BOOLEAN" },
-    // `porting.coverage` is keyed `(project_id, scenario_id)`, so one
-    // scenario id can be covered by more than one spec root and the
-    // mart emits a row per covering project. `spec_project_id` is that
-    // discriminator, NULL alongside a NULL `spec_covered` when no
-    // overlay exists for the scenario at all.
-    { name: "spec_project_id", type: "VARCHAR" },
+    // s44 made evidence authorable against a scenario directly; the
+    // task-keyed trust matrix cannot see those, so the latest
+    // scenario-keyed verdict is carried here.
+    { name: "scenario_verdict", type: "VARCHAR" },
     { name: "spec_covered", type: "BOOLEAN" },
   ],
   mart_subjects: [
