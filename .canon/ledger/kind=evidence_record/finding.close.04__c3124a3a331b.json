@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T06:14:14.827954Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib closing_to_the_current_disposition_is_a_no_op_that_stages_nothing"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "finding.close.04",
+  "schema": 1,
+  "staging_id": "e90cf982e097",
+  "verdict": "faithful"
+}

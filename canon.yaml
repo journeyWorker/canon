@@ -91,12 +91,24 @@ plans:
 # behavior scenarios. `canon inventory sync` validates (S11) then
 # materializes one `Scenario` ledger-index record per tagged scenario;
 # `canon review add` attests against the SAME (project_id, scenario_id)
-# join. Single entry deliberately: `canon feature new`/`scenario new`
-# refuse a multi-root config.
+# join.
+#
+# s47: a SECOND root, and the first that describes canon itself. Until
+# now `platformer` was the only one, so `spec_coverage` — the check that
+# starts from the Scenario corpus and reports a spec nobody attested to
+# — could only ever measure a demo browser game. canon shipped a gate it
+# had no corpus to point at itself. `specs/` is that corpus; it grows one
+# area at a time, and `scope:` in `.canon/policy.yaml` is what keeps a
+# half-written area from blocking (see that file).
+#
+# `canon feature new`/`canon scenario new` take `--project <id>` to pick
+# between these two; a single-root repo still needs no flag.
 specs:
   roots:
     - id: platformer
       root: examples/platformer/specs
+    - id: canon
+      root: specs
 
 # s37 (`execution-graph-topology`): this repo's own `canon ingest
 # artifacts` source. Absent until now — which is why every

@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-06T06:25:40.401307Z",
+  "change_id": "s47-canon-specs-itself",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/main.rs:1",
+  "kind": "finding",
+  "reviewer": "release-voice",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "canon format spec names a POSITIONAL root and this repo has no spec/ directory, so every release verification reporting 0 file(s) checked was checking nothing"
+}

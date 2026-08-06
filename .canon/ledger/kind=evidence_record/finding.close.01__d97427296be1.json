@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T06:14:14.778488Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib a_disposition_transition_commits_alongside_the_record_it_supersedes"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "finding.close.01",
+  "schema": 1,
+  "staging_id": "d8da577e2851",
+  "verdict": "faithful"
+}

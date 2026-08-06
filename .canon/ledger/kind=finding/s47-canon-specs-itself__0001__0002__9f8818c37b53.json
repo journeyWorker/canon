@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-06T06:25:40.430662Z",
+  "change_id": "s47-canon-specs-itself",
+  "disposition": "open",
+  "file_ref": ".canon/ledger/kind=evidence_record",
+  "kind": "finding",
+  "reviewer": "release-voice",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "Four EvidenceRecords claim cargo test -p canon-gate spec_coverage verifies platformer game scenarios; honest as s44 fixtures, wrong as coverage"
+}

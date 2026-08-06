@@ -702,20 +702,48 @@ fn evidence_add_still_accepts_a_task_keyed_record() {
     assert!(stdout(&out).contains("canon gate task it-task-keyed#1"), "the task path must still name the flip: {}", stdout(&out));
 }
 
-/// s44 task 4.2: canon's OWN `.canon/policy.yaml` must resolve to
-/// `spec_coverage: None`. Turning the check on for this repo is a
-/// separate, deliberate act; until then its own gate verdicts provably
-/// do not move, and this test fails the moment someone enables it
-/// without meaning to.
+/// s44 task 4.2 asserted canon's OWN `.canon/policy.yaml` resolved
+/// `spec_coverage` to `None`, and said enabling it would be "a separate,
+/// deliberate act". s47 is that act, so this test now guards the
+/// enabled shape instead — the deliberate-act guard did its job by
+/// failing loud when the section appeared, and the reason it appeared
+/// is recorded here.
+///
+/// # Why it was off, and what changed
+/// It was never that canon failed its specs. canon had none: its only
+/// configured `specs.roots[]` entry was `examples/platformer/specs`, a
+/// demo browser game, so the check could only ever have measured a
+/// platformer. s47 adds a second root (`canon`) carrying canon's own
+/// `.feature` corpus, which is the first thing the check can honestly
+/// point at.
+///
+/// # Why `scope` is asserted, and not just `require_evidence`
+/// `scope` is what makes an incomplete corpus honest rather than
+/// silently green: an area with no Subject at `building`/`verifying`
+/// blocks nothing and is VISIBLY absent. Drop the scope and every
+/// platformer scenario becomes blocking, which would push an author
+/// toward attesting a demo game to get back to green — the exact
+/// fabricated-evidence shape the gate exists to refuse. So the scope is
+/// part of the contract, not a tuning knob, and its removal must fail
+/// here.
 #[test]
-fn canons_own_policy_does_not_enable_spec_coverage() {
+fn canons_own_policy_enables_spec_coverage_against_its_own_corpus() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
-    let policy = std::fs::read_to_string(repo.join(".canon/policy.yaml")).expect("canon's own policy.yaml");
-    assert!(
-        !policy.contains("spec_coverage"),
-        "canon's own policy.yaml declares spec_coverage; enabling it for this repo is a deliberate act that must update this test and its rationale"
-    );
 
     let resolution = canon_gate::PolicyResolution::resolve(repo, &canon_policy::SchemaRegistry::load());
-    assert_eq!(resolution.spec_coverage, None, "an absent section must resolve to None, never a poisoned or default-Active value");
+    let Some(canon_gate::SpecCoverage::Active { require_evidence, scope }) = resolution.spec_coverage.clone() else {
+        panic!("canon's own policy must resolve spec_coverage to Active, got {:?}", resolution.spec_coverage);
+    };
+    assert!(require_evidence, "the section exists to require evidence; a false here would be a section that enforces nothing");
+    assert_eq!(
+        scope,
+        vec![canon_model::SubjectStatus::Building, canon_model::SubjectStatus::Verifying],
+        "the scope is part of the contract: widening it makes a demo corpus blocking, and narrowing it makes canon's own underway work invisible"
+    );
+
+    let canon_yaml = std::fs::read_to_string(repo.join("canon.yaml")).expect("canon's own canon.yaml");
+    assert!(
+        canon_yaml.contains("id: canon"),
+        "spec_coverage is only meaningful against a corpus that describes canon; without the `canon` spec root it would measure the platformer demo"
+    );
 }

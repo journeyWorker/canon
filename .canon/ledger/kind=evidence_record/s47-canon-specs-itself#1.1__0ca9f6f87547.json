@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T06:33:38.342729Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon inventory sync"
+  },
+  "kind": "evidence_record",
+  "run_seq": 4,
+  "schema": 1,
+  "staging_id": "299d75e3f22c",
+  "task_id": "s47-canon-specs-itself#1.1",
+  "verdict": "faithful"
+}

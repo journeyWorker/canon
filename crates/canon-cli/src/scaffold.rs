@@ -61,7 +61,7 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use canon_model::family::feature::FeatureProvenance;
-use canon_model::{Actor, ScenarioId};
+use canon_model::{Actor, ProjectId, ScenarioId};
 use chrono::{DateTime, Utc};
 
 use crate::context::resolve_repo_root;
@@ -228,18 +228,72 @@ fn canonicalize_best_effort(path: &Path) -> PathBuf {
     }
 }
 
-/// `canon scenario new <tag> --title <label> [--feature <path>]` (task
-/// 5.1; s19 `derived-validated-scenario-feature` makes `--feature`
-/// optional, design D1-D3). Returns the process exit code: `0` on a
-/// successful append/create, `2` on a refused invocation — a
-/// `specs.roots[]` config fault, an ambiguous multi-root config when
-/// `--feature` is omitted (design D2), an explicit `--feature` path
-/// resolving outside every configured root (design D3), or `tag`
-/// already existing somewhere in the target feature corpus — with
-/// ZERO bytes written either way, mirroring `canon review add`'s own
+/// Pick the ONE configured `specs.roots[]` entry a scaffold write
+/// lands under — the single owner of that choice for BOTH
+/// [`run_feature_new`] and [`run_scenario_new`]'s tag-derived path, so
+/// the two commands can never drift into two different disambiguation
+/// rules or two differently-worded refusals. `Err` carries the
+/// operator-facing message WITHOUT a leading `canon <cmd>: ` prefix;
+/// each caller prints it behind its own prefix exactly as it prints
+/// every other refusal it owns.
+///
+/// Resolution, in order: an explicit `project` selects by id at ANY
+/// root count; absent it, a lone configured root is unambiguous and is
+/// taken as-is (the single-root repo never has to learn the flag
+/// exists); anything else refuses loud, never a guess.
+///
+/// Selection is by CONFIGURED ID, never by directory, for three
+/// reasons that all point the same way: the id is what the operator
+/// already wrote in `canon.yaml` and the only handle they have on a
+/// root, it is literally what becomes the `project_id` of every record
+/// `canon inventory sync` later materializes from this corpus (so
+/// naming it here is naming the key), and a directory-shaped bypass
+/// would resolve to a synthetic root carrying
+/// `crate::inventory::default_root_id()` instead of the configured id
+/// — silently mis-keying the very corpus the write is joining. That
+/// directory bypass is `canon inventory sync --spec-root`'s
+/// deliberately DIFFERENT job (an ad hoc root OUTSIDE config, whose id
+/// is immaterial to a read-and-validate pass), never this one's.
+fn resolve_spec_root<'a>(command: &str, roots: &'a [SpecRoot], project: Option<&ProjectId>) -> Result<&'a SpecRoot, String> {
+    // Every refusal below names the full configured set: the operator
+    // who got the id wrong, or didn't know one was needed, learns the
+    // exact accepted values from the refusal itself.
+    let configured = || roots.iter().map(|r| r.id.as_str()).collect::<Vec<_>>().join(", ");
+    match (project, roots) {
+        (Some(id), _) => roots.iter().find(|r| &r.id == id).ok_or_else(|| {
+            format!("refused — `--project {}` names no configured `specs.roots[]` entry (configured ids: {})", id.as_str(), configured())
+        }),
+        (None, [one]) => Ok(one),
+        (None, many) => Err(format!(
+            "refused — {} configured `specs.roots[]` entries (ids: {}); pass `--project <id>` to select which one `{command}` writes under",
+            many.len(),
+            configured()
+        )),
+    }
+}
+
+/// `canon scenario new <tag> --title <label> [--feature <path>]
+/// [--project <id>]` (task 5.1; s19 `derived-validated-scenario-feature`
+/// makes `--feature` optional, design D1-D3). Returns the process exit
+/// code: `0` on a successful append/create, `2` on a refused
+/// invocation — a `specs.roots[]` config fault, a spec root
+/// [`resolve_spec_root`] cannot pin down when `--feature` is omitted
+/// (design D2), an explicit `--feature` path resolving outside every
+/// configured root (design D3), or `tag` already existing somewhere in
+/// the target feature corpus — with ZERO bytes written either way,
+/// mirroring `canon review add`'s own
 /// refusal-exits-`2`/nothing-written convention
 /// (`crate::review::run_add`).
-pub fn run_scenario_new(repo: &Path, tag: &ScenarioId, title: &str, feature: Option<&Path>, at: DateTime<Utc>) -> i32 {
+///
+/// `project` is `--project <id>`: which configured `specs.roots[]`
+/// entry the DERIVED path lands under, selected by the root's `id`
+/// exactly as [`run_feature_new`] selects it ([`resolve_spec_root`]
+/// holds the rule and the reasoning for id-over-directory). It is
+/// consulted ONLY when `--feature` is omitted — an explicit
+/// `--feature <path>` already names its target outright, and which
+/// root that path belongs to is settled by the D3 under-any-root check
+/// below, never by a second id that could contradict it.
+pub fn run_scenario_new(repo: &Path, tag: &ScenarioId, title: &str, feature: Option<&Path>, project: Option<&ProjectId>, at: DateTime<Utc>) -> i32 {
     let repo_root = resolve_repo_root(repo);
     let ctx = SyncCtx::from_repo(&repo_root);
     let roots = match ctx.spec_roots(None) {
@@ -257,16 +311,13 @@ pub fn run_scenario_new(repo: &Path, tag: &ScenarioId, title: &str, feature: Opt
     let feature_path: PathBuf = match feature {
         None => {
             // D2: the tag-derived default mirrors `run_feature_new`'s
-            // own ambiguity refusal — never guess which root among
-            // several a derived file belongs under.
-            let root = match roots.as_slice() {
-                [one] => one,
-                many => {
-                    eprintln!(
-                        "canon scenario new: refused — {} configured `specs.roots[]` entries; omitting `--feature` requires exactly one configured root (pass `--feature <path>` explicitly to disambiguate which root `{}` belongs under)",
-                        many.len(),
-                        tag.as_str()
-                    );
+            // own root selection — the SAME [`resolve_spec_root`], so
+            // `--project` means one thing across both commands and an
+            // unresolvable root is never guessed at.
+            let root = match resolve_spec_root("canon scenario new", &roots, project) {
+                Ok(root) => root,
+                Err(msg) => {
+                    eprintln!("canon scenario new: {msg}");
                     return 2;
                 }
             };
@@ -346,12 +397,12 @@ pub fn run_scenario_new(repo: &Path, tag: &ScenarioId, title: &str, feature: Opt
     0
 }
 
-/// `canon feature new <area>.<surface> --title <label>` (task 5.2).
-/// Returns the process exit code: `0` on a fresh file written, `2` on
-/// a refused invocation (a `specs.roots[]` config fault, an ambiguous
-/// multi-root config — this command has no `--spec-root` override,
-/// unlike `canon inventory sync`/`canon plugin sync`, to disambiguate
-/// which root to scaffold under — or the target file already
+/// `canon feature new <area>.<surface> --title <label> [--project
+/// <id>]` (task 5.2). Returns the process exit code: `0` on a fresh
+/// file written, `2` on a refused invocation (a `specs.roots[]` config
+/// fault, a spec root [`resolve_spec_root`] cannot pin down — a
+/// multi-root config with no `--project <id>`, or a `--project` naming
+/// no configured entry — or the target file already
 /// existing). Uses `create_new` (atomic create-fails-if-exists), never
 /// a check-then-write race, so the existing file's bytes are UNTOUCHED
 /// in every refusal case. The path is derived via
@@ -371,7 +422,18 @@ pub fn run_scenario_new(repo: &Path, tag: &ScenarioId, title: &str, feature: Opt
 /// (s19 `wip-feature-stub-class`, design D4); the
 /// `corpus-authoring-scaffold` spec deliberately ties the fmt-clean
 /// round-trip to `scenario new`'s output, never this bare stub.
-pub fn run_feature_new(repo: &Path, area_surface: &AreaSurface, title: &str, at: DateTime<Utc>) -> i32 {
+///
+/// `project` is `--project <id>`, naming which configured
+/// `specs.roots[]` entry to scaffold under by that entry's `id`. By
+/// id, not by directory: the id is the operator's own handle on the
+/// root and is what becomes the `project_id` key of every record
+/// `canon inventory sync` later derives from this file, whereas a
+/// directory-shaped override would stamp
+/// `crate::inventory::default_root_id()` over the configured id and
+/// mis-key the corpus — that override is `canon inventory sync
+/// --spec-root`'s separate contract, not this command's
+/// ([`resolve_spec_root`]).
+pub fn run_feature_new(repo: &Path, area_surface: &AreaSurface, title: &str, project: Option<&ProjectId>, at: DateTime<Utc>) -> i32 {
     let repo_root = resolve_repo_root(repo);
     let ctx = SyncCtx::from_repo(&repo_root);
     let roots = match ctx.spec_roots(None) {
@@ -381,20 +443,21 @@ pub fn run_feature_new(repo: &Path, area_surface: &AreaSurface, title: &str, at:
             return 2;
         }
     };
-    let root = match roots.as_slice() {
-        [one] => one,
-        many => {
-            eprintln!(
-                "canon feature new: refused — {} configured `specs.roots[]` entries; this command has no `--spec-root` override to disambiguate which root `{}.{}` belongs under",
-                many.len(),
-                area_surface.area,
-                area_surface.surface
-            );
+    let root = match resolve_spec_root("canon feature new", &roots, project) {
+        Ok(root) => root,
+        Err(msg) => {
+            eprintln!("canon feature new: {msg}");
             return 2;
         }
     };
 
     let feature_path = resolve_feature_path(root, &area_surface.area, &area_surface.surface);
+    // The next-step hint below must be an invocation that actually
+    // RUNS (design D4 calls it "the exact invocation that closes that
+    // gap"), so it carries `--project` exactly when a bare `canon
+    // scenario new` would refuse for ambiguity — echoing the root just
+    // resolved rather than making the operator re-derive it.
+    let project_hint = if roots.len() > 1 { format!(" --project {}", root.id.as_str()) } else { String::new() };
 
     if let Some(parent) = feature_path.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
@@ -409,7 +472,7 @@ pub fn run_feature_new(repo: &Path, area_surface: &AreaSurface, title: &str, at:
             Ok(()) => {
                 println!("canon feature new: wrote {}", feature_path.display());
                 println!(
-                    "canon feature new: next: `canon scenario new {}.{}.01 --title '<label>' [--feature <path>]` to make it fmt-clean",
+                    "canon feature new: next: `canon scenario new {}.{}.01 --title '<label>'{project_hint} [--feature <path>]` to make it fmt-clean",
                     area_surface.area, area_surface.surface
                 );
                 0
@@ -488,5 +551,113 @@ mod tests {
         assert_eq!(append_scenario_block(no_trailing, "a.b.01", "t", prov), expected);
         assert_eq!(append_scenario_block(one_trailing, "a.b.01", "t", prov), expected);
         assert_eq!(append_scenario_block(blank_trailing, "a.b.01", "t", prov), expected);
+    }
+
+    /// `<n>` configured roots, ids `p0..p<n-1>`, each under its own
+    /// `specs-p<i>/` directory — the multi-root config these commands
+    /// used to refuse outright, built here rather than read off the
+    /// workspace's own `canon.yaml` so the tests pin the RULE, not this
+    /// repo's current root count.
+    fn repo_with_spec_roots(n: usize) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let mut yaml = String::from("specs:\n  roots:\n");
+        for i in 0..n {
+            yaml.push_str(&format!("    - id: p{i}\n      root: specs-p{i}\n"));
+        }
+        fs::write(dir.path().join("canon.yaml"), yaml).unwrap();
+        dir
+    }
+
+    fn spec_roots_of(dir: &tempfile::TempDir) -> Vec<SpecRoot> {
+        SyncCtx::from_repo(dir.path()).spec_roots(None).unwrap()
+    }
+
+    fn project(id: &str) -> ProjectId {
+        ProjectId::parse(id).unwrap()
+    }
+
+    const AT: &str = "2026-01-02T03:04:05Z";
+
+    fn at() -> DateTime<Utc> {
+        AT.parse().unwrap()
+    }
+
+    #[test]
+    fn resolve_spec_root_takes_the_lone_configured_root_when_no_project_is_given() {
+        let dir = repo_with_spec_roots(1);
+        let roots = spec_roots_of(&dir);
+        let picked = resolve_spec_root("canon feature new", &roots, None).unwrap();
+        assert_eq!(picked.id.as_str(), "p0");
+    }
+
+    #[test]
+    fn resolve_spec_root_selects_a_named_project_at_any_root_count() {
+        // Rule 2 is NOT conditioned on ambiguity: naming the only root
+        // explicitly is as valid as naming one among several, so a
+        // script can always pass `--project` regardless of how many
+        // roots the repo it runs against happens to configure.
+        let one = repo_with_spec_roots(1);
+        let one_roots = spec_roots_of(&one);
+        assert_eq!(resolve_spec_root("canon feature new", &one_roots, Some(&project("p0"))).unwrap().id.as_str(), "p0");
+
+        let three = repo_with_spec_roots(3);
+        let three_roots = spec_roots_of(&three);
+        assert_eq!(resolve_spec_root("canon feature new", &three_roots, Some(&project("p1"))).unwrap().id.as_str(), "p1");
+    }
+
+    #[test]
+    fn resolve_spec_root_refuses_a_project_id_no_configured_root_carries_and_lists_the_ones_that_exist() {
+        let dir = repo_with_spec_roots(2);
+        let roots = spec_roots_of(&dir);
+        let err = resolve_spec_root("canon feature new", &roots, Some(&project("nope"))).unwrap_err();
+        assert!(err.contains("`--project nope`"), "{err}");
+        assert!(err.contains("configured ids: p0, p1"), "{err}");
+    }
+
+    #[test]
+    fn resolve_spec_root_refuses_an_ambiguous_multi_root_config_and_names_the_flag_that_fixes_it() {
+        let dir = repo_with_spec_roots(2);
+        let roots = spec_roots_of(&dir);
+        let err = resolve_spec_root("canon feature new", &roots, None).unwrap_err();
+        assert!(err.contains("2 configured `specs.roots[]` entries"), "{err}");
+        assert!(err.contains("ids: p0, p1"), "{err}");
+        assert!(err.contains("pass `--project <id>`"), "{err}");
+        assert!(err.contains("`canon feature new`"), "{err}");
+    }
+
+    #[test]
+    fn feature_new_still_writes_under_the_lone_configured_root_with_no_project_flag() {
+        // The single-root repo never has to learn the flag exists.
+        let dir = repo_with_spec_roots(1);
+        let surface = AreaSurface::parse("world.hotdeal").unwrap();
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", None, at()), 0);
+        assert!(dir.path().join("specs-p0/features/kind=feature/area=world/hotdeal.feature").is_file());
+    }
+
+    #[test]
+    fn feature_new_writes_under_the_project_named_root_when_several_are_configured() {
+        let dir = repo_with_spec_roots(2);
+        let surface = AreaSurface::parse("world.hotdeal").unwrap();
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", Some(&project("p1")), at()), 0);
+        assert!(dir.path().join("specs-p1/features/kind=feature/area=world/hotdeal.feature").is_file());
+        assert!(!dir.path().join("specs-p0").exists(), "the unnamed root must be left entirely alone");
+    }
+
+    #[test]
+    fn feature_new_refuses_an_unknown_project_id_with_zero_bytes_written() {
+        let dir = repo_with_spec_roots(2);
+        let surface = AreaSurface::parse("world.hotdeal").unwrap();
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", Some(&project("p9")), at()), 2);
+        assert!(!dir.path().join("specs-p0").exists());
+        assert!(!dir.path().join("specs-p1").exists());
+    }
+
+    #[test]
+    fn feature_new_refuses_several_configured_roots_with_no_project_flag() {
+        let dir = repo_with_spec_roots(2);
+        let surface = AreaSurface::parse("world.hotdeal").unwrap();
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", None, at()), 2);
+        assert!(!dir.path().join("specs-p0").exists());
+        assert!(!dir.path().join("specs-p1").exists());
     }
 }

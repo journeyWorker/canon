@@ -466,3 +466,47 @@ fn fold_list_matches_pg_routing() {
          a kind routed to a postgres-backed rung but missing from the fold list regresses `canon query` for it"
     );
 }
+
+/// s47: `canon inventory sync` re-materializes a `Scenario` index
+/// record per scan, so a `.feature` edit followed by a re-sync leaves
+/// BOTH generations committed. `canon_gate::spec_coverage` has folded
+/// them since s44 — it must, or it judges one scenario twice and may
+/// judge the STALE copy — while `canon query --kind scenario` did not,
+/// and reported this repo's 24 scenarios as 38.
+///
+/// The assertion is that the two AGREE, not that a count is 1: a reader
+/// deciding what to attest and the gate deciding what is unattested must
+/// see the same corpus, or a green gate and a red-looking query describe
+/// the same repo.
+#[test]
+fn a_resynced_scenario_reads_as_one_current_record() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\n").unwrap();
+    let ledger = dir.path().join(".canon/ledger");
+    let tier = canon_store::git_tier::GitTier::new(&ledger);
+
+    let scenario = |at: chrono::DateTime<chrono::Utc>, title: &str| {
+        canon_model::Scenario::new(
+            canon_model::Envelope::new(1, canon_model::RecordKind::Scenario, at, canon_model::Actor::new("canon", canon_model::RoleId::parse("implementer").unwrap())),
+            canon_model::ProjectId::parse("canon").unwrap(),
+            canon_model::ScenarioId::parse("finding.close.01").unwrap(),
+            title,
+            "",
+            canon_model::SpecDigest::of(title.as_bytes()),
+        )
+    };
+    let first = chrono::DateTime::parse_from_rfc3339("2026-08-05T10:00:00Z").unwrap().with_timezone(&chrono::Utc);
+    canon_store::tier::Tier::write(&tier, &scenario(first, "the title before the edit")).unwrap();
+    canon_store::tier::Tier::write(&tier, &scenario(first + chrono::Duration::hours(1), "the title after the edit")).unwrap();
+
+    let raw = canon_store::tier::Tier::read(&tier, &canon_store::tier::TierQuery::kind(canon_model::RecordKind::Scenario)).unwrap();
+    assert_eq!(raw.records.len(), 2, "the ledger is append-only: a re-sync leaves both generations on disk");
+
+    let outcome = canon_cli::query::run(dir.path(), None, canon_model::RecordKind::Scenario, None, None, None, None).expect("query the scenario corpus");
+    assert_eq!(outcome.records.len(), 1, "`canon query --kind scenario` must fold to the CURRENT record, the way the gate already does");
+    assert_eq!(
+        outcome.records[0].0.get("title").and_then(|t| t.as_str()),
+        Some("the title after the edit"),
+        "and the survivor is the LATEST, never an arbitrary one"
+    );
+}

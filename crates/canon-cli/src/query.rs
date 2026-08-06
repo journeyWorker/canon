@@ -249,12 +249,27 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 ///   `NaturalKeyRule::Unique` at `canon_gate::promote`, which admits
 ///   the second version ONLY when it is a transition — so the versions
 ///   this fold collapses are always the same finding, never two.
+/// - `scenario` (s47): `canon inventory sync` re-materializes the index
+///   record for every scanned scenario, so editing one `.feature` line
+///   and re-syncing leaves BOTH generations on disk. `canon_gate::
+///   spec_coverage` has folded them since s44 — it must, or it would
+///   judge one scenario twice and judge the STALE copy — but `canon
+///   query --kind scenario` did not, and reported this repo's 24
+///   scenarios as 38. That divergence between what the gate evaluates
+///   and what the operator can read is the bug, not the row count.
 ///
 /// KIND-gated for [`fold_pg_routed_kind`]'s stated reason, and by the
 /// same trade-off: a kind that gains a re-writing verb must be added
 /// here or its `canon query` result regresses to N-independent-versions.
+///
+/// `review` is deliberately ABSENT and is not an oversight: its natural
+/// key carries the pinned sha
+/// (`{project_id}__{scenario_id}__{pin}`), so two attestations of one
+/// scenario at two commits are two DISTINCT keys, not two versions of
+/// one. Folding by key would collapse nothing today and would silently
+/// start dropping attestations the day two reviews share a pin.
 fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
-    if !matches!(kind, RecordKind::Subject | RecordKind::Finding) {
+    if !matches!(kind, RecordKind::Subject | RecordKind::Finding | RecordKind::Scenario) {
         return records;
     }
     fold_latest_by_natural_key(kind, records)

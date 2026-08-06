@@ -784,6 +784,9 @@ enum ScenarioCommand {
         /// Target .feature file (default: derived from <tag>; must live under a specs.roots[] entry)
         #[arg(long)]
         feature: Option<PathBuf>,
+        /// Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one
+        #[arg(long, value_parser = canon_cli::review::parse_project_id)]
+        project: Option<ProjectId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -800,6 +803,9 @@ enum FeatureCommand {
         /// The Feature: header label
         #[arg(long)]
         title: String,
+        /// Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one
+        #[arg(long, value_parser = canon_cli::review::parse_project_id)]
+        project: Option<ProjectId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1016,10 +1022,10 @@ fn main() -> ExitCode {
             PluginCommand::Sync { plugin_id, repo, spec_root } => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref()),
         },
         Command::Scenario { action } => match action {
-            ScenarioCommand::New { tag, title, feature, repo } => run_scenario_new(&repo, &tag, &title, feature.as_deref()),
+            ScenarioCommand::New { tag, title, feature, project, repo } => run_scenario_new(&repo, &tag, &title, feature.as_deref(), project.as_ref()),
         },
         Command::Feature { action } => match action {
-            FeatureCommand::New { surface, title, repo } => run_feature_new(&repo, &surface, &title),
+            FeatureCommand::New { surface, title, project, repo } => run_feature_new(&repo, &surface, &title, project.as_ref()),
         },
         Command::Subject { action } => match action {
             SubjectCommand::New { id, domain, title, summary, owner_role, actor_id, repo, json } => {
@@ -1214,27 +1220,30 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
     }
 }
 
-/// `canon scenario new <tag> --title <label> [--feature <path>]` (s16
-/// P5, `canon_cli::scaffold::run_scenario_new`'s own doc): the ONE
+/// `canon scenario new <tag> --title <label> [--feature <path>]
+/// [--project <id>]` (s16 P5,
+/// `canon_cli::scaffold::run_scenario_new`'s own doc): the ONE
 /// `Utc::now()` call for this command — computed here, at the
 /// dispatch boundary, so a brand-new `.feature` file's `Feature:` +
 /// first `Scenario:` provenance comments never straddle two different
 /// timestamps (`canon_cli::scaffold`'s module doc, "deterministic
-/// provenance"). `2` on a refused invocation (config fault, ambiguous
-/// multi-root default derivation, an out-of-root explicit `--feature`,
-/// or a duplicate tag), `0` on a successful append/create.
-fn run_scenario_new(repo: &std::path::Path, tag: &ScenarioId, title: &str, feature: Option<&std::path::Path>) -> ExitCode {
-    ExitCode::from(canon_cli::scaffold::run_scenario_new(repo, tag, title, feature, Utc::now()) as u8)
+/// provenance"). `2` on a refused invocation (config fault, a spec
+/// root the `--project` rules can't pin down for the derived path, an
+/// out-of-root explicit `--feature`, or a duplicate tag), `0` on a
+/// successful append/create.
+fn run_scenario_new(repo: &std::path::Path, tag: &ScenarioId, title: &str, feature: Option<&std::path::Path>, project: Option<&ProjectId>) -> ExitCode {
+    ExitCode::from(canon_cli::scaffold::run_scenario_new(repo, tag, title, feature, project, Utc::now()) as u8)
 }
 
-/// `canon feature new <area>.<surface> --title <label>` (s16 P5,
-/// `canon_cli::scaffold::run_feature_new`'s own doc) — same
-/// single-`Utc::now()`-call discipline as [`run_scenario_new`] above.
-/// `2` on a refused invocation (config fault, an ambiguous multi-root
-/// config, or an already-existing target file), `0` on a fresh file
+/// `canon feature new <area>.<surface> --title <label> [--project
+/// <id>]` (s16 P5, `canon_cli::scaffold::run_feature_new`'s own doc)
+/// — same single-`Utc::now()`-call discipline as [`run_scenario_new`]
+/// above. `2` on a refused invocation (config fault, a spec root the
+/// `--project` rules can't pin down, or an already-existing target
+/// file), `0` on a fresh file
 /// written.
-fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str) -> ExitCode {
-    ExitCode::from(canon_cli::scaffold::run_feature_new(repo, surface, title, Utc::now()) as u8)
+fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, project: Option<&ProjectId>) -> ExitCode {
+    ExitCode::from(canon_cli::scaffold::run_feature_new(repo, surface, title, project, Utc::now()) as u8)
 }
 
 /// `canon init [--repo <dir>]` / `canon init --check-config` (s19 P4,

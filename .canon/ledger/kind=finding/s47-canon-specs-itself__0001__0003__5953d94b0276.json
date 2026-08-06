@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "reviewer"
+  },
+  "at": "2026-08-06T06:25:40.445811Z",
+  "change_id": "s47-canon-specs-itself",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/query.rs:271",
+  "kind": "finding",
+  "reviewer": "release-voice",
+  "round": 1,
+  "schema": 1,
+  "seq": 3,
+  "severity": "blocker",
+  "summary": "Scenario is re-written by canon inventory sync but absent from query's fold list, so the gate folded 24 while canon query reported 38 for one corpus"
+}

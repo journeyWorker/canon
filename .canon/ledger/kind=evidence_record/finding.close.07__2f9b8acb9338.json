@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T06:14:14.868357Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib close_refuses_a_finding_that_was_never_committed"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "finding.close.07",
+  "schema": 1,
+  "staging_id": "79ac2f942329",
+  "verdict": "faithful"
+}

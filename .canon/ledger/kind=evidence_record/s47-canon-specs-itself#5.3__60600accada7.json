@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T06:33:38.841063Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib"
+  },
+  "kind": "evidence_record",
+  "run_seq": 19,
+  "schema": 1,
+  "staging_id": "933f482f7003",
+  "task_id": "s47-canon-specs-itself#5.3",
+  "verdict": "faithful"
+}

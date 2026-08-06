@@ -15,3 +15,7 @@
 trust_required:
   test-run: agent
   manual-review: human
+
+spec_coverage:
+  require_evidence: true
+  scope: [building, verifying]
