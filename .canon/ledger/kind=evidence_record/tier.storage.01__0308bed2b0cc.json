@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.945013Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-store --lib policy::tests::each_class_correct_rung_backend_pairing_parses"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "tier.storage.01",
+  "schema": 1,
+  "staging_id": "e0e34ded3544",
+  "verdict": "faithful"
+}

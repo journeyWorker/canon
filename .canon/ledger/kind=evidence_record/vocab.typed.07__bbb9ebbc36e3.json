@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:03.134502Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-vocab --lib compiling_a_valid_atom_produces_a_task"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "vocab.typed.07",
+  "schema": 1,
+  "staging_id": "085432de4e2e",
+  "verdict": "faithful"
+}

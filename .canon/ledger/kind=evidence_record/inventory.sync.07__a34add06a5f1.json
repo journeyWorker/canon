@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.946019Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib a_tagged_scenario_round_trips_the_subject_join"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "inventory.sync.07",
+  "schema": 1,
+  "staging_id": "0472638275a5",
+  "verdict": "faithful"
+}

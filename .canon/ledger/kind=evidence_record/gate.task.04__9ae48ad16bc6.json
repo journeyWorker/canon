@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.436365Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib checkbox::tests::a_not_applicable_verdict_counts_as_passing_alongside_faithful"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "gate.task.04",
+  "schema": 1,
+  "staging_id": "37dbe9175b89",
+  "verdict": "faithful"
+}

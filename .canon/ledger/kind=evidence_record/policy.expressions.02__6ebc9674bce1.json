@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.232973Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-policy --lib rejects_unknown_function"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "policy.expressions.02",
+  "schema": 1,
+  "staging_id": "e90efb9948fa",
+  "verdict": "faithful"
+}

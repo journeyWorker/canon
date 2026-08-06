@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.175689Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate gate_check_exits_clean_on_an_empty_repo"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "gate.check.01",
+  "schema": 1,
+  "staging_id": "72558bbcf8eb",
+  "verdict": "faithful"
+}

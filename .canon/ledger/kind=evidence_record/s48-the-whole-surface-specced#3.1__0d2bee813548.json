@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:22:03.969133Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test --workspace"
+  },
+  "kind": "evidence_record",
+  "run_seq": 10,
+  "schema": 1,
+  "staging_id": "59cf9b051174",
+  "task_id": "s48-the-whole-surface-specced#3.1",
+  "verdict": "faithful"
+}

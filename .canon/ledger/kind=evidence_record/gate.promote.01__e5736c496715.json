@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.293011Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib promote::tests::promote_assigns_monotonic_gap_free_run_seq_within_one_invocation"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "gate.promote.01",
+  "schema": 1,
+  "staging_id": "0924d8f2ff00",
+  "verdict": "faithful"
+}

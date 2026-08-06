@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.905932Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject shipped_is_blocked_when_a_linked_scenario_is_divergent"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "subject.lifecycle.07",
+  "schema": 1,
+  "staging_id": "338557a50634",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.904268Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib resync_of_an_unchanged_corpus_writes_zero_new_records"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "inventory.sync.04",
+  "schema": 1,
+  "staging_id": "ba6b5a1a1b06",
+  "verdict": "faithful"
+}

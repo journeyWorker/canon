@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.463006Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate gate_task_reports_an_unknown_task_id_as_a_usage_failure"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "gate.task.06",
+  "schema": 1,
+  "staging_id": "d6e278c7ad2c",
+  "verdict": "faithful"
+}

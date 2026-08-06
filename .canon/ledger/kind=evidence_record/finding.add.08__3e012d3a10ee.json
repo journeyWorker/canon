@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.059871Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib every_row_line_break_in_every_free_text_field_is_refused"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "finding.add.08",
+  "schema": 1,
+  "staging_id": "c30cd9faafc9",
+  "verdict": "faithful"
+}

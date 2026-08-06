@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:03.007595Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test query_tier_degradation pg_routed_kind_query_fails_naming_pg_and_the_no_live_dsn_reason"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "tier.storage.06",
+  "schema": 1,
+  "staging_id": "d6d243fb54aa",
+  "verdict": "faithful"
+}

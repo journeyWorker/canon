@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.449274Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib checkbox::tests::blocks_on_a_fabricated_evidence_note"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "gate.task.05",
+  "schema": 1,
+  "staging_id": "da1320452557",
+  "verdict": "faithful"
+}

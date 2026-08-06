@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:03.108285Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-vocab --lib bad_enum_value_carries_the_verbatim_expected_one_of_message"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "vocab.typed.05",
+  "schema": 1,
+  "staging_id": "aded167fed25",
+  "verdict": "faithful"
+}

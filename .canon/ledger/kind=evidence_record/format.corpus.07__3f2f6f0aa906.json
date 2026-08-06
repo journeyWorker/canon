@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.162530Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --test wip_feature_stub scan_cost_and_violation_count_are_unchanged_by_the_stub_rewording"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "format.corpus.07",
+  "schema": 1,
+  "staging_id": "57b366204382",
+  "verdict": "faithful"
+}

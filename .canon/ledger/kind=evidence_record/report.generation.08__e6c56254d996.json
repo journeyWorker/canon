@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.532145Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test tier_boundary multi_tier_config_renders_the_boundary_note_naming_exactly_the_kinds_not_read_directly"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "report.generation.08",
+  "schema": 1,
+  "staging_id": "ea8fad27f52d",
+  "verdict": "faithful"
+}

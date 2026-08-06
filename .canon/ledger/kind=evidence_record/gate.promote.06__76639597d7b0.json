@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.358745Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib promote::tests::a_retried_promote_after_an_interrupted_one_recovers_instead_of_duplicating"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "gate.promote.06",
+  "schema": 1,
+  "staging_id": "139824e27e5c",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.788512Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --test claude_ingest_integration a_sidechain_transcript_normalizes_to_a_root_run_plus_one_child_run_per_subagent"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "ingest.sessions.04",
+  "schema": 1,
+  "staging_id": "242ae55ba8f7",
+  "verdict": "faithful"
+}

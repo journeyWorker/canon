@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.710632Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib dispatch::begin_tests::an_already_flipped_row_is_still_a_bindable_task"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "dispatch.manifest.06",
+  "schema": 1,
+  "staging_id": "b679ebfa09f1",
+  "verdict": "faithful"
+}

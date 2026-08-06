@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.514430Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --lib artifact_registry::tests::handoff_is_tagged_records_and_every_other_s4_adapter_is_tagged_path"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "ingest.artifacts.01",
+  "schema": 1,
+  "staging_id": "e1dd6731f602",
+  "verdict": "faithful"
+}

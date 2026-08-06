@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.332195Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib promote::tests::promote_refuses_a_candidate_with_no_derivable_partition_key"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "gate.promote.04",
+  "schema": 1,
+  "staging_id": "cad182e69f6c",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.111084Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --test fixtures_check fmt_check_detects_every_audited_gap_category_on_fixtures"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "format.corpus.03",
+  "schema": 1,
+  "staging_id": "08bf7bc97058",
+  "verdict": "faithful"
+}

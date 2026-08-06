@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.814932Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-model --lib as_of_governs_deferred_expiry"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "divergence.lifecycle.07",
+  "schema": 1,
+  "staging_id": "31fad9f81288",
+  "verdict": "faithful"
+}

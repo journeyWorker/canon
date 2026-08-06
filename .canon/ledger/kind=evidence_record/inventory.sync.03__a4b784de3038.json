@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.891514Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib a_duplicate_scenario_id_in_one_root_aborts_that_root_but_siblings_continue"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "inventory.sync.03",
+  "schema": 1,
+  "staging_id": "037c923fa2e4",
+  "verdict": "faithful"
+}

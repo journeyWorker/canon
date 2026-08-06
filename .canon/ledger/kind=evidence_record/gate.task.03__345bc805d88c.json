@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.423252Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate gate_task_flip_is_blocked_on_a_divergent_verdict"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "gate.task.03",
+  "schema": 1,
+  "staging_id": "ded3623fa581",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.855126Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence the_three_command_loop_flips_a_checkbox_on_authored_evidence"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "evidence.add.01",
+  "schema": 1,
+  "staging_id": "bb714488f60a",
+  "verdict": "faithful"
+}

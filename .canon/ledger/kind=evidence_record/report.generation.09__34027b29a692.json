@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.545453Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test tier_boundary git_only_routing_renders_no_boundary_section"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "report.generation.09",
+  "schema": 1,
+  "staging_id": "a12d7d1cbc2e",
+  "verdict": "faithful"
+}

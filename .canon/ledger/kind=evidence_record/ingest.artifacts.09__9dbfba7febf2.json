@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.621408Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test artifact_ingest an_unrouted_handoff_source_degrades_to_unavailable_without_aborting_the_rest_of_the_pass"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "ingest.artifacts.09",
+  "schema": 1,
+  "staging_id": "51d5cde47fbf",
+  "verdict": "faithful"
+}

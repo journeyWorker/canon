@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.248495Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-policy --lib rejects_comparison_between_incompatible_operand_types"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "policy.expressions.03",
+  "schema": 1,
+  "staging_id": "946febdaa9b9",
+  "verdict": "faithful"
+}

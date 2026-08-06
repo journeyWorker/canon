@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.527787Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test artifact_ingest ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_real_marts"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "ingest.artifacts.02",
+  "schema": 1,
+  "staging_id": "c44ff9e3ef7f",
+  "verdict": "faithful"
+}

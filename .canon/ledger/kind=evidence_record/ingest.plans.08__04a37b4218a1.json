@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.722437Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test plans_ingest cross_source_change_id_collision_first_configured_source_wins"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "ingest.plans.08",
+  "schema": 1,
+  "staging_id": "5e58d00a9023",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.318550Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib promote::tests::promote_refuses_a_malformed_candidate_without_consuming_a_run_seq"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "gate.promote.03",
+  "schema": 1,
+  "staging_id": "ec002272b95a",
+  "verdict": "faithful"
+}

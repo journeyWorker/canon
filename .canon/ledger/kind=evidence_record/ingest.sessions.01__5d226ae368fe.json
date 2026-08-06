@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.748873Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --lib registry::tests::every_shipped_adapters_parse_generation_matches_its_declared_value"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "ingest.sessions.01",
+  "schema": 1,
+  "staging_id": "bb3530a68936",
+  "verdict": "faithful"
+}

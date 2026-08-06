@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.311879Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib a_misspelled_key_poisons_the_section_rather_than_being_ignored"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "policy.expressions.08",
+  "schema": 1,
+  "staging_id": "1f2af51b5e91",
+  "verdict": "faithful"
+}

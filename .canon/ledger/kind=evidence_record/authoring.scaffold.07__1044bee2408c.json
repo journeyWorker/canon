@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.500804Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib resolve_spec_root_refuses_an_ambiguous_multi_root_config_and_names_the_flag_that_fixes_it"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "authoring.scaffold.07",
+  "schema": 1,
+  "staging_id": "f9f899fb5872",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.764591Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib content_hash_is_stable_and_content_addressed"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "skills.install.04",
+  "schema": 1,
+  "staging_id": "c0c64901e73e",
+  "verdict": "faithful"
+}

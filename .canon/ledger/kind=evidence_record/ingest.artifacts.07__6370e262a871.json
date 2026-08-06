@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.594340Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib artifact_ingest::tests::trajectory_content_digest_differs_when_verdict_contents_differ"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "ingest.artifacts.07",
+  "schema": 1,
+  "staging_id": "93522f430d39",
+  "verdict": "faithful"
+}

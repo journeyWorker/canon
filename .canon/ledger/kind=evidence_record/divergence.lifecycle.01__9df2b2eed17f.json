@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.737886Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib stage_then_promote_assigns_a_monotonic_run_seq_and_a_refusal_consumes_none"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "divergence.lifecycle.01",
+  "schema": 1,
+  "staging_id": "1ec61c90bcfa",
+  "verdict": "faithful"
+}

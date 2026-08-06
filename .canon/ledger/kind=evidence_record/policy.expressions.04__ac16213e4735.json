@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.260809Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-policy --lib select_on_a_dyn_field_stays_runtime_deferred"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "policy.expressions.04",
+  "schema": 1,
+  "staging_id": "a826317770ce",
+  "verdict": "faithful"
+}

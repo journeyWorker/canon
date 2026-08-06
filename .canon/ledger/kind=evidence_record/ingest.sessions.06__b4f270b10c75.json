@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.813721Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib ingest::tests::all_workspaces_flag_restores_the_machine_wide_scan"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "ingest.sessions.06",
+  "schema": 1,
+  "staging_id": "a630aadf677f",
+  "verdict": "faithful"
+}

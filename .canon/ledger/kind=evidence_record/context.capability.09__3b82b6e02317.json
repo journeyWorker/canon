@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.632375Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib resolve_surface_never_fails_with_no_vocab_directory_at_all"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "context.capability.09",
+  "schema": 1,
+  "staging_id": "1b466d0f2217",
+  "verdict": "faithful"
+}

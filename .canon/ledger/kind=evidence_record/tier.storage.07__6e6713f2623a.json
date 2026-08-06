@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:03.018085Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test query_tier_degradation git_routed_kind_query_succeeds_when_pg_and_r2_are_both_unreachable"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "tier.storage.07",
+  "schema": 1,
+  "staging_id": "48cc8f0eff60",
+  "verdict": "faithful"
+}

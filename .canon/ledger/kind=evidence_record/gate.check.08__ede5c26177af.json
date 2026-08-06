@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.266910Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib coverage::tests::a_policy_diff_alone_tightens_coverage_with_no_artifact_edits"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "gate.check.08",
+  "schema": 1,
+  "staging_id": "ea665c6dcbef",
+  "verdict": "faithful"
+}

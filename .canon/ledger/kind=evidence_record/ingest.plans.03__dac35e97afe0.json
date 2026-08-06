@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.659510Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test plans_ingest superpowers_dialect_end_to_end_import_via_one_shot_override"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "ingest.plans.03",
+  "schema": 1,
+  "staging_id": "a5d28ffa9443",
+  "verdict": "faithful"
+}

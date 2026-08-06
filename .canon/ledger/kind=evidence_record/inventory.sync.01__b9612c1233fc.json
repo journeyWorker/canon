@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.866364Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib a_clean_root_materializes_one_scenario_per_scenario_id_with_correct_digest_and_title"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "inventory.sync.01",
+  "schema": 1,
+  "staging_id": "50180a88db5d",
+  "verdict": "faithful"
+}

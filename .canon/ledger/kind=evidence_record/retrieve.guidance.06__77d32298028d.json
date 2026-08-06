@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.623455Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test dispatch a_recorded_manifest_replays_verbatim_even_after_the_source_is_demoted"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "retrieve.guidance.06",
+  "schema": 1,
+  "staging_id": "3a28a899db90",
+  "verdict": "faithful"
+}

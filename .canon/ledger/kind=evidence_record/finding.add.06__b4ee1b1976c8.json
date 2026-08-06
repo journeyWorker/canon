@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.032370Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib an_annotated_tags_own_object_id_is_refused_on_every_sha_flag"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "finding.add.06",
+  "schema": 1,
+  "staging_id": "5b7b22a0ffc2",
+  "verdict": "faithful"
+}

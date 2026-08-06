@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.208647Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test plugin_sync a_second_porting_sync_over_an_unchanged_inventory_writes_zero_new_overlay_records"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "plugin.overlay.09",
+  "schema": 1,
+  "staging_id": "7a3ba5d943a7",
+  "verdict": "faithful"
+}

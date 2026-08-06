@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.724480Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib dispatch::begin_tests::a_repo_with_no_plan_sources_reports_distinctly_from_an_unknown_task"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "dispatch.manifest.07",
+  "schema": 1,
+  "staging_id": "a58307a58004",
+  "verdict": "faithful"
+}

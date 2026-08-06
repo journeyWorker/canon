@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.493520Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test report check_exit_codes_track_missing_no_drift_and_drift_across_the_full_lifecycle"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "report.generation.05",
+  "schema": 1,
+  "staging_id": "1d84c742eb96",
+  "verdict": "faithful"
+}

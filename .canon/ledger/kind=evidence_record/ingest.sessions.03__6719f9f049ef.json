@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.775530Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --test claude_ingest_integration claude_adapter_scans_dot_claude_projects_and_derives_workspace_from_path"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "ingest.sessions.03",
+  "schema": 1,
+  "staging_id": "b4727a23a6fc",
+  "verdict": "faithful"
+}

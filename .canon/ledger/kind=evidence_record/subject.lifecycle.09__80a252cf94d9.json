@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.932758Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject a_domain_outside_the_activated_vocabulary_is_refused_naming_the_legal_set"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "subject.lifecycle.09",
+  "schema": 1,
+  "staging_id": "7686b24cc9c4",
+  "verdict": "faithful"
+}

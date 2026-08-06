@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:03.121167Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-vocab --lib evidence_kind_outside_policy_domain_is_rejected_with_the_invalid_kinds_list"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "vocab.typed.06",
+  "schema": 1,
+  "staging_id": "0c910fb56f7f",
+  "verdict": "faithful"
+}

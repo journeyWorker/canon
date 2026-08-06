@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.412054Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test scaffold omitting_feature_derives_the_identical_path_feature_new_would_scaffold"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "authoring.scaffold.01",
+  "schema": 1,
+  "staging_id": "6046ebad5e0a",
+  "verdict": "faithful"
+}

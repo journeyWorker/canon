@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.085894Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test fmt_check format_without_check_flag_exits_nonzero_and_lists_the_same_failure_classes"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "format.corpus.01",
+  "schema": 1,
+  "staging_id": "5589fe272e77",
+  "verdict": "faithful"
+}

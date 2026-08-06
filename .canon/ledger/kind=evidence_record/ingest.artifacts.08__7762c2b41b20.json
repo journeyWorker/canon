@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.608329Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test artifact_ingest native_records_true_with_a_raw_path_fails_the_xor_before_any_read"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "ingest.artifacts.08",
+  "schema": 1,
+  "staging_id": "2347ce823a36",
+  "verdict": "faithful"
+}

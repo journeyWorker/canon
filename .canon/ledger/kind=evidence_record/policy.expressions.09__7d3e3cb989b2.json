@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.324824Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib a_broken_spec_coverage_section_does_not_discard_the_rest_of_the_file"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "policy.expressions.09",
+  "schema": 1,
+  "staging_id": "212fa4a310f5",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.590436Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib cel_surface_matches_a_fresh_independent_bindings_for_walk"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "context.capability.06",
+  "schema": 1,
+  "staging_id": "7d9a8658f986",
+  "verdict": "faithful"
+}

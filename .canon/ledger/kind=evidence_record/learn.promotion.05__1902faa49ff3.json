@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.038950Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test learn_promote pending_trajectories_never_corroborate_a_promotion"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "learn.promotion.05",
+  "schema": 1,
+  "staging_id": "7c7824273197",
+  "verdict": "faithful"
+}

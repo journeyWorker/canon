@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.646371Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test plans_ingest one_shot_override_bypasses_config_and_imports_the_given_source"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "ingest.plans.02",
+  "schema": 1,
+  "staging_id": "d70e03d79780",
+  "verdict": "faithful"
+}

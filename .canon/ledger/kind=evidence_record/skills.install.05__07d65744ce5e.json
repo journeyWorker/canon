@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.778354Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib flatten_for_codex_renders_header_and_body"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "skills.install.05",
+  "schema": 1,
+  "staging_id": "5c93d90ad70d",
+  "verdict": "faithful"
+}

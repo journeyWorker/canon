@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.813393Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject adopt_links_the_change_and_the_subject_on_both_sides"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "subject.lifecycle.02",
+  "schema": 1,
+  "staging_id": "f12a1fbf4596",
+  "verdict": "faithful"
+}

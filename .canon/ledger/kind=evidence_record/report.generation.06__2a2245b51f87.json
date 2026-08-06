@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.506587Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test byte_stability rendering_the_same_fixture_twice_is_byte_identical"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "report.generation.06",
+  "schema": 1,
+  "staging_id": "e20ba2b8f049",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.800842Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib ingest::tests::default_scope_includes_project_and_worktree_excludes_foreign_project_and_captures_directives"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "ingest.sessions.05",
+  "schema": 1,
+  "staging_id": "181ae04970b6",
+  "verdict": "faithful"
+}

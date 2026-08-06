@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.215885Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib failure_class::tests::failure_classes_const_matches_enum_exactly"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "gate.check.04",
+  "schema": 1,
+  "staging_id": "17d8f06063ae",
+  "verdict": "faithful"
+}

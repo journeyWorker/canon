@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.827633Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-model --lib a_resolved_winner_whose_live_app_sha_moved_folds_to_resolved_invalid"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "divergence.lifecycle.08",
+  "schema": 1,
+  "staging_id": "a41c6eea083a",
+  "verdict": "faithful"
+}

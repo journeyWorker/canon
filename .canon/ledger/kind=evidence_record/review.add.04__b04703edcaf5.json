@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.675620Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-store --lib scenario_review_divergence_natural_keys_are_project_prefixed"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "review.add.04",
+  "schema": 1,
+  "staging_id": "042916068a41",
+  "verdict": "faithful"
+}

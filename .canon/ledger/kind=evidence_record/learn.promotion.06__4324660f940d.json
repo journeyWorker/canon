@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.052231Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test learn_promote a_later_contradiction_resets_the_streak_and_blocks"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "learn.promotion.06",
+  "schema": 1,
+  "staging_id": "851edd6a46eb",
+  "verdict": "faithful"
+}

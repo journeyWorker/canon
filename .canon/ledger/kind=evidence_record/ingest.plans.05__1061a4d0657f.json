@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.685764Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test plans_ingest one_shot_override_requires_both_flags_dialect_alone_fails"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "ingest.plans.05",
+  "schema": 1,
+  "staging_id": "6f39a6036873",
+  "verdict": "faithful"
+}

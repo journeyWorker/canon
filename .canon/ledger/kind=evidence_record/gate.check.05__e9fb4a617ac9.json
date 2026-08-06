@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.229175Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate gate_check_release_flag_engages_release_trust_check_but_ordinary_run_stays_silent_on_it"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "gate.check.05",
+  "schema": 1,
+  "staging_id": "bece4fac6d34",
+  "verdict": "faithful"
+}

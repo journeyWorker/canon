@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.789570Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-model --lib a_lower_run_seq_at_a_higher_round_still_folds_before_a_higher_run_seq"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "divergence.lifecycle.05",
+  "schema": 1,
+  "staging_id": "48a0e095ee24",
+  "verdict": "faithful"
+}

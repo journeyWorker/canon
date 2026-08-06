@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.846687Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject the_forward_status_chain_advances_and_folds_to_one_row"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "subject.lifecycle.03",
+  "schema": 1,
+  "staging_id": "c98bc81f5ae2",
+  "verdict": "faithful"
+}

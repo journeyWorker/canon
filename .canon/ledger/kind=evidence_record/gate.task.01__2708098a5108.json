@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.397544Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate gate_task_flip_is_blocked_with_no_evidence_record"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "gate.task.01",
+  "schema": 1,
+  "staging_id": "ba0e01dc7d19",
+  "verdict": "faithful"
+}

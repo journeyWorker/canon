@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.526073Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test context context_exits_zero_with_a_full_surface_even_when_the_corpus_fails_fmt_check"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "context.capability.01",
+  "schema": 1,
+  "staging_id": "3c01c10f82b4",
+  "verdict": "faithful"
+}

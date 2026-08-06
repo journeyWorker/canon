@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.006512Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test finding finding_add_refuses_a_resolution_sha_on_every_non_fixed_disposition"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "finding.add.04",
+  "schema": 1,
+  "staging_id": "6ede7cb3ef05",
+  "verdict": "faithful"
+}

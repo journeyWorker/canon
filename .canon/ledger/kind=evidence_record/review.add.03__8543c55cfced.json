@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.661944Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib refuses_two_provenance_refs_at_once_and_writes_nothing"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "review.add.03",
+  "schema": 1,
+  "staging_id": "924126385504",
+  "verdict": "faithful"
+}

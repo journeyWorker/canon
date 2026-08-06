@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.123813Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --test fixtures_check fmt_check_flags_the_pre_migration_features_dir_as_layout_violation"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "format.corpus.04",
+  "schema": 1,
+  "staging_id": "39f3ed51d08e",
+  "verdict": "faithful"
+}

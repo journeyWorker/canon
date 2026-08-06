@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.371738Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib promote::tests::the_committed_record_carries_the_staging_identity_it_was_promoted_under"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "gate.promote.07",
+  "schema": 1,
+  "staging_id": "4a42b69bd7cf",
+  "verdict": "faithful"
+}

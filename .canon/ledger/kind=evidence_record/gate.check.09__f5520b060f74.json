@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.279798Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib dispatch::tests::a_present_malformed_native_field_surfaces_as_malformed_evidence_through_the_normal_dispatcher"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "gate.check.09",
+  "schema": 1,
+  "staging_id": "0bbcca4c8d36",
+  "verdict": "faithful"
+}

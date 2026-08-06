@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:03.159224Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-vocab --lib evidence_with_an_unchecked_extra_key_is_rejected_not_silently_passed"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "vocab.typed.09",
+  "schema": 1,
+  "staging_id": "73c3d52929e3",
+  "verdict": "faithful"
+}

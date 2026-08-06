@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.961008Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib two_subject_tags_on_one_scenario_first_wins_with_a_counted_diagnostic"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "inventory.sync.08",
+  "schema": 1,
+  "staging_id": "141acd69bcb6",
+  "verdict": "faithful"
+}

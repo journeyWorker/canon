@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.556283Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --lib verdict::tests::code_review_finding_becomes_dev_guardrail_candidate"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "ingest.artifacts.04",
+  "schema": 1,
+  "staging_id": "7e1cd09f777a",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.604508Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test context context_from_a_subdirectory_resolves_the_ancestor_repo_root_policy"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "context.capability.07",
+  "schema": 1,
+  "staging_id": "b8fc32641f41",
+  "verdict": "faithful"
+}

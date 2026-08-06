@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.942506Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence evidence_add_refuses_a_newline_that_would_forge_a_second_checked_row"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "evidence.add.08",
+  "schema": 1,
+  "staging_id": "32c1ce325fb8",
+  "verdict": "faithful"
+}

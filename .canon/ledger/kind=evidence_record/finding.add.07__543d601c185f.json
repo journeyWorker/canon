@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.046200Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib outside_a_git_checkout_the_sha_existence_check_is_skipped"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "finding.add.07",
+  "schema": 1,
+  "staging_id": "ea92186c9a31",
+  "verdict": "faithful"
+}

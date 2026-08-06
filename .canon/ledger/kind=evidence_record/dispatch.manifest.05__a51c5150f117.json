@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.697910Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib dispatch::begin_tests::an_unknown_row_fails_loud_naming_the_id_and_persists_no_manifest"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "dispatch.manifest.05",
+  "schema": 1,
+  "staging_id": "12950a207e55",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.611763Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test retrieve retrieve_against_a_nonexistent_store_prints_empty_and_exits_zero"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "retrieve.guidance.05",
+  "schema": 1,
+  "staging_id": "e9e3e795482f",
+  "verdict": "faithful"
+}

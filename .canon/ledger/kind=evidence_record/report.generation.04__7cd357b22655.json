@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.480727Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --test check_gate check_reports_drift_when_the_committed_file_has_been_hand_edited"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "report.generation.04",
+  "schema": 1,
+  "staging_id": "c22433472d57",
+  "verdict": "faithful"
+}

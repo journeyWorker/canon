@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:03.044397Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-store --lib fold::tests::an_equal_at_tie_goes_to_the_greater_schema_even_when_the_lower_schema_has_the_greater_digest"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "tier.storage.09",
+  "schema": 1,
+  "staging_id": "73f70ac4b1e2",
+  "verdict": "faithful"
+}

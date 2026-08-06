@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.873707Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib any_non_retired_state_may_retire_but_retired_is_terminal"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "subject.lifecycle.05",
+  "schema": 1,
+  "staging_id": "0fba231ca2cb",
+  "verdict": "faithful"
+}

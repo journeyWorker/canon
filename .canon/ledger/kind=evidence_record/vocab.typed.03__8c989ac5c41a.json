@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:03.083678Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-vocab --test pilot_consumer_change the_pilot_atoms_declared_evidence_kind_is_in_the_real_policy_derived_domain"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "vocab.typed.03",
+  "schema": 1,
+  "staging_id": "4f58b36ef9e2",
+  "verdict": "faithful"
+}

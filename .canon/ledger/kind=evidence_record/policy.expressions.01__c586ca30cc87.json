@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.221256Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-policy --lib rejects_undeclared_field_with_expected_list"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "policy.expressions.01",
+  "schema": 1,
+  "staging_id": "4ca67d2c0346",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.697753Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test plans_ingest an_unchanged_source_rerun_writes_zero_records"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "ingest.plans.06",
+  "schema": 1,
+  "staging_id": "0feadefa7e3d",
+  "verdict": "faithful"
+}

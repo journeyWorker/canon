@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.474087Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib feature_new_writes_under_the_project_named_root_when_several_are_configured"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "authoring.scaffold.05",
+  "schema": 1,
+  "staging_id": "a606d90b6103",
+  "verdict": "faithful"
+}

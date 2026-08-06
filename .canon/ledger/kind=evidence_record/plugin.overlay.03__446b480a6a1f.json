@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.131867Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-plugin --lib write_overlay_never_calls_write_namespaced_when_validation_fails"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "plugin.overlay.03",
+  "schema": 1,
+  "staging_id": "8ceaa173dd42",
+  "verdict": "faithful"
+}

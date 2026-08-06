@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.519099Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test report snapshot_writes_nine_parquet_files_and_a_manifest_under_the_given_dir"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "report.generation.07",
+  "schema": 1,
+  "staging_id": "2d855e3cd2a2",
+  "verdict": "faithful"
+}

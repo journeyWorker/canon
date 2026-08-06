@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.995761Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-store --lib registry::tests::query_fans_out_and_merges_when_a_kind_is_split_across_two_tiers"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "tier.storage.05",
+  "schema": 1,
+  "staging_id": "99ce748be7e5",
+  "verdict": "faithful"
+}

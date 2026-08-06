@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.091373Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-learn --lib promotion::demote::tests::default_policy_soft_flags_an_existing_git_tier_file_leaving_other_front_matter_intact"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "learn.promotion.09",
+  "schema": 1,
+  "staging_id": "4aeea38009b4",
+  "verdict": "faithful"
+}

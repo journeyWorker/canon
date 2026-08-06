@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.137195Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --test fixtures_check fmt_check_flags_assets_lock_as_a_fourth_ad_hoc_format"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "format.corpus.05",
+  "schema": 1,
+  "staging_id": "85ac42656692",
+  "verdict": "faithful"
+}

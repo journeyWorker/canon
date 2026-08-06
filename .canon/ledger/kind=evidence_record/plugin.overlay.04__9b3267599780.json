@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.144183Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test plugin_sync a_covered_scenario_projects_covered_true_with_its_surface_ref"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "plugin.overlay.04",
+  "schema": 1,
+  "staging_id": "8df75911338f",
+  "verdict": "faithful"
+}

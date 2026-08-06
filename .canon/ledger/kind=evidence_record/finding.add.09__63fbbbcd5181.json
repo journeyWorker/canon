@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.072905Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test finding finding_add_help_states_it_is_an_observation_and_names_what_canon_skips"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "finding.add.09",
+  "schema": 1,
+  "staging_id": "9dd75d2693bf",
+  "verdict": "faithful"
+}

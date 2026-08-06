@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.826928Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib ingest::tests::a_changed_source_reingests_while_unchanged_ones_stay_skipped"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "ingest.sessions.07",
+  "schema": 1,
+  "staging_id": "83bf1673742e",
+  "verdict": "faithful"
+}

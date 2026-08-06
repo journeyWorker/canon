@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.440520Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test report report_writes_canon_report_md_under_the_resolved_repo_root"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "report.generation.01",
+  "schema": 1,
+  "staging_id": "52ba4042024d",
+  "verdict": "faithful"
+}

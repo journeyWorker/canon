@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.490526Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib evidence::tests::a_committed_multi_line_note_cannot_forge_a_second_checked_row"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "gate.task.08",
+  "schema": 1,
+  "staging_id": "a806bc811974",
+  "verdict": "faithful"
+}

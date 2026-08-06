@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.852909Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --test ingest_integration full_pipeline_is_idempotent_across_two_ingest_runs"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "ingest.sessions.09",
+  "schema": 1,
+  "staging_id": "6cf65150409e",
+  "verdict": "faithful"
+}

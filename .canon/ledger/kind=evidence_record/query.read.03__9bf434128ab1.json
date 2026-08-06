@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.362223Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test query fold_is_a_noop_for_an_unsuperseded_task_corpus"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "query.read.03",
+  "schema": 1,
+  "staging_id": "95d9d025131c",
+  "verdict": "faithful"
+}

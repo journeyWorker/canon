@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.065629Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-learn --lib config::tests::a_role_with_no_promotion_entry_gets_the_conservative_occurrence_default"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "learn.promotion.07",
+  "schema": 1,
+  "staging_id": "ed754c29e9e5",
+  "verdict": "faithful"
+}

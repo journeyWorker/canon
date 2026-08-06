@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.019842Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib a_well_formed_sha_that_names_no_commit_is_refused_by_flag_name"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "finding.add.05",
+  "schema": 1,
+  "staging_id": "3bfce8dfa2d0",
+  "verdict": "faithful"
+}

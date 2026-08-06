@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.202735Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib selftest::tests::every_failure_class_fires_exactly_on_its_own_fixture"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "gate.check.03",
+  "schema": 1,
+  "staging_id": "bbe4548d7c95",
+  "verdict": "faithful"
+}

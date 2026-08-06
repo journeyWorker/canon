@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.253116Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib policy::tests::missing_policy_yaml_resolves_to_documented_defaults_with_a_diagnostic"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "gate.check.07",
+  "schema": 1,
+  "staging_id": "4b669fe03859",
+  "verdict": "faithful"
+}

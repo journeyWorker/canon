@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.345669Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib promote::tests::dry_run_computes_the_plan_without_writing_or_deleting"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "gate.promote.05",
+  "schema": 1,
+  "staging_id": "afcc5aada1a2",
+  "verdict": "faithful"
+}

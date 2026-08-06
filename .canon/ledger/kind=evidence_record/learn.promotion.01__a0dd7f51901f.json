@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:01.986877Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test learn_promote promote_materializes_a_seeded_strategy_as_a_git_tier_file"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "learn.promotion.01",
+  "schema": 1,
+  "staging_id": "051516e3628c",
+  "verdict": "faithful"
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:00.564321Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib json_and_outline_agree_on_every_kind_enum_and_join_key_name"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "context.capability.04",
+  "schema": 1,
+  "staging_id": "ba01aa9db83e",
+  "verdict": "faithful"
+}

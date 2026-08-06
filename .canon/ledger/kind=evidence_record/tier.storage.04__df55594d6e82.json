@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.983568Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test tier_age real_run_moves_the_aged_record_and_leaves_the_fresh_one_and_is_idempotent_on_rerun"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "tier.storage.04",
+  "schema": 1,
+  "staging_id": "e8ca9816a3ab",
+  "verdict": "faithful"
+}

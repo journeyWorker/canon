@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:22:03.797801Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon inventory sync"
+  },
+  "kind": "evidence_record",
+  "run_seq": 9,
+  "schema": 1,
+  "staging_id": "b54da0faf3d7",
+  "task_id": "s48-the-whole-surface-specced#2.5",
+  "verdict": "faithful"
+}

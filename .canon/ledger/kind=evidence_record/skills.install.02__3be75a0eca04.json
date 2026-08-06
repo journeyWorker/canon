@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T11:13:02.738687Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test skills_install install_is_idempotent_with_no_source_change"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "skills.install.02",
+  "schema": 1,
+  "staging_id": "5be534b8de1b",
+  "verdict": "faithful"
+}
