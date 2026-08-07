@@ -56,7 +56,7 @@ Gherkin `.feature` 스펙 코퍼스를 검증하고 확장합니다.
 
 | Command | Description |
 |---|---|
-| `canon fmt --check [--repo <dir>] <ROOT>` | 코퍼스 루트(예: `spec/`)를 아티팩트 패밀리 스키마 + 레이아웃 디스크립터에 대해 검증합니다. `--check`가 fmt의 유일한 지원 모드입니다. |
+| `canon format <ROOT> [--repo <dir>]` (별칭 `canon fmt`) | 코퍼스 루트(예: `spec/`)를 아티팩트 패밀리 스키마 + 레이아웃 디스크립터에 대해 검증합니다. 검증이 유일한 모드이므로 `--check`는 이제 기본값이며 호환을 위해서만 받아들여집니다. |
 | `canon inventory sync [--repo <dir>] [--spec-root <dir>]` | 설정된 `specs.roots[]` 항목마다 `canon-fmt`로 검증한 뒤, `(project_id, scenario_id)`당 하나의 `Scenario` ledger-index 레코드를 생성합니다. `--spec-root`는 하나의 ad hoc 루트로 `canon.yaml`을 완전히 오버라이드합니다. |
 | `canon scenario new <TAG> --title <label> [--feature <path>] [--repo <dir>]` | `<area>.<surface>.<nn>` 태그에 대한 S11 준수 `.feature` 스텁을 추가합니다(없으면 생성). ledger 레코드는 쓰지 않습니다. |
 | `canon feature new <SURFACE> --title <label> [--repo <dir>]` | 아직 시작되지 않은 `<area>.<surface>`를 위한 시나리오 없는 새 `.feature` 파일을 스캐폴딩합니다. 기존 파일이 있으면 덮어쓰지 않고 실패합니다. |
@@ -79,11 +79,14 @@ Gherkin `.feature` 스펙 코퍼스를 검증하고 확장합니다.
 
 | Command | Description |
 |---|---|
-| `canon gate check [--repo <dir>] [--release]` | coverage/ledger/staleness/trust-ladder 체크 셋을 실행하고 위반 사항을 failure class별로 출력합니다. 종료 코드: `0` 클린, `1` gate-red, `2` 사용/로드 실패. `--release`는 release-scoped 트러스트 체크를 추가로 적용합니다. |
+| `canon gate check [--repo <dir>] [--release]` | coverage/ledger/staleness/spec-coverage/trust-ladder 체크 셋을 실행하고 위반 사항을 failure class별로 출력합니다. 종료 코드: `0` 클린, `1` gate-red, `2` 사용/로드 실패. `--release`는 release-scoped 트러스트 체크를 추가로 적용합니다. |
 | `canon gate task <TASK_ID> [--repo <dir>]` | plan `task_id` (`<change_id>#<n>`) 하나에 대한 증거 게이팅된 체크박스 플립입니다. 증거가 없거나 형식이 잘못되었거나 조작된 경우 fail closed — 행은 플립되지 않은 채로 남습니다. |
 | `canon gate promote [--repo <dir>] [--dry-run]` | `_staging/` 증거 레코드를 커밋된 ledger로 승급시키고, (role, surface)별로 단조 증가하는 `run_seq`를 부여합니다. `--dry-run`은 쓰지 않고 계획만 출력합니다. |
 | `canon gate install-hooks [--repo <dir>] [--event <name>] [--matcher <m>] [--command <cmd>] [--timeout <secs>]` | `.claude/settings.json`/`.codex/hooks.json`에 멱등적인 diff-only hook-seam을 설치하고, 범용 pre-commit 스크립트도 함께 설치합니다. 기본값: `--event PreToolUse`, `--command "canon gate task"`, `--timeout 30`. |
 | `canon gate selftest` | 번들된 fixture 코퍼스를 실행합니다: 발동이 증명된 모든 `FAILURE_CLASSES` 문자열을 `expected_failures.txt`와 정확히 일치시킵니다. `--repo`를 받지 않습니다. |
+| `canon evidence add --task <id> --kind <k> --ref <r> --role <role> [--verdict <v>] [--summary <s>] [--command-result <out>] [--scenario-id <id>] [--run-id <ulid>] [--repo <dir>]` | 플랜 태스크에 대한 귀속된 `EvidenceRecord` 하나를 스테이징합니다. 이후 `canon gate promote`로 커밋하고 `canon gate task`로 사용합니다. `--summary`는 플립된 행의 ✅ 접미사가 되며 조작 마커 검사를 거칩니다. 줄바꿈은 거부됩니다 — 줄바꿈 하나가 체크된 행을 하나 더 위조할 수 있기 때문입니다. |
+| `canon finding add --change-id <id> --round <n> --seq <n> --severity <s> --reviewer <name> --summary <s> [--disposition <d>] [--reviewed-sha <sha>] [--resolution-sha <sha>] [--introduced-by <sha>] [--file-ref <path:lines>] [--repo <dir>]` | 코드 리뷰 findings 하나를 durable 레코드로 스테이징합니다. 릴리즈 노트의 개수를 기억이 아니라 조회로 얻게 하기 위함입니다. `--seq`는 필수이며 충돌은 거부됩니다. `fixed`는 `--resolution-sha`를 요구하고, `fixed`만 그것을 가질 수 있습니다. |
+| `canon finding close --change-id <id> --round <n> --seq <n> --disposition <d> [--resolution-sha <sha>] [--repo <dir>]` | 이미 커밋된 finding의 처분(disposition)을 옮깁니다. append-only입니다: 이력을 수정하는 대신 이를 대체하는 레코드를 쓰므로, 그것이 제기된 라운드가 보존됩니다. 재오픈도 실제 전이입니다. |
 | `canon review add --project-id <id> --scenario-id <id> --reviewer <name> --pin <pin> --role <role> --upstream-ref <ref>` (또는 `--original-spec-ref <ref>`) `[--actor-id <id>] [--repo <dir>]` | 네이티브하고 귀속된 `Review` 레코드 하나를 씁니다. `--upstream-ref`/`--original-spec-ref` 중 정확히 하나가 필요합니다 — 둘 다 또는 둘 다 아니면 쓰기를 거부합니다. |
 | `canon divergence stage --project-id <id> --scenario-id <id> --sha <sha> --reviewer <name> --role <role> [--status <status>] [--reason <r>] [--expiry <e>] [--round <n>] [--detail <d>] [--repo <dir>]` | `run_seq`가 없는 순서 없는 staging candidate 하나를 씁니다. `--status`는 `open`, `still-divergent`, `resolved`, `deferred` 중 하나를 받으며(`deferred`는 `--reason`/`--expiry`를 추가로 요구합니다), `run_seq`는 이후 `canon divergence promote`가 부여합니다. |
 | `canon divergence promote [--repo <dir>] [--dry-run]` | 현재 staged된 모든 `Divergence` candidate를 일괄 승급시키고, `(project_id, role, surface)` 파티션 내에서 각각 단조 증가하는 `run_seq`를 부여합니다. |

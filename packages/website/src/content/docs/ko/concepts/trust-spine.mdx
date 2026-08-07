@@ -13,6 +13,10 @@ description: canon gate가 태스크 완료를 자가 보고에서 증거 기반
 `Divergent` 판정도 커버리지는 만족합니다 — 커버리지는 "테스트가
 존재한다"이지, 결코 "테스트가 통과했다"가 아닙니다.
 
+두 질문 모두 증거에서 출발하므로, 아무도 증명한 적 없는 스펙은 어느
+쪽에도 보이지 않습니다. [스펙 커버리지](#스펙-커버리지-해야-할-일-목록)는
+대신 스펙 코퍼스에서 출발하는, 옵트인 방식의 세 번째 질문입니다.
+
 ## 8개의 실패 클래스
 
 `canon gate`가 보고하는 모든 위반은 아래의 안정적이고 grep 가능한 문자열
@@ -21,7 +25,7 @@ description: canon gate가 태스크 완료를 자가 보고에서 증거 기반
 
 | 클래스 | 의미 |
 |---|---|
-| `uncovered-cell` | 정책상 요구되는 증거 셀(역할 × 아티팩트)에 대응하는 레코드가 아예 없음. |
+| `uncovered-cell` | 정책상 요구되는 증거 셀(역할 × 아티팩트)에 대응하는 레코드가 아예 없음 — 또는 `spec_coverage`가 켜진 경우, 스펙 코퍼스의 시나리오 중 어떤 증거도 없거나, 열린 divergence를 갖거나, 최신 판정이 `Divergent`인 것. 어느 쪽인지는 detail 문자열이 밝힙니다. |
 | `unreviewed-promotion` | 아티팩트의 `reviewed` 라이프사이클 태그에 대응하는 레저 리뷰-레코드가 없음. |
 | `trust-below-required` | 아티팩트의 트러스트 레벨이 `policy.yaml`의 `trust_required`보다 낮음 — release 스코프 전용(`canon gate check --release`). |
 | `stale-evidence` | 통과했던 레코드가 stale로 저하됨: `evidence_sha` 이후 선언된 표면이 변경됐거나, HEAD가 `staleness.max_commits_behind`를 넘어섬. 이미 green인 레코드만 저하시킴. |
@@ -29,6 +33,40 @@ description: canon gate가 태스크 완료를 자가 보고에서 증거 기반
 | `flagged` | 사람만 설정 가능한 `flagged` 오버레이가 켜짐 — 어떤 통과 증거가 있어도 절대 green이 되지 않음. |
 | `unevidenced-flip` | `canon gate task <task_id>`가 대응하는 non-`Divergent` `EvidenceRecord` 없이 체크박스 플립을 요청받음. |
 | `fabricated-evidence` | 플립에 첨부된 증거 노트에 차단 대상 마커(`"would pass"`, `"TBD"`, `"n/a"`)가 있거나, 첨부된 커맨드 결과 없이 `verified`만 주장함. |
+
+## 스펙 커버리지: 해야 할 일 목록
+
+커버리지와 판정 레저는 둘 다 증거에서 출발해 열거하므로, 스펙만 써두고
+아무도 손대지 않은 `.feature` 시나리오는 두 검사 모두에게 보이지
+않습니다 — 묶을 레코드 자체가 없기 때문입니다. 스펙 주도 도구가 가장
+잡아야 할 경우가 바로 그것이라, `spec_coverage`는 방향을 뒤집습니다:
+`canon inventory sync`가 인덱싱한 Scenario 코퍼스에서 출발해 증거를
+left join합니다. 그 결과가 곧 해야 할 일 목록입니다. **미구현 스펙과
+미스매치 스펙은 둘 다 작업 항목**이며, 둘 다 `uncovered-cell`로
+보고되고 어느 쪽인지는 detail이 밝힙니다.
+
+**옵트인하지 않으면 꺼져 있습니다.** 스펙 주도 팀은 구현보다 스펙을
+먼저 쓰므로, 기본값이 켜짐이면 그 방식대로 일하기 시작하는 순간 게이트가
+빨개집니다. 섹션이 없으면 위반은 0건입니다:
+
+```yaml
+# .canon/policy.yaml
+spec_coverage:
+  require_evidence: true
+  scope: [building, verifying]
+```
+
+`scope`는 무엇이 *차단할 수 있는지*를, Gherkin `@subject:<id>` 태그로
+Subject에 연결된 시나리오 중 해당 [라이프사이클
+상태](/ko/concepts/canon/)에 있는 것으로 좁힙니다. `building`이나
+`verifying` 상태의 Subject가 없는 영역은 아무것도 차단하지 않으며, 이것이
+부분적으로만 스펙이 있는 리포를 정직하게 유지합니다 — 스펙이 없는 부분은
+조용히 green이 되는 대신 눈에 띄게 비어 있습니다. `scope`를 생략하면 모든
+시나리오가 대상입니다.
+
+섹션이 있는데 형식이 잘못된 경우는 섹션이 없는 것과 결코 같지
+않습니다 — 보고된 뒤 검사를 실패시키므로, 오타가 게이트를 조용히
+꺼버릴 수 없습니다.
 
 ## 트러스트 래더
 
@@ -45,8 +83,8 @@ canon gate check --repo .            # 일반 평가
 canon gate check --repo . --release  # + trust-below-required
 ```
 
-`canon gate check`는 디스패처입니다: 커버리지 + 레저 + staleness + 항상
-켜져 있는 트러스트 래더 검사를 모아 실행하고, 모든 위반을 실패 클래스별로
+`canon gate check`는 디스패처입니다: 커버리지 + 레저 + staleness +
+스펙 커버리지 + 항상 켜져 있는 트러스트 래더 검사를 모아 실행하고, 모든 위반을 실패 클래스별로
 묶어 출력합니다. `--release`는 release 스코프의 `trust-below-required`
 검사를 추가로 켭니다 — `--release`가 전달되어도 트러스트 래더 검사는
 절대 빠지지 않습니다. 종료 코드: 깨끗하면 `0`, 게이트 red(위반 존재)면

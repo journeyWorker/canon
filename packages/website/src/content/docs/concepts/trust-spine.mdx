@@ -15,6 +15,10 @@ artifact, and never collapses them into one "done" boolean:
 A `Divergent` verdict still satisfies coverage — coverage is "a test
 exists", never "a test passed".
 
+Both questions start from evidence, so neither can see a spec nobody has
+attested to at all. [Spec coverage](#spec-coverage-the-worklist) is the
+opt-in third question that starts from the spec corpus instead.
+
 ## The eight failure classes
 
 Every violation `canon gate` reports carries one of these stable, grep-able
@@ -23,7 +27,7 @@ migration:
 
 | Class | Meaning |
 |---|---|
-| `uncovered-cell` | A policy-required evidence cell (role × artifact) has no matching record at all. |
+| `uncovered-cell` | A policy-required evidence cell (role × artifact) has no matching record at all — or, when `spec_coverage` is on, a scenario in the spec corpus that no evidence attests to, carries an open divergence, or whose latest verdict is `Divergent`. The detail string names which. |
 | `unreviewed-promotion` | An artifact's `reviewed` lifecycle tag has no matching ledger review-record. |
 | `trust-below-required` | The artifact's trust level is below `policy.yaml`'s `trust_required` — release-scoped only (`canon gate check --release`). |
 | `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only ever degrades an already-green record. |
@@ -31,6 +35,40 @@ migration:
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of any passing evidence. |
 | `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` `EvidenceRecord`. |
 | `fabricated-evidence` | The evidence note attached to a flip contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) or a bare `verified` claim with no attached command result. |
+
+## Spec coverage: the worklist
+
+Coverage and the verdict ledger both enumerate from evidence, so a
+`.feature` scenario that is specced and never touched is invisible to
+them — there is no record to group. That is the one case a spec-driven
+tool most needs to catch, so `spec_coverage` inverts the direction: it
+starts from the Scenario corpus `canon inventory sync` indexed and
+left-joins evidence onto it. What falls out is a worklist. An
+unimplemented spec and a mismatched one are both work items, and both
+report as `uncovered-cell` with a detail naming which.
+
+It is **off unless a repo opts in.** A spec-driven team writes specs
+before it implements them, so a check that were on by default would go
+red the moment the workflow started working. An absent section derives
+zero violations:
+
+```yaml
+# .canon/policy.yaml
+spec_coverage:
+  require_evidence: true
+  scope: [building, verifying]
+```
+
+`scope` narrows what can *block* to scenarios linked — via their
+`@subject:<id>` Gherkin tag — to a Subject in one of those
+[lifecycle states](/concepts/canon/). An area with no Subject at
+`building` or `verifying` blocks nothing, which is what keeps a partly
+specced repo honest: the unspecced parts are visibly absent rather than
+silently green. Leave `scope` out and every scenario is in scope.
+
+A present-but-malformed section is never silently equivalent to an absent
+one — it is reported and then fails the check, so a typo cannot quietly
+disable the gate.
 
 ## The trust ladder
 
@@ -47,9 +85,9 @@ canon gate check --repo . --release  # + trust-below-required
 ```
 
 `canon gate check` is the dispatcher: it assembles coverage + ledger +
-staleness + the always-on trust-ladder check and prints every violation
-grouped by failure class. `--release` additionally engages the
-release-scoped `trust-below-required` check — the trust-ladder check is
+staleness + spec-coverage + the always-on trust-ladder check and prints
+every violation grouped by failure class. `--release` additionally engages
+the release-scoped `trust-below-required` check — the trust-ladder check is
 never dropped when `--release` is passed. Exit `0` clean, `1` gate-red (any
 violation), `2` usage/load failure (unreadable ledger, corrupt
 `canon.yaml`).
