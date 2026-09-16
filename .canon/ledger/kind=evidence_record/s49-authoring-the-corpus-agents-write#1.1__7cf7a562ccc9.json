@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:28.884390Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --lib -- provenance_comment_in_contiguous_tag_comment_block_above_header_is_detected provenance_in_both_positions_counts_as_one_present_state"
+  },
+  "evidence_note": {
+    "summary": "leading block accepted, both positions count once; 43 canon-fmt tests green"
+  },
+  "kind": "evidence_record",
+  "run_seq": 1,
+  "schema": 1,
+  "staging_id": "c21d4234356f",
+  "task_id": "s49-authoring-the-corpus-agents-write#1.1",
+  "verdict": "faithful"
+}

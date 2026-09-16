@@ -87,3 +87,24 @@ Feature: gate check
     When the gate checks the repository
     Then the record is reported as malformed-evidence
     And it is caught once where the corpus is read, not re-validated by each check
+
+  # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @lane:behavior
+  @gate.check.10
+  Scenario: A scenario in an excluded lane is outside coverage
+    Given spec coverage is enabled with one lane listed under exclude_lanes
+    And an in-scope scenario in that lane has no evidence
+    When the gate runs
+    Then that scenario produces no uncovered-cell violation
+    And a scenario in an unlisted lane with no evidence still does
+
+  # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @lane:behavior
+  @gate.check.11
+  Scenario: A non-slug entry in exclude_lanes poisons the section rather than vanishing
+    Given a spec_coverage section whose exclude_lanes carries a value that is not a kebab-case slug
+    When the policy is resolved
+    Then the section is reported unusable, naming the value
+    And the gate refuses rather than treating the section as absent

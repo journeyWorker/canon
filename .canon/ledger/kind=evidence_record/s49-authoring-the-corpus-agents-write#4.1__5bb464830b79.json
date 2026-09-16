@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:44.270059Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib -- an_excluded_lane_is_out_of_scope_after_subject_scope an_unlisted_lane_remains_in_scope absent_exclude_lanes_preserves_existing_coverage_behavior an_invalid_exclude_lane_poisons_the_section"
+  },
+  "evidence_note": {
+    "summary": "smoke: 3 uncovered to 2 with exclude_lanes [process]; Bad Lane poisons the section"
+  },
+  "kind": "evidence_record",
+  "run_seq": 13,
+  "schema": 1,
+  "staging_id": "c2f682783aab",
+  "task_id": "s49-authoring-the-corpus-agents-write#4.1",
+  "verdict": "faithful"
+}

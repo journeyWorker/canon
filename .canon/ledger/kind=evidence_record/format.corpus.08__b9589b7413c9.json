@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:05:56.872010Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --lib -- provenance_comment_in_contiguous_tag_comment_block_above_header_is_detected blank_line_between_leading_comment_and_header_breaks_provenance"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "format.corpus.08",
+  "schema": 1,
+  "staging_id": "7824f69b6619",
+  "verdict": "faithful"
+}

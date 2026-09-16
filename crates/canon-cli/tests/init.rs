@@ -41,6 +41,7 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
     let dir = tempfile::tempdir().unwrap();
     let out = run_canon(&["init", "--repo", "."], dir.path());
     assert!(out.status.success(), "canon init failed: {}", stderr(&out));
+    assert!(stdout(&out).contains("canon skills install"), "init must name the skills install next step: {}", stdout(&out));
 
     let text = std::fs::read_to_string(dir.path().join("canon.yaml")).unwrap();
     assert!(text.contains("tiers:"), "{text}");

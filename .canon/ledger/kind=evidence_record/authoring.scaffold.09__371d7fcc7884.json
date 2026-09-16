@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:05:56.756943Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test scaffold scenario_new_emits_leading_provenance_subject_lane_and_actor"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "authoring.scaffold.09",
+  "schema": 1,
+  "staging_id": "fb8fc1476dae",
+  "verdict": "faithful"
+}

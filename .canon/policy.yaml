@@ -19,3 +19,4 @@ trust_required:
 spec_coverage:
   require_evidence: true
   scope: [building, verifying]
+  exclude_lanes: [process]

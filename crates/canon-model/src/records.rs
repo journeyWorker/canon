@@ -115,6 +115,25 @@ where
     Ok(s)
 }
 
+/// Validate an optional `Scenario.lane` at parse: SHAPE only — a
+/// kebab-case slug. Vocabulary membership stays in the CLI layer, where
+/// the repository's activated enum snapshot is available.
+fn deserialize_lane_slug<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<String>::deserialize(deserializer)?;
+    let Some(s) = value else {
+        return Ok(None);
+    };
+    if !is_kebab_slug(&s) {
+        return Err(serde::de::Error::custom(format!(
+            "scenario lane {s:?} is not a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)"
+        )));
+    }
+    Ok(Some(s))
+}
+
 /// A subject (join-spine `subject_id` row: subject ↔ change ↔ scenario)
 /// — the durable product/management unit a team plans, designs, builds,
 /// and measures across many changes (s36, the reviewed 13th kind). A
@@ -329,6 +348,12 @@ pub struct Scenario {
     /// the freshness signal `sync`'s logical-idempotence check compares
     /// against, NOT `ids::Sha` (a 40-hex git commit sha).
     pub source_digest: SpecDigest,
+    /// The optional classification axis for the scenario (s49), retained
+    /// as a shape-validated kebab slug. Vocabulary membership is checked
+    /// by `canon inventory sync` against the repository's activated
+    /// `lane` enum; `Scenario::new` leaves it absent.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_lane_slug")]
+    pub lane: Option<String>,
     /// The durable [`Subject`] this scenario is specced against (s36,
     /// additive — `#[serde(default, skip_serializing_if =
     /// "Option::is_none")]`, so a pre-s36 `Scenario` is byte-identical
@@ -345,7 +370,7 @@ pub struct Scenario {
 impl Scenario {
     pub fn new(envelope: Envelope, project_id: ProjectId, scenario_id: ScenarioId, title: impl Into<String>, description: impl Into<String>, source_digest: SpecDigest) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Scenario);
-        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, subject_id: None }
+        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, lane: None, subject_id: None }
     }
 }
 
@@ -1615,6 +1640,22 @@ mod tests {
     );
 
     round_trip_test!(
+        scenario_with_lane_round_trips,
+        {
+            let mut s = Scenario::new(
+                envelope(RecordKind::Scenario),
+                project_id(),
+                ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap(),
+                "hotdeal",
+                "desc",
+                SpecDigest::of(b"fixture .feature bytes"),
+            );
+            s.lane = Some("behavior".to_string());
+            s
+        }
+    );
+
+    round_trip_test!(
         scenario_with_subject_id_round_trips,
         {
             let mut s = Scenario::new(
@@ -1649,7 +1690,25 @@ mod tests {
         });
         let scenario: Scenario = serde_json::from_value(json.clone()).unwrap();
         assert_eq!(scenario.subject_id, None);
+        assert_eq!(scenario.lane, None);
         assert_eq!(serde_json::to_value(&scenario).unwrap(), json);
+    }
+
+    #[test]
+    fn scenario_with_malformed_lane_is_rejected_on_deserialize() {
+        let at = serde_json::to_value(Utc::now()).unwrap();
+        let json = serde_json::json!({
+            "schema": 1,
+            "kind": "scenario",
+            "at": at,
+            "actor": {"agent_id": "codex-cli", "role": "implementer"},
+            "project_id": "root",
+            "scenario_id": "world.firstbuy-hotdeal.26",
+            "title": "hotdeal",
+            "source_digest": SpecDigest::of(b"fixture .feature bytes").to_string(),
+            "lane": "Not-a-lane",
+        });
+        assert!(serde_json::from_value::<Scenario>(json).is_err());
     }
 
     round_trip_test!(

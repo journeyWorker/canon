@@ -37,27 +37,23 @@ pub struct ScenarioScan {
     pub scenario_id: String,
     pub title: String,
     /// Raw `@subject:<value>` tag values (the substring after
-    /// `@subject:`) paired with this scenario, in source order (s36
-    /// task 6.2). This module stays a pure lexer — it collects the raw
-    /// values only and NEVER validates them against
-    /// `canon_model::SubjectId` (mirroring how `looks_like_scenario_id`
-    /// stays loose); `canon inventory sync` owns grammar validation,
-    /// the multiple-tag diagnostic, and the fail-soft
-    /// `Scenario.subject_id` join. Normally zero or one entry; two or
-    /// more is a sync-level diagnostic, not a scan error.
+    /// `subject:`), retained exactly as authored for inventory sync's
+    /// fail-soft grammar/duplicate diagnostic.
     pub subject_tags: Vec<String>,
+    /// Raw `@lane:<value>` tag values, retained exactly as authored for
+    /// inventory sync's fail-soft grammar/duplicate diagnostic.
+    pub lane_tags: Vec<String>,
+    /// Namespaces from `@name:value`-shaped tags other than the
+    /// recognized `subject` and `lane` axes. Plain tags are ignored.
+    pub unknown_namespace_tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct FeatureScan {
     pub headers: Vec<HeaderScan>,
-    /// Every `@area.surface.nn`-shaped tag found anywhere in the file,
-    /// in source order — the partition-value resolver's input.
     pub scenario_ids: Vec<String>,
-    /// Every scenario tag successfully paired with its following
-    /// header, in source order (design D4/task 3.2) — `sync`'s
-    /// `title` source; may be shorter than `scenario_ids` when a tag
-    /// has no following `Scenario:` header to pair with.
+    /// Only scenario-id tags that pair with a following Scenario header
+    /// carry a titled scan entry.
     pub scenarios: Vec<ScenarioScan>,
 }
 
@@ -77,34 +73,79 @@ pub fn scan(text: &str) -> FeatureScan {
     // this without pairing, so a stray pre-`Feature:` tag never links
     // to a scenario several blocks later.
     let mut pending_scenario_ids: Vec<String> = Vec::new();
-    // `@subject:<value>` tags seen since the last header, paired with
-    // the next scenario header exactly like `pending_scenario_ids`
-    // (s36 task 6.2). Cloned onto every scenario the pending id tags
-    // pair with, so a scenario's subject link travels with it.
+    // Axis and unknown namespace tags travel with the same pending
+    // scenario block as the scenario id.
     let mut pending_subject_tags: Vec<String> = Vec::new();
+    let mut pending_lane_tags: Vec<String> = Vec::new();
+    let mut pending_unknown_namespace_tags: Vec<String> = Vec::new();
+    // The line index of the provenance comment the PREVIOUS header
+    // claimed in the trailing position. One comment serves one header:
+    // a `Feature:`'s own trailing comment must not double as the
+    // leading comment of a scenario written directly beneath it with
+    // no blank line between.
+    let mut claimed_trailing: Option<usize> = None;
 
     for (i, line) in lines.iter().enumerate() {
         let trimmed = line.trim_start();
         if let Some(label) = header_label(trimmed) {
-            let has_provenance = lines[i + 1..]
+            // Trailing form: the first non-blank line after the header.
+            // Leading form: any provenance comment in the contiguous
+            // `@`/`#` block directly above the header, excluding a line
+            // the previous header already claimed.
+            let trailing_provenance = lines[i + 1..]
                 .iter()
-                .find(|l| !l.trim().is_empty())
-                .is_some_and(|next| FeatureProvenance::parse_comment_line(next).is_some());
+                .position(|l| !l.trim().is_empty())
+                .map(|offset| i + 1 + offset)
+                .filter(|&j| FeatureProvenance::parse_comment_line(lines[j]).is_some());
+            let mut leading_provenance = false;
+            for j in (0..i).rev() {
+                if Some(j) == claimed_trailing {
+                    break;
+                }
+                let above = lines[j].trim_start();
+                if above.is_empty() || !(above.starts_with('@') || above.starts_with('#')) {
+                    break;
+                }
+                if FeatureProvenance::parse_comment_line(above).is_some() {
+                    leading_provenance = true;
+                }
+            }
+            let has_provenance = trailing_provenance.is_some() || leading_provenance;
+            claimed_trailing = trailing_provenance;
             result.headers.push(HeaderScan { line_no: i + 1, label: label.clone(), has_provenance });
             if is_scenario_header(trimmed) {
                 for scenario_id in pending_scenario_ids.drain(..) {
-                    result.scenarios.push(ScenarioScan { scenario_id, title: label.clone(), subject_tags: pending_subject_tags.clone() });
+                    result.scenarios.push(ScenarioScan {
+                        scenario_id,
+                        title: label.clone(),
+                        subject_tags: pending_subject_tags.clone(),
+                        lane_tags: pending_lane_tags.clone(),
+                        unknown_namespace_tags: pending_unknown_namespace_tags.clone(),
+                    });
                 }
                 pending_subject_tags.clear();
+                pending_lane_tags.clear();
+                pending_unknown_namespace_tags.clear();
             } else {
                 pending_scenario_ids.clear();
                 pending_subject_tags.clear();
+                pending_lane_tags.clear();
+                pending_unknown_namespace_tags.clear();
             }
         }
         for tag in trimmed.split_whitespace().filter(|t| t.starts_with('@')) {
             let candidate = &tag[1..];
             if let Some(subject) = candidate.strip_prefix("subject:") {
                 pending_subject_tags.push(subject.to_string());
+            } else if let Some(lane) = candidate.strip_prefix("lane:") {
+                pending_lane_tags.push(lane.to_string());
+            } else if let Some((namespace, _value)) = candidate.split_once(':') {
+                if !namespace.is_empty()
+                    && namespace.as_bytes()[0].is_ascii_lowercase()
+                    && namespace.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                {
+                    pending_unknown_namespace_tags.push(namespace.to_string());
+                }
             } else if looks_like_scenario_id(candidate) {
                 result.scenario_ids.push(candidate.to_string());
                 pending_scenario_ids.push(candidate.to_string());
@@ -182,10 +223,53 @@ mod tests {
         assert!(scan.headers[0].has_provenance);
     }
 
+    const PROV: &str = "  # canon: {\"schema\":1,\"at\":\"2026-07-10T00:00:00Z\",\"actor\":{\"agent_id\":\"canon-fmt\"}}";
+
+    #[test]
+    fn provenance_comment_in_contiguous_tag_comment_block_above_header_is_detected() {
+        let text = format!("Feature: X\n{PROV}\n\n{PROV}\n  @subject:s @lane:behavior\n  @a.b.01\n  Scenario: One\n    Given a\n");
+        let scan = scan(&text);
+        assert_eq!(scan.missing_provenance_count(), 0);
+    }
+
+    #[test]
+    fn blank_line_between_leading_comment_and_header_breaks_provenance() {
+        let text = format!("Feature: X\n{PROV}\n\n{PROV}\n\n  @a.b.01\n  Scenario: One\n    Given a\n");
+        let scan = scan(&text);
+        assert!(!scan.headers[1].has_provenance);
+    }
+
+    #[test]
+    fn a_features_trailing_comment_never_doubles_as_the_next_scenarios_leading_one() {
+        // No blank line between the Feature's own comment and the
+        // scenario's tag: the comment is the Feature's, the scenario
+        // has none.
+        let text = format!("Feature: X\n{PROV}\n  @a.b.01\n  Scenario: One\n    Given a\n");
+        let scan = scan(&text);
+        assert!(scan.headers[0].has_provenance);
+        assert!(!scan.headers[1].has_provenance);
+    }
+
+    #[test]
+    fn provenance_in_both_positions_counts_as_one_present_state() {
+        let text = format!("Feature: X\n{PROV}\n\n{PROV}\n  @a.b.01\n  Scenario: One\n{PROV}\n    Given a\n");
+        let scan = scan(&text);
+        assert_eq!(scan.headers.len(), 2);
+        assert_eq!(scan.missing_provenance_count(), 0);
+    }
+
+    #[test]
+    fn lane_and_unknown_namespace_tags_are_collected_but_plain_tags_are_ignored() {
+        let text = "Feature: Tagged\n\n  @a.b.01 @lane:design @foo:bar @p2\n  Scenario: One\n    Given a\n";
+        let scan = scan(text);
+        assert_eq!(scan.scenarios[0].lane_tags, vec!["design"]);
+        assert_eq!(scan.scenarios[0].unknown_namespace_tags, vec!["foo"]);
+    }
+
     #[test]
     fn scenario_tag_pairs_with_its_following_header_as_title() {
         let scan = scan(SAMPLE);
-        assert_eq!(scan.scenarios, vec![ScenarioScan { scenario_id: "idolive.replay-detail.01".to_string(), title: "Opening a replay loads its detail".to_string(), subject_tags: vec![] }]);
+        assert_eq!(scan.scenarios, vec![ScenarioScan { scenario_id: "idolive.replay-detail.01".to_string(), title: "Opening a replay loads its detail".to_string(), subject_tags: vec![], lane_tags: vec![], unknown_namespace_tags: vec![] }]);
     }
 
     #[test]
@@ -217,7 +301,7 @@ mod tests {
         );
         assert_eq!(
             scan.scenarios,
-            vec![ScenarioScan { scenario_id: "world.hotdeal.02".to_string(), title: "Buying triggers the coupon".to_string(), subject_tags: vec![] }],
+            vec![ScenarioScan { scenario_id: "world.hotdeal.02".to_string(), title: "Buying triggers the coupon".to_string(), subject_tags: vec![], lane_tags: vec![], unknown_namespace_tags: vec![] }],
             "only the tag within the scenario block pairs; the pre-`Feature:` tag is drained, never paired to a later scenario"
         );
     }
@@ -229,8 +313,8 @@ mod tests {
         assert_eq!(
             scan.scenarios,
             vec![
-                ScenarioScan { scenario_id: "a.b.01".to_string(), title: "First one".to_string(), subject_tags: vec![] },
-                ScenarioScan { scenario_id: "a.b.02".to_string(), title: "Second one".to_string(), subject_tags: vec![] },
+                ScenarioScan { scenario_id: "a.b.01".to_string(), title: "First one".to_string(), subject_tags: vec![], lane_tags: vec![], unknown_namespace_tags: vec![] },
+                ScenarioScan { scenario_id: "a.b.02".to_string(), title: "Second one".to_string(), subject_tags: vec![], lane_tags: vec![], unknown_namespace_tags: vec![] },
             ]
         );
     }
@@ -241,7 +325,7 @@ mod tests {
         let scan = scan(text);
         assert_eq!(
             scan.scenarios,
-            vec![ScenarioScan { scenario_id: "a.b.01".to_string(), title: "One".to_string(), subject_tags: vec!["payments-core".to_string()] }],
+        vec![ScenarioScan { scenario_id: "a.b.01".to_string(), title: "One".to_string(), subject_tags: vec!["payments-core".to_string()], lane_tags: vec![], unknown_namespace_tags: vec![] }],
             "the raw @subject: value is paired with its scenario, unvalidated"
         );
     }

@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:43.600045Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test scaffold scenario_new_emits_leading_provenance_subject_lane_and_actor"
+  },
+  "evidence_note": {
+    "summary": "at stamped 2026-09-16T11:04:12Z, no fractional part"
+  },
+  "kind": "evidence_record",
+  "run_seq": 5,
+  "schema": 1,
+  "staging_id": "cae5544bce82",
+  "task_id": "s49-authoring-the-corpus-agents-write#2.2",
+  "verdict": "faithful"
+}

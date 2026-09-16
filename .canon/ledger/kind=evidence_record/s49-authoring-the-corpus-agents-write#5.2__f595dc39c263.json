@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:44.439876Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init"
+  },
+  "evidence_note": {
+    "summary": "canon init: next: canon skills install to install authoring guidance"
+  },
+  "kind": "evidence_record",
+  "run_seq": 15,
+  "schema": 1,
+  "staging_id": "f9c1a73ad6db",
+  "task_id": "s49-authoring-the-corpus-agents-write#5.2",
+  "verdict": "faithful"
+}

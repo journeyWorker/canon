@@ -34,7 +34,7 @@ canon-vocab = { path = "crates/canon-vocab" }
 canon-plugin = { path = "crates/canon-plugin" }
 
 # CLI
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.5", features = ["derive", "env"] }
 
 # Content hashing (skill materialization lock, D4)
 sha2 = "0.10"

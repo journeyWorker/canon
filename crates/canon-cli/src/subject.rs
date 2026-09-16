@@ -210,8 +210,11 @@ fn report_subject(subject: &Subject, verb: &str, json: bool) {
 /// extends — the SAME key `canon context` renders under `vocab.enums`.
 const DOMAIN_ENUM: &str = "domain";
 
-/// Is `domain` a member of this repo's ACTIVATED domain vocabulary?
-/// `None` = acceptable, `Some(message)` = the operator-facing refusal.
+/// Is `value` a member of this repo's ACTIVATED `enum_name` vocabulary?
+/// `None` = acceptable (including when no such enum is declared),
+/// `Some(message)` = the operator-facing refusal. Shared by `subject
+/// new --domain` (`domain`) and `scenario new --lane` (`lane`, s49) —
+/// one write-time membership rule, one refusal grammar.
 ///
 /// # Why this exists
 /// `canon.core`'s `enums.yaml` has always declared the `domain` set, and
@@ -225,7 +228,8 @@ const DOMAIN_ENUM: &str = "domain";
 /// panel) then disagreed about how many categories the repo has.
 /// `task-status` is checked through `Type::Domain` and `handoff-domain`
 /// through its directive tag plus `canon.yaml`'s `handoff_templates`;
-/// this closes the third case at its single write point.
+/// this closes the third case at its single write point, and `lane`
+/// reuses the closure.
 ///
 /// # Why it stays dynamic
 /// The member set is resolved from the vocabulary, never hardcoded here
@@ -238,26 +242,29 @@ const DOMAIN_ENUM: &str = "domain";
 ///
 /// # Fail-soft when nothing is declared
 /// A repo with no vocabulary plugin, or one whose plugins declare no
-/// `domain` enum, resolves to no constraint and every kebab slug is
+/// such enum, resolves to no constraint and every kebab slug is
 /// accepted. `canon init` scaffolds no `.canon/vocab`, so the alternative
-/// would make a freshly-inited repo unable to author its first Subject.
-/// This mirrors the empty-`risk_routing`-derives-zero-cells default
-/// canon-gate already uses for policy.
+/// would make a freshly-inited repo unable to author its first Subject
+/// or lane. This mirrors the empty-`risk_routing`-derives-zero-cells
+/// default canon-gate already uses for policy.
 ///
-/// This is a WRITE-time check at the one place a domain is ever set
-/// (`adopt`/`status` never take one), so an already-persisted Subject
-/// whose domain predates its vocabulary is untouched and still reads
-/// back — the check tightens authoring, never invalidates history.
-fn domain_membership_violation(repo: &Path, domain: &str) -> Option<String> {
+/// This is a WRITE-time check at the one place a value is ever set, so
+/// an already-persisted record whose value predates its vocabulary is
+/// untouched and still reads back — the check tightens authoring, never
+/// invalidates history.
+pub fn enum_membership_violation(repo: &Path, enum_name: &str, value: &str) -> Option<String> {
     let (snapshot, _diags) = canon_vocab::resolve_snapshot(repo, None);
-    let members = snapshot.enums.get(DOMAIN_ENUM)?;
-    if members.is_empty() || members.iter().any(|m| m == domain) {
+    let members = snapshot.enums.get(enum_name)?;
+    if members.is_empty() || members.iter().any(|m| m == value) {
         return None;
     }
-    // The donor checker's verbatim "expected one of: …" shape
-    // (`canon_vocab::checker`), so one enum-rejection grammar covers the
-    // typed-atom path and this one.
-    Some(format!("`{domain}` is not a valid value for `{DOMAIN_ENUM}` (expected one of: {})", members.join(", ")))
+    Some(format!("`{value}` is not a valid value for `{enum_name}` (expected one of: {})", members.join(", ")))
+}
+
+/// Is `domain` a member of this repo's ACTIVATED domain vocabulary?
+/// `None` = acceptable, `Some(message)` = the operator-facing refusal.
+fn domain_membership_violation(repo: &Path, domain: &str) -> Option<String> {
+    enum_membership_violation(repo, DOMAIN_ENUM, domain)
 }
 
 /// `canon subject new <id> --domain <d> --title <t> [--summary <s>]

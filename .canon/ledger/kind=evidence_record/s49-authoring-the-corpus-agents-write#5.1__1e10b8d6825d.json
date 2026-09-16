@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:44.354227Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon/skills/canon-authoring/SKILL.md"
+  },
+  "evidence_note": {
+    "summary": "vocabulary, lanes + exclude_lanes yaml, subject pinning, commands, never hand-type # canon, 6 named anti-patterns, worked example"
+  },
+  "kind": "evidence_record",
+  "run_seq": 14,
+  "schema": 1,
+  "staging_id": "0112b02823a9",
+  "task_id": "s49-authoring-the-corpus-agents-write#5.1",
+  "verdict": "faithful"
+}

@@ -151,6 +151,7 @@ pub fn run_init(repo: &Path) -> i32 {
             Ok(()) => match scaffold_gitignore(repo) {
                 Ok(()) => {
                     println!("canon init: wrote {}", canon_yaml_path.display());
+                    println!("canon init: next: `canon skills install` to install authoring guidance");
                     0
                 }
                 Err(e) => {

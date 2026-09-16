@@ -415,10 +415,10 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
         },
         risk_routing: policy.risk_routing.iter().map(|(k, v)| (k.clone(), summarize_field(v))).collect(),
         spec_coverage: policy.spec_coverage.as_ref().map(|sc| match sc {
-            SpecCoverage::Active { require_evidence, scope } if scope.is_empty() => {
+            SpecCoverage::Active { require_evidence, scope, .. } if scope.is_empty() => {
                 format!("require_evidence={require_evidence} scope=<every scenario>")
             }
-            SpecCoverage::Active { require_evidence, scope } => {
+            SpecCoverage::Active { require_evidence, scope, .. } => {
                 format!("require_evidence={require_evidence} scope={}", scope.iter().map(subject_status_slug).collect::<Vec<_>>().join(", "))
             }
             SpecCoverage::Invalid { detail } => format!("INVALID — {detail}"),

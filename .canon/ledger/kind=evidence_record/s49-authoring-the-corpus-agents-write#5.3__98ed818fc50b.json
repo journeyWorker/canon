@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:44.522353Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon skills install --source canon/skills --target ."
+  },
+  "evidence_note": {
+    "summary": "canon-authoring v1 installed; fmt/inventory/subject bumped by one; others unchanged"
+  },
+  "kind": "evidence_record",
+  "run_seq": 16,
+  "schema": 1,
+  "staging_id": "25d0b16bf1bc",
+  "task_id": "s49-authoring-the-corpus-agents-write#5.3",
+  "verdict": "faithful"
+}

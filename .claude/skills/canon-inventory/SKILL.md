@@ -46,8 +46,13 @@ Per configured root, in order:
    records written for it, the violation(s) reported. Never a partial sync.
 2. **Scan** — walks `<root>/features/**/*.feature`, pairing each
    `@<area>.<surface>.<nn>` tag with its header label as `title` and a
-   `source_digest` (sha256 over the raw `.feature` bytes). The index
-   derives from the `.feature` corpus alone.
+   `source_digest` (sha256 over the raw `.feature` bytes). `@subject:<id>`
+   → `subject_id`, `@lane:<v>` → `lane` (first tag wins; a second, a
+   malformed value, or a value outside a declared `lane` enum is dropped
+   with a counted, non-fatal diagnostic). Any other `@name:value`
+   namespace is counted as a diagnostic so a dropped classification is
+   visible; plain tags (`@p2`) are ignored. The index derives from the
+   `.feature` corpus alone. See `canon-authoring` for the organizing rule.
 3. **Materialize** — upserts ONE scenario index record per
    `(project_id, scenario_id)` via the append-only git-tier write.
    Logically idempotent: an unchanged `source_digest` is a no-op; a

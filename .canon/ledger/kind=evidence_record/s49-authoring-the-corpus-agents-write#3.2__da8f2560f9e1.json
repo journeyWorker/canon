@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:43.768312Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-model --lib scenario"
+  },
+  "evidence_note": {
+    "summary": "lane additive, absent key when unset, malformed slug rejected on deserialize; scenario.schema.json updated"
+  },
+  "kind": "evidence_record",
+  "run_seq": 7,
+  "schema": 1,
+  "staging_id": "988d4f42c8ee",
+  "task_id": "s49-authoring-the-corpus-agents-write#3.2",
+  "verdict": "faithful"
+}

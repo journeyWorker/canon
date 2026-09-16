@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:43.934183Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon context"
+  },
+  "evidence_note": {
+    "summary": "vocab.enums.lane: behavior, design, architecture, process"
+  },
+  "kind": "evidence_record",
+  "run_seq": 9,
+  "schema": 1,
+  "staging_id": "1e3b35048f58",
+  "task_id": "s49-authoring-the-corpus-agents-write#3.4",
+  "verdict": "faithful"
+}

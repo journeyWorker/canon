@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:05:56.977652Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib unknown_namespace_is_counted_once_per_scenario_and_namespace"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 11,
+  "scenario_id": "inventory.sync.11",
+  "schema": 1,
+  "staging_id": "f70d11703330",
+  "verdict": "faithful"
+}

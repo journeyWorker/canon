@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:44.186671Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib unknown_namespace_is_counted_once_per_scenario_and_namespace"
+  },
+  "evidence_note": {
+    "summary": "smoke: [tag] shop.cart.04 carries an unrecognized @foo: namespace; sync exit 0"
+  },
+  "kind": "evidence_record",
+  "run_seq": 12,
+  "schema": 1,
+  "staging_id": "af7ab8fbad31",
+  "task_id": "s49-authoring-the-corpus-agents-write#3.7",
+  "verdict": "faithful"
+}

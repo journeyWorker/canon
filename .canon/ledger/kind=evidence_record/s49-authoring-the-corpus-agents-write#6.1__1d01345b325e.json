@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:44.606187Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon inventory sync"
+  },
+  "evidence_note": {
+    "summary": "9 scenarios added across authoring/format/inventory/gate, each with a cited test the parent ran: 9/9 pass"
+  },
+  "kind": "evidence_record",
+  "run_seq": 17,
+  "schema": 1,
+  "staging_id": "da963ec1a9bf",
+  "task_id": "s49-authoring-the-corpus-agents-write#6.1",
+  "verdict": "faithful"
+}

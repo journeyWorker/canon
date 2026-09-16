@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:05:57.011887Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib -- an_excluded_lane_is_out_of_scope_after_subject_scope an_unlisted_lane_remains_in_scope"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "gate.check.10",
+  "schema": 1,
+  "staging_id": "4cd0ec90abc0",
+  "verdict": "faithful"
+}

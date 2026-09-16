@@ -79,3 +79,34 @@ Feature: authoring scaffold
     Then it prints the next-step invocation, already carrying the first derived tag for that surface
     And checking the corpus still fails, calling the file an empty feature stub not yet a valid corpus entry
     And running the printed invocation is what turns that stub clean
+
+  # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @lane:behavior
+  @authoring.scaffold.09
+  Scenario: The provenance line leads the scenario's tags and carries the actor the author named
+    Given a scenario is created naming an actor, a subject, and a lane
+    When the feature file is read back
+    Then the provenance comment sits directly above the scenario's tags, with no blank line between
+    And the subject tag, then the lane tag, then the scenario id tag precede the header in that order
+    And the provenance names the actor that was given, stamped to the whole second
+
+  # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @lane:behavior
+  @authoring.scaffold.10
+  Scenario: The actor falls back to the environment when no flag names one
+    Given the environment names an actor and the invocation names none
+    When a scenario is created
+    Then the provenance carries the environment's actor
+    And with neither flag nor environment the actor is the scaffold's own fixed id
+
+  # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @lane:behavior
+  @authoring.scaffold.11
+  Scenario: A lane that is not a slug is refused with nothing written
+    Given a lane value that is not a kebab-case slug
+    When a scenario is created with it
+    Then the command refuses before resolving any path
+    And the feature file does not exist afterwards

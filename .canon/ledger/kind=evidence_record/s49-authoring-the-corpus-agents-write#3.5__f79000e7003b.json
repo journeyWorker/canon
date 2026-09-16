@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:44.016424Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon scenario new authoring.scaffold.99 --lane bogus"
+  },
+  "evidence_note": {
+    "summary": "refused exit 2: not a valid value for lane (expected one of: behavior, design, architecture, process)"
+  },
+  "kind": "evidence_record",
+  "run_seq": 10,
+  "schema": 1,
+  "staging_id": "f4eaab4eb632",
+  "task_id": "s49-authoring-the-corpus-agents-write#3.5",
+  "verdict": "faithful"
+}

@@ -41,10 +41,10 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use canon_model::envelope::RecordKind;
-use canon_model::{regime_key, ChangeId, EvidenceVerdict, ProjectId, RegimeKey, RoleId, RunId, RunStatus, ScenarioId, Sha, SubjectId, TaskId};
+use canon_model::{regime_key, Actor, ChangeId, EvidenceVerdict, ProjectId, RegimeKey, RoleId, RunId, RunStatus, ScenarioId, Sha, SubjectId, TaskId};
 use canon_learn::StrategyId;
 use canon_cli::scaffold::AreaSurface;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Timelike, Utc};
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -781,6 +781,15 @@ enum ScenarioCommand {
         /// The Scenario: header label
         #[arg(long)]
         title: String,
+        /// Optional subject id tag to pin above the scenario
+        #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
+        subject: Option<SubjectId>,
+        /// Optional lane tag to classify the scenario
+        #[arg(long, value_parser = canon_cli::scaffold::parse_lane_slug)]
+        lane: Option<String>,
+        /// Agent id written into provenance (env: CANON_ACTOR)
+        #[arg(long, env = "CANON_ACTOR", default_value = "canon-scaffold")]
+        actor: String,
         /// Target .feature file (default: derived from <tag>; must live under a specs.roots[] entry)
         #[arg(long)]
         feature: Option<PathBuf>,
@@ -803,6 +812,9 @@ enum FeatureCommand {
         /// The Feature: header label
         #[arg(long)]
         title: String,
+        /// Agent id written into provenance (env: CANON_ACTOR)
+        #[arg(long, env = "CANON_ACTOR", default_value = "canon-scaffold")]
+        actor: String,
         /// Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project: Option<ProjectId>,
@@ -1022,10 +1034,12 @@ fn main() -> ExitCode {
             PluginCommand::Sync { plugin_id, repo, spec_root } => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref()),
         },
         Command::Scenario { action } => match action {
-            ScenarioCommand::New { tag, title, feature, project, repo } => run_scenario_new(&repo, &tag, &title, feature.as_deref(), project.as_ref()),
+            ScenarioCommand::New { tag, title, subject, lane, actor, feature, project, repo } => {
+                run_scenario_new(&repo, &tag, &title, feature.as_deref(), project.as_ref(), subject.as_ref(), lane.as_deref(), &actor)
+            }
         },
         Command::Feature { action } => match action {
-            FeatureCommand::New { surface, title, project, repo } => run_feature_new(&repo, &surface, &title, project.as_ref()),
+            FeatureCommand::New { surface, title, actor, project, repo } => run_feature_new(&repo, &surface, &title, project.as_ref(), &actor),
         },
         Command::Subject { action } => match action {
             SubjectCommand::New { id, domain, title, summary, owner_role, actor_id, repo, json } => {
@@ -1220,8 +1234,8 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
     }
 }
 
-/// `canon scenario new <tag> --title <label> [--feature <path>]
-/// [--project <id>]` (s16 P5,
+/// `canon scenario new <tag> --title <label> [--subject <id>] [--lane
+/// <v>] [--actor <id>] [--feature <path>] [--project <id>]` (s16 P5,
 /// `canon_cli::scaffold::run_scenario_new`'s own doc): the ONE
 /// `Utc::now()` call for this command — computed here, at the
 /// dispatch boundary, so a brand-new `.feature` file's `Feature:` +
@@ -1231,8 +1245,38 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
 /// root the `--project` rules can't pin down for the derived path, an
 /// out-of-root explicit `--feature`, or a duplicate tag), `0` on a
 /// successful append/create.
-fn run_scenario_new(repo: &std::path::Path, tag: &ScenarioId, title: &str, feature: Option<&std::path::Path>, project: Option<&ProjectId>) -> ExitCode {
-    ExitCode::from(canon_cli::scaffold::run_scenario_new(repo, tag, title, feature, project, Utc::now()) as u8)
+fn run_scenario_new(
+    repo: &std::path::Path,
+    tag: &ScenarioId,
+    title: &str,
+    feature: Option<&std::path::Path>,
+    project: Option<&ProjectId>,
+    subject: Option<&SubjectId>,
+    lane: Option<&str>,
+    actor_id: &str,
+) -> ExitCode {
+    if let Some(lane) = lane {
+        let resolved = canon_cli::context::resolve_repo_root(repo);
+        if let Some(violation) = canon_cli::subject::enum_membership_violation(&resolved, "lane", lane) {
+            eprintln!("canon scenario new: refused — {violation}");
+            return ExitCode::from(2);
+        }
+    }
+    let at = Utc::now().with_nanosecond(0).expect("0 is a valid nanosecond");
+    let actor = Actor::new_unattributed(actor_id);
+    ExitCode::from(
+        canon_cli::scaffold::run_scenario_new(
+            repo,
+            tag,
+            title,
+            feature,
+            project,
+            subject.map(SubjectId::as_str),
+            lane,
+            &actor,
+            at,
+        ) as u8,
+    )
 }
 
 /// `canon feature new <area>.<surface> --title <label> [--project
@@ -1242,8 +1286,10 @@ fn run_scenario_new(repo: &std::path::Path, tag: &ScenarioId, title: &str, featu
 /// `--project` rules can't pin down, or an already-existing target
 /// file), `0` on a fresh file
 /// written.
-fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, project: Option<&ProjectId>) -> ExitCode {
-    ExitCode::from(canon_cli::scaffold::run_feature_new(repo, surface, title, project, Utc::now()) as u8)
+fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, project: Option<&ProjectId>, actor_id: &str) -> ExitCode {
+    let at = Utc::now().with_nanosecond(0).expect("0 is a valid nanosecond");
+    let actor = Actor::new_unattributed(actor_id);
+    ExitCode::from(canon_cli::scaffold::run_feature_new(repo, surface, title, project, &actor, at) as u8)
 }
 
 /// `canon init [--repo <dir>]` / `canon init --check-config` (s19 P4,

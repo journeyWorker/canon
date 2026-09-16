@@ -93,3 +93,24 @@ Feature: inventory sync
     Then the scenario is still indexed and the root is still clean
     And exactly one diagnostic is counted, quoting the offending value
     And the record's subject join is unset rather than holding an unparseable id
+
+  # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @lane:behavior
+  @inventory.sync.10
+  Scenario: A lane tag becomes the scenario's lane on the index record
+    Given a scenario tagged with one lane
+    When the root is synced
+    Then the materialized record carries that lane
+    And the sync is clean with no diagnostic
+
+  # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @lane:behavior
+  @inventory.sync.11
+  Scenario: An unrecognized tag namespace is counted and never aborts the root
+    Given a scenario carrying a namespaced tag canon does not recognize
+    When the root is synced
+    Then the scenario is still indexed
+    And exactly one diagnostic names the namespace, once per scenario and namespace
+    And the root's sync exits clean

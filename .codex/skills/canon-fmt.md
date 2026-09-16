@@ -23,7 +23,7 @@ a report grouped by failure class in this fixed order:
 |---|---|---|
 | `layout-grammar` | Wrong Hive path shape — a `features/`/`inventory/` file not under a `kind=<kind>/area=<area>/` prefix, a wrong leaf filename, or `assets.lock`'s ad-hoc format. | Move the file under the correct `kind=…/area=…/` prefix with the expected leaf name. |
 | `missing-envelope` | A YAML file (`inventory/`, `policy.yaml`) has no top-level `schema`/`kind`/`at`/`actor` keys. | Add the four envelope keys at the top level. |
-| `missing-provenance` | A `.feature` file's `Feature:`/`Scenario:` header has no `# canon: {...}` comment right after it. | Add the `# canon: {...}` provenance comment beneath the header. |
+| `missing-provenance` | A `.feature` file's `Feature:`/`Scenario:` header has no `# canon: {...}` comment either directly above it (with its tags, no blank line) or directly below it. | Use `canon scenario new` / `canon feature new`, which stamp it; never hand-type the line. See `canon-authoring`. |
 | `missing-actor` | No structured `actor` object — a bare `by` string, or absent. | Replace `by: <name>` with a structured `actor` object. |
 | `unspecified-evidence` | A ledger `run`/`drill` record's `evidence` field is absent or an empty, untyped array. | Add a typed `evidence` array. |
 | `free-text-ref` | `upstream_ref`/`port_ref` has a segment not matching `<file>#<symbol>[:<a>-<b>]`. | Rewrite the ref into the `<file>#<symbol>[:<a>-<b>]` grammar. |

@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:43.684089Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --lib lane_and_unknown_namespace_tags_are_collected_but_plain_tags_are_ignored"
+  },
+  "evidence_note": {
+    "summary": "@lane collected, @foo:bar namespace collected, @p2 ignored"
+  },
+  "kind": "evidence_record",
+  "run_seq": 6,
+  "schema": 1,
+  "staging_id": "f5d14bcbf3fd",
+  "task_id": "s49-authoring-the-corpus-agents-write#3.1",
+  "verdict": "faithful"
+}

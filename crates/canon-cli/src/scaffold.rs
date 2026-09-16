@@ -4,51 +4,43 @@
 //! INDEPENDENT of s16 P1-P4: a `.feature`-authoring convenience, never
 //! a plugin concern, tasks.md task group 5): the two scaffold commands
 //! that write S11-conformant `.feature` corpus content directly,
-//! matching the EXACT tag-then-header shape `canon_fmt::gherkin::scan`
-//! already reads (s15 D4) — never a new parser, never a new
+//! matching the leading provenance/tag/header shape `canon_fmt::gherkin::scan`
+//! now accepts (while retaining trailing-form compatibility) — never a new
 //! `RecordKind`, and NO ledger record of any kind (spec.md's own
 //! requirement text: "writes NO ledger record of any kind; its only
 //! output is the `.feature` file").
 //!
-//! # Byte shape (grounded in `tests/plugin_sync.rs::write_repo`'s own
-//! `feature_text` fixture — the one hand-authored `.feature` sample in
-//! this workspace, and `canon_fmt::gherkin::scan`'s own scan rules)
+//! # Byte shape
 //! ```text
 //! Feature: <label>
 //!   # canon: {"schema":1,"at":"...","actor":{"agent_id":"..."}}
 //!
+//!   # canon: {"schema":1,"at":"...","actor":{"agent_id":"..."}}
+//!   [@subject:<id>]
+//!   [@lane:<value>]
 //!   @<area>.<surface>.<nn>
 //!   Scenario: <label>
-//!   # canon: {"schema":1,"at":"...","actor":{"agent_id":"..."}}
 //!     Given a step
 //! ```
-//! A 2-space-indented provenance comment immediately follows EVERY
-//! header (`gherkin::scan`'s `has_provenance` requires the FIRST
-//! non-blank line after a header to parse as one); a blank line
-//! separates the `Feature:` block from the first `Scenario:` block,
-//! and every subsequent scenario block from its predecessor.
+//! Scenario provenance leads its tag/header block. The scanner accepts
+//! this leading form and the existing first-non-blank-line-after-header
+//! form, while Feature provenance stays directly after `Feature:`.
+//! A blank line separates the `Feature:` block from the first
+//! `Scenario:` block, and every subsequent scenario block from its
+//! predecessor.
 //! [`run_scenario_new`] produces this via [`append_scenario_block`]'s
 //! trim-and-rejoin — the SAME helper whether the file is brand new
 //! (created by [`run_feature_new`], or minted fresh by
-//! [`run_scenario_new`] itself) or already carries scenarios, so a
-//! file assembled purely from repeated `canon scenario new` calls is
-//! byte-identical in shape to the hand-authored fixture above.
+//! [`run_scenario_new`] itself) or already carries scenarios.
 //!
 //! # Deterministic provenance, never a bare `Utc::now()`
-//! [`run_scenario_new`]/[`run_feature_new`] take `at: DateTime<Utc>` as
-//! an EXPLICIT parameter — `main.rs`'s dispatch match arms are the ONE
-//! place `Utc::now()` is ever called for these commands (mirroring
-//! `canon context`'s own "resolve once" discipline), so a file this
-//! module writes in ONE invocation never straddles two different
-//! timestamps even when it stamps two provenance comments at once (a
-//! brand-new `.feature` file's `Feature:` + first `Scenario:` header,
-//! both under `run_scenario_new`), and a test driving these library
-//! functions directly gets fully reproducible bytes. The actor is
-//! [`scaffold_actor`] — a FIXED, unattributed agent id, mirroring
-//! `canon inventory sync`'s own
-//! `Actor::new_unattributed("canon-inventory-sync")`
-//! (`crate::inventory::run_sync_with_ctx`): never an agent-authored
-//! attestation, this is deterministic tooling output.
+//! [`run_scenario_new`]/[`run_feature_new`] take `at: DateTime<Utc>` as an
+//! EXPLICIT parameter — `main.rs`'s dispatch match arms are the ONE
+//! place `Utc::now()` is ever called for these commands, truncated to
+//! whole seconds there, so a file this module writes in ONE invocation
+//! never straddles two different timestamps even when it stamps two
+//! provenance comments at once. The actor is supplied by the caller,
+//! with the CLI defaulting to `CANON_ACTOR` then `canon-scaffold`.
 //!
 //! # Writes NO ledger record
 //! Neither function touches `canon-store`/`GitTier` at all — the ONLY
@@ -113,26 +105,33 @@ pub fn parse_scenario_tag(s: &str) -> Result<ScenarioId, String> {
     ScenarioId::parse(s.strip_prefix('@').unwrap_or(s)).map_err(|e| e.to_string())
 }
 
+
 /// `<surface>`'s `clap` value parser (`canon feature new`).
 pub fn parse_area_surface(s: &str) -> Result<AreaSurface, String> {
     AreaSurface::parse(s)
 }
 
-/// Both commands' fixed, unattributed provenance actor (module doc,
-/// "Deterministic provenance").
-fn scaffold_actor() -> Actor {
-    Actor::new_unattributed("canon-scaffold")
+/// `<lane>`'s `clap` value parser (`canon scenario new`) — the same
+/// kebab-slug grammar used by model `domain` values.
+pub fn parse_lane_slug(s: &str) -> Result<String, String> {
+    let valid = !s.is_empty()
+        && !s.starts_with('-')
+        && !s.ends_with('-')
+        && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && !s.contains("--");
+    if valid {
+        Ok(s.to_string())
+    } else {
+        Err(format!("invalid lane `{s}`: expected a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)"))
+    }
 }
 
 /// The 2-space-indented `# canon: {...}` comment line every
-/// `Feature:`/`Scenario:` header in this module's output carries
-/// (module doc's byte shape) — built fresh per call so a caller
-/// stamping two headers in one write (a brand-new file's `Feature:` +
-/// first `Scenario:`) can still reuse the SAME `at`/actor for both
-/// without a second [`FeatureProvenance`] construction drifting from
-/// the first.
-fn provenance_line(at: DateTime<Utc>) -> String {
-    let prov = FeatureProvenance::new(1, at, scaffold_actor());
+/// `Feature:`/`Scenario:` header in this module's output carries,
+/// built fresh per call so a caller stamping two headers in one write
+/// can still reuse the SAME `at`/actor for both.
+fn provenance_line(at: DateTime<Utc>, actor: &Actor) -> String {
+    let prov = FeatureProvenance::new(1, at, actor.clone());
     format!("  {}", prov.render_comment_line())
 }
 
@@ -155,18 +154,30 @@ fn corpus_tags(root: &Path) -> BTreeSet<String> {
     tags
 }
 
-/// Append one `@<tag>` scenario block to `existing` (the target
-/// `.feature` file's current content, `""` when the file doesn't exist
-/// yet) — trims `existing`'s trailing newline(s), then rejoins with
-/// exactly one blank line before the new block, so the separator is
-/// correct whether `existing` already ends with a trailing newline, a
-/// trailing blank line, or neither (module doc's byte shape; matches
-/// `tests/plugin_sync.rs::write_repo`'s hand-authored fixture's own
-/// inter-scenario blank line). `existing` MUST already carry a
-/// `Feature:` header (the caller synthesizes one first when the file
-/// is new — see [`run_scenario_new`]).
-fn append_scenario_block(existing: &str, tag: &str, title: &str, prov_line: &str) -> String {
-    let block = format!("  @{tag}\n  Scenario: {title}\n{prov_line}\n    Given a step\n");
+/// Append one scenario block. Provenance leads the block, followed by
+/// optional subject/lane tags in that order, then the id tag and header.
+fn append_scenario_block(
+    existing: &str,
+    tag: &str,
+    title: &str,
+    prov_line: &str,
+    subject: Option<&str>,
+    lane: Option<&str>,
+) -> String {
+    let mut block = String::new();
+    block.push_str(prov_line);
+    block.push('\n');
+    if let Some(subject) = subject {
+        block.push_str("  @subject:");
+        block.push_str(subject);
+        block.push('\n');
+    }
+    if let Some(lane) = lane {
+        block.push_str("  @lane:");
+        block.push_str(lane);
+        block.push('\n');
+    }
+    block.push_str(&format!("  @{tag}\n  Scenario: {title}\n    Given a step\n"));
     let trimmed = existing.trim_end_matches('\n');
     let mut out = String::with_capacity(trimmed.len() + block.len() + 2);
     out.push_str(trimmed);
@@ -174,14 +185,6 @@ fn append_scenario_block(existing: &str, tag: &str, title: &str, prov_line: &str
     out.push_str(&block);
     out
 }
-
-/// The `features/kind=feature/area=<area>/<surface>.feature` layout
-/// `canon_model::family::FamilyKind::Feature::layout_descriptor`
-/// declares (design D1) — the ONE authoritative constructor for this
-/// shape. [`run_feature_new`] and [`run_scenario_new`]'s tag-derived
-/// default both call this, never a second, independently hand-typed
-/// copy of the same join (the exact bug class s19
-/// `derived-validated-scenario-feature` closes).
 pub fn resolve_feature_path(root: &SpecRoot, area: &str, surface: &str) -> PathBuf {
     root.root.join("features").join("kind=feature").join(format!("area={area}")).join(format!("{surface}.feature"))
 }
@@ -287,13 +290,18 @@ fn resolve_spec_root<'a>(command: &str, roots: &'a [SpecRoot], project: Option<&
 ///
 /// `project` is `--project <id>`: which configured `specs.roots[]`
 /// entry the DERIVED path lands under, selected by the root's `id`
-/// exactly as [`run_feature_new`] selects it ([`resolve_spec_root`]
-/// holds the rule and the reasoning for id-over-directory). It is
-/// consulted ONLY when `--feature` is omitted — an explicit
-/// `--feature <path>` already names its target outright, and which
-/// root that path belongs to is settled by the D3 under-any-root check
-/// below, never by a second id that could contradict it.
-pub fn run_scenario_new(repo: &Path, tag: &ScenarioId, title: &str, feature: Option<&Path>, project: Option<&ProjectId>, at: DateTime<Utc>) -> i32 {
+/// exactly as [`run_feature_new`] selects it ([`resolve_spec_root`]).
+pub fn run_scenario_new(
+    repo: &Path,
+    tag: &ScenarioId,
+    title: &str,
+    feature: Option<&Path>,
+    project: Option<&ProjectId>,
+    subject: Option<&str>,
+    lane: Option<&str>,
+    actor: &Actor,
+    at: DateTime<Utc>,
+) -> i32 {
     let repo_root = resolve_repo_root(repo);
     let ctx = SyncCtx::from_repo(&repo_root);
     let roots = match ctx.spec_roots(None) {
@@ -370,18 +378,17 @@ pub fn run_scenario_new(repo: &Path, tag: &ScenarioId, title: &str, feature: Opt
         return 2;
     }
 
-    let prov_line = provenance_line(at);
+    let prov_line = provenance_line(at, actor);
     let content = if existing.trim().is_empty() {
         // New file: emit `Feature:` + provenance first (task 5.1). No
         // `--feature-title` flag exists on this command — `<area>
-        // <surface>` space-joined mirrors the one hand-authored
-        // fixture in this workspace (`tests/plugin_sync.rs`'s
-        // `"Feature: idolive hub"` for tags under `idolive.hub`).
+        // <surface>` space-joined mirrors the one hand-authored fixture
+        // in this workspace.
         format!("Feature: {} {}\n{prov_line}\n", tag.area(), tag.surface())
     } else {
         existing
     };
-    let out = append_scenario_block(&content, tag.as_str(), title, &prov_line);
+    let out = append_scenario_block(&content, tag.as_str(), title, &prov_line, subject, lane);
 
     if let Some(parent) = feature_path.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
@@ -433,7 +440,14 @@ pub fn run_scenario_new(repo: &Path, tag: &ScenarioId, title: &str, feature: Opt
 /// mis-key the corpus — that override is `canon inventory sync
 /// --spec-root`'s separate contract, not this command's
 /// ([`resolve_spec_root`]).
-pub fn run_feature_new(repo: &Path, area_surface: &AreaSurface, title: &str, project: Option<&ProjectId>, at: DateTime<Utc>) -> i32 {
+pub fn run_feature_new(
+    repo: &Path,
+    area_surface: &AreaSurface,
+    title: &str,
+    project: Option<&ProjectId>,
+    actor: &Actor,
+    at: DateTime<Utc>,
+) -> i32 {
     let repo_root = resolve_repo_root(repo);
     let ctx = SyncCtx::from_repo(&repo_root);
     let roots = match ctx.spec_roots(None) {
@@ -466,7 +480,7 @@ pub fn run_feature_new(repo: &Path, area_surface: &AreaSurface, title: &str, pro
         }
     }
 
-    let content = format!("Feature: {title}\n{}\n", provenance_line(at));
+    let content = format!("Feature: {title}\n{}\n", provenance_line(at, actor));
     match fs::OpenOptions::new().write(true).create_new(true).open(&feature_path) {
         Ok(mut file) => match file.write_all(content.as_bytes()) {
             Ok(()) => {
@@ -514,6 +528,10 @@ mod tests {
         assert!(AreaSurface::parse(".hotdeal").is_err());
     }
 
+    fn actor() -> Actor {
+        Actor::new_unattributed("test-actor")
+    }
+
     #[test]
     fn area_surface_rejects_uppercase_or_underscore() {
         assert!(AreaSurface::parse("World.hotdeal").is_err());
@@ -535,9 +553,6 @@ mod tests {
 
     #[test]
     fn parse_scenario_tag_rejects_a_double_at_prefix() {
-        // Only one leading `@` is stripped -- `@@story.x.01` strips to
-        // `@story.x.01`, which `ScenarioId::parse`'s `@`-free grammar
-        // still refuses (design R3).
         assert!(parse_scenario_tag("@@story.x.01").is_err());
     }
 
@@ -547,10 +562,10 @@ mod tests {
         let no_trailing = "Feature: x";
         let one_trailing = "Feature: x\n";
         let blank_trailing = "Feature: x\n\n";
-        let expected = "Feature: x\n\n  @a.b.01\n  Scenario: t\n  # canon: {}\n    Given a step\n";
-        assert_eq!(append_scenario_block(no_trailing, "a.b.01", "t", prov), expected);
-        assert_eq!(append_scenario_block(one_trailing, "a.b.01", "t", prov), expected);
-        assert_eq!(append_scenario_block(blank_trailing, "a.b.01", "t", prov), expected);
+        let expected = "Feature: x\n\n  # canon: {}\n  @a.b.01\n  Scenario: t\n    Given a step\n";
+        assert_eq!(append_scenario_block(no_trailing, "a.b.01", "t", prov, None, None), expected);
+        assert_eq!(append_scenario_block(one_trailing, "a.b.01", "t", prov, None, None), expected);
+        assert_eq!(append_scenario_block(blank_trailing, "a.b.01", "t", prov, None, None), expected);
     }
 
     /// `<n>` configured roots, ids `p0..p<n-1>`, each under its own
@@ -630,7 +645,7 @@ mod tests {
         // The single-root repo never has to learn the flag exists.
         let dir = repo_with_spec_roots(1);
         let surface = AreaSurface::parse("world.hotdeal").unwrap();
-        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", None, at()), 0);
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", None, &actor(), at()), 0);
         assert!(dir.path().join("specs-p0/features/kind=feature/area=world/hotdeal.feature").is_file());
     }
 
@@ -638,7 +653,7 @@ mod tests {
     fn feature_new_writes_under_the_project_named_root_when_several_are_configured() {
         let dir = repo_with_spec_roots(2);
         let surface = AreaSurface::parse("world.hotdeal").unwrap();
-        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", Some(&project("p1")), at()), 0);
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", Some(&project("p1")), &actor(), at()), 0);
         assert!(dir.path().join("specs-p1/features/kind=feature/area=world/hotdeal.feature").is_file());
         assert!(!dir.path().join("specs-p0").exists(), "the unnamed root must be left entirely alone");
     }
@@ -647,7 +662,7 @@ mod tests {
     fn feature_new_refuses_an_unknown_project_id_with_zero_bytes_written() {
         let dir = repo_with_spec_roots(2);
         let surface = AreaSurface::parse("world.hotdeal").unwrap();
-        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", Some(&project("p9")), at()), 2);
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", Some(&project("p9")), &actor(), at()), 2);
         assert!(!dir.path().join("specs-p0").exists());
         assert!(!dir.path().join("specs-p1").exists());
     }
@@ -656,7 +671,7 @@ mod tests {
     fn feature_new_refuses_several_configured_roots_with_no_project_flag() {
         let dir = repo_with_spec_roots(2);
         let surface = AreaSurface::parse("world.hotdeal").unwrap();
-        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", None, at()), 2);
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", None, &actor(), at()), 2);
         assert!(!dir.path().join("specs-p0").exists());
         assert!(!dir.path().join("specs-p1").exists());
     }

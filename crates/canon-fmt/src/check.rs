@@ -288,7 +288,7 @@ fn check_features(root: &Path, report: &mut FmtReport) {
             report.violations.push(Violation::new(
                 FmtFailureClass::MissingProvenance,
                 &rel,
-                format!("{} of {} Feature:/Scenario: header(s) lack a `# canon: {{...}}` provenance comment", scan.missing_provenance_count(), scan.headers.len()),
+                format!("{} of {} Feature:/Scenario: header(s) lack a `# canon: {{...}}` provenance comment — it may sit directly above the header (with its tags) or directly below it", scan.missing_provenance_count(), scan.headers.len()),
             ));
         }
     }

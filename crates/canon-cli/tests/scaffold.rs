@@ -114,6 +114,64 @@ fn a_bare_feature_new_file_has_the_provenance_comment_and_zero_scenarios() {
 }
 
 #[test]
+fn scenario_new_emits_leading_provenance_subject_lane_and_actor() {
+    let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path());
+    let out = run_canon(
+        &[
+            "scenario",
+            "new",
+            "world.checkout.01",
+            "--title",
+            "Start checkout",
+            "--subject",
+            "checkout-flow",
+            "--lane",
+            "behavior",
+            "--actor",
+            "author-agent",
+        ],
+        dir.path(),
+    );
+    assert!(out.status.success(), "scenario new failed: {}", stderr(&out));
+    let path = dir.path().join("specs/features/kind=feature/area=world/checkout.feature");
+    let content = std::fs::read_to_string(path).unwrap();
+    let normalized = normalize_provenance_timestamps(&content);
+    assert_eq!(
+        normalized,
+        "Feature: world checkout\n  # canon: {\"schema\":1,\"at\":\"STAMP\",\"actor\":{\"agent_id\":\"author-agent\"}}\n\n  # canon: {\"schema\":1,\"at\":\"STAMP\",\"actor\":{\"agent_id\":\"author-agent\"}}\n  @subject:checkout-flow\n  @lane:behavior\n  @world.checkout.01\n  Scenario: Start checkout\n    Given a step\n"
+    );
+}
+
+#[test]
+fn scenario_new_uses_canon_actor_environment_when_flag_is_absent() {
+    let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path());
+    let out = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["scenario", "new", "world.checkout.01", "--title", "Start checkout"])
+        .env("CANON_ACTOR", "env-agent")
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "scenario new failed: {}", stderr(&out));
+    let path = dir.path().join("specs/features/kind=feature/area=world/checkout.feature");
+    let content = std::fs::read_to_string(path).unwrap();
+    assert!(content.contains("\"agent_id\":\"env-agent\""), "{content}");
+}
+
+#[test]
+fn scenario_new_rejects_a_malformed_lane_before_writing() {
+    let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path());
+    let out = run_canon(
+        &["scenario", "new", "world.checkout.01", "--title", "Start checkout", "--lane", "Not_A_Lane"],
+        dir.path(),
+    );
+    assert_eq!(out.status.code(), Some(2), "bad lane must exit 2: {}", stderr(&out));
+    assert!(!dir.path().join("specs").exists(), "bad lane must write zero bytes");
+}
+
+#[test]
 fn a_bare_feature_new_stub_is_fmt_dirty_until_scenario_new_adds_a_tagged_scenario() {
     // ReviewS16P5 contract clarification: the `corpus-authoring-scaffold`
     // spec ties the fmt-clean round-trip to `scenario new`'s output. A

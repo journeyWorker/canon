@@ -17,6 +17,13 @@
     "kind": {
       "$ref": "#/$defs/RecordKind"
     },
+    "lane": {
+      "description": "The optional classification axis for the scenario (s49), retained\nas a shape-validated kebab slug. Vocabulary membership is checked\nby `canon inventory sync` against the repository's activated\n`lane` enum; `Scenario::new` leaves it absent.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "project_id": {
       "$ref": "#/$defs/ProjectId"
     },

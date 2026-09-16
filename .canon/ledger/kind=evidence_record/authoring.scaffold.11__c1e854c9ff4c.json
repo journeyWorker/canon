@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:05:56.834628Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test scaffold scenario_new_rejects_a_malformed_lane_before_writing"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 11,
+  "scenario_id": "authoring.scaffold.11",
+  "schema": 1,
+  "staging_id": "528b5c194461",
+  "verdict": "faithful"
+}

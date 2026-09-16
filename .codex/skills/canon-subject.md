@@ -75,9 +75,10 @@ canon retrieve --role dev --domain dev --subject subject-domain-loop --k 5
 
 ### 3. Work → pin every artifact to `subject_id`
 
-- **Scenarios**: tag a `.feature` scenario `@subject:<subject-id>`;
-  `canon inventory sync` maps the tag onto the scenario's `subject_id`.
-  A malformed/absent tag leaves it unset (fail-soft), never an error.
+- **Scenarios**: `canon scenario new <tag> --subject <subject-id>` emits
+  the `@subject:<subject-id>` tag; `canon inventory sync` maps the tag
+  onto the scenario's `subject_id`. A malformed/absent tag leaves it
+  unset (fail-soft), never an error. See `canon-authoring`.
 - **Changes**: adopt imported plan changes under the Subject (see
   [Adopt flow](#adopt-flow)).
 - **Reviews / evidence / divergences**: authored as usual (`canon review

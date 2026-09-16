@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:44.701938Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon format specs && canon inventory sync && canon gate check"
+  },
+  "evidence_note": {
+    "summary": "26 files 0 violations; 226 scanned; gate check clean, --release clean, selftest ok"
+  },
+  "kind": "evidence_record",
+  "run_seq": 18,
+  "schema": 1,
+  "staging_id": "7d0473c82f17",
+  "task_id": "s49-authoring-the-corpus-agents-write#6.2",
+  "verdict": "faithful"
+}

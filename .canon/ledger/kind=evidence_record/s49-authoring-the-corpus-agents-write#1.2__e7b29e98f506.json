@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:28.966969Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "canon format on a header with no comment"
+  },
+  "evidence_note": {
+    "summary": "message: 'either directly above it (with its tags) or directly below it'"
+  },
+  "kind": "evidence_record",
+  "run_seq": 2,
+  "schema": 1,
+  "staging_id": "c92297589784",
+  "task_id": "s49-authoring-the-corpus-agents-write#1.2",
+  "verdict": "faithful"
+}

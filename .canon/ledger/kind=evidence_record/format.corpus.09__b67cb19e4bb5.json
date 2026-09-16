@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:05:56.907965Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --lib a_features_trailing_comment_never_doubles_as_the_next_scenarios_leading_one"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "format.corpus.09",
+  "schema": 1,
+  "staging_id": "208c2bba8162",
+  "verdict": "faithful"
+}

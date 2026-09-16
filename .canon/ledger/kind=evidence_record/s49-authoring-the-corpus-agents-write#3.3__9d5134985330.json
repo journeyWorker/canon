@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-09-16T11:06:43.851639Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib -- a_lane_tag_round_trips_the_lane_join two_lane_tags_first_wins_with_a_counted_diagnostic malformed_lane_is_dropped_with_a_counted_diagnostic"
+  },
+  "evidence_note": {
+    "summary": "lane on record; first wins; malformed dropped with diagnostic; smoke: bogus lane refused against canon.core enum"
+  },
+  "kind": "evidence_record",
+  "run_seq": 8,
+  "schema": 1,
+  "staging_id": "74d94cc20740",
+  "task_id": "s49-authoring-the-corpus-agents-write#3.3",
+  "verdict": "faithful"
+}

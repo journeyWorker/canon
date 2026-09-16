@@ -108,7 +108,7 @@ impl GateCheck for SpecCoverageCheck {
             )];
         }
 
-        let SpecCoverage::Active { scope, .. } = policy else {
+        let SpecCoverage::Active { scope, exclude_lanes, .. } = policy else {
             unreachable!("the non-Active arms return above");
         };
 
@@ -131,6 +131,9 @@ impl GateCheck for SpecCoverageCheck {
                     continue;
                 }
                 ScopeDecision::InScope => {}
+            }
+            if scenario.lane.as_ref().is_some_and(|lane| exclude_lanes.contains(lane)) {
+                continue;
             }
 
             let key = (scenario.project_id.clone(), scenario.scenario_id.clone());
@@ -369,7 +372,7 @@ mod tests {
     }
 
     fn active(scope: Vec<SubjectStatus>) -> Option<SpecCoverage> {
-        Some(SpecCoverage::Active { require_evidence: true, scope })
+        Some(SpecCoverage::Active { require_evidence: true, scope, exclude_lanes: Vec::new() })
     }
 
     /// The upgrade path every existing consumer takes: a corpus full of
@@ -385,7 +388,7 @@ mod tests {
     fn require_evidence_false_is_also_silent() {
         let mut corpus = Corpus::new();
         corpus.scenarios = vec![scenario("p.a.01", None)];
-        assert!(run(corpus, Some(SpecCoverage::Active { require_evidence: false, scope: Vec::new() })).is_empty());
+        assert!(run(corpus, Some(SpecCoverage::Active { require_evidence: false, scope: Vec::new(), exclude_lanes: Vec::new() })).is_empty());
     }
 
     /// The defect the whole change exists for: a spec nobody attested
@@ -400,6 +403,43 @@ mod tests {
         assert_eq!(out[0].class, FailureClass::UncoveredCell);
         assert_eq!(out[0].subject, "p.a.01");
         assert!(out[0].detail.contains("no evidence record"), "{}", out[0].detail);
+    }
+
+    #[test]
+    fn an_excluded_lane_is_out_of_scope_after_subject_scope() {
+        let mut corpus = Corpus::new();
+        let mut excluded = scenario("p.a.01", None);
+        excluded.lane = Some("process".to_string());
+        corpus.scenarios = vec![excluded];
+        let policy = Some(SpecCoverage::Active {
+            require_evidence: true,
+            scope: Vec::new(),
+            exclude_lanes: vec!["process".to_string()],
+        });
+        assert!(run(corpus, policy).is_empty());
+    }
+
+    #[test]
+    fn an_unlisted_lane_remains_in_scope() {
+        let mut corpus = Corpus::new();
+        let mut scenario = scenario("p.a.01", None);
+        scenario.lane = Some("behavior".to_string());
+        corpus.scenarios = vec![scenario];
+        let policy = Some(SpecCoverage::Active {
+            require_evidence: true,
+            scope: Vec::new(),
+            exclude_lanes: vec!["process".to_string()],
+        });
+        assert_eq!(run(corpus, policy).len(), 1);
+    }
+
+    #[test]
+    fn absent_exclude_lanes_preserves_existing_coverage_behavior() {
+        let mut corpus = Corpus::new();
+        let mut scenario = scenario("p.a.01", None);
+        scenario.lane = Some("process".to_string());
+        corpus.scenarios = vec![scenario];
+        assert_eq!(run(corpus, active(Vec::new())).len(), 1);
     }
 
     #[test]

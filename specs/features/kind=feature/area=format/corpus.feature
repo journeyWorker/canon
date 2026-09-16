@@ -69,3 +69,23 @@ Feature: format corpus
     Then the report says two files were checked, never four, because no file is scanned twice
     And exactly one layout-grammar violation is reported
     And the well-formed sibling accounts for none of it
+
+  # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
+  @subject:format-corpus
+  @lane:behavior
+  @format.corpus.08
+  Scenario: A provenance comment directly above a scenario's tags satisfies the check
+    Given a scenario whose provenance comment sits in the tag block directly above its header
+    When the file is scanned
+    Then no header is reported as missing provenance
+    And a blank line between that comment and the tag block makes the scenario missing again
+
+  # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
+  @subject:format-corpus
+  @lane:behavior
+  @format.corpus.09
+  Scenario: One provenance comment never serves two headers
+    Given a Feature whose own provenance comment is followed, with no blank line, by a scenario's tag
+    When the file is scanned
+    Then the Feature has provenance
+    And the scenario does not, because the comment was already the Feature's

@@ -30,3 +30,11 @@ enums:
     - dev
     - data
     - test
+  # The s49 scenario classification axis: behavior/design requirements
+  # are covered by implementation gates; architecture/process lanes may
+  # be excluded by a repository's spec_coverage policy.
+  lane:
+    - behavior
+    - design
+    - architecture
+    - process
