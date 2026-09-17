@@ -2,8 +2,9 @@ name: Publish
 run-name: "release ${{ github.ref_name }}"
 
 # Adapted from the vendored upstream release pipeline's publish workflow (design
-# D3), simplified to canon's two-level package chain and to S0's two-row
-# platform matrix (macOS arm64 + Linux x64 gnu). Naming (s34): the
+# D3), simplified to canon's two-level package chain and a three-row
+# platform matrix (macOS arm64 + Linux x64 gnu + Windows x64 msvc, the
+# rows the sibling `lute` monorepo ships). Naming (s34): the
 # launcher publishes as the SCOPED `@journeykit/canon` shipping
 # `bin: { canon: "./bin.js" }`, so `bunx @journeykit/canon` is the
 # friendly invocation while the installed bin stays `canon`; platform
@@ -92,10 +93,17 @@ jobs:
             target: aarch64-apple-darwin
             package_dir: core-darwin-arm64
             package_name: "@journeykit/canon-core-darwin-arm64"
+            binary_ext: ""
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             package_dir: core-linux-x64
             package_name: "@journeykit/canon-core-linux-x64"
+            binary_ext: ""
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            package_dir: core-win32-x64
+            package_name: "@journeykit/canon-core-win32-x64"
+            binary_ext: ".exe"
 
     steps:
       - uses: actions/checkout@v7
@@ -119,13 +127,14 @@ jobs:
         run: cargo build --release -p canon-cli --target ${{ matrix.settings.target }}
 
       - name: Strip binary
+        if: matrix.settings.binary_ext == ''
         run: strip "target/${{ matrix.settings.target }}/release/canon"
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v6
         with:
           name: canon-binary-${{ matrix.settings.target }}
-          path: target/${{ matrix.settings.target }}/release/canon
+          path: target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}
           if-no-files-found: error
 
   publish:
@@ -157,7 +166,7 @@ jobs:
       # the BOOTSTRAP path: a brand-new package has no settings page yet, so
       # a trusted publisher cannot be configured until it exists. Set the
       # NPM_TOKEN repo secret for the first release; once trusted publishing
-      # is configured on all three package pages, OIDC is used and the token
+      # is configured on all four package pages, OIDC is used and the token
       # (and this secret) can be removed.
       - name: Upgrade npm for OIDC trusted publishing
         run: npm install -g npm@latest
@@ -174,17 +183,24 @@ jobs:
           name: canon-binary-x86_64-unknown-linux-gnu
           path: packages/core-linux-x64/bin
 
+      - name: Download win32-x64 binary artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: canon-binary-x86_64-pc-windows-msvc
+          path: packages/core-win32-x64/bin
+
       - name: Stage binaries executable
         run: |
           chmod +x packages/core-darwin-arm64/bin/canon
           chmod +x packages/core-linux-x64/bin/canon
+          chmod +x packages/core-win32-x64/bin/canon.exe
 
       - name: Apply the workspace version to every package.json
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
         run: |
           set -euo pipefail
-          for pkg in packages/cli packages/core-darwin-arm64 packages/core-linux-x64; do
+          for pkg in packages/cli packages/core-darwin-arm64 packages/core-linux-x64 packages/core-win32-x64; do
             jq --arg v "$VERSION" '.version = $v' "$pkg/package.json" > "$pkg/package.json.tmp"
             mv "$pkg/package.json.tmp" "$pkg/package.json"
           done
@@ -234,7 +250,7 @@ jobs:
             exit 1
           }
           ALREADY=""
-          for pkg_dir in core-darwin-arm64 core-linux-x64 cli; do
+          for pkg_dir in core-darwin-arm64 core-linux-x64 core-win32-x64 cli; do
             PKG=$(jq -r .name "packages/$pkg_dir/package.json")
             if is_published "$PKG"; then
               ALREADY="$ALREADY $PKG"
@@ -272,6 +288,20 @@ jobs:
 
       - name: Publish @journeykit/canon-core-linux-x64 (idempotent)
         working-directory: packages/core-linux-x64
+        env:
+          VERSION: ${{ needs.read-version.outputs.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          PKG=$(jq -r .name package.json)
+          if npm view "$PKG@$VERSION" version >/dev/null 2>&1; then
+            echo "$PKG@$VERSION already on npm — skipping (idempotent)."
+          else
+            npm publish --provenance --access public
+          fi
+
+      - name: Publish @journeykit/canon-core-win32-x64 (idempotent)
+        working-directory: packages/core-win32-x64
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

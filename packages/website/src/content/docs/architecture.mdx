@@ -112,7 +112,8 @@ vendored upstream launcher project): the published `@journeykit/canon`
 package (`packages/cli`) is a thin JS launcher with **no runtime
 dependencies of its own**. Platform-specific `canon-cli` binaries ship as
 `optionalDependencies` (`@journeykit/canon-core-darwin-arm64`,
-`@journeykit/canon-core-linux-x64`, …); npm/Bun installs only the one matching the
+`@journeykit/canon-core-linux-x64`, `@journeykit/canon-core-win32-x64`);
+npm/Bun installs only the one matching the
 running platform, and the launcher's `bin.js` resolves + execs it. This is
 what makes `bunx @journeykit/canon` work from any repo with zero local Rust toolchain.
 

@@ -258,7 +258,12 @@ mod tests {
     }
 
     // ── PRE_COMMIT_SCRIPT: actually exercised via `sh`, not just string assertions ──
+    // The script is what git runs (git-for-windows too, under its own
+    // sh), but this harness drives `/bin/sh` directly and stubs `canon`
+    // as a shell script — a unix-only fixture, so the four tests below
+    // are gated to unix rather than pretending a Windows host has one.
 
+    #[cfg(unix)]
     fn write_stub_canon(dir: &std::path::Path, exit_code: i32) {
         let path = dir.join("canon");
         let mut file = fs::File::create(&path).unwrap();
@@ -272,6 +277,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     fn run_script(path_dir: Option<&std::path::Path>, advisory: Option<&str>) -> std::process::ExitStatus {
         let script_dir = std::env::temp_dir().join(format!("canon-gate-pre-commit-test-{}", std::process::id()));
         fs::create_dir_all(&script_dir).unwrap();
@@ -305,12 +311,14 @@ mod tests {
         cmd.status().expect("sh must be available to run the pre-commit script")
     }
 
+    #[cfg(unix)]
     #[test]
     fn exits_zero_when_canon_is_not_installed() {
         let status = run_script(None, None);
         assert!(status.success(), "a missing canon binary must never block a commit (fail-soft, §7)");
     }
 
+    #[cfg(unix)]
     #[test]
     fn advisory_mode_never_blocks_even_when_the_gate_fails() {
         let dir = tempfile::tempdir().unwrap();
@@ -319,6 +327,7 @@ mod tests {
         assert!(status.success(), "CANON_GATE_ADVISORY defaults to 1 — a gate failure must not block the commit");
     }
 
+    #[cfg(unix)]
     #[test]
     fn blocking_mode_fails_the_commit_when_the_gate_fails() {
         let dir = tempfile::tempdir().unwrap();
@@ -327,6 +336,7 @@ mod tests {
         assert!(!status.success(), "CANON_GATE_ADVISORY=0 must propagate a gate failure");
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_passing_gate_always_exits_zero() {
         let dir = tempfile::tempdir().unwrap();

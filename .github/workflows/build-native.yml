@@ -1,12 +1,16 @@
 name: Build Native (Test Only)
 
 # Adapted from the vendored upstream release pipeline's build workflow (design
-# D3), scoped to S0's acceptance bar: macOS arm64 + Linux x64 gnu only.
-# Both matrix rows build on a host that natively matches the target triple
-# (macos-14 runners are Apple Silicon; ubuntu-latest runners are x86_64),
-# so no cross-compilation toolchain (zig / cargo-zigbuild) is needed for
-# either row — that machinery only becomes necessary once a target is
-# added whose triple doesn't match any available runner's native arch.
+# D3): S0's acceptance bar (macOS arm64 + Linux x64 gnu) plus Windows x64
+# msvc, the same three rows the sibling `lute` monorepo ships. Every
+# matrix row builds on a host that natively matches the target triple
+# (macos-14 runners are Apple Silicon; ubuntu-latest and windows-latest
+# runners are x86_64), so no cross-compilation toolchain (zig /
+# cargo-zigbuild) is needed for any row — that machinery only becomes
+# necessary once a target is added whose triple doesn't match any
+# available runner's native arch. The Windows row needs CMake + NASM
+# (aws-lc-sys / ring build scripts); both ship on the windows-latest
+# image. `binary_ext` is the only per-row difference the steps see.
 
 on:
   workflow_dispatch:
@@ -44,9 +48,15 @@ jobs:
           - host: macos-14
             target: aarch64-apple-darwin
             package_dir: core-darwin-arm64
+            binary_ext: ""
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             package_dir: core-linux-x64
+            binary_ext: ""
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            package_dir: core-win32-x64
+            binary_ext: ".exe"
 
     steps:
       - uses: actions/checkout@v7
@@ -70,18 +80,21 @@ jobs:
         run: cargo build --release -p canon-cli --target ${{ matrix.settings.target }}
 
       - name: Strip binary
+        if: matrix.settings.binary_ext == ''
         run: strip "target/${{ matrix.settings.target }}/release/canon"
 
       - name: Stage into platform package (local verification only — not committed)
+        shell: bash
         run: |
+          BIN="canon${{ matrix.settings.binary_ext }}"
           mkdir -p "packages/${{ matrix.settings.package_dir }}/bin"
-          cp "target/${{ matrix.settings.target }}/release/canon" "packages/${{ matrix.settings.package_dir }}/bin/canon"
-          chmod +x "packages/${{ matrix.settings.package_dir }}/bin/canon"
-          "packages/${{ matrix.settings.package_dir }}/bin/canon" --version
+          cp "target/${{ matrix.settings.target }}/release/$BIN" "packages/${{ matrix.settings.package_dir }}/bin/$BIN"
+          chmod +x "packages/${{ matrix.settings.package_dir }}/bin/$BIN"
+          "packages/${{ matrix.settings.package_dir }}/bin/$BIN" --version
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: canon-binary-${{ matrix.settings.target }}
-          path: target/${{ matrix.settings.target }}/release/canon
+          path: target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}
           if-no-files-found: error

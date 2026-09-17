@@ -118,9 +118,10 @@ function loaderPresent(prefix: string): boolean {
   return false;
 }
 
-// Only the two S0 acceptance-bar platforms (design D3: macOS arm64, Linux
-// x64 gnu) resolve to a real `@journeykit/canon-core-<platform>` package today.
-// Every other platform/arch/libc combination returns null and hits the
+// Only the shipped platforms (S0's acceptance bar: macOS arm64, Linux
+// x64 gnu; plus Windows x64 msvc, matching the sibling `lute` launcher)
+// resolve to a real `@journeykit/canon-core-<platform>` package. Every
+// other platform/arch/libc combination returns null and hits the
 // "Unsupported platform fails with an actionable error" scenario — adding
 // a target later is a new `packages/core-<platform>/` + a CI matrix row,
 // not a change to this function's shape (design non-goals).
@@ -135,6 +136,11 @@ function resolveTargetPackageName(): string | null {
   if (process.platform === "linux") {
     const libc = detectLibcKind();
     if (arch === "x64" && libc === "gnu") return "core-linux-x64";
+    return null;
+  }
+
+  if (process.platform === "win32") {
+    if (arch === "x64") return "core-win32-x64";
     return null;
   }
 

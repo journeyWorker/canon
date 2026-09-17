@@ -1,0 +1,26 @@
+{
+  "name": "@journeykit/canon-core-win32-x64",
+  "version": "0.7.0",
+  "description": "canon CLI binary for windows x64 (msvc)",
+  "license": "MIT",
+  "type": "module",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "bin/canon.exe",
+  "files": [
+    "bin"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/journeyWorker/canon.git",
+    "directory": "packages/core-win32-x64"
+  }
+}

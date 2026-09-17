@@ -111,7 +111,8 @@ canon은 검증된 Rust-core→npm 패키징 패턴(벤더링된 업스트림 �
 프로젝트에서 적응)을 따릅니다: 배포되는 `@journeykit/canon` 패키지
 (`packages/cli`)는 자체 런타임 의존성이 없는 얇은 JS 런처입니다.
 플랫폼별 `canon-cli` 바이너리는 `optionalDependencies`로 배포됩니다
-(`@journeykit/canon-core-darwin-arm64`, `@journeykit/canon-core-linux-x64` 등). npm/Bun은
+(`@journeykit/canon-core-darwin-arm64`, `@journeykit/canon-core-linux-x64`,
+`@journeykit/canon-core-win32-x64`). npm/Bun은
 현재 실행 중인 플랫폼에 맞는 것 하나만 설치하고, 런처의 `bin.js`가 그것을
 찾아 실행합니다. `bunx @journeykit/canon`가 로컬 Rust 툴체인 없이 어느 레포에서든
 동작하는 이유입니다.

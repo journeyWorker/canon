@@ -7,7 +7,7 @@
     },
     "packages/cli": {
       "name": "@journeykit/canon",
-      "version": "0.5.0",
+      "version": "0.7.0",
       "bin": {
         "canon": "./bin.js",
       },
@@ -18,19 +18,24 @@
       "optionalDependencies": {
         "@journeykit/canon-core-darwin-arm64": "workspace:*",
         "@journeykit/canon-core-linux-x64": "workspace:*",
+        "@journeykit/canon-core-win32-x64": "workspace:*",
       },
     },
     "packages/core-darwin-arm64": {
       "name": "@journeykit/canon-core-darwin-arm64",
-      "version": "0.5.0",
+      "version": "0.7.0",
     },
     "packages/core-linux-x64": {
       "name": "@journeykit/canon-core-linux-x64",
-      "version": "0.5.0",
+      "version": "0.7.0",
+    },
+    "packages/core-win32-x64": {
+      "name": "@journeykit/canon-core-win32-x64",
+      "version": "0.7.0",
     },
     "packages/dashboard": {
       "name": "@canon-dev/dashboard",
-      "version": "0.5.0",
+      "version": "0.7.0",
       "dependencies": {
         "@duckdb/duckdb-wasm": "1.32.0",
         "apache-arrow": "17.0.0",
@@ -44,7 +49,7 @@
     },
     "packages/website": {
       "name": "@canon/website",
-      "version": "0.5.0",
+      "version": "0.7.0",
       "dependencies": {
         "@astrojs/starlight": "^0.36.0",
         "@fontsource-variable/jetbrains-mono": "^5.2.5",
@@ -212,6 +217,8 @@
     "@journeykit/canon-core-darwin-arm64": ["@journeykit/canon-core-darwin-arm64@workspace:packages/core-darwin-arm64"],
 
     "@journeykit/canon-core-linux-x64": ["@journeykit/canon-core-linux-x64@workspace:packages/core-linux-x64"],
+
+    "@journeykit/canon-core-win32-x64": ["@journeykit/canon-core-win32-x64@workspace:packages/core-win32-x64"],
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
@@ -988,8 +995,6 @@
     "xxhash-wasm": ["xxhash-wasm@1.1.0", "", {}, "sha512-147y/6YNh+tlp6nd/2pWq38i9h6mz/EuQ6njIrmW8D1BS5nCqs0P6DG+m6zTGnNz5I+uhZ0SHxBs9BsPrwcKDA=="],
 
     "y18n": ["y18n@5.0.8", "", {}, "sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA=="],
-
-    "yaml": ["yaml@2.9.0", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA=="],
 
     "yargs": ["yargs@18.0.0", "", { "dependencies": { "cliui": "^9.0.1", "escalade": "^3.1.1", "get-caller-file": "^2.0.5", "string-width": "^7.2.0", "y18n": "^5.0.5", "yargs-parser": "^22.0.0" } }, "sha512-4UEqdc2RYGHZc7Doyqkrqiln3p9X2DZVxaGbwhn2pi7MrRagKaOcIKe8L3OxYcbhXLgLFUS3zAYuQjKBQgmuNg=="],
 

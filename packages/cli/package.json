@@ -29,7 +29,8 @@
   "dependencies": {},
   "optionalDependencies": {
     "@journeykit/canon-core-darwin-arm64": "workspace:*",
-    "@journeykit/canon-core-linux-x64": "workspace:*"
+    "@journeykit/canon-core-linux-x64": "workspace:*",
+    "@journeykit/canon-core-win32-x64": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

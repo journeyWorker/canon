@@ -29,10 +29,13 @@ name match").
 ## Add a new CI matrix target / platform package
 
 canon's platform packages follow `@journeykit/canon-core-<platform>` naming
-(design D1/D3). S0 ships two: `core-darwin-arm64`, `core-linux-x64`. Adding
-a target (e.g. `core-linux-arm64`, `core-darwin-x64`) is a CI matrix row
+(design D1/D3). Three ship today: `core-darwin-arm64`, `core-linux-x64`,
+`core-win32-x64` (the same rows as the sibling `lute` monorepo). Adding a
+target (e.g. `core-linux-arm64`, `core-darwin-x64`) is a CI matrix row
 plus a new package directory — never a redesign of the launcher (design
-non-goals).
+non-goals). A matrix row carries `binary_ext` (`""` or `".exe"`); the
+build/stage/upload steps are written against it, and `strip` is skipped
+when it is non-empty.
 
 1. Create `packages/core-<platform>/package.json`: copy an existing
    platform package's shape, set `"os"`/`"cpu"` to the new target's values,
@@ -42,7 +45,8 @@ non-goals).
    bin/*` rule).
 3. Add the new target as a matrix row in both `.github/workflows/
    build-native.yml` and `.github/workflows/publish.yml`'s `build` job
-   (`host`, `target`, `package_dir` — `package_name` too, in `publish.yml`).
+   (`host`, `target`, `package_dir`, `binary_ext` — `package_name` too, in
+   `publish.yml`).
 4. Add the new platform package to `packages/cli/package.json`'s
    `optionalDependencies` as `"@journeykit/canon-core-<platform>": "workspace:*"`.
 5. If the target needs a new libc/arch branch, extend
