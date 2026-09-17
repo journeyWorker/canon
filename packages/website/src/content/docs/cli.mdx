@@ -29,7 +29,7 @@ companion agent skills.
 
 | Command | Description |
 |---|---|
-| `canon init [--repo <dir>]` | Scaffold a fresh, working `canon.yaml` (`tiers:`/`routing:`/`specs:`/`plans:`) at `<repo>/canon.yaml`. Refuses to overwrite an existing file. |
+| `canon init [--repo <dir>]` | Scaffold a fresh, working `canon.yaml` (`tiers:`/`routing:`/`specs:`/`plans:`) at `<repo>/canon.yaml`. Refuses to overwrite an existing file. Prints `canon skills install` as the next step. |
 | `canon init --check-config [--repo <dir>]` | Read-only validate an existing `canon.yaml`, chaining the same strict loaders `inventory sync`/`ingest plans`/`tier age` use. |
 | `canon context [--repo <dir>] [--json]` | Emit the resolved authoring surface: record kinds + envelope fields, enum domains, join-key grammars, partition layout, policy-derived requirements, capability version. A capability *query* — always exits 0, even when `fmt --check`/`gate` would report diagnostics. |
 | `canon skills install [--source <dir>] [--target <dir>]` | Materialize `canon/skills/<name>/SKILL.md` into `.claude/skills/` and `.codex/skills/` in a consumer repo, updating the content-hash + version lock. Defaults: `--source canon/skills`, `--target .`. |
@@ -56,8 +56,8 @@ Validate and grow a Gherkin `.feature` spec corpus.
 |---|---|
 | `canon format <ROOT> [--repo <dir>]` (alias `canon fmt`) | Validate a corpus root (e.g. `spec/`) against the artifact-family schemas + layout descriptors. Validating is the only mode, so `--check` is now the default and is accepted only for compatibility. |
 | `canon inventory sync [--repo <dir>] [--spec-root <dir>]` | Validate each configured `specs.roots[]` entry with `canon-fmt`, then materialize one `Scenario` ledger-index record per `(project_id, scenario_id)`. `--spec-root` overrides `canon.yaml` for one ad hoc root. |
-| `canon scenario new <TAG> --title <label> [--feature <path>] [--repo <dir>]` | Append (creating if absent) an S11-conformant `.feature` stub for a `<area>.<surface>.<nn>` tag. Writes no ledger record. |
-| `canon feature new <SURFACE> --title <label> [--repo <dir>]` | Scaffold a fresh, zero-scenario `.feature` file for a not-yet-started `<area>.<surface>`. Fails loud rather than overwriting an existing file. |
+| `canon scenario new <TAG> --title <label> [--subject <id>] [--lane <v>] [--actor <id>] [--feature <path>] [--repo <dir>]` | Append (creating if absent) a `.feature` stub for a `<area>.<surface>.<nn>` tag: a `# canon:` provenance line directly above the tags, then `@subject:<id>` / `@lane:<v>` if given, then the id tag and header. `--actor` (or `CANON_ACTOR`) names the provenance actor, default `canon-scaffold`; `--lane` is checked against the repo's `lane` vocabulary. Writes no ledger record. |
+| `canon feature new <SURFACE> --title <label> [--actor <id>] [--repo <dir>]` | Scaffold a fresh, zero-scenario `.feature` file for a not-yet-started `<area>.<surface>`. Fails loud rather than overwriting an existing file. |
 
 ## Ingest
 

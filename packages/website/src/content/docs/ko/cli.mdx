@@ -31,7 +31,7 @@ description: canon --help 출력을 기준으로 목적별로 묶은 전체 서�
 
 | Command | Description |
 |---|---|
-| `canon init [--repo <dir>]` | `<repo>/canon.yaml`에 동작하는 새 `canon.yaml` (`tiers:`/`routing:`/`specs:`/`plans:`)을 생성합니다. 기존 파일이 있으면 덮어쓰지 않습니다. |
+| `canon init [--repo <dir>]` | `<repo>/canon.yaml`에 동작하는 새 `canon.yaml` (`tiers:`/`routing:`/`specs:`/`plans:`)을 생성합니다. 기존 파일이 있으면 덮어쓰지 않습니다. 다음 단계로 `canon skills install`을 안내합니다. |
 | `canon init --check-config [--repo <dir>]` | 기존 `canon.yaml`을 읽기 전용으로 검증합니다. `inventory sync`/`ingest plans`/`tier age`가 쓰는 것과 동일한 strict loader를 그대로 체이닝합니다. |
 | `canon context [--repo <dir>] [--json]` | 해석된 저작 표면을 출력합니다: 레코드 종류 + envelope 필드, enum 도메인, 조인 키 문법, 파티션 레이아웃, 정책 기반 요구사항, capability 버전. capability *쿼리*입니다 — `fmt --check`/`gate`가 같은 레포에서 진단을 보고하더라도 항상 0으로 종료합니다. |
 | `canon skills install [--source <dir>] [--target <dir>]` | consumer 레포의 `.claude/skills/`와 `.codex/skills/`에 `canon/skills/<name>/SKILL.md`를 구체화하고, content-hash + 버전 락을 갱신합니다. 기본값: `--source canon/skills`, `--target .`. |
@@ -58,8 +58,8 @@ Gherkin `.feature` 스펙 코퍼스를 검증하고 확장합니다.
 |---|---|
 | `canon format <ROOT> [--repo <dir>]` (별칭 `canon fmt`) | 코퍼스 루트(예: `spec/`)를 아티팩트 패밀리 스키마 + 레이아웃 디스크립터에 대해 검증합니다. 검증이 유일한 모드이므로 `--check`는 이제 기본값이며 호환을 위해서만 받아들여집니다. |
 | `canon inventory sync [--repo <dir>] [--spec-root <dir>]` | 설정된 `specs.roots[]` 항목마다 `canon-fmt`로 검증한 뒤, `(project_id, scenario_id)`당 하나의 `Scenario` ledger-index 레코드를 생성합니다. `--spec-root`는 하나의 ad hoc 루트로 `canon.yaml`을 완전히 오버라이드합니다. |
-| `canon scenario new <TAG> --title <label> [--feature <path>] [--repo <dir>]` | `<area>.<surface>.<nn>` 태그에 대한 S11 준수 `.feature` 스텁을 추가합니다(없으면 생성). ledger 레코드는 쓰지 않습니다. |
-| `canon feature new <SURFACE> --title <label> [--repo <dir>]` | 아직 시작되지 않은 `<area>.<surface>`를 위한 시나리오 없는 새 `.feature` 파일을 스캐폴딩합니다. 기존 파일이 있으면 덮어쓰지 않고 실패합니다. |
+| `canon scenario new <TAG> --title <label> [--subject <id>] [--lane <v>] [--actor <id>] [--feature <path>] [--repo <dir>]` | `<area>.<surface>.<nn>` 태그에 대한 `.feature` 스텁을 추가합니다(없으면 생성): 태그 바로 위의 `# canon:` provenance 줄, 지정 시 `@subject:<id>` / `@lane:<v>`, 그 다음 id 태그와 헤더. `--actor`(또는 `CANON_ACTOR`)가 provenance의 actor를 정하며 기본값은 `canon-scaffold`, `--lane`은 레포의 `lane` vocabulary에 대해 검사됩니다. ledger 레코드는 쓰지 않습니다. |
+| `canon feature new <SURFACE> --title <label> [--actor <id>] [--repo <dir>]` | 아직 시작되지 않은 `<area>.<surface>`를 위한 시나리오 없는 새 `.feature` 파일을 스캐폴딩합니다. 기존 파일이 있으면 덮어쓰지 않고 실패합니다. |
 
 ## Ingest
 

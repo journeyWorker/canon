@@ -57,6 +57,7 @@ zero violations:
 spec_coverage:
   require_evidence: true
   scope: [building, verifying]
+  exclude_lanes: [process]
 ```
 
 `scope` narrows what can *block* to scenarios linked — via their
@@ -66,9 +67,20 @@ spec_coverage:
 specced repo honest: the unspecced parts are visibly absent rather than
 silently green. Leave `scope` out and every scenario is in scope.
 
+`exclude_lanes` takes a second, independent cut after `scope`. A
+scenario's **lane** — its `@lane:<value>` tag, carried onto the indexed
+`Scenario` record — says what kind of requirement it is: `behavior`
+(what the product does), `design` (how it looks and moves),
+`architecture` (how the code is shaped), or `process` (how the team
+works — what a review report may claim, how acceptance is run). The
+base set is `canon.core`'s; a repo replaces it through its own `lane`
+vocabulary enum. A `process` rule has no code surface and can never be
+`faithful` from a test, so listing it here keeps a real rule out of a
+number it would only pollute. Absent, nothing is excluded.
+
 A present-but-malformed section is never silently equivalent to an absent
-one — it is reported and then fails the check, so a typo cannot quietly
-disable the gate.
+one — it is reported and then fails the check, so a typo (or a
+non-slug lane) cannot quietly disable the gate.
 
 ## The trust ladder
 
