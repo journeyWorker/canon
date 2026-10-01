@@ -897,7 +897,7 @@ enum SkillsCommand {
         /// Consumer repo root to materialize into.
         #[arg(long, default_value = ".")]
         target: PathBuf,
-        /// Providers to project (`claude`, `codex`, or a comma-separated list).
+        /// Providers to project (`claude`, `codex`, `omp`, `pi`, or a comma-separated list).
         #[arg(long)]
         providers: Option<String>,
     },
@@ -905,8 +905,10 @@ enum SkillsCommand {
     Check {
         #[arg(long)]
         source: Option<PathBuf>,
+        /// Consumer repo root to inspect.
         #[arg(long, default_value = ".")]
         target: PathBuf,
+        /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list).
         #[arg(long)]
         providers: Option<String>,
     },
@@ -914,8 +916,10 @@ enum SkillsCommand {
     Doctor {
         #[arg(long)]
         source: Option<PathBuf>,
+        /// Consumer repo root to inspect.
         #[arg(long, default_value = ".")]
         target: PathBuf,
+        /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list).
         #[arg(long)]
         providers: Option<String>,
     },

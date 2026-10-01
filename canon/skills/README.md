@@ -18,8 +18,8 @@ does not replace Canon's explicit CLI commands or internal Rust modules.
 ## Materialization
 
 ```bash
-canon skills install                              # detect .claude/.codex
-canon skills install --providers=claude,codex     # explicit, deterministic
+canon skills install                              # detect .claude/.codex/.omp/.pi
+canon skills install --providers=claude,codex,omp,pi
 canon skills check                                # read-only drift check
 canon skills doctor                               # diagnostics, no deletion
 ```
@@ -31,16 +31,26 @@ Claude receives:
 - `.claude/skills/canon/scripts/**`
 
 Codex receives the flattened `.codex/skills/canon.md` plus matching
-`.codex/skills/canon/reference/**` and `scripts/**` sidecars. Provider
-selection is `claude` and/or `codex`; invalid names fail before any write. If
-neither target exists, both are selected for backwards compatibility.
+`.codex/skills/canon/reference/**` and `scripts/**` sidecars. OMP and Pi are
+directory-shaped, verbatim projections:
+
+- `.omp/skills/canon/SKILL.md`, `.omp/skills/canon/reference/**`, and
+  `.omp/skills/canon/scripts/**`
+- `.pi/skills/canon/SKILL.md`, `.pi/skills/canon/reference/**`, and
+  `.pi/skills/canon/scripts/**`
+
+OMP/Pi projections are project-local passive bundles. The
+`canon-retrieve-pre-dispatch.sh` script is provided only as a sidecar; no OMP
+or Pi native hook is installed. Provider selection is `claude`, `codex`, `omp`,
+and/or `pi`; invalid names fail before any write. If no provider root exists,
+Claude and Codex are selected for backwards compatibility.
 
 The source checkout is never modified by a canonical install. The target owns
 a timestamp-free content-addressed manifest at
 `.canon/skills/.install-lock.json`. Re-running an unchanged install is a
 byte-identical no-op. Existing symlinks are never overwritten. `doctor`
-reports stale/missing projections and old `canon-*` remnants without deleting
-user data.
+reports stale/missing projections and old `canon-*` remnants in all four
+managed roots without deleting user data.
 
 ## Developer-only source
 

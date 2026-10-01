@@ -123,15 +123,17 @@ is attributed, and is fresh — never on a self-report. See
 ## For agent harnesses
 
 If your repo runs coding agents, install canon's one canonical `canon` skill
-projected into each provider's native location: `.claude/skills/canon/SKILL.md`
-for Claude and `.codex/skills/canon.md` for Codex. When `--providers` is
-omitted, canon detects existing provider targets and defaults to both when
-neither target exists. Select providers explicitly when you want to pin the
-projection:
+projected into each selected provider's project-local location: Claude gets
+`.claude/skills/canon/SKILL.md`, Codex gets `.codex/skills/canon.md`, OMP gets
+`.omp/skills/canon/SKILL.md`, and Pi gets `.pi/skills/canon/SKILL.md`. OMP/Pi
+are passive bundles; their retrieve pre-dispatch script is a sidecar only, not
+a native hook. When `--providers` is omitted, canon detects existing
+`.claude`, `.codex`, `.omp`, and `.pi` roots and defaults to Claude+Codex when
+none exist. Select providers explicitly when you want to pin the projection:
 
 ```bash
-# project one canonical canon skill for both providers
-bunx @journeykit/canon skills install --source canon/skills --target . --providers=claude,codex
+# project one canonical canon skill for all four providers
+bunx @journeykit/canon skills install --source canon/skills --target . --providers=claude,codex,omp,pi
 
 # inspect projections without writing
 bunx @journeykit/canon skills check --source canon/skills --target .
@@ -143,7 +145,7 @@ bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon re
 
 `skills check` and `skills doctor` are read-only: `check` reports missing or
 stale projections, while `doctor` reports provider, drift, and legacy-remnant
-diagnostics without deleting user files.
+diagnostics across all four managed roots without deleting user files.
 
 Strategies are distilled from your team's own verdicts and promoted through a
 statistical gate — see [Strategy memory](/concepts/strategy-memory/) for the
@@ -151,9 +153,11 @@ full flywheel.
 
 ## Opting out
 
-canon keeps everything it generates under a single `.canon/` directory
-(with `canon.yaml` at the repo root). To back out completely, delete
-`canon.yaml` and `.canon/` — that's the whole footprint.
+canon keeps its data under a single `.canon/` directory (with `canon.yaml` at
+the repo root). Project-local skill projections additionally live under the
+selected provider roots (`.claude`, `.codex`, `.omp`, and/or `.pi`). To back
+out completely, delete `canon.yaml`, `.canon/`, and any selected skill roots
+you no longer want — that's the whole project-local footprint.
 
 ## Next
 

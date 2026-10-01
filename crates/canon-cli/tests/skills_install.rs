@@ -213,3 +213,79 @@ fn canonical_check_and_doctor_report_projected_drift_and_legacy_remnant() {
     assert!(doctor.iter().any(|line| line.contains("legacy-remnant:") && line.contains("canon-old")));
     assert!(legacy.exists(), "doctor must report legacy remnants without deleting them");
 }
+
+#[test]
+fn canonical_install_projects_omp_and_pi_verbatim_with_sidecars() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    fs::create_dir_all(source.join("reference")).unwrap();
+    fs::create_dir_all(source.join("scripts")).unwrap();
+    let source_skill = "---\nname: canon\ndescription: umbrella\nx-extra: preserved\n---\n\n# Canon\n";
+    fs::write(source.join("SKILL.src.md"), source_skill).unwrap();
+    fs::write(source.join("reference/topic.md"), "# topic\n").unwrap();
+    fs::write(source.join("scripts/pre-dispatch.sh"), "#!/bin/sh\n").unwrap();
+
+    let report = skills::install_canonical(&source, &target, Some("pi,OMP")).unwrap();
+
+    assert_eq!(report.providers, vec![skills::Provider::Omp, skills::Provider::Pi]);
+    for root in [".omp", ".pi"] {
+        let bundle = target.join(root).join("skills/canon");
+        assert_eq!(fs::read_to_string(bundle.join("SKILL.md")).unwrap(), source_skill);
+        assert_eq!(fs::read_to_string(bundle.join("reference/topic.md")).unwrap(), "# topic\n");
+        assert_eq!(
+            fs::read_to_string(bundle.join("scripts/pre-dispatch.sh")).unwrap(),
+            "#!/bin/sh\n"
+        );
+    }
+    assert!(!target.join(".claude").exists());
+    assert!(!target.join(".codex").exists());
+}
+
+#[test]
+fn canonical_implicit_detection_selects_omp_pi_in_stable_order() {
+    for (roots, expected) in [
+        (vec![".omp"], vec![skills::Provider::Omp]),
+        (vec![".pi"], vec![skills::Provider::Pi]),
+        (vec![".omp", ".pi"], vec![skills::Provider::Omp, skills::Provider::Pi]),
+    ] {
+        let tmp = tempfile::tempdir().unwrap();
+        let source = tmp.path().join("source");
+        let target = tmp.path().join("target");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("SKILL.src.md"), "# canon\n").unwrap();
+        for root in roots {
+            fs::create_dir_all(target.join(root)).unwrap();
+        }
+
+        let report = skills::install_canonical(&source, &target, None).unwrap();
+        assert_eq!(report.providers, expected);
+    }
+}
+
+#[test]
+fn canonical_check_and_doctor_report_omp_pi_drift_and_remnant() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    fs::create_dir_all(&source).unwrap();
+    fs::write(source.join("SKILL.src.md"), "---\nname: canon\n---\n\n# Canon\n").unwrap();
+    skills::install_canonical(&source, &target, Some("omp,pi")).unwrap();
+
+    let projected = target.join(".omp/skills/canon/SKILL.md");
+    fs::write(&projected, "mutated projection\n").unwrap();
+    let legacy = target.join(".pi/skills/canon-old");
+    fs::create_dir_all(&legacy).unwrap();
+
+    let check = skills::check(&source, &target, Some("omp,pi")).unwrap();
+    assert!(check.providers == vec![skills::Provider::Omp, skills::Provider::Pi]);
+    assert!(check
+        .statuses
+        .iter()
+        .any(|status| status.provider == skills::Provider::Omp && status.state == "stale"));
+
+    let doctor = skills::doctor(&source, &target, Some("omp,pi")).unwrap();
+    assert!(doctor.iter().any(|line| line.contains("stale:") && line.contains(".omp")));
+    assert!(doctor.iter().any(|line| line.contains("legacy-remnant:") && line.contains("canon-old")));
+    assert!(legacy.exists(), "doctor must report legacy remnants without deleting them");
+}

@@ -33,12 +33,13 @@ explicit; the skill only routes an agent to lazy references.
 | `canon init [--repo <dir>]` | Scaffold a fresh, working `canon.yaml` (`tiers:`/`routing:`/`specs:`/`plans:`) at `<repo>/canon.yaml`. Refuses to overwrite an existing file. Prints `canon skills install` as the next step. |
 | `canon init --check-config [--repo <dir>]` | Read-only validate an existing `canon.yaml`, chaining the same strict loaders `inventory sync`/`ingest plans`/`tier age` use. |
 | `canon context [--repo <dir>] [--json]` | Emit the resolved authoring surface: record kinds + envelope fields, enum domains, join-key grammars, partition layout, policy-derived requirements, capability version. A capability *query* — always exits 0, even when `fmt --check`/`gate` would report diagnostics. |
-| `canon skills install [--source <dir>] [--target <dir>] [--providers claude,codex]` | Project one canonical `canon` skill. Claude receives `.claude/skills/canon/SKILL.md`; Codex receives `.codex/skills/canon.md`; both receive lazy `reference/**` and `scripts/**` sidecars. Provider selection is deterministic; absent selection detects existing targets and defaults to both when neither exists. |
-| `canon skills check [--source <dir>] [--target <dir>]` | Read-only report of missing or stale canonical projections and the target-owned content manifest. |
-| `canon skills doctor [--source <dir>] [--target <dir>]` | Human-readable provider, drift, and legacy-remnant diagnostics. It never deletes user files. |
+| `canon skills install [--source <dir>] [--target <dir>] [--providers claude,codex,omp,pi]` | Project one canonical `canon` skill. Claude receives `.claude/skills/canon/SKILL.md`; Codex receives `.codex/skills/canon.md`; OMP receives `.omp/skills/canon/SKILL.md`; and Pi receives `.pi/skills/canon/SKILL.md`. Every selected provider receives lazy `reference/**` and `scripts/**` sidecars. OMP/Pi are project-local passive bundles; their retrieve pre-dispatch script is a sidecar, not a native hook. Provider selection is deterministic; absent selection detects `.claude`, `.codex`, `.omp`, and `.pi`, and defaults to Claude+Codex when none exists. |
+| `canon skills check [--source <dir>] [--target <dir>] [--providers claude,codex,omp,pi]` | Read-only report of missing or stale canonical projections and the target-owned content manifest. |
+| `canon skills doctor [--source <dir>] [--target <dir>] [--providers claude,codex,omp,pi]` | Human-readable provider, drift, and legacy-remnant diagnostics across all four managed roots. It never deletes user files. |
 
 `canon skills install --source canon/skills-dev --target .` retains the
-legacy per-developer-skill materializer for Canon contributors.
+legacy per-developer-skill materializer for Canon contributors and remains
+Claude/Codex-only.
 
 ## Subjects
 

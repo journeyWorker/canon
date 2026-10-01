@@ -11,13 +11,22 @@ Use this single skill when working with Canon in a consumer repository. Canon's 
 
 ```bash
 canon init
-canon skills install                         # detects .claude/.codex; if neither exists, installs both
-canon skills install --providers=claude,codex
+canon skills install                         # detects .claude/.codex/.omp/.pi; if none exists, installs Claude+Codex
+canon skills install --providers=claude,codex,omp,pi
 canon skills check                           # read-only drift check
 canon skills doctor                          # diagnostics; never deletes user files
 ```
 
-The canonical bundle is read-only. Claude receives `.claude/skills/canon/SKILL.md`; Codex receives `.codex/skills/canon.md`. Both receive `reference/**` and `scripts/**` sidecars under their `canon` bundle. Load only the reference needed for the current task. `canon/skills-dev` is a separate developer-only legacy source and is installed explicitly with `--source canon/skills-dev`.
+The canonical bundle is read-only. Claude receives
+`.claude/skills/canon/SKILL.md`; Codex receives the flattened
+`.codex/skills/canon.md`; OMP receives `.omp/skills/canon/SKILL.md`; and Pi
+receives `.pi/skills/canon/SKILL.md`. Every selected provider receives matching
+`reference/**` and `scripts/**` sidecars under its `canon` bundle. OMP and Pi
+projections are project-local passive skill bundles: the
+`scripts/canon-retrieve-pre-dispatch.sh` file is available as a sidecar, not
+installed as a native hook. Load only the reference needed for the current
+task. `canon/skills-dev` is a separate developer-only legacy source and is
+installed explicitly with `--source canon/skills-dev`.
 
 ## Route by task
 

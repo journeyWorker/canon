@@ -7,22 +7,28 @@ content. Legacy directory-shaped sources such as `canon/skills-dev` MAY retain
 individual `<name>/SKILL.md` files for developer-only compatibility.
 
 #### Scenario: A canonical bundle projects only the selected providers
-- **WHEN** `canon skills install --source canon/skills --providers=claude,codex`
+- **WHEN** `canon skills install --source canon/skills --providers=claude,codex,omp,pi`
   runs inside a consumer repo
-- **THEN** the consumer gains exactly one Claude skill at
-  `.claude/skills/canon/SKILL.md` and one Codex skill at
-  `.codex/skills/canon.md`, plus matching `reference/**` and `scripts/**`
-  sidecars under each provider's `canon` bundle
+- **THEN** the consumer gains one Claude skill at
+  `.claude/skills/canon/SKILL.md`, one Codex skill at
+  `.codex/skills/canon.md`, one OMP skill at
+  `.omp/skills/canon/SKILL.md`, and one Pi skill at
+  `.pi/skills/canon/SKILL.md`, plus matching `reference/**` and `scripts/**`
+  sidecars under each selected provider's `canon` bundle
+- **AND** Claude, OMP, and Pi preserve the source frontmatter/body verbatim
+- **AND** OMP/Pi projections are project-local passive bundles; the
+  `canon-retrieve-pre-dispatch.sh` file is only a sidecar, not a native hook
 - **AND** no old per-topic user skill directory/file is generated
-- **AND** no `.gemini/` file is created or modified.
+- **AND** no `.agents/` or `.gemini/` file is created or modified.
 
 #### Scenario: Provider selection and detection are deterministic
-- **WHEN** `--providers=claude,codex` is supplied, or when existing `.claude`
-  and `.codex` targets are detected without the flag
-- **THEN** only the selected/detected providers are projected in stable order
+- **WHEN** `--providers=claude,codex,omp,pi` is supplied, or when existing
+  `.claude`, `.codex`, `.omp`, and `.pi` targets are detected without the flag
+- **THEN** only the selected/detected providers are projected in stable enum
+  order (`claude`, `codex`, `omp`, `pi`)
 - **AND** an invalid provider name fails before any target write.
-- **AND** when neither target exists, both providers are selected for backwards
-  compatibility.
+- **AND** when none of the four target roots exists, Claude and Codex are
+  selected for backwards compatibility.
 
 ### Requirement: Canonical installation is target-owned and read-only at source
 The canonical installer SHALL NOT mutate `canon/skills` or any installed npm

@@ -24,16 +24,21 @@ Run `canon <command> --help` for any explicit CLI command. Install the
 provider-neutral user-facing companion bundle with:
 
 ```bash
-canon skills install                         # detect .claude/.codex
-canon skills install --providers=claude,codex
+canon skills install                         # detect .claude/.codex/.omp/.pi
+canon skills install --providers=claude,codex,omp,pi
 canon skills check                           # read-only drift check
 canon skills doctor                          # diagnostics, never deletes
 ```
 
-The canonical projection is one `canon` skill per selected provider, with
-lazy `reference/**` and `scripts/**` sidecars. Developer-only procedures
-remain available explicitly with `canon skills install --source
-canon/skills-dev`; they are not part of the user-facing bundle.
+The canonical projection is one `canon` skill per selected provider:
+Claude uses `.claude/skills/canon/SKILL.md`, Codex uses flattened
+`.codex/skills/canon.md`, and OMP/Pi use directory-shaped
+`.omp/skills/canon/SKILL.md` and `.pi/skills/canon/SKILL.md`. Every selected
+provider receives lazy `reference/**` and `scripts/**` sidecars. OMP/Pi are
+project-local passive bundles; the retrieve pre-dispatch script is a sidecar,
+not a native hook. Developer-only procedures remain available explicitly with
+`canon skills install --source canon/skills-dev`; they are not part of the
+user-facing bundle.
 
 ## Status
 

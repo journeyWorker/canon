@@ -1,8 +1,8 @@
 //! Canon skill bundle materialization.
 //!
 //! The canonical user-facing source is a read-only bundle rooted at
-//! `SKILL.src.md`. It projects one `canon` skill to Claude and/or Codex and
-//! keeps references and scripts as lazy sidecars. Directory-shaped sources
+//! `SKILL.src.md`. It projects one `canon` skill to Claude, Codex, OMP, and Pi
+//! and keeps references and scripts as lazy sidecars. Directory-shaped sources
 //! (notably `canon/skills-dev`) retain the legacy materializer for backwards
 //! compatibility.
 
@@ -51,22 +51,55 @@ pub struct InstallReport {
 pub enum Provider {
     Claude,
     Codex,
+    Omp,
+    Pi,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ProviderDescriptor {
+    name: &'static str,
+    root: &'static str,
+    directory_shaped: bool,
+}
+
+impl Provider {
+    fn descriptor(self) -> ProviderDescriptor {
+        match self {
+            Self::Claude => ProviderDescriptor {
+                name: "claude",
+                root: ".claude",
+                directory_shaped: true,
+            },
+            Self::Codex => ProviderDescriptor {
+                name: "codex",
+                root: ".codex",
+                directory_shaped: false,
+            },
+            Self::Omp => ProviderDescriptor {
+                name: "omp",
+                root: ".omp",
+                directory_shaped: true,
+            },
+            Self::Pi => ProviderDescriptor {
+                name: "pi",
+                root: ".pi",
+                directory_shaped: true,
+            },
+        }
+    }
 }
 
 impl Provider {
     pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Claude => "claude",
-            Self::Codex => "codex",
-        }
+        self.descriptor().name
     }
 
     pub fn parse(value: &str) -> Result<Self, SkillsError> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "claude" => Ok(Self::Claude),
-            "codex" => Ok(Self::Codex),
-            other => Err(SkillsError::InvalidProvider(other.to_string())),
-        }
+        let normalized = value.trim().to_ascii_lowercase();
+        ALL_PROVIDERS
+            .into_iter()
+            .find(|provider| provider.descriptor().name == normalized.as_str())
+            .ok_or(SkillsError::InvalidProvider(normalized))
     }
 }
 
@@ -98,7 +131,7 @@ pub enum SkillsError {
     SourceNotFound(PathBuf),
     #[error("canonical skill source is missing SKILL.src.md under {0}")]
     CanonicalSourceMissing(PathBuf),
-    #[error("invalid provider `{0}`; expected one of: claude, codex")]
+    #[error("invalid provider `{0}`; expected one of: claude, codex, omp, pi")]
     InvalidProvider(String),
     #[error("canonical bundle has an unsupported or unsafe symlink at {0}")]
     UnsafeSymlink(PathBuf),
@@ -415,6 +448,30 @@ fn bundle_hash(files: &[BundleFile]) -> String {
     format!("sha256:{:x}", hasher.finalize())
 }
 
+const ALL_PROVIDERS: [Provider; 4] = [
+    Provider::Claude,
+    Provider::Codex,
+    Provider::Omp,
+    Provider::Pi,
+];
+
+fn provider_skill_root(target_dir: &Path, provider: Provider) -> PathBuf {
+    target_dir.join(provider.descriptor().root).join("skills")
+}
+
+fn provider_bundle_root(target_dir: &Path, provider: Provider) -> PathBuf {
+    provider_skill_root(target_dir, provider).join("canon")
+}
+
+fn provider_entrypoint_path(target_dir: &Path, provider: Provider) -> PathBuf {
+    let descriptor = provider.descriptor();
+    if descriptor.directory_shaped {
+        provider_bundle_root(target_dir, provider).join("SKILL.md")
+    } else {
+        provider_skill_root(target_dir, provider).join("canon.md")
+    }
+}
+
 fn parse_providers(value: Option<&str>, target_dir: &Path) -> Result<Vec<Provider>, SkillsError> {
     let mut providers = if let Some(value) = value {
         let mut parsed = Vec::new();
@@ -426,14 +483,21 @@ fn parse_providers(value: Option<&str>, target_dir: &Path) -> Result<Vec<Provide
         }
         parsed
     } else {
-        let claude = target_dir.join(".claude").exists();
-        let codex = target_dir.join(".codex").exists();
-        if !claude && !codex {
+        let detected = ALL_PROVIDERS
+            .into_iter()
+            .map(|provider| {
+                (
+                    target_dir.join(provider.descriptor().root).exists(),
+                    provider,
+                )
+            })
+            .collect::<Vec<_>>();
+        if detected.iter().all(|(exists, _)| !exists) {
             vec![Provider::Claude, Provider::Codex]
         } else {
-            [(claude, Provider::Claude), (codex, Provider::Codex)]
+            detected
                 .into_iter()
-                .filter_map(|(yes, provider)| yes.then_some(provider))
+                .filter_map(|(exists, provider)| exists.then_some(provider))
                 .collect()
         }
     };
@@ -467,7 +531,10 @@ fn load_manifest(target_dir: &Path) -> Result<Option<CanonicalManifest>, SkillsE
 
 fn projected_relative(provider: Provider, relative: &Path) -> Option<PathBuf> {
     if relative == Path::new("SKILL.src.md") {
-        return (provider == Provider::Claude).then(|| PathBuf::from("SKILL.md"));
+        return provider
+            .descriptor()
+            .directory_shaped
+            .then(|| PathBuf::from("SKILL.md"));
     }
     Some(relative.to_path_buf())
 }
@@ -476,29 +543,29 @@ fn manifest_for(files: &[BundleFile], providers: &[Provider]) -> CanonicalManife
     let source_hash = bundle_hash(files);
     let mut hashes = BTreeMap::new();
     for provider in providers {
+        let descriptor = provider.descriptor();
         for file in files {
             let Some(relative) = projected_relative(*provider, &file.relative) else {
                 continue;
             };
-            let prefix = match provider {
-                Provider::Claude => ".claude/skills/canon",
-                Provider::Codex => ".codex/skills/canon",
-            };
-            let path = PathBuf::from(prefix).join(relative);
+            let path = Path::new(descriptor.root)
+                .join("skills/canon")
+                .join(relative);
             hashes.insert(
                 path.to_string_lossy().into_owned(),
                 content_hash(&file.bytes),
             );
         }
-        if let Some(skill) = files
-            .iter()
-            .find(|file| file.relative == Path::new("SKILL.src.md"))
-        {
-            let (_, description, body) =
-                parse_frontmatter("canon", &String::from_utf8_lossy(&skill.bytes));
-            if *provider == Provider::Codex {
+        if !descriptor.directory_shaped {
+            if let Some(skill) = files
+                .iter()
+                .find(|file| file.relative == Path::new("SKILL.src.md"))
+            {
+                let (_, description, body) =
+                    parse_frontmatter("canon", &String::from_utf8_lossy(&skill.bytes));
+                let path = Path::new(descriptor.root).join("skills/canon.md");
                 hashes.insert(
-                    ".codex/skills/canon.md".into(),
+                    path.to_string_lossy().into_owned(),
                     content_hash(flatten_for_codex("canon", &description, &body).as_bytes()),
                 );
             }
@@ -514,10 +581,7 @@ fn manifest_for(files: &[BundleFile], providers: &[Provider]) -> CanonicalManife
 
 fn project_path(target_dir: &Path, provider: Provider, relative: &Path) -> Option<PathBuf> {
     let relative = projected_relative(provider, relative)?;
-    Some(match provider {
-        Provider::Claude => target_dir.join(".claude/skills/canon").join(relative),
-        Provider::Codex => target_dir.join(".codex/skills/canon").join(relative),
-    })
+    Some(provider_bundle_root(target_dir, provider).join(relative))
 }
 
 pub fn install_canonical(
@@ -542,9 +606,9 @@ pub fn install_canonical(
                 writes.push((path, file.bytes.clone()));
             }
         }
-        if *provider == Provider::Codex {
+        if !provider.descriptor().directory_shaped {
             writes.push((
-                target_dir.join(".codex/skills/canon.md"),
+                provider_entrypoint_path(target_dir, *provider),
                 flatten_for_codex("canon", &description, &body).into_bytes(),
             ));
         }
@@ -611,9 +675,10 @@ pub fn check(
             let Some(path) = project_path(target_dir, *provider, &file.relative) else {
                 continue;
             };
+            let expected_bytes = file.bytes.as_slice();
             let state = if !path.is_file() {
                 "missing"
-            } else if fs::read(&path).ok().as_deref() != Some(file.bytes.as_slice()) {
+            } else if fs::read(&path).ok().as_deref() != Some(expected_bytes) {
                 "stale"
             } else {
                 "ok"
@@ -624,8 +689,8 @@ pub fn check(
                 state,
             });
         }
-        if *provider == Provider::Codex {
-            let path = target_dir.join(".codex/skills/canon.md");
+        if !provider.descriptor().directory_shaped {
+            let path = provider_entrypoint_path(target_dir, *provider);
             let skill = files
                 .iter()
                 .find(|file| file.relative == Path::new("SKILL.src.md"))
@@ -691,10 +756,8 @@ pub fn doctor(
     if !report.manifest_ok {
         lines.push(format!("stale: {}", manifest_path(target_dir).display()));
     }
-    for root in [
-        target_dir.join(".claude/skills"),
-        target_dir.join(".codex/skills"),
-    ] {
+    for provider in ALL_PROVIDERS {
+        let root = provider_skill_root(target_dir, provider);
         if let Ok(entries) = fs::read_dir(&root) {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().into_owned();
