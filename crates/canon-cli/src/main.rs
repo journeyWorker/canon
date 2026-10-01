@@ -547,6 +547,12 @@ enum EvidenceCommand {
         /// Required: `canon gate promote` derives its run_seq partition key from it
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// Required approval attestation's distinct approver id; must be paired with --approval-role
+        #[arg(long)]
+        approval_by: Option<String>,
+        /// Required approval attestation role; must be paired with --approval-by
+        #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
+        approval_role: Option<RoleId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -984,7 +990,22 @@ fn main() -> ExitCode {
             GateCommand::Selftest => ExitCode::from(canon_cli::gate::run_selftest() as u8),
         },
         Command::Evidence { action } => match action {
-            EvidenceCommand::Add { task, project_id, kind, evidence_ref, verdict, summary, command_result, scenario_id, run_id, actor_id, role, repo } => ExitCode::from(
+            EvidenceCommand::Add {
+                task,
+                project_id,
+                kind,
+                evidence_ref,
+                verdict,
+                summary,
+                command_result,
+                scenario_id,
+                run_id,
+                actor_id,
+                role,
+                approval_by,
+                approval_role,
+                repo,
+            } => ExitCode::from(
                 canon_cli::evidence::run_add(
                     &repo,
                     &canon_cli::evidence::EvidenceArgs {
@@ -999,6 +1020,8 @@ fn main() -> ExitCode {
                         run_id,
                         actor_id,
                         role,
+                        approval_by,
+                        approval_role,
                     },
                 ) as u8,
             ),

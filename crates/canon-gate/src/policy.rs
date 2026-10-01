@@ -13,16 +13,17 @@
 //! Fixed at `<repo>/.canon/policy.yaml`
 //! ([`POLICY_YAML_RELATIVE_PATH`] —
 //! `docs/superpowers/specs/2026-07-10-canon-design.md`'s infra layout
-//! table). Every field — `trust_required`/`trust_sample`'s per-key
-//! entries, `staleness.max_commits_behind`, `staleness.surface_scoped`,
-//! and every `risk_routing` entry — is independently EITHER a flat
-//! value OR a single-key `{cel: "<expression>"}` mapping (design
-//! decision 10 / D7: "Whether a given ... field is a flat value or a
-//! CEL predicate over scenario facts ... D7 discipline kept: facts on
-//! artifacts, routing in policy"). The `{cel: ...}` wrapper — not
-//! string-shape sniffing — disambiguates a CEL predicate from a flat
-//! value that happens to also be a string (`trust_required`'s flat
-//! values, `"human"`/`"agent"`, are themselves valid strings).
+//! table). Every field — `trust_required`/`trust_sample`'s
+//! per-key entries, `staleness.max_commits_behind`,
+//! `staleness.surface_scoped`, and every `risk_routing` entry — is
+//! independently EITHER a flat value OR a single-key `{cel: "<expression>"}`
+//! mapping (design decision 10 / D7: "Whether a given ... field is a flat
+//! value or a CEL predicate over scenario facts ... D7 discipline kept:
+//! facts on artifacts, routing in policy"). The `{cel: ...}` wrapper — not
+//! string-shape sniffing — disambiguates a CEL predicate from a flat value
+//! that happens to also be a string (`trust_required`'s flat values,
+//! `"human"`/`"agent"`, are themselves valid strings). The separate
+//! `risk_tiers` section is declarative and never CEL-compiled.
 //!
 //! # CEL predicates evaluate against one `EvidenceRecord`
 //! Every predicate's `record` variable is one
@@ -260,8 +261,8 @@ struct RawStaleness {
 }
 
 /// `policy.yaml`'s raw on-disk schema (design decisions 3/7). Every
-/// top-level key is `#[serde(default)]` — an absent section resolves
-/// to "no entries"/documented defaults, never a parse failure (module
+/// top-level key is `#[serde(default)]` — an absent section resolves to
+/// "no entries"/documented defaults, never a parse failure (module
 /// doc).
 #[derive(Debug, Clone, Default, Deserialize)]
 struct RawPolicy {
@@ -284,6 +285,11 @@ struct RawPolicy {
     staleness: RawStaleness,
     #[serde(default)]
     risk_routing: BTreeMap<String, RawField<bool>>,
+    /// Declarative effect-aware approval rules. Kept untyped at the
+    /// section boundary so one malformed tier cannot discard sibling
+    /// policy sections.
+    #[serde(default)]
+    risk_tiers: Option<serde_yaml::Value>,
     /// Deliberately an untyped [`serde_yaml::Value`], not a typed
     /// struct: a typed field would make a malformed `spec_coverage:`
     /// fail the WHOLE `RawPolicy` deserialize, and
@@ -295,6 +301,83 @@ struct RawPolicy {
     #[serde(default)]
     spec_coverage: Option<serde_yaml::Value>,
 }
+
+/// One effect-aware approval tier in `policy.yaml`. The simple wildcard
+/// matcher used by the gate treats `*` as spanning any characters,
+/// including `/`; these are not CEL expressions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RiskTierRule {
+    pub rank: u32,
+    pub paths: Vec<String>,
+    pub effects: Vec<String>,
+    pub min_human_approvals: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawRiskTierRule {
+    rank: u32,
+    paths: Vec<String>,
+    effects: Vec<String>,
+    min_human_approvals: u32,
+}
+/// Resolve the declarative `risk_tiers:` section. A malformed section or
+/// entry is diagnosed and omitted; it is never silently enabled.
+fn resolve_risk_tiers(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<PolicyDiagnostic>) -> BTreeMap<String, RiskTierRule> {
+    const SECTION: &str = "risk_tiers";
+    let Some(raw) = raw else {
+        return BTreeMap::new();
+    };
+    let serde_yaml::Value::Mapping(entries) = raw else {
+        diagnostics.push(PolicyDiagnostic::InvalidSection {
+            section: SECTION,
+            detail: "expected a mapping of tier names to {rank, paths, effects, min_human_approvals}".to_string(),
+        });
+        return BTreeMap::new();
+    };
+
+    let mut resolved = BTreeMap::new();
+    for (raw_name, raw_rule) in entries {
+        let Some(name) = raw_name.as_str() else {
+            diagnostics.push(PolicyDiagnostic::InvalidSection {
+                section: SECTION,
+                detail: format!("tier name {raw_name:?} is not a string"),
+            });
+            continue;
+        };
+        let parsed: RawRiskTierRule = match serde_yaml::from_value(raw_rule) {
+            Ok(rule) => rule,
+            Err(error) => {
+                diagnostics.push(PolicyDiagnostic::InvalidSection {
+                    section: SECTION,
+                    detail: format!("tier `{name}` is invalid: {error}"),
+                });
+                continue;
+            }
+        };
+        let detail = if parsed.rank == 0 {
+            Some("rank must be greater than zero".to_string())
+        } else if parsed.paths.is_empty() && parsed.effects.is_empty() {
+            Some("paths or effects must contain at least one matcher".to_string())
+        } else if parsed.paths.iter().any(|path| path.is_empty()) {
+            Some("paths must not contain empty patterns".to_string())
+        } else if parsed.effects.iter().any(|effect| !is_kebab_slug(effect)) {
+            Some("effects must be non-empty kebab-case slugs".to_string())
+        } else {
+            None
+        };
+        if let Some(detail) = detail {
+            diagnostics.push(PolicyDiagnostic::InvalidSection { section: SECTION, detail: format!("tier `{name}` is invalid: {detail}") });
+            continue;
+        }
+        resolved.insert(
+            name.to_string(),
+            RiskTierRule { rank: parsed.rank, paths: parsed.paths, effects: parsed.effects, min_human_approvals: parsed.min_human_approvals },
+        );
+    }
+    resolved
+}
+
 
 /// `policy.yaml`'s optional `spec_coverage:` section (s44
 /// `spec-derived-worklist`), resolved. `None` on
@@ -433,6 +516,9 @@ pub struct PolicyResolution {
     /// matching `canon_policy::PolicyValue`'s scalar-only evaluation
     /// contract.
     pub risk_routing: BTreeMap<String, PolicyField<bool>>,
+    /// Declarative effect-aware approval tiers. An empty map is a strict
+    /// no-op; these rules are intentionally separate from risk routing.
+    pub risk_tiers: BTreeMap<String, RiskTierRule>,
     /// s44's opt-in spec-corpus coverage requirement. `None` = the
     /// section is absent and `crate::spec_coverage` is silent; see
     /// [`SpecCoverage`] for why a BROKEN section resolves to
@@ -489,12 +575,13 @@ impl PolicyResolution {
             surface_scoped: compile_single(raw.staleness.surface_scoped, "staleness.surface_scoped", DEFAULT_SURFACE_SCOPED, bindings, &mut diagnostics),
         };
         let risk_routing = compile_map(raw.risk_routing, "risk_routing", bindings, &mut diagnostics);
+        let risk_tiers = resolve_risk_tiers(raw.risk_tiers, &mut diagnostics);
         // Parsed, never CEL-compiled: `spec_coverage` carries no
         // per-record predicate, so it needs no bindings and is
         // unaffected by `SchemaUnavailable`.
         let spec_coverage = resolve_spec_coverage(raw.spec_coverage, &mut diagnostics);
 
-        Self { trust_required, trust_sample, staleness, risk_routing, spec_coverage, diagnostics }
+        Self { trust_required, trust_sample, staleness, risk_routing, risk_tiers, spec_coverage, diagnostics }
     }
 
     /// The required [`TrustLevel`] for `key` (whatever vocabulary this
@@ -835,6 +922,34 @@ risk_routing:
         assert_eq!(resolution.risk_routing_for("divergent_only", &divergent, now).unwrap(), Some(true));
         assert_eq!(resolution.risk_routing_for("unknown_key", &faithful, now).unwrap(), None);
     }
+    #[test]
+    fn risk_tiers_resolve_rank_paths_effects_and_minimum() {
+        let (resolution, _dir) = resolve_with(
+            "risk_tiers:\n  high:\n    rank: 3\n    paths: [\"src/auth/**\"]\n    effects: [secret-access]\n    min_human_approvals: 1\n",
+        );
+        assert_eq!(
+            resolution.risk_tiers.get("high"),
+            Some(&RiskTierRule {
+                rank: 3,
+                paths: vec!["src/auth/**".to_string()],
+                effects: vec!["secret-access".to_string()],
+                min_human_approvals: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn malformed_risk_tier_is_diagnosed_and_not_enabled() {
+        let (resolution, _dir) = resolve_with(
+            "risk_tiers:\n  broken:\n    rank: 0\n    paths: []\n    effects: []\n    min_human_approvals: 1\n",
+        );
+        assert!(resolution.risk_tiers.is_empty());
+        assert!(resolution.diagnostics.iter().any(|diagnostic| matches!(
+            diagnostic,
+            PolicyDiagnostic::InvalidSection { section: "risk_tiers", detail } if detail.contains("broken")
+        )));
+    }
+
 
     /// The second Important review finding this fix closes:
     /// `canon_policy::bindings_for` PANICS when the registry has no

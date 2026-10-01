@@ -1,11 +1,21 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "EvidenceRecord",
-  "description": "The evidence-integrity spec's own record kind: the candidate shape\n[`crate::evidence::validate_evidence`] validates. Carries whichever\njoin keys are relevant to what it attests (join-spine `task_id`\nrow: task ↔ evidence ↔ trajectory). `project_id` is OPTIONAL\n(design D6: real records may exist via `canon gate promote` before\nevery producer is project-aware). The five trailing fields are s15's\nnative home for what were `canon-gate`-owned raw-JSON companions\n(design D9) — each reads THREE-way: a legitimately ABSENT key\ndeserializes to `None`/empty (the documented safe default —\n`canon-gate` still owns what that default MEANS per field, e.g.\nabsent `lifecycle` = draft), a PRESENT well-formed value deserializes\ntyped, and a PRESENT malformed value fails this whole record's\n`Deserialize` — never silently collapsed to absent.",
+  "description": "The evidence-integrity spec's own record kind: the candidate shape\n[`crate::evidence::validate_evidence`] validates. Carries whichever\njoin keys are relevant to what it attests (join-spine `task_id`\nrow: task ↔ evidence ↔ trajectory). `project_id` is OPTIONAL\n(design D6: real records may exist via `canon gate promote` before\nevery producer is project-aware). The native trust/evidence fields are\nthe home for what were `canon-gate`-owned raw-JSON companions (design\nD9), and `approval` is the explicit accountable attestation for this\nphase. Each companion reads THREE-way: a legitimately ABSENT key\ndeserializes to `None`/empty (the documented safe default —\n`canon-gate` still owns what that default MEANS per field, e.g.\nabsent `lifecycle` = draft), a PRESENT well-formed value deserializes\ntyped, and a PRESENT malformed value fails this whole record's\n`Deserialize` — never silently collapsed to absent.",
   "type": "object",
   "properties": {
     "actor": {
       "$ref": "#/$defs/Actor"
+    },
+    "approval": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceApproval"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "at": {
       "type": "string",
@@ -154,6 +164,27 @@
       },
       "required": [
         "agent_id"
+      ]
+    },
+    "EvidenceApproval": {
+      "description": "An accountable approval attestation attached to an [`EvidenceRecord`].\nThe shape records who approved, under which role, and when; it does not\nclaim that an external human actually reviewed the evidence.",
+      "type": "object",
+      "properties": {
+        "approver": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "role": {
+          "$ref": "#/$defs/RoleId"
+        }
+      },
+      "required": [
+        "approver",
+        "role",
+        "at"
       ]
     },
     "EvidenceVerdict": {

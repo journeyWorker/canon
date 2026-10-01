@@ -16,6 +16,19 @@ trust_required:
   test-run: agent
   manual-review: human
 
+
+# Effect-aware approval tiers are additive and independent from risk_routing:
+# risk_tiers:
+#   high:
+#     rank: 3
+#     paths: ["src/auth/**", "migrations/**"]
+#     effects: ["secret-access", "network-egress"]
+#     min_human_approvals: 1
+#   very-high:
+#     rank: 4
+#     paths: ["deploy/**"]
+#     effects: ["destructive-operation", "production-deploy"]
+#     min_human_approvals: 2
 spec_coverage:
   require_evidence: true
   scope: [building, verifying]

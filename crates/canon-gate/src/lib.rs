@@ -14,10 +14,13 @@
 //! [`checkbox`]/[`markers`] (`gated-task-completion`'s evidence-gated
 //! flip + fabrication scanning), and [`hooks`] (the D8 hook-seam merge
 //! logic + the generic pre-commit script). Wave 2-part2 (this commit)
-//! completes S5: [`dispatch`] (the `GateCheck` set `canon gate check`
+//! completes S5: [`dispatch`] (the [`GateCheck`] set `canon gate check`
 //! and this crate's own selftest both assemble from) and [`selftest`]
 //! (the fixture corpus + exact-set-match oracle proving every
-//! `FAILURE_CLASSES` string actually fires) — see the
+//! [`FAILURE_CLASSES`] string actually fires). The additive [`risk`]
+//! check reuses `uncovered-cell` for effect-aware approval deficits
+//! without widening that closed vocabulary — see its module doc for the
+//! separate `risk_tiers` policy semantics. This is the
 //! `s5-trust-spine-gate` change's tasks. `canon-cli`'s `canon
 //! gate check`/`task`/`promote`/`install-hooks`/`selftest` subcommands
 //! (`crates/canon-cli/src/gate.rs`) are the CLI wiring over this crate's
@@ -53,6 +56,7 @@ pub mod promote;
 pub mod report;
 pub mod selftest;
 pub mod spec_coverage;
+pub mod risk;
 pub mod staleness;
 pub mod trust;
 pub mod trust_ladder;
@@ -60,12 +64,13 @@ pub mod trust_ladder;
 pub use checkbox::{gate_task, TaskFlipDecision};
 pub use context::{GateCheck, GateContext, GateContextError, GateCtx};
 pub use coverage::CoverageCheck;
+pub use risk::RiskApprovalCheck;
 pub use dispatch::check_set;
 pub use failure_class::{FailureClass, Violation, FAILURE_CLASSES};
 pub use hooks::{install_hooks, HookEntry, InstallOutcome, PRE_COMMIT_SCRIPT};
 pub use ledger::{latest_verdicts, CellKey, LedgerCheck, LedgerEntry};
 pub use markers::{evidence_note_of, scan_fake_markers, EvidenceNote, FABRICATION_BLOCKLIST};
-pub use policy::{FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError, SpecCoverage, StalenessPolicy};
+pub use policy::{FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError, RiskTierRule, SpecCoverage, StalenessPolicy};
 pub use promote::{
     commit_divergence, divergence_staging_dir, promote, promote_divergence, stage_divergence, DivergenceCandidate, Promoted, PromoteReport, Refused, RunSeqAssignment,
     StagedAssignment, StagedKind, STAGED_KINDS,

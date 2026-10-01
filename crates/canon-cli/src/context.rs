@@ -52,7 +52,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use canon_gate::{PolicyField, PolicyResolution, SpecCoverage};
+use canon_gate::{PolicyField, PolicyResolution, RiskTierRule, SpecCoverage};
 use canon_model::SubjectStatus;
 use canon_policy::SchemaRegistry;
 use canon_vocab::CapabilitySnapshot;
@@ -68,11 +68,8 @@ use serde::Serialize;
 /// can never advertise a generation nothing writes, while this constant
 /// keeps describing the CLI surface itself (design D1's "resolve, then
 /// render" split — the registry call site stays singular either way).
-/// Bumped to `2` by s44 (`spec-derived-worklist`), which adds the
-/// `spec_coverage` policy section to [`PolicySurface`]. The field
-/// exists so a consumer can detect surface GROWTH; adding a section
-/// without bumping it would defeat the one thing it is for.
-const CURRENT_CAPABILITY_VERSION: u32 = 2;
+/// Bumped to `3` for the effect-aware `risk_tiers` policy projection.
+const CURRENT_CAPABILITY_VERSION: u32 = 3;
 
 /// Resolution-time options beyond the repo root itself. Empty today —
 /// `canon context` takes only `--repo`/`--json`, and `--json` selects a
@@ -130,6 +127,14 @@ pub struct StalenessSurface {
     pub max_commits_behind: PolicyFieldSurface,
     pub surface_scoped: PolicyFieldSurface,
 }
+#[derive(Debug, Clone, Serialize)]
+pub struct RiskTierSurface {
+    pub rank: u32,
+    pub paths: Vec<String>,
+    pub effects: Vec<String>,
+    pub min_human_approvals: u32,
+}
+
 
 /// `canon_gate::PolicyResolution`'s own fields, summarized field-by-field
 /// via [`PolicyFieldSurface`] — one Rust field per `PolicyResolution` field,
@@ -141,6 +146,7 @@ pub struct PolicySurface {
     pub trust_sample: BTreeMap<String, PolicyFieldSurface>,
     pub staleness: StalenessSurface,
     pub risk_routing: BTreeMap<String, PolicyFieldSurface>,
+    pub risk_tiers: BTreeMap<String, RiskTierSurface>,
     /// s44's opt-in spec-corpus requirement, rendered as a one-line
     /// summary. `None` = the section is absent, which is a DIFFERENT
     /// fact from `require_evidence: false` and stays distinguishable
@@ -414,6 +420,7 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
             surface_scoped: summarize_field(&policy.staleness.surface_scoped),
         },
         risk_routing: policy.risk_routing.iter().map(|(k, v)| (k.clone(), summarize_field(v))).collect(),
+        risk_tiers: policy.risk_tiers.iter().map(|(name, rule)| (name.clone(), summarize_risk_tier(rule))).collect(),
         spec_coverage: policy.spec_coverage.as_ref().map(|sc| match sc {
             SpecCoverage::Active { require_evidence, scope, .. } if scope.is_empty() => {
                 format!("require_evidence={require_evidence} scope=<every scenario>")
@@ -426,6 +433,10 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
         clean: policy.is_clean(),
         diagnostics: policy.diagnostics.iter().map(ToString::to_string).collect(),
     }
+}
+
+fn summarize_risk_tier(rule: &RiskTierRule) -> RiskTierSurface {
+    RiskTierSurface { rank: rule.rank, paths: rule.paths.clone(), effects: rule.effects.clone(), min_human_approvals: rule.min_human_approvals }
 }
 
 /// A [`SubjectStatus`]'s wire spelling — the same vocabulary
@@ -507,6 +518,17 @@ pub fn render_outline(surface: &AuthoringSurface) -> String {
         render_field_compact(&surface.policy.staleness.surface_scoped),
     );
     write_field_map(&mut out, "risk_routing", &surface.policy.risk_routing);
+    let _ = writeln!(out, "  risk_tiers ({}):", surface.policy.risk_tiers.len());
+    for (name, tier) in &surface.policy.risk_tiers {
+        let _ = writeln!(
+            out,
+            "    {name}: rank={} paths={} effects={} min_human_approvals={}",
+            tier.rank,
+            tier.paths.join(","),
+            tier.effects.join(","),
+            tier.min_human_approvals
+        );
+    }
     let _ = match &surface.policy.spec_coverage {
         Some(summary) => writeln!(out, "  spec_coverage: {summary}"),
         // Printed even when absent: "this repo has not opted in" is the
@@ -908,5 +930,20 @@ mod tests {
         let surface = resolve_surface(dir.path(), ContextOptions::default());
         assert!(surface.vocab.snapshot.directives.is_empty());
         assert!(surface.vocab.snapshot.evidence_kinds.is_empty());
+    }
+    #[test]
+    fn risk_tiers_are_projected_to_json_and_outline() {
+        let dir = fixture_repo(Some(
+            "risk_tiers:\n  high:\n    rank: 3\n    paths: [\"src/auth/**\"]\n    effects: [secret-access]\n    min_human_approvals: 1\n",
+        ));
+        let surface = resolve_surface(dir.path(), ContextOptions::default());
+        let json: serde_json::Value = serde_json::from_str(&render_json(&surface)).unwrap();
+        assert_eq!(json["policy"]["risk_tiers"]["high"]["rank"], 3);
+        assert_eq!(json["policy"]["risk_tiers"]["high"]["paths"][0], "src/auth/**");
+        assert_eq!(json["policy"]["risk_tiers"]["high"]["effects"][0], "secret-access");
+        assert_eq!(json["policy"]["risk_tiers"]["high"]["min_human_approvals"], 1);
+        let outline = render_outline(&surface);
+        assert!(outline.contains("risk_tiers (1):"));
+        assert!(outline.contains("high: rank=3"));
     }
 }

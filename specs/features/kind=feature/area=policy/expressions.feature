@@ -85,3 +85,13 @@ Feature: policy expressions
     Then the coverage section resolves as invalid
     And the trust requirement beside it survives unchanged
     And the failure is scoped to the section that caused it
+
+  @subject:policy-expressions
+  @policy.expressions.10
+  Scenario: Risk tiers remain declarative and do not extend the closed CEL profile
+  # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
+    Given a policy with path and effect matchers under risk_tiers
+    When the policy is resolved
+    Then rank selects the highest matching tier
+    And malformed tier entries produce explicit diagnostics and are not enabled
+    And the risk_tiers section does not add a CEL expression or failure class

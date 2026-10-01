@@ -880,14 +880,25 @@ where
     T::deserialize(deserializer).map(Some)
 }
 
+/// An accountable approval attestation attached to an [`EvidenceRecord`].
+/// The shape records who approved, under which role, and when; it does not
+/// claim that an external human actually reviewed the evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct EvidenceApproval {
+    pub approver: String,
+    pub role: RoleId,
+    pub at: DateTime<Utc>,
+}
+
 /// The evidence-integrity spec's own record kind: the candidate shape
 /// [`crate::evidence::validate_evidence`] validates. Carries whichever
 /// join keys are relevant to what it attests (join-spine `task_id`
 /// row: task ↔ evidence ↔ trajectory). `project_id` is OPTIONAL
 /// (design D6: real records may exist via `canon gate promote` before
-/// every producer is project-aware). The five trailing fields are s15's
-/// native home for what were `canon-gate`-owned raw-JSON companions
-/// (design D9) — each reads THREE-way: a legitimately ABSENT key
+/// every producer is project-aware). The native trust/evidence fields are
+/// the home for what were `canon-gate`-owned raw-JSON companions (design
+/// D9), and `approval` is the explicit accountable attestation for this
+/// phase. Each companion reads THREE-way: a legitimately ABSENT key
 /// deserializes to `None`/empty (the documented safe default —
 /// `canon-gate` still owns what that default MEANS per field, e.g.
 /// absent `lifecycle` = draft), a PRESENT well-formed value deserializes
@@ -916,6 +927,8 @@ pub struct EvidenceRecord {
     pub run_seq: Option<TotalOrder>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub surface_ref: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval: Option<EvidenceApproval>,
 }
 
 impl EvidenceRecord {
@@ -939,6 +952,7 @@ impl EvidenceRecord {
             evidence_sha: None,
             run_seq: None,
             surface_ref: Vec::new(),
+            approval: None,
         }
     }
 
@@ -969,6 +983,10 @@ impl EvidenceRecord {
 
     pub fn with_surface_ref(mut self, surface_ref: Vec<String>) -> Self {
         self.surface_ref = surface_ref;
+        self
+    }
+    pub fn with_approval(mut self, approval: EvidenceApproval) -> Self {
+        self.approval = Some(approval);
         self
     }
 }
@@ -2002,6 +2020,28 @@ mod tests {
         evidence_record_round_trips,
         EvidenceRecord::new(envelope(RecordKind::EvidenceRecord), None, None, None, EvidenceVerdict::Faithful)
     );
+    #[test]
+    fn evidence_approval_is_additive_and_malformed_attestations_are_rejected() {
+        let record = EvidenceRecord::new(envelope(RecordKind::EvidenceRecord), None, None, None, EvidenceVerdict::Faithful);
+        let legacy = serde_json::to_value(&record).unwrap();
+        assert!(legacy.get("approval").is_none());
+        assert!(serde_json::from_value::<EvidenceRecord>(legacy.clone()).unwrap().approval.is_none());
+        let approval = EvidenceApproval { approver: "alice".to_string(), role: RoleId::parse("human").unwrap(), at: record.envelope.at };
+        let approved = record.with_approval(approval.clone());
+        let approved_json = serde_json::to_value(&approved).unwrap();
+        assert_eq!(serde_json::from_value::<EvidenceRecord>(approved_json).unwrap().approval, Some(approval));
+        for malformed in [
+            serde_json::json!({"approver": "alice", "role": "human"}),
+            serde_json::json!({"approver": "alice", "role": "Bad Role", "at": "2026-10-01T00:00:00Z"}),
+            serde_json::json!({"approver": "alice", "role": "human", "at": "not-a-time"}),
+            serde_json::json!({"approver": 7, "role": "human", "at": "2026-10-01T00:00:00Z"}),
+        ] {
+            let mut candidate = legacy.clone();
+            candidate["approval"] = malformed;
+            assert!(serde_json::from_value::<EvidenceRecord>(candidate).is_err());
+        }
+    }
+
 
     #[test]
     fn evidence_record_with_no_native_fields_deserializes_to_defaults() {

@@ -173,7 +173,7 @@ use std::path::Path;
 
 use canon_gate::{scan_fake_markers, EvidenceNote, GateCtx};
 use canon_ingest::task_rows::first_row_line_break;
-use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, RunId, ScenarioId, TaskId};
+use canon_model::{Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, RunId, ScenarioId, TaskId};
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier};
 use chrono::Utc;
@@ -199,11 +199,11 @@ pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, String> {
 
 /// One `canon evidence add` invocation's already-parsed flags.
 ///
-/// A named struct rather than a positional parameter list: ten
+/// A named struct rather than a positional parameter list: twelve
 /// arguments, of which `kind`/`evidence_ref`/`summary`/`command_result`/
-/// `actor_id` are all plain strings — every adjacent pair of them would
-/// silently compile if transposed, and three of the five end up in the
-/// permanent ledger body.
+/// `actor_id`/`approval_by` are plain strings — every adjacent pair of
+/// them would silently compile if transposed, and approval fields end up
+/// in the permanent ledger body.
 pub struct EvidenceArgs {
     /// The plan task this evidence attests to, validated against the
     /// live plan corpus by [`crate::dispatch::validate_task_binding`]
@@ -257,6 +257,10 @@ pub struct EvidenceArgs {
     /// `run_seq` partition key from `actor.role`, and refuses a record
     /// that carries none.
     pub role: RoleId,
+    /// Optional accountable approval attestation; must be supplied as a
+    /// complete `--approval-by`/`--approval-role` pair.
+    pub approval_by: Option<String>,
+    pub approval_role: Option<RoleId>,
 }
 
 /// `canon evidence add` (module doc). Returns the process exit code.
@@ -283,6 +287,17 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     if args.kind.trim().is_empty() || args.evidence_ref.trim().is_empty() {
         eprintln!("canon evidence add: refused — --kind and --ref must both be non-empty; an empty companion narrows the gate's typed evidence slice to nothing");
         return 2;
+    }
+    match (&args.approval_by, &args.approval_role) {
+        (Some(_), None) | (None, Some(_)) => {
+            eprintln!("canon evidence add: refused — --approval-by and --approval-role must be supplied together");
+            return 2;
+        }
+        (Some(approver), Some(_)) if approver.trim().is_empty() => {
+            eprintln!("canon evidence add: refused — --approval-by must be non-empty");
+            return 2;
+        }
+        (None, None) | (Some(_), Some(_)) => {}
     }
     if args.summary.is_none() && args.command_result.is_some() {
         eprintln!(
@@ -399,6 +414,9 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         args.run_id.clone(),
         args.verdict,
     );
+    if let (Some(approver), Some(role)) = (&args.approval_by, &args.approval_role) {
+        record = record.with_approval(EvidenceApproval { approver: approver.clone(), role: role.clone(), at: Utc::now() });
+    }
     if let Some(project_id) = &args.project_id {
         record = record.with_project_id(project_id.clone());
     }
@@ -508,6 +526,8 @@ mod tests {
             run_id: None,
             actor_id: "canon".to_string(),
             role: RoleId::parse("implementer").expect("a literal role"),
+            approval_by: None,
+            approval_role: None,
         }
     }
 

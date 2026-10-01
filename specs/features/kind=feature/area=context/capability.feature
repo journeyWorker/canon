@@ -85,3 +85,12 @@ Feature: context capability
     When the surface is resolved
     Then the vocabulary index holds no directives and no evidence kinds
     And the resolution still returns a surface rather than failing
+
+  @subject:context-capability
+  @context.capability.10
+  Scenario: The policy surface exposes resolved effect-aware risk tiers
+  # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
+    Given a policy declaring rank, paths, effects, and minimum human approvals
+    When the capability surface is resolved as JSON and outline
+    Then risk_tiers carries the same resolved values in both forms
+    And an absent risk_tiers section is an empty no-op

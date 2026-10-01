@@ -36,7 +36,7 @@ pub use ids::{
     SpecDigest, SubjectId, TaskId, TotalOrder, regime_key,
 };
 pub use records::{
-    Change, ChangeStatus, Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Finding, FindingDisposition,
+    Change, ChangeStatus, Divergence, DivergenceStatus, Event, EvidenceApproval, EvidenceRecord, EvidenceVerdict, Finding, FindingDisposition,
     FindingSeverity, ProvenanceRef, Review, Run, RunLineage, RunStatus, SkillSnapshot, ContextSnapshot, PolicySnapshot, Scenario,
     Session, StrategyItem, StrategyRef, Subject,
     SubjectStatus, Task, TaskStatus, Trajectory,

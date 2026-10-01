@@ -84,3 +84,12 @@ Feature: evidence add
     When it is invoked
     Then it succeeds and the record is staged
     And the refusal of line separators is scoped to the fields that reach a document, never to pasted output
+
+  @subject:evidence-attestation
+  @evidence.add.10
+  Scenario: An accountable approval is authored as a complete pair
+  # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
+    Given an evidence add with --approval-by and --approval-role
+    When the record is staged
+    Then the record carries approver, role, and timestamp
+    And supplying only one approval flag is refused before staging

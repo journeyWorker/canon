@@ -81,7 +81,7 @@ fn context_json_is_byte_stable_and_has_the_public_capability_shape() {
         ["capabilityVersion", "cel", "enums", "joinKeys", "kinds", "policy", "vocab"],
         "context JSON public top-level shape changed"
     );
-    assert_eq!(surface["capabilityVersion"], 2);
+    assert_eq!(surface["capabilityVersion"], 3);
     assert_eq!(surface["kinds"].as_object().map(|k| k.len()), Some(14));
     assert_eq!(
         surface["cel"].as_object().map(|k| k.len()),
@@ -91,6 +91,7 @@ fn context_json_is_byte_stable_and_has_the_public_capability_shape() {
     assert!(surface["enums"].as_object().is_some_and(|v| !v.is_empty()));
     assert!(surface["joinKeys"].as_object().is_some_and(|v| !v.is_empty()));
     assert!(surface["policy"].is_object());
+    assert!(surface["policy"]["risk_tiers"].is_object());
     assert!(surface["vocab"].is_object());
 }
 

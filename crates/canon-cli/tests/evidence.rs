@@ -71,6 +71,30 @@ fn committed_evidence_files(repo: &Path) -> Vec<std::path::PathBuf> {
     paths.sort();
     paths
 }
+#[test]
+fn approval_pair_is_recorded_and_half_pairs_write_nothing() {
+    let dir = repo_with_plan_corpus("it-approval", "- [ ] 1.1 Approve the change\n");
+    let base = ["evidence", "add", "--task", "it-approval#1.1", "--kind", "test-run", "--ref", "report.txt", "--role", "implementer"];
+    for flags in [vec!["--approval-by", "alice"], vec!["--approval-role", "human"], vec!["--approval-by", " ", "--approval-role", "human"]] {
+        let args: Vec<&str> = base.iter().copied().chain(flags).collect();
+        let output = run_canon(&args, dir.path());
+        assert_eq!(output.status.code(), Some(2), "{}", stderr(&output));
+        assert!(staging_is_empty(dir.path()));
+        assert!(committed_evidence_files(dir.path()).is_empty());
+    }
+    let args: Vec<&str> = base.iter().copied().chain(["--approval-by", "alice", "--approval-role", "human"]).collect();
+    let output = run_canon(&args, dir.path());
+    assert!(output.status.success(), "{}", stderr(&output));
+    let output = run_canon(&["gate", "promote"], dir.path());
+    assert!(output.status.success(), "{}", stderr(&output));
+    let files = committed_evidence_files(dir.path());
+    assert_eq!(files.len(), 1);
+    let record: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&files[0]).unwrap()).unwrap();
+    assert_eq!(record["approval"]["approver"], "alice");
+    assert_eq!(record["approval"]["role"], "human");
+    assert!(record["approval"]["at"].as_str().unwrap().parse::<chrono::DateTime<chrono::Utc>>().is_ok());
+}
+
 
 /// s42 task 4.3, through the real binary: a checkbox flips on evidence
 /// this repo's own CLI authored. Each step is asserted for its EFFECT,

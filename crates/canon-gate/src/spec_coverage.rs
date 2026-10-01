@@ -336,6 +336,7 @@ mod tests {
             trust_sample: BTreeMap::new(),
             staleness: StalenessPolicy { max_commits_behind: PolicyField::Flat(50), surface_scoped: PolicyField::Flat(true) },
             risk_routing: BTreeMap::new(),
+            risk_tiers: BTreeMap::new(),
             spec_coverage,
             diagnostics: Vec::new(),
         }

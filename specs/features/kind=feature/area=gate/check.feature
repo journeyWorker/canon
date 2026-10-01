@@ -108,3 +108,23 @@ Feature: gate check
     When the policy is resolved
     Then the section is reported unusable, naming the value
     And the gate refuses rather than treating the section as absent
+
+  @subject:gate-trust-spine
+  @gate.check.12
+  Scenario: A matching high risk tier requires a distinct human approval
+  # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
+    Given a risk_tiers policy matching src/auth/** with one human approval required
+    And an evidence record for that path with no approval attestation
+    When the gate checks the repository
+    Then it reports uncovered-cell for the existing evidence subject
+    And the detail names the high tier, minimum, and observed approval count
+    And an approval whose role is agent does not satisfy the tier
+
+  @subject:gate-trust-spine
+  @gate.check.13
+  Scenario: A very high risk tier requires two distinct human approvers
+  # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
+    Given a very-high tier matching effect:production-deploy with two approvals required
+    When two evidence records carry the same human approver id
+    Then the tier remains uncovered
+    And two distinct non-empty human approver ids satisfy it

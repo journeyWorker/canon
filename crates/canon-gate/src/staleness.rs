@@ -295,6 +295,7 @@ mod tests {
             trust_sample: Default::default(),
             staleness: StalenessPolicy { max_commits_behind: PolicyField::Flat(max_commits_behind), surface_scoped: PolicyField::Flat(surface_scoped) },
             risk_routing: Default::default(),
+            risk_tiers: Default::default(),
             spec_coverage: None,
             diagnostics: Vec::new(),
         }
