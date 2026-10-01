@@ -16,6 +16,67 @@ canon context --json          # the full machine-readable surface
 canon context --repo ../other # resolve a specific repo's surface
 ```
 
+## Reproducible context packs and prompt bundles
+
+Use an explicit, repository-relative JSON manifest when a run needs a
+replayable snapshot. The manifest selects files; Canon copies their bytes into
+an immutable content-addressed registry and records only metadata and digests
+in the pack manifest.
+
+```bash
+canon context-pack create --manifest .canon/context-manifest.json
+canon context-pack create --manifest .canon/context-manifest.json --repo ../my-repo --json
+canon context-pack show sha256:<pack-digest> --repo . --json
+canon context-pack verify sha256:<pack-digest>
+```
+
+`create` prints only the pack id by default, so captured content is never
+written to concise terminal output. `--json` prints the pack manifest,
+including selected-path metadata and content digests. `show` verifies the
+manifest and immutable content objects before returning it; `verify` exits
+nonzero when the pack is missing, stale, or tampered. Manifest paths must be
+relative to the resolved repo, remain inside it, and contain no symlink;
+missing or unsafe paths are rejected by the context-pack module.
+
+## Provider-neutral adapter responses
+
+An execution provider may return a versioned response envelope for Canon to
+validate. Validation is read-only: `canon` never starts a provider, interprets
+provider-specific extension payloads, or enforces declared capabilities.
+
+```bash
+canon adapter validate --response response.json
+canon adapter validate --response response.json --repo . --json
+```
+
+The envelope has `protocol_version: 1`, required `run_id`, `provider`,
+`model`, and `context_pack_id`, a closed status vocabulary
+(`succeeded`/`failed`/`aborted`), and strict filesystem/network/secrets
+capability vocabularies. Evidence references are safe, relative references
+with `sha256:<64-hex>` digests. Telemetry timestamps must be RFC3339 with
+`ended_at >= started_at`, and counts/cost are nonnegative.
+
+Core fields are closed and unknown fields are rejected. Provider-specific JSON
+belongs only under opaque `extensions`; successful JSON output contains the
+normalized core summary and extension key names, never extension payloads.
+`--repo` can verify the referenced context pack; file-only validation reports
+`context_join_verified: null`. A valid declaration is not a sandbox:
+providers MUST enforce filesystem, network, and secret capabilities before
+execution.
+
+Version prompt inputs separately when several runs should share the same
+prompt files:
+
+```bash
+canon prompt register --name reviewer --version v1 \
+  --manifest .canon/reviewer-prompt.json
+canon prompt show --name reviewer --version v1 --json
+```
+
+Prompt registration uses the same immutable content registry. `prompt show`
+verifies the selected bundle and returns its metadata/digests; neither concise
+output form includes captured prompt bytes.
+
 - **A capability query, never validation:** `canon context` ALWAYS exits
   `0` with the full surface — even when `canon format --check` or
   `canon gate` would report diagnostics against the same repo. It reads

@@ -2,6 +2,7 @@
 //! integration-test coverage (`tests/skills_install.rs`) without spawning a
 //! subprocess. `src/main.rs` is a thin `clap` wrapper around this module.
 
+pub mod adapter;
 pub mod artifact_ingest;
 pub mod context;
 pub mod context_pack;

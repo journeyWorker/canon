@@ -32,6 +32,7 @@ installed explicitly with `--source canon/skills-dev`.
 - **Start product work / pin a durable unit:** read `reference/canon-subject.md`, then run `canon context` and `canon subject`.
 - **Write or reorganize `.feature` specs:** read `reference/canon-authoring.md` before editing; use the scaffold.
 - **Understand available fields/enums/policy bindings:** read `reference/canon-context.md` and `reference/canon-vocab.md`.
+- **Capture replayable run inputs / version prompts:** read `reference/canon-context.md`, then use `canon context-pack create|show|verify` and `canon prompt register|show` with explicit repository-relative JSON manifests.
 - **Validate or index specs:** read `reference/canon-fmt.md` and `reference/canon-inventory.md`.
 - **Run evidence gates, flip tasks, install hooks:** read `reference/canon-gate.md`.
 - **Ingest artifacts or sessions:** read `reference/canon-artifact-ingest.md`, `reference/canon-session-ingest.md`, or `reference/canon-plan-import.md`.

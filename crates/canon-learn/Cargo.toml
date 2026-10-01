@@ -14,6 +14,7 @@ path = "src/lib.rs"
 # serialization (frozen S1 foundation) every write/read path in this
 # crate reuses, never re-derives.
 canon-model.workspace = true
+canon-gate.workspace = true
 # `verdict::{VerdictRow, Polarity, Becomes}` ONLY — the frozen S4
 # artifact-ingest contract (S4Foundation commit 7b258b7a). This crate
 # never calls `derive_verdict`/touches `ArtifactEventKind`/adapter

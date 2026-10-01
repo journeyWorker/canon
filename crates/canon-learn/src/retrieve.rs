@@ -32,7 +32,11 @@ use crate::strategy::StrategyItem;
 /// the derived id keeps the choice a pure function of the stored
 /// content.
 pub fn retrieve(strategy_store: &dyn StrategyStore, regime_key: &RegimeKey, limit: Option<usize>) -> Result<Vec<StrategyItem>, LearnError> {
-    let mut items = strategy_store.query_by_regime_key(regime_key)?;
+    let mut items: Vec<_> = strategy_store
+        .query_by_regime_key(regime_key)?
+        .into_iter()
+        .filter(StrategyItem::is_retrievable)
+        .collect();
     items.sort_by(|a, b| b.recorded_at.cmp(&a.recorded_at).then_with(|| a.id.cmp(&b.id)));
     if let Some(limit) = limit {
         items.truncate(limit);

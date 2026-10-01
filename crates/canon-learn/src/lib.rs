@@ -98,22 +98,17 @@
 //!   ([`webhook::WebhookConfig`], task 5.3); no HTTP server ships in
 //!   this change (`webhook` module doc, Migration Step 1).
 //!
-//! Out of this crate's scope (see
-//! `openspec/changes/{s6-role-strategy-memory,s7-reward-statistical-
-//! promotion}/{design,tasks}.md`):
-//! git-tier strategy promotion (`canon learn promote`, a `canon-cli`
-//! surface — [`promotion::demote_strategy`]'s own git-tier soft-flag/
-//! hard-delete only ever touches a file `canon learn promote` would
-//! have written; a strategy never promoted to the git tier has
-//! nothing to touch, see `promotion::demote` module doc), the
-//! donor harness cutover plan, any production `canon ingest`
-//! artifact-driver wiring a real `VerdictRow` pipeline into this
-//! crate end-to-end (deferred — this crate's own tests build
-//! `VerdictRow`s synthetically), and an actual HTTP server for the
-//! webhook receiver (`webhook` module doc, Migration Step 1 — the
-//! receiver's normalize/join/reward/mark_trajectory_verdict LOGIC is
-//! implemented and tested against synthetic payloads; wiring a real
-//! listener is `canon-cli`/deployment territory).
+//! Promotion is enforced through a quarantine/evaluation/approval writer:
+//! [`promotion::promote_strategy_approved`] is the only activation path for
+//! new candidates, while legacy rows with no lifecycle remain readable.
+//! Rollback is explicit and provenance-bearing via
+//! [`promotion::rollback_strategy`]. Optional autonomy remains disabled until
+//! real paired evaluation evidence and a trusted approval verifier exist.
+//!
+//! The crate does not run an evaluator itself: callers provide an explicit
+//! [`promotion::PromotionEvaluation`] bundle and a cryptographically verified
+//! [`promotion::PromotionApproval`]. Unverified or incomplete bundles fail
+//! closed, and occurrence/CRN eligibility is only a prerequisite.
 
 pub mod config;
 pub mod distill;
@@ -140,15 +135,16 @@ pub use guidance::{DEFAULT_K, manifest_guidance_for_replay, retrieve_first_nonem
 pub use ids::{StrategyId, StrategyIdentity, TrajectoryId};
 pub use mark_verdict::mark_trajectory_verdict;
 pub use promotion::{
-    CrnPromotionGate, DemotionPolicy, DemotionRecord, OccurrencePromotionGate, Promotion, PromotionDecision, PromotionGate,
-    demote_strategy, evaluate_now, plan_promotion, promote_strategy,
+    CrnPromotionGate, DemotionPolicy, DemotionRecord, OccurrencePromotionGate, Promotion, PromotionApproval, PromotionDecision,
+    PromotionEvaluation, PromotionGate, RollbackRecord, demote_strategy, evaluate_now, plan_promotion, promote_strategy,
+    promote_strategy_approved, rollback_strategy, rollback_strategy_authenticated,
 };
 pub use rebuild::rebuild_namespace;
 pub use retrieve::retrieve;
 pub use reward::{RewardFn, RewardRegistry};
 pub use role::RoleRegistry;
 pub use store::{ParquetStrategyStore, ParquetTrajectoryStore, StrategyStore, TrajectoryStore};
-pub use strategy::{DemotionEvidence, StrategyItem};
+pub use strategy::{DemotionEvidence, StrategyItem, StrategyLifecycle};
 pub use trajectory::Trajectory;
 pub use verdict_outcome::{TrajectoryVerdict, VerdictOutcome};
 pub use webhook::{

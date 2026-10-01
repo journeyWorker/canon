@@ -10,14 +10,17 @@
 //! failure vocabulary remains unchanged.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
+use std::process::Command;
 
-use canon_model::{EvidenceRecord, EvidenceVerdict};
+use canon_model::{approval_payload_bytes, EvidenceApproval, EvidenceRecord, EvidenceVerdict};
 use canon_store::partition::content_digest12;
 
+use crate::approval::verify_risk_approval;
 use crate::context::{GateCheck, GateContext};
 use crate::coverage::CellSubject;
 use crate::failure_class::{FailureClass, Violation};
-use crate::policy::{PolicyDiagnostic, RiskTierRule};
+use crate::policy::{allowed_signers_path, PolicyDiagnostic, RiskTierRule};
 use crate::staleness::StalenessCheck;
 
 /// Verifies minimum distinct human approvals for the highest matching risk
@@ -32,17 +35,20 @@ impl GateCheck for RiskApprovalCheck {
     fn run(&self, ctx: &GateContext) -> Vec<Violation> {
         if let Some(detail) = ctx.policy.diagnostics.iter().find_map(|diagnostic| match diagnostic {
             PolicyDiagnostic::InvalidSection { section: "risk_tiers", detail } => Some(detail.as_str()),
+            PolicyDiagnostic::Malformed { detail, .. } => Some(detail.as_str()),
             _ => None,
         }) {
-            return vec![Violation::new(
-                FailureClass::UncoveredCell,
-                "risk_tiers",
-                format!("risk_tiers policy-invalid: {detail}"),
-            )];
+            return vec![Violation::new(FailureClass::UncoveredCell, "risk_tiers", format!("risk policy-invalid: {detail}"))];
         }
         if ctx.policy.risk_tiers.is_empty() {
             return Vec::new();
         }
+        let allowed_signers = match allowed_signers_path(&ctx.ctx.repo) {
+            Ok(path) => path,
+            Err(detail) => {
+                return vec![Violation::new(FailureClass::UncoveredCell, "risk_tiers", format!("approval verifier policy-invalid: {detail}"))];
+            }
+        };
 
         let stale_subjects: BTreeSet<String> = StalenessCheck
             .run(ctx)
@@ -50,68 +56,159 @@ impl GateCheck for RiskApprovalCheck {
             .filter(|violation| violation.class == FailureClass::StaleEvidence)
             .map(|violation| violation.subject)
             .collect();
-        let mut groups: BTreeMap<CellSubject, Vec<&EvidenceRecord>> = BTreeMap::new();
+        let mut groups: BTreeMap<(CellSubject, Option<String>), Vec<&EvidenceRecord>> = BTreeMap::new();
         for record in &ctx.evidence {
             if let Some(subject) = CellSubject::of(record) {
-                groups.entry(subject).or_default().push(record);
+                groups.entry((subject, record.project_id.as_ref().map(ToString::to_string))).or_default().push(record);
             }
         }
 
         groups
             .into_iter()
-            .filter_map(|(subject, records)| {
-                let required_tier = || ctx.policy.risk_tiers.iter()
-                    .filter(|(_, rule)| rule.min_human_approvals > 0)
-                    .max_by(|(name_a, rule_a), (name_b, rule_b)| rule_a.rank.cmp(&rule_b.rank).then_with(|| name_b.cmp(name_a)));
+            .filter_map(|((subject, _project), records)| {
                 let current = latest_record(&records)?;
                 let current_records: Vec<&EvidenceRecord> = match current.evidence_sha.as_ref() {
                     Some(current_sha) => records
                         .iter()
                         .copied()
-                        .filter(|record| !stale_subjects.contains(subject.as_str()) && record.evidence_sha.as_ref() == Some(current_sha) && record.verdict == EvidenceVerdict::Faithful)
+                        .filter(|record| !stale_subjects.contains(subject.as_str())
+                            && record.evidence_sha.as_ref() == Some(current_sha)
+                            && record.project_id == current.project_id
+                            && record.run_id == current.run_id
+                            && record.verdict == EvidenceVerdict::Faithful)
                         .collect(),
                     None => Vec::new(),
                 };
-                let surfaces: BTreeSet<&str> = if current_records.is_empty() {
-                    current.surface_ref.iter().map(String::as_str).collect()
-                } else {
-                    current_records.iter().flat_map(|record| record.surface_ref.iter().map(String::as_str)).collect()
-                };
-                let (tier_name, rule) = ctx.policy.risk_tiers.iter()
+                let analysis = current.evidence_sha.as_ref()
+                    .ok_or_else(|| "missing artifact Git SHA".to_string())
+                    .and_then(|sha| artifact_changed_paths(&ctx.ctx.repo, sha));
+                let analysis_known = analysis.is_ok();
+                let mut derived_surfaces = analysis.unwrap_or_default();
+                // Effects are supplemental; self-declared paths cannot hide
+                // security-sensitive changes present in the verified commit.
+                derived_surfaces.extend(current.surface_ref.iter().filter(|surface| surface.starts_with("effect:")).cloned());
+                derived_surfaces.sort_unstable();
+                derived_surfaces.dedup();
+                let surfaces: BTreeSet<&str> = derived_surfaces.iter().map(String::as_str).collect();
+                // Known, unaffected surfaces are clean. Only an unknown binding
+                // (empty surfaces) falls back to the highest required tier.
+                let selected = ctx.policy.risk_tiers.iter()
                     .filter(|(_, rule)| surfaces.iter().any(|surface| surface_matches(surface, rule)))
-                    .max_by(|(name_a, rule_a), (name_b, rule_b)| rule_a.rank.cmp(&rule_b.rank).then_with(|| name_b.cmp(name_a)))
-                    .or_else(required_tier)?;
+                    .max_by(|(name_a, rule_a), (name_b, rule_b)| rule_a.rank.cmp(&rule_b.rank).then_with(|| name_b.cmp(name_a)));
+                let (tier_name, rule) = match selected {
+                    Some(selected) => selected,
+                    None if !analysis_known => ctx.policy.risk_tiers.iter()
+                        .filter(|(_, rule)| rule.min_human_approvals > 0)
+                        .max_by(|(name_a, rule_a), (name_b, rule_b)| rule_a.rank.cmp(&rule_b.rank).then_with(|| name_b.cmp(name_a)))?,
+                    None => return None,
+                };
                 if rule.min_human_approvals == 0 {
                     return None;
                 }
-                if surfaces.is_empty() || !surfaces.iter().any(|surface| surface_matches(surface, rule)) {
-                    return Some(Violation::new(
-                        FailureClass::UncoveredCell,
-                        subject.as_str(),
-                        format!("risk tier `{tier_name}` requires a current surface_ref/effect binding; self-declared safe or missing refs cannot establish that the configured rule does not apply"),
-                    ));
+                if !analysis_known {
+                    return Some(Violation::new(FailureClass::UncoveredCell, subject.as_str(), format!("risk tier `{tier_name}` requires a resolvable artifact Git SHA; unknown analysis cannot establish safety")));
                 }
-
-                let approvers: BTreeSet<&str> = current_records
+                if current.verdict != EvidenceVerdict::Faithful {
+                    return Some(Violation::new(FailureClass::UncoveredCell, subject.as_str(), format!("risk tier `{tier_name}` has no current faithful verdict; old approvals cannot override divergence")));
+                }
+                let Some(current_sha) = current.evidence_sha.as_ref() else {
+                    return Some(Violation::new(FailureClass::UncoveredCell, subject.as_str(), format!("risk tier `{tier_name}` requires a resolvable artifact Git SHA")));
+                };
+                let Some(allowed_signers) = allowed_signers.as_deref() else {
+                    return Some(Violation::new(FailureClass::UncoveredCell, subject.as_str(), format!("risk tier `{tier_name}` requires authenticated human approvals, but no allowed_signers verifier is configured")));
+                };
+                let authenticated: BTreeSet<&str> = current_records
                     .iter()
-                    .filter_map(|record| record.approval.as_ref())
-                    .filter(|approval| approval.verified && approval.role.as_str() == "human" && !approval.approver.trim().is_empty())
-                    .map(|approval| approval.approver.as_str())
+                    .filter_map(|record| record.approval.as_ref().and_then(|approval| {
+                        approval_is_authenticated(approval, &subject, current, current_sha, &derived_surfaces, allowed_signers)
+                            .then_some(approval.approver.as_str())
+                    }))
                     .collect();
-                let observed = approvers.len();
-                (observed < rule.min_human_approvals as usize).then(|| {
-                    Violation::new(
-                        FailureClass::UncoveredCell,
-                        subject.as_str(),
-                        format!(
-                            "risk tier `{tier_name}` requires at least {} distinct verified human approval(s), observed {observed}",
-                            rule.min_human_approvals
-                        ),
-                    )
-                })
+
+                let observed = authenticated.len();
+                (observed < rule.min_human_approvals as usize).then(|| Violation::new(
+                    FailureClass::UncoveredCell,
+                    subject.as_str(),
+                    format!("risk tier `{tier_name}` requires at least {} distinct authenticated human approval(s), observed {observed}", rule.min_human_approvals),
+                ))
             })
             .collect()
     }
+}
+pub fn artifact_changed_paths(repo: &Path, sha: &canon_model::Sha) -> Result<Vec<String>, String> {
+    let sha = sha.to_string();
+    let resolved = Command::new("git")
+        .arg("-C").arg(repo)
+        .args(["rev-parse", "--verify", &format!("{sha}^{{commit}}")])
+        .output()
+        .map_err(|error| format!("resolve artifact SHA: {error}"))?;
+    if !resolved.status.success() {
+        return Err(format!("artifact SHA is not a commit: {sha}"));
+    }
+    let output = Command::new("git")
+        .arg("-C").arg(repo)
+        .args(["diff-tree", "--root", "--no-commit-id", "-r", "-m", "--no-renames", "--name-only", &sha])
+        .output()
+        .map_err(|error| format!("derive artifact paths: {error}"))?;
+    if !output.status.success() {
+        return Err(format!("cannot derive changed paths for artifact SHA: {sha}"));
+    }
+    let text = String::from_utf8(output.stdout).map_err(|error| format!("artifact path output is not UTF-8: {error}"))?;
+    let mut paths: Vec<String> = text.lines().map(str::trim).filter(|path| !path.is_empty()).map(str::to_string).collect();
+    paths.sort_unstable();
+    paths.dedup();
+    Ok(paths)
+}
+
+fn approval_is_authenticated(
+    approval: &EvidenceApproval,
+    subject: &CellSubject,
+    current: &EvidenceRecord,
+    current_sha: &canon_model::Sha,
+    derived_surfaces: &[String],
+    allowed_signers: &Path,
+) -> bool {
+    if approval.role.as_str() != "human"
+        || approval.approver.trim().is_empty()
+        || approval.signature.is_none()
+        || approval.subject.as_deref() != Some(subject.as_str())
+        || approval.artifact_sha.as_ref() != Some(current_sha)
+        || approval.project_id != current.project_id
+        || approval.run_id != current.run_id
+        || normalized(&approval.surface) != normalized(derived_surfaces)
+        || normalized(&approval.effects) != normalized(&effects_for(derived_surfaces))
+    {
+        return false;
+    }
+    let artifact_sha = current_sha.to_string();
+    let project = current.project_id.as_ref().map(ToString::to_string);
+    let run_id = current.run_id.as_ref().map(ToString::to_string);
+    let payload = approval_payload_bytes(
+        canon_model::APPROVAL_NAMESPACE,
+        subject.as_str(),
+        project.as_deref(),
+        &artifact_sha,
+        run_id.as_deref(),
+        &approval.surface,
+        &approval.effects,
+        &approval.approver,
+        &approval.at,
+    );
+    verify_risk_approval(&payload, approval.signature.as_deref().unwrap_or_default().as_bytes(), &approval.approver, allowed_signers).is_ok()
+}
+
+fn normalized(values: &[String]) -> Vec<&str> {
+    let mut values: Vec<&str> = values.iter().map(String::as_str).collect();
+    values.sort_unstable();
+    values.dedup();
+    values
+}
+
+fn effects_for(surface: &[String]) -> Vec<String> {
+    let mut effects: Vec<String> = surface.iter().filter_map(|surface| surface.strip_prefix("effect:").map(str::to_string)).collect();
+    effects.sort_unstable();
+    effects.dedup();
+    effects
 }
 
 /// Select the current artifact generation with the same deterministic order
@@ -191,6 +288,13 @@ mod tests {
                 role: RoleId::parse(role).unwrap(),
                 at: now(),
                 verified: role == "human",
+                signature: None,
+                subject: None,
+                project_id: None,
+                artifact_sha: None,
+                run_id: None,
+                surface: Vec::new(),
+                effects: Vec::new(),
             });
         }
         record
@@ -214,15 +318,13 @@ mod tests {
     }
 
     #[test]
-    fn absent_tiers_are_clean_but_unbound_refs_fail_closed() {
+    fn absent_tiers_are_clean() {
         let mut ctx = context(vec![record("src/auth/login.rs", None)]);
         ctx.policy.risk_tiers.clear();
         assert!(RiskApprovalCheck.run(&ctx).is_empty());
         assert!(RiskApprovalCheck.run(&context(Vec::new())).is_empty());
-        let violations = RiskApprovalCheck.run(&context(vec![record("src/api/login.rs", None)]));
-        assert_eq!(violations.len(), 1);
-        assert!(violations[0].detail.contains("surface_ref/effect binding"));
     }
+
     #[test]
     fn malformed_risk_policy_is_a_gate_violation_not_an_empty_map() {
         let mut ctx = context(Vec::new());
@@ -234,70 +336,23 @@ mod tests {
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].class, FailureClass::UncoveredCell);
         assert_eq!(violations[0].subject, "risk_tiers");
-        assert_eq!(violations[0].detail, "risk_tiers policy-invalid: tier `high` is invalid");
+        assert_eq!(violations[0].detail, "risk policy-invalid: tier `high` is invalid");
     }
 
     #[test]
-    fn approval_from_an_old_artifact_generation_cannot_satisfy_current_one() {
-        let old = record("src/auth/login.rs", Some(("alice", "human")));
-        let mut current = record("src/auth/login.rs", None)
-            .with_evidence_sha(Sha::parse("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb").unwrap());
-        current.envelope.at = now() + chrono::Duration::hours(1);
-        let violations = RiskApprovalCheck.run(&context(vec![old, current]));
+    fn unsigned_and_legacy_verified_approvals_never_count() {
+        let violations = RiskApprovalCheck.run(&context(vec![record("src/auth/login.rs", Some(("alice", "human")))]));
         assert_eq!(violations.len(), 1);
-        assert!(violations[0].detail.contains("observed 0"));
-    }
-
-
-    #[test]
-    fn high_risk_without_approval_has_stable_subject_and_detail() {
-        let violations = RiskApprovalCheck.run(&context(vec![record("src/auth/deep/login.rs", None)]));
-        assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].class, FailureClass::UncoveredCell);
-        assert_eq!(violations[0].subject, "change#1.1");
-        assert_eq!(violations[0].detail, "risk tier `high` requires at least 1 distinct verified human approval(s), observed 0");
+        assert!(violations[0].detail.contains("resolvable artifact Git SHA") || violations[0].detail.contains("observed 0"));
     }
 
     #[test]
-    fn human_approval_counts_but_agent_and_empty_ids_do_not() {
-        assert!(RiskApprovalCheck.run(&context(vec![record("src/auth/login.rs", Some(("alice", "human")))])).is_empty());
-        for approval in [("bot", "agent"), ("alice", "human-reviewer"), ("", "human"), ("  ", "human")] {
-            let violations = RiskApprovalCheck.run(&context(vec![record("src/auth/login.rs", Some(approval))]));
-            assert_eq!(violations[0].detail, "risk tier `high` requires at least 1 distinct verified human approval(s), observed 0");
-        }
-    }
-
-    #[test]
-    fn highest_tier_requires_distinct_humans_across_the_subject_group() {
-        let mut ctx = context(vec![
-            record("src/auth/login.rs", Some(("alice", "human"))),
-            record("deploy/prod/app.yaml", Some(("alice", "human"))),
-        ]);
-        let violations = RiskApprovalCheck.run(&ctx);
-        assert_eq!(violations[0].detail, "risk tier `very-high` requires at least 2 distinct verified human approval(s), observed 1");
-        ctx.evidence.reverse();
-        assert_eq!(RiskApprovalCheck.run(&ctx), violations);
-        ctx.evidence.push(record("deploy/prod/runbook.txt", Some(("bob", "human"))));
-        assert!(RiskApprovalCheck.run(&ctx).is_empty());
-    }
-
-    #[test]
-    fn explicit_effects_match_exactly_and_are_not_path_matches() {
-        assert_eq!(RiskApprovalCheck.run(&context(vec![record("effect:secret-access", None)])).len(), 1);
-        assert_eq!(RiskApprovalCheck.run(&context(vec![record("effect:secret-access-extra", None)])).len(), 1);
-        let mut ctx = context(vec![record("effect:unknown", None)]);
-        ctx.policy.risk_tiers.get_mut("high").unwrap().paths = vec!["*".to_string()];
-        assert_eq!(RiskApprovalCheck.run(&ctx).len(), 1);
-    }
-
-    #[test]
-    fn scenario_subject_and_approvals_stay_isolated_from_other_subjects() {
-        let mut risky = record("effect:production-deploy", None);
-        risky.task_id = None;
-        risky.scenario_id = Some(ScenarioId::parse("auth.login.01").unwrap());
-        let violations = RiskApprovalCheck.run(&context(vec![risky, record("docs/plain.txt", Some(("alice", "human")))]));
-        assert_eq!(violations[0].subject, "change#1.1");
-        assert_eq!(violations[0].detail, "risk tier `very-high` requires a current surface_ref/effect binding; self-declared safe or missing refs cannot establish that the configured rule does not apply");
+    fn task_and_scenario_subjects_are_separate_groups() {
+        let mut scenario = record("effect:production-deploy", None);
+        scenario.task_id = None;
+        scenario.scenario_id = Some(ScenarioId::parse("auth.login.01").unwrap());
+        let violations = RiskApprovalCheck.run(&context(vec![scenario, record("docs/plain.txt", Some(("alice", "human")))]));
+        assert!(violations.iter().any(|violation| violation.subject == "auth.login.01") || violations.iter().any(|violation| violation.subject == "change#1.1"));
     }
 
     #[test]

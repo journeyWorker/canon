@@ -1,0 +1,12 @@
+{
+  "protocol_version": 1,
+  "run_id": "run-omp-001",
+  "provider": "omp",
+  "model": "omp-default",
+  "context_pack_id": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "status": "succeeded",
+  "capabilities": {"filesystem": "read-only", "network": "none", "secrets": "none"},
+  "evidence_refs": [{"kind": "test-run", "ref": "artifacts/omp-result.json", "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}],
+  "telemetry": {"started_at": "2026-01-01T00:00:00Z", "ended_at": "2026-01-01T00:01:00Z", "tool_calls": 2, "retries": 0, "tokens": 128, "cost_usd": 0.01},
+  "extensions": {"omp": {"session_id": "omp-session-001"}}
+}

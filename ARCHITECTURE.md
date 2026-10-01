@@ -83,6 +83,15 @@ are code contracts, not merely labels:
   command wiring. Provider-specific skill materialization lives in
   `crates/canon-cli/src/skills.rs`; it does not change the canonical source.
 
+The provider-neutral adapter boundary lives in
+[`crates/canon-cli/src/adapter.rs`](crates/canon-cli/src/adapter.rs). It
+accepts only protocol version 1 envelopes with strict core fields and opaque
+provider data under `extensions`; `canon adapter validate` is read-only and
+never executes an adapter. Declared filesystem, network, and secret
+capabilities are records, not enforcement: a provider sandbox MUST enforce
+them before execution. Optional `--repo` context-pack verification can confirm
+the context join; file-only validation reports it as unknown.
+
 ## Five architecture invariants
 
 These are the public principles. Each has an existing evidence boundary and a

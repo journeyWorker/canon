@@ -87,3 +87,33 @@ its own evaluation logic," it is out of scope — raise it as a design
 question rather than adding an expression field. Conditional logic about
 what a record *means* lives in `policy.yaml`/`applies_when:`, evaluated
 against the record's fields, never inside the record.
+
+## Effect-aware risk tiers
+
+The optional `risk_tiers` section is not CEL. Absent means no risk-approval
+check. A present section must be a mapping of tier names to:
+
+```yaml
+risk_tiers:
+  high:
+    rank: 3
+    paths: ["src/auth/**"]
+    effects: ["secret-access"]
+    min_human_approvals: 1
+```
+
+Malformed sections or entries are retained as a policy diagnostic and make
+`canon gate check` fail closed with `uncovered-cell risk_tiers — risk_tiers
+policy-invalid: ...`; they are never treated as an empty map. The gate
+selects the highest-ranked tier against the current, faithful
+`EvidenceRecord` generation. A current `evidence_sha` and an explicit
+`surface_ref`/`effect:<kebab-slug>` binding are required for a tier that
+requires approval. Surface refs are validated syntax and attestation input,
+not proof that the caller's path is authoritative; configured rules cannot
+be bypassed by declaring a safe ref.
+
+Approval text is also only an attestation unless identity is verified.
+`canon evidence add` marks an approval verified only when `--approval-by`
+equals non-empty `CANON_ACTOR` and `--approval-role human` is supplied.
+The persisted verification bit is what later gates count; arbitrary caller
+strings, empty identities, and agent roles do not count.

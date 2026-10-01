@@ -222,10 +222,11 @@ pub fn register_prompt_bundle(
     version: &str,
     spec: &ContextPackSpec,
 ) -> Result<PromptBundleVersion, ContextPackError> {
-    ensure_registry(repo)?;
+    let repo = repo.canonicalize().map_err(|e| io(repo, e))?;
+    ensure_registry(&repo)?;
     validate_label(name)?;
     validate_label(version)?;
-    let prompts = capture_prompts(repo, spec)?;
+    let prompts = capture_prompts(&repo, spec)?;
     let unsigned = PromptBundleVersion { name: name.to_string(), version: version.to_string(), digest: String::new(), prompts };
     let digest_bytes = serde_json::to_vec(&unsigned).map_err(|e| ContextPackError::Serialize(e.to_string()))?;
     let bundle = PromptBundleVersion { digest: digest(&digest_bytes), ..unsigned };
@@ -311,8 +312,10 @@ pub fn create(repo: &Path, spec: &ContextPackSpec) -> Result<ContextPack, Contex
     write_immutable(&path, &manifest)?;
     Ok(pack)
 }
-/// Load an explicit JSON input manifest and create its immutable pack.
-pub fn create_from_manifest(repo: &Path, manifest: &Path) -> Result<ContextPack, ContextPackError> {
+/// Load and validate an explicit JSON input manifest without creating a pack.
+/// Dispatch uses this to merge runtime lineage into the selected spec while
+/// retaining the manifest's exact document/prompt/tool selections.
+pub fn load_manifest_spec(repo: &Path, manifest: &Path) -> Result<ContextPackSpec, ContextPackError> {
     let repo = repo.canonicalize().map_err(|e| io(repo, e))?;
     let path = safe_path(&repo, manifest)?;
     let bytes = std::fs::read(&path).map_err(|e| io(&path, e))?;
@@ -320,7 +323,13 @@ pub fn create_from_manifest(repo: &Path, manifest: &Path) -> Result<ContextPack,
     if spec.manifest_version != CONTEXT_PACK_FORMAT_VERSION {
         return Err(ContextPackError::InvalidManifestVersion(spec.manifest_version));
     }
-    create(&repo, &spec)
+    Ok(spec)
+}
+
+/// Load an explicit JSON input manifest and create its immutable pack.
+pub fn create_from_manifest(repo: &Path, manifest: &Path) -> Result<ContextPack, ContextPackError> {
+    let spec = load_manifest_spec(repo, manifest)?;
+    create(repo, &spec)
 }
 
 /// Register a prompt bundle described by a repository-local JSON manifest.

@@ -144,6 +144,15 @@ impl StrategyStore for ParquetStrategyStore {
         fs::write(&path, encode_strategy(&item)?)?;
         Ok(())
     }
+
+    fn set_lifecycle(&self, id: &StrategyId, lifecycle: crate::strategy::StrategyLifecycle) -> Result<(), LearnError> {
+        let Some((path, mut item)) = find_strategy_file(&self.root, id)? else {
+            return Err(LearnError::UnknownStrategyId(id.to_string()));
+        };
+        item.lifecycle = Some(lifecycle);
+        fs::write(&path, encode_strategy(&item)?)?;
+        Ok(())
+    }
 }
 
 /// Recursively finds the ONE strategy file matching `id` under `root`

@@ -34,6 +34,13 @@ spec_coverage:
   scope: [building, verifying]
   exclude_lanes: [process]
 
+
+# Authenticated risk approvals use external SSH trust. Uncomment and pin a
+# protected allowed-signers file (outside ordinary repo writes for production):
+# approval:
+#   allowed_signers: /etc/canon/allowed_signers
+# A missing verifier counts zero approvals; canon never treats CANON_ACTOR,
+# `verified`, or repository-controlled policy as human authentication.
 # Sensitive query/export output is disabled unless an operator explicitly
 # enables it and passes --include-sensitive.
 query:

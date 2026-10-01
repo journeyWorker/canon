@@ -205,4 +205,11 @@ pub trait StrategyStore {
     /// `id` matches nothing — never a silent no-op (same "fail loud"
     /// discipline `mark_verdict` already established).
     fn mark_demoted(&self, id: &StrategyId, demotion: crate::strategy::DemotionEvidence) -> Result<(), LearnError>;
+
+    /// Changes only the lifecycle marker of an existing row. Implementations
+    /// that cannot mutate rows fail closed instead of silently activating one.
+    fn set_lifecycle(&self, id: &StrategyId, lifecycle: crate::strategy::StrategyLifecycle) -> Result<(), LearnError> {
+        let _ = (id, lifecycle);
+        Err(LearnError::MalformedRow("strategy store does not support lifecycle writes".to_string()))
+    }
 }

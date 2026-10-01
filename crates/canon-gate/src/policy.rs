@@ -378,6 +378,34 @@ fn resolve_risk_tiers(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<Poli
     }
     resolved
 }
+/// Resolve the policy-pinned SSH allowed-signers file. Supported spelling is
+/// `approval: { allowed_signers: path }`; `risk_approvals` and a top-level
+/// `allowed_signers` are accepted as compatibility aliases. A malformed
+/// policy is an error, never an absent verifier.
+pub fn allowed_signers_path(repo: &Path) -> Result<Option<PathBuf>, String> {
+    let path = repo.join(POLICY_YAML_RELATIVE_PATH);
+    let content = match std::fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("read policy {}: {error}", path.display())),
+    };
+    let value: serde_yaml::Value = serde_yaml::from_str(&content).map_err(|error| format!("parse policy {}: {error}", path.display()))?;
+    let mapping = value.as_mapping().ok_or_else(|| format!("policy {} must be a mapping", path.display()))?;
+    let key = |name: &str| serde_yaml::Value::String(name.to_string());
+    let configured = mapping
+        .get(&key("approval"))
+        .or_else(|| mapping.get(&key("risk_approvals")))
+        .and_then(serde_yaml::Value::as_mapping)
+        .and_then(|map| map.get(&key("allowed_signers")))
+        .or_else(|| mapping.get(&key("allowed_signers")));
+    let Some(configured) = configured else { return Ok(None) };
+    let configured = configured.as_str().ok_or_else(|| "approval.allowed_signers must be a path string".to_string())?;
+    if configured.trim().is_empty() {
+        return Err("approval.allowed_signers must not be empty".into());
+    }
+    let path = PathBuf::from(configured);
+    Ok(Some(if path.is_absolute() { path } else { repo.join(path) }))
+}
 
 
 /// `policy.yaml`'s optional `spec_coverage:` section (s44

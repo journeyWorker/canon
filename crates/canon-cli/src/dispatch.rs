@@ -117,7 +117,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::context::{render_json, resolve_canon_yaml, resolve_repo_root, resolve_surface, ContextOptions};
-use crate::context_pack::{create_dispatch_pack, ContextPackError, ContextPackSpec};
+use crate::context_pack::{create_dispatch_pack, load_manifest_spec, ContextPackError, ContextPackSpec, PromptBundleSelection};
 
 /// The private side-channel directory a dispatch record lands under,
 /// relative to the repo root. NOT the record's only home since s42
@@ -462,6 +462,19 @@ pub struct DispatchMetadata {
     pub model: Option<String>,
     pub skill_id: Option<String>,
     pub skill_digest: Option<String>,
+    /// Repository-relative explicit ContextPack input manifest.
+    pub context_manifest: Option<PathBuf>,
+    /// Registered prompt bundle selected as `name@version`.
+    pub prompt_bundle: Option<PromptBundleSelection>,
+}
+
+/// Parse the CLI's `name@version` prompt bundle selector.
+pub fn parse_prompt_bundle(value: &str) -> Result<PromptBundleSelection, String> {
+    let (name, version) = value.split_once('@').ok_or_else(|| "prompt bundle must be NAME@VERSION".to_string())?;
+    if name.is_empty() || version.is_empty() || version.contains('@') {
+        return Err("prompt bundle must be NAME@VERSION with non-empty name and version".to_string());
+    }
+    Ok(PromptBundleSelection { name: name.to_string(), version: version.to_string() })
 }
 
 /// Capture the canonical capability surface AND its immutable ContextPack.
@@ -477,21 +490,32 @@ fn capture_lineage(
     let surface = resolve_surface(repo, ContextOptions::default());
     let context_bytes = render_json(&surface).into_bytes();
     let context_digest = sha256_digest(&context_bytes);
-    let mut spec = ContextPackSpec::for_dispatch(
-        metadata.provider.clone(),
-        metadata.model.clone(),
-        metadata.skill_digest.clone(),
-        context_digest.clone(),
-        surface.capability_version,
-        guidance.to_vec(),
-    );
+    let mut spec = match &metadata.context_manifest {
+        Some(manifest) => load_manifest_spec(repo, manifest)?,
+        None => ContextPackSpec::for_dispatch(
+            metadata.provider.clone(),
+            metadata.model.clone(),
+            metadata.skill_digest.clone(),
+            context_digest.clone(),
+            surface.capability_version,
+            guidance.to_vec(),
+        ),
+    };
+    // Runtime declarations are authoritative for this dispatch. Explicit
+    // manifests retain all selected inputs, while these fields identify the
+    // actual provider/model/skill and run edges.
+    spec.provider = metadata.provider.clone().or(spec.provider);
+    spec.model = metadata.model.clone().or(spec.model);
+    spec.skill_bundle_digest = metadata.skill_digest.clone().or(spec.skill_bundle_digest);
+    spec.prompt_bundle = metadata.prompt_bundle.clone().or(spec.prompt_bundle);
     spec.work_ref = work_ref;
     spec.task_ref = task_ref;
+    spec.injected_guidance = guidance.to_vec();
     let (pack, _) = create_dispatch_pack(repo, &spec, &context_bytes, surface.capability_version)?;
     let policy_digest = pack.policy.as_ref().map(|file| file.content.digest.clone()).unwrap_or_else(|| "sha256:absent".to_string());
     Ok(RunLineage {
-        provider: metadata.provider.clone(),
-        model: metadata.model.clone(),
+        provider: metadata.provider.clone().or(pack.provider.clone()),
+        model: metadata.model.clone().or(pack.model.clone()),
         skill: metadata.skill_id.as_ref().map(|id| SkillSnapshot { id: id.clone(), digest: metadata.skill_digest.clone() }),
         context: Some(ContextSnapshot { digest: context_digest, capability_version: surface.capability_version, pack_id: Some(pack.id) }),
         policy: Some(PolicySnapshot { digest: policy_digest }),
@@ -2314,6 +2338,7 @@ mod begin_tests {
             model: Some("model/@declared".into()),
             skill_id: Some("skill-id".into()),
             skill_digest: Some("sha256:skill-digest".into()),
+            ..DispatchMetadata::default()
         };
         let begun = begin(tmp.path(), &role(), &regime(), "agent-provider-looking", &DispatchBinding::default(), &metadata)
             .expect("declared metadata dispatches");
@@ -2323,6 +2348,61 @@ mod begin_tests {
             begun.run.lineage.as_ref().unwrap().skill,
             Some(SkillSnapshot { id: "skill-id".into(), digest: Some("sha256:skill-digest".into()) })
         );
+    }
+
+    #[test]
+    fn explicit_manifest_and_prompt_bundle_are_recorded_in_dispatch_pack() {
+        let tmp = repo_without_plan_sources();
+        std::fs::write(tmp.path().join("selected.md"), "selected input\n").unwrap();
+        std::fs::write(tmp.path().join("system.md"), "system prompt\n").unwrap();
+        let bundle_spec = ContextPackSpec {
+            manifest_version: 1,
+            prompt_system: Some(PathBuf::from("system.md")),
+            ..ContextPackSpec::default()
+        };
+        crate::context_pack::register_prompt_bundle(tmp.path(), "reviewer", "v1", &bundle_spec).unwrap();
+        let manifest = tmp.path().join("inputs.json");
+        let explicit_spec = ContextPackSpec {
+            manifest_version: 1,
+            selected_docs: vec![PathBuf::from("selected.md")],
+            ..ContextPackSpec::default()
+        };
+        std::fs::write(&manifest, serde_json::to_vec(&explicit_spec).unwrap()).unwrap();
+        let metadata = DispatchMetadata {
+            context_manifest: Some(PathBuf::from("inputs.json")),
+            prompt_bundle: Some(PromptBundleSelection { name: "reviewer".into(), version: "v1".into() }),
+            ..DispatchMetadata::default()
+        };
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &metadata).unwrap();
+        let pack_id = begun.run.lineage.as_ref().unwrap().context.as_ref().unwrap().pack_id.clone().unwrap();
+        let pack = crate::context_pack::show(tmp.path(), &pack_id).unwrap();
+        assert_eq!(pack.selected_docs.len(), 1);
+        assert_eq!(pack.selected_docs[0].path, "selected.md");
+        assert_eq!(pack.prompt_bundle.as_ref().unwrap().name, "reviewer");
+        assert_eq!(pack.prompt_bundle.as_ref().unwrap().version, "v1");
+    }
+
+    #[test]
+    fn tampered_selected_prompt_bundle_is_rejected_before_dispatch_write() {
+        let tmp = repo_without_plan_sources();
+        std::fs::write(tmp.path().join("system.md"), "system prompt\n").unwrap();
+        let bundle_spec = ContextPackSpec {
+            manifest_version: 1,
+            prompt_system: Some(PathBuf::from("system.md")),
+            ..ContextPackSpec::default()
+        };
+        crate::context_pack::register_prompt_bundle(tmp.path(), "reviewer", "v1", &bundle_spec).unwrap();
+        let bundle_path = tmp.path().join(".canon/prompts/reviewer/v1.json");
+        let mut bundle: Value = serde_json::from_slice(&std::fs::read(&bundle_path).unwrap()).unwrap();
+        bundle["digest"] = Value::String("sha256:tampered".into());
+        std::fs::write(&bundle_path, serde_json::to_vec(&bundle).unwrap()).unwrap();
+        let metadata = DispatchMetadata {
+            prompt_bundle: Some(PromptBundleSelection { name: "reviewer".into(), version: "v1".into() }),
+            ..DispatchMetadata::default()
+        };
+        let error = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &metadata).unwrap_err();
+        assert!(matches!(error, DispatchError::ContextPack(ContextPackError::PromptBundle { .. })));
+        assert!(!tmp.path().join(DISPATCH_DIR).exists());
     }
 
     #[test]
@@ -2579,6 +2659,7 @@ mod begin_tests {
             model: Some("model".into()),
             skill_id: Some("skill".into()),
             skill_digest: Some("sha256:skill".into()),
+            ..DispatchMetadata::default()
         };
         let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &metadata).expect("the dispatch begins");
         let lineage_before = serde_json::to_vec(begun.run.lineage.as_ref().unwrap()).unwrap();

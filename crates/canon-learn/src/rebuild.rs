@@ -8,12 +8,14 @@
 //! function — there is no code path here (or anywhere in this crate)
 //! that can delete a raw trajectory.
 
+use std::collections::HashMap;
+
 use canon_model::ids::RegimeKey;
 
 use crate::distill::distill_namespace;
 use crate::error::LearnError;
 use crate::store::{StrategyStore, TrajectoryStore};
-use crate::strategy::StrategyItem;
+use crate::strategy::{StrategyItem, StrategyLifecycle};
 
 /// Rebuilds the strategy layer for `regime_key`: queries every raw
 /// trajectory for it, deletes every existing strategy item for it,
@@ -35,10 +37,18 @@ pub fn rebuild_namespace(
     regime_key: &RegimeKey,
 ) -> Result<Vec<StrategyItem>, LearnError> {
     let trajectories = trajectory_store.query_by_regime_key(regime_key)?;
+    let existing = strategy_store.query_by_regime_key(regime_key)?;
+    let prior: HashMap<_, _> = existing.into_iter().map(|item| (item.id, (item.lifecycle, item.demotion))).collect();
     strategy_store.delete_for_regime_key(regime_key)?;
 
-    let items = distill_namespace(regime_key, &trajectories);
-    for item in &items {
+    let mut items = distill_namespace(regime_key, &trajectories);
+    for item in &mut items {
+        if let Some((lifecycle, demotion)) = prior.get(&item.id) {
+            item.lifecycle = *lifecycle;
+            item.demotion = demotion.clone();
+        } else {
+            item.lifecycle = Some(StrategyLifecycle::Quarantined);
+        }
         strategy_store.append(item)?;
     }
     Ok(items)

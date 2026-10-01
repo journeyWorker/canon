@@ -53,9 +53,12 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use canon_learn::{
-    CrnPromotionGate, LearnConfig, LearnError, OccurrencePromotionGate, ParquetStrategyStore, ParquetTrajectoryStore, Promotion,
-    PromotionDecision, PromotionMode, StrategyId, StrategyStore, TrajectoryStore, evaluate_now, plan_promotion, promote_strategy,
+    CrnPromotionGate, DemotionPolicy, LearnConfig, LearnError, OccurrencePromotionGate, ParquetStrategyStore, ParquetTrajectoryStore, Promotion,
+    PromotionApproval, PromotionDecision, PromotionEvaluation, PromotionMode, StrategyId, StrategyLifecycle, StrategyStore, TrajectoryStore,
+    demote_strategy, evaluate_now, plan_promotion, promote_strategy, promote_strategy_approved, rollback_strategy_authenticated,
 };
+use chrono::Utc;
+use serde_json::json;
 
 use crate::context::resolve_repo_root;
 
@@ -68,6 +71,17 @@ pub fn parse_strategy_id(s: &str) -> Result<StrategyId, String> {
 
 /// `canon learn promote <strategy_id> [--repo <dir>] [--dry-run]`.
 pub fn run_promote(repo: &Path, strategy_id: &StrategyId, dry_run: bool) -> ExitCode {
+    run_promote_with_evidence(repo, strategy_id, dry_run, None, None, None)
+}
+
+pub fn run_promote_with_evidence(
+    repo: &Path,
+    strategy_id: &StrategyId,
+    dry_run: bool,
+    evaluation_path: Option<&Path>,
+    approval_path: Option<&Path>,
+    signature_path: Option<&Path>,
+) -> ExitCode {
     let repo = resolve_repo_root(repo);
     let canon_yaml_text = std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default();
     // A genuinely absent `learn:` section resolves to `LearnConfig::default()`
@@ -83,6 +97,44 @@ pub fn run_promote(repo: &Path, strategy_id: &StrategyId, dry_run: bool) -> Exit
     };
 
     let strategy_store = ParquetStrategyStore::open(repo.join(&learn_config.root).join("strategies"));
+
+    let evidence = match (evaluation_path, approval_path) {
+        (None, None) => None,
+        (Some(eval), Some(approval)) => {
+            let evaluation: PromotionEvaluation = match read_json(eval) {
+                Ok(value) => value,
+                Err(error) => {
+                    eprintln!("canon learn promote: invalid evaluation: {error}");
+                    return ExitCode::from(1);
+                }
+            };
+            let mut approval: PromotionApproval = match read_json(approval) {
+                Ok(value) => value,
+                Err(error) => {
+                    eprintln!("canon learn promote: invalid approval: {error}");
+                    return ExitCode::from(1);
+                }
+            };
+            if let Some(signature) = signature_path {
+                match std::fs::read_to_string(signature) {
+                    Ok(value) => {
+                        approval.signature = Some(value);
+                        approval.signer_key.get_or_insert_with(|| approval.approver_identity.clone());
+                        approval.integrity_digest = approval.recomputed_integrity_digest();
+                    }
+                    Err(error) => {
+                        eprintln!("canon learn promote: cannot read detached signature: {error}");
+                        return ExitCode::from(1);
+                    }
+                }
+            }
+            Some((evaluation, approval))
+        }
+        _ => {
+            eprintln!("canon learn promote: --evaluation and --approval must be supplied together");
+            return ExitCode::from(1);
+        }
+    };
     let git_tier_root = repo.join(&learn_config.strategies_root);
 
     // The S7 gate runs BEFORE any write (module doc). `None` means the
@@ -97,6 +149,24 @@ pub fn run_promote(repo: &Path, strategy_id: &StrategyId, dry_run: bool) -> Exit
         }
     };
     let blocked = decision.as_ref().is_some_and(|d| !d.is_promote());
+    if blocked && !dry_run {
+        if let Ok(Some(item)) = strategy_store.find_by_id(strategy_id) {
+            if item.lifecycle == Some(StrategyLifecycle::Active) {
+                if let Ok(samples) = ParquetTrajectoryStore::open(repo.join(&learn_config.root).join("trajectories")).query_by_regime_key(&item.regime_key) {
+                    if let Some(contradiction) = samples.iter().find(|sample| {
+                        matches!(sample.verdict_record.outcome, canon_learn::VerdictOutcome::Failure | canon_learn::VerdictOutcome::RolledBack)
+                    }) {
+                        let demotion_policy = if learn_config.demotion.hard_delete { DemotionPolicy::HARD_DELETE } else { DemotionPolicy::SOFT_FLAG };
+                        if let Err(error) = demote_strategy(&strategy_store, *strategy_id, contradiction.id, &git_tier_root, demotion_policy) {
+                            eprintln!("canon learn promote: contradiction detected but demotion failed: {error}");
+                        } else {
+                            eprintln!("canon learn promote: later contradictory evidence demoted {strategy_id}");
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // A blocked NON-dry-run stops here: nothing is rendered, nothing is
     // written. A blocked dry-run still renders its preview first — the
@@ -110,6 +180,8 @@ pub fn run_promote(repo: &Path, strategy_id: &StrategyId, dry_run: bool) -> Exit
 
     let outcome = if dry_run {
         plan_promotion(&strategy_store, strategy_id, &git_tier_root)
+    } else if let Some((evaluation, approval)) = evidence.as_ref() {
+        promote_strategy_approved(&strategy_store, strategy_id, &git_tier_root, evaluation, approval)
     } else {
         promote_strategy(&strategy_store, strategy_id, &git_tier_root)
     };
@@ -132,6 +204,122 @@ pub fn run_promote(repo: &Path, strategy_id: &StrategyId, dry_run: bool) -> Exit
         }
         Err(err) => {
             eprintln!("canon learn promote: {err}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
+    let text = std::fs::read_to_string(path).map_err(|error| error.to_string())?;
+    serde_json::from_str(&text).map_err(|error| error.to_string())
+}
+
+/// Emit the exact domain-separated bytes an external SSH signer must sign.
+/// This command never reads a private key and never sets `verified`.
+pub fn run_approve(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path, principal: &str, _json_output: bool) -> ExitCode {
+    let repo = resolve_repo_root(repo);
+    let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("canon learn approve: {error}");
+            return ExitCode::from(1);
+        }
+    };
+    let store = ParquetStrategyStore::open(repo.join(&config.root).join("strategies"));
+    let Some(candidate) = (match store.find_by_id(strategy_id) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("canon learn approve: {error}");
+            return ExitCode::from(1);
+        }
+    }) else {
+        eprintln!("canon learn approve: unknown strategy {strategy_id}");
+        return ExitCode::from(1);
+    };
+    let evaluation: PromotionEvaluation = match read_json(evaluation_path) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("canon learn approve: invalid evaluation: {error}");
+            return ExitCode::from(1);
+        }
+    };
+    if let Err(error) = evaluation.validate_for(&candidate) {
+        eprintln!("canon learn approve: evaluation rejected: {error}");
+        return ExitCode::from(1);
+    }
+    let approved_at = Utc::now();
+    let payload = canon_model::approval_payload_bytes(
+        "canon-learning-approval-v1", &format!("strategy:{strategy_id}"), None,
+        &evaluation.digest(), None, &[], &[], principal, &approved_at,
+    );
+    let response = json!({
+        "schema_version": 1, "candidate_strategy_id": strategy_id.to_string(),
+        "evaluation_digest": evaluation.digest(), "approver_identity": principal,
+        "approver_role": "human", "approved_at": approved_at,
+        "namespace": "canon-learning-approval-v1", "subject": format!("strategy:{strategy_id}"),
+        "payload_hex": payload.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+        "instructions": "Sign payload_hex externally; put the armored detached signature in approval.signature, set signer_key to approver_identity, and run canon learn promote with --evaluation and --approval.",
+    });
+    println!("{}", serde_json::to_string_pretty(&response).expect("approval payload serializes"));
+    ExitCode::SUCCESS
+}
+
+pub fn run_request(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path, principal: &str, json_output: bool) -> ExitCode {
+    run_approve(repo, strategy_id, evaluation_path, principal, json_output)
+}
+
+pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: &str, contradicting: Option<&str>, signature_path: &Path, approved_at: &str) -> ExitCode {
+    let repo = resolve_repo_root(repo);
+    let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("canon learn rollback: {error}");
+            return ExitCode::from(1);
+        }
+    };
+    let store = ParquetStrategyStore::open(repo.join(&config.root).join("strategies"));
+    let contradicting = match contradicting.map(canon_learn::TrajectoryId::parse).transpose() {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("canon learn rollback: invalid contradicting trajectory id: {error}");
+            return ExitCode::from(1);
+        }
+    };
+    let trajectory_store = ParquetTrajectoryStore::open(repo.join(&config.root).join("trajectories"));
+    if let Some(id) = contradicting.as_ref() {
+        match trajectory_store.find_by_id(id) {
+            Ok(Some(_)) => {}
+            Ok(None) => {
+                eprintln!("canon learn rollback: contradicting trajectory does not exist");
+                return ExitCode::from(1);
+            }
+            Err(error) => {
+                eprintln!("canon learn rollback: cannot verify contradicting trajectory: {error}");
+                return ExitCode::from(1);
+            }
+        }
+    }
+    let signature = match std::fs::read_to_string(signature_path) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("canon learn rollback: cannot read detached signature: {error}");
+            return ExitCode::from(1);
+        }
+    };
+    let approved_at = match chrono::DateTime::parse_from_rfc3339(approved_at) {
+        Ok(value) => value.with_timezone(&Utc),
+        Err(error) => {
+            eprintln!("canon learn rollback: invalid --approved-at timestamp: {error}");
+            return ExitCode::from(1);
+        }
+    };
+    match rollback_strategy_authenticated(&store, *strategy_id, reason, actor, contradicting, &repo.join(&config.strategies_root), &signature, approved_at) {
+        Ok(record) => {
+            println!("{}", serde_json::to_string(&record).expect("rollback record serializes"));
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("canon learn rollback: {error}");
             ExitCode::from(1)
         }
     }

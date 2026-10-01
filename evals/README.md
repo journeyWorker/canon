@@ -9,19 +9,44 @@ by the caller.
 ```sh
 python3 evals/run_eval.py \
   --task-id plan-adapter-openspec-03 \
-  --agent-cmd 'codex --full-auto "Implement task plan-adapter-openspec-03; inspect the CANON_EVAL_SEED_DIR environment variable and read task.json there"' \
+  --agent-cmd 'codex --full-auto "Implement the task described by CANON_EVAL_TASK_FILE"' \
   --timeout 900 \
   --result /tmp/openspec.result.json
 ```
 
-The runner creates a detached git worktree, gives the agent a temporary seed
-directory through `CANON_EVAL_SEED_DIR`, runs the task's real grader command, and
-collects the diff, test output, evidence checks, and final gate. `--agent-cmd` is
-required for execution mode; it is parsed as an argv command rather than run
-through a shell. The command is intentionally explicit so a scoreboard can record
-which executor was used. Add `--cost-usd`, `--input-tokens`, or `--output-tokens`
-only when an external measurement exists; otherwise the corresponding result
-fields remain `null`.
+The repository-default corpus is exactly 40 tasks and is pinned by
+`evals/corpus.sha256`; another corpus is rejected unless
+`--allow-unpinned-corpus` is explicitly supplied. The runner creates the
+evaluator-owned `.canon/eval/task.json` contract and read-only
+`.canon/eval/seed/` files inside the isolated workspace. Agents receive the
+absolute `CANON_EVAL_TASK_FILE` and `CANON_EVAL_SEED_DIR` paths. The grader
+never trusts a modified contract or seed.
+
+Grading is dispatched through the pinned evaluator probes in `evals/probes/`,
+not through commands or files supplied by the task workspace. The single
+evaluation deadline covers the agent, grader, contract commands, and gate;
+stdout/stderr are streamed and capped and process groups are killed on
+deadline or overflow.
+
+## Provider-neutral adapter response evidence
+
+Adapter executions can be represented by Canon's protocol-v1 response envelope
+and checked without running the provider:
+
+```sh
+canon adapter validate --response response.json --json
+```
+
+The envelope joins a `run_id` to a `context_pack_id`, records one of
+`claude`, `codex`, `omp`, `pi`, or a lowercase extension slug, and carries
+strict capability, evidence-digest, and telemetry fields. Provider-specific
+payloads are opaque under `extensions`; validation output exposes only their
+key names. OMP and Pi fixtures are supported even when those executables are
+not installed locally. A file-only validation reports
+`context_join_verified: null`; `--repo` can verify the referenced context pack.
+This contract records declared capabilities but does not enforce them. The
+provider sandbox MUST enforce filesystem, network, and secret restrictions
+before execution.
 
 To grade a completed workspace without running an agent:
 
@@ -70,14 +95,21 @@ A task passes only when all of the following are observed:
   sidecar `.canon/evidence/**` implicitly allowed) and none matches forbidden
   paths;
 * every expected contract check passes;
-* each required evidence JSON exists and has its declared keys; and
-* final-gate evidence has `status: "pass"` and the required keys.
+* each required evidence JSON exists and is bound to the task, corpus, immutable
+  base/current commits, and observed grader-command digest; and
+* the runner-generated independent final gate has `status: "pass"`.
 
 A zero exit code from an agent is recorded as a claim, not an outcome. If it is
 followed by a failed objective grader, the result records `false_pass: true`.
-Tampered result files are rejected by integrity verification. Resource control is
-currently a wall-clock timeout plus bounded captured output; no hidden retries are
-performed.
+Tampered result files are rejected by integrity verification. The repository
+default corpus is exactly 40 unique tasks and is pinned by `evals/corpus.sha256`;
+custom corpora require explicit `--allow-unpinned-corpus`. Grading uses the
+SHA-pinned probes under `evals/probes/`, never a grader executable from the
+task workspace.
+
+The single evaluation deadline is shared by the agent, grader, contract
+commands, and gate. Stdout/stderr are streamed and capped while each process
+runs; overflow or deadline expiration kills the complete process group.
 
 ## Zero-results baseline
 

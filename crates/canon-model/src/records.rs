@@ -890,8 +890,11 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
-/// An approval attestation attached to an [`EvidenceRecord`]. The optional
-/// verification bit is persisted so later gates do not trust caller input.
+/// An approval attestation attached to an [`EvidenceRecord`].
+///
+/// `verified` is retained only as a non-authoritative display field for wire
+/// compatibility. Gate decisions MUST reverify `signature` over the canonical
+/// artifact-bound payload and MUST ignore this bit and process environment.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct EvidenceApproval {
     pub approver: String,
@@ -899,6 +902,22 @@ pub struct EvidenceApproval {
     pub at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub verified: bool,
+    /// Detached SSH signature in armored form. Missing signatures never count.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    /// Subject and artifact binding covered by the signature.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<ProjectId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_sha: Option<Sha>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<RunId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub surface: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub effects: Vec<String>,
 }
 
 /// The evidence-integrity spec's own record kind: the candidate shape
@@ -2043,6 +2062,13 @@ mod tests {
             role: RoleId::parse("human").unwrap(),
             at: record.envelope.at,
             verified: false,
+            signature: None,
+            subject: None,
+            project_id: None,
+            artifact_sha: None,
+            run_id: None,
+            surface: Vec::new(),
+            effects: Vec::new(),
         };
         let approved = record.with_approval(approval.clone());
         let approved_json = serde_json::to_value(&approved).unwrap();

@@ -79,11 +79,11 @@ pub const DEFAULT_K: usize = 5;
 /// `limit`, since demoted items must be filtered out BEFORE `k` is
 /// applied — passing `k` straight through as the store-level limit could
 /// undercount when some of the top-`k` freshest rows are demoted),
-/// EXCLUDES any [`crate::strategy::StrategyItem`] carrying
-/// `demotion.is_some()` (S7's demotion contract restated as a hard
-/// read-side requirement, design decision per the proposal's "Depends on
-/// S7's demotion contract"), then caps the result at `k` (`k: None`
-/// defaults to [`DEFAULT_K`]).
+/// EXCLUDES any [`crate::strategy::StrategyItem`] carrying a demotion or a
+/// non-active lifecycle. Legacy rows with `lifecycle: None` are active for
+/// backward compatibility; quarantined, rejected, and rolled-back rows are
+/// never served, then caps the result at `k` (`k: None` defaults to
+/// [`DEFAULT_K`]).
 ///
 /// `role` is a caller-contract check, not a second filter:
 /// `regime_key` already embeds `role` as its leading segment (S6 design

@@ -109,6 +109,12 @@ enum Command {
         #[command(subcommand)]
         action: ContextPackCommand,
     },
+    /// Validate a provider-neutral adapter response without executing a provider
+    #[command(after_help = "Examples:\n  canon adapter validate --response response.json\n  canon adapter validate --response response.json --repo . --json")]
+    Adapter {
+        #[command(subcommand)]
+        action: AdapterCommand,
+    },
     /// Register and select versioned prompt bundles
     #[command(
         disable_version_flag = true,
@@ -161,7 +167,7 @@ enum Command {
         action: GateCommand,
     },
     /// Author a staged, attributed evidence attestation for a plan task
-    #[command(after_help = "Examples:\n  canon evidence add --task my-change#3.1 --kind test-run --ref 'cargo test -p canon-cli' --role implementer\n\nThe loop:\n  canon evidence add ...    Stage an EvidenceRecord\n  canon gate promote        Commit it (assigns run_seq)\n  canon gate task <id>      Flip the checkbox on it\n\nATTESTATION, NOT PROOF — canon never runs or resolves --ref.\nSee `canon evidence add --help` for exactly what the gate does and does not check.")]
+    #[command(after_help = "Examples:\n  canon evidence add --task my-change#3.1 --kind test-run --ref 'cargo test -p canon-cli' --role implementer\n\nThe loop:\n  canon evidence add ...    Stage an EvidenceRecord\n  canon gate promote        Commit it (assigns run_seq)\n  canon gate task <id>      Flip the checkbox on it\n\nSee `canon evidence add --help` for exactly what the gate does and does not check.")]
     Evidence {
         #[command(subcommand)]
         action: EvidenceCommand,
@@ -393,6 +399,22 @@ enum ContextPackCommand {
 }
 
 #[derive(Subcommand)]
+enum AdapterCommand {
+    /// Read and validate one provider-neutral response envelope
+    Validate {
+        /// JSON response file to validate
+        #[arg(long)]
+        response: PathBuf,
+        /// Optional repo root for context-pack join verification
+        #[arg(long)]
+        repo: Option<PathBuf>,
+        /// Output the normalized core summary as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum PromptCommand {
     /// Register a prompt bundle from a repository-local JSON manifest
     Register {
@@ -431,7 +453,7 @@ enum PromptCommand {
 
 #[derive(Subcommand)]
 enum LearnCommand {
-    /// Promote a distilled strategy (by id) into .canon/strategies/
+    /// Promote a strategy after paired evaluation and signed approval
     Promote {
         /// The StrategyId (ULID) to promote
         #[arg(value_parser = canon_cli::learn::parse_strategy_id)]
@@ -439,9 +461,61 @@ enum LearnCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Evaluation bundle produced by the honest promotion adapter
+        #[arg(long)]
+        evaluation: Option<PathBuf>,
+        /// Approval JSON containing the detached SSH signature
+        #[arg(long)]
+        approval: Option<PathBuf>,
+        /// Optional detached signature file to attach to approval JSON
+        #[arg(long)]
+        signature: Option<PathBuf>,
         /// Preview without writing anything
         #[arg(long)]
         dry_run: bool,
+    },
+    /// Produce an unsigned, externally signable approval payload
+    Approve {
+        #[arg(value_parser = canon_cli::learn::parse_strategy_id)]
+        strategy_id: StrategyId,
+        #[arg(long)]
+        evaluation: PathBuf,
+        #[arg(long)]
+        principal: String,
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Alias for approve: produce an unsigned approval request payload
+    Request {
+        #[arg(value_parser = canon_cli::learn::parse_strategy_id)]
+        strategy_id: StrategyId,
+        #[arg(long)]
+        evaluation: PathBuf,
+        #[arg(long)]
+        principal: String,
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Disable an active strategy with durable rollback provenance
+    Rollback {
+        #[arg(value_parser = canon_cli::learn::parse_strategy_id)]
+        strategy_id: StrategyId,
+        #[arg(long)]
+        reason: String,
+        #[arg(long)]
+        actor: String,
+        #[arg(long)]
+        signature_file: PathBuf,
+        #[arg(long)]
+        approved_at: String,
+        #[arg(long)]
+        contradicting_trajectory_id: Option<String>,
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
     },
 }
 
@@ -486,6 +560,12 @@ enum DispatchCommand {
         /// Declared skill digest; requires --skill-id
         #[arg(long)]
         skill_digest: Option<String>,
+        /// Explicit repository-relative ContextPack input manifest
+        #[arg(long)]
+        context_manifest: Option<PathBuf>,
+        /// Registered prompt bundle to select (`name@version`)
+        #[arg(long, value_parser = canon_cli::dispatch::parse_prompt_bundle)]
+        prompt_bundle: Option<canon_cli::context_pack::PromptBundleSelection>,
         /// Plan task this run serves (<change_id>#<n>); validated against the plan corpus
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
         task: Option<TaskId>,
@@ -635,8 +715,29 @@ enum GateCommand {
 
 #[derive(Subcommand)]
 enum EvidenceCommand {
+    /// Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`
+    ApprovalPayload {
+        #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
+        task: Option<TaskId>,
+        #[arg(long, value_parser = canon_cli::review::parse_project_id)]
+        project_id: Option<ProjectId>,
+        #[arg(long, value_parser = canon_cli::review::parse_scenario_id)]
+        scenario_id: Option<ScenarioId>,
+        #[arg(long, value_parser = canon_cli::dispatch::parse_run_id)]
+        run_id: Option<RunId>,
+        #[arg(long, value_parser = canon_cli::divergence::parse_sha)]
+        artifact_sha: canon_model::Sha,
+        #[arg(long = "surface-ref", value_parser = canon_cli::evidence::parse_surface_ref)]
+        surface_ref: Vec<String>,
+        #[arg(long)]
+        approval_by: String,
+        #[arg(long)]
+        approval_at: String,
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+    },
     /// Stage one attributed EvidenceRecord for a task (commit it with `canon gate promote`)
-    #[command(after_help = "ATTESTATION, NOT PROOF. canon never runs, resolves, or checks --ref.\nThis records that a named actor, in a named role, at a stamped time, CLAIMED\nthe named evidence supports the task — the same record whether the command\npassed, failed, or was never run.\n\nAn agent that can run this command can authorize its own checkbox: there is\nno separation between the author of an attestation and its beneficiary, no\nsignature, and no second party. What you get is attribution and an auditable\ntrail, which is what a hand-flipped checkbox left none of.\n\nWhat `canon gate task <id>` then CHECKS:\n  - a non-divergent evidence record exists for that task\n  - its note passes the fabrication-marker scan (and is a single line)\n  - on the typed path, its kind/ref equals the task atom's declared contract\n  - the plan document carries an open row for the task\n\nWhat it does NOT check:\n  - whether --ref names anything real, let alone anything that ran\n  - staleness, trust-ladder, or release-trust: none of `canon gate check`'s\n    registered checks run on this path\n  - divergence: an open divergence on the surface does not block the flip\n\nPass --command-result with the real captured output to make the claim\nauditable against something concrete. It is scanned for fabrication markers\ntoo, and it is still text you supplied.\n\nLine breaks are refused in --summary and --actor-id: both are written into\nthe plan document as ONE checkbox row.")]
+    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.")]
     Add {
         /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
@@ -674,12 +775,21 @@ enum EvidenceCommand {
         /// Required: `canon gate promote` derives its run_seq partition key from it
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
-        /// Optional approval attestation id; verified only when it equals non-empty CANON_ACTOR
+        /// Human approval identity; authentication comes only from the detached signature.
         #[arg(long)]
         approval_by: Option<String>,
-        /// Optional approval role; only human is eligible for verified risk approval and it must be paired with --approval-by
+        /// Approval role; only human is eligible for risk approval.
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         approval_role: Option<RoleId>,
+        /// Armored SSH detached signature file. Canon never signs on the user's behalf.
+        #[arg(long)]
+        approval_signature_file: Option<PathBuf>,
+        /// RFC3339 timestamp included in the signed approval payload.
+        #[arg(long)]
+        approval_at: Option<String>,
+        /// Exact Git SHA bound by the evidence and any approval.
+        #[arg(long, value_parser = canon_cli::divergence::parse_sha)]
+        artifact_sha: Option<canon_model::Sha>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1109,6 +1219,9 @@ fn main() -> ExitCode {
             ContextPackCommand::Show { id, repo, json } => run_context_pack_show(&repo, &id, json),
             ContextPackCommand::Verify { id, repo, json } => run_context_pack_verify(&repo, &id, json),
         },
+        Command::Adapter { action } => match action {
+            AdapterCommand::Validate { response, repo, json } => run_adapter_validate(&response, repo.as_deref(), json),
+        },
         Command::Prompt { action } => match action {
             PromptCommand::Register { name, version, manifest, repo, json } => {
                 run_prompt_register(&repo, &name, &version, &manifest, json)
@@ -1130,6 +1243,16 @@ fn main() -> ExitCode {
             GateCommand::Selftest => ExitCode::from(canon_cli::gate::run_selftest() as u8),
         },
         Command::Evidence { action } => match action {
+            EvidenceCommand::ApprovalPayload {
+                task, project_id, scenario_id, run_id, artifact_sha, surface_ref,
+                approval_by, approval_at, repo,
+            } => ExitCode::from(canon_cli::evidence::run_approval_payload(
+                &repo,
+                &canon_cli::evidence::ApprovalPayloadArgs {
+                    task_id: task, scenario_id, project_id, run_id, artifact_sha,
+                    surface_ref, approval_by, approval_at,
+                },
+            ) as u8),
             EvidenceCommand::Add {
                 task,
                 project_id,
@@ -1145,6 +1268,9 @@ fn main() -> ExitCode {
                 role,
                 approval_by,
                 approval_role,
+                approval_signature_file,
+                approval_at,
+                artifact_sha,
                 repo,
             } => ExitCode::from(
                 canon_cli::evidence::run_add(
@@ -1164,6 +1290,9 @@ fn main() -> ExitCode {
                         role,
                         approval_by,
                         approval_role,
+                        approval_signature_file,
+                        approval_at,
+                        artifact_sha,
                     },
                 ) as u8,
             ),
@@ -1264,12 +1393,26 @@ fn main() -> ExitCode {
         Command::Dashboard { repo, snapshot, port } => run_dashboard(&repo, snapshot.as_deref(), port),
         Command::RegimeKey { role, repo, area, hash } => run_regime_key(&role, &repo, &area, &hash),
         Command::Learn { action } => match action {
-            LearnCommand::Promote { strategy_id, repo, dry_run } => canon_cli::learn::run_promote(&repo, &strategy_id, dry_run),
+            LearnCommand::Promote { strategy_id, repo, evaluation, approval, signature, dry_run } =>
+                canon_cli::learn::run_promote_with_evidence(&repo, &strategy_id, dry_run, evaluation.as_deref(), approval.as_deref(), signature.as_deref()),
+            LearnCommand::Approve { strategy_id, evaluation, principal, repo, json } =>
+                canon_cli::learn::run_approve(&repo, &strategy_id, &evaluation, &principal, json),
+            LearnCommand::Request { strategy_id, evaluation, principal, repo, json } =>
+                canon_cli::learn::run_request(&repo, &strategy_id, &evaluation, &principal, json),
+            LearnCommand::Rollback { strategy_id, reason, actor, signature_file, approved_at, contradicting_trajectory_id, repo } =>
+                canon_cli::learn::run_rollback(&repo, &strategy_id, &reason, &actor, contradicting_trajectory_id.as_deref(), &signature_file, &approved_at),
         },
         Command::Dispatch { action } => match action {
-            DispatchCommand::Begin { role, regime, agent_id, provider, model, skill_id, skill_digest, task, parent_run, repo, json } => {
+            DispatchCommand::Begin { role, regime, agent_id, provider, model, skill_id, skill_digest, context_manifest, prompt_bundle, task, parent_run, repo, json } => {
                 let binding = canon_cli::dispatch::DispatchBinding { task_id: task, parent_run_id: parent_run };
-                let metadata = canon_cli::dispatch::DispatchMetadata { provider, model, skill_id, skill_digest };
+                let metadata = canon_cli::dispatch::DispatchMetadata {
+                    provider,
+                    model,
+                    skill_id,
+                    skill_digest,
+                    context_manifest,
+                    prompt_bundle,
+                };
                 canon_cli::dispatch::run_begin(&repo, &role, &regime, &agent_id, &binding, &metadata, json)
             }
             DispatchCommand::End { run, status, repo, json } => canon_cli::dispatch::run_end(&repo, run, status, json),
@@ -1575,6 +1718,71 @@ fn context_pack_error_code(error: &canon_cli::context_pack::ContextPackError) ->
         | ContextPackError::Git(_) => 1,
     };
     ExitCode::from(code)
+}
+
+/// `canon adapter validate` is deliberately read-only: it parses one response
+/// envelope and prints a redacted summary. Provider execution and capability
+/// enforcement remain outside canon.
+fn run_adapter_validate(response: &std::path::Path, repo: Option<&std::path::Path>, json: bool) -> ExitCode {
+    let mut summary = match canon_cli::adapter::validate_response(response) {
+        Ok(summary) => summary,
+        Err(error) => {
+            eprintln!("canon adapter validate: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if let Some(repo) = repo {
+        let repo = canon_cli::context::resolve_repo_root(repo);
+        summary.context_join_verified = Some(verify_adapter_context_join(&repo, &summary));
+    }
+
+    if json {
+        match serde_json::to_string_pretty(&summary) {
+            Ok(output) => println!("{output}"),
+            Err(error) => {
+                eprintln!("canon adapter validate: cannot render summary: {error}");
+                return ExitCode::FAILURE;
+            }
+        }
+    } else {
+        println!("adapter response: valid");
+        println!("  protocol_version: {}", summary.protocol_version);
+        println!("  run_id: {}", summary.run_id);
+        println!("  provider: {}", summary.provider);
+        println!("  model: {}", summary.model);
+        println!("  context_pack_id: {}", summary.context_pack_id);
+        println!("  status: {}", format!("{:?}", summary.status).to_lowercase());
+        println!("  evidence_refs: {}", summary.evidence_count);
+        println!("  extensions: {}", if summary.extension_keys.is_empty() {
+            "(none)".to_string()
+        } else {
+            summary.extension_keys.join(", ")
+        });
+        if let Some(verified) = summary.context_join_verified {
+            println!("  context_join_verified: {verified}");
+        }
+    }
+    ExitCode::SUCCESS
+}
+
+fn verify_adapter_context_join(repo: &std::path::Path, summary: &canon_cli::adapter::ValidationSummary) -> bool {
+    if canon_cli::context_pack::verify(repo, &summary.context_pack_id).is_err() {
+        return false;
+    }
+    let Ok(outcome) = canon_cli::query::run(repo, None, RecordKind::Run, None, None, None, None) else {
+        return false;
+    };
+    outcome.records.iter().any(|record| {
+        record.0.get("run_id").and_then(serde_json::Value::as_str) == Some(summary.run_id.as_str())
+            && record
+                .0
+                .get("lineage")
+                .and_then(|lineage| lineage.get("context"))
+                .and_then(|context| context.get("pack_id"))
+                .and_then(serde_json::Value::as_str)
+                == Some(summary.context_pack_id.as_str())
+    })
 }
 
 fn run_context_pack_create(repo: &std::path::Path, manifest: &std::path::Path, json: bool) -> ExitCode {

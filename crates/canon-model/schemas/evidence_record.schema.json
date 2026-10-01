@@ -167,18 +167,74 @@
       ]
     },
     "EvidenceApproval": {
-      "description": "An approval attestation attached to an [`EvidenceRecord`]. The optional\nverification bit is persisted so later gates do not trust caller input.",
+      "description": "An approval attestation attached to an [`EvidenceRecord`].\n\n`verified` is retained only as a non-authoritative display field for wire\ncompatibility. Gate decisions MUST reverify `signature` over the canonical\nartifact-bound payload and MUST ignore this bit and process environment.",
       "type": "object",
       "properties": {
         "approver": {
           "type": "string"
         },
+        "artifact_sha": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sha"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "at": {
           "type": "string",
           "format": "date-time"
         },
+        "effects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "project_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProjectId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "role": {
           "$ref": "#/$defs/RoleId"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "signature": {
+          "description": "Detached SSH signature in armored form. Missing signatures never count.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subject": {
+          "description": "Subject and artifact binding covered by the signature.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "surface": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "verified": {
           "type": "boolean"

@@ -38,7 +38,7 @@ use canon_ingest::verdict::Polarity;
 use canon_model::ids::RegimeKey;
 
 use crate::ids::StrategyIdentity;
-use crate::strategy::StrategyItem;
+use crate::strategy::{StrategyItem, StrategyLifecycle};
 use crate::trajectory::Trajectory;
 
 /// Distills one trajectory into zero-or-more strategy items — one per
@@ -73,7 +73,8 @@ pub fn distill_trajectory(trajectory: &Trajectory) -> Vec<StrategyItem> {
             content: &content,
             source_trajectory_ids: &source_trajectory_ids,
             recorded_at: trajectory.recorded_at,
-        });
+        })
+        .with_lifecycle(StrategyLifecycle::Quarantined);
         // Two byte-identical `VerdictRow`s on one trajectory distill
         // into one strategy, not two indistinguishable copies of it:
         // under a content-derived id they share a `<id>.parquet`

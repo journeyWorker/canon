@@ -93,6 +93,32 @@ Malformed rows in those three kinds do NOT surface as
 `malformed-evidence`; they are kept off the evidence violation set on
 purpose, so enabling nothing changes no existing verdict.
 
+## Effect-aware risk approvals (`risk_tiers`)
+
+`risk_tiers` is absent by default and remains a no-op when absent. When it
+is present, `canon gate check` selects the highest-ranked configured tier
+whose current evidence binding matches a path or exact `effect:<kebab-slug>`.
+The current generation is selected deterministically; approvals from an
+older `evidence_sha`, a non-`faithful` verdict, or an unverified attestation
+never count. A required tier also fails closed when the current record has
+no usable `surface_ref`/effect binding, so a caller cannot suppress a
+configured rule by declaring a safe path.
+
+`canon evidence add --surface-ref src/auth/login.rs` (repeatable) or
+`--surface-ref effect:secret-access` persists an explicitly validated
+binding. This is still attestation input, not proof of the changed paths;
+run/diff metadata is authoritative when available, and an unavailable
+binding is a gate violation rather than a clean result.
+
+Approval identity is separate from attestation text. `--approval-by` is
+accepted as a verified approval only when it equals a non-empty
+`CANON_ACTOR` environment identity and `--approval-role human` is supplied.
+The record persists that verification bit for replay; arbitrary caller
+strings, empty identities, and `agent` roles never satisfy a risk tier.
+Malformed `risk_tiers` sections produce a stable `uncovered-cell` policy
+violation (`risk_tiers policy-invalid: ...`) instead of degrading to an
+empty clean map.
+
 ## `canon gate task <task_id> [--repo <dir>]`
 
 The evidence-gated task checkbox flip. Resolves `<task_id>`

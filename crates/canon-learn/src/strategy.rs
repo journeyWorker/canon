@@ -36,20 +36,20 @@ use crate::ids::{StrategyId, StrategyIdentity, TrajectoryId};
 pub struct DemotionEvidence {
     #[serde(flatten)]
     pub envelope: Envelope,
-    /// The `Failure`/`RolledBack`-verdict [`crate::ids::TrajectoryId`]
-    /// that contradicted this (previously-eligible-for-promotion)
-    /// strategy's regime.
     pub contradicting_trajectory_id: TrajectoryId,
-    /// Human-readable reason — mirrors the git-tier file's own
-    /// `status: demoted` front-matter `reason` field (S7 design D4);
-    /// the SAME text lands in both places.
     pub reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evaluation_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome_provenance: Option<String>,
 }
 
 impl DemotionEvidence {
     pub fn new(contradicting_trajectory_id: TrajectoryId, reason: impl Into<String>, at: DateTime<Utc>) -> Self {
         let envelope = Envelope::new(1, RecordKind::EvidenceRecord, at, Actor::new_unattributed("canon-learn::demote_strategy"));
-        Self { envelope, contradicting_trajectory_id, reason: reason.into() }
+        Self { envelope, contradicting_trajectory_id, reason: reason.into(), evaluation_digest: None, approval_digest: None, outcome_provenance: None }
     }
 
     pub fn demoted_at(&self) -> DateTime<Utc> {
@@ -57,43 +57,40 @@ impl DemotionEvidence {
     }
 }
 
-/// A distilled, non-destructively-derived strategy insight (design
-/// decision 3). Every field here is plain-`Serialize`/`Deserialize`
-/// (unlike [`crate::trajectory::Trajectory`], which carries the
-/// non-serde [`canon_ingest::verdict::VerdictRow`]) — the parquet
-/// store encodes this type's JSON form directly, no wire mirror
-/// needed.
+/// Lifecycle of a distilled strategy candidate. The field on
+/// [`StrategyItem`] is optional for wire compatibility: `None` means the
+/// pre-quarantine rows are legacy active rows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StrategyLifecycle {
+    Quarantined,
+    Active,
+    Rejected,
+    RolledBack,
+}
+
+impl StrategyLifecycle {
+    pub fn retrievable(self) -> bool {
+        matches!(self, Self::Active)
+    }
+}
+
+/// A distilled, non-destructively-derived strategy insight.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StrategyItem {
     pub id: StrategyId,
     pub regime_key: RegimeKey,
     pub role: RoleId,
-    /// Concise strategy identifier (`StrategyMemoryItem.title`'s
-    /// analog; paper §3.2 `title`, cited by the reasoning-bank-
-    /// substrate audit).
     pub title: String,
-    /// One-sentence summary (`StrategyMemoryItem.description`'s
-    /// analog).
     pub description: String,
-    /// Distilled reasoning / rationale / operational insight — the
-    /// low-level execution detail abstracted away
-    /// (`StrategyMemoryItem.content`'s analog).
     pub content: String,
-    /// Provenance: the trajectory id(s) this item was distilled from
-    /// (`StrategyMemoryItem.sourceTrajectoryIds`'s analog) — never
-    /// empty; a strategy item that cites no source trajectory has no
-    /// audit trail (design decision 3's "audit trail of what the
-    /// distiller believed at time T").
     pub source_trajectory_ids: Vec<TrajectoryId>,
     pub recorded_at: DateTime<Utc>,
-    /// `None` while active; `Some(_)` once [`crate::promotion::
-    /// demote_strategy`] soft-flags this item after a contradicting
-    /// trajectory arrives (S7 design D4) — presence alone IS "demoted",
-    /// no separate status enum duplicating the same state.
-    /// `#[serde(default)]` is load-bearing: a pre-S7 row with no
-    /// `demotion` key at all deserializes as `None`, the same
-    /// backward-compat contract [`crate::trajectory::Trajectory::
-    /// verdict_record`] uses for pre-S7 rows.
+    /// `None` is a legacy active row. New distillation starts in
+    /// `quarantined` and only the approved writer can set `active`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lifecycle: Option<StrategyLifecycle>,
+    /// Durable contradiction evidence. Presence excludes retrieval.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub demotion: Option<DemotionEvidence>,
 }
@@ -119,8 +116,18 @@ impl StrategyItem {
             content: content.into(),
             source_trajectory_ids,
             recorded_at,
+            lifecycle: None,
             demotion: None,
         }
+    }
+
+    pub fn with_lifecycle(mut self, lifecycle: StrategyLifecycle) -> Self {
+        self.lifecycle = Some(lifecycle);
+        self
+    }
+
+    pub fn is_retrievable(&self) -> bool {
+        self.demotion.is_none() && self.lifecycle.map_or(true, StrategyLifecycle::retrievable)
     }
 
     /// Constructs a distilled item whose `id` is DERIVED from the rest
@@ -147,6 +154,7 @@ impl StrategyItem {
             content: identity.content.to_string(),
             source_trajectory_ids: identity.source_trajectory_ids.to_vec(),
             recorded_at: identity.recorded_at,
+            lifecycle: None,
             demotion: None,
         }
     }
@@ -225,6 +233,35 @@ mod tests {
         let back: StrategyItem = serde_json::from_str(&json).unwrap();
         assert_eq!(back, item);
         assert_eq!(back.demotion.unwrap().reason, "contradicting failure");
+    }
+
+    #[test]
+    fn lifecycle_round_trips_and_legacy_rows_are_active() {
+        let item = StrategyItem::new(
+            StrategyId::new(),
+            regime(),
+            RoleId::parse("dev").unwrap(),
+            "title",
+            "description",
+            "content",
+            vec![TrajectoryId::new()],
+            Utc::now(),
+        )
+        .with_lifecycle(StrategyLifecycle::Quarantined);
+        let back: StrategyItem = serde_json::from_str(&serde_json::to_string(&item).unwrap()).unwrap();
+        assert_eq!(back.lifecycle, Some(StrategyLifecycle::Quarantined));
+        assert!(!back.is_retrievable());
+        let legacy = StrategyItem::new(
+            StrategyId::new(),
+            regime(),
+            RoleId::parse("dev").unwrap(),
+            "title",
+            "description",
+            "content",
+            vec![TrajectoryId::new()],
+            Utc::now(),
+        );
+        assert!(legacy.is_retrievable());
     }
 
     #[test]

@@ -37,13 +37,16 @@
 //!   reviewer or a later reader can go check. Before this module the same
 //!   flips happened by hand, leaving nothing at all. That is the whole
 //!   delta, and it is worth having; it is not proof.
-//! - A risk approval is a separate attestation. `--approval-by` is only
-//!   counted when it equals the non-empty `CANON_ACTOR` trusted identity and
-//!   `--approval-role human`; the persisted `verified` bit is what a later
-//!   gate reads. Caller text, agent roles, and empty identities never count.
-//! - `--surface-ref` records an explicitly validated path or `effect:<slug>`
-//!   binding. It remains attestation input, not proof of changed paths; a
-//!   configured risk tier fails closed when the current record cannot bind it.
+//! - A risk approval is a separate authenticated attestation. `--approval-by`
+//!   identifies the signer for the policy's allowed-signers file; the gate
+//!   counts it only after `ssh-keygen -Y verify` succeeds over a deterministic
+//!   `canon-approval-v1` payload bound to subject, project, artifact SHA, run,
+//!   normalized surface/effects, actor, and timestamp. `CANON_ACTOR` and the
+//!   persisted `verified` display bit are never authentication.
+//! - `--surface-ref` records an explicitly bound path or `effect:<slug>`.
+//!   Risk approvals additionally require `--artifact-sha`, `--approval-at`,
+//!   and an externally produced `--approval-signature-file`; canon never signs
+//!   or reads private keys.
 //!
 //! Making the underlying evidence verifiable is a DIFFERENT change: canon
 //! would have to capture evidence through an execution path it controls (a
@@ -177,14 +180,14 @@
 //! grade matches what `canon gate task` returns for the SAME condition,
 //! so the operator sees one verdict, earlier.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use canon_gate::{scan_fake_markers, EvidenceNote, GateCtx};
+use canon_gate::{verify_risk_approval, scan_fake_markers, EvidenceNote, GateCtx};
 use canon_ingest::task_rows::first_row_line_break;
-use canon_model::{Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, RunId, ScenarioId, TaskId};
+use canon_model::{approval_payload_bytes, Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, RunId, ScenarioId, Sha, TaskId, APPROVAL_NAMESPACE};
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 
 use crate::context::resolve_repo_root;
 use crate::gate::{evidence_staging_dir, typed_evidence_contract_for_task};
@@ -224,6 +227,13 @@ pub fn parse_surface_ref(s: &str) -> Result<String, String> {
         return Err("path surface refs must be repository-relative and stay inside the repository".to_string());
     }
     Ok(s.to_string())
+}
+
+fn normalized_strings(values: &[String]) -> Vec<String> {
+    let mut values = values.to_vec();
+    values.sort_unstable();
+    values.dedup();
+    values
 }
 
 /// One `canon evidence add` invocation's already-parsed flags.
@@ -290,10 +300,80 @@ pub struct EvidenceArgs {
     /// `run_seq` partition key from `actor.role`, and refuses a record
     /// that carries none.
     pub role: RoleId,
-    /// Optional accountable approval attestation; must be supplied as a
-    /// complete `--approval-by`/`--approval-role` pair.
+    /// Optional authenticated approval. A complete approval additionally
+    /// requires a detached SSH signature and exact artifact SHA binding.
     pub approval_by: Option<String>,
     pub approval_role: Option<RoleId>,
+    pub approval_signature_file: Option<PathBuf>,
+    /// RFC3339 timestamp covered by the external signature.
+    pub approval_at: Option<String>,
+    /// Exact Git artifact SHA bound by an approval and persisted on the record.
+    pub artifact_sha: Option<Sha>,
+}
+
+/// Inputs shared by payload export and authenticated evidence staging.
+pub struct ApprovalPayloadArgs {
+    pub task_id: Option<TaskId>,
+    pub scenario_id: Option<ScenarioId>,
+    pub project_id: Option<ProjectId>,
+    pub run_id: Option<RunId>,
+    pub artifact_sha: Sha,
+    pub surface_ref: Vec<String>,
+    pub approval_by: String,
+    pub approval_at: String,
+}
+
+fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<(Vec<u8>, Vec<String>, Vec<String>), String> {
+    let subject = args.task_id.as_ref().map(ToString::to_string)
+        .or_else(|| args.scenario_id.as_ref().map(ToString::to_string))
+        .ok_or("give --task or --scenario-id")?;
+    if args.scenario_id.is_some() && args.project_id.is_none() {
+        return Err("--scenario-id requires --project-id".into());
+    }
+    if args.approval_by.is_empty() || args.approval_by.trim() != args.approval_by
+        || first_row_line_break(&args.approval_by).is_some() {
+        return Err("--approval-by must be a non-empty trimmed single-line identity".into());
+    }
+    let at = args.approval_at.parse::<DateTime<Utc>>()
+        .map_err(|_| "--approval-at must be an RFC3339 timestamp")?;
+    if let Some(task) = &args.task_id {
+        crate::dispatch::validate_task_binding(repo, task).map_err(|error| error.to_string())?;
+    }
+    let mut surface = canon_gate::risk::artifact_changed_paths(repo, &args.artifact_sha)?;
+    for value in &args.surface_ref {
+        parse_surface_ref(value)?;
+        if value.starts_with("effect:") {
+            surface.push(value.clone());
+        }
+    }
+    let surface = normalized_strings(&surface);
+    let effects = normalized_strings(&surface.iter().filter_map(|value| value.strip_prefix("effect:").map(str::to_string)).collect::<Vec<_>>());
+    let payload = approval_payload_bytes(
+        APPROVAL_NAMESPACE, &subject,
+        args.project_id.as_ref().map(ToString::to_string).as_deref(),
+        &args.artifact_sha.to_string(),
+        args.run_id.as_ref().map(ToString::to_string).as_deref(),
+        &surface, &effects, &args.approval_by, &at,
+    );
+    Ok((payload, surface, effects))
+}
+
+/// Emit only the exact signable bytes to stdout; never stage or sign.
+pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> i32 {
+    use std::io::Write;
+    match approval_binding(&resolve_repo_root(repo), args) {
+        Ok((payload, _, _)) => match std::io::stdout().lock().write_all(&payload) {
+            Ok(()) => 0,
+            Err(error) => {
+                eprintln!("canon evidence approval-payload: {error}");
+                2
+            }
+        },
+        Err(error) => {
+            eprintln!("canon evidence approval-payload: refused — {error}");
+            2
+        }
+    }
 }
 
 /// `canon evidence add` (module doc). Returns the process exit code.
@@ -327,34 +407,38 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             return 2;
         }
     }
-    match (&args.approval_by, &args.approval_role) {
-        (Some(_), None) | (None, Some(_)) => {
-            eprintln!("canon evidence add: refused — --approval-by and --approval-role must be supplied together");
+    let approval_requested = args.approval_by.is_some()
+        || args.approval_role.is_some()
+        || args.approval_signature_file.is_some()
+        || args.approval_at.is_some();
+    if approval_requested {
+        if args.approval_by.is_none()
+            || args.approval_role.is_none()
+            || args.approval_signature_file.is_none()
+            || args.approval_at.is_none()
+            || args.artifact_sha.is_none()
+        {
+            eprintln!("canon evidence add: refused — authenticated approval requires --approval-by, --approval-role human, --approval-signature-file, --approval-at, and --artifact-sha");
             return 2;
         }
-        (Some(approver), Some(_role)) if approver.trim().is_empty() => {
-            eprintln!("canon evidence add: refused — --approval-by must be non-empty");
+        let approver = args.approval_by.as_deref().unwrap_or_default();
+        if approver.trim().is_empty() || approver.trim() != approver || approver.chars().any(|ch| matches!(ch, '\n' | '\r')) {
+            eprintln!("canon evidence add: refused — approval identity must be a non-empty trimmed single-line value");
             return 2;
         }
-        (Some(approver), Some(role)) if role.as_str() != "human" => {
-            eprintln!("canon evidence add: refused — only the human approval role can be verified; agent and empty roles never satisfy risk approval");
+        if args.approval_role.as_ref().map_or(true, |role| role.as_str() != "human") {
+            eprintln!("canon evidence add: refused — only the human approval role can satisfy risk approval");
             return 2;
         }
-        (Some(approver), Some(_)) => {
-            let Some(trusted_actor) = std::env::var("CANON_ACTOR").ok().filter(|actor| !actor.trim().is_empty()) else {
-                eprintln!("canon evidence add: refused — --approval-by requires a non-empty CANON_ACTOR trusted identity; caller input alone is only an attestation");
-                return 2;
-            };
-            if approver.chars().any(|ch| matches!(ch, '\n' | '\r')) || trusted_actor.chars().any(|ch| matches!(ch, '\n' | '\r')) || trusted_actor.trim() != trusted_actor {
-                eprintln!("canon evidence add: refused — verified approval identities must be single-line, trimmed values");
-                return 2;
-            }
-            if approver != &trusted_actor {
-                eprintln!("canon evidence add: refused — --approval-by must equal the verified CANON_ACTOR identity; caller input alone is not authenticated");
-                return 2;
-            }
+        if args.approval_at.as_deref().and_then(|value| value.parse::<DateTime<Utc>>().ok()).is_none() {
+            eprintln!("canon evidence add: refused — --approval-at must be an RFC3339 timestamp");
+            return 2;
         }
-        (None, None) => {}
+        let signature_path = args.approval_signature_file.as_ref().unwrap();
+        if !signature_path.is_file() {
+            eprintln!("canon evidence add: refused — detached signature file does not exist: {}", signature_path.display());
+            return 2;
+        }
     }
     if args.summary.is_none() && args.command_result.is_some() {
         eprintln!(
@@ -464,26 +548,89 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         }
     }
 
+    let at = Utc::now();
     let mut record = EvidenceRecord::new(
-        Envelope::current(RecordKind::EvidenceRecord, Utc::now(), Actor::new(args.actor_id.as_str(), args.role.clone())),
+        Envelope::current(RecordKind::EvidenceRecord, at, Actor::new(args.actor_id.as_str(), args.role.clone())),
         args.task_id.clone(),
         args.scenario_id.clone(),
         args.run_id.clone(),
         args.verdict,
     );
-    if let (Some(approver), Some(role)) = (&args.approval_by, &args.approval_role) {
-        record = record.with_approval(EvidenceApproval {
-            approver: approver.clone(),
-            role: role.clone(),
-            at: Utc::now(),
-            verified: true,
-        });
-    }
     if !args.surface_ref.is_empty() {
-        record = record.with_surface_ref(args.surface_ref.clone());
+        record = record.with_surface_ref(normalized_strings(&args.surface_ref));
     }
     if let Some(project_id) = &args.project_id {
         record = record.with_project_id(project_id.clone());
+    }
+    if let Some(artifact_sha) = &args.artifact_sha {
+        record = record.with_evidence_sha(artifact_sha.clone());
+    }
+    if approval_requested {
+        let approver = args.approval_by.as_ref().unwrap();
+        let role = args.approval_role.as_ref().unwrap();
+        let approval_at = args.approval_at.as_ref().unwrap().parse::<DateTime<Utc>>().unwrap();
+        let artifact_sha = args.artifact_sha.as_ref().unwrap();
+        let subject = args.task_id.as_ref().map(ToString::to_string).or_else(|| args.scenario_id.as_ref().map(ToString::to_string)).unwrap();
+        let (payload, surface, effects) = match approval_binding(&repo, &ApprovalPayloadArgs {
+            task_id: args.task_id.clone(),
+            scenario_id: args.scenario_id.clone(),
+            project_id: args.project_id.clone(),
+            run_id: args.run_id.clone(),
+            artifact_sha: artifact_sha.clone(),
+            surface_ref: args.surface_ref.clone(),
+            approval_by: approver.clone(),
+            approval_at: args.approval_at.clone().unwrap(),
+        }) {
+            Ok(binding) => binding,
+            Err(error) => {
+                eprintln!("canon evidence add: refused — {error}");
+                return 2;
+            }
+        };
+        record = record.with_surface_ref(surface.clone());
+        let signature_path = args.approval_signature_file.as_ref().unwrap();
+        let signature = match std::fs::read(signature_path) {
+            Ok(signature) => signature,
+            Err(error) => {
+                eprintln!("canon evidence add: refused — read detached signature: {error}");
+                return 2;
+            }
+        };
+        let allowed_signers = match canon_gate::policy::allowed_signers_path(&repo) {
+            Ok(Some(path)) => path,
+            Ok(None) => {
+                eprintln!("canon evidence add: refused — no policy-pinned allowed_signers verifier is configured");
+                return 2;
+            }
+            Err(error) => {
+                eprintln!("canon evidence add: refused — approval policy is malformed: {error}");
+                return 2;
+            }
+        };
+        if let Err(error) = verify_risk_approval(&payload, &signature, approver, &allowed_signers) {
+            eprintln!("canon evidence add: refused — {error}");
+            return 1;
+        }
+        let signature = match String::from_utf8(signature) {
+            Ok(signature) => signature,
+            Err(_) => {
+                eprintln!("canon evidence add: refused — detached signature must be UTF-8 armored SSH signature text");
+                return 2;
+            }
+        };
+        record = record.with_approval(EvidenceApproval {
+            approver: approver.clone(),
+            role: role.clone(),
+            at: approval_at,
+            verified: false,
+            signature: Some(signature),
+            subject: Some(subject),
+            project_id: args.project_id.clone(),
+            artifact_sha: Some(artifact_sha.clone()),
+            run_id: args.run_id.clone(),
+            surface,
+            effects,
+        });
     }
 
     // `serde_json::to_value` on a record canon just constructed, and
@@ -594,6 +741,9 @@ mod tests {
             role: RoleId::parse("implementer").expect("a literal role"),
             approval_by: None,
             approval_role: None,
+            approval_signature_file: None,
+            approval_at: None,
+            artifact_sha: None,
         }
     }
 

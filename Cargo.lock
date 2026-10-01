@@ -584,6 +584,7 @@ name = "canon-learn"
 version = "0.7.0"
 dependencies = [
  "arrow",
+ "canon-gate",
  "canon-ingest",
  "canon-model",
  "chrono",

@@ -116,3 +116,37 @@ These kinds are not lost: read them with `canon query --kind <kind>`.
 The gap is named loud, not under-counted — when any routed kind isn't
 report-readable, `canon report` renders a `## Kinds not read directly`
 section listing them and emits a matching stderr `WARN`.
+
+## Retention, export, and access audit
+
+`canon purge --kind <kind> --before <RFC3339> [--repo <dir>] [--dry-run] [--json]`
+is the canonical data-lifecycle boundary. The only purgeable kinds are
+`session`, `run`, `event`, and `trajectory`; the cutoff applies to every
+routed rung and every configured aging destination, including retained
+historical versions. For `trajectory`, the command also purges the
+operator-local Parquet learn store under `learn.root` in `canon.yaml`;
+an unavailable configured learn root is an explicit error, never a
+successful zero-row purge. The operation is idempotent. Apply mode
+preflights all attached destinations before the first delete, but storage
+backends are not one transaction: a failure after a prior delete returns
+an explicit `partial` result with matched/deleted counts and a nonzero
+status. Purge never rewrites Git history or deletes source transcript
+files.
+
+`canon export --kind <kind> [--before <RFC3339>] [--after <RFC3339>]
+[--out <file>] [--json]` emits a versioned manifest containing source scope,
+counts, digests, and redacted metadata. It does not authorize backend access;
+credentials remain an operator prerequisite. New output files are mode
+`0600`. Raw event detail text is excluded unless `--include-sensitive` is
+passed and `.canon/policy.yaml` explicitly contains:
+
+```yaml
+query:
+  allow_sensitive: true
+```
+
+Every query, export, and purge appends an actor-stamped record to
+`.canon/audit/access.jsonl` (mode `0600` on creation). `CANON_ACTOR` takes
+precedence over the OS username. Audit rows contain operation, kind, scope,
+sensitive flag, counts, and timestamp only—never query text, secrets, or
+record bodies.

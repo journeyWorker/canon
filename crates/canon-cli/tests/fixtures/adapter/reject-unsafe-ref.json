@@ -1,0 +1,12 @@
+{
+  "protocol_version": 1,
+  "run_id": "run-bad",
+  "provider": "claude",
+  "model": "model",
+  "context_pack_id": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "status": "succeeded",
+  "capabilities": {"filesystem": "read-only", "network": "none", "secrets": "none"},
+  "evidence_refs": [{"kind": "test-run", "ref": "../secret.json", "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}],
+  "telemetry": {"started_at": "2026-01-01T00:00:00Z", "ended_at": "2026-01-01T00:01:00Z", "tool_calls": null, "retries": null, "tokens": null, "cost_usd": null},
+  "extensions": {}
+}

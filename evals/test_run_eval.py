@@ -38,10 +38,10 @@ def task_for(root: pathlib.Path) -> dict:
 
 
 class CorpusTests(unittest.TestCase):
-    def test_corpus_has_distinct_real_tasks_and_required_categories(self) -> None:
+    def test_corpus_is_exactly_pinned_and_has_required_categories(self) -> None:
         tasks = RUNNER.load_tasks(HERE / "tasks.json")
-        self.assertGreaterEqual(len(tasks), 30)
-        self.assertEqual(len({tuple(task["allowed_diff_paths"]) for task in tasks.values()}), len(tasks))
+        self.assertEqual(len(tasks), 40)
+        self.assertEqual(len({tuple(task["allowed_diff_paths"]) for task in tasks.values()}), 40)
         categories = {task["category"] for task in tasks.values()}
         for category in ("doc-schema-conflict", "plan-adapter", "stale-evidence-refusal", "env-diagnosis", "generated-output", "provider-projection", "run-lineage", "unsafe-approval"):
             self.assertIn(category, categories)
@@ -81,12 +81,18 @@ class GraderContractTests(unittest.TestCase):
             with self.assertRaises(RUNNER.EvalError):
                 RUNNER.verify_payload(RUNNER.load_json(path))
 
-    def test_scoreboard_keeps_unknown_metrics_null_and_has_provenance(self) -> None:
-        item = RUNNER.finalize({"schema_version": 1, "task_id": "x", "outcome": {"passed": True, "false_pass": False}, "metrics": {"latency_ms": None, "cost_usd": None}, "integrity": {"schema_version": 1}})
-        score = RUNNER.scoreboard([item], [item])
+    def test_scoreboard_requires_pinned_task_sets_and_keeps_unknown_metrics_null(self) -> None:
+        tasks = RUNNER.load_tasks(HERE / "tasks.json")
+        corpus_hash = RUNNER.corpus_digest(HERE / "tasks.json")
+        def result(task_id: str) -> dict:
+            task = tasks[task_id]
+            return RUNNER.finalize({"schema_version": RUNNER.SCHEMA_VERSION, "task_id": task_id, "provenance": {"corpus_digest": corpus_hash, "task_digest": RUNNER.digest(task), "base_commit": "base", "current_commit": "current"}, "outcome": {"passed": True, "false_pass": False}, "metrics": {"latency_ms": None, "cost_usd": None}, "integrity": {"schema_version": RUNNER.SCHEMA_VERSION}})
+        baseline = [result(task_id) for task_id in tasks]
+        candidate = [result(task_id) for task_id in tasks]
+        score = RUNNER.scoreboard(baseline, candidate, tasks, corpus_hash)
         self.assertEqual(score["baseline"]["success_at_1"], 1.0)
         self.assertIsNone(score["candidate"]["latency_ms"])
-        self.assertEqual(score["provenance"]["baseline_result_digests"], [item["integrity"]["sha256"]])
+        self.assertEqual(len(score["rows"]), 40)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@
 //! easy-to-forget CI step.
 
 pub mod envelope;
+pub mod approval;
 pub mod evidence;
 pub mod family;
 pub mod fold;
@@ -28,6 +29,7 @@ pub mod schema_export;
 pub mod trust;
 
 pub use envelope::{Actor, CanonRecord, Envelope, RecordKind};
+pub use approval::{approval_payload_bytes, APPROVAL_NAMESPACE};
 pub use evidence::{EvidenceViolation, FailureClass, RawRecord, validate_evidence, validate_evidence_batch};
 pub use fold::{BindingSnapshot, FoldedState, fold_to_current_state};
 pub use handoff::{DomainId, GihoekTemplate, Handoff, HandoffBody, HandoffState, HandoffTemplate, TemplateRegistry};

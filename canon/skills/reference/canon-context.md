@@ -38,6 +38,32 @@ nonzero when the pack is missing, stale, or tampered. Manifest paths must be
 relative to the resolved repo, remain inside it, and contain no symlink;
 missing or unsafe paths are rejected by the context-pack module.
 
+## Provider-neutral adapter responses
+
+An execution provider may return a versioned response envelope for Canon to
+validate. Validation is read-only: `canon` never starts a provider, interprets
+provider-specific extension payloads, or enforces declared capabilities.
+
+```bash
+canon adapter validate --response response.json
+canon adapter validate --response response.json --repo . --json
+```
+
+The envelope has `protocol_version: 1`, required `run_id`, `provider`,
+`model`, and `context_pack_id`, a closed status vocabulary
+(`succeeded`/`failed`/`aborted`), and strict filesystem/network/secrets
+capability vocabularies. Evidence references are safe, relative references
+with `sha256:<64-hex>` digests. Telemetry timestamps must be RFC3339 with
+`ended_at >= started_at`, and counts/cost are nonnegative.
+
+Core fields are closed and unknown fields are rejected. Provider-specific JSON
+belongs only under opaque `extensions`; successful JSON output contains the
+normalized core summary and extension key names, never extension payloads.
+`--repo` can verify the referenced context pack; file-only validation reports
+`context_join_verified: null`. A valid declaration is not a sandbox:
+providers MUST enforce filesystem, network, and secret capabilities before
+execution.
+
 Version prompt inputs separately when several runs should share the same
 prompt files:
 

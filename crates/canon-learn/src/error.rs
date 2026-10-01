@@ -95,6 +95,11 @@ pub enum LearnError {
     #[error("demote_strategy: no stored strategy matches id {0:?}")]
     UnknownStrategyId(String),
 
+    #[error("strategy promotion requires a valid paired evaluation and verified human approval")]
+    PromotionApprovalRequired,
+
+    #[error("promotion evidence invalid: {0}")]
+    InvalidPromotionEvidence(String),
     /// `mark_trajectory_verdict` was called with `VerdictOutcome::
     /// Pending` — `Pending` is only the trajectory's unset default,
     /// never a value a covering-verdict write may set (S7 design D2:

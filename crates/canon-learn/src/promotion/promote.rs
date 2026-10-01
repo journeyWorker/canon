@@ -30,8 +30,9 @@ use serde::Serialize;
 use crate::error::LearnError;
 use crate::ids::StrategyId;
 use crate::store::StrategyStore;
-use crate::strategy::StrategyItem;
+use crate::strategy::{StrategyItem, StrategyLifecycle};
 
+use super::evaluation::{PromotionApproval, PromotionEvaluation};
 use super::git_tier_path;
 
 /// A content longer than this (chars) trips [`lint_strategy`]'s
@@ -95,11 +96,19 @@ struct FrontMatter {
     description: String,
     source_trajectory_ids: Vec<String>,
     recorded_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    evaluation_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    approval_digest: Option<String>,
 }
 
 /// Renders `item` into its full git-tier file content: `---\n<yaml>---\n
 /// <content>\n`, byte-compatible with [`demote::split_front_matter`].
-fn render_strategy_file(item: &StrategyItem) -> Result<String, LearnError> {
+fn render_strategy_file(
+    item: &StrategyItem,
+    evaluation_digest: Option<String>,
+    approval_digest: Option<String>,
+) -> Result<String, LearnError> {
     let front = FrontMatter {
         status: "active",
         id: item.id.to_string(),
@@ -109,6 +118,8 @@ fn render_strategy_file(item: &StrategyItem) -> Result<String, LearnError> {
         description: item.description.clone(),
         source_trajectory_ids: item.source_trajectory_ids.iter().map(ToString::to_string).collect(),
         recorded_at: item.recorded_at.to_rfc3339(),
+        evaluation_digest,
+        approval_digest,
     };
     let yaml = serde_yaml::to_string(&front).map_err(|e| LearnError::MalformedRow(e.to_string()))?;
     Ok(format!("---\n{yaml}---\n{}\n", item.content))
@@ -122,7 +133,7 @@ fn render_strategy_file(item: &StrategyItem) -> Result<String, LearnError> {
 pub fn plan_promotion(strategy_store: &dyn StrategyStore, strategy_id: &StrategyId, git_tier_root: &Path) -> Result<Promotion, LearnError> {
     let item = strategy_store.find_by_id(strategy_id)?.ok_or_else(|| LearnError::UnknownStrategyId(strategy_id.to_string()))?;
     let path = git_tier_path(git_tier_root, item.role.as_str(), item.id);
-    let rendered = render_strategy_file(&item)?;
+    let rendered = render_strategy_file(&item, None, None)?;
     Ok(Promotion { path, warnings: lint_strategy(&item), rendered })
 }
 
@@ -132,12 +143,63 @@ pub fn plan_promotion(strategy_store: &dyn StrategyStore, strategy_id: &Strategy
 /// rendered content). Idempotent by content — re-promoting an
 /// unchanged strategy rewrites the byte-identical file.
 pub fn promote_strategy(strategy_store: &dyn StrategyStore, strategy_id: &StrategyId, git_tier_root: &Path) -> Result<Promotion, LearnError> {
+    let Some(item) = strategy_store.find_by_id(strategy_id)? else {
+        return Err(LearnError::UnknownStrategyId(strategy_id.to_string()));
+    };
+    // This public writer is intentionally only a re-render operation for an
+    // already active item.  Quarantined, rejected, rolled-back, and legacy
+    // rows all require the explicit evaluation + approval activation boundary.
+    if item.lifecycle != Some(StrategyLifecycle::Active) || item.demotion.is_some() {
+        return Err(LearnError::PromotionApprovalRequired);
+    }
     let promotion = plan_promotion(strategy_store, strategy_id, git_tier_root)?;
     if let Some(parent) = promotion.path.parent() {
         fs::create_dir_all(parent)?;
     }
     fs::write(&promotion.path, &promotion.rendered)?;
     Ok(promotion)
+}
+
+/// Validated activation boundary for quarantined candidates.
+pub fn promote_strategy_approved(
+    strategy_store: &dyn StrategyStore,
+    strategy_id: &StrategyId,
+    git_tier_root: &Path,
+    evaluation: &PromotionEvaluation,
+    approval: &PromotionApproval,
+) -> Result<Promotion, LearnError> {
+    let item = strategy_store.find_by_id(strategy_id)?.ok_or_else(|| LearnError::UnknownStrategyId(strategy_id.to_string()))?;
+    if item.lifecycle != Some(StrategyLifecycle::Quarantined) || item.demotion.is_some() {
+        return Err(LearnError::PromotionApprovalRequired);
+    }
+    evaluation.validate_for(&item).map_err(LearnError::InvalidPromotionEvidence)?;
+    let repo_root = git_tier_root.parent().and_then(Path::parent).unwrap_or(git_tier_root);
+    let allowed_signers = canon_gate::policy::allowed_signers_path(repo_root)
+        .map_err(LearnError::InvalidPromotionEvidence)?
+        .ok_or_else(|| LearnError::InvalidPromotionEvidence("no policy-pinned approval.allowed_signers verifier is configured".into()))?;
+    approval.verify_signature(&item, &allowed_signers).map_err(LearnError::InvalidPromotionEvidence)?;
+    approval.validate_for(&item, evaluation).map_err(LearnError::InvalidPromotionEvidence)?;
+    let path = git_tier_path(git_tier_root, item.role.as_str(), item.id);
+    if path.exists() {
+        return Err(LearnError::InvalidPromotionEvidence("activation target already exists; rollback or remove the stale target before activation".into()));
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    // Write the target atomically before changing the durable lifecycle.  A
+    // failed rename/write leaves the candidate quarantined and unreachable.
+    let rendered = render_strategy_file(&item, Some(evaluation.digest()), Some(approval.integrity_digest.clone()))?;
+    let temporary = path.with_extension("md.activation");
+    fs::write(&temporary, &rendered)?;
+    if let Err(error) = fs::rename(&temporary, &path) {
+        let _ = fs::remove_file(&temporary);
+        return Err(error.into());
+    }
+    if let Err(error) = strategy_store.set_lifecycle(strategy_id, StrategyLifecycle::Active) {
+        let _ = fs::remove_file(&path);
+        return Err(error);
+    }
+    Ok(Promotion { path, warnings: lint_strategy(&item), rendered })
 }
 
 #[cfg(test)]

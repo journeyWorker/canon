@@ -43,6 +43,7 @@
 //! the five migrated fields and stays a raw-JSON companion read
 //! (`trust`'s own module doc).
 
+pub mod approval;
 pub mod checkbox;
 pub mod context;
 pub mod coverage;
@@ -62,15 +63,16 @@ pub mod trust;
 pub mod trust_ladder;
 
 pub use checkbox::{gate_task, TaskFlipDecision};
+pub use approval::{verify_risk_approval, verify_ssh_signature};
 pub use context::{GateCheck, GateContext, GateContextError, GateCtx};
 pub use coverage::CoverageCheck;
-pub use risk::RiskApprovalCheck;
+pub use risk::{artifact_changed_paths, RiskApprovalCheck};
 pub use dispatch::check_set;
 pub use failure_class::{FailureClass, Violation, FAILURE_CLASSES};
 pub use hooks::{install_hooks, HookEntry, InstallOutcome, PRE_COMMIT_SCRIPT};
 pub use ledger::{latest_verdicts, CellKey, LedgerCheck, LedgerEntry};
 pub use markers::{evidence_note_of, scan_fake_markers, EvidenceNote, FABRICATION_BLOCKLIST};
-pub use policy::{FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError, RiskTierRule, SpecCoverage, StalenessPolicy};
+pub use policy::{allowed_signers_path, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError, RiskTierRule, SpecCoverage, StalenessPolicy};
 pub use promote::{
     commit_divergence, divergence_staging_dir, promote, promote_divergence, stage_divergence, DivergenceCandidate, Promoted, PromoteReport, Refused, RunSeqAssignment,
     StagedAssignment, StagedKind, STAGED_KINDS,

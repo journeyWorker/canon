@@ -26,14 +26,17 @@ use crate::trajectory::Trajectory;
 
 pub mod crn;
 pub mod demote;
+pub mod evaluation;
 pub mod occurrence;
 pub mod promote;
+pub mod rollback;
 
 pub use crn::CrnPromotionGate;
 pub use demote::{DemotionPolicy, demote_strategy};
+pub use promote::{plan_promotion, promote_strategy, promote_strategy_approved, Promotion};
+pub use evaluation::{strategy_digest, PromotionApproval, PromotionEvaluation};
 pub use occurrence::OccurrencePromotionGate;
-pub use promote::{plan_promotion, promote_strategy, Promotion};
-
+pub use rollback::{rollback_strategy, rollback_strategy_authenticated, RollbackRecord};
 /// The git-tier file path for a promoted/demoted strategy:
 /// `<git_tier_root>/<role>/<strategy_id>.md` (S6 design decision 4).
 /// Shared by [`promote::promote_strategy`] (which writes it) and
