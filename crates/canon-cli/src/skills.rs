@@ -1,20 +1,10 @@
-//! `canon skills install`: materializes `canon/skills/<name>/SKILL.md` (the
-//! single source of truth, design decision 9) into a consumer repo's
-//! `.claude/skills/<name>/SKILL.md` (verbatim copy) and `.codex/skills/
-//! <name>.md` (canon's own flattened convention, design D4) — gemini is
-//! never touched (decision 11).
+//! Canon skill bundle materialization.
 //!
-//! The install is deterministic and timestamp-free: `canon/skills/
-//! .install-lock.json` records only a content hash and a monotonic version
-//! integer per skill, never a `generatedAt` field. Re-running with no
-//! source changes is a byte-identical no-op (skill-materialization spec,
-//! scenario "Re-running with no source changes is a byte-identical
-//! no-op") — this is the fix for the `generatedAt`-poisoned-hash failure
-//! mode a donor's agent-manifest materialization documents against its
-//! own `agent-manifest` package: the lock's
-//! `contentHash` is computed over the skill's own semantic bytes (the
-//! `SKILL.md` file content), never over an artifact that embeds its own
-//! wall-clock generation time.
+//! The canonical user-facing source is a read-only bundle rooted at
+//! `SKILL.src.md`. It projects one `canon` skill to Claude and/or Codex and
+//! keeps references and scripts as lazy sidecars. Directory-shaped sources
+//! (notably `canon/skills-dev`) retain the legacy materializer for backwards
+//! compatibility.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -23,7 +13,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-/// One companion skill discovered under `canon/skills/<name>/SKILL.md`.
+pub const CANONICAL_SOURCE_ENV: &str = "CANON_SKILLS_SOURCE";
+
 #[derive(Debug, Clone)]
 pub struct DiscoveredSkill {
     pub name: String,
@@ -31,9 +22,6 @@ pub struct DiscoveredSkill {
     pub content: String,
 }
 
-/// `canon/skills/.install-lock.json`'s per-skill entry. Field order is the
-/// struct declaration order (`contentHash` before `version`); no
-/// `generatedAt` field ever exists on this type (decision 11).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LockEntry {
     #[serde(rename = "contentHash")]
@@ -41,16 +29,11 @@ pub struct LockEntry {
     pub version: u64,
 }
 
-/// The full lock file: `{ "skills": { "<name>": LockEntry, ... } }`. A
-/// `BTreeMap` keeps the serialized key order alphabetical regardless of
-/// filesystem scan order, so two runs over an unchanged source directory
-/// produce byte-identical JSON.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Lock {
     pub skills: BTreeMap<String, LockEntry>,
 }
 
-/// One skill's outcome from an `install` run, reported to the CLI caller.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InstalledSkill {
     pub name: String,
@@ -58,68 +41,180 @@ pub struct InstalledSkill {
     pub changed: bool,
 }
 
-/// The full result of an `install` run: per-skill outcomes plus the final
-/// lock snapshot that was written to disk.
 #[derive(Debug, Clone)]
 pub struct InstallReport {
     pub installed: Vec<InstalledSkill>,
     pub lock: Lock,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
+pub enum Provider {
+    Claude,
+    Codex,
+}
+
+impl Provider {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Claude => "claude",
+            Self::Codex => "codex",
+        }
+    }
+
+    pub fn parse(value: &str) -> Result<Self, SkillsError> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "claude" => Ok(Self::Claude),
+            "codex" => Ok(Self::Codex),
+            other => Err(SkillsError::InvalidProvider(other.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanonicalInstallReport {
+    pub providers: Vec<Provider>,
+    pub source_hash: String,
+    pub changed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillStatus {
+    pub provider: Provider,
+    pub path: PathBuf,
+    pub state: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillsCheckReport {
+    pub providers: Vec<Provider>,
+    pub source_hash: String,
+    pub statuses: Vec<SkillStatus>,
+    pub manifest_ok: bool,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum SkillsError {
     #[error("source directory not found: {0}")]
     SourceNotFound(PathBuf),
-    #[error("io error at {path}: {source}")]
-    Io {
-        path: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
+    #[error("canonical skill source is missing SKILL.src.md under {0}")]
+    CanonicalSourceMissing(PathBuf),
+    #[error("invalid provider `{0}`; expected one of: claude, codex")]
+    InvalidProvider(String),
+    #[error("canonical bundle has an unsupported or unsafe symlink at {0}")]
+    UnsafeSymlink(PathBuf),
+    #[error("refusing to overwrite a symlink at {0}")]
+    RefuseSymlink(PathBuf),
     #[error("malformed lock file at {path}: {source}")]
     LockParse {
         path: PathBuf,
         #[source]
         source: serde_json::Error,
     },
+    #[error("malformed canonical manifest at {path}: {source}")]
+    ManifestParse {
+        path: PathBuf,
+        #[source]
+        source: serde_json::Error,
+    },
+    #[error("io error at {path}: {source}")]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
 }
 
-fn read_to_string(path: &Path) -> Result<String, SkillsError> {
-    fs::read_to_string(path).map_err(|source| SkillsError::Io {
+fn read_bytes(path: &Path) -> Result<Vec<u8>, SkillsError> {
+    fs::read(path).map_err(|source| SkillsError::Io {
         path: path.to_path_buf(),
         source,
     })
 }
 
-fn write_file(path: &Path, content: &str) -> Result<(), SkillsError> {
+fn read_to_string(path: &Path) -> Result<String, SkillsError> {
+    String::from_utf8(read_bytes(path)?).map_err(|source| SkillsError::Io {
+        path: path.to_path_buf(),
+        source: std::io::Error::new(std::io::ErrorKind::InvalidData, source),
+    })
+}
+
+fn reject_symlink_path(path: &Path) -> Result<(), SkillsError> {
+    if let Ok(metadata) = fs::symlink_metadata(path) {
+        if metadata.file_type().is_symlink() {
+            return Err(SkillsError::RefuseSymlink(path.to_path_buf()));
+        }
+    }
+    Ok(())
+}
+
+fn reject_symlink_path_under(target_dir: &Path, path: &Path) -> Result<(), SkillsError> {
+    let relative = path
+        .strip_prefix(target_dir)
+        .map_err(|_| SkillsError::RefuseSymlink(path.to_path_buf()))?;
+    let mut current = target_dir.to_path_buf();
+    if let Ok(metadata) = fs::symlink_metadata(&current) {
+        if metadata.file_type().is_symlink() {
+            return Err(SkillsError::RefuseSymlink(path.to_path_buf()));
+        }
+    }
+    for component in relative.components() {
+        current.push(component);
+        if let Ok(metadata) = fs::symlink_metadata(&current) {
+            if metadata.file_type().is_symlink() {
+                return Err(SkillsError::RefuseSymlink(path.to_path_buf()));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn write_bytes_under(target_dir: &Path, path: &Path, bytes: &[u8]) -> Result<(), SkillsError> {
+    reject_symlink_path_under(target_dir, path)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|source| SkillsError::Io {
             path: parent.to_path_buf(),
             source,
         })?;
     }
-    fs::write(path, content).map_err(|source| SkillsError::Io {
+    fs::write(path, bytes).map_err(|source| SkillsError::Io {
         path: path.to_path_buf(),
         source,
     })
 }
 
-/// `sha256:<hex>` over the exact bytes given — never over a re-derived or
-/// re-serialized projection that could pick up incidental formatting
-/// differences.
+fn write_file_under(target_dir: &Path, path: &Path, content: &str) -> Result<(), SkillsError> {
+    write_bytes_under(target_dir, path, content.as_bytes())
+}
+
+fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), SkillsError> {
+    reject_symlink_path(path)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|source| SkillsError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+    fs::write(path, bytes).map_err(|source| SkillsError::Io {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+fn write_file(path: &Path, content: &str) -> Result<(), SkillsError> {
+    write_bytes(path, content.as_bytes())
+}
+
 pub fn content_hash(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("sha256:{:x}", hasher.finalize())
 }
 
-/// Discover every `<source_dir>/<name>/SKILL.md`, sorted by name for
-/// deterministic iteration.
 pub fn discover_skills(source_dir: &Path) -> Result<Vec<DiscoveredSkill>, SkillsError> {
     if !source_dir.is_dir() {
         return Err(SkillsError::SourceNotFound(source_dir.to_path_buf()));
     }
-    let mut names: Vec<String> = Vec::new();
+    let mut names = Vec::new();
     for entry in fs::read_dir(source_dir).map_err(|source| SkillsError::Io {
         path: source_dir.to_path_buf(),
         source,
@@ -131,46 +226,36 @@ pub fn discover_skills(source_dir: &Path) -> Result<Vec<DiscoveredSkill>, Skills
         if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
             continue;
         }
-        let skill_md = entry.path().join("SKILL.md");
-        if skill_md.is_file() {
+        if entry.path().join("SKILL.md").is_file() {
             names.push(entry.file_name().to_string_lossy().into_owned());
         }
     }
     names.sort();
-
-    let mut skills = Vec::with_capacity(names.len());
-    for name in names {
-        let skill_md_path = source_dir.join(&name).join("SKILL.md");
-        let content = read_to_string(&skill_md_path)?;
-        skills.push(DiscoveredSkill {
-            name,
-            skill_md_path,
-            content,
-        });
-    }
-    Ok(skills)
+    names
+        .into_iter()
+        .map(|name| {
+            let skill_md_path = source_dir.join(&name).join("SKILL.md");
+            Ok(DiscoveredSkill {
+                name,
+                content: read_to_string(&skill_md_path)?,
+                skill_md_path,
+            })
+        })
+        .collect()
 }
 
-/// Extract `name`/`description` from a `SKILL.md`'s YAML frontmatter
-/// (`---\nname: …\ndescription: …\n---\n<body>`). Falls back to the
-/// directory name / empty description when frontmatter is absent or a
-/// field is missing — never fails the whole install over a formatting
-/// wrinkle in one skill file.
 fn parse_frontmatter(fallback_name: &str, content: &str) -> (String, String, String) {
     let mut name = fallback_name.to_string();
     let mut description = String::new();
-
     if let Some(rest) = content.strip_prefix("---\n") {
         if let Some(end) = rest.find("\n---\n") {
             let frontmatter = &rest[..end];
             let body = &rest[end + "\n---\n".len()..];
             for line in frontmatter.lines() {
                 if let Some((key, value)) = line.split_once(':') {
-                    let key = key.trim();
-                    let value = value.trim();
-                    match key {
-                        "name" => name = value.to_string(),
-                        "description" => description = value.to_string(),
+                    match key.trim() {
+                        "name" => name = value.trim().to_string(),
+                        "description" => description = value.trim().to_string(),
                         _ => {}
                     }
                 }
@@ -181,19 +266,10 @@ fn parse_frontmatter(fallback_name: &str, content: &str) -> (String, String, Str
     (name, description, content.to_string())
 }
 
-/// canon's `.codex/skills/<name>.md` flattening (design D4): Codex has no
-/// native skill-directory concept, so this is canon's own convention — a
-/// single flat file with the name/description promoted to a header block
-/// followed by the skill body, replacing the YAML frontmatter Claude Code
-/// reads natively.
 pub fn flatten_for_codex(name: &str, description: &str, body: &str) -> String {
-    let mut out = String::new();
-    out.push_str("# ");
-    out.push_str(name);
-    out.push('\n');
+    let mut out = format!("# {name}\n");
     if !description.is_empty() {
-        out.push('\n');
-        out.push_str("> ");
+        out.push_str("\n> ");
         out.push_str(description);
         out.push('\n');
     }
@@ -215,41 +291,25 @@ fn load_lock(source_dir: &Path) -> Result<Lock, SkillsError> {
     })
 }
 
-/// Canonical, timestamp-free JSON serialization: `BTreeMap` gives
-/// alphabetical key order and `to_string_pretty` gives stable 2-space
-/// indentation; a trailing newline makes the file POSIX-text-file clean.
 fn write_lock(source_dir: &Path, lock: &Lock) -> Result<(), SkillsError> {
-    let lock_path = source_dir.join(".install-lock.json");
     let mut json = serde_json::to_string_pretty(lock).expect("Lock serialization is infallible");
     json.push('\n');
-    write_file(&lock_path, &json)
+    write_file(&source_dir.join(".install-lock.json"), &json)
 }
 
-/// Materialize every skill under `source_dir` (`canon/skills/`) into
-/// `target_dir`'s `.claude/skills/<name>/SKILL.md` and `.codex/skills/
-/// <name>.md`, then write the updated lock back into `source_dir`.
-///
-/// Idempotent: running twice with no source change writes byte-identical
-/// output both times (skill-materialization spec). A skill's version
-/// increments by exactly one when its content hash changes; unrelated
-/// skills' lock entries are left untouched.
-pub fn install(source_dir: &Path, target_dir: &Path) -> Result<InstallReport, SkillsError> {
+fn install_legacy(source_dir: &Path, target_dir: &Path) -> Result<InstallReport, SkillsError> {
     let discovered = discover_skills(source_dir)?;
     let previous_lock = load_lock(source_dir)?;
-
     let mut new_skills = BTreeMap::new();
     let mut installed = Vec::with_capacity(discovered.len());
-
     for skill in &discovered {
         let hash = content_hash(skill.content.as_bytes());
         let (name, description, body) = parse_frontmatter(&skill.name, &skill.content);
-
         let (version, changed) = match previous_lock.skills.get(&skill.name) {
             Some(prev) if prev.content_hash == hash => (prev.version, false),
             Some(prev) => (prev.version + 1, true),
             None => (1, true),
         };
-
         new_skills.insert(
             skill.name.clone(),
             LockEntry {
@@ -257,32 +317,404 @@ pub fn install(source_dir: &Path, target_dir: &Path) -> Result<InstallReport, Sk
                 version,
             },
         );
-
-        let claude_path = target_dir
-            .join(".claude")
-            .join("skills")
-            .join(&skill.name)
-            .join("SKILL.md");
-        write_file(&claude_path, &skill.content)?;
-
-        let codex_path = target_dir
-            .join(".codex")
-            .join("skills")
-            .join(format!("{}.md", skill.name));
-        let flattened = flatten_for_codex(&name, &description, &body);
-        write_file(&codex_path, &flattened)?;
-
+        write_file_under(
+            target_dir,
+            &target_dir
+                .join(".claude/skills")
+                .join(&skill.name)
+                .join("SKILL.md"),
+            &skill.content,
+        )?;
+        write_file_under(
+            target_dir,
+            &target_dir
+                .join(".codex/skills")
+                .join(format!("{}.md", skill.name)),
+            &flatten_for_codex(&name, &description, &body),
+        )?;
         installed.push(InstalledSkill {
             name: skill.name.clone(),
             version,
             changed,
         });
     }
-
     let lock = Lock { skills: new_skills };
     write_lock(source_dir, &lock)?;
-
     Ok(InstallReport { installed, lock })
+}
+
+#[derive(Debug, Clone)]
+struct BundleFile {
+    relative: PathBuf,
+    bytes: Vec<u8>,
+}
+
+fn collect_bundle_files(
+    root: &Path,
+    relative_root: &Path,
+    out: &mut Vec<BundleFile>,
+) -> Result<(), SkillsError> {
+    let dir = root.join(relative_root);
+    if !dir.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(&dir).map_err(|source| SkillsError::Io {
+        path: dir.clone(),
+        source,
+    })? {
+        let entry = entry.map_err(|source| SkillsError::Io {
+            path: dir.clone(),
+            source,
+        })?;
+        let file_type = entry.file_type().map_err(|source| SkillsError::Io {
+            path: entry.path(),
+            source,
+        })?;
+        let relative = relative_root.join(entry.file_name());
+        if file_type.is_symlink() {
+            return Err(SkillsError::UnsafeSymlink(entry.path()));
+        }
+        if file_type.is_dir() {
+            collect_bundle_files(root, &relative, out)?;
+        } else if file_type.is_file() {
+            out.push(BundleFile {
+                relative,
+                bytes: read_bytes(&entry.path())?,
+            });
+        }
+    }
+    Ok(())
+}
+
+fn canonical_bundle(source_dir: &Path) -> Result<Vec<BundleFile>, SkillsError> {
+    let root = source_dir.join("SKILL.src.md");
+    if !root.is_file() {
+        return Err(SkillsError::CanonicalSourceMissing(
+            source_dir.to_path_buf(),
+        ));
+    }
+    let mut files = vec![BundleFile {
+        relative: PathBuf::from("SKILL.src.md"),
+        bytes: read_bytes(&root)?,
+    }];
+    collect_bundle_files(source_dir, Path::new("reference"), &mut files)?;
+    collect_bundle_files(source_dir, Path::new("scripts"), &mut files)?;
+    files.sort_by(|a, b| a.relative.cmp(&b.relative));
+    Ok(files)
+}
+
+fn bundle_hash(files: &[BundleFile]) -> String {
+    let mut hasher = Sha256::new();
+    for file in files {
+        let path = file.relative.to_string_lossy();
+        hasher.update(path.as_bytes());
+        hasher.update([0]);
+        hasher.update(&file.bytes);
+        hasher.update([0]);
+    }
+    format!("sha256:{:x}", hasher.finalize())
+}
+
+fn parse_providers(value: Option<&str>, target_dir: &Path) -> Result<Vec<Provider>, SkillsError> {
+    let mut providers = if let Some(value) = value {
+        let mut parsed = Vec::new();
+        for part in value.split(',').filter(|part| !part.trim().is_empty()) {
+            parsed.push(Provider::parse(part)?);
+        }
+        if parsed.is_empty() {
+            return Err(SkillsError::InvalidProvider(value.to_string()));
+        }
+        parsed
+    } else {
+        let claude = target_dir.join(".claude").exists();
+        let codex = target_dir.join(".codex").exists();
+        if !claude && !codex {
+            vec![Provider::Claude, Provider::Codex]
+        } else {
+            [(claude, Provider::Claude), (codex, Provider::Codex)]
+                .into_iter()
+                .filter_map(|(yes, provider)| yes.then_some(provider))
+                .collect()
+        }
+    };
+    providers.sort();
+    providers.dedup();
+    Ok(providers)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct CanonicalManifest {
+    version: u64,
+    source_hash: String,
+    providers: Vec<String>,
+    files: BTreeMap<String, String>,
+}
+
+fn manifest_path(target_dir: &Path) -> PathBuf {
+    target_dir.join(".canon/skills/.install-lock.json")
+}
+
+fn load_manifest(target_dir: &Path) -> Result<Option<CanonicalManifest>, SkillsError> {
+    let path = manifest_path(target_dir);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let raw = read_to_string(&path)?;
+    serde_json::from_str(&raw)
+        .map(Some)
+        .map_err(|source| SkillsError::ManifestParse { path, source })
+}
+
+fn projected_relative(provider: Provider, relative: &Path) -> Option<PathBuf> {
+    if relative == Path::new("SKILL.src.md") {
+        return (provider == Provider::Claude).then(|| PathBuf::from("SKILL.md"));
+    }
+    Some(relative.to_path_buf())
+}
+
+fn manifest_for(files: &[BundleFile], providers: &[Provider]) -> CanonicalManifest {
+    let source_hash = bundle_hash(files);
+    let mut hashes = BTreeMap::new();
+    for provider in providers {
+        for file in files {
+            let Some(relative) = projected_relative(*provider, &file.relative) else {
+                continue;
+            };
+            let prefix = match provider {
+                Provider::Claude => ".claude/skills/canon",
+                Provider::Codex => ".codex/skills/canon",
+            };
+            let path = PathBuf::from(prefix).join(relative);
+            hashes.insert(
+                path.to_string_lossy().into_owned(),
+                content_hash(&file.bytes),
+            );
+        }
+        if let Some(skill) = files
+            .iter()
+            .find(|file| file.relative == Path::new("SKILL.src.md"))
+        {
+            let (_, description, body) =
+                parse_frontmatter("canon", &String::from_utf8_lossy(&skill.bytes));
+            if *provider == Provider::Codex {
+                hashes.insert(
+                    ".codex/skills/canon.md".into(),
+                    content_hash(flatten_for_codex("canon", &description, &body).as_bytes()),
+                );
+            }
+        }
+    }
+    CanonicalManifest {
+        version: 1,
+        source_hash,
+        providers: providers.iter().map(|p| p.as_str().into()).collect(),
+        files: hashes,
+    }
+}
+
+fn project_path(target_dir: &Path, provider: Provider, relative: &Path) -> Option<PathBuf> {
+    let relative = projected_relative(provider, relative)?;
+    Some(match provider {
+        Provider::Claude => target_dir.join(".claude/skills/canon").join(relative),
+        Provider::Codex => target_dir.join(".codex/skills/canon").join(relative),
+    })
+}
+
+pub fn install_canonical(
+    source_dir: &Path,
+    target_dir: &Path,
+    providers: Option<&str>,
+) -> Result<CanonicalInstallReport, SkillsError> {
+    let selected = parse_providers(providers, target_dir)?;
+    let files = canonical_bundle(source_dir)?;
+    let manifest = manifest_for(&files, &selected);
+    let previous = load_manifest(target_dir)?;
+    let mut writes: Vec<(PathBuf, Vec<u8>)> = Vec::new();
+    let source_skill = files
+        .iter()
+        .find(|file| file.relative == Path::new("SKILL.src.md"))
+        .expect("canonical source exists");
+    let (_, description, body) =
+        parse_frontmatter("canon", &String::from_utf8_lossy(&source_skill.bytes));
+    for provider in &selected {
+        for file in &files {
+            if let Some(path) = project_path(target_dir, *provider, &file.relative) {
+                writes.push((path, file.bytes.clone()));
+            }
+        }
+        if *provider == Provider::Codex {
+            writes.push((
+                target_dir.join(".codex/skills/canon.md"),
+                flatten_for_codex("canon", &description, &body).into_bytes(),
+            ));
+        }
+    }
+    for (path, _) in &writes {
+        reject_symlink_path_under(target_dir, path)?;
+    }
+    reject_symlink_path_under(target_dir, &manifest_path(target_dir))?;
+    let changed = previous.as_ref() != Some(&manifest)
+        || writes
+            .iter()
+            .any(|(path, bytes)| fs::read(path).ok().as_deref() != Some(bytes.as_slice()));
+    if changed {
+        for (path, bytes) in writes {
+            write_bytes_under(target_dir, &path, &bytes)?;
+        }
+        let mut json =
+            serde_json::to_string_pretty(&manifest).expect("manifest serialization is infallible");
+        json.push('\n');
+        write_file_under(target_dir, &manifest_path(target_dir), &json)?;
+    }
+    Ok(CanonicalInstallReport {
+        providers: selected,
+        source_hash: manifest.source_hash,
+        changed,
+    })
+}
+
+pub fn install(source_dir: &Path, target_dir: &Path) -> Result<InstallReport, SkillsError> {
+    if source_dir.join("SKILL.src.md").is_file() {
+        let report = install_canonical(source_dir, target_dir, None)?;
+        let mut lock = Lock::default();
+        lock.skills.insert(
+            "canon".into(),
+            LockEntry {
+                content_hash: report.source_hash,
+                version: 1,
+            },
+        );
+        return Ok(InstallReport {
+            installed: vec![InstalledSkill {
+                name: "canon".into(),
+                version: 1,
+                changed: report.changed,
+            }],
+            lock,
+        });
+    }
+    install_legacy(source_dir, target_dir)
+}
+
+pub fn check(
+    source_dir: &Path,
+    target_dir: &Path,
+    providers: Option<&str>,
+) -> Result<SkillsCheckReport, SkillsError> {
+    let selected = parse_providers(providers, target_dir)?;
+    let files = canonical_bundle(source_dir)?;
+    let expected = manifest_for(&files, &selected);
+    let actual = load_manifest(target_dir)?;
+    let mut statuses = Vec::new();
+    for provider in &selected {
+        for file in &files {
+            let Some(path) = project_path(target_dir, *provider, &file.relative) else {
+                continue;
+            };
+            let state = if !path.is_file() {
+                "missing"
+            } else if fs::read(&path).ok().as_deref() != Some(file.bytes.as_slice()) {
+                "stale"
+            } else {
+                "ok"
+            };
+            statuses.push(SkillStatus {
+                provider: *provider,
+                path,
+                state,
+            });
+        }
+        if *provider == Provider::Codex {
+            let path = target_dir.join(".codex/skills/canon.md");
+            let skill = files
+                .iter()
+                .find(|file| file.relative == Path::new("SKILL.src.md"))
+                .unwrap();
+            let (_, description, body) =
+                parse_frontmatter("canon", &String::from_utf8_lossy(&skill.bytes));
+            let expected_bytes = flatten_for_codex("canon", &description, &body).into_bytes();
+            let state = if !path.is_file() {
+                "missing"
+            } else if fs::read(&path).ok().as_deref() != Some(expected_bytes.as_slice()) {
+                "stale"
+            } else {
+                "ok"
+            };
+            statuses.push(SkillStatus {
+                provider: *provider,
+                path,
+                state,
+            });
+        }
+    }
+    let manifest_ok = actual.as_ref() == Some(&expected);
+    Ok(SkillsCheckReport {
+        providers: selected,
+        source_hash: expected.source_hash,
+        statuses,
+        manifest_ok,
+    })
+}
+
+pub fn doctor(
+    source_dir: &Path,
+    target_dir: &Path,
+    providers: Option<&str>,
+) -> Result<Vec<String>, SkillsError> {
+    let selected = parse_providers(providers, target_dir)?;
+    let mut lines = vec![format!(
+        "providers: {}",
+        selected
+            .iter()
+            .map(|p| p.as_str())
+            .collect::<Vec<_>>()
+            .join(",")
+    )];
+    let report = match check(source_dir, target_dir, providers) {
+        Ok(report) => report,
+        Err(SkillsError::ManifestParse { path, source }) => {
+            lines.push(format!("manifest-error: {} ({source})", path.display()));
+            return Ok(lines);
+        }
+        Err(err) => return Err(err),
+    };
+    for status in report.statuses {
+        if status.state != "ok" {
+            lines.push(format!(
+                "{}: {} ({})",
+                status.state,
+                status.path.display(),
+                status.provider.as_str()
+            ));
+        }
+    }
+    if !report.manifest_ok {
+        lines.push(format!("stale: {}", manifest_path(target_dir).display()));
+    }
+    for root in [
+        target_dir.join(".claude/skills"),
+        target_dir.join(".codex/skills"),
+    ] {
+        if let Ok(entries) = fs::read_dir(&root) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if name.starts_with("canon-") {
+                    lines.push(format!("legacy-remnant: {}", entry.path().display()));
+                }
+            }
+        }
+    }
+    if lines.len() == 1 {
+        lines.push("status: healthy".into());
+    }
+    Ok(lines)
+}
+
+pub fn resolve_source(explicit: Option<&Path>) -> PathBuf {
+    explicit
+        .map(Path::to_path_buf)
+        .or_else(|| std::env::var_os(CANONICAL_SOURCE_ENV).map(PathBuf::from))
+        .unwrap_or_else(|| PathBuf::from("canon/skills"))
 }
 
 #[cfg(test)]
@@ -290,37 +722,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn content_hash_is_stable_and_content_addressed() {
-        let a = content_hash(b"hello");
-        let b = content_hash(b"hello");
-        let c = content_hash(b"hello!");
-        assert_eq!(a, b);
-        assert_ne!(a, c);
-        assert!(a.starts_with("sha256:"));
+    fn codex_flattening_removes_frontmatter() {
+        let output = flatten_for_codex("canon", "desc", "body\n");
+        assert_eq!(output, "# canon\n\n> desc\n\nbody\n");
+        assert!(!output.contains("---"));
     }
 
     #[test]
-    fn parse_frontmatter_extracts_name_and_description() {
-        let content = "---\nname: repo-scaffold\ndescription: how to add a crate\n---\n\nbody text\n";
-        let (name, description, body) = parse_frontmatter("fallback", content);
-        assert_eq!(name, "repo-scaffold");
-        assert_eq!(description, "how to add a crate");
-        assert_eq!(body, "body text\n");
-    }
-
-    #[test]
-    fn parse_frontmatter_falls_back_without_delimiters() {
-        let (name, description, body) = parse_frontmatter("fallback", "just a body\n");
-        assert_eq!(name, "fallback");
-        assert_eq!(description, "");
-        assert_eq!(body, "just a body\n");
-    }
-
-    #[test]
-    fn flatten_for_codex_renders_header_and_body() {
-        let flattened = flatten_for_codex("repo-scaffold", "how to add a crate", "body text\n");
-        assert!(flattened.starts_with("# repo-scaffold\n"));
-        assert!(flattened.contains("> how to add a crate\n"));
-        assert!(flattened.trim_end().ends_with("body text"));
+    fn invalid_provider_is_rejected() {
+        assert!(matches!(
+            Provider::parse("gemini"),
+            Err(SkillsError::InvalidProvider(_))
+        ));
     }
 }

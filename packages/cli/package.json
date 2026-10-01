@@ -22,7 +22,8 @@
     "directory": "packages/cli"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node --format esm",
+    "bundle-skills": "bun run scripts/bundle-skills.ts",
+    "build": "bun run bundle-skills && bun build src/index.ts --outdir dist --target node --format esm",
     "dev": "bun src/index.ts",
     "start": "node dist/index.js"
   },

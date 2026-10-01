@@ -1,39 +1,57 @@
 ## ADDED Requirements
 
-### Requirement: canon/skills/ is the single source of truth for every spec's companion skill
-Every companion skill SHALL be authored under `canon/skills/<name>/SKILL.md`
-(design §5's cross-cutting deliverable, decision 9) — never directly under a consumer
-repo's `.claude/` or `.codex/` tree.
+### Requirement: The canonical user-facing bundle has one provider-aware skill
+The canonical user-facing source SHALL be authored at `canon/skills/SKILL.src.md`.
+Its `reference/**` and `scripts/**` files SHALL remain lazy-loadable bundle
+content. Legacy directory-shaped sources such as `canon/skills-dev` MAY retain
+individual `<name>/SKILL.md` files for developer-only compatibility.
 
-#### Scenario: A skill authored once is installable into any consumer repo
-- **WHEN** `canon skills install` runs inside a consumer repo (e.g. the donor monorepo)
-  with `canon/skills/<name>/SKILL.md` present in the canon checkout it was
-  invoked from
-- **THEN** the consumer repo gains `.claude/skills/<name>/SKILL.md`
-  (verbatim copy) and `.codex/skills/<name>.md` (canon's flattened
-  convention, D4), and no other runtime directory is written (gemini is
-  dropped per decision 11).
+#### Scenario: A canonical bundle projects only the selected providers
+- **WHEN** `canon skills install --source canon/skills --providers=claude,codex`
+  runs inside a consumer repo
+- **THEN** the consumer gains exactly one Claude skill at
+  `.claude/skills/canon/SKILL.md` and one Codex skill at
+  `.codex/skills/canon.md`, plus matching `reference/**` and `scripts/**`
+  sidecars under each provider's `canon` bundle
+- **AND** no old per-topic user skill directory/file is generated
+- **AND** no `.gemini/` file is created or modified.
 
-### Requirement: Materialization is deterministic and timestamp-free
-`canon skills install` SHALL produce a lock recording each installed
-skill's content hash and a monotonic version integer, and MUST NOT embed
-wall-clock time (no `generatedAt` field), per decision 11.
+#### Scenario: Provider selection and detection are deterministic
+- **WHEN** `--providers=claude,codex` is supplied, or when existing `.claude`
+  and `.codex` targets are detected without the flag
+- **THEN** only the selected/detected providers are projected in stable order
+- **AND** an invalid provider name fails before any target write.
+- **AND** when neither target exists, both providers are selected for backwards
+  compatibility.
+
+### Requirement: Canonical installation is target-owned and read-only at source
+The canonical installer SHALL NOT mutate `canon/skills` or any installed npm
+source tree. It SHALL write a timestamp-free, content-addressed manifest under
+the target (for example `.canon/skills/.install-lock.json`) recording source,
+provider, and projected-file hashes. Existing symlinks and unrelated user files
+MUST NOT be overwritten.
 
 #### Scenario: Re-running with no source changes is a byte-identical no-op
-- **WHEN** `canon skills install` runs twice in a row with no change to any
-  `canon/skills/**` file
-- **THEN** every materialized file and the lock file are byte-identical
-  across both runs, producing zero git diff on the second run.
+- **WHEN** `canon skills install` runs twice in a row with no change to the
+  canonical source bundle
+- **THEN** every projected file and the target manifest are byte-identical
+  across both runs and the second run reports unchanged.
 
-#### Scenario: A content change bumps the version, not the timestamp
-- **WHEN** `canon/skills/<name>/SKILL.md` content changes between two
-  `canon skills install` runs
-- **THEN** the lock's `contentHash` for `<name>` changes and its `version`
-  integer increments by exactly one; unrelated skills' lock entries are
-  untouched.
+#### Scenario: Read-only check and doctor expose drift
+- **WHEN** a projected file is missing or changed, or an old `canon-*` user
+  skill remains
+- **THEN** `canon skills check` reports drift without writing
+- **AND** `canon skills doctor` reports the missing/stale projection or legacy
+  remnant without deleting user data.
 
-#### Scenario: Only Claude Code and Codex targets are materialized
-- **WHEN** `canon skills install` runs in a repo that also has a `.gemini/`
-  directory
-- **THEN** no file under `.gemini/` is created, modified, or referenced by
-  the install — gemini is out of scope per decision 11.
+### Requirement: Developer-only legacy materialization remains compatible
+- **WHEN** `canon skills install --source canon/skills-dev` runs
+- **THEN** it retains `.claude/skills/<name>/SKILL.md`, `.codex/skills/<name>.md`,
+  and the source-local legacy `.install-lock.json` behavior.
+
+### Requirement: Published npm packages resolve the canonical source
+The npm build SHALL package the canonical bundle under the CLI package's
+`dist/skills` (or equivalent package-owned path), and the launcher SHALL pass
+that path to the native binary through `CANON_SKILLS_SOURCE`. A checkout
+launcher SHALL fall back to `canon/skills` when no generated package bundle is
+present.

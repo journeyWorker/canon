@@ -20,8 +20,20 @@ canon format spec                # validate a spec corpus
 canon gate check                 # run the evidence gate
 ```
 
-Run `canon <command> --help` for any command, and `canon skills install`
-to materialize the full guides into `.claude/skills/` and `.codex/skills/`.
+Run `canon <command> --help` for any explicit CLI command. Install the
+provider-neutral user-facing companion bundle with:
+
+```bash
+canon skills install                         # detect .claude/.codex
+canon skills install --providers=claude,codex
+canon skills check                           # read-only drift check
+canon skills doctor                          # diagnostics, never deletes
+```
+
+The canonical projection is one `canon` skill per selected provider, with
+lazy `reference/**` and `scripts/**` sidecars. Developer-only procedures
+remain available explicitly with `canon skills install --source
+canon/skills-dev`; they are not part of the user-facing bundle.
 
 ## Status
 

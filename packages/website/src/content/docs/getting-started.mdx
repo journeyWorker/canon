@@ -122,15 +122,28 @@ is attributed, and is fresh — never on a self-report. See
 
 ## For agent harnesses
 
-If your repo runs coding agents, two more commands close the loop:
+If your repo runs coding agents, install canon's one canonical `canon` skill
+projected into each provider's native location: `.claude/skills/canon/SKILL.md`
+for Claude and `.codex/skills/canon.md` for Codex. When `--providers` is
+omitted, canon detects existing provider targets and defaults to both when
+neither target exists. Select providers explicitly when you want to pin the
+projection:
 
 ```bash
-# materialize canon's companion skills into .claude/ and .codex/
-bunx @journeykit/canon skills install --source canon/skills --target .
+# project one canonical canon skill for both providers
+bunx @journeykit/canon skills install --source canon/skills --target . --providers=claude,codex
+
+# inspect projections without writing
+bunx @journeykit/canon skills check --source canon/skills --target .
+bunx @journeykit/canon skills doctor --source canon/skills --target .
 
 # surface role-scoped strategy memory before a task starts
 bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon regime-key dev my-repo core abc123)"
 ```
+
+`skills check` and `skills doctor` are read-only: `check` reports missing or
+stale projections, while `doctor` reports provider, drift, and legacy-remnant
+diagnostics without deleting user files.
 
 Strategies are distilled from your team's own verdicts and promoted through a
 statistical gate — see [Strategy memory](/concepts/strategy-memory/) for the

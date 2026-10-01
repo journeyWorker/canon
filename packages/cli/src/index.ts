@@ -262,5 +262,10 @@ if (!binary) {
   process.exit(1);
 }
 
-const result = spawnSync(binary, process.argv.slice(2), { stdio: "inherit" });
-process.exit(result.status ?? 1);
+const bundledSkills = join(cliDir, "dist", "skills");
+const checkoutSkills = join(workspaceRoot, "canon", "skills");
+const skillsSource = existsSync(join(bundledSkills, "SKILL.src.md")) ? bundledSkills : checkoutSkills;
+const result = spawnSync(binary, process.argv.slice(2), {
+  stdio: "inherit",
+  env: { ...process.env, CANON_SKILLS_SOURCE: skillsSource },
+});

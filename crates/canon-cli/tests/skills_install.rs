@@ -121,3 +121,95 @@ fn content_change_bumps_version_not_timestamp() {
     assert!(second.installed[0].changed);
     assert_eq!(second.installed[0].version, 2, "version increments by exactly one");
 }
+
+#[test]
+fn canonical_bundle_projects_selected_provider_and_sidecars_without_source_lock() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    fs::create_dir_all(source.join("reference")).unwrap();
+    fs::create_dir_all(source.join("scripts")).unwrap();
+    fs::write(source.join("SKILL.src.md"), "---\nname: canon\ndescription: umbrella\n---\n\n# Canon\n").unwrap();
+    fs::write(source.join("reference/topic.md"), "# topic\n").unwrap();
+    fs::write(source.join("scripts/hook.sh"), "#!/bin/sh\n").unwrap();
+
+    let first = skills::install_canonical(&source, &target, Some("codex")).unwrap();
+    assert!(first.changed);
+    assert!(!target.join(".claude/skills/canon").exists());
+    assert_eq!(fs::read_to_string(target.join(".codex/skills/canon.md")).unwrap(), "# canon\n\n> umbrella\n\n# Canon\n");
+    assert_eq!(fs::read_to_string(target.join(".codex/skills/canon/reference/topic.md")).unwrap(), "# topic\n");
+    assert_eq!(fs::read_to_string(target.join(".codex/skills/canon/scripts/hook.sh")).unwrap(), "#!/bin/sh\n");
+    assert!(!source.join(".install-lock.json").exists());
+
+    let second = skills::install_canonical(&source, &target, Some("codex")).unwrap();
+    assert!(!second.changed);
+    let check = skills::check(&source, &target, Some("codex")).unwrap();
+    assert!(check.manifest_ok);
+    assert!(check.statuses.iter().all(|status| status.state == "ok"));
+}
+
+#[test]
+fn canonical_invalid_provider_fails_before_writing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    fs::create_dir_all(&source).unwrap();
+    fs::write(source.join("SKILL.src.md"), "# canon\n").unwrap();
+    assert!(matches!(skills::install_canonical(&source, &target, Some("gemini")), Err(skills::SkillsError::InvalidProvider(_))));
+    assert!(!target.exists());
+}
+#[test]
+fn canonical_install_without_provider_selects_claude_and_codex() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    fs::create_dir_all(&source).unwrap();
+    fs::write(
+        source.join("SKILL.src.md"),
+        "---\nname: canon\ndescription: umbrella\n---\n\n# Canon\n",
+    )
+    .unwrap();
+
+    let report = skills::install_canonical(&source, &target, None).unwrap();
+
+    assert_eq!(report.providers, vec![skills::Provider::Claude, skills::Provider::Codex]);
+    assert!(target.join(".claude/skills/canon/SKILL.md").is_file());
+    assert!(target.join(".codex/skills/canon.md").is_file());
+    assert!(!target.join(".gemini").exists());
+    let entrypoints = [
+        target.join(".claude/skills/canon/SKILL.md"),
+        target.join(".codex/skills/canon.md"),
+    ];
+    assert_eq!(
+        entrypoints.iter().filter(|path| path.is_file()).count(),
+        2,
+        "canonical install must create exactly the Claude and Codex entrypoints",
+    );
+}
+
+#[test]
+fn canonical_check_and_doctor_report_projected_drift_and_legacy_remnant() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    fs::create_dir_all(&source).unwrap();
+    fs::write(
+        source.join("SKILL.src.md"),
+        "---\nname: canon\ndescription: umbrella\n---\n\n# Canon\n",
+    )
+    .unwrap();
+    skills::install_canonical(&source, &target, None).unwrap();
+
+    let projected = target.join(".claude/skills/canon/SKILL.md");
+    fs::write(&projected, "mutated projection\n").unwrap();
+    let legacy = target.join(".claude/skills/canon-old");
+    fs::create_dir_all(&legacy).unwrap();
+
+    let check = skills::check(&source, &target, None).unwrap();
+    assert!(check.statuses.iter().any(|status| status.state != "ok"));
+
+    let doctor = skills::doctor(&source, &target, None).unwrap();
+    assert!(doctor.iter().any(|line| line.contains("stale:") || line.contains("missing:")));
+    assert!(doctor.iter().any(|line| line.contains("legacy-remnant:") && line.contains("canon-old")));
+    assert!(legacy.exists(), "doctor must report legacy remnants without deleting them");
+}

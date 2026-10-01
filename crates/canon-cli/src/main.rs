@@ -66,7 +66,9 @@ Examples:
 
 Learn more:
   Use `canon <command> --help` for details on any command.
-  `canon skills install` materializes the full guides into .claude/skills/ and .codex/skills/."
+  `canon skills install` projects one `canon` skill per selected provider,
+  with lazy reference and script sidecars; `skills check` and `skills doctor`
+  inspect the target without deleting user files."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -887,14 +889,35 @@ enum SubjectCommand {
 
 #[derive(Subcommand)]
 enum SkillsCommand {
-    /// Copy canon's skill guides into .claude/skills/ and .codex/skills/
+    /// Install the canonical `canon` bundle or legacy developer skills.
     Install {
-        /// Directory holding <name>/SKILL.md sources
-        #[arg(long, default_value = "canon/skills")]
-        source: PathBuf,
-        /// Consumer repo root to materialize .claude/ and .codex/ into
+        /// Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills.
+        #[arg(long)]
+        source: Option<PathBuf>,
+        /// Consumer repo root to materialize into.
         #[arg(long, default_value = ".")]
         target: PathBuf,
+        /// Providers to project (`claude`, `codex`, or a comma-separated list).
+        #[arg(long)]
+        providers: Option<String>,
+    },
+    /// Check canonical projections without writing.
+    Check {
+        #[arg(long)]
+        source: Option<PathBuf>,
+        #[arg(long, default_value = ".")]
+        target: PathBuf,
+        #[arg(long)]
+        providers: Option<String>,
+    },
+    /// Print structured diagnostics for canonical projections and legacy remnants.
+    Doctor {
+        #[arg(long)]
+        source: Option<PathBuf>,
+        #[arg(long, default_value = ".")]
+        target: PathBuf,
+        #[arg(long)]
+        providers: Option<String>,
     },
 }
 
@@ -918,7 +941,9 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
         Command::Skills { action } => match action {
-            SkillsCommand::Install { source, target } => run_skills_install(&source, &target),
+            SkillsCommand::Install { source, target, providers } => run_skills_install(source.as_deref(), &target, providers.as_deref()),
+            SkillsCommand::Check { source, target, providers } => run_skills_check(source.as_deref(), &target, providers.as_deref()),
+            SkillsCommand::Doctor { source, target, providers } => run_skills_doctor(source.as_deref(), &target, providers.as_deref()),
         },
         Command::Tier { action } => match action {
             TierCommand::Age { dry_run, repo, canon_yaml } => run_tier_age(&repo, canon_yaml.as_deref(), dry_run),
@@ -1072,19 +1097,45 @@ fn main() -> ExitCode {
     }
 }
 
-fn run_skills_install(source: &std::path::Path, target: &std::path::Path) -> ExitCode {
-    match canon_cli::skills::install(source, target) {
-        Ok(report) => {
-            for skill in &report.installed {
-                let status = if skill.changed { "installed" } else { "unchanged" };
-                println!("{} v{} — {}", skill.name, skill.version, status);
+fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>) -> ExitCode {
+    let source = canon_cli::skills::resolve_source(source);
+    if !source.join("SKILL.src.md").is_file() {
+        return match canon_cli::skills::install(&source, target) {
+            Ok(report) => {
+                for skill in &report.installed {
+                    let status = if skill.changed { "installed" } else { "unchanged" };
+                    println!("{} v{} — {}", skill.name, skill.version, status);
+                }
+                ExitCode::SUCCESS
             }
+            Err(err) => { eprintln!("canon skills install: {err}"); ExitCode::FAILURE }
+        };
+    }
+    match canon_cli::skills::install_canonical(&source, target, providers) {
+        Ok(report) => {
+            println!("canon v1 — {} ({})", if report.changed { "installed" } else { "unchanged" }, report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(","));
             ExitCode::SUCCESS
         }
-        Err(err) => {
-            eprintln!("canon skills install: {err}");
-            ExitCode::FAILURE
+        Err(err) => { eprintln!("canon skills install: {err}"); ExitCode::FAILURE }
+    }
+}
+
+fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>) -> ExitCode {
+    let source = canon_cli::skills::resolve_source(source);
+    match canon_cli::skills::check(&source, target, providers) {
+        Ok(report) => {
+            for status in &report.statuses { println!("{} — {} ({})", status.path.display(), status.state, status.provider.as_str()); }
+            if report.manifest_ok && report.statuses.iter().all(|status| status.state == "ok") { ExitCode::SUCCESS } else { ExitCode::from(1) }
         }
+        Err(err) => { eprintln!("canon skills check: {err}"); ExitCode::FAILURE }
+    }
+}
+
+fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>) -> ExitCode {
+    let source = canon_cli::skills::resolve_source(source);
+    match canon_cli::skills::doctor(&source, target, providers) {
+        Ok(lines) => { for line in lines { println!("{line}"); } ExitCode::SUCCESS }
+        Err(err) => { eprintln!("canon skills doctor: {err}"); ExitCode::FAILURE }
     }
 }
 

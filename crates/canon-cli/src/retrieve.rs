@@ -141,8 +141,8 @@ fn open_strategy_store(repo: &Path) -> ParquetStrategyStore {
 }
 
 /// The `<hash>` a DERIVED `--domain`/`--subject` candidate carries: the
-/// byte-for-byte Rust twin of `canon/skills/canon-retrieve/
-/// pre-dispatch.sh`'s `printf '%s' <area> | sha256sum | cut -c1-12`
+/// byte-for-byte Rust twin of `canon/skills/scripts/
+/// canon-retrieve-pre-dispatch.sh`'s `printf '%s' <area> | sha256sum | cut -c1-12`
 /// area-hash — the ONE retrieval-side `<area>`→`<hash>` derivation, NOT
 /// a second hash scheme. A subject/domain query has no single source
 /// event to digest (the write-path `<hash>` primitive,

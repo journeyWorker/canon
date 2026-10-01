@@ -1,4 +1,4 @@
-//! Integration test for `canon/skills/canon-retrieve/pre-dispatch.sh`
+//! Integration test for `canon/skills/scripts/canon-retrieve-pre-dispatch.sh`
 //! (S8 part2, task 3.1) — the generic pre-dispatch hook script, run as
 //! a real subprocess against the real `canon` binary, exactly as
 //! Claude Code/Codex would invoke it (PreToolUse hook JSON on stdin,
@@ -23,7 +23,7 @@ fn have(cmd: &str) -> bool {
 }
 
 fn script_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../canon/skills/canon-retrieve/pre-dispatch.sh")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../canon/skills/scripts/canon-retrieve-pre-dispatch.sh")
 }
 
 /// The exact `sha256(<area>)[..12]` derivation the script itself
