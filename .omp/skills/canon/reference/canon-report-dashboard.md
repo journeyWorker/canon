@@ -1,7 +1,7 @@
 # canon-report-dashboard
 
-canon's single status surface: `canon report` renders NINE panels to
-markdown, `canon report --snapshot` exports the same nine marts to
+canon's single status surface: `canon report` renders TEN panels to
+markdown, `canon report --snapshot` exports the same ten marts to
 Parquet, and `canon dashboard` serves a small zero-network web app that
 renders SEVEN of them from such a snapshot. Neither surface computes an
 aggregate itself — both read canon's precomputed
@@ -35,7 +35,7 @@ drift-checked.
 
 ## `canon report [--repo <dir>]`
 
-Renders the current nine-panel report to `<repo>/.canon/REPORT.md`.
+Renders the current ten-panel report to `<repo>/.canon/REPORT.md`.
 `--repo` resolves through the nearest-`canon.yaml`-ancestor walk every
 subcommand uses — omit it (or pass `.`) to run from any subdirectory.
 
@@ -71,16 +71,14 @@ Wire it as a CI step or pre-push hook the same way `canon gate
 install-hooks` wires `canon gate check`; run `canon report --check`
 directly wherever CI already runs those.
 
-## `canon report --snapshot <dir>`
-
-Exports all nine views to `<dir>/<table>.parquet` plus a
+Exports all ten views to `<dir>/<table>.parquet` plus a
 `<dir>/manifest.json`. One explicit `COPY` per view — the exported
 columns are each view's own `SELECT` list, wider than the curated column
 subset the markdown tables render. `file` is always
 `<table>.parquet`, and the table order is the report's own panel order,
-with `mart_scope_status`, `mart_subjects`, `mart_review_rounds` and
-`mart_review_totals` APPENDED last so an existing consumer's order
-never moves:
+with `mart_scope_status`, `mart_subjects`, `mart_review_rounds`,
+`mart_review_totals` and `mart_run_observability` APPENDED last so an
+existing consumer's order never moves:
 
 ```json
 {
@@ -96,7 +94,8 @@ never moves:
     { "table": "mart_scope_status", "file": "mart_scope_status.parquet" },
     { "table": "mart_subjects", "file": "mart_subjects.parquet" },
     { "table": "mart_review_rounds", "file": "mart_review_rounds.parquet" },
-    { "table": "mart_review_totals", "file": "mart_review_totals.parquet" }
+    { "table": "mart_review_totals", "file": "mart_review_totals.parquet" },
+    { "table": "mart_run_observability", "file": "mart_run_observability.parquet" }
   ]
 }
 ```
@@ -145,7 +144,7 @@ The dashboard's freshness banner shows the snapshot's
 snapshot, not necessarily the live checkout" note — treat "matches
 `canon report`" as "matches the inputs that produced THIS snapshot".
 
-## Reading the nine panels
+## Reading the ten panels
 
 In `canon report`'s own render order. Each panel names the view that
 computes it; nothing here is derived a second time.
@@ -315,6 +314,20 @@ computes it; nothing here is derived a second time.
 Two marts in `views.sql` are NOT report panels and are not exported by
 `--snapshot`: `mart_records_by_kind` and `mart_session_run_handoff`.
 Read them with DuckDB directly against `views.sql`.
+
+- **Run observability** (`mart_run_observability`) — one row per folded
+  `run_id`, appended after the established nine snapshot tables. It reports
+  lifecycle identifiers/status/timestamps, latency only when both timestamps
+  exist, event and label counts, child-run count, guidance count, lineage
+  provider/model, and token/cost source totals. These are bounded
+  observations and proxies: event counts do not infer tool calls, retries, or
+  human interventions, and no field claims guidance caused an outcome.
+  `directive_event_count` and `guidance_count` are counts only; directive and
+  guidance text is never emitted. `*_unknown` columns explicitly expose
+  missing joins/coverage, including missing session/project/task/lineage,
+  end timestamps, event times, costs, and guidance. Workspace absolute paths
+  and verbatim directives/guidance are intentionally omitted. Privacy
+  redaction and adapter contracts remain next-phase constraints.
 
 ## What this skill does NOT cover
 

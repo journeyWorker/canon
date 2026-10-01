@@ -1,10 +1,10 @@
 //! `canon report --snapshot <dir>` (design D3, tasks.md 3.3; s24
-//! extended this to 6 marts, s36 to 7, s43 to 8): asserts the SHARED
-//! CONTRACT both `canon-report` (the writer) and `packages/dashboard`
-//! (the reader) build to — locked over IRC with the dashboard's own
-//! fixture-owning sibling change, verified fresh against
+//! extended this to 6 marts, s36 to 7, s43 to 8, observability to 10):
+//! asserts the SHARED CONTRACT both `canon-report` (the writer) and
+//! `packages/dashboard` (the reader) build to — locked over IRC with the
+//! dashboard's own fixture-owning sibling change, verified fresh against
 //! `crates/canon-store/sql/views.sql` by both sides independently:
-//! exactly 9 parquet files (filenames byte-identical to table names) +
+//! exactly 10 parquet files (filenames byte-identical to table names) +
 //! one `manifest.json` declaring exactly those `{table, file}` pairs in
 //! the report's own panel order, and each parquet file's own column set
 //! matches the mart's `views.sql` `SELECT` list name-for-name, in
@@ -83,6 +83,18 @@ const EXPECTED_CONTRACT: &[(&str, &[&str])] = &[
             "introduced_by_unsourced",
         ],
     ),
+    (
+        "mart_run_observability",
+        &[
+            "run_id", "session_id", "project_key", "task_id", "parent_run_id", "status",
+            "started_at", "ended_at", "latency_ms", "event_count", "token_event_count",
+            "directive_event_count", "child_run_count", "guidance_count", "provider",
+            "model", "cost_source_count", "total_cost", "total_tokens", "first_event_at",
+            "last_event_at", "session_id_unknown", "project_key_unknown", "task_id_unknown",
+            "parent_run_id_unknown", "ended_at_unknown", "provider_unknown", "model_unknown",
+            "event_times_unknown", "cost_unknown", "guidance_unknown",
+        ],
+    ),
 ];
 
 fn parquet_columns(path: &std::path::Path) -> Vec<String> {
@@ -92,7 +104,7 @@ fn parquet_columns(path: &std::path::Path) -> Vec<String> {
 }
 
 #[test]
-fn snapshot_writes_nine_parquet_files_and_a_manifest_listing_exactly_them() {
+fn snapshot_writes_ten_parquet_files_and_a_manifest_listing_exactly_them() {
     if !support::duckdb_available() {
         eprintln!("skipping: `duckdb` CLI not found on PATH");
         return;
@@ -104,22 +116,22 @@ fn snapshot_writes_nine_parquet_files_and_a_manifest_listing_exactly_them() {
 
     let manifest = snapshot(&inputs, &out_dir).unwrap();
 
-    // Exactly the 9 contracted tables, in the report's declared order
+    // Exactly the 10 contracted tables, in the report's declared order
     // — never a superset/subset, never reordered.
-    assert_eq!(manifest.tables.len(), 9, "manifest.tables must list exactly 9 marts, got {:?}", manifest.tables);
+    assert_eq!(manifest.tables.len(), 10, "manifest.tables must list exactly 10 marts, got {:?}", manifest.tables);
     for (entry, (table, _columns)) in manifest.tables.iter().zip(EXPECTED_CONTRACT) {
         assert_eq!(entry.table, *table);
         assert_eq!(entry.file, format!("{table}.parquet"), "filename must be byte-identical to the table name (design D3)");
     }
 
     // "exactly them": no stray parquet files in the output dir beyond
-    // the 9 declared ones.
+    // the 10 declared ones.
     let parquet_files: Vec<_> = std::fs::read_dir(&out_dir)
         .unwrap()
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
         .filter(|name| name.ends_with(".parquet"))
         .collect();
-    assert_eq!(parquet_files.len(), 9, "expected exactly 9 parquet files, found {parquet_files:?}");
+    assert_eq!(parquet_files.len(), 10, "expected exactly 10 parquet files, found {parquet_files:?}");
 
     // manifest.json on disk round-trips to the identical declared shape.
     let manifest_path = out_dir.join("manifest.json");
@@ -130,7 +142,7 @@ fn snapshot_writes_nine_parquet_files_and_a_manifest_listing_exactly_them() {
     assert!(parsed["source_git_sha"].is_string());
     assert!(parsed["source_digest"].is_string());
     let tables = parsed["tables"].as_array().unwrap();
-    assert_eq!(tables.len(), 9);
+    assert_eq!(tables.len(), 10);
 
     // The CONTRACT: per-mart column set (name + order) matches
     // views.sql's own SELECT list exactly — a writer/reader schema
@@ -150,10 +162,10 @@ fn snapshot_writes_nine_parquet_files_and_a_manifest_listing_exactly_them() {
 /// early and corrupt the statement. `snapshot::copy_statement`
 /// SQL-escapes the path (doubling every `'`) before embedding it —
 /// this proves the full `--snapshot` run still succeeds, writing all
-/// 9 parquet files + manifest.json, when the destination directory
-/// itself contains an apostrophe. All nine `COPY`s go out as one
-/// pinned batch, so the escape has to hold for every statement in the
-/// script, not just the first.
+/// 10 parquet files + manifest.json, when the destination directory
+/// itself contains an apostrophe. All 10 `COPY`s go out as one pinned
+/// batch, so the escape has to hold for every statement in the script,
+/// not just the first.
 #[test]
 fn snapshot_into_a_directory_whose_path_contains_an_apostrophe_succeeds() {
     if !support::duckdb_available() {
@@ -168,7 +180,7 @@ fn snapshot_into_a_directory_whose_path_contains_an_apostrophe_succeeds() {
 
     let manifest = snapshot(&inputs, &out_dir).unwrap();
 
-    assert_eq!(manifest.tables.len(), 9, "manifest.tables must list exactly 9 marts, got {:?}", manifest.tables);
+    assert_eq!(manifest.tables.len(), 10, "manifest.tables must list exactly 10 marts, got {:?}", manifest.tables);
     for (entry, (table, _columns)) in manifest.tables.iter().zip(EXPECTED_CONTRACT) {
         assert_eq!(entry.table, *table);
         let parquet_path = out_dir.join(&entry.file);
@@ -179,6 +191,6 @@ fn snapshot_into_a_directory_whose_path_contains_an_apostrophe_succeeds() {
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
         .filter(|name| name.ends_with(".parquet"))
         .collect();
-    assert_eq!(parquet_files.len(), 9, "expected exactly 9 parquet files, found {parquet_files:?}");
+    assert_eq!(parquet_files.len(), 10, "expected exactly 10 parquet files, found {parquet_files:?}");
     assert!(out_dir.join("manifest.json").is_file());
 }

@@ -1,5 +1,5 @@
--- Builds packages/dashboard's canonical fixture snapshot: nine small tables
--- (eight hand-authored, one DERIVED — see panel 9) whose column NAME + ORDER + TYPE match
+-- Builds packages/dashboard's canonical fixture snapshot: ten small tables
+-- (nine hand-authored, one DERIVED — see panel 9) whose column NAME + ORDER + TYPE match
 -- crates/canon-store/sql/views.sql's mart_* SELECT lists exactly (S9
 -- SHARED SNAPSHOT CONTRACT). Each is exported with the same
 -- `COPY "<table>" TO '<table>.parquet' (FORMAT parquet)` shape
@@ -180,6 +180,32 @@ FROM mart_review_rounds
 GROUP BY change_id
 ORDER BY change_id;
 
+-- Panel 10: mart_run_observability (crates/canon-store/sql/views.sql).
+-- Synthetic run metadata and aggregate counters only; no directive or guidance
+-- payloads are included in this privacy-safe fixture.
+CREATE OR REPLACE TABLE mart_run_observability AS
+SELECT * FROM (
+    VALUES
+        ('run-synth-001', 'sess-synth-001', 'project-synth', 'task-synth-001', CAST(NULL AS VARCHAR), 'completed',
+         TIMESTAMP '2026-07-08 14:00:00', TIMESTAMP '2026-07-08 14:02:15', 135000::BIGINT,
+         3::BIGINT, 1::BIGINT, 0::BIGINT, 0::BIGINT, 0::UBIGINT, 'provider-a', 'model-synth',
+         1::BIGINT, 0.125000::DOUBLE, 2048::BIGINT,
+         TIMESTAMP '2026-07-08 14:00:05', TIMESTAMP '2026-07-08 14:02:10',
+         false, false, false, true, false, false, false, false, false, true),
+        ('run-synth-002', 'sess-synth-001', 'project-synth', 'task-synth-002', 'run-synth-001', 'failed',
+         TIMESTAMP '2026-07-08 14:03:00', CAST(NULL AS TIMESTAMP), CAST(NULL AS BIGINT),
+         1::BIGINT, 0::BIGINT, 1::BIGINT, 1::BIGINT, 0::UBIGINT, 'provider-a', CAST(NULL AS VARCHAR),
+         0::BIGINT, CAST(NULL AS DOUBLE), CAST(NULL AS BIGINT),
+         TIMESTAMP '2026-07-08 14:03:02', TIMESTAMP '2026-07-08 14:03:02',
+         false, false, false, false, true, false, true, false, true, true)
+) AS t(run_id, session_id, project_key, task_id, parent_run_id, status,
+       started_at, ended_at, latency_ms, event_count, token_event_count,
+       directive_event_count, child_run_count, guidance_count, provider, model,
+       cost_source_count, total_cost, total_tokens, first_event_at, last_event_at,
+       session_id_unknown, project_key_unknown, task_id_unknown, parent_run_id_unknown,
+       ended_at_unknown, provider_unknown, model_unknown, event_times_unknown,
+       cost_unknown, guidance_unknown);
+
 COPY "mart_trust_matrix"    TO 'fixtures/snapshot/mart_trust_matrix.parquet'    (FORMAT parquet);
 COPY "mart_session_costs"   TO 'fixtures/snapshot/mart_session_costs.parquet'   (FORMAT parquet);
 COPY "mart_role_memory"     TO 'fixtures/snapshot/mart_role_memory.parquet'     (FORMAT parquet);
@@ -189,3 +215,4 @@ COPY "mart_scope_status"    TO 'fixtures/snapshot/mart_scope_status.parquet'    
 COPY "mart_subjects"        TO 'fixtures/snapshot/mart_subjects.parquet'        (FORMAT parquet);
 COPY "mart_review_rounds"   TO 'fixtures/snapshot/mart_review_rounds.parquet'   (FORMAT parquet);
 COPY "mart_review_totals"   TO 'fixtures/snapshot/mart_review_totals.parquet'   (FORMAT parquet);
+COPY "mart_run_observability" TO 'fixtures/snapshot/mart_run_observability.parquet' (FORMAT parquet);

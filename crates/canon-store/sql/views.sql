@@ -1108,6 +1108,110 @@ JOIN token_usage tu ON tu.run_id = r.run_id
 GROUP BY s.session_id, s.client, s.actor_role, tu.workspace_label
 ORDER BY s.session_id, tu.workspace_label;
 
+-- Panel 3: run observability. One row per folded run, with bounded
+-- lifecycle/event/cost proxies only. This view deliberately emits counts
+-- and identifiers, never directive or guidance text and never a causal
+-- interpretation of any outcome.
+CREATE OR REPLACE VIEW mart_run_observability AS
+WITH runs AS (
+    SELECT
+        body ->> '$.run_id' AS run_id,
+        body ->> '$.session_id' AS session_id,
+        body ->> '$.project_key' AS project_key,
+        body ->> '$.task_id' AS task_id,
+        body ->> '$.parent_run_id' AS parent_run_id,
+        body ->> '$.status' AS status,
+        CAST(body ->> '$.started_at' AS TIMESTAMP) AS started_at,
+        CAST(body ->> '$.ended_at' AS TIMESTAMP) AS ended_at,
+        body -> '$.lineage' ->> '$.provider' AS provider,
+        body -> '$.lineage' ->> '$.model' AS model,
+        json_array_length(coalesce(body -> '$.injected_guidance', '[]')) AS guidance_count
+    FROM stg_records
+    WHERE kind = 'run'
+    QUALIFY row_number() OVER (PARTITION BY body ->> '$.run_id' ORDER BY version_rank DESC) = 1
+),
+sessions AS (
+    SELECT
+        body ->> '$.session_id' AS session_id,
+        body ->> '$.project_key' AS project_key
+    FROM stg_records
+    WHERE kind = 'session'
+    QUALIFY row_number() OVER (PARTITION BY body ->> '$.session_id' ORDER BY version_rank DESC) = 1
+),
+events AS (
+    SELECT
+        body ->> '$.run_id' AS run_id,
+        "at",
+        body ->> '$.label' AS label,
+        CAST(body -> '$.detail' ->> '$.cost' AS DOUBLE) AS cost,
+        CAST(body -> '$.detail' -> '$.tokens' ->> '$.total' AS BIGINT) AS tokens_total
+    FROM stg_records
+    WHERE kind = 'event'
+    QUALIFY row_number() OVER (
+        PARTITION BY body ->> '$.run_id', body ->> '$.seq'
+        ORDER BY version_rank DESC
+    ) = 1
+),
+event_rollup AS (
+    SELECT
+        run_id,
+        count(*) AS event_count,
+        count(*) FILTER (WHERE label = 'token_usage') AS token_event_count,
+        count(*) FILTER (WHERE label = 'user_directive') AS directive_event_count,
+        count(*) FILTER (WHERE label = 'token_usage' AND cost IS NOT NULL) AS cost_source_count,
+        round(sum(cost) FILTER (WHERE label = 'token_usage'), 6) AS total_cost,
+        CAST(sum(tokens_total) FILTER (WHERE label = 'token_usage') AS BIGINT) AS total_tokens,
+        min("at") AS first_event_at,
+        max("at") AS last_event_at
+    FROM events
+    GROUP BY run_id
+),
+children AS (
+    SELECT parent_run_id, count(*) AS child_run_count
+    FROM runs
+    WHERE parent_run_id IS NOT NULL
+    GROUP BY parent_run_id
+)
+SELECT
+    r.run_id,
+    r.session_id,
+    coalesce(r.project_key, s.project_key) AS project_key,
+    r.task_id,
+    r.parent_run_id,
+    r.status,
+    r.started_at,
+    r.ended_at,
+    CASE WHEN r.started_at IS NOT NULL AND r.ended_at IS NOT NULL
+         THEN date_diff('millisecond', r.started_at, r.ended_at) END AS latency_ms,
+    coalesce(e.event_count, 0) AS event_count,
+    coalesce(e.token_event_count, 0) AS token_event_count,
+    coalesce(e.directive_event_count, 0) AS directive_event_count,
+    coalesce(c.child_run_count, 0) AS child_run_count,
+    r.guidance_count,
+    r.provider,
+    r.model,
+    coalesce(e.cost_source_count, 0) AS cost_source_count,
+    e.total_cost,
+    e.total_tokens,
+    e.first_event_at,
+    e.last_event_at,
+    r.session_id IS NULL AS session_id_unknown,
+    coalesce(r.project_key, s.project_key) IS NULL AS project_key_unknown,
+    r.task_id IS NULL AS task_id_unknown,
+    r.parent_run_id IS NULL AS parent_run_id_unknown,
+    r.ended_at IS NULL AS ended_at_unknown,
+    r.provider IS NULL AS provider_unknown,
+    r.model IS NULL AS model_unknown,
+    e.event_count IS NULL AS event_times_unknown,
+    e.cost_source_count IS NULL OR e.cost_source_count = 0 AS cost_unknown,
+    r.guidance_count = 0 AS guidance_unknown
+FROM runs r
+LEFT JOIN sessions s ON s.session_id = r.session_id
+LEFT JOIN event_rollup e ON e.run_id = r.run_id
+LEFT JOIN children c ON c.parent_run_id = r.run_id
+ORDER BY r.run_id;
+
+
 -- Panel 3: role memory (per-namespace strategy counts, plus the
 -- not-demoted share design D5 named "hit rate, effect"), over
 -- `stg_strategy_items` (S6's `StrategyItem` store, one row per

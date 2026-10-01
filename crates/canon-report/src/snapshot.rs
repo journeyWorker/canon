@@ -9,13 +9,13 @@
 //! list, never a Rust-side projection (unlike [`crate::marts`]'s
 //! curated markdown-rendering column subset).
 //!
-//! All nine `COPY` statements run in ONE `duckdb` process over ONE
+//! All ten `COPY` statements run in ONE `duckdb` process over ONE
 //! pinned read of the corpus ([`crate::query::run_pinned_command`]),
-//! so the exported files are nine views of a single input. A snapshot
+//! so the exported files are ten views of a single input. A snapshot
 //! is what `packages/dashboard` renders, and the dashboard repeats the
 //! report's claim that a per-change total and the per-round rows it
-//! totals cannot disagree — which would be false of nine files
-//! exported by nine processes against a ledger still being written.
+//! totals cannot disagree — which would be false of ten files
+//! exported by ten processes against a ledger still being written.
 
 use std::path::Path;
 
@@ -25,18 +25,15 @@ use crate::manifest::{git_head_sha, Manifest, ManifestTable};
 use crate::query;
 use crate::ReportInputs;
 
-/// The S9/S24/S36/s43-owned marts, in the order the report declares
+/// The ten S9/S24/S36/s43-owned marts, in the order the report declares
 /// them — [`crate::marts::REPORT_MARTS`]'s own order, duplicated here
 /// as a bare name list (`packages/dashboard/test/panel-copy.test.ts`
 /// parses this literal out of the source, so it stays a literal;
 /// `marts`' own `report_marts_are_the_snapshot_tables` pins the two
-/// together). `mart_scope_status` (s20 `task-scenario-join`, surfaced
-/// by s24 `scope-status-report`), then `mart_subjects` (s36
-/// `subject-domain-loop`), then `mart_review_rounds` (s43
-/// `findings-are-records`), then `mart_review_totals` (s43 round 5 —
-/// the per-change total that makes a release note a copy) are appended
-/// LAST, after the original five — each addition appends rather than
-/// reorders, so an existing consumer's table order never moves.
+/// together). `mart_scope_status`, `mart_subjects`, `mart_review_rounds`
+/// and `mart_review_totals` remain appended in their historical order;
+/// `mart_run_observability` is appended last so existing consumers'
+/// table order never moves.
 pub const SNAPSHOT_TABLES: &[&str] = &[
     "mart_trust_matrix",
     "mart_session_costs",
@@ -47,6 +44,7 @@ pub const SNAPSHOT_TABLES: &[&str] = &[
     "mart_subjects",
     "mart_review_rounds",
     "mart_review_totals",
+    "mart_run_observability",
 ];
 
 /// Escapes a path for embedding inside a single-quoted DuckDB SQL
@@ -78,7 +76,7 @@ pub fn copy_statement(view: &str, dest: &Path) -> String {
 /// plus `generated_at`/`source_git_sha`/`source_digest` (design D3).
 /// Returns the written [`Manifest`].
 ///
-/// The nine `COPY`s are ONE pinned batch, not nine processes: a
+/// The ten `COPY`s are ONE pinned batch, not ten processes: a
 /// snapshot is a set of files a consumer joins across, so two of them
 /// disagreeing about the same corpus would be the same defect as two
 /// report panels disagreeing (module doc above). `manifest.json`'s

@@ -1,11 +1,11 @@
-//! The nine S9/S20/S24/S36/s43-owned marts (`crates/canon-store/sql/views.sql`'s
+//! The ten S9/S20/S24/S36/s43-owned marts (`crates/canon-store/sql/views.sql`'s
 //! addition" section, design D5) — one [`MartSpec`] per panel, each a
 //! bare `SELECT * FROM mart_x ORDER BY …`. No aggregation happens
 //! here: every number this module returns is exactly what the DuckDB
 //! view already computed (design D1) — this is a thin, ordered-column
 //! typed wrapper over [`crate::query::Row`], nothing more.
 //!
-//! [`fetch_all`] is the read a report uses: all nine statements in one
+//! [`fetch_all`] is the read a report uses: all ten statements in one
 //! pinned batch, so no two panels can be computed from different
 //! corpora. The per-mart `fetch_*` functions run one statement each
 //! and exist for callers reading a SINGLE number, where there is
@@ -64,6 +64,26 @@ pub const SESSION_COSTS: MartSpec = MartSpec { view: "mart_session_costs", order
 pub fn fetch_session_costs(roots: &Roots) -> Result<MartResult, ReportError> {
     fetch(roots, &SESSION_COSTS)
 }
+
+pub const RUN_OBSERVABILITY_COLUMNS: &[&str] = &[
+    "run_id", "session_id", "project_key", "task_id", "parent_run_id", "status",
+    "started_at", "ended_at", "latency_ms", "event_count", "token_event_count",
+    "directive_event_count", "child_run_count", "guidance_count", "provider",
+    "model", "cost_source_count", "total_cost", "total_tokens", "first_event_at",
+    "last_event_at", "session_id_unknown", "project_key_unknown", "task_id_unknown",
+    "parent_run_id_unknown", "ended_at_unknown", "provider_unknown", "model_unknown",
+    "event_times_unknown", "cost_unknown", "guidance_unknown",
+];
+
+pub const RUN_OBSERVABILITY: MartSpec =
+    MartSpec { view: "mart_run_observability", order_by: "run_id", columns: RUN_OBSERVABILITY_COLUMNS };
+
+pub fn fetch_run_observability(roots: &Roots) -> Result<MartResult, ReportError> {
+    fetch(roots, &RUN_OBSERVABILITY)
+}
+
+/// Run observability is appended after the established nine panels so
+/// existing consumers retain their table order.
 
 pub const ROLE_MEMORY_COLUMNS: &[&str] =
     &["role", "regime_key", "strategy_count", "active_count", "demoted_count", "hit_rate", "avg_source_trajectories", "latest_recorded_at"];
@@ -392,13 +412,13 @@ pub fn fetch_review_totals(roots: &Roots) -> Result<MartResult, ReportError> {
 /// both follow (pinned by `report_marts_are_the_snapshot_tables` below
 /// and by `packages/dashboard/test/panel-copy.test.ts`'s
 /// rendered-order check).
-pub const REPORT_MARTS: [MartSpec; 9] =
-    [TRUST_MATRIX, SESSION_COSTS, ROLE_MEMORY, FLYWHEEL_FUNNEL, REVIEW_BURNDOWN, SCOPE_STATUS, SUBJECTS, REVIEW_ROUNDS, REVIEW_TOTALS];
+pub const REPORT_MARTS: [MartSpec; 10] =
+    [TRUST_MATRIX, SESSION_COSTS, ROLE_MEMORY, FLYWHEEL_FUNNEL, REVIEW_BURNDOWN, SCOPE_STATUS, SUBJECTS, REVIEW_ROUNDS, REVIEW_TOTALS, RUN_OBSERVABILITY];
 
-/// The nine panels one report renders, fetched together.
+/// The ten panels one report renders, fetched together.
 ///
 /// Lives here rather than beside [`crate::render::render`] because the
-/// nine are one READ before they are nine panels: [`fetch_all`] is the
+/// ten are one READ before they are ten panels: [`fetch_all`] is the
 /// only thing that builds this struct, and it builds it from one
 /// corpus.
 pub struct ReportMarts {
@@ -411,16 +431,17 @@ pub struct ReportMarts {
     pub subjects: MartResult,
     pub review_rounds: MartResult,
     pub review_totals: MartResult,
+    pub run_observability: MartResult,
 }
 
-/// Fetches all nine marts from ONE materialized read of the corpus, in
+/// Fetches all ten marts from ONE materialized read of the corpus, in
 /// one `duckdb` process ([`query::run_pinned_queries`]).
 ///
 /// This is what makes "the total and the rows it totals cannot
 /// disagree" true of the RENDERED report and not merely of the SQL.
 /// `mart_review_totals`' only `FROM` is `mart_review_rounds`, so the
-/// two agree by construction over any one input — but nine
-/// `run_query` calls are nine processes over a LIVE ledger, and a
+/// two agree by construction over any one input — but ten
+/// `run_query` calls are ten processes over a LIVE ledger, and a
 /// finding written between two of them lands in the later panel and
 /// not the earlier one. Pinning removes the between: a record written
 /// during a report run reaches every panel or none.
@@ -456,6 +477,7 @@ pub fn fetch_all(roots: &Roots) -> Result<ReportMarts, ReportError> {
         subjects: next(),
         review_rounds: next(),
         review_totals: next(),
+        run_observability: next(),
     })
 }
 

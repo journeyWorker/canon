@@ -35,10 +35,10 @@ fn report_generation_on_a_completely_fresh_repo_succeeds_with_empty_panels() {
     );
 
     assert!(content.starts_with("# canon report\n"));
-    // Every one of the nine marts has zero rows over a corpus this
+    // Every one of the ten marts has zero rows over a corpus this
     // empty — each panel renders the documented "no rows" placeholder,
     // never a missing section or a panic.
-    assert_eq!(content.matches("_No rows._").count(), 9, "all nine mart panels must render empty, not crash:\n{content}");
+    assert_eq!(content.matches("_No rows._").count(), 10, "all ten mart panels must render empty, not crash:\n{content}");
     assert!(content.contains("## Role memory\n\n"));
     assert!(content.contains("## Flywheel funnel\n\n"));
     assert!(content.contains("## Scope status\n\n"));

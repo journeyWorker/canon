@@ -35,8 +35,10 @@ const REPO_ROOT = join(new URL("../../..", import.meta.url).pathname);
 const REPORT_RENDER_RS = readFileSync(join(REPO_ROOT, "crates/canon-report/src/render.rs"), "utf-8");
 const REPORT_MARTS_RS = readFileSync(join(REPO_ROOT, "crates/canon-report/src/marts.rs"), "utf-8");
 const STORE_VIEWS_SQL = readFileSync(join(REPO_ROOT, "crates/canon-store/sql/views.sql"), "utf-8");
-const CLAUDE_SKILL = ".claude/skills/canon-report-dashboard/SKILL.md";
-const CODEX_SKILL = ".codex/skills/canon-report-dashboard.md";
+const CLAUDE_SKILL = ".claude/skills/canon/reference/canon-report-dashboard.md";
+const CODEX_SKILL = ".codex/skills/canon/reference/canon-report-dashboard.md";
+const OMP_SKILL = ".omp/skills/canon/reference/canon-report-dashboard.md";
+const PI_SKILL = ".pi/skills/canon/reference/canon-report-dashboard.md";
 
 /** Soft-wraps are not semantic; a claim spanning two source lines is the same claim. */
 const unwrap = (text: string) => text.replace(/\s+/g, " ");
@@ -771,7 +773,7 @@ test("the review totals panel is neither causal nor directional, on either surfa
   }
 });
 
-// ── The THIRD surface: `canon/skills/canon-report-dashboard/SKILL.md` ──
+// ── The reference surface: `canon/skills/reference/canon-report-dashboard.md` ──
 //
 // s43 follow-up. The two surfaces above were pinned to each other while
 // the skill doc — the file an agent reads to LEARN how the report works
@@ -788,7 +790,7 @@ test("the review totals panel is neither causal nor directional, on either surfa
 // Pinned the same way as above — against EMITTED report prose only, so
 // a claim can never be satisfied by a `render.rs` comment or unit-test
 // literal.
-const SKILL_SOURCE = "canon/skills/canon-report-dashboard/SKILL.md";
+const SKILL_SOURCE = "canon/skills/reference/canon-report-dashboard.md";
 const SKILL_MD = readFileSync(join(REPO_ROOT, SKILL_SOURCE), "utf-8");
 const SNAPSHOT_RS = readFileSync(join(REPO_ROOT, "crates/canon-report/src/snapshot.rs"), "utf-8");
 
@@ -846,17 +848,16 @@ const SNAPSHOT_TABLES = snapshotTables(SNAPSHOT_RS);
 const SKILL_TEXT = unwrap(SKILL_MD);
 
 /**
- * All THREE materialized copies of this skill, as flattened prose.
+ * All FIVE materialized copies of this skill, as flattened prose.
  *
  * s43 round 7, finding 1: the sweeps above used to take `SKILL_TEXT`
- * alone and read as if they covered "the skill". They covered one of
- * three files. `the installed skill mirrors carry the corrected
- * source` below does pin the mirrors byte-for-byte to
- * `canon/skills/`, so a drifted mirror is caught — but by a DIFFERENT
- * test, whose failure message is about `canon skills install` rather
- * than about the claim, and `.codex/` is only pinned to CONTAIN the
- * body. Naming the three here makes each sweep say which copy failed.
+ * alone and read as if they covered "the skill". They covered one of five
+ * files. `the installed skill mirrors carry the corrected source` below does pin
+ * every provider projection byte-for-byte to `canon/skills/reference/`, so a
+ * drifted mirror is caught — by the same test, with the failing projection's
+ * path in the assertion.
  *
+ * Naming all five here makes each sweep say which copy failed.
  * A function, not a const: `SKILL_MD` is declared in this section and
  * the sweeps that call this sit above it. Declarations hoist; the
  * bindings they close over are read at test time, after this module
@@ -867,6 +868,8 @@ function skillCopies(): [string, string][] {
     [SKILL_SOURCE, SKILL_TEXT],
     [CLAUDE_SKILL, unwrap(readFileSync(join(REPO_ROOT, CLAUDE_SKILL), "utf-8"))],
     [CODEX_SKILL, unwrap(readFileSync(join(REPO_ROOT, CODEX_SKILL), "utf-8"))],
+    [OMP_SKILL, unwrap(readFileSync(join(REPO_ROOT, OMP_SKILL), "utf-8"))],
+    [PI_SKILL, unwrap(readFileSync(join(REPO_ROOT, PI_SKILL), "utf-8"))],
   ];
 }
 
@@ -996,15 +999,9 @@ for (const [heading, claims] of Object.entries(SKILL_CLAIMS)) {
 test("the installed skill mirrors carry the corrected source", () => {
   // `canon skills install` is the only thing that materializes these,
   // and nothing re-runs it automatically — so a correction landing in
-  // `canon/skills/` while `.claude/`/`.codex/` still serve the old
-  // bytes is drift of exactly the kind this file exists to catch, one
-  // copy further out.
-  const claude = readFileSync(join(REPO_ROOT, CLAUDE_SKILL), "utf-8");
-  expect(claude).toBe(SKILL_MD);
-
-  // `.codex/` is the flattened convention: frontmatter promoted to a
-  // header block, body verbatim after it.
-  const codex = readFileSync(join(REPO_ROOT, CODEX_SKILL), "utf-8");
-  const body = SKILL_MD.split(/^---$/m)[2] ?? "";
-  expect(codex).toContain(body.trimEnd());
+  // `canon/skills/reference/` while a provider projection still serves
+  // the old bytes is drift of exactly the kind this file exists to catch.
+  for (const projection of [CLAUDE_SKILL, CODEX_SKILL, OMP_SKILL, PI_SKILL]) {
+    expect(readFileSync(join(REPO_ROOT, projection), "utf-8"), projection).toBe(SKILL_MD);
+  }
 });
