@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-10-01",
+  "freshness_days": 180,
+  "entries": [
+    {
+      "id": "guide",
+      "path": "GUIDE.md",
+      "kind": "source",
+      "status": "active",
+      "primary": true,
+      "owner": "team",
+      "review_date": "2026-10-01",
+      "review_criteria": ["links resolve"]
+    },
+    {
+      "id": "provider-guide",
+      "path": ".provider/GUIDE.md",
+      "kind": "projection",
+      "status": "active",
+      "primary": false,
+      "source_id": "guide",
+      "owner": "team",
+      "review_date": "2026-10-01",
+      "review_criteria": ["projection matches source"]
+    },
+    {
+      "id": "memory-contract",
+      "path": "memory.txt",
+      "kind": "empirical-memory",
+      "status": "active",
+      "primary": false,
+      "source_id": "guide",
+      "owner": "team",
+      "review_date": "2026-10-01",
+      "review_criteria": ["memory remains evidence-backed"]
+    }
+  ]
+}

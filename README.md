@@ -43,8 +43,9 @@ user-facing bundle.
 ## Status
 
 Public pre-alpha. Core workflows are implemented and dogfooded; interfaces
-and storage formats may change. See
-`docs/superpowers/specs/2026-07-10-canon-design.md`.
+and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
+the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
+for the machine-readable source/projection/memory map.
 
 ## Layout
 
