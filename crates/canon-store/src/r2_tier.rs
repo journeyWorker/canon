@@ -38,7 +38,7 @@ use parquet::arrow::ArrowWriter;
 
 use crate::partition::{content_digest12, hive_object_key, resolve_partition, validate_body, validate_kind_matches_content};
 use crate::policy::Backend;
-use crate::tier::{raw_record_at, AgeReport, AgingRule, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
+use crate::tier::{raw_record_at, AgeReport, AgingRule, PurgeCount, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
 
 /// The one Arrow/parquet schema every r2-tier object uses — uniform
 /// across all twelve record kinds (design's Risk-section "content-
@@ -247,6 +247,7 @@ pub struct R2Tier {
     store: Arc<dyn ObjectStore>,
     prefix: String,
     rt: tokio::runtime::Runtime,
+    local_root: Option<std::path::PathBuf>,
 }
 
 impl std::fmt::Debug for R2Tier {
@@ -258,7 +259,7 @@ impl std::fmt::Debug for R2Tier {
 impl R2Tier {
     pub fn with_object_store(store: Arc<dyn ObjectStore>, prefix: impl Into<String>) -> Result<Self, StoreError> {
         let rt = tokio::runtime::Runtime::new().map_err(StoreError::Io)?;
-        Ok(Self { store, prefix: prefix.into(), rt })
+        Ok(Self { store, prefix: prefix.into(), rt, local_root: None })
     }
 
     /// A local-filesystem-backed r2 tier — the offline test/dev
@@ -269,7 +270,9 @@ impl R2Tier {
     pub fn local(root: impl AsRef<std::path::Path>, prefix: impl Into<String>) -> Result<Self, StoreError> {
         std::fs::create_dir_all(root.as_ref())?;
         let fs = object_store::local::LocalFileSystem::new_with_prefix(root.as_ref()).map_err(|e| StoreError::ObjectStore(e.to_string()))?;
-        Self::with_object_store(Arc::new(fs), prefix)
+        let mut tier = Self::with_object_store(Arc::new(fs), prefix)?;
+        tier.local_root = Some(root.as_ref().to_path_buf());
+        Ok(tier)
     }
 
     /// Attach to an S3-compatible object store — MinIO by default (the
@@ -354,6 +357,23 @@ impl R2Tier {
     fn object_path(&self, relative: &std::path::Path) -> ObjectPath {
         ObjectPath::from(format!("{}{}", self.prefix, relative.display()))
     }
+    fn ensure_local_path_safe(&self, path: &ObjectPath) -> Result<(), StoreError> {
+        let Some(root) = &self.local_root else { return Ok(()) };
+        let key = path.to_string();
+        let relative = key.strip_prefix(&self.prefix).ok_or_else(|| StoreError::Policy("object path escaped configured prefix".to_string()))?;
+        let mut current = root.clone();
+        for component in std::path::Path::new(relative).components() {
+            match component {
+                std::path::Component::Normal(name) => current.push(name),
+                _ => return Err(StoreError::Policy(format!("unsafe object path `{key}`"))),
+            }
+            if std::fs::symlink_metadata(&current).is_ok_and(|m| m.file_type().is_symlink()) {
+                return Err(StoreError::Policy(format!("refusing to traverse symlink `{}`", current.display())));
+            }
+        }
+        Ok(())
+    }
+
 
     /// `head` distinguishes absence from failure (design D5): only
     /// `object_store::Error::NotFound` means "not written yet" — any
@@ -442,6 +462,27 @@ impl Tier for R2Tier {
         }
         Ok(TierReadResult { records, violations })
     }
+    fn purge_before(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
+        let mut matched = 0;
+        let mut deleted = 0;
+        for path in self.list_kind(kind)? {
+            self.ensure_local_path_safe(&path)?;
+            let bytes = self.rt.block_on(async {
+                let result = self.store.get(&path).await.map_err(|e| StoreError::ObjectStore(e.to_string()))?;
+                result.bytes().await.map_err(|e| StoreError::ObjectStore(e.to_string()))
+            })?;
+            let Ok((rows, _)) = decode_rows(bytes, &path, kind) else { continue };
+            if rows.iter().any(|raw| raw_record_at(raw) < before) {
+                matched += 1;
+                if !dry_run {
+                    self.rt.block_on(async { self.store.delete(&path).await.map_err(|e| StoreError::ObjectStore(e.to_string())) })?;
+                    deleted += 1;
+                }
+            }
+        }
+        Ok(PurgeCount { matched, deleted })
+    }
+
 
     fn age(&self, rule: &AgingRule) -> Result<AgeReport, StoreError> {
         // No `aging` entry in this repo's `canon.yaml` ever routes OUT

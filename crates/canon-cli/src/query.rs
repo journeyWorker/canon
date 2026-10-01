@@ -5,18 +5,16 @@
 //! D4) — no cross-tier JOIN happens here or in the library it calls.
 //!
 //! `--plugin <id>` (s16, `plugin-overlay-projection` spec) is a
-//! SEPARATE, ADDITIVE layer: [`run`]/[`format_human`]/[`format_json`]
-//! are the pre-s16 functions task 3.4's own "no `--plugin` ⇒
-//! byte-identical" hard test pins, and this module never edits them to
-//! thread `--plugin` through — [`run_with_plugin`] is a superset
-//! function calling the identical query steps [`run`] does, plus
-//! [`resolve_and_project`]'s own resolution; [`format_human_with_overlay`]/
-//! [`format_json_with_overlay`] are new functions, never a branch
-//! bolted onto [`format_human`]/[`format_json`]. `main.rs::run_query`
-//! only reaches for the `_with_overlay` formatters when a projection
-//! actually resolved (`PluginQueryOutcome::projections` non-empty);
-//! otherwise it calls [`format_human`]/[`format_json`] verbatim, the
-//! exact same call the no-`--plugin` path makes.
+//! SEPARATE, ADDITIVE layer: [`run`] and the default formatter wrappers
+//! remain the pre-s16 query surface, while the `*_with_sensitive`
+//! variants carry the already-policy-validated authorization from
+//! `main.rs::run_query`. [`run_with_plugin`] is a superset function
+//! calling the identical query steps [`run`] does, plus
+//! [`resolve_and_project`]'s own resolution; the overlay formatters
+//! preserve the same default-redacted behavior. `main.rs::run_query`
+//! reaches for the overlay formatters only when a projection actually
+//! resolved (`PluginQueryOutcome::projections` non-empty), and otherwise
+//! uses the core formatter path.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -373,6 +371,13 @@ pub fn run(
 /// [`canon_store::partition::resolve_partition`]) and content digest,
 /// ordered by `at` exactly as [`TierRegistry::query`] returns them.
 pub fn format_human(outcome: &QueryOutcome) -> String {
+    format_human_with_sensitive(outcome, false)
+}
+
+/// Human output is intentionally a metadata table, so it never includes
+/// event bodies even when sensitive output was authorized for another
+/// formatter.
+pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: bool) -> String {
     let since_desc = outcome.since.map(|s| s.to_rfc3339()).unwrap_or_else(|| "none".to_string());
     let mut out = format!("canon query --kind {} --since {}: {} record(s)", outcome.kind.as_str(), since_desc, outcome.records.len());
     if outcome.violation_count > 0 {
@@ -402,15 +407,91 @@ pub fn format_human(outcome: &QueryOutcome) -> String {
     out
 }
 
-/// `--json`: machine-readable output — the full merged record bodies,
-/// never a human-table-shaped projection.
+/// Replace the open-ended parts of an event body that commonly carry
+/// transcript text or credentials. The stored [`RawRecord`] is never
+/// modified; this is a presentation-only projection.
+fn redacted_event_record(raw: &RawRecord) -> Value {
+    let mut record = raw.0.clone();
+    if let Some(detail) = record.as_object_mut().and_then(|object| object.get_mut("detail")) {
+        if detail.is_string() {
+            *detail = Value::String("[REDACTED]".to_string());
+        } else {
+            redact_event_detail(detail);
+        }
+    }
+    record
+}
+
+fn redact_event_detail(value: &mut Value) {
+    match value {
+        Value::Object(object) => {
+            let keys: Vec<String> = object.keys().cloned().collect();
+            for key in keys {
+                if key.eq_ignore_ascii_case("text") {
+                    object.remove(&key);
+                } else if sensitive_detail_key(&key) {
+                    object.insert(key, Value::String("[REDACTED]".to_string()));
+                } else if let Some(child) = object.get_mut(&key) {
+                    redact_event_detail(child);
+                }
+            }
+        }
+        Value::Array(values) => {
+            for value in values {
+                redact_event_detail(value);
+            }
+        }
+        Value::String(_) => {}
+        Value::Null | Value::Bool(_) | Value::Number(_) => {}
+    }
+}
+
+fn sensitive_detail_key(key: &str) -> bool {
+    let compact = key.chars().filter(|character| character.is_ascii_alphanumeric()).map(|character| character.to_ascii_lowercase()).collect::<String>();
+    matches!(
+        compact.as_str(),
+        "credential"
+            | "credentials"
+            | "password"
+            | "passwd"
+            | "secret"
+            | "secrets"
+            | "token"
+            | "accesstoken"
+            | "refreshtoken"
+            | "apikey"
+            | "authorization"
+            | "auth"
+            | "cookie"
+            | "privatekey"
+            | "clientsecret"
+            | "raw"
+            | "rawdetail"
+    ) || compact.ends_with("token") || compact.ends_with("apikey") || compact.ends_with("secret")
+}
+
+fn query_record(kind: RecordKind, raw: &RawRecord, include_sensitive: bool) -> Value {
+    if kind == RecordKind::Event && !include_sensitive {
+        redacted_event_record(raw)
+    } else {
+        raw.0.clone()
+    }
+}
+
+/// `--json`: machine-readable output — event bodies are redacted by default.
+/// The full merged record bodies are emitted only when the caller has
+/// already passed `--include-sensitive` through policy validation.
 pub fn format_json(outcome: &QueryOutcome) -> String {
+    format_json_with_sensitive(outcome, false)
+}
+
+pub fn format_json_with_sensitive(outcome: &QueryOutcome, include_sensitive: bool) -> String {
     let mut payload = serde_json::json!({
         "kind": outcome.kind.as_str(),
         "since": outcome.since.map(|s| s.to_rfc3339()),
         "count": outcome.records.len(),
         "violations": outcome.violation_count,
-        "records": outcome.records.iter().map(|r| r.0.clone()).collect::<Vec<_>>(),
+        "records": outcome.records.iter().map(|r| query_record(outcome.kind, r, include_sensitive)).collect::<Vec<_>>(),
     });
     if let Some((done, total)) = outcome.rollup {
         payload.as_object_mut().expect("payload is always a JSON object").insert("rollup".to_string(), serde_json::json!({"done": done, "total": total}));
@@ -602,7 +683,11 @@ pub fn run_with_plugin(
 /// by `main.rs::run_query` unless `projections` is non-empty — the
 /// empty case calls [`format_json`] verbatim instead.
 pub fn format_json_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection]) -> String {
-    let records: Vec<Value> = outcome.records.iter().map(|raw| merge_overlay_fields(raw, projections)).collect();
+    format_json_with_overlay_and_sensitive(outcome, plugin_id, projections, false)
+}
+
+pub fn format_json_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], include_sensitive: bool) -> String {
+    let records: Vec<Value> = outcome.records.iter().map(|raw| merge_overlay_fields(outcome.kind, raw, projections, include_sensitive)).collect();
     let mut payload = serde_json::json!({
         "kind": outcome.kind.as_str(),
         "since": outcome.since.map(|s| s.to_rfc3339()),
@@ -618,8 +703,8 @@ pub fn format_json_with_overlay(outcome: &QueryOutcome, plugin_id: &str, project
     serde_json::to_string_pretty(&payload).expect("serde_json::Value always serializes")
 }
 
-fn merge_overlay_fields(raw: &RawRecord, projections: &[OverlayProjection]) -> Value {
-    let Some(key) = scenario_key(raw) else { return raw.0.clone() };
+fn merge_overlay_fields(kind: RecordKind, raw: &RawRecord, projections: &[OverlayProjection], include_sensitive: bool) -> Value {
+    let Some(key) = scenario_key(raw) else { return query_record(kind, raw, include_sensitive) };
     let mut overlay_obj = serde_json::Map::new();
     for projection in projections {
         if let Some(fields) = projection.projected.get(&key) {
@@ -627,9 +712,9 @@ fn merge_overlay_fields(raw: &RawRecord, projections: &[OverlayProjection]) -> V
         }
     }
     if overlay_obj.is_empty() {
-        return raw.0.clone();
+        return query_record(kind, raw, include_sensitive);
     }
-    let mut merged = raw.0.clone();
+    let mut merged = query_record(kind, raw, include_sensitive);
     if let Some(obj) = merged.as_object_mut() {
         obj.insert("overlay".to_string(), Value::Object(overlay_obj));
     }
@@ -648,6 +733,10 @@ fn merge_overlay_fields(raw: &RawRecord, projections: &[OverlayProjection]) -> V
 /// Never called by `main.rs::run_query` unless `projections` is
 /// non-empty — the empty case calls [`format_human`] verbatim instead.
 pub fn format_human_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection]) -> String {
+    format_human_with_overlay_and_sensitive(outcome, plugin_id, projections, false)
+}
+
+pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], _include_sensitive: bool) -> String {
     let since_desc = outcome.since.map(|s| s.to_rfc3339()).unwrap_or_else(|| "none".to_string());
     let mut out =
         format!("canon query --kind {} --since {} --plugin {}: {} record(s)", outcome.kind.as_str(), since_desc, plugin_id, outcome.records.len());
@@ -687,4 +776,65 @@ pub fn format_human_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projec
         out.push_str(&format!("{:<30} {:<30} {:<16} {}\n", at.to_rfc3339(), id, digest, overlay_desc));
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn event_outcome() -> QueryOutcome {
+        QueryOutcome {
+            kind: RecordKind::Event,
+            since: None,
+            records: vec![RawRecord(serde_json::json!({
+                "schema": 1,
+                "kind": "event",
+                "at": "2026-01-01T00:00:00Z",
+                "event_id": "evt-1",
+                "run_id": "run-1",
+                "seq": 1,
+                "label": "tool_result",
+                "detail": {
+                    "text": "directive contains secret prose",
+                    "api_key": "credential-value",
+                    "nested": {"raw": "raw credential value", "safe": "retained"},
+                },
+            }))],
+            violation_count: 0,
+            rollup: None,
+        }
+    }
+
+    #[test]
+    fn json_query_redacts_event_text_and_credentials_by_default() {
+        let outcome = event_outcome();
+        let payload: Value = serde_json::from_str(&format_json(&outcome)).unwrap();
+        let detail = &payload["records"][0]["detail"];
+
+        assert!(detail.get("text").is_none(), "event text must be omitted by default: {payload}");
+        assert_eq!(detail["api_key"], "[REDACTED]");
+        assert_eq!(detail["nested"]["raw"], "[REDACTED]");
+        assert_eq!(detail["nested"]["safe"], "retained");
+        assert!(!format_json(&outcome).contains("credential-value"));
+        assert!(!format_json(&outcome).contains("secret prose"));
+    }
+
+    #[test]
+    fn json_query_includes_event_detail_only_for_authorized_projection() {
+        let outcome = event_outcome();
+        let payload: Value = serde_json::from_str(&format_json_with_sensitive(&outcome, true)).unwrap();
+        let detail = &payload["records"][0]["detail"];
+
+        assert_eq!(detail["text"], "directive contains secret prose");
+        assert_eq!(detail["api_key"], "credential-value");
+        assert_eq!(detail["nested"]["raw"], "raw credential value");
+    }
+
+    #[test]
+    fn human_query_is_metadata_only_and_never_emits_event_detail() {
+        let output = format_human(&event_outcome());
+        assert!(output.contains("event"));
+        assert!(!output.contains("directive contains secret prose"));
+        assert!(!output.contains("credential-value"));
+    }
 }

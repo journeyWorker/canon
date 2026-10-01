@@ -322,7 +322,8 @@ struct RawRiskTierRule {
     min_human_approvals: u32,
 }
 /// Resolve the declarative `risk_tiers:` section. A malformed section or
-/// entry is diagnosed and omitted; it is never silently enabled.
+/// entry is diagnosed and omitted from the usable map; the owning risk gate
+/// consumes that diagnostic and fails closed rather than treating it as absent.
 fn resolve_risk_tiers(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<PolicyDiagnostic>) -> BTreeMap<String, RiskTierRule> {
     const SECTION: &str = "risk_tiers";
     let Some(raw) = raw else {
@@ -517,7 +518,9 @@ pub struct PolicyResolution {
     /// contract.
     pub risk_routing: BTreeMap<String, PolicyField<bool>>,
     /// Declarative effect-aware approval tiers. An empty map is a strict
-    /// no-op; these rules are intentionally separate from risk routing.
+    /// no-op only when the section is absent and has no `risk_tiers`
+    /// diagnostic; the owning gate fails closed for a present malformed
+    /// section. These rules are intentionally separate from risk routing.
     pub risk_tiers: BTreeMap<String, RiskTierRule>,
     /// s44's opt-in spec-corpus coverage requirement. `None` = the
     /// section is absent and `crate::spec_coverage` is silent; see

@@ -48,7 +48,7 @@ jobs:
     outputs:
       version: ${{ steps.read.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Cross-workflow drift guard (the upstream release pipeline's lesson,
       # recommended action #1) — the FIRST thing a release does, so a
@@ -106,15 +106,15 @@ jobs:
             binary_ext: ".exe"
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           targets: ${{ matrix.settings.target }}
 
       - name: Cache cargo
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             ~/.cargo/registry/index/
@@ -124,17 +124,34 @@ jobs:
           key: canon-cli-${{ matrix.settings.target }}-cargo-${{ hashFiles('Cargo.lock') }}
 
       - name: Build canon-cli binary
-        run: cargo build --release -p canon-cli --target ${{ matrix.settings.target }}
+        run: cargo build --locked --release -p canon-cli --target ${{ matrix.settings.target }}
 
       - name: Strip binary
         if: matrix.settings.binary_ext == ''
         run: strip "target/${{ matrix.settings.target }}/release/canon"
 
+      - name: Create binary checksum handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN="canon${{ matrix.settings.binary_ext }}"
+          BIN_PATH="target/${{ matrix.settings.target }}/release/$BIN"
+          (
+            cd "$(dirname "$BIN_PATH")"
+            if [ "${{ runner.os }}" = "macOS" ]; then
+              shasum -a 256 "$BIN" > "$BIN.sha256"
+            else
+              sha256sum "$BIN" > "$BIN.sha256"
+            fi
+          )
+
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: canon-binary-${{ matrix.settings.target }}
-          path: target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}
+          path: |
+            target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}
+            target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}.sha256
           if-no-files-found: error
 
   publish:
@@ -145,15 +162,15 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.3.14
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
@@ -169,25 +186,36 @@ jobs:
       # is configured on all four package pages, OIDC is used and the token
       # (and this secret) can be removed.
       - name: Upgrade npm for OIDC trusted publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@11.5.1
+
+      - name: Install workspace dependencies from the frozen lockfile
+        run: bun install --frozen-lockfile
 
       - name: Download darwin-arm64 binary artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: canon-binary-aarch64-apple-darwin
           path: packages/core-darwin-arm64/bin
 
       - name: Download linux-x64 binary artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: canon-binary-x86_64-unknown-linux-gnu
           path: packages/core-linux-x64/bin
 
       - name: Download win32-x64 binary artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: canon-binary-x86_64-pc-windows-msvc
           path: packages/core-win32-x64/bin
+
+      - name: Verify binary checksum handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd packages/core-darwin-arm64/bin && sha256sum -c canon.sha256)
+          (cd packages/core-linux-x64/bin && sha256sum -c canon.sha256)
+          (cd packages/core-win32-x64/bin && sha256sum -c canon.exe.sha256)
 
       - name: Stage binaries executable
         run: |

@@ -192,8 +192,25 @@ impl fmt::Debug for AgingRule {
     }
 }
 
-/// `Tier::age`'s report (tier-policy spec: "a record past its aging
-/// threshold moves tiers"; tier-adapter-trait spec: "aging is
+/// The outcome of one retention purge operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PurgeCount {
+    /// Records matching the cutoff, including rows found during a dry run.
+    pub matched: usize,
+    /// Records actually deleted. This is zero for a dry run.
+    pub deleted: usize,
+}
+
+/// The stable allowlist for canonical retention. Git history and authored
+/// evidence are intentionally not represented here.
+pub const PURGEABLE_KINDS: &[RecordKind] = &[RecordKind::Session, RecordKind::Run, RecordKind::Event, RecordKind::Trajectory];
+
+pub fn is_purgeable_kind(kind: RecordKind) -> bool {
+    PURGEABLE_KINDS.contains(&kind)
+}
+
+/// The outcome of one [`Tier::age`] call (tier-policy spec: "a record past
+/// its aging threshold moves tiers"; tier-adapter-trait spec: "aging is
 /// idempotent under a duplicate run").
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AgeReport {
@@ -207,6 +224,7 @@ pub struct AgeReport {
     pub already_aged: usize,
 }
 
+
 /// Every failure mode a `Tier` adapter can report — one shared enum so
 /// `canon query`/`canon tier age`/`canon gate` (S5) match on a single
 /// error type across all three adapters, rather than three
@@ -219,6 +237,16 @@ pub enum StoreError {
     DuplicatePath { kind: RecordKind, location: String },
     #[error("{kind:?}: no `TierPolicy.routing` entry (canon.yaml) — every write/read must resolve through the declarative policy, never a hardcoded default")]
     UnroutedKind { kind: RecordKind },
+    #[error("purge kind `{kind}` is not allowed; allowed kinds: session, run, event, trajectory")]
+    PurgeKindUnsupported { kind: String },
+    #[error("{}", partial_purge_message(*rung, *backend, *matched, *deleted, reason))]
+    PurgePartial {
+        rung: crate::policy::Rung,
+        backend: crate::policy::Backend,
+        matched: usize,
+        deleted: usize,
+        reason: String,
+    },
     #[error("{}", tier_unavailable_message(*rung, *backend, reason))]
     TierUnavailable { rung: crate::policy::Rung, backend: Option<crate::policy::Backend>, reason: String },
     #[error("{} backend is not attached ({reason})", backend.as_str())]
@@ -246,6 +274,14 @@ pub enum StoreError {
 /// entry at all (`backend: None`) — the ONE place both shapes are
 /// assembled, so `canon query`'s failure text and this crate's own
 /// unit tests never drift apart.
+fn partial_purge_message(rung: crate::policy::Rung, backend: crate::policy::Backend, matched: usize, deleted: usize, reason: &str) -> String {
+    format!(
+        "partial purge: {matched} record(s) matched; at least {deleted} deleted before {} ({}) failed: {reason}; purge backends are non-transactional",
+        rung.as_str(),
+        backend.as_str()
+    )
+}
+
 fn tier_unavailable_message(rung: crate::policy::Rung, backend: Option<crate::policy::Backend>, reason: &str) -> String {
     match backend {
         Some(b) => format!("{} tier ({}) is not attached ({reason})", rung.as_str(), b.as_str()),
@@ -303,6 +339,11 @@ pub trait Tier: Send + Sync {
     /// reporting (never panicking on) anything malformed or misfiled
     /// along the way.
     fn read(&self, query: &TierQuery) -> Result<TierReadResult, StoreError>;
+
+    /// Delete (or count, in a dry run) every record for `kind` whose
+    /// envelope `at` is older than `before`. Adapters MUST identify rows
+    /// by their complete digest/key identity and MUST NOT follow symlinks.
+    fn purge_before(&self, kind: RecordKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError>;
 
     /// Move every `rule.kind` record older than `rule.after` (by `at`)
     /// from this tier to `rule.destination`, deleting the source copy

@@ -157,6 +157,10 @@ pub trait TrajectoryStore {
     /// items (zero included), this addresses exactly one row — so a count
     /// would carry nothing the `Result` does not already say.
     fn delete_by_id(&self, regime_key: &RegimeKey, id: &TrajectoryId) -> Result<(), LearnError>;
+    /// Purge trajectories older than `before`, addressed by their
+    /// `(regime_key, id)` file key. Dry runs only count matching rows.
+    fn purge_before(&self, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<usize, LearnError>;
+
 }
 
 /// The distilled, warm-tier strategy store: the ONLY store

@@ -90,6 +90,13 @@ PostgreSQL and S3-compatible storage are optional scale-up backends that
 require operator-supplied credentials. See
 [Tiered storage](/concepts/tiered-storage/).
 
+Retention is a separate lifecycle boundary: `canon purge` removes only the
+allowlisted operational records from every configured routed/aging destination.
+It does not rewrite Git history or delete operator-owned source transcripts.
+`canon export` produces a redacted manifest, and access to query/export/purge
+is appended to `.canon/audit/access.jsonl`; backend credentials and deployment
+RBAC remain external prerequisites.
+
 ## The flywheel
 
 ```

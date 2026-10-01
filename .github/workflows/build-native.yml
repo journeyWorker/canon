@@ -24,12 +24,15 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
 
+permissions:
+  contents: read
+
 jobs:
   safety:
     name: Release workflow safety check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # Cross-workflow drift guard (the upstream release pipeline's lesson,
       # recommended action #1): fails the moment this workflow's build
       # matrix / env drifts from publish.yml's, or from the platform
@@ -59,15 +62,15 @@ jobs:
             binary_ext: ".exe"
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           targets: ${{ matrix.settings.target }}
 
       - name: Cache cargo
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             ~/.cargo/registry/index/
@@ -77,7 +80,7 @@ jobs:
           key: canon-cli-${{ matrix.settings.target }}-cargo-${{ hashFiles('Cargo.lock') }}
 
       - name: Build canon-cli binary
-        run: cargo build --release -p canon-cli --target ${{ matrix.settings.target }}
+        run: cargo build --locked --release -p canon-cli --target ${{ matrix.settings.target }}
 
       - name: Strip binary
         if: matrix.settings.binary_ext == ''
@@ -86,15 +89,27 @@ jobs:
       - name: Stage into platform package (local verification only — not committed)
         shell: bash
         run: |
+          set -euo pipefail
           BIN="canon${{ matrix.settings.binary_ext }}"
+          BIN_PATH="target/${{ matrix.settings.target }}/release/$BIN"
+          (
+            cd "$(dirname "$BIN_PATH")"
+            if [ "${{ runner.os }}" = "macOS" ]; then
+              shasum -a 256 "$BIN" > "$BIN.sha256"
+            else
+              sha256sum "$BIN" > "$BIN.sha256"
+            fi
+          )
           mkdir -p "packages/${{ matrix.settings.package_dir }}/bin"
-          cp "target/${{ matrix.settings.target }}/release/$BIN" "packages/${{ matrix.settings.package_dir }}/bin/$BIN"
+          cp "$BIN_PATH" "packages/${{ matrix.settings.package_dir }}/bin/$BIN"
           chmod +x "packages/${{ matrix.settings.package_dir }}/bin/$BIN"
           "packages/${{ matrix.settings.package_dir }}/bin/$BIN" --version
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: canon-binary-${{ matrix.settings.target }}
-          path: target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}
+          path: |
+            target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}
+            target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}.sha256
           if-no-files-found: error

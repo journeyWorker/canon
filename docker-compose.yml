@@ -18,7 +18,7 @@
 # repo's own Postgres/MinIO on the same host.
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
     ports:
       - "${CANON_PG_PORT:-55432}:5432"
     environment:
@@ -34,7 +34,9 @@ services:
       - canon-pg-data:/var/lib/postgresql/data
 
   minio:
-    image: minio/minio
+    build:
+      context: docker/minio
+      dockerfile: Dockerfile
     ports:
       - "${CANON_MINIO_PORT:-59000}:9000"
       - "${CANON_MINIO_CONSOLE_PORT:-59001}:9001"
@@ -43,7 +45,7 @@ services:
       MINIO_ROOT_PASSWORD: canoncanon
     command: server /data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/ready"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9000/minio/health/ready"]
       interval: 2s
       timeout: 5s
       retries: 20
@@ -59,7 +61,9 @@ services:
   # (or `--wait` a healthy `postgres`/`minio` first) before assuming the
   # bucket is ready — see this file's own header comment / CI job.
   minio-init:
-    image: minio/mc
+    build:
+      context: docker/mc
+      dockerfile: Dockerfile
     depends_on:
       minio:
         condition: service_healthy

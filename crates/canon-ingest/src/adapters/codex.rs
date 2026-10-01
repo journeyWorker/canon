@@ -42,12 +42,12 @@
 //!   (`codex.rs:561-565` et al.) — `UnifiedRow` (Wave 1's frozen
 //!   contract) carries no `agent` field at all, so tracking it here
 //!   would be dead state.
-//! - **s31 design D4 (user-directive capture)**: `parse_codex_reader`'s
+//! - **s31 design D4 (user-directive parsing)**: `parse_codex_reader`'s
 //!   existing `event_msg`/`user_message` gate — `codex_message_is_human_turn`
 //!   already distinguishes a real human turn from Codex's own
 //!   `<environment_context>`/`<system-reminder>`/`<user_instructions>`
-//!   injected context (`CODEX_SYSTEM_INJECTED_PREFIXES`) — now ALSO
-//!   emits a `DirectiveRow` carrying that turn's verbatim
+//!   injected context (`CODEX_SYSTEM_INJECTED_PREFIXES`) — emits a
+//!   `DirectiveRow` carrying that turn's in-memory
 //!   `payload.message` text (a plain string; Codex's format has no
 //!   structured content-block array to flatten, unlike omp/claude).
 //!   Forked-child replays of the parent's prompt are already skipped

@@ -70,7 +70,7 @@ pub use artifact_adapter::{
     ArtifactAdapter, ArtifactEvent, ArtifactEventKind, ArtifactJoinKey, ArtifactParseOutcome, ArtifactSourceConfig, ArtifactSourceHandle,
 };
 pub use artifact_registry::{ArtifactAdapterEntry, registry as artifact_adapter_registry};
-pub use normalize::{NormalizeOutcome, NormalizedSession, normalize_rows};
+pub use normalize::{DirectivePrivacyPolicy, NormalizeOutcome, NormalizedSession, normalize_rows, normalize_with_privacy};
 pub use plan_adapter::{PlanAdapter, PlanParseOutcome, PlanSourceConfig, PlanSourceHandle};
 pub use plan_registry::{PlanAdapterEntry, find as find_plan_adapter, registry as plan_adapter_registry};
 pub use plan_writeback::{FlipDocOutcome, PlanTaskLocation, PlanWriteBack, WriteBackError, reject_multi_line_note};

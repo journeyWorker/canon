@@ -117,6 +117,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::context::{render_json, resolve_canon_yaml, resolve_repo_root, resolve_surface, ContextOptions};
+use crate::context_pack::{create_dispatch_pack, ContextPackError, ContextPackSpec};
 
 /// The private side-channel directory a dispatch record lands under,
 /// relative to the repo root. NOT the record's only home since s42
@@ -148,6 +149,11 @@ pub enum DispatchError {
     /// `Run` is always `Serialize`).
     #[error("serializing the dispatch Run manifest: {0}")]
     Serialize(String),
+
+    /// The reproducible context snapshot could not be created. This is
+    /// surfaced before the run id, manifest, or tier record is written.
+    #[error(transparent)]
+    ContextPack(#[from] ContextPackError),
 
     /// `--task <id>` (s40 task 1.2) names a task no configured plan
     /// source carries. Raised BEFORE the mint and the write:
@@ -268,7 +274,12 @@ impl DispatchError {
             | Self::AlreadyEnded { .. }
             | Self::NotRunning { .. }
             | Self::RunIdMismatch { .. }
-            | Self::Unreadable { .. } => true,
+            | Self::Unreadable { .. }
+            | Self::ContextPack(ContextPackError::UnsafePath(_)
+                | ContextPackError::MissingInput(_)
+                | ContextPackError::SecretDetected(_)
+                | ContextPackError::PromptBundle { .. }) => true,
+            Self::ContextPack(_) => false,
             // A concurrent close and a filesystem failure are both
             // "the invocation was fine, the machine was busy or
             // broken" — exit `1`, retryable, never a flag to fix.
@@ -453,26 +464,36 @@ pub struct DispatchMetadata {
     pub skill_digest: Option<String>,
 }
 
-/// Capture the same capability surface as `canon context`, without
-/// reading the evidence corpus. A missing policy is explicitly labelled
-/// as `sha256:absent`, never replaced with current policy defaults
-/// (nor confused with the empty bytes of a present, empty file).
-fn capture_lineage(repo: &Path, metadata: &DispatchMetadata) -> Result<RunLineage, DispatchError> {
+/// Capture the canonical capability surface AND its immutable ContextPack.
+/// This runs before a `RunId` is minted or any run manifest/tier is written,
+/// so a missing or unsafe declared input cannot leave a partial run.
+fn capture_lineage(
+    repo: &Path,
+    metadata: &DispatchMetadata,
+    guidance: &[canon_model::records::StrategyRef],
+    work_ref: Option<String>,
+    task_ref: Option<String>,
+) -> Result<RunLineage, DispatchError> {
     let surface = resolve_surface(repo, ContextOptions::default());
-    let context = ContextSnapshot {
-        digest: sha256_digest(render_json(&surface).as_bytes()),
-        capability_version: surface.capability_version,
-    };
-    let policy_digest = match std::fs::read(repo.join(".canon/policy.yaml")) {
-        Ok(bytes) => sha256_digest(&bytes),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => "sha256:absent".to_string(),
-        Err(error) => return Err(DispatchError::Io(error)),
-    };
+    let context_bytes = render_json(&surface).into_bytes();
+    let context_digest = sha256_digest(&context_bytes);
+    let mut spec = ContextPackSpec::for_dispatch(
+        metadata.provider.clone(),
+        metadata.model.clone(),
+        metadata.skill_digest.clone(),
+        context_digest.clone(),
+        surface.capability_version,
+        guidance.to_vec(),
+    );
+    spec.work_ref = work_ref;
+    spec.task_ref = task_ref;
+    let (pack, _) = create_dispatch_pack(repo, &spec, &context_bytes, surface.capability_version)?;
+    let policy_digest = pack.policy.as_ref().map(|file| file.content.digest.clone()).unwrap_or_else(|| "sha256:absent".to_string());
     Ok(RunLineage {
         provider: metadata.provider.clone(),
         model: metadata.model.clone(),
         skill: metadata.skill_id.as_ref().map(|id| SkillSnapshot { id: id.clone(), digest: metadata.skill_digest.clone() }),
-        context: Some(context),
+        context: Some(ContextSnapshot { digest: context_digest, capability_version: surface.capability_version, pack_id: Some(pack.id) }),
         policy: Some(PolicySnapshot { digest: policy_digest }),
     })
 }
@@ -647,10 +668,17 @@ pub fn begin(
     if let Some(task_id) = &binding.task_id {
         validate_task_binding(&repo, task_id)?;
     }
-    let lineage = capture_lineage(&repo, metadata)?;
     let store = open_strategy_store(&repo);
     let guidance = retrieve_guidance(&store, role, regime_key, None);
-
+    // Capture guidance inside the immutable pack before minting the run. A
+    // failed pack capture therefore leaves no dispatch manifest or tier row.
+    let lineage = capture_lineage(
+        &repo,
+        metadata,
+        &guidance,
+        Some(regime_key.as_str().to_string()),
+        binding.task_id.as_ref().map(|task| task.as_str().to_string()),
+    )?;
     let run_id = RunId::new();
     let now = Utc::now();
     let actor = Actor::new(agent_id.to_string(), role.clone());

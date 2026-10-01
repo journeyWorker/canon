@@ -167,7 +167,7 @@
       ]
     },
     "EvidenceApproval": {
-      "description": "An accountable approval attestation attached to an [`EvidenceRecord`].\nThe shape records who approved, under which role, and when; it does not\nclaim that an external human actually reviewed the evidence.",
+      "description": "An approval attestation attached to an [`EvidenceRecord`]. The optional\nverification bit is persisted so later gates do not trust caller input.",
       "type": "object",
       "properties": {
         "approver": {
@@ -179,6 +179,9 @@
         },
         "role": {
           "$ref": "#/$defs/RoleId"
+        },
+        "verified": {
+          "type": "boolean"
         }
       },
       "required": [

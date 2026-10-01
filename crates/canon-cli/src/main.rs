@@ -103,6 +103,21 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Create, inspect, and verify reproducible context packs
+    #[command(after_help = "Examples:\n  canon context-pack create --manifest .canon/context-manifest.json\n  canon context-pack show sha256:<pack-digest> --repo . --json\n  canon context-pack verify sha256:<pack-digest>")]
+    ContextPack {
+        #[command(subcommand)]
+        action: ContextPackCommand,
+    },
+    /// Register and select versioned prompt bundles
+    #[command(
+        disable_version_flag = true,
+        after_help = "Examples:\n  canon prompt register --name reviewer --version v1 --manifest .canon/reviewer.json\n  canon prompt show --name reviewer --version v1 --json"
+    )]
+    Prompt {
+        #[command(subcommand)]
+        action: PromptCommand,
+    },
 
     // ── Specs & authoring ──
     /// Validate a spec/artifact corpus against canon's format
@@ -255,7 +270,41 @@ enum Command {
         /// Scope --kind subject by domain (other kinds exit 2)
         #[arg(long)]
         domain: Option<String>,
+        /// Permit sensitive query output only when policy explicitly allows it
+        #[arg(long)]
+        include_sensitive: bool,
     },
+    /// Export a redacted retention manifest without deleting records
+    Export {
+        #[arg(long, value_parser = canon_cli::query::parse_kind)]
+        kind: RecordKind,
+        #[arg(long, value_parser = canon_cli::query::parse_since)]
+        before: Option<DateTime<Utc>>,
+        #[arg(long, value_parser = canon_cli::query::parse_since)]
+        after: Option<DateTime<Utc>>,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        include_sensitive: bool,
+    },
+    /// Permanently remove allowlisted records older than a cutoff
+    Purge {
+        #[arg(long, value_parser = canon_cli::query::parse_kind)]
+        kind: RecordKind,
+        #[arg(long, value_parser = canon_cli::query::parse_since)]
+        before: DateTime<Utc>,
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Generate the status report (write, --check, or --snapshot)
     Report {
         /// Repo root (default: nearest ancestor with a canon.yaml)
@@ -300,6 +349,81 @@ enum Command {
     /// Run canon's built-in fixture self-tests
     Selftest {
         /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum ContextPackCommand {
+    /// Create an immutable context pack from a repository-local JSON manifest
+    Create {
+        /// Repository-relative input manifest
+        #[arg(long)]
+        manifest: PathBuf,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output the complete pack manifest as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show a context pack after verifying its manifest and content objects
+    Show {
+        /// Context pack id (sha256:<64 hex digits>)
+        id: String,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output the complete pack manifest as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Verify a context pack's manifest and immutable content objects
+    Verify {
+        /// Context pack id (sha256:<64 hex digits>)
+        id: String,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output a JSON verification result
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum PromptCommand {
+    /// Register a prompt bundle from a repository-local JSON manifest
+    Register {
+        /// Bundle name
+        #[arg(long)]
+        name: String,
+        /// Bundle version
+        #[arg(long)]
+        version: String,
+        /// Repository-relative input manifest
+        #[arg(long)]
+        manifest: PathBuf,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output the complete bundle manifest as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Select a registered prompt bundle version
+    Show {
+        /// Bundle name
+        #[arg(long)]
+        name: String,
+        /// Bundle version
+        #[arg(long)]
+        version: String,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output the complete bundle manifest as JSON
         #[arg(long)]
         json: bool,
     },
@@ -541,16 +665,19 @@ enum EvidenceCommand {
         /// RunId (ULID) of the run that produced this evidence
         #[arg(long, value_parser = canon_cli::dispatch::parse_run_id)]
         run_id: Option<RunId>,
+        /// Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref
+        #[arg(long = "surface-ref", value_parser = canon_cli::evidence::parse_surface_ref)]
+        surface_ref: Vec<String>,
         /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
         #[arg(long, default_value = "canon")]
         actor_id: String,
         /// Required: `canon gate promote` derives its run_seq partition key from it
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
-        /// Required approval attestation's distinct approver id; must be paired with --approval-role
+        /// Optional approval attestation id; verified only when it equals non-empty CANON_ACTOR
         #[arg(long)]
         approval_by: Option<String>,
-        /// Required approval attestation role; must be paired with --approval-by
+        /// Optional approval role; only human is eligible for verified risk approval and it must be paired with --approval-by
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         approval_role: Option<RoleId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
@@ -970,11 +1097,24 @@ fn main() -> ExitCode {
         Command::Tier { action } => match action {
             TierCommand::Age { dry_run, repo, canon_yaml } => run_tier_age(&repo, canon_yaml.as_deref(), dry_run),
         },
-        Command::Query { kind, since, repo, canon_yaml, json, plugin, change_id, status, domain } => {
-            run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, change_id, status, domain)
+        Command::Query { kind, since, repo, canon_yaml, json, plugin, change_id, status, domain, include_sensitive } => {
+            run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, change_id, status, domain, include_sensitive)
         }
+        Command::Export { kind, before, after, out, repo, json, include_sensitive } => ExitCode::from(canon_cli::retention::run_export(&repo, kind, before, after, out.as_deref(), json, include_sensitive)),
+        Command::Purge { kind, before, repo, dry_run, json } => ExitCode::from(canon_cli::retention::run_purge(&repo, kind, before, dry_run, json)),
         Command::Format { check: _, root, repo } => run_fmt(&root, repo.as_deref()),
         Command::Context { repo, json } => run_context(&repo, json),
+        Command::ContextPack { action } => match action {
+            ContextPackCommand::Create { manifest, repo, json } => run_context_pack_create(&repo, &manifest, json),
+            ContextPackCommand::Show { id, repo, json } => run_context_pack_show(&repo, &id, json),
+            ContextPackCommand::Verify { id, repo, json } => run_context_pack_verify(&repo, &id, json),
+        },
+        Command::Prompt { action } => match action {
+            PromptCommand::Register { name, version, manifest, repo, json } => {
+                run_prompt_register(&repo, &name, &version, &manifest, json)
+            }
+            PromptCommand::Show { name, version, repo, json } => run_prompt_show(&repo, &name, &version, json),
+        },
         Command::Ingest { action } => match action {
             IngestCommand::Sessions { watch, interval_secs, home, canon_yaml, full, all_workspaces } => run_ingest_sessions(&canon_yaml, home.as_deref(), watch, interval_secs, full, all_workspaces),
             IngestCommand::Artifacts { watch, interval_secs, repo, json, run } => run_ingest_artifacts(&repo, watch, interval_secs, json, run.as_ref()),
@@ -1000,6 +1140,7 @@ fn main() -> ExitCode {
                 command_result,
                 scenario_id,
                 run_id,
+                surface_ref,
                 actor_id,
                 role,
                 approval_by,
@@ -1018,6 +1159,7 @@ fn main() -> ExitCode {
                         command_result,
                         scenario_id,
                         run_id,
+                        surface_ref,
                         actor_id,
                         role,
                         approval_by,
@@ -1193,19 +1335,14 @@ fn run_tier_age(repo: &std::path::Path, canon_yaml: Option<&std::path::Path>, dr
     }
 }
 
-/// `plugin: None` calls the EXACT SAME [`canon_cli::query::run`]/
-/// [`canon_cli::query::format_human`]/[`canon_cli::query::format_json`]
-/// this function called before s16 P3 -- byte-for-byte the same source
-/// (task 3.4's no-`--plugin`-⇒-byte-identical hard test). `plugin:
-/// Some(id)` calls [`canon_cli::query::run_with_plugin`] instead;
-/// every diagnostic it returns is printed to stderr regardless of
-/// whether a projection actually resolved, and stdout falls back to
-/// the SAME [`format_human`]/[`format_json`] calls whenever
-/// `projections` came back empty (an unresolved plugin, or a
-/// `--kind`/overlay `core_kind` mismatch) -- so a degraded `--plugin`
-/// run's stdout is ALSO byte-identical to the no-`--plugin` path,
-/// exactly as `plugin-overlay-projection`'s own fail-soft scenarios
-/// require.
+/// `plugin: None` calls the EXACT SAME [`canon_cli::query::run`] path this
+/// function used before sensitive query output was added. The selected
+/// formatter receives the already-policy-validated `include_sensitive` bit,
+/// while the default formatter wrappers remain redacted. `plugin: Some(id)`
+/// calls [`canon_cli::query::run_with_plugin`] instead; every diagnostic it
+/// returns is printed to stderr regardless of whether a projection actually
+/// resolved, and stdout uses the matching core/overlay formatter with the
+/// same sensitive-output authorization.
 #[allow(clippy::too_many_arguments)]
 fn run_query(
     repo: &std::path::Path,
@@ -1217,26 +1354,35 @@ fn run_query(
     change_id: Option<ChangeId>,
     status: Option<String>,
     domain: Option<String>,
+    include_sensitive: bool,
 ) -> ExitCode {
     // s19 `query-scope-filters` design D5: kind-gating + status-domain
     // validation runs BEFORE any tier read (task 3.2/3.3) -- a usage
     // fault here is a clean, nothing-read `2`, never a store error.
     if let Err(e) = canon_cli::query::validate_scope(kind, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
         eprintln!("canon query: {e}");
+        let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, 0);
         return ExitCode::from(2);
     }
 
+    if let Err(err) = canon_cli::retention::validate_sensitive(repo, include_sensitive) {
+        eprintln!("canon query: {err}");
+        let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, 0);
+        return ExitCode::from(2);
+    }
     let Some(plugin_id) = plugin else {
         return match canon_cli::query::run(repo, canon_yaml, kind, since, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
             Ok(outcome) => {
+                let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, outcome.records.len());
                 if json {
-                    println!("{}", canon_cli::query::format_json(&outcome));
+                    println!("{}", canon_cli::query::format_json_with_sensitive(&outcome, include_sensitive));
                 } else {
-                    print!("{}", canon_cli::query::format_human(&outcome));
+                    print!("{}", canon_cli::query::format_human_with_sensitive(&outcome, include_sensitive));
                 }
                 ExitCode::SUCCESS
             }
             Err(err) => {
+                let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, 0);
                 eprintln!("canon query: {err}");
                 ExitCode::FAILURE
             }
@@ -1245,23 +1391,25 @@ fn run_query(
 
     match canon_cli::query::run_with_plugin(repo, canon_yaml, kind, since, &plugin_id, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
         Ok((outcome, plugin_outcome)) => {
+            let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, outcome.records.len());
             for msg in &plugin_outcome.diagnostics {
                 eprintln!("canon query --plugin {plugin_id}: {msg}");
             }
             if plugin_outcome.projections.is_empty() {
                 if json {
-                    println!("{}", canon_cli::query::format_json(&outcome));
+                    println!("{}", canon_cli::query::format_json_with_sensitive(&outcome, include_sensitive));
                 } else {
-                    print!("{}", canon_cli::query::format_human(&outcome));
+                    print!("{}", canon_cli::query::format_human_with_sensitive(&outcome, include_sensitive));
                 }
             } else if json {
-                println!("{}", canon_cli::query::format_json_with_overlay(&outcome, &plugin_id, &plugin_outcome.projections));
+                println!("{}", canon_cli::query::format_json_with_overlay_and_sensitive(&outcome, &plugin_id, &plugin_outcome.projections, include_sensitive));
             } else {
-                print!("{}", canon_cli::query::format_human_with_overlay(&outcome, &plugin_id, &plugin_outcome.projections));
+                print!("{}", canon_cli::query::format_human_with_overlay_and_sensitive(&outcome, &plugin_id, &plugin_outcome.projections, include_sensitive));
             }
             ExitCode::SUCCESS
         }
         Err(err) => {
+            let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, 0);
             eprintln!("canon query: {err}");
             ExitCode::FAILURE
         }
@@ -1409,6 +1557,114 @@ fn run_context(repo: &std::path::Path, json: bool) -> ExitCode {
         print!("{}", canon_cli::context::render_outline(&surface));
     }
     ExitCode::SUCCESS
+}
+
+fn context_pack_error_code(error: &canon_cli::context_pack::ContextPackError) -> ExitCode {
+    use canon_cli::context_pack::ContextPackError;
+    let code = match error {
+        ContextPackError::UnsafePath(_)
+        | ContextPackError::InvalidManifestVersion(_)
+        | ContextPackError::MissingInput(_)
+        | ContextPackError::MissingPack(_)
+        | ContextPackError::PromptBundle { .. }
+        | ContextPackError::SecretDetected(_)
+        | ContextPackError::Serialize(_) => 2,
+        ContextPackError::Io { .. }
+        | ContextPackError::ObjectConflict { .. }
+        | ContextPackError::Tampered { .. }
+        | ContextPackError::Git(_) => 1,
+    };
+    ExitCode::from(code)
+}
+
+fn run_context_pack_create(repo: &std::path::Path, manifest: &std::path::Path, json: bool) -> ExitCode {
+    let repo = canon_cli::context::resolve_repo_root(repo);
+    match canon_cli::context_pack::create_from_manifest(&repo, manifest) {
+        Ok(pack) => {
+            if json {
+                println!("{}", serde_json::to_string_pretty(&pack).expect("context pack is serializable"));
+            } else {
+                println!("{}", pack.id);
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("canon context-pack create: {error}");
+            context_pack_error_code(&error)
+        }
+    }
+}
+
+fn run_context_pack_show(repo: &std::path::Path, id: &str, json: bool) -> ExitCode {
+    let repo = canon_cli::context::resolve_repo_root(repo);
+    match canon_cli::context_pack::show(&repo, id) {
+        Ok(pack) => {
+            if json {
+                println!("{}", serde_json::to_string_pretty(&pack).expect("context pack is serializable"));
+            } else {
+                println!("{}", pack.id);
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("canon context-pack show: {error}");
+            context_pack_error_code(&error)
+        }
+    }
+}
+
+fn run_context_pack_verify(repo: &std::path::Path, id: &str, json: bool) -> ExitCode {
+    let repo = canon_cli::context::resolve_repo_root(repo);
+    match canon_cli::context_pack::verify(&repo, id) {
+        Ok(()) => {
+            if json {
+                println!("{}", serde_json::json!({ "id": id, "verified": true }));
+            } else {
+                println!("context pack {id} verified");
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("canon context-pack verify: {error}");
+            context_pack_error_code(&error)
+        }
+    }
+}
+
+fn run_prompt_register(repo: &std::path::Path, name: &str, version: &str, manifest: &std::path::Path, json: bool) -> ExitCode {
+    let repo = canon_cli::context::resolve_repo_root(repo);
+    match canon_cli::context_pack::register_prompt_bundle_from_manifest(&repo, name, version, manifest) {
+        Ok(bundle) => {
+            if json {
+                println!("{}", serde_json::to_string_pretty(&bundle).expect("prompt bundle is serializable"));
+            } else {
+                println!("prompt bundle {}@{} registered ({})", bundle.name, bundle.version, bundle.digest);
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("canon prompt register: {error}");
+            context_pack_error_code(&error)
+        }
+    }
+}
+
+fn run_prompt_show(repo: &std::path::Path, name: &str, version: &str, json: bool) -> ExitCode {
+    let repo = canon_cli::context::resolve_repo_root(repo);
+    match canon_cli::context_pack::select_prompt_bundle(&repo, name, version) {
+        Ok(bundle) => {
+            if json {
+                println!("{}", serde_json::to_string_pretty(&bundle).expect("prompt bundle is serializable"));
+            } else {
+                println!("prompt bundle {}@{} ({})", bundle.name, bundle.version, bundle.digest);
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("canon prompt show: {error}");
+            context_pack_error_code(&error)
+        }
+    }
 }
 
 fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Path>, watch: bool, interval_secs: u64, full: bool, all_workspaces: bool) -> ExitCode {

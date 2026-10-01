@@ -37,12 +37,20 @@
 //!   reviewer or a later reader can go check. Before this module the same
 //!   flips happened by hand, leaving nothing at all. That is the whole
 //!   delta, and it is worth having; it is not proof.
-//! - Making it verifiable is a DIFFERENT change: canon would have to
-//!   capture evidence through an execution path it controls (a run it
-//!   launched, a transcript it recorded, a signed artifact) rather than a
-//!   string a caller typed. Shelling out to `--ref` here would be worse
-//!   than the honest gap — it would let a caller pick the command whose
-//!   exit code becomes canon's proof.
+//! - A risk approval is a separate attestation. `--approval-by` is only
+//!   counted when it equals the non-empty `CANON_ACTOR` trusted identity and
+//!   `--approval-role human`; the persisted `verified` bit is what a later
+//!   gate reads. Caller text, agent roles, and empty identities never count.
+//! - `--surface-ref` records an explicitly validated path or `effect:<slug>`
+//!   binding. It remains attestation input, not proof of changed paths; a
+//!   configured risk tier fails closed when the current record cannot bind it.
+//!
+//! Making the underlying evidence verifiable is a DIFFERENT change: canon
+//! would have to capture evidence through an execution path it controls (a
+//! run it launched, a transcript it recorded, a signed artifact) rather than
+//! a string a caller typed. Shelling out to `--ref` here would be worse
+//! than the honest gap — it would let a caller pick the command whose
+//! exit code becomes canon's proof.
 //!
 //! ## Exactly what `canon gate task` checks on this path
 //! Checked: a non-`Divergent` [`EvidenceRecord`] exists for that
@@ -197,13 +205,34 @@ pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, String> {
     }
 }
 
+/// Validate one explicit risk-surface binding. Effects use the unambiguous
+/// `effect:<kebab-slug>` form; all other refs are repository-relative paths.
+/// This validates shape only — the CLI still records an attestation, not
+/// proof that the caller's ref equals the changed paths.
+pub fn parse_surface_ref(s: &str) -> Result<String, String> {
+    if s.is_empty() || s.trim() != s || s.contains('\n') || s.contains('\r') || s.contains('\0') {
+        return Err("surface refs must be non-empty, trimmed, and contain no line separators or NUL".to_string());
+    }
+    if let Some(effect) = s.strip_prefix("effect:") {
+        if effect.is_empty() || !effect.split('-').all(|part| !part.is_empty() && part.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit())) {
+            return Err("effect surface refs must use `effect:<kebab-slug>`".to_string());
+        }
+        return Ok(s.to_string());
+    }
+    let path = std::path::Path::new(s);
+    if path.is_absolute() || path.components().any(|component| matches!(component, std::path::Component::ParentDir | std::path::Component::RootDir | std::path::Component::Prefix(_))) {
+        return Err("path surface refs must be repository-relative and stay inside the repository".to_string());
+    }
+    Ok(s.to_string())
+}
+
 /// One `canon evidence add` invocation's already-parsed flags.
 ///
-/// A named struct rather than a positional parameter list: twelve
+/// A named struct rather than a positional parameter list: thirteen
 /// arguments, of which `kind`/`evidence_ref`/`summary`/`command_result`/
-/// `actor_id`/`approval_by` are plain strings — every adjacent pair of
-/// them would silently compile if transposed, and approval fields end up
-/// in the permanent ledger body.
+/// `actor_id`/`surface_ref`/`approval_by` are plain strings — every adjacent
+/// pair of them would silently compile if transposed, and approval fields
+/// end up in the permanent ledger body.
 pub struct EvidenceArgs {
     /// The plan task this evidence attests to, validated against the
     /// live plan corpus by [`crate::dispatch::validate_task_binding`]
@@ -248,6 +277,10 @@ pub struct EvidenceArgs {
     pub command_result: Option<String>,
     pub scenario_id: Option<ScenarioId>,
     pub run_id: Option<RunId>,
+    /// Explicit risk binding, persisted on the EvidenceRecord. This is
+    /// caller-supplied attestation data; gate checks fail closed whenever a
+    /// configured rule cannot be matched to a current binding.
+    pub surface_ref: Vec<String>,
     /// The attesting actor's id — the ATTRIBUTION half of what this
     /// command buys (module doc). Refused when it carries a line
     /// separator: with no `--summary`, `default_evidence_text` embeds it
@@ -288,16 +321,40 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         eprintln!("canon evidence add: refused — --kind and --ref must both be non-empty; an empty companion narrows the gate's typed evidence slice to nothing");
         return 2;
     }
+    for surface in &args.surface_ref {
+        if let Err(error) = parse_surface_ref(surface) {
+            eprintln!("canon evidence add: refused — --surface-ref `{surface}` is invalid: {error}");
+            return 2;
+        }
+    }
     match (&args.approval_by, &args.approval_role) {
         (Some(_), None) | (None, Some(_)) => {
             eprintln!("canon evidence add: refused — --approval-by and --approval-role must be supplied together");
             return 2;
         }
-        (Some(approver), Some(_)) if approver.trim().is_empty() => {
+        (Some(approver), Some(_role)) if approver.trim().is_empty() => {
             eprintln!("canon evidence add: refused — --approval-by must be non-empty");
             return 2;
         }
-        (None, None) | (Some(_), Some(_)) => {}
+        (Some(approver), Some(role)) if role.as_str() != "human" => {
+            eprintln!("canon evidence add: refused — only the human approval role can be verified; agent and empty roles never satisfy risk approval");
+            return 2;
+        }
+        (Some(approver), Some(_)) => {
+            let Some(trusted_actor) = std::env::var("CANON_ACTOR").ok().filter(|actor| !actor.trim().is_empty()) else {
+                eprintln!("canon evidence add: refused — --approval-by requires a non-empty CANON_ACTOR trusted identity; caller input alone is only an attestation");
+                return 2;
+            };
+            if approver.chars().any(|ch| matches!(ch, '\n' | '\r')) || trusted_actor.chars().any(|ch| matches!(ch, '\n' | '\r')) || trusted_actor.trim() != trusted_actor {
+                eprintln!("canon evidence add: refused — verified approval identities must be single-line, trimmed values");
+                return 2;
+            }
+            if approver != &trusted_actor {
+                eprintln!("canon evidence add: refused — --approval-by must equal the verified CANON_ACTOR identity; caller input alone is not authenticated");
+                return 2;
+            }
+        }
+        (None, None) => {}
     }
     if args.summary.is_none() && args.command_result.is_some() {
         eprintln!(
@@ -415,7 +472,15 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         args.verdict,
     );
     if let (Some(approver), Some(role)) = (&args.approval_by, &args.approval_role) {
-        record = record.with_approval(EvidenceApproval { approver: approver.clone(), role: role.clone(), at: Utc::now() });
+        record = record.with_approval(EvidenceApproval {
+            approver: approver.clone(),
+            role: role.clone(),
+            at: Utc::now(),
+            verified: true,
+        });
+    }
+    if !args.surface_ref.is_empty() {
+        record = record.with_surface_ref(args.surface_ref.clone());
     }
     if let Some(project_id) = &args.project_id {
         record = record.with_project_id(project_id.clone());
@@ -524,6 +589,7 @@ mod tests {
             command_result: None,
             scenario_id: None,
             run_id: None,
+            surface_ref: Vec::new(),
             actor_id: "canon".to_string(),
             role: RoleId::parse("implementer").expect("a literal role"),
             approval_by: None,
@@ -688,6 +754,15 @@ mod tests {
         }
         let err = parse_verdict("passing").expect_err("an unknown verdict is refused");
         assert!(err.contains("faithful"), "the refusal must name the domain: {err}");
+    }
+
+    #[test]
+    fn surface_ref_validation_preserves_effect_and_rejects_unsafe_paths() {
+        assert_eq!(parse_surface_ref("effect:secret-access").unwrap(), "effect:secret-access");
+        assert_eq!(parse_surface_ref("src/auth/login.rs").unwrap(), "src/auth/login.rs");
+        assert!(parse_surface_ref("../outside").is_err());
+        assert!(parse_surface_ref("/absolute/path").is_err());
+        assert!(parse_surface_ref("effect:Secret-Access").is_err());
     }
 
     /// LAYER ONE of the newline-injection fix (module doc): the exact

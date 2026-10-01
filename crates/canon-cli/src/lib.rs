@@ -4,6 +4,7 @@
 
 pub mod artifact_ingest;
 pub mod context;
+pub mod context_pack;
 pub mod dashboard;
 pub mod demo;
 pub mod dispatch;
@@ -20,6 +21,7 @@ pub mod learn;
 pub mod plans;
 pub mod plugin_sync;
 pub mod query;
+pub mod retention;
 pub mod report;
 pub mod retrieve;
 pub mod review;

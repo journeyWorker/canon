@@ -126,18 +126,19 @@ pub struct UnifiedRow {
     pub parent_agent_id: Option<String>,
 }
 
-/// One USER-role message extracted verbatim from a transcript (s31
-/// design D4 — user-directive capture). Adapters emit one
+/// One USER-role message extracted from a transcript (s31
+/// design D4 — user-directive parsing). Adapters emit one
 /// `DirectiveRow` per user-role message they encounter, NEVER for
 /// system/tool/assistant content — see each adapter's own parse
 /// function for the exact per-format role/type gate (e.g. omp/pi's
 /// `message.role == "user"`, Claude Code's `entry_type == "user"`,
-/// Codex's `event_msg`/`user_message` payload). `text` is stored
-/// verbatim — command/paste blobs ARE the directive, no truncation
-/// this wave (design D4) — flattened from a structured content-block
-/// array when the source format uses one (concatenating every `text`
-/// block, skipping every non-text block) or used as-is when the
-/// source's own content is already a plain string.
+/// Codex's `event_msg`/`user_message` payload). `text` is retained
+/// verbatim only in this in-memory parser row; the shared
+/// post-adapter privacy boundary decides whether a bounded prefix
+/// reaches normalized records. It is flattened from a structured
+/// content-block array when the source format uses one (concatenating
+/// every `text` block, skipping every non-text block) or used as-is
+/// when the source's own content is already a plain string.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DirectiveRow {
     /// The adapter's own `client_id()` — same rule as

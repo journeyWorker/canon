@@ -257,7 +257,53 @@ impl TrajectoryStore for ParquetTrajectoryStore {
             Err(err) => Err(err.into()),
         }
     }
+    fn purge_before(&self, before: chrono::DateTime<Utc>, dry_run: bool) -> Result<usize, LearnError> {
+        purge_trajectory_files(&self.root, before, dry_run)
+    }
+
 }
+fn purge_trajectory_files(dir: &Path, before: chrono::DateTime<Utc>, dry_run: bool) -> Result<usize, LearnError> {
+    let metadata = match fs::symlink_metadata(dir) {
+        Ok(metadata) => metadata,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+        Err(err) => return Err(err.into()),
+    };
+    if metadata.file_type().is_symlink() {
+        return Err(symlink_policy_error(dir));
+    }
+    if !metadata.is_dir() {
+        return Ok(0);
+    }
+    let mut count = 0;
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            return Err(symlink_policy_error(&path));
+        }
+        if file_type.is_dir() {
+            count += purge_trajectory_files(&path, before, dry_run)?;
+        } else if file_type.is_file() && path.extension().is_some_and(|ext| ext == "parquet") {
+            let rows = decode_trajectories(File::open(&path)?)?;
+            let matching = rows.iter().filter(|row| row.recorded_at < before).count();
+            count += matching;
+            if matching > 0 && !dry_run {
+                fs::remove_file(path)?;
+            }
+        }
+    }
+    Ok(count)
+}
+
+fn symlink_policy_error(path: &Path) -> LearnError {
+    std::io::Error::new(
+        std::io::ErrorKind::PermissionDenied,
+        format!("refusing to traverse symlink `{}`", path.display()),
+    )
+    .into()
+}
+
 
 /// Recursively finds the ONE trajectory file matching `id` under
 /// `root` (Hive-nested `<role>/<repo>/<area>/<hash>/<id>.parquet` —
@@ -518,6 +564,57 @@ mod tests {
         let err = store.delete_by_id(&regime("content"), &stored.id).unwrap_err();
         assert!(matches!(err, LearnError::UnknownTrajectoryRow { .. }), "an id under another regime is a miss, never a redirect: {err}");
         assert_eq!(store.find_by_id(&stored.id).unwrap(), Some(stored), "…and refusing left the row where it was");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn purge_rejects_a_symlinked_trajectory_file_instead_of_skipping_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let source_root = dir.path().join("source");
+        let managed_root = dir.path().join("managed");
+        let source = ParquetTrajectoryStore::open(&source_root);
+        let managed = ParquetTrajectoryStore::open(&managed_root);
+        let mut old = trajectory("dev", "old trajectory");
+        old.recorded_at = Utc::now() - chrono::Duration::days(10);
+        source.append(&old).unwrap();
+
+        let source_file = source.file_path(&old.regime_key, &old.id).unwrap();
+        let relative = source_file.strip_prefix(&source_root).unwrap();
+        let managed_file = managed_root.join(relative);
+        std::fs::create_dir_all(managed_file.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(&source_file, &managed_file).unwrap();
+
+        let err = managed.purge_before(Utc::now(), false).unwrap_err();
+        assert!(
+            matches!(&err, LearnError::Io(io) if io.kind() == std::io::ErrorKind::PermissionDenied && io.to_string().contains("symlink")),
+            "expected an explicit symlink policy error, got {err:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn purge_rejects_a_symlinked_trajectory_directory_instead_of_traversing_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let source_root = dir.path().join("source");
+        let managed_root = dir.path().join("managed");
+        let source = ParquetTrajectoryStore::open(&source_root);
+        let managed = ParquetTrajectoryStore::open(&managed_root);
+        let mut old = trajectory("dev", "old trajectory");
+        old.recorded_at = Utc::now() - chrono::Duration::days(10);
+        source.append(&old).unwrap();
+
+        let source_file = source.file_path(&old.regime_key, &old.id).unwrap();
+        let source_namespace = source_file.parent().unwrap();
+        let relative = source_namespace.strip_prefix(&source_root).unwrap();
+        let managed_namespace = managed_root.join(relative);
+        std::fs::create_dir_all(managed_namespace.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(source_namespace, &managed_namespace).unwrap();
+
+        let err = managed.purge_before(Utc::now(), false).unwrap_err();
+        assert!(
+            matches!(&err, LearnError::Io(io) if io.kind() == std::io::ErrorKind::PermissionDenied && io.to_string().contains("symlink")),
+            "expected an explicit symlink policy error, got {err:?}"
+        );
     }
 
     /// Hand-builds an S6-era trajectory parquet file — the exact JSON

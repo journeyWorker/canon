@@ -480,6 +480,12 @@ pub struct SkillSnapshot {
 pub struct ContextSnapshot {
     pub digest: String,
     pub capability_version: u32,
+    /// Content-addressed full ContextPack manifest. The digest-only
+    /// capability surface above remains for backwards compatibility; this
+    /// optional identity points replay to the immutable selected-input
+    /// snapshot when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pack_id: Option<String>,
 }
 
 /// A snapshot of the policy used to derive a run. This is nested
@@ -880,14 +886,19 @@ where
     T::deserialize(deserializer).map(Some)
 }
 
-/// An accountable approval attestation attached to an [`EvidenceRecord`].
-/// The shape records who approved, under which role, and when; it does not
-/// claim that an external human actually reviewed the evidence.
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+/// An approval attestation attached to an [`EvidenceRecord`]. The optional
+/// verification bit is persisted so later gates do not trust caller input.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct EvidenceApproval {
     pub approver: String,
     pub role: RoleId,
     pub at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub verified: bool,
 }
 
 /// The evidence-integrity spec's own record kind: the candidate shape
@@ -1860,6 +1871,7 @@ mod tests {
                 context: Some(ContextSnapshot {
                     digest: "sha256:context".into(),
                     capability_version: 3,
+                    pack_id: None,
                 }),
                 policy: Some(PolicySnapshot {
                     digest: "sha256:policy".into(),
@@ -2026,7 +2038,12 @@ mod tests {
         let legacy = serde_json::to_value(&record).unwrap();
         assert!(legacy.get("approval").is_none());
         assert!(serde_json::from_value::<EvidenceRecord>(legacy.clone()).unwrap().approval.is_none());
-        let approval = EvidenceApproval { approver: "alice".to_string(), role: RoleId::parse("human").unwrap(), at: record.envelope.at };
+        let approval = EvidenceApproval {
+            approver: "alice".to_string(),
+            role: RoleId::parse("human").unwrap(),
+            at: record.envelope.at,
+            verified: false,
+        };
         let approved = record.with_approval(approval.clone());
         let approved_json = serde_json::to_value(&approved).unwrap();
         assert_eq!(serde_json::from_value::<EvidenceRecord>(approved_json).unwrap().approval, Some(approval));

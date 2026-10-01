@@ -131,14 +131,29 @@ impl GitTier {
         kind: RecordKind,
         keep: impl Fn(chrono::DateTime<chrono::Utc>) -> bool,
     ) -> Result<ScanResult, StoreError> {
+        let kind_dir = self.absolute(Path::new(&format!("kind={}", kind.as_str())));
         let mut records = Vec::new();
         let mut violations = Vec::new();
-        let kind_dir = self.root.join(format!("kind={}", kind.as_str()));
-        if !kind_dir.exists() {
+        let kind_metadata = match std::fs::symlink_metadata(&kind_dir) {
+            Ok(metadata) => metadata,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok((records, violations)),
+            Err(err) => return Err(err.into()),
+        };
+        if kind_metadata.file_type().is_symlink() {
+            let relative = kind_dir.strip_prefix(&self.root).expect("kind directory is under root");
+            return Err(StoreError::Policy(format!("refusing to traverse symlink `{}`", relative.display())));
+        }
+        if !kind_metadata.is_dir() {
             return Ok((records, violations));
         }
-        for entry in walkdir::WalkDir::new(&kind_dir).sort_by_file_name().into_iter().filter_map(Result::ok) {
-            if !entry.file_type().is_file() {
+        for entry in walkdir::WalkDir::new(&kind_dir).sort_by_file_name().into_iter() {
+            let entry = entry.map_err(|err| StoreError::Policy(format!("failed to scan `{}`: {err}", kind_dir.display())))?;
+            let file_type = entry.file_type();
+            if file_type.is_symlink() {
+                let relative = entry.path().strip_prefix(&self.root).expect("walked entries are under root");
+                return Err(StoreError::Policy(format!("refusing to traverse symlink `{}`", relative.display())));
+            }
+            if !file_type.is_file() {
                 continue;
             }
             let absolute = entry.path();
@@ -480,6 +495,27 @@ impl Tier for GitTier {
         let since = query.since;
         let (found, violations) = self.scan_kind_where(query.kind, move |at| since.is_none_or(|s| at >= s))?;
         Ok(TierReadResult { records: found.into_iter().map(|(_, raw)| raw).collect(), violations })
+    }
+
+    fn purge_before(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<crate::tier::PurgeCount, StoreError> {
+        let (candidates, _) = self.scan_kind_where(kind, |at| at < before)?;
+        let matched = candidates.len();
+        if dry_run {
+            return Ok(crate::tier::PurgeCount { matched, deleted: 0 });
+        }
+        let mut deleted = 0;
+        for (relative, _) in candidates {
+            // `scan_kind_where` never follows links and this path was
+            // derived from a path below the configured root.
+            let path = self.absolute(&relative);
+            let metadata = std::fs::symlink_metadata(&path)?;
+            if metadata.file_type().is_symlink() {
+                return Err(StoreError::Policy(format!("refusing to purge symlink {}", relative.display())));
+            }
+            std::fs::remove_file(path)?;
+            deleted += 1;
+        }
+        Ok(crate::tier::PurgeCount { matched, deleted })
     }
 
     /// A genuine move-and-delete, exercised whenever a repo's own
@@ -1080,5 +1116,32 @@ mod tests {
         let (records, violations) = tier.scan_namespaced_kind("porting.coverage").unwrap();
         assert!(violations.is_empty(), "{violations:?}");
         assert_eq!(records.len(), 1);
+    }
+    #[cfg(unix)]
+    #[test]
+    fn purge_rejects_a_symlink_record_instead_of_omitting_it_from_discovery() {
+        let dir = tempfile::tempdir().unwrap();
+        let source_root = dir.path().join("source");
+        let managed_root = dir.path().join("managed");
+        let source = GitTier::new(&source_root);
+        let managed = GitTier::new(&managed_root);
+        let old_at = Utc::now() - chrono::Duration::days(10);
+        let change = Change::new(
+            Envelope::new(1, RecordKind::Change, old_at, actor()),
+            ChangeId::parse("symlinked-old-change").unwrap(),
+            "old",
+            "x",
+            ChangeStatus::Completed,
+        );
+        let receipt = source.write(&change).unwrap();
+        let managed_path = managed_root.join(&receipt.location);
+        std::fs::create_dir_all(managed_path.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(source_root.join(&receipt.location), &managed_path).unwrap();
+
+        let err = managed.purge_before(RecordKind::Change, Utc::now(), false).unwrap_err();
+        assert!(
+            matches!(&err, StoreError::Policy(detail) if detail.contains("symlink")),
+            "expected an explicit symlink policy error, got {err:?}"
+        );
     }
 }

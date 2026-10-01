@@ -5,8 +5,8 @@ The checker intentionally treats ``canon/knowledge-index.json`` as a small
 manifest, not as a second documentation system.  It verifies that every
 mapped path exists, that projections point at canonical sources, that primary
 Markdown links resolve within the checkout, and that active entries have a
-review date no older than the configured window.  ``--as-of`` makes freshness
-checks reproducible in CI and offline fixture tests.
+review date no older than the configured window. The live default is today's
+UTC date; ``--as-of`` makes freshness checks reproducible for offline replay.
 """
 
 from __future__ import annotations
@@ -21,7 +21,6 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INDEX = Path("canon/knowledge-index.json")
-DEFAULT_AS_OF = dt.date(2026, 10, 1)
 DEFAULT_MAX_AGE_DAYS = 180
 KINDS = {"source", "projection", "empirical-memory"}
 ACTIVE_STATUSES = {"active"}
@@ -121,7 +120,7 @@ def check_index(
     entries = index.get("entries")
     if not isinstance(entries, list):
         return errors + ["knowledge index entries must be an array"]
-    as_of = as_of or _date(index.get("as_of"), "as_of") or DEFAULT_AS_OF
+    as_of = as_of or dt.datetime.now(dt.timezone.utc).date()
     max_age = max_age_days if max_age_days is not None else index.get("freshness_days", DEFAULT_MAX_AGE_DAYS)
     if not isinstance(max_age, int) or max_age < 0:
         errors.append("freshness_days/max_age_days must be a non-negative integer")
@@ -199,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT, help="repository root (default: script parent)")
     parser.add_argument("--index", type=Path, default=DEFAULT_INDEX, help="knowledge index path, relative to root")
-    parser.add_argument("--as-of", dest="as_of", type=lambda value: dt.date.fromisoformat(value), help="date used for freshness checks (YYYY-MM-DD)")
+    parser.add_argument("--as-of", dest="as_of", type=lambda value: dt.date.fromisoformat(value), help="date used for freshness checks (YYYY-MM-DD; default: today in UTC)")
     parser.add_argument("--max-age-days", type=int, help="maximum active-document review age")
     args = parser.parse_args(argv)
     root = args.root.resolve()

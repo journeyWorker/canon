@@ -25,9 +25,42 @@ use crate::pg_tier::PgTier;
 use crate::policy::{Backend, BackendConfig, Rung, TierPolicy};
 use crate::r2_tier::R2Tier;
 use crate::sqlite_tier::SqliteTier;
-use crate::tier::{AgeReport, AgingRule, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
+use crate::tier::{is_purgeable_kind, AgeReport, AgingRule, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RungPurgeReport {
+    pub rung: Rung,
+    pub backend: Backend,
+    pub matched: usize,
+    pub deleted: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PurgeOutcome {
+    pub kind: RecordKind,
+    pub before: chrono::DateTime<chrono::Utc>,
+    pub dry_run: bool,
+    pub rungs: Vec<RungPurgeReport>,
+    pub unavailable: Vec<String>,
+}
+
+/// Retention facade kept separate from ordinary query/age call sites so
+/// destructive lifecycle operations have one explicit entry point.
+pub struct RetentionService<'a> {
+    registry: &'a TierRegistry,
+}
+
+impl<'a> RetentionService<'a> {
+    pub fn new(registry: &'a TierRegistry) -> Self {
+        Self { registry }
+    }
+
+    pub fn purge(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<PurgeOutcome, StoreError> {
+        self.registry.purge(kind, before, dry_run)
+    }
+}
 pub struct TierRegistry {
+
     policy: TierPolicy,
     local: Option<Arc<dyn Tier>>,
     hot: Option<Arc<dyn Tier>>,
@@ -165,6 +198,68 @@ impl TierRegistry {
         merged.records.sort_by_key(crate::tier::raw_record_at);
         Ok(merged)
     }
+    /// This registry owns only canon-store's routed/aging rungs. The
+    /// operator-local `canon-learn` Parquet trajectory store is a separate
+    /// retention target wired by `canon-cli`, not hidden behind this facade.
+    /// Purge every routed and aging destination rung for an allowlisted kind.
+    ///
+    /// Apply mode performs a read-only purge pass against every attached rung
+    /// before issuing the first delete. This is the strongest preflight the
+    /// backend trait can provide without imposing a cross-backend transaction.
+    /// A backend can still fail after that pass (for example, a concurrent
+    /// permission change); once any delete has succeeded such a failure is
+    /// returned as [`StoreError::PurgePartial`] with explicit lower-bound
+    /// counts. Backends are not transactional, so callers MUST NOT present
+    /// that error as a complete purge.
+    ///
+    /// Dry-run performs only the read-only pass and preserves the existing
+    /// unavailable-destination report.
+    pub fn purge(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<PurgeOutcome, StoreError> {
+        if !is_purgeable_kind(kind) {
+            return Err(StoreError::PurgeKindUnsupported { kind: kind.as_str().to_string() });
+        }
+        let mut rungs = self.tiers_for_read(kind)?;
+        rungs.sort();
+        rungs.dedup();
+        let mut attached = Vec::new();
+        let mut unavailable = Vec::new();
+        for rung in rungs {
+            match self.handle(rung) {
+                Ok(tier) => attached.push((rung, tier)),
+                Err(err) if dry_run => unavailable.push(err.to_string()),
+                Err(err) => return Err(err),
+            }
+        }
+
+        let mut preflight = Vec::with_capacity(attached.len());
+        for (rung, tier) in &attached {
+            let count = tier.purge_before(kind, before, true)?;
+            preflight.push(RungPurgeReport { rung: *rung, backend: tier.backend(), matched: count.matched, deleted: 0 });
+        }
+        if dry_run {
+            return Ok(PurgeOutcome { kind, before, dry_run, rungs: preflight, unavailable });
+        }
+
+        let matched_total = preflight.iter().map(|report| report.matched).sum();
+        let mut reports = Vec::with_capacity(attached.len());
+        for (rung, tier) in attached {
+            match tier.purge_before(kind, before, false) {
+                Ok(count) => reports.push(RungPurgeReport { rung, backend: tier.backend(), matched: count.matched, deleted: count.deleted }),
+                Err(err) => {
+                    let deleted = reports.iter().map(|report: &RungPurgeReport| report.deleted).sum();
+                    return Err(StoreError::PurgePartial {
+                        rung,
+                        backend: tier.backend(),
+                        matched: matched_total,
+                        deleted,
+                        reason: err.to_string(),
+                    });
+                }
+            }
+        }
+        Ok(PurgeOutcome { kind, before, dry_run, rungs: reports, unavailable })
+    }
+
 
     /// `canon tier age`'s backing implementation (tier-policy spec):
     /// run every `TierPolicy.aging` entry once, from its routed source
@@ -195,6 +290,8 @@ impl TierRegistry {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use canon_model::envelope::{Actor, Envelope};
     use canon_model::ids::{ChangeId, RoleId, RunId};
     use canon_model::records::{Change, ChangeStatus, Trajectory};
@@ -494,5 +591,58 @@ routing:
             }
             other => panic!("expected TierUnavailable, got {other:?}"),
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn purge_preflight_rejects_managed_symlink_before_deleting_local_candidates() {
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::tempdir().unwrap();
+        let policy = TierPolicy::from_yaml(
+            r#"
+tiers:
+  local: { backend: git, root: .canon/ledger }
+routing:
+  trajectory: local
+"#,
+        )
+        .unwrap();
+        let git_root = dir.path().join(".canon/ledger");
+        let git = GitTier::new(&git_root);
+        let old = Trajectory::new(
+            Envelope::new(1, RecordKind::Trajectory, Utc::now() - chrono::Duration::days(3), actor()),
+            RunId::new(),
+            None,
+            None,
+            None,
+            None,
+            Some(0.4),
+        );
+        git.write(&old).unwrap();
+        let kind_dir = git_root.join("kind=trajectory");
+        fs::create_dir_all(&kind_dir).unwrap();
+        symlink(git_root.join("not-a-record"), kind_dir.join("managed-link.json")).unwrap();
+
+        let registry = TierRegistry::new(policy, Some(git), None, None, None);
+        let err = registry.purge(RecordKind::Trajectory, Utc::now(), false).unwrap_err();
+        assert!(err.to_string().contains("symlink"), "preflight must reject the managed symlink: {err}");
+        assert!(git_root.join("kind=trajectory").exists(), "a preflight failure must not delete local candidates");
+    }
+
+    #[test]
+    fn partial_purge_error_exposes_lower_bound_counts_and_non_atomic_policy() {
+        let err = StoreError::PurgePartial {
+            rung: Rung::Cold,
+            backend: Backend::S3,
+            matched: 7,
+            deleted: 2,
+            reason: "permission denied".to_string(),
+        };
+        let message = err.to_string();
+        assert!(message.contains("partial purge"));
+        assert!(message.contains("7 record(s) matched"));
+        assert!(message.contains("at least 2 deleted"));
+        assert!(message.contains("non-transactional"));
     }
 }

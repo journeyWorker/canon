@@ -5,7 +5,7 @@ into `Session`/`Run`/`Event` records on canon's join spine, scanning four
 adapters, normalizing, and persisting through the same tier resolution
 `canon query` / `canon tier age` use. The default corpus is scoped to the
 current PROJECT; the watermark gate is per-file; user directives are
-captured.
+metadata-only unless explicitly opted in by bounded privacy config.
 
 **Quick start needs zero docker/services.** `canon init` scaffolds `hot`
 as a local sqlite file (`.canon/hot.db`) with `session`/`run`/`event`
@@ -113,14 +113,45 @@ resubmission is a no-op; cursors re-advance afterward.
 ## User directives
 
 Every adapter (except Hermes, whose format carries no user-turn text)
-emits one event per USER-role message: `label: "user_directive"`,
-`detail: { text, workspace_key, workspace_label }`, the FULL verbatim
-text (no truncation). These interleave with `token_usage` events in one
-deterministic order (directive-before-token on a timestamp tie). Query
-them with:
+emits one parsed `DirectiveRow` per USER-role message. Parsing retains
+source text only in memory; the shared post-adapter privacy boundary
+controls whether it becomes a durable event. The default when
+`ingest.sessions.privacy` is absent is metadata-only: no
+`user_directive` event reaches normalized output.
+
+Repositories that explicitly opt in MUST set a positive bound:
+
+```yaml
+ingest:
+  sessions:
+    privacy:
+      capture_user_directives: true
+      max_directive_chars: 4096
+```
+
+Captured text is classified and redacted BEFORE the Unicode-scalar capture
+bound is applied. The conservative classifier replaces known API
+key/token/password assignments, bearer credentials, PEM private keys, and
+email addresses with deterministic `[REDACTED_SECRET_N]` /
+`[REDACTED_PII_N]` placeholders and includes `redaction_counts`. The
+detail's `redacted` is true only when a known value was replaced;
+`truncated` is independent and may be true for otherwise unredacted text.
+This classifier is not a guarantee against every kind of secret or PII.
+`workspace_key`/`workspace_label` remain metadata. The source transcript
+remains the source of truth and is not rewritten, purged, or replaced by
+Canon's normalized event.
+
+The source cursor identity includes the privacy mode and positive bound, so
+toggling capture or changing its bound re-scans unchanged source bytes.
+Re-scans retain stable event sequence/key ordinals; they do not purge
+previously stored normalized records. Operators owning pre-existing raw
+data MUST handle purge/migration separately.
+
+These events interleave with `token_usage` events in one deterministic
+order (directive-before-token on a timestamp tie). Query them with:
 
 ```bash
-canon query --kind event   # then filter client-side on detail.label == "user_directive"
+canon query --kind event   # filter detail.label == "user_directive"
 ```
 
 ## Reading the run summary
@@ -149,8 +180,11 @@ events written: 37
   not extract a row from (counted as a violation, never crashing).
 - **store tiers unreachable** — if `canon.yaml`'s tiers aren't reachable
   (e.g. `tiers.pg` set but `CANON_PG_DSN` unset) or `session`/`run`/
-  `event` aren't routed, the pass prints the normalized bundle as JSON
-  instead of persisting — never a partial write.
+  `event` aren't routed, the pass prints a metadata-only JSON fallback
+  instead of persisting — never a partial write. The fallback contains
+  scope, adapter counts, record counts, IDs/digests, and a stable
+  routing/tier failure class/reason; it never contains directive text,
+  task/context prose, or raw event detail.
 
 ## What this skill does NOT cover
 

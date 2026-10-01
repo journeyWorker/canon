@@ -58,7 +58,7 @@ use sqlx::Row;
 
 use crate::partition::{content_digest12, resolve_partition};
 use crate::policy::{Backend, Rung};
-use crate::tier::{AgeReport, AgingRule, RawWrite, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
+use crate::tier::{AgeReport, AgingRule, PurgeCount, RawWrite, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
 
 /// `schema` comes from `canon.yaml` (an operator-controlled config
 /// file, not runtime user input) but is still interpolated into DDL/
@@ -181,6 +181,14 @@ fn select_sql(schema: &str, since: bool) -> String {
 fn select_older_than_sql(schema: &str) -> String {
     format!("SELECT id, at, digest, body FROM {schema}.records_history WHERE kind = $1 AND at < $2 ORDER BY at")
 }
+fn purge_count_sql(schema: &str) -> String {
+    format!("SELECT COUNT(*) AS count FROM {schema}.records_history WHERE kind = $1 AND at < $2")
+}
+
+fn purge_delete_sql(schema: &str) -> String {
+    format!("DELETE FROM {schema}.records_history WHERE kind = $1 AND at < $2")
+}
+
 
 /// Keyed by the FULL `(kind, id, digest)` identity, never a bare
 /// `(kind, id)` (s21 D1/task 3.5): `records_history` can hold several
@@ -444,6 +452,30 @@ impl Tier for PgTier {
         let records = self.read_rows(query, None)?;
         Ok(TierReadResult { records, violations: Vec::new() })
     }
+    fn purge_before(&self, kind: canon_model::envelope::RecordKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
+        self.rt.block_on(async {
+            let matched = sqlx::query(sqlx::AssertSqlSafe(purge_count_sql(&self.schema)))
+                .bind(kind.as_str())
+                .bind(before)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| StoreError::Sql(e.to_string()))?
+                .get::<i64, _>("count") as usize;
+            let deleted = if dry_run {
+                0
+            } else {
+                sqlx::query(sqlx::AssertSqlSafe(purge_delete_sql(&self.schema)))
+                    .bind(kind.as_str())
+                    .bind(before)
+                    .execute(&self.pool)
+                    .await
+                    .map_err(|e| StoreError::Sql(e.to_string()))?
+                    .rows_affected() as usize
+            };
+            Ok(PurgeCount { matched, deleted })
+        })
+    }
+
 
     fn age(&self, rule: &AgingRule) -> Result<AgeReport, StoreError> {
         let cutoff = Utc::now() - rule.after;

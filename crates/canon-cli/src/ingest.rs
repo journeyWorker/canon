@@ -21,18 +21,15 @@
 //! exactly one file) despite [`canon_store::cursor`]'s module doc
 //! still describing source-granularity as the general-purpose default.
 //!
-//! **s40 4.1 (parse-versioned cursor identity).** A cursor is keyed on
-//! [`session_source_cursor_id`] — the adapter's `client_id` PLUS its
-//! [`canon_ingest::SessionAdapter::parse_version`] — not on the
-//! `client_id` alone. The gate compares byte-stable transcript
-//! digests, so an adapter's normalization could change and every
-//! transcript still reported `skipped unchanged (watermark)`; a
-//! version bump now moves the identity and re-reads the source in
-//! full. Three of the four shipped adapters are at version 1, whose id
-//! IS the pre-s40 id, so installing this invalidated nothing;
-//! `claude-code` is at 2 because s37 (`execution-graph-topology`)
-//! genuinely changed its sidechain output, and that one adapter
-//! re-reads once to backfill the lineage.
+//! **s40 4.1 (parse-versioned cursor identity) plus privacy generation.**
+//! A cursor is keyed on [`session_source_cursor_id_with_privacy`] — the
+//! adapter's `client_id`, [`canon_ingest::SessionAdapter::parse_version`],
+//! and the exact metadata-only/capture mode and positive capture bound.
+//! The gate compares byte-stable transcript digests, so either adapter
+//! normalization or privacy policy changes move the identity and re-read
+//! the source in full. The legacy parse-generation helper preserves the
+//! v1 unsuffixed adapter id, but actual privacy-aware cursors deliberately
+//! add their policy suffix so pre-boundary cursors are not reused.
 //!
 //! **s31 D3 (project scope).** [`ProjectScope`] resolves "this
 //! project" as the repo's main `git worktree` root plus every linked
@@ -43,27 +40,33 @@
 //! (Codex/Hermes) split and why it never DECODES an encoded on-disk
 //! directory name.
 //!
+//! **Privacy boundary.** Adapters may parse user-turn text into
+//! `DirectiveRow` in memory, but after all adapters and scope filtering
+//! the shared [`canon_ingest::normalize_with_privacy`] policy either
+//! omits directive events (the default when
+//! `ingest.sessions.privacy` is absent) or captures a positive,
+//! Unicode-scalar-bounded prefix with redaction metadata. The source
+//! transcript is never rewritten.
+//!
 //! **Documented seam**: when `canon.yaml` itself is missing/unreadable,
 //! or the policy hasn't routed `session`/`run`/`event` yet, or a
 //! NEEDED rung is configured but unreachable (`tiers.pg` configured
 //! but `CANON_PG_DSN` unset, exactly the "NO cloud creds" case this
-//! module's own offline tests exercise), `run()` returns its
-//! normalized bundle in [`IngestOutcome::unwritten`] instead of
-//! persisting — the CLI prints it as JSON rather than failing the
-//! whole ingest pass. [`IngestOutcome::degrade_reason`] carries WHY
-//! (design D6 — the configured env-var name for an unreachable
-//! rung) whenever a specific build-time reason is available.
-
+//! module's own offline tests exercise), `run()` returns candidates in
+//! [`IngestOutcome::unwritten`] instead of persisting — the CLI prints
+//! a metadata-only JSON summary rather than failing the whole ingest
+//! pass. Directive text and raw event detail never reach that fallback.
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use canon_ingest::adapter::{DirectiveRow, UnifiedRow};
-use canon_ingest::normalize::{NormalizedSession, normalize, normalize_workspace_key};
+use canon_ingest::normalize::{normalize_with_privacy, DirectivePrivacyPolicy, NormalizedSession, normalize_workspace_key};
 use canon_ingest::{enumerate, registry, scanner};
 use canon_model::envelope::RecordKind;
 use canon_model::paths;
 use canon_store::cursor::{CursorStore, SourceCursor, file_digest};
+use canon_store::partition::content_digest12;
 use canon_store::policy::BackendConfig;
 use canon_store::registry::TierRegistry;
 use canon_store::tier::StoreError;
@@ -143,17 +146,18 @@ pub struct IngestOutcome {
     /// JSON instead. `None` means every normalized record was
     /// persisted through canon-store.
     pub unwritten: Option<Vec<NormalizedSession>>,
+    /// Stable class for the metadata-only degraded JSON seam.
+    pub degrade_class: Option<&'static str>,
     /// `Some(reason)` when [`Self::unwritten`] is `Some` because a
     /// NEEDED rung (`session`/`run`/`event`'s routed or aged-to rung)
-    /// was ATTEMPTED and degraded (s29 design D6) — names the
-    /// configured env-var (e.g. "hot tier (postgres) is not attached
-    /// (`CANON_PG_DSN` is unset)"), reusing
-    /// `canon_store::tier::StoreError::TierUnavailable`'s own Display
-    /// so the wording matches the rest of the codebase. `None` when
-    /// `unwritten` is `None` too, or when the degrade has no single
-    /// specific rung reason (canon.yaml missing/unreadable, or
-    /// `session`/`run`/`event` simply not routed yet) — those cases
-    /// keep [`format_human`]'s generic fallback prose.
+    /// was ATTEMPTED and degraded (s29 design D6). The reason preserves
+    /// a safe configured env-var name when that is the failure class, but
+    /// collapses live backend diagnostics to a generic availability reason
+    /// so DSNs, usernames, and passwords never enter fallback metadata.
+    /// `None` when [`Self::unwritten`] is `None` too, or when the degrade
+    /// has no single specific rung reason (canon.yaml missing/unreadable,
+    /// or `session`/`run`/`event` simply not routed yet) — those cases keep
+    /// [`format_human`]'s generic fallback prose.
     pub degrade_reason: Option<String>,
 }
 
@@ -181,6 +185,30 @@ pub struct IngestOutcome {
 struct RawIngest {
     #[serde(default)]
     sources: BTreeMap<String, RawIngestSource>,
+    #[serde(default)]
+    sessions: RawIngestSessions,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawIngestSessions {
+    #[serde(default)]
+    privacy: RawDirectivePrivacy,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawDirectivePrivacy {
+    #[serde(default)]
+    capture_user_directives: bool,
+    #[serde(default)]
+    max_directive_chars: Option<usize>,
+}
+
+impl Default for RawDirectivePrivacy {
+    fn default() -> Self {
+        Self { capture_user_directives: false, max_directive_chars: None }
+    }
 }
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -197,6 +225,8 @@ struct IngestSourceConfig {
     /// absent `roots` is omitted so its `.get()` misses and the source
     /// falls back to default resolution.
     sources: BTreeMap<String, Vec<PathBuf>>,
+    /// The one policy applied after every adapter has parsed.
+    privacy: DirectivePrivacyPolicy,
 }
 
 impl IngestSourceConfig {
@@ -205,7 +235,7 @@ impl IngestSourceConfig {
     /// (`tiers`/`routing`/…) are ignored — only the `ingest:` subtree
     /// is parsed — so this coexists with the `TierPolicy` parse.
     fn load(canon_yaml: &Path) -> Result<Self, IngestError> {
-        let empty = || Self { sources: BTreeMap::new() };
+        let empty = || Self { sources: BTreeMap::new(), privacy: DirectivePrivacyPolicy::METADATA_ONLY };
         // Missing / unreadable canon.yaml: fail-soft (no config at all
         // is a legitimate first-run / minimal state).
         let Ok(text) = std::fs::read_to_string(canon_yaml) else {
@@ -243,12 +273,28 @@ impl IngestSourceConfig {
                 names.join(", ")
             )));
         }
+        let privacy = if ingest.sessions.privacy.capture_user_directives {
+            let max = ingest.sessions.privacy.max_directive_chars.ok_or_else(|| {
+                IngestError::Config(
+                    "canon.yaml `ingest.sessions.privacy.max_directive_chars` is required and positive when `capture_user_directives: true`".to_string(),
+                )
+            })?;
+            if max == 0 {
+                return Err(IngestError::Config(
+                    "canon.yaml `ingest.sessions.privacy.max_directive_chars` must be positive when `capture_user_directives: true`".to_string(),
+                ));
+            }
+            DirectivePrivacyPolicy { capture_user_directives: true, max_directive_chars: max }
+        } else {
+            DirectivePrivacyPolicy::METADATA_ONLY
+        };
         Ok(Self {
             sources: ingest
                 .sources
                 .into_iter()
                 .filter_map(|(k, v)| v.roots.map(|r| (k, r)))
                 .collect(),
+            privacy,
         })
     }
 
@@ -532,13 +578,11 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
         }
 
         // s31 D1: per-file diff, against the cursor stored at THIS
-        // source's identity (s40 task 4.1: `client_id` + the adapter's
-        // `parse_version`, see `session_source_cursor_id`).
-        // `full_rescan` / no persisted cursor / a cursor id this
-        // adapter has never written at (a version bump) all degrade to
-        // an EMPTY base cursor, whose `diff` puts every present key in
-        // `changed_or_new`.
-        let cursor_id = session_source_cursor_id(entry.client_id(), entry.adapter.parse_version());
+        // source's identity (s40 task 4.1 plus the privacy policy
+        // generation): `client_id` + adapter parse version + the exact
+        // capture mode/bound. A policy change must not reuse a cursor
+        // whose normalized records were produced under another boundary.
+        let cursor_id = session_source_cursor_id_with_privacy(entry.client_id(), entry.adapter.parse_version(), source_config.privacy);
         let base_cursor = base_session_cursor(&cursors, &cursor_id, full_rescan);
         let diff = base_cursor.diff(&present_digests);
 
@@ -597,7 +641,9 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
         }
     }
 
-    let mut normalized = normalize(&all_rows, &all_directives);
+    // Apply the single privacy boundary only after every adapter's
+    // rows have been collected and scope-filtered.
+    let mut normalized = normalize_with_privacy(&all_rows, &all_directives, source_config.privacy);
     for session in &mut normalized.sessions {
         session.session.project_key = scope.project_key_for(session.session.workspace_key.as_deref());
     }
@@ -616,7 +662,18 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
     let loaded = match tiers::build_lenient_tiers_for_kinds(canon_yaml, &SESSION_KINDS) {
         Ok(loaded) => loaded,
         Err(TierCliError::ReadCanonYaml { .. }) => {
-            return Ok(IngestOutcome { adapters, scope_summary, sessions_normalized, runs_written: 0, events_written: 0, skipped_rows, malformed_records, unwritten: Some(normalized.sessions), degrade_reason: None });
+            return Ok(IngestOutcome {
+                adapters,
+                scope_summary,
+                sessions_normalized,
+                runs_written: 0,
+                events_written: 0,
+                skipped_rows,
+                malformed_records,
+                unwritten: Some(normalized.sessions),
+                degrade_class: Some("config_unavailable"),
+                degrade_reason: None,
+            });
         }
         Err(other) => return Err(other.into()),
     };
@@ -628,7 +685,18 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
     // caller gets the documented-seam JSON fallback instead.
     let fully_routed = SESSION_KINDS.into_iter().all(|kind| loaded.policy.tier_for(kind).is_ok());
     if !fully_routed {
-        return Ok(IngestOutcome { adapters, scope_summary, sessions_normalized, runs_written: 0, events_written: 0, skipped_rows, malformed_records, unwritten: Some(normalized.sessions), degrade_reason: None });
+        return Ok(IngestOutcome {
+            adapters,
+            scope_summary,
+            sessions_normalized,
+            runs_written: 0,
+            events_written: 0,
+            skipped_rows,
+            malformed_records,
+            unwritten: Some(normalized.sessions),
+            degrade_class: Some("unrouted"),
+            degrade_reason: None,
+        });
     }
 
     // s29 design D6: a routed-but-unattached rung carries its
@@ -640,7 +708,7 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
         if let Ok(rung) = loaded.policy.tier_for(kind) {
             if let Some(reason) = loaded.unavailable_reasons.get(&rung) {
                 let backend = loaded.policy.tiers.get(&rung).map(BackendConfig::backend);
-                let message = StoreError::tier_unavailable(rung, backend, reason.clone()).to_string();
+                let message = safe_tier_degrade_reason(rung, backend, reason);
                 if !degrade_reasons.contains(&message) {
                     degrade_reasons.push(message);
                 }
@@ -657,6 +725,7 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
             skipped_rows,
             malformed_records,
             unwritten: Some(normalized.sessions),
+            degrade_class: Some("tier_unavailable"),
             degrade_reason: Some(degrade_reasons.join("; ")),
         });
     }
@@ -711,7 +780,18 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
         let _ = cursors.write(&cursor);
     }
 
-    Ok(IngestOutcome { adapters, scope_summary, sessions_normalized, runs_written, events_written, skipped_rows, malformed_records, unwritten: None, degrade_reason: None })
+    Ok(IngestOutcome {
+        adapters,
+        scope_summary,
+        sessions_normalized,
+        runs_written,
+        events_written,
+        skipped_rows,
+        malformed_records,
+        unwritten: None,
+        degrade_class: None,
+        degrade_reason: None,
+    })
 }
 
 /// A file's `(mtime_ms, size)` for the cursor's informational summary
@@ -728,11 +808,13 @@ fn file_stat(path: &Path) -> (i64, u64) {
     }
 }
 
-/// One [`SourceCursor`] id per `(client_id, parse_version)` session
-/// source (s40 (`plan-vs-actual-diff`), task 4.1) — the counterpart of
-/// `crate::plans::plan_source_cursor_id` for session ingest, and the
-/// session-side half of the cursor fix s38
-/// (`evidence-bearing-memory`) left open as its task 5.3.
+/// The parse-generation component of a [`SourceCursor`] id per
+/// `(client_id, parse_version)` session source (s40
+/// (`plan-vs-actual-diff`), task 4.1) — the counterpart of
+/// `crate::plans::plan_source_cursor_id` for session ingest. The actual
+/// cursor identity used by [`run`] is
+/// [`session_source_cursor_id_with_privacy`], which appends the privacy
+/// mode and bound to this component.
 ///
 /// `parse_version` ([`canon_ingest::SessionAdapter::parse_version`])
 /// joins the identity because of what this cursor's gate actually
@@ -791,8 +873,19 @@ fn session_source_cursor_id(client_id: &str, parse_version: u32) -> String {
     if parse_version == 1 { client_id.to_string() } else { format!("{client_id}-v{parse_version}") }
 }
 
-/// The cursor this pass gates a source against: the one persisted at
-/// `cursor_id`, or an EMPTY cursor (every present file classified
+/// Compose the actual session cursor identity. Privacy is part of the
+/// identity because the same source bytes normalize to different durable
+/// event sets under metadata-only, bounded capture, or a changed bound.
+/// Old unsuffixed cursors are intentionally not reused: they may have been
+/// produced before the pre-store privacy boundary existed.
+fn session_source_cursor_id_with_privacy(client_id: &str, parse_version: u32, privacy: DirectivePrivacyPolicy) -> String {
+    let generation = session_source_cursor_id(client_id, parse_version);
+    if privacy.capture_user_directives {
+        format!("{generation}-privacy-capture-{}", privacy.max_directive_chars)
+    } else {
+        format!("{generation}-privacy-metadata-{}", privacy.max_directive_chars)
+    }
+}
 /// `changed_or_new`) when `full_rescan` is set, when this source has
 /// never been ingested, or when nothing is stored AT THIS IDENTITY.
 /// That last case is the whole mechanism behind s40 task 4.2: an
@@ -858,6 +951,20 @@ fn persist_many_idempotent<T: canon_model::envelope::CanonRecord>(store: &TierRe
     }
 }
 
+/// Build a degraded-store reason without copying backend diagnostics into
+/// metadata-only output. Unset env-var names are safe, stable configuration
+/// identifiers; live backend errors are intentionally collapsed to the
+/// backend's generic availability reason because they may contain DSNs,
+/// usernames, or passwords.
+fn safe_tier_degrade_reason(rung: canon_store::policy::Rung, backend: Option<canon_store::policy::Backend>, raw: &str) -> String {
+    let safe_reason = raw.strip_suffix(" is unset").and_then(|name| {
+        let name = name.strip_prefix('`').and_then(|name| name.strip_suffix('`')).unwrap_or(name);
+        (!name.is_empty() && name.bytes().all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')).then_some(name)
+    });
+    let reason = safe_reason.map(|name| format!("{name} is unset")).unwrap_or_else(|| backend.map(|value| value.default_unattached_reason().to_string()).unwrap_or_else(|| "unavailable".to_string()));
+    StoreError::tier_unavailable(rung, backend, reason).to_string()
+}
+
 /// Human-readable run summary (task 5.2: "records scanned, records
 /// skipped as violations, per-adapter counts").
 pub fn format_human(outcome: &IngestOutcome) -> String {
@@ -891,11 +998,92 @@ pub fn format_human(outcome: &IngestOutcome) -> String {
     out
 }
 
-/// `--json`: the unwritten normalized bundle as machine-readable JSON
-/// (the documented seam's actual output) — `None` (nothing to print)
-/// when every record was already persisted.
+/// `--json`: metadata-only representation of the unwritten normalized
+/// candidates. Directive text and every open event `detail` are omitted
+/// even when bounded capture was explicitly enabled.
 pub fn format_json(outcome: &IngestOutcome) -> Option<String> {
-    outcome.unwritten.as_ref().map(|sessions| serde_json::to_string_pretty(sessions).expect("NormalizedSession always serializes"))
+    outcome.unwritten.as_ref().map(|sessions| serde_json::to_string_pretty(&degraded_metadata(outcome, sessions)).expect("metadata JSON always serializes"))
+}
+
+fn degraded_metadata(outcome: &IngestOutcome, sessions: &[NormalizedSession]) -> serde_json::Value {
+    let session_entries: Vec<serde_json::Value> = sessions
+        .iter()
+        .map(|normalized| {
+            let body = serde_json::to_value(&normalized.session).expect("Session always serializes");
+            serde_json::json!({
+                "session_id": normalized.session.session_id,
+                "client": normalized.session.client,
+                "workspace_key": normalized.session.workspace_key,
+                "workspace_label": normalized.session.workspace_label,
+                "project_key": normalized.session.project_key,
+                "digest": content_digest12(&body),
+            })
+        })
+        .collect();
+    let run_entries: Vec<serde_json::Value> = sessions
+        .iter()
+        .flat_map(|normalized| normalized.runs().map(|run| {
+            let body = serde_json::to_value(run).expect("Run always serializes");
+            serde_json::json!({
+                "run_id": run.run_id,
+                "session_id": run.session_id,
+                "parent_run_id": run.parent_run_id,
+                "digest": content_digest12(&body),
+            })
+        }))
+        .collect();
+    let event_entries: Vec<serde_json::Value> = sessions
+        .iter()
+        .flat_map(|normalized| normalized.events.iter().map(|event| {
+            let body = serde_json::to_value(event).expect("Event always serializes");
+            serde_json::json!({
+                "run_id": event.run_id,
+                "seq": event.seq,
+                "at": event.envelope.at,
+                "label": event.label,
+                "digest": content_digest12(&body),
+            })
+        }))
+        .collect();
+    let adapters: Vec<serde_json::Value> = outcome
+        .adapters
+        .iter()
+        .map(|adapter| serde_json::json!({
+            "client_id": adapter.client_id,
+            "files_scanned": adapter.files_scanned,
+            "reparsed": adapter.reparsed,
+            "rows_parsed": adapter.rows_parsed,
+            "malformed_records": adapter.malformed_records,
+            "skipped_unchanged": adapter.skipped_unchanged,
+        }))
+        .collect();
+    let failure_class = outcome.degrade_class.unwrap_or("degraded");
+    let failure_reason = outcome.degrade_reason.as_deref().unwrap_or(match failure_class {
+        "config_unavailable" => "canon.yaml missing or unreadable",
+        "unrouted" => "session/run/event routing is incomplete",
+        _ => "session ingest did not reach a durable tier",
+    });
+    serde_json::json!({
+        "scope": outcome.scope_summary,
+        "adapters": adapters,
+        "counts": {
+            "sessions": session_entries.len(),
+            "runs": run_entries.len(),
+            "events": event_entries.len(),
+            "sessions_normalized": outcome.sessions_normalized,
+            "runs_written": outcome.runs_written,
+            "events_written": outcome.events_written,
+            "malformed_records": outcome.malformed_records,
+            "rows_skipped": outcome.skipped_rows,
+        },
+        "sessions": session_entries,
+        "runs": run_entries,
+        "events": event_entries,
+        "failure": {
+            "class": failure_class,
+            "reason": failure_reason,
+        },
+    })
 }
 
 #[cfg(test)]
@@ -919,6 +1107,43 @@ mod tests {
         let path = root.join("canon.yaml");
         std::fs::write(&path, yaml).unwrap();
         path
+    }
+
+    #[test]
+    fn absent_privacy_config_defaults_to_metadata_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("canon.yaml");
+        std::fs::write(&path, "tiers: {}\n").unwrap();
+
+        let config = IngestSourceConfig::load(&path).unwrap();
+        assert_eq!(config.privacy, DirectivePrivacyPolicy::METADATA_ONLY);
+    }
+
+    #[test]
+    fn capture_privacy_requires_a_positive_unicode_bound() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("canon.yaml");
+        std::fs::write(
+            &path,
+            "ingest:\n  sessions:\n    privacy:\n      capture_user_directives: true\n      max_directive_chars: 4096\n",
+        )
+        .unwrap();
+
+        let config = IngestSourceConfig::load(&path).unwrap();
+        assert_eq!(config.privacy, DirectivePrivacyPolicy { capture_user_directives: true, max_directive_chars: 4096 });
+    }
+
+    #[test]
+    fn capture_privacy_rejects_missing_or_zero_bound() {
+        let dir = tempfile::tempdir().unwrap();
+        for privacy in [
+            "capture_user_directives: true\n",
+            "capture_user_directives: true\n      max_directive_chars: 0\n",
+        ] {
+            let path = dir.path().join("canon.yaml");
+            std::fs::write(&path, format!("ingest:\n  sessions:\n    privacy:\n      {privacy}")).unwrap();
+            assert!(IngestSourceConfig::load(&path).is_err());
+        }
     }
 
     #[test]
@@ -985,7 +1210,8 @@ mod tests {
         assert_eq!(second.events_written, 0);
         assert_eq!(second.adapters[0].reparsed, 0, "unchanged source is not re-parsed");
         assert!(second.adapters[0].skipped_unchanged >= 1, "the skip must be surfaced in the summary");
-        assert!(dir.path().join(".canon/ingest/cursors/omp.json").exists(), "the pass-1 cursor persisted");
+        let cursor_id = session_source_cursor_id_with_privacy("omp", 1, DirectivePrivacyPolicy::METADATA_ONLY);
+        assert!(dir.path().join(paths::INGEST_CURSORS_DIR).join(format!("{cursor_id}.json")).exists(), "the pass-1 cursor persisted");
 
         // S3 6.8 (watermark reset): `--full` (full_rescan) ignores the
         // cursor and re-parses every source — the reset re-scan. The S3
@@ -1078,7 +1304,8 @@ mod tests {
         assert!(before >= 3);
 
         // literally reset: remove the persisted cursor file.
-        let cursor = dir.path().join(".canon/ingest/cursors/omp.json");
+        let cursor_id = session_source_cursor_id_with_privacy("omp", 1, DirectivePrivacyPolicy::METADATA_ONLY);
+        let cursor = dir.path().join(paths::INGEST_CURSORS_DIR).join(format!("{cursor_id}.json"));
         assert!(cursor.exists(), "pass 1 wrote the cursor");
         std::fs::remove_file(&cursor).unwrap();
 
@@ -1315,7 +1542,7 @@ mod tests {
     }
 
     #[test]
-    fn default_scope_includes_project_and_worktree_excludes_foreign_project_and_captures_directives() {
+    fn default_scope_uses_metadata_only_unwritten_output() {
         let fixture = build_two_project_fixture(false);
 
         let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false).unwrap();
@@ -1323,22 +1550,37 @@ mod tests {
         assert!(outcome.scope_summary.contains("2 roots"), "scope: {}", outcome.scope_summary);
 
         let json = format_json(&outcome).unwrap();
-        let sessions: serde_json::Value = serde_json::from_str(&json).unwrap();
-        let by_id = |id: &str| sessions.as_array().unwrap().iter().find(|s| s["session"]["session_id"] == id).cloned();
+        let payload: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let by_id = |id: &str| payload["sessions"].as_array().unwrap().iter().find(|s| s["session_id"] == id).cloned();
 
         let expected_project_key = fixture.project_a.to_string_lossy().replace('\\', "/");
         let a = by_id("ing_ses_a").expect("project A's own session is ingested");
-        assert_eq!(a["session"]["project_key"], expected_project_key);
+        assert_eq!(a["project_key"], expected_project_key);
         let wt = by_id("ing_ses_a_wt").expect("the linked worktree's session is ingested");
-        assert_eq!(wt["session"]["project_key"], expected_project_key, "the worktree session carries the MAIN worktree's project_key (spec: aggregation by project)");
+        assert_eq!(wt["project_key"], expected_project_key, "the worktree session carries the MAIN worktree's project_key (spec: aggregation by project)");
         assert!(by_id("ing_ses_b").is_none(), "the foreign project's session must be excluded: {json}");
-
-        // s31 D4: the user-role message became a `user_directive` event.
-        let a_events = a["events"].as_array().unwrap();
-        let directive = a_events.iter().find(|e| e["label"] == "user_directive").expect("a user_directive event is present");
-        assert_eq!(directive["detail"]["text"], "do the a thing");
+        assert!(!json.contains("do the a thing"), "default degraded JSON must not contain directive text: {json}");
+        assert!(payload["events"].as_array().unwrap().iter().all(|event| event["label"] != "user_directive"));
     }
 
+
+    #[test]
+    fn degraded_json_omits_captured_directive_text() {
+        let fixture = build_two_project_fixture(false);
+        std::fs::write(
+            &fixture.canon_yaml,
+            "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n\
+             ingest:\n  sessions:\n    privacy:\n      capture_user_directives: true\n      max_directive_chars: 4096\n",
+        )
+        .unwrap();
+
+        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false).unwrap();
+        let json = format_json(&outcome).unwrap();
+        assert!(!json.contains("do the a thing"), "degraded metadata must omit captured directive text: {json}");
+        let payload: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(payload["failure"]["class"], "unrouted");
+        assert!(payload["events"].as_array().unwrap().iter().any(|event| event["label"] == "user_directive"));
+    }
     #[test]
     fn all_workspaces_flag_restores_the_machine_wide_scan() {
         let fixture = build_two_project_fixture(false);
@@ -1396,6 +1638,43 @@ mod tests {
     fn version_zero_is_not_folded_into_version_ones_id() {
         assert_ne!(session_source_cursor_id("omp", 0), session_source_cursor_id("omp", 1));
         assert_eq!(session_source_cursor_id("omp", 0), "omp-v0");
+    }
+    #[test]
+    fn privacy_policy_is_part_of_cursor_identity() {
+        let metadata = DirectivePrivacyPolicy::METADATA_ONLY;
+        let captured_128 = DirectivePrivacyPolicy { capture_user_directives: true, max_directive_chars: 128 };
+        let captured_256 = DirectivePrivacyPolicy { capture_user_directives: true, max_directive_chars: 256 };
+        let metadata_128 = DirectivePrivacyPolicy { capture_user_directives: false, max_directive_chars: 128 };
+
+        assert_ne!(session_source_cursor_id_with_privacy("omp", 1, metadata), session_source_cursor_id_with_privacy("omp", 1, captured_128));
+        assert_ne!(session_source_cursor_id_with_privacy("omp", 1, captured_128), session_source_cursor_id_with_privacy("omp", 1, captured_256));
+        assert_ne!(session_source_cursor_id_with_privacy("omp", 1, metadata), session_source_cursor_id_with_privacy("omp", 1, metadata_128));
+        assert!(session_source_cursor_id_with_privacy("omp", 1, metadata).ends_with("-privacy-metadata-0"));
+        assert!(session_source_cursor_id_with_privacy("omp", 1, captured_128).ends_with("-privacy-capture-128"));
+    }
+
+    #[test]
+    fn degraded_reason_drops_credential_laden_backend_diagnostics() {
+        let reason = safe_tier_degrade_reason(
+            canon_store::policy::Rung::Hot,
+            Some(canon_store::policy::Backend::Postgres),
+            "connect failed for postgres://alice:super-secret@example.invalid/canon",
+        );
+        assert!(reason.contains("no live DSN"));
+        assert!(!reason.contains("super-secret"));
+        assert!(!reason.contains("alice@"));
+    }
+
+    #[test]
+    fn degraded_reason_preserves_backtick_wrapped_env_name() {
+        let reason = safe_tier_degrade_reason(
+            canon_store::policy::Rung::Hot,
+            Some(canon_store::policy::Backend::Postgres),
+            "`CANON_PG_DSN_1` is unset",
+        );
+        assert!(reason.contains("CANON_PG_DSN_1 is unset"));
+        assert!(!reason.contains('`'));
+        assert!(!reason.contains("no live DSN"));
     }
 
     /// A cursor id is used as a bare filename component
@@ -1536,14 +1815,16 @@ mod tests {
         let transcript = dir.path().join(".omp/agent/sessions/-tmp-proj/s1.jsonl");
         let present = BTreeMap::from([(transcript.to_string_lossy().into_owned(), file_digest(&std::fs::read(&transcript).unwrap()))]);
 
-        let at_shipped = base_session_cursor(&cursors, &session_source_cursor_id("omp", 1), false).diff(&present);
+        let privacy = DirectivePrivacyPolicy::METADATA_ONLY;
+        let at_shipped = base_session_cursor(&cursors, &session_source_cursor_id_with_privacy("omp", 1, privacy), false).diff(&present);
         assert_eq!(at_shipped.unchanged.len(), 1, "control: at the shipped version the transcript is still skipped");
         assert!(at_shipped.changed_or_new.is_empty());
 
-        let at_bumped = base_session_cursor(&cursors, &session_source_cursor_id("omp", 2), false).diff(&present);
+        let at_bumped = base_session_cursor(&cursors, &session_source_cursor_id_with_privacy("omp", 2, privacy), false).diff(&present);
         assert_eq!(at_bumped.changed_or_new.len(), 1, "a bumped parse version must re-read the transcript with no --full and no cursor deletion");
         assert!(at_bumped.unchanged.is_empty());
 
-        assert!(dir.path().join(".canon/ingest/cursors/omp.json").exists(), "the pre-bump cursor is ORPHANED, never deleted or mutated");
+        let cursor_id = session_source_cursor_id_with_privacy("omp", 1, privacy);
+        assert!(dir.path().join(paths::INGEST_CURSORS_DIR).join(format!("{cursor_id}.json")).exists(), "the pre-bump cursor is ORPHANED, never deleted or mutated");
     }
 }

@@ -14,14 +14,25 @@
 //! calls for, keyed by `run_id` (which in turn carries `session_id`).
 //!
 //! **s31 D4 (user-directive capture)**: every `DirectiveRow` an
-//! adapter extracted becomes a SECOND `Event` stream, `label:
+//! adapter extracted can become a SECOND `Event` stream, `label:
 //! "user_directive"`, folded into the SAME per-session `events` list
-//! as the `token_usage` stream — one deterministic `seq` order across
-//! both (`normalize_session`'s merge-then-stable-sort, see its doc
-//! comment). `Session` also gains optional `workspace_key`/
+//! — but only through [`normalize_with_privacy`]'s shared policy
+//! boundary. That boundary either omits directive events entirely or
+//! captures a bounded Unicode-scalar prefix and records redaction
+//! metadata. `normalize` remains the pre-policy adapter/normalization
+//! seam used by parser-focused tests. `Session` also gains optional
+//! `workspace_key`/
 //! `workspace_label` (populated here, first non-`None` in fold order)
 //! and `project_key` (left `None` here — stamped on by `canon-cli`,
 //! design D3: "project_key set by the CLI layer").
+//!
+//! The privacy boundary is deliberately here, after all adapters have
+//! produced their rows, rather than in adapter-specific parsers.
+//! This keeps source parsing tests able to inspect `DirectiveRow` while
+//! ensuring the CLI's durable and degraded paths share one policy.
+//!
+//! The policy metadata is intentionally attached to the Event detail
+//! rather than to `DirectiveRow`, so adapter contracts stay unchanged.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -41,6 +52,221 @@ pub const TOKEN_USAGE_LABEL: &str = "token_usage";
 /// The `Event.label` every normalized user-directive row carries (s31
 /// design D4).
 pub const USER_DIRECTIVE_LABEL: &str = "user_directive";
+/// The shared policy applied after all transcript adapters have parsed
+/// their rows. `max_directive_chars` is a Unicode-scalar bound; callers
+/// validate that it is positive when capture is enabled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DirectivePrivacyPolicy {
+    pub capture_user_directives: bool,
+    pub max_directive_chars: usize,
+}
+
+impl DirectivePrivacyPolicy {
+    /// Metadata-only default: directive rows never become normalized
+    /// events.
+    pub const METADATA_ONLY: Self = Self { capture_user_directives: false, max_directive_chars: 0 };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RedactionKind {
+    Secret,
+    Pii,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RedactionSpan {
+    start: usize,
+    end: usize,
+    kind: RedactionKind,
+}
+
+/// Redact a conservative set of high-confidence secret/PII forms before the
+/// caller applies its capture bound. This is intentionally a classifier, not
+/// a general PII guarantee: unknown credentials, source-specific identifiers,
+/// and non-email personal data may remain in opted-in text.
+fn find_ascii_case_insensitive(text: &str, from: usize, needle: &[u8]) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let last = bytes.len().saturating_sub(needle.len());
+    (from..=last).find(|start| text.is_char_boundary(*start) && bytes[*start..*start + needle.len()].eq_ignore_ascii_case(needle))
+}
+
+fn redact_directive(text: &str) -> (String, usize, usize) {
+    let mut spans = Vec::new();
+
+    // PEM private keys are multiline and must be found before truncation.
+    let mut search_from = 0;
+    while let Some(relative_start) = text[search_from..].find("-----BEGIN ") {
+        let start = search_from + relative_start;
+        let Some(private_marker) = text[start..].find("PRIVATE KEY-----") else {
+            break;
+        };
+        let Some(end_marker) = text[start + private_marker..].find("-----END ") else {
+            break;
+        };
+        let end_search = start + private_marker + end_marker;
+        let end_body_start = end_search + "-----END ".len();
+        let Some(end_suffix) = text[end_body_start..].find("-----") else {
+            break;
+        };
+        let end = end_body_start + end_suffix + 5;
+        spans.push(RedactionSpan { start, end, kind: RedactionKind::Secret });
+        search_from = end;
+    }
+
+    // Assignment forms cover the common API key/token/password spellings.
+    // Values may be quoted and may cross lines; unquoted values stop at
+    // whitespace/punctuation so ordinary prose following `token:` is not
+    // swallowed wholesale.
+    const SECRET_KEYS: &[&str] = &[
+        "api_key", "api-key", "apikey", "token", "secret", "password", "passwd", "authorization", "access_token", "access-token",
+        "private_key", "private-key",
+    ];
+    let bytes = text.as_bytes();
+    for start in 0..bytes.len() {
+        if !text.is_char_boundary(start) {
+            continue;
+        }
+        if start > 0 && (bytes[start - 1].is_ascii_alphanumeric() || bytes[start - 1] == b'_' || bytes[start - 1] == b'-') {
+            continue;
+        }
+        let Some(key) = SECRET_KEYS.iter().find(|key| {
+            let key_end = start + key.len();
+            key_end <= bytes.len() && bytes[start..key_end].eq_ignore_ascii_case(key.as_bytes())
+        }) else {
+            continue;
+        };
+        let key_end = start + key.len();
+        if key_end < bytes.len() && (bytes[key_end].is_ascii_alphanumeric() || bytes[key_end] == b'_' || bytes[key_end] == b'-') {
+            continue;
+        }
+        let mut cursor = key_end;
+        while cursor < bytes.len() && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= bytes.len() || !matches!(bytes[cursor], b'=' | b':') {
+            continue;
+        }
+        cursor += 1;
+        while cursor < bytes.len() && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= bytes.len() {
+            continue;
+        }
+        let (value_start, value_end) = if matches!(bytes[cursor], b'\'' | b'"') {
+            let quote = bytes[cursor];
+            let value_start = cursor;
+            cursor += 1;
+            while cursor < bytes.len() && bytes[cursor] != quote {
+                cursor += 1;
+            }
+            if cursor < bytes.len() {
+                cursor += 1;
+            }
+            (value_start, cursor)
+        } else {
+            let value_start = cursor;
+            while cursor < bytes.len() && !bytes[cursor].is_ascii_whitespace() && !matches!(bytes[cursor], b',' | b';' | b')' | b']' | b'}') {
+                cursor += 1;
+            }
+            (value_start, cursor)
+        };
+        let assignment_value_is_bearer = key.eq_ignore_ascii_case("authorization")
+            && value_end - value_start >= 6
+            && bytes[value_start..value_start + 6].eq_ignore_ascii_case(b"bearer");
+        if value_start < value_end && !assignment_value_is_bearer {
+            spans.push(RedactionSpan { start: value_start, end: value_end, kind: RedactionKind::Secret });
+        }
+    }
+
+    // Bearer credentials are deliberately recognized independently of an
+    // assignment key because transcripts commonly contain HTTP headers.
+    let mut search_from = 0;
+    while let Some(start) = find_ascii_case_insensitive(text, search_from, b"bearer") {
+        let bearer_end = start + 6;
+        let boundary_before = start == 0 || !bytes[start - 1].is_ascii_alphanumeric();
+        let boundary_after = bearer_end == bytes.len() || !bytes[bearer_end].is_ascii_alphanumeric();
+        if boundary_before && boundary_after {
+            let mut value_start = bearer_end;
+            while value_start < bytes.len() && bytes[value_start].is_ascii_whitespace() {
+                value_start += 1;
+            }
+            let mut value_end = value_start;
+            while value_end < bytes.len() && !bytes[value_end].is_ascii_whitespace() && !matches!(bytes[value_end], b',' | b';' | b'"' | b'\'') {
+                value_end += 1;
+            }
+            if value_start < value_end {
+                spans.push(RedactionSpan { start: value_start, end: value_end, kind: RedactionKind::Secret });
+            }
+        }
+        search_from = bearer_end;
+    }
+
+    // Email is the intentionally narrow PII detector: enough to prevent
+    // common account identifiers from being copied into the event, without
+    // claiming to classify every personal identifier.
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        let is_email_char = |byte: u8| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'%' | b'+' | b'-');
+        if !is_email_char(bytes[cursor]) {
+            cursor += 1;
+            continue;
+        }
+        let start = cursor;
+        while cursor < bytes.len() && is_email_char(bytes[cursor]) {
+            cursor += 1;
+        }
+        if cursor >= bytes.len() || bytes[cursor] != b'@' {
+            continue;
+        }
+        cursor += 1;
+        let domain_start = cursor;
+        while cursor < bytes.len() && (bytes[cursor].is_ascii_alphanumeric() || matches!(bytes[cursor], b'.' | b'-')) {
+            cursor += 1;
+        }
+        let domain = &text[domain_start..cursor];
+        if domain.contains('.') && domain.split('.').all(|part| !part.is_empty()) && domain.rsplit('.').next().is_some_and(|suffix| suffix.len() >= 2) {
+            spans.push(RedactionSpan { start, end: cursor, kind: RedactionKind::Pii });
+        }
+    }
+
+    spans.sort_by_key(|span| (span.start, span.end));
+    let mut merged: Vec<RedactionSpan> = Vec::with_capacity(spans.len());
+    for span in spans {
+        if let Some(previous) = merged.last_mut() {
+            if span.start < previous.end {
+                previous.end = previous.end.max(span.end);
+                if span.kind == RedactionKind::Secret {
+                    previous.kind = RedactionKind::Secret;
+                }
+                continue;
+            }
+        }
+        merged.push(span);
+    }
+
+    let mut secret_count = 0;
+    let mut pii_count = 0;
+    let mut output = String::with_capacity(text.len());
+    let mut cursor = 0;
+    for span in merged {
+        output.push_str(&text[cursor..span.start]);
+        let placeholder = match span.kind {
+            RedactionKind::Secret => {
+                secret_count += 1;
+                format!("[REDACTED_SECRET_{secret_count}]")
+            }
+            RedactionKind::Pii => {
+                pii_count += 1;
+                format!("[REDACTED_PII_{pii_count}]")
+            }
+        };
+        output.push_str(&placeholder);
+        cursor = span.end;
+    }
+    output.push_str(&text[cursor..]);
+    (output, secret_count, pii_count)
+}
 
 /// One session's worth of normalized canon-model output.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -170,14 +396,22 @@ pub fn normalize_rows(rows: &[UnifiedRow]) -> NormalizeOutcome {
     normalize(rows, &[])
 }
 
-/// The full normalization entry point (s31 design D4): [`normalize_rows`]'s
-/// `UnifiedRow` grouping/dedup PLUS a `DirectiveRow` stream, unioned by
-/// `session_id` (a session with directives but zero billable rows yet —
-/// e.g. a human turn parsed before its assistant reply — still gets a
-/// `Session`/`Run` and its directive events, never silently dropped)
-/// and folded into each session's `events` in ONE deterministic `seq`
-/// order (`normalize_session`'s merge-then-stable-sort).
+/// The pre-policy normalization seam retained for adapter-focused
+/// callers/tests. The CLI ingest driver MUST use
+/// [`normalize_with_privacy`] before any durable write.
 pub fn normalize(rows: &[UnifiedRow], directives: &[DirectiveRow]) -> NormalizeOutcome {
+    normalize_inner(rows, directives, None)
+}
+
+/// Normalize after all adapters have emitted their rows, applying the
+/// one shared transcript privacy policy. Disabled capture omits every
+/// directive event; enabled capture truncates by Unicode scalar chars
+/// and marks the detail as redacted.
+pub fn normalize_with_privacy(rows: &[UnifiedRow], directives: &[DirectiveRow], policy: DirectivePrivacyPolicy) -> NormalizeOutcome {
+    normalize_inner(rows, directives, Some(policy))
+}
+
+fn normalize_inner(rows: &[UnifiedRow], directives: &[DirectiveRow], privacy: Option<DirectivePrivacyPolicy>) -> NormalizeOutcome {
     // BTreeMap, not HashMap: deterministic (lexical session_id) fold
     // order — the same reason canon-store's own registry.rs sorts its
     // aging-report iteration instead of trusting HashMap order.
@@ -220,14 +454,14 @@ pub fn normalize(rows: &[UnifiedRow], directives: &[DirectiveRow]) -> NormalizeO
         .filter_map(|session_id| {
             let rows = by_session_rows.get(session_id).unwrap_or(&empty_rows);
             let directives = by_session_directives.get(session_id).unwrap_or(&empty_directives);
-            normalize_session(session_id, rows, directives)
+            normalize_session(session_id, rows, directives, privacy)
         })
         .collect();
 
     NormalizeOutcome { sessions, skipped_rows }
 }
 
-fn normalize_session(session_id_str: &str, rows: &[&UnifiedRow], directives: &[&DirectiveRow]) -> Option<NormalizedSession> {
+fn normalize_session(session_id_str: &str, rows: &[&UnifiedRow], directives: &[&DirectiveRow], privacy: Option<DirectivePrivacyPolicy>) -> Option<NormalizedSession> {
     if rows.is_empty() && directives.is_empty() {
         return None;
     }
@@ -292,6 +526,14 @@ fn normalize_session(session_id_str: &str, rows: &[&UnifiedRow], directives: &[&
     let events = seeds
         .iter()
         .enumerate()
+        // Sequence numbers belong to the source event stream, not to the
+        // privacy projection. Keeping the original ordinal when directives
+        // are omitted prevents a policy toggle from re-keying token events
+        // onto an older directive-bearing event's natural key.
+        .filter(|(_, seed)| match (privacy, seed) {
+            (Some(policy), EventSeed::UserDirective(_)) => policy.capture_user_directives,
+            _ => true,
+        })
         .map(|(idx, seed)| {
             let seq = (idx + 1) as u64;
             let at = millis_to_utc(seed.timestamp_ms());
@@ -320,11 +562,34 @@ fn normalize_session(session_id_str: &str, rows: &[&UnifiedRow], directives: &[&
                 }
                 EventSeed::UserDirective(directive) => {
                     let actor = Actor::new_unattributed(client.clone()).with_session(session_id.clone());
-                    let detail = json!({
-                        "text": directive.text,
-                        "workspace_key": directive.workspace_key,
-                        "workspace_label": directive.workspace_label,
-                    });
+                    let detail = match privacy {
+                        None => json!({
+                            "text": directive.text,
+                            "workspace_key": directive.workspace_key,
+                            "workspace_label": directive.workspace_label,
+                        }),
+                        Some(policy) => {
+                            let original_chars = directive.text.chars().count();
+                            let (redacted_text, secret_count, pii_count) = redact_directive(&directive.text);
+                            let redacted_chars = redacted_text.chars().count();
+                            let text: String = redacted_text.chars().take(policy.max_directive_chars).collect();
+                            let captured_chars = text.chars().count();
+                            let redacted = secret_count > 0 || pii_count > 0;
+                            json!({
+                                "text": text,
+                                "workspace_key": directive.workspace_key,
+                                "workspace_label": directive.workspace_label,
+                                "redacted": redacted,
+                                "truncated": captured_chars < redacted_chars,
+                                "original_chars": original_chars,
+                                "captured_chars": captured_chars,
+                                "redaction_counts": {
+                                    "secret": secret_count,
+                                    "pii": pii_count,
+                                },
+                            })
+                        }
+                    };
                     Event::new(Envelope::current(RecordKind::Event, at, actor), run_id, seq, USER_DIRECTIVE_LABEL, detail)
                 }
             }
@@ -810,6 +1075,74 @@ mod tests {
         assert_eq!(session.events[0].detail["text"], "hello, are you there?");
         assert_eq!(session.events[0].detail["workspace_key"], "/tmp/proj");
         assert_eq!(session.events[0].detail["workspace_label"], "proj");
+    }
+
+    #[test]
+    fn metadata_only_privacy_omits_directive_events() {
+        let rows = vec![row("ses_private", 2_000)];
+        let directives = vec![directive("ses_private", 1_000, "secret directive")];
+        let outcome = normalize_with_privacy(&rows, &directives, DirectivePrivacyPolicy::METADATA_ONLY);
+
+        assert_eq!(outcome.sessions.len(), 1);
+        assert_eq!(outcome.sessions[0].events.len(), 1);
+        assert_eq!(outcome.sessions[0].events[0].label, TOKEN_USAGE_LABEL);
+    }
+
+    #[test]
+    fn bounded_privacy_truncates_unicode_scalars_without_claiming_redaction() {
+        let directives = vec![directive("ses_private", 1_000, "é🙂秘密")];
+        let policy = DirectivePrivacyPolicy { capture_user_directives: true, max_directive_chars: 3 };
+        let outcome = normalize_with_privacy(&[], &directives, policy);
+        let detail = &outcome.sessions[0].events[0].detail;
+
+        assert_eq!(detail["text"], "é🙂秘");
+        assert_eq!(detail["redacted"], false, "truncation is not secret/PII redaction");
+        assert_eq!(detail["truncated"], true);
+        assert_eq!(detail["original_chars"], 4);
+        assert_eq!(detail["captured_chars"], 3);
+        assert_eq!(detail["redaction_counts"]["secret"], 0);
+        assert_eq!(detail["redaction_counts"]["pii"], 0);
+    }
+
+    #[test]
+    fn secret_scanner_handles_non_ascii_prefix_before_key_match() {
+        let (redacted, secret_count, pii_count) = redact_directive("éto🙂 token=split-secret");
+
+        assert_eq!(redacted, "éto🙂 token=[REDACTED_SECRET_1]");
+        assert_eq!(secret_count, 1);
+        assert_eq!(pii_count, 0);
+    }
+
+    #[test]
+    fn opted_in_privacy_redacts_split_multiline_unicode_and_after_bound_secrets_before_truncation() {
+        let text = "안전한 요청 api_key =\n  \"sk-live-123456\" email me@example.com; Authorization: Bearer bearer-secret-xyz\n-----BEGIN PRIVATE KEY-----\n秘密-key-material\n-----END PRIVATE KEY----- token=after-boundary";
+        let directives = vec![directive("ses_private", 1_000, text)];
+        let policy = DirectivePrivacyPolicy { capture_user_directives: true, max_directive_chars: 80 };
+        let outcome = normalize_with_privacy(&[], &directives, policy);
+        let detail = &outcome.sessions[0].events[0].detail;
+        let captured = detail["text"].as_str().unwrap();
+
+        assert!(detail["redacted"].as_bool().unwrap());
+        assert_eq!(detail["redaction_counts"]["secret"], 4);
+        assert_eq!(detail["redaction_counts"]["pii"], 1);
+        assert!(!captured.contains("sk-live-123456"));
+        assert!(!captured.contains("me@example.com"));
+        assert!(!captured.contains("bearer-secret-xyz"));
+        assert!(!captured.contains("秘密-key-material"));
+        assert!(!captured.contains("after-boundary"), "a secret after the capture boundary must be classified before truncation");
+        assert!(captured.contains("[REDACTED_SECRET_1]"));
+        assert!(captured.contains("[REDACTED_PII_1]"));
+    }
+
+    #[test]
+    fn privacy_toggle_keeps_token_event_sequence_stable() {
+        let rows = vec![row("ses_private", 2_000)];
+        let directives = vec![directive("ses_private", 1_000, "token=split-secret")];
+        let metadata_only = normalize_with_privacy(&rows, &directives, DirectivePrivacyPolicy::METADATA_ONLY);
+        let captured = normalize_with_privacy(&rows, &directives, DirectivePrivacyPolicy { capture_user_directives: true, max_directive_chars: 128 });
+
+        assert_eq!(metadata_only.sessions[0].events[0].seq, 2);
+        assert_eq!(captured.sessions[0].events[1].seq, 2);
     }
 
     /// s31 D4's digest-dedup invariant: re-parsing a GROWN file (more

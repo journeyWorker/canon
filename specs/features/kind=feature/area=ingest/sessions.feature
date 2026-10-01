@@ -42,15 +42,16 @@ Feature: ingest sessions
 
   @subject:ingest-pipelines
   @ingest.sessions.05
-  Scenario: Ingest is scoped to this project by default and a user turn becomes a directive event
+  Scenario: Ingest is scoped to this project by default and explicit directive capture is bounded
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a machine holding transcripts for this project, for a worktree linked to it, and for a foreign project
+    And the repository opts into bounded directive capture with a positive `max_directive_chars`
     When sessions are ingested with no scope flag
     Then this project's own session and its linked worktree's session are both ingested
     And the worktree session carries the main worktree's project key so the two aggregate together
     And the foreign project's session is excluded
-    And the user turn is carried as a user_directive event holding the text the user wrote
-
+    And with `ingest.sessions.privacy.capture_user_directives: true` and `max_directive_chars: 4096`, the user turn is carried as a bounded user_directive event
+    And capture is rejected when `max_directive_chars` is absent, zero, or negative
   @subject:ingest-pipelines
   @ingest.sessions.06
   Scenario: Widening to all workspaces restores the machine-wide scan
@@ -62,13 +63,14 @@ Feature: ingest sessions
 
   @subject:ingest-pipelines
   @ingest.sessions.07
-  Scenario: The watermark is per source, so only the source that changed is re-read
+  Scenario: The watermark is per source and privacy policy, so only changed inputs are re-read
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a first pass that wrote a cursor for every scanned source
-    When a second pass runs over an unchanged corpus
+    When a second pass runs over an unchanged corpus with the same privacy policy
     Then nothing is re-parsed and nothing is written
     And when a session is appended to one source's transcript, only that source re-parses
     And that source is not reported as skipped
+    And changing the privacy policy changes the cursor identity even when the source is unchanged
 
   @subject:ingest-pipelines
   @ingest.sessions.08
@@ -87,3 +89,47 @@ Feature: ingest sessions
     When the whole pipeline runs over it twice
     Then the normalized output of the second pass is byte-identical to the first
     And the count of rows the pass skipped is identical too, so nothing is rediscovered as new
+
+  @subject:ingest-pipelines
+  @ingest.sessions.10
+  Scenario: Absent privacy config omits directive text from durable normalized output
+  # canon: {"schema":1,"at":"2026-10-02T00:00:00.000000Z","actor":{"agent_id":"canon"}}
+    Given a transcript containing a user directive with secret prose
+    And a repository with no `ingest.sessions.privacy` section
+    When sessions are ingested
+    Then no user_directive event reaches durable normalized output
+    And the source transcript remains unchanged
+    And source transcript ownership and rewriting are out of scope for ingest
+
+  @subject:ingest-pipelines
+  @ingest.sessions.11
+  Scenario: Bounded capture replaces secrets before truncating and records deterministic metadata
+  # canon: {"schema":1,"at":"2026-10-02T00:00:00.000000Z","actor":{"agent_id":"canon"}}
+    Given a transcript containing a directive longer than the configured positive bound with a known secret or PII value
+    When sessions are ingested with capture explicitly enabled
+    Then the known secret or PII value is replaced before truncation
+    And the directive event carries deterministic redaction metadata including `redacted: true`
+    And it carries `truncated`, `original_chars`, and `captured_chars`
+    And the captured text ends at a Unicode scalar boundary
+
+  @subject:ingest-pipelines
+  @ingest.sessions.13
+  Scenario: Bounded capture truncation alone is not redaction
+  # canon: {"schema":1,"at":"2026-10-02T00:00:00.000000Z","actor":{"agent_id":"canon"}}
+    Given a transcript containing a directive longer than the configured positive bound with no known secret or PII value
+    When sessions are ingested with capture explicitly enabled
+    Then the directive event carries `truncated: true`
+    And it carries `original_chars` and `captured_chars`
+    And it does not carry `redacted: true`
+    And the captured text ends at a Unicode scalar boundary
+
+  @subject:ingest-pipelines
+  @ingest.sessions.12
+  Scenario: Unwritten JSON is metadata-only even when bounded capture is enabled
+  # canon: {"schema":1,"at":"2026-10-02T00:00:00.000000Z","actor":{"agent_id":"canon"}}
+    Given a routed session tier that is unreachable
+    And a transcript containing secret directive, credential, and task/context prose
+    When sessions are ingested
+    Then the unwritten JSON contains scope, counts, IDs and digests
+    And it contains a stable tier failure class and reason
+    And it contains none of the directive text, credential text, task/context prose, or raw event detail

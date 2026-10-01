@@ -2,9 +2,12 @@
 //! (S2, sqlite added s32 `sqlite-hot-backend`) —
 //! `GitTier`/`PgTier`/`R2Tier`/`SqliteTier` behind the one
 //! [`tier::Tier`] trait, [`policy::TierPolicy`] resolving
-//! `canon.yaml`'s routing/aging rules, and [`registry::TierRegistry`]
-//! as the ergonomic entry point `canon-ingest` (S3), `canon-gate`
-//! (S5), and `canon-learn` (S6) write/read/age through.
+//! `canon.yaml`'s routing/aging rules, and [`registry::TierRegistry`] as
+//! the ergonomic entry point `canon-ingest` (S3), `canon-gate` (S5), and
+//! `canon-learn` (S6) write/read/age through.
+//! Its retention facade (`registry::RetentionService`) is the only
+//! cross-rung purge boundary; it removes allowlisted operational records
+//! without rewriting Git history.
 
 pub mod atomic;
 pub mod cursor;

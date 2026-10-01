@@ -146,6 +146,13 @@
         },
         "digest": {
           "type": "string"
+        },
+        "pack_id": {
+          "description": "Content-addressed full ContextPack manifest. The digest-only\ncapability surface above remains for backwards compatibility; this\noptional identity points replay to the immutable selected-input\nsnapshot when present.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [

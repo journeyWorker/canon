@@ -33,3 +33,8 @@ spec_coverage:
   require_evidence: true
   scope: [building, verifying]
   exclude_lanes: [process]
+
+# Sensitive query/export output is disabled unless an operator explicitly
+# enables it and passes --include-sensitive.
+query:
+  allow_sensitive: false

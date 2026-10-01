@@ -17,6 +17,10 @@
 use std::path::Path;
 use std::process::{Command, Output};
 
+fn run_canon_as(args: &[&str], cwd: &Path, actor: &str) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", actor).current_dir(cwd).output().expect("spawn canon binary")
+}
+
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
@@ -74,7 +78,7 @@ fn committed_evidence_files(repo: &Path) -> Vec<std::path::PathBuf> {
 #[test]
 fn approval_pair_is_recorded_and_half_pairs_write_nothing() {
     let dir = repo_with_plan_corpus("it-approval", "- [ ] 1.1 Approve the change\n");
-    let base = ["evidence", "add", "--task", "it-approval#1.1", "--kind", "test-run", "--ref", "report.txt", "--role", "implementer"];
+    let base = ["evidence", "add", "--task", "it-approval#1.1", "--kind", "test-run", "--ref", "report.txt", "--surface-ref", "effect:secret-access", "--role", "implementer"];
     for flags in [vec!["--approval-by", "alice"], vec!["--approval-role", "human"], vec!["--approval-by", " ", "--approval-role", "human"]] {
         let args: Vec<&str> = base.iter().copied().chain(flags).collect();
         let output = run_canon(&args, dir.path());
@@ -83,8 +87,10 @@ fn approval_pair_is_recorded_and_half_pairs_write_nothing() {
         assert!(committed_evidence_files(dir.path()).is_empty());
     }
     let args: Vec<&str> = base.iter().copied().chain(["--approval-by", "alice", "--approval-role", "human"]).collect();
-    let output = run_canon(&args, dir.path());
+    let output = run_canon_as(&args, dir.path(), "alice");
     assert!(output.status.success(), "{}", stderr(&output));
+    let spoofed = run_canon_as(&args, dir.path(), "mallory");
+    assert_eq!(spoofed.status.code(), Some(2), "a caller cannot spoof a different approval identity: {}", stderr(&spoofed));
     let output = run_canon(&["gate", "promote"], dir.path());
     assert!(output.status.success(), "{}", stderr(&output));
     let files = committed_evidence_files(dir.path());
@@ -92,6 +98,8 @@ fn approval_pair_is_recorded_and_half_pairs_write_nothing() {
     let record: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&files[0]).unwrap()).unwrap();
     assert_eq!(record["approval"]["approver"], "alice");
     assert_eq!(record["approval"]["role"], "human");
+    assert_eq!(record["approval"]["verified"], true);
+    assert_eq!(record["surface_ref"], serde_json::json!(["effect:secret-access"]));
     assert!(record["approval"]["at"].as_str().unwrap().parse::<chrono::DateTime<chrono::Utc>>().is_ok());
 }
 

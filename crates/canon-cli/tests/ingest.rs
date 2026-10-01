@@ -22,7 +22,8 @@ fn write_omp_fixture_home(home: &std::path::Path) {
     std::fs::write(
         session_dir.join("s1.jsonl"),
         "{\"type\":\"session\",\"id\":\"cli_ing_ses_1\",\"cwd\":\"/tmp/proj\"}\n\
-         {\"type\":\"message\",\"timestamp\":\"2026-07-01T00:00:00Z\",\"message\":{\"role\":\"assistant\",\"model\":\"gpt-4o-mini\",\"provider\":\"openai\",\"usage\":{\"input\":10,\"output\":5}}}\n",
+         {\"type\":\"message\",\"timestamp\":\"2026-07-01T00:00:00Z\",\"message\":{\"role\":\"user\",\"content\":\"secret directive prose\"}}\n\
+         {\"type\":\"message\",\"timestamp\":\"2026-07-01T00:00:01Z\",\"message\":{\"role\":\"assistant\",\"model\":\"gpt-4o-mini\",\"provider\":\"openai\",\"usage\":{\"input\":10,\"output\":5}}}\n",
     )
     .unwrap();
 }
@@ -69,14 +70,16 @@ fn unrouted_default_run_prints_the_normalized_json_fallback_without_the_json_fla
     let stdout = support::stdout(&output);
     assert!(stdout.contains("printing JSON instead"), "human summary must still claim the fallback: {stdout}");
 
-    // The human summary line and the JSON body are both on stdout;
-    // the JSON body is the pretty-printed `[...]` array `format_json`
-    // always produces — locate its start and parse the remainder.
-    let json_start = stdout.find('[').unwrap_or_else(|| panic!("no JSON array found in default (non --json) output: {stdout}"));
+    // The human summary line and the metadata-only JSON body are both on
+    // stdout; locate the object's start and parse the remainder.
+    let json_start = stdout.find('{').unwrap_or_else(|| panic!("no JSON object found in default (non --json) output: {stdout}"));
     let payload: Value = serde_json::from_str(&stdout[json_start..]).expect("valid JSON on stdout even without --json");
-    let sessions = payload.as_array().expect("normalized sessions array");
+    let sessions = payload["sessions"].as_array().expect("metadata session summaries");
     assert_eq!(sessions.len(), 1, "only the isolated fixture home's one session, no ambient env leakage: {stdout}");
-    assert_eq!(sessions[0]["session"]["session_id"], "cli_ing_ses_1", "the only normalized output must not be discarded");
+    assert_eq!(sessions[0]["session_id"], "cli_ing_ses_1", "the only normalized output must not be discarded");
+    assert!(payload["events"].is_array(), "metadata fallback must include event summaries");
+    assert!(payload["failure"]["class"].is_string(), "metadata fallback must include stable failure class");
+    assert!(!stdout.contains("secret directive prose"), "metadata-only fallback must omit directive text: {stdout}");
 }
 
 #[test]
@@ -92,6 +95,25 @@ fn routed_default_run_persists_and_prints_no_json_body() {
     assert!(stdout.contains("runs written: 1"), "stdout: {stdout}");
     assert!(!stdout.contains("printing JSON instead"), "a fully-routed/persisted run has nothing to fall back to: {stdout}");
     assert!(!stdout.trim_end().ends_with(']'), "no JSON body should print when everything was persisted: {stdout}");
+}
+
+#[test]
+fn privacy_opt_in_toggle_rescans_unchanged_source_bytes() {
+    let fixture = support::Fixture::new("  session: local\n  run: local\n  event: local\n", "");
+    let home = tempfile::tempdir().unwrap();
+    write_omp_fixture_home(home.path());
+
+    let first = run_canon_ingest(&fixture, &["--home", &home.path().display().to_string(), "--all-workspaces"]);
+    assert!(first.status.success(), "stderr: {}", support::stderr(&first));
+
+    std::fs::write(
+        fixture.canon_yaml_path(),
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  session: local\n  run: local\n  event: local\ningest:\n  sessions:\n    privacy:\n      capture_user_directives: true\n      max_directive_chars: 4096\n",
+    )
+    .unwrap();
+    let second = run_canon_ingest(&fixture, &["--home", &home.path().display().to_string(), "--all-workspaces"]);
+    assert!(second.status.success(), "stderr: {}", support::stderr(&second));
+    assert!(support::stdout(&second).contains("omp: 1 file(s) scanned, 1 reparsed"), "privacy policy change must invalidate the unchanged-file cursor: {}", support::stdout(&second));
 }
 
 #[test]
