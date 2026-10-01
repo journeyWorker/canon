@@ -6,10 +6,11 @@ read: it NEVER blocks a dispatch and NEVER gates reproducibility.
 
 ## `canon retrieve --role <r> --regime <k> [--k <n>] [--repo <dir>] [--json]`
 
-Prints the top-`k` non-demoted strategies stored for `regime_key = <k>`
-(strategies + guardrails; a guardrail is just a strategy distilled from a
-failure-polarity verdict), newest-distilled first, capped at `--k`
-(default 5).
+Prints the top-`k` retrievable strategies stored for `regime_key = <k>`
+(active strategies plus backward-compatible legacy rows without a lifecycle;
+guardrails are just strategies distilled from a failure-polarity verdict),
+newest-distilled first, capped at `--k` (default 5). Demoted,
+quarantined, rejected, and rolled-back rows are not retrievable.
 
 ```bash
 canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2
@@ -92,6 +93,26 @@ change what a manifest already recorded.
 
 `canon retrieve` and the pre-dispatch script work standalone today — a
 caller can print retrieved guidance with zero manifest integration.
+
+## Lifecycle and legacy limitations
+
+Retrieval is a read path, not an activation or evidence path. It serves only
+exact role/regime matches and excludes `quarantined`, `rejected`,
+`rolled_back`, and demoted strategies. Newly distilled strategies are
+quarantined by default and therefore do not appear until the paired evaluation
+and signed approval workflow in `canon-learn` activates them.
+
+Rows written before lifecycle tracking (`lifecycle: null`) remain readable for
+backward compatibility when they are not demoted. They have no current
+quarantine, paired-evaluation, or SSH-approval provenance; retrieval MUST NOT
+interpret them as proof of the signed workflow, upgrade them, or claim
+measured uplift. The repository currently has no published measured uplift
+result.
+
+Role/regime retrieval is exact and advisory, not similarity search or a
+quality guarantee. A live lookup is also not a replayable proof: dispatch
+manifests snapshot the returned `{strategy_id, title, content}` entries, and
+replay uses that snapshot rather than refreshing the store.
 
 ## What this skill does NOT cover
 

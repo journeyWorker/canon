@@ -10,10 +10,13 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, RawRecord, RecordKind, RoleId, TaskId};
+use canon_model::{
+    approval_payload_bytes, Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, RunId,
+    Sha, TaskId, APPROVAL_NAMESPACE,
+};
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier};
-use chrono::Utc;
+use chrono::{Duration, Utc};
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
@@ -113,6 +116,304 @@ fn gate_check_from_a_subdirectory_resolves_the_ancestor_repo_root() {
     );
     assert!(stdout(&output).contains("uncovered-cell"), "{}", stdout(&output));
 }
+// ── risk approval integration ──
+
+struct RiskRepo {
+    root: tempfile::TempDir,
+    _key_dir: tempfile::TempDir,
+    alice: PathBuf,
+    bob: PathBuf,
+    initial_sha: String,
+    auth_sha: String,
+    docs_sha: String,
+}
+
+impl RiskRepo {
+    fn new() -> Self {
+        let root = tempfile::tempdir().unwrap();
+        let key_dir = tempfile::tempdir().unwrap();
+        let alice = key_dir.path().join("alice");
+        let bob = key_dir.path().join("bob");
+        for key in [&alice, &bob] {
+            let output = Command::new("ssh-keygen")
+                .args(["-q", "-t", "ed25519", "-N", ""])
+                .arg("-f")
+                .arg(key)
+                .output()
+                .expect("spawn ssh-keygen");
+            assert!(output.status.success(), "ssh-keygen failed: {}", String::from_utf8_lossy(&output.stderr));
+        }
+
+        git(root.path(), &["init", "-q"]);
+        git(root.path(), &["config", "user.email", "risk-integration@example.test"]);
+        git(root.path(), &["config", "user.name", "Risk Integration"]);
+
+        std::fs::create_dir_all(root.path().join(".canon")).unwrap();
+        std::fs::create_dir_all(root.path().join("src/auth")).unwrap();
+        std::fs::create_dir_all(root.path().join("docs")).unwrap();
+        std::fs::write(
+            root.path().join(".canon/policy.yaml"),
+            "risk_tiers:\n  high:\n    rank: 1\n    paths:\n      - src/auth/**\n    effects: []\n    min_human_approvals: 2\napproval:\n  allowed_signers: .canon/allowed_signers\n",
+        )
+        .unwrap();
+        let alice_public = public_key(&alice);
+        let bob_public = public_key(&bob);
+        std::fs::write(
+            root.path().join(".canon/allowed_signers"),
+            format!("alice {alice_public}\nbob {bob_public}\n"),
+        )
+        .unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(root.path().join(".canon/allowed_signers"), std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert_eq!(
+            std::fs::metadata(root.path().join(".canon/allowed_signers")).unwrap().permissions().mode() & 0o777,
+            0o600,
+            "the verifier file must be owner-protected",
+        );
+
+        std::fs::write(root.path().join("docs/README.md"), "initial docs\n").unwrap();
+        std::fs::write(root.path().join("src/auth/login.rs"), "pub fn login() { /* initial */ }\n").unwrap();
+        std::fs::write(root.path().join("src/auth/password.rs"), "pub fn password() { /* initial */ }\n").unwrap();
+        git(root.path(), &["add", "."]);
+        git(root.path(), &["commit", "-q", "-m", "initial"]);
+        let initial_sha = git_text(root.path(), &["rev-parse", "HEAD"]);
+
+        std::fs::write(root.path().join("src/auth/login.rs"), "pub fn login() { /* hardened */ }\n").unwrap();
+        std::fs::write(root.path().join("src/auth/password.rs"), "pub fn password() { /* hardened */ }\n").unwrap();
+        git(root.path(), &["add", "src/auth/login.rs", "src/auth/password.rs"]);
+        git(root.path(), &["commit", "-q", "-m", "auth change"]);
+        let auth_sha = git_text(root.path(), &["rev-parse", "HEAD"]);
+
+        std::fs::write(root.path().join("docs/README.md"), "updated docs only\n").unwrap();
+        git(root.path(), &["add", "docs/README.md"]);
+        git(root.path(), &["commit", "-q", "-m", "docs update"]);
+        let docs_sha = git_text(root.path(), &["rev-parse", "HEAD"]);
+
+        Self { root, _key_dir: key_dir, alice, bob, initial_sha, auth_sha, docs_sha }
+    }
+
+    fn ledger(&self) -> PathBuf {
+        self.root.path().join(".canon/ledger")
+    }
+
+    fn reset_ledger(&self) {
+        let _ = std::fs::remove_dir_all(self.ledger());
+    }
+
+    fn gate(&self) -> Output {
+        run_canon(&["gate", "check", "--repo", "."], self.root.path())
+    }
+
+    fn write_record(
+        &self,
+        task: &str,
+        artifact: &str,
+        run_id: RunId,
+        at: chrono::DateTime<Utc>,
+        verdict: EvidenceVerdict,
+        surface: Vec<String>,
+        approvals: Vec<EvidenceApproval>,
+    ) {
+        let approvals = if approvals.is_empty() { vec![None] } else { approvals.into_iter().map(Some).collect() };
+        for approval in approvals {
+            let mut record = EvidenceRecord::new(
+                Envelope::new(1, RecordKind::EvidenceRecord, at, Actor::new("risk-test", RoleId::parse("implementer").unwrap())),
+                Some(TaskId::parse(task).unwrap()),
+                None,
+                Some(run_id),
+                verdict,
+            )
+            .with_project_id(ProjectId::parse("risk-project").unwrap())
+            .with_evidence_sha(Sha::parse(artifact).unwrap())
+            .with_surface_ref(surface.clone());
+            if let Some(approval) = approval {
+                record = record.with_approval(approval);
+            }
+            GitTier::new(self.ledger()).write(&record).expect("write risk evidence record");
+        }
+    }
+
+    fn approval(
+        &self,
+        signer: &str,
+        key: &Path,
+        subject: &str,
+        artifact: &str,
+        run_id: RunId,
+        at: chrono::DateTime<Utc>,
+        surface: &[String],
+    ) -> EvidenceApproval {
+        let project = "risk-project";
+        let effects: Vec<String> = Vec::new();
+        let payload = approval_payload_bytes(
+            APPROVAL_NAMESPACE,
+            subject,
+            Some(project),
+            artifact,
+            Some(&run_id.to_string()),
+            surface,
+            &effects,
+            signer,
+            &at,
+        );
+        let payload_file = tempfile::NamedTempFile::new_in(self.root.path()).unwrap();
+        std::fs::write(payload_file.path(), payload).unwrap();
+        let output = Command::new("ssh-keygen")
+            .args(["-Y", "sign", "-f"])
+            .arg(key)
+            .args(["-n", APPROVAL_NAMESPACE])
+            .arg(payload_file.path())
+            .output()
+            .expect("spawn ssh-keygen signing");
+        assert!(output.status.success(), "ssh-keygen signing failed: {}", String::from_utf8_lossy(&output.stderr));
+        let signature = std::fs::read_to_string(format!("{}.sig", payload_file.path().display())).unwrap();
+        EvidenceApproval {
+            approver: signer.to_string(),
+            role: RoleId::parse("human").unwrap(),
+            at,
+            verified: false,
+            signature: Some(signature),
+            subject: Some(subject.to_string()),
+            project_id: Some(ProjectId::parse(project).unwrap()),
+            artifact_sha: Some(Sha::parse(artifact).unwrap()),
+            run_id: Some(run_id),
+            surface: surface.to_vec(),
+            effects,
+        }
+    }
+}
+
+fn git(repo: &Path, args: &[&str]) {
+    let output = Command::new("git").args(["-C"]).arg(repo).args(args).output().expect("spawn git");
+    assert!(output.status.success(), "git {:?} failed: {}", args, String::from_utf8_lossy(&output.stderr));
+}
+
+fn git_text(repo: &Path, args: &[&str]) -> String {
+    let output = Command::new("git").args(["-C"]).arg(repo).args(args).output().expect("spawn git");
+    assert!(output.status.success(), "git {:?} failed: {}", args, String::from_utf8_lossy(&output.stderr));
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
+}
+
+fn public_key(private_key: &Path) -> String {
+    let line = std::fs::read_to_string(format!("{}.pub", private_key.display())).unwrap();
+    let mut fields = line.split_whitespace();
+    format!("{} {}", fields.next().unwrap(), fields.next().unwrap())
+}
+
+fn changed_paths(repo: &Path, sha: &str) -> Vec<String> {
+    let output = Command::new("git")
+        .args(["-C"])
+        .arg(repo)
+        .args(["diff-tree", "--root", "--no-commit-id", "-r", "-m", "--no-renames", "--name-only", sha])
+        .output()
+        .expect("spawn git");
+    assert!(output.status.success(), "git diff-tree failed: {}", String::from_utf8_lossy(&output.stderr));
+    let mut paths: Vec<String> = String::from_utf8(output.stdout).unwrap().lines().map(str::to_string).collect();
+    paths.sort();
+    paths.dedup();
+    paths
+}
+
+fn normalized_for_signature(paths: &[String]) -> Vec<String> {
+    let mut normalized = paths.to_vec();
+    normalized.reverse();
+    if let Some(first) = paths.first() {
+        normalized.push(first.clone());
+    }
+    normalized
+}
+
+#[test]
+fn risk_gate_rejects_zero_and_one_signer_then_accepts_two_distinct_ssh_signers() {
+    let repo = RiskRepo::new();
+    let task = "risk-auth#1";
+    let run = RunId::parse("01ARZ3NDEKTSV4RRFFQ69G5FAV").unwrap();
+    let paths = changed_paths(repo.root.path(), &repo.auth_sha);
+    let signed_paths = normalized_for_signature(&paths);
+
+    repo.reset_ledger();
+    repo.write_record(task, &repo.auth_sha, run, Utc::now(), EvidenceVerdict::Faithful, paths.clone(), Vec::new());
+    let zero = repo.gate();
+    assert_eq!(zero.status.code(), Some(1), "zero approvals must gate-red: {}", stdout(&zero));
+    assert!(stdout(&zero).contains("observed 0"), "{}", stdout(&zero));
+
+    repo.reset_ledger();
+    let one_at = Utc::now();
+    let alice = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, one_at, &signed_paths);
+    repo.write_record(task, &repo.auth_sha, run, one_at, EvidenceVerdict::Faithful, paths.clone(), vec![alice]);
+    let one = repo.gate();
+    assert_eq!(one.status.code(), Some(1), "one approval must gate-red: {}", stdout(&one));
+    assert!(stdout(&one).contains("observed 1"), "{}", stdout(&one));
+
+    repo.reset_ledger();
+    let two_at = Utc::now();
+    let alice = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, two_at, &signed_paths);
+    let bob = repo.approval("bob", &repo.bob, task, &repo.auth_sha, run, two_at, &signed_paths);
+    repo.write_record(task, &repo.auth_sha, run, two_at, EvidenceVerdict::Faithful, paths, vec![alice, bob]);
+    let two = repo.gate();
+    assert!(two.status.success(), "two distinct authenticated signers must pass: stdout={} stderr={}", stdout(&two), stderr(&two));
+    assert!(stdout(&two).contains("clean"), "{}", stdout(&two));
+}
+
+#[test]
+fn risk_gate_rejects_tampered_signature_old_artifact_and_divergent_generation() {
+    let repo = RiskRepo::new();
+    let run = RunId::parse("01ARZ3NDEKTSV4RRFFQ69G5FAW").unwrap();
+
+    let task = "risk-tampered#1";
+    let paths = changed_paths(repo.root.path(), &repo.auth_sha);
+    let signed_paths = normalized_for_signature(&paths);
+    let at = Utc::now();
+    let mut alice = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, at, &signed_paths);
+    let signature = alice.signature.as_mut().unwrap();
+    let body_start = signature.find('\n').unwrap() + 1;
+    let replacement = if signature.as_bytes()[body_start] == b'A' { "B" } else { "A" };
+    signature.replace_range(body_start..body_start + 1, replacement);
+    let bob = repo.approval("bob", &repo.bob, task, &repo.auth_sha, run, at, &signed_paths);
+    repo.write_record(task, &repo.auth_sha, run, at, EvidenceVerdict::Faithful, paths, vec![alice, bob]);
+    let tampered = repo.gate();
+    assert_eq!(tampered.status.code(), Some(1), "tampered signature must gate-red: {}", stdout(&tampered));
+    assert!(stdout(&tampered).contains("observed 1"), "{}", stdout(&tampered));
+
+    repo.reset_ledger();
+    let task = "risk-old#1";
+    let old_paths = changed_paths(repo.root.path(), &repo.initial_sha);
+    let old_signed_paths = normalized_for_signature(&old_paths);
+    let old_at = Utc::now();
+    let alice = repo.approval("alice", &repo.alice, task, &repo.initial_sha, run, old_at, &old_signed_paths);
+    let bob = repo.approval("bob", &repo.bob, task, &repo.initial_sha, run, old_at, &old_signed_paths);
+    repo.write_record(task, &repo.initial_sha, run, old_at, EvidenceVerdict::Faithful, old_paths, vec![alice, bob]);
+    let old = repo.gate();
+    assert_eq!(old.status.code(), Some(1), "old artifact must gate-red: {}", stdout(&old));
+    assert!(stdout(&old).contains("stale-evidence"), "{}", stdout(&old));
+
+    repo.reset_ledger();
+    let task = "risk-divergent#1";
+    let paths = changed_paths(repo.root.path(), &repo.auth_sha);
+    let signed_paths = normalized_for_signature(&paths);
+    let divergent_at = Utc::now();
+    let faithful_at = divergent_at - Duration::seconds(1);
+    let alice = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, faithful_at, &signed_paths);
+    let bob = repo.approval("bob", &repo.bob, task, &repo.auth_sha, run, faithful_at, &signed_paths);
+    repo.write_record(task, &repo.auth_sha, run, faithful_at, EvidenceVerdict::Faithful, paths.clone(), vec![alice, bob]);
+    repo.write_record(task, &repo.auth_sha, run, divergent_at, EvidenceVerdict::Divergent, paths, Vec::new());
+    let divergent = repo.gate();
+    assert_eq!(divergent.status.code(), Some(1), "divergent generation must gate-red: {}", stdout(&divergent));
+    assert!(stdout(&divergent).contains("current faithful verdict"), "{}", stdout(&divergent));
+}
+
+#[test]
+fn risk_gate_accepts_a_known_unaffected_docs_artifact_without_approvals() {
+    let repo = RiskRepo::new();
+    let task = "risk-docs#1";
+    let run = RunId::parse("01ARZ3NDEKTSV4RRFFQ69G5FAX").unwrap();
+    let paths = changed_paths(repo.root.path(), &repo.docs_sha);
+    repo.write_record(task, &repo.docs_sha, run, Utc::now(), EvidenceVerdict::Faithful, paths, Vec::new());
+    let output = repo.gate();
+    assert!(output.status.success(), "known unaffected docs must be accepted without risk approvals: stdout={} stderr={}", stdout(&output), stderr(&output));
+    assert!(stdout(&output).contains("clean"), "{}", stdout(&output));
+}
+
 
 // ── canon gate task ──
 

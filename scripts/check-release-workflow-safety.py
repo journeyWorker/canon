@@ -447,7 +447,7 @@ def tracked_paths(root: pathlib.Path) -> list[pathlib.Path]:
     return [
         pathlib.Path(item)
         for item in result.stdout.decode("utf-8").split("\0")
-        if item
+        if item and not item.startswith("scripts/test-fixtures/")
     ]
 
 

@@ -354,6 +354,65 @@ pub fn validate_response<P: AsRef<Path>>(path: P) -> Result<ValidationSummary, A
     Ok(ValidationSummary::from_response(&response))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CapabilityLevel {
+    None,
+    ReadOnly,
+    WorkspaceWrite,
+    Allowlisted,
+    Full,
+    Brokered,
+    Direct,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AuthorizationResult {
+    pub execution_authorized: bool,
+    pub execution_performed: bool,
+    pub sandbox_enforced: bool,
+    pub reasons: Vec<String>,
+    pub capabilities: AdapterCapabilities,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapabilityPolicy {
+    #[serde(default)]
+    runtime_enforced: bool,
+    #[serde(default = "default_none")]
+    filesystem: String,
+    #[serde(default = "default_none")]
+    network: String,
+    #[serde(default = "default_none")]
+    secrets: String,
+}
+fn default_none() -> String { "none".into() }
+
+/// Authorize a validated response against `.canon/policy.yaml`; this never executes anything.
+pub fn authorize_response<P: AsRef<Path>, R: AsRef<Path>>(response_path: P, repo: R) -> Result<AuthorizationResult, AdapterError> {
+    let response = parse_response(fs::read(response_path.as_ref()).map_err(|source| AdapterError::Io { path: response_path.as_ref().display().to_string(), source })?)?;
+    let policy_path = repo.as_ref().join(".canon/policy.yaml");
+    let text = fs::read_to_string(&policy_path).unwrap_or_default();
+    let root: serde_yaml::Value = serde_yaml::from_str(&text).map_err(|e| AdapterError::Validation(format!("malformed policy: {e}")))?;
+    let root = if root.is_null() { serde_yaml::Value::Mapping(Default::default()) } else { root };
+    let root = root.as_mapping().ok_or_else(|| AdapterError::Validation("malformed policy: expected mapping".into()))?;
+    let policy = root.get(&serde_yaml::Value::String("adapter_capabilities".into())).cloned().unwrap_or_else(|| serde_yaml::Value::Mapping(Default::default()));
+    let policy: CapabilityPolicy = serde_yaml::from_value(policy).map_err(|e| AdapterError::Validation(format!("malformed adapter_capabilities policy: {e}")))?;
+    let mut reasons = Vec::new();
+    if !policy.runtime_enforced { reasons.push("runtime_enforced=false; no enforcement adapter is available".into()); }
+    let fs_rank = |v: FilesystemCapability| match v { FilesystemCapability::None => 0, FilesystemCapability::ReadOnly => 1, FilesystemCapability::WorkspaceWrite => 2 };
+    let net_rank = |v: NetworkCapability| match v { NetworkCapability::None => 0, NetworkCapability::Allowlisted => 1, NetworkCapability::Full => 2 };
+    let sec_rank = |v: SecretsCapability| match v { SecretsCapability::None => 0, SecretsCapability::Brokered => 1, SecretsCapability::Direct => 2 };
+    let fs_policy = match policy.filesystem.as_str() { "none" => 0, "read-only" => 1, "workspace-write" => 2, _ => { reasons.push("filesystem: invalid policy level".into()); 99 } };
+    let net_policy = match policy.network.as_str() { "none" => 0, "allowlisted" => 1, "full" => 2, _ => { reasons.push("network: invalid policy level".into()); 99 } };
+    let sec_policy = match policy.secrets.as_str() { "none" => 0, "brokered" => 1, "direct" => 2, _ => { reasons.push("secrets: invalid policy level".into()); 99 } };
+    if fs_rank(response.capabilities.filesystem) > fs_policy { reasons.push(format!("filesystem: declared capability exceeds policy budget ({})", policy.filesystem)); }
+    if net_rank(response.capabilities.network) > net_policy { reasons.push(format!("network: declared capability exceeds policy budget ({})", policy.network)); }
+    if sec_rank(response.capabilities.secrets) > sec_policy { reasons.push(format!("secrets: declared capability exceeds policy budget ({})", policy.secrets)); }
+    Ok(AuthorizationResult { execution_authorized: reasons.is_empty(), execution_performed: false, sandbox_enforced: false, reasons, capabilities: response.capabilities })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -371,6 +430,40 @@ mod tests {
             "telemetry": {"started_at": "2026-01-01T00:00:00Z", "ended_at": "2026-01-01T00:01:00Z", "tool_calls": 1, "retries": 0, "tokens": 2, "cost_usd": 0.1},
             "extensions": {"claude": {"session_id": "s"}}
         })
+    }
+
+    #[test]
+    fn absent_capability_policy_defaults_to_denial() {
+        for policy in [None, Some(""), Some(" \n# no policy\n"), Some("null\n"), Some("~\n")] {
+            let repo = tempfile::tempdir().unwrap();
+            let response_path = repo.path().join("response.json");
+            fs::write(&response_path, response().to_string()).unwrap();
+            if let Some(policy) = policy {
+                fs::create_dir(repo.path().join(".canon")).unwrap();
+                fs::write(repo.path().join(".canon/policy.yaml"), policy).unwrap();
+            }
+
+            let result = authorize_response(&response_path, repo.path()).unwrap();
+            assert!(!result.execution_authorized);
+            assert!(!result.execution_performed);
+            assert!(!result.sandbox_enforced);
+            assert!(result.reasons.iter().any(|reason| reason.contains("runtime_enforced=false")));
+            assert!(result.reasons.iter().any(|reason| reason.contains("filesystem: declared capability exceeds policy budget (none)")));
+        }
+    }
+
+    #[test]
+    fn rejects_non_mapping_capability_policy() {
+        for policy in ["enabled\n", "- enabled\n", "[]\n", "false\n"] {
+            let repo = tempfile::tempdir().unwrap();
+            let response_path = repo.path().join("response.json");
+            fs::write(&response_path, response().to_string()).unwrap();
+            fs::create_dir(repo.path().join(".canon")).unwrap();
+            fs::write(repo.path().join(".canon/policy.yaml"), policy).unwrap();
+
+            let error = authorize_response(&response_path, repo.path()).unwrap_err();
+            assert!(error.to_string().contains("malformed policy: expected mapping"));
+        }
     }
 
     #[test]

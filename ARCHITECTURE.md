@@ -163,11 +163,17 @@ be described as enforcement.
 ### 5. Every learned rule has measured provenance.
 
 Raw `Trajectory` evidence and distilled `StrategyItem` memory are different
-layers. Distillation is deterministic and content/time-derived; strategy
-entries retain source provenance and role/regime scope. Retrieval excludes
- demoted entries and caps guidance. Promotion uses explicit gates (including
-occurrence or paired comparison where configured), and replay uses the
-recorded guidance snapshot rather than a fresh lookup.
+layers. Distillation is deterministic and content/time-derived; newly
+distilled strategies start quarantined, while entries retain source
+provenance and role/regime scope. Retrieval excludes quarantined, rejected,
+rolled-back, and demoted entries (legacy `lifecycle: null` rows remain
+readable only for compatibility). Promotion eligibility uses occurrence or
+paired CRN gates, but activation additionally requires a paired evaluation
+with finite, positive measured uplift and zero regressions plus a
+policy-pinned SSH detached signature from a configured principal declared as
+human (the signature authenticates the principal, not humanity or
+authorization outside policy). Replay
+uses the recorded guidance snapshot rather than a fresh lookup.
 
 Evidence: [`canon-learn`](crates/canon-learn/src/lib.rs),
 [`strategy`](crates/canon-learn/src/strategy.rs), and
@@ -175,8 +181,10 @@ Evidence: [`canon-learn`](crates/canon-learn/src/lib.rs),
 
 **Invariant:** no learned rule becomes canonical guidance merely because it is
 frequent or recent. It MUST retain source evidence and pass the configured
-measurement/promotion boundary; contradiction or regression MUST support
-demotion or rollback.
+measurement/approval boundary; unknown metrics, absent uplift, contradiction,
+or regression MUST remain a visible refusal or support demotion/rollback.
+Canon currently publishes no measured uplift result, so retrieval MUST NOT be
+described as improving agent outcomes.
 
 ## Storage and lifecycle
 

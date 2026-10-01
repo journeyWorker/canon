@@ -1,6 +1,6 @@
 ---
 title: 전략 메모리
-description: 역할별로 네임스페이스가 나뉜 ReasoningBank 레이어 — trajectory에서 verdict, distillation, 통계적 promotion, retrieval까지.
+description: 역할별로 네임스페이스가 나뉜 ReasoningBank 레이어 — trajectory에서 verdict, 자격, 서명된 활성화, retrieval까지.
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -17,12 +17,12 @@ retrieval 루프는 모델 자신의 출력을 다시 되먹이는 데 그칩니
 ## 플라이휠
 
 ```
-ingest (세션, 리뷰, divergence, 핸드오프, 태스크 체크박스) → trajectory + verdict (역할별)
-    → distill: 성공 → 전략, 리뷰 지적 → 가드레일
-    → 통계적 승급 게이트 — 노이즈는 증류되지 않음
-    → git 티어로 승급 (버전 관리, PR 리뷰)
+    → distill: 성공 → quarantine 전략, review 지적 → guardrail
+    → 자격 게이트 (occurrence 또는 paired CRN)
+    → paired evaluation + policy-pinned SSH approval
+    → git 티어에서 활성화 (버전 관리, PR 리뷰)
     → 태스크 시작 전 retrieve (역할 + regime 스코프, 어드바이저리)
-    → 더 나은 에이전트 실행 ↻
+    → 이후 에이전트 실행 (uplift는 아직 측정되지 않음) ↻
 ```
 
 ## 두 개의 티어, 두 개의 스토어
@@ -108,10 +108,10 @@ trajectory는 정확히 한 번 커버링 verdict가 매겨집니다 — `Pendin
 상태를 벗어나는 것은 단방향 전이이며, 알 수 없는 trajectory id는
 조용히 no-op하지 않고 즉시 실패합니다.
 
-## 승급 게이트: `crn` vs `occurrence`
+## 승급 자격과 활성화: `crn` vs `occurrence`
 
-역할의 승급 게이트는 컴파일 타임이 아니라 `canon.yaml`의 `learn:`
-설정으로 선택합니다:
+역할의 승급 자격 게이트는 컴파일 타임이 아니라 `canon.yaml`의
+`learn:` 설정으로 선택합니다:
 
 ```yaml
 learn:
@@ -127,54 +127,97 @@ learn:
     strategies_root: .canon/strategies
 ```
 
-- **`occurrence`** — 결정적 리플레이를 지원하지 않는 도메인의
-  역할용(대부분의 `dev`/`content`/`design`/`review`). 트레일링
-  윈도우 안에서 같은 regime에 대해 `Success` verdict trajectory가
-  최소 `n_min`개 쌓이고, 그 윈도우 안에 `Failure`/`RolledBack`
-  trajectory가 하나도 없을 때 승급합니다. 상반되는 실패 하나가
-  카운트를 **리셋**시킵니다 — 평균으로 희석되지 않습니다.
-- **`crn`** — 결정적 시뮬레이터를 돌릴 수 있는 역할용: paired
-  common-random-number 통계적 교차 검증 게이트(band-variance 분해,
-  F/t 임계값 표)입니다.
+새로 증류된 전략은 **기본적으로 quarantine**됩니다. 자격 게이트를
+통과하는 것만으로는 충분하지 않습니다. 활성화에는 정직한 paired
+evaluation과 `human`으로 선언된 approval이 필요하며, signature는
+policy에 pin된 principal을 인증할 뿐 그 사람이 실제 인간인지 또는
+policy 밖의 권한이 있는지 증명하지 않습니다.
 
-명시적인 `promotion.<role>` 항목이 없는 역할은 보수적인 기본값
-(`occurrence`, `n_min: 5`, `window_days: 30`)으로 해석됩니다.
+- **`occurrence`** — 결정적 replay를 지원하지 않는 역할용(대부분의
+  `dev`/`content`/`design`/`review`)입니다. trailing window 안에서 같은
+  regime의 해소된 `Success` trajectory가 최소 `n_min`개이고
+  `Failure`/`RolledBack` trajectory가 없어야 합니다. 모순 하나가
+  카운트를 리셋하며 평균으로 희석되지 않습니다.
+- **`crn`** — 결정적 simulator를 실행할 수 있는 역할용입니다. 비교하는
+  설정들이 동일한 `crn:config=<label>` 및 `crn:panel=<index>` 패널을
+  사용하는 paired common-random-number 자격 게이트입니다. 패널이
+  부족하거나 설명되지 않는 noise가 크면 통과가 아닙니다.
 
-## 승급과 강등
+명시적인 `promotion.<role>`이 없는 역할은 `occurrence`, `n_min: 5`,
+`window_days: 30`으로 해석됩니다. 두 모드 모두 raw verdict row가
+아니라 해소된 trajectory outcome을 읽으므로 먼저
+`canon ingest artifacts`를 실행해야 합니다. 어느 모드도 품질 향상을
+단독으로 증명하지 않습니다.
+
+## 승급, 승인, 롤백
 
 ```bash
-canon learn promote 01J...ULID           # 증류된 전략을 승급
-canon learn promote 01J...ULID --dry-run # 미리보기: lint + resolve, 쓰기 없음
+canon ingest artifacts
+canon learn approve 01J...ULID --evaluation evaluation.json \
+  --principal alice --repo .
+# `request`는 `approve`의 정확한 alias입니다
+canon learn promote 01J...ULID --repo . \
+  --evaluation evaluation.json --approval approval.json
 ```
 
-`canon learn promote`는 증류된 `StrategyItem`(ULID 기준)을 웜
-parquet 티어에서 `.canon/strategies/<role>/<id>.md`로 승급시키며, YAML
-프론트매터(`status`, `regime_key`, `role`, `title`,
-`source_trajectory_ids`, `recorded_at`)를 함께 씁니다.
+`PromotionEvaluation`은 외부의 정직한 evaluator adapter가 만드는 JSON
+bundle입니다. quarantine 상태의 candidate, 전략 및 source-trajectory
+digest, paired baseline/candidate result digest, 그리고 비어 있지 않은
+corpus/evaluator/context/policy/model/tool provenance에 바인딩되어야
+합니다. 유한한 `paired_metrics`에는 `pairs`, `uplift`, `regressions`가
+반드시 있어야 하며, pairs는 result 개수와 같고 uplift는 양수,
+regressions는 0이어야 합니다. 누락되었거나 unknown인 metric, 중복되거나
+서로 공유되는 result digest, 잘못된 integrity digest, 통과가 아닌
+decision은 거부됩니다. Canon은 evaluator를 실행하지 않으며, 이
+repository에는 현재 **측정된 uplift 결과가 공개되어 있지 않습니다**.
 
-승급은 **증거 기반 게이트이며 fail-closed입니다**. 무엇이든 쓰기 전에
-canon은 해당 전략 자신의 regime trajectory를 읽어 역할별로 설정된
-게이트를 평가합니다. 코로보레이션이 부족한 전략은 이유가 명시된 채
-거부되고 종료 코드 `1`로 끝나며, 아무것도 쓰이지 않습니다. `--force`는
-없습니다 — 거부는 아직 증거가 없다는 뜻입니다.
+`canon learn approve`/`request`는 서명하지 않은 payload를 출력합니다:
+namespace `canon-learning-approval-v1`, subject `strategy:<id>`,
+evaluation digest, RFC3339 `approved_at`, `payload_hex`입니다. private
+key를 읽거나 `verified`를 설정하지 않습니다. 정확히 그 bytes를
+decode한 뒤 외부에서
+`ssh-keygen -Y sign -n canon-learning-approval-v1`으로 서명합니다.
+Armored detached signature를 `PromotionApproval.signature`에 넣고
+`signer_key`를 principal과 같게 하며 `approver_role: human`을 사용합니다.
+서명되는 canonical JSON은 다음과 같습니다:
 
-게이트는 각 trajectory의 **해소된(resolved)** outcome을 읽으며 raw
-verdict row를 보지 않습니다. 따라서 `pending` 상태로 남은 trajectory는
-아무리 많아도 승급을 코로보레이트하지 않습니다. 이를 해소하는 것이
-`canon ingest artifacts`입니다(같은 패스에서 각 trajectory의 covering
-verdict와 reward를 계산해 되씁니다). 그래서 작업 순서는 항상 `canon
-ingest artifacts` → `canon learn promote`입니다.
+```json
+{"namespace":"canon-learning-approval-v1","subject":"strategy:<id>","project":null,"artifact_sha":"<evaluation_digest>","run_id":null,"surface":[],"effects":[],"actor":"<principal>","timestamp":"<RFC3339 nanosecond timestamp>"}
+```
 
-게이트 통과 후에는 어드바이저리 lint(콘텐츠 길이 상한, 리터럴 절대
-경로 거부)를 실행하지만 이는 non-blocking이며, 파일 전체를 멱등하게
-다시 씁니다 — 즉 승급된 파일을 수동으로 편집해도 재승급하면 살아남지
-않습니다.
+rollback에서는 subject와 `artifact_sha`가
+`strategy:<id>:rollback:<sha256(reason)>` 및 해당 reason digest를 사용합니다.
+signature는 policy에 pin된 principal만 인증하며 실제 인간인지 또는
+policy 밖의 권한이 있는지는 증명하지 않습니다. Repository policy의
+verifier는 다음처럼 pin해야 합니다:
 
-이후 **상반되는** trajectory를 수집한 전략은 삭제가 아니라
-강등됩니다: 소프트 플래그가 파일의 기존 프론트매터에 `status:
-demoted`와 `reason:`을 병합하며, 본문은 손대지 않아 git blame이
-보존됩니다. 강등은 append-only 증거입니다 — 아무것도 강제로 다시
-쓰이지 않습니다.
+```yaml
+approval:
+  allowed_signers: .canon/allowed_signers
+```
+
+승급은 이 policy-pinned 파일과 `ssh-keygen -Y verify`로 signature를
+검증합니다. `--evaluation`과 `--approval`은 함께 필요하며
+`--signature <path>`로 armored signature를 approval JSON에 붙일 수
+있습니다. 유효한 paired evidence와 이 signature가 없으면 quarantine
+candidate는 계속 quarantine 상태입니다. `--force`는 없습니다.
+
+일반적인 모순 trajectory는 이미 active인 전략을 demote합니다. 기본은
+기존 git 파일에 `status: demoted`와 `reason:`을 소프트 플래그하며,
+`demotion.hard_delete: true`이면 파일을 삭제합니다. 이것은 인증된
+rollback이 아니며 rollback record도 만들지 않습니다. 명시적 rollback은
+별도 작업입니다:
+
+```bash
+canon learn rollback 01J...ULID --reason "regression" --actor alice \
+  --signature-file rollback.sig --approved-at 2026-10-02T12:00:00Z \
+  --contradicting-trajectory-id 01J...TRAJECTORY --repo .
+```
+
+rollback signature는 `canon-learning-approval-v1` namespace에서
+`strategy:<id>:rollback:<sha256(reason)>`, actor, timestamp에 바인딩됩니다.
+actor는 policy-pinned `approval.allowed_signers`에 있어야 하며, 성공한
+rollback은 provenance를 기록하고 lifecycle을 `rolled_back`로 설정합니다.
 
 ## 태스크 전에 retrieve하기
 

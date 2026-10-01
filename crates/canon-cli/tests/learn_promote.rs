@@ -2,9 +2,19 @@
 //! `role-strategy-memory` task group 4 / task 5.2, gate wiring s37
 //! `execution-graph-topology`), run as a real subprocess against the
 //! real `canon` binary: seed a distilled `StrategyItem` into the
-//! operator-local parquet warm tier, then prove `canon learn promote`
-//! materializes it as a git-tier `.canon/strategies/<role>/<id>.md` file
-//! (and that `--dry-run` writes nothing).
+//! operator-local parquet warm tier, then prove direct promotion is
+//! refused without paired evaluation and verified approval.
+//!
+//! # Why every promoting fixture now also seeds trajectories
+//! S6 shipped `canon learn promote` before S7's statistical gates
+//! existed, so the original version of this file seeded ONLY a
+//! `StrategyItem` and asserted exit `0`. That encoded the gap S6's own
+//! design named as temporary ("[Mitigation] S7's statistical-promotion
+//! gate is the primary enforcement point"): promotion into the
+//! git-tracked, PR-reviewed tier was reachable with zero corroborating
+//! evidence. The gate is wired now, so a promoting fixture must supply
+//! the evidence a promotion claims to rest on — and direct activation
+//! additionally requires paired evaluation and verified approval.
 //!
 //! # Why every promoting fixture now also seeds trajectories
 //! S6 shipped `canon learn promote` before S7's statistical gates
@@ -108,17 +118,15 @@ fn promote_materializes_a_seeded_strategy_as_a_git_tier_file() {
     seed_proven_regime(dir.path());
 
     let output = run_promote(dir.path(), &id, &[]);
-    assert!(output.status.success(), "promote must exit 0; stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(!output.status.success(), "direct promotion without approval must be refused");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("strategy promotion requires a valid paired evaluation and verified human approval"),
+        "stable refusal reason must be reported: {stderr}"
+    );
 
     let written_at = git_tier_file(dir.path(), &id);
-    assert!(written_at.exists(), "promote must write the git-tier file at {}", written_at.display());
-    let written = std::fs::read_to_string(&written_at).unwrap();
-    assert!(written.starts_with("---\n"), "front-matter opener");
-    assert!(written.contains("status: active"), "opens active");
-    assert!(written.contains("prefer the boring, correct option"), "body carries the strategy content");
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("promoted") && stdout.contains(&id.to_string()), "reports the promotion: {stdout}");
+    assert!(!written_at.exists(), "refused direct promotion must not write the git-tier file");
 }
 
 #[test]
@@ -201,10 +209,9 @@ fn a_blocked_dry_run_previews_then_reports_the_refusal() {
     assert!(!git_tier_file(dir.path(), &id).exists(), "--dry-run still writes nothing");
 }
 
-/// `canon.yaml`'s `learn.promotion.<role>` block was parsed and
-/// validated but read by NO write path before the gate was wired. This
-/// proves it is live: `n_min: 1` lets a single corroborating success
-/// promote, where the conservative default (`n_min: 5`) would refuse.
+/// `canon.yaml`'s `learn.promotion.<role>` block is still parsed and
+/// applied to the statistical gate, but it cannot bypass the separate
+/// paired-evaluation and verified-approval activation boundary.
 #[test]
 fn the_per_role_promotion_config_in_canon_yaml_drives_the_gate() {
     let dir = tempfile::tempdir().unwrap();
@@ -213,10 +220,14 @@ fn the_per_role_promotion_config_in_canon_yaml_drives_the_gate() {
     seed_trajectories(dir.path(), 1, VerdictOutcome::Success);
 
     let output = run_promote(dir.path(), &id, &[]);
+    assert!(!output.status.success(), "direct promotion must still require approval");
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        output.status.success(),
-        "n_min: 1 must let a single success promote; stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
+        stderr.contains("strategy promotion requires a valid paired evaluation and verified human approval"),
+        "stable refusal reason must be reported: {stderr}"
     );
-    assert!(git_tier_file(dir.path(), &id).exists(), "the configured gate promoted, so the file must exist");
+    assert!(
+        !git_tier_file(dir.path(), &id).exists(),
+        "configured statistical gate must not bypass activation approval"
+    );
 }

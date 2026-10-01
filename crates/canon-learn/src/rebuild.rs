@@ -166,6 +166,7 @@ mod tests {
         rebuild_namespace(&trajectory_store, &strategy_store, &regime()).unwrap();
 
         let promoted = strategy_store.query_by_regime_key(&regime()).unwrap().remove(0).id;
+        strategy_store.set_lifecycle(&promoted, StrategyLifecycle::Active).unwrap();
         let promotion = crate::promotion::promote_strategy(&strategy_store, &promoted, git_tier.path()).unwrap();
         assert!(promotion.path.exists(), "promotion wrote its git-tier file");
 

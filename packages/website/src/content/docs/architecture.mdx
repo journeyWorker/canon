@@ -102,11 +102,12 @@ RBAC remain external prerequisites.
 ```
 team runs agents → ingest (sessions, reviews, handoffs, CI/PR)
                  → trajectories + verdicts (per role)
-                 → distill (success → strategy, review-finding → guardrail)
-                 → statistical promotion gate (no noise distilled)
-                 → promote to git tier (versioned, PR-reviewed)
+                 → distill (success → quarantined strategy, review-finding → guardrail)
+                 → occurrence/paired-CRN eligibility
+                 → paired evaluation + policy-pinned SSH approval
+                 → activate in git tier (versioned, PR-reviewed)
                  → retrieve-before-task (role + regime scoped, advisory)
-                 → better agent runs
+                 → later agent runs (uplift not yet measured)
 ```
 
 See [Strategy memory](/concepts/strategy-memory/) for the role-namespaced

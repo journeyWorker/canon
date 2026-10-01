@@ -160,6 +160,7 @@ pub fn promote_strategy(strategy_store: &dyn StrategyStore, strategy_id: &Strate
     Ok(promotion)
 }
 
+
 /// Validated activation boundary for quarantined candidates.
 pub fn promote_strategy_approved(
     strategy_store: &dyn StrategyStore,
@@ -216,7 +217,8 @@ mod tests {
     fn seed(store: &ParquetStrategyStore, content: &str) -> StrategyId {
         let id = StrategyId::new();
         let rk = RegimeKey::parse(regime_key("dev", "canon", "join-spine", "9c93d024b1a2")).unwrap();
-        let item = StrategyItem::new(id, rk, RoleId::parse("dev").unwrap(), "title", "description", content, vec![TrajectoryId::new()], Utc::now());
+        let item = StrategyItem::new(id, rk, RoleId::parse("dev").unwrap(), "title", "description", content, vec![TrajectoryId::new()], Utc::now())
+            .with_lifecycle(StrategyLifecycle::Active);
         store.append(&item).unwrap();
         id
     }

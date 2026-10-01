@@ -412,6 +412,18 @@ enum AdapterCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Authorize declared capabilities against repository policy (preflight only)
+    Authorize {
+        /// JSON response file to validate and authorize
+        #[arg(long)]
+        response: PathBuf,
+        /// Repository root containing `.canon/policy.yaml`
+        #[arg(long)]
+        repo: PathBuf,
+        /// Output authorization result as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1221,6 +1233,7 @@ fn main() -> ExitCode {
         },
         Command::Adapter { action } => match action {
             AdapterCommand::Validate { response, repo, json } => run_adapter_validate(&response, repo.as_deref(), json),
+            AdapterCommand::Authorize { response, repo, json } => run_adapter_authorize(&response, &repo, json),
         },
         Command::Prompt { action } => match action {
             PromptCommand::Register { name, version, manifest, repo, json } => {
@@ -1764,6 +1777,28 @@ fn run_adapter_validate(response: &std::path::Path, repo: Option<&std::path::Pat
         }
     }
     ExitCode::SUCCESS
+}
+
+fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, json: bool) -> ExitCode {
+    let result = match canon_cli::adapter::authorize_response(response, repo) {
+        Ok(result) => result,
+        Err(error) => {
+            eprintln!("canon adapter authorize: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if json {
+        println!("{}", serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".into()));
+    } else {
+        println!("execution_authorized: {}", result.execution_authorized);
+        println!("execution_performed: false");
+        println!("sandbox_enforced: false");
+        for reason in &result.reasons { println!("reason: {reason}"); }
+    }
+    if result.execution_authorized { ExitCode::SUCCESS } else {
+        eprintln!("execution_not_authorized");
+        ExitCode::FAILURE
+    }
 }
 
 fn verify_adapter_context_join(repo: &std::path::Path, summary: &canon_cli::adapter::ValidationSummary) -> bool {

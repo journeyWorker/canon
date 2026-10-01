@@ -20,67 +20,114 @@ hand-promoted strategy the trajectory rows don't touch. There is no
 standalone `canon learn` rebuild command; the only subcommand is
 `promote`.
 
-## `canon learn promote <strategy_id> [--dry-run]`
+# `canon learn promote <strategy_id> [--repo <dir>] [--evaluation <path> --approval <path>] [--signature <path>] [--dry-run]`
 
-```bash
-canon learn promote 01J...ULID           # promote a distilled strategy
-canon learn promote 01J...ULID --dry-run # preview: lint + resolve, no write
-```
+The production activation path is a signed, paired-evaluation workflow:
 
-Graduates a distilled strategy (by its ULID) from the local warm tier UP
-into the git-tracked `.canon/strategies/<role>/<id>.md` tier. It:
+1. Run `canon ingest artifacts`. Ingest resolves covering verdicts and rebuilds
+   newly distilled strategies as `lifecycle: quarantined`.
+2. Check eligibility with the configured `occurrence` or `crn` gate. This is
+   only a prerequisite; occurrence alone MUST NOT activate a strategy.
+3. An honest external evaluator writes a `PromotionEvaluation` JSON bundle.
+   It MUST bind the candidate's id, version, quarantined lifecycle, strategy
+   digest, source trajectory ids, baseline and candidate result digests, and
+   non-empty corpus/evaluator/context/policy/model/tool provenance.
+4. Require paired evidence: baseline and candidate digest arrays MUST be
+   non-empty, equal-length, disjoint, and duplicate-free. The evaluation's
+   finite `paired_metrics` MUST include `pairs`, `uplift`, and `regressions`;
+   `pairs` MUST equal the array length, `uplift` MUST be strictly positive,
+   `regressions` MUST be zero, `passed` MUST match those derived checks, and
+   `decision` MUST be `pass`, `promote`, or `approved`. Missing or unknown
+   metrics are rejected; the repository currently publishes **no measured
+   uplift result**, so this command is not evidence that retrieval improves
+   agent outcomes.
+5. Produce the unsigned approval payload:
 
-- resolves the repo via the nearest-`canon.yaml`-ancestor walk;
-- **evaluates the role's promotion gate and FAILS CLOSED** (see below) —
-  this is the primary enforcement point, not the lint;
-- runs advisory lints (content-length ceiling, literal-absolute-path
-  rejection) — printed, NON-blocking;
-- writes the file with YAML front-matter (`status`, `regime_key`,
-  `role`, `title`, `source_trajectory_ids`, `recorded_at`) + the
-  strategy content as the body;
-- `--dry-run` does everything EXCEPT the write.
+   ```bash
+   canon learn approve <strategy_id> --evaluation evaluation.json \
+     --principal alice --repo .
+   # `request` is an exact alias:
+   canon learn request <strategy_id> --evaluation evaluation.json \
+     --principal alice --repo .
+   ```
 
-An unknown `strategy_id` fails loud (nonzero exit). Promotion re-renders
-the whole file, idempotent by content — re-promoting an unchanged
-strategy is a byte-identical rewrite, so it does NOT preserve manual
-edits to that file. A later demotion soft-flags the SAME file, preserving
-git blame.
+   The JSON output contains the evaluation digest, RFC3339 `approved_at`,
+   subject `strategy:<strategy_id>`, namespace
+   `canon-learning-approval-v1`, and `payload_hex`. `approve`/`request` never
+   read a private key and never set `verified`.
+6. Decode `payload_hex` to the exact canonical JSON bytes. The signed object
+   is:
 
-### The gate blocks unproven promotions
+   ```json
+   {
+     "namespace": "canon-learning-approval-v1",
+     "subject": "strategy:<strategy_id>",
+     "project": null,
+     "artifact_sha": "<evaluation_digest>",
+     "run_id": null,
+     "surface": [],
+     "effects": [],
+     "actor": "<principal>",
+     "timestamp": "<RFC3339 nanosecond timestamp>"
+   }
+   ```
 
-Promotion is evidence-gated. Before any write, canon resolves the
-strategy's own `regime_key`, reads that regime's trajectories, and
-evaluates the role's configured gate:
+   For rollback, the corresponding signed object uses subject
+   `strategy:<id>:rollback:<sha256(reason)>`, `artifact_sha` equal to that
+   reason digest, and the rollback actor/timestamp. Sign the decoded bytes
+   externally with an SSH key using the `canon-learning-approval-v1`
+   namespace (for example, `ssh-keygen -Y sign -n canon-learning-approval-v1
+   -f <private-key>`). Put the armored detached signature in
+   `PromotionApproval.signature` and set `signer_key` to the same principal.
+   The approval JSON has exactly these fields: `schema_version`,
+   `candidate_strategy_id`, `evaluation_digest`, `approver_identity`,
+   `approver_role` (`human`), `verified` (non-authoritative display data),
+   `approved_at`, optional `signature`, optional `signer_key`, and
+   `integrity_digest`.
+7. Configure the verifier in the repository policy:
 
-```
-canon learn promote: blocked by the promotion gate: 1 corroborating
-successes since the last contradiction (need n_min 5) in the trailing
-30-day window
-```
+   ```yaml
+   approval:
+     allowed_signers: .canon/allowed_signers
+   ```
 
-Exit `1`, nothing written. **There is no `--force`.** A refusal means the
-evidence is not there yet; the fix is to resolve the regime's
-trajectories, not to bypass the gate.
+   The path is policy-pinned (relative paths resolve from the repository).
+   The verifier runs `ssh-keygen -Y verify` against that file; an absent,
+   unreadable, or non-matching signer fails closed. A detached signature is
+   authentication of the configured principal, not proof that the principal
+   is a human or is otherwise authorized outside this policy.
+8. Activate only with both evidence files:
 
-The gate reads each trajectory's RESOLVED `verdict_record.outcome` — NOT
-its raw verdict rows. A trajectory sitting at `pending` neither
-corroborates nor contradicts, so a wall of pending trajectories is still
-a refusal. `canon ingest artifacts` is what resolves them (it computes
-each trajectory's covering verdict + reward and writes it back in the
-same pass, reporting `trajectories marked` and `trajectories left
-pending`). So the working order is always:
+   ```bash
+   canon learn promote <strategy_id> --repo . \
+     --evaluation evaluation.json --approval approval.json
+   # Or attach an armored signature file and recompute the approval digest:
+   canon learn promote <strategy_id> --repo . \
+     --evaluation evaluation.json --approval approval.json \
+     --signature approval.sig
+   ```
 
-```bash
-canon ingest artifacts        # derive verdicts AND resolve trajectories
-canon learn promote <id>      # now the gate can see corroboration
-```
+   `--evaluation` and `--approval` MUST be supplied together. A quarantined
+   candidate without valid paired evaluation, policy-pinned SSH verification,
+   and human approval remains quarantined. `--dry-run` previews the render but
+   does not activate or write.
 
-A blocked `--dry-run` still prints its preview (you asked what WOULD be
-written), then reports the refusal and exits `1`.
+The command resolves the repo via the nearest-`canon.yaml`-ancestor walk,
+evaluates the role gate before any write, and runs advisory lints
+(content-length ceiling and literal-absolute-path rejection). There is no
+`--force`. Promotion re-renders the whole git-tier file with YAML front matter
+(`status`, `regime_key`, `role`, `title`, `source_trajectory_ids`,
+`recorded_at`) plus evaluation and approval digests; a re-promote does not
+preserve manual edits.
 
-## Choosing a promotion gate: `crn` vs `occurrence`
+An unknown `strategy_id` fails nonzero. A candidate's lifecycle defaults to
+`quarantined` when newly distilled and quarantine is excluded from retrieval.
+The old public writer is retained only for already-`active` items; it is not a
+way to activate new or legacy candidates.
 
-A role's promotion gate is a `canon.yaml` `learn:`-section choice:
+### The eligibility gates: `crn` vs `occurrence`
+
+A role's eligibility gate is a `canon.yaml` `learn:`-section choice:
 
 ```yaml
 # canon.yaml
@@ -94,27 +141,67 @@ learn:
       mode: crn
   demotion:
     hard_delete: false                 # optional — soft-flag is the default
-    strategies_root: .canon/strategies  # optional
+    strategies_root: .canon/strategies # optional
 ```
 
-A role with no explicit `promotion.<role>` entry is not an error — it
-defaults to `mode: occurrence, n_min: 5, window_days: 30` (the
-conservative defaults).
+A role with no explicit `promotion.<role>` entry defaults to
+`mode: occurrence, n_min: 5, window_days: 30`.
 
-- **`occurrence`** — for roles whose domain does NOT support
-  deterministic replay (most of `dev`/`content`/`design`/`review`).
-  Promotes when, inside the trailing `window_days`, at least `n_min`
-  `Success`-verdict trajectories accumulate for the SAME `regime_key`
-  AND zero `Failure`/`RolledBack`-verdict trajectories arrived for that
-  regime. A contradicting failure RESETS the count (never averaged
-  away). Samples older than the window don't count; a `Pending` sample
-  (no covering verdict yet) is skipped. `RolledBack` resets the count
-  like `Failure` (a stronger negative signal).
-- **`crn`** — for roles that CAN run a deterministic simulator
-  (`sim`-shaped domains): a paired common-random-number statistical
-  corroboration gate. A CRN-capable role's trajectory-recording caller
-  stamps `crn:config=<label>` / `crn:panel=<index>` tags on each
-  trajectory it records.
+- **`occurrence`** — for roles whose domain does NOT support deterministic
+  replay. Within the trailing window, at least `n_min` resolved `Success`
+  trajectories for the same `regime_key` are required and no `Failure` or
+  `RolledBack` trajectory may be present. A contradiction resets the count;
+  it is never averaged away. This eligibility does not replace paired
+  evaluation or signed approval.
+- **`crn`** — for roles that CAN run a deterministic simulator. A paired
+  common-random-number statistical eligibility gate uses the same
+  `crn:config=<label>` and `crn:panel=<index>` panels across compared
+  configurations. Insufficient panels/noise evidence is not a pass. CRN
+  eligibility still does not replace the external `PromotionEvaluation` and
+  signature.
+
+Both gates read resolved `verdict_record.outcome`, not raw verdict rows.
+`Pending` trajectories neither corroborate nor contradict. `canon ingest
+artifacts` is therefore always first:
+
+```bash
+canon ingest artifacts
+canon learn promote <id> --evaluation evaluation.json --approval approval.json
+```
+
+### Demotion versus authenticated rollback
+
+A later ordinary contradictory `Failure`/`RolledBack` trajectory demotes an
+already-active strategy when a non-dry-run promotion observes it. The default
+is append-only soft-flagging of the existing git file with `status: demoted`
+and `reason:`; `demotion.hard_delete: true` deletes that file instead. This
+ordinary contradiction path is not an approval and does not create a rollback
+record.
+
+An operator-requested rollback is a distinct authenticated action:
+
+```bash
+canon learn rollback <strategy_id> --reason "<reason>" --actor alice \
+  --signature-file rollback.sig --approved-at 2026-10-02T12:00:00Z \
+  [--contradicting-trajectory-id <trajectory_id>] --repo .
+```
+
+`--signature-file` is an armored SSH detached signature over the
+`canon-learning-approval-v1` payload bound to
+`strategy:<id>:rollback:<sha256(reason)>`, actor, and `--approved-at`.
+`actor` MUST be listed in policy-pinned `approval.allowed_signers`; verification
+uses that file and `ssh-keygen -Y verify`. Successful rollback writes durable
+provenance, sets lifecycle `rolled_back`, and records the optional contradicting
+trajectory. Missing policy, signer, timestamp, or signature fails closed.
+
+### What retrieval can and cannot serve
+
+Retrieval serves only exact role/regime matches and excludes demoted,
+quarantined, rejected, and rolled-back strategies. Legacy rows with
+`lifecycle: null` remain readable for backward compatibility, but they have no
+quarantine/evaluation/signature provenance and MUST NOT be treated as proof of
+the current activation workflow. Retrieval is fail-soft and advisory; it does
+not upgrade legacy rows or establish measured uplift.
 
 ## How verdicts feed scoring
 
@@ -122,41 +209,32 @@ Verdicts arrive from `canon ingest artifacts` (see
 `canon-artifact-ingest`), persisted regime-keyed
 (`<role>/<repo>/<area>/<hash>`). Each verdict scores its covering
 trajectory into `Success` / `Failure` / `RolledBack` / `Pending`; the
-promotion gate above reads a regime's accumulated verdicts to decide
-promotion, and a contradicting trajectory arriving for an
-already-promoted strategy triggers a demotion.
+eligibility gate reads a regime's accumulated resolved verdicts, while the
+paired evaluation and signed approval decide whether a quarantined strategy
+may become active. A contradicting trajectory for an already-promoted
+strategy triggers ordinary demotion; an explicit rollback is separate and
+authenticated.
 
-## Reading a demoted strategy
+## Reading a demoted or rolled-back strategy
 
-A promoted strategy that later collects a contradicting trajectory is
-demoted append-only: the soft-flag (default) merges `status: demoted` +
-`reason: <text>` into the strategy file's EXISTING front-matter, leaving
-every other key and the whole body byte-unchanged:
-
-```markdown
----
-title: batch the parquet writes
-description: avoids one fsync per row
-status: demoted
-reason: 'contradicting trajectory 01J... arrived for regime dev/app/auth-flow/deadbeef'
----
-buffer writes and flush once per namespace
-```
-
-Set `demotion.hard_delete: true` to delete the file instead of
-soft-flagging. A strategy demoted before it was ever promoted to the git
-tier has no file to flag — that is not an error. A non-demoted strategy
-simply has no `status`/`reason` keys. `canon retrieve` skips any
-`status: demoted` strategy.
+An ordinary contradicting trajectory demotes an active strategy append-only:
+the default soft-flag merges `status: demoted` + `reason: <text>` into the
+existing front matter and leaves the body byte-unchanged. Set
+`demotion.hard_delete: true` to delete the file instead. A strategy demoted
+before it reached the git tier has no file to flag — that is not an error.
+`canon retrieve` skips demoted and rolled-back strategies. An authenticated
+rollback is different: it records signed operator provenance and sets the
+stored lifecycle to `rolled_back`.
 
 ## The flywheel
 
 ```
-ingest → trajectories → rebuild (canon ingest artifacts) → strategies
-   ↑                                                   │
-verdicts                       canon learn promote      │ (graduate)
-                                                        ▼
-             canon retrieve reads promoted strategies before a dispatch
+ingest → resolved trajectories → quarantined strategies
+   ↑                                  │
+verdicts                 eligibility + paired evaluation + SSH approval
+                                      │ (activate)
+                                      ▼
+                      active git strategies → advisory retrieve
 ```
 
 ## What this skill does NOT cover

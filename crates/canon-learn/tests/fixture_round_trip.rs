@@ -13,7 +13,8 @@
 
 use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
 use canon_learn::{
-    LearnConfig, LearnError, ParquetStrategyStore, ParquetTrajectoryStore, RoleRegistry, Trajectory, TrajectoryId,
+    LearnConfig, LearnError, ParquetStrategyStore, ParquetTrajectoryStore, RoleRegistry, StrategyLifecycle,
+    StrategyStore, Trajectory, TrajectoryId,
     TrajectoryStore, rebuild_namespace, retrieve, store_trajectory,
 };
 use canon_model::ids::{RegimeKey, RoleId, regime_key};
@@ -61,6 +62,13 @@ fn store_distill_rebuild_search_round_trip_over_a_fixture_corpus() {
     let first_build = rebuild_namespace(&trajectory_store, &strategy_store, &dev_regime_key()).unwrap();
     assert_eq!(first_build.len(), 3, "one strategy item per trajectory's single verdict");
 
+    // Rebuild correctly quarantines newly distilled strategies; quarantine is
+    // excluded from the public retrieval path until explicitly activated.
+    assert!(retrieve(&strategy_store, &dev_regime_key(), None).unwrap().is_empty());
+    for item in &first_build {
+        strategy_store.set_lifecycle(&item.id, StrategyLifecycle::Active).unwrap();
+    }
+
     // --- retrieve: the read side of the apply loop ---
     let retrieved = retrieve(&strategy_store, &dev_regime_key(), None).unwrap();
     let mut titles: Vec<&str> = retrieved.iter().map(|i| i.title.as_str()).collect();
@@ -82,6 +90,18 @@ fn store_distill_rebuild_search_round_trip_over_a_fixture_corpus() {
     // --- rebuild again: non-destructive delete-rebuild, content-equivalent ---
     let second_build = rebuild_namespace(&trajectory_store, &strategy_store, &dev_regime_key()).unwrap();
     assert_eq!(second_build.len(), 3);
+    let retrieved_preserved = retrieve(&strategy_store, &dev_regime_key(), None).unwrap();
+    let mut preserved_titles: Vec<String> = retrieved_preserved.iter().map(|i| i.title.clone()).collect();
+    preserved_titles.sort_unstable();
+    assert_eq!(
+        preserved_titles,
+        titles,
+        "the second rebuild preserves the active strategy set from the first rebuild"
+    );
+    assert!(retrieved_preserved.iter().all(|item| item.lifecycle == Some(StrategyLifecycle::Active)));
+    for item in &second_build {
+        strategy_store.set_lifecycle(&item.id, StrategyLifecycle::Active).unwrap();
+    }
     let retrieved_after_rebuild = retrieve(&strategy_store, &dev_regime_key(), None).unwrap();
     let mut titles_after_rebuild: Vec<String> = retrieved_after_rebuild.iter().map(|i| i.title.clone()).collect();
     titles_after_rebuild.sort_unstable();

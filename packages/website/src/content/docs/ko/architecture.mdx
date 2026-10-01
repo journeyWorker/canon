@@ -95,11 +95,12 @@ S3 호환 스토리지는 운영자가 직접 자격 증명을 제공해야 하�
 ```
 team runs agents → ingest (sessions, reviews, handoffs, CI/PR)
                  → trajectories + verdicts (per role)
-                 → distill (success → strategy, review-finding → guardrail)
-                 → statistical promotion gate (no noise distilled)
-                 → promote to git tier (versioned, PR-reviewed)
-                 → retrieve-before-task (role + regime scoped, advisory)
-                 → better agent runs
+                 → distill (성공 → quarantine 전략, review-finding → guardrail)
+                 → occurrence/paired-CRN 자격
+                 → paired evaluation + policy-pinned SSH approval
+                 → git 티어에서 활성화 (버전 관리, PR 리뷰)
+                 → 태스크 시작 전 retrieve (역할 + regime 스코프, 어드바이저리)
+                 → 이후 에이전트 실행 (uplift는 아직 측정되지 않음)
 ```
 
 같은 루프의 역할별 버전은 [전략 메모리](/ko/concepts/strategy-memory/)를
