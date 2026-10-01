@@ -37,7 +37,8 @@ pub use ids::{
 };
 pub use records::{
     Change, ChangeStatus, Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Finding, FindingDisposition,
-    FindingSeverity, ProvenanceRef, Review, Run, RunStatus, Scenario, Session, StrategyItem, StrategyRef, Subject,
+    FindingSeverity, ProvenanceRef, Review, Run, RunLineage, RunStatus, SkillSnapshot, ContextSnapshot, PolicySnapshot, Scenario,
+    Session, StrategyItem, StrategyRef, Subject,
     SubjectStatus, Task, TaskStatus, Trajectory,
 };
 pub use trust::{FlaggedOverlay, TrustLifecycle};

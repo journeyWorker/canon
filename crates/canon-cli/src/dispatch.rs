@@ -1,6 +1,7 @@
 //! `canon dispatch begin --role <r> --regime <k> [--repo <dir>]
 //! [--agent-id <id>] [--task <task_id>] [--parent-run <run_id>]
-//! [--json]` (S8 `retrieve-before-task`, task 2.3):
+//! [--provider <name>] [--model <name>] [--skill-id <id>]
+//! [--skill-digest <digest>] [--json]` (S8 `retrieve-before-task`, task 2.3):
 //! the LIVE run-manifest write seam. Everything else in S8 shipped
 //! standalone (design.md Migration Plan Step 1 — `canon retrieve` + the
 //! pre-dispatch hook "work with zero manifest integration"); this is
@@ -77,8 +78,8 @@
 //!
 //! Both flags stay OPTIONAL and both keys stay
 //! `skip_serializing_if = "Option::is_none"`, so the single-agent,
-//! no-plan dispatch — the overwhelming and correct case — still writes
-//! the byte-identical manifest it always did.
+//! no-plan dispatch still omits both binding keys. Every begin also
+//! captures context/policy lineage, independent of those bindings.
 //!
 //! `--task` joins the FAIL-LOUD half (exit `2`): a typo must never
 //! persist a dangling `Run.task_id`, which is the very
@@ -107,14 +108,15 @@ use canon_learn::guidance::retrieve_guidance;
 use canon_learn::{LearnConfig, ParquetStrategyStore};
 use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::ids::{ChangeId, RunId, TaskId};
-use canon_model::records::{Run, RunStatus};
+use canon_model::records::{ContextSnapshot, PolicySnapshot, Run, RunLineage, RunStatus, SkillSnapshot};
 use canon_model::{RegimeKey, RoleId};
 use canon_store::registry::TierRegistry;
 use canon_store::write_atomic;
 use chrono::{DateTime, TimeDelta, Utc};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
-use crate::context::{resolve_canon_yaml, resolve_repo_root};
+use crate::context::{render_json, resolve_canon_yaml, resolve_repo_root, resolve_surface, ContextOptions};
 
 /// The private side-channel directory a dispatch record lands under,
 /// relative to the repo root. NOT the record's only home since s42
@@ -133,6 +135,10 @@ pub enum DispatchError {
         "--role `{role}` does not match --regime `{regime_key}`'s own leading role segment `{regime_role}` — pass the SAME role to both"
     )]
     RoleRegimeMismatch { role: String, regime_key: String, regime_role: String },
+
+    /// A digest without a declared skill cannot identify an input.
+    #[error("--skill-digest requires --skill-id — declare the skill id, or omit the digest")]
+    SkillDigestWithoutId,
 
     /// The dispatch record could not be written to the side-channel.
     #[error(transparent)]
@@ -254,6 +260,7 @@ impl DispatchError {
     pub(crate) fn is_usage(&self) -> bool {
         match self {
             Self::RoleRegimeMismatch { .. }
+            | Self::SkillDigestWithoutId
             | Self::TaskNotFound { .. }
             | Self::NoPlanSources { .. }
             | Self::PlanCorpus { .. }
@@ -436,6 +443,44 @@ pub struct DispatchBinding {
     pub parent_run_id: Option<RunId>,
 }
 
+/// Optional, caller-declared run metadata. Provider and model are copied
+/// verbatim; the actor's id is never used to infer a provider.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct DispatchMetadata {
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub skill_id: Option<String>,
+    pub skill_digest: Option<String>,
+}
+
+/// Capture the same capability surface as `canon context`, without
+/// reading the evidence corpus. A missing policy is explicitly labelled
+/// as `sha256:absent`, never replaced with current policy defaults
+/// (nor confused with the empty bytes of a present, empty file).
+fn capture_lineage(repo: &Path, metadata: &DispatchMetadata) -> Result<RunLineage, DispatchError> {
+    let surface = resolve_surface(repo, ContextOptions::default());
+    let context = ContextSnapshot {
+        digest: sha256_digest(render_json(&surface).as_bytes()),
+        capability_version: surface.capability_version,
+    };
+    let policy_digest = match std::fs::read(repo.join(".canon/policy.yaml")) {
+        Ok(bytes) => sha256_digest(&bytes),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => "sha256:absent".to_string(),
+        Err(error) => return Err(DispatchError::Io(error)),
+    };
+    Ok(RunLineage {
+        provider: metadata.provider.clone(),
+        model: metadata.model.clone(),
+        skill: metadata.skill_id.as_ref().map(|id| SkillSnapshot { id: id.clone(), digest: metadata.skill_digest.clone() }),
+        context: Some(context),
+        policy: Some(PolicySnapshot { digest: policy_digest }),
+    })
+}
+
+fn sha256_digest(bytes: &[u8]) -> String {
+    format!("sha256:{:x}", Sha256::digest(bytes))
+}
+
 /// Resolve `task_id` against the repo's configured plan corpus (s40
 /// task 1.2), through the SAME `canon.yaml` `plans:` sources and the
 /// SAME `canon_ingest::plan_registry` dialect lookup `canon gate task`
@@ -576,15 +621,18 @@ pub(crate) fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(),
 /// is complete on disk rather than half-recorded.
 ///
 /// `binding` carries s40's two optional edges. `binding.task_id` is
-/// validated FIRST — before the guidance retrieval, the mint, and the
-/// write — so a rejected id leaves nothing at all on disk. A
-/// [`DispatchBinding::default`] (neither flag given) reproduces the
-/// pre-s40 manifest byte-for-byte: `Run::new` already starts
-/// `parent_run_id: None`, and both fields are
-/// `skip_serializing_if = "Option::is_none"`, so their keys stay ABSENT
-/// rather than `null` — load-bearing beyond cosmetics, since canon's
-/// write-time idempotence keys on a content digest over these bytes.
-pub fn begin(repo: &Path, role: &RoleId, regime_key: &RegimeKey, agent_id: &str, binding: &DispatchBinding) -> Result<Begun, DispatchError> {
+/// validated before guidance retrieval, mint, and write, so a rejected
+/// id leaves nothing on disk. Unset task/parent keys remain absent.
+/// Declared skill metadata is also admitted before mint/write. Every
+/// dispatch captures context/policy lineage, even without metadata flags.
+pub fn begin(
+    repo: &Path,
+    role: &RoleId,
+    regime_key: &RegimeKey,
+    agent_id: &str,
+    binding: &DispatchBinding,
+    metadata: &DispatchMetadata,
+) -> Result<Begun, DispatchError> {
     if regime_key.role() != role.as_str() {
         return Err(DispatchError::RoleRegimeMismatch {
             role: role.as_str().to_string(),
@@ -592,10 +640,14 @@ pub fn begin(repo: &Path, role: &RoleId, regime_key: &RegimeKey, agent_id: &str,
             regime_role: regime_key.role().to_string(),
         });
     }
+    if metadata.skill_digest.is_some() && metadata.skill_id.is_none() {
+        return Err(DispatchError::SkillDigestWithoutId);
+    }
     let repo = resolve_repo_root(repo);
     if let Some(task_id) = &binding.task_id {
         validate_task_binding(&repo, task_id)?;
     }
+    let lineage = capture_lineage(&repo, metadata)?;
     let store = open_strategy_store(&repo);
     let guidance = retrieve_guidance(&store, role, regime_key, None);
 
@@ -604,7 +656,8 @@ pub fn begin(repo: &Path, role: &RoleId, regime_key: &RegimeKey, agent_id: &str,
     let actor = Actor::new(agent_id.to_string(), role.clone());
     let run =
         Run::new(Envelope::current(RecordKind::Run, now, actor), run_id, None, binding.task_id.clone(), RunStatus::Running, now, None)
-            .with_injected_guidance(guidance);
+            .with_injected_guidance(guidance)
+            .with_lineage(lineage);
     // The builder, not a field poke — `Run::with_parent_run_id`'s own
     // doc is that the edge is recorded exactly once, at the moment it
     // becomes known; a root dispatch must leave the field untouched so
@@ -625,29 +678,36 @@ pub fn begin(repo: &Path, role: &RoleId, regime_key: &RegimeKey, agent_id: &str,
 }
 
 /// `canon dispatch begin`'s CLI wrapper: `0` on a written manifest, `2`
-/// on a usage failure (a `--role`/`--regime` mismatch, or a `--task`
-/// naming no task / no plan corpus to name one in), `1` on a
-/// write/serialize failure.
+/// on a usage failure (role/regime mismatch, a task naming no task /
+/// plan corpus, or a skill digest without an id), `1` on a
+/// read/write/serialize failure.
 ///
 /// A degraded tier write (s42 task 1.1) is NOT one of those: it prints
 /// a note on stderr and still exits `0`, because the dispatch itself
-/// succeeded — [`persist_run`] explains why. `--json` gains a
-/// `tier_degraded` key ONLY when it degraded, mirroring the same
-/// omit-when-unset discipline the binding keys below keep, so a
-/// healthy dispatch's `--json` shape is byte-identical to pre-s42.
-pub fn run_begin(repo: &Path, role: &RoleId, regime_key: &RegimeKey, agent_id: &str, binding: &DispatchBinding, json: bool) -> ExitCode {
-    match begin(repo, role, regime_key, agent_id, binding) {
+/// succeeded — [`persist_run`] explains why. Existing JSON keys are
+/// unchanged; `lineage` summarizes the recorded inputs and
+/// `tier_degraded` is included only when the tier write degraded.
+pub fn run_begin(
+    repo: &Path,
+    role: &RoleId,
+    regime_key: &RegimeKey,
+    agent_id: &str,
+    binding: &DispatchBinding,
+    metadata: &DispatchMetadata,
+    json: bool,
+) -> ExitCode {
+    match begin(repo, role, regime_key, agent_id, binding, metadata) {
         Ok(begun) => {
             if json {
-                // The binding keys are OMITTED when unset, mirroring
-                // the manifest's own `skip_serializing_if` discipline:
-                // an unbound dispatch's `--json` shape stays exactly
-                // what it was before s40, rather than gaining two
-                // permanently-`null` keys every consumer must ignore.
+                // Binding keys remain absent when unset; lineage is
+                // present only when the manifest records it.
                 let mut summary = serde_json::Map::new();
                 summary.insert("run_id".to_string(), serde_json::json!(begun.run_id.to_string()));
                 summary.insert("manifest".to_string(), serde_json::json!(begun.manifest_path.display().to_string()));
                 summary.insert("injected_guidance".to_string(), serde_json::json!(begun.run.injected_guidance));
+                if let Some(lineage) = &begun.run.lineage {
+                    summary.insert("lineage".to_string(), serde_json::json!(lineage));
+                }
                 if let Some(task_id) = &begun.run.task_id {
                     summary.insert("task_id".to_string(), serde_json::json!(task_id.as_str()));
                 }
@@ -2189,34 +2249,80 @@ mod begin_tests {
         tmp
     }
 
-    /// Task 1.3's byte-identity half. The comparison is against a `Run`
-    /// built the PRE-s40 way — `Run::new` with a literal `None` task_id
-    /// and no `with_parent_run_id` call — so this fails the moment
-    /// either key starts serializing as `null` instead of vanishing.
-    /// Load-bearing beyond cosmetics: canon's write-time idempotence
-    /// keys on a content digest over exactly these bytes.
     #[test]
-    fn a_dispatch_with_neither_flag_writes_todays_exact_manifest() {
+    fn an_unbound_dispatch_omits_binding_keys_but_records_deterministic_lineage() {
         let tmp = repo_without_plan_sources();
-        let begun =
-            begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("a dispatch with no binding always succeeds");
+        let surface = resolve_surface(tmp.path(), ContextOptions::default());
+        let expected_context_digest = format!("sha256:{:x}", Sha256::digest(render_json(&surface).as_bytes()));
+        let first = begin(tmp.path(), &role(), &regime(), "omp-agent", &DispatchBinding::default(), &DispatchMetadata::default())
+            .expect("an unbound dispatch succeeds");
+        let second = begin(tmp.path(), &role(), &regime(), "different-agent", &DispatchBinding::default(), &DispatchMetadata::default())
+            .expect("a repeated dispatch succeeds");
 
-        let manifest = std::fs::read_to_string(&begun.manifest_path).expect("the manifest was written");
-        assert!(!manifest.contains("task_id"), "a no-flag manifest must carry NO task_id key at all:\n{manifest}");
-        assert!(!manifest.contains("parent_run_id"), "a no-flag manifest must carry NO parent_run_id key at all:\n{manifest}");
+        let first_manifest: Value = serde_json::from_slice(&std::fs::read(&first.manifest_path).unwrap()).unwrap();
+        let second_manifest: Value = serde_json::from_slice(&std::fs::read(&second.manifest_path).unwrap()).unwrap();
+        for manifest in [&first_manifest, &second_manifest] {
+            assert!(manifest.get("task_id").is_none(), "unbound dispatch must omit task_id");
+            assert!(manifest.get("parent_run_id").is_none(), "root dispatch must omit parent_run_id");
+            assert!(manifest["lineage"].get("provider").is_none(), "provider must not be inferred from agent_id");
+            assert!(manifest["lineage"].get("model").is_none());
+            assert!(manifest["lineage"].get("skill").is_none());
+            assert_eq!(manifest["lineage"]["context"]["digest"], expected_context_digest);
+            assert_eq!(manifest["lineage"]["context"]["capability_version"], surface.capability_version);
+            assert_eq!(manifest["lineage"]["policy"]["digest"], "sha256:absent");
+        }
+        assert_eq!(
+            serde_json::to_vec(&first_manifest["lineage"]).unwrap(),
+            serde_json::to_vec(&second_manifest["lineage"]).unwrap(),
+            "context/policy lineage is byte-stable for the same repo despite new run/actor identities"
+        );
+    }
 
-        let pre_s40 = Run::new(
-            begun.run.envelope.clone(),
-            begun.run.run_id,
-            None,
-            None,
-            begun.run.status,
-            begun.run.started_at,
-            begun.run.ended_at,
-        )
-        .with_injected_guidance(begun.run.injected_guidance.clone());
-        let expected = serde_json::to_string_pretty(&pre_s40).expect("a Run is always serializable");
-        assert_eq!(manifest, expected, "s40 must not perturb the no-binding manifest by a single byte");
+    #[test]
+    fn declared_provider_model_and_skill_are_copied_verbatim() {
+        let tmp = repo_without_plan_sources();
+        let metadata = DispatchMetadata {
+            provider: Some("provider with spaces".into()),
+            model: Some("model/@declared".into()),
+            skill_id: Some("skill-id".into()),
+            skill_digest: Some("sha256:skill-digest".into()),
+        };
+        let begun = begin(tmp.path(), &role(), &regime(), "agent-provider-looking", &DispatchBinding::default(), &metadata)
+            .expect("declared metadata dispatches");
+        assert_eq!(begun.run.lineage.as_ref().unwrap().provider.as_deref(), Some("provider with spaces"));
+        assert_eq!(begun.run.lineage.as_ref().unwrap().model.as_deref(), Some("model/@declared"));
+        assert_eq!(
+            begun.run.lineage.as_ref().unwrap().skill,
+            Some(SkillSnapshot { id: "skill-id".into(), digest: Some("sha256:skill-digest".into()) })
+        );
+    }
+
+    #[test]
+    fn skill_digest_without_skill_id_is_rejected_before_writing() {
+        let tmp = repo_without_plan_sources();
+        let metadata = DispatchMetadata { skill_digest: Some("sha256:orphan".into()), ..DispatchMetadata::default() };
+        let error = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &metadata)
+            .expect_err("a digest without an id is invalid usage");
+        assert!(matches!(error, DispatchError::SkillDigestWithoutId));
+        assert!(error.is_usage());
+        assert!(!tmp.path().join(DISPATCH_DIR).exists(), "usage refusal must not mint or write");
+    }
+
+    #[test]
+    fn policy_digest_distinguishes_absence_from_raw_present_bytes() {
+        let tmp = repo_without_plan_sources();
+        let absent = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default())
+            .expect("dispatch without policy succeeds");
+        let absent_digest = absent.run.lineage.as_ref().unwrap().policy.as_ref().unwrap().digest.clone();
+        std::fs::create_dir_all(tmp.path().join(".canon")).unwrap();
+        let raw_policy = b"trust_required:\n  p1: human\n";
+        std::fs::write(tmp.path().join(".canon/policy.yaml"), raw_policy).unwrap();
+        let present = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default())
+            .expect("dispatch with policy succeeds");
+        let present_digest = present.run.lineage.as_ref().unwrap().policy.as_ref().unwrap().digest.clone();
+        assert_eq!(present_digest, sha256_digest(raw_policy));
+        assert_ne!(absent_digest, present_digest);
+        assert!(absent_digest.starts_with("sha256:"));
     }
 
     /// Task 1.3's round-trip half. The parent is a freshly minted
@@ -2230,7 +2336,7 @@ mod begin_tests {
         let parent = RunId::new();
 
         let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: Some(parent) };
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding).expect("a task that exists in the corpus dispatches");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect("a task that exists in the corpus dispatches");
 
         let manifest = std::fs::read_to_string(&begun.manifest_path).expect("the manifest was written");
         let round_tripped: Run = serde_json::from_str(&manifest).expect("the manifest deserializes as a Run");
@@ -2248,7 +2354,7 @@ mod begin_tests {
         let tmp = repo_with_plan_corpus();
         let task_id = TaskId::parse("demo-change#1.2").expect("a literal task id");
         let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None };
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding).expect("an already-done task is still a real task");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect("an already-done task is still a real task");
         assert_eq!(begun.run.task_id, Some(task_id));
     }
 
@@ -2262,7 +2368,7 @@ mod begin_tests {
         let before = std::fs::read_to_string(&tasks_md).expect("the fixture tasks.md");
 
         let binding = DispatchBinding { task_id: Some(TaskId::parse("demo-change#1.1").expect("a literal task id")), parent_run_id: None };
-        begin(tmp.path(), &role(), &regime(), "canon", &binding).expect("the dispatch succeeds");
+        begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect("the dispatch succeeds");
 
         assert_eq!(std::fs::read_to_string(&tasks_md).expect("tasks.md still readable"), before, "resolving a task must leave the document byte-identical");
     }
@@ -2273,7 +2379,7 @@ mod begin_tests {
     fn an_unknown_row_fails_loud_naming_the_id_and_persists_no_manifest() {
         let tmp = repo_with_plan_corpus();
         let binding = DispatchBinding { task_id: Some(TaskId::parse("demo-change#9.9").expect("a literal task id")), parent_run_id: None };
-        let err = begin(tmp.path(), &role(), &regime(), "canon", &binding).expect_err("a row that is not in the document must be rejected");
+        let err = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect_err("a row that is not in the document must be rejected");
 
         assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
         assert!(err.to_string().contains("demo-change#9.9"), "the message must name the rejected id: {err}");
@@ -2287,7 +2393,7 @@ mod begin_tests {
     fn a_change_no_source_carries_fails_loud_naming_the_sources_consulted() {
         let tmp = repo_with_plan_corpus();
         let binding = DispatchBinding { task_id: Some(TaskId::parse("no-such-change#1.1").expect("a literal task id")), parent_run_id: None };
-        let err = begin(tmp.path(), &role(), &regime(), "canon", &binding).expect_err("an unknown change must be rejected");
+        let err = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect_err("an unknown change must be rejected");
 
         assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
         let message = err.to_string();
@@ -2301,7 +2407,7 @@ mod begin_tests {
     fn a_repo_with_no_plan_sources_reports_distinctly_from_an_unknown_task() {
         let tmp = repo_without_plan_sources();
         let binding = DispatchBinding { task_id: Some(TaskId::parse("demo-change#1.1").expect("a literal task id")), parent_run_id: None };
-        let err = begin(tmp.path(), &role(), &regime(), "canon", &binding).expect_err("--task against no corpus must be rejected");
+        let err = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect_err("--task against no corpus must be rejected");
 
         assert!(matches!(err, DispatchError::NoPlanSources { .. }), "expected NoPlanSources, got {err:?}");
         let message = err.to_string();
@@ -2322,7 +2428,7 @@ mod begin_tests {
     fn a_nonexistent_superpowers_row_is_rejected_even_though_its_change_doc_exists() {
         let tmp = repo_with_superpowers_corpus();
         let binding = DispatchBinding { task_id: Some(TaskId::parse("sp-plan#9").expect("a literal task id")), parent_run_id: None };
-        let err = begin(tmp.path(), &role(), &regime(), "canon", &binding)
+        let err = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default())
             .expect_err("a section the plan doc does not have is not a bindable task");
 
         assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
@@ -2341,7 +2447,7 @@ mod begin_tests {
         let tmp = repo_with_superpowers_corpus();
         let task_id = TaskId::parse("sp-plan#1").expect("a literal task id");
         let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None };
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding).expect("a section the plan doc DOES have is bindable");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect("a section the plan doc DOES have is bindable");
         assert_eq!(begun.run.task_id, Some(task_id));
     }
 
@@ -2397,7 +2503,7 @@ mod begin_tests {
 
         let binding = DispatchBinding { task_id: Some(refused), parent_run_id: None };
         let err =
-            begin(tmp.path(), &role(), &regime(), "canon", &binding).expect_err("a row no import pass would persist is not bindable");
+            begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect_err("a row no import pass would persist is not bindable");
         assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
         let message = err.to_string();
         assert!(message.contains("shared-change#2.1"), "the message must name the rejected id: {message}");
@@ -2417,7 +2523,7 @@ mod begin_tests {
         let task_id = TaskId::parse("shared-change#1.1").expect("a literal task id");
         let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None };
         let begun =
-            begin(tmp.path(), &role(), &regime(), "canon", &binding).expect("the row an import pass DOES persist is bindable");
+            begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect("the row an import pass DOES persist is bindable");
         assert_eq!(begun.run.task_id, Some(task_id));
     }
 
@@ -2429,7 +2535,7 @@ mod begin_tests {
     fn a_row_no_source_carries_names_every_source_consulted_across_a_duplicate() {
         let tmp = repo_with_a_duplicated_change_id();
         let missing = DispatchBinding { task_id: Some(TaskId::parse("shared-change#9.9").expect("a literal task id")), parent_run_id: None };
-        let err = begin(tmp.path(), &role(), &regime(), "canon", &missing).expect_err("a row no source carries must be rejected");
+        let err = begin(tmp.path(), &role(), &regime(), "canon", &missing, &DispatchMetadata::default()).expect_err("a row no source carries must be rejected");
         let message = err.to_string();
         for root in ["first", "second"] {
             let consulted = format!("openspec @ {}", tmp.path().join(root).display());
@@ -2438,9 +2544,27 @@ mod begin_tests {
     }
 
     #[test]
+    fn ending_a_run_preserves_lineage_bytes() {
+        let tmp = repo_without_plan_sources();
+        let metadata = DispatchMetadata {
+            provider: Some("provider".into()),
+            model: Some("model".into()),
+            skill_id: Some("skill".into()),
+            skill_digest: Some("sha256:skill".into()),
+        };
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &metadata).expect("the dispatch begins");
+        let lineage_before = serde_json::to_vec(begun.run.lineage.as_ref().unwrap()).unwrap();
+        let ended = end(tmp.path(), begun.run_id, RunStatus::Succeeded).expect("the run closes");
+        let lineage_after = serde_json::to_vec(ended.run.lineage.as_ref().unwrap()).unwrap();
+        assert_eq!(lineage_after, lineage_before, "dispatch end must only change lifecycle fields");
+        let round_tripped: Run = serde_json::from_str(&std::fs::read_to_string(&ended.manifest_path).unwrap()).unwrap();
+        assert_eq!(round_tripped.lineage, ended.run.lineage);
+    }
+
+    #[test]
     fn beginning_then_ending_lands_a_terminal_status_and_an_ended_at() {
         let tmp = repo_without_plan_sources();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
         assert_eq!(begun.run.status, RunStatus::Running, "begin mints a Running run");
         assert!(begun.run.ended_at.is_none(), "a begun run is not closed");
 
@@ -2474,7 +2598,7 @@ mod begin_tests {
     #[test]
     fn ending_an_already_ended_run_fails_loud_and_preserves_the_first_close() {
         let tmp = repo_without_plan_sources();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
         let first = end(tmp.path(), begun.run_id, RunStatus::Succeeded).expect("the first close succeeds");
 
         let err = end(tmp.path(), begun.run_id, RunStatus::Failed).expect_err("a second close must be rejected");
@@ -2504,7 +2628,7 @@ mod begin_tests {
     #[test]
     fn a_close_already_in_flight_blocks_a_second_end_instead_of_overwriting_it() {
         let tmp = repo_without_plan_sources();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
         let before = std::fs::read(&begun.manifest_path).expect("the begun manifest");
 
         // Stand in for the other process: it holds the sidecar across
@@ -2531,7 +2655,7 @@ mod begin_tests {
     #[test]
     fn a_rejected_close_still_releases_the_lock() {
         let tmp = repo_without_plan_sources();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
         end(tmp.path(), begun.run_id, RunStatus::Succeeded).expect("the first close succeeds");
 
         end(tmp.path(), begun.run_id, RunStatus::Failed).expect_err("the second close is rejected");
@@ -2547,7 +2671,7 @@ mod begin_tests {
     #[test]
     fn a_terminal_status_with_no_ended_at_is_not_a_closeable_run() {
         let tmp = repo_without_plan_sources();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
         // A hand edit / partial restore: terminal status, no timestamp.
         let mut inconsistent = begun.run.clone();
         inconsistent.status = RunStatus::Succeeded;
@@ -2568,7 +2692,7 @@ mod begin_tests {
     #[test]
     fn a_pending_run_is_not_a_closeable_run() {
         let tmp = repo_without_plan_sources();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
         let mut pending = begun.run.clone();
         pending.status = RunStatus::Pending;
         std::fs::write(&begun.manifest_path, serde_json::to_string_pretty(&pending).expect("serializable")).expect("write");
@@ -2584,7 +2708,7 @@ mod begin_tests {
     #[test]
     fn a_manifest_filed_under_another_run_id_is_not_closeable() {
         let tmp = repo_without_plan_sources();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
         let mut impostor = begun.run.clone();
         impostor.run_id = RunId::new();
         let body = serde_json::to_string_pretty(&impostor).expect("a Run is always serializable");
@@ -2725,7 +2849,7 @@ mod tier_tests {
     #[test]
     fn a_dispatch_lands_in_both_the_manifest_and_the_routed_tier() {
         let tmp = repo_with_git_routed_runs();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None)).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None), &DispatchMetadata::default()).expect("the dispatch begins");
 
         assert_eq!(begun.tier, TierPersist::Persisted, "a routed, reachable rung must actually take the record");
         assert!(begun.manifest_path.is_file(), "the manifest is still written, tier or no tier");
@@ -2745,7 +2869,7 @@ mod tier_tests {
     fn a_dead_hot_rung_leaves_a_manifest_only_dispatch_that_still_succeeds() {
         let tmp = repo_with_a_dead_hot_rung();
         let begun =
-            begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("a dead hot rung must never fail a dispatch");
+            begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("a dead hot rung must never fail a dispatch");
 
         let reason = match &begun.tier {
             TierPersist::Degraded { reason } => reason.clone(),
@@ -2769,12 +2893,12 @@ mod tier_tests {
     fn an_unrouted_run_kind_degrades_with_its_own_distinct_reason() {
         let unrouted = repo_with_run_unrouted();
         let begun =
-            begin(unrouted.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("an unrouted kind must not fail a dispatch");
+            begin(unrouted.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("an unrouted kind must not fail a dispatch");
         let unrouted_reason = begun.tier.degrade_reason().expect("an unrouted kind cannot have persisted").to_string();
         assert!(unrouted_reason.contains("routing"), "the reason must point at the missing routing entry: {unrouted_reason}");
 
         let dead = repo_with_a_dead_hot_rung();
-        let dead_reason = begin(dead.path(), &role(), &regime(), "canon", &DispatchBinding::default())
+        let dead_reason = begin(dead.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default())
             .expect("a dead rung must not fail a dispatch")
             .tier
             .degrade_reason()
@@ -2793,7 +2917,7 @@ mod tier_tests {
     #[test]
     fn closing_a_run_leaves_exactly_one_row_at_that_run_id() {
         let tmp = repo_with_git_routed_runs();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None)).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None), &DispatchMetadata::default()).expect("the dispatch begins");
         assert_eq!(begun.tier, TierPersist::Persisted);
 
         let ended = end(tmp.path(), begun.run_id, RunStatus::Succeeded).expect("a running run closes");
@@ -2819,7 +2943,7 @@ mod tier_tests {
     #[test]
     fn a_close_advances_the_record_version_timestamp_but_never_started_at() {
         let tmp = repo_with_git_routed_runs();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
         let ended = end(tmp.path(), begun.run_id, RunStatus::Succeeded).expect("a running run closes");
 
         let ended_at = ended.run.ended_at.expect("end always stamps ended_at");
@@ -2857,7 +2981,7 @@ mod tier_tests {
     #[test]
     fn a_close_out_ranks_a_future_dated_running_version() {
         let tmp = repo_with_git_routed_runs();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default()).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
 
         // The running version as a clock 30 days fast would have left
         // it — in BOTH homes, since that is the state a real
@@ -2996,8 +3120,8 @@ mod tier_tests {
     #[test]
     fn a_dispatched_run_is_counted_once_across_tier_and_side_channel() {
         let tmp = repo_with_git_routed_runs();
-        let parent = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None)).expect("the parent dispatch begins");
-        let child = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.2", Some(parent.run_id)))
+        let parent = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None), &DispatchMetadata::default()).expect("the parent dispatch begins");
+        let child = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.2", Some(parent.run_id)), &DispatchMetadata::default())
             .expect("the child dispatch begins");
         assert_eq!(parent.tier, TierPersist::Persisted);
         assert_eq!(child.tier, TierPersist::Persisted);
@@ -3025,7 +3149,7 @@ mod tier_tests {
     #[test]
     fn a_stale_tier_copy_of_a_closed_run_surfaces_as_a_divergence_note() {
         let tmp = repo_with_git_routed_runs();
-        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None)).expect("the dispatch begins");
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding_to("demo-change#1.1", None), &DispatchMetadata::default()).expect("the dispatch begins");
         assert_eq!(begun.tier, TierPersist::Persisted);
 
         let closed_at = Utc::now();

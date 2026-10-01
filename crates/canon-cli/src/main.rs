@@ -339,7 +339,7 @@ enum DemoCommand {
 
 #[derive(Subcommand)]
 enum DispatchCommand {
-    /// Mint a Run manifest with retrieved guidance recorded into it
+    /// Mint a Run manifest with retrieved guidance and context/policy lineage
     Begin {
         /// Role about to run; must equal --regime's leading segment
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
@@ -350,6 +350,18 @@ enum DispatchCommand {
         /// The dispatching agent's id (recorded as the run's actor)
         #[arg(long, default_value = "canon")]
         agent_id: String,
+        /// Declared provider metadata (copied verbatim; never inferred from --agent-id)
+        #[arg(long)]
+        provider: Option<String>,
+        /// Declared model metadata (copied verbatim)
+        #[arg(long)]
+        model: Option<String>,
+        /// Skill that contributed to this run
+        #[arg(long)]
+        skill_id: Option<String>,
+        /// Declared skill digest; requires --skill-id
+        #[arg(long)]
+        skill_digest: Option<String>,
         /// Plan task this run serves (<change_id>#<n>); validated against the plan corpus
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
         task: Option<TaskId>,
@@ -1090,9 +1102,10 @@ fn main() -> ExitCode {
             LearnCommand::Promote { strategy_id, repo, dry_run } => canon_cli::learn::run_promote(&repo, &strategy_id, dry_run),
         },
         Command::Dispatch { action } => match action {
-            DispatchCommand::Begin { role, regime, agent_id, task, parent_run, repo, json } => {
+            DispatchCommand::Begin { role, regime, agent_id, provider, model, skill_id, skill_digest, task, parent_run, repo, json } => {
                 let binding = canon_cli::dispatch::DispatchBinding { task_id: task, parent_run_id: parent_run };
-                canon_cli::dispatch::run_begin(&repo, &role, &regime, &agent_id, &binding, json)
+                let metadata = canon_cli::dispatch::DispatchMetadata { provider, model, skill_id, skill_digest };
+                canon_cli::dispatch::run_begin(&repo, &role, &regime, &agent_id, &binding, &metadata, json)
             }
             DispatchCommand::End { run, status, repo, json } => canon_cli::dispatch::run_end(&repo, run, status, json),
             DispatchCommand::Diff { repo, json } => canon_cli::dispatch::run_diff(&repo, json),

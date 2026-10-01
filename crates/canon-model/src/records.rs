@@ -465,6 +465,47 @@ impl StrategyRef {
     }
 }
 
+/// A snapshot of the skill that contributed to a run. This is nested
+/// provenance metadata, not a `CanonRecord` or a new join-spine key.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SkillSnapshot {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+}
+
+/// A snapshot of the context used to derive a run. This is nested
+/// provenance metadata, not a `CanonRecord` or a new join-spine key.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ContextSnapshot {
+    pub digest: String,
+    pub capability_version: u32,
+}
+
+/// A snapshot of the policy used to derive a run. This is nested
+/// provenance metadata, not a `CanonRecord` or a new join-spine key.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct PolicySnapshot {
+    pub digest: String,
+}
+
+/// Additive provenance metadata captured for a [`Run`]. Every nested
+/// snapshot is copied by value so replay can identify the exact provider,
+/// model, skill, context, and policy inputs used for dispatch.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct RunLineage {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill: Option<SkillSnapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<ContextSnapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy: Option<PolicySnapshot>,
+}
+
 /// A run (join-spine `run_id` row: run ↔ events ↔ manifest).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Run {
@@ -491,6 +532,11 @@ pub struct Run {
     /// overwhelmingly common) single-agent, no-parent case.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_run_id: Option<RunId>,
+    /// Provider/model and input snapshots captured at dispatch time.
+    /// Like the other additive run metadata, absent lineage is omitted
+    /// from serialization so pre-lineage run bytes remain unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lineage: Option<RunLineage>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<SessionId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -529,7 +575,18 @@ impl Run {
         ended_at: Option<DateTime<Utc>>,
     ) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Run);
-        Self { envelope, run_id, parent_run_id: None, session_id, task_id, status, started_at, ended_at, injected_guidance: Vec::new() }
+        Self {
+            envelope,
+            run_id,
+            parent_run_id: None,
+            lineage: None,
+            session_id,
+            task_id,
+            status,
+            started_at,
+            ended_at,
+            injected_guidance: Vec::new(),
+        }
     }
 
     /// Records S8's retrieved guidance into this run's manifest (design
@@ -552,6 +609,14 @@ impl Run {
     /// rather than merging.
     pub fn with_parent_run_id(mut self, parent_run_id: RunId) -> Self {
         self.parent_run_id = Some(parent_run_id);
+        self
+    }
+
+    /// Records the provider/model and input snapshots used to derive this
+    /// run. A second call replaces the snapshot, matching the other
+    /// dispatch-time `Run` builders.
+    pub fn with_lineage(mut self, lineage: RunLineage) -> Self {
+        self.lineage = Some(lineage);
         self
     }
 }
@@ -1764,6 +1829,27 @@ mod tests {
         Run::new(envelope(RecordKind::Run), RunId::new(), None, None, RunStatus::Succeeded, Utc::now(), Some(Utc::now())).with_parent_run_id(RunId::new())
     );
 
+    round_trip_test!(
+        run_with_lineage_round_trips,
+        Run::new(envelope(RecordKind::Run), RunId::new(), None, None, RunStatus::Succeeded, Utc::now(), Some(Utc::now())).with_lineage(
+            RunLineage {
+                provider: Some("omp".into()),
+                model: Some("gpt-6.1-sol".into()),
+                skill: Some(SkillSnapshot {
+                    id: "canon-subject".into(),
+                    digest: Some("sha256:skill".into()),
+                }),
+                context: Some(ContextSnapshot {
+                    digest: "sha256:context".into(),
+                    capability_version: 3,
+                }),
+                policy: Some(PolicySnapshot {
+                    digest: "sha256:policy".into(),
+                }),
+            },
+        )
+    );
+
     /// S7-era `Run`/manifest JSON — the exact shape `Run::new` produced
     /// before this change added `injected_guidance` — has no
     /// `injected_guidance` key at all. Backward compat: it must still
@@ -1794,6 +1880,7 @@ mod tests {
 
         let run: Run = serde_json::from_value(pre_s8_json.clone()).expect("a pre-S8 manifest with no injected_guidance key must still deserialize");
         assert!(run.injected_guidance.is_empty());
+        assert!(run.lineage.is_none());
 
         let reserialized = serde_json::to_value(&run).unwrap();
         assert_eq!(reserialized, pre_s8_json, "empty injected_guidance must not introduce a spurious key on reserialize");

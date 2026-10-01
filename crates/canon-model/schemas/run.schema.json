@@ -28,6 +28,17 @@
     "kind": {
       "$ref": "#/$defs/RecordKind"
     },
+    "lineage": {
+      "description": "Provider/model and input snapshots captured at dispatch time.\nLike the other additive run metadata, absent lineage is omitted\nfrom serialization so pre-lineage run bytes remain unchanged.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RunLineage"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "parent_run_id": {
       "description": "The run that DISPATCHED this run — a subagent run's parent,\n`None` for a root run. canon's ONLY representation of agent\nexecution topology: without it a session's runs are a flat bag\nand a dispatch tree (main agent -> N subagents -> their own\nsubagents) is unrecoverable after ingest, which is exactly what\nthe plan-vs-actual graph diff needs to compare a declared\n[`Task::depends_on`] plan against what actually ran.\n\nA pointer along the SAME join-spine `run_id` key this record is\nalready keyed by — deliberately not a new join key, so\n`run <-> events <-> manifest` stays the one run-scoped spine.\n`#[serde(default, skip_serializing_if = \"Option::is_none\")]`\ncarries the same backward/forward-compat discipline\n[`Run::injected_guidance`] establishes: a pre-existing manifest\nwith no `parent_run_id` key deserializes to `None`, AND a root\nrun reserializes WITHOUT the key at all — so adding execution\nlineage never perturbs the on-disk shape of the (still\noverwhelmingly common) single-agent, no-parent case.",
       "anyOf": [
@@ -124,6 +135,36 @@
         "agent_id"
       ]
     },
+    "ContextSnapshot": {
+      "description": "A snapshot of the context used to derive a run. This is nested\nprovenance metadata, not a `CanonRecord` or a new join-spine key.",
+      "type": "object",
+      "properties": {
+        "capability_version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "digest",
+        "capability_version"
+      ]
+    },
+    "PolicySnapshot": {
+      "description": "A snapshot of the policy used to derive a run. This is nested\nprovenance metadata, not a `CanonRecord` or a new join-spine key.",
+      "type": "object",
+      "properties": {
+        "digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "digest"
+      ]
+    },
     "RecordKind": {
       "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
       "type": "string",
@@ -153,6 +194,54 @@
       "type": "string",
       "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
     },
+    "RunLineage": {
+      "description": "Additive provenance metadata captured for a [`Run`]. Every nested\nsnapshot is copied by value so replay can identify the exact provider,\nmodel, skill, context, and policy inputs used for dispatch.",
+      "type": "object",
+      "properties": {
+        "context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContextSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PolicySnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "skill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SkillSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
     "RunStatus": {
       "description": "A run's lifecycle state.",
       "type": "string",
@@ -167,6 +256,24 @@
     "SessionId": {
       "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
       "type": "string"
+    },
+    "SkillSnapshot": {
+      "description": "A snapshot of the skill that contributed to a run. This is nested\nprovenance metadata, not a `CanonRecord` or a new join-spine key.",
+      "type": "object",
+      "properties": {
+        "digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
     },
     "StrategyRef": {
       "description": "A full content SNAPSHOT of one retrieved strategy (S8 design D2),\nnever a live pointer: `strategy_id` names its source\n`canon-learn::StrategyItem` for provenance only — `title`/`content`\nare copied by value at the moment they were shown to an agent, so a\nlater edit or demotion of the source strategy can never retroactively\nchange what a [`Run`]'s [`Run::injected_guidance`] already recorded\n(the \"replay reproduces byte-identical run inputs\" guarantee this\ntype exists to make possible). Deliberately NOT a `CanonRecord`\nitself — it only ever lives nested inside [`Run::injected_guidance`],\nmirroring how [`crate::envelope::Actor`] composes into [`Envelope`]\nwithout being one of the twelve closed record kinds itself.",
