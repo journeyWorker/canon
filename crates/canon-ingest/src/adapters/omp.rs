@@ -94,6 +94,7 @@ const PRE_SESSION_METADATA_TYPES: &[&str] = &["title"];
 struct PiSessionEntry {
     #[serde(rename = "type")]
     entry_type: String,
+    id: Option<String>,
     timestamp: Option<String>,
     message: Option<PiMessage>,
 }
@@ -107,6 +108,9 @@ struct PiMessage {
     usage: Option<PiUsage>,
     model: Option<String>,
     provider: Option<String>,
+    /// Stable provider response identity used to collapse copied fork rows.
+    #[serde(rename = "responseId")]
+    response_id: Option<String>,
     /// A plain string, or an array of typed content blocks — see the
     /// module doc's D4 paragraph and [`flatten_pi_content`].
     content: Option<Value>,
@@ -127,23 +131,11 @@ impl SessionAdapter for OmpAdapter {
         "omp"
     }
 
-    /// `1` — this adapter's OUTPUT is unchanged since it shipped, so
-    /// `1` is the value that re-reads nothing: every session cursor
-    /// already on disk was computed against exactly this parse output.
-    /// s37 (`execution-graph-topology`) touched this file but did not
-    /// change that: it added `agent_id`/`parent_agent_id` as a constant
-    /// `None` (omp/pi carries no agent-delegation edge — see
-    /// `PiSessionEntry`'s doc), and a `skip_serializing_if`-elided
-    /// `None` is indistinguishable from the field's absence to every
-    /// downstream consumer, so an unchanged transcript still normalizes
-    /// to byte-identical records. Contrast `claude-code`, whose s37
-    /// change DID populate them and which is therefore at `2`. Bump
-    /// this the moment a change in this file alters what an UNCHANGED
-    /// transcript normalizes to (a newly POPULATED field, a changed
-    /// header probe, a different usage gate) — see
-    /// [`SessionAdapter::parse_version`].
+    /// `2` — assistant rows now carry a stable source-level dedup key.
+    /// This changes normalized output for unchanged transcripts: copied
+    /// `.omp`/`.pi` fork files collapse before session grouping.
     fn parse_version(&self) -> u32 {
-        1
+        2
     }
 
     fn scan_roots(&self, home: &Path, use_env_roots: bool) -> Vec<PathBuf> {
@@ -319,6 +311,14 @@ fn parse_pi_file(path: &Path) -> ParseOutcome {
         // model name (falling back to "pi") rather than dropping a
         // row that carries valid tokens. Ported from `pi.rs:160-168`.
         let provider = message.provider.unwrap_or_else(|| inferred_provider_from_model(&model).unwrap_or("pi").to_string());
+        let dedup_key = pi_assistant_dedup_key(
+            entry.id.as_deref(),
+            message.response_id.as_deref(),
+            entry.timestamp.as_deref(),
+            &provider,
+            &model,
+            &usage,
+        );
 
         rows.push(UnifiedRow {
             client: "omp".to_string(),
@@ -339,7 +339,7 @@ fn parse_pi_file(path: &Path) -> ParseOutcome {
             cost: 0.0,
             cost_source: CostSource::Unknown,
             duration_ms: None,
-            dedup_key: None,
+            dedup_key,
             // pi.rs never computes a turn boundary either (no setter
             // call anywhere in the donor) — ported behavior, not an
             // omission; a future enhancement, not invented here.
@@ -349,10 +349,30 @@ fn parse_pi_file(path: &Path) -> ParseOutcome {
             // one.
             agent_id: None,
             parent_agent_id: None,
+
         });
     }
 
     ParseOutcome::with_directives(rows, skipped, directives)
+}
+/// Build a stable identity for an assistant response without using the
+/// filename or session id. A response id is the source's strongest identity;
+/// older producers omit it, so the fallback requires an entry id and all
+/// immutable response fields to avoid collapsing distinct messages.
+fn pi_assistant_dedup_key(
+    entry_id: Option<&str>,
+    response_id: Option<&str>,
+    timestamp: Option<&str>,
+    provider: &str,
+    model: &str,
+    usage: &PiUsage,
+) -> Option<String> {
+    if let Some(response_id) = response_id.filter(|id| !id.is_empty()) {
+        return Some(format!("omp:response:{response_id}"));
+    }
+    let entry_id = entry_id.filter(|id| !id.is_empty())?;
+    let identity = serde_json::to_string(&(entry_id, timestamp, provider, model, usage.input, usage.output, usage.cache_read, usage.cache_write)).ok()?;
+    Some(format!("omp:entry:{identity}"))
 }
 
 /// Flatten a pi/omp `user` message's `content` field into a verbatim
@@ -658,5 +678,45 @@ not valid json
         assert_eq!(flatten_pi_content(Some(&serde_json::json!([{"type": "tool_use", "name": "read"}]))), None, "an all-non-text block array yields no directive");
         assert_eq!(flatten_pi_content(None), None);
         assert_eq!(flatten_pi_content(Some(&serde_json::json!(""))), None, "an empty string yields no directive");
+    }
+    #[test]
+    fn copied_fork_files_with_response_id_collapse_before_session_grouping() {
+        let first = write_fixture(
+            r#"{"type":"session","id":"pi_parent","cwd":"/tmp"}
+{"type":"message","id":"entry_parent","timestamp":"2026-01-01T00:00:01.000Z","message":{"role":"assistant","responseId":"resp_shared","model":"gpt-4o-mini","provider":"openai","usage":{"input":10,"output":5}}}"#,
+        );
+        let fork = write_fixture(
+            r#"{"type":"session","id":"pi_fork","cwd":"/tmp"}
+{"type":"message","id":"entry_fork","timestamp":"2026-01-01T00:00:01.000Z","message":{"role":"assistant","responseId":"resp_shared","model":"gpt-4o-mini","provider":"openai","usage":{"input":10,"output":5}}}"#,
+        );
+        let first = parse_pi_file(first.path());
+        let fork = parse_pi_file(fork.path());
+        assert_eq!(first.rows[0].dedup_key, fork.rows[0].dedup_key);
+
+        let rows = [first.rows, fork.rows].concat();
+        let normalized = crate::normalize::normalize_rows(&rows);
+        assert_eq!(normalized.sessions.len(), 1, "dedup must happen before session grouping");
+        assert_eq!(normalized.sessions[0].events.len(), 1, "the copied response must emit one token row");
+    }
+
+    #[test]
+    fn distinct_fallback_entry_ids_remain_two_messages() {
+        let file = write_fixture(
+            r#"{"type":"session","id":"pi_distinct","cwd":"/tmp"}
+{"type":"message","id":"entry_one","timestamp":"2026-01-01T00:00:01.000Z","message":{"role":"assistant","model":"gpt-4o-mini","provider":"openai","usage":{"input":10,"output":5}}}
+{"type":"message","id":"entry_two","timestamp":"2026-01-01T00:00:01.000Z","message":{"role":"assistant","model":"gpt-4o-mini","provider":"openai","usage":{"input":10,"output":5}}}"#,
+        );
+        let outcome = parse_pi_file(file.path());
+        assert_eq!(outcome.rows.len(), 2);
+        assert_ne!(outcome.rows[0].dedup_key, outcome.rows[1].dedup_key);
+
+        let normalized = crate::normalize::normalize_rows(&outcome.rows);
+        assert_eq!(normalized.sessions.len(), 1);
+        assert_eq!(normalized.sessions[0].events.len(), 2);
+    }
+
+    #[test]
+    fn omp_parse_version_tracks_response_dedup_output() {
+        assert_eq!(OmpAdapter.parse_version(), 2);
     }
 }

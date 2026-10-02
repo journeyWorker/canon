@@ -188,11 +188,13 @@ mod tests {
     /// while its assertion still passed.
     ///
     /// `claude-code` is at `3`: nested Claude cache-creation accounting
-    /// changes normalized output for identical transcript bytes. The other
-    /// adapters remain at `1`; their new bucket is always zero.
+    /// changes normalized output for identical transcript bytes.
+    /// `codex` is at `2`: reasoning is split out of output while
+    /// preserving producer totals, changing normalized output for
+    /// identical rollout bytes. OMP and Hermes remain at `1`.
     #[test]
     fn every_shipped_adapters_parse_generation_matches_its_declared_value() {
-        let declared: &[(&str, u32)] = &[("omp", 1), ("hermes", 1), ("claude-code", 3), ("codex", 1)];
+        let declared: &[(&str, u32)] = &[("omp", 2), ("hermes", 1), ("claude-code", 3), ("codex", 2)];
 
         for entry in registry() {
             let expected = declared.iter().find(|(id, _)| *id == entry.client_id()).map(|(_, version)| *version);

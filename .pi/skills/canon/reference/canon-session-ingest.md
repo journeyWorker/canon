@@ -119,11 +119,12 @@ the whole source back through parse/persist.
   cursor deletion. Version `1` IS the bare `client_id` (`omp.json`), so a
   cursor already on disk is never invalidated just by installing the
   mechanism; a bump appends the suffix (`claude-code-v3.json`) and that
-  adapter re-reads once. `omp`, `hermes`, and `codex` are at `1`;
-  `claude-code` is at `3`, because s37 changed its sidechain parse output
-  (it now carries `agent_id`/`parent_agent_id`) and cache-accounting parity
-  now recognizes nested cache-write buckets, so it re-reads once to backfill
-  both normalization changes that the old watermark would otherwise hide.
+  `omp` is at `2` because the logical adapter now deduplicates forks
+  across files; `hermes` remains at `1`; `codex` is at `2` because its
+  reasoning-token accounting is split; and `claude-code` is at `3` because
+  cache accounting now recognizes `cache_write_1h` buckets. Each changed
+  adapter re-reads once to backfill the normalization change that the old
+  watermark would otherwise hide.
 
 **`--full`** ignores the cursors and re-parses every present in-scope
 file (a full rescan / cursor reset) — safe because a byte-identical

@@ -210,12 +210,27 @@ impl CodexTotals {
     }
 
     fn into_tokens(self) -> TokenBreakdown {
+        // `output_tokens` includes the reasoning subset in Codex usage
+        // snapshots. Keep the producer's total invariant by moving that
+        // subset into the dedicated reasoning bucket rather than counting
+        // it twice. Malformed snapshots reporting more reasoning than
+        // output are conservatively clamped to the available output.
+        let clamped_reasoning = self.reasoning.min(self.output).max(0);
+        let billable_output = (self.output - clamped_reasoning).max(0);
         // Clamp cached to not exceed input to prevent inflated totals
         // when malformed data reports more cached tokens than input.
         let clamped_cached = self.cached.min(self.input).max(0);
-        TokenBreakdown { input: (self.input - clamped_cached).max(0), output: self.output.max(0), cache_read: clamped_cached, cache_write: 0, cache_write_1h: 0, reasoning: self.reasoning.max(0) }
+        TokenBreakdown {
+            input: (self.input - clamped_cached).max(0),
+            output: billable_output,
+            cache_read: clamped_cached,
+            cache_write: 0,
+            cache_write_1h: 0,
+            reasoning: clamped_reasoning,
+        }
     }
 }
+
 
 /// Ported from `codex.rs:178-219`, trimmed of `session_is_headless`/
 /// `session_agent` (see module doc) and the `#[serde(default)]`/
@@ -255,24 +270,15 @@ impl SessionAdapter for CodexAdapter {
         "codex"
     }
 
-    /// `1` — this adapter's OUTPUT is unchanged since it shipped, so
-    /// `1` is the value that re-reads nothing: every session cursor
-    /// already on disk was computed against exactly this parse output.
-    /// s37 (`execution-graph-topology`) touched this file but did not
-    /// change that: it added `agent_id`/`parent_agent_id` as a constant
-    /// `None`, because Codex's `session_forked_from_id` marks a FORK,
-    /// never a dispatch (see the two comment sites below), and a
-    /// `skip_serializing_if`-elided `None` is indistinguishable from the
-    /// field's absence to every downstream consumer — an unchanged
-    /// rollout still normalizes to byte-identical records. Contrast
-    /// `claude-code`, whose s37 change DID populate them and which is
-    /// therefore at `2`. Bump this the moment a change in this file
-    /// alters what an UNCHANGED rollout transcript normalizes to (a
-    /// newly POPULATED field, a changed cumulative-delta or
-    /// fork-detection rule, a different usage gate) — see
-    /// [`SessionAdapter::parse_version`].
+    /// `2` — reasoning tokens are a subset of Codex `output_tokens`, so
+    /// `into_tokens` subtracts reasoning from billable output while
+    /// retaining it in the dedicated reasoning bucket. This changes the
+    /// normalized output for unchanged transcripts (without changing the
+    /// producer-total interpretation), so existing cursors MUST reparse.
+    /// Bump this whenever a future change alters what an unchanged rollout
+    /// transcript normalizes to; see [`SessionAdapter::parse_version`].
     fn parse_version(&self) -> u32 {
-        1
+        2
     }
 
     /// Live+archived root union — ported from `scanner.rs:1101-1136`
@@ -972,6 +978,31 @@ mod tests {
         assert_eq!(rows[0].provider_id, "openai");
         assert_eq!(rows[0].workspace_key.as_deref(), Some("/repo/proj"));
     }
+    /// Codex reports `last_token_usage.output_tokens` including
+    /// `last_token_usage.reasoning_output_tokens`. The normalized buckets
+    /// must preserve the producer total rather than double-counting the
+    /// reasoning subset.
+    #[test]
+    fn reasoning_is_split_from_cumulative_last_usage_output() {
+        let content = concat!(
+            r#"{"timestamp":"2026-01-01T00:00:00Z","type":"session_meta","payload":{"source":"interactive","model_provider":"openai","cwd":"/repo/proj"}}"#,
+            "\n",
+            r#"{"timestamp":"2026-01-01T00:00:01Z","type":"turn_context","payload":{"model":"gpt-5.1"}}"#,
+            "\n",
+            r#"{"timestamp":"2026-01-01T00:00:02Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":30,"reasoning_output_tokens":10,"total_tokens":130},"last_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":12,"reasoning_output_tokens":5,"total_tokens":112}}}}"#,
+            "\n",
+            r#"{"timestamp":"2026-01-01T00:00:03Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":180,"cached_input_tokens":40,"output_tokens":55,"reasoning_output_tokens":18,"total_tokens":195},"last_token_usage":{"input_tokens":80,"cached_input_tokens":20,"output_tokens":25,"reasoning_output_tokens":8,"total_tokens":105}}}}"#,
+        );
+        let file = write_fixture(content);
+        let rows = parse_codex_file(file.path()).rows;
+
+        assert_eq!(rows.len(), 2);
+        assert_eq!((rows[0].tokens.input, rows[0].tokens.cache_read, rows[0].tokens.output, rows[0].tokens.reasoning), (80, 20, 7, 5));
+        assert_eq!((rows[1].tokens.input, rows[1].tokens.cache_read, rows[1].tokens.output, rows[1].tokens.reasoning), (60, 20, 17, 8));
+        assert_eq!(rows[0].tokens.total(), 112);
+        assert_eq!(rows[1].tokens.total(), 105);
+    }
+
 
     /// Forked-child replay is NOT double-counted: the child's own file
     /// opens with a session_meta declaring `forked_from_id`, then

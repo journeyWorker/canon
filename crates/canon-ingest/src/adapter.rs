@@ -83,9 +83,9 @@ pub struct UnifiedRow {
     pub cost_source: CostSource,
     pub duration_ms: Option<i64>,
     /// A per-adapter dedup identity for source-level reconciliation
-    /// (design D6) — `None` when the adapter's format has no
-    /// duplicate-write problem to guard against (e.g. omp/pi, which
-    /// writes each assistant turn exactly once).
+    /// (design D6). Rows sharing a key for the same client are collapsed
+    /// before session grouping; `None` means the source could not provide
+    /// a conservative stable identity.
     pub dedup_key: Option<String>,
     /// True when this row is the first assistant response after a
     /// user turn. `false` for adapters whose source format doesn't
