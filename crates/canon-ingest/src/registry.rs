@@ -187,21 +187,12 @@ mod tests {
     /// (`execution-graph-topology`) change the Claude adapter's output
     /// while its assertion still passed.
     ///
-    /// `claude-code` is at `2` because its sidechain parse now populates
-    /// `agent_id`/`parent_agent_id`, which `crate::normalize` turns into
-    /// child runs: an unchanged `.jsonl` normalizes to strictly more
-    /// records, so a stored unsuffixed `claude-code` cursor would report
-    /// every sidechain `unchanged` and the lineage would never backfill.
-    /// The other three gained the same two fields as a constant `None`
-    /// (elided by `skip_serializing_if`), so their output is
-    /// byte-identical and `1` — the value whose cursor id is the
-    /// unsuffixed `client_id` — is what re-reads nothing. Changing a
-    /// number here without changing this table is the mistake this test
-    /// exists to make loud; see [`SessionAdapter::parse_version`] and
-    /// `canon-cli`'s `ingest::session_source_cursor_id`.
+    /// `claude-code` is at `3`: nested Claude cache-creation accounting
+    /// changes normalized output for identical transcript bytes. The other
+    /// adapters remain at `1`; their new bucket is always zero.
     #[test]
     fn every_shipped_adapters_parse_generation_matches_its_declared_value() {
-        let declared: &[(&str, u32)] = &[("omp", 1), ("hermes", 1), ("claude-code", 2), ("codex", 1)];
+        let declared: &[(&str, u32)] = &[("omp", 1), ("hermes", 1), ("claude-code", 3), ("codex", 1)];
 
         for entry in registry() {
             let expected = declared.iter().find(|(id, _)| *id == entry.client_id()).map(|(_, version)| *version);

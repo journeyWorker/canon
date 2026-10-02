@@ -333,6 +333,7 @@ fn parse_pi_file(path: &Path) -> ParseOutcome {
                 output: usage.output.unwrap_or(0).max(0),
                 cache_read: usage.cache_read.unwrap_or(0).max(0),
                 cache_write: usage.cache_write.unwrap_or(0).max(0),
+                cache_write_1h: 0,
                 reasoning: 0,
             },
             cost: 0.0,

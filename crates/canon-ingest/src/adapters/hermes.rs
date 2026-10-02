@@ -284,6 +284,7 @@ pub fn parse_hermes_sqlite(db_path: &Path) -> ParseOutcome {
                         output: output.max(0),
                         cache_read: cache_read.max(0),
                         cache_write: cache_write.max(0),
+                        cache_write_1h: 0,
                         reasoning: reasoning.max(0),
                     },
                     cost,

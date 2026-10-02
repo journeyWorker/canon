@@ -213,7 +213,7 @@ impl CodexTotals {
         // Clamp cached to not exceed input to prevent inflated totals
         // when malformed data reports more cached tokens than input.
         let clamped_cached = self.cached.min(self.input).max(0);
-        TokenBreakdown { input: (self.input - clamped_cached).max(0), output: self.output.max(0), cache_read: clamped_cached, cache_write: 0, reasoning: self.reasoning.max(0) }
+        TokenBreakdown { input: (self.input - clamped_cached).max(0), output: self.output.max(0), cache_read: clamped_cached, cache_write: 0, cache_write_1h: 0, reasoning: self.reasoning.max(0) }
     }
 }
 

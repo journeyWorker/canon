@@ -78,6 +78,25 @@ fails soft to the repo root alone.
 - The run summary's first line always names the active scope:
   `scope: project /repo/root (2 roots)` or `scope: all workspaces`.
 
+### Provenance, digests, and parser generations
+
+The parser semantics are compared against Tokscale upstream at
+https://github.com/junhoyeo/tokscale (revision
+`fe72e1f9b5a2b1a927108b353a9730a5c631a196`); the cache-accounting comparison
+reference is commit
+[`2cd6c648df026fb43d37e492efa9c344e2d681ee`](https://github.com/junhoyeo/tokscale/commit/2cd6c648df026fb43d37e492efa9c344e2d681ee).
+Canon ports the selected parser semantics, including Claude's nested
+cache-write buckets, but does **not** vendor Tokscale's pricing or cache
+service.
+
+Three identities are intentionally distinct:
+
+* the raw file SHA-256 watermark identifies unchanged transcript bytes;
+* the normalized content digest is canonical JSON over the complete
+  normalized event and changes when normalized token detail changes; and
+* the parse-generation cursor identity combines adapter id and parse version,
+  forcing a re-read when parser semantics change even if raw bytes do not.
+
 ## The watermark — per-file, incremental `--watch`
 
 Each pass content-digests every present (post-pruning) file and diffs it
@@ -99,12 +118,12 @@ the whole source back through parse/persist.
   transcripts instead of reporting them unchanged — no `--full`, no
   cursor deletion. Version `1` IS the bare `client_id` (`omp.json`), so a
   cursor already on disk is never invalidated just by installing the
-  mechanism; a bump appends the suffix (`claude-code-v2.json`) and that
+  mechanism; a bump appends the suffix (`claude-code-v3.json`) and that
   adapter re-reads once. `omp`, `hermes`, and `codex` are at `1`;
-  `claude-code` is at `2`, because s37 changed its sidechain parse output
-  (it now carries `agent_id`/`parent_agent_id`, which is what mints child
-  runs), so it re-reads once to backfill execution lineage that the old
-  watermark would otherwise hide forever.
+  `claude-code` is at `3`, because s37 changed its sidechain parse output
+  (it now carries `agent_id`/`parent_agent_id`) and cache-accounting parity
+  now recognizes nested cache-write buckets, so it re-reads once to backfill
+  both normalization changes that the old watermark would otherwise hide.
 
 **`--full`** ignores the cursors and re-parses every present in-scope
 file (a full rescan / cursor reset) — safe because a byte-identical

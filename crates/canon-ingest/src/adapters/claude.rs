@@ -152,13 +152,32 @@ struct ClaudeMessage {
     content: Option<Value>,
 }
 
-/// Ported from `claudecode.rs:76-82` (`ClaudeUsage`).
 #[derive(Debug, Deserialize)]
 struct ClaudeUsage {
     input_tokens: Option<i64>,
     output_tokens: Option<i64>,
     cache_read_input_tokens: Option<i64>,
     cache_creation_input_tokens: Option<i64>,
+    cache_creation: Option<ClaudeCacheCreation>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ClaudeCacheCreation {
+    ephemeral_5m_input_tokens: Option<i64>,
+    ephemeral_1h_input_tokens: Option<i64>,
+}
+
+impl ClaudeUsage {
+    fn cache_write_buckets(&self) -> (i64, i64) {
+        if let Some(cache) = &self.cache_creation {
+            let five = cache.ephemeral_5m_input_tokens.unwrap_or(0).max(0);
+            let one = cache.ephemeral_1h_input_tokens.unwrap_or(0).max(0);
+            let total = five.saturating_add(one);
+            (total, one.min(total))
+        } else {
+            (self.cache_creation_input_tokens.unwrap_or(0).max(0), 0)
+        }
+    }
 }
 
 impl SessionAdapter for ClaudeCodeAdapter {
@@ -166,35 +185,10 @@ impl SessionAdapter for ClaudeCodeAdapter {
         "claude-code"
     }
 
-    /// `2` — bumped by s37 (`execution-graph-topology`), and the ONLY
-    /// shipped session adapter above `1`. This file's parse output for
-    /// a BYTE-IDENTICAL `.jsonl` transcript changed: a sidechain
-    /// transcript's rows and directives now carry
-    /// `agent_id`/`parent_agent_id` (see the module doc's
-    /// execution-lineage paragraph and `parse_claude_file` below), and
-    /// those are precisely the fields `canon_ingest::normalize` reads
-    /// to mint a child `Run` and its `parent_run_id` edge. So an
-    /// unchanged sidechain now normalizes to strictly MORE records than
-    /// before.
-    ///
-    /// That is what makes `1` wrong here rather than merely
-    /// conservative. Every existing installation holds an unsuffixed
-    /// `claude-code.json` cursor whose per-file digests were computed
-    /// against the OLD normalization; at `1` the cursor id is that same
-    /// unsuffixed name, `SourceCursor::diff` reports every untouched
-    /// sidechain `unchanged`, and the execution lineage this change
-    /// ships is never backfilled — invisibly, with no `--full` to
-    /// suggest otherwise. `2` moves the identity to
-    /// `claude-code-v2.json`, so the lookup misses, the source re-reads
-    /// in full exactly once, and the stale cursor is orphaned rather
-    /// than mutated. The one-time re-read is the cost of the fields
-    /// being real; the alternative is shipping them dark.
-    ///
-    /// omp/codex/hermes stay at `1`: s37 gave them the same two fields
-    /// as a constant `None`, which changes no byte of their output —
-    /// see [`SessionAdapter::parse_version`].
+    /// `3` — cache accounting now accepts Claude's nested cache-creation
+    /// buckets, changing normalized output for byte-identical transcripts.
     fn parse_version(&self) -> u32 {
-        2
+        3
     }
 
     fn scan_roots(&self, home: &Path, use_env_roots: bool) -> Vec<PathBuf> {
@@ -404,6 +398,7 @@ fn parse_claude_file(path: &Path) -> ParseOutcome {
             processed_hashes.insert(hash.clone(), rows.len());
         });
 
+        let (cache_write, cache_write_1h) = usage.cache_write_buckets();
         rows.push(UnifiedRow {
             client: "claude-code".to_string(),
             model_id: model,
@@ -416,7 +411,8 @@ fn parse_claude_file(path: &Path) -> ParseOutcome {
                 input: usage.input_tokens.unwrap_or(0).max(0),
                 output: usage.output_tokens.unwrap_or(0).max(0),
                 cache_read: usage.cache_read_input_tokens.unwrap_or(0).max(0),
-                cache_write: usage.cache_creation_input_tokens.unwrap_or(0).max(0),
+                cache_write,
+                cache_write_1h,
                 reasoning: 0,
             },
             cost: 0.0,
@@ -504,7 +500,7 @@ fn extract_claude_tool_result_row(
         workspace_key,
         workspace_label,
         timestamp_ms,
-        tokens: TokenBreakdown { input: usage.input_tokens, output: 0, cache_read: 0, cache_write: 0, reasoning: 0 },
+        tokens: TokenBreakdown { input: usage.input_tokens, output: 0, cache_read: 0, cache_write: 0, cache_write_1h: 0, reasoning: 0 },
         cost: 0.0,
         cost_source: CostSource::Unknown,
         duration_ms: None,
@@ -704,7 +700,9 @@ fn merge_claude_duplicate(existing: &mut UnifiedRow, usage: &ClaudeUsage, parsed
     t.input = t.input.max(usage.input_tokens.unwrap_or(0).max(0));
     t.output = t.output.max(usage.output_tokens.unwrap_or(0).max(0));
     t.cache_read = t.cache_read.max(usage.cache_read_input_tokens.unwrap_or(0).max(0));
-    t.cache_write = t.cache_write.max(usage.cache_creation_input_tokens.unwrap_or(0).max(0));
+    let (cache_write, cache_write_1h) = usage.cache_write_buckets();
+    t.cache_write = t.cache_write.max(cache_write);
+    t.cache_write_1h = t.cache_write_1h.max(cache_write_1h).min(t.cache_write);
 
     if let Some(timestamp_ms) = parsed_timestamp {
         if timestamp_ms >= existing.timestamp_ms {

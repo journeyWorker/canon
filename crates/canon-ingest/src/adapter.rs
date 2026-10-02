@@ -14,21 +14,25 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-/// A per-message token count, split by billing bucket — ported 1:1
-/// from the donor's `TokenBreakdown`.
+/// A per-message token count, split by billing bucket.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TokenBreakdown {
     pub input: i64,
     pub output: i64,
     pub cache_read: i64,
     pub cache_write: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub cache_write_1h: i64,
     pub reasoning: i64,
 }
 
+fn is_zero(value: &i64) -> bool {
+    *value == 0
+}
+
 impl TokenBreakdown {
-    /// Saturating sum across all five buckets so a corrupt source
-    /// can't overflow-wrap the total — ported from the donor
-    /// session-parser project.
+    /// Saturating sum across the billing buckets. `cache_write_1h` is a
+    /// subset of `cache_write`, not an additional bucket.
     pub fn total(&self) -> i64 {
         self.input.saturating_add(self.output).saturating_add(self.cache_read).saturating_add(self.cache_write).saturating_add(self.reasoning)
     }

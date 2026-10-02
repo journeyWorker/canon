@@ -43,7 +43,7 @@ fn row(session_id: &str, ts_ms: i64) -> UnifiedRow {
         workspace_key: Some("/tmp/proj".into()),
         workspace_label: Some("proj".into()),
         timestamp_ms: ts_ms,
-        tokens: TokenBreakdown { input: 10, output: 5, cache_read: 0, cache_write: 0, reasoning: 0 },
+        tokens: TokenBreakdown { input: 10, output: 5, cache_read: 0, cache_write: 0, cache_write_1h: 0, reasoning: 0 },
         cost: 0.0,
         cost_source: CostSource::Unknown,
         duration_ms: None,
