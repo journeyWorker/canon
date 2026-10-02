@@ -316,18 +316,20 @@ Two marts in `views.sql` are NOT report panels and are not exported by
 Read them with DuckDB directly against `views.sql`.
 
 - **Run observability** (`mart_run_observability`) — one row per folded
-  `run_id`, appended after the established nine snapshot tables. It reports
-  lifecycle identifiers/status/timestamps, latency only when both timestamps
-  exist, event and label counts, child-run count, guidance count, lineage
-  provider/model, and token/cost source totals. These are bounded
-  observations and proxies: event counts do not infer tool calls, retries, or
-  human interventions, and no field claims guidance caused an outcome.
-  `directive_event_count` and `guidance_count` are counts only; directive and
-  guidance text is never emitted. `*_unknown` columns explicitly expose
-  missing joins/coverage, including missing session/project/task/lineage,
+  `run_id`, appended as the tenth report/snapshot table after the established
+  nine tables. It reports lifecycle identifiers/status/timestamps, latency
+  only when both timestamps exist, event and label counts, child-run count,
+  guidance count, lineage provider/model, and token/cost source totals. These
+  are bounded observations and proxies: event counts do not infer tool calls,
+  retries, or human interventions, and no field claims guidance caused an
+  outcome. `directive_event_count` and `guidance_count` are counts only;
+  directive and guidance text is never emitted. `*_unknown` columns explicitly
+  expose missing joins/coverage, including missing session/project/task/lineage,
   end timestamps, event times, costs, and guidance. Workspace absolute paths
-  and verbatim directives/guidance are intentionally omitted. Privacy
-  redaction and adapter contracts remain next-phase constraints.
+  and verbatim directives/guidance are intentionally omitted. The adapter
+  contract is strict read-only validation; this panel does not execute
+  adapters or enforce provider sandbox capabilities. Privacy-safe omission of
+  paths and directive/guidance text is part of the current semantics.
 
 ## What this skill does NOT cover
 

@@ -52,15 +52,16 @@ byte-identical no-op. Existing symlinks are never overwritten. `doctor`
 reports stale/missing projections and old `canon-*` remnants in all four
 managed roots without deleting user data.
 
-## Developer-only source
+## Developer-only legacy source
 
-`canon/skills-dev/` is intentionally separate and remains a legacy directory
-source. Install it explicitly when developing Canon:
+`canon/skills-dev/` is contributor-only legacy tooling, intentionally separate
+from the canonical user-facing bundle. It is not a normal install source.
+Maintainers developing Canon MAY materialize it explicitly:
 
 ```bash
 canon skills install --source canon/skills-dev --target .
 ```
 
-That source keeps its own `.install-lock.json` and still materializes its
-individual developer skills for compatibility. It is not part of the
-canonical user-facing projection.
+That source keeps its own `.install-lock.json` and materializes individual
+developer skills for compatibility. Do not present those skills as the
+canonical provider-neutral `canon` projection.

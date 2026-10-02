@@ -92,6 +92,24 @@ capabilities are records, not enforcement: a provider sandbox MUST enforce
 them before execution. Optional `--repo` context-pack verification can confirm
 the context join; file-only validation reports it as unknown.
 
+### Safety and execution boundary
+
+ContextPack and prompt-registry selections capture immutable input bytes.
+`RunLineage` records the selected pack, provider, model, skill, and policy;
+replay MUST use those recorded inputs rather than a fresh lookup. Risk tiers
+require current effect/path binding and policy-pinned SSH approval. Capability
+authorization is default deny, with `execution=false`; Canon records these
+decisions but does not enforce provider permissions or sandbox behavior.
+
+Adapter v1 is strict read-only validation, not execution or sandbox
+enforcement. Learning remains quarantined until paired evaluation and signed
+approval, with rollback support. Real quality and cost metrics are currently
+unknown/null, so Canon MUST NOT claim that retrieved guidance improves
+outcomes.
+
+The knowledge map and its checks govern canonical-source and projection
+ownership; they are governance evidence, not a substitute for implementation.
+
 ## Five architecture invariants
 
 These are the public principles. Each has an existing evidence boundary and a

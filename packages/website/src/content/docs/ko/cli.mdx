@@ -41,13 +41,14 @@ description: canon --help 출력을 기준으로 목적별로 묶은 전체 서�
 | `canon prompt register --name <name> --version <version> --manifest <repo-relative.json> [--repo <dir>] [--json]` | 명시적 레포 내부 매니페스트에서 버전이 지정된 prompt bundle을 불변 content registry에 등록합니다. |
 | `canon prompt show --name <name> --version <version> [--repo <dir>] [--json]` | 등록된 prompt bundle 버전을 선택하고 검증합니다. 기본 출력은 간결한 메타데이터이며 `--json`은 snapshot 메타데이터와 digest를 포함합니다. |
 | `canon context [--repo <dir>] [--json]` | 해석된 저작 표면을 출력합니다: 레코드 종류 + envelope 필드, enum 도메인, 조인 키 문법, 파티션 레이아웃, 정책 기반 요구사항, capability 버전. capability *쿼리*입니다 — `fmt --check`/`gate`가 같은 레포에서 진단을 보고하더라도 항상 0으로 종료합니다. |
-| `canon skills install [--source <dir>] [--target <dir>] [--providers claude,codex,omp,pi]` | canonical `canon` 스킬 하나를 투영합니다. Claude는 `.claude/skills/canon/SKILL.md`, Codex는 `.codex/skills/canon.md`, OMP는 `.omp/skills/canon/SKILL.md`, Pi는 `.pi/skills/canon/SKILL.md`를 받습니다. 선택된 모든 provider가 `reference/**`와 `scripts/**` sidecar를 받습니다. OMP/Pi는 레포 로컬의 passive bundle이며 retrieve pre-dispatch 스크립트는 sidecar일 뿐 native hook이 아닙니다. 선택하지 않으면 `.claude`/`.codex`/`.omp`/`.pi`를 감지하고, 아무 root도 없을 때는 Claude+Codex를 기본 선택합니다. |
-| `canon skills check [--source <dir>] [--target <dir>] [--providers claude,codex,omp,pi]` | 쓰기 없이 canonical 투영의 누락·오래됨과 target 소유 content manifest를 확인합니다. |
-| `canon skills doctor [--source <dir>] [--target <dir>] [--providers claude,codex,omp,pi]` | 네 개의 관리 root 전체에서 provider, drift, legacy 잔재를 사람이 읽을 수 있게 진단하며 사용자 파일을 삭제하지 않습니다. |
+| `canon skills install [--source <dir>] [--target <dir>] [--providers=claude,codex,omp,pi]` | canonical `canon` 스킬 하나를 투영합니다. Claude는 `.claude/skills/canon/SKILL.md`, Codex는 `.codex/skills/canon.md`, OMP는 `.omp/skills/canon/SKILL.md`, Pi는 `.pi/skills/canon/SKILL.md`를 받습니다. 선택된 모든 provider가 `reference/**`와 `scripts/**` sidecar를 받습니다. OMP/Pi는 레포 로컬의 passive bundle이며 retrieve pre-dispatch 스크립트는 sidecar일 뿐 native hook이 아닙니다. 선택하지 않으면 `.claude`/`.codex`/`.omp`/`.pi`를 감지하고, 아무 root도 없을 때는 Claude+Codex를 기본 선택합니다. |
+| `canon skills check [--source <dir>] [--target <dir>] [--providers=claude,codex,omp,pi]` | 쓰기 없이 canonical 투영의 누락·오래됨과 target 소유 content manifest를 확인합니다. |
+| `canon skills doctor [--source <dir>] [--target <dir>] [--providers=claude,codex,omp,pi]` | 네 개의 관리 root 전체에서 provider, drift, legacy 잔재를 사람이 읽을 수 있게 진단하며 사용자 파일을 삭제하지 않습니다. |
 
-`canon skills install --source canon/skills-dev --target .`는 Canon
-기여자를 위한 기존 개발자별 스킬 materializer를 유지하며 Claude/Codex만
-지원합니다.
+Canon 기여자는 legacy `canon skills install --source
+canon/skills-dev --target .` materializer를 사용할 수 있습니다. 이는
+일반 사용자 설치 흐름에 포함되지 않습니다.
+
 
 ## Subjects
 
@@ -132,6 +133,7 @@ Gherkin `.feature` 스펙 코퍼스를 검증하고 확장합니다.
 | `canon report [--repo <dir>] [--check] [--snapshot <dir>]` | markdown 상태 리포트를 생성하거나(기본값), 커밋된 사본과 byte-diff하거나(`--check`, drift 시 종료 코드 `1`), panel mart를 Parquet + `manifest.json`으로 export합니다(`--snapshot`, 둘 다 주어지면 우선). |
 | `canon dashboard [--repo <dir>] [--snapshot <dir>] [--port <n>]` | 로컬에서 빌드된 대시보드 앱을 스냅샷 기준으로 서빙합니다. 기본 포트는 `4173`이며, `--snapshot`을 생략하면 매 실행마다 `.canon/dashboard-snapshot`에 새로 생성됩니다. |
 | `canon query --kind <kind> [--since <ts>] [--repo <dir>] [--canon-yaml <path>] [--json] [--plugin <id>] [--change-id <id>] [--domain <d>] [--status <s>]` | 레코드 종류의 읽기를 그것이 있을 수 있는 모든 티어에 걸쳐 팬아웃하고 `at` 기준으로 병합합니다. `--plugin`은 해석된 플러그인의 오버레이 필드를 각 레코드에 투영하며, 미해석 플러그인이나 종류 불일치 시 fail-soft합니다. `--change-id`는 `--kind change`/`--kind task`에, `--domain`/`--status`는 `--kind subject`(도메인별 관리 뷰)에 범위를 제한하며, `--status`는 `--kind change`/`--kind task`에도 적용됩니다. |
+| `canon purge --kind &lt;session|run|event|trajectory&gt; --before &lt;RFC3339&gt; [--repo &lt;dir&gt;] [--dry-run] [--json]` | 일치하는 레코드를 라우팅된 rung과 모든 aging 대상에서 과거 버전을 포함해 제거합니다. 적용 모드는 모든 대상을 사전 점검하며, dry-run은 변경하지 않습니다. 원본 transcript나 Git history는 삭제하지 않습니다. |
 | `canon tier age [--dry-run] [--repo <dir>] [--canon-yaml <path>]` | 모든 `canon.yaml` `aging:` 규칙을 한 번 적용해, 임계값을 넘은 레코드를 설정된 대상 티어로 이동시킵니다. `--dry-run`은 쓰지 않고 미리보기만 합니다. |
 | `canon plugin sync <PLUGIN_ID> [--repo <dir>] [--spec-root <dir>]` | `<plugin-id>`의 매니페스트에 선언된 오버레이를 해석하고, 각각을 등록된 소스로 넘긴 뒤, 모든 candidate를 validate-then-write 파이프라인으로 씁니다. |
 | `canon selftest [--json]` | 등록된 모든 크레이트의 fixture 코퍼스 셀프 테스트를 실행하고 EXPECTED oracle과 비교합니다. `canon gate selftest`와 별도로 추가됩니다. |

@@ -32,20 +32,15 @@ zero-record skip — never an error.
 
 ## What Canon stores
 
-A pass normalizes every scanned transcript into canon-model `Session`, `Run`,
-and `Event` records:
-
-- **Sessions/Runs** carry per-run token and cost telemetry (model, token
-  counts, provider, cost where the source CLI reports it).
-- **Events** interleave `token_usage` rows with **`user_directive`** events —
-  one per user-turn message, carrying the **full verbatim text of your
-  prompt** (`detail.text`), never truncated or summarized. This applies to
-  every adapter except Hermes, whose on-disk format has no per-turn
-  message table to read directive text from (Hermes emits zero directives —
-  a documented format gap, not a privacy filter).
-
-There is no separate "metadata-only" mode: ingesting sessions from an adapter
-that supports directive capture stores your prompt text.
+A pass normalizes scanned transcripts into canon-model `Session`, `Run`, and
+`Event` records. By default, session ingest is metadata-only: it stores
+telemetry such as model, provider, token counts, and reported cost, without
+capturing directive text. Directive capture is an explicit opt-in requiring
+`ingest.sessions.privacy.capture_user_directives: true` and a positive
+`max_directive_chars` limit. Captured text is bounded and known secrets/PII
+patterns are redacted before storage; this is not a guarantee of complete PII
+detection. Truncation is separate from redaction. Source transcripts remain
+operator-owned and are not modified or deleted by ingest.
 
 ## Where it stores it
 
@@ -64,40 +59,21 @@ committed under `.canon/ledger`, reviewable in a normal PR diff. PostgreSQL
 backends that only activate if an operator explicitly adds credentials to
 `canon.yaml`.
 
-## What never leaves your machine
+With the default `canon init` configuration there is no network egress:
+records stay in local Git (`.canon/ledger`) or local SQLite
+(`.canon/hot.db`, gitignored). Data leaves the machine only when an operator
+explicitly configures PostgreSQL or S3/R2 credentials in `canon.yaml`.
 
-With the default `canon init` config there is **no network egress** at all:
-every record — including the verbatim `user_directive` text above — stays in
-local Git (`.canon/ledger`, committed) and local SQLite (`.canon/hot.db`,
-gitignored, disk-only). Nothing is sent anywhere.
+## Redaction, export, and deletion
 
-Data leaves your machine **only** if an operator explicitly configures a
-PostgreSQL DSN (swapping `hot` to a shared Postgres instance) or an S3/R2
-bucket (`cold`) in `canon.yaml`. Neither is present in the scaffolded
-default config.
+Opt-in directive capture is bounded by the configured character limit and
+redacts known secrets and PII patterns before storage. No detector can
+guarantee that every sensitive value is found, so do not treat redaction as
+a complete PII filter. Canon supports `purge` for removing ingested records,
+redacted `export` for sharing a sanitized extract, and an access audit log at
+`.canon/audit/access.jsonl`. These controls do not delete the source
+transcripts read by adapters or rewrite Git history; manage those separately.
 
-## Redaction and deletion
-
-<Aside type="caution" title="No automatic redaction yet">
-  Canon does **not** currently redact, mask, or scan secrets out of ingested
-  transcripts. If a prompt you typed contained a token, password, or other
-  sensitive string, that string is stored verbatim in the `user_directive`
-  event text. This is a known gap, not a hidden one — treat local transcript
-  ingestion the same way you'd treat any other local log of your agent
-  sessions.
-</Aside>
-
-Deletion today is manual and file-level:
-
-- Delete `.canon/hot.db*` to drop every ingested `session`/`run`/`event`
-  record (including all `user_directive` text) and reset the ingest cursor
-  state.
-- Remove the specific record file(s) under `.canon/ledger` for any `local`-
-  tier kind you want gone, then commit the removal like any other repo
-  change.
-
-There is no automatic retention policy or expiry — records persist until you
-remove them by hand.
 
 ## Project-scoped vs all-workspaces
 

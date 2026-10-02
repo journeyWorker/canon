@@ -1,4 +1,4 @@
-// Presentation-only DOM helper shared by all five panels — builds an
+// Presentation-only DOM helper shared by all seven dashboard panels — builds an
 // HTML <table> from column defs + row objects, plus the two annotation
 // affordances a web surface has and the markdown report does not: a
 // per-column tooltip and a short note under the table. Carries no query

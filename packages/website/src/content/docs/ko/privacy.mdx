@@ -32,21 +32,15 @@ redaction과 삭제 기능이 (아직) 어디까지 제공되는지를 있는 �
 
 ## Canon이 저장하는 것
 
-한 번의 pass는 스캔된 모든 transcript를 canon-model `Session`, `Run`,
-`Event` record로 정규화합니다:
-
-- **Session/Run**은 실행별 token 및 cost telemetry(모델, token 수, provider,
-  원본 CLI가 보고하는 경우의 cost)를 담습니다.
-- **Event**는 `token_usage` row와 **`user_directive`** event를 시간순으로
-  섞어서 기록합니다. `user_directive`는 사용자 turn 메시지 하나당 하나씩
-  생성되며, **내가 입력한 프롬프트의 전체 원문(verbatim text)**(`detail.text`)을
-  담습니다 — 잘리거나 요약되지 않습니다. 이는 Hermes를 제외한 모든 adapter에
-  적용됩니다. Hermes는 디스크 포맷에 turn 단위 메시지 테이블이 없어 directive
-  텍스트를 읽어올 데이터가 없습니다 (Hermes는 항상 directive를 0건 생성합니다
-  — 이는 문서화된 포맷상의 한계이지, 프라이버시 필터가 아닙니다).
-
-별도의 "메타데이터만" 모드는 없습니다 — directive capture를 지원하는
-adapter에서 세션을 ingest하면 프롬프트 텍스트도 함께 저장됩니다.
+한 번의 pass는 스캔된 transcript를 canon-model `Session`, `Run`, `Event`
+record로 정규화합니다. 기본 세션 ingest는 메타데이터 전용입니다. 모델,
+provider, token 수, 보고된 cost 같은 telemetry를 저장하지만 directive
+텍스트는 수집하지 않습니다. directive 수집은
+`ingest.sessions.privacy.capture_user_directives: true`와 양수인
+`max_directive_chars` 제한이 필요한 명시적 opt-in입니다. 수집된 텍스트는
+길이가 제한되며 알려진 secret/PII 패턴은 저장 전에 redaction됩니다. 이는
+PII를 완전히 탐지한다는 보장이 아닙니다. truncation은 redaction과 별개입니다.
+원본 transcript는 operator가 관리하며 ingest가 수정하거나 삭제하지 않습니다.
 
 ## 어디에 저장하는지
 
@@ -64,38 +58,21 @@ divergence, strategy)는 **`local`** tier로 라우팅됩니다 — Git 기반�
 PostgreSQL(`hot`의 동급 대체제)과 S3/R2(`cold`)는 operator가 `canon.yaml`에
 자격 증명을 명시적으로 추가할 때만 활성화되는 선택적 스케일업 backend입니다.
 
-## 컴퓨터 밖으로 절대 나가지 않는 것
+기본 `canon init` 설정에서는 네트워크 egress가 없습니다. record는 로컬
+Git(`.canon/ledger`) 또는 로컬 SQLite(`.canon/hot.db`, gitignore 대상)에
+머뭅니다. operator가 `canon.yaml`에 PostgreSQL 또는 S3/R2 자격 증명을
+명시적으로 설정한 경우에만 데이터가 컴퓨터 밖으로 나갑니다.
 
-기본 `canon init` 설정에서는 **네트워크 egress가 전혀 없습니다**. 위에서 말한
-`user_directive` 원문을 포함한 모든 record는 로컬 Git(`.canon/ledger`, 커밋됨)과
-로컬 SQLite(`.canon/hot.db`, gitignore 대상, 디스크 전용)에만 머뭅니다. 어디로도
-전송되지 않습니다.
+## Redaction, export, 삭제
 
-데이터가 컴퓨터 밖으로 나가는 경우는 operator가 `canon.yaml`에 PostgreSQL DSN을
-명시적으로 설정해 `hot`을 공유 Postgres 인스턴스로 교체하거나, S3/R2 버킷(`cold`)을
-설정하는 경우 **뿐**입니다. 스캐폴딩된 기본 설정에는 둘 다 존재하지 않습니다.
+opt-in directive 수집은 설정된 문자 수 제한을 따르며, 알려진 secret 및 PII
+패턴을 저장 전에 redaction합니다. 어떤 detector도 모든 민감한 값을 찾는다고
+보장할 수 없으므로 redaction을 완전한 PII 필터로 취급해서는 안 됩니다.
+Canon은 ingest된 record를 제거하는 `purge`, 공유할 수 있는 정제된 추출물을
+만드는 redacted `export`, 그리고 `.canon/audit/access.jsonl`의 접근 감사
+로그를 지원합니다. 이 제어 기능들은 adapter가 읽은 원본 transcript를
+삭제하거나 Git history를 다시 쓰지 않습니다. 원본은 별도로 관리해야 합니다.
 
-## Redaction과 삭제
-
-<Aside type="caution" title="아직 자동 redaction은 없습니다">
-  Canon은 현재 ingest된 transcript에서 secret을 redact하거나 마스킹하거나
-  스캔해 제거하지 **않습니다**. 입력한 프롬프트에 토큰, 비밀번호, 기타 민감한
-  문자열이 포함되어 있었다면, 그 문자열은 `user_directive` event 텍스트에
-  원문 그대로 저장됩니다. 이는 숨겨진 한계가 아니라 알려진 한계입니다 — 로컬
-  transcript ingestion을 내 에이전트 세션의 다른 로컬 로그와 동일하게
-  취급하시기 바랍니다.
-</Aside>
-
-현재 삭제는 수동이며 파일 단위로 이루어집니다:
-
-- `.canon/hot.db*`를 삭제하면 ingest된 모든 `session`/`run`/`event`
-  record(모든 `user_directive` 텍스트 포함)가 사라지고 ingest cursor 상태도
-  초기화됩니다.
-- 없애고 싶은 `local` tier record가 있다면 `.canon/ledger` 아래의 해당 record
-  파일을 제거한 뒤, 다른 레포 변경 사항과 마찬가지로 커밋하면 됩니다.
-
-자동 retention 정책이나 만료 기능은 없습니다 — 직접 제거하기 전까지 record는
-계속 남아 있습니다.
 
 ## Project-scoped vs all-workspaces
 

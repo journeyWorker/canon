@@ -24,7 +24,7 @@ import { Steps } from "@astrojs/starlight/components";
    바로 동작하는 `canon.yaml`을 씁니다. `canon init`은 내구성 있고
    리뷰 가능한 레코드에는 Git을, 대량으로 발생하는 운영 레코드에는
    로컬 SQLite를 사용합니다. PostgreSQL과 S3 호환 스토리지는 선택적
-   스케일업 백엔드입니다. canon-model의 13개 레코드 종류 중 8개는
+   스케일업 백엔드입니다. canon-model의 14개 레코드 종류 중 9개는
    환경 변수가 필요 없는 `local`(git 백엔드) rung으로 라우팅되고,
    `task`, `handoff`, `session`, `run`, `event`는 `hot`(기본값
    SQLite, `.canon/hot.db`, gitignore 처리됨)으로 라우팅됩니다.
@@ -174,11 +174,14 @@ import { Steps } from "@astrojs/starlight/components";
    bunx @journeykit/canon report
    ```
 
-   다섯 개 상태 패널(트러스트 매트릭스, 세션 비용, 역할별 메모리,
-   플라이휠 퍼널, 리뷰 번다운)을 `.canon/REPORT.md`에 렌더링합니다
-   — 생성된 파일이며 절대 손으로 편집하지 않습니다. `canon gate
-   check`를 CI에 연결하는 것과 같은 방식으로 `canon report --check`를
-   연결해 커밋된 파일을 현재 입력과 byte-diff하세요.
+   10개 리포트 mart(트러스트 매트릭스, 세션 비용, 역할별 메모리,
+   플라이휠 퍼널, 리뷰 번다운 및 5개의 추가 운영 mart를 포함하며
+   `mart_run_observability`가 열 번째 리포트 mart입니다)를
+   `.canon/REPORT.md`에 렌더링합니다 — 생성된 파일이며 절대 손으로
+   편집하지 않습니다. scope status와 subjects는 리포트/스냅샷 출력에
+   포함되지만 대시보드 패널은 아닙니다. `canon gate check`를 CI에
+   연결하는 것과 같은 방식으로 `canon report --check`를 연결해
+   커밋된 파일을 현재 입력과 byte-diff하세요.
 
 </Steps>
 
@@ -224,10 +227,11 @@ import { Steps } from "@astrojs/starlight/components";
    새 Parquet 스냅샷을 생성하고(내부적으로 `canon report
    --snapshot`을 `.canon/dashboard-snapshot`에 실행) 빌드된
    `packages/dashboard` 앱을 로컬에서 그 스냅샷을 가리켜
-   서빙합니다 — `canon report`가 렌더링하는 것과 동일한 다섯 개
-   패널을, 브라우저에서 다시 계산하는 대신 스냅샷에서 읽습니다.
-   다른 곳에서 생성한 스냅샷(예: 다운로드한 CI 아티팩트)을
-   그대로 서빙하려면 `--snapshot <dir>`을 넘기세요.
+   서빙합니다. 스냅샷에는 `mart_run_observability`와 scope/subjects
+   상태를 포함한 10개 리포트 mart가 모두 들어가지만, 대시보드는
+   의도적으로 7개 패널만 렌더링합니다. 다른 곳에서 생성한 스냅샷
+   (예: 다운로드한 CI 아티팩트)을 그대로 서빙하려면
+   `--snapshot <dir>`을 넘기세요.
 
 </Steps>
 

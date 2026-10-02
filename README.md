@@ -36,9 +36,29 @@ Claude uses `.claude/skills/canon/SKILL.md`, Codex uses flattened
 `.omp/skills/canon/SKILL.md` and `.pi/skills/canon/SKILL.md`. Every selected
 provider receives lazy `reference/**` and `scripts/**` sidecars. OMP/Pi are
 project-local passive bundles; the retrieve pre-dispatch script is a sidecar,
-not a native hook. Developer-only procedures remain available explicitly with
-`canon skills install --source canon/skills-dev`; they are not part of the
-user-facing bundle.
+not a native hook.
+
+`canon/skills-dev/` is contributor-only legacy tooling. It is not part of the
+user-facing install; maintainers may materialize it explicitly when developing
+Canon with `canon skills install --source canon/skills-dev`.
+
+## Safety boundaries
+
+Canon records and verifies intent, evidence, policy, approvals, and run
+lineage; it does not execute agent actions or enforce provider capabilities.
+Adapter v1 validation is strict and read-only. Filesystem, network, and secret
+capabilities require enforcement by the external provider sandbox. ContextPack
+and prompt-registry inputs are captured as immutable selected bytes, while Run
+lineage records the pack, provider, model, skill, and policy used.
+
+Risk tiers require current effect/path binding and policy-pinned SSH approval.
+Learning is quarantined until paired evaluation and signed approval, and can be
+rolled back. Capability authorization defaults to deny (`execution=false`).
+Quality and cost outcomes are currently unknown/null; Canon does not claim that
+retrieved guidance improves outcomes.
+
+Knowledge-map and check scripts govern canonical-source/projection ownership;
+they are not substitutes for implementation or runtime enforcement.
 
 ## Status
 

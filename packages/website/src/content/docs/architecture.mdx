@@ -30,13 +30,14 @@ toolchain required.
 ```
 
 - **canon-model** — canon's closed, versioned artifact-family types: the
-  envelope, the thirteen record kinds, the nine join-spine key newtypes, and
+  envelope, the fourteen record kinds, the nine join-spine key newtypes, and
   generated JSON-schema + join-spine doc output. It also carries execution
   lineage: `Run.parent_run_id` links a subagent run to its parent and
   `Handoff.from_role`/`to_role` type a handoff's endpoints, while
   `Task.depends_on` holds **declared** plan intent extracted from the plan
   corpus — canon records the dependency, never schedules or executes from
-  it.
+  it. Dispatch also records an immutable, content-addressed ContextPack
+  lineage; see [`context-pack`](/cli/#setup).
 - **canon-store** — one storage trait behind git / Postgres / R2 tier
   adapters.
 - **canon-ingest** — the adapter registry that turns raw agent-CLI session
@@ -45,7 +46,8 @@ toolchain required.
   run per session plus one child run per subagent, so a delegation tree is
   a queryable shape rather than a flat run list.
 - **canon-gate** — the trust spine: covered/green evidence gating,
-  `FAILURE_CLASSES`, the trust ladder, and policy resolution.
+  `FAILURE_CLASSES`, the trust ladder, policy resolution, and signed,
+  effect-aware risk bindings.
 - **canon-learn** — role-namespaced strategy memory: trace → verdict →
   distill → store → retrieve → apply, keyed by `regime_key`.
 - **canon-policy** — canon's CEL policy-expression engine: parse/type-check/
@@ -62,9 +64,8 @@ toolchain required.
   widening canon-model's frozen record-kind set.
 - **canon-report** — the generated-never-edited markdown status report over
   canon-store's DuckDB view layer, plus the `--snapshot` Parquet export the
-  dashboard reads.
-- **canon-cli** — the single entrypoint binary all of the above are wired
-  into.
+  dashboard reads. The report contains 10 marts; the dashboard intentionally
+  renders 7 panels. See [CLI surface](/cli/#surface).
 
 ## Storage tiers
 
@@ -97,6 +98,11 @@ It does not rewrite Git history or delete operator-owned source transcripts.
 is appended to `.canon/audit/access.jsonl`; backend credentials and deployment
 RBAC remain external prerequisites.
 
+Privacy and retention are explicit boundaries: session adapters read local
+transcripts, while `canon purge` only removes allowlisted operational records;
+source transcripts and Git history remain outside that lifecycle. See
+[Data & Privacy](/privacy/) and [the CLI reference](/cli/#surface).
+
 ## The flywheel
 
 ```
@@ -111,7 +117,12 @@ team runs agents → ingest (sessions, reviews, handoffs, CI/PR)
 ```
 
 See [Strategy memory](/concepts/strategy-memory/) for the role-namespaced
-version of this loop.
+version of this loop. Candidates remain quarantined until signed, policy-pinned
+evaluation; canon does not claim measured uplift.
+
+The provider-neutral adapter protocol is validated at the boundary, not
+enforced as a sandbox. Canon records and gates evidence; it is **not a general
+agent runtime** and does not schedule or execute declared plans.
 
 ## Packaging
 
