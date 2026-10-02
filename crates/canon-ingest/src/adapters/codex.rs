@@ -968,12 +968,12 @@ mod tests {
         let rows = parse_codex_file(file.path()).rows;
 
         assert_eq!(rows.len(), 3);
-        // Row 1: first event, no previous baseline -> full total (clamped).
-        assert_eq!((rows[0].tokens.input, rows[0].tokens.cache_read, rows[0].tokens.output, rows[0].tokens.reasoning), (80, 20, 30, 5));
+        // Row 1: first event, no previous baseline -> full total (clamped), split to preserve the producer-total invariant.
+        assert_eq!((rows[0].tokens.input, rows[0].tokens.cache_read, rows[0].tokens.output, rows[0].tokens.reasoning), (80, 20, 25, 5));
         // Row 2: delta of totals (180-100=80 raw input, 40-20=20 cached -> 60 net input).
-        assert_eq!((rows[1].tokens.input, rows[1].tokens.cache_read, rows[1].tokens.output, rows[1].tokens.reasoning), (60, 20, 25, 3));
+        assert_eq!((rows[1].tokens.input, rows[1].tokens.cache_read, rows[1].tokens.output, rows[1].tokens.reasoning), (60, 20, 22, 3));
         // Row 3: delta of totals (260-180=80 raw input, 60-40=20 cached -> 60 net input).
-        assert_eq!((rows[2].tokens.input, rows[2].tokens.cache_read, rows[2].tokens.output, rows[2].tokens.reasoning), (60, 20, 35, 4));
+        assert_eq!((rows[2].tokens.input, rows[2].tokens.cache_read, rows[2].tokens.output, rows[2].tokens.reasoning), (60, 20, 31, 4));
         assert_eq!(rows[0].model_id, "gpt-5.1");
         assert_eq!(rows[0].provider_id, "openai");
         assert_eq!(rows[0].workspace_key.as_deref(), Some("/repo/proj"));
@@ -1040,7 +1040,7 @@ mod tests {
         assert_eq!(rows[0].model_id, "gpt-5.5");
         assert_eq!(rows[0].tokens.input, 500);
         assert_eq!(rows[0].tokens.cache_read, 1000);
-        assert_eq!(rows[0].tokens.output, 200);
+        assert_eq!(rows[0].tokens.output, 150);
         assert_eq!(rows[0].tokens.reasoning, 50);
         // Workspace comes from the child's OWN session_meta (first
         // line), never the replayed parent's `/repo-parent`.

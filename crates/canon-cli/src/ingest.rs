@@ -1090,6 +1090,18 @@ fn degraded_metadata(outcome: &IngestOutcome, sessions: &[NormalizedSession]) ->
 mod tests {
     use super::*;
 
+    fn omp_parse_version() -> u32 {
+        canon_ingest::registry::find("omp").expect("the omp adapter is registered").adapter.parse_version()
+    }
+
+    fn omp_cursor_id(privacy: DirectivePrivacyPolicy) -> String {
+        session_source_cursor_id_with_privacy("omp", omp_parse_version(), privacy)
+    }
+
+    fn omp_bumped_cursor_id(privacy: DirectivePrivacyPolicy) -> String {
+        session_source_cursor_id_with_privacy("omp", omp_parse_version() + 1, privacy)
+    }
+
     fn write_fixture_home(root: &Path) {
         let session_dir = root.join(".omp/agent/sessions/-tmp-proj");
         std::fs::create_dir_all(&session_dir).unwrap();
@@ -1210,7 +1222,7 @@ mod tests {
         assert_eq!(second.events_written, 0);
         assert_eq!(second.adapters[0].reparsed, 0, "unchanged source is not re-parsed");
         assert!(second.adapters[0].skipped_unchanged >= 1, "the skip must be surfaced in the summary");
-        let cursor_id = session_source_cursor_id_with_privacy("omp", 1, DirectivePrivacyPolicy::METADATA_ONLY);
+        let cursor_id = omp_cursor_id(DirectivePrivacyPolicy::METADATA_ONLY);
         assert!(dir.path().join(paths::INGEST_CURSORS_DIR).join(format!("{cursor_id}.json")).exists(), "the pass-1 cursor persisted");
 
         // S3 6.8 (watermark reset): `--full` (full_rescan) ignores the
@@ -1304,7 +1316,7 @@ mod tests {
         assert!(before >= 3);
 
         // literally reset: remove the persisted cursor file.
-        let cursor_id = session_source_cursor_id_with_privacy("omp", 1, DirectivePrivacyPolicy::METADATA_ONLY);
+        let cursor_id = omp_cursor_id(DirectivePrivacyPolicy::METADATA_ONLY);
         let cursor = dir.path().join(paths::INGEST_CURSORS_DIR).join(format!("{cursor_id}.json"));
         assert!(cursor.exists(), "pass 1 wrote the cursor");
         std::fs::remove_file(&cursor).unwrap();
@@ -1816,15 +1828,15 @@ mod tests {
         let present = BTreeMap::from([(transcript.to_string_lossy().into_owned(), file_digest(&std::fs::read(&transcript).unwrap()))]);
 
         let privacy = DirectivePrivacyPolicy::METADATA_ONLY;
-        let at_shipped = base_session_cursor(&cursors, &session_source_cursor_id_with_privacy("omp", 1, privacy), false).diff(&present);
+        let at_shipped = base_session_cursor(&cursors, &omp_cursor_id(privacy), false).diff(&present);
         assert_eq!(at_shipped.unchanged.len(), 1, "control: at the shipped version the transcript is still skipped");
         assert!(at_shipped.changed_or_new.is_empty());
 
-        let at_bumped = base_session_cursor(&cursors, &session_source_cursor_id_with_privacy("omp", 2, privacy), false).diff(&present);
+        let at_bumped = base_session_cursor(&cursors, &omp_bumped_cursor_id(privacy), false).diff(&present);
         assert_eq!(at_bumped.changed_or_new.len(), 1, "a bumped parse version must re-read the transcript with no --full and no cursor deletion");
         assert!(at_bumped.unchanged.is_empty());
 
-        let cursor_id = session_source_cursor_id_with_privacy("omp", 1, privacy);
+        let cursor_id = omp_cursor_id(privacy);
         assert!(dir.path().join(paths::INGEST_CURSORS_DIR).join(format!("{cursor_id}.json")).exists(), "the pre-bump cursor is ORPHANED, never deleted or mutated");
     }
 }

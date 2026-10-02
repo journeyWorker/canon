@@ -67,6 +67,15 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.8.0 release and migration
+
+Version 0.8.0 consolidates provider projections into a single `canon` skill,
+with stricter signed-approval and quarantine boundaries. Ingest is now
+metadata-only: source bytes remain external while Canon records metadata and
+provenance. Update integrations to the current parser generations before
+migrating, and review existing approval/quarantine workflows for the stricter
+requirements.
+
 ## Layout
 
 ```
