@@ -11,8 +11,8 @@ use std::path::Path;
 use std::process::{Command, Output};
 
 use canon_model::{
-    Actor, Change, ChangeId, ChangeStatus, Envelope, EvidenceRecord, EvidenceVerdict, RecordKind, RoleId, ScenarioId, Subject,
-    SubjectId, SubjectStatus,
+    Actor, Change, ChangeId, ChangeStatus, Envelope, EvidenceRecord, EvidenceVerdict, ProjectId, RecordKind, RoleId, Scenario,
+    ScenarioId, SpecDigest, Subject, SubjectId, SubjectStatus,
 };
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -62,15 +62,28 @@ fn seed_change(repo: &Path, change_id: &str) {
     ledger(repo).write(&change).unwrap();
 }
 
-/// Plant a `Subject` at an arbitrary lifecycle state with linked
-/// scenarios — the only way to reach the `verifying → shipped` gate,
-/// since scenario links land via inventory sync's `@subject` tag, not a
-/// CLI verb.
+/// Plant a `Subject` at an arbitrary lifecycle state, plus one `Scenario`
+/// per entry in `scenarios` carrying `subject_id` exactly as `canon
+/// inventory sync` writes it from an `@subject:<id>` tag — the only
+/// way a subject owns scenarios, and the only way to reach the
+/// `verifying → shipped` gate's per-scenario checks.
 fn seed_subject(repo: &Path, id: &str, status: SubjectStatus, scenarios: &[&str]) {
     let envelope = Envelope::new(1, RecordKind::Subject, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
-    let subject = Subject::new(envelope, SubjectId::parse(id).unwrap(), "Seeded", "s", "dev", status, RoleId::parse("implementer").unwrap())
-        .with_links(Vec::new(), scenarios.iter().map(|s| ScenarioId::parse(*s).unwrap()).collect());
+    let subject = Subject::new(envelope, SubjectId::parse(id).unwrap(), "Seeded", "s", "dev", status, RoleId::parse("implementer").unwrap());
     ledger(repo).write(&subject).unwrap();
+    for scenario_id in scenarios {
+        let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
+        let mut scenario = Scenario::new(
+            envelope,
+            ProjectId::parse("demo").unwrap(),
+            ScenarioId::parse(*scenario_id).unwrap(),
+            "seeded",
+            "",
+            SpecDigest::of(scenario_id.as_bytes()),
+        );
+        scenario.subject_id = Some(SubjectId::parse(id).unwrap());
+        ledger(repo).write(&scenario).unwrap();
+    }
 }
 
 fn seed_scenario_verdict(repo: &Path, scenario: &str, verdict: EvidenceVerdict) {
@@ -195,6 +208,24 @@ fn shipped_is_blocked_when_a_linked_scenario_has_no_verdict() {
     assert!(err.contains("world.demo.01"), "must name the uncovered scenario: {err}");
 
     // Record unchanged — still verifying.
+    let payload = query_subjects(dir.path(), &[]);
+    assert_eq!(payload["records"][0]["status"], "verifying");
+}
+
+/// The defect this closes: the gate used to read a subject-side link
+/// list no command ever wrote, so it was always empty and `shipped`
+/// passed with zero evidence. A subject that owns no tagged scenario
+/// has nothing to ship on.
+#[test]
+fn shipped_is_blocked_when_no_scenario_is_tagged_to_the_subject() {
+    let dir = repo();
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &[]);
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert_eq!(out.status.code(), Some(1), "an empty owned set must fail closed, not pass vacuously");
+    let err = stderr(&out);
+    assert!(err.contains("uncovered-cell") && err.contains("@subject:demo-subject"), "must name the missing tag: {err}");
+
     let payload = query_subjects(dir.path(), &[]);
     assert_eq!(payload["records"][0]["status"], "verifying");
 }

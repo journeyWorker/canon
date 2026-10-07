@@ -45,9 +45,12 @@ change와 여러 scenario에 걸쳐 계획하고, 설계하고, 구현하고, �
 각 서브젝트는 `domain`(vocabulary로 정의된 slug — 기본
 `planning`/`design`/`dev`/`data`/`test`, 레포별 확장)과 상태 라이프사이클
 `proposed → specced → building → verifying → shipped`(및 any → `retired`)를
-가집니다. 출시는 증거 게이팅됩니다: 서브젝트는 연결된 모든 scenario가 최신
-non-Divergent 판정을 가질 때에만 `verifying → shipped`로 이동합니다 — task
-완료를 게이팅하는 것과 동일한 트러스트 스파인을 product unit에 적용한
+가집니다. 서브젝트는 `canon inventory sync`가 인덱싱한 Gherkin
+`@subject:<id>` 태그를 단 시나리오를 소유하며, 이 연결은 스펙 코퍼스에만
+기록됩니다. 출시는 증거 게이팅됩니다: 서브젝트는 시나리오를 하나 이상
+소유하고 그 모두가 최신 non-Divergent 판정을 가질 때에만
+`verifying → shipped`로 이동합니다 — task 완료를 게이팅하는 것과 동일한
+트러스트 스파인을 product unit에 적용한
 것입니다. `canon query --kind subject`와 `canon report`의 Subjects 패널이
 도메인별 관리 뷰를 제공하며, [CLI 레퍼런스](/ko/cli/#subjects)에 저작
 명령어가 정리되어 있습니다.

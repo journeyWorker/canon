@@ -82,3 +82,12 @@ Feature: subject lifecycle
     When a subject is authored under a near miss of one of them
     Then the command refuses, naming both the offending value and the members it expected
     And no subject was written, so a typo can never mint a new domain
+
+  # canon: {"schema":1,"at":"2026-10-07T03:21:21Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @subject.lifecycle.10
+  Scenario: Shipping is refused when no scenario is tagged to the subject
+    Given a verifying subject that no scenario names in an @subject tag
+    When it is moved to shipped
+    Then the command fails, reporting an uncovered cell that names the missing tag
+    And the subject still reads verifying, so an empty scenario set is never read as passing evidence

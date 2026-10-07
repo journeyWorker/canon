@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-07T03:21:36.160612Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject shipped_is_blocked_when_no_scenario_is_tagged_to_the_subject"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "subject.lifecycle.10",
+  "schema": 1,
+  "staging_id": "c634fe055e7e",
+  "verdict": "faithful"
+}

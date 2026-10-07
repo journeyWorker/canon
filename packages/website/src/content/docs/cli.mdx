@@ -59,7 +59,7 @@ is the management record.
 |---|---|
 | `canon subject new <id> --domain <d> --title <t> [--summary <s>] [--owner-role <r>] [--repo <dir>] [--json]` | Author a `Subject` (kebab-slug `<id>` is the durable `subject_id` join key). `--domain` is a vocabulary-defined kebab slug — base set `planning`/`design`/`dev`/`data`/`test`, extended per-repo via `.canon/vocab`. Starts at status `proposed`; `--owner-role` defaults to `implementer`. Envelope + policy validated at write. |
 | `canon subject adopt <change_id> --subject <id> [--repo <dir>] [--json]` | Link an imported plan `Change` (from `canon ingest plans`) to a `Subject`: stamps `Change.subject_id` and appends to the subject's `change_ids`. |
-| `canon subject status <id> <state> [--repo <dir>] [--json]` | Policy-gated transition along `proposed → specced → building → verifying → shipped` (plus any → `retired`). `verifying → shipped` additionally requires every linked scenario to carry a latest non-Divergent verdict; a violation prints by failure class, exits `1`, and leaves the record unchanged (fail closed). |
+| `canon subject status <id> <state> [--repo <dir>] [--json]` | Policy-gated transition along `proposed → specced → building → verifying → shipped` (plus any → `retired`). `verifying → shipped` additionally requires the subject to own at least one scenario — one whose `@subject:<id>` tag `canon inventory sync` has indexed — and every owned scenario to carry a latest non-Divergent verdict; a violation prints by failure class, exits `1`, and leaves the record unchanged (fail closed). |
 
 ## Corpus
 

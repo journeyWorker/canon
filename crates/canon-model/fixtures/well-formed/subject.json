@@ -10,9 +10,6 @@
   "domain": "dev",
   "kind": "subject",
   "owner_role": "implementer",
-  "scenario_ids": [
-    "world.subject-loop.01"
-  ],
   "schema": 1,
   "status": "building",
   "subject_id": "subject-domain-loop",

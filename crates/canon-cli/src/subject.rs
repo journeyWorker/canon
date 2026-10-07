@@ -26,23 +26,27 @@
 //! plan-derived `Task`/`Change`, `s38-evidence-bearing-memory`.)
 //!
 //! # `verifying → shipped` is evidence-gated, fail-closed
-//! That ONE transition additionally requires every linked
-//! `scenario_ids` entry to carry a latest NON-`Divergent` verdict in
-//! the ledger — resolved by REUSING `canon-gate`'s own
-//! [`canon_gate::latest_verdicts`] over a [`canon_gate::GateContext`]
-//! loaded exactly as `canon gate check` loads it (never a second
-//! verdict fold). A violation prints by failure class
-//! ([`canon_gate::FailureClass`]), exits `1`, and leaves the record
+//! That ONE transition additionally requires the subject to own at least
+//! one scenario, and every scenario it owns to carry a latest
+//! NON-`Divergent` verdict in the ledger. A subject owns the scenarios
+//! whose `@subject:<id>` Gherkin tag `canon inventory sync` indexed onto
+//! `Scenario.subject_id` — read through
+//! [`canon_gate::spec_coverage::subject_scenarios`], the same join the
+//! gate's `spec_coverage.scope` and `canon report`'s Subjects panel use.
+//! Verdicts resolve by REUSING [`canon_gate::latest_verdicts`] over a
+//! [`canon_gate::GateContext`] loaded exactly as `canon gate check`
+//! loads it (never a second verdict fold). A violation prints by failure
+//! class ([`canon_gate::FailureClass`]), exits `1`, and leaves the record
 //! UNCHANGED (fail closed). Every other transition is the pure
 //! [`is_valid_transition`] chain; an off-chain transition is refused
 //! (exit `2`), the record likewise unchanged.
 
 use std::path::Path;
 
+use canon_gate::spec_coverage::subject_scenarios;
 use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, Violation};
 use canon_model::{
-    Actor, Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, RoleId, ScenarioId, Subject, SubjectId,
-    SubjectStatus,
+    Actor, Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, RoleId, Subject, SubjectId, SubjectStatus,
 };
 use canon_policy::SchemaRegistry;
 use canon_store::registry::TierRegistry;
@@ -448,7 +452,7 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, js
     }
 
     if current == SubjectStatus::Verifying && target == SubjectStatus::Shipped {
-        match ship_gate_violations(&repo, &subject.scenario_ids) {
+        match ship_gate_violations(&repo, subject_id) {
             Ok(violations) if !violations.is_empty() => {
                 for v in &violations {
                     eprintln!("canon subject status: {}", v.line());
@@ -482,27 +486,49 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, js
     }
 }
 
-/// The `verifying → shipped` evidence gate (contract, fail-closed):
-/// every linked `scenario_ids` entry MUST carry a latest NON-`Divergent`
-/// verdict in the ledger. Reuses `canon-gate`'s own
-/// [`latest_verdicts`] fold over a [`GateContext`] loaded exactly as
-/// `canon gate check` loads it — never a second verdict derivation. A
-/// scenario with NO ledger verdict is `uncovered-cell`; a scenario
-/// whose latest verdict (for any authoring role) is `Divergent` is
-/// likewise refused — the CLOSED [`FailureClass`] set has no
-/// "divergent" member (by canon-gate design, a divergent verdict is a
-/// reported fact, never its own gate class), so both refusals surface
-/// as `uncovered-cell` with a distinguishing detail. An empty
-/// `scenario_ids` yields no violations (nothing linked to gate).
-fn ship_gate_violations(repo: &Path, scenario_ids: &[ScenarioId]) -> Result<Vec<Violation>, String> {
+/// The `verifying → shipped` evidence gate (contract, fail-closed). The
+/// scenarios checked are the ones the subject OWNS through their
+/// `@subject:` tag ([`subject_scenarios`]); there is no second,
+/// hand-maintained link list to drift from the spec corpus.
+///
+/// Refuses, each as `uncovered-cell` with a distinguishing detail (the
+/// CLOSED [`FailureClass`] set has no "divergent" or "unlinked" member —
+/// by canon-gate design those are reported facts, never their own gate
+/// class):
+/// - the `scenario` kind routes away from the rung the gate reads, so the
+///   owned set would read as empty for a reason other than "none";
+/// - the subject owns NO scenario: shipping with zero evidence is the
+///   exact pass-by-seeing-nothing this gate exists to stop;
+/// - an owned scenario has no ledger verdict;
+/// - an owned scenario's latest verdict (for any authoring role) is
+///   `Divergent`.
+fn ship_gate_violations(repo: &Path, subject_id: &SubjectId) -> Result<Vec<Violation>, String> {
     let ctx = GateCtx::from_repo(repo);
     let registry = SchemaRegistry::load();
     let now = Utc::now();
     let gate_context = GateContext::load(ctx, &registry, now).map_err(|e| e.to_string())?;
-    let verdicts = latest_verdicts(&gate_context);
+    let subject = subject_id.as_str();
 
+    if gate_context.unreadable_kinds.contains(&RecordKind::Scenario) {
+        return Ok(vec![Violation::new(
+            FailureClass::UncoveredCell,
+            subject,
+            "verifying → shipped: the `scenario` kind routes away from the rung the gate reads, so this subject's scenarios cannot be counted; route `scenario` to `local`",
+        )]);
+    }
+
+    let owned = subject_scenarios(&gate_context, subject_id);
+    if owned.is_empty() {
+        return Ok(vec![Violation::new(
+            FailureClass::UncoveredCell,
+            subject,
+            format!("verifying → shipped: no scenario is tagged `@subject:{subject}` — tag its scenarios and run `canon inventory sync`; shipping needs evidence, not an empty set"),
+        )]);
+    }
+
+    let verdicts = latest_verdicts(&gate_context);
     let mut violations = Vec::new();
-    for scenario in scenario_ids {
+    for (_, scenario) in &owned {
         let sid = scenario.as_str().to_string();
         let entries: Vec<&LedgerEntry> = verdicts.iter().filter(|((subject, _), _)| subject == &sid).map(|(_, entry)| entry).collect();
         if entries.is_empty() {

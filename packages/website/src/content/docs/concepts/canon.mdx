@@ -46,10 +46,13 @@ management record.
 Each Subject carries a `domain` (a vocabulary-defined slug —
 `planning`/`design`/`dev`/`data`/`test` by default, extended per repo)
 and a status lifecycle `proposed → specced → building → verifying →
-shipped` (plus any → `retired`). Shipping is evidence-gated: a Subject
-moves `verifying → shipped` only when every scenario it links carries a
-latest non-Divergent verdict — the same trust spine that gates task
-completion, applied to the product unit. `canon query --kind subject`
+shipped` (plus any → `retired`). A Subject owns the scenarios whose
+Gherkin `@subject:<id>` tag `canon inventory sync` indexed; the spec
+corpus is the only place that link is written. Shipping is
+evidence-gated: a Subject moves `verifying → shipped` only when it owns
+at least one scenario and every one carries a latest non-Divergent
+verdict — the same trust spine that gates task completion, applied to
+the product unit. `canon query --kind subject`
 and `canon report`'s Subjects panel give the per-domain management view;
 the [CLI reference](/cli/#subjects) lists the authoring commands.
 

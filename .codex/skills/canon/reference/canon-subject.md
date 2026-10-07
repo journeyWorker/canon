@@ -14,8 +14,17 @@ domain agent follows.
   A Subject is the product unit; its `.feature` files are its behavior
   specs. Never the same word.
 
-A Subject links, but does not contain, its work: `change_ids` (adopted
-plan units) and `scenario_ids` (behavior specs) are join links.
+A Subject links, but does not contain, its work. Two joins, each
+authored in one place:
+
+- **Changes**: `change_ids` on the Subject, appended by `canon subject
+  adopt`.
+- **Scenarios**: the `@subject:<id>` tag on each Gherkin scenario,
+  indexed onto `Scenario.subject_id` by `canon inventory sync`. The
+  Subject record carries no scenario list — the spec corpus is the only
+  source, and the Subjects report panel, `spec_coverage.scope`, and the
+  shipped gate all read it from there. To link a scenario, tag it and
+  re-sync; there is no subject-side command for it.
 
 ## The 4-step loop
 
@@ -52,8 +61,8 @@ canon subject new subject-domain-loop \
   `canon context` to see the set in force.
 - `--summary` is optional; `--owner-role` defaults to `implementer`;
   `--actor-id` defaults to `canon`. A freshly-authored Subject with no
-  `change_ids`/`scenario_ids` is a valid minimal record and starts at
-  status `proposed`. `--json` prints the written record.
+  adopted changes and no tagged scenarios is a valid minimal record and
+  starts at status `proposed`. `--json` prints the written record.
 
 ### 2. Retrieve subject-scoped strategy memory BEFORE working
 
@@ -120,12 +129,14 @@ blocking to subjects in named statuses, and `@subject:<id>` tagging is
 what brings a scenario into that scope. See `canon-gate`.
 
 **The `verifying → shipped` evidence gate:** shipping additionally
-requires that EVERY linked `scenario_ids` entry carries a latest,
-non-`Divergent` verdict in the ledger (the same last-wins rule `canon
-gate check` uses). If any linked scenario is uncovered or its latest
-verdict is `Divergent`, the transition prints the violating scenarios by
-failure class, exits 1, and the status stays `verifying`. `retired` is
-not gated.
+requires that the Subject OWNS at least one scenario (one whose latest
+synced generation carries `@subject:<id>`), and that EVERY owned
+scenario carries a latest, non-`Divergent` verdict in the ledger (the
+same last-wins rule `canon gate check` uses). A Subject with no tagged
+scenario is refused rather than shipped on an empty set; so is one whose
+`scenario` records route away from the gate's rung. Each refusal prints
+by failure class (`uncovered-cell`), exits 1, and the status stays
+`verifying`. `retired` is not gated.
 
 ## Adopt flow
 

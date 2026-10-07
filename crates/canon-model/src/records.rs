@@ -141,10 +141,17 @@ where
 /// `scenario_id`. `domain` is a validated-shape-only kebab slug (see
 /// [`deserialize_domain_slug`] — the closed vocabulary lives in
 /// `canon/vocab`, not here); `owner_role` names the accountable role;
-/// `change_ids`/`scenario_ids` are the join links accumulated as work
-/// is adopted and specced against the subject (both additive-empty by
-/// default, so a freshly-authored subject with no links yet is still a
-/// valid, minimal record).
+/// `change_ids` accumulates as plan changes are adopted
+/// (additive-empty by default, so a freshly-authored subject with no
+/// links yet is still a valid, minimal record).
+///
+/// The scenario side of the join lives on [`Scenario::subject_id`], set
+/// by `canon inventory sync` from each scenario's `@subject:<id>` tag —
+/// the spec corpus is the one place that link is authored. A subject
+/// carries no copy of it: a second, separately-written list is exactly
+/// what drifted (never populated, so every reader saw zero scenarios and
+/// the ship gate passed on an empty set). Records written before that
+/// list was removed still deserialize; the stale key is ignored.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Subject {
     #[serde(flatten)]
@@ -158,8 +165,6 @@ pub struct Subject {
     pub owner_role: RoleId,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub change_ids: Vec<ChangeId>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub scenario_ids: Vec<ScenarioId>,
 }
 
 impl Subject {
@@ -185,15 +190,13 @@ impl Subject {
             status,
             owner_role,
             change_ids: Vec::new(),
-            scenario_ids: Vec::new(),
         }
     }
 
-    /// Builder for the join links — `Subject::new`'s own signature stays
-    /// unchanged (mirrors [`Task::with_scenario_refs`]).
-    pub fn with_links(mut self, change_ids: Vec<ChangeId>, scenario_ids: Vec<ScenarioId>) -> Self {
+    /// Builder for the adopted-change links — `Subject::new`'s own
+    /// signature stays unchanged (mirrors [`Task::with_scenario_refs`]).
+    pub fn with_change_ids(mut self, change_ids: Vec<ChangeId>) -> Self {
         self.change_ids = change_ids;
-        self.scenario_ids = scenario_ids;
         self
     }
 }
@@ -1594,10 +1597,7 @@ mod tests {
             SubjectStatus::Building,
             RoleId::parse("implementer").unwrap(),
         )
-        .with_links(
-            vec![ChangeId::parse("s36-subject-domain-loop").unwrap()],
-            vec![ScenarioId::parse("world.subject-loop.01").unwrap()],
-        )
+        .with_change_ids(vec![ChangeId::parse("s36-subject-domain-loop").unwrap()])
     );
 
     round_trip_test!(
@@ -1612,6 +1612,29 @@ mod tests {
             RoleId::parse("planner").unwrap(),
         )
     );
+
+    /// A subject written while `scenario_ids` was still a field reads
+    /// back: consumer ledgers keep that key forever (append-only), and a
+    /// read failure would drop the subject from every report and gate.
+    #[test]
+    fn a_subject_carrying_the_removed_scenario_ids_key_still_deserializes() {
+        let json = serde_json::json!({
+            "schema": 1,
+            "kind": "subject",
+            "at": "2026-07-20T12:00:00Z",
+            "actor": {"agent_id": "codex-cli", "role": "implementer"},
+            "subject_id": "payments",
+            "title": "payments",
+            "summary": "billing subject",
+            "domain": "planning",
+            "status": "verifying",
+            "owner_role": "planner",
+            "scenario_ids": ["world.subject-loop.01"]
+        });
+        let subject: Subject = serde_json::from_value(json).expect("legacy subject must still deserialize");
+        assert_eq!(subject.status, SubjectStatus::Verifying);
+        assert!(serde_json::to_value(&subject).unwrap().get("scenario_ids").is_none(), "the stale key is not written back");
+    }
 
     /// A pre-s36 `Change` (no `subject_id` key at all) still
     /// deserializes to `subject_id: None` and never reserializes a

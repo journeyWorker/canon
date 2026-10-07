@@ -230,13 +230,15 @@ pub mod scope_status {
 }
 
 /// `mart_subjects`'s expected single row (s36 `subject-domain-loop`):
-/// one `dev`-domain subject in status `building`, linking two
-/// scenarios — one carrying a `Faithful` evidence record keyed by its
-/// `scenario_id` (covered), one with no evidence at all (uncovered) —
-/// so `scenario_count = 2`, `covered_scenarios = 1`. Proves the panel
-/// joins subject `scenario_ids` against the scenario-keyed evidence
-/// ledger with the latest-non-Divergent fold, never a "some rows came
-/// back" smoke check.
+/// one `dev`-domain subject in status `building` that OWNS two
+/// scenarios — the two spec-corpus `Scenario` records `scope_status`
+/// already authors, both carrying `subject_id` exactly as `canon
+/// inventory sync` writes it from an `@subject:` tag. One carries a
+/// scenario-keyed `Faithful` evidence record (covered), the other none
+/// (uncovered) — so `scenario_count = 2`, `covered_scenarios = 1`.
+/// Proves the panel joins the TAGGED scenario corpus against the
+/// scenario-keyed evidence ledger with the latest-non-Divergent fold,
+/// never a "some rows came back" smoke check.
 pub mod subjects {
     pub const DOMAIN: &str = "dev";
     pub const SUBJECT_ID: &str = "s9-fixture-subject";
@@ -244,8 +246,8 @@ pub mod subjects {
     pub const STATUS: &str = "building";
     pub const SCENARIO_COUNT: i64 = 2;
     pub const COVERED_SCENARIOS: i64 = 1;
-    pub const COVERED_SCENARIO_ID: &str = "s9.subject.01";
-    pub const UNCOVERED_SCENARIO_ID: &str = "s9.subject.02";
+    pub const COVERED_SCENARIO_ID: &str = super::scope_status::FULLY_GREEN_SCENARIO_ID;
+    pub const UNCOVERED_SCENARIO_ID: &str = super::scope_status::UNAUTHORED_SCENARIO_ID;
 }
 
 /// `mart_review_rounds`'s expected four rows (s43
@@ -663,14 +665,16 @@ fn build_git_tier(git_root: &Path) {
     .unwrap();
 
     // ── mart_subjects: one `dev`-domain subject (status `building`)
-    // linking two scenarios. The first carries a scenario-keyed
-    // `Faithful` evidence record (covered); the second has none
-    // (uncovered) -> scenario_count 2, covered_scenarios 1. Both
-    // evidence writes are keyed by `scenario_id` with `task_id` None,
-    // so `int_task_evidence` (which filters `task_id IS NOT NULL`)
-    // excludes them -> `mart_trust_matrix`'s three-task shape is
-    // unchanged. Dated 2026-01-02 (an already-present review-burndown
-    // day) so the burn-down's last row stays 2026-01-03.
+    // owning the two scope_status scenarios through their `subject_id`
+    // tag. The first carries a scenario-keyed `Faithful` evidence record
+    // (covered); the second has none (uncovered) -> scenario_count 2,
+    // covered_scenarios 1. The evidence write is keyed by `scenario_id`
+    // with `task_id` None, so `int_task_evidence` (which filters
+    // `task_id IS NOT NULL`) excludes it -> `mart_trust_matrix`'s
+    // three-task shape is unchanged; it carries no `project_id`, so
+    // `mart_scope_status`'s composite-keyed scenario evidence join
+    // excludes it too. Dated 2026-01-02 (an already-present
+    // review-burndown day) so the burn-down's last row stays 2026-01-03.
     tier.write(&EvidenceRecord::new(
         Envelope::new(1, RecordKind::EvidenceRecord, at(2026, 1, 2, 13), actor("agentA", "dev")),
         None,
@@ -687,35 +691,27 @@ fn build_git_tier(git_root: &Path) {
     // join resolves for the fully-green scenario and honestly misses
     // for the unauthored one.
     for scenario_id in [scope_status::FULLY_GREEN_SCENARIO_ID, scope_status::UNAUTHORED_SCENARIO_ID] {
-        tier.write(&canon_model::Scenario::new(
+        let mut scenario = canon_model::Scenario::new(
             Envelope::new(1, RecordKind::Scenario, at(2026, 1, 5, 8), actor("canon", "dev")),
             canon_model::ProjectId::parse(scope_status::FULLY_GREEN_SPEC_PROJECT_ID).unwrap(),
             ScenarioId::parse(scenario_id).unwrap(),
             "fixture scenario",
             "",
             canon_model::SpecDigest::of(scenario_id.as_bytes()),
-        ))
-        .unwrap();
+        );
+        scenario.subject_id = Some(SubjectId::parse(subjects::SUBJECT_ID).unwrap());
+        tier.write(&scenario).unwrap();
     }
 
-    tier.write(
-        &Subject::new(
-            Envelope::new(1, RecordKind::Subject, at(2026, 1, 5, 9), actor("planner1", "planner")),
-            SubjectId::parse(subjects::SUBJECT_ID).unwrap(),
-            subjects::TITLE,
-            "fixture product unit",
-            subjects::DOMAIN,
-            SubjectStatus::Building,
-            RoleId::parse("dev").unwrap(),
-        )
-        .with_links(
-            vec![],
-            vec![
-                ScenarioId::parse(subjects::COVERED_SCENARIO_ID).unwrap(),
-                ScenarioId::parse(subjects::UNCOVERED_SCENARIO_ID).unwrap(),
-            ],
-        ),
-    )
+    tier.write(&Subject::new(
+        Envelope::new(1, RecordKind::Subject, at(2026, 1, 5, 9), actor("planner1", "planner")),
+        SubjectId::parse(subjects::SUBJECT_ID).unwrap(),
+        subjects::TITLE,
+        "fixture product unit",
+        subjects::DOMAIN,
+        SubjectStatus::Building,
+        RoleId::parse("dev").unwrap(),
+    ))
     .unwrap();
 }
 

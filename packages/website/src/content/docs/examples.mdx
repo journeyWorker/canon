@@ -305,6 +305,16 @@ guidance, then drive it through its evidence-gated lifecycle.
    subject's `change_ids` — the plan unit now belongs to a managed
    product unit.
 
+   Scenarios join the subject from the spec side: scaffold them with
+   `--subject` (or add `@subject:checkout-revamp` by hand), then sync so
+   the tag lands on the `Scenario` record:
+
+   ```bash
+   bunx @journeykit/canon scenario new checkout.cart.01 \
+     --title "Adding an item raises the count" --subject checkout-revamp
+   bunx @journeykit/canon inventory sync
+   ```
+
 3. **Retrieve subject-scoped guidance before working.**
 
    ```bash
@@ -325,9 +335,11 @@ guidance, then drive it through its evidence-gated lifecycle.
    ```
 
    The `verifying → shipped` step is evidence-gated: it succeeds only
-   when every scenario the subject links carries a latest non-Divergent
-   verdict. Otherwise it prints the offending scenarios, exits `1`, and
-   the status stays `verifying`.
+   when the subject owns at least one scenario (tagged
+   `@subject:checkout-revamp` and indexed by `inventory sync`) and every
+   owned scenario carries a latest non-Divergent verdict. Otherwise it
+   prints the offending scenarios, exits `1`, and the status stays
+   `verifying`.
 
 5. **Read the per-domain management view.**
 

@@ -216,10 +216,12 @@ computes it; nothing here is derived a second time.
   Per-domain subject rollup: status × scenario coverage.
   One row per `subject` record, folded to its latest version, so a subject
   that walked proposed → shipped is still one row. `scenario_count` is how
-  many `scenario_ids` the subject links; `covered_scenarios` is how many of
-  those carry a latest NON-divergent evidence verdict (`faithful` or
-  `not_applicable`), the same last-wins fold the `verifying -> shipped` gate
-  uses. Read-only reporting; never a `canon gate` input. See `canon-subject`.
+  many scenarios the subject owns — those whose latest synced `Scenario`
+  generation carries `@subject:<id>` (run `canon inventory sync` after
+  tagging); `covered_scenarios` is how many of those carry a latest
+  NON-divergent evidence verdict (`faithful` or `not_applicable`), the same
+  join and last-wins fold the `verifying -> shipped` gate uses. Read-only
+  reporting; never a `canon gate` input. See `canon-subject`.
 
 - **Review rounds** (`mart_review_rounds`) — one row per `(change_id, round)`
   over `Finding` records (`canon finding add`, then `canon finding close` to

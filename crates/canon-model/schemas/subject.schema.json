@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Subject",
-  "description": "A subject (join-spine `subject_id` row: subject ↔ change ↔ scenario)\n— the durable product/management unit a team plans, designs, builds,\nand measures across many changes (s36, the reviewed 13th kind). A\nby-id kind like [`Change`]: flat Hive partition, no mandatory\n`scenario_id`. `domain` is a validated-shape-only kebab slug (see\n[`deserialize_domain_slug`] — the closed vocabulary lives in\n`canon/vocab`, not here); `owner_role` names the accountable role;\n`change_ids`/`scenario_ids` are the join links accumulated as work\nis adopted and specced against the subject (both additive-empty by\ndefault, so a freshly-authored subject with no links yet is still a\nvalid, minimal record).",
+  "description": "A subject (join-spine `subject_id` row: subject ↔ change ↔ scenario)\n— the durable product/management unit a team plans, designs, builds,\nand measures across many changes (s36, the reviewed 13th kind). A\nby-id kind like [`Change`]: flat Hive partition, no mandatory\n`scenario_id`. `domain` is a validated-shape-only kebab slug (see\n[`deserialize_domain_slug`] — the closed vocabulary lives in\n`canon/vocab`, not here); `owner_role` names the accountable role;\n`change_ids` accumulates as plan changes are adopted\n(additive-empty by default, so a freshly-authored subject with no\nlinks yet is still a valid, minimal record).\n\nThe scenario side of the join lives on [`Scenario::subject_id`], set\nby `canon inventory sync` from each scenario's `@subject:<id>` tag —\nthe spec corpus is the one place that link is authored. A subject\ncarries no copy of it: a second, separately-written list is exactly\nwhat drifted (never populated, so every reader saw zero scenarios and\nthe ship gate passed on an empty set). Records written before that\nlist was removed still deserialize; the stale key is ignored.",
   "type": "object",
   "properties": {
     "actor": {
@@ -25,12 +25,6 @@
     },
     "owner_role": {
       "$ref": "#/$defs/RoleId"
-    },
-    "scenario_ids": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/ScenarioId"
-      }
     },
     "schema": {
       "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
@@ -128,10 +122,6 @@
     },
     "RoleId": {
       "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
-      "type": "string"
-    },
-    "ScenarioId": {
-      "description": "`<area>.<surface>.<nn>` — `[a-z0-9-]+\\.[a-z0-9-]+\\.\\d{2,}`; never renumbered once assigned — joins: spec ↔ test ↔ ledger ↔ divergence",
       "type": "string"
     },
     "SessionId": {

@@ -205,6 +205,24 @@ fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], key: impl Fn
         .collect()
 }
 
+/// The scenarios a Subject owns: every `(project_id, scenario_id)` whose
+/// LATEST `Scenario` generation carries `subject_id == subject`.
+///
+/// This is the ONE subject ↔ scenario join. It is written by `canon
+/// inventory sync` from each scenario's `@subject:<id>` Gherkin tag and
+/// read by this check's `scope`, the `verifying → shipped` subject gate,
+/// and `canon report`'s Subjects panel (`mart_subjects` applies the same
+/// latest-generation fold in SQL). Folding first matters: a scenario
+/// whose tag was removed or moved to another subject still has its old
+/// tagged generation on disk, and reading that row would keep it linked.
+pub fn subject_scenarios(ctx: &GateContext, subject: &SubjectId) -> BTreeSet<(ProjectId, ScenarioId)> {
+    latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone()))
+        .into_iter()
+        .filter(|s| s.subject_id.as_ref() == Some(subject))
+        .map(|s| (s.project_id.clone(), s.scenario_id.clone()))
+        .collect()
+}
+
 /// Every `(project_id, scenario_id)` an `EvidenceRecord` attests to.
 ///
 /// A record carrying a `scenario_id` but no `project_id` is EXCLUDED,
@@ -533,6 +551,34 @@ mod tests {
         let out = run(corpus, active(vec![SubjectStatus::Building]));
         assert_eq!(out.len(), 1, "one scenario, one violation — the stale row must not be judged too: {out:?}");
         assert!(out[0].detail.contains("no evidence record"), "and it must be judged on the FRESH row's subject link: {}", out[0].detail);
+    }
+
+    /// A scenario re-tagged from one subject to another belongs only to
+    /// the new one: its stale generation still names the old subject on
+    /// disk, and reading that row would keep shipping `old` gated on
+    /// work it no longer owns.
+    #[test]
+    fn subject_scenarios_follow_the_latest_tag_generation() {
+        let stale = scenario("p.a.01", Some("old"));
+        let mut fresh = scenario("p.a.01", Some("new"));
+        fresh.envelope.at = stale.envelope.at + chrono::Duration::seconds(1);
+        let other = scenario("p.a.02", Some("old"));
+
+        let ctx = GateContext {
+            ctx: crate::context::GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/.canon/ledger".into() },
+            policy: policy(None),
+            evidence: Vec::new(),
+            scenarios: vec![stale, fresh, other],
+            divergences: Vec::new(),
+            subjects: Vec::new(),
+            violations: Vec::new(),
+            corpus_violations: Vec::new(),
+            unreadable_kinds: Vec::new(),
+            now: Utc::now(),
+        };
+        let ids = |s: &str| subject_scenarios(&ctx, &SubjectId::parse(s).unwrap()).into_iter().map(|(_, id)| id.as_str().to_string()).collect::<Vec<_>>();
+        assert_eq!(ids("old"), vec!["p.a.02".to_string()]);
+        assert_eq!(ids("new"), vec!["p.a.01".to_string()]);
     }
 
     // ── scope ──

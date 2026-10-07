@@ -62,7 +62,7 @@ subject-write-first 루프는 [캐논 개념](/ko/concepts/canon/#서브젝트)�
 |---|---|
 | `canon subject new <id> --domain <d> --title <t> [--summary <s>] [--owner-role <r>] [--repo <dir>] [--json]` | `Subject`을 저작합니다(kebab-slug `<id>`가 durable `subject_id` 조인 키). `--domain`은 vocabulary로 정의된 kebab slug입니다 — 기본 집합 `planning`/`design`/`dev`/`data`/`test`, `.canon/vocab`로 레포별 확장. 상태 `proposed`로 시작하며, `--owner-role`은 생략 시 `implementer`가 기본값입니다. 쓰기 시 envelope + 정책을 검증합니다. |
 | `canon subject adopt <change_id> --subject <id> [--repo <dir>] [--json]` | import된 plan `Change`(`canon ingest plans` 결과)를 `Subject`에 연결합니다: `Change.subject_id`를 찍고 subject의 `change_ids`에 추가합니다. |
-| `canon subject status <id> <state> [--repo <dir>] [--json]` | `proposed → specced → building → verifying → shipped`(및 any → `retired`)를 따르는 정책 게이팅 전이입니다. `verifying → shipped`는 연결된 모든 scenario가 최신 non-Divergent 판정을 가질 것을 추가로 요구합니다. 위반 시 failure class별로 출력하고 `1`로 종료하며 레코드는 변경되지 않습니다(fail closed). |
+| `canon subject status <id> <state> [--repo <dir>] [--json]` | `proposed → specced → building → verifying → shipped`(및 any → `retired`)를 따르는 정책 게이팅 전이입니다. `verifying → shipped`는 subject가 시나리오를 하나 이상 소유하고(`canon inventory sync`가 인덱싱한 `@subject:<id>` 태그 기준), 소유한 모든 scenario가 최신 non-Divergent 판정을 가질 것을 추가로 요구합니다. 위반 시 failure class별로 출력하고 `1`로 종료하며 레코드는 변경되지 않습니다(fail closed). |
 
 ## Corpus
 

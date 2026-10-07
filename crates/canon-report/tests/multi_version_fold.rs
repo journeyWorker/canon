@@ -247,6 +247,7 @@ fn subjects_counts_scenarios_once_across_a_status_lifecycle() {
     let subject_id = SubjectId::parse("fold-subject").unwrap();
     let covered = ScenarioId::parse("fold.subject.01").unwrap();
     let uncovered = ScenarioId::parse("fold.subject.02").unwrap();
+    let untagged_later = ScenarioId::parse("fold.subject.03").unwrap();
 
     // The full `canon subject status` walk: FIVE versions at one
     // `subject_id`, which is the ordinary end state of any shipped
@@ -258,19 +259,42 @@ fn subjects_counts_scenarios_once_across_a_status_lifecycle() {
         (12, SubjectStatus::Verifying),
         (13, SubjectStatus::Shipped),
     ] {
-        tier.write(
-            &Subject::new(
-                Envelope::new(1, RecordKind::Subject, at(2026, 5, 2, hour), actor("planner")),
-                subject_id.clone(),
-                "folded subject",
-                "one product unit, five stored versions",
-                "dev",
-                status,
-                RoleId::parse("dev").unwrap(),
-            )
-            .with_links(vec![], vec![covered.clone(), uncovered.clone()]),
-        )
+        tier.write(&Subject::new(
+            Envelope::new(1, RecordKind::Subject, at(2026, 5, 2, hour), actor("planner")),
+            subject_id.clone(),
+            "folded subject",
+            "one product unit, five stored versions",
+            "dev",
+            status,
+            RoleId::parse("dev").unwrap(),
+        ))
         .unwrap();
+    }
+
+    // The scenario side is append-only too: every `canon inventory
+    // sync` after a `.feature` edit adds a generation. `uncovered` is
+    // synced twice with its tag; `untagged_later` lost its tag in the
+    // second sync, so only its STALE generation still names the subject.
+    let scenario = |id: &ScenarioId, hour: u32, tagged: bool| {
+        let mut s = canon_model::Scenario::new(
+            Envelope::new(1, RecordKind::Scenario, at(2026, 5, 2, hour), actor("canon")),
+            canon_model::ProjectId::parse("fold-project").unwrap(),
+            id.clone(),
+            "fold scenario",
+            "",
+            canon_model::SpecDigest::of(format!("{}-{hour}", id.as_str()).as_bytes()),
+        );
+        s.subject_id = tagged.then(|| subject_id.clone());
+        s
+    };
+    for record in [
+        scenario(&covered, 8, true),
+        scenario(&uncovered, 8, true),
+        scenario(&uncovered, 15, true),
+        scenario(&untagged_later, 8, true),
+        scenario(&untagged_later, 15, false),
+    ] {
+        tier.write(&record).unwrap();
     }
 
     tier.write(&EvidenceRecord::new(
@@ -288,9 +312,10 @@ fn subjects_counts_scenarios_once_across_a_status_lifecycle() {
     assert_eq!(result.rows.len(), 1, "one subject must yield exactly one row however many statuses it walked, got {:?}", result.rows);
     let row = &result.rows[0];
     assert_eq!(row["status"], "shipped", "the row must carry the LATEST status, not an arbitrary superseded one");
-    // Unfolded, `subject_scenarios` fanned out five-fold: 2 linked
-    // scenarios read as 10, and the 1 covered one read as 5.
-    assert_eq!(row["scenario_count"], 2, "the subject links two scenarios, not two-per-stored-version");
+    // Unfolded on either side the counts multiply: five subject
+    // versions read 2 scenarios as 10, and an unfolded scenario corpus
+    // counts `uncovered` twice and keeps the untagged one linked.
+    assert_eq!(row["scenario_count"], 2, "two scenarios whose LATEST generation carries the tag — once each");
     assert_eq!(row["covered_scenarios"], 1, "exactly one of them carries a non-divergent verdict");
 }
 

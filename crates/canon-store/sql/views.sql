@@ -1650,13 +1650,23 @@ ORDER BY s.session_id, r.run_id, h.handoff_id;
 -- (the reviewed 13th kind), grouped/ordered by `domain` then
 -- `subject_id` — the per-domain management view `canon report` renders
 -- and `canon query --kind subject [--domain] [--status]` filters.
--- `scenario_count` is how many `scenario_ids` the subject links;
+-- `scenario_count` is how many scenarios the subject OWNS: the
+-- `(project_id, scenario_id)` rows whose LATEST `scenario` generation
+-- carries `subject_id = <this subject>`, written by `canon inventory
+-- sync` from each scenario's `@subject:<id>` Gherkin tag. That is the
+-- one subject <-> scenario join; `canon-gate::spec_coverage::
+-- subject_scenarios` (the `verifying -> shipped` gate and
+-- `spec_coverage.scope`) reads the same rows with the same fold. The
+-- panel used to count a `subject.scenario_ids` list instead — a list no
+-- command ever wrote, so every subject read 0 while its scenarios sat
+-- tagged in the corpus. Folding the scenario first matters: a scenario
+-- re-tagged to another subject still has its old generation on disk.
 -- `covered_scenarios` is how many of those carry a latest NON-Divergent
 -- `evidence_record` verdict (faithful | not_applicable), the same
 -- last-wins-by-`at` fold rule `mart_trust_matrix`'s `green` and
 -- `canon-gate::ledger::latest_verdicts` (the `verifying -> shipped`
 -- gate) use — read-only reporting only, never a `canon-gate` input. A
--- subject with no linked scenarios yields `scenario_count = 0`,
+-- subject with no tagged scenarios yields `scenario_count = 0`,
 -- `covered_scenarios = 0` (a valid, minimal row, never dropped); an
 -- empty/absent subject corpus yields zero rows, never an error.
 --
@@ -1665,8 +1675,8 @@ ORDER BY s.session_id, r.run_id, h.handoff_id;
 -- subject status` walks proposed -> specced -> building -> verifying ->
 -- shipped — so a subject that reached shipped is FIVE `subject`
 -- versions at one key, and unfolded this panel emitted five rows for
--- it, each claiming a different current `status`, while
--- `subject_scenarios` fanned out five-fold and multiplied BOTH
+-- it, each claiming a different current `status`, while the coverage
+-- join fanned out five-fold and multiplied BOTH
 -- `scenario_count` and `covered_scenarios` by five. A two-scenario
 -- shipped subject read `scenario_count 10`. That is the same shape as
 -- `mart_session_costs`' cost double-count, on the panel whose grain is
@@ -1677,18 +1687,26 @@ WITH subjects AS (
         body ->> '$.subject_id'  AS subject_id,
         body ->> '$.domain'      AS domain,
         body ->> '$.title'       AS title,
-        body ->> '$.status'      AS status,
-        body -> '$.scenario_ids' AS scenario_ids
+        body ->> '$.status'      AS status
     FROM stg_records
     WHERE kind = 'subject'
     QUALIFY row_number() OVER (PARTITION BY body ->> '$.subject_id' ORDER BY version_rank DESC) = 1
 ),
 subject_scenarios AS (
-    SELECT
-        s.subject_id,
-        g ->> '$' AS scenario_id
-    FROM subjects s, UNNEST(from_json(s.scenario_ids, '["JSON"]')) AS u(g)
-    WHERE s.scenario_ids IS NOT NULL
+    SELECT subject_id, project_id, scenario_id
+    FROM (
+        SELECT
+            body ->> '$.project_id'  AS project_id,
+            body ->> '$.scenario_id' AS scenario_id,
+            body ->> '$.subject_id'  AS subject_id
+        FROM stg_records
+        WHERE kind = 'scenario'
+        QUALIFY row_number() OVER (
+            PARTITION BY body ->> '$.project_id', body ->> '$.scenario_id'
+            ORDER BY version_rank DESC
+        ) = 1
+    )
+    WHERE subject_id IS NOT NULL
 ),
 -- The CURRENT verdict about each scenario, as one WHOLE winner row
 -- ordered by `version_rank` — the `(at, schema, digest)` triple
