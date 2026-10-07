@@ -67,6 +67,16 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.9.0 release and migration
+
+Version 0.9.0 makes the Gherkin `@subject:<id>` tag the only subject ↔
+scenario link. `canon report`'s Subjects panel and the `verifying → shipped`
+gate now count the scenarios whose latest `canon inventory sync` generation
+carries the tag; the never-populated `Subject.scenario_ids` list is gone
+(older records still read). Shipping is now refused when a subject owns no
+tagged scenario, so tag each subject's scenarios and re-run
+`canon inventory sync` before moving it to `shipped`.
+
 ## 0.8.0 release and migration
 
 Version 0.8.0 consolidates provider projections into a single `canon` skill,

@@ -87,9 +87,9 @@ Feature: evidence add
 
   @subject:evidence-attestation
   @evidence.add.10
-  Scenario: An accountable approval is authored as a complete pair
+  Scenario: Approval metadata without authentication is refused before staging
   # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given an evidence add with --approval-by and --approval-role
-    When the record is staged
-    Then the record carries approver, role, and timestamp
-    And supplying only one approval flag is refused before staging
+    Given an evidence add with approval metadata but no detached SSH signature
+    When the add is invoked
+    Then it is refused before staging, even when --approval-by and --approval-role are both supplied
+    And CANON_ACTOR does not substitute for authenticated approval

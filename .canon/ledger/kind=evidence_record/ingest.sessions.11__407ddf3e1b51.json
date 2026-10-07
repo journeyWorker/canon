@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-07T04:01:49.257807Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --lib opted_in_privacy_redacts_split_multiline_unicode_and_after_bound_secrets_before_truncation"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 11,
+  "scenario_id": "ingest.sessions.11",
+  "schema": 1,
+  "staging_id": "63e88b4f86db",
+  "verdict": "faithful"
+}

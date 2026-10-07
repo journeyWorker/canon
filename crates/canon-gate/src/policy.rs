@@ -958,6 +958,8 @@ risk_routing:
         let (resolution, _dir) = resolve_with(
             "risk_tiers:\n  high:\n    rank: 3\n    paths: [\"src/auth/**\"]\n    effects: [secret-access]\n    min_human_approvals: 1\n",
         );
+        assert!(resolution.is_clean(), "declarative risk tiers must not compile as CEL: {:?}", resolution.diagnostics);
+        assert!(!resolution.diagnostics.iter().any(|diagnostic| matches!(diagnostic, PolicyDiagnostic::InvalidPredicate { .. })));
         assert_eq!(
             resolution.risk_tiers.get("high"),
             Some(&RiskTierRule {

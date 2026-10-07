@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-07T04:01:49.091725Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib absent_privacy_omits_directive_and_preserves_source_transcript"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "ingest.sessions.10",
+  "schema": 1,
+  "staging_id": "282db34a5276",
+  "verdict": "faithful"
+}

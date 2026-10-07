@@ -1575,6 +1575,62 @@ mod tests {
         assert!(payload["events"].as_array().unwrap().iter().all(|event| event["label"] != "user_directive"));
     }
 
+    #[test]
+    fn absent_privacy_omits_directive_and_preserves_source_transcript() {
+        let fixture = build_two_project_fixture(false);
+        let source_dir = fixture
+            .home
+            .path()
+            .join(".omp/agent/sessions")
+            .join(encode_cwd_dirname(&normalize_workspace_key(&fixture.project_a.to_string_lossy()).unwrap()));
+        let source = source_dir.join("ing_ses_a.jsonl");
+        let before = std::fs::read(&source).unwrap();
+
+        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false).unwrap();
+        let sessions = outcome.unwritten.as_ref().expect("unrouted fixture uses metadata-only unwritten output");
+        assert!(sessions.iter().flat_map(|session| &session.events).all(|event| event.label != "user_directive"));
+        assert_eq!(std::fs::read(&source).unwrap(), before, "ingest must never rewrite the source transcript");
+    }
+
+    #[test]
+    fn degraded_json_is_metadata_only_with_capture_enabled_and_tier_unavailable() {
+        let fixture = build_two_project_fixture(false);
+        let source_dir = fixture
+            .home
+            .path()
+            .join(".omp/agent/sessions")
+            .join(encode_cwd_dirname(&normalize_workspace_key(&fixture.project_a.to_string_lossy()).unwrap()));
+        let source = source_dir.join("ing_ses_a.jsonl");
+        let source_text = std::fs::read_to_string(&source).unwrap().replace("do the a thing", "credential=sk-live-secret task/context prose");
+        std::fs::write(&source, source_text).unwrap();
+        let dsn_env = "CANON_PG_DSN_INGEST_SESSIONS_METADATA_ONLY_TEST";
+        std::env::remove_var(dsn_env);
+        std::fs::write(
+            &fixture.canon_yaml,
+            format!(
+                "tiers:\n  hot: {{ backend: postgres, dsn_env: {dsn_env}, schema: canon_v1 }}\n\
+                 routing:\n  session: hot\n  run: hot\n  event: hot\n\
+                 ingest:\n  sessions:\n    privacy:\n      capture_user_directives: true\n      max_directive_chars: 64\n"
+            ),
+        )
+        .unwrap();
+
+        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false).unwrap();
+        let payload: serde_json::Value = serde_json::from_str(&format_json(&outcome).unwrap()).unwrap();
+        assert_eq!(payload["failure"]["class"], "tier_unavailable");
+        assert!(payload["failure"]["reason"].as_str().unwrap().contains(dsn_env));
+        assert!(payload["scope"].is_string());
+        assert!(payload["counts"].is_object());
+        assert!(payload["counts"]["sessions"].as_u64().unwrap() > 0);
+        assert!(payload["sessions"].as_array().unwrap().iter().all(|entry| entry.get("digest").is_some()));
+        assert!(payload["runs"].as_array().unwrap().iter().all(|entry| entry.get("digest").is_some()));
+        assert!(payload["events"].as_array().unwrap().iter().all(|entry| entry.get("digest").is_some() && entry.get("detail").is_none()));
+        let json = serde_json::to_string(&payload).unwrap();
+        for secret in ["credential=sk-live-secret", "task/context prose", "do the worktree thing", "do the b thing"] {
+            assert!(!json.contains(secret), "metadata fallback leaked {secret}: {json}");
+        }
+    }
+
 
     #[test]
     fn degraded_json_omits_captured_directive_text() {

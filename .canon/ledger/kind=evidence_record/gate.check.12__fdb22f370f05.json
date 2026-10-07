@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-07T04:01:48.657983Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate risk_gate_rejects_zero_and_one_signer_then_accepts_two_distinct_ssh_signers"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 12,
+  "scenario_id": "gate.check.12",
+  "schema": 1,
+  "staging_id": "37c40ee918e6",
+  "verdict": "faithful"
+}

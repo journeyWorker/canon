@@ -335,6 +335,8 @@ fn risk_gate_rejects_zero_and_one_signer_then_accepts_two_distinct_ssh_signers()
     repo.write_record(task, &repo.auth_sha, run, Utc::now(), EvidenceVerdict::Faithful, paths.clone(), Vec::new());
     let zero = repo.gate();
     assert_eq!(zero.status.code(), Some(1), "zero approvals must gate-red: {}", stdout(&zero));
+    assert!(stdout(&zero).contains("risk tier `high`"), "{}", stdout(&zero));
+    assert!(stdout(&zero).contains("at least 2 distinct authenticated human approval"), "{}", stdout(&zero));
     assert!(stdout(&zero).contains("observed 0"), "{}", stdout(&zero));
 
     repo.reset_ledger();
@@ -344,6 +346,28 @@ fn risk_gate_rejects_zero_and_one_signer_then_accepts_two_distinct_ssh_signers()
     let one = repo.gate();
     assert_eq!(one.status.code(), Some(1), "one approval must gate-red: {}", stdout(&one));
     assert!(stdout(&one).contains("observed 1"), "{}", stdout(&one));
+
+    repo.reset_ledger();
+    let agent_at = Utc::now();
+    let mut agent = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, agent_at, &signed_paths);
+    agent.role = RoleId::parse("agent").unwrap();
+    repo.write_record(task, &repo.auth_sha, run, agent_at, EvidenceVerdict::Faithful, paths.clone(), vec![agent]);
+    let agent_only = repo.gate();
+    assert_eq!(agent_only.status.code(), Some(1), "agent approval must not satisfy the human tier: {}", stdout(&agent_only));
+    assert!(stdout(&agent_only).contains("observed 0"), "{}", stdout(&agent_only));
+
+    // Two distinct records from one signer: Ed25519 signatures are
+    // deterministic, so the second approval is signed a second later —
+    // otherwise both records are byte-identical and collapse into one.
+    repo.reset_ledger();
+    let duplicate_at = Utc::now();
+    let alice_one = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, duplicate_at, &signed_paths);
+    let alice_two =
+        repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, duplicate_at + chrono::Duration::seconds(1), &signed_paths);
+    repo.write_record(task, &repo.auth_sha, run, duplicate_at, EvidenceVerdict::Faithful, paths.clone(), vec![alice_one, alice_two]);
+    let duplicate = repo.gate();
+    assert_eq!(duplicate.status.code(), Some(1), "the same signer twice must not satisfy distinct approvals: {}", stdout(&duplicate));
+    assert!(stdout(&duplicate).contains("observed 1"), "{}", stdout(&duplicate));
 
     repo.reset_ledger();
     let two_at = Utc::now();

@@ -94,4 +94,4 @@ Feature: policy expressions
     When the policy is resolved
     Then rank selects the highest matching tier
     And malformed tier entries produce explicit diagnostics and are not enabled
-    And the risk_tiers section does not add a CEL expression or failure class
+    And the risk_tiers section remains declarative, adding no CEL expression or InvalidPredicate diagnostic

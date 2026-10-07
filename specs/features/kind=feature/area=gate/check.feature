@@ -111,9 +111,9 @@ Feature: gate check
 
   @subject:gate-trust-spine
   @gate.check.12
-  Scenario: A matching high risk tier requires a distinct human approval
+  Scenario: A matching high risk tier requires distinct human approvals
   # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given a risk_tiers policy matching src/auth/** with one human approval required
+    Given a risk_tiers policy matching src/auth/** with two human approvals required
     And an evidence record for that path with no approval attestation
     When the gate checks the repository
     Then it reports uncovered-cell for the existing evidence subject
@@ -122,9 +122,9 @@ Feature: gate check
 
   @subject:gate-trust-spine
   @gate.check.13
-  Scenario: A very high risk tier requires two distinct human approvers
+  Scenario: A high risk tier requires distinct verified SSH signers
   # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given a very-high tier matching effect:production-deploy with two approvals required
-    When two evidence records carry the same human approver id
+    Given a high tier matching src/auth/** with two approvals required
+    When two evidence records carry the same verified SSH signer identity
     Then the tier remains uncovered
-    And two distinct non-empty human approver ids satisfy it
+    And two distinct verified SSH signers satisfy it

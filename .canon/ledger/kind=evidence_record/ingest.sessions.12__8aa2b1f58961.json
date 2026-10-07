@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-07T04:01:49.396746Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib degraded_json_is_metadata_only_with_capture_enabled_and_tier_unavailable"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 12,
+  "scenario_id": "ingest.sessions.12",
+  "schema": 1,
+  "staging_id": "c7b5b2805a6d",
+  "verdict": "faithful"
+}

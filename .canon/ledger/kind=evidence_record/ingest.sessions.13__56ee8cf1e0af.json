@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-07T04:01:49.511143Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --lib bounded_privacy_truncates_unicode_scalars_without_claiming_redaction"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 13,
+  "scenario_id": "ingest.sessions.13",
+  "schema": 1,
+  "staging_id": "a9e0d6840020",
+  "verdict": "faithful"
+}

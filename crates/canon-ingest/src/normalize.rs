@@ -1103,6 +1103,7 @@ mod tests {
         assert_eq!(detail["captured_chars"], 3);
         assert_eq!(detail["redaction_counts"]["secret"], 0);
         assert_eq!(detail["redaction_counts"]["pii"], 0);
+        assert_eq!(detail["text"].as_str().unwrap().chars().count(), detail["captured_chars"].as_u64().unwrap() as usize);
     }
 
     #[test]
@@ -1126,6 +1127,9 @@ mod tests {
         assert!(detail["redacted"].as_bool().unwrap());
         assert_eq!(detail["redaction_counts"]["secret"], 4);
         assert_eq!(detail["redaction_counts"]["pii"], 1);
+        assert_eq!(detail["truncated"], true);
+        assert_eq!(detail["original_chars"], text.chars().count());
+        assert_eq!(detail["captured_chars"], captured.chars().count());
         assert!(!captured.contains("sk-live-123456"));
         assert!(!captured.contains("me@example.com"));
         assert!(!captured.contains("bearer-secret-xyz"));

@@ -945,5 +945,11 @@ mod tests {
         let outline = render_outline(&surface);
         assert!(outline.contains("risk_tiers (1):"));
         assert!(outline.contains("high: rank=3"));
+
+        let absent = fixture_repo(None);
+        let absent_surface = resolve_surface(absent.path(), ContextOptions::default());
+        let absent_json: serde_json::Value = serde_json::from_str(&render_json(&absent_surface)).unwrap();
+        assert_eq!(absent_json["policy"]["risk_tiers"], serde_json::json!({}));
+        assert!(render_outline(&absent_surface).contains("risk_tiers (0):"));
     }
 }
