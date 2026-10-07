@@ -67,6 +67,14 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.9.1 fix
+
+The `@journeykit/canon` launcher in 0.8.0–0.9.0 exited 0 regardless of the
+native binary's result, so refusals such as a blocked `verifying → shipped`
+or a red `canon gate check` looked successful to scripts, CI, and hooks.
+0.9.1 passes the binary's exit code through again; a spawn failure or signal
+death exits 1. Upgrade if anything relies on `canon`'s exit status.
+
 ## 0.9.0 release and migration
 
 Version 0.9.0 makes the Gherkin `@subject:<id>` tag the only subject ↔

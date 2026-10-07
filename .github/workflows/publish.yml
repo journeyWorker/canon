@@ -245,6 +245,14 @@ jobs:
         working-directory: packages/cli
         run: bun run build
 
+      # The launcher is the `canon` every npm user runs; scripts, CI, and
+      # hooks see only its exit status. 0.8.0–0.9.0 shipped a launcher that
+      # dropped the native binary's status and exited 0 on every refusal,
+      # and no Rust test can see it. Fail the release before publishing.
+      - name: Test @journeykit/canon launcher exit status
+        working-directory: packages/cli
+        run: bun test
+
       # The upstream release pipeline's lesson (recommended action #2): the
       # `@canon-dev/core-<platform>` fan-out is non-atomic across packages
       # on npm, so a runner death mid-publish leaves a partial release.

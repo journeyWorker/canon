@@ -269,3 +269,11 @@ const result = spawnSync(binary, process.argv.slice(2), {
   stdio: "inherit",
   env: { ...process.env, CANON_SKILLS_SOURCE: skillsSource },
 });
+
+// The launcher IS the `canon` users run, so the native binary's exit code
+// must survive it: scripts, CI, and hooks read only the status. A spawn
+// failure or signal death has no status and must still read as failure.
+if (result.error) {
+  console.error(`canon: failed to run ${binary}: ${result.error.message}`);
+}
+process.exit(result.status ?? 1);
