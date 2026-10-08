@@ -146,7 +146,8 @@ fn base_env(home: &Path) -> BTreeMap<String, String> {
 // 2. The temp repo path as created (macOS: `/var/...`) -> `<repo>`.
 // 3. RFC3339 timestamps -> `<ts>`.
 // 4. ULIDs -> `<ulid>`.
-// 5. 12-hex record digests in ledger filenames (`__<12 hex>.json`) ->
+// 5. 12-hex record digests in ledger record paths
+//    (`kind=<kind>/[area=<area>/]<natural_key>__<12 hex>.json`) ->
 //    `__<digest12>.json`.
 
 fn normalize(text: &str, repo_paths: &[String]) -> String {
@@ -277,31 +278,86 @@ fn replace_ulids(text: &str) -> String {
     out
 }
 
-/// Ledger record files are `<id>__<12 lowercase hex>.json`; the digest is
-/// over a time-stamped record, so only that 12-hex segment is replaced.
+/// The writer's ledger record path (`canon_store::partition::hive_object_key`,
+/// `GitTier::write_namespaced`) is
+/// `kind=<kind>/[area=<area>/]<natural_key>__<12 lowercase hex>.json`; the
+/// digest is over a time-stamped record, so only that 12-hex segment is
+/// replaced, and only where the whole path shape is present:
+///
+/// - `kind=` begins a path segment: text start, or right after `/`,
+///   whitespace or a quote (`"`, `'`, `` ` ``), so both a bare
+///   ledger-relative location and `.canon/ledger/kind=...` qualify;
+/// - `<kind>` is `[a-z0-9_.-]+` (core snake_case or namespaced `ns.kind`);
+/// - `<area>` and `<natural_key>` are non-empty path components, and
+///   `<natural_key>` does not start with `.`;
+/// - `.json` ends the filename token: text end or a byte that cannot
+///   continue a filename (not ASCII alphanumeric, `_`, `-`, `.`, `/`, `\`).
+///
+/// A bare `name__<12 hex>.json` outside a `kind=` directory — a cache file
+/// name in a JSON field, a message — is consumer-visible and kept verbatim.
 fn replace_ledger_digests(text: &str) -> String {
     const HEX: usize = 12;
+    const SUFFIX: usize = 2 + HEX + 5;
     let bytes = text.as_bytes();
     let mut out = String::with_capacity(text.len());
     let mut i = 0;
     let mut copied = 0;
-    while i + 2 + HEX + 5 <= bytes.len() {
-        if bytes[i] == b'_' && bytes[i + 1] == b'_' {
-            let hex = &bytes[i + 2..i + 2 + HEX];
-            if hex.iter().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'))
-                && &bytes[i + 2 + HEX..i + 2 + HEX + 5] == b".json"
-            {
-                out.push_str(&text[copied..i]);
-                out.push_str("__<digest12>.json");
-                i += 2 + HEX + 5;
-                copied = i;
-                continue;
-            }
+    while i + SUFFIX <= bytes.len() {
+        if bytes[i..].starts_with(b"__")
+            && bytes[i + 2..i + 2 + HEX].iter().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'))
+            && &bytes[i + 2 + HEX..i + SUFFIX] == b".json"
+            && bytes.get(i + SUFFIX).is_none_or(|&c| !continues_filename(c))
+            && in_ledger_record_path(bytes, i)
+        {
+            out.push_str(&text[copied..i]);
+            out.push_str("__<digest12>.json");
+            i += SUFFIX;
+            copied = i;
+            continue;
         }
         i += 1;
     }
     out.push_str(&text[copied..]);
     out
+}
+
+fn continues_filename(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.' | b'/' | b'\\')
+}
+
+/// A byte that can sit inside one path component of a ledger record path.
+fn is_component_byte(b: u8) -> bool {
+    !(b.is_ascii_whitespace() || matches!(b, b'/' | b'\\' | b'"' | b'\'' | b'`'))
+}
+
+/// Start of the run of component bytes ending at `end` (exclusive).
+fn component_start(bytes: &[u8], end: usize) -> usize {
+    bytes[..end].iter().rposition(|&b| !is_component_byte(b)).map_or(0, |p| p + 1)
+}
+
+/// Whether the `__<12 hex>.json` suffix at `suffix` ends a
+/// `kind=<kind>/[area=<area>/]<natural_key>` path (see
+/// [`replace_ledger_digests`]).
+fn in_ledger_record_path(bytes: &[u8], suffix: usize) -> bool {
+    let stem = component_start(bytes, suffix);
+    if stem == suffix || stem == 0 || bytes[stem - 1] != b'/' || bytes[stem] == b'.' {
+        return false;
+    }
+    let mut dir_end = stem - 1;
+    let mut dir = component_start(bytes, dir_end);
+    if let Some(area) = bytes[dir..dir_end].strip_prefix(b"area=") {
+        if area.is_empty() || dir == 0 || bytes[dir - 1] != b'/' {
+            return false;
+        }
+        dir_end = dir - 1;
+        dir = component_start(bytes, dir_end);
+    }
+    let Some(kind) = bytes[dir..dir_end].strip_prefix(b"kind=") else {
+        return false;
+    };
+    !kind.is_empty()
+        && kind.iter().all(|c| matches!(c, b'a'..=b'z' | b'0'..=b'9' | b'_' | b'.' | b'-'))
+        && (dir == 0 || bytes[dir - 1] != b'\\')
 }
 
 // ── Diff ──
@@ -589,6 +645,23 @@ fn normalization_rules_rewrite_only_the_documented_values() {
          id <ulid> stamped <ts> / <ts>\n\
          file kind=evidence_record/<ulid>__<digest12>.json\n\
          kept: not-a-ulid 01J9Z3Q4W5E6R7T8Y9U0P1A2SX sha 0123456789abcdef0123 task seed-change#1 2026-10-09\n"
+    );
+}
+
+#[test]
+fn ledger_digest_rule_rewrites_only_ledger_record_paths() {
+    let text = "wrote .canon/ledger/kind=task/seed-change#1__0123456789ab.json\n\
+                {\"location\":\"kind=review/area=world/root__world.hotdeal.01__abc__fedcba987654.json\"}\n\
+                {\"cache\":\"cache__0123456789ab.json\"}\n\
+                plain cache__0123456789ab.json and tmp/cache__0123456789ab.json\n\
+                not a filename end: kind=task/x__0123456789ab.json.bak kind=Task/x__0123456789ab.json\n";
+    assert_eq!(
+        replace_ledger_digests(text),
+        "wrote .canon/ledger/kind=task/seed-change#1__<digest12>.json\n\
+         {\"location\":\"kind=review/area=world/root__world.hotdeal.01__abc__<digest12>.json\"}\n\
+         {\"cache\":\"cache__0123456789ab.json\"}\n\
+         plain cache__0123456789ab.json and tmp/cache__0123456789ab.json\n\
+         not a filename end: kind=task/x__0123456789ab.json.bak kind=Task/x__0123456789ab.json\n"
     );
 }
 

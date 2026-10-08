@@ -73,8 +73,12 @@ rewritten, so anything a consumer could parse is compared exactly:
 4. **ULIDs** — exactly 26 Crockford base32 characters (`0-9`, `A-Z` without
    `I L O U`), the first `0`–`7`, standing alone (no ASCII letter/digit on
    either side) → `<ulid>`.
-5. **Ledger record digests** — the 12 lowercase hex characters in a ledger
-   filename's `__<12 hex>.json` suffix → `__<digest12>.json`.
+5. **Ledger record digests** — the 12 lowercase hex characters of a ledger
+   record path `kind=<kind>/[area=<area>/]<natural_key>__<12 hex>.json`
+   → `__<digest12>.json`. `kind=` must begin a path segment (text start, or
+   after `/`, whitespace or a quote), `<kind>` is `[a-z0-9_.-]+`, and `.json`
+   must end the filename (no following ASCII letter/digit, `_ - . / \`). A
+   `name__<12 hex>.json` outside a `kind=` directory is never rewritten.
 
 A plain date, a full Git SHA, a task id, or any other value is never
 normalized. If a new case needs another rule, that is a change to this list
