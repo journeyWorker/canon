@@ -88,6 +88,11 @@ listed as advisories by `canon gate check` until the next status change.
 and the active `require_review` setting. Nothing changes for a repo that
 does not set `require_review`; canon's own policy leaves it off for now.
 
+One conformance expectation changed for this: `context-json-policy-summary`
+was re-blessed because `canon context --json` now carries the `review`
+object, `capabilityVersion` 4, and the Subject kind's optional
+`status_override` field. Every other case is unchanged.
+
 ## 0.11.0 release (experimental evidence binding)
 
 Version 0.11.0 adds an **experimental, off-by-default** way to bind

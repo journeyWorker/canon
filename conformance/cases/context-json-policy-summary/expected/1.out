@@ -1,5 +1,5 @@
 {
-  "capabilityVersion": 3,
+  "capabilityVersion": 4,
   "kinds": {
     "change": {
       "schema_version": 1,
@@ -244,6 +244,7 @@
         "owner_role": true,
         "schema": true,
         "status": true,
+        "status_override": false,
         "subject_id": true,
         "summary": true,
         "title": true
@@ -399,6 +400,31 @@
       "inactive": {}
     },
     "diagnostics": []
+  },
+  "review": {
+    "findingSeverities": [
+      "blocker",
+      "should-fix",
+      "note"
+    ],
+    "findingDispositions": [
+      "open",
+      "fixed",
+      "rejected",
+      "deferred"
+    ],
+    "reviewFields": {
+      "actor": true,
+      "at": true,
+      "kind": true,
+      "pin": true,
+      "project_id": true,
+      "provenance_ref": true,
+      "reviewer": true,
+      "scenario_id": true,
+      "schema": true
+    },
+    "requireReview": null
   },
   "cel": {
     "change": {
@@ -621,6 +647,7 @@
         "record.owner_role": "string",
         "record.schema": "uint",
         "record.status": "string (one of: proposed, specced, building, verifying, shipped, retired)",
+        "record.status_override": "map",
         "record.subject_id": "string",
         "record.summary": "string",
         "record.title": "string"
