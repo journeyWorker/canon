@@ -569,13 +569,18 @@ fn an_override_records_the_reason_and_gate_check_lists_an_advisory() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("waived unreviewed-promotion world.demo.01"), "{err}");
-    assert!(err.contains("override recorded by `lead`: reviewer out until Monday"), "{err}");
+    assert!(err.contains("override recorded by `lead` for the 1 violation(s) above: reviewer out until Monday"), "{err}");
 
     let subject = current_subject(dir.path());
     assert_eq!(subject["status"], "verifying");
     assert_eq!(
         subject["status_override"],
-        serde_json::json!({"to": "verifying", "reason": "reviewer out until Monday", "checks": ["unreviewed-promotion"], "actor": {"agent_id": "lead"}})
+        serde_json::json!({
+            "to": "verifying",
+            "reason": "reviewer out until Monday",
+            "waived": [{"class": "unreviewed-promotion", "subject": "world.demo.01"}],
+            "actor": {"agent_id": "lead"}
+        })
     );
 
     let gate = run(dir.path(), &["gate", "check"]);
@@ -586,6 +591,16 @@ fn an_override_records_the_reason_and_gate_check_lists_an_advisory() {
         text.contains("  waived unreviewed-promotion world.demo.01 — no review record") && text.contains("[waiver: subject `demo-subject` moved to verifying by `lead`: reviewer out until Monday]"),
         "{text}"
     );
+
+    // The waiver named one scenario. A blocker raised afterwards on the
+    // adopted change was never waived, so the gate goes red on it while
+    // the recorded gap stays an advisory.
+    seed_blocker(dir.path(), None);
+    let gate = run(dir.path(), &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(1), "a gap the waiver did not record must block: {}", stdout(&gate));
+    let text = stdout(&gate);
+    assert!(text.contains("open-blocker (1):\n  open-blocker c-demo#1.1"), "{text}");
+    assert!(text.contains("review waivers: 1 advisory(ies)"), "{text}");
 
     // The waiver belongs to the transition that needed it: the next
     // write (retired is outside the default scope) drops it.

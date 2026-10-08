@@ -62,7 +62,7 @@ use canon_gate::review_gate::{active_require_review, subject_guard, unreadable_r
 use canon_gate::spec_coverage::{case_gaps, subject_scenarios};
 use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, PolicyResolution, RequireReview, SpecCoverage, Violation};
 use canon_model::{
-    Actor, Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, RoleId, StatusOverride, Subject, SubjectId, SubjectStatus,
+    Actor, Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, RoleId, StatusOverride, Subject, SubjectId, SubjectStatus, WaivedViolation,
 };
 use canon_policy::SchemaRegistry;
 use canon_store::registry::TierRegistry;
@@ -540,9 +540,13 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
         for v in &waivable {
             eprintln!("canon subject status: waived {}", v.line());
         }
-        let checks: std::collections::BTreeSet<String> = waivable.iter().map(|v| v.class.as_str().to_string()).collect();
-        subject.status_override = Some(StatusOverride { to: target, reason: reason.to_string(), checks: checks.into_iter().collect(), actor: Actor::new_unattributed(actor_id) });
-        eprintln!("canon subject status: override recorded by `{actor_id}`: {reason}");
+        let waived: std::collections::BTreeSet<WaivedViolation> =
+            waivable.iter().map(|v| WaivedViolation { class: v.class.as_str().to_string(), subject: v.subject.clone() }).collect();
+        let count = waived.len();
+        subject.status_override = Some(StatusOverride { to: target, reason: reason.to_string(), waived: waived.into_iter().collect(), actor: Actor::new_unattributed(actor_id) });
+        eprintln!(
+            "canon subject status: override recorded by `{actor_id}` for the {count} violation(s) above: {reason}; a gap that appears later is not covered"
+        );
     } else if override_reason.is_some() {
         eprintln!("canon subject status: --override-reason not recorded — no review check refused this transition");
     }

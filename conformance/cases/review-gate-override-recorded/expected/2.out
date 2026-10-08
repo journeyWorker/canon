@@ -20,11 +20,14 @@
         "actor": {
           "agent_id": "lead"
         },
-        "checks": [
-          "unreviewed-promotion"
-        ],
         "reason": "reviewer out until Monday",
-        "to": "verifying"
+        "to": "verifying",
+        "waived": [
+          {
+            "class": "unreviewed-promotion",
+            "subject": "cart.add.01"
+          }
+        ]
       },
       "subject_id": "cart",
       "summary": "",

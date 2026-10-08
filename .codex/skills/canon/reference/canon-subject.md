@@ -171,21 +171,24 @@ canon subject status demo-subject verifying \
 `--override-reason "<one line>"` waives ONLY `unreviewed-promotion` and
 `open-blocker` — never a ship-gate verdict or case gap, never unreadable
 routing. It prints the `waived ...` lines and `override recorded by
-`lead`: <reason>`, and records on the new Subject record:
+`lead` for the N violation(s) above: <reason>`, and records on the new
+Subject record exactly the violations it let through:
 
 ```yaml
 status_override:
   to: verifying
   reason: reviewer out until Monday
-  checks: [unreviewed-promotion]
+  waived:
+    - { class: unreviewed-promotion, subject: world.demo.01 }
   actor: { agent_id: lead }   # from --actor-id, default `canon`
 ```
 
 A blank or multi-line reason exits 2. The waiver is cleared on the
 subject's next status write, so it never outlives the status it was
-granted for; while it stands, `canon gate check` lists the waived gaps
-as advisories instead of failing. Without `require_review`, nothing is
-printed and nothing changes.
+granted for. While it stands, `canon gate check` lists the recorded gaps
+as advisories instead of failing; a gap it did not record (a blocker
+raised later, a scenario tagged later) still fails the gate. Without
+`require_review`, nothing is printed and nothing changes.
 
 ## Adopt flow
 

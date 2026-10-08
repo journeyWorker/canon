@@ -128,9 +128,11 @@ purpose, so enabling nothing changes no existing verdict.
 ### Review-waiver advisories
 
 A subject moved into a review-scoped status with `canon subject status
---override-reason` (see `canon-subject`) keeps its `unreviewed-promotion`
-and `open-blocker` gaps visible without failing the gate. They print
-after the violations:
+--override-reason` (see `canon-subject`) keeps the `unreviewed-promotion`
+and `open-blocker` gaps its waiver recorded visible without failing the
+gate. Only those exact `(class, subject)` pairs are waived; a gap that
+appears later is a violation. The waived ones print after the
+violations:
 
 ```
 review waivers: 1 advisory(ies) — not failing the gate:

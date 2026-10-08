@@ -135,8 +135,10 @@ open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-de
 `should-fix` and `note` findings never block.
 
 A subject moved past these checks with `canon subject status
---override-reason` (see [CLI reference](/cli/)) keeps its gaps visible
-as advisories after the violations, without failing the gate:
+--override-reason` (see [CLI reference](/cli/)) keeps the exact gaps
+its waiver recorded visible as advisories after the violations, without
+failing the gate. A gap that appears later is not covered and fails as
+usual:
 
 ```
 review waivers: 1 advisory(ies) — not failing the gate:

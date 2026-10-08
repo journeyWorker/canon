@@ -830,7 +830,7 @@ mod tests {
     // ── require_review (issue #2) ──
 
     use crate::policy::RequireReview;
-    use canon_model::{ChangeId, Finding, FindingDisposition, FindingSeverity, ProvenanceRef, Review, StatusOverride};
+    use canon_model::{ChangeId, Finding, FindingDisposition, FindingSeverity, ProvenanceRef, Review, StatusOverride, WaivedViolation};
 
     fn reviewing(scope: Vec<SubjectStatus>, distinct_actor: bool) -> Option<SpecCoverage> {
         Some(SpecCoverage::Active {
@@ -930,18 +930,22 @@ mod tests {
         assert!(out[0].detail.contains("`live`"), "{}", out[0].detail);
     }
 
-    /// A subject moved under `--override-reason` reports its gaps as
-    /// advisories naming the waiver, not violations, while it stays at
-    /// the waived status.
-    #[test]
-    fn a_waived_subjects_gaps_are_advisories_not_violations() {
-        let mut waived = verifying_subject("live", &["c-live"]);
-        waived.status_override = Some(StatusOverride {
+    fn waiver(waived: &[(&str, &str)]) -> StatusOverride {
+        StatusOverride {
             to: SubjectStatus::Verifying,
             reason: "reviewer out".into(),
-            checks: vec!["open-blocker".into(), "unreviewed-promotion".into()],
+            waived: waived.iter().map(|(class, subject)| WaivedViolation { class: class.to_string(), subject: subject.to_string() }).collect(),
             actor: Actor::new_unattributed("lead"),
-        });
+        }
+    }
+
+    /// A subject moved under `--override-reason` reports the gaps its
+    /// waiver recorded as advisories naming the waiver, not violations,
+    /// while it stays at the waived status.
+    #[test]
+    fn a_waived_subjects_recorded_gaps_are_advisories_not_violations() {
+        let mut waived = verifying_subject("live", &["c-live"]);
+        waived.status_override = Some(waiver(&[("open-blocker", "c-live#1.1"), ("unreviewed-promotion", "p.a.01")]));
         let mut corpus = Corpus::new();
         corpus.scenarios = vec![scenario("p.a.01", Some("live"))];
         corpus.subjects = vec![waived];
@@ -952,6 +956,40 @@ mod tests {
         let advisories = crate::review_gate::review_advisories(&ctx).unwrap();
         assert_eq!(advisories.len(), 2);
         assert!(advisories.iter().all(|a| a.line().contains("[waiver: subject `live` moved to verifying by `lead`: reviewer out]")), "{advisories:?}");
+    }
+
+    /// The bug a class-level waiver had: waiving only the unreviewed
+    /// scenario must not also waive a blocker raised afterwards.
+    #[test]
+    fn a_new_blocker_after_an_unreviewed_only_waiver_is_a_violation() {
+        let mut waived = verifying_subject("live", &["c-live"]);
+        waived.status_override = Some(waiver(&[("unreviewed-promotion", "p.a.01")]));
+        let mut corpus = Corpus::new();
+        corpus.scenarios = vec![scenario("p.a.01", Some("live"))];
+        corpus.subjects = vec![waived];
+        corpus.findings = vec![finding("c-live", 1, FindingSeverity::Blocker, FindingDisposition::Open, 0)];
+        let ctx = context(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+
+        let out = SpecCoverageCheck.run(&ctx);
+        assert_eq!(out.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(FailureClass::OpenBlocker, "c-live#1.1")]);
+        let advisories = crate::review_gate::review_advisories(&ctx).unwrap();
+        assert_eq!(advisories.iter().map(|a| a.violation.subject.as_str()).collect::<Vec<_>>(), vec!["p.a.01"]);
+    }
+
+    /// A scenario tagged to the subject after the waiver was granted is
+    /// not covered by it, though the same class was waived for another.
+    #[test]
+    fn a_new_unreviewed_scenario_after_a_waiver_is_a_violation() {
+        let mut waived = verifying_subject("live", &[]);
+        waived.status_override = Some(waiver(&[("unreviewed-promotion", "p.a.01")]));
+        let mut corpus = Corpus::new();
+        corpus.scenarios = vec![scenario("p.a.01", Some("live")), scenario("p.a.02", Some("live"))];
+        corpus.subjects = vec![waived];
+        let ctx = context(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+
+        let out = SpecCoverageCheck.run(&ctx);
+        assert_eq!(out.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(FailureClass::UnreviewedPromotion, "p.a.02")]);
+        assert_eq!(crate::review_gate::review_advisories(&ctx).unwrap().len(), 1);
     }
 
     #[test]

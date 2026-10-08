@@ -131,8 +131,9 @@ open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-de
 `should-fix`와 `note` finding은 절대 차단하지 않습니다.
 
 `canon subject status --override-reason`으로 이 검사를 넘긴 subject는
-([CLI 레퍼런스](/ko/cli/) 참고) 게이트를 실패시키지 않고, 위반 목록 뒤에
-advisory로 빈틈을 계속 보여줍니다:
+([CLI 레퍼런스](/ko/cli/) 참고) 면제 기록에 적힌 빈틈만 게이트를 실패시키지
+않고 위반 목록 뒤에 advisory로 계속 보여줍니다. 나중에 생긴 빈틈은 면제되지
+않고 평소처럼 실패합니다:
 
 ```
 review waivers: 1 advisory(ies) — not failing the gate:

@@ -30,10 +30,13 @@
 //!
 //! # Waivers
 //! `canon subject status --override-reason` records a
-//! [`StatusOverride`] on the subject. While the subject stays at the
-//! status the waiver was granted for, this module reports that subject's
-//! review gaps as [`ReviewAdvisory`]s naming the waiver, never as
-//! violations. A waiver is visible, never silent.
+//! [`StatusOverride`] on the subject listing exactly the violations it
+//! let through, as `(class, subject)` pairs. While the subject stays at
+//! the status the waiver was granted for, a violation matching one of
+//! those pairs is reported as a [`ReviewAdvisory`] naming the waiver.
+//! Anything else stays a violation: a blocker raised after the waiver, or
+//! a scenario tagged to the subject later, was never waived. A waiver is
+//! visible, never silent, and never wider than what it named.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -124,7 +127,9 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
     let subjects: BTreeMap<&str, &Subject> =
         latest_by_key(&ctx.subjects, |s| s.subject_id.as_str().to_string()).into_iter().map(|s| (s.subject_id.as_str(), s)).collect();
     let status: BTreeMap<&str, SubjectStatus> = subjects.iter().map(|(id, s)| (*id, s.status)).collect();
-    let waiver_of = |id: &str| subjects.get(id).and_then(|s| current_waiver(s));
+    // The waiver of `id`'s subject, if it recorded exactly `violation`.
+    let waiver_for =
+        |id: &str, violation: &Violation| subjects.get(id).and_then(|s| current_waiver(s)).filter(|w| w.covers(violation.class.as_str(), &violation.subject));
 
     let mut outcome = ReviewOutcome::default();
     for scenario in latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone())) {
@@ -138,7 +143,7 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
             continue;
         }
         let Some(violation) = review_gap(ctx, scenario, require_review.distinct_actor) else { continue };
-        match scenario.subject_id.as_ref().and_then(|id| waiver_of(id.as_str()).map(|w| (id, w))) {
+        match scenario.subject_id.as_ref().and_then(|id| waiver_for(id.as_str(), &violation).map(|w| (id, w))) {
             Some((subject_id, waiver)) => outcome.advisories.push(ReviewAdvisory { violation, subject_id: subject_id.clone(), waiver: waiver.clone() }),
             None => outcome.violations.push(violation),
         }
@@ -146,7 +151,8 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
 
     if require_review.block_on_findings {
         // A change can belong to several subjects. Its blocker is waived
-        // only when EVERY in-scope subject holding it carries a waiver.
+        // only when EVERY in-scope subject holding it recorded that exact
+        // blocker in its waiver.
         let mut holders: BTreeMap<&str, Vec<&Subject>> = BTreeMap::new();
         for subject in subjects.values().filter(|s| require_review.covers(s.status)) {
             for change_id in &subject.change_ids {
@@ -157,8 +163,11 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
             let Some(holding) = holders.get(finding.change_id.as_str()) else { continue };
             let names: Vec<&str> = holding.iter().map(|s| s.subject_id.as_str()).collect();
             let violation = open_blocker_violation(finding, &names);
-            let waived: Option<(&Subject, &StatusOverride)> =
-                holding.iter().map(|s| current_waiver(s).map(|w| (*s, w))).collect::<Option<Vec<_>>>().and_then(|all| all.into_iter().next());
+            let waived: Option<(&Subject, &StatusOverride)> = holding
+                .iter()
+                .map(|s| waiver_for(s.subject_id.as_str(), &violation).map(|w| (*s, w)))
+                .collect::<Option<Vec<_>>>()
+                .and_then(|all| all.into_iter().next());
             match waived {
                 Some((subject, waiver)) => {
                     outcome.advisories.push(ReviewAdvisory { violation, subject_id: subject.subject_id.clone(), waiver: waiver.clone() })

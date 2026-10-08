@@ -82,8 +82,9 @@ class, `open-blocker`, for an open `blocker` finding on a change the
 subject adopted. `canon subject status` runs the same checks when moving
 into a scoped status, prints which ones it ran or skipped, and refuses on
 gaps; `--override-reason "<one line>"` (with `--actor-id`) waives only
-those two classes, records the waiver on the subject, and leaves the gaps
-listed as advisories by `canon gate check` until the next status change.
+the violations of those two classes it reports, records exactly those on
+the subject, and leaves them listed as advisories by `canon gate check`
+until the next status change; a gap that appears later is not covered.
 `canon context` now lists finding severities, dispositions, Review fields,
 and the active `require_review` setting. Nothing changes for a repo that
 does not set `require_review`; canon's own policy leaves it off for now.

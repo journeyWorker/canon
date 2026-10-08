@@ -171,8 +171,10 @@ Findings on changes no in-scope subject has adopted do not block.
 
 ### Review-waiver advisories
 
-A subject moved with `--override-reason` (below) has its review gaps
-printed after the violations as advisories; the gate stays green:
+A subject moved with `--override-reason` (below) has the exact gaps its
+waiver recorded printed after the violations as advisories; the gate
+stays green for those. A gap the waiver did not record (a blocker raised
+later, a scenario tagged to the subject later) is a violation as usual:
 
 ```
 review waivers: 1 advisory(ies) — not failing the gate:
@@ -197,11 +199,14 @@ unchanged, and names `--override-reason`.
 
 `--override-reason "<one line>"` waives ONLY `unreviewed-promotion` and
 `open-blocker` — never ship-gate verdict or case gaps, never unreadable
-routing. The new Subject record carries
-`status_override: {to, reason, checks: [classes], actor: {agent_id}}`
-(actor from `--actor-id`, default `canon`), and the command prints the
-`waived ...` lines and `override recorded by `lead`: <reason>`. A blank
-or multi-line reason exits 2. The waiver clears on the subject's next
+routing. The new Subject record lists exactly the violations it let
+through:
+`status_override: {to, reason, waived: [{class, subject}], actor: {agent_id}}`
+(`subject` is the scenario id, or `<change_id>#<round>.<seq>` for a
+blocker; actor from `--actor-id`, default `canon`). The command prints
+the `waived ...` lines and `override recorded by `lead` for the N
+violation(s) above: <reason>`. A blank or multi-line reason exits 2. The
+waiver covers only what it recorded, and clears on the subject's next
 status write, so it never outlives the status it was granted for.
 
 Without `require_review`, the guard prints nothing and changes nothing.

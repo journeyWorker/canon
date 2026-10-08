@@ -140,19 +140,12 @@
       "type": "string"
     },
     "StatusOverride": {
-      "description": "A recorded waiver of the `spec_coverage.require_review` status guard\n(see [`Subject::status_override`]). `canon gate check` reports the\nwaived subject's review gaps as advisories naming this waiver rather\nthan as violations, for as long as the subject stays at `to`.",
+      "description": "A recorded waiver of the `spec_coverage.require_review` status guard\n(see [`Subject::status_override`]). `canon gate check` reports a gap\nas an advisory naming this waiver only when it matches one of\n`waived` exactly, and only while the subject stays at `to`. A gap that\nappears later (a new blocker, a newly tagged scenario) is not covered\nand stays a violation.",
       "type": "object",
       "properties": {
         "actor": {
           "description": "Who waived it.",
           "$ref": "#/$defs/Actor"
-        },
-        "checks": {
-          "description": "The gate failure classes the guard reported and this waiver let\nthrough, sorted (`open-blocker`, `unreviewed-promotion`).",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         },
         "reason": {
           "description": "The operator's reason, verbatim (one line).",
@@ -161,12 +154,19 @@
         "to": {
           "description": "The status the transition moved to under this waiver.",
           "$ref": "#/$defs/SubjectStatus"
+        },
+        "waived": {
+          "description": "Exactly the guard violations this waiver let through, sorted.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WaivedViolation"
+          }
         }
       },
       "required": [
         "to",
         "reason",
-        "checks",
+        "waived",
         "actor"
       ]
     },
@@ -184,6 +184,22 @@
         "verifying",
         "shipped",
         "retired"
+      ]
+    },
+    "WaivedViolation": {
+      "description": "One violation a [`StatusOverride`] let through: the gate failure\nclass (`unreviewed-promotion`, `open-blocker`) and the violation's\nsubject (a scenario id, or `<change_id>#<round>.<seq>` for a\nblocker), as `canon gate check` prints them.",
+      "type": "object",
+      "properties": {
+        "class": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "class",
+        "subject"
       ]
     }
   }

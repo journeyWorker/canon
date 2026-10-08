@@ -2,4 +2,4 @@ canon subject status: review guard for building → verifying (spec_coverage.req
 canon subject status:   ran unreviewed-promotion — every owned scenario needs a review by an actor other than its evidence actor
 canon subject status:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
 canon subject status: waived unreviewed-promotion cart.add.01 — building → verifying: no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review add`) once its subject is claimed done
-canon subject status: override recorded by `lead`: reviewer out until Monday
+canon subject status: override recorded by `lead` for the 1 violation(s) above: reviewer out until Monday; a gap that appears later is not covered
