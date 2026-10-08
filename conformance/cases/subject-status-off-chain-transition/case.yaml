@@ -1,0 +1,4 @@
+description: "`canon subject status` exits 2 (refused) on a transition off the lifecycle chain (`proposed → shipped`)"
+steps:
+  - args: [subject, status, checkout, shipped]
+    exit: 2

@@ -1,0 +1,14 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-08T17:15:15.575174Z",
+  "case": "golden",
+  "kind": "scenario",
+  "project_id": "root",
+  "scenario_id": "checkout.pay.01",
+  "schema": 1,
+  "source_digest": "f7eace6d59f01ba9b7c70611702e4f98b0e8b778e9d8270dfd8fbbe69bc7d5c8",
+  "subject_id": "checkout",
+  "title": "Paying with a valid card places the order"
+}

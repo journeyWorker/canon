@@ -1,0 +1,4 @@
+description: "`canon subject status <id> shipped` from `verifying` exits 1 naming each tagged scenario that has no ledger verdict"
+steps:
+  - args: [subject, status, checkout, shipped]
+    exit: 1

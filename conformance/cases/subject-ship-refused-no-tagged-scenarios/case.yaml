@@ -1,0 +1,4 @@
+description: "`canon subject status <id> shipped` from `verifying` exits 1 (gated) when no scenario is tagged `@subject:<id>` — shipping on an empty set is refused"
+steps:
+  - args: [subject, status, checkout, shipped]
+    exit: 1
