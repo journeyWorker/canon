@@ -49,7 +49,10 @@
 //! [`canon_gate::review_gate::subject_guard`]: every owned scenario needs
 //! a qualifying review, and no adopted change may carry an open blocker
 //! finding. A refusal exits `1` with the record unchanged, like the ship
-//! gate. `--override-reason` lets ONLY those review checks through; the
+//! gate. With `block_on_findings`, a Finding row the ledger read refused
+//! is a `malformed-evidence` refusal naming its file
+//! ([`canon_gate::review_gate::malformed_findings`]), never waivable.
+//! `--override-reason` lets ONLY the review checks through; the
 //! reason, the waived classes, and the actor are recorded on the new
 //! Subject record ([`canon_model::StatusOverride`]), and `canon gate
 //! check` keeps reporting the gaps as advisories. The guard prints, on
@@ -58,7 +61,7 @@
 
 use std::path::Path;
 
-use canon_gate::review_gate::{active_require_review, subject_guard, unreadable_review_kinds, unreadable_violation};
+use canon_gate::review_gate::{active_require_review, malformed_findings, subject_guard, unreadable_review_kinds, unreadable_violation};
 use canon_gate::spec_coverage::{case_gaps, subject_scenarios};
 use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, PolicyResolution, RequireReview, SpecCoverage, Violation};
 use canon_model::{
@@ -505,6 +508,9 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
         let (rr, exclude_lanes) = active_require_review(ctx).expect("`reviews` implies an active require_review");
         let unreadable = unreadable_review_kinds(ctx, rr);
         if unreadable.is_empty() {
+            // An unreadable finding blocks, unwaivably: it might be an
+            // open blocker on this subject's changes.
+            blocking.extend(malformed_findings(ctx, rr));
             waivable = subject_guard(ctx, rr, exclude_lanes, subject_id, &subject.change_ids);
             for violation in &mut waivable {
                 violation.detail = format!("{} → {}: {}", status_str(current), status_str(target), violation.detail);

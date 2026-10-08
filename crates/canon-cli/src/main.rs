@@ -2133,7 +2133,16 @@ fn run_regime_key(role: &str, repo: &str, area: &str, hash: &str) -> ExitCode {
 /// section reads, so the two can never disagree; silent for a repo
 /// with nothing routed to a backend that is not read directly.
 fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::path::Path>) -> ExitCode {
-    let (repo, inputs) = canon_cli::report::resolve_inputs(repo);
+    // A present but unusable `canon.yaml` is a usage error (exit 2),
+    // the same refusal `canon gate check` makes — never a report of
+    // the default ledger.
+    let (repo, inputs) = match canon_cli::report::resolve_inputs(repo) {
+        Ok(resolved) => resolved,
+        Err(err) => {
+            eprintln!("canon report: {err}");
+            return ExitCode::from(2);
+        }
+    };
 
     let kinds_not_read_directly = canon_report::tier_boundary::kinds_not_read_directly(&repo);
     if let Some(msg) = canon_report::tier_boundary::warn_line(&kinds_not_read_directly) {
@@ -2197,7 +2206,10 @@ fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path::Path>, por
         }
         Err(err) => {
             eprintln!("canon dashboard: {err}");
-            ExitCode::FAILURE
+            match err {
+                canon_cli::dashboard::DashboardError::Config(_) => ExitCode::from(2),
+                _ => ExitCode::FAILURE,
+            }
         }
     }
 }

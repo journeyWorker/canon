@@ -992,6 +992,33 @@ mod tests {
         assert_eq!(crate::review_gate::review_advisories(&ctx).unwrap().len(), 1);
     }
 
+    /// A Finding row the ledger read refused blocks as `malformed-evidence`
+    /// named by its file, even with no subject in scope: it might be an
+    /// open blocker. Other kinds' read problems are not this rule's, and
+    /// `block_on_findings: false` turns it off.
+    #[test]
+    fn an_unreadable_finding_blocks_as_malformed_evidence_naming_its_file() {
+        use canon_model::EvidenceViolation;
+        let path = "kind=finding/c-live__0001__0001__0123456789ab.json";
+        let corpus_violations = vec![
+            (RecordKind::Finding, EvidenceViolation::new(canon_model::FailureClass::Malformed, path, "resolution_sha: fixed with no `resolution_sha`")),
+            (RecordKind::Scenario, EvidenceViolation::new(canon_model::FailureClass::Malformed, "kind=scenario/x.json", "bad")),
+        ];
+        let mut ctx = context(Corpus::new(), reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+        ctx.corpus_violations = corpus_violations.clone();
+
+        let out = SpecCoverageCheck.run(&ctx);
+        assert_eq!(out.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(FailureClass::MalformedEvidence, path)]);
+        assert!(out[0].detail.contains("resolution_sha") && out[0].detail.contains("fails closed"), "{}", out[0].detail);
+
+        let mut off = RequireReview { scope: RequireReview::DEFAULT_SCOPE.to_vec(), distinct_actor: true, block_on_findings: false };
+        let mut ctx = context(Corpus::new(), None);
+        ctx.corpus_violations = corpus_violations;
+        assert!(crate::review_gate::malformed_findings(&ctx, &off).is_empty());
+        off.block_on_findings = true;
+        assert_eq!(crate::review_gate::malformed_findings(&ctx, &off).len(), 1);
+    }
+
     #[test]
     fn absent_require_review_reads_neither_reviews_nor_findings() {
         let mut corpus = Corpus::new();

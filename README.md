@@ -70,8 +70,8 @@ for the machine-readable source/projection/memory map.
 ## 0.12.0 release
 
 Version 0.12.0 pins canon's command-line behavior in a conformance corpus,
-adds an opt-in independent-review gate, and makes every ledger-touching
-command fail loud on an invalid `canon.yaml`.
+adds an opt-in independent-review gate, and makes the ledger commands fail
+loud on an invalid `canon.yaml`.
 
 **Conformance corpus.** [`conformance/`](conformance/README.md) replays
 real `canon` invocations against checked-in fixture repos and compares
@@ -99,13 +99,18 @@ groups and what they pin:
   summary, inventory tag diagnostics, `canon query --kind subject --json`.
 - `review-gate-*` — the review gate below: unreviewed promotion refused,
   self-review not counted, distinct review passes, open blocker, recorded
-  override.
+  override, unreadable finding blocks.
 
-**Fail loud on an invalid `canon.yaml`.** Every command that touches the
-ledger (`gate check`, `inventory sync`, `evidence`, `review`, `finding`,
-`divergence`, `subject`, and the rest) now exits 2 naming
-`<repo>/canon.yaml` and the parse error, where it used to fall back
-silently to the default ledger. *Migration:* a `canon.yaml` that only
+**Fail loud on an invalid `canon.yaml`.** The commands that read or write
+the ledger (`gate`, `inventory sync`, `evidence`, `review`, `finding`,
+`divergence`, `subject`, `report`, `dashboard`, and the rest) now exit 2
+naming `<repo>/canon.yaml` and the parse error, where they used to fall
+back silently to the default ledger. One deliberate exception:
+`canon dispatch begin`/`end` still exit 0, writing the run manifest and
+printing the unpersisted ledger write, with the parse error, as a stderr
+warning, because failing a live dispatch would lose the run's provenance.
+`canon retrieve`, which reads only the learn store, still falls back to its
+defaults. *Migration:* a `canon.yaml` that only
 worked because of that fallback now refuses — notably a legacy
 `tiers: git:` layout; rewrite it to named tiers
 (`tiers: { local: { backend: git, root: .canon/ledger } }`) before
@@ -134,6 +139,11 @@ gaps; `--override-reason "<one line>"` (with `--actor-id`) waives only
 the violations of those two classes it reports, records exactly those on
 the subject, and leaves them listed as advisories by `canon gate check`
 until the next status change; a gap that appears later is not covered.
+With `block_on_findings`, a finding record canon cannot read (unparseable,
+schema-invalid, or misfiled) is a `malformed-evidence` violation naming
+its ledger file, in `canon gate check` and in `canon subject status`, and
+no override waives it: it might be an open blocker. An unreadable review
+record already fails closed, because it counts as no review.
 `canon context` now lists finding severities, dispositions, Review fields,
 and the active `require_review` setting. Nothing changes for a repo that
 does not set `require_review`; canon's own policy leaves it off for now.

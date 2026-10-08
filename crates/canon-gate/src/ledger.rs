@@ -208,8 +208,10 @@ mod tests {
     #[test]
     fn corpus_violations_are_not_surfaced_by_this_check() {
         let mut ctx = ctx_with(Vec::new(), Vec::new());
-        ctx.corpus_violations =
-            vec![EvidenceViolation::new(EvidenceFailureClass::Malformed, "scenario", "scenario row does not deserialize: missing field `title`")];
+        ctx.corpus_violations = vec![(
+            RecordKind::Scenario,
+            EvidenceViolation::new(EvidenceFailureClass::Malformed, "scenario", "scenario row does not deserialize: missing field `title`"),
+        )];
 
         assert!(LedgerCheck.run(&ctx).is_empty(), "a corpus read problem is not an evidence-ledger violation");
     }

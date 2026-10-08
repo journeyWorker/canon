@@ -165,16 +165,17 @@ pub struct GateContext {
     pub reviews: Vec<Review>,
     pub findings: Vec<Finding>,
     pub violations: Vec<EvidenceViolation>,
-    /// Read problems from the three corpus kinds above, kept OUT of
-    /// `violations` deliberately. [`crate::ledger`]'s `LedgerCheck`
-    /// maps every `violations` entry to
+    /// Read problems from the corpus kinds above, each tagged with the
+    /// kind it was read as, kept OUT of `violations` deliberately.
+    /// [`crate::ledger`]'s `LedgerCheck` maps every `violations` entry to
     /// [`crate::FailureClass::MalformedEvidence`] and is
     /// unconditionally in `crate::dispatch::check_set`, so folding
     /// these in would turn a green repo red on upgrade with no policy
-    /// change — the opposite of `spec_coverage` being opt-in. Only
-    /// [`crate::spec_coverage`] reads this, and only when the policy
-    /// section is present.
-    pub corpus_violations: Vec<EvidenceViolation>,
+    /// change — the opposite of `spec_coverage` being opt-in. Only an
+    /// opted-in rule reads this: [`crate::review_gate`] blocks on the
+    /// `Finding` entries when `require_review.block_on_findings` is on,
+    /// because a finding it cannot read might be an open blocker.
+    pub corpus_violations: Vec<(RecordKind, EvidenceViolation)>,
     /// Kinds whose configured routing sends them somewhere this
     /// context's [`GitTier`] does not read, so their vector above is
     /// empty for a reason that is NOT "the corpus is empty".
@@ -242,22 +243,21 @@ impl GateContext {
 fn read_corpus_kind<T: serde::de::DeserializeOwned>(
     tier: &GitTier,
     kind: RecordKind,
-    corpus_violations: &mut Vec<EvidenceViolation>,
+    corpus_violations: &mut Vec<(RecordKind, EvidenceViolation)>,
 ) -> Result<Vec<T>, GateContextError> {
     let read = tier.read(&TierQuery::kind(kind))?;
-    corpus_violations.extend(read.violations);
+    corpus_violations.extend(read.violations.into_iter().map(|violation| (kind, violation)));
     let mut out = Vec::with_capacity(read.records.len());
     for raw in &read.records {
         match serde_json::from_value::<T>(raw.0.clone()) {
             Ok(record) => out.push(record),
             // `RawRecord` is a bare body with no path, so the subject is
-            // the kind itself — enough for an operator to know WHICH
-            // corpus is malformed, and this vector is diagnostic input
-            // to one check rather than a reported violation set.
-            Err(e) => corpus_violations.push(EvidenceViolation::new(
-                canon_model::FailureClass::Malformed,
-                kind.as_str(),
-                format!("{} row does not deserialize: {e}", kind.as_str()),
+            // the kind itself. The tier's own `validate_body` already
+            // deserialized this row into the same type and refused it
+            // against its file, so this arm is a backstop only.
+            Err(e) => corpus_violations.push((
+                kind,
+                EvidenceViolation::new(canon_model::FailureClass::Malformed, kind.as_str(), format!("{} row does not deserialize: {e}", kind.as_str())),
             )),
         }
     }
@@ -453,5 +453,78 @@ mod tests {
         assert_eq!(gate_context.evidence.len(), 1);
         assert!(gate_context.violations.is_empty());
         assert_eq!(gate_context.evidence[0].verdict, EvidenceVerdict::Faithful);
+    }
+
+    /// Plant `body` at the exact ledger path its own content resolves to,
+    /// so only the body-schema gate can refuse it.
+    fn plant(ledger_root: &Path, kind: RecordKind, body: &serde_json::Value) -> String {
+        let relative = canon_store::partition::expected_relative_path(kind, body).unwrap();
+        std::fs::create_dir_all(ledger_root.join(&relative).parent().unwrap()).unwrap();
+        std::fs::write(ledger_root.join(&relative), serde_json::to_vec_pretty(body).unwrap()).unwrap();
+        relative.display().to_string()
+    }
+
+    /// The read problems of the review kinds reach `corpus_violations`
+    /// tagged with their kind and named by their file. A refused Finding
+    /// is what `review_gate::malformed_findings` blocks on; a refused
+    /// Review is simply absent, which leaves its scenario unreviewed —
+    /// the review rule fails closed on it without any extra handling.
+    #[test]
+    fn load_tags_unreadable_review_and_finding_rows_with_kind_and_file() {
+        use canon_model::{Actor, Envelope, ProjectId, ProvenanceRef, Review, RoleId, Scenario, ScenarioId, SpecDigest};
+
+        let dir = TempDir::new().unwrap();
+        let ctx = GateCtx::from_fixture(dir.path());
+        let finding_path = plant(
+            &ctx.ledger_root,
+            RecordKind::Finding,
+            &serde_json::json!({
+                "actor": { "agent_id": "reviewer-2", "role": "reviewer" },
+                "at": "2026-10-08T17:56:58.886973Z",
+                "change_id": "c-cart",
+                "disposition": "fixed",
+                "kind": "finding",
+                "reviewer": "reviewer-2",
+                "round": 1,
+                "schema": 1,
+                "seq": 1,
+                "severity": "blocker",
+                "summary": "fixed, but no commit names the fix"
+            }),
+        );
+        let project = ProjectId::parse("root").unwrap();
+        let scenario_id = ScenarioId::parse("cart.add.01").unwrap();
+        let review = Review::new(
+            Envelope::new(1, RecordKind::Review, fixed_now(), Actor::new("reviewer-2", RoleId::parse("reviewer").unwrap())),
+            project.clone(),
+            scenario_id.clone(),
+            "reviewer-2",
+            "pin-1",
+            ProvenanceRef::OriginalSpecRef("spec".into()),
+        );
+        let mut review_body = serde_json::to_value(&review).unwrap();
+        review_body["actor"]["role"] = serde_json::json!(7);
+        let review_path = plant(&ctx.ledger_root, RecordKind::Review, &review_body);
+
+        let gate_context = GateContext::load(ctx, &SchemaRegistry::load(), fixed_now()).unwrap();
+        assert!(gate_context.findings.is_empty() && gate_context.reviews.is_empty());
+        let tagged: Vec<(RecordKind, &str)> = gate_context.corpus_violations.iter().map(|(kind, v)| (*kind, v.subject.as_str())).collect();
+        assert_eq!(tagged, vec![(RecordKind::Review, review_path.as_str()), (RecordKind::Finding, finding_path.as_str())]);
+        assert!(gate_context.violations.is_empty(), "review-corpus problems never reach the always-on ledger check");
+
+        let require_review = crate::RequireReview { scope: crate::RequireReview::DEFAULT_SCOPE.to_vec(), distinct_actor: true, block_on_findings: true };
+        let blocking = crate::review_gate::malformed_findings(&gate_context, &require_review);
+        assert_eq!(blocking.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(crate::FailureClass::MalformedEvidence, finding_path.as_str())]);
+
+        let scenario = Scenario::new(
+            Envelope::new(1, RecordKind::Scenario, fixed_now(), Actor::new("canon", RoleId::parse("implementer").unwrap())),
+            project,
+            scenario_id,
+            "t",
+            "",
+            SpecDigest::of(b"cart.add.01"),
+        );
+        let gap = crate::review_gate::review_gap(&gate_context, &scenario, true).expect("an unreadable review is no review");
+        assert_eq!(gap.class, crate::FailureClass::UnreviewedPromotion);
     }
 }

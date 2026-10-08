@@ -1,0 +1,4 @@
+canon gate check: 1 violation(s)
+
+malformed-evidence (1):
+  malformed-evidence kind=finding/c-cart__0001__0001__<digest12>.json — unreadable finding record: resolution_sha: disposition is `fixed` but no `resolution_sha` names the commit that closed it (malformed); require_review.block_on_findings cannot tell whether it is an open blocker, so the gate fails closed — fix or remove the record

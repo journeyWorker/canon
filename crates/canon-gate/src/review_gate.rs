@@ -28,6 +28,14 @@
 //! with severity `blocker`, on a change listed in an in-scope subject's
 //! `change_ids`, is an `open-blocker` violation.
 //!
+//! A Finding row the ledger read refused (unparseable, schema-invalid,
+//! misfiled) is a `malformed-evidence` violation naming its file, for
+//! every subject, and no waiver covers it. The rule cannot tell whether
+//! the row it could not read is an open blocker, or a newer version that
+//! reopened one, so it fails closed. A Review row the read refused needs
+//! no such rule: dropping it can only remove a review, which leaves its
+//! scenario `unreviewed-promotion`, never cleared.
+//!
 //! # Waivers
 //! `canon subject status --override-reason` records a
 //! [`StatusOverride`] on the subject listing exactly the violations it
@@ -148,6 +156,9 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
             None => outcome.violations.push(violation),
         }
     }
+    // Never waivable: a waiver names violations by subject, and nobody
+    // can know which subject an unreadable finding belongs to.
+    outcome.violations.extend(malformed_findings(ctx, require_review));
 
     if require_review.block_on_findings {
         // A change can belong to several subjects. Its blocker is waived
@@ -204,6 +215,32 @@ pub fn subject_guard(
         );
     }
     violations
+}
+
+/// One `malformed-evidence` violation per Finding row the ledger read
+/// refused, named by its ledger file (module doc), when
+/// `block_on_findings` is on. Empty otherwise. Both `canon gate check`
+/// and `canon subject status` refuse on these, and neither lets
+/// `--override-reason` waive them.
+pub fn malformed_findings(ctx: &GateContext, require_review: &RequireReview) -> Vec<Violation> {
+    if !require_review.block_on_findings {
+        return Vec::new();
+    }
+    ctx.corpus_violations
+        .iter()
+        .filter(|(kind, _)| *kind == RecordKind::Finding)
+        .map(|(_, violation)| {
+            Violation::new(
+                FailureClass::MalformedEvidence,
+                violation.subject.clone(),
+                format!(
+                    "unreadable finding record: {} ({}); require_review.block_on_findings cannot tell whether it is an open blocker, so the gate fails closed — fix or remove the record",
+                    violation.detail,
+                    violation.class.as_str()
+                ),
+            )
+        })
+        .collect()
 }
 
 /// The waiver a subject's latest record carries, if it was granted for

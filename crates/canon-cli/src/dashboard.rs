@@ -83,6 +83,9 @@ pub const LIVE_SNAPSHOT_ROUTE: &str = "/live-snapshot/";
 pub enum DashboardError {
     #[error(transparent)]
     Report(#[from] canon_report::ReportError),
+    /// A present but unusable `canon.yaml` (`crate::report`'s refusal).
+    #[error(transparent)]
+    Config(#[from] crate::report::ReportConfigError),
     #[error("`packages/dashboard` is not built — run `bun install && bun run build` in {0} first (or from the repo root: `bun install && bun run --cwd packages/dashboard build`)")]
     DashboardNotBuilt(PathBuf),
     #[error("io error: {0}")]
@@ -124,7 +127,7 @@ pub struct BoundDashboard {
 /// out so callers (and tests) can bind + inspect/query before the
 /// actually-infinite serve loop starts.
 pub fn prepare(repo: &Path, snapshot: Option<&Path>, port: u16) -> Result<BoundDashboard, DashboardError> {
-    let (repo, inputs) = resolve_inputs(repo);
+    let (repo, inputs) = resolve_inputs(repo)?;
     let explicit = snapshot.is_some();
     let snapshot_dir = resolve_snapshot_dir(&repo, snapshot);
     ensure_snapshot(&inputs, &snapshot_dir, explicit)?;
