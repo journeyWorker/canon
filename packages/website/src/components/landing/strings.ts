@@ -34,6 +34,17 @@ const en = {
     scenarios: (n: number) => `${n} scenarios`,
     violations: (n: number) => (n === 1 ? "1 violation" : `${n} violations`),
     unknown: "gate result unavailable",
+    data: {
+      caption: (n: number, lagged: number) =>
+        `Fig. 1 data: ${n} scenarios, each with the day it was authored and the day of its first evidence; ${lagged} got evidence after authoring.`,
+      id: "Scenario",
+      authored: "Authored",
+      evidence: "First evidence",
+      lagged: "Evidence after authoring",
+      none: "none",
+      yes: "yes",
+      no: "no",
+    },
   },
   stations: ["intent", "run", "evidence", "gate", "decision", "learning"],
 
@@ -236,6 +247,17 @@ const ko: Strings = {
     scenarios: (n: number) => `시나리오 ${n}개`,
     violations: (n: number) => `위반 ${n}건`,
     unknown: "gate 결과 없음",
+    data: {
+      caption: (n: number, lagged: number) =>
+        `그림 1 데이터: 시나리오 ${n}개의 작성일과 첫 증거일. 이 중 ${lagged}개는 작성 후에 증거가 기록되었습니다.`,
+      id: "시나리오",
+      authored: "작성일",
+      evidence: "첫 증거일",
+      lagged: "작성 후 증거",
+      none: "없음",
+      yes: "예",
+      no: "아니요",
+    },
   },
   stations: ["의도", "실행", "증거", "게이트", "결정", "학습"],
 

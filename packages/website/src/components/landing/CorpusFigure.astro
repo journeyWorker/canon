@@ -48,6 +48,7 @@ const readout = rows.map((r, i) => {
   const s = data.scenarios[i];
   return [s.id, day(s.authoredAt), s.firstEvidenceAt ? day(s.firstEvidenceAt) : "", r.x1, r.lag ? r.lag.x2 : 0];
 });
+const lagged = rows.filter((r) => r.lag).length;
 ---
 
 <figure class="fig1" data-fig1>
@@ -55,7 +56,7 @@ const readout = rows.map((r, i) => {
     <span class="fig1-num">{t.fig1.number}</span>
     <span class="fig1-cap" data-fig1-cap>{t.fig1.title} · {t.fig1.scenarios(data.scenarioCount)}</span>
   </figcaption>
-  <div class="fig1-plot" role="img" aria-label={summary} data-fig1-plot>
+  <div class="fig1-plot" role="img" aria-label={summary} tabindex="0" data-fig1-plot>
     <svg
       class="fig1-chart"
       viewBox={`0 0 ${W} ${H}`}
@@ -74,6 +75,27 @@ const readout = rows.map((r, i) => {
     <canvas class="fig1-canvas" aria-hidden="true"></canvas>
   </div>
   <p class="fig1-total" data-violations={violations ?? "unknown"}>{violations === null ? t.fig1.unknown : t.fig1.violations(violations)}</p>
+  <table class="fig1-data">
+    <caption>{t.fig1.data.caption(data.scenarioCount, lagged)}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{t.fig1.data.id}</th>
+        <th scope="col">{t.fig1.data.authored}</th>
+        <th scope="col">{t.fig1.data.evidence}</th>
+        <th scope="col">{t.fig1.data.lagged}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {readout.map(([id, authored, evidence, , gapEnd]) => (
+        <tr>
+          <th scope="row">{id}</th>
+          <td>{authored}</td>
+          <td>{evidence || t.fig1.data.none}</td>
+          <td>{gapEnd ? t.fig1.data.yes : t.fig1.data.no}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
   <script type="application/json" data-fig1-rows set:html={JSON.stringify({ w: W, rows: readout })} />
 </figure>
 
@@ -81,7 +103,9 @@ const readout = rows.map((r, i) => {
   // Draws Fig. 1 on a canvas at device resolution, one device-pixel row per
   // scenario, so hundreds of hairlines stay even instead of beating against
   // the pixel grid. Lines grow from their authored time to the gate run once;
-  // pointer position reads out the scenario under it in the caption.
+  // pointer position, or the arrow keys while the plot has focus, reads out
+  // the scenario under it in the caption. The full per-scenario data is also
+  // in the visually hidden table that follows the plot.
   type Row = [string, string, string, number, number];
 
   for (const fig of document.querySelectorAll<HTMLElement>("[data-fig1]")) {
@@ -143,9 +167,7 @@ const readout = rows.map((r, i) => {
     }
     new ResizeObserver(() => draw()).observe(plot);
 
-    plot.addEventListener("pointermove", (event) => {
-      const box = plot.getBoundingClientRect();
-      const i = Math.floor(((event.clientY - box.top) / box.height) * rows.length);
+    const read = (i: number) => {
       if (i === hover || i < 0 || i >= rows.length) return;
       hover = i;
       const [id, authored, evidence] = rows[i];
@@ -153,12 +175,31 @@ const readout = rows.map((r, i) => {
       cap.textContent = evidence ? `${id} · ${md(authored)} → ${md(evidence)}` : `${id} · ${md(authored)}`;
       fig.classList.add("is-reading");
       draw();
-    });
-    plot.addEventListener("pointerleave", () => {
+    };
+    const clear = () => {
       hover = -1;
       cap.textContent = capText;
       fig.classList.remove("is-reading");
       draw();
+    };
+
+    plot.addEventListener("pointermove", (event) => {
+      const box = plot.getBoundingClientRect();
+      read(Math.floor(((event.clientY - box.top) / box.height) * rows.length));
     });
+    plot.addEventListener("pointerleave", clear);
+    plot.addEventListener("keydown", (event) => {
+      const step: Record<string, number> = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1, PageDown: 10, PageUp: -10 };
+      let next: number;
+      if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = rows.length - 1;
+      else if (event.key === "Escape") next = -1;
+      else if (event.key in step) next = hover < 0 ? 0 : Math.min(rows.length - 1, Math.max(0, hover + step[event.key]));
+      else return;
+      event.preventDefault();
+      if (next < 0) clear();
+      else read(next);
+    });
+    plot.addEventListener("blur", clear);
   }
 </script>

@@ -290,6 +290,26 @@
   letter-spacing: -0.01em;
 }
 
+/* The orange field would swallow the signal focus outline. */
+.fig1-plot:focus-visible {
+  outline-color: var(--c-ink);
+}
+
+/* Per-scenario data for screen readers; the plot's readout is pointer- and
+   keyboard-only. Out of the grid flow, so the layout is unchanged. */
+.fig1-data {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ---------- Stations ---------- */
 
 .lp-stations {

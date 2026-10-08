@@ -100,7 +100,7 @@ components:
 
 **Creative North Star: "The Grid Manual"**
 
-canon reads as an engineering standard set in the International Typographic Style: every claim sits flush-left on a strict twelve-column grid, and every proof is a numbered figure the reader can check. The landing page and the Starlight docs are one world: the same off-white ground, near-black ink, grey hairline column rules, and one signal-orange field.
+canon reads as an engineering standard set in the International Typographic Style: every claim sits flush-left on a strict twelve-column grid, and every proof is a numbered figure the reader can check. The landing page and the Starlight docs are one world: the same off-white ground, near-black ink, grey hairline column rules, and a signal orange that marks canon's own.
 
 The first viewport is scaled from the approved 1536x1024 comp through a single unit (`--u`, one comp pixel, bounded by viewport width, height, and 1.35px), so the composition holds its proportions rather than reflowing. Below the fold the page switches to fluid `clamp()` sizes on the same twelve columns. Density is low and typographic; there are no cards, no shadows, no gradients, no rounded corners.
 
@@ -108,7 +108,7 @@ The world refuses the dev-tool hero with a glowing terminal and a feature-card g
 
 **Key Characteristics:**
 - Twelve visible hairline column rules over the whole page (four on mobile).
-- One signal-orange field that owns a whole region (Fig. 1), plus orange as hover, focus, and selection.
+- Signal orange marks canon's own: the Fig. 1 field (canon's own corpus) and canon's row in the Fig. 3 comparison table; elsewhere orange is state (hover, focus, selection) or a single marker.
 - Spline Sans bold at poster scale with tight negative tracking; Inconsolata for commands, captions, and data.
 - Square corners everywhere; black command bar and black code blocks.
 - Numbered "Fig." captions and black rules that carry stations and section heads.
@@ -118,7 +118,7 @@ The world refuses the dev-tool hero with a glowing terminal and a feature-card g
 A near-monochrome engineering palette with one loud signal.
 
 ### Primary
-- **Signal Orange** (signal): the Fig. 1 panel field, the active state of links and Copy, the focus outline, text selection, the Expressive Code active-tab indicator and copy tooltip, and Starlight's accent in both themes. Text on it is always ink.
+- **Signal Orange** (signal): the Fig. 1 panel field, canon's own row in the Fig. 3 comparison table, the gate node on the Fig. 2 station rule, the active state of links and Copy, the focus outline, text selection, the Expressive Code active-tab indicator and copy tooltip, the docs danger aside, and Starlight's accent in both themes. Text on it is always ink.
 
 ### Neutral
 - **Manual Ground** (ground): page background on the landing and the light docs theme; text colour inside black fields.
@@ -130,7 +130,7 @@ A near-monochrome engineering palette with one loud signal.
 - **Code Hairline** (code-hairline) and **Code Muted** (code-muted): divider and titlebar text inside black code frames.
 
 ### Named Rules
-**The One Field Rule.** Signal orange fills exactly one region per surface (Fig. 1 on the landing); elsewhere it appears only as state: hover, focus, selection, active tab.
+**The Canon's Own Rule.** Signal orange fills only what is canon's own: the Fig. 1 field (canon's own corpus) and canon's own row in the Fig. 3 comparison table. Other tools' rows and every other region stay ground and ink. Elsewhere orange appears only as state (hover, focus, selection, active tab), as the gate node on Fig. 2, and as the docs danger aside.
 
 **The Visible Grid Rule.** Column rules are always drawn, behind content, never hidden at any breakpoint.
 
@@ -185,13 +185,13 @@ Black field holding the install command in mono with a `$ ` prompt and a mono "C
 Inline link with an arrow SVG, underlined by a 2-unit currentColor border; turns signal on hover.
 
 ### Figure Panel (Fig. 1)
-Signal-orange field spanning five columns, mono caption at the top, the corpus drawn as one ink hairline per scenario (canvas, SVG fallback), and the figure numeral at its foot. Built from `src/data/corpus-figure.json`; never hand-drawn.
+Signal-orange field spanning five columns, mono caption at the top, the corpus drawn as one ink hairline per scenario (canvas, SVG fallback), and the figure numeral at its foot. Built from `src/data/corpus-figure.json`; never hand-drawn. The per-scenario readout in the caption follows the pointer or, with the plot focused, the arrow keys (Home/End, Page Up/Down, Escape); a visually hidden table after the plot lists every scenario with its authored and first-evidence days and whether evidence came after authoring.
 
 ### Station Rule (Fig. 2)
 A black rule carrying six stations aligned to column lines; each station a numbered mono label with a bold title.
 
 ### Comparison Table (Fig. 3)
-Full-width table with 2px ink top rule per row group, 1px ink row rules, bold product names, and 14px source notes with underlined primary-source links. Experimental canon features are marked in text.
+Full-width table with 2px ink top rule per row group, 1px ink row rules, bold product names, and 14px source notes with underlined primary-source links. canon's own row is filled signal orange (on mobile, the whole stacked row); every other row stays on the ground. Experimental canon features are marked in text.
 
 ### Code Blocks
 Black field, mono 17px at 1.6, square, no shadow, comments in a muted tone. Docs code uses Expressive Code with the same black field, signal active-tab indicator, and hidden terminal dots.
@@ -203,7 +203,7 @@ Bold wordmark at left; plain text links at right, underlined on hover. Docs use 
 
 ### Do:
 - **Do** keep the twelve column rules visible behind every surface.
-- **Do** put signal orange on one full region per surface and use it otherwise only for hover, focus (2px outline, 3px offset), and selection.
+- **Do** reserve the signal-orange fill for canon's own figure (Fig. 1) and canon's own comparison row (Fig. 3), and use it otherwise only for hover, focus (2px outline, 3px offset; ink inside the orange Fig. 1 field), selection, and the Fig. 2 gate node.
 - **Do** set every proof as a numbered "Fig." with a mono caption and real data.
 - **Do** keep corners square and separation flat: rules and fills only.
 - **Do** start every text block on a gutter line, flush-left.
