@@ -41,7 +41,7 @@ pub const E_UNKNOWN_DOMAIN: &str = "E-UNKNOWN-DOMAIN";
 /// `&'static str` array + stability-test pattern
 /// (`crates/canon-gate/src/failure_class.rs`), scoped to THIS crate's own
 /// checker codes (a different, unrelated closed vocabulary from
-/// `canon_gate::FAILURE_CLASSES`'s eight gate-check classes or
+/// `canon_gate::FAILURE_CLASSES`'s nine gate-check classes or
 /// `canon_model::FailureClass`'s five evidence-integrity classes).
 pub const DIAGNOSTIC_CODES: [&str; 7] = [E_UNKNOWN_DIRECTIVE, E_UNKNOWN_ATTR, E_MISSING_ATTR, E_BAD_ENUM, E_BAD_EVIDENCE_KIND, E_ATTR_TYPE, E_UNKNOWN_DOMAIN];
 

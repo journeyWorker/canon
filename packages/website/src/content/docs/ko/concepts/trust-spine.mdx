@@ -1,6 +1,6 @@
 ---
 title: 트러스트 스파인
-description: canon gate가 태스크 완료를 자가 보고에서 증거 기반 게이팅으로 바꾸는 방법과 8개의 안정적인 실패 클래스.
+description: canon gate가 태스크 완료를 자가 보고에서 증거 기반 게이팅으로 바꾸는 방법과 9개의 안정적인 실패 클래스.
 ---
 
 `canon-gate`는 canon의 트러스트 스파인입니다: `EvidenceRecord` 형태의
@@ -17,7 +17,7 @@ description: canon gate가 태스크 완료를 자가 보고에서 증거 기반
 쪽에도 보이지 않습니다. [스펙 커버리지](#스펙-커버리지-해야-할-일-목록)는
 대신 스펙 코퍼스에서 출발하는, 옵트인 방식의 세 번째 질문입니다.
 
-## 8개의 실패 클래스
+## 9개의 실패 클래스
 
 `canon gate`가 보고하는 모든 위반은 아래의 안정적이고 grep 가능한 문자열
 중 하나를 가집니다. 조율된 픽스처+훅 마이그레이션 없이는 이름을 절대
@@ -26,13 +26,14 @@ description: canon gate가 태스크 완료를 자가 보고에서 증거 기반
 | 클래스 | 의미 |
 |---|---|
 | `uncovered-cell` | 정책상 요구되는 증거 셀(역할 × 아티팩트)에 대응하는 레코드가 아예 없음 — 또는 `spec_coverage`가 켜진 경우, 스펙 코퍼스의 시나리오 중 어떤 증거도 없거나, 열린 divergence를 갖거나, 최신 판정이 `Divergent`인 것. 어느 쪽인지는 detail 문자열이 밝힙니다. |
-| `unreviewed-promotion` | 아티팩트의 `reviewed` 라이프사이클 태그에 대응하는 레저 리뷰-레코드가 없음. |
+| `unreviewed-promotion` | 아티팩트의 `reviewed` 라이프사이클 태그에 대응하는 레저 리뷰-레코드가 없음 — 또는 `spec_coverage.require_review`가 켜진 경우, 범위 안 시나리오에 유효한 `Review`가 없음(아예 없거나, 그 시나리오의 증거를 남긴 액터 본인의 리뷰뿐임). |
 | `trust-below-required` | 아티팩트의 트러스트 레벨이 `policy.yaml`의 `trust_required`보다 낮음 — release 스코프 전용(`canon gate check --release`). |
 | `stale-evidence` | 통과했던 레코드가 stale로 저하됨: `evidence_sha` 이후 선언된 표면이 변경됐거나, HEAD가 `staleness.max_commits_behind`를 넘어섬. 이미 green인 레코드만 저하시킴. |
 | `malformed-evidence` | 후보 레코드가 파싱되지 않거나, 잘못된 위치에 있거나, 파싱 불가능한 임시 태그를 가짐. 잘못된 형식의 증거는 증거가 아님. |
 | `flagged` | 사람만 설정 가능한 `flagged` 오버레이가 켜짐 — 어떤 통과 증거가 있어도 절대 green이 되지 않음. |
 | `unevidenced-flip` | `canon gate task <task_id>`가 대응하는 non-`Divergent` `EvidenceRecord` 없이 체크박스 플립을 요청받음. |
 | `fabricated-evidence` | 플립에 첨부된 증거 노트에 차단 대상 마커(`"would pass"`, `"TBD"`, `"n/a"`)가 있거나, 첨부된 커맨드 결과 없이 `verified`만 주장함. |
+| `open-blocker` | `spec_coverage.require_review`가 켜진 경우, 범위 안 subject가 adopt한 change에 최신 버전 기준 severity `blocker`, disposition `open`인 리뷰 finding이 있음. subject 문자열은 `<change_id>#<round>.<seq>`입니다. |
 
 ## 스펙 커버리지: 해야 할 일 목록
 
@@ -89,8 +90,57 @@ Subject에 연결된 시나리오 중 해당 [라이프사이클
 보고됩니다. 생략하면 아무것도 요구하지 않습니다.
 
 섹션이 있는데 형식이 잘못된 경우는 섹션이 없는 것과 결코 같지
-않습니다 — 보고된 뒤 검사를 실패시키므로, 오타(또는 slug가 아닌 lane)가
-게이트를 조용히 꺼버릴 수 없습니다.
+않습니다 — 보고된 뒤 검사를 실패시키므로, 오타(또는 slug가 아닌 lane,
+형식이 잘못된 `require_review`)가 게이트를 조용히 꺼버릴 수 없습니다.
+
+### 독립 리뷰
+
+증거는 테스트가 있다는 것을 말할 뿐, 작성자 아닌 누군가가 그 작업을
+들여다봤다는 것은 말하지 않습니다. `require_review`(기본값은 없음 — 레포가
+설정하기 전까지는 아무것도 바뀌지 않습니다)는 subject를 완료라고 주장하기
+전에 그 두 번째 확인을 요구합니다:
+
+```yaml
+spec_coverage:
+  require_evidence: true
+  require_review:                 # `{}`이면 전부 기본값
+    scope: [verifying, shipped]   # 기본값; [] = 모든 시나리오
+    distinct_actor: true          # 기본값
+    block_on_findings: true       # 기본값
+```
+
+subject가 `require_review.scope`에 있는 모든 시나리오(`spec_coverage.scope`와는
+독립적이며, `exclude_lanes`는 여기서도 제외합니다)는 `Review` 레코드가
+필요합니다 — `canon review add --project-id <root> --scenario-id <id>
+--reviewer <who> --role reviewer --pin <sha> --upstream-ref <ref>` 후
+`canon gate promote`. `distinct_actor`이면 리뷰의 `reviewer`와 액터가 둘 다
+그 시나리오 증거의 모든 액터와 달라야 하므로, 에이전트가 자기 작업을 스스로
+리뷰할 수 없습니다. 리뷰가 없거나 본인 리뷰뿐이면 `unreviewed-promotion`입니다.
+리뷰에는 판정이 없으며, 판정은 여전히 ship 게이트가 확인합니다.
+
+`block_on_findings`이면 리뷰 finding(`canon finding add --severity
+blocker|should-fix|note`)은 `(change_id, round, seq)`별 최신 버전으로
+읽힙니다. 범위 안 subject가 adopt한 change에 열린 `blocker`가 있으면, 닫힐
+때까지 — `--resolution-sha <sha>`와 함께 `fixed`, 또는 `rejected`나
+`deferred` — `open-blocker`입니다:
+
+```
+open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close --disposition fixed --resolution-sha <sha>`, or close it as rejected or deferred
+```
+
+`should-fix`와 `note` finding은 절대 차단하지 않습니다.
+
+`canon subject status --override-reason`으로 이 검사를 넘긴 subject는
+([CLI 레퍼런스](/ko/cli/) 참고) 게이트를 실패시키지 않고, 위반 목록 뒤에
+advisory로 빈틈을 계속 보여줍니다:
+
+```
+review waivers: 1 advisory(ies) — not failing the gate:
+  waived unreviewed-promotion world.demo.01 — no review record ... [waiver: subject `demo-subject` moved to verifying by `lead`: reviewer out until Monday]
+```
+
+`canon context`는 finding severity, disposition, Review 필드, 현재
+`require_review` 설정을 나열합니다.
 
 ## 실험 기능: 증거 바인딩
 
@@ -198,7 +248,8 @@ canon gate install-hooks --repo .
 canon gate selftest
 ```
 
-내장된 픽스처 코퍼스를 실행합니다 — 실패 클래스마다 하나씩, 의도적으로
+내장된 픽스처 코퍼스를 실행합니다 — 실패 클래스마다 하나씩(`open-blocker`를
+포함한 9개), 의도적으로
 깨진 코퍼스로 해당 클래스만 발동함을 증명합니다. 게이트 자체의 코드를
 건드린 뒤, 다른 `canon gate check` 실행의 green을 신뢰하기 전에
 실행하십시오.

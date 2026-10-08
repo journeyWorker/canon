@@ -1,6 +1,6 @@
 ---
 title: Trust Spine
-description: How canon gate turns task completion from self-reported to evidence-gated, and reads the eight stable failure classes.
+description: How canon gate turns task completion from self-reported to evidence-gated, and reads the nine stable failure classes.
 ---
 
 `canon-gate` is canon's trust spine: a two-layer evidence gate over any
@@ -19,7 +19,7 @@ Both questions start from evidence, so neither can see a spec nobody has
 attested to at all. [Spec coverage](#spec-coverage-the-worklist) is the
 opt-in third question that starts from the spec corpus instead.
 
-## The eight failure classes
+## The nine failure classes
 
 Every violation `canon gate` reports carries one of these stable, grep-able
 strings. They are never renamed without a coordinated fixtures+hooks
@@ -28,13 +28,14 @@ migration:
 | Class | Meaning |
 |---|---|
 | `uncovered-cell` | A policy-required evidence cell (role × artifact) has no matching record at all — or, when `spec_coverage` is on, a scenario in the spec corpus that no evidence attests to, carries an open divergence, or whose latest verdict is `Divergent`. The detail string names which. |
-| `unreviewed-promotion` | An artifact's `reviewed` lifecycle tag has no matching ledger review-record. |
+| `unreviewed-promotion` | An artifact's `reviewed` lifecycle tag has no matching ledger review-record — or, with `spec_coverage.require_review` on, an in-scope scenario has no qualifying `Review` (none at all, or only reviews by its own evidence actor). |
 | `trust-below-required` | The artifact's trust level is below `policy.yaml`'s `trust_required` — release-scoped only (`canon gate check --release`). |
 | `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only ever degrades an already-green record. |
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of any passing evidence. |
 | `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` `EvidenceRecord`. |
 | `fabricated-evidence` | The evidence note attached to a flip contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) or a bare `verified` claim with no attached command result. |
+| `open-blocker` | With `spec_coverage.require_review` on, a review finding whose latest version is severity `blocker` and disposition `open`, on a change adopted by an in-scope subject. The subject string is `<change_id>#<round>.<seq>`. |
 
 ## Spec coverage: the worklist
 
@@ -93,7 +94,57 @@ passing. Absent, nothing is required.
 
 A present-but-malformed section is never silently equivalent to an absent
 one — it is reported and then fails the check, so a typo (or a
-non-slug lane) cannot quietly disable the gate.
+non-slug lane, or a malformed `require_review`) cannot quietly disable the gate.
+
+### Independent review
+
+Evidence says a test exists; it does not say anyone other than its
+author looked at the work. `require_review` (absent by default — nothing
+changes until a repo sets it) asks for that second look before a
+subject is claimed done:
+
+```yaml
+spec_coverage:
+  require_evidence: true
+  require_review:                 # `{}` takes every default
+    scope: [verifying, shipped]   # default; [] = every scenario
+    distinct_actor: true          # default
+    block_on_findings: true       # default
+```
+
+Every scenario whose subject is in `require_review.scope` (independent of
+`spec_coverage.scope`; `exclude_lanes` still exempts) needs a `Review`
+record — `canon review add --project-id <root> --scenario-id <id>
+--reviewer <who> --role reviewer --pin <sha> --upstream-ref <ref>`, then
+`canon gate promote`. With `distinct_actor`, both the review's `reviewer` and its
+actor must differ from every actor on that scenario's evidence, so an
+agent cannot review its own work. A missing or self-only review is
+`unreviewed-promotion`. A review carries no verdict; the ship gate still
+checks verdicts.
+
+With `block_on_findings`, review findings (`canon finding add
+--severity blocker|should-fix|note`) are read at their latest version per
+`(change_id, round, seq)`. An open `blocker` on a change an in-scope
+subject adopted is `open-blocker` until it is closed — `fixed` with
+`--resolution-sha <sha>`, or `rejected` or `deferred`:
+
+```
+open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close --disposition fixed --resolution-sha <sha>`, or close it as rejected or deferred
+```
+
+`should-fix` and `note` findings never block.
+
+A subject moved past these checks with `canon subject status
+--override-reason` (see [CLI reference](/cli/)) keeps its gaps visible
+as advisories after the violations, without failing the gate:
+
+```
+review waivers: 1 advisory(ies) — not failing the gate:
+  waived unreviewed-promotion world.demo.01 — no review record ... [waiver: subject `demo-subject` moved to verifying by `lead`: reviewer out until Monday]
+```
+
+`canon context` lists the finding severities, dispositions, Review
+fields, and the active `require_review` setting.
 
 ## Experimental: evidence binding
 
@@ -203,7 +254,8 @@ neither file already invokes `canon gate`, it also emits
 canon gate selftest
 ```
 
-Runs the shipped fixture corpus — one fixture per failure class, each a
+Runs the shipped fixture corpus — one fixture per failure class, all nine
+including `open-blocker`, each a
 deliberately broken corpus proving that class fires and only that class.
 Run this after touching the gate's own code, before trusting any other
 `canon gate check` run's green.

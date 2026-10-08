@@ -5,7 +5,9 @@ vocabulary registry `canon format`/`canon gate` validate against — never
 validation itself. It answers "what CAN I author in this repo, and how?":
 record kinds + their envelope fields, enum domains, join-key grammars,
 partition layout, policy-derived evidence requirements, the typed
-authoring vocabulary, and the CEL binding surface — folded into one
+authoring vocabulary, the review vocabulary (`review`: finding severities
+and dispositions, Review fields, the active `require_review`; see
+`canon-review`), and the CEL binding surface — folded into one
 deterministic authoring surface.
 
 ## `canon context [--repo <dir>] [--json]`

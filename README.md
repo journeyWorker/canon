@@ -67,6 +67,27 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.12.0 release
+
+Independent review before "done" ([journeyWorker/canon#2](https://github.com/journeyWorker/canon/issues/2)).
+Until now, a subject could reach `verifying` or `shipped` on evidence the
+same agent wrote, and open review findings did not affect the gate: nothing
+asked whether anyone other than the author had looked at the work. The new
+opt-in `spec_coverage.require_review` policy (`scope`, default
+`[verifying, shipped]`; `distinct_actor`, default `true`;
+`block_on_findings`, default `true`) makes `canon gate check` report each
+in-scope scenario with no `canon review add` record by someone other than
+its evidence actor as `unreviewed-promotion`, and adds a ninth failure
+class, `open-blocker`, for an open `blocker` finding on a change the
+subject adopted. `canon subject status` runs the same checks when moving
+into a scoped status, prints which ones it ran or skipped, and refuses on
+gaps; `--override-reason "<one line>"` (with `--actor-id`) waives only
+those two classes, records the waiver on the subject, and leaves the gaps
+listed as advisories by `canon gate check` until the next status change.
+`canon context` now lists finding severities, dispositions, Review fields,
+and the active `require_review` setting. Nothing changes for a repo that
+does not set `require_review`; canon's own policy leaves it off for now.
+
 ## 0.11.0 release (experimental evidence binding)
 
 Version 0.11.0 adds an **experimental, off-by-default** way to bind

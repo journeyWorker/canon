@@ -87,8 +87,10 @@ canon retrieve --role dev --domain dev --subject subject-domain-loop --k 5
 - **Changes**: adopt imported plan changes under the Subject (see
   [Adopt flow](#adopt-flow)).
 - **Reviews / evidence / divergences**: authored as usual (`canon review
-  add`, `canon gate`, `canon divergence …`) against the Subject's
-  scenarios — the join spine carries them back through `scenario_id`.
+  add`, `canon finding add`, `canon gate`, `canon divergence …`) against
+  the Subject's scenarios and adopted changes — the join spine carries
+  them back through `scenario_id` and `change_id`. See `canon-review`
+  for the finish-a-subject order.
 
 ### 4. Verdicts / trajectories → learn (knowledge out)
 
@@ -98,7 +100,8 @@ this subject and domain — the exact memory step 2 retrieves next time.
 
 ## Status lifecycle + the shipped evidence gate
 
-`canon subject status <id> <state>` performs a policy-gated transition.
+`canon subject status <id> <state> [--override-reason <text>] [--actor-id <id>]`
+performs a policy-gated transition.
 The legal chain:
 
 ```
@@ -140,6 +143,49 @@ Subject with no tagged scenario is refused rather than shipped on an
 empty set; so is one whose `scenario` records route away from the
 gate's rung. Each refusal prints by failure class (`uncovered-cell`),
 exits 1, and the status stays `verifying`. `retired` is not gated.
+
+### The review guard (`spec_coverage.require_review`, opt-in)
+
+When `.canon/policy.yaml` sets `spec_coverage.require_review` (see
+`canon-review`), every status write also runs the review checks and
+prints on stderr which it ran or skipped:
+
+```
+canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
+  ran unreviewed-promotion — every owned scenario needs a review by an actor other than its evidence actor
+  ran open-blocker — 1 adopted change(s) checked for open blocker findings
+```
+
+A target outside `require_review.scope` prints `skipped
+unreviewed-promotion — `specced` is not in require_review.scope`. A
+transition INTO an in-scope status with gaps — an owned scenario with no
+qualifying review (`unreviewed-promotion`), or an open blocker finding
+on an adopted change (`open-blocker`) — prints the violations, exits 1,
+leaves the record unchanged, and names `--override-reason`.
+
+```bash
+canon subject status demo-subject verifying \
+  --override-reason "reviewer out until Monday" --actor-id lead
+```
+
+`--override-reason "<one line>"` waives ONLY `unreviewed-promotion` and
+`open-blocker` — never a ship-gate verdict or case gap, never unreadable
+routing. It prints the `waived ...` lines and `override recorded by
+`lead`: <reason>`, and records on the new Subject record:
+
+```yaml
+status_override:
+  to: verifying
+  reason: reviewer out until Monday
+  checks: [unreviewed-promotion]
+  actor: { agent_id: lead }   # from --actor-id, default `canon`
+```
+
+A blank or multi-line reason exits 2. The waiver is cleared on the
+subject's next status write, so it never outlives the status it was
+granted for; while it stands, `canon gate check` lists the waived gaps
+as advisories instead of failing. Without `require_review`, nothing is
+printed and nothing changes.
 
 ## Adopt flow
 

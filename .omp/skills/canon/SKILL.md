@@ -36,6 +36,7 @@ installed explicitly with `--source canon/skills-dev`.
 - **Capture replayable run inputs / version prompts:** read `reference/canon-context.md`, then use `canon context-pack create|show|verify` and `canon prompt register|show` with explicit repository-relative JSON manifests.
 - **Validate or index specs:** read `reference/canon-fmt.md` and `reference/canon-inventory.md`.
 - **Run evidence gates, flip tasks, install hooks:** read `reference/canon-gate.md`.
+- **Finish a subject (claim work done):** read `reference/canon-review.md`. Order: test-run evidence (`canon evidence add`) → independent review of the adopted change (`canon finding add` per issue, fix, `canon finding close --disposition fixed --resolution-sha <sha>`) → `canon review add` per scenario by a reviewer other than the evidence actor → `canon subject status`. Commit each record with `canon gate promote`.
 - **Ingest artifacts or sessions:** read `reference/canon-artifact-ingest.md`, `reference/canon-session-ingest.md`, or `reference/canon-plan-import.md`.
 - **Configure storage, policy, plugins, or strategy learning:** read `reference/canon-storage.md`, `reference/canon-policy.md`, `reference/canon-plugins.md`, or `reference/canon-learn.md`.
 - **Retrieve dispatch guidance:** read `reference/canon-retrieve.md` and load `scripts/canon-retrieve-pre-dispatch.sh` when wiring hooks.

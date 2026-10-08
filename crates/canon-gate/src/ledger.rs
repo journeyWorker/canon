@@ -20,7 +20,7 @@
 //!   fail/by-whom, spec.md "Covered cell with a failing verdict is not
 //!   green" — "the failure is visible as its own fact"). This is
 //!   informational, not a [`crate::GateCheck`] — [`FAILURE_CLASSES`]
-//!   (design decision 9) is a CLOSED eight-string set with no member
+//!   (design decision 9) is a CLOSED set with no member
 //!   named for "the latest verdict was `Divergent`"; a failing verdict
 //!   is a REPORTED fact for `canon gate check`/`report` (task 1.9,
 //!   `canon gate promote`'s re-validation, task 2.2) to render, never a
