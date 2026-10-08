@@ -2,6 +2,7 @@ Feature: learn promotion
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:learn-promotion
+  @case:happy
   @learn.promotion.01
   Scenario: A proven strategy graduates into a git-tracked file
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -11,6 +12,7 @@ Feature: learn promotion
     And the strategy has moved from derived memory into something a person can review in a diff
 
   @subject:learn-promotion
+  @case:happy
   @learn.promotion.02
   Scenario: The promoted file opens active and carries the strategy's own content
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -21,6 +23,7 @@ Feature: learn promotion
     And the body carries the strategy's content, not a summary of it
 
   @subject:learn-promotion
+  @case:happy
   @learn.promotion.03
   Scenario: A dry run previews the promotion and writes nothing
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -30,6 +33,7 @@ Feature: learn promotion
     And no file is created in the git-tracked tier
 
   @subject:learn-promotion
+  @case:failure
   @learn.promotion.04
   Scenario: A strategy with no corroborating trajectories is blocked by the gate
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -39,6 +43,7 @@ Feature: learn promotion
     And the strategy stays out of the git-tracked tier, because nothing corroborates it
 
   @subject:learn-promotion
+  @case:failure
   @learn.promotion.05
   Scenario: Unresolved trajectories never count toward a promotion
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -48,6 +53,7 @@ Feature: learn promotion
     And volume of unresolved evidence is not evidence
 
   @subject:learn-promotion
+  @case:failure
   @learn.promotion.06
   Scenario: A later contradiction resets the streak and blocks the promotion
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -57,6 +63,7 @@ Feature: learn promotion
     And the gate counts the streak up to the contradiction, not the total number of successes
 
   @subject:learn-promotion
+  @case:edge
   @learn.promotion.07
   Scenario: A role that configures no promotion gate gets the conservative occurrence default
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -66,6 +73,7 @@ Feature: learn promotion
     And the minimum sample count and the window come from the conservative defaults, never left unset
 
   @subject:learn-promotion
+  @case:happy
   @learn.promotion.08
   Scenario: Gate mode is chosen per role between crn and occurrence
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -76,6 +84,7 @@ Feature: learn promotion
     And the crn role's occurrence fields still hold well-formed defaults, because a mode change never leaves a field uninitialized
 
   @subject:learn-promotion
+  @case:happy
   @learn.promotion.09
   Scenario: Demoting soft-flags the promoted file and leaves the rest of it intact
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}

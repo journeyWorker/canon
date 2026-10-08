@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-07-30T07:33:00.961615Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "flywheel-execution-graph",
+  "summary": "Wire canon-learn's reward/promotion seams into the CLI, then record execution lineage and declared task dependencies so a plan-vs-actual graph diff becomes possible",
+  "title": "Flywheel repair + execution-graph lineage"
+}

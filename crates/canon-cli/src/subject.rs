@@ -28,7 +28,9 @@
 //! # `verifying → shipped` is evidence-gated, fail-closed
 //! That ONE transition additionally requires the subject to own at least
 //! one scenario, and every scenario it owns to carry a latest
-//! NON-`Divergent` verdict in the ledger. A subject owns the scenarios
+//! NON-`Divergent` verdict in the ledger; with `spec_coverage.
+//! require_cases`, each owned feature surface must also specify a
+//! scenario of every required case. A subject owns the scenarios
 //! whose `@subject:<id>` Gherkin tag `canon inventory sync` indexed onto
 //! `Scenario.subject_id` — read through
 //! [`canon_gate::spec_coverage::subject_scenarios`], the same join the
@@ -43,8 +45,8 @@
 
 use std::path::Path;
 
-use canon_gate::spec_coverage::subject_scenarios;
-use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, Violation};
+use canon_gate::spec_coverage::{case_gaps, subject_scenarios};
+use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, SpecCoverage, Violation};
 use canon_model::{
     Actor, Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, RoleId, Subject, SubjectId, SubjectStatus,
 };
@@ -501,7 +503,11 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, js
 ///   exact pass-by-seeing-nothing this gate exists to stop;
 /// - an owned scenario has no ledger verdict;
 /// - an owned scenario's latest verdict (for any authoring role) is
-///   `Divergent`.
+///   `Divergent`;
+/// - `spec_coverage.require_cases` is set and an owned feature surface
+///   carries no scenario of a required case (through the SAME
+///   [`case_gaps`] rule `canon gate check` applies), so a subject cannot
+///   ship on a spec that only describes its golden path.
 fn ship_gate_violations(repo: &Path, subject_id: &SubjectId) -> Result<Vec<Violation>, String> {
     let ctx = GateCtx::from_repo(repo);
     let registry = SchemaRegistry::load();
@@ -528,8 +534,8 @@ fn ship_gate_violations(repo: &Path, subject_id: &SubjectId) -> Result<Vec<Viola
 
     let verdicts = latest_verdicts(&gate_context);
     let mut violations = Vec::new();
-    for (_, scenario) in &owned {
-        let sid = scenario.as_str().to_string();
+    for scenario in &owned {
+        let sid = scenario.scenario_id.as_str().to_string();
         let entries: Vec<&LedgerEntry> = verdicts.iter().filter(|((subject, _), _)| subject == &sid).map(|(_, entry)| entry).collect();
         if entries.is_empty() {
             violations.push(Violation::new(FailureClass::UncoveredCell, sid.clone(), "verifying → shipped: no ledger verdict for this linked scenario"));
@@ -539,6 +545,15 @@ fn ship_gate_violations(repo: &Path, subject_id: &SubjectId) -> Result<Vec<Viola
                 sid.clone(),
                 format!("verifying → shipped: latest verdict is divergent (by {})", divergent.agent_id),
             ));
+        }
+    }
+
+    if let Some(SpecCoverage::Active { exclude_lanes, require_cases, .. }) = &gate_context.policy.spec_coverage {
+        let counted = owned.iter().copied().filter(|s| !s.lane.as_ref().is_some_and(|lane| exclude_lanes.contains(lane)));
+        for gap in case_gaps(counted, require_cases) {
+            let mut violation = gap.violation();
+            violation.detail = format!("verifying → shipped: {}", violation.detail);
+            violations.push(violation);
         }
     }
     Ok(violations)

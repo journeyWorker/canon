@@ -422,11 +422,20 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
         risk_routing: policy.risk_routing.iter().map(|(k, v)| (k.clone(), summarize_field(v))).collect(),
         risk_tiers: policy.risk_tiers.iter().map(|(name, rule)| (name.clone(), summarize_risk_tier(rule))).collect(),
         spec_coverage: policy.spec_coverage.as_ref().map(|sc| match sc {
-            SpecCoverage::Active { require_evidence, scope, .. } if scope.is_empty() => {
-                format!("require_evidence={require_evidence} scope=<every scenario>")
-            }
-            SpecCoverage::Active { require_evidence, scope, .. } => {
-                format!("require_evidence={require_evidence} scope={}", scope.iter().map(subject_status_slug).collect::<Vec<_>>().join(", "))
+            SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases } => {
+                let scope = if scope.is_empty() {
+                    "<every scenario>".to_string()
+                } else {
+                    scope.iter().map(subject_status_slug).collect::<Vec<_>>().join(", ")
+                };
+                let mut summary = format!("require_evidence={require_evidence} scope={scope}");
+                if !exclude_lanes.is_empty() {
+                    summary.push_str(&format!(" exclude_lanes={}", exclude_lanes.join(", ")));
+                }
+                if !require_cases.is_empty() {
+                    summary.push_str(&format!(" require_cases={}", require_cases.join(", ")));
+                }
+                summary
             }
             SpecCoverage::Invalid { detail } => format!("INVALID — {detail}"),
         }),
@@ -951,5 +960,23 @@ mod tests {
         let absent_json: serde_json::Value = serde_json::from_str(&render_json(&absent_surface)).unwrap();
         assert_eq!(absent_json["policy"]["risk_tiers"], serde_json::json!({}));
         assert!(render_outline(&absent_surface).contains("risk_tiers (0):"));
+    }
+
+    /// A broken `spec_coverage` section must read as INVALID in the
+    /// surface an author consults, never as the "not enforced here"
+    /// absent state — and a well-formed one names every cut it applies,
+    /// so `require_cases` is visible before writing a `.feature` file.
+    #[test]
+    fn a_malformed_spec_coverage_surfaces_as_invalid_and_a_valid_one_names_its_cases() {
+        let broken = fixture_repo(Some("spec_coverage:\n  require_evidence: true\n  require_cases: [Not-A-Case]\n"));
+        let surface = resolve_surface(broken.path(), ContextOptions::default());
+        let summary = surface.policy.spec_coverage.as_deref().expect("a present section is never reported absent");
+        assert!(summary.starts_with("INVALID") && summary.contains("Not-A-Case"), "{summary}");
+        assert!(!surface.policy.clean, "a poisoned section makes the policy unclean");
+        assert!(render_outline(&surface).contains("spec_coverage: INVALID"));
+
+        let valid = fixture_repo(Some("spec_coverage:\n  require_evidence: true\n  exclude_lanes: [process]\n  require_cases: [failure]\n"));
+        let summary = resolve_surface(valid.path(), ContextOptions::default()).policy.spec_coverage.unwrap();
+        assert_eq!(summary, "require_evidence=true scope=<every scenario> exclude_lanes=process require_cases=failure");
     }
 }

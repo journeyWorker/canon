@@ -132,11 +132,14 @@ what brings a scenario into that scope. See `canon-gate`.
 requires that the Subject OWNS at least one scenario (one whose latest
 synced generation carries `@subject:<id>`), and that EVERY owned
 scenario carries a latest, non-`Divergent` verdict in the ledger (the
-same last-wins rule `canon gate check` uses). A Subject with no tagged
-scenario is refused rather than shipped on an empty set; so is one whose
-`scenario` records route away from the gate's rung. Each refusal prints
-by failure class (`uncovered-cell`), exits 1, and the status stays
-`verifying`. `retired` is not gated.
+same last-wins rule `canon gate check` uses). With
+`spec_coverage.require_cases` set, every feature surface the Subject
+owns must also carry a scenario of each required `@case:` (e.g. one
+`@case:failure`) — attested golden-path scenarios alone do not ship. A
+Subject with no tagged scenario is refused rather than shipped on an
+empty set; so is one whose `scenario` records route away from the
+gate's rung. Each refusal prints by failure class (`uncovered-cell`),
+exits 1, and the status stays `verifying`. `retired` is not gated.
 
 ## Adopt flow
 

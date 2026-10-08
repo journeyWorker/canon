@@ -72,7 +72,7 @@ Gherkin `.feature` 스펙 코퍼스를 검증하고 확장합니다.
 |---|---|
 | `canon format <ROOT> [--repo <dir>]` (별칭 `canon fmt`) | 코퍼스 루트(예: `spec/`)를 아티팩트 패밀리 스키마 + 레이아웃 디스크립터에 대해 검증합니다. 검증이 유일한 모드이므로 `--check`는 이제 기본값이며 호환을 위해서만 받아들여집니다. |
 | `canon inventory sync [--repo <dir>] [--spec-root <dir>]` | 설정된 `specs.roots[]` 항목마다 `canon-fmt`로 검증한 뒤, `(project_id, scenario_id)`당 하나의 `Scenario` ledger-index 레코드를 생성합니다. `--spec-root`는 하나의 ad hoc 루트로 `canon.yaml`을 완전히 오버라이드합니다. |
-| `canon scenario new <TAG> --title <label> [--subject <id>] [--lane <v>] [--actor <id>] [--feature <path>] [--repo <dir>]` | `<area>.<surface>.<nn>` 태그에 대한 `.feature` 스텁을 추가합니다(없으면 생성): 태그 바로 위의 `# canon:` provenance 줄, 지정 시 `@subject:<id>` / `@lane:<v>`, 그 다음 id 태그와 헤더. `--actor`(또는 `CANON_ACTOR`)가 provenance의 actor를 정하며 기본값은 `canon-scaffold`, `--lane`은 레포의 `lane` vocabulary에 대해 검사됩니다. ledger 레코드는 쓰지 않습니다. |
+| `canon scenario new <TAG> --title <label> [--subject <id>] [--lane <v>] [--case <v>] [--actor <id>] [--feature <path>] [--repo <dir>]` | `<area>.<surface>.<nn>` 태그에 대한 `.feature` 스텁을 추가합니다(없으면 생성): 태그 바로 위의 `# canon:` provenance 줄, 지정 시 `@subject:<id>` / `@lane:<v>` / `@case:<v>`, 그 다음 id 태그와 헤더. `--actor`(또는 `CANON_ACTOR`)가 provenance의 actor를 정하며 기본값은 `canon-scaffold`, `--lane`과 `--case`는 레포의 `lane`/`case` vocabulary에 대해 검사됩니다. ledger 레코드는 쓰지 않습니다. |
 | `canon feature new <SURFACE> --title <label> [--actor <id>] [--repo <dir>]` | 아직 시작되지 않은 `<area>.<surface>`를 위한 시나리오 없는 새 `.feature` 파일을 스캐폴딩합니다. 기존 파일이 있으면 덮어쓰지 않고 실패합니다. |
 
 ## Ingest

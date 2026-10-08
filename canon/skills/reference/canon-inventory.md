@@ -42,9 +42,9 @@ Per configured root, in order:
 2. **Scan** — walks `<root>/features/**/*.feature`, pairing each
    `@<area>.<surface>.<nn>` tag with its header label as `title` and a
    `source_digest` (sha256 over the raw `.feature` bytes). `@subject:<id>`
-   → `subject_id`, `@lane:<v>` → `lane` (first tag wins; a second, a
-   malformed value, or a value outside a declared `lane` enum is dropped
-   with a counted, non-fatal diagnostic). Any other `@name:value`
+   → `subject_id`, `@lane:<v>` → `lane`, `@case:<v>` → `case` (first tag
+   wins; a second, a malformed value, or a value outside a declared
+   `lane`/`case` enum is dropped with a counted, non-fatal diagnostic). Any other `@name:value`
    namespace is counted as a diagnostic so a dropped classification is
    visible; plain tags (`@p2`) are ignored. The index derives from the
    `.feature` corpus alone. See `canon-authoring` for the organizing rule.

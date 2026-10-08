@@ -2,6 +2,7 @@ Feature: gate promote
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:gate-trust-spine
+  @case:happy
   @gate.promote.01
   Scenario: Run sequence numbers are monotonic and gap-free per role and surface
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -12,6 +13,7 @@ Feature: gate promote
     And a third record for that same role and surface, promoted separately, continues at three rather than restarting
 
   @subject:gate-trust-spine
+  @case:happy
   @gate.promote.02
   Scenario: Two surfaces number themselves independently
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -21,6 +23,7 @@ Feature: gate promote
     And the sequence is per surface, not a single counter shared across the ledger
 
   @subject:gate-trust-spine
+  @case:failure
   @gate.promote.03
   Scenario: A malformed candidate is refused and consumes no run sequence number
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -31,6 +34,7 @@ Feature: gate promote
     And its staging file is left on disk, never committed and never deleted
 
   @subject:gate-trust-spine
+  @case:failure
   @gate.promote.04
   Scenario: A candidate whose partition cannot be derived is refused rather than filed somewhere
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -40,6 +44,7 @@ Feature: gate promote
     And the committed tier stays empty, because a record with no partition has no sequence to join
 
   @subject:gate-trust-spine
+  @case:happy
   @gate.promote.05
   Scenario: A dry run computes the whole plan and writes nothing
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -50,6 +55,7 @@ Feature: gate promote
     And the staging file is still there, undeleted
 
   @subject:gate-trust-spine
+  @case:edge
   @gate.promote.06
   Scenario: A promote retried after an interruption recovers instead of appending a duplicate
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -61,6 +67,7 @@ Feature: gate promote
     And a genuinely different record for the same role and surface still promotes, at the next number
 
   @subject:gate-trust-spine
+  @case:happy
   @gate.promote.07
   Scenario: The committed record carries the staged identity it was promoted under
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -70,6 +77,7 @@ Feature: gate promote
     And recovery therefore works from the ledger alone, surviving the process that was interrupted
 
   @subject:gate-trust-spine
+  @case:failure
   @gate.promote.08
   Scenario: Two different records at one natural key commit one and refuse the other
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}

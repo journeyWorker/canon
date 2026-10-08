@@ -2,6 +2,7 @@ Feature: ingest artifacts
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:ingest-pipelines
+  @case:happy
   @ingest.artifacts.01
   Scenario: Every artifact adapter declares which shape of input it reads
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -12,6 +13,7 @@ Feature: ingest artifacts
     And the tag is a property of the adapter, not something a caller chooses per run
 
   @subject:ingest-pipelines
+  @case:happy
   @ingest.artifacts.02
   Scenario: One pass drives both input shapes and lands one regime-keyed trajectory
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -24,6 +26,7 @@ Feature: ingest artifacts
     And that trajectory is readable back as a dev-role failure-polarity verdict
 
   @subject:ingest-pipelines
+  @case:edge
   @ingest.artifacts.03
   Scenario: A regime is the grouping key and its recorded instant is the newest source record
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -33,6 +36,7 @@ Feature: ingest artifacts
     And the regime's recorded instant is the later of the two, never the first read
 
   @subject:ingest-pipelines
+  @case:happy
   @ingest.artifacts.04
   Scenario: A code-review finding is a failure the dev role must not repeat
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -42,6 +46,7 @@ Feature: ingest artifacts
     And its polarity is failure and it becomes a guardrail candidate, never a strategy
 
   @subject:ingest-pipelines
+  @case:happy
   @ingest.artifacts.05
   Scenario: A native divergence takes the actor's own role, never a fixed default
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -51,6 +56,7 @@ Feature: ingest artifacts
     And it is not silently coerced to dev
 
   @subject:ingest-pipelines
+  @case:edge
   @ingest.artifacts.06
   Scenario: Re-ingesting an unchanged corpus persists nothing new
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -60,6 +66,7 @@ Feature: ingest artifacts
     And the second pass is a no-op rather than a second copy of the first pass's conclusions
 
   @subject:ingest-pipelines
+  @case:edge
   @ingest.artifacts.07
   Scenario: The identity a trajectory is deduplicated on is its content, so changed verdicts are a different trajectory
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -69,6 +76,7 @@ Feature: ingest artifacts
     And the changed trajectory is therefore written rather than mistaken for the one already stored
 
   @subject:ingest-pipelines
+  @case:failure
   @ingest.artifacts.08
   Scenario: Reading canon's own records and reading a raw path are mutually exclusive, and the conflict is caught first
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -78,6 +86,7 @@ Feature: ingest artifacts
     And the error names the conflicting field rather than quietly picking one of the two
 
   @subject:ingest-pipelines
+  @case:failure
   @ingest.artifacts.09
   Scenario: A source with nowhere to write degrades to unavailable and the rest of the pass still runs
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}

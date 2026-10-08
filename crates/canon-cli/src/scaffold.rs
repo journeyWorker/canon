@@ -154,28 +154,26 @@ fn corpus_tags(root: &Path) -> BTreeSet<String> {
     tags
 }
 
+/// The optional classification tags a scaffolded scenario carries, in
+/// the order they are written above its id tag.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ScenarioAxes<'a> {
+    pub subject: Option<&'a str>,
+    pub lane: Option<&'a str>,
+    pub case: Option<&'a str>,
+}
+
 /// Append one scenario block. Provenance leads the block, followed by
-/// optional subject/lane tags in that order, then the id tag and header.
-fn append_scenario_block(
-    existing: &str,
-    tag: &str,
-    title: &str,
-    prov_line: &str,
-    subject: Option<&str>,
-    lane: Option<&str>,
-) -> String {
+/// the optional subject/lane/case tags in that order, then the id tag
+/// and header.
+fn append_scenario_block(existing: &str, tag: &str, title: &str, prov_line: &str, axes: ScenarioAxes<'_>) -> String {
     let mut block = String::new();
     block.push_str(prov_line);
     block.push('\n');
-    if let Some(subject) = subject {
-        block.push_str("  @subject:");
-        block.push_str(subject);
-        block.push('\n');
-    }
-    if let Some(lane) = lane {
-        block.push_str("  @lane:");
-        block.push_str(lane);
-        block.push('\n');
+    for (axis, value) in [("subject", axes.subject), ("lane", axes.lane), ("case", axes.case)] {
+        if let Some(value) = value {
+            block.push_str(&format!("  @{axis}:{value}\n"));
+        }
     }
     block.push_str(&format!("  @{tag}\n  Scenario: {title}\n    Given a step\n"));
     let trimmed = existing.trim_end_matches('\n');
@@ -297,8 +295,7 @@ pub fn run_scenario_new(
     title: &str,
     feature: Option<&Path>,
     project: Option<&ProjectId>,
-    subject: Option<&str>,
-    lane: Option<&str>,
+    axes: ScenarioAxes<'_>,
     actor: &Actor,
     at: DateTime<Utc>,
 ) -> i32 {
@@ -388,7 +385,7 @@ pub fn run_scenario_new(
     } else {
         existing
     };
-    let out = append_scenario_block(&content, tag.as_str(), title, &prov_line, subject, lane);
+    let out = append_scenario_block(&content, tag.as_str(), title, &prov_line, axes);
 
     if let Some(parent) = feature_path.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
@@ -563,9 +560,16 @@ mod tests {
         let one_trailing = "Feature: x\n";
         let blank_trailing = "Feature: x\n\n";
         let expected = "Feature: x\n\n  # canon: {}\n  @a.b.01\n  Scenario: t\n    Given a step\n";
-        assert_eq!(append_scenario_block(no_trailing, "a.b.01", "t", prov, None, None), expected);
-        assert_eq!(append_scenario_block(one_trailing, "a.b.01", "t", prov, None, None), expected);
-        assert_eq!(append_scenario_block(blank_trailing, "a.b.01", "t", prov, None, None), expected);
+        assert_eq!(append_scenario_block(no_trailing, "a.b.01", "t", prov, ScenarioAxes::default()), expected);
+        assert_eq!(append_scenario_block(one_trailing, "a.b.01", "t", prov, ScenarioAxes::default()), expected);
+        assert_eq!(append_scenario_block(blank_trailing, "a.b.01", "t", prov, ScenarioAxes::default()), expected);
+    }
+
+    #[test]
+    fn axis_tags_are_written_subject_lane_case_above_the_id_tag() {
+        let axes = ScenarioAxes { subject: Some("cart"), lane: Some("behavior"), case: Some("failure") };
+        let out = append_scenario_block("Feature: x\n", "a.b.01", "t", "  # canon: {}", axes);
+        assert!(out.ends_with("  @subject:cart\n  @lane:behavior\n  @case:failure\n  @a.b.01\n  Scenario: t\n    Given a step\n"), "{out}");
     }
 
     /// `<n>` configured roots, ids `p0..p<n-1>`, each under its own

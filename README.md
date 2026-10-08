@@ -67,6 +67,19 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.10.0 release
+
+Version 0.10.0 makes golden-path-only specs visible. A scenario can carry a
+`@case:<value>` tag (`happy`, `failure`, `edge` in the base vocabulary;
+`canon scenario new --case`), indexed onto `Scenario.case` by
+`canon inventory sync`. The opt-in `spec_coverage.require_cases: [failure]`
+then reports every feature surface (`<area>.<surface>`) whose in-scope
+scenarios specify no failure path, and `canon subject status <id> shipped`
+refuses on the same rule. Nothing changes until a repo sets
+`require_cases`; when it does, untagged scenarios satisfy no case, so tag
+existing failure-path scenarios first. `canon context` now also prints
+`exclude_lanes` and `require_cases`.
+
 ## 0.9.1 fix
 
 The `@journeykit/canon` launcher in 0.8.0–0.9.0 exited 0 regardless of the

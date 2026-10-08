@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T09:46:55.941814Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "specced",
+  "subject_id": "gate-trust-spine",
+  "summary": "",
+  "title": "Gate: the trust-spine evidence gate and its failure classes"
+}

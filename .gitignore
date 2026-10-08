@@ -12,7 +12,7 @@ packages/core-*/bin/*
 # written by `canon ingest`/`sync` and tests; derived from committed
 # openspec/ + specs/ sources, regenerable, never committed).
 #
-# TWO exceptions, and both for the same reason: the record is not
+# THREE exceptions, all for the same reason: the record is not
 # regenerable from any committed source because it is AUTHORED.
 #
 # s42 (`close-the-open-loops`) carved out `EvidenceRecord` — an
@@ -30,6 +30,12 @@ packages/core-*/bin/*
 # source regenerates it, and the derived counts in `.canon/REPORT.md`
 # are drift-gated against a corpus that must therefore be in the repo.
 #
+# Subject records join them on the identical argument: `canon subject
+# new`/`status` author them and no source regenerates them. Left local,
+# `spec_coverage.scope` reads every subject-tagged scenario as naming a
+# missing subject on any fresh checkout (CI included), so the gate's
+# answer depended on whose laptop ran it.
+#
 # Written as `ledger/*` + re-includes because a negation cannot
 # resurrect a path whose PARENT directory is excluded. `_staging/` is
 # still matched by the `*` line, so a STAGED (unpromoted) record stays
@@ -37,6 +43,7 @@ packages/core-*/bin/*
 .canon/ledger/*
 !.canon/ledger/kind=evidence_record/
 !.canon/ledger/kind=finding/
+!.canon/ledger/kind=subject/
 .canon/learn/
 .canon/r2/
 .canon/ingest/

@@ -2,6 +2,7 @@ Feature: plugin overlay
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:plugin-overlay
+  @case:happy
   @plugin.overlay.01
   Scenario: An overlay body is admitted only when it satisfies its manifest exactly
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -11,6 +12,7 @@ Feature: plugin overlay
     And the join-key fields are recognized rather than flagged as outside the declared set
 
   @subject:plugin-overlay
+  @case:failure
   @plugin.overlay.02
   Scenario: A field the manifest never declared is refused, named
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -20,6 +22,7 @@ Feature: plugin overlay
     And an overlay may only ever say what its manifest declared it could say
 
   @subject:plugin-overlay
+  @case:failure
   @plugin.overlay.03
   Scenario: An invalid overlay body never reaches disk
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -29,6 +32,7 @@ Feature: plugin overlay
     And no directory for that overlay identity exists afterwards, because validation gates the write
 
   @subject:plugin-overlay
+  @case:happy
   @plugin.overlay.04
   Scenario: A synced overlay projects its declared fields onto the matching core read
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -38,6 +42,7 @@ Feature: plugin overlay
     And it carries the surface reference the overlay recorded
 
   @subject:plugin-overlay
+  @case:happy
   @plugin.overlay.05
   Scenario: A projection read never rewrites the core record
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -47,6 +52,7 @@ Feature: plugin overlay
     And the overlay read is therefore a view, never a migration of the core corpus
 
   @subject:plugin-overlay
+  @case:failure
   @plugin.overlay.06
   Scenario: A malformed overlay record is diagnosed and skipped while its siblings still project
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -58,6 +64,7 @@ Feature: plugin overlay
     And the well-formed sibling still projects its declared field
 
   @subject:plugin-overlay
+  @case:edge
   @plugin.overlay.07
   Scenario: Without the plugin flag the core read is unchanged even with overlay data present
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -67,6 +74,7 @@ Feature: plugin overlay
     And no plugin, overlays or overlay key appears anywhere in the payload
 
   @subject:plugin-overlay
+  @case:edge
   @plugin.overlay.08
   Scenario: A plugin projects only its own overlays, never a namespace sibling's
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -77,6 +85,7 @@ Feature: plugin overlay
     And the sibling's overlay never appears, because a shared namespace is not shared authority
 
   @subject:plugin-overlay
+  @case:edge
   @plugin.overlay.09
   Scenario: A second sync over an unchanged index writes nothing new
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}

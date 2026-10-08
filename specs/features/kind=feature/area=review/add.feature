@@ -2,6 +2,7 @@ Feature: review add
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:review-attestation
+  @case:happy
   @review.add.01
   Scenario: A review is written attributed to the invoking actor with its provenance ref intact
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -12,6 +13,7 @@ Feature: review add
     And the upstream ref is stored exactly as given, never rewritten into the other ref variant
 
   @subject:review-attestation
+  @case:failure
   @review.add.02
   Scenario: A review carrying no provenance ref is refused and writes nothing
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -21,6 +23,7 @@ Feature: review add
     And no review record exists, because an empty or synthesized ref is never written in place of one
 
   @subject:review-attestation
+  @case:failure
   @review.add.03
   Scenario: A review naming both provenance refs is refused as ambiguous
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -30,6 +33,7 @@ Feature: review add
     And nothing is written, so exactly one ref is required rather than one being preferred
 
   @subject:review-attestation
+  @case:edge
   @review.add.04
   Scenario: The pinned commit is part of a review's identity
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -40,6 +44,7 @@ Feature: review add
     And two attestations at two commits are two records, never two versions of one
 
   @subject:review-attestation
+  @case:edge
   @review.add.05
   Scenario: A review's area comes from its scenario id and never from a plausible directory
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -49,6 +54,7 @@ Feature: review add
     And the caller's directory guess decides nothing
 
   @subject:review-attestation
+  @case:failure
   @review.add.06
   Scenario: A review that names no project is malformed rather than project-inferred
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -58,6 +64,7 @@ Feature: review add
     And no project is inferred for it, so it never becomes a legitimately identified review of a guessed project
 
   @subject:review-attestation
+  @case:failure
   @review.add.07
   Scenario: A review of one project never satisfies another project's evidence for the same scenario id
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}

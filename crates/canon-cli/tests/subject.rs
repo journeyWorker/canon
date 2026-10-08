@@ -257,6 +257,35 @@ fn shipped_is_allowed_with_a_faithful_verdict_for_every_linked_scenario() {
     assert_eq!(payload["records"][0]["status"], "shipped");
 }
 
+/// With `spec_coverage.require_cases`, attested golden-path scenarios
+/// are not enough to ship: the surface must also specify a failure
+/// path. Adding one (attested) on the same surface clears the refusal.
+#[test]
+fn shipped_is_blocked_until_each_owned_surface_specifies_a_required_case() {
+    let dir = repo();
+    std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "spec_coverage:\n  require_evidence: true\n  require_cases: [failure]\n").unwrap();
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
+    seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert_eq!(out.status.code(), Some(1), "a golden-path-only surface must fail closed: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("world.demo") && err.contains("@case:failure"), "must name the surface and the missing case: {err}");
+    assert_eq!(query_subjects(dir.path(), &[])["records"][0]["status"], "verifying");
+
+    let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
+    let mut failure = Scenario::new(envelope, ProjectId::parse("demo").unwrap(), ScenarioId::parse("world.demo.02").unwrap(), "refused", "", SpecDigest::of(b"02"));
+    failure.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
+    failure.case = Some("failure".to_string());
+    ledger(dir.path()).write(&failure).unwrap();
+    seed_scenario_verdict(dir.path(), "world.demo.02", EvidenceVerdict::Faithful);
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(query_subjects(dir.path(), &[])["records"][0]["status"], "shipped");
+}
+
 #[test]
 fn domain_and_status_filters_scope_the_subject_view() {
     let dir = repo();

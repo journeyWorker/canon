@@ -2,6 +2,7 @@ Feature: divergence lifecycle
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:divergence-lifecycle
+  @case:happy
   @divergence.lifecycle.01
   Scenario: Promotion assigns each staged divergence a monotonic order and a refusal consumes none
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -11,6 +12,7 @@ Feature: divergence lifecycle
     And the staging area is empty afterwards
 
   @subject:divergence-lifecycle
+  @case:failure
   @divergence.lifecycle.02
   Scenario: A candidate promote refuses consumes no run seq
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -21,6 +23,7 @@ Feature: divergence lifecycle
     And it holds the first run seq, so the refused one burned no position in the order
 
   @subject:divergence-lifecycle
+  @case:happy
   @divergence.lifecycle.03
   Scenario: Resolving and deferring commit directly and leave a batch mid-stage alone
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -30,6 +33,7 @@ Feature: divergence lifecycle
     And the staged candidate is still sitting there untouched, so a routine resolve never promotes somebody else's work
 
   @subject:divergence-lifecycle
+  @case:happy
   @divergence.lifecycle.04
   Scenario: A directly committed resolution is what the status view reports
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -39,6 +43,7 @@ Feature: divergence lifecycle
     And the current state of that scenario is resolved
 
   @subject:divergence-lifecycle
+  @case:edge
   @divergence.lifecycle.05
   Scenario: Run seq alone decides which record is current
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -49,6 +54,7 @@ Feature: divergence lifecycle
     And the round the record was raised in moved nothing, because it is not an ordering axis
 
   @subject:divergence-lifecycle
+  @case:edge
   @divergence.lifecycle.06
   Scenario: Round breaks a tie only between records sharing a run seq
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -57,6 +63,7 @@ Feature: divergence lifecycle
     Then the higher round wins and the scenario is open
 
   @subject:divergence-lifecycle
+  @case:edge
   @divergence.lifecycle.07
   Scenario: A deferral lapses back into still-divergent at its expiry
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -66,6 +73,7 @@ Feature: divergence lifecycle
     And read after the expiry it is still-divergent, because time alone resolves nothing
 
   @subject:divergence-lifecycle
+  @case:failure
   @divergence.lifecycle.08
   Scenario: A resolution downgrades to resolved-invalid once the app sha moves off what it resolved against
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -75,6 +83,7 @@ Feature: divergence lifecycle
     And the record on disk is never rewritten, so the downgrade is derived at read time and not persisted
 
   @subject:divergence-lifecycle
+  @case:happy
   @divergence.lifecycle.09
   Scenario: A resolution whose app sha still matches stays resolved
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T14:06:59.641926Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib a_malformed_spec_coverage_surfaces_as_invalid_and_a_valid_one_names_its_cases"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 11,
+  "scenario_id": "context.capability.11",
+  "schema": 1,
+  "staging_id": "d5e1a7410126",
+  "verdict": "faithful"
+}

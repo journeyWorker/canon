@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T14:06:59.878399Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib axis_tags_are_written_subject_lane_case_above_the_id_tag"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 12,
+  "scenario_id": "authoring.scaffold.12",
+  "schema": 1,
+  "staging_id": "4c7ee2b19731",
+  "verdict": "faithful"
+}

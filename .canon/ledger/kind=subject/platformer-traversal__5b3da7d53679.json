@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "s44-phase0",
+    "role": "implementer"
+  },
+  "at": "2026-08-05T06:57:02.974907Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "platformer-traversal",
+  "summary": "Red panda locomotion, collision, and moving-platform carry for the platformer example corpus",
+  "title": "Platformer traversal: movement and moving platforms"
+}

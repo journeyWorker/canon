@@ -2,6 +2,7 @@ Feature: context capability
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:context-capability
+  @case:edge
   @context.capability.01
   Scenario: The authoring surface answers in full even when the corpus it describes is broken
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -12,6 +13,7 @@ Feature: context capability
     And every registered record kind, every enum domain, every join key and the per-kind CEL section are all present
 
   @subject:context-capability
+  @case:edge
   @context.capability.02
   Scenario: A repo with no canon state at all still resolves the whole surface
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -22,6 +24,7 @@ Feature: context capability
     And nothing about the absence is reported as a failure
 
   @subject:context-capability
+  @case:edge
   @context.capability.03
   Scenario: Two resolutions of an unchanged repo are byte-identical
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -31,6 +34,7 @@ Feature: context capability
     And the outline is therefore diffable as a record of repo state, not a timestamped report
 
   @subject:context-capability
+  @case:happy
   @context.capability.04
   Scenario: The machine form and the human form name exactly the same surface
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -40,6 +44,7 @@ Feature: context capability
     And the JSON flag selects a renderer, never a resolution input
 
   @subject:context-capability
+  @case:happy
   @context.capability.05
   Scenario: Kinds and enum domains come from the one shared registry, never a second hand-kept list
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -49,6 +54,7 @@ Feature: context capability
     And there is no seam through which a caller could hand the resolver a different registry
 
   @subject:context-capability
+  @case:happy
   @context.capability.06
   Scenario: The CEL binding surface is exactly what a policy expression is checked against
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -59,6 +65,7 @@ Feature: context capability
     And an author reading the surface can never be told a field the validator would reject
 
   @subject:context-capability
+  @case:edge
   @context.capability.07
   Scenario: Run from a subdirectory it surfaces the repo root's policy, not a local absence of one
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -69,6 +76,7 @@ Feature: context capability
     And the root's own policy loads cleanly and its p1 requirement surfaces, rather than degrading to a default
 
   @subject:context-capability
+  @case:happy
   @context.capability.08
   Scenario: The typed vocabulary index is the vocabulary's own resolved snapshot
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -78,6 +86,7 @@ Feature: context capability
     And the surface projects no second independent view of the vocabulary
 
   @subject:context-capability
+  @case:edge
   @context.capability.09
   Scenario: An absent vocabulary directory resolves an empty index rather than failing
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -87,6 +96,7 @@ Feature: context capability
     And the resolution still returns a surface rather than failing
 
   @subject:context-capability
+  @case:happy
   @context.capability.10
   Scenario: The policy surface exposes resolved effect-aware risk tiers
   # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -94,3 +104,13 @@ Feature: context capability
     When the capability surface is resolved as JSON and outline
     Then risk_tiers carries the same resolved values in both forms
     And an absent risk_tiers section is an empty no-op
+
+  # canon: {"schema":1,"at":"2026-10-08T14:02:45Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.11
+  Scenario: A malformed coverage policy reads as invalid, never as not enforced
+    Given a policy whose spec_coverage lists a required case that is not a kebab-case slug
+    When the capability surface is resolved
+    Then spec_coverage reads INVALID and names the offending value
+    And the policy is reported unclean rather than as a repository that never opted in

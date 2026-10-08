@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T09:46:56.131504Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "building",
+  "subject_id": "divergence-lifecycle",
+  "summary": "",
+  "title": "Divergence: stage, promote, resolve, expire"
+}

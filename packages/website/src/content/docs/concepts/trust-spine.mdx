@@ -58,6 +58,7 @@ spec_coverage:
   require_evidence: true
   scope: [building, verifying]
   exclude_lanes: [process]
+  require_cases: [failure]
 ```
 
 `scope` narrows what can *block* to scenarios linked — via their
@@ -77,6 +78,18 @@ base set is `canon.core`'s; a repo replaces it through its own `lane`
 vocabulary enum. A `process` rule has no code surface and can never be
 `faithful` from a test, so listing it here keeps a real rule out of a
 number it would only pollute. Absent, nothing is excluded.
+
+`require_cases` closes the gap evidence presence cannot see: a surface
+whose every scenario is attested but all of them describe the golden
+path. A scenario's **case** — its `@case:<value>` tag — says which path
+of the behavior it specifies: `happy`, `failure` (a refusal, error, or
+denied action), or `edge` (a boundary such as an empty set, a limit, or
+a duplicate). Every feature surface (`<area>.<surface>`) with in-scope
+scenarios must carry at least one scenario of each listed case, or the
+surface is reported as `uncovered-cell`; `canon subject status <id>
+shipped` refuses on the same rule. An untagged scenario satisfies no
+case, so an unclassified corpus reports every surface rather than
+passing. Absent, nothing is required.
 
 A present-but-malformed section is never silently equivalent to an absent
 one — it is reported and then fails the check, so a typo (or a

@@ -38,9 +38,9 @@ without a Git checkout or network access.
 Coverage note (the upstream lesson): a
 drift checker only guards what it is told to compare. This one compares
 the build/publish matrices, the shared `CARGO_*` env, and the package
-manifests; it deliberately does NOT assert `setup-bun` version parity
-(canon pins bun in one workflow only today) — add that comparison here
-if a second workflow ever pins its own bun version.
+manifests, and that every workflow pinning `setup-bun` pins the same
+version (test.yml proves the launcher under the bun publish.yml ships it
+with).
 """
 
 from __future__ import annotations
@@ -605,6 +605,20 @@ def main(argv: list[str] | None = None) -> int:
             found == workspace_version,
             f"version drift in {rel}: package.json={found!r} vs Cargo.toml [workspace.package]={workspace_version!r}",
         )
+
+    # 8. Every workflow that pins bun pins the SAME bun. test.yml runs the
+    #    launcher's exit-status test and publish.yml builds and publishes
+    #    it; a launcher proven under one bun and shipped under another is
+    #    the drift this file exists to catch.
+    bun_pins: dict[str, set[str]] = {}
+    for workflow in sorted((ROOT / ".github/workflows").glob("*.yml")):
+        for pin in re.findall(r"^\s*bun-version:\s*[\"']?([^\s\"'#]+)", read(workflow), re.MULTILINE):
+            bun_pins.setdefault(pin, set()).add(workflow.name)
+    check(
+        len(bun_pins) <= 1,
+        "setup-bun version drift across workflows: "
+        + ", ".join(f"{v} in {sorted(files)}" for v, files in sorted(bun_pins.items())),
+    )
 
     # 7. Repo-root hygiene. An agent-authored patch fragment landed at the
     #    repo root in s43 round 7 and was committed by a `git add -A`: a file

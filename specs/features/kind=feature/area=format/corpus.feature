@@ -2,6 +2,7 @@ Feature: format corpus
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:format-corpus
+  @case:failure
   @format.corpus.01
   Scenario: A corpus carrying violations fails the command and every class it hit is named
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -12,6 +13,7 @@ Feature: format corpus
     And validation ran unconditionally, with no opt-in check flag to forget
 
   @subject:format-corpus
+  @case:happy
   @format.corpus.02
   Scenario: The root is a positional argument and a repo-relative root resolves to the same corpus
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -22,6 +24,7 @@ Feature: format corpus
     And so the positional root, not a flag, is what selects what gets checked
 
   @subject:format-corpus
+  @case:failure
   @format.corpus.03
   Scenario: The failure vocabulary is a closed set and the fixture corpus reaches every audited member
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -32,6 +35,7 @@ Feature: format corpus
     And no class outside the frozen set can be reported, because the set is the enum
 
   @subject:format-corpus
+  @case:failure
   @format.corpus.04
   Scenario: A record sitting outside its kind's partition layout is a layout-grammar violation
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -41,6 +45,7 @@ Feature: format corpus
     And the violation names that file, not the corpus as a whole
 
   @subject:format-corpus
+  @case:failure
   @format.corpus.05
   Scenario: A fourth ad hoc file format is a layout-grammar violation, not a new class
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -51,6 +56,7 @@ Feature: format corpus
     And the closed class set absorbs it rather than growing a class for it
 
   @subject:format-corpus
+  @case:failure
   @format.corpus.06
   Scenario: A partition key that disagrees with the file it labels is refused
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -61,6 +67,7 @@ Feature: format corpus
     And the same segment omitted entirely is accepted, because the segment is optional, not the agreement
 
   @subject:format-corpus
+  @case:edge
   @format.corpus.07
   Scenario: Rewording a violation's message changes neither the files scanned nor the violations counted
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -73,6 +80,7 @@ Feature: format corpus
   # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
   @subject:format-corpus
   @lane:behavior
+  @case:happy
   @format.corpus.08
   Scenario: A provenance comment directly above a scenario's tags satisfies the check
     Given a scenario whose provenance comment sits in the tag block directly above its header
@@ -83,6 +91,7 @@ Feature: format corpus
   # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
   @subject:format-corpus
   @lane:behavior
+  @case:edge
   @format.corpus.09
   Scenario: One provenance comment never serves two headers
     Given a Feature whose own provenance comment is followed, with no blank line, by a scenario's tag

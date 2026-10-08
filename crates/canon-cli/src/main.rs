@@ -1056,6 +1056,10 @@ enum ScenarioCommand {
         /// Optional lane tag to classify the scenario
         #[arg(long, value_parser = canon_cli::scaffold::parse_lane_slug)]
         lane: Option<String>,
+        /// Optional case tag: which path of the behavior this scenario
+        /// specifies (`happy`, `failure`, `edge` in the base vocabulary)
+        #[arg(long, value_parser = canon_cli::scaffold::parse_lane_slug)]
+        case: Option<String>,
         /// Agent id written into provenance (env: CANON_ACTOR)
         #[arg(long, env = "CANON_ACTOR", default_value = "canon-scaffold")]
         actor: String,
@@ -1382,8 +1386,13 @@ fn main() -> ExitCode {
             PluginCommand::Sync { plugin_id, repo, spec_root } => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref()),
         },
         Command::Scenario { action } => match action {
-            ScenarioCommand::New { tag, title, subject, lane, actor, feature, project, repo } => {
-                run_scenario_new(&repo, &tag, &title, feature.as_deref(), project.as_ref(), subject.as_ref(), lane.as_deref(), &actor)
+            ScenarioCommand::New { tag, title, subject, lane, case, actor, feature, project, repo } => {
+                let axes = canon_cli::scaffold::ScenarioAxes {
+                    subject: subject.as_ref().map(SubjectId::as_str),
+                    lane: lane.as_deref(),
+                    case: case.as_deref(),
+                };
+                run_scenario_new(&repo, &tag, &title, feature.as_deref(), project.as_ref(), axes, &actor)
             }
         },
         Command::Feature { action } => match action {
@@ -1630,7 +1639,7 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
 }
 
 /// `canon scenario new <tag> --title <label> [--subject <id>] [--lane
-/// <v>] [--actor <id>] [--feature <path>] [--project <id>]` (s16 P5,
+/// <v>] [--case <v>] [--actor <id>] [--feature <path>] [--project <id>]` (s16 P5,
 /// `canon_cli::scaffold::run_scenario_new`'s own doc): the ONE
 /// `Utc::now()` call for this command — computed here, at the
 /// dispatch boundary, so a brand-new `.feature` file's `Feature:` +
@@ -1646,15 +1655,16 @@ fn run_scenario_new(
     title: &str,
     feature: Option<&std::path::Path>,
     project: Option<&ProjectId>,
-    subject: Option<&SubjectId>,
-    lane: Option<&str>,
+    axes: canon_cli::scaffold::ScenarioAxes<'_>,
     actor_id: &str,
 ) -> ExitCode {
-    if let Some(lane) = lane {
-        let resolved = canon_cli::context::resolve_repo_root(repo);
-        if let Some(violation) = canon_cli::subject::enum_membership_violation(&resolved, "lane", lane) {
-            eprintln!("canon scenario new: refused — {violation}");
-            return ExitCode::from(2);
+    let resolved = canon_cli::context::resolve_repo_root(repo);
+    for (axis, value) in [("lane", axes.lane), ("case", axes.case)] {
+        if let Some(value) = value {
+            if let Some(violation) = canon_cli::subject::enum_membership_violation(&resolved, axis, value) {
+                eprintln!("canon scenario new: refused — {violation}");
+                return ExitCode::from(2);
+            }
         }
     }
     let at = Utc::now().with_nanosecond(0).expect("0 is a valid nanosecond");
@@ -1666,8 +1676,7 @@ fn run_scenario_new(
             title,
             feature,
             project,
-            subject.map(SubjectId::as_str),
-            lane,
+            axes,
             &actor,
             at,
         ) as u8,

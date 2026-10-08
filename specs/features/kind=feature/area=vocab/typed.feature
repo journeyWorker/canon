@@ -2,6 +2,7 @@ Feature: vocab typed
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:vocab-typed
+  @case:happy
   @vocab.typed.01
   Scenario: A plugin declares its directives and enums and both resolve into the active vocabulary
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -14,6 +15,7 @@ Feature: vocab typed
     And the enum resolves to exactly the members declared, in the order declared
 
   @subject:vocab-typed
+  @case:happy
   @vocab.typed.02
   Scenario: The evidence-kind domain is the policy's own required-trust keys and nothing else
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -24,6 +26,7 @@ Feature: vocab typed
     And so the vocabulary's evidence requirement is derived from policy, never restated beside it
 
   @subject:vocab-typed
+  @case:happy
   @vocab.typed.03
   Scenario: This repository's own pilot atom declares an evidence kind its real policy admits
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -33,6 +36,7 @@ Feature: vocab typed
     And so the requirement is a real policy-derived binding, not merely a string that parses
 
   @subject:vocab-typed
+  @case:failure
   @vocab.typed.04
   Scenario: A directive nobody declared is refused
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -42,6 +46,7 @@ Feature: vocab typed
     And no attempt is made to check its attributes, because there is no declaration to check them against
 
   @subject:vocab-typed
+  @case:failure
   @vocab.typed.05
   Scenario: An enum value outside its declared members is refused and the message lists what is allowed
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -52,6 +57,7 @@ Feature: vocab typed
     And an author reading only the refusal learns the whole accepted domain
 
   @subject:vocab-typed
+  @case:failure
   @vocab.typed.06
   Scenario: An evidence kind outside the policy-derived domain is refused the same way an enum value is
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -62,6 +68,7 @@ Feature: vocab typed
     And the required attribute being present is not enough, because presence is not membership
 
   @subject:vocab-typed
+  @case:happy
   @vocab.typed.07
   Scenario: A well-formed typed task atom compiles into a task record carrying its evidence
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -72,6 +79,7 @@ Feature: vocab typed
     And it carries an evidence note, because the evidence attribute was required and satisfied
 
   @subject:vocab-typed
+  @case:failure
   @vocab.typed.08
   Scenario: An atom that fails the vocabulary produces diagnostics and no record at all
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -82,6 +90,7 @@ Feature: vocab typed
     And nothing partial is emitted, so an invalid atom can never become a half-written task
 
   @subject:vocab-typed
+  @case:failure
   @vocab.typed.09
   Scenario: An unrecognized field inside an evidence value is refused, never carried through unchecked
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}

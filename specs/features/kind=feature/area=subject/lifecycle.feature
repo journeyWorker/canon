@@ -2,6 +2,7 @@ Feature: subject lifecycle
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:subject-lifecycle
+  @case:happy
   @subject.lifecycle.01
   Scenario: A new subject is born proposed and reads back through the routed tier
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -11,6 +12,7 @@ Feature: subject lifecycle
     And its status is proposed, the only state a subject can start in
 
   @subject:subject-lifecycle
+  @case:happy
   @subject.lifecycle.02
   Scenario: Adopting a change links it to the subject on both sides
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -20,6 +22,7 @@ Feature: subject lifecycle
     And the change names that subject, so neither side has to be inferred from the other
 
   @subject:subject-lifecycle
+  @case:happy
   @subject.lifecycle.03
   Scenario: The forward chain advances one rung at a time and every write folds to one row
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -30,6 +33,7 @@ Feature: subject lifecycle
     And a re-write appends a version rather than mutating one, and the reader folds to the latest
 
   @subject:subject-lifecycle
+  @case:failure
   @subject.lifecycle.04
   Scenario: A transition off the chain is refused and the subject is unchanged
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -39,6 +43,7 @@ Feature: subject lifecycle
     And the subject still reads proposed
 
   @subject:subject-lifecycle
+  @case:edge
   @subject.lifecycle.05
   Scenario: Any state but retired may retire and retired is terminal
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -48,6 +53,7 @@ Feature: subject lifecycle
     And retiring from retired is refused, because there is nowhere left to go
 
   @subject:subject-lifecycle
+  @case:failure
   @subject.lifecycle.06
   Scenario: Shipping fails closed while a linked scenario carries no verdict at all
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -57,6 +63,7 @@ Feature: subject lifecycle
     And the subject still reads verifying, so absent evidence is never read as passing evidence
 
   @subject:subject-lifecycle
+  @case:failure
   @subject.lifecycle.07
   Scenario: Shipping is blocked while a linked scenario's latest verdict is divergent
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -66,6 +73,7 @@ Feature: subject lifecycle
     And the subject still reads verifying
 
   @subject:subject-lifecycle
+  @case:happy
   @subject.lifecycle.08
   Scenario: Shipping is admitted once every linked scenario has a faithful latest verdict
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -75,6 +83,7 @@ Feature: subject lifecycle
     And this one rung of the chain is the only one evidence gates
 
   @subject:subject-lifecycle
+  @case:failure
   @subject.lifecycle.09
   Scenario: A domain outside the vocabulary this repo declares is refused naming the legal set
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -85,9 +94,21 @@ Feature: subject lifecycle
 
   # canon: {"schema":1,"at":"2026-10-07T03:21:21Z","actor":{"agent_id":"canon"}}
   @subject:subject-lifecycle
+  @case:failure
   @subject.lifecycle.10
   Scenario: Shipping is refused when no scenario is tagged to the subject
     Given a verifying subject that no scenario names in an @subject tag
     When it is moved to shipped
     Then the command fails, reporting an uncovered cell that names the missing tag
     And the subject still reads verifying, so an empty scenario set is never read as passing evidence
+
+  # canon: {"schema":1,"at":"2026-10-08T14:02:46Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.11
+  Scenario: Shipping is refused until each owned surface specifies a required case
+    Given a verifying subject whose only scenario is attested but specifies no failure path
+    And a spec_coverage policy that requires the failure case
+    When it is moved to shipped
+    Then the command exits 1 reporting the surface and the missing case, and the subject stays verifying
+    And once an attested failure scenario is added on that surface the move succeeds

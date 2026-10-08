@@ -2,6 +2,7 @@ Feature: tier storage
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:tier-storage
+  @case:happy
   @tier.storage.01
   Scenario: Each rung admits only the class of backend that rung is for
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -11,6 +12,7 @@ Feature: tier storage
     And each rung resolves to exactly the backend it declared
 
   @subject:tier-storage
+  @case:failure
   @tier.storage.02
   Scenario: A rung pointed at the wrong class of backend is refused with the pairing named
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -20,6 +22,7 @@ Feature: tier storage
     And the error names the rung, the backend it was given, and the class of backend that rung expects
 
   @subject:tier-storage
+  @case:happy
   @tier.storage.03
   Scenario: Asking what aging would do changes nothing
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -29,6 +32,7 @@ Feature: tier storage
     And both records are still in the source rung, and nothing was written to the destination
 
   @subject:tier-storage
+  @case:happy
   @tier.storage.04
   Scenario: Aging moves what is past the threshold, leaves what is not, and settles
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -40,6 +44,7 @@ Feature: tier storage
     And running it again moves nothing and duplicates nothing
 
   @subject:tier-storage
+  @case:happy
   @tier.storage.05
   Scenario: A kind whose records straddle two rungs reads as one merged history
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -50,6 +55,7 @@ Feature: tier storage
     And the read reports no layout violation
 
   @subject:tier-storage
+  @case:failure
   @tier.storage.06
   Scenario: A kind routed to a rung that cannot be reached fails by name rather than reading empty
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -59,6 +65,7 @@ Feature: tier storage
     And the error names the rung, the backend, and that there is no live connection
 
   @subject:tier-storage
+  @case:edge
   @tier.storage.07
   Scenario: A rung this read does not need never blocks it
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -68,6 +75,7 @@ Feature: tier storage
     And no credential for an unrelated rung was ever required
 
   @subject:tier-storage
+  @case:edge
   @tier.storage.08
   Scenario: One natural key reads as one current record, the one recorded latest
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -77,6 +85,7 @@ Feature: tier storage
     And it is the one with the later recorded instant, whatever its digest sorts as
 
   @subject:tier-storage
+  @case:edge
   @tier.storage.09
   Scenario: Two generations sharing an instant resolve by format generation, never by digest luck
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}

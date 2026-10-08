@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T09:46:56.503714Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "verifying",
+  "subject_id": "learn-promotion",
+  "summary": "",
+  "title": "Learn: strategy promotion and demotion gates"
+}

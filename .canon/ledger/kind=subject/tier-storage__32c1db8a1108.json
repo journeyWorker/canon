@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T09:46:56.592002Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "specced",
+  "subject_id": "tier-storage",
+  "summary": "",
+  "title": "Tier: storage rungs, routing, and aging"
+}

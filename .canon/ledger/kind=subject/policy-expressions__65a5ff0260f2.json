@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-08-06T09:46:56.726375Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "building",
+  "subject_id": "policy-expressions",
+  "summary": "",
+  "title": "Policy: CEL expressions bound to a record kind"
+}

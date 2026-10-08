@@ -337,6 +337,7 @@ pub struct ScannedScenario {
     pub source_digest: SpecDigest,
     pub subject_tags: Vec<String>,
     pub lane_tags: Vec<String>,
+    pub case_tags: Vec<String>,
     pub unknown_namespace_tags: Vec<String>,
 }
 
@@ -361,6 +362,7 @@ pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
                     source_digest: digest.clone(),
                     subject_tags: candidate.subject_tags,
                     lane_tags: candidate.lane_tags,
+                    case_tags: candidate.case_tags,
                     unknown_namespace_tags: candidate.unknown_namespace_tags,
                 });
             }
@@ -402,33 +404,36 @@ fn resolve_subject_tag(scanned: &ScannedScenario, root_id: &ProjectId, diagnosti
     }
 }
 
-/// Resolve a scanned scenario's `@lane:` tags into its optional
-/// classification, fail-soft like [`resolve_subject_tag`]. The first tag
-/// wins; malformed shape or vocabulary membership drops only the lane.
-fn resolve_lane_tag(scanned: &ScannedScenario, root_id: &ProjectId, repo: &Path, diagnostics: &mut Vec<String>) -> Option<String> {
-    let first = scanned.lane_tags.first()?;
-    if scanned.lane_tags.len() > 1 {
+/// Resolve one vocabulary-classified axis tag (`@lane:`, `@case:`) into
+/// the scenario's optional classification, fail-soft like
+/// [`resolve_subject_tag`]. `axis` names both the tag namespace and the
+/// vocabulary enum it is checked against. The first tag wins; a
+/// malformed shape or a value outside the repo's activated enum drops
+/// only that classification, with a counted diagnostic.
+fn resolve_axis_tag(axis: &str, tags: &[String], scenario_id: &ScenarioId, root_id: &ProjectId, repo: &Path, diagnostics: &mut Vec<String>) -> Option<String> {
+    let first = tags.first()?;
+    if tags.len() > 1 {
         diagnostics.push(format!(
-            "scenario `{}` under root `{}` carries {} `@lane:` tags — a scenario has at most one lane, so the first (`{}`) wins and the rest are ignored",
-            scanned.scenario_id.as_str(),
+            "scenario `{}` under root `{}` carries {} `@{axis}:` tags — a scenario has at most one {axis}, so the first (`{}`) wins and the rest are ignored",
+            scenario_id.as_str(),
             root_id.as_str(),
-            scanned.lane_tags.len(),
+            tags.len(),
             first
         ));
     }
     if SubjectId::parse(first).is_err() {
         diagnostics.push(format!(
-            "scenario `{}` under root `{}` has a malformed `@lane:{}` tag (not a kebab-case lane slug) — indexed without the lane",
-            scanned.scenario_id.as_str(),
+            "scenario `{}` under root `{}` has a malformed `@{axis}:{}` tag (not a kebab-case {axis} slug) — indexed without the {axis}",
+            scenario_id.as_str(),
             root_id.as_str(),
             first
         ));
         return None;
     }
-    if let Some(detail) = enum_membership_violation(repo, "lane", first) {
+    if let Some(detail) = enum_membership_violation(repo, axis, first) {
         diagnostics.push(format!(
-            "scenario `{}` under root `{}` has an invalid `@lane:{}` tag ({detail}) — indexed without the lane",
-            scanned.scenario_id.as_str(),
+            "scenario `{}` under root `{}` has an invalid `@{axis}:{}` tag ({detail}) — indexed without the {axis}",
+            scenario_id.as_str(),
             root_id.as_str(),
             first
         ));
@@ -531,7 +536,8 @@ fn sync_one_root(tier: &GitTier, repo: &Path, spec_root: &SpecRoot, actor: &Acto
         // malformed/duplicate tag is reported on EVERY sync run, not
         // just the write that first introduced it.
         let subject_id = resolve_subject_tag(candidate, &spec_root.id, &mut tag_diagnostics);
-        let lane = resolve_lane_tag(candidate, &spec_root.id, repo, &mut tag_diagnostics);
+        let lane = resolve_axis_tag("lane", &candidate.lane_tags, &candidate.scenario_id, &spec_root.id, repo, &mut tag_diagnostics);
+        let case = resolve_axis_tag("case", &candidate.case_tags, &candidate.scenario_id, &spec_root.id, repo, &mut tag_diagnostics);
         let mut namespaces = std::collections::BTreeSet::new();
         for namespace in &candidate.unknown_namespace_tags {
             namespaces.insert(namespace);
@@ -555,6 +561,7 @@ fn sync_one_root(tier: &GitTier, repo: &Path, spec_root: &SpecRoot, actor: &Acto
                     && latest.scenario.title == candidate.title
                     && latest.scenario.subject_id == subject_id
                     && latest.scenario.lane.as_deref() == lane.as_deref()
+                    && latest.scenario.case.as_deref() == case.as_deref()
             });
         if unchanged {
             continue;
@@ -568,6 +575,7 @@ fn sync_one_root(tier: &GitTier, repo: &Path, spec_root: &SpecRoot, actor: &Acto
             candidate.source_digest.clone(),
         );
         record.lane = lane;
+        record.case = case;
         record.subject_id = subject_id;
         tier.write(&record)?;
         written += 1;
@@ -1031,6 +1039,42 @@ mod tests {
         assert_eq!(outcome.roots[0].tag_diagnostics.len(), 1);
         assert!(outcome.roots[0].tag_diagnostics[0].contains("Bad_Lane"));
         assert_eq!(only_scenario(repo.path()).lane, None);
+    }
+
+    #[test]
+    fn a_case_tag_round_trips_and_a_value_outside_the_vocabulary_is_dropped() {
+        let repo = TempDir::new().unwrap();
+        std::fs::create_dir_all(repo.path().join(".canon/vocab/canon.core")).unwrap();
+        std::fs::write(
+            repo.path().join(".canon/vocab/canon.core/plugin.yaml"),
+            "id: canon.core\nversion: \"0.1.0\"\nkind: core\nexports:\n  enums: enums.yaml\n",
+        )
+        .unwrap();
+        std::fs::write(repo.path().join(".canon/vocab/canon.core/enums.yaml"), "enums:\n  case: [happy, failure, edge]\n").unwrap();
+
+        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@case:failure");
+        let outcome = run_sync(repo.path(), None).unwrap();
+        assert!(outcome.roots[0].tag_diagnostics.is_empty(), "{:?}", outcome.roots[0].tag_diagnostics);
+        assert_eq!(only_scenario(repo.path()).case.as_deref(), Some("failure"));
+
+        // A case the repo never declared must not count toward
+        // `require_cases`: dropped, with a named diagnostic, and the
+        // re-synced record no longer carries the old case.
+        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@case:sad");
+        let outcome = run_sync(repo.path(), None).unwrap();
+        assert_eq!(outcome.roots[0].tag_diagnostics.len(), 1);
+        assert!(outcome.roots[0].tag_diagnostics[0].contains("@case:sad"), "{}", outcome.roots[0].tag_diagnostics[0]);
+        let gate_ctx = GateCtx::from_repo(repo.path());
+        let result = GitTier::new(&gate_ctx.ledger_root).read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
+        let latest = fold_latest_by_key(
+            result.records.iter().filter_map(|r| serde_json::from_value::<Scenario>(r.0.clone()).ok()).collect::<Vec<_>>(),
+            |s: &Scenario| (s.project_id.clone(), s.scenario_id.clone()),
+            |s: &Scenario| s.envelope.at,
+            |s: &Scenario| s.envelope.schema,
+            |_: &Scenario| "",
+        );
+        let key = (ProjectId::parse("root").unwrap(), ScenarioId::parse("world.hotdeal.01").unwrap());
+        assert_eq!(latest.get(&key).unwrap().case, None);
     }
 
     #[test]

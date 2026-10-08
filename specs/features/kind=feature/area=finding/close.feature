@@ -2,6 +2,7 @@ Feature: finding close
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:finding-lifecycle
+  @case:happy
   @finding.close.01
   Scenario: A finding raised open is closed by a commit and counted once
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -12,6 +13,7 @@ Feature: finding close
     And the superseding record carries the closer as its actor, not the reviewer
 
   @subject:finding-lifecycle
+  @case:happy
   @finding.close.02
   Scenario: Closing changes the disposition and nothing else
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -22,6 +24,7 @@ Feature: finding close
     And no command offered any way to edit them
 
   @subject:finding-lifecycle
+  @case:failure
   @finding.close.03
   Scenario: A second body that is not a transition is refused
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -32,6 +35,7 @@ Feature: finding close
     And the committed corpus is unchanged
 
   @subject:finding-lifecycle
+  @case:edge
   @finding.close.04
   Scenario: Closing to the disposition already recorded stages nothing
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -41,6 +45,7 @@ Feature: finding close
     And nothing is staged, because an identical disposition carries no new fact
 
   @subject:finding-lifecycle
+  @case:happy
   @finding.close.05
   Scenario: A fix that did not hold reopens the finding
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -50,6 +55,7 @@ Feature: finding close
     And the corpus reports that finding open again
 
   @subject:finding-lifecycle
+  @case:edge
   @finding.close.06
   Scenario: The current disposition is the latest version never the first read
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -59,6 +65,7 @@ Feature: finding close
     And a resubmission of the current disposition is refused rather than appended
 
   @subject:finding-lifecycle
+  @case:failure
   @finding.close.07
   Scenario: Closing refuses a finding that was never committed
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -68,6 +75,7 @@ Feature: finding close
     And the staged original is left exactly as it was
 
   @subject:finding-lifecycle
+  @case:failure
   @finding.close.08
   Scenario: A fixed finding must name a commit this repository holds
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}

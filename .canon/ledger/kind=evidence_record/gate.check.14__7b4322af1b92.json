@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T14:06:59.747142Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib spec_coverage::tests"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 14,
+  "scenario_id": "gate.check.14",
+  "schema": 1,
+  "staging_id": "fec505096cb4",
+  "verdict": "faithful"
+}

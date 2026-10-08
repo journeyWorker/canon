@@ -33,6 +33,9 @@ spec_coverage:
   require_evidence: true
   scope: [building, verifying]
   exclude_lanes: [process]
+  # Every feature surface must specify at least one failure path; a
+  # surface whose scenarios are all attested golden paths is still red.
+  require_cases: [failure]
 
 
 # Authenticated risk approvals use external SSH trust. Uncomment and pin a

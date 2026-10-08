@@ -2,6 +2,7 @@ Feature: retrieve guidance
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:retrieve-guidance
+  @case:happy
   @retrieve.guidance.01
   Scenario: Guidance is served scoped to one role and one regime
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -11,6 +12,7 @@ Feature: retrieve guidance
     And the item's title is the seeded strategy's, in both the human and the machine-readable shape
 
   @subject:retrieve-guidance
+  @case:edge
   @retrieve.guidance.02
   Scenario: A result bound caps how much guidance is served
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -20,6 +22,7 @@ Feature: retrieve guidance
     And the bound is enforced by the command itself, not left to the caller to trim
 
   @subject:retrieve-guidance
+  @case:failure
   @retrieve.guidance.03
   Scenario: A malformed regime key is refused against the four-segment grammar
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -29,6 +32,7 @@ Feature: retrieve guidance
     And passing such a value to retrieval exits nonzero naming the regime flag, never panicking
 
   @subject:retrieve-guidance
+  @case:failure
   @retrieve.guidance.04
   Scenario: A role that does not lead its own regime key is a usage error
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -38,6 +42,7 @@ Feature: retrieve guidance
     And the message says the two do not match, rather than silently serving the wrong scope
 
   @subject:retrieve-guidance
+  @case:edge
   @retrieve.guidance.05
   Scenario: A repository with no strategy memory yet reports an explicit empty result
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -47,6 +52,7 @@ Feature: retrieve guidance
     And a repository that has learned nothing is not an error, it is an empty answer
 
   @subject:retrieve-guidance
+  @case:edge
   @retrieve.guidance.06
   Scenario: A recorded manifest replays its guidance verbatim after the live store moves on
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}

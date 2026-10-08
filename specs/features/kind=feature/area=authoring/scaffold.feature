@@ -2,6 +2,7 @@ Feature: authoring scaffold
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:authoring-scaffold
+  @case:happy
   @authoring.scaffold.01
   Scenario: The tag alone determines where a scenario is written
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -12,6 +13,7 @@ Feature: authoring scaffold
     And that path is the same one the feature scaffolding command would have produced
 
   @subject:authoring-scaffold
+  @case:failure
   @authoring.scaffold.02
   Scenario: Scaffolding a feature that already exists is refused and the existing bytes survive
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -22,6 +24,7 @@ Feature: authoring scaffold
     And the create is atomic, so no window exists where the new title half-landed
 
   @subject:authoring-scaffold
+  @case:failure
   @authoring.scaffold.03
   Scenario: A scenario tag that is already present is refused rather than duplicated
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -32,6 +35,7 @@ Feature: authoring scaffold
     And the tag still appears exactly once in it
 
   @subject:authoring-scaffold
+  @case:happy
   @authoring.scaffold.04
   Scenario: A repository with a single spec root never has to name it
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -41,6 +45,7 @@ Feature: authoring scaffold
     And that is a resolution, not a default, because there is nothing else it could mean
 
   @subject:authoring-scaffold
+  @case:happy
   @authoring.scaffold.05
   Scenario: Naming a project selects that root and leaves every other root alone
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -51,6 +56,7 @@ Feature: authoring scaffold
     And naming a root by id is valid even when it is the only one, so a script never has to branch
 
   @subject:authoring-scaffold
+  @case:failure
   @authoring.scaffold.06
   Scenario: A project id no configured root carries is refused with nothing written
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -61,6 +67,7 @@ Feature: authoring scaffold
     And the id is never guessed at by nearest match
 
   @subject:authoring-scaffold
+  @case:failure
   @authoring.scaffold.07
   Scenario: Several configured roots with no selector is ambiguous and refuses rather than guessing
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -71,6 +78,7 @@ Feature: authoring scaffold
     And it names the command that refused, so the message is actionable as written
 
   @subject:authoring-scaffold
+  @case:edge
   @authoring.scaffold.08
   Scenario: A fresh feature stub is not yet a valid corpus entry and the command says what closes that
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -83,6 +91,7 @@ Feature: authoring scaffold
   # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
   @lane:behavior
+  @case:happy
   @authoring.scaffold.09
   Scenario: The provenance line leads the scenario's tags and carries the actor the author named
     Given a scenario is created naming an actor, a subject, and a lane
@@ -94,6 +103,7 @@ Feature: authoring scaffold
   # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
   @lane:behavior
+  @case:edge
   @authoring.scaffold.10
   Scenario: The actor falls back to the environment when no flag names one
     Given the environment names an actor and the invocation names none
@@ -104,9 +114,19 @@ Feature: authoring scaffold
   # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
   @lane:behavior
+  @case:failure
   @authoring.scaffold.11
   Scenario: A lane that is not a slug is refused with nothing written
     Given a lane value that is not a kebab-case slug
     When a scenario is created with it
     Then the command refuses before resolving any path
     And the feature file does not exist afterwards
+
+  # canon: {"schema":1,"at":"2026-10-08T14:02:46Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @authoring.scaffold.12
+  Scenario: The scaffold writes the case tag after subject and lane
+    Given a scenario scaffolded with a subject, a lane and a case
+    When the stub is appended
+    Then the subject, lane and case tags appear in that order directly above the id tag

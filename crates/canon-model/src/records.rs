@@ -115,10 +115,11 @@ where
     Ok(s)
 }
 
-/// Validate an optional `Scenario.lane` at parse: SHAPE only — a
-/// kebab-case slug. Vocabulary membership stays in the CLI layer, where
-/// the repository's activated enum snapshot is available.
-fn deserialize_lane_slug<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+/// Validate an optional scenario axis slug (`Scenario.lane`,
+/// `Scenario.case`) at parse: SHAPE only — a kebab-case slug.
+/// Vocabulary membership stays in the CLI layer, where the repository's
+/// activated enum snapshot is available.
+fn deserialize_axis_slug<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -128,7 +129,7 @@ where
     };
     if !is_kebab_slug(&s) {
         return Err(serde::de::Error::custom(format!(
-            "scenario lane {s:?} is not a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)"
+            "scenario axis value {s:?} is not a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)"
         )));
     }
     Ok(Some(s))
@@ -355,8 +356,18 @@ pub struct Scenario {
     /// as a shape-validated kebab slug. Vocabulary membership is checked
     /// by `canon inventory sync` against the repository's activated
     /// `lane` enum; `Scenario::new` leaves it absent.
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_lane_slug")]
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_axis_slug")]
     pub lane: Option<String>,
+    /// Which path of the behavior the scenario specifies — `happy`,
+    /// `failure`, `edge` in the base vocabulary, from its `@case:<slug>`
+    /// tag. Shape-validated here; membership is checked by `canon
+    /// inventory sync` against the repository's activated `case` enum.
+    /// `spec_coverage.require_cases` reads it to refuse a feature
+    /// surface whose spec covers only its golden path. Additive and
+    /// skipped when absent, so an untagged `Scenario` is byte-identical
+    /// on the wire (its `at` is derivation time, so no schema bump).
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_axis_slug")]
+    pub case: Option<String>,
     /// The durable [`Subject`] this scenario is specced against (s36,
     /// additive — `#[serde(default, skip_serializing_if =
     /// "Option::is_none")]`, so a pre-s36 `Scenario` is byte-identical
@@ -373,7 +384,7 @@ pub struct Scenario {
 impl Scenario {
     pub fn new(envelope: Envelope, project_id: ProjectId, scenario_id: ScenarioId, title: impl Into<String>, description: impl Into<String>, source_digest: SpecDigest) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Scenario);
-        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, lane: None, subject_id: None }
+        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, lane: None, case: None, subject_id: None }
     }
 }
 

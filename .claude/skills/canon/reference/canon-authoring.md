@@ -51,6 +51,36 @@ diagnostic, at `canon inventory sync`.
 attest it. If you can't, it is a `process` rule, or it is a gap — record
 the gap, do not write the scenario.
 
+## Cases: which path of the behavior is this?
+
+A second, independent axis, tagged `@case:<value>`:
+
+| Case | The scenario specifies |
+|---|---|
+| `happy` | The expected path: valid input, the outcome the user wants. |
+| `failure` | A refusal, an error, a denied or blocked action — what happens when the input is wrong, missing, unauthorized, or stale. |
+| `edge` | A boundary that is neither: empty sets, limits, duplicates, re-runs, ordering. |
+
+A spec can be fully attested and still describe only its golden path.
+Evidence presence cannot see that gap; `require_cases` can:
+
+```yaml
+# .canon/policy.yaml
+spec_coverage:
+  require_evidence: true
+  scope: [building, verifying]
+  require_cases: [failure]
+```
+
+Every feature surface (`<area>.<surface>`) with in-scope scenarios must
+then carry at least one scenario of each listed case, or `canon gate
+check` reports it as `uncovered-cell`, and `canon subject status <id>
+shipped` refuses for a subject that owns such a surface. An untagged
+scenario counts toward its surface but satisfies no case, so an
+untagged corpus reports every surface instead of passing silently. The
+base set comes from `canon.core`; a repo replaces it with its own `case`
+enum, like `lane`.
+
 ## Subject pinning
 
 Every scenario belongs to a Subject (the durable product unit, see
@@ -64,7 +94,9 @@ a scoped gate.
 ```bash
 canon feature new checkout.cart --title "Cart"                       # once per surface
 canon scenario new checkout.cart.01 --title "Adding an item raises the count" \
-  --subject checkout-core --lane behavior                            # once per behavior
+  --subject checkout-core --lane behavior --case happy               # once per behavior
+canon scenario new checkout.cart.04 --title "Adding an out-of-stock item is refused" \
+  --subject checkout-core --lane behavior --case failure             # and its failure path
 canon format specs                                                   # clean?
 canon inventory sync                                                 # index it
 ```
@@ -78,6 +110,7 @@ canon inventory sync                                                 # index it
     # canon: {"schema":1,"at":"2026-09-16T10:02:11Z","actor":{"agent_id":"Main"}}
     @subject:checkout-core
     @lane:behavior
+    @case:happy
     @checkout.cart.01
     Scenario: Adding an item raises the count
       Given an empty cart
@@ -107,9 +140,13 @@ canon inventory sync                                                 # index it
 - **Coverage by splitting.** One behavior as two scenarios so two rows go
   green. One behavior, one id.
 - **Runner tags as classification.** `@design`, `@p2`, `@wip` are
-  invisible to canon — they index nothing. Only `@lane:` and `@subject:`
-  are read; any other `@name:value` namespace is counted as a diagnostic
-  at sync so you can see it was dropped.
+  invisible to canon — they index nothing. Only `@lane:`, `@case:`, and
+  `@subject:` are read; any other `@name:value` namespace is counted as a
+  diagnostic at sync so you can see it was dropped.
+- **The golden-path-only surface.** Five scenarios, all of the form
+  "doing X works". Nothing says what happens on a missing field, a
+  denied user, a duplicate submit. Write the refusal as its own
+  `@case:failure` scenario; `require_cases` makes the gap a gate failure.
 
 ## Worked example
 

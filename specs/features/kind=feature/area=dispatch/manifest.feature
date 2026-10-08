@@ -2,6 +2,7 @@ Feature: dispatch manifest
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:dispatch-manifest
+  @case:happy
   @dispatch.manifest.01
   Scenario: Beginning a dispatch mints a manifest carrying the guidance it retrieved
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -12,6 +13,7 @@ Feature: dispatch manifest
     And the file itself reads back as a run carrying that same guidance, so what was injected is on disk
 
   @subject:dispatch-manifest
+  @case:edge
   @dispatch.manifest.02
   Scenario: A dispatch binding nothing writes a manifest with no binding keys at all
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -21,6 +23,7 @@ Feature: dispatch manifest
     And it is byte-identical to the run serialized without those fields, because the content digest keys on exactly these bytes
 
   @subject:dispatch-manifest
+  @case:happy
   @dispatch.manifest.03
   Scenario: A task and a parent run supplied together both round-trip through the manifest
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -30,6 +33,7 @@ Feature: dispatch manifest
     And the parent is recorded without being verified to exist, because a parent may not have flushed yet
 
   @subject:dispatch-manifest
+  @case:happy
   @dispatch.manifest.04
   Scenario: Validating a task reads the plan corpus and never writes to it
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -39,6 +43,7 @@ Feature: dispatch manifest
     And the plan document is byte-identical afterwards, because resolution is a read
 
   @subject:dispatch-manifest
+  @case:failure
   @dispatch.manifest.05
   Scenario: A task row the plan corpus does not carry is refused before anything is minted
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -48,6 +53,7 @@ Feature: dispatch manifest
     And no dispatch record is left behind, because validation runs before the mint
 
   @subject:dispatch-manifest
+  @case:edge
   @dispatch.manifest.06
   Scenario: An already-completed task row is still a bindable task
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -57,6 +63,7 @@ Feature: dispatch manifest
     And membership asks whether the row exists, never whether it is still open
 
   @subject:dispatch-manifest
+  @case:failure
   @dispatch.manifest.07
   Scenario: A repo configuring no plan sources refuses distinctly from an unknown task
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}

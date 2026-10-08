@@ -427,6 +427,10 @@ pub enum SpecCoverage {
         scope: Vec<SubjectStatus>,
         /// Scenario lanes excluded after the subject-status scope filter.
         exclude_lanes: Vec<String>,
+        /// `@case:` values every feature surface (`<area>.<surface>`)
+        /// must carry at least one in-scope scenario of. EMPTY means no
+        /// case requirement — the pre-existing behavior.
+        require_cases: Vec<String>,
     },
     /// Present but unusable — see [`PolicyDiagnostic::InvalidSection`].
     /// `crate::spec_coverage` emits a violation carrying `detail`
@@ -446,6 +450,8 @@ struct RawSpecCoverage {
     scope: Vec<String>,
     #[serde(default)]
     exclude_lanes: Vec<String>,
+    #[serde(default)]
+    require_cases: Vec<String>,
 }
 
 /// Parse the `spec_coverage:` section, poisoning it (never dropping it)
@@ -482,18 +488,25 @@ fn resolve_spec_coverage(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<P
         }
     }
 
-    for lane in &parsed.exclude_lanes {
-        if !is_kebab_slug(lane) {
-            let detail = format!("`{lane}` is not a valid value for `exclude_lanes` (expected a kebab-case slug)");
-            diagnostics.push(PolicyDiagnostic::InvalidSection { section: SECTION, detail: detail.clone() });
-            return Some(SpecCoverage::Invalid { detail });
+    for (field, values) in [("exclude_lanes", &parsed.exclude_lanes), ("require_cases", &parsed.require_cases)] {
+        for value in values {
+            if !is_kebab_slug(value) {
+                let detail = format!("`{value}` is not a valid value for `{field}` (expected a kebab-case slug)");
+                diagnostics.push(PolicyDiagnostic::InvalidSection { section: SECTION, detail: detail.clone() });
+                return Some(SpecCoverage::Invalid { detail });
+            }
         }
     }
 
-    Some(SpecCoverage::Active { require_evidence: parsed.require_evidence, scope, exclude_lanes: parsed.exclude_lanes })
+    Some(SpecCoverage::Active {
+        require_evidence: parsed.require_evidence,
+        scope,
+        exclude_lanes: parsed.exclude_lanes,
+        require_cases: parsed.require_cases,
+    })
 }
 
-/// Validate a lane's shape before policy resolution accepts it.
+/// Validate a lane/case slug's shape before policy resolution accepts it.
 fn is_kebab_slug(s: &str) -> bool {
     !s.is_empty()
         && !s.starts_with('-')
@@ -1063,7 +1076,12 @@ trust_required:
         let (resolution, _dir) = resolve_with("spec_coverage:\n  require_evidence: true\n  scope: [building, verifying]\n");
         assert_eq!(
             resolution.spec_coverage,
-            Some(SpecCoverage::Active { require_evidence: true, scope: vec![SubjectStatus::Building, SubjectStatus::Verifying], exclude_lanes: Vec::new() })
+            Some(SpecCoverage::Active {
+                require_evidence: true,
+                scope: vec![SubjectStatus::Building, SubjectStatus::Verifying],
+                exclude_lanes: Vec::new(),
+                require_cases: Vec::new()
+            })
         );
     }
 
@@ -1072,7 +1090,10 @@ trust_required:
     #[test]
     fn an_omitted_scope_means_every_scenario() {
         let (resolution, _dir) = resolve_with("spec_coverage:\n  require_evidence: true\n");
-        assert_eq!(resolution.spec_coverage, Some(SpecCoverage::Active { require_evidence: true, scope: Vec::new(), exclude_lanes: Vec::new() }));
+        assert_eq!(
+            resolution.spec_coverage,
+            Some(SpecCoverage::Active { require_evidence: true, scope: Vec::new(), exclude_lanes: Vec::new(), require_cases: Vec::new() })
+        );
     }
 
     /// The frozen-infallible resolver cannot refuse, so a broken
@@ -1097,6 +1118,26 @@ trust_required:
         };
         assert!(detail.contains("Not-a-lane"), "must name the offender: {detail}");
         assert!(detail.contains("exclude_lanes"), "must name the field: {detail}");
+    }
+
+    #[test]
+    fn require_cases_resolves_and_a_malformed_case_poisons_the_section() {
+        let (resolution, _dir) = resolve_with("spec_coverage:\n  require_evidence: true\n  require_cases: [failure, edge]\n");
+        assert_eq!(
+            resolution.spec_coverage,
+            Some(SpecCoverage::Active {
+                require_evidence: true,
+                scope: Vec::new(),
+                exclude_lanes: Vec::new(),
+                require_cases: vec!["failure".to_string(), "edge".to_string()]
+            })
+        );
+
+        let (resolution, _dir) = resolve_with("spec_coverage:\n  require_evidence: true\n  require_cases: [Failure]\n");
+        let Some(SpecCoverage::Invalid { detail }) = &resolution.spec_coverage else {
+            panic!("expected a poisoned section, got {:?}", resolution.spec_coverage);
+        };
+        assert!(detail.contains("Failure") && detail.contains("require_cases"), "must name the offender and field: {detail}");
     }
 
     #[test]

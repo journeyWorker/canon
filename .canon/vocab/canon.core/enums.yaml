@@ -38,3 +38,12 @@ enums:
     - design
     - architecture
     - process
+  # Which path of a behavior a scenario specifies, from its `@case:` tag.
+  # `spec_coverage.require_cases` refuses a feature surface whose in-scope
+  # scenarios carry none of a required value (typically `failure`), so a
+  # spec that only describes its golden path is visible as incomplete. A
+  # repo replaces this set with its own `case` enum.
+  case:
+    - happy
+    - failure
+    - edge

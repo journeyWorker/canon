@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T14:06:59.792572Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib a_case_tag_round_trips_and_a_value_outside_the_vocabulary_is_dropped"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 12,
+  "scenario_id": "inventory.sync.12",
+  "schema": 1,
+  "staging_id": "5bc7611eddbf",
+  "verdict": "faithful"
+}

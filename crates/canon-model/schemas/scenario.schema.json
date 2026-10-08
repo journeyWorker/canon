@@ -11,6 +11,13 @@
       "type": "string",
       "format": "date-time"
     },
+    "case": {
+      "description": "Which path of the behavior the scenario specifies — `happy`,\n`failure`, `edge` in the base vocabulary, from its `@case:<slug>`\ntag. Shape-validated here; membership is checked by `canon\ninventory sync` against the repository's activated `case` enum.\n`spec_coverage.require_cases` reads it to refuse a feature\nsurface whose spec covers only its golden path. Additive and\nskipped when absent, so an untagged `Scenario` is byte-identical\non the wire (its `at` is derivation time, so no schema bump).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "description": {
       "type": "string"
     },

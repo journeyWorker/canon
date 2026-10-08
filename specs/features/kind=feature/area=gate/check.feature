@@ -2,6 +2,7 @@ Feature: gate check
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:gate-trust-spine
+  @case:edge
   @gate.check.01
   Scenario: A repository with nothing to complain about gates green
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -11,6 +12,7 @@ Feature: gate check
     And the report reads clean rather than reporting nothing at all
 
   @subject:gate-trust-spine
+  @case:failure
   @gate.check.02
   Scenario: A policy-required cell with no evidence is gate-red and names its subject
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -21,6 +23,7 @@ Feature: gate check
     And the report carries uncovered-cell against that task id
 
   @subject:gate-trust-spine
+  @case:failure
   @gate.check.03
   Scenario: Each of the eight failure classes fires on its own fixture and only there
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -31,6 +34,7 @@ Feature: gate check
     And the whole selftest exits zero
 
   @subject:gate-trust-spine
+  @case:edge
   @gate.check.04
   Scenario: The failure-class vocabulary is closed at eight grep-stable strings
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -41,6 +45,7 @@ Feature: gate check
     And a plausible-looking class name the gate never raises does not parse
 
   @subject:gate-trust-spine
+  @case:failure
   @gate.check.05
   Scenario: The release-scoped trust requirement never fires on an ordinary run
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -51,6 +56,7 @@ Feature: gate check
     And the release run still evaluates the always-on trust ladder rather than replacing it
 
   @subject:gate-trust-spine
+  @case:edge
   @gate.check.06
   Scenario: Run from a subdirectory the gate answers for the nearest ancestor repository
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -61,6 +67,7 @@ Feature: gate check
     And it reports that root's uncovered-cell violation, not a subdirectory-relative default
 
   @subject:gate-trust-spine
+  @case:edge
   @gate.check.07
   Scenario: An absent policy resolves to documented defaults and says it is missing
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -71,6 +78,7 @@ Feature: gate check
     And the staleness ceiling and surface scoping still answer, at their documented defaults
 
   @subject:gate-trust-spine
+  @case:failure
   @gate.check.08
   Scenario: A policy edit alone tightens the gate with no artifact touched
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -80,6 +88,7 @@ Feature: gate check
     And the violation is attributable to the policy diff, since no record was added or edited
 
   @subject:gate-trust-spine
+  @case:failure
   @gate.check.09
   Scenario: A record whose own fields do not parse is malformed-evidence, not silence
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -91,6 +100,7 @@ Feature: gate check
   # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
   @lane:behavior
+  @case:edge
   @gate.check.10
   Scenario: A scenario in an excluded lane is outside coverage
     Given spec coverage is enabled with one lane listed under exclude_lanes
@@ -102,6 +112,7 @@ Feature: gate check
   # canon: {"schema":1,"at":"2026-09-16T11:04:54Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
   @lane:behavior
+  @case:failure
   @gate.check.11
   Scenario: A non-slug entry in exclude_lanes poisons the section rather than vanishing
     Given a spec_coverage section whose exclude_lanes carries a value that is not a kebab-case slug
@@ -110,6 +121,7 @@ Feature: gate check
     And the gate refuses rather than treating the section as absent
 
   @subject:gate-trust-spine
+  @case:failure
   @gate.check.12
   Scenario: A matching high risk tier requires distinct human approvals
   # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -121,6 +133,7 @@ Feature: gate check
     And an approval whose role is agent does not satisfy the tier
 
   @subject:gate-trust-spine
+  @case:failure
   @gate.check.13
   Scenario: A high risk tier requires distinct verified SSH signers
   # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -128,3 +141,14 @@ Feature: gate check
     When two evidence records carry the same verified SSH signer identity
     Then the tier remains uncovered
     And two distinct verified SSH signers satisfy it
+
+  # canon: {"schema":1,"at":"2026-10-08T14:02:45Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.14
+  Scenario: A surface that specifies only its golden path is reported when failure cases are required
+    Given a spec_coverage policy that requires the failure case
+    And one surface whose scenarios are all tagged happy and another with a failure scenario
+    When the gate checks the repository
+    Then it reports uncovered-cell for the golden-path-only surface naming the missing case
+    And an untagged or out-of-scope failure scenario does not satisfy its surface

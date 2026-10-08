@@ -55,6 +55,7 @@ spec_coverage:
   require_evidence: true
   scope: [building, verifying]
   exclude_lanes: [process]
+  require_cases: [failure]
 ```
 
 `scope`는 무엇이 *차단할 수 있는지*를, Gherkin `@subject:<id>` 태그로
@@ -75,6 +76,17 @@ Subject에 연결된 시나리오 중 해당 [라이프사이클
 교체합니다. `process` 규칙은 코드 표면이 없어 테스트로 `faithful`이 될 수
 없으므로, 여기에 올려두면 실제 규칙이 오염시킬 뿐인 숫자 밖에 머무릅니다.
 생략하면 아무것도 제외되지 않습니다.
+
+`require_cases`는 증거 존재 여부로는 보이지 않는 빈틈을 막습니다: 모든
+시나리오에 증거가 붙어 있지만 전부 골든패스만 설명하는 표면입니다.
+시나리오의 **case** — `@case:<value>` 태그 — 는 그 시나리오가 동작의 어느
+경로를 명세하는지 말합니다: `happy`, `failure`(거부·오류·차단된 동작),
+`edge`(빈 집합·한계·중복 같은 경계). 범위 안 시나리오가 있는 모든 기능
+표면(`<area>.<surface>`)은 나열된 case마다 시나리오를 하나 이상 가져야
+하며, 없으면 그 표면이 `uncovered-cell`로 보고되고 `canon subject status
+<id> shipped`도 같은 규칙으로 거부됩니다. 태그 없는 시나리오는 어떤 case도
+채우지 않으므로, 분류되지 않은 코퍼스는 통과하지 않고 모든 표면이
+보고됩니다. 생략하면 아무것도 요구하지 않습니다.
 
 섹션이 있는데 형식이 잘못된 경우는 섹션이 없는 것과 결코 같지
 않습니다 — 보고된 뒤 검사를 실패시키므로, 오타(또는 slug가 아닌 lane)가

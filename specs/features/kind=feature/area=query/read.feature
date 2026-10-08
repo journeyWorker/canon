@@ -2,6 +2,7 @@ Feature: query read
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:query-reads
+  @case:edge
   @query.read.01
   Scenario: A re-materialized scenario reads as one current record and the survivor is the latest
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -11,6 +12,7 @@ Feature: query read
     And the record it reports carries the later title, never an arbitrary generation
 
   @subject:query-reads
+  @case:happy
   @query.read.02
   Scenario: A subject walked forward through its status chain reads as one row
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -20,6 +22,7 @@ Feature: query read
     And its status is the last one the chain reached
 
   @subject:query-reads
+  @case:edge
   @query.read.03
   Scenario: A corpus carrying no supersession folds to itself
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -29,6 +32,7 @@ Feature: query read
     And the fold has taken nothing away, because there was nothing to supersede
 
   @subject:query-reads
+  @case:edge
   @query.read.04
   Scenario: A review's natural key carries the pinned commit, so two attestations at two pins are two records
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -39,6 +43,7 @@ Feature: query read
     And folding by key would therefore drop an attestation rather than collapse a duplicate
 
   @subject:query-reads
+  @case:edge
   @query.read.05
   Scenario: A since cutoff admits records at or after it and nothing older
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -48,6 +53,7 @@ Feature: query read
     And the older record is filtered out even though it lives in a different tier than the newer one
 
   @subject:query-reads
+  @case:happy
   @query.read.06
   Scenario: A status filter scopes the result to the records that carry that status
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -57,6 +63,7 @@ Feature: query read
     And it is named by its own task id, not by position
 
   @subject:query-reads
+  @case:happy
   @query.read.07
   Scenario: A scope filter narrows the rollup, not only the printed rows
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -66,6 +73,7 @@ Feature: query read
     And the task belonging to the other change contributes to neither number
 
   @subject:query-reads
+  @case:failure
   @query.read.08
   Scenario: A kind routed to a tier this repo cannot attach fails loud instead of reading empty
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}

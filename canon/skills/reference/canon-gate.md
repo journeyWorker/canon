@@ -21,7 +21,7 @@ Every violation carries one of these stable, grep-able strings:
 
 | Class | Meaning |
 |---|---|
-| `uncovered-cell` | Either a policy-required evidence cell (role × artifact) with no matching record, or — with `spec_coverage` enabled — a spec scenario that is unimplemented or mismatched. The detail string distinguishes them. Coverage means "a test exists", not "a test passed": even a `Divergent` verdict satisfies the role-cell form. |
+| `uncovered-cell` | Either a policy-required evidence cell (role × artifact) with no matching record, or — with `spec_coverage` enabled — a spec scenario that is unimplemented or mismatched, or a feature surface missing a `require_cases` case. The detail string distinguishes them. Coverage means "a test exists", not "a test passed": even a `Divergent` verdict satisfies the role-cell form. |
 | `unreviewed-promotion` | An artifact tagged `reviewed` has no matching ledger review record. |
 | `trust-below-required` | Achieved trust level is below `policy.yaml`'s `trust_required` for its class — RELEASE-scoped only (`canon gate check --release`); never fires on an ordinary run. |
 | `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. |
@@ -63,6 +63,8 @@ an unimplemented or mismatched spec becomes a reported violation.
 spec_coverage:
   require_evidence: true
   scope: [building, verifying]   # optional; omit for the whole corpus
+  exclude_lanes: [process]       # optional
+  require_cases: [failure]       # optional; see Golden-path only below
 ```
 
 - **Unimplemented** — no `EvidenceRecord` carries the scenario's
@@ -78,6 +80,15 @@ spec_coverage:
   set, an untagged scenario is out of scope; with `scope` omitted, every
   scenario is in scope. A tag naming no Subject record is reported as a
   dangling link, never silently skipped.
+- **Golden-path only** (`require_cases`) — every feature surface
+  (`<area>.<surface>`) among the in-scope scenarios must carry at least
+  one scenario tagged `@case:<v>` for each listed value, or the SURFACE
+  is reported (subject `<area>.<surface>`, detail naming the missing
+  case). This is the gap evidence presence cannot see: every scenario
+  attested, none of them specifying a refusal. Untagged scenarios satisfy
+  no case, so an unclassified corpus is reported, not passed. Works with
+  `require_evidence: false` too. `canon subject status <id> shipped`
+  applies the same rule to the scenarios the subject owns.
 
 Two refusals rather than a silent pass, both surfacing as
 `uncovered-cell` on the subject `spec_coverage`:

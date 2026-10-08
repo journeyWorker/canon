@@ -2,6 +2,7 @@ Feature: skills install
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:skills-install
+  @case:happy
   @skills.install.01
   Scenario: Installing materializes both agent conventions and records what it wrote
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -14,6 +15,7 @@ Feature: skills install
     And no third agent directory is created
 
   @subject:skills-install
+  @case:edge
   @skills.install.02
   Scenario: A rerun with no source change reports unchanged rather than rewriting
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -24,6 +26,7 @@ Feature: skills install
     And its recorded version did not move
 
   @subject:skills-install
+  @case:happy
   @skills.install.03
   Scenario: An edited guide bumps its recorded version by exactly one
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -33,6 +36,7 @@ Feature: skills install
     And its recorded version is two, incremented by exactly one
 
   @subject:skills-install
+  @case:edge
   @skills.install.04
   Scenario: The lock keys on content, never on the clock
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -42,6 +46,7 @@ Feature: skills install
     And the hash names its algorithm, so an install decision is reproducible from content alone
 
   @subject:skills-install
+  @case:happy
   @skills.install.05
   Scenario: The Codex form is a flattening, not a second authored document
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -52,6 +57,7 @@ Feature: skills install
     And it ends with the body, so nothing authored is dropped in translation
 
   @subject:skills-install
+  @case:edge
   @skills.install.06
   Scenario: A guide with no frontmatter delimiters parses to a fallback name and an empty description
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -59,3 +65,13 @@ Feature: skills install
     When its frontmatter is parsed with a fallback name supplied
     Then the fallback name is used and the description is empty
     And the whole content is kept as the body, unmodified
+
+  # canon: {"schema":1,"at":"2026-10-08T14:02:45Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.07
+  Scenario: An unknown provider is refused before anything is written
+    Given a canonical skill source and an empty target
+    When the skill is installed for a provider canon does not know
+    Then the install fails with the provider named
+    And no projection or lock file is written to the target

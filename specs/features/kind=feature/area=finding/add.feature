@@ -2,6 +2,7 @@ Feature: finding add
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:finding-lifecycle
+  @case:failure
   @finding.add.01
   Scenario: The round and the seq are both 1-based and a zero is refused
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -11,6 +12,7 @@ Feature: finding add
     And nothing is staged, because a zero would sort ahead of every finding a round really has
 
   @subject:finding-lifecycle
+  @case:failure
   @finding.add.02
   Scenario: A second finding at an occupied change round and seq is refused naming the occupant
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -21,6 +23,7 @@ Feature: finding add
     And seq is never auto-assigned, so the author transcribes the number the review artifact already gave it
 
   @subject:finding-lifecycle
+  @case:failure
   @finding.add.03
   Scenario: A fixed finding that names no closing commit is refused
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -30,6 +33,7 @@ Feature: finding add
     And nothing is staged
 
   @subject:finding-lifecycle
+  @case:failure
   @finding.add.04
   Scenario: A resolution sha alongside any disposition other than fixed is refused
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -39,6 +43,7 @@ Feature: finding add
     And the pair holds in both directions, so fixed and a closing commit imply each other
 
   @subject:finding-lifecycle
+  @case:failure
   @finding.add.05
   Scenario: A well-formed sha this repository does not hold is refused by flag name
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -48,6 +53,7 @@ Feature: finding add
     And a sha the checkout does hold is accepted on each of the three flags
 
   @subject:finding-lifecycle
+  @case:failure
   @finding.add.06
   Scenario: An annotated tag's own object id is not a commit and is refused
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -57,6 +63,7 @@ Feature: finding add
     And the refusal names the offending flag
 
   @subject:finding-lifecycle
+  @case:edge
   @finding.add.07
   Scenario: Outside a checkout the existence check is skipped rather than failed
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -66,6 +73,7 @@ Feature: finding add
     And the check is best-effort, so a place where nothing is verifiable refuses nothing
 
   @subject:finding-lifecycle
+  @case:failure
   @finding.add.08
   Scenario: A line separator in any free-text field is refused and never escaped
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
@@ -75,6 +83,7 @@ Feature: finding add
     And the set is the one the row grammar already owns, so a separator that forges a second rendered row is refused wherever it appears
 
   @subject:finding-lifecycle
+  @case:happy
   @finding.add.09
   Scenario: A finding is a recorded observation and the command says canon verifies none of it
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
