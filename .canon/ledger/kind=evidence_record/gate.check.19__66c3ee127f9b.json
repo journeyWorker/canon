@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T17:41:13.452604Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate a_malformed_require_review_poisons_the_section a_poisoned_policy_section_refuses_instead_of_passing"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 19,
+  "scenario_id": "gate.check.19",
+  "schema": 1,
+  "staging_id": "6005177eb211",
+  "verdict": "faithful"
+}

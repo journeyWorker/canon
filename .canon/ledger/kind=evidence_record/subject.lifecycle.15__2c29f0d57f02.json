@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T17:41:13.114150Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject an_open_blocker_refuses_and_a_fixed_one_clears"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "subject.lifecycle.15",
+  "schema": 1,
+  "staging_id": "43b70b751ea1",
+  "verdict": "faithful"
+}
