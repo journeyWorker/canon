@@ -19,8 +19,8 @@ const { loop } = t;
     </figcaption>
     <ol class="fig2-track">
       {
-        loop.stations.map((s) => (
-          <li class:list={["fig2-st", { "is-gate": s.name === "gate" }]} id={`loop-${s.name}`}>
+        loop.stations.map((s, i) => (
+          <li class:list={["fig2-st", { "is-gate": i === 3 }]} id={`loop-${i + 1}`}>
             <span class="fig2-node" aria-hidden="true" />
             <h3 class="fig2-name">
               <a href={s.href}>{s.name}</a>

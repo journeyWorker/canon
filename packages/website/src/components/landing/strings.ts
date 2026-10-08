@@ -235,25 +235,25 @@ const ko: Strings = {
     scenarios: (n: number) => `시나리오 ${n}개`,
     violations: (n: number) => `위반 ${n}건`,
   },
-  stations: ["intent", "run", "evidence", "gate", "decision", "learning"],
+  stations: ["의도", "실행", "증거", "게이트", "결정", "학습"],
 
   loop: {
     heading: "모든 실행이 다음 실행을 먹입니다",
     number: "그림 2",
-    title: "intent → run → evidence → gate → decision → learning",
+    title: "의도 → 실행 → 증거 → 게이트 → 결정 → 학습",
     stations: [
       {
-        name: "intent",
+        name: "의도",
         lines: ["본격적인 작업에서 에이전트의 첫 행동은 서브젝트를 저작하거나 갱신하는 것입니다."],
         href: "/ko/concepts/canon/",
       },
       {
-        name: "run",
+        name: "실행",
         lines: ["세션 어댑터는 세션마다 루트 run 하나와 서브에이전트마다 자식 run 하나를 씁니다."],
         href: "/ko/architecture/",
       },
       {
-        name: "evidence",
+        name: "증거",
         lines: [
           "커버리지 — 정책상 요구되는 증거가 이 아티팩트에 대해 존재하는가?",
           "판정 레저 — 그 증거가 통과했는가, 누가 했는가, 얼마나 오래됐는가?",
@@ -261,7 +261,7 @@ const ko: Strings = {
         href: "/ko/concepts/trust-spine/",
       },
       {
-        name: "gate",
+        name: "게이트",
         lines: [
           "증거가 없거나 형식이 잘못되었거나 조작된 경우 fail closed — 행은 플립되지 않은 채로 남습니다.",
           "종료 코드: 0 클린, 1 gate-red, 2 사용/로드 실패.",
@@ -269,12 +269,12 @@ const ko: Strings = {
         href: "/ko/cli/",
       },
       {
-        name: "decision",
+        name: "결정",
         lines: ["위험 등급은 현재의 effect/path 바인딩과 policy에 pin된 SSH 승인을 요구합니다."],
         href: "/ko/concepts/strategy-memory/",
       },
       {
-        name: "learning",
+        name: "학습",
         lines: [
           "새로 증류된 전략은 기본적으로 quarantine됩니다.",
           "canon retrieve가 다음 실행 전에 꺼내줍니다.",

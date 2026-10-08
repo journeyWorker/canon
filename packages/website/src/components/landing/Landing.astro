@@ -89,8 +89,8 @@ const shell = (line: string) => {
             >
               <span data-copy-text>{t.copy}</span>
             </button>
-            <span class="lp-sr" role="status" data-copy-status></span>
           </div>
+          <span class="lp-sr" role="status" data-copy-status></span>
           <a class="lp-guide" href={t.guide.href}>
             {t.guide.text}
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
@@ -102,7 +102,7 @@ const shell = (line: string) => {
       </div>
 
       <ol class="lp-stations">
-        {t.stations.map((s) => <li><a href={`#loop-${s}`}>{s}</a></li>)}
+        {t.stations.map((s, i) => <li><a href={`#loop-${i + 1}`}>{s}</a></li>)}
       </ol>
     </div>
 
@@ -169,7 +169,7 @@ const shell = (line: string) => {
     <script>
       for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
         const label = btn.querySelector<HTMLElement>("[data-copy-text]");
-        const status = btn.parentElement?.querySelector<HTMLElement>("[data-copy-status]");
+        const status = btn.closest("[data-copy-root]")?.nextElementSibling as HTMLElement | null;
         const original = label?.textContent ?? "";
         let timer = 0;
         btn.addEventListener("click", async () => {
