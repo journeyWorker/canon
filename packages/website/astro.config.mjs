@@ -23,6 +23,36 @@ export default defineConfig({
         },
       ],
       customCss: ["./src/styles/theme.css"],
+      expressiveCode: {
+        // Code is a black field in both themes, like the landing's command bar.
+        themes: ["min-dark"],
+        styleOverrides: {
+          borderRadius: "0",
+          borderWidth: "0",
+          codeBackground: "#0b0b0b",
+          codeFontFamily: "'Inconsolata Variable', ui-monospace, Menlo, monospace",
+          codeFontSize: "0.9375rem",
+          uiFontFamily: "'Spline Sans Variable', system-ui, sans-serif",
+          frames: {
+            frameBoxShadowCssValue: "none",
+            editorBackground: "#0b0b0b",
+            editorTabBarBackground: "#0b0b0b",
+            editorActiveTabBackground: "#0b0b0b",
+            editorActiveTabIndicatorTopColor: "#ff4a1c",
+            editorActiveTabIndicatorBottomColor: "transparent",
+            editorTabBarBorderBottomColor: "#2a2a28",
+            editorTabBorderRadius: "0",
+            terminalBackground: "#0b0b0b",
+            terminalTitlebarBackground: "#0b0b0b",
+            terminalTitlebarBorderBottomColor: "#2a2a28",
+            terminalTitlebarForeground: "#a3a39b",
+            terminalTitlebarDotsOpacity: "0",
+            inlineButtonBorder: "#a3a39b",
+            tooltipSuccessBackground: "#ff4a1c",
+            tooltipSuccessForeground: "#0b0b0b",
+          },
+        },
+      },
       sidebar: [
         {
           label: "Getting Started",
