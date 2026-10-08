@@ -1,0 +1,4 @@
+canon gate check: 1 violation(s)
+
+malformed-evidence (1):
+  malformed-evidence kind=evidence_record/cart.add.02__<digest12>.json — EOF while parsing an object at line 8 column 4 (malformed)

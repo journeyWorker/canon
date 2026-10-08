@@ -1,0 +1,4 @@
+description: "`canon gate check` exits 1 naming the feature surface whose scenarios carry no `@case:failure` under `spec_coverage.require_cases`, and only that surface"
+steps:
+  - args: [gate, check]
+    exit: 1

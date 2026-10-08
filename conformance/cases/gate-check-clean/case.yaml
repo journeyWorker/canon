@@ -1,0 +1,4 @@
+description: "`canon gate check` exits 0 and prints the clean line when every specified scenario is evidenced under `spec_coverage.require_evidence`"
+steps:
+  - args: [gate, check]
+    exit: 0

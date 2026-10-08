@@ -1,0 +1,4 @@
+description: "`canon gate check` exits 1 with an `uncovered-cell` line for a specified scenario that has no evidence record under `spec_coverage.require_evidence`"
+steps:
+  - args: [gate, check]
+    exit: 1

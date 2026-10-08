@@ -1,0 +1,4 @@
+description: "a verb that reads `specs.roots[]` exits 2 (usage error) on a `canon.yaml` that is not valid YAML, rather than falling back to the default root"
+steps:
+  - args: [inventory, sync]
+    exit: 2

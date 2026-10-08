@@ -1,0 +1,6 @@
+tiers:
+  local: [backend: git
+specs:
+  roots:
+    - id: root
+      root: specs

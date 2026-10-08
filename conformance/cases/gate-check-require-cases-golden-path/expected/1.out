@@ -1,0 +1,4 @@
+canon gate check: 1 violation(s)
+
+uncovered-cell (1):
+  uncovered-cell cart.add — feature surface `cart.add` (root `root`) has no `@case:failure` scenario among its 2 in-scope scenario(s) — its spec covers only other paths; specify what happens on that path

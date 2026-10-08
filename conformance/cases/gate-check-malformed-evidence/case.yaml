@@ -1,0 +1,4 @@
+description: "`canon gate check` exits 1 with a `malformed-evidence` line naming the ledger file when an evidence record is truncated, never skipping it silently"
+steps:
+  - args: [gate, check]
+    exit: 1
