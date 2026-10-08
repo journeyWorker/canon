@@ -1,16 +1,16 @@
 {
-  "generatedAt": "2026-10-08T17:12:16.948Z",
-  "sourceCommit": "601f5c8560f59f846d3024c754f24ae731a04f94",
-  "scenarioCount": 246,
-  "withEvidence": 246,
-  "evidenceAtOrBeforeAuthoring": 237,
+  "generatedAt": "2026-10-08T18:13:47.577Z",
+  "sourceCommit": "5191ef1308f77feb71ccee790784c4d98eaba983",
+  "scenarioCount": 257,
+  "withEvidence": 257,
+  "evidenceAtOrBeforeAuthoring": 248,
   "evidenceAfterAuthoring": 9,
   "withoutEvidence": 0,
   "range": {
     "start": "2026-08-06T15:34:18+09:00",
-    "end": "2026-10-09T00:16:37+09:00",
+    "end": "2026-10-09T02:41:18+09:00",
     "startMs": 1785998058000,
-    "endMs": 1791472597000
+    "endMs": 1791481278000
   },
   "gate": {
     "command": "canon gate check",
@@ -19,7 +19,7 @@
     "violations": 0,
     "clean": true,
     "summary": "canon gate check: clean (0 violations)",
-    "checkedAt": "2026-10-08T17:12:17.032Z"
+    "checkedAt": "2026-10-08T18:13:47.662Z"
   },
   "scenarios": [
     {
@@ -2234,6 +2234,105 @@
       "authoredMs": 1791472597000,
       "firstEvidenceAt": "2026-10-08T15:15:13.001787Z",
       "firstEvidenceMs": 1791472513001,
+      "lagHours": 0
+    },
+    {
+      "id": "gate.check.17",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.357636Z",
+      "firstEvidenceMs": 1791481273357,
+      "lagHours": 0
+    },
+    {
+      "id": "gate.check.18",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.407358Z",
+      "firstEvidenceMs": 1791481273407,
+      "lagHours": 0
+    },
+    {
+      "id": "gate.check.19",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.452604Z",
+      "firstEvidenceMs": 1791481273452,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.12",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:12.967169Z",
+      "firstEvidenceMs": 1791481272967,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.13",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.016528Z",
+      "firstEvidenceMs": 1791481273016,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.14",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.067971Z",
+      "firstEvidenceMs": 1791481273067,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.15",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.114150Z",
+      "firstEvidenceMs": 1791481273114,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.16",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.168086Z",
+      "firstEvidenceMs": 1791481273168,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.17",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.212791Z",
+      "firstEvidenceMs": 1791481273212,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.18",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.264045Z",
+      "firstEvidenceMs": 1791481273264,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.19",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.312913Z",
+      "firstEvidenceMs": 1791481273312,
       "lagHours": 0
     }
   ]
