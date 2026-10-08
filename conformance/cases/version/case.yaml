@@ -1,0 +1,4 @@
+description: "`canon --version` prints the workspace version (D6 live stamp: a release bump without a re-bless fails)"
+steps:
+  - args: [--version]
+    exit: 0
