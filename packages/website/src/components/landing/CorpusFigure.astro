@@ -1,0 +1,163 @@
+---
+// Fig. 1: one hairline per scenario in canon's own spec corpus, on a time axis
+// running from the first authored scenario to the recorded `canon gate check`.
+// Each line starts when its scenario was authored. A white segment marks the
+// interval between authoring and first evidence, drawn only when evidence
+// arrived after the authoring commit. Data: src/data/corpus-figure.json
+// (regenerate with `bun run figure:data`).
+import data from "../../data/corpus-figure.json";
+import type { Strings } from "./strings";
+
+interface Props {
+  t: Strings;
+}
+const { t } = Astro.props;
+
+const W = 1000;
+const PITCH = 10;
+const MIN_LEN = 6; // a scenario authored just before the gate run still gets a visible stub
+
+const checkedMs = Date.parse(data.gate.checkedAt);
+const startMs = data.range.startMs;
+const endMs = Math.max(data.range.endMs, Number.isNaN(checkedMs) ? 0 : checkedMs);
+const x = (ms: number) => ((ms - startMs) / (endMs - startMs)) * W;
+const round = (v: number) => Math.round(v * 10) / 10;
+
+const rows = data.scenarios.map((s, i) => {
+  const x1 = round(Math.min(x(s.authoredMs), W - MIN_LEN));
+  const lag =
+    s.firstEvidenceMs !== null && s.firstEvidenceMs > s.authoredMs
+      ? { x1, x2: round(Math.max(x(s.firstEvidenceMs), x1 + 2)) }
+      : null;
+  return { id: s.id, y: i * PITCH + PITCH / 2, x1, lag };
+});
+const H = rows.length * PITCH;
+
+const violations = data.gate.violations ?? 0;
+const day = (iso: string) => iso.slice(0, 10);
+const summary = [
+  `${t.fig1.number}: ${t.fig1.title}, ${t.fig1.scenarios(data.scenarioCount)}.`,
+  `${day(data.range.start)} → ${day(data.gate.checkedAt)}.`,
+  `${data.evidenceAtOrBeforeAuthoring} / ${data.scenarioCount}: evidence ≤ authored; ${data.evidenceAfterAuthoring}: evidence later.`,
+  `${data.gate.summary ?? ""}`,
+].join(" ");
+
+// Per row: scenario id, authored day, first-evidence day, line start, gap end (0..W).
+const readout = rows.map((r, i) => {
+  const s = data.scenarios[i];
+  return [s.id, day(s.authoredAt), s.firstEvidenceAt ? day(s.firstEvidenceAt) : "", r.x1, r.lag ? r.lag.x2 : 0];
+});
+---
+
+<figure class="fig1" data-fig1>
+  <figcaption class="fig1-caption">
+    <span class="fig1-num">{t.fig1.number}</span>
+    <span class="fig1-cap" data-fig1-cap>{t.fig1.title} · {t.fig1.scenarios(data.scenarioCount)}</span>
+  </figcaption>
+  <div class="fig1-plot" role="img" aria-label={summary} data-fig1-plot>
+    <svg
+      class="fig1-chart"
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <g class="fig1-lines">
+        {rows.map((r) => <line x1={r.x1} x2={W} y1={r.y} y2={r.y} />)}
+      </g>
+      <g class="fig1-gaps">
+        {rows
+          .filter((r) => r.lag)
+          .map((r) => <line x1={r.lag!.x1} x2={r.lag!.x2} y1={r.y} y2={r.y} />)}
+      </g>
+    </svg>
+    <canvas class="fig1-canvas" aria-hidden="true"></canvas>
+  </div>
+  <p class="fig1-total" data-violations={violations}>{t.fig1.violations(violations)}</p>
+  <script type="application/json" data-fig1-rows set:html={JSON.stringify({ w: W, rows: readout })} />
+</figure>
+
+<script>
+  // Draws Fig. 1 on a canvas at device resolution, one device-pixel row per
+  // scenario, so hundreds of hairlines stay even instead of beating against
+  // the pixel grid. Lines grow from their authored time to the gate run once;
+  // pointer position reads out the scenario under it in the caption.
+  type Row = [string, string, string, number, number];
+
+  for (const fig of document.querySelectorAll<HTMLElement>("[data-fig1]")) {
+    const plot = fig.querySelector<HTMLElement>("[data-fig1-plot]")!;
+    const canvas = fig.querySelector<HTMLCanvasElement>("canvas")!;
+    const cap = fig.querySelector<HTMLElement>("[data-fig1-cap]")!;
+    const source = fig.querySelector<HTMLScriptElement>("[data-fig1-rows]")!;
+    const { w: W, rows } = JSON.parse(source.textContent ?? "{}") as { w: number; rows: Row[] };
+    const ctx = canvas.getContext("2d");
+    if (!ctx || rows.length === 0) continue;
+
+    const capText = cap.textContent ?? "";
+    const style = getComputedStyle(fig);
+    const ink = style.getPropertyValue("--c-ink").trim() || "#0b0b0b";
+    const paper = style.getPropertyValue("--c-paper").trim() || "#ffffff";
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let hover = -1;
+    let progress = still ? 1 : 0;
+
+    const draw = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const cw = Math.round(plot.clientWidth * dpr);
+      const ch = Math.round(plot.clientHeight * dpr);
+      if (canvas.width !== cw || canvas.height !== ch) {
+        canvas.width = cw;
+        canvas.height = ch;
+      }
+      ctx.clearRect(0, 0, cw, ch);
+      const pitch = ch / rows.length;
+      const thick = Math.max(1, Math.round(dpr * 0.5));
+      rows.forEach(([, , , x1, gapEnd], i) => {
+        const y = Math.round(i * pitch + pitch / 2 - thick / 2);
+        const local = Math.min(1, Math.max(0, progress * 1.6 - (i / rows.length) * 0.6));
+        const eased = 1 - Math.pow(1 - local, 4);
+        const start = Math.round((x1 / W) * cw);
+        const end = Math.round(start + (cw - start) * eased);
+        if (end <= start) return;
+        ctx.fillStyle = i === hover ? paper : ink;
+        ctx.fillRect(start, y, end - start, i === hover ? thick * 2 : thick);
+        if (gapEnd > 0) {
+          const gx = Math.min(end, Math.round((gapEnd / W) * cw));
+          ctx.fillStyle = paper;
+          if (gx > start) ctx.fillRect(start, y - thick, gx - start, thick * 3);
+        }
+      });
+    };
+
+    fig.classList.add("has-canvas");
+    if (still) {
+      draw();
+    } else {
+      const t0 = performance.now();
+      const tick = (now: number) => {
+        progress = Math.min(1, (now - t0) / 1400);
+        draw();
+        if (progress < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+    new ResizeObserver(() => draw()).observe(plot);
+
+    plot.addEventListener("pointermove", (event) => {
+      const box = plot.getBoundingClientRect();
+      const i = Math.floor(((event.clientY - box.top) / box.height) * rows.length);
+      if (i === hover || i < 0 || i >= rows.length) return;
+      hover = i;
+      const [id, authored, evidence] = rows[i];
+      const md = (d: string) => d.slice(5);
+      cap.textContent = evidence ? `${id} · ${md(authored)} → ${md(evidence)}` : `${id} · ${md(authored)}`;
+      fig.classList.add("is-reading");
+      draw();
+    });
+    plot.addEventListener("pointerleave", () => {
+      hover = -1;
+      cap.textContent = capText;
+      fig.classList.remove("is-reading");
+      draw();
+    });
+  }
+</script>

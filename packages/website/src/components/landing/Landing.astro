@@ -1,0 +1,194 @@
+---
+import { getCollection } from "astro:content";
+import "../../styles/tokens.css";
+import "../../styles/landing.css";
+import CorpusFigure from "./CorpusFigure.astro";
+import LoopFigure from "./LoopFigure.astro";
+import CompareTable from "./CompareTable.astro";
+import { strings, type Lang } from "./strings";
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const t = strings[lang];
+
+// Docs entry points, in sidebar order, with each page's own title and description.
+const order = [
+  "getting-started",
+  "privacy",
+  "concepts/canon",
+  "concepts/trust-spine",
+  "concepts/tiered-storage",
+  "concepts/strategy-memory",
+  "architecture",
+  "cli",
+  "examples",
+];
+const prefix = lang === "en" ? "" : `${lang}/`;
+const all = await getCollection("docs");
+const docs = order.flatMap((slug) => {
+  const entry = all.find((e) => e.id === `${prefix}${slug}`);
+  return entry
+    ? [{ href: `${t.docsBase}${slug}/`, title: entry.data.title, description: entry.data.description ?? "" }]
+    : [];
+});
+
+// Split a shell line into command and trailing comment.
+const shell = (line: string) => {
+  const m = line.match(/^(.*?)(^|\s)(#.*)$/);
+  return m ? { cmd: m[1] + m[2], comment: m[3] } : { cmd: line, comment: "" };
+};
+---
+
+<!doctype html>
+<html lang={t.htmlLang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{t.title}</title>
+    <meta name="description" content={t.description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate" hreflang="en" href="/" />
+    <link rel="alternate" hreflang="ko" href="/ko/" />
+    <meta property="og:title" content={t.title} />
+    <meta property="og:description" content={t.description} />
+    <meta name="theme-color" content="#f3f3ef" />
+  </head>
+  <body class="lp">
+    <div class="lp-rules" aria-hidden="true">
+      {Array.from({ length: 12 }, () => <span />)}
+    </div>
+
+    <header class="lp-head">
+      <a class="lp-wordmark" href={t.base}>canon</a>
+      <nav class="lp-nav" aria-label={t.nav.label}>
+        <a href={t.nav.docs.href}>{t.nav.docs.text}</a>
+        <a href={t.nav.cli.href}>{t.nav.cli.text}</a>
+        <a href={t.nav.concepts.href}>{t.nav.concepts.text}</a>
+        <a href={t.nav.github.href}>{t.nav.github.text}</a>
+      </nav>
+    </header>
+
+    <main id="main">
+    <div class="lp-first">
+      <div class="lp-hero">
+        <div class="lp-hero-copy">
+          <h1 class="lp-headline">
+            {t.headline.map((line) => <span>{line}</span>)}
+          </h1>
+          <p class="lp-subline">{t.subline}</p>
+          <div class="lp-command" data-copy-root>
+            <code><span class="lp-prompt" aria-hidden="true">$ </span>{t.command}</code>
+            <button
+              type="button"
+              class="lp-copy"
+              data-copy={t.command}
+              data-copied={t.copied}
+              aria-label={t.copyLabel}
+            >
+              <span data-copy-text>{t.copy}</span>
+            </button>
+            <span class="lp-sr" role="status" data-copy-status></span>
+          </div>
+          <a class="lp-guide" href={t.guide.href}>
+            {t.guide.text}
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" />
+            </svg>
+          </a>
+        </div>
+        <CorpusFigure t={t} />
+      </div>
+
+      <ol class="lp-stations">
+        {t.stations.map((s) => <li><a href={`#loop-${s}`}>{s}</a></li>)}
+      </ol>
+    </div>
+
+    <LoopFigure t={t} />
+
+    <CompareTable t={t} />
+
+    <section class="lp-sec lp-quick" aria-labelledby="quick-h">
+      <h2 class="lp-h2" id="quick-h">{t.quick.heading}</h2>
+      <div class="lp-quick-body">
+        <pre class="lp-code"><code>{t.quick.demo.map((line) => {
+          const { cmd, comment } = shell(line);
+          return <span class="ln">{cmd}{comment && <span class="cm">{comment}</span>}</span>;
+        })}</code></pre>
+        <p class="lp-after">{t.quick.after}</p>
+        <h3 class="lp-h3">{t.quick.anyRepo}</h3>
+        <pre class="lp-code"><code>{t.quick.repo.map((line) => {
+          const { cmd, comment } = shell(line);
+          return <span class="ln">{cmd}{comment && <span class="cm">{comment}</span>}</span>;
+        })}</code></pre>
+      </div>
+    </section>
+
+    <section class="lp-sec lp-limits" aria-labelledby="limits-h">
+      <h2 class="lp-h2" id="limits-h">{t.limits.heading}</h2>
+      <div class="lp-limits-col">
+        <p class="lp-list-lead">{t.limits.verifiesLead}</p>
+        <ul class="lp-list">{t.limits.verifies.map((item) => <li>{item}</li>)}</ul>
+      </div>
+      <div class="lp-limits-col">
+        <p class="lp-list-lead">{t.limits.notLead}</p>
+        <ul class="lp-list">{t.limits.not.map((item) => <li>{item}</li>)}</ul>
+      </div>
+      <p class="lp-statement">{t.limits.statement}</p>
+    </section>
+
+    <section class="lp-sec lp-docs" aria-labelledby="docs-h">
+      <h2 class="lp-h2" id="docs-h">{t.docs.heading}</h2>
+      <ul class="lp-docs-list">
+        {
+          docs.map((d) => (
+            <li>
+              <a href={d.href}>
+                <span class="lp-docs-title">{d.title}</span>
+                <span class="lp-docs-desc">{d.description}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+    </main>
+
+    <footer class="lp-foot">
+      <a class="lp-wordmark" href={t.base}>canon</a>
+      <p class="lp-foot-status">{t.footer.status}</p>
+      <nav class="lp-foot-lang" aria-label={t.footer.language}>
+        <a href="/" hreflang="en" lang="en" aria-current={lang === "en" ? "page" : undefined}>English</a>
+        <a href="/ko/" hreflang="ko" lang="ko" aria-current={lang === "ko" ? "page" : undefined}>한국어</a>
+      </nav>
+      <a class="lp-foot-gh" href={t.nav.github.href}>{t.nav.github.text}</a>
+    </footer>
+
+    <script>
+      for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
+        const label = btn.querySelector<HTMLElement>("[data-copy-text]");
+        const status = btn.parentElement?.querySelector<HTMLElement>("[data-copy-status]");
+        const original = label?.textContent ?? "";
+        let timer = 0;
+        btn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(btn.dataset.copy ?? "");
+          } catch {
+            return;
+          }
+          if (label) label.textContent = btn.dataset.copied ?? original;
+          if (status) status.textContent = btn.dataset.copied ?? "";
+          btn.classList.add("is-copied");
+          clearTimeout(timer);
+          timer = window.setTimeout(() => {
+            if (label) label.textContent = original;
+            if (status) status.textContent = "";
+            btn.classList.remove("is-copied");
+          }, 1600);
+        });
+      }
+    </script>
+  </body>
+</html>

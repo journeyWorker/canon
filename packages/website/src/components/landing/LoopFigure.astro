@@ -1,0 +1,41 @@
+---
+// Fig. 2: the loop as six stations on one rule, with the return path from
+// learning back to intent drawn underneath.
+import type { Strings } from "./strings";
+
+interface Props {
+  t: Strings;
+}
+const { t } = Astro.props;
+const { loop } = t;
+---
+
+<section class="lp-sec lp-loop" aria-labelledby="loop-h">
+  <h2 class="lp-h2" id="loop-h">{loop.heading}</h2>
+  <figure class="fig2">
+    <figcaption class="lp-cap">
+      <span>{loop.number}</span>
+      <span>{loop.title}</span>
+    </figcaption>
+    <ol class="fig2-track">
+      {
+        loop.stations.map((s) => (
+          <li class:list={["fig2-st", { "is-gate": s.name === "gate" }]} id={`loop-${s.name}`}>
+            <span class="fig2-node" aria-hidden="true" />
+            <h3 class="fig2-name">
+              <a href={s.href}>{s.name}</a>
+            </h3>
+            {s.lines.map((line) => (
+              <p>{line}</p>
+            ))}
+          </li>
+        ))
+      }
+    </ol>
+    <div class="fig2-return" aria-hidden="true">
+      <svg viewBox="0 0 12 12" width="12" height="12">
+        <path d="M6 0 0 9h12z" />
+      </svg>
+    </div>
+  </figure>
+</section>

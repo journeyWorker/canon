@@ -1,0 +1,20 @@
+/* canon — Grid Manual. Shared tokens for the landing page and the Starlight docs. */
+
+@import "@fontsource-variable/spline-sans";
+@import "@fontsource-variable/inconsolata";
+@import "@fontsource-variable/noto-sans-kr";
+
+:root {
+  --c-ground: #f3f3ef;
+  --c-ink: #0b0b0b;
+  --c-ink-2: #4a4a45;
+  --c-signal: #ff4a1c;
+  --c-rule: #b4b6b1;
+  --c-rule-soft: #d9dad4;
+  --c-paper: #ffffff;
+
+  --f-sans: "Spline Sans Variable", "Noto Sans KR Variable", "Apple SD Gothic Neo",
+    "Malgun Gothic", system-ui, sans-serif;
+  --f-mono: "Inconsolata Variable", "Noto Sans KR Variable", ui-monospace, "SFMono-Regular", Menlo,
+    monospace;
+}

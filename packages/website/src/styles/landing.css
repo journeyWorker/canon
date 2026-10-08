@@ -1,0 +1,1015 @@
+/* canon landing — Grid Manual.
+   One unit, --u, is a pixel of the 1536x1024 comp; the first viewport scales
+   with whichever of width or height runs out first. */
+
+.lp {
+  --u: min(calc(100vw / 1536), calc(100svh / 1024), 1.35px);
+  --m: calc(32 * var(--u));
+  --gutter: calc(25 * var(--u));
+  margin: 0;
+  position: relative;
+  background: var(--c-ground);
+  color: var(--c-ink);
+  font-family: var(--f-sans);
+  font-size: 18px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+}
+
+.lp *,
+.lp *::before,
+.lp *::after {
+  box-sizing: border-box;
+}
+
+.lp ::selection {
+  background: var(--c-signal);
+  color: var(--c-ink);
+}
+
+.lp a {
+  color: inherit;
+}
+
+.lp :focus-visible {
+  outline: 2px solid var(--c-signal);
+  outline-offset: 3px;
+}
+
+.lp-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Column rules: twelve hairline columns over the whole page ---------- */
+
+.lp-rules {
+  position: absolute;
+  inset: 0 var(--m);
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lp-rules span {
+  border-inline-start: 1px solid var(--c-rule);
+}
+
+.lp-rules span:last-child {
+  border-inline-end: 1px solid var(--c-rule);
+}
+
+/* ---------- First viewport ---------- */
+
+.lp-first {
+  position: relative;
+  z-index: 1;
+  height: calc(1024 * var(--u));
+  min-height: 600px;
+  padding-inline: var(--m);
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: calc(123 * var(--u)) 1fr calc(76 * var(--u));
+}
+
+.lp-head {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+  padding: calc(17 * var(--u)) var(--m) 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.lp-wordmark {
+  margin-inline-start: var(--gutter);
+  font-weight: 700;
+  font-size: calc(34 * var(--u));
+  line-height: 1;
+  letter-spacing: -0.035em;
+  text-decoration: none;
+}
+
+.lp-nav {
+  display: flex;
+  gap: calc(34 * var(--u));
+  margin-inline-end: calc(33 * var(--u));
+  padding-top: calc(5 * var(--u));
+  font-size: max(14px, calc(19 * var(--u)));
+  line-height: 1.2;
+}
+
+.lp-nav a {
+  text-decoration: none;
+  text-underline-offset: 0.25em;
+  text-decoration-thickness: 1px;
+}
+
+.lp-nav a:hover {
+  text-decoration-line: underline;
+}
+
+.lp-hero {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-content: start;
+}
+
+.lp-hero-copy {
+  grid-column: 1 / 8;
+  padding-inline-start: var(--gutter);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.lp-headline {
+  margin: calc(57 * var(--u)) 0 0;
+  margin-inline-start: calc(-3 * var(--u));
+  font-weight: 700;
+  font-size: calc(103 * var(--u));
+  line-height: 1.15;
+  letter-spacing: -0.045em;
+  -webkit-text-stroke: 0.014em currentColor;
+  white-space: nowrap;
+}
+
+.lp-headline span {
+  display: block;
+}
+
+.lp-headline:lang(ko) {
+  font-size: calc(86 * var(--u));
+  letter-spacing: -0.02em;
+  margin-top: calc(40 * var(--u));
+  word-break: keep-all;
+}
+
+.lp-subline {
+  margin: calc(43 * var(--u)) 0 0;
+  font-size: max(16px, calc(25 * var(--u)));
+  font-weight: 450;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.lp-command {
+  margin-top: calc(26 * var(--u));
+  width: calc(681 * var(--u));
+  height: calc(68 * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: calc(21 * var(--u));
+  background: var(--c-ink);
+  color: var(--c-ground);
+}
+
+.lp-command code {
+  font-family: var(--f-mono);
+  font-size: calc(26.5 * var(--u));
+  letter-spacing: 0;
+}
+
+.lp-copy {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: calc(6 * var(--u)) 0;
+  background: none;
+  color: inherit;
+  font-family: var(--f-mono);
+  font-size: calc(26.5 * var(--u));
+  cursor: pointer;
+}
+
+.lp-copy:hover,
+.lp-copy.is-copied {
+  color: var(--c-signal);
+}
+
+.lp-guide {
+  margin-top: calc(30 * var(--u));
+  display: inline-flex;
+  align-items: center;
+  gap: calc(7 * var(--u));
+  font-size: max(15px, calc(22.5 * var(--u)));
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  text-decoration: none;
+  padding-bottom: 0;
+  border-bottom: calc(2 * var(--u)) solid currentColor;
+}
+
+.lp-guide svg {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+
+.lp-guide:hover {
+  color: var(--c-signal);
+}
+
+/* ---------- Fig. 1 ---------- */
+
+.fig1 {
+  grid-column: 8 / -1;
+  margin: 0 calc(14 * var(--u));
+  height: calc(768 * var(--u));
+  padding: calc(22 * var(--u)) calc(24 * var(--u)) calc(27 * var(--u)) calc(25 * var(--u));
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background: var(--c-signal);
+  color: var(--c-ink);
+}
+
+.fig1-caption {
+  display: flex;
+  gap: calc(14 * var(--u));
+  font-family: var(--f-mono);
+  font-size: max(12px, calc(20 * var(--u)));
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.fig1-plot {
+  position: relative;
+  height: calc(552 * var(--u));
+  margin-top: calc(23 * var(--u));
+  touch-action: pan-y;
+}
+
+.fig1-chart,
+.fig1-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.fig1.has-canvas .fig1-chart {
+  visibility: hidden;
+}
+
+.fig1-lines line {
+  stroke: var(--c-ink);
+  stroke-width: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.fig1-gaps line {
+  stroke: var(--c-paper);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.fig1-total {
+  margin: 0;
+  align-self: end;
+  font-weight: 700;
+  font-size: calc(111 * var(--u));
+  line-height: 0.8;
+  letter-spacing: -0.05em;
+  -webkit-text-stroke: 0.014em currentColor;
+  white-space: nowrap;
+}
+
+/* ---------- Stations ---------- */
+
+.lp-stations {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  list-style: none;
+  margin: 0;
+  padding: calc(16 * var(--u)) calc(30 * var(--u)) 0 var(--gutter);
+  border-top: calc(1.5 * var(--u)) solid var(--c-ink);
+  display: flex;
+  justify-content: space-between;
+  font-size: max(13px, calc(19 * var(--u)));
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.lp-stations a {
+  text-decoration: none;
+  text-underline-offset: 0.25em;
+}
+
+.lp-stations a:hover {
+  text-decoration-line: underline;
+}
+
+/* ---------- Sections: same grid, same rules, one black rule over each heading ---------- */
+
+.lp-sec {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  padding: clamp(96px, 10vw, 168px) var(--m) 0;
+}
+
+.lp-h2 {
+  grid-column: 1 / -1;
+  margin: 0 0 clamp(36px, 4vw, 64px);
+  padding: 18px var(--gutter) 0;
+  border-top: 1.5px solid var(--c-ink);
+  font-size: clamp(40px, 4.3vw, 66px);
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  -webkit-text-stroke: 0.01em currentColor;
+  text-wrap: balance;
+}
+
+.lp-h2:lang(ko) {
+  letter-spacing: -0.02em;
+  word-break: keep-all;
+}
+
+.lp-h3 {
+  margin: 0 0 16px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.lp-cap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0 0 20px;
+  padding-inline-start: var(--gutter);
+  font-family: var(--f-mono);
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.lp-lead {
+  grid-column: 1 / 9;
+  margin: 0 0 clamp(40px, 4vw, 64px);
+  padding-inline-start: var(--gutter);
+  max-width: 44ch;
+  font-size: clamp(20px, 1.6vw, 25px);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  text-wrap: pretty;
+}
+
+/* ---------- Fig. 2: the loop ---------- */
+
+.fig2 {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.fig2-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border-top: 2px solid var(--c-ink);
+}
+
+.fig2-st {
+  position: relative;
+  padding: 30px var(--gutter) 0;
+}
+
+.fig2-node {
+  position: absolute;
+  top: -8px;
+  left: -6px;
+  width: 14px;
+  height: 14px;
+  background: var(--c-ink);
+}
+
+.fig2-st:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: -7px;
+  right: 14px;
+  width: 10px;
+  height: 12px;
+  background: var(--c-ink);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.fig2-st.is-gate .fig2-node {
+  top: -13px;
+  left: -11px;
+  width: 24px;
+  height: 24px;
+  background: var(--c-signal);
+}
+
+.fig2-name {
+  margin: 0 0 12px;
+  font-size: clamp(24px, 2.1vw, 32px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.fig2-name a {
+  text-decoration: none;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 2px;
+}
+
+.fig2-name a:hover {
+  text-decoration-line: underline;
+}
+
+.fig2-st p {
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.fig2-st p:lang(ko) {
+  word-break: keep-all;
+}
+
+.fig2-return {
+  position: relative;
+  width: calc(100% * 5 / 6);
+  height: 40px;
+  margin-top: 28px;
+  border: 2px solid var(--c-ink);
+  border-top: 0;
+}
+
+.fig2-return svg {
+  position: absolute;
+  top: -12px;
+  left: -7px;
+  fill: var(--c-ink);
+}
+
+/* ---------- Fig. 3: comparison ---------- */
+
+.fig3 {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.fig3-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.fig3-table .c-tool,
+.fig3-table .c-src {
+  width: calc(100% / 6);
+}
+
+.fig3-table .c-owns,
+.fig3-table .c-checks {
+  width: calc(100% / 3);
+}
+
+.fig3-table th,
+.fig3-table td {
+  padding: 16px var(--gutter) 22px;
+  border-top: 1px solid var(--c-ink);
+  text-align: start;
+  vertical-align: top;
+  text-wrap: pretty;
+}
+
+.fig3-table:lang(ko) td {
+  word-break: keep-all;
+}
+
+.fig3-table thead th {
+  padding-block: 12px;
+  border-top: 2px solid var(--c-ink);
+  font-family: var(--f-mono);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.fig3-table tbody th {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.fig3-table tbody tr:last-child > * {
+  border-bottom: 1px solid var(--c-ink);
+}
+
+.fig3-table tr.is-canon > * {
+  background: var(--c-signal);
+}
+
+.fig3-note {
+  display: block;
+  margin-top: 10px;
+  font-family: var(--f-mono);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.fig3-src {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--f-mono);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.fig3-src a,
+.lp-docs-list a,
+.lp-foot a {
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+.fig3-src a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.fig3-foot {
+  margin: 14px 0 0;
+  padding-inline-start: var(--gutter);
+  font-family: var(--f-mono);
+  font-size: 14px;
+  color: var(--c-ink-2);
+}
+
+/* ---------- Quick start ---------- */
+
+.lp-quick-body {
+  grid-column: 1 / 11;
+  padding-inline-start: var(--gutter);
+  min-width: 0;
+}
+
+.lp-code {
+  margin: 0;
+  padding: 22px 26px;
+  overflow-x: auto;
+  background: var(--c-ink);
+  color: var(--c-ground);
+  font-family: var(--f-mono);
+  font-size: 17px;
+  line-height: 1.6;
+  scrollbar-color: #5c5c57 var(--c-ink);
+}
+
+.lp-code .ln {
+  display: block;
+  white-space: pre;
+}
+
+.lp-code .cm {
+  color: #a3a39b;
+}
+
+.lp-code ::selection {
+  background: var(--c-signal);
+  color: var(--c-ink);
+}
+
+.lp-after {
+  max-width: 62ch;
+  margin: 22px 0 56px;
+  font-size: 18px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* ---------- Limits ---------- */
+
+.lp-limits-col {
+  grid-column: span 6;
+  padding-inline: var(--gutter);
+}
+
+.lp-list-lead {
+  margin: 0 0 14px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.lp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.lp-list li {
+  padding: 12px 0 14px;
+  border-top: 1px solid var(--c-ink);
+}
+
+.lp-list li:last-child {
+  border-bottom: 1px solid var(--c-ink);
+}
+
+.lp-statement {
+  grid-column: 1 / 10;
+  margin: clamp(56px, 6vw, 96px) 0 0;
+  padding-inline-start: var(--gutter);
+  font-size: clamp(26px, 2.5vw, 38px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.lp-statement:lang(ko) {
+  letter-spacing: -0.015em;
+  word-break: keep-all;
+}
+
+/* ---------- Docs index ---------- */
+
+.lp-docs-list {
+  grid-column: 1 / -1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lp-docs-list li {
+  border-top: 1px solid var(--c-ink);
+}
+
+.lp-docs-list li:last-child {
+  border-bottom: 1px solid var(--c-ink);
+}
+
+.lp-docs-list a {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  padding: 16px 0 20px;
+  text-decoration: none;
+}
+
+.lp-docs-title {
+  grid-column: 1 / 5;
+  padding-inline-start: var(--gutter);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.lp-docs-desc {
+  grid-column: 5 / 12;
+  padding-inline-start: var(--gutter);
+  font-size: 17px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.lp-docs-list a:hover {
+  background: var(--c-signal);
+}
+
+/* ---------- Footer ---------- */
+
+.lp-foot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  align-items: baseline;
+  margin: clamp(120px, 12vw, 200px) var(--m) 0;
+  padding: 18px 0 64px;
+  border-top: 1.5px solid var(--c-ink);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.lp-foot .lp-wordmark {
+  grid-column: 1 / 3;
+  font-size: 26px;
+}
+
+.lp-foot-status {
+  grid-column: 3 / 9;
+  margin: 0;
+  padding-inline-start: var(--gutter);
+  max-width: 52ch;
+}
+
+.lp-foot-lang {
+  grid-column: 9 / 12;
+  display: flex;
+  gap: 20px;
+  padding-inline-start: var(--gutter);
+}
+
+.lp-foot-lang a[aria-current="page"] {
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.lp-foot-gh {
+  grid-column: 12 / 13;
+  padding-inline-start: var(--gutter);
+}
+
+/* ---------- Narrow screens: one column, four rules ---------- */
+
+@media (max-width: 900px) {
+  .lp {
+    --m: 16px;
+    --gutter: 12px;
+  }
+
+  .lp-rules {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .lp-rules span:nth-child(n + 5) {
+    display: none;
+  }
+
+  .lp-rules span:nth-child(4) {
+    border-inline-end: 1px solid var(--c-rule);
+  }
+
+  .lp-head {
+    padding: 16px var(--m) 0;
+    align-items: center;
+  }
+
+  .lp-wordmark {
+    font-size: 26px;
+  }
+
+  .lp-nav {
+    gap: 14px;
+    margin-inline-end: var(--gutter);
+    padding-top: 0;
+    font-size: 15px;
+  }
+
+  .lp-first {
+    height: auto;
+    min-height: 0;
+    display: block;
+    padding: 92px var(--m) 0;
+  }
+
+  .lp-hero {
+    display: block;
+  }
+
+  .lp-headline,
+  .lp-headline:lang(ko) {
+    margin: 0;
+    font-size: calc((100vw - 2 * var(--m) - 2 * var(--gutter)) / 8.3);
+    line-height: 1.1;
+    white-space: normal;
+  }
+
+  .lp-headline:lang(ko) {
+    font-size: calc((100vw - 2 * var(--m) - 2 * var(--gutter)) / 9.6);
+  }
+
+  .lp-subline {
+    margin-top: 24px;
+    font-size: 18px;
+  }
+
+  .lp-command {
+    width: 100%;
+    height: 56px;
+    margin-top: 20px;
+    padding-inline: 16px;
+  }
+
+  .lp-command code,
+  .lp-copy {
+    font-size: 16px;
+  }
+
+  .lp-copy {
+    padding: 12px 0 12px 12px;
+  }
+
+  .lp-guide {
+    margin-top: 24px;
+    font-size: 17px;
+    border-bottom-width: 1.5px;
+  }
+
+  .lp-guide svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .fig1 {
+    margin: 48px 0 0;
+    height: auto;
+    padding: 16px 16px 20px;
+  }
+
+  .fig1-caption {
+    gap: 10px;
+    font-size: 14px;
+    white-space: normal;
+  }
+
+  .fig1-plot {
+    height: 300px;
+    margin-top: 16px;
+  }
+
+  .fig1-total {
+    margin-top: 28px;
+    font-size: calc((100vw - 2 * var(--m) - 32px) / 5.1);
+  }
+
+  .lp-stations {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px 0;
+    margin-top: 40px;
+    padding: 14px var(--gutter) 0;
+    border-top-width: 1.5px;
+    font-size: 15px;
+  }
+
+  .lp-sec {
+    display: block;
+    padding-top: 88px;
+  }
+
+  .lp-h2 {
+    font-size: 34px;
+  }
+
+  .lp-lead {
+    font-size: 19px;
+  }
+
+  .fig2-track {
+    grid-template-columns: 1fr;
+    border-top: 0;
+    border-inline-start: 2px solid var(--c-ink);
+    margin-inline-start: 8px;
+  }
+
+  .fig2-st {
+    padding: 0 var(--gutter) 28px 26px;
+  }
+
+  .fig2-node {
+    top: 6px;
+    left: -8px;
+  }
+
+  .fig2-st.is-gate .fig2-node {
+    top: 1px;
+    left: -13px;
+  }
+
+  .fig2-st:not(:last-child)::after {
+    top: auto;
+    bottom: 6px;
+    right: auto;
+    left: -7px;
+    width: 12px;
+    height: 10px;
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+  }
+
+  .fig2-return {
+    display: none;
+  }
+
+  .fig3-table,
+  .fig3-table tbody,
+  .fig3-table tr,
+  .fig3-table th,
+  .fig3-table td {
+    display: block;
+    width: auto;
+  }
+
+  .fig3-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .fig3-table tr {
+    border-top: 2px solid var(--c-ink);
+    padding-bottom: 12px;
+  }
+
+  .fig3-table th,
+  .fig3-table td {
+    border-top: 0;
+    padding: 8px var(--gutter) 6px;
+  }
+
+  .fig3-table tbody th {
+    padding-top: 14px;
+  }
+
+  .fig3-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-family: var(--f-mono);
+    font-size: 13px;
+  }
+
+  .fig3-table tbody tr:last-child > * {
+    border-bottom: 0;
+  }
+
+  .fig3-table tr.is-canon {
+    background: var(--c-signal);
+  }
+
+  .fig3-src li {
+    display: inline;
+    margin-inline-end: 14px;
+  }
+
+  .lp-quick-body {
+    padding-inline-start: 0;
+  }
+
+  .lp-code {
+    font-size: 14px;
+    padding: 16px;
+  }
+
+  .lp-limits-col + .lp-limits-col {
+    margin-top: 36px;
+  }
+
+  .lp-docs-list a {
+    display: block;
+    padding: 14px var(--gutter) 16px;
+  }
+
+  .lp-docs-title,
+  .lp-docs-desc {
+    display: block;
+    padding: 0;
+  }
+
+  .lp-docs-title {
+    font-size: 21px;
+    margin-bottom: 4px;
+  }
+
+  .lp-docs-desc {
+    font-size: 16px;
+  }
+
+  .lp-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 24px;
+    margin-top: 96px;
+    padding-inline: var(--gutter);
+  }
+
+  .lp-foot-status {
+    flex-basis: 100%;
+    order: 2;
+    padding: 0;
+  }
+
+  .lp-foot-lang,
+  .lp-foot-gh {
+    padding: 0;
+  }
+}
