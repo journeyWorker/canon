@@ -217,7 +217,7 @@
 }
 
 .lp-guide:hover {
-  color: var(--c-signal);
+  border-bottom-color: var(--c-signal);
 }
 
 /* ---------- Fig. 1 ---------- */

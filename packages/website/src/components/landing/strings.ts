@@ -33,6 +33,7 @@ const en = {
     title: "canon's own corpus",
     scenarios: (n: number) => `${n} scenarios`,
     violations: (n: number) => (n === 1 ? "1 violation" : `${n} violations`),
+    unknown: "gate result unavailable",
   },
   stations: ["intent", "run", "evidence", "gate", "decision", "learning"],
 
@@ -234,6 +235,7 @@ const ko: Strings = {
     title: "canon 자체 코퍼스",
     scenarios: (n: number) => `시나리오 ${n}개`,
     violations: (n: number) => `위반 ${n}건`,
+    unknown: "gate 결과 없음",
   },
   stations: ["의도", "실행", "증거", "게이트", "결정", "학습"],
 
@@ -349,7 +351,7 @@ const ko: Strings = {
     heading: "60초 만에 확인하기",
     demo: en.quick.demo,
     after:
-      "리뷰어 증거가 도착하는 순간 게이트가 red에서 green으로 바뀌는 것을 확인하세요 — 시나리오, 리뷰 레코드, regime key가 무엇인지 몰라도 이 흐름을 볼 수 있습니다.",
+      "리뷰어 증거가 도착하는 순간 게이트가 red에서 green으로 바뀌는 것을 확인하세요 — 시나리오, 리뷰 레코드, regime key 없이도 이 흐름을 볼 수 있습니다.",
     anyRepo: "어느 레포에서든",
     repo: [
       "# 하나의 Rust 코어, npm으로 배포",
