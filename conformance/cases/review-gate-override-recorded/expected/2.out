@@ -1,0 +1,36 @@
+{
+  "count": 1,
+  "kind": "subject",
+  "records": [
+    {
+      "actor": {
+        "agent_id": "canon",
+        "role": "implementer"
+      },
+      "at": "<ts>",
+      "change_ids": [
+        "c-cart"
+      ],
+      "domain": "dev",
+      "kind": "subject",
+      "owner_role": "implementer",
+      "schema": 1,
+      "status": "verifying",
+      "status_override": {
+        "actor": {
+          "agent_id": "lead"
+        },
+        "checks": [
+          "unreviewed-promotion"
+        ],
+        "reason": "reviewer out until Monday",
+        "to": "verifying"
+      },
+      "subject_id": "cart",
+      "summary": "",
+      "title": "Cart"
+    }
+  ],
+  "since": null,
+  "violations": 0
+}

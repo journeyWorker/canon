@@ -1,0 +1,10 @@
+description: "An open blocker finding on a subject's adopted change refuses `canon subject status <id> verifying` with `open-blocker` (exit 1); once its `finding close --disposition fixed` (staged in the fixture by the real command, since the case repo holds no commit to name) is promoted, the same transition exits 0 and `canon gate check` is clean"
+steps:
+  - args: [subject, status, cart, verifying]
+    exit: 1
+  - args: [gate, promote]
+    exit: 0
+  - args: [subject, status, cart, verifying]
+    exit: 0
+  - args: [gate, check]
+    exit: 0

@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "impl-agent",
+    "role": "reviewer"
+  },
+  "at": "2026-10-08T17:56:52.513023Z",
+  "kind": "review",
+  "pin": "r1",
+  "project_id": "root",
+  "provenance_ref": {
+    "original_spec_ref": "specs/features/kind=feature/area=cart/add.feature"
+  },
+  "reviewer": "reviewer-2",
+  "scenario_id": "cart.add.01",
+  "schema": 1
+}

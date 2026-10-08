@@ -1,0 +1,5 @@
+canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
+canon subject status:   ran unreviewed-promotion — every owned scenario needs a review by an actor other than its evidence actor
+canon subject status:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
+canon subject status: open-blocker c-cart#1.1 — building → verifying: open blocker finding by `reviewer-2` on change `c-cart` (subject `cart`): adding an item twice duplicates the line; fix it and `canon finding close --disposition fixed --resolution-sha <sha>`, or close it as rejected or deferred
+canon subject status: refused — record an independent review (`canon review add`) and close blocker findings, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject and `canon gate check` keeps listing these gaps

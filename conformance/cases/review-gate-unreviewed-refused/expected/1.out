@@ -1,0 +1,4 @@
+canon gate check: 1 violation(s)
+
+unreviewed-promotion (1):
+  unreviewed-promotion cart.add.01 — no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review add`) once its subject is claimed done

@@ -1,0 +1,4 @@
+spec_coverage:
+  require_evidence: true
+  require_review:
+    distinct_actor: true

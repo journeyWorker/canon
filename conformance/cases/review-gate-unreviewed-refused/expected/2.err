@@ -1,0 +1,5 @@
+canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
+canon subject status:   ran unreviewed-promotion — every owned scenario needs a review by an actor other than its evidence actor
+canon subject status:   ran open-blocker — 0 adopted change(s) checked for open blocker findings
+canon subject status: unreviewed-promotion wishlist.save.01 — building → verifying: no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review add`) once its subject is claimed done
+canon subject status: refused — record an independent review (`canon review add`) and close blocker findings, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject and `canon gate check` keeps listing these gaps
