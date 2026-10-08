@@ -140,7 +140,7 @@ const en = {
       {
         tool: "canon",
         owns: "Records and verifies intent, evidence, policy, approvals, and run lineage; it does not execute agent actions.",
-        checks: "Completion is gated on evidence that exists, is attributed, and is fresh — never on a self-report.",
+        checks: "Completion is gated on evidence that exists, is attributed, and is fresh. A policy can also require an independent review per scenario (spec_coverage.require_review, 0.12.0).",
         note: "Experimental (0.11.0, off by default): evidence binding to artifacts and JUnit/Cucumber reports.",
         sources: [
           { label: "Trust spine", href: "/concepts/trust-spine/" },
@@ -336,7 +336,7 @@ const ko: Strings = {
       {
         tool: "canon",
         owns: "intent, 증거, policy, 승인, run lineage를 기록하고 검증합니다. 에이전트의 행동을 실행하지는 않습니다.",
-        checks: "완료는 자가 보고가 아니라, 존재하고 귀속되며 최신인(fresh) evidence로 게이트됩니다.",
+        checks: "완료는 존재하고 귀속되며 최신인(fresh) evidence로 게이트됩니다. 정책으로 시나리오마다 독립 리뷰를 요구할 수도 있습니다(spec_coverage.require_review, 0.12.0).",
         note: "실험 기능(0.11.0, 기본값 off): 아티팩트와 JUnit/Cucumber 리포트에 대한 증거 바인딩.",
         sources: [
           { label: "트러스트 스파인", href: "/ko/concepts/trust-spine/" },
