@@ -1,0 +1,4 @@
+description: "`experimental.evidence_binding` with `mode: warn` keeps `canon gate check` at exit 0 and lists each scenario below the required strength as a `warn` advisory under the distribution line"
+steps:
+  - args: [gate, check]
+    exit: 0

@@ -1,0 +1,4 @@
+description: "`experimental.evidence_binding` with `mode: require` makes `canon gate check` exit 1 with an `uncovered-cell` line per scenario below the required strength, followed by the distribution line"
+steps:
+  - args: [gate, check]
+    exit: 1

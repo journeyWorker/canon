@@ -1,0 +1,1 @@
+canon evidence add: refused — --summary carries the line separator '\n' at byte offset 10; it is written into a plan document as ONE checkbox row, so a separator there appends a second row (a `- [x] ` one, if the value says so) that no evidence record backs

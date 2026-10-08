@@ -1,0 +1,4 @@
+description: "`experimental.evidence_binding` with `mode: off` adds nothing to `canon gate check`: an attested-only scenario stays clean (exit 0) and no binding block is printed"
+steps:
+  - args: [gate, check]
+    exit: 0

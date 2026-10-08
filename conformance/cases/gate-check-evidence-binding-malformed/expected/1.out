@@ -1,0 +1,4 @@
+canon gate check: 1 violation(s)
+
+uncovered-cell (1):
+  uncovered-cell experimental.evidence_binding — `experimental.evidence_binding` is present but invalid (`strict` is not a valid value for `mode` (expected one of: off, warn, require)); fix it or remove it — a broken section never reads as off

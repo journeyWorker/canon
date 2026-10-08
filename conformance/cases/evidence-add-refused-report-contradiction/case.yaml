@@ -1,0 +1,6 @@
+description: "`canon evidence add --report` exits 1 when the report records the matched case as failed but the verdict is faithful, and stages nothing"
+steps:
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, cargo test, --role, implementer, --report, "junit:reports/junit.xml"]
+    exit: 1
+  - args: [gate, promote]
+    exit: 0

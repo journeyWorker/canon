@@ -1,0 +1,6 @@
+canon gate check: 1 violation(s)
+
+uncovered-cell (1):
+  uncovered-cell cart.add.02 — latest evidence is attested but experimental evidence binding requires artifact — bind it with `canon evidence add --artifact <path>` or `--report <junit|cucumber>:<path>`
+
+experimental evidence binding (require, requires artifact): report 1, artifact 0, attested-only 1
