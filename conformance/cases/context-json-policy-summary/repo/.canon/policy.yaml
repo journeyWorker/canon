@@ -1,0 +1,9 @@
+risk_routing:
+  reviewer: true
+spec_coverage:
+  require_evidence: true
+  scope: [verifying, shipped]
+  require_cases: [failure]
+experimental:
+  evidence_binding:
+    mode: strict

@@ -1,0 +1,667 @@
+{
+  "capabilityVersion": 3,
+  "kinds": {
+    "change": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "change_id": true,
+        "kind": true,
+        "schema": true,
+        "status": true,
+        "subject_id": false,
+        "summary": true,
+        "title": true
+      },
+      "partition": {
+        "template": "kind={kind}/{id}.json",
+        "area_scoped": false
+      }
+    },
+    "divergence": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "detail": false,
+        "kind": true,
+        "project_id": true,
+        "reviewer": true,
+        "round": true,
+        "run_seq": true,
+        "scenario_id": true,
+        "schema": true,
+        "sha": true,
+        "status": true
+      },
+      "partition": {
+        "template": "kind={kind}/area={area}/{id}.json",
+        "area_scoped": true
+      }
+    },
+    "event": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "detail": false,
+        "kind": true,
+        "label": true,
+        "run_id": true,
+        "schema": true,
+        "seq": true
+      },
+      "partition": {
+        "template": "kind={kind}/{id}.json",
+        "area_scoped": false
+      }
+    },
+    "evidence_record": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "approval": false,
+        "at": true,
+        "attachments": false,
+        "evidence_sha": false,
+        "flagged": false,
+        "kind": true,
+        "lifecycle": false,
+        "project_id": false,
+        "run_id": false,
+        "run_seq": false,
+        "scenario_id": false,
+        "schema": true,
+        "surface_ref": false,
+        "task_id": false,
+        "verdict": true
+      },
+      "partition": {
+        "template": "kind={kind}/{id}.json",
+        "area_scoped": false
+      }
+    },
+    "finding": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "change_id": true,
+        "disposition": true,
+        "file_ref": false,
+        "introduced_by": false,
+        "kind": true,
+        "resolution_sha": false,
+        "reviewed_sha": false,
+        "reviewer": true,
+        "round": true,
+        "schema": true,
+        "seq": true,
+        "severity": true,
+        "summary": true
+      },
+      "partition": {
+        "template": "kind={kind}/{id}.json",
+        "area_scoped": false
+      }
+    },
+    "handoff": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "abandoned_at": false,
+        "actor": true,
+        "at": true,
+        "body": true,
+        "chain_id": true,
+        "claimed_at": false,
+        "claimed_by": false,
+        "completed_at": false,
+        "from_role": false,
+        "id": true,
+        "kind": true,
+        "openspec_change_slug": false,
+        "parent_handoff_id": false,
+        "research_vendor_slug": false,
+        "schema": true,
+        "seq": true,
+        "state": true,
+        "tags": false,
+        "title": true,
+        "to_role": false
+      },
+      "partition": {
+        "template": "kind={kind}/{id}.json",
+        "area_scoped": false
+      }
+    },
+    "review": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "kind": true,
+        "pin": true,
+        "project_id": true,
+        "provenance_ref": true,
+        "reviewer": true,
+        "scenario_id": true,
+        "schema": true
+      },
+      "partition": {
+        "template": "kind={kind}/area={area}/{id}.json",
+        "area_scoped": true
+      }
+    },
+    "run": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "ended_at": false,
+        "injected_guidance": false,
+        "kind": true,
+        "lineage": false,
+        "parent_run_id": false,
+        "run_id": true,
+        "schema": true,
+        "session_id": false,
+        "started_at": true,
+        "status": true,
+        "task_id": false
+      },
+      "partition": {
+        "template": "kind={kind}/{id}.json",
+        "area_scoped": false
+      }
+    },
+    "scenario": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "case": false,
+        "description": false,
+        "kind": true,
+        "lane": false,
+        "project_id": true,
+        "scenario_id": true,
+        "schema": true,
+        "source_digest": true,
+        "subject_id": false,
+        "title": true
+      },
+      "partition": {
+        "template": "kind={kind}/area={area}/{id}.json",
+        "area_scoped": true
+      }
+    },
+    "session": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "client": true,
+        "ended_at": false,
+        "kind": true,
+        "project_key": false,
+        "schema": true,
+        "session_id": true,
+        "started_at": true,
+        "workspace_key": false,
+        "workspace_label": false
+      },
+      "partition": {
+        "template": "kind={kind}/{id}.json",
+        "area_scoped": false
+      }
+    },
+    "strategy_item": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "content": true,
+        "kind": true,
+        "regime_key": true,
+        "role": true,
+        "schema": true,
+        "source_task_id": false
+      },
+      "partition": {
+        "template": "kind={kind}/{id}.json",
+        "area_scoped": false
+      }
+    },
+    "subject": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "change_ids": false,
+        "domain": true,
+        "kind": true,
+        "owner_role": true,
+        "schema": true,
+        "status": true,
+        "subject_id": true,
+        "summary": true,
+        "title": true
+      },
+      "partition": {
+        "template": "kind={kind}/{id}.json",
+        "area_scoped": false
+      }
+    },
+    "task": {
+      "schema_version": 2,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "depends_on": false,
+        "evidence_note": false,
+        "kind": true,
+        "scenario_refs": false,
+        "schema": true,
+        "status": true,
+        "task_id": true,
+        "title": true
+      },
+      "partition": {
+        "template": "kind={kind}/{id}.json",
+        "area_scoped": false
+      }
+    },
+    "trajectory": {
+      "schema_version": 1,
+      "envelope_fields": {
+        "actor": true,
+        "at": true,
+        "kind": true,
+        "pr": false,
+        "reward": false,
+        "run_id": true,
+        "schema": true,
+        "session_id": false,
+        "sha": false,
+        "task_id": false
+      },
+      "partition": {
+        "template": "kind={kind}/{id}.json",
+        "area_scoped": false
+      }
+    }
+  },
+  "enums": {
+    "ChangeStatus": [
+      "archived",
+      "completed",
+      "in_progress",
+      "proposed"
+    ],
+    "EvidenceVerdict": [
+      "divergent",
+      "faithful",
+      "not_applicable"
+    ],
+    "FindingDisposition": [
+      "deferred",
+      "fixed",
+      "open",
+      "rejected"
+    ],
+    "FindingSeverity": [
+      "blocker",
+      "note",
+      "should_fix"
+    ],
+    "HandoffState": [
+      "abandoned",
+      "done",
+      "in-progress",
+      "pending"
+    ],
+    "ReportOutcome": [
+      "failed",
+      "passed",
+      "skipped"
+    ],
+    "RunStatus": [
+      "aborted",
+      "failed",
+      "pending",
+      "running",
+      "succeeded"
+    ],
+    "SubjectStatus": [
+      "building",
+      "proposed",
+      "retired",
+      "shipped",
+      "specced",
+      "verifying"
+    ],
+    "TaskStatus": [
+      "done",
+      "open"
+    ],
+    "TrustLifecycle": [
+      "draft",
+      "ratified",
+      "reviewed"
+    ]
+  },
+  "joinKeys": {
+    "change_id": "openspec change slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the directory name under `openspec/changes/`",
+    "handoff_id": "the donor CLI's handoff-id grammar: `YYYYMMDD-HHmm-<topic-slug>-<nonce>`",
+    "regime_key": "`<role>/<repo>/<area>/<hash>`, four `/`-separated segments, the last a lowercase-hex digest",
+    "run_id": "ULID (Crockford base32, 26 chars) — `ulid::Ulid`",
+    "scenario_id": "`<area>.<surface>.<nn>` — `[a-z0-9-]+\\.[a-z0-9-]+\\.\\d{2,}`; never renumbered once assigned",
+    "session_id": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format",
+    "sha / pr": "git commit SHA-1: exactly 40 lowercase hex characters",
+    "subject_id": "subject slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the durable product-unit identifier",
+    "task_id": "`<change_id>#<n>`, where `<n>` is one or more dot-separated integers (`1`, `1.1`, `6.2`) matching `tasks.md`'s own numbering"
+  },
+  "policy": {
+    "trust_required": {},
+    "trust_sample": {},
+    "staleness": {
+      "max_commits_behind": {
+        "kind": "flat",
+        "value": 50
+      },
+      "surface_scoped": {
+        "kind": "flat",
+        "value": true
+      }
+    },
+    "risk_routing": {
+      "reviewer": {
+        "kind": "flat",
+        "value": true
+      }
+    },
+    "risk_tiers": {},
+    "spec_coverage": "require_evidence=true scope=verifying, shipped require_cases=failure",
+    "evidence_binding": "INVALID — `strict` is not a valid value for `mode` (expected one of: off, warn, require)",
+    "clean": false,
+    "diagnostics": [
+      "experimental.evidence_binding: section is present but unusable (`strict` is not a valid value for `mode` (expected one of: off, warn, require)) — the owning check refuses rather than treating it as absent"
+    ]
+  },
+  "vocab": {
+    "snapshot": {
+      "capabilityVersion": "3790f22997a5c1209039144b179fb5475623589c0ba09ef4f58d859795318a8a",
+      "plugins": {},
+      "enums": {},
+      "directives": {},
+      "evidenceKinds": [],
+      "inactive": {}
+    },
+    "diagnostics": []
+  },
+  "cel": {
+    "change": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.change_id": "string",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.schema": "uint",
+        "record.status": "string (one of: proposed, in_progress, completed, archived)",
+        "record.subject_id": "string",
+        "record.summary": "string",
+        "record.title": "string"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "divergence": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.detail": "string",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.project_id": "string",
+        "record.reviewer": "string",
+        "record.round": "uint",
+        "record.run_seq": "uint",
+        "record.scenario_id": "string",
+        "record.schema": "uint",
+        "record.sha": "string",
+        "record.status": "dyn"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "event": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.detail": "dyn",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.label": "string",
+        "record.run_id": "string",
+        "record.schema": "uint",
+        "record.seq": "uint"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "evidence_record": {
+      "fields": {
+        "record.actor": "map",
+        "record.approval": "map",
+        "record.at": "timestamp",
+        "record.attachments": "list<map>",
+        "record.evidence_sha": "string",
+        "record.flagged": "map",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.lifecycle": "string (one of: draft, reviewed, ratified)",
+        "record.project_id": "string",
+        "record.run_id": "string",
+        "record.run_seq": "uint",
+        "record.scenario_id": "string",
+        "record.schema": "uint",
+        "record.surface_ref": "list<string>",
+        "record.task_id": "string",
+        "record.verdict": "string (one of: faithful, not_applicable, divergent)"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "finding": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.change_id": "string",
+        "record.disposition": "string (one of: open, fixed, rejected, deferred)",
+        "record.file_ref": "string",
+        "record.introduced_by": "string",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.resolution_sha": "string",
+        "record.reviewed_sha": "string",
+        "record.reviewer": "string",
+        "record.round": "uint",
+        "record.schema": "uint",
+        "record.seq": "uint",
+        "record.severity": "string (one of: blocker, should_fix, note)",
+        "record.summary": "string"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "handoff": {
+      "fields": {
+        "record.abandoned_at": "timestamp",
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.body": "map",
+        "record.chain_id": "string",
+        "record.claimed_at": "timestamp",
+        "record.claimed_by": "string",
+        "record.completed_at": "timestamp",
+        "record.from_role": "string",
+        "record.id": "string",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.openspec_change_slug": "string",
+        "record.parent_handoff_id": "string",
+        "record.research_vendor_slug": "string",
+        "record.schema": "uint",
+        "record.seq": "int",
+        "record.state": "string (one of: pending, in-progress, done, abandoned)",
+        "record.tags": "list<string>",
+        "record.title": "string",
+        "record.to_role": "string"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "review": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.pin": "string",
+        "record.project_id": "string",
+        "record.provenance_ref": "dyn",
+        "record.reviewer": "string",
+        "record.scenario_id": "string",
+        "record.schema": "uint"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "run": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.ended_at": "timestamp",
+        "record.injected_guidance": "list<map>",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.lineage": "map",
+        "record.parent_run_id": "string",
+        "record.run_id": "string",
+        "record.schema": "uint",
+        "record.session_id": "string",
+        "record.started_at": "timestamp",
+        "record.status": "string (one of: pending, running, succeeded, failed, aborted)",
+        "record.task_id": "string"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "scenario": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.case": "string",
+        "record.description": "string",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.lane": "string",
+        "record.project_id": "string",
+        "record.scenario_id": "string",
+        "record.schema": "uint",
+        "record.source_digest": "string",
+        "record.subject_id": "string",
+        "record.title": "string"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "session": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.client": "string",
+        "record.ended_at": "timestamp",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.project_key": "string",
+        "record.schema": "uint",
+        "record.session_id": "string",
+        "record.started_at": "timestamp",
+        "record.workspace_key": "string",
+        "record.workspace_label": "string"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "strategy_item": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.content": "string",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.regime_key": "string",
+        "record.role": "string",
+        "record.schema": "uint",
+        "record.source_task_id": "string"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "subject": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.change_ids": "list<string>",
+        "record.domain": "string",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.owner_role": "string",
+        "record.schema": "uint",
+        "record.status": "string (one of: proposed, specced, building, verifying, shipped, retired)",
+        "record.subject_id": "string",
+        "record.summary": "string",
+        "record.title": "string"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "task": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.depends_on": "list<string>",
+        "record.evidence_note": "string",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.scenario_refs": "list<string>",
+        "record.schema": "uint",
+        "record.status": "string (one of: open, done)",
+        "record.task_id": "string",
+        "record.title": "string"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    },
+    "trajectory": {
+      "fields": {
+        "record.actor": "map",
+        "record.at": "timestamp",
+        "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
+        "record.pr": "int",
+        "record.reward": "double",
+        "record.run_id": "string",
+        "record.schema": "uint",
+        "record.session_id": "string",
+        "record.sha": "string",
+        "record.task_id": "string"
+      },
+      "functions": [
+        "age_days(timestamp) -> int"
+      ]
+    }
+  }
+}

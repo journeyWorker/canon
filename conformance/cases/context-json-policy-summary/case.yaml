@@ -1,0 +1,4 @@
+description: "`canon context --json` exits 0 and reports the resolved policy summary — each section in its resolved form, an unusable section as INVALID with a diagnostic and `clean: false` — alongside the capability surface it is read from"
+steps:
+  - args: [context, --json]
+    exit: 0

@@ -1,0 +1,4 @@
+canon inventory sync: root `root` (<repo>/specs) — 4 scenario(s) scanned, 4 record(s) written
+  [tag] scenario `cart.add.02` under root `root` has a malformed `@case:Not_Kebab` tag (not a kebab-case case slug) — indexed without the case
+  [tag] scenario `cart.add.03` under root `root` has a malformed `@lane:UPPER` tag (not a kebab-case lane slug) — indexed without the lane
+  [tag] scenario `cart.add.04` under root `root` carries an unrecognized `@owner:` tag namespace — canon ignores it; use a recognized axis or a plain runner tag
