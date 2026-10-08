@@ -1,0 +1,952 @@
+{
+  "tool": "comp-spec",
+  "version": 1,
+  "createdAt": "2026-10-08T17:12:00.224Z",
+  "comp": ".impeccable/comps/landing.png",
+  "warnings": [
+    "region column-rules: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
+    "region fig-chart: \"codeDrawn\": true set in the regions file (the painted-material refusal is overridden: code draws this region)",
+    "region fig-panel: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)"
+  ],
+  "uncoveredInkCells": [],
+  "compSize": {
+    "width": 1536,
+    "height": 1024
+  },
+  "aspect": 1.5,
+  "orientation": "landscape",
+  "palette": [
+    {
+      "hex": "#f5f8f3",
+      "coverage": 0.6287
+    },
+    {
+      "hex": "#f74f18",
+      "coverage": 0.2435
+    },
+    {
+      "hex": "#090909",
+      "coverage": 0.1102
+    },
+    {
+      "hex": "#b4b4b4",
+      "coverage": 0.0088
+    },
+    {
+      "hex": "#370f08",
+      "coverage": 0.0087
+    }
+  ],
+  "bands": [
+    {
+      "y": 0.0235,
+      "strength": 0.2281
+    },
+    {
+      "y": 0.1176,
+      "strength": 0.625
+    },
+    {
+      "y": 0.2235,
+      "strength": 0.5795
+    },
+    {
+      "y": 0.2824,
+      "strength": 0.5409
+    },
+    {
+      "y": 0.3294,
+      "strength": 0.9785
+    },
+    {
+      "y": 0.3882,
+      "strength": 0.8134
+    },
+    {
+      "y": 0.4353,
+      "strength": 0.3222
+    },
+    {
+      "y": 0.4941,
+      "strength": 0.29
+    },
+    {
+      "y": 0.5882,
+      "strength": 0.3105
+    },
+    {
+      "y": 0.6235,
+      "strength": 0.7547
+    },
+    {
+      "y": 0.6471,
+      "strength": 0.2482
+    },
+    {
+      "y": 0.6824,
+      "strength": 1
+    },
+    {
+      "y": 0.7765,
+      "strength": 0.3208
+    },
+    {
+      "y": 0.8353,
+      "strength": 0.3761
+    },
+    {
+      "y": 0.8706,
+      "strength": 0.7966
+    },
+    {
+      "y": 0.9294,
+      "strength": 0.4589
+    }
+  ],
+  "regions": [
+    {
+      "id": "column-rules",
+      "kind": "chrome",
+      "note": "twelve-column grid: thin grey vertical hairline column rules over the bright white ground, full height",
+      "grid": "A0:J9",
+      "container": true,
+      "snap": false,
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "px": {
+        "x": 0,
+        "y": 0,
+        "w": 1536,
+        "h": 1024
+      },
+      "aspect": 1.5,
+      "palette": [
+        {
+          "hex": "#f5f8f3",
+          "coverage": 0.6287
+        },
+        {
+          "hex": "#f74f18",
+          "coverage": 0.2435
+        },
+        {
+          "hex": "#090909",
+          "coverage": 0.1102
+        },
+        {
+          "hex": "#b4b4b4",
+          "coverage": 0.0088
+        },
+        {
+          "hex": "#370f08",
+          "coverage": 0.0087
+        }
+      ],
+      "detail": {
+        "energy": 33.9983
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "wordmark",
+      "kind": "text",
+      "note": "canon wordmark, bold black grotesk, lowercase",
+      "grid": null,
+      "box": {
+        "x": 0.0371,
+        "y": 0.0244,
+        "w": 0.0612,
+        "h": 0.0195
+      },
+      "px": {
+        "x": 57,
+        "y": 25,
+        "w": 94,
+        "h": 20
+      },
+      "aspect": 4.7,
+      "palette": [
+        {
+          "hex": "#0a0a0a",
+          "coverage": 0.5561
+        },
+        {
+          "hex": "#f3f3f3",
+          "coverage": 0.3004
+        },
+        {
+          "hex": "#4b4b4a",
+          "coverage": 0.0987
+        },
+        {
+          "hex": "#b6b8b8",
+          "coverage": 0.0314
+        },
+        {
+          "hex": "#8d8d8d",
+          "coverage": 0.0135
+        }
+      ],
+      "detail": {
+        "energy": 44.4415
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 6,
+          "capHeightPx": 20,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.3125,
+          "advTall": 0.3125,
+          "advX": null,
+          "gap": 0.25,
+          "xRatio": 0.7599,
+          "stemW": 0.1539,
+          "contrast": 1.7342,
+          "serif": 1.0634,
+          "densTall": 0.5266,
+          "densX": null,
+          "weight": 0.5266
+        },
+        "widthClass": "compressed",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "nav",
+      "kind": "control",
+      "note": "nav links Docs, CLI, Concepts, GitHub in black grotesk regular, right-aligned on column lines",
+      "grid": null,
+      "box": {
+        "x": 0.7533,
+        "y": 0.0264,
+        "w": 0.2051,
+        "h": 0.0156
+      },
+      "px": {
+        "x": 1157,
+        "y": 27,
+        "w": 315,
+        "h": 16
+      },
+      "aspect": 19.6875,
+      "palette": [
+        {
+          "hex": "#f2f6f1",
+          "coverage": 0.762
+        },
+        {
+          "hex": "#100f10",
+          "coverage": 0.1118
+        },
+        {
+          "hex": "#4b4c4c",
+          "coverage": 0.0575
+        },
+        {
+          "hex": "#b7bbb9",
+          "coverage": 0.0367
+        },
+        {
+          "hex": "#8a8b8b",
+          "coverage": 0.0319
+        }
+      ],
+      "detail": {
+        "energy": 114.8882
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "headline",
+      "kind": "text",
+      "note": "huge flush-left black heavy grotesk headline, three lines: Agents say done. / canon makes them / prove it.",
+      "grid": null,
+      "box": {
+        "x": 0.0352,
+        "y": 0.1924,
+        "w": 0.5391,
+        "h": 0.3291
+      },
+      "px": {
+        "x": 54,
+        "y": 197,
+        "w": 828,
+        "h": 337
+      },
+      "aspect": 2.457,
+      "palette": [
+        {
+          "hex": "#f4f7f2",
+          "coverage": 0.6797
+        },
+        {
+          "hex": "#090909",
+          "coverage": 0.2933
+        },
+        {
+          "hex": "#b9b9b9",
+          "coverage": 0.0129
+        },
+        {
+          "hex": "#818181",
+          "coverage": 0.0077
+        },
+        {
+          "hex": "#454545",
+          "coverage": 0.0064
+        }
+      ],
+      "detail": {
+        "energy": 67.111
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 3,
+          "glyphs": 24,
+          "capHeightPx": 86.5,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.6226,
+          "advTall": 0.588,
+          "advX": 0.6226,
+          "gap": 0.0346,
+          "xRatio": 0.7263,
+          "stemW": 0.2076,
+          "contrast": 1.1534,
+          "serif": 0.9919,
+          "densTall": 0.6305,
+          "densX": 0.7009,
+          "weight": 0.6305
+        },
+        "widthClass": "normal",
+        "weightClass": "bold",
+        "chosen": {
+          "family": "Spline Sans",
+          "weight": 700,
+          "fontSizePx": 111,
+          "source": "index",
+          "fp": {
+            "lines": 1,
+            "glyphs": 13,
+            "capHeightPx": 86.5,
+            "inkIsDark": true,
+            "allCaps": false,
+            "advance": 0.6243,
+            "advTall": 0.659,
+            "advX": 0.6243,
+            "gap": 0.1156,
+            "xRatio": 0.698,
+            "stemW": 0.2077,
+            "contrast": 1.2028,
+            "serif": 1,
+            "densTall": 0.605,
+            "densX": 0.6799,
+            "weight": 0.605
+          },
+          "stamp": "866e4b5571ac"
+        }
+      }
+    },
+    {
+      "id": "subline",
+      "kind": "text",
+      "note": "line: A verification gate for agent-written work. regular black grotesk",
+      "grid": null,
+      "box": {
+        "x": 0.0371,
+        "y": 0.5664,
+        "w": 0.2982,
+        "h": 0.0244
+      },
+      "px": {
+        "x": 57,
+        "y": 580,
+        "w": 458,
+        "h": 25
+      },
+      "aspect": 18.32,
+      "palette": [
+        {
+          "hex": "#f3f6f3",
+          "coverage": 0.6967
+        },
+        {
+          "hex": "#0a0a0a",
+          "coverage": 0.1899
+        },
+        {
+          "hex": "#363637",
+          "coverage": 0.0458
+        },
+        {
+          "hex": "#c5c7c6",
+          "coverage": 0.0375
+        },
+        {
+          "hex": "#696968",
+          "coverage": 0.03
+        }
+      ],
+      "detail": {
+        "energy": 153.7478
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 35,
+          "capHeightPx": 20,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.5888,
+          "advTall": 0.4009,
+          "advX": 0.6014,
+          "gap": 0.0752,
+          "xRatio": 0.6992,
+          "stemW": 0.1446,
+          "contrast": 1.0852,
+          "serif": 0.9231,
+          "densTall": 0.4712,
+          "densX": 0.5165,
+          "weight": 0.4712
+        },
+        "widthClass": "normal",
+        "weightClass": "regular",
+        "chosen": {
+          "family": "Spline Sans",
+          "weight": 400,
+          "fontSizePx": 25,
+          "source": "index",
+          "fp": {
+            "lines": 1,
+            "glyphs": 37,
+            "capHeightPx": 20.1,
+            "inkIsDark": true,
+            "allCaps": false,
+            "advance": 0.5475,
+            "advTall": 0.423,
+            "advX": 0.5724,
+            "gap": 0.1244,
+            "xRatio": 0.694,
+            "stemW": 0.1456,
+            "contrast": 1.0704,
+            "serif": 0.9982,
+            "densTall": 0.4736,
+            "densX": 0.554,
+            "weight": 0.4736
+          },
+          "stamp": "36b78bae89bf"
+        }
+      }
+    },
+    {
+      "id": "command",
+      "kind": "control",
+      "note": "black command field with monospace $ bunx @journeykit/canon init in white and a Copy control at its right end",
+      "grid": null,
+      "box": {
+        "x": 0.0371,
+        "y": 0.6172,
+        "w": 0.4434,
+        "h": 0.0664
+      },
+      "px": {
+        "x": 57,
+        "y": 632,
+        "w": 681,
+        "h": 68
+      },
+      "aspect": 10.0147,
+      "palette": [
+        {
+          "hex": "#0a0a0a",
+          "coverage": 0.9315
+        },
+        {
+          "hex": "#f1f1f1",
+          "coverage": 0.0326
+        },
+        {
+          "hex": "#b1b1b3",
+          "coverage": 0.0139
+        },
+        {
+          "hex": "#414141",
+          "coverage": 0.0135
+        },
+        {
+          "hex": "#787878",
+          "coverage": 0.0085
+        }
+      ],
+      "detail": {
+        "energy": 27.7101
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 30,
+          "capHeightPx": 18.6,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.5647,
+          "advTall": 0.5916,
+          "advX": 0.5647,
+          "gap": 0.1345,
+          "xRatio": 0.7406,
+          "stemW": 0.1491,
+          "contrast": 1.0519,
+          "serif": 0.6089,
+          "densTall": 0.4108,
+          "densX": 0.5538,
+          "weight": 0.4108
+        },
+        "widthClass": "condensed",
+        "weightClass": "regular",
+        "chosen": {
+          "family": "Inconsolata",
+          "weight": 400,
+          "fontSizePx": 28,
+          "source": "index",
+          "fp": {
+            "lines": 1,
+            "glyphs": 26,
+            "capHeightPx": 18.7,
+            "inkIsDark": true,
+            "allCaps": false,
+            "advance": 0.5752,
+            "advTall": 0.5618,
+            "advX": 0.5886,
+            "gap": 0.1605,
+            "xRatio": 0.7161,
+            "stemW": 0.1411,
+            "contrast": 1.0576,
+            "serif": 0.8139,
+            "densTall": 0.3983,
+            "densX": 0.5287,
+            "weight": 0.3983
+          },
+          "stamp": "1e011243bfac"
+        }
+      }
+    },
+    {
+      "id": "guide-link",
+      "kind": "control",
+      "note": "underlined text link: Read the getting started guide with a right arrow",
+      "grid": null,
+      "box": {
+        "x": 0.0371,
+        "y": 0.7188,
+        "w": 0.2142,
+        "h": 0.0244
+      },
+      "px": {
+        "x": 57,
+        "y": 736,
+        "w": 329,
+        "h": 25
+      },
+      "aspect": 13.16,
+      "palette": [
+        {
+          "hex": "#f4f7f5",
+          "coverage": 0.615
+        },
+        {
+          "hex": "#161616",
+          "coverage": 0.2659
+        },
+        {
+          "hex": "#424242",
+          "coverage": 0.0575
+        },
+        {
+          "hex": "#7b7e7d",
+          "coverage": 0.0472
+        },
+        {
+          "hex": "#d0cfd0",
+          "coverage": 0.0144
+        }
+      ],
+      "detail": {
+        "energy": 133.6811
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "fig-caption",
+      "kind": "text",
+      "note": "monospace caption line: Fig. 1 canon's own corpus · 246 scenarios, black on orange",
+      "grid": null,
+      "box": {
+        "x": 0.6068,
+        "y": 0.1465,
+        "w": 0.2702,
+        "h": 0.0166
+      },
+      "px": {
+        "x": 932,
+        "y": 150,
+        "w": 415,
+        "h": 17
+      },
+      "aspect": 24.4118,
+      "palette": [
+        {
+          "hex": "#f64f19",
+          "coverage": 0.7758
+        },
+        {
+          "hex": "#0f0808",
+          "coverage": 0.0904
+        },
+        {
+          "hex": "#2f0908",
+          "coverage": 0.0471
+        },
+        {
+          "hex": "#9b2e0d",
+          "coverage": 0.0471
+        },
+        {
+          "hex": "#c33f14",
+          "coverage": 0.0395
+        }
+      ],
+      "detail": {
+        "energy": 60.1633
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 33,
+          "capHeightPx": 13.4,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.6322,
+          "advTall": 0.595,
+          "advX": 0.6322,
+          "gap": 0.1488,
+          "xRatio": 0.7636,
+          "stemW": 0.1823,
+          "contrast": 1.1237,
+          "serif": 0.54,
+          "densTall": 0.4547,
+          "densX": 0.5768,
+          "weight": 0.4547
+        },
+        "widthClass": "normal",
+        "weightClass": "regular",
+        "chosen": {
+          "family": "Cousine",
+          "weight": 400,
+          "fontSizePx": 18,
+          "source": "index",
+          "fp": {
+            "lines": 1,
+            "glyphs": 33,
+            "capHeightPx": 13.2,
+            "inkIsDark": true,
+            "allCaps": false,
+            "advance": 0.6439,
+            "advTall": 0.6817,
+            "advX": 0.6439,
+            "gap": 0.1894,
+            "xRatio": 0.7506,
+            "stemW": 0.1768,
+            "contrast": 1.0974,
+            "serif": 0.8362,
+            "densTall": 0.5031,
+            "densX": 0.5997,
+            "weight": 0.5031
+          },
+          "stamp": "1f7079d05aef"
+        }
+      }
+    },
+    {
+      "id": "fig-chart",
+      "kind": "chrome",
+      "note": "data chart the page draws from corpus JSON at build time: black hairlines, one per scenario, each starting at its authored time on a time axis and running to the right edge; a few lines carry a short white gap",
+      "grid": null,
+      "codeDrawn": true,
+      "box": {
+        "x": 0.6055,
+        "y": 0.1875,
+        "w": 0.3496,
+        "h": 0.5391
+      },
+      "px": {
+        "x": 930,
+        "y": 192,
+        "w": 537,
+        "h": 552
+      },
+      "aspect": 0.9728,
+      "palette": [
+        {
+          "hex": "#f75018",
+          "coverage": 0.8651
+        },
+        {
+          "hex": "#120808",
+          "coverage": 0.0438
+        },
+        {
+          "hex": "#380f08",
+          "coverage": 0.0425
+        },
+        {
+          "hex": "#b73e16",
+          "coverage": 0.0283
+        },
+        {
+          "hex": "#892c08",
+          "coverage": 0.0202
+        }
+      ],
+      "detail": {
+        "energy": 24.9042
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "fig-panel",
+      "kind": "chrome",
+      "note": "flat signal-orange field, one undivided rectangle",
+      "grid": null,
+      "container": true,
+      "box": {
+        "x": 0.5892,
+        "y": 0.1201,
+        "w": 0.3815,
+        "h": 0.751
+      },
+      "px": {
+        "x": 905,
+        "y": 123,
+        "w": 586,
+        "h": 769
+      },
+      "aspect": 0.762,
+      "palette": [
+        {
+          "hex": "#f74f18",
+          "coverage": 0.8516
+        },
+        {
+          "hex": "#0c0808",
+          "coverage": 0.0808
+        },
+        {
+          "hex": "#370f08",
+          "coverage": 0.0303
+        },
+        {
+          "hex": "#912d0c",
+          "coverage": 0.023
+        },
+        {
+          "hex": "#be4115",
+          "coverage": 0.0143
+        }
+      ],
+      "detail": {
+        "energy": 21.9507
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "fig-total",
+      "kind": "text",
+      "note": "0 violations set huge in black heavy grotesk at the bottom of the orange field",
+      "grid": null,
+      "box": {
+        "x": 0.6055,
+        "y": 0.7568,
+        "w": 0.3516,
+        "h": 0.084
+      },
+      "px": {
+        "x": 930,
+        "y": 775,
+        "w": 540,
+        "h": 86
+      },
+      "aspect": 6.2791,
+      "palette": [
+        {
+          "hex": "#080808",
+          "coverage": 0.4816
+        },
+        {
+          "hex": "#f74d19",
+          "coverage": 0.4783
+        },
+        {
+          "hex": "#310908",
+          "coverage": 0.0151
+        },
+        {
+          "hex": "#932d0e",
+          "coverage": 0.0135
+        },
+        {
+          "hex": "#741f0a",
+          "coverage": 0.0116
+        }
+      ],
+      "detail": {
+        "energy": 33.6387
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": null,
+        "measuredAt": "2026-10-08T17:12:02.602Z",
+        "note": "no separable lettering in the crop; size by the region box"
+      }
+    },
+    {
+      "id": "stations-rule",
+      "kind": "chrome",
+      "note": "single black horizontal rule across the full grid near the bottom",
+      "grid": null,
+      "box": {
+        "x": 0.0215,
+        "y": 0.9248,
+        "w": 0.9577,
+        "h": 0.0039
+      },
+      "px": {
+        "x": 33,
+        "y": 947,
+        "w": 1471,
+        "h": 4
+      },
+      "aspect": 367.75,
+      "palette": [
+        {
+          "hex": "#f8f8f8",
+          "coverage": 0.9878
+        },
+        {
+          "hex": "#cdcfcd",
+          "coverage": 0.0071
+        },
+        {
+          "hex": "#aeabab",
+          "coverage": 0.0051
+        }
+      ],
+      "detail": {
+        "energy": 109.6219
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "stations",
+      "kind": "text",
+      "note": "station labels under the rule on column lines: intent, run, evidence, gate, decision, learning",
+      "grid": null,
+      "box": {
+        "x": 0.0384,
+        "y": 0.9453,
+        "w": 0.9219,
+        "h": 0.0176
+      },
+      "px": {
+        "x": 59,
+        "y": 968,
+        "w": 1416,
+        "h": 18
+      },
+      "aspect": 78.6667,
+      "palette": [
+        {
+          "hex": "#f3f7f1",
+          "coverage": 0.9187
+        },
+        {
+          "hex": "#0c0b0c",
+          "coverage": 0.0292
+        },
+        {
+          "hex": "#b0b2b2",
+          "coverage": 0.0278
+        },
+        {
+          "hex": "#353635",
+          "coverage": 0.016
+        },
+        {
+          "hex": "#707072",
+          "coverage": 0.0082
+        }
+      ],
+      "detail": {
+        "energy": 15.5057
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 36,
+          "capHeightPx": 14,
+          "inkIsDark": true,
+          "allCaps": false,
+          "advance": 0.5722,
+          "advTall": 0.2503,
+          "advX": 0.5901,
+          "gap": 0.0715,
+          "xRatio": 0.7037,
+          "stemW": 0.1615,
+          "contrast": 1.044,
+          "serif": 0.8061,
+          "densTall": 0.6319,
+          "densX": 0.5859,
+          "weight": 0.6319
+        },
+        "widthClass": "normal",
+        "weightClass": "bold"
+      }
+    }
+  ]
+}

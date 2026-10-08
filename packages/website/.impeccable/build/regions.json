@@ -1,0 +1,146 @@
+{
+  "regions": [
+    {
+      "id": "column-rules",
+      "kind": "chrome",
+      "grid": "A0:J9",
+      "container": true,
+      "snap": false,
+      "note": "twelve-column grid: thin grey vertical hairline column rules over the bright white ground, full height"
+    },
+    {
+      "id": "wordmark",
+      "kind": "text",
+      "note": "canon wordmark, bold black grotesk, lowercase",
+      "box": {
+        "x": 0.0371,
+        "y": 0.0244,
+        "w": 0.0612,
+        "h": 0.0195
+      }
+    },
+    {
+      "id": "nav",
+      "kind": "control",
+      "note": "nav links Docs, CLI, Concepts, GitHub in black grotesk regular, right-aligned on column lines",
+      "box": {
+        "x": 0.7533,
+        "y": 0.0264,
+        "w": 0.2051,
+        "h": 0.0156
+      }
+    },
+    {
+      "id": "headline",
+      "kind": "text",
+      "note": "huge flush-left black heavy grotesk headline, three lines: Agents say done. / canon makes them / prove it.",
+      "box": {
+        "x": 0.0352,
+        "y": 0.1924,
+        "w": 0.5391,
+        "h": 0.3291
+      }
+    },
+    {
+      "id": "subline",
+      "kind": "text",
+      "note": "line: A verification gate for agent-written work. regular black grotesk",
+      "box": {
+        "x": 0.0371,
+        "y": 0.5664,
+        "w": 0.2982,
+        "h": 0.0244
+      }
+    },
+    {
+      "id": "command",
+      "kind": "control",
+      "note": "black command field with monospace $ bunx @journeykit/canon init in white and a Copy control at its right end",
+      "box": {
+        "x": 0.0371,
+        "y": 0.6172,
+        "w": 0.4434,
+        "h": 0.0664
+      }
+    },
+    {
+      "id": "guide-link",
+      "kind": "control",
+      "note": "underlined text link: Read the getting started guide with a right arrow",
+      "box": {
+        "x": 0.0371,
+        "y": 0.7188,
+        "w": 0.2142,
+        "h": 0.0244
+      }
+    },
+    {
+      "id": "fig-caption",
+      "kind": "text",
+      "note": "monospace caption line: Fig. 1 canon's own corpus \u00b7 246 scenarios, black on orange",
+      "box": {
+        "x": 0.6068,
+        "y": 0.1465,
+        "w": 0.2702,
+        "h": 0.0166
+      }
+    },
+    {
+      "id": "fig-chart",
+      "kind": "chrome",
+      "codeDrawn": true,
+      "note": "data chart the page draws from corpus JSON at build time: black hairlines, one per scenario, each starting at its authored time on a time axis and running to the right edge; a few lines carry a short white gap",
+      "box": {
+        "x": 0.6055,
+        "y": 0.1875,
+        "w": 0.3496,
+        "h": 0.5391
+      }
+    },
+    {
+      "id": "fig-panel",
+      "kind": "chrome",
+      "container": true,
+      "note": "flat signal-orange field, one undivided rectangle",
+      "box": {
+        "x": 0.5892,
+        "y": 0.1201,
+        "w": 0.3815,
+        "h": 0.751
+      }
+    },
+    {
+      "id": "fig-total",
+      "kind": "text",
+      "note": "0 violations set huge in black heavy grotesk at the bottom of the orange field",
+      "box": {
+        "x": 0.6055,
+        "y": 0.7568,
+        "w": 0.3516,
+        "h": 0.084
+      }
+    },
+    {
+      "id": "stations-rule",
+      "kind": "chrome",
+      "note": "single black horizontal rule across the full grid near the bottom",
+      "box": {
+        "x": 0.0215,
+        "y": 0.9248,
+        "w": 0.9577,
+        "h": 0.0039
+      }
+    },
+    {
+      "id": "stations",
+      "kind": "text",
+      "note": "station labels under the rule on column lines: intent, run, evidence, gate, decision, learning",
+      "box": {
+        "x": 0.0384,
+        "y": 0.9453,
+        "w": 0.9219,
+        "h": 0.0176
+      }
+    }
+  ]
+}

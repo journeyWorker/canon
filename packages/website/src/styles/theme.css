@@ -1,197 +1,396 @@
-/* ============================================================
-   Score & Voices — canon site theme
-   Dark: ink black / deep navy, amber accent (brass).
-   Light: sepia paper, ink text.
-   Type: Newsreader (serif display) / system sans / JetBrains Mono.
-   ============================================================ */
+/* canon docs — Grid Manual, applied to Starlight through its documented
+   custom properties plus a few element overrides. Tokens: tokens.css. */
 
-@import "@fontsource-variable/newsreader";
-@import "@fontsource-variable/jetbrains-mono";
+@import "./tokens.css";
 
+/* ---------- Palette ---------- */
+
+/* Dark: the same manual printed in reverse. */
 :root {
-  /* Dark theme (default): ink & brass */
-  --sl-color-accent-low: #3b2c10;
-  --sl-color-accent: #c99a3d;
-  --sl-color-accent-high: #ecd6a4;
-  --sl-color-white: #f2efe8;
-  --sl-color-gray-1: #e4e0d6;
-  --sl-color-gray-2: #c2beb3;
-  --sl-color-gray-3: #918d82;
-  --sl-color-gray-4: #5e5b52;
-  --sl-color-gray-5: #3a3a38;
-  --sl-color-gray-6: #16181d;
-  --sl-color-black: #0b0d12;
+  --sl-font: var(--f-sans);
+  --sl-font-mono: var(--f-mono);
 
-  --sl-color-bg-nav: #0e1016;
-  --sl-color-bg-sidebar: #0c0e13;
-  --sl-color-hairline: #23252c;
-  --sl-color-hairline-light: #1d2027;
+  --sl-color-white: #f0f3f0;
+  --sl-color-gray-1: #e2e2dc;
+  --sl-color-gray-2: #c9c9c2;
+  --sl-color-gray-3: #a0a09a;
+  --sl-color-gray-4: #6d6d68;
+  --sl-color-gray-5: #3a3a37;
+  --sl-color-gray-6: #1a1a19;
+  --sl-color-black: #0b0b0b;
 
-  --sl-font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular",
-    Menlo, monospace;
-  --canon-serif: "Newsreader Variable", "Newsreader", Georgia, "Times New Roman",
-    serif;
+  --sl-color-accent-low: #3a160b;
+  --sl-color-accent: var(--c-signal);
+  --sl-color-accent-high: #ffb59f;
+
+  --sl-color-text: var(--sl-color-gray-1);
+  --sl-color-text-accent: var(--sl-color-white);
+  --sl-color-text-invert: var(--c-ink);
+  --sl-color-bg: var(--sl-color-black);
+  --sl-color-bg-nav: var(--sl-color-black);
+  --sl-color-bg-sidebar: var(--sl-color-black);
+  --sl-color-bg-inline-code: var(--sl-color-gray-6);
+  --sl-color-bg-accent: var(--c-signal);
+  --sl-color-hairline-light: var(--sl-color-gray-5);
+  --sl-color-hairline: var(--sl-color-gray-4);
+  --sl-color-hairline-shade: var(--sl-color-white);
+
+  --docs-rule: #2a2a28;
+  --docs-strong-rule: var(--sl-color-white);
+
+  --sl-shadow-sm: none;
+  --sl-shadow-md: none;
+  --sl-shadow-lg: none;
+
+  --sl-text-h1: clamp(2.5rem, 4vw, 3.5rem);
+  --sl-text-h2: 2rem;
+  --sl-text-h3: 1.5rem;
+  --sl-text-h4: 1.25rem;
+  --sl-line-height: 1.65;
+  --sl-line-height-headings: 1.1;
+  --sl-content-width: 46rem;
 }
 
-/* Light theme: sepia paper */
+/* Light (the default world): white stock, black ink, one signal orange. */
 :root[data-theme="light"] {
-  --sl-color-accent-low: #f0e2c4;
-  --sl-color-accent: #9a7120;
-  --sl-color-accent-high: #533d0d;
-  --sl-color-white: #221f19;
-  --sl-color-gray-1: #333028;
-  --sl-color-gray-2: #4c483e;
-  --sl-color-gray-3: #6e6a5e;
-  --sl-color-gray-4: #9a9587;
-  --sl-color-gray-5: #cdc7b6;
-  --sl-color-gray-6: #f0ead9;
-  --sl-color-gray-7: #f7f2e4;
-  --sl-color-black: #fbf7ec;
+  --sl-color-white: var(--c-ink);
+  --sl-color-gray-1: #1e1e1c;
+  --sl-color-gray-2: #2f2f2c;
+  --sl-color-gray-3: var(--c-ink-2);
+  --sl-color-gray-4: #85857f;
+  --sl-color-gray-5: #c4c4be;
+  --sl-color-gray-6: #e6e6e0;
+  --sl-color-gray-7: #ecece7;
+  --sl-color-black: var(--c-ground);
 
-  --sl-color-bg-nav: #f7f2e4;
-  --sl-color-bg-sidebar: #f7f2e4;
-  --sl-color-hairline: #e2dac5;
-  --sl-color-hairline-light: #ece5d2;
+  --sl-color-accent-low: #ffd9cd;
+  --sl-color-accent: var(--c-signal);
+  --sl-color-accent-high: #8f2200;
+
+  --sl-color-text: var(--sl-color-gray-1);
+  --sl-color-text-accent: var(--c-ink);
+  --sl-color-text-invert: var(--c-ink);
+  --sl-color-bg: var(--c-ground);
+  --sl-color-bg-nav: var(--c-ground);
+  --sl-color-bg-sidebar: var(--c-ground);
+  --sl-color-bg-inline-code: #e4e4de;
+  --sl-color-bg-accent: var(--c-signal);
+  --sl-color-hairline-light: var(--c-rule-soft);
+  --sl-color-hairline: var(--c-rule);
+  --sl-color-hairline-shade: var(--c-ink);
+
+  --docs-rule: var(--c-rule-soft);
+  --docs-strong-rule: var(--c-ink);
 }
 
-/* ---------- Typography: serif display voice ---------- */
+::selection {
+  background: var(--c-signal);
+  color: var(--c-ink);
+}
 
-.sl-markdown-content h1,
-.sl-markdown-content h2,
-.sl-markdown-content h3,
-.sl-markdown-content h4,
-h1[data-page-title],
-.hero h1,
-.hero .tagline strong {
-  font-family: var(--canon-serif);
-  font-weight: 500;
-  letter-spacing: -0.01em;
+:focus-visible {
+  outline-color: var(--c-signal);
+}
+
+/* ---------- Column rules behind the reading area ---------- */
+
+body {
+  -webkit-font-smoothing: antialiased;
+  font-kerning: normal;
+}
+
+.main-frame {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--docs-rule) 0 1px,
+    transparent 1px calc((100vw - 2rem) / 12)
+  );
+  background-position: 1rem 0;
+}
+
+@media (max-width: 50rem) {
+  .main-frame {
+    background-image: repeating-linear-gradient(
+      to right,
+      var(--docs-rule) 0 1px,
+      transparent 1px calc((100vw - 2rem) / 4)
+    );
+  }
+}
+
+:lang(ko) .sl-markdown-content {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Header ---------- */
+
+header.header {
+  border-bottom: 1.5px solid var(--docs-strong-rule);
 }
 
 .site-title {
-  font-family: var(--canon-serif);
-  font-weight: 550;
-  font-size: var(--sl-text-xl);
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  font-size: 1.625rem;
+  letter-spacing: -0.035em;
+  color: var(--sl-color-white);
 }
 
-/* Inline code gets a whisper of brass */
-.sl-markdown-content code:not(pre code) {
-  color: var(--sl-color-accent-high);
-  background: var(--sl-color-accent-low);
-  border-radius: 0.25rem;
-}
-:root[data-theme="light"] .sl-markdown-content code:not(pre code) {
-  color: var(--sl-color-accent-high);
-}
-
-/* ---------- Splash / hero ---------- */
-
-[data-has-hero] .hero {
-  padding-block: 3rem;
-}
-
-[data-has-hero] .hero h1 {
-  font-family: var(--canon-serif);
-  font-weight: 480;
-  font-size: clamp(2.75rem, 6vw, 4.25rem);
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-}
-
-[data-has-hero] .hero .tagline {
+site-search button[data-open-modal] {
+  border-radius: 0;
+  border: 1px solid var(--sl-color-hairline);
+  background: transparent;
   color: var(--sl-color-gray-2);
-  max-width: 42ch;
 }
 
-/* Staff-lines wash behind the whole splash page */
-[data-has-hero] .main-frame {
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      transparent 0,
-      transparent 71px,
-      color-mix(in srgb, var(--sl-color-hairline) 55%, transparent) 71px,
-      color-mix(in srgb, var(--sl-color-hairline) 55%, transparent) 72px
-    );
+site-search button[data-open-modal]:hover {
+  border-color: var(--sl-color-white);
+  color: var(--sl-color-white);
 }
 
-/* ---------- Voices motif (hero SVG) ---------- */
-
-.canon-voices {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.canon-voices .voice {
-  stroke: var(--sl-color-accent);
-  opacity: 0;
-  stroke-dasharray: 260;
-  stroke-dashoffset: 260;
-  animation: canon-voice-enter 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.canon-voices .voice-head {
-  fill: var(--sl-color-accent-high);
-  opacity: 0;
-  animation: canon-head-enter 0.5s ease-out forwards;
-}
-
-.canon-voices .staff {
-  stroke: var(--sl-color-gray-5);
-}
-
-.canon-voices text {
+site-search kbd {
+  border-radius: 0;
   font-family: var(--sl-font-mono);
-  font-size: 11px;
-  fill: var(--sl-color-gray-3);
-  opacity: 0;
-  animation: canon-head-enter 0.6s ease-out forwards;
 }
 
-@keyframes canon-voice-enter {
-  to {
-    opacity: 1;
-    stroke-dashoffset: 0;
-  }
+mobile-starlight-toc .toggle,
+starlight-menu-button button {
+  border-radius: 0;
 }
 
-@keyframes canon-head-enter {
-  to {
-    opacity: 1;
-  }
+starlight-theme-select select,
+starlight-lang-select select {
+  font-family: var(--sl-font);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .canon-voices .voice,
-  .canon-voices .voice-head,
-  .canon-voices text {
-    animation: none;
-    opacity: 1;
-    stroke-dashoffset: 0;
-  }
+/* ---------- Sidebar ---------- */
+
+.sidebar-pane {
+  border-inline-end: 1px solid var(--sl-color-hairline);
 }
 
-/* ---------- Landing sections ---------- */
-
-.canon-kicker {
-  font-family: var(--sl-font-mono);
-  font-size: var(--sl-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: var(--sl-color-accent);
+.sidebar-content a {
+  border-radius: 0;
+  font-size: 0.9375rem;
 }
 
-.canon-flywheel {
-  font-family: var(--sl-font-mono);
-  font-size: var(--sl-text-sm);
-  line-height: 2;
-  border-inline-start: 2px solid var(--sl-color-accent);
-  padding-inline-start: 1.25rem;
-}
-
-.canon-flywheel b {
-  color: var(--sl-color-accent-high);
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  background: var(--c-signal);
+  color: var(--c-ink);
   font-weight: 600;
+}
+
+.sidebar-content .group-label .large,
+.sidebar-content .top-level > li > a .large {
+  font-family: var(--sl-font);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+/* ---------- Page title and headings ---------- */
+
+.content-panel {
+  border-top-color: var(--sl-color-hairline);
+}
+
+h1#_top {
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+  -webkit-text-stroke: 0.01em currentColor;
+}
+
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--sl-color-white);
+}
+
+/* h2 opens a section under a full-width black rule, as on the landing. */
+.sl-markdown-content .sl-heading-wrapper.level-h2,
+.sl-markdown-content h2:not(.sl-heading-wrapper > h2) {
+  margin-top: 3rem;
+  padding-top: 0.875rem;
+  border-top: 1.5px solid var(--docs-strong-rule);
+}
+
+.sl-markdown-content h2 {
+  letter-spacing: -0.03em;
+}
+
+:lang(ko) :is(h1#_top, .sl-markdown-content :is(h1, h2, h3, h4)) {
+  letter-spacing: -0.015em;
+  word-break: keep-all;
+}
+
+.sl-markdown-content a {
+  color: var(--sl-color-white);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+.sl-markdown-content a:hover {
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--c-signal);
+}
+
+/* ---------- Inline code, tables, rules ---------- */
+
+.sl-markdown-content code:not(pre code) {
+  border-radius: 0;
+  padding: 0.1em 0.3em;
+  font-size: 0.92em;
+  color: var(--sl-color-white);
+}
+
+.sl-markdown-content table {
+  border-collapse: collapse;
+  font-size: var(--sl-text-sm);
+}
+
+.sl-markdown-content :is(th, td) {
+  padding: 0.625rem 0.875rem 0.75rem;
+  border: 0;
+  border-top: 1px solid var(--docs-strong-rule);
+  vertical-align: top;
+}
+
+.sl-markdown-content thead th {
+  border-top-width: 2px;
+  font-family: var(--sl-font-mono);
+  font-weight: 400;
+  font-size: var(--sl-text-sm);
+}
+
+.sl-markdown-content tbody tr:last-child > * {
+  border-bottom: 1px solid var(--docs-strong-rule);
+}
+
+.sl-markdown-content tr:nth-child(2n) {
+  background: transparent;
+}
+
+.sl-markdown-content hr {
+  border-top: 1.5px solid var(--docs-strong-rule);
+}
+
+.sl-markdown-content blockquote {
+  border-inline-start: 1px solid var(--docs-strong-rule);
+}
+
+/* ---------- Code: untitled terminal frames drop their empty title bar ---------- */
+
+.expressive-code .frame.is-terminal:not(.has-title) .header {
+  display: none;
+}
+
+.expressive-code .frame.is-terminal:not(.has-title) pre {
+  border-top: 0;
+}
+
+:root[data-theme="dark"] .expressive-code .frame {
+  outline: 1px solid var(--sl-color-gray-5);
+}
+
+/* ---------- Asides: a ruled box, the label set in mono ---------- */
+
+.starlight-aside {
+  border: 1px solid var(--docs-strong-rule);
+  border-radius: 0;
+  background: transparent;
+}
+
+.starlight-aside__title {
+  font-family: var(--sl-font-mono);
+  font-weight: 400;
+  color: var(--sl-color-white);
+}
+
+.starlight-aside__icon {
+  color: var(--sl-color-white);
+}
+
+.starlight-aside--caution,
+.starlight-aside--danger {
+  background: var(--c-signal);
+  border-color: var(--c-signal);
+  color: var(--c-ink);
+}
+
+.starlight-aside--caution :is(.starlight-aside__title, .starlight-aside__icon, a, code),
+.starlight-aside--danger :is(.starlight-aside__title, .starlight-aside__icon, a, code) {
+  color: var(--c-ink);
+}
+
+/* ---------- Cards and steps ---------- */
+
+.card {
+  border: 1px solid var(--docs-strong-rule);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.card .icon {
+  border-radius: 0;
+  border: 0;
+  background: var(--c-signal);
+  color: var(--c-ink);
+}
+
+.card .title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.sl-steps > li::before {
+  border-radius: 0;
+  font-family: var(--sl-font-mono);
+  background: var(--sl-color-white);
+  color: var(--sl-color-black);
+  border: 0;
+}
+
+.sl-steps > li::after {
+  width: 1px;
+  background: var(--docs-strong-rule);
+}
+
+/* ---------- Table of contents, pagination ---------- */
+
+starlight-toc a[aria-current="true"],
+starlight-toc a[aria-current="true"]:hover {
+  color: var(--sl-color-white);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--c-signal);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.25em;
+}
+
+.right-sidebar {
+  border-inline-start-color: var(--sl-color-hairline);
+}
+
+.pagination-links a {
+  border-radius: 0;
+  border: 1px solid var(--docs-strong-rule);
+  box-shadow: none;
+}
+
+.pagination-links a:hover {
+  background: var(--c-signal);
+  border-color: var(--c-signal);
+  color: var(--c-ink);
+}
+
+.pagination-links a:hover .link-title {
+  color: var(--c-ink);
+}
+
+.pagination-links .link-title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
