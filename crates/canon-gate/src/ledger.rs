@@ -20,7 +20,7 @@
 //!   fail/by-whom, spec.md "Covered cell with a failing verdict is not
 //!   green" — "the failure is visible as its own fact"). This is
 //!   informational, not a [`crate::GateCheck`] — [`FAILURE_CLASSES`]
-//!   (design decision 9) is a CLOSED eight-string set with no member
+//!   (design decision 9) is a CLOSED set with no member
 //!   named for "the latest verdict was `Divergent`"; a failing verdict
 //!   is a REPORTED fact for `canon gate check`/`report` (task 1.9,
 //!   `canon gate promote`'s re-validation, task 2.2) to render, never a
@@ -178,6 +178,8 @@ mod tests {
             scenarios: Vec::new(),
             divergences: Vec::new(),
             subjects: Vec::new(),
+            reviews: Vec::new(),
+            findings: Vec::new(),
             violations,
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
@@ -206,8 +208,10 @@ mod tests {
     #[test]
     fn corpus_violations_are_not_surfaced_by_this_check() {
         let mut ctx = ctx_with(Vec::new(), Vec::new());
-        ctx.corpus_violations =
-            vec![EvidenceViolation::new(EvidenceFailureClass::Malformed, "scenario", "scenario row does not deserialize: missing field `title`")];
+        ctx.corpus_violations = vec![(
+            RecordKind::Scenario,
+            EvidenceViolation::new(EvidenceFailureClass::Malformed, "scenario", "scenario row does not deserialize: missing field `title`"),
+        )];
 
         assert!(LedgerCheck.run(&ctx).is_empty(), "a corpus read problem is not an evidence-ledger violation");
     }

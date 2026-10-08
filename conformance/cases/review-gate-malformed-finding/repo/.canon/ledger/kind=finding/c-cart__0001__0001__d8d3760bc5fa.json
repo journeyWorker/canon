@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "reviewer-2",
+    "role": "reviewer"
+  },
+  "at": "2026-10-08T17:56:58.886973Z",
+  "change_id": "c-cart",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reviewer": "reviewer-2",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "adding an item twice duplicates the line"
+}

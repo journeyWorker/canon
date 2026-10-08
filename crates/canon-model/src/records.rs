@@ -22,7 +22,7 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::envelope::{CanonRecord, Envelope, RecordKind};
+use crate::envelope::{Actor, CanonRecord, Envelope, RecordKind};
 use crate::evidence::{EvidenceViolation, FailureClass};
 use crate::ids::{
     is_kebab_slug, ChangeId, PrNumber, ProjectId, RegimeKey, RoleId, RunId, ScenarioId, Sha, SessionId, SpecDigest, SubjectId,
@@ -166,6 +166,50 @@ pub struct Subject {
     pub owner_role: RoleId,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub change_ids: Vec<ChangeId>,
+    /// The accountable waiver this record's status transition was let
+    /// through under, when `spec_coverage.require_review` refused it and
+    /// the operator passed `canon subject status --override-reason`.
+    /// Skipped when absent, so every subject written without one stays
+    /// byte-identical on the wire. Each `canon subject status` write
+    /// clears it and sets it again only when it waives something, so a
+    /// waiver never outlives the status it was granted for.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub status_override: Option<StatusOverride>,
+}
+
+/// A recorded waiver of the `spec_coverage.require_review` status guard
+/// (see [`Subject::status_override`]). `canon gate check` reports a gap
+/// as an advisory naming this waiver only when it matches one of
+/// `waived` exactly, and only while the subject stays at `to`. A gap that
+/// appears later (a new blocker, a newly tagged scenario) is not covered
+/// and stays a violation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct StatusOverride {
+    /// The status the transition moved to under this waiver.
+    pub to: SubjectStatus,
+    /// The operator's reason, verbatim (one line).
+    pub reason: String,
+    /// Exactly the guard violations this waiver let through, sorted.
+    pub waived: Vec<WaivedViolation>,
+    /// Who waived it.
+    pub actor: Actor,
+}
+
+/// One violation a [`StatusOverride`] let through: the gate failure
+/// class (`unreviewed-promotion`, `open-blocker`) and the violation's
+/// subject (a scenario id, or `<change_id>#<round>.<seq>` for a
+/// blocker), as `canon gate check` prints them.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+pub struct WaivedViolation {
+    pub class: String,
+    pub subject: String,
+}
+
+impl StatusOverride {
+    /// Whether this waiver recorded the violation `(class, subject)`.
+    pub fn covers(&self, class: &str, subject: &str) -> bool {
+        self.waived.iter().any(|w| w.class == class && w.subject == subject)
+    }
 }
 
 impl Subject {
@@ -191,6 +235,7 @@ impl Subject {
             status,
             owner_role,
             change_ids: Vec::new(),
+            status_override: None,
         }
     }
 
@@ -1711,6 +1756,72 @@ mod tests {
         let subject: Subject = serde_json::from_value(json).expect("legacy subject must still deserialize");
         assert_eq!(subject.status, SubjectStatus::Verifying);
         assert!(serde_json::to_value(&subject).unwrap().get("scenario_ids").is_none(), "the stale key is not written back");
+    }
+
+    round_trip_test!(subject_with_status_override_round_trips, {
+        let mut s = Subject::new(
+            envelope(RecordKind::Subject),
+            SubjectId::parse("payments").unwrap(),
+            "payments",
+            "billing subject",
+            "planning",
+            SubjectStatus::Verifying,
+            RoleId::parse("planner").unwrap(),
+        );
+        s.status_override = Some(StatusOverride {
+            to: SubjectStatus::Verifying,
+            reason: "reviewer out until Monday; tracked in #42".to_string(),
+            waived: vec![
+                WaivedViolation { class: "open-blocker".to_string(), subject: "c-demo#1.1".to_string() },
+                WaivedViolation { class: "unreviewed-promotion".to_string(), subject: "world.demo.01".to_string() },
+            ],
+            actor: Actor::new_unattributed("lead"),
+        });
+        s
+    });
+
+    /// A waiver covers exactly the `(class, subject)` pairs it recorded:
+    /// another subject of the same class, or the same subject under
+    /// another class, is not covered.
+    #[test]
+    fn a_status_override_covers_only_its_recorded_violations() {
+        let waiver = StatusOverride {
+            to: SubjectStatus::Verifying,
+            reason: "r".to_string(),
+            waived: vec![WaivedViolation { class: "unreviewed-promotion".to_string(), subject: "world.demo.01".to_string() }],
+            actor: Actor::new_unattributed("lead"),
+        };
+        assert!(waiver.covers("unreviewed-promotion", "world.demo.01"));
+        assert!(!waiver.covers("unreviewed-promotion", "world.demo.02"));
+        assert!(!waiver.covers("open-blocker", "world.demo.01"));
+    }
+
+    /// A subject with no waiver carries no `status_override` key, so a
+    /// record written before the field existed reads back and reserializes
+    /// byte-identically (same content digest). A present `null` is
+    /// malformed, never read as "no waiver".
+    #[test]
+    fn a_subject_without_status_override_is_byte_identical_and_a_null_one_is_refused() {
+        let json = serde_json::json!({
+            "schema": 1,
+            "kind": "subject",
+            "at": "2026-07-20T12:00:00Z",
+            "actor": {"agent_id": "codex-cli", "role": "implementer"},
+            "subject_id": "payments",
+            "title": "payments",
+            "summary": "billing subject",
+            "domain": "planning",
+            "status": "verifying",
+            "owner_role": "planner",
+            "change_ids": ["s36-subject-domain-loop"]
+        });
+        let subject: Subject = serde_json::from_value(json.clone()).expect("a pre-0.12 subject must deserialize");
+        assert_eq!(subject.status_override, None);
+        assert_eq!(serde_json::to_value(&subject).unwrap(), json, "no waiver must not add a key on reserialize");
+
+        let mut with_null = json;
+        with_null["status_override"] = serde_json::Value::Null;
+        assert!(serde_json::from_value::<Subject>(with_null).is_err(), "a present null waiver must fail, not read as absent");
     }
 
     /// An attachment-bound record round-trips, an unbound one carries no

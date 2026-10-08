@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T17:41:12.967169Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject require_review_refuses_entering_its_scope_without_a_review"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 12,
+  "scenario_id": "subject.lifecycle.12",
+  "schema": 1,
+  "staging_id": "8016c32e5af2",
+  "verdict": "faithful"
+}

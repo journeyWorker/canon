@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T17:41:13.357636Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject gate_check_reports_unreviewed_and_open_blocker_for_an_in_scope_subject"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 17,
+  "scenario_id": "gate.check.17",
+  "schema": 1,
+  "staging_id": "ba5b4a40387d",
+  "verdict": "faithful"
+}

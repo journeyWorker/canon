@@ -327,6 +327,8 @@ mod tests {
             scenarios: Vec::new(),
             divergences: Vec::new(),
             subjects: Vec::new(),
+            reviews: Vec::new(),
+            findings: Vec::new(),
             violations: read.violations,
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
@@ -561,12 +563,12 @@ mod tests {
         let registry = SchemaRegistry::load();
         let now = now_after_threshold();
 
-        let ctx1 = GateContext::load(GateCtx::from_repo(&repo), &registry, now).unwrap();
+        let ctx1 = GateContext::load(GateCtx::from_repo(&repo).unwrap(), &registry, now).unwrap();
         assert!(ctx1.policy.is_clean(), "diagnostics: {:?}", ctx1.policy.diagnostics);
         let report1 = StalenessCheck.run(&ctx1);
         assert!(!report1.is_empty(), "sanity: this fixture at now_after_threshold must actually fire a violation, or this test proves nothing");
 
-        let ctx2 = GateContext::load(GateCtx::from_repo(&repo), &registry, now).unwrap();
+        let ctx2 = GateContext::load(GateCtx::from_repo(&repo).unwrap(), &registry, now).unwrap();
         let report2 = StalenessCheck.run(&ctx2);
 
         assert_eq!(report1, report2, "two independent GateContext::load calls at the SAME injected `now` must produce byte-identical reports");
@@ -578,7 +580,7 @@ mod tests {
         let registry = SchemaRegistry::load();
         let now = now_after_threshold();
 
-        let reports: Vec<_> = (0..3).map(|_| StalenessCheck.run(&GateContext::load(GateCtx::from_repo(&repo), &registry, now).unwrap())).collect();
+        let reports: Vec<_> = (0..3).map(|_| StalenessCheck.run(&GateContext::load(GateCtx::from_repo(&repo).unwrap(), &registry, now).unwrap())).collect();
         assert_eq!(reports[0], reports[1], "run 1 vs run 2 must agree");
         assert_eq!(reports[1], reports[2], "run 2 vs run 3 must agree — no run-to-run drift at a fixed now");
     }
@@ -588,14 +590,14 @@ mod tests {
         let (_dir, repo) = time_bearing_fixture();
         let registry = SchemaRegistry::load();
 
-        let ctx_before = GateContext::load(GateCtx::from_repo(&repo), &registry, now_before_threshold()).unwrap();
+        let ctx_before = GateContext::load(GateCtx::from_repo(&repo).unwrap(), &registry, now_before_threshold()).unwrap();
         assert!(ctx_before.policy.is_clean(), "diagnostics: {:?}", ctx_before.policy.diagnostics);
         assert!(
             StalenessCheck.run(&ctx_before).is_empty(),
             "age below the age_days threshold: surface_scoped resolves false, the surface-changed reason is never checked"
         );
 
-        let ctx_after = GateContext::load(GateCtx::from_repo(&repo), &registry, now_after_threshold()).unwrap();
+        let ctx_after = GateContext::load(GateCtx::from_repo(&repo).unwrap(), &registry, now_after_threshold()).unwrap();
         let violations = StalenessCheck.run(&ctx_after);
         assert_eq!(violations.len(), 1, "age above the age_days threshold: surface_scoped resolves true and the declared surface changed since the evidence sha");
         assert_eq!(violations[0].class, FailureClass::StaleEvidence);

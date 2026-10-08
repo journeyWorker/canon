@@ -11,9 +11,10 @@ canon/skills/
   scripts/canon-retrieve-pre-dispatch.sh
 ```
 
-The 16 topic references retain the former companion-skill bodies without their
-repeated YAML frontmatter. The umbrella source routes an agent to a topic; it
-does not replace Canon's explicit CLI commands or internal Rust modules.
+The 17 topic references retain the former companion-skill bodies without their
+repeated YAML frontmatter (`canon-review.md` is new in 0.12). The umbrella
+source routes an agent to a topic; it does not replace Canon's explicit CLI
+commands or internal Rust modules.
 
 ## Materialization
 

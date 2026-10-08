@@ -15,20 +15,21 @@ release-scoped check (below) enforces it. A human-only `flagged` overlay
 overrides the ladder — a flagged artifact is never green regardless of
 evidence. (Author `policy.yaml`'s trust/staleness fields via `canon-policy`.)
 
-## The eight failure classes
+## The nine failure classes
 
 Every violation carries one of these stable, grep-able strings:
 
 | Class | Meaning |
 |---|---|
 | `uncovered-cell` | Either a policy-required evidence cell (role × artifact) with no matching record, or — with `spec_coverage` enabled — a spec scenario that is unimplemented or mismatched, or a feature surface missing a `require_cases` case. The detail string distinguishes them. Coverage means "a test exists", not "a test passed": even a `Divergent` verdict satisfies the role-cell form. |
-| `unreviewed-promotion` | An artifact tagged `reviewed` has no matching ledger review record. |
+| `unreviewed-promotion` | An artifact tagged `reviewed` has no matching ledger review record — or, with `spec_coverage.require_review` set, an in-scope scenario has no qualifying `Review` (none at all, or only reviews by its own evidence actor). See `canon-review`. |
 | `trust-below-required` | Achieved trust level is below `policy.yaml`'s `trust_required` for its class — RELEASE-scoped only (`canon gate check --release`); never fires on an ordinary run. |
 | `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. |
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of passing evidence. |
 | `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` evidence record. |
 | `fabricated-evidence` | An evidence note contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) or a bare `verified` claim with no attached command result. |
+| `open-blocker` | With `spec_coverage.require_review` set (and `block_on_findings`, the default), a Finding whose latest version is severity `blocker`, disposition `open`, on a change an in-scope subject adopted. Subject string `<change_id>#<round>.<seq>`. See `canon-review`. |
 
 ## `canon gate check [--repo <dir>] [--release]`
 
@@ -65,6 +66,7 @@ spec_coverage:
   scope: [building, verifying]   # optional; omit for the whole corpus
   exclude_lanes: [process]       # optional
   require_cases: [failure]       # optional; see Golden-path only below
+  require_review: {}             # optional; see Independent review below
 ```
 
 - **Unimplemented** — no `EvidenceRecord` carries the scenario's
@@ -89,13 +91,32 @@ spec_coverage:
   no case, so an unclassified corpus is reported, not passed. Works with
   `require_evidence: false` too. `canon subject status <id> shipped`
   applies the same rule to the scenarios the subject owns.
+- **Independent review** (`require_review`) — scenarios whose subject is
+  in `require_review.scope` (default `[verifying, shipped]`; `[]` = every
+  scenario; independent of `scope` above) need a `Review` record
+  (`canon review add`), by a reviewer and actor other than the
+  scenario's evidence actor when `distinct_actor` (default `true`);
+  gaps are `unreviewed-promotion`. With `block_on_findings` (default
+  `true`), an open `blocker` Finding on a change an in-scope subject
+  adopted is `open-blocker`. `exclude_lanes` also exempts scenarios
+  from review. Full contract: `canon-review`.
+
+  ```yaml
+  spec_coverage:
+    require_evidence: true
+    require_review:                 # absent = nothing changes
+      scope: [verifying, shipped]   # default
+      distinct_actor: true          # default
+      block_on_findings: true       # default
+  ```
 
 Two refusals rather than a silent pass, both surfacing as
 `uncovered-cell` on the subject `spec_coverage`:
 
-- A **malformed section** (unknown key, unknown `scope` status) refuses
-  at check time. It is never treated as absent — a typo must not be
-  silently equivalent to not opting in.
+- A **malformed section** (unknown key, unknown `scope` status, or a
+  malformed `require_cases`/`require_review` — unknown key, bad status,
+  `null`, non-mapping) refuses at check time. It is never treated as
+  absent — a typo must not be silently equivalent to not opting in.
 - A **corpus kind routed off the gate's rung** (`scenario`,
   `divergence`, or `subject` sent anywhere but `local`) refuses, because
   the gate reads one tier and would otherwise pass by seeing nothing.
@@ -103,6 +124,22 @@ Two refusals rather than a silent pass, both surfacing as
 Malformed rows in those three kinds do NOT surface as
 `malformed-evidence`; they are kept off the evidence violation set on
 purpose, so enabling nothing changes no existing verdict.
+
+### Review-waiver advisories
+
+A subject moved into a review-scoped status with `canon subject status
+--override-reason` (see `canon-subject`) keeps the `unreviewed-promotion`
+and `open-blocker` gaps its waiver recorded visible without failing the
+gate. Only those exact `(class, subject)` pairs are waived; a gap that
+appears later is a violation. The waived ones print after the
+violations:
+
+```
+review waivers: 1 advisory(ies) — not failing the gate:
+  waived unreviewed-promotion world.demo.01 — no review record ... [waiver: subject `demo-subject` moved to verifying by `lead`: reviewer out until Monday]
+```
+
+The waiver lasts only until the subject's next status write.
 
 ## Experimental: evidence binding (`experimental.evidence_binding`, off by default)
 
@@ -243,7 +280,8 @@ Prefer this over hand-editing `settings.json`/`hooks.json`.
 
 ## `canon gate selftest`
 
-Runs the shipped fixture corpus — one fixture per failure class, each a
+Runs the shipped fixture corpus — one fixture per failure class (nine,
+including `open-blocker`), each a
 deliberately broken corpus proving that class fires and ONLY that class
 (both under-detection and over-triggering fail the run). Takes no
 `--repo`; self-contained. Run it before trusting any other `canon gate

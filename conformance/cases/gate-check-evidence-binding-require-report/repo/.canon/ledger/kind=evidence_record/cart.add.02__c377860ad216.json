@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T17:16:47.905485Z",
+  "attachments": [
+    {
+      "path": "reports/junit.xml",
+      "sha256": "b7cbf09d38648bf6cab5ccf5a647f737a3b49fda43b5679209f84ded60ed1e9f"
+    }
+  ],
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test"
+  },
+  "kind": "evidence_record",
+  "project_id": "root",
+  "run_seq": 2,
+  "scenario_id": "cart.add.02",
+  "schema": 1,
+  "staging_id": "3a89710b73e4",
+  "verdict": "faithful"
+}

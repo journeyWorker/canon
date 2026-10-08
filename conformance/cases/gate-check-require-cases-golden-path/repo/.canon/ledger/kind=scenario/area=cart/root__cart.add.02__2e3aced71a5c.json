@@ -1,0 +1,13 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-08T17:13:52.219313Z",
+  "case": "golden",
+  "kind": "scenario",
+  "project_id": "root",
+  "scenario_id": "cart.add.02",
+  "schema": 1,
+  "source_digest": "b6ec04c7a01f4592baeec195fdae94000e9febb4b30f9b9dc447230d8f1bf59c",
+  "title": "Adding an item twice raises its quantity"
+}

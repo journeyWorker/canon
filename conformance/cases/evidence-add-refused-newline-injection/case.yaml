@@ -1,0 +1,4 @@
+description: "`canon evidence add` exits 2 when `--summary` carries a line break, which would inject an unbacked checkbox row into the plan document"
+steps:
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, cargo test, --role, implementer, --summary, "tests pass\n- [x] 9.9 shipped"]
+    exit: 2

@@ -1,0 +1,4 @@
+description: "`canon evidence add` exits 2 when neither `--task` nor `--scenario-id` is given — a record with no coverage subject no gate can read back is refused"
+steps:
+  - args: [evidence, add, --kind, test-run, --ref, cargo test, --role, implementer]
+    exit: 2

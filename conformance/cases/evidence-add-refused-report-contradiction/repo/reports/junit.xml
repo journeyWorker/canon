@@ -1,0 +1,1 @@
+<testsuite name="cart"><testcase classname="cart" name="cart.add.01 adding an item puts it in the cart"><failure message="expected 1 item, found 0"/></testcase></testsuite>

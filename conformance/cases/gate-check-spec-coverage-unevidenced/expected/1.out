@@ -1,0 +1,4 @@
+canon gate check: 1 violation(s)
+
+uncovered-cell (1):
+  uncovered-cell cart.add.02 — spec scenario has no evidence record — specified, never attested to

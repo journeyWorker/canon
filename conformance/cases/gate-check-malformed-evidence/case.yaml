@@ -1,0 +1,4 @@
+description: "`canon gate check` exits 1 with a `malformed-evidence` line naming the ledger file for every refused evidence record, whether truncated (unparseable JSON) or parseable but schema-invalid (`verdict: maybe`), never skipping it silently"
+steps:
+  - args: [gate, check]
+    exit: 1

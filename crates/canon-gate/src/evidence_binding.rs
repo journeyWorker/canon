@@ -68,8 +68,17 @@ pub struct BindingGap {
 
 impl BindingGap {
     pub fn detail(&self) -> String {
+        // Name the flag that actually reaches `required`: an artifact
+        // never satisfies `report`, so suggesting `--artifact` there
+        // would send the author round a second failing gate run.
+        let hint = match self.required {
+            BindingStrength::Report => "bind a passing report with `canon evidence add --report <junit|cucumber>:<path>`",
+            BindingStrength::Artifact | BindingStrength::Attested => {
+                "bind it with `canon evidence add --artifact <path>` or `--report <junit|cucumber>:<path>`"
+            }
+        };
         format!(
-            "latest evidence is {} but experimental evidence binding requires {} — bind it with `canon evidence add --artifact <path>` or `--report <junit|cucumber>:<path>`",
+            "latest evidence is {} but experimental evidence binding requires {} — {hint}",
             self.actual.as_str(),
             self.required.as_str()
         )
@@ -314,6 +323,8 @@ mod tests {
             scenarios,
             divergences: Vec::new(),
             subjects,
+            reviews: Vec::new(),
+            findings: Vec::new(),
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
@@ -394,6 +405,7 @@ mod tests {
             "{}",
             violations[0].detail
         );
+        assert!(violations[0].detail.contains("--artifact <path>"), "an artifact satisfies `artifact`: {}", violations[0].detail);
     }
 
     /// The latest record decides: binding an older attestation does not
@@ -457,6 +469,12 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["a.b.02"]
         );
+        assert!(
+            !summary.gaps[0].detail().contains("--artifact"),
+            "an artifact never reaches `report`, so the hint must not offer it: {}",
+            summary.gaps[0].detail()
+        );
+        assert!(summary.gaps[0].detail().contains("--report <junit|cucumber>:<path>"), "{}", summary.gaps[0].detail());
     }
 
     /// `scope` holds only scenarios whose subject is in a listed status.

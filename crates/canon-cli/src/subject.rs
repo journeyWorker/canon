@@ -42,13 +42,30 @@
 //! UNCHANGED (fail closed). Every other transition is the pure
 //! [`is_valid_transition`] chain; an off-chain transition is refused
 //! (exit `2`), the record likewise unchanged.
+//!
+//! # `spec_coverage.require_review` guards every transition into its scope
+//! With the policy present (issue #2), a transition whose target status
+//! `require_review.scope` covers also runs
+//! [`canon_gate::review_gate::subject_guard`]: every owned scenario needs
+//! a qualifying review, and no adopted change may carry an open blocker
+//! finding. A refusal exits `1` with the record unchanged, like the ship
+//! gate. With `block_on_findings`, a Finding row the ledger read refused
+//! is a `malformed-evidence` refusal naming its file
+//! ([`canon_gate::review_gate::malformed_findings`]), never waivable.
+//! `--override-reason` lets ONLY the review checks through; the
+//! reason, the waived classes, and the actor are recorded on the new
+//! Subject record ([`canon_model::StatusOverride`]), and `canon gate
+//! check` keeps reporting the gaps as advisories. The guard prints, on
+//! stderr, which checks it ran and which it skipped. Without the policy
+//! none of this runs and the output is unchanged.
 
 use std::path::Path;
 
+use canon_gate::review_gate::{active_require_review, malformed_findings, subject_guard, unreadable_review_kinds, unreadable_violation};
 use canon_gate::spec_coverage::{case_gaps, subject_scenarios};
-use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, SpecCoverage, Violation};
+use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, PolicyResolution, RequireReview, SpecCoverage, Violation};
 use canon_model::{
-    Actor, Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, RoleId, Subject, SubjectId, SubjectStatus,
+    Actor, Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, RoleId, StatusOverride, Subject, SubjectId, SubjectStatus, WaivedViolation,
 };
 use canon_policy::SchemaRegistry;
 use canon_store::registry::TierRegistry;
@@ -416,11 +433,20 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
 /// `canon subject status <id> <state>` (module doc): apply a lifecycle
 /// transition. Refuses an off-chain step ([`is_valid_transition`], exit
 /// `2`); for `verifying → shipped` additionally runs
-/// [`ship_gate_violations`] and, on any violation, prints each by
-/// failure class and exits `1` with the record UNCHANGED (fail closed).
-/// A successful transition re-stamps the subject (fresh `at`) and
-/// persists it through the routed tier.
-pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, json: bool) -> i32 {
+/// [`ship_gate_violations`], and for a target `require_review.scope`
+/// covers, the review guard (module doc). On any violation it prints
+/// each by failure class and exits `1` with the record UNCHANGED (fail
+/// closed), unless every violation is a review check and
+/// `override_reason` waives them. A successful transition re-stamps the
+/// subject (fresh `at`) and persists it through the routed tier.
+pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, override_reason: Option<&str>, actor_id: &str, json: bool) -> i32 {
+    if let Some(reason) = override_reason {
+        if reason.trim().is_empty() || reason.contains(['\n', '\r']) {
+            eprintln!("canon subject status: refused — --override-reason must be one non-empty line; it is recorded on the subject as the accountable reason");
+            return EXIT_REFUSED;
+        }
+    }
+
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = resolve_canon_yaml(&repo, None);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
@@ -453,20 +479,82 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, js
         return EXIT_REFUSED;
     }
 
-    if current == SubjectStatus::Verifying && target == SubjectStatus::Shipped {
-        match ship_gate_violations(&repo, subject_id) {
-            Ok(violations) if !violations.is_empty() => {
-                for v in &violations {
-                    eprintln!("canon subject status: {}", v.line());
-                }
-                return EXIT_GATED;
-            }
-            Ok(_) => {}
+    let schemas = SchemaRegistry::load();
+    let policy = PolicyResolution::resolve(&repo, &schemas);
+    let ships = current == SubjectStatus::Verifying && target == SubjectStatus::Shipped;
+    let reviews = match &policy.spec_coverage {
+        Some(SpecCoverage::Active { require_review: Some(rr), .. }) => rr.covers(target),
+        _ => false,
+    };
+    let gate_context = if ships || reviews {
+        match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &schemas, Utc::now()).map_err(|e| e.to_string())) {
+            Ok(ctx) => Some(ctx),
             Err(e) => {
                 eprintln!("canon subject status: {e}");
                 return EXIT_REFUSED;
             }
         }
+    } else {
+        None
+    };
+
+    let mut blocking = match (ships, &gate_context) {
+        (true, Some(ctx)) => ship_gate_violations(ctx, subject_id),
+        _ => Vec::new(),
+    };
+    let mut waivable = Vec::new();
+    report_review_guard(&policy, current, target, subject.change_ids.len());
+    if let (true, Some(ctx)) = (reviews, &gate_context) {
+        let (rr, exclude_lanes) = active_require_review(ctx).expect("`reviews` implies an active require_review");
+        let unreadable = unreadable_review_kinds(ctx, rr);
+        if unreadable.is_empty() {
+            // An unreadable finding blocks, unwaivably: it might be an
+            // open blocker on this subject's changes.
+            blocking.extend(malformed_findings(ctx, rr));
+            waivable = subject_guard(ctx, rr, exclude_lanes, subject_id, &subject.change_ids);
+            for violation in &mut waivable {
+                violation.detail = format!("{} → {}: {}", status_str(current), status_str(target), violation.detail);
+            }
+        } else {
+            blocking.push(unreadable_violation(&unreadable));
+        }
+    }
+
+    if !blocking.is_empty() {
+        for v in blocking.iter().chain(&waivable) {
+            eprintln!("canon subject status: {}", v.line());
+        }
+        if override_reason.is_some() {
+            eprintln!("canon subject status: --override-reason waives only the review checks (unreviewed-promotion, open-blocker); the violations above that are not review checks still refuse this transition");
+        }
+        return EXIT_GATED;
+    }
+
+    // A waiver belongs to the transition that needed it: every write
+    // starts without one, so an old waiver never carries forward.
+    subject.status_override = None;
+    if !waivable.is_empty() {
+        let Some(reason) = override_reason else {
+            for v in &waivable {
+                eprintln!("canon subject status: {}", v.line());
+            }
+            eprintln!(
+                "canon subject status: refused — record an independent review (`canon review add`) and close blocker findings, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject and `canon gate check` keeps listing these gaps"
+            );
+            return EXIT_GATED;
+        };
+        for v in &waivable {
+            eprintln!("canon subject status: waived {}", v.line());
+        }
+        let waived: std::collections::BTreeSet<WaivedViolation> =
+            waivable.iter().map(|v| WaivedViolation { class: v.class.as_str().to_string(), subject: v.subject.clone() }).collect();
+        let count = waived.len();
+        subject.status_override = Some(StatusOverride { to: target, reason: reason.to_string(), waived: waived.into_iter().collect(), actor: Actor::new_unattributed(actor_id) });
+        eprintln!(
+            "canon subject status: override recorded by `{actor_id}` for the {count} violation(s) above: {reason}; a gap that appears later is not covered"
+        );
+    } else if override_reason.is_some() {
+        eprintln!("canon subject status: --override-reason not recorded — no review check refused this transition");
     }
 
     subject.status = target;
@@ -485,6 +573,34 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, js
             eprintln!("canon subject status: {e}");
             EXIT_REFUSED
         }
+    }
+}
+
+/// Print, on stderr, which review checks this transition runs and which
+/// it skips. Silent when `policy.yaml` has no `require_review`, so a repo
+/// that never opted in sees exactly the pre-0.12 output.
+fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: SubjectStatus, changes: usize) {
+    let rr: &RequireReview = match &policy.spec_coverage {
+        Some(SpecCoverage::Active { require_review: Some(rr), .. }) => rr,
+        Some(SpecCoverage::Invalid { .. }) => {
+            eprintln!("canon subject status: review guard skipped — policy.yaml's `spec_coverage` section is invalid, so whether review is required cannot be read; `canon gate check` reports why");
+            return;
+        }
+        _ => return,
+    };
+    let scope = if rr.scope.is_empty() { "every status".to_string() } else { rr.scope.iter().map(|s| status_str(*s)).collect::<Vec<_>>().join(", ") };
+    eprintln!("canon subject status: review guard for {} → {} (spec_coverage.require_review, scope: {scope})", status_str(from), status_str(to));
+    if !rr.covers(to) {
+        eprintln!("canon subject status:   skipped unreviewed-promotion — `{}` is not in require_review.scope", status_str(to));
+        eprintln!("canon subject status:   skipped open-blocker — `{}` is not in require_review.scope", status_str(to));
+        return;
+    }
+    let rule = if rr.distinct_actor { "a review by an actor other than its evidence actor" } else { "a review record" };
+    eprintln!("canon subject status:   ran unreviewed-promotion — every owned scenario needs {rule}");
+    if rr.block_on_findings {
+        eprintln!("canon subject status:   ran open-blocker — {changes} adopted change(s) checked for open blocker findings");
+    } else {
+        eprintln!("canon subject status:   skipped open-blocker — require_review.block_on_findings is false");
     }
 }
 
@@ -508,31 +624,27 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, js
 ///   carries no scenario of a required case (through the SAME
 ///   [`case_gaps`] rule `canon gate check` applies), so a subject cannot
 ///   ship on a spec that only describes its golden path.
-fn ship_gate_violations(repo: &Path, subject_id: &SubjectId) -> Result<Vec<Violation>, String> {
-    let ctx = GateCtx::from_repo(repo);
-    let registry = SchemaRegistry::load();
-    let now = Utc::now();
-    let gate_context = GateContext::load(ctx, &registry, now).map_err(|e| e.to_string())?;
+fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> Vec<Violation> {
     let subject = subject_id.as_str();
 
     if gate_context.unreadable_kinds.contains(&RecordKind::Scenario) {
-        return Ok(vec![Violation::new(
+        return vec![Violation::new(
             FailureClass::UncoveredCell,
             subject,
             "verifying → shipped: the `scenario` kind routes away from the rung the gate reads, so this subject's scenarios cannot be counted; route `scenario` to `local`",
-        )]);
+        )];
     }
 
-    let owned = subject_scenarios(&gate_context, subject_id);
+    let owned = subject_scenarios(gate_context, subject_id);
     if owned.is_empty() {
-        return Ok(vec![Violation::new(
+        return vec![Violation::new(
             FailureClass::UncoveredCell,
             subject,
             format!("verifying → shipped: no scenario is tagged `@subject:{subject}` — tag its scenarios and run `canon inventory sync`; shipping needs evidence, not an empty set"),
-        )]);
+        )];
     }
 
-    let verdicts = latest_verdicts(&gate_context);
+    let verdicts = latest_verdicts(gate_context);
     let mut violations = Vec::new();
     for scenario in &owned {
         let sid = scenario.scenario_id.as_str().to_string();
@@ -556,7 +668,7 @@ fn ship_gate_violations(repo: &Path, subject_id: &SubjectId) -> Result<Vec<Viola
             violations.push(violation);
         }
     }
-    Ok(violations)
+    violations
 }
 
 #[cfg(test)]

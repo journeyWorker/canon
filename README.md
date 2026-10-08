@@ -67,6 +67,98 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.12.0 release
+
+Version 0.12.0 pins canon's command-line behavior in a conformance corpus,
+adds an opt-in independent-review gate, and makes the ledger commands fail
+loud on an invalid `canon.yaml`.
+
+**Conformance corpus.** [`conformance/`](conformance/README.md) replays
+real `canon` invocations against checked-in fixture repos and compares
+normalized stdout, stderr, and exit code byte for byte;
+`conformance/regenerate.sh` is the only bless path, and any changed
+expectation is a contract change named in the release notes. The case
+groups and what they pin:
+
+- `version` — `canon --version` output.
+- `gate-check-*` — exit 0 on a clean corpus, 1 on a red cell, 2 on an
+  invalid `canon.yaml`; `malformed-evidence` naming the file; the
+  `spec_coverage` evidence and `require_cases` golden-path checks; and
+  experimental evidence binding off / warn / require / require-report /
+  malformed section.
+- `usage-error-unreadable-canon-yaml` — exit 2 with the parse error when a
+  command cannot read `canon.yaml`.
+- `evidence-add-refused-*` — refusals for a file outside the repo, newline
+  injection, no matching report case, no subject key, and a report that
+  contradicts the verdict.
+- `subject-ship-*` and `subject-status-off-chain-transition` — ship refused
+  on no tagged scenarios, a missing verdict, or a `require_cases` gap;
+  ship allowed; an off-chain status transition.
+- `context-json-policy-summary`, `inventory-sync-tag-diagnostics`,
+  `query-subject-json` — the read surfaces: `canon context --json` policy
+  summary, inventory tag diagnostics, `canon query --kind subject --json`.
+- `review-gate-*` — the review gate below: unreviewed promotion refused,
+  self-review not counted, distinct review passes, open blocker, recorded
+  override, unreadable finding blocks.
+
+**Fail loud on an invalid `canon.yaml`.** The commands that read or write
+the ledger (`gate`, `inventory sync`, `evidence`, `review`, `finding`,
+`divergence`, `subject`, `report`, `dashboard`, and the rest) now exit 2
+naming `<repo>/canon.yaml` and the parse error, where they used to fall
+back silently to the default ledger. One deliberate exception:
+`canon dispatch begin`/`end` still exit 0, writing the run manifest and
+printing the unpersisted ledger write, with the parse error, as a stderr
+warning, because failing a live dispatch would lose the run's provenance.
+`canon retrieve`, which reads only the learn store, still falls back to its
+defaults. *Migration:* a `canon.yaml` that only
+worked because of that fallback now refuses — notably a legacy
+`tiers: git:` layout; rewrite it to named tiers
+(`tiers: { local: { backend: git, root: .canon/ledger } }`) before
+upgrading.
+
+**Smaller fixes.** A `malformed-evidence` violation now names the ledger
+file for schema-invalid records too (for example `verdict: maybe`), not only
+for unparseable JSON. Under `experimental.evidence_binding` with
+`strength: report`, the remediation hint names `--report`, never
+`--artifact`, since an artifact cannot reach that strength. `canon context`
+reports `capabilityVersion` 4.
+
+**Independent review before "done"** ([journeyWorker/canon#2](https://github.com/journeyWorker/canon/issues/2)).
+Until now, a subject could reach `verifying` or `shipped` on evidence the
+same agent wrote, and open review findings did not affect the gate: nothing
+asked whether anyone other than the author had looked at the work. The new
+opt-in `spec_coverage.require_review` policy (`scope`, default
+`[verifying, shipped]`; `distinct_actor`, default `true`;
+`block_on_findings`, default `true`) makes `canon gate check` report each
+in-scope scenario with no `canon review add` record by someone other than
+its evidence actor as `unreviewed-promotion`, and adds a ninth failure
+class, `open-blocker`, for an open `blocker` finding on a change the
+subject adopted. `canon subject status` runs the same checks when moving
+into a scoped status, prints which ones it ran or skipped, and refuses on
+gaps; `--override-reason "<one line>"` (with `--actor-id`) waives only
+the violations of those two classes it reports, records exactly those on
+the subject, and leaves them listed as advisories by `canon gate check`
+until the next status change; a gap that appears later is not covered.
+With `block_on_findings`, a finding record canon cannot read (unparseable,
+schema-invalid, or misfiled) is a `malformed-evidence` violation naming
+its ledger file, in `canon gate check` and in `canon subject status`, and
+no override waives it: it might be an open blocker. An unreadable review
+record already fails closed, because it counts as no review.
+`canon context` now lists finding severities, dispositions, Review fields,
+and the active `require_review` setting. Nothing changes for a repo that
+does not set `require_review`; canon's own policy leaves it off for now.
+
+**Changed conformance expectations.** `version` re-blessed for
+`canon 0.12.0`. `usage-error-unreadable-canon-yaml` `1.err` now reads
+``parsing `<repo>/canon.yaml`: canon.yaml TierPolicy: …`` from the shared
+fail-loud loader instead of the old inventory-only message.
+`context-json-policy-summary` was re-blessed because `canon context --json`
+now carries the `review` object, `capabilityVersion` 4, and the Subject
+kind's optional `status_override` field. Every other case is unchanged.
+
+**Website.** The docs site is redesigned as the "Grid Manual" (EN and KO
+landing, re-themed Starlight docs, a build-time corpus figure).
+
 ## 0.11.0 release (experimental evidence binding)
 
 Version 0.11.0 adds an **experimental, off-by-default** way to bind

@@ -1,0 +1,6 @@
+description: "A review by an actor other than the evidence actor satisfies `require_review`: `canon subject status <id> verifying` exits 0 and `canon gate check` is clean (exit 0)"
+steps:
+  - args: [subject, status, cart, verifying]
+    exit: 0
+  - args: [gate, check]
+    exit: 0

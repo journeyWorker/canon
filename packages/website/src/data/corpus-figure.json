@@ -1,0 +1,2339 @@
+{
+  "generatedAt": "2026-10-08T18:13:47.577Z",
+  "sourceCommit": "5191ef1308f77feb71ccee790784c4d98eaba983",
+  "scenarioCount": 257,
+  "withEvidence": 257,
+  "evidenceAtOrBeforeAuthoring": 248,
+  "evidenceAfterAuthoring": 9,
+  "withoutEvidence": 0,
+  "range": {
+    "start": "2026-08-06T15:34:18+09:00",
+    "end": "2026-10-09T02:41:18+09:00",
+    "startMs": 1785998058000,
+    "endMs": 1791481278000
+  },
+  "gate": {
+    "command": "canon gate check",
+    "runner": "canon 0.11.0",
+    "exitCode": 0,
+    "violations": 0,
+    "clean": true,
+    "summary": "canon gate check: clean (0 violations)",
+    "checkedAt": "2026-10-08T18:13:47.662Z"
+  },
+  "scenarios": [
+    {
+      "id": "finding.close.01",
+      "file": "specs/features/kind=feature/area=finding/close.feature",
+      "authoredAt": "2026-08-06T15:34:18+09:00",
+      "authoredMs": 1785998058000,
+      "firstEvidenceAt": "2026-08-06T06:14:14.778488Z",
+      "firstEvidenceMs": 1785996854778,
+      "lagHours": -0.3
+    },
+    {
+      "id": "finding.close.02",
+      "file": "specs/features/kind=feature/area=finding/close.feature",
+      "authoredAt": "2026-08-06T15:34:18+09:00",
+      "authoredMs": 1785998058000,
+      "firstEvidenceAt": "2026-08-06T06:14:14.802973Z",
+      "firstEvidenceMs": 1785996854802,
+      "lagHours": -0.3
+    },
+    {
+      "id": "finding.close.03",
+      "file": "specs/features/kind=feature/area=finding/close.feature",
+      "authoredAt": "2026-08-06T15:34:18+09:00",
+      "authoredMs": 1785998058000,
+      "firstEvidenceAt": "2026-08-06T06:14:14.815447Z",
+      "firstEvidenceMs": 1785996854815,
+      "lagHours": -0.3
+    },
+    {
+      "id": "finding.close.04",
+      "file": "specs/features/kind=feature/area=finding/close.feature",
+      "authoredAt": "2026-08-06T15:34:18+09:00",
+      "authoredMs": 1785998058000,
+      "firstEvidenceAt": "2026-08-06T06:14:14.827954Z",
+      "firstEvidenceMs": 1785996854827,
+      "lagHours": -0.3
+    },
+    {
+      "id": "finding.close.05",
+      "file": "specs/features/kind=feature/area=finding/close.feature",
+      "authoredAt": "2026-08-06T15:34:18+09:00",
+      "authoredMs": 1785998058000,
+      "firstEvidenceAt": "2026-08-06T06:14:14.839757Z",
+      "firstEvidenceMs": 1785996854839,
+      "lagHours": -0.3
+    },
+    {
+      "id": "finding.close.06",
+      "file": "specs/features/kind=feature/area=finding/close.feature",
+      "authoredAt": "2026-08-06T15:34:18+09:00",
+      "authoredMs": 1785998058000,
+      "firstEvidenceAt": "2026-08-06T06:14:14.854569Z",
+      "firstEvidenceMs": 1785996854854,
+      "lagHours": -0.3
+    },
+    {
+      "id": "finding.close.07",
+      "file": "specs/features/kind=feature/area=finding/close.feature",
+      "authoredAt": "2026-08-06T15:34:18+09:00",
+      "authoredMs": 1785998058000,
+      "firstEvidenceAt": "2026-08-06T06:14:14.868357Z",
+      "firstEvidenceMs": 1785996854868,
+      "lagHours": -0.3
+    },
+    {
+      "id": "finding.close.08",
+      "file": "specs/features/kind=feature/area=finding/close.feature",
+      "authoredAt": "2026-08-06T15:34:18+09:00",
+      "authoredMs": 1785998058000,
+      "firstEvidenceAt": "2026-08-06T06:14:14.881909Z",
+      "firstEvidenceMs": 1785996854881,
+      "lagHours": -0.3
+    },
+    {
+      "id": "authoring.scaffold.01",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.412054Z",
+      "firstEvidenceMs": 1786014780412,
+      "lagHours": -0.2
+    },
+    {
+      "id": "authoring.scaffold.02",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.429686Z",
+      "firstEvidenceMs": 1786014780429,
+      "lagHours": -0.2
+    },
+    {
+      "id": "authoring.scaffold.03",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.447785Z",
+      "firstEvidenceMs": 1786014780447,
+      "lagHours": -0.2
+    },
+    {
+      "id": "authoring.scaffold.04",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.460754Z",
+      "firstEvidenceMs": 1786014780460,
+      "lagHours": -0.2
+    },
+    {
+      "id": "authoring.scaffold.05",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.474087Z",
+      "firstEvidenceMs": 1786014780474,
+      "lagHours": -0.2
+    },
+    {
+      "id": "authoring.scaffold.06",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.487222Z",
+      "firstEvidenceMs": 1786014780487,
+      "lagHours": -0.2
+    },
+    {
+      "id": "authoring.scaffold.07",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.500804Z",
+      "firstEvidenceMs": 1786014780500,
+      "lagHours": -0.2
+    },
+    {
+      "id": "authoring.scaffold.08",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.512949Z",
+      "firstEvidenceMs": 1786014780512,
+      "lagHours": -0.2
+    },
+    {
+      "id": "context.capability.01",
+      "file": "specs/features/kind=feature/area=context/capability.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.526073Z",
+      "firstEvidenceMs": 1786014780526,
+      "lagHours": -0.2
+    },
+    {
+      "id": "context.capability.02",
+      "file": "specs/features/kind=feature/area=context/capability.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.537360Z",
+      "firstEvidenceMs": 1786014780537,
+      "lagHours": -0.2
+    },
+    {
+      "id": "context.capability.03",
+      "file": "specs/features/kind=feature/area=context/capability.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.550809Z",
+      "firstEvidenceMs": 1786014780550,
+      "lagHours": -0.2
+    },
+    {
+      "id": "context.capability.04",
+      "file": "specs/features/kind=feature/area=context/capability.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.564321Z",
+      "firstEvidenceMs": 1786014780564,
+      "lagHours": -0.2
+    },
+    {
+      "id": "context.capability.05",
+      "file": "specs/features/kind=feature/area=context/capability.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.577417Z",
+      "firstEvidenceMs": 1786014780577,
+      "lagHours": -0.2
+    },
+    {
+      "id": "context.capability.06",
+      "file": "specs/features/kind=feature/area=context/capability.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.590436Z",
+      "firstEvidenceMs": 1786014780590,
+      "lagHours": -0.2
+    },
+    {
+      "id": "context.capability.07",
+      "file": "specs/features/kind=feature/area=context/capability.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.604508Z",
+      "firstEvidenceMs": 1786014780604,
+      "lagHours": -0.2
+    },
+    {
+      "id": "context.capability.08",
+      "file": "specs/features/kind=feature/area=context/capability.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.617616Z",
+      "firstEvidenceMs": 1786014780617,
+      "lagHours": -0.2
+    },
+    {
+      "id": "context.capability.09",
+      "file": "specs/features/kind=feature/area=context/capability.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.632375Z",
+      "firstEvidenceMs": 1786014780632,
+      "lagHours": -0.2
+    },
+    {
+      "id": "dispatch.manifest.01",
+      "file": "specs/features/kind=feature/area=dispatch/manifest.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.645284Z",
+      "firstEvidenceMs": 1786014780645,
+      "lagHours": -0.2
+    },
+    {
+      "id": "dispatch.manifest.02",
+      "file": "specs/features/kind=feature/area=dispatch/manifest.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.659570Z",
+      "firstEvidenceMs": 1786014780659,
+      "lagHours": -0.2
+    },
+    {
+      "id": "dispatch.manifest.03",
+      "file": "specs/features/kind=feature/area=dispatch/manifest.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.672653Z",
+      "firstEvidenceMs": 1786014780672,
+      "lagHours": -0.2
+    },
+    {
+      "id": "dispatch.manifest.04",
+      "file": "specs/features/kind=feature/area=dispatch/manifest.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.684859Z",
+      "firstEvidenceMs": 1786014780684,
+      "lagHours": -0.2
+    },
+    {
+      "id": "dispatch.manifest.05",
+      "file": "specs/features/kind=feature/area=dispatch/manifest.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.697910Z",
+      "firstEvidenceMs": 1786014780697,
+      "lagHours": -0.2
+    },
+    {
+      "id": "dispatch.manifest.06",
+      "file": "specs/features/kind=feature/area=dispatch/manifest.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.710632Z",
+      "firstEvidenceMs": 1786014780710,
+      "lagHours": -0.2
+    },
+    {
+      "id": "dispatch.manifest.07",
+      "file": "specs/features/kind=feature/area=dispatch/manifest.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.724480Z",
+      "firstEvidenceMs": 1786014780724,
+      "lagHours": -0.2
+    },
+    {
+      "id": "divergence.lifecycle.01",
+      "file": "specs/features/kind=feature/area=divergence/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.737886Z",
+      "firstEvidenceMs": 1786014780737,
+      "lagHours": -0.2
+    },
+    {
+      "id": "divergence.lifecycle.02",
+      "file": "specs/features/kind=feature/area=divergence/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.751148Z",
+      "firstEvidenceMs": 1786014780751,
+      "lagHours": -0.2
+    },
+    {
+      "id": "divergence.lifecycle.03",
+      "file": "specs/features/kind=feature/area=divergence/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.764264Z",
+      "firstEvidenceMs": 1786014780764,
+      "lagHours": -0.2
+    },
+    {
+      "id": "divergence.lifecycle.04",
+      "file": "specs/features/kind=feature/area=divergence/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.776840Z",
+      "firstEvidenceMs": 1786014780776,
+      "lagHours": -0.2
+    },
+    {
+      "id": "divergence.lifecycle.05",
+      "file": "specs/features/kind=feature/area=divergence/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.789570Z",
+      "firstEvidenceMs": 1786014780789,
+      "lagHours": -0.2
+    },
+    {
+      "id": "divergence.lifecycle.06",
+      "file": "specs/features/kind=feature/area=divergence/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.803058Z",
+      "firstEvidenceMs": 1786014780803,
+      "lagHours": -0.2
+    },
+    {
+      "id": "divergence.lifecycle.07",
+      "file": "specs/features/kind=feature/area=divergence/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.814932Z",
+      "firstEvidenceMs": 1786014780814,
+      "lagHours": -0.2
+    },
+    {
+      "id": "divergence.lifecycle.08",
+      "file": "specs/features/kind=feature/area=divergence/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.827633Z",
+      "firstEvidenceMs": 1786014780827,
+      "lagHours": -0.2
+    },
+    {
+      "id": "divergence.lifecycle.09",
+      "file": "specs/features/kind=feature/area=divergence/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.841320Z",
+      "firstEvidenceMs": 1786014780841,
+      "lagHours": -0.2
+    },
+    {
+      "id": "evidence.add.01",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.855126Z",
+      "firstEvidenceMs": 1786014780855,
+      "lagHours": -0.2
+    },
+    {
+      "id": "evidence.add.02",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.867613Z",
+      "firstEvidenceMs": 1786014780867,
+      "lagHours": -0.2
+    },
+    {
+      "id": "evidence.add.03",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.879856Z",
+      "firstEvidenceMs": 1786014780879,
+      "lagHours": -0.2
+    },
+    {
+      "id": "evidence.add.04",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.892608Z",
+      "firstEvidenceMs": 1786014780892,
+      "lagHours": -0.2
+    },
+    {
+      "id": "evidence.add.05",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.905737Z",
+      "firstEvidenceMs": 1786014780905,
+      "lagHours": -0.2
+    },
+    {
+      "id": "evidence.add.06",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.919568Z",
+      "firstEvidenceMs": 1786014780919,
+      "lagHours": -0.2
+    },
+    {
+      "id": "evidence.add.07",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.931715Z",
+      "firstEvidenceMs": 1786014780931,
+      "lagHours": -0.2
+    },
+    {
+      "id": "evidence.add.08",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.942506Z",
+      "firstEvidenceMs": 1786014780942,
+      "lagHours": -0.2
+    },
+    {
+      "id": "evidence.add.09",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.954628Z",
+      "firstEvidenceMs": 1786014780954,
+      "lagHours": -0.2
+    },
+    {
+      "id": "finding.add.01",
+      "file": "specs/features/kind=feature/area=finding/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.966739Z",
+      "firstEvidenceMs": 1786014780966,
+      "lagHours": -0.2
+    },
+    {
+      "id": "finding.add.02",
+      "file": "specs/features/kind=feature/area=finding/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.979209Z",
+      "firstEvidenceMs": 1786014780979,
+      "lagHours": -0.2
+    },
+    {
+      "id": "finding.add.03",
+      "file": "specs/features/kind=feature/area=finding/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:00.992358Z",
+      "firstEvidenceMs": 1786014780992,
+      "lagHours": -0.2
+    },
+    {
+      "id": "finding.add.04",
+      "file": "specs/features/kind=feature/area=finding/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.006512Z",
+      "firstEvidenceMs": 1786014781006,
+      "lagHours": -0.2
+    },
+    {
+      "id": "finding.add.05",
+      "file": "specs/features/kind=feature/area=finding/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.019842Z",
+      "firstEvidenceMs": 1786014781019,
+      "lagHours": -0.2
+    },
+    {
+      "id": "finding.add.06",
+      "file": "specs/features/kind=feature/area=finding/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.032370Z",
+      "firstEvidenceMs": 1786014781032,
+      "lagHours": -0.2
+    },
+    {
+      "id": "finding.add.07",
+      "file": "specs/features/kind=feature/area=finding/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.046200Z",
+      "firstEvidenceMs": 1786014781046,
+      "lagHours": -0.2
+    },
+    {
+      "id": "finding.add.08",
+      "file": "specs/features/kind=feature/area=finding/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.059871Z",
+      "firstEvidenceMs": 1786014781059,
+      "lagHours": -0.2
+    },
+    {
+      "id": "finding.add.09",
+      "file": "specs/features/kind=feature/area=finding/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.072905Z",
+      "firstEvidenceMs": 1786014781072,
+      "lagHours": -0.2
+    },
+    {
+      "id": "format.corpus.01",
+      "file": "specs/features/kind=feature/area=format/corpus.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.085894Z",
+      "firstEvidenceMs": 1786014781085,
+      "lagHours": -0.2
+    },
+    {
+      "id": "format.corpus.02",
+      "file": "specs/features/kind=feature/area=format/corpus.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.098027Z",
+      "firstEvidenceMs": 1786014781098,
+      "lagHours": -0.2
+    },
+    {
+      "id": "format.corpus.03",
+      "file": "specs/features/kind=feature/area=format/corpus.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.111084Z",
+      "firstEvidenceMs": 1786014781111,
+      "lagHours": -0.2
+    },
+    {
+      "id": "format.corpus.04",
+      "file": "specs/features/kind=feature/area=format/corpus.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.123813Z",
+      "firstEvidenceMs": 1786014781123,
+      "lagHours": -0.2
+    },
+    {
+      "id": "format.corpus.05",
+      "file": "specs/features/kind=feature/area=format/corpus.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.137195Z",
+      "firstEvidenceMs": 1786014781137,
+      "lagHours": -0.2
+    },
+    {
+      "id": "format.corpus.06",
+      "file": "specs/features/kind=feature/area=format/corpus.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.150064Z",
+      "firstEvidenceMs": 1786014781150,
+      "lagHours": -0.2
+    },
+    {
+      "id": "format.corpus.07",
+      "file": "specs/features/kind=feature/area=format/corpus.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.162530Z",
+      "firstEvidenceMs": 1786014781162,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.check.01",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.175689Z",
+      "firstEvidenceMs": 1786014781175,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.check.02",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.188885Z",
+      "firstEvidenceMs": 1786014781188,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.check.03",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.202735Z",
+      "firstEvidenceMs": 1786014781202,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.check.04",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.215885Z",
+      "firstEvidenceMs": 1786014781215,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.check.05",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.229175Z",
+      "firstEvidenceMs": 1786014781229,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.check.06",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.241784Z",
+      "firstEvidenceMs": 1786014781241,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.check.07",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.253116Z",
+      "firstEvidenceMs": 1786014781253,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.check.08",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.266910Z",
+      "firstEvidenceMs": 1786014781266,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.check.09",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.279798Z",
+      "firstEvidenceMs": 1786014781279,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.promote.01",
+      "file": "specs/features/kind=feature/area=gate/promote.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.293011Z",
+      "firstEvidenceMs": 1786014781293,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.promote.02",
+      "file": "specs/features/kind=feature/area=gate/promote.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.306069Z",
+      "firstEvidenceMs": 1786014781306,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.promote.03",
+      "file": "specs/features/kind=feature/area=gate/promote.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.318550Z",
+      "firstEvidenceMs": 1786014781318,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.promote.04",
+      "file": "specs/features/kind=feature/area=gate/promote.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.332195Z",
+      "firstEvidenceMs": 1786014781332,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.promote.05",
+      "file": "specs/features/kind=feature/area=gate/promote.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.345669Z",
+      "firstEvidenceMs": 1786014781345,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.promote.06",
+      "file": "specs/features/kind=feature/area=gate/promote.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.358745Z",
+      "firstEvidenceMs": 1786014781358,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.promote.07",
+      "file": "specs/features/kind=feature/area=gate/promote.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.371738Z",
+      "firstEvidenceMs": 1786014781371,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.promote.08",
+      "file": "specs/features/kind=feature/area=gate/promote.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.384851Z",
+      "firstEvidenceMs": 1786014781384,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.task.01",
+      "file": "specs/features/kind=feature/area=gate/task.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.397544Z",
+      "firstEvidenceMs": 1786014781397,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.task.02",
+      "file": "specs/features/kind=feature/area=gate/task.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.410617Z",
+      "firstEvidenceMs": 1786014781410,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.task.03",
+      "file": "specs/features/kind=feature/area=gate/task.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.423252Z",
+      "firstEvidenceMs": 1786014781423,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.task.04",
+      "file": "specs/features/kind=feature/area=gate/task.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.436365Z",
+      "firstEvidenceMs": 1786014781436,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.task.05",
+      "file": "specs/features/kind=feature/area=gate/task.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.449274Z",
+      "firstEvidenceMs": 1786014781449,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.task.06",
+      "file": "specs/features/kind=feature/area=gate/task.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.463006Z",
+      "firstEvidenceMs": 1786014781463,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.task.07",
+      "file": "specs/features/kind=feature/area=gate/task.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.477263Z",
+      "firstEvidenceMs": 1786014781477,
+      "lagHours": -0.2
+    },
+    {
+      "id": "gate.task.08",
+      "file": "specs/features/kind=feature/area=gate/task.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.490526Z",
+      "firstEvidenceMs": 1786014781490,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.artifacts.01",
+      "file": "specs/features/kind=feature/area=ingest/artifacts.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.514430Z",
+      "firstEvidenceMs": 1786014781514,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.artifacts.02",
+      "file": "specs/features/kind=feature/area=ingest/artifacts.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.527787Z",
+      "firstEvidenceMs": 1786014781527,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.artifacts.03",
+      "file": "specs/features/kind=feature/area=ingest/artifacts.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.542199Z",
+      "firstEvidenceMs": 1786014781542,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.artifacts.04",
+      "file": "specs/features/kind=feature/area=ingest/artifacts.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.556283Z",
+      "firstEvidenceMs": 1786014781556,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.artifacts.05",
+      "file": "specs/features/kind=feature/area=ingest/artifacts.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.568803Z",
+      "firstEvidenceMs": 1786014781568,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.artifacts.06",
+      "file": "specs/features/kind=feature/area=ingest/artifacts.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.581472Z",
+      "firstEvidenceMs": 1786014781581,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.artifacts.07",
+      "file": "specs/features/kind=feature/area=ingest/artifacts.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.594340Z",
+      "firstEvidenceMs": 1786014781594,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.artifacts.08",
+      "file": "specs/features/kind=feature/area=ingest/artifacts.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.608329Z",
+      "firstEvidenceMs": 1786014781608,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.artifacts.09",
+      "file": "specs/features/kind=feature/area=ingest/artifacts.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.621408Z",
+      "firstEvidenceMs": 1786014781621,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.plans.01",
+      "file": "specs/features/kind=feature/area=ingest/plans.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.633543Z",
+      "firstEvidenceMs": 1786014781633,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.plans.02",
+      "file": "specs/features/kind=feature/area=ingest/plans.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.646371Z",
+      "firstEvidenceMs": 1786014781646,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.plans.03",
+      "file": "specs/features/kind=feature/area=ingest/plans.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.659510Z",
+      "firstEvidenceMs": 1786014781659,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.plans.04",
+      "file": "specs/features/kind=feature/area=ingest/plans.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.672771Z",
+      "firstEvidenceMs": 1786014781672,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.plans.05",
+      "file": "specs/features/kind=feature/area=ingest/plans.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.685764Z",
+      "firstEvidenceMs": 1786014781685,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.plans.06",
+      "file": "specs/features/kind=feature/area=ingest/plans.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.697753Z",
+      "firstEvidenceMs": 1786014781697,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.plans.07",
+      "file": "specs/features/kind=feature/area=ingest/plans.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.711085Z",
+      "firstEvidenceMs": 1786014781711,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.plans.08",
+      "file": "specs/features/kind=feature/area=ingest/plans.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.722437Z",
+      "firstEvidenceMs": 1786014781722,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.plans.09",
+      "file": "specs/features/kind=feature/area=ingest/plans.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.735623Z",
+      "firstEvidenceMs": 1786014781735,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.sessions.01",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.748873Z",
+      "firstEvidenceMs": 1786014781748,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.sessions.02",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.761353Z",
+      "firstEvidenceMs": 1786014781761,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.sessions.03",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.775530Z",
+      "firstEvidenceMs": 1786014781775,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.sessions.04",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.788512Z",
+      "firstEvidenceMs": 1786014781788,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.sessions.05",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.800842Z",
+      "firstEvidenceMs": 1786014781800,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.sessions.06",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.813721Z",
+      "firstEvidenceMs": 1786014781813,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.sessions.07",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.826928Z",
+      "firstEvidenceMs": 1786014781826,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.sessions.08",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.839694Z",
+      "firstEvidenceMs": 1786014781839,
+      "lagHours": -0.2
+    },
+    {
+      "id": "ingest.sessions.09",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.852909Z",
+      "firstEvidenceMs": 1786014781852,
+      "lagHours": -0.2
+    },
+    {
+      "id": "inventory.sync.01",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.866364Z",
+      "firstEvidenceMs": 1786014781866,
+      "lagHours": -0.2
+    },
+    {
+      "id": "inventory.sync.02",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.878534Z",
+      "firstEvidenceMs": 1786014781878,
+      "lagHours": -0.2
+    },
+    {
+      "id": "inventory.sync.03",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.891514Z",
+      "firstEvidenceMs": 1786014781891,
+      "lagHours": -0.2
+    },
+    {
+      "id": "inventory.sync.04",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.904268Z",
+      "firstEvidenceMs": 1786014781904,
+      "lagHours": -0.2
+    },
+    {
+      "id": "inventory.sync.05",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.919130Z",
+      "firstEvidenceMs": 1786014781919,
+      "lagHours": -0.2
+    },
+    {
+      "id": "inventory.sync.06",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.932960Z",
+      "firstEvidenceMs": 1786014781932,
+      "lagHours": -0.2
+    },
+    {
+      "id": "inventory.sync.07",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.946019Z",
+      "firstEvidenceMs": 1786014781946,
+      "lagHours": -0.2
+    },
+    {
+      "id": "inventory.sync.08",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.961008Z",
+      "firstEvidenceMs": 1786014781961,
+      "lagHours": -0.2
+    },
+    {
+      "id": "inventory.sync.09",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.973944Z",
+      "firstEvidenceMs": 1786014781973,
+      "lagHours": -0.2
+    },
+    {
+      "id": "learn.promotion.01",
+      "file": "specs/features/kind=feature/area=learn/promotion.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.986877Z",
+      "firstEvidenceMs": 1786014781986,
+      "lagHours": -0.2
+    },
+    {
+      "id": "learn.promotion.02",
+      "file": "specs/features/kind=feature/area=learn/promotion.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:01.999558Z",
+      "firstEvidenceMs": 1786014781999,
+      "lagHours": -0.2
+    },
+    {
+      "id": "learn.promotion.03",
+      "file": "specs/features/kind=feature/area=learn/promotion.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.012842Z",
+      "firstEvidenceMs": 1786014782012,
+      "lagHours": -0.2
+    },
+    {
+      "id": "learn.promotion.04",
+      "file": "specs/features/kind=feature/area=learn/promotion.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.025294Z",
+      "firstEvidenceMs": 1786014782025,
+      "lagHours": -0.2
+    },
+    {
+      "id": "learn.promotion.05",
+      "file": "specs/features/kind=feature/area=learn/promotion.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.038950Z",
+      "firstEvidenceMs": 1786014782038,
+      "lagHours": -0.2
+    },
+    {
+      "id": "learn.promotion.06",
+      "file": "specs/features/kind=feature/area=learn/promotion.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.052231Z",
+      "firstEvidenceMs": 1786014782052,
+      "lagHours": -0.2
+    },
+    {
+      "id": "learn.promotion.07",
+      "file": "specs/features/kind=feature/area=learn/promotion.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.065629Z",
+      "firstEvidenceMs": 1786014782065,
+      "lagHours": -0.2
+    },
+    {
+      "id": "learn.promotion.08",
+      "file": "specs/features/kind=feature/area=learn/promotion.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.078867Z",
+      "firstEvidenceMs": 1786014782078,
+      "lagHours": -0.2
+    },
+    {
+      "id": "learn.promotion.09",
+      "file": "specs/features/kind=feature/area=learn/promotion.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.091373Z",
+      "firstEvidenceMs": 1786014782091,
+      "lagHours": -0.2
+    },
+    {
+      "id": "plugin.overlay.01",
+      "file": "specs/features/kind=feature/area=plugin/overlay.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.105026Z",
+      "firstEvidenceMs": 1786014782105,
+      "lagHours": -0.2
+    },
+    {
+      "id": "plugin.overlay.02",
+      "file": "specs/features/kind=feature/area=plugin/overlay.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.118422Z",
+      "firstEvidenceMs": 1786014782118,
+      "lagHours": -0.2
+    },
+    {
+      "id": "plugin.overlay.03",
+      "file": "specs/features/kind=feature/area=plugin/overlay.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.131867Z",
+      "firstEvidenceMs": 1786014782131,
+      "lagHours": -0.2
+    },
+    {
+      "id": "plugin.overlay.04",
+      "file": "specs/features/kind=feature/area=plugin/overlay.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.144183Z",
+      "firstEvidenceMs": 1786014782144,
+      "lagHours": -0.2
+    },
+    {
+      "id": "plugin.overlay.05",
+      "file": "specs/features/kind=feature/area=plugin/overlay.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.157735Z",
+      "firstEvidenceMs": 1786014782157,
+      "lagHours": -0.2
+    },
+    {
+      "id": "plugin.overlay.06",
+      "file": "specs/features/kind=feature/area=plugin/overlay.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.170800Z",
+      "firstEvidenceMs": 1786014782170,
+      "lagHours": -0.2
+    },
+    {
+      "id": "plugin.overlay.07",
+      "file": "specs/features/kind=feature/area=plugin/overlay.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.183191Z",
+      "firstEvidenceMs": 1786014782183,
+      "lagHours": -0.2
+    },
+    {
+      "id": "plugin.overlay.08",
+      "file": "specs/features/kind=feature/area=plugin/overlay.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.195776Z",
+      "firstEvidenceMs": 1786014782195,
+      "lagHours": -0.2
+    },
+    {
+      "id": "plugin.overlay.09",
+      "file": "specs/features/kind=feature/area=plugin/overlay.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.208647Z",
+      "firstEvidenceMs": 1786014782208,
+      "lagHours": -0.2
+    },
+    {
+      "id": "policy.expressions.01",
+      "file": "specs/features/kind=feature/area=policy/expressions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.221256Z",
+      "firstEvidenceMs": 1786014782221,
+      "lagHours": -0.2
+    },
+    {
+      "id": "policy.expressions.02",
+      "file": "specs/features/kind=feature/area=policy/expressions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.232973Z",
+      "firstEvidenceMs": 1786014782232,
+      "lagHours": -0.2
+    },
+    {
+      "id": "policy.expressions.03",
+      "file": "specs/features/kind=feature/area=policy/expressions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.248495Z",
+      "firstEvidenceMs": 1786014782248,
+      "lagHours": -0.2
+    },
+    {
+      "id": "policy.expressions.04",
+      "file": "specs/features/kind=feature/area=policy/expressions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.260809Z",
+      "firstEvidenceMs": 1786014782260,
+      "lagHours": -0.2
+    },
+    {
+      "id": "policy.expressions.05",
+      "file": "specs/features/kind=feature/area=policy/expressions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.273183Z",
+      "firstEvidenceMs": 1786014782273,
+      "lagHours": -0.2
+    },
+    {
+      "id": "policy.expressions.06",
+      "file": "specs/features/kind=feature/area=policy/expressions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.286430Z",
+      "firstEvidenceMs": 1786014782286,
+      "lagHours": -0.2
+    },
+    {
+      "id": "policy.expressions.07",
+      "file": "specs/features/kind=feature/area=policy/expressions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.299638Z",
+      "firstEvidenceMs": 1786014782299,
+      "lagHours": -0.2
+    },
+    {
+      "id": "policy.expressions.08",
+      "file": "specs/features/kind=feature/area=policy/expressions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.311879Z",
+      "firstEvidenceMs": 1786014782311,
+      "lagHours": -0.2
+    },
+    {
+      "id": "policy.expressions.09",
+      "file": "specs/features/kind=feature/area=policy/expressions.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.324824Z",
+      "firstEvidenceMs": 1786014782324,
+      "lagHours": -0.2
+    },
+    {
+      "id": "query.read.01",
+      "file": "specs/features/kind=feature/area=query/read.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.337436Z",
+      "firstEvidenceMs": 1786014782337,
+      "lagHours": -0.2
+    },
+    {
+      "id": "query.read.02",
+      "file": "specs/features/kind=feature/area=query/read.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.351034Z",
+      "firstEvidenceMs": 1786014782351,
+      "lagHours": -0.2
+    },
+    {
+      "id": "query.read.03",
+      "file": "specs/features/kind=feature/area=query/read.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.362223Z",
+      "firstEvidenceMs": 1786014782362,
+      "lagHours": -0.2
+    },
+    {
+      "id": "query.read.04",
+      "file": "specs/features/kind=feature/area=query/read.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.375421Z",
+      "firstEvidenceMs": 1786014782375,
+      "lagHours": -0.2
+    },
+    {
+      "id": "query.read.05",
+      "file": "specs/features/kind=feature/area=query/read.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.388360Z",
+      "firstEvidenceMs": 1786014782388,
+      "lagHours": -0.2
+    },
+    {
+      "id": "query.read.06",
+      "file": "specs/features/kind=feature/area=query/read.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.401462Z",
+      "firstEvidenceMs": 1786014782401,
+      "lagHours": -0.2
+    },
+    {
+      "id": "query.read.07",
+      "file": "specs/features/kind=feature/area=query/read.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.414808Z",
+      "firstEvidenceMs": 1786014782414,
+      "lagHours": -0.2
+    },
+    {
+      "id": "query.read.08",
+      "file": "specs/features/kind=feature/area=query/read.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.427384Z",
+      "firstEvidenceMs": 1786014782427,
+      "lagHours": -0.2
+    },
+    {
+      "id": "report.generation.01",
+      "file": "specs/features/kind=feature/area=report/generation.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.440520Z",
+      "firstEvidenceMs": 1786014782440,
+      "lagHours": -0.2
+    },
+    {
+      "id": "report.generation.02",
+      "file": "specs/features/kind=feature/area=report/generation.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.454255Z",
+      "firstEvidenceMs": 1786014782454,
+      "lagHours": -0.2
+    },
+    {
+      "id": "report.generation.03",
+      "file": "specs/features/kind=feature/area=report/generation.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.467790Z",
+      "firstEvidenceMs": 1786014782467,
+      "lagHours": -0.2
+    },
+    {
+      "id": "report.generation.04",
+      "file": "specs/features/kind=feature/area=report/generation.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.480727Z",
+      "firstEvidenceMs": 1786014782480,
+      "lagHours": -0.2
+    },
+    {
+      "id": "report.generation.05",
+      "file": "specs/features/kind=feature/area=report/generation.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.493520Z",
+      "firstEvidenceMs": 1786014782493,
+      "lagHours": -0.2
+    },
+    {
+      "id": "report.generation.06",
+      "file": "specs/features/kind=feature/area=report/generation.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.506587Z",
+      "firstEvidenceMs": 1786014782506,
+      "lagHours": -0.2
+    },
+    {
+      "id": "report.generation.07",
+      "file": "specs/features/kind=feature/area=report/generation.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.519099Z",
+      "firstEvidenceMs": 1786014782519,
+      "lagHours": -0.2
+    },
+    {
+      "id": "report.generation.08",
+      "file": "specs/features/kind=feature/area=report/generation.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.532145Z",
+      "firstEvidenceMs": 1786014782532,
+      "lagHours": -0.2
+    },
+    {
+      "id": "report.generation.09",
+      "file": "specs/features/kind=feature/area=report/generation.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.545453Z",
+      "firstEvidenceMs": 1786014782545,
+      "lagHours": -0.2
+    },
+    {
+      "id": "retrieve.guidance.01",
+      "file": "specs/features/kind=feature/area=retrieve/guidance.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.558368Z",
+      "firstEvidenceMs": 1786014782558,
+      "lagHours": -0.2
+    },
+    {
+      "id": "retrieve.guidance.02",
+      "file": "specs/features/kind=feature/area=retrieve/guidance.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.571959Z",
+      "firstEvidenceMs": 1786014782571,
+      "lagHours": -0.2
+    },
+    {
+      "id": "retrieve.guidance.03",
+      "file": "specs/features/kind=feature/area=retrieve/guidance.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.585110Z",
+      "firstEvidenceMs": 1786014782585,
+      "lagHours": -0.2
+    },
+    {
+      "id": "retrieve.guidance.04",
+      "file": "specs/features/kind=feature/area=retrieve/guidance.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.598748Z",
+      "firstEvidenceMs": 1786014782598,
+      "lagHours": -0.2
+    },
+    {
+      "id": "retrieve.guidance.05",
+      "file": "specs/features/kind=feature/area=retrieve/guidance.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.611763Z",
+      "firstEvidenceMs": 1786014782611,
+      "lagHours": -0.2
+    },
+    {
+      "id": "retrieve.guidance.06",
+      "file": "specs/features/kind=feature/area=retrieve/guidance.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.623455Z",
+      "firstEvidenceMs": 1786014782623,
+      "lagHours": -0.2
+    },
+    {
+      "id": "review.add.01",
+      "file": "specs/features/kind=feature/area=review/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.635412Z",
+      "firstEvidenceMs": 1786014782635,
+      "lagHours": -0.2
+    },
+    {
+      "id": "review.add.02",
+      "file": "specs/features/kind=feature/area=review/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.648325Z",
+      "firstEvidenceMs": 1786014782648,
+      "lagHours": -0.2
+    },
+    {
+      "id": "review.add.03",
+      "file": "specs/features/kind=feature/area=review/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.661944Z",
+      "firstEvidenceMs": 1786014782661,
+      "lagHours": -0.2
+    },
+    {
+      "id": "review.add.04",
+      "file": "specs/features/kind=feature/area=review/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.675620Z",
+      "firstEvidenceMs": 1786014782675,
+      "lagHours": -0.2
+    },
+    {
+      "id": "review.add.05",
+      "file": "specs/features/kind=feature/area=review/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.688678Z",
+      "firstEvidenceMs": 1786014782688,
+      "lagHours": -0.2
+    },
+    {
+      "id": "review.add.06",
+      "file": "specs/features/kind=feature/area=review/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.699988Z",
+      "firstEvidenceMs": 1786014782699,
+      "lagHours": -0.2
+    },
+    {
+      "id": "review.add.07",
+      "file": "specs/features/kind=feature/area=review/add.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.712815Z",
+      "firstEvidenceMs": 1786014782712,
+      "lagHours": -0.2
+    },
+    {
+      "id": "skills.install.01",
+      "file": "specs/features/kind=feature/area=skills/install.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.725989Z",
+      "firstEvidenceMs": 1786014782725,
+      "lagHours": -0.2
+    },
+    {
+      "id": "skills.install.02",
+      "file": "specs/features/kind=feature/area=skills/install.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.738687Z",
+      "firstEvidenceMs": 1786014782738,
+      "lagHours": -0.2
+    },
+    {
+      "id": "skills.install.03",
+      "file": "specs/features/kind=feature/area=skills/install.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.751070Z",
+      "firstEvidenceMs": 1786014782751,
+      "lagHours": -0.2
+    },
+    {
+      "id": "skills.install.04",
+      "file": "specs/features/kind=feature/area=skills/install.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.764591Z",
+      "firstEvidenceMs": 1786014782764,
+      "lagHours": -0.2
+    },
+    {
+      "id": "skills.install.05",
+      "file": "specs/features/kind=feature/area=skills/install.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.778354Z",
+      "firstEvidenceMs": 1786014782778,
+      "lagHours": -0.2
+    },
+    {
+      "id": "skills.install.06",
+      "file": "specs/features/kind=feature/area=skills/install.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.789824Z",
+      "firstEvidenceMs": 1786014782789,
+      "lagHours": -0.2
+    },
+    {
+      "id": "subject.lifecycle.01",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.801034Z",
+      "firstEvidenceMs": 1786014782801,
+      "lagHours": -0.2
+    },
+    {
+      "id": "subject.lifecycle.02",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.813393Z",
+      "firstEvidenceMs": 1786014782813,
+      "lagHours": -0.2
+    },
+    {
+      "id": "subject.lifecycle.03",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.846687Z",
+      "firstEvidenceMs": 1786014782846,
+      "lagHours": -0.2
+    },
+    {
+      "id": "subject.lifecycle.04",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.860011Z",
+      "firstEvidenceMs": 1786014782860,
+      "lagHours": -0.2
+    },
+    {
+      "id": "subject.lifecycle.05",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.873707Z",
+      "firstEvidenceMs": 1786014782873,
+      "lagHours": -0.2
+    },
+    {
+      "id": "subject.lifecycle.06",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.892128Z",
+      "firstEvidenceMs": 1786014782892,
+      "lagHours": -0.2
+    },
+    {
+      "id": "subject.lifecycle.07",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.905932Z",
+      "firstEvidenceMs": 1786014782905,
+      "lagHours": -0.2
+    },
+    {
+      "id": "subject.lifecycle.08",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.918643Z",
+      "firstEvidenceMs": 1786014782918,
+      "lagHours": -0.2
+    },
+    {
+      "id": "subject.lifecycle.09",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.932758Z",
+      "firstEvidenceMs": 1786014782932,
+      "lagHours": -0.2
+    },
+    {
+      "id": "tier.storage.01",
+      "file": "specs/features/kind=feature/area=tier/storage.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.945013Z",
+      "firstEvidenceMs": 1786014782945,
+      "lagHours": -0.2
+    },
+    {
+      "id": "tier.storage.02",
+      "file": "specs/features/kind=feature/area=tier/storage.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.958129Z",
+      "firstEvidenceMs": 1786014782958,
+      "lagHours": -0.2
+    },
+    {
+      "id": "tier.storage.03",
+      "file": "specs/features/kind=feature/area=tier/storage.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.971052Z",
+      "firstEvidenceMs": 1786014782971,
+      "lagHours": -0.2
+    },
+    {
+      "id": "tier.storage.04",
+      "file": "specs/features/kind=feature/area=tier/storage.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.983568Z",
+      "firstEvidenceMs": 1786014782983,
+      "lagHours": -0.2
+    },
+    {
+      "id": "tier.storage.05",
+      "file": "specs/features/kind=feature/area=tier/storage.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:02.995761Z",
+      "firstEvidenceMs": 1786014782995,
+      "lagHours": -0.2
+    },
+    {
+      "id": "tier.storage.06",
+      "file": "specs/features/kind=feature/area=tier/storage.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.007595Z",
+      "firstEvidenceMs": 1786014783007,
+      "lagHours": -0.2
+    },
+    {
+      "id": "tier.storage.07",
+      "file": "specs/features/kind=feature/area=tier/storage.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.018085Z",
+      "firstEvidenceMs": 1786014783018,
+      "lagHours": -0.2
+    },
+    {
+      "id": "tier.storage.08",
+      "file": "specs/features/kind=feature/area=tier/storage.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.030875Z",
+      "firstEvidenceMs": 1786014783030,
+      "lagHours": -0.2
+    },
+    {
+      "id": "tier.storage.09",
+      "file": "specs/features/kind=feature/area=tier/storage.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.044397Z",
+      "firstEvidenceMs": 1786014783044,
+      "lagHours": -0.2
+    },
+    {
+      "id": "vocab.typed.01",
+      "file": "specs/features/kind=feature/area=vocab/typed.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.057625Z",
+      "firstEvidenceMs": 1786014783057,
+      "lagHours": -0.2
+    },
+    {
+      "id": "vocab.typed.02",
+      "file": "specs/features/kind=feature/area=vocab/typed.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.070579Z",
+      "firstEvidenceMs": 1786014783070,
+      "lagHours": -0.2
+    },
+    {
+      "id": "vocab.typed.03",
+      "file": "specs/features/kind=feature/area=vocab/typed.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.083678Z",
+      "firstEvidenceMs": 1786014783083,
+      "lagHours": -0.2
+    },
+    {
+      "id": "vocab.typed.04",
+      "file": "specs/features/kind=feature/area=vocab/typed.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.095661Z",
+      "firstEvidenceMs": 1786014783095,
+      "lagHours": -0.2
+    },
+    {
+      "id": "vocab.typed.05",
+      "file": "specs/features/kind=feature/area=vocab/typed.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.108285Z",
+      "firstEvidenceMs": 1786014783108,
+      "lagHours": -0.2
+    },
+    {
+      "id": "vocab.typed.06",
+      "file": "specs/features/kind=feature/area=vocab/typed.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.121167Z",
+      "firstEvidenceMs": 1786014783121,
+      "lagHours": -0.2
+    },
+    {
+      "id": "vocab.typed.07",
+      "file": "specs/features/kind=feature/area=vocab/typed.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.134502Z",
+      "firstEvidenceMs": 1786014783134,
+      "lagHours": -0.2
+    },
+    {
+      "id": "vocab.typed.08",
+      "file": "specs/features/kind=feature/area=vocab/typed.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.146402Z",
+      "firstEvidenceMs": 1786014783146,
+      "lagHours": -0.2
+    },
+    {
+      "id": "vocab.typed.09",
+      "file": "specs/features/kind=feature/area=vocab/typed.feature",
+      "authoredAt": "2026-08-06T20:22:44+09:00",
+      "authoredMs": 1786015364000,
+      "firstEvidenceAt": "2026-08-06T11:13:03.159224Z",
+      "firstEvidenceMs": 1786014783159,
+      "lagHours": -0.2
+    },
+    {
+      "id": "authoring.scaffold.09",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-09-16T20:08:46+09:00",
+      "authoredMs": 1789556926000,
+      "firstEvidenceAt": "2026-09-16T11:05:56.756943Z",
+      "firstEvidenceMs": 1789556756756,
+      "lagHours": 0
+    },
+    {
+      "id": "authoring.scaffold.10",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-09-16T20:08:46+09:00",
+      "authoredMs": 1789556926000,
+      "firstEvidenceAt": "2026-09-16T11:05:56.798733Z",
+      "firstEvidenceMs": 1789556756798,
+      "lagHours": 0
+    },
+    {
+      "id": "authoring.scaffold.11",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-09-16T20:08:46+09:00",
+      "authoredMs": 1789556926000,
+      "firstEvidenceAt": "2026-09-16T11:05:56.834628Z",
+      "firstEvidenceMs": 1789556756834,
+      "lagHours": 0
+    },
+    {
+      "id": "format.corpus.08",
+      "file": "specs/features/kind=feature/area=format/corpus.feature",
+      "authoredAt": "2026-09-16T20:08:46+09:00",
+      "authoredMs": 1789556926000,
+      "firstEvidenceAt": "2026-09-16T11:05:56.872010Z",
+      "firstEvidenceMs": 1789556756872,
+      "lagHours": 0
+    },
+    {
+      "id": "format.corpus.09",
+      "file": "specs/features/kind=feature/area=format/corpus.feature",
+      "authoredAt": "2026-09-16T20:08:46+09:00",
+      "authoredMs": 1789556926000,
+      "firstEvidenceAt": "2026-09-16T11:05:56.907965Z",
+      "firstEvidenceMs": 1789556756907,
+      "lagHours": 0
+    },
+    {
+      "id": "gate.check.10",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-09-16T20:08:46+09:00",
+      "authoredMs": 1789556926000,
+      "firstEvidenceAt": "2026-09-16T11:05:57.011887Z",
+      "firstEvidenceMs": 1789556757011,
+      "lagHours": 0
+    },
+    {
+      "id": "gate.check.11",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-09-16T20:08:46+09:00",
+      "authoredMs": 1789556926000,
+      "firstEvidenceAt": "2026-09-16T11:05:57.049340Z",
+      "firstEvidenceMs": 1789556757049,
+      "lagHours": 0
+    },
+    {
+      "id": "inventory.sync.10",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-09-16T20:08:46+09:00",
+      "authoredMs": 1789556926000,
+      "firstEvidenceAt": "2026-09-16T11:05:56.943118Z",
+      "firstEvidenceMs": 1789556756943,
+      "lagHours": 0
+    },
+    {
+      "id": "inventory.sync.11",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-09-16T20:08:46+09:00",
+      "authoredMs": 1789556926000,
+      "firstEvidenceAt": "2026-09-16T11:05:56.977652Z",
+      "firstEvidenceMs": 1789556756977,
+      "lagHours": 0
+    },
+    {
+      "id": "context.capability.10",
+      "file": "specs/features/kind=feature/area=context/capability.feature",
+      "authoredAt": "2026-10-02T00:30:30+09:00",
+      "authoredMs": 1790868630000,
+      "firstEvidenceAt": "2026-10-07T04:01:48.346339Z",
+      "firstEvidenceMs": 1791345708346,
+      "lagHours": 132.5
+    },
+    {
+      "id": "evidence.add.10",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-10-02T00:30:30+09:00",
+      "authoredMs": 1790868630000,
+      "firstEvidenceAt": "2026-10-07T04:01:48.517380Z",
+      "firstEvidenceMs": 1791345708517,
+      "lagHours": 132.5
+    },
+    {
+      "id": "gate.check.12",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-10-02T00:30:30+09:00",
+      "authoredMs": 1790868630000,
+      "firstEvidenceAt": "2026-10-07T04:01:48.657983Z",
+      "firstEvidenceMs": 1791345708657,
+      "lagHours": 132.5
+    },
+    {
+      "id": "gate.check.13",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-10-02T00:30:30+09:00",
+      "authoredMs": 1790868630000,
+      "firstEvidenceAt": "2026-10-07T04:01:48.797079Z",
+      "firstEvidenceMs": 1791345708797,
+      "lagHours": 132.5
+    },
+    {
+      "id": "policy.expressions.10",
+      "file": "specs/features/kind=feature/area=policy/expressions.feature",
+      "authoredAt": "2026-10-02T00:30:30+09:00",
+      "authoredMs": 1790868630000,
+      "firstEvidenceAt": "2026-10-07T04:01:48.946206Z",
+      "firstEvidenceMs": 1791345708946,
+      "lagHours": 132.5
+    },
+    {
+      "id": "ingest.sessions.10",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-10-02T04:09:38+09:00",
+      "authoredMs": 1790881778000,
+      "firstEvidenceAt": "2026-10-07T04:01:49.091725Z",
+      "firstEvidenceMs": 1791345709091,
+      "lagHours": 128.9
+    },
+    {
+      "id": "ingest.sessions.11",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-10-02T04:09:38+09:00",
+      "authoredMs": 1790881778000,
+      "firstEvidenceAt": "2026-10-07T04:01:49.257807Z",
+      "firstEvidenceMs": 1791345709257,
+      "lagHours": 128.9
+    },
+    {
+      "id": "ingest.sessions.12",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-10-02T04:09:38+09:00",
+      "authoredMs": 1790881778000,
+      "firstEvidenceAt": "2026-10-07T04:01:49.396746Z",
+      "firstEvidenceMs": 1791345709396,
+      "lagHours": 128.9
+    },
+    {
+      "id": "ingest.sessions.13",
+      "file": "specs/features/kind=feature/area=ingest/sessions.feature",
+      "authoredAt": "2026-10-02T04:09:38+09:00",
+      "authoredMs": 1790881778000,
+      "firstEvidenceAt": "2026-10-07T04:01:49.511143Z",
+      "firstEvidenceMs": 1791345709511,
+      "lagHours": 128.9
+    },
+    {
+      "id": "subject.lifecycle.10",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-07T12:28:09+09:00",
+      "authoredMs": 1791343689000,
+      "firstEvidenceAt": "2026-10-07T03:21:36.160612Z",
+      "firstEvidenceMs": 1791343296160,
+      "lagHours": -0.1
+    },
+    {
+      "id": "authoring.scaffold.12",
+      "file": "specs/features/kind=feature/area=authoring/scaffold.feature",
+      "authoredAt": "2026-10-08T23:07:45+09:00",
+      "authoredMs": 1791468465000,
+      "firstEvidenceAt": "2026-10-08T14:06:59.878399Z",
+      "firstEvidenceMs": 1791468419878,
+      "lagHours": 0
+    },
+    {
+      "id": "context.capability.11",
+      "file": "specs/features/kind=feature/area=context/capability.feature",
+      "authoredAt": "2026-10-08T23:07:45+09:00",
+      "authoredMs": 1791468465000,
+      "firstEvidenceAt": "2026-10-08T14:06:59.641926Z",
+      "firstEvidenceMs": 1791468419641,
+      "lagHours": 0
+    },
+    {
+      "id": "gate.check.14",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-10-08T23:07:45+09:00",
+      "authoredMs": 1791468465000,
+      "firstEvidenceAt": "2026-10-08T14:06:59.747142Z",
+      "firstEvidenceMs": 1791468419747,
+      "lagHours": 0
+    },
+    {
+      "id": "inventory.sync.12",
+      "file": "specs/features/kind=feature/area=inventory/sync.feature",
+      "authoredAt": "2026-10-08T23:07:45+09:00",
+      "authoredMs": 1791468465000,
+      "firstEvidenceAt": "2026-10-08T14:06:59.792572Z",
+      "firstEvidenceMs": 1791468419792,
+      "lagHours": 0
+    },
+    {
+      "id": "skills.install.07",
+      "file": "specs/features/kind=feature/area=skills/install.feature",
+      "authoredAt": "2026-10-08T23:07:45+09:00",
+      "authoredMs": 1791468465000,
+      "firstEvidenceAt": "2026-10-08T14:06:59.702115Z",
+      "firstEvidenceMs": 1791468419702,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.11",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-08T23:07:45+09:00",
+      "authoredMs": 1791468465000,
+      "firstEvidenceAt": "2026-10-08T14:06:59.834063Z",
+      "firstEvidenceMs": 1791468419834,
+      "lagHours": 0
+    },
+    {
+      "id": "evidence.add.11",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-10-09T00:16:37+09:00",
+      "authoredMs": 1791472597000,
+      "firstEvidenceAt": "2026-10-08T15:15:12.844536Z",
+      "firstEvidenceMs": 1791472512844,
+      "lagHours": 0
+    },
+    {
+      "id": "evidence.add.12",
+      "file": "specs/features/kind=feature/area=evidence/add.feature",
+      "authoredAt": "2026-10-09T00:16:37+09:00",
+      "authoredMs": 1791472597000,
+      "firstEvidenceAt": "2026-10-08T15:15:12.894100Z",
+      "firstEvidenceMs": 1791472512894,
+      "lagHours": 0
+    },
+    {
+      "id": "gate.check.15",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-10-09T00:16:37+09:00",
+      "authoredMs": 1791472597000,
+      "firstEvidenceAt": "2026-10-08T15:15:12.946087Z",
+      "firstEvidenceMs": 1791472512946,
+      "lagHours": 0
+    },
+    {
+      "id": "gate.check.16",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-10-09T00:16:37+09:00",
+      "authoredMs": 1791472597000,
+      "firstEvidenceAt": "2026-10-08T15:15:13.001787Z",
+      "firstEvidenceMs": 1791472513001,
+      "lagHours": 0
+    },
+    {
+      "id": "gate.check.17",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.357636Z",
+      "firstEvidenceMs": 1791481273357,
+      "lagHours": 0
+    },
+    {
+      "id": "gate.check.18",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.407358Z",
+      "firstEvidenceMs": 1791481273407,
+      "lagHours": 0
+    },
+    {
+      "id": "gate.check.19",
+      "file": "specs/features/kind=feature/area=gate/check.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.452604Z",
+      "firstEvidenceMs": 1791481273452,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.12",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:12.967169Z",
+      "firstEvidenceMs": 1791481272967,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.13",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.016528Z",
+      "firstEvidenceMs": 1791481273016,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.14",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.067971Z",
+      "firstEvidenceMs": 1791481273067,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.15",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.114150Z",
+      "firstEvidenceMs": 1791481273114,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.16",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.168086Z",
+      "firstEvidenceMs": 1791481273168,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.17",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.212791Z",
+      "firstEvidenceMs": 1791481273212,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.18",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.264045Z",
+      "firstEvidenceMs": 1791481273264,
+      "lagHours": 0
+    },
+    {
+      "id": "subject.lifecycle.19",
+      "file": "specs/features/kind=feature/area=subject/lifecycle.feature",
+      "authoredAt": "2026-10-09T02:41:18+09:00",
+      "authoredMs": 1791481278000,
+      "firstEvidenceAt": "2026-10-08T17:41:13.312913Z",
+      "firstEvidenceMs": 1791481273312,
+      "lagHours": 0
+    }
+  ]
+}

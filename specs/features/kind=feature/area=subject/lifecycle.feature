@@ -112,3 +112,85 @@ Feature: subject lifecycle
     When it is moved to shipped
     Then the command exits 1 reporting the surface and the missing case, and the subject stays verifying
     And once an attested failure scenario is added on that surface the move succeeds
+
+  # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.12
+  Scenario: With require_review, entering its scope is refused while an owned scenario has no review
+    Given a building subject whose only scenario is attested by its implementer and never reviewed
+    And a spec_coverage policy whose require_review section takes its defaults
+    When it is moved to verifying
+    Then the command exits 1 reporting unreviewed-promotion for that scenario and naming --override-reason
+    And it prints which review checks it ran, and the subject stays building
+
+  # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.13
+  Scenario: A review authored by the evidence actor does not count under distinct_actor
+    Given a building subject whose scenario's only review was authored by the actor who attested its evidence
+    When it is moved to verifying
+    Then the command exits 1 naming that actor and the distinct_actor rule
+    And the subject stays building
+
+  # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @subject.lifecycle.14
+  Scenario: A review by a distinct actor admits the move with no waiver recorded
+    Given a building subject whose scenario was reviewed by someone other than its evidence actor
+    When it is moved to verifying
+    Then the move succeeds and the subject carries no status_override
+    And the gate checks the repository green
+
+  # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.15
+  Scenario: An open blocker finding on an adopted change refuses the move until it is closed as fixed
+    Given a reviewed building subject whose adopted change carries an open blocker finding
+    When it is moved to verifying
+    Then the command exits 1 reporting open-blocker for that finding
+    And once the latest version of the same finding is fixed the move succeeds
+
+  # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:edge
+  @subject.lifecycle.16
+  Scenario: An override reason moves the subject, records the waiver and keeps the gap visible
+    Given a building subject with an unreviewed scenario under require_review
+    When it is moved to verifying with an override reason and an actor
+    Then the move succeeds and the subject records the reason, the waived classes and the actor
+    And the gate stays green but lists the gap as an advisory naming the waiver
+    And the next status write drops the waiver
+
+  # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.17
+  Scenario: An override never waives the ship gate and a blank reason is refused
+    Given a verifying subject whose scenario has no verdict and no review
+    When it is moved to shipped with an override reason
+    Then the command exits 1, because the override waives only the review checks
+    And a blank override reason is refused as a usage error
+
+  # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:edge
+  @subject.lifecycle.18
+  Scenario: Without require_review the guard is silent and review records change nothing
+    Given a spec_coverage policy with no require_review section
+    When a subject with unreviewed scenarios and an open blocker finding is moved to verifying
+    Then the move succeeds with exactly the pre-0.12 output and no status_override
+    And the gate output is byte-identical to the same repository without any review records
+
+  # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:edge
+  @subject.lifecycle.19
+  Scenario: The review guard says which checks it skipped outside its scope
+    Given a spec_coverage policy whose require_review section takes its defaults
+    When a proposed subject is moved to specced
+    Then the move succeeds
+    And the guard reports both review checks as skipped because specced is not in its scope

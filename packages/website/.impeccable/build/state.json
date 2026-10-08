@@ -1,0 +1,294 @@
+{
+  "tool": "build-phase",
+  "version": 2,
+  "startedAt": "2026-10-08T17:08:18.322Z",
+  "comp": ".impeccable/comps/landing.png",
+  "direction": null,
+  "breakpoint": "1536x1024",
+  "artifact": null,
+  "phase": "review",
+  "phases": {
+    "comps": {
+      "status": "skipped",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [
+        {
+          "at": "2026-10-08T17:08:18.322Z",
+          "text": "started with an approved comp; the comp round happened before this state (surface round or manual)"
+        }
+      ],
+      "gate": null,
+      "forced": null
+    },
+    "spec": {
+      "status": "closed",
+      "openedAt": "2026-10-08T17:08:18.321Z",
+      "closedAt": "2026-10-08T17:14:13.515Z",
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "13 regions, 0 plates, 6 text regions measured",
+        "at": "2026-10-08T17:14:13.515Z"
+      },
+      "forced": null
+    },
+    "plates": {
+      "status": "closed",
+      "openedAt": "2026-10-08T17:14:13.515Z",
+      "closedAt": "2026-10-08T17:14:15.724Z",
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "no plates owed",
+        "at": "2026-10-08T17:14:15.724Z"
+      },
+      "forced": null
+    },
+    "hero": {
+      "status": "closed",
+      "openedAt": "2026-10-08T17:14:15.724Z",
+      "closedAt": "2026-10-08T17:24:21.453Z",
+      "attempts": 3,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "hero 83% (match)",
+        "score": 0.8259,
+        "verdict": "match",
+        "report": ".impeccable/review/diff/hero/report.json",
+        "sideBySide": "/Users/journey/Workspace/canon/packages/website/.impeccable/review/diff/hero/side-by-side.png",
+        "worst": [
+          "subline drift 66%",
+          "fig-total drift 67%",
+          "fig-chart drift 67%"
+        ],
+        "worstIds": [
+          "subline",
+          "fig-total",
+          "fig-chart"
+        ],
+        "worstCrops": [
+          {
+            "id": "subline",
+            "verdict": "drift",
+            "score": {
+              "overall": 0.6581,
+              "structure": 0.6669,
+              "color": 0.5759,
+              "colorIntersection": 0.2191,
+              "paletteMatch": 0.768,
+              "detail": 0.7319,
+              "detailRaw": 0.758,
+              "detailAdded": 0.0521,
+              "bands": 0.7086
+            },
+            "file": ".impeccable/review/diff/hero/regions/subline.png"
+          },
+          {
+            "id": "fig-total",
+            "verdict": "drift",
+            "score": {
+              "overall": 0.6651,
+              "structure": 0.4925,
+              "color": 0.8801,
+              "colorIntersection": 0.7719,
+              "paletteMatch": 0.9384,
+              "detail": 0.7698,
+              "detailRaw": 0.7906,
+              "detailAdded": 0.0417,
+              "bands": 0.8333
+            },
+            "file": ".impeccable/review/diff/hero/regions/fig-total.png"
+          },
+          {
+            "id": "fig-chart",
+            "verdict": "drift",
+            "score": {
+              "overall": 0.673,
+              "structure": 0.6542,
+              "color": 0.625,
+              "colorIntersection": 0.3657,
+              "paletteMatch": 0.7646,
+              "detail": 0.5723,
+              "detailRaw": 0.6296,
+              "detailAdded": 0.1146,
+              "bands": 0.9647
+            },
+            "file": ".impeccable/review/diff/hero/regions/fig-chart.png"
+          }
+        ],
+        "advisories": [
+          "(advisory, above the 72% bar; fix in the polish pass before responsive) 2 readings:",
+          "  text wordmark: ink is #090909 in the build, #f3f3f3 in the comp; use the comp's colour",
+          "  text fig-caption: ink is #5d2012 in the build, #0f0808 in the comp; use the comp's colour"
+        ],
+        "regionVerdicts": {
+          "column-rules": "match",
+          "wordmark": "drift",
+          "nav": "drift",
+          "headline": "drift",
+          "subline": "drift",
+          "command": "match",
+          "guide-link": "drift",
+          "fig-caption": "match",
+          "fig-chart": "drift",
+          "fig-panel": "drift",
+          "fig-total": "drift",
+          "stations-rule": "drift",
+          "stations": "match"
+        },
+        "at": "2026-10-08T17:24:21.452Z"
+      },
+      "forced": null,
+      "readingsSeen": {
+        "text wordmark: ink is #181818 in the build, #f3f3f3 in the comp; use the comp's colour": 2,
+        "text fig-total: ink is #181818 in the build, #f74d19 in the comp; use the comp's colour": 2,
+        "text wordmark: ink is #090909 in the build, #f3f3f3 in the comp; use the comp's colour": 1,
+        "text fig-caption: ink is #5d2012 in the build, #0f0808 in the comp; use the comp's colour": 1
+      },
+      "history": [
+        {
+          "at": "2026-10-08T17:21:16.864Z",
+          "score": 0.8069,
+          "worstIds": [
+            "guide-link",
+            "command",
+            "fig-total"
+          ],
+          "regionVerdicts": {
+            "column-rules": "match",
+            "wordmark": "drift",
+            "nav": "drift",
+            "headline": "drift",
+            "subline": "drift",
+            "command": "drift",
+            "guide-link": "drift",
+            "fig-caption": "match",
+            "fig-chart": "drift",
+            "fig-panel": "drift",
+            "fig-total": "drift",
+            "stations-rule": "drift",
+            "stations": "match"
+          },
+          "artifactHash": null
+        },
+        {
+          "at": "2026-10-08T17:22:04.131Z",
+          "score": 0.8089,
+          "worstIds": [
+            "command",
+            "fig-total",
+            "subline"
+          ],
+          "regionVerdicts": {
+            "column-rules": "match",
+            "wordmark": "drift",
+            "nav": "drift",
+            "headline": "drift",
+            "subline": "drift",
+            "command": "drift",
+            "guide-link": "drift",
+            "fig-caption": "match",
+            "fig-chart": "drift",
+            "fig-panel": "drift",
+            "fig-total": "drift",
+            "stations-rule": "drift",
+            "stations": "match"
+          },
+          "artifactHash": null
+        },
+        {
+          "at": "2026-10-08T17:24:21.453Z",
+          "score": 0.8259,
+          "worstIds": [
+            "subline",
+            "fig-total",
+            "fig-chart"
+          ],
+          "regionVerdicts": {
+            "column-rules": "match",
+            "wordmark": "drift",
+            "nav": "drift",
+            "headline": "drift",
+            "subline": "drift",
+            "command": "match",
+            "guide-link": "drift",
+            "fig-caption": "match",
+            "fig-chart": "drift",
+            "fig-panel": "drift",
+            "fig-total": "drift",
+            "stations-rule": "drift",
+            "stations": "match"
+          },
+          "artifactHash": null
+        }
+      ]
+    },
+    "sections": {
+      "status": "closed",
+      "openedAt": "2026-10-08T17:24:21.453Z",
+      "closedAt": "2026-10-08T17:32:48.548Z",
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "no mechanical gate",
+        "at": "2026-10-08T17:32:48.548Z"
+      },
+      "forced": null
+    },
+    "motion": {
+      "status": "closed",
+      "openedAt": "2026-10-08T17:32:48.548Z",
+      "closedAt": "2026-10-08T17:33:10.631Z",
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "no mechanical gate",
+        "at": "2026-10-08T17:33:10.631Z"
+      },
+      "forced": null
+    },
+    "responsive": {
+      "status": "closed",
+      "openedAt": "2026-10-08T17:33:10.631Z",
+      "closedAt": "2026-10-08T17:34:41.466Z",
+      "attempts": 2,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "desktop 82% (match)",
+        "score": 0.8169,
+        "sideBySide": "/Users/journey/Workspace/canon/packages/website/.impeccable/review/diff/desktop/side-by-side.png",
+        "at": "2026-10-08T17:34:41.466Z"
+      },
+      "forced": null
+    },
+    "review": {
+      "status": "closed",
+      "openedAt": "2026-10-08T17:34:41.466Z",
+      "closedAt": "2026-10-08T17:43:52.933Z",
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    }
+  },
+  "finish": {
+    "disposition": "fix",
+    "at": "2026-10-08T17:43:52.933Z",
+    "phaseAtFinish": "review"
+  },
+  "plates": {}
+}

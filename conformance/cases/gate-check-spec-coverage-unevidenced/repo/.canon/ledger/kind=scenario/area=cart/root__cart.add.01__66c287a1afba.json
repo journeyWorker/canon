@@ -1,0 +1,12 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-08T17:13:38.869477Z",
+  "kind": "scenario",
+  "project_id": "root",
+  "scenario_id": "cart.add.01",
+  "schema": 1,
+  "source_digest": "91b6f9336e069cc1990968d1a8e9a8e232f8b735e8249ce01baf8980d1a22a9e",
+  "title": "Adding an item puts it in the cart"
+}

@@ -1,0 +1,4 @@
+description: "`canon evidence add --report` exits 2 when no case in the report carries the scenario id and no `--report-case` names one"
+steps:
+  - args: [evidence, add, --scenario-id, cart.add.02, --project-id, root, --kind, test-run, --ref, cargo test, --role, implementer, --report, "junit:reports/junit.xml"]
+    exit: 2

@@ -46,6 +46,49 @@ fn gate_check_exits_clean_on_an_empty_repo() {
     assert!(stdout(&output).contains("clean"), "{}", stdout(&output));
 }
 
+/// A present `canon.yaml` canon cannot parse is a usage error naming the
+/// file, exactly like `canon inventory sync` — never a silent fallback to
+/// the default ledger that then reports whatever happens to live there.
+#[test]
+fn gate_check_refuses_an_unparseable_canon_yaml() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: [backend: git\n").unwrap();
+    // Evidence at the default ledger path: the old fallback would read
+    // it and gate green.
+    write_evidence(&dir.path().join(".canon/ledger"), "seed-change#1", "implementer", EvidenceVerdict::Faithful);
+
+    for verb in [&["gate", "check", "--repo", "."][..], &["gate", "promote", "--repo", "."][..]] {
+        let output = run_canon(verb, dir.path());
+        assert_eq!(output.status.code(), Some(2), "{verb:?}: stdout: {}\nstderr: {}", stdout(&output), stderr(&output));
+        assert!(stdout(&output).is_empty(), "{verb:?} must not report a gate result: {}", stdout(&output));
+        let err = stderr(&output);
+        assert!(err.contains("canon.yaml`") && err.contains("parsing `"), "{verb:?} must name the file: {err}");
+        assert!(err.contains("line 2"), "{verb:?} must carry the parse error: {err}");
+    }
+}
+
+/// A record that is valid JSON at its own layout path but fails the
+/// evidence schema is reported against its ledger file, the same as an
+/// unparseable one.
+#[test]
+fn gate_check_names_the_file_of_a_schema_invalid_evidence_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let ledger_root = dir.path().join(".canon/ledger");
+    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("it-agent", RoleId::parse("implementer").unwrap()));
+    let record = EvidenceRecord::new(envelope, Some(TaskId::parse("seed-change#1").unwrap()), None, None, EvidenceVerdict::Faithful);
+    let mut body = serde_json::to_value(&record).unwrap();
+    body["verdict"] = serde_json::json!("maybe");
+    let relative = canon_store::partition::expected_relative_path(RecordKind::EvidenceRecord, &body).unwrap();
+    std::fs::create_dir_all(ledger_root.join(&relative).parent().unwrap()).unwrap();
+    std::fs::write(ledger_root.join(&relative), serde_json::to_vec_pretty(&body).unwrap()).unwrap();
+
+    let output = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    assert_eq!(output.status.code(), Some(1), "stderr: {}", stderr(&output));
+    let text = stdout(&output);
+    assert!(text.contains(&format!("malformed-evidence {} — ", relative.display())), "{text}");
+    assert!(!text.contains("<candidate>"), "{text}");
+}
+
 #[test]
 fn gate_check_exits_gate_red_on_a_seeded_uncovered_cell_violation() {
     let dir = tempfile::tempdir().unwrap();
@@ -99,7 +142,7 @@ fn gate_check_release_flag_engages_release_trust_check_but_ordinary_run_stays_si
 #[test]
 fn gate_check_from_a_subdirectory_resolves_the_ancestor_repo_root() {
     let repo = tempfile::tempdir().unwrap();
-    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  git: { root: .canon/ledger }\n").unwrap();
+    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
     std::fs::create_dir_all(repo.path().join(".canon")).unwrap();
     std::fs::write(repo.path().join(".canon/policy.yaml"), "risk_routing:\n  reviewer: true\n").unwrap();
     write_evidence(&repo.path().join(".canon/ledger"), "seed-change#1", "implementer", EvidenceVerdict::Faithful);
@@ -515,7 +558,7 @@ fn write_tasks_under(root: &Path, change_id: &str, body: &str) -> PathBuf {
 #[test]
 fn gate_task_compat_default_resolves_openspec_at_repo_when_plans_is_absent() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  git:\n    root: .canon/ledger\n").unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local:\n    backend: git\n    root: .canon/ledger\n").unwrap();
     let tasks_path = write_tasks_md(dir.path(), "it-compat-default", "- [ ] 1 Do the thing\n");
     write_evidence(&dir.path().join(".canon/ledger"), "it-compat-default#1", "implementer", EvidenceVerdict::Faithful);
 
@@ -532,7 +575,7 @@ fn gate_task_resolves_the_task_in_a_later_configured_source() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("canon.yaml"),
-        "tiers:\n  git:\n    root: .canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n    - dialect: openspec\n      root: plansB\n",
+        "tiers:\n  local:\n    backend: git\n    root: .canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n    - dialect: openspec\n      root: plansB\n",
     )
     .unwrap();
     let tasks_b = write_tasks_under(&dir.path().join("plansB"), "it-multi", "- [ ] 1 Do the thing\n");
@@ -550,7 +593,7 @@ fn gate_task_first_configured_source_wins_when_both_locate_the_task() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("canon.yaml"),
-        "tiers:\n  git:\n    root: .canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n    - dialect: openspec\n      root: plansB\n",
+        "tiers:\n  local:\n    backend: git\n    root: .canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n    - dialect: openspec\n      root: plansB\n",
     )
     .unwrap();
     let tasks_a = write_tasks_under(&dir.path().join("plansA"), "it-both", "- [ ] 1 Do the thing\n");
@@ -571,7 +614,7 @@ fn gate_task_reports_when_no_plan_source_locates_the_task() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("canon.yaml"),
-        "tiers:\n  git:\n    root: .canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n",
+        "tiers:\n  local:\n    backend: git\n    root: .canon/ledger\nplans:\n  sources:\n    - dialect: openspec\n      root: plansA\n",
     )
     .unwrap();
 
@@ -590,7 +633,7 @@ fn gate_task_reports_when_no_plan_source_locates_the_task() {
 #[test]
 fn gate_task_refuses_without_naming_openspec_when_plan_sources_is_explicitly_empty() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  git:\n    root: .canon/ledger\nplans:\n  sources: []\n").unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local:\n    backend: git\n    root: .canon/ledger\nplans:\n  sources: []\n").unwrap();
     // A tasks.md sitting at the compat default's exact location: the
     // pre-fix code synthesized `openspec @ <repo>` and would locate it.
     let tasks_path = write_tasks_md(dir.path(), "it-empty-sources", "- [ ] 1 Do the thing\n");
@@ -1056,10 +1099,13 @@ fn canons_own_policy_enables_spec_coverage_against_its_own_corpus() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
 
     let resolution = canon_gate::PolicyResolution::resolve(repo, &canon_policy::SchemaRegistry::load());
-    let Some(canon_gate::SpecCoverage::Active { require_evidence, scope, .. }) = resolution.spec_coverage.clone() else {
+    let Some(canon_gate::SpecCoverage::Active { require_evidence, scope, require_review, .. }) = resolution.spec_coverage.clone() else {
         panic!("canon's own policy must resolve spec_coverage to Active, got {:?}", resolution.spec_coverage);
     };
     assert!(require_evidence, "the section exists to require evidence; a false here would be a section that enforces nothing");
+    // 0.12 plan R6: turning review on for canon's own corpus is a
+    // separate, deliberate dogfooding change, never a release side effect.
+    assert_eq!(require_review, None, "canon's own policy must not enable spec_coverage.require_review in 0.12");
     assert_eq!(
         scope,
         vec![canon_model::SubjectStatus::Building, canon_model::SubjectStatus::Verifying],

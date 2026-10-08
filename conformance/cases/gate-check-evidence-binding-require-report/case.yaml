@@ -1,0 +1,4 @@
+description: "`experimental.evidence_binding` with `mode: require, strength: report` holds an artifact-only scenario below the bar and names `--report` as the remediation, never `--artifact`, since an artifact cannot reach `report`"
+steps:
+  - args: [gate, check]
+    exit: 1

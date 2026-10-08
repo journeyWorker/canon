@@ -435,11 +435,58 @@ pub enum SpecCoverage {
         /// must carry at least one in-scope scenario of. EMPTY means no
         /// case requirement — the pre-existing behavior.
         require_cases: Vec<String>,
+        /// `require_review:` (issue #2). `None` = the sub-section is
+        /// absent, and nothing about review is checked — the
+        /// pre-existing behavior, byte for byte.
+        require_review: Option<RequireReview>,
     },
     /// Present but unusable — see [`PolicyDiagnostic::InvalidSection`].
     /// `crate::spec_coverage` emits a violation carrying `detail`
     /// rather than silently behaving like the absent case.
     Invalid { detail: String },
+}
+
+/// `spec_coverage.require_review`, resolved (issue #2). Present means:
+/// a scenario owned by a subject in one of `scope`'s statuses needs a
+/// qualifying `Review` record, and (with `block_on_findings`) such a
+/// subject's changes may carry no open `blocker` Finding. `scope` is its
+/// own list, independent of `spec_coverage.scope`: evidence is wanted
+/// while a subject is being built, review once it is claimed done.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequireReview {
+    /// Subject statuses whose scenarios need review. EMPTY means every
+    /// scenario, mirroring `spec_coverage.scope`.
+    pub scope: Vec<SubjectStatus>,
+    /// A review counts only when neither its `reviewer` nor its actor is
+    /// an actor on that scenario's evidence records.
+    pub distinct_actor: bool,
+    /// An open `blocker` Finding on an in-scope subject's change fails.
+    pub block_on_findings: bool,
+}
+
+impl RequireReview {
+    /// `scope`'s default when the key is omitted.
+    pub const DEFAULT_SCOPE: [SubjectStatus; 2] = [SubjectStatus::Verifying, SubjectStatus::Shipped];
+
+    /// Whether a subject at `status` is in this requirement's scope.
+    pub fn covers(&self, status: SubjectStatus) -> bool {
+        self.scope.is_empty() || self.scope.contains(&status)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+struct RawRequireReview {
+    #[serde(default)]
+    scope: Option<Vec<String>>,
+    #[serde(default = "default_true")]
+    distinct_actor: bool,
+    #[serde(default = "default_true")]
+    block_on_findings: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// The typed shape [`resolve_spec_coverage`] parses the untyped section
@@ -456,6 +503,17 @@ struct RawSpecCoverage {
     exclude_lanes: Vec<String>,
     #[serde(default)]
     require_cases: Vec<String>,
+    /// Kept untyped until [`resolve_spec_coverage`] so an empty mapping
+    /// (`require_review: {}`, every default) and an explicit `null`
+    /// can be told apart from a malformed body.
+    #[serde(default, deserialize_with = "present_yaml")]
+    require_review: Option<serde_yaml::Value>,
+}
+
+/// A key that is present deserializes to `Some`, whatever its value —
+/// including `null`, which a plain `Option` would read as absent.
+fn present_yaml<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<serde_yaml::Value>, D::Error> {
+    serde_yaml::Value::deserialize(deserializer).map(Some)
 }
 
 /// Parse the `spec_coverage:` section, poisoning it (never dropping it)
@@ -480,17 +538,13 @@ fn resolve_spec_coverage(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<P
         }
     };
 
-    let mut scope = Vec::with_capacity(parsed.scope.len());
-    for name in &parsed.scope {
-        match subject_status_from_str(name) {
-            Some(status) => scope.push(status),
-            None => {
-                let detail = format!("`{name}` is not a valid value for `scope` (expected one of: {})", SUBJECT_STATUS_NAMES.join(", "));
-                diagnostics.push(PolicyDiagnostic::InvalidSection { section: SECTION, detail: detail.clone() });
-                return Some(SpecCoverage::Invalid { detail });
-            }
+    let scope = match parse_statuses("scope", &parsed.scope) {
+        Ok(scope) => scope,
+        Err(detail) => {
+            diagnostics.push(PolicyDiagnostic::InvalidSection { section: SECTION, detail: detail.clone() });
+            return Some(SpecCoverage::Invalid { detail });
         }
-    }
+    };
 
     for (field, values) in [("exclude_lanes", &parsed.exclude_lanes), ("require_cases", &parsed.require_cases)] {
         for value in values {
@@ -502,12 +556,48 @@ fn resolve_spec_coverage(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<P
         }
     }
 
+    let require_review = match parsed.require_review.map(resolve_require_review).transpose() {
+        Ok(require_review) => require_review,
+        Err(detail) => {
+            diagnostics.push(PolicyDiagnostic::InvalidSection { section: SECTION, detail: detail.clone() });
+            return Some(SpecCoverage::Invalid { detail });
+        }
+    };
+
     Some(SpecCoverage::Active {
         require_evidence: parsed.require_evidence,
         scope,
         exclude_lanes: parsed.exclude_lanes,
         require_cases: parsed.require_cases,
+        require_review,
     })
+}
+
+/// Every name in `names` as a [`SubjectStatus`], or the detail naming
+/// the first one that is not, with the legal set.
+fn parse_statuses(field: &str, names: &[String]) -> Result<Vec<SubjectStatus>, String> {
+    names
+        .iter()
+        .map(|name| {
+            subject_status_from_str(name)
+                .ok_or_else(|| format!("`{name}` is not a valid value for `{field}` (expected one of: {})", SUBJECT_STATUS_NAMES.join(", ")))
+        })
+        .collect()
+}
+
+/// Parse `spec_coverage.require_review`. A present `null` or a non-mapping
+/// is malformed, never "every default": the defaults are what an empty
+/// mapping (`require_review: {}`) means.
+fn resolve_require_review(raw: serde_yaml::Value) -> Result<RequireReview, String> {
+    if !raw.is_mapping() {
+        return Err("`require_review` must be a mapping (use `require_review: {}` for every default)".to_string());
+    }
+    let parsed: RawRequireReview = serde_yaml::from_value(raw).map_err(|e| format!("`require_review`: {e}"))?;
+    let scope = match &parsed.scope {
+        None => RequireReview::DEFAULT_SCOPE.to_vec(),
+        Some(names) => parse_statuses("require_review.scope", names)?,
+    };
+    Ok(RequireReview { scope, distinct_actor: parsed.distinct_actor, block_on_findings: parsed.block_on_findings })
 }
 
 /// How `experimental.evidence_binding` treats a scenario whose latest
@@ -659,6 +749,12 @@ fn subject_status_from_str(s: &str) -> Option<SubjectStatus> {
         "retired" => Some(SubjectStatus::Retired),
         _ => None,
     }
+}
+
+/// A [`SubjectStatus`]'s wire spelling, from the same table
+/// [`subject_status_from_str`] parses.
+pub fn subject_status_name(status: SubjectStatus) -> &'static str {
+    SUBJECT_STATUS_NAMES.into_iter().find(|name| subject_status_from_str(name) == Some(status)).expect("SUBJECT_STATUS_NAMES covers every SubjectStatus")
 }
 
 /// The resolved `policy.yaml`, S12 design D2's single shared object:
@@ -1212,7 +1308,8 @@ trust_required:
                 require_evidence: true,
                 scope: vec![SubjectStatus::Building, SubjectStatus::Verifying],
                 exclude_lanes: Vec::new(),
-                require_cases: Vec::new()
+                require_cases: Vec::new(),
+                require_review: None
             })
         );
     }
@@ -1224,7 +1321,13 @@ trust_required:
         let (resolution, _dir) = resolve_with("spec_coverage:\n  require_evidence: true\n");
         assert_eq!(
             resolution.spec_coverage,
-            Some(SpecCoverage::Active { require_evidence: true, scope: Vec::new(), exclude_lanes: Vec::new(), require_cases: Vec::new() })
+            Some(SpecCoverage::Active {
+                require_evidence: true,
+                scope: Vec::new(),
+                exclude_lanes: Vec::new(),
+                require_cases: Vec::new(),
+                require_review: None
+            })
         );
     }
 
@@ -1261,7 +1364,8 @@ trust_required:
                 require_evidence: true,
                 scope: Vec::new(),
                 exclude_lanes: Vec::new(),
-                require_cases: vec!["failure".to_string(), "edge".to_string()]
+                require_cases: vec!["failure".to_string(), "edge".to_string()],
+                require_review: None
             })
         );
 
@@ -1270,6 +1374,70 @@ trust_required:
             panic!("expected a poisoned section, got {:?}", resolution.spec_coverage);
         };
         assert!(detail.contains("Failure") && detail.contains("require_cases"), "must name the offender and field: {detail}");
+    }
+
+    fn require_review_of(contents: &str) -> Option<SpecCoverage> {
+        resolve_with(&format!("spec_coverage:\n  require_evidence: true\n{contents}")).0.spec_coverage
+    }
+
+    /// Issue #2, R1: an absent `require_review` resolves to `None`, so a
+    /// repo that never wrote it gets exactly the pre-0.12 section.
+    #[test]
+    fn an_absent_require_review_resolves_to_none() {
+        let Some(SpecCoverage::Active { require_review, .. }) = require_review_of("") else { panic!("expected an active section") };
+        assert_eq!(require_review, None);
+    }
+
+    /// An empty mapping means every default: `[verifying, shipped]`,
+    /// distinct actors, blocking on open blocker findings.
+    #[test]
+    fn an_empty_require_review_takes_every_default() {
+        let Some(SpecCoverage::Active { require_review, .. }) = require_review_of("  require_review: {}\n") else { panic!("expected an active section") };
+        assert_eq!(
+            require_review,
+            Some(RequireReview { scope: vec![SubjectStatus::Verifying, SubjectStatus::Shipped], distinct_actor: true, block_on_findings: true })
+        );
+    }
+
+    #[test]
+    fn each_require_review_field_resolves_independently() {
+        let cases = [
+            ("  require_review:\n    scope: [shipped]\n", RequireReview { scope: vec![SubjectStatus::Shipped], distinct_actor: true, block_on_findings: true }),
+            ("  require_review:\n    scope: []\n", RequireReview { scope: Vec::new(), distinct_actor: true, block_on_findings: true }),
+            (
+                "  require_review:\n    distinct_actor: false\n",
+                RequireReview { scope: RequireReview::DEFAULT_SCOPE.to_vec(), distinct_actor: false, block_on_findings: true },
+            ),
+            (
+                "  require_review:\n    block_on_findings: false\n",
+                RequireReview { scope: RequireReview::DEFAULT_SCOPE.to_vec(), distinct_actor: true, block_on_findings: false },
+            ),
+        ];
+        for (yaml, expected) in cases {
+            let Some(SpecCoverage::Active { require_review, .. }) = require_review_of(yaml) else { panic!("{yaml}: expected an active section") };
+            assert_eq!(require_review, Some(expected), "{yaml}");
+        }
+    }
+
+    /// A malformed `require_review` poisons the whole `spec_coverage`
+    /// section, exactly as a malformed `require_cases` does: reported
+    /// invalid, never silently read as "no review required".
+    #[test]
+    fn a_malformed_require_review_poisons_the_section() {
+        for (yaml, needle) in [
+            ("  require_review:\n    scope: [done]\n", "require_review.scope"),
+            ("  require_review:\n    distinct_actors: true\n", "distinct_actors"),
+            ("  require_review:\n    block_on_findings: maybe\n", "require_review"),
+            ("  require_review:\n", "must be a mapping"),
+            ("  require_review: true\n", "must be a mapping"),
+        ] {
+            let (resolution, _dir) = resolve_with(&format!("spec_coverage:\n  require_evidence: true\n{yaml}"));
+            let Some(SpecCoverage::Invalid { detail }) = &resolution.spec_coverage else {
+                panic!("{yaml}: expected a poisoned section, got {:?}", resolution.spec_coverage);
+            };
+            assert!(detail.contains(needle), "{yaml}: must name the problem ({needle}): {detail}");
+            assert!(resolution.diagnostics.iter().any(|d| matches!(d, PolicyDiagnostic::InvalidSection { section: "spec_coverage", .. })));
+        }
     }
 
     /// Absent and an empty `experimental:` both mean off; `mode` defaults

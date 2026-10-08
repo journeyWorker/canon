@@ -1,0 +1,5 @@
+canon gate check: 2 violation(s)
+
+malformed-evidence (2):
+  malformed-evidence kind=evidence_record/cart.add.01__<digest12>.json — unknown variant `maybe`, expected one of `faithful`, `not_applicable`, `divergent` (malformed)
+  malformed-evidence kind=evidence_record/cart.add.02__<digest12>.json — EOF while parsing an object at line 8 column 4 (malformed)

@@ -1,0 +1,4 @@
+description: "`canon query --kind subject --json` returns one record per subject — the latest generation of its append-only history — with `count`, `kind`, `since`, and `violations` alongside"
+steps:
+  - args: [query, --kind, subject, --json]
+    exit: 0

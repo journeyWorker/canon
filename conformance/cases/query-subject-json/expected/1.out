@@ -1,0 +1,38 @@
+{
+  "count": 2,
+  "kind": "subject",
+  "records": [
+    {
+      "actor": {
+        "agent_id": "canon",
+        "role": "implementer"
+      },
+      "at": "<ts>",
+      "domain": "commerce",
+      "kind": "subject",
+      "owner_role": "implementer",
+      "schema": 1,
+      "status": "building",
+      "subject_id": "checkout",
+      "summary": "Pay for a cart",
+      "title": "Checkout"
+    },
+    {
+      "actor": {
+        "agent_id": "canon",
+        "role": "implementer"
+      },
+      "at": "<ts>",
+      "domain": "discovery",
+      "kind": "subject",
+      "owner_role": "implementer",
+      "schema": 1,
+      "status": "proposed",
+      "subject_id": "search",
+      "summary": "",
+      "title": "Search"
+    }
+  ],
+  "since": null,
+  "violations": 0
+}

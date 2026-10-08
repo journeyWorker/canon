@@ -1,0 +1,6 @@
+description: "With `spec_coverage.require_review: {}`, `canon gate check` exits 1 with `unreviewed-promotion` for a scenario of a subject already in `verifying` without a review, and `canon subject status <id> verifying` refuses (exit 1) a building subject whose scenario has no review"
+steps:
+  - args: [gate, check]
+    exit: 1
+  - args: [subject, status, wishlist, verifying]
+    exit: 1

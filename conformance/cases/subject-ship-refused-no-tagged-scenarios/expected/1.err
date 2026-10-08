@@ -1,0 +1,1 @@
+canon subject status: uncovered-cell checkout — verifying → shipped: no scenario is tagged `@subject:checkout` — tag its scenarios and run `canon inventory sync`; shipping needs evidence, not an empty set

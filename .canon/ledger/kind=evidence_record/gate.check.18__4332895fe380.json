@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T17:41:13.407358Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate require_review (an_absent_require_review_resolves_to_none, an_empty_require_review_takes_every_default, each_require_review_field_resolves_independently)"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 18,
+  "scenario_id": "gate.check.18",
+  "schema": 1,
+  "staging_id": "1e6d57fed916",
+  "verdict": "faithful"
+}

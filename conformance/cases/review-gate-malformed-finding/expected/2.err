@@ -1,0 +1,5 @@
+canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
+canon subject status:   ran unreviewed-promotion — every owned scenario needs a review by an actor other than its evidence actor
+canon subject status:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
+canon subject status: malformed-evidence kind=finding/c-cart__0001__0001__<digest12>.json — unreadable finding record: resolution_sha: disposition is `fixed` but no `resolution_sha` names the commit that closed it (malformed); require_review.block_on_findings cannot tell whether it is an open blocker, so the gate fails closed — fix or remove the record
+canon subject status: --override-reason waives only the review checks (unreviewed-promotion, open-blocker); the violations above that are not review checks still refuse this transition

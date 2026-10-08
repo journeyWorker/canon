@@ -1,0 +1,4 @@
+description: "a present but invalid `experimental.evidence_binding` section makes `canon gate check` exit 1 with an `uncovered-cell` line naming the section — a broken section never reads as off"
+steps:
+  - args: [gate, check]
+    exit: 1

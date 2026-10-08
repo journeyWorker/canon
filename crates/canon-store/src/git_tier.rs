@@ -103,6 +103,16 @@ pub struct GitTier {
     root: PathBuf,
 }
 
+/// Re-anchor a per-record violation on the file that holds the record.
+/// The body validators see a bare [`RawRecord`] and can only name a
+/// field (or `<candidate>`); a reader that cannot find the file it is
+/// told about cannot fix it. The field, when there is one, moves into
+/// the detail.
+fn at_file(violation: EvidenceViolation, relative: &Path) -> EvidenceViolation {
+    let detail = if violation.subject == "<candidate>" { violation.detail } else { format!("{}: {}", violation.subject, violation.detail) };
+    EvidenceViolation::new(violation.class, relative.display().to_string(), detail)
+}
+
 impl GitTier {
     /// `root` is `canon.yaml`'s `tiers.git.root` (design D3), an
     /// ordinary directory on local disk — no network, no credentials,
@@ -169,14 +179,14 @@ impl GitTier {
             };
 
             if let Err(violation) = validate_kind_matches_content(kind, &json) {
-                violations.push(violation);
+                violations.push(at_file(violation, &relative));
                 continue;
             }
 
             let expected = match expected_relative_path(kind, &json) {
                 Ok(p) => p,
                 Err(violation) => {
-                    violations.push(violation);
+                    violations.push(at_file(violation, &relative));
                     continue;
                 }
             };
@@ -191,7 +201,7 @@ impl GitTier {
 
             let raw = RawRecord(json);
             if let Err(violation) = validate_body(kind, &raw) {
-                violations.push(violation);
+                violations.push(at_file(violation, &relative));
                 continue;
             }
 
@@ -742,6 +752,48 @@ mod tests {
         let result = tier.read(&TierQuery::kind(RecordKind::Change)).unwrap();
         assert!(result.records.is_empty());
         assert_eq!(result.violations.len(), 1);
+    }
+
+    /// A record that parses as JSON and sits at its own layout path but
+    /// fails the body schema is reported against that file — the
+    /// operator has to be able to open what the gate is refusing.
+    #[test]
+    fn a_schema_invalid_record_is_reported_against_its_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = GitTier::new(dir.path());
+        let record = canon_model::EvidenceRecord::new(
+            Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor()),
+            Some(canon_model::TaskId::parse("s5#1.7").unwrap()),
+            None,
+            None,
+            canon_model::EvidenceVerdict::Faithful,
+        );
+        let valid = serde_json::to_value(&record).unwrap();
+
+        let mut bad_verdict = valid.clone();
+        bad_verdict["verdict"] = serde_json::json!("not-a-verdict");
+        let mut no_agent = valid;
+        no_agent["actor"].as_object_mut().unwrap().remove("agent_id");
+
+        let mut planted = Vec::new();
+        for body in [bad_verdict, no_agent] {
+            let relative = expected_relative_path(RecordKind::EvidenceRecord, &body).unwrap();
+            std::fs::create_dir_all(dir.path().join(&relative).parent().unwrap()).unwrap();
+            std::fs::write(dir.path().join(&relative), serde_json::to_vec_pretty(&body).unwrap()).unwrap();
+            planted.push(relative.display().to_string());
+        }
+
+        let result = tier.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap();
+        assert!(result.records.is_empty(), "{:?}", result.records);
+        let mut subjects: Vec<_> = result.violations.iter().map(|v| v.subject.clone()).collect();
+        subjects.sort();
+        planted.sort();
+        assert_eq!(subjects, planted, "every refusal names its file: {:?}", result.violations);
+        assert!(
+            result.violations.iter().any(|v| v.detail.starts_with("actor.agent_id: ")),
+            "the field a validator named moves into the detail: {:?}",
+            result.violations
+        );
     }
 
     #[test]

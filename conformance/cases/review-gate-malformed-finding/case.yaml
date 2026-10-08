@@ -1,0 +1,8 @@
+description: "With `require_review.block_on_findings`, a Finding row the ledger read refuses (here `disposition: fixed` with no `resolution_sha`) is a `malformed-evidence` violation naming its ledger file: `canon subject status <id> verifying` refuses it (exit 1) even with `--override-reason`, which waives only review checks, and `canon gate check` exits 1 on it, never treating the unreadable finding as absent"
+steps:
+  - args: [subject, status, cart, verifying]
+    exit: 1
+  - args: [subject, status, cart, verifying, --override-reason, reviewer out until Monday, --actor-id, lead]
+    exit: 1
+  - args: [gate, check]
+    exit: 1

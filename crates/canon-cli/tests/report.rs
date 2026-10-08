@@ -133,3 +133,23 @@ fn report_help_smoke() {
     assert!(text.contains("--check"));
     assert!(text.contains("--snapshot"));
 }
+
+/// A present but unparseable `canon.yaml` is a usage error naming the
+/// file in every mode — the report never falls back to the default
+/// ledger. Needs no `duckdb`: the refusal precedes any view build.
+#[test]
+fn report_refuses_an_unparseable_canon_yaml_in_every_mode() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: [backend: git\n").unwrap();
+    let snapshot = dir.path().join("snap");
+    let snapshot_arg = snapshot.to_str().unwrap();
+    for args in [&["report"][..], &["report", "--check"][..], &["report", "--snapshot", snapshot_arg][..]] {
+        let output = run_canon(args, dir.path());
+        assert_eq!(output.status.code(), Some(2), "{args:?}: stdout: {}\nstderr: {}", stdout(&output), stderr(&output));
+        let err = stderr(&output);
+        assert!(err.starts_with("canon report: parsing `") && err.contains("canon.yaml`: "), "{args:?} must name the file: {err}");
+        assert!(err.contains("line 2"), "{args:?} must carry the parse error: {err}");
+    }
+    assert!(!dir.path().join(".canon/REPORT.md").exists(), "a refused report writes nothing");
+    assert!(!snapshot.exists(), "a refused snapshot writes nothing");
+}

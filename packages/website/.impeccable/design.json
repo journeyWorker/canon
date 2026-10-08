@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-08T17:41:12.795106+00:00",
+  "title": "Design System: canon",
+  "extensions": {
+    "colorMeta": {
+      "signal": {
+        "role": "primary",
+        "displayName": "Signal Orange",
+        "canonical": "#ff4a1c",
+        "tonalRamp": [
+          "#3a160b",
+          "#6b2410",
+          "#8f2200",
+          "#c43510",
+          "#ff4a1c",
+          "#ff8a68",
+          "#ffb59f",
+          "#ffd9cd"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Manual Ground",
+        "canonical": "#f0f3f0",
+        "tonalRamp": [
+          "oklch(15% 0.006 105)",
+          "oklch(25% 0.006 105)",
+          "oklch(35% 0.006 105)",
+          "oklch(48% 0.006 105)",
+          "oklch(60% 0.006 105)",
+          "oklch(72% 0.006 105)",
+          "oklch(84% 0.006 105)",
+          "oklch(95% 0.006 105)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Press Ink",
+        "canonical": "#0b0b0b",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#1a1a19",
+          "#3a3a37",
+          "#4a4a45",
+          "#6d6d68",
+          "#a0a09a",
+          "#c9c9c2",
+          "#e2e2dc"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "#4a4a45",
+        "tonalRamp": [
+          "oklch(15% 0.008 105)",
+          "oklch(25% 0.008 105)",
+          "oklch(35% 0.008 105)",
+          "oklch(48% 0.008 105)",
+          "oklch(60% 0.008 105)",
+          "oklch(72% 0.008 105)",
+          "oklch(84% 0.008 105)",
+          "oklch(95% 0.008 105)"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Column Rule",
+        "canonical": "#b4b6b1",
+        "tonalRamp": [
+          "oklch(15% 0.006 130)",
+          "oklch(25% 0.006 130)",
+          "oklch(35% 0.006 130)",
+          "oklch(48% 0.006 130)",
+          "oklch(60% 0.006 130)",
+          "oklch(72% 0.006 130)",
+          "oklch(84% 0.006 130)",
+          "oklch(95% 0.006 130)"
+        ]
+      },
+      "rule-soft": {
+        "role": "neutral",
+        "displayName": "Soft Rule",
+        "canonical": "#d9dad4",
+        "tonalRamp": [
+          "oklch(15% 0.007 115)",
+          "oklch(25% 0.007 115)",
+          "oklch(35% 0.007 115)",
+          "oklch(48% 0.007 115)",
+          "oklch(60% 0.007 115)",
+          "oklch(72% 0.007 115)",
+          "oklch(84% 0.007 115)",
+          "oklch(95% 0.007 115)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(35% 0 0)",
+          "oklch(48% 0 0)",
+          "oklch(60% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "code-hairline": {
+        "role": "neutral",
+        "displayName": "Code Hairline",
+        "canonical": "#2a2a28",
+        "tonalRamp": [
+          "oklch(15% 0.004 105)",
+          "oklch(25% 0.004 105)",
+          "oklch(35% 0.004 105)",
+          "oklch(48% 0.004 105)",
+          "oklch(60% 0.004 105)",
+          "oklch(72% 0.004 105)",
+          "oklch(84% 0.004 105)",
+          "oklch(95% 0.004 105)"
+        ]
+      },
+      "code-muted": {
+        "role": "neutral",
+        "displayName": "Code Muted",
+        "canonical": "#a3a39b",
+        "tonalRamp": [
+          "oklch(15% 0.01 105)",
+          "oklch(25% 0.01 105)",
+          "oklch(35% 0.01 105)",
+          "oklch(48% 0.01 105)",
+          "oklch(60% 0.01 105)",
+          "oklch(72% 0.01 105)",
+          "oklch(84% 0.01 105)",
+          "oklch(95% 0.01 105)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero headline only; 0.014em text-stroke."
+      },
+      "figure-numeral": {
+        "displayName": "Figure Numeral",
+        "purpose": "Gate count at the foot of Fig. 1."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section heads on a 1.5px ink rule."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Sub-heads, docs-list and Fig. 3 product names."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "Section introductions, max 44ch."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text, 52-62ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Figure captions and table notes."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Commands and code."
+      }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "900px"
+      }
+    ],
+    "focus": {
+      "value": "outline: 2px solid var(--c-signal); outline-offset: 3px",
+      "purpose": "All focus-visible states."
+    },
+    "unit": {
+      "name": "--u",
+      "value": "min(calc(100vw / 1536), calc(100svh / 1024), 1.35px)",
+      "purpose": "One comp pixel; scales the first viewport."
+    }
+  },
+  "components": [
+    {
+      "name": "Command Bar",
+      "kind": "custom",
+      "refersTo": "command-bar",
+      "description": "Primary action: install command with Copy.",
+      "html": "<div class=\"ds-cmd\"><code><span>$ </span>bunx @journeykit/canon init</code><button class=\"ds-copy\">Copy</button></div>",
+      "css": ".ds-cmd{display:flex;align-items:center;justify-content:space-between;gap:24px;height:56px;padding:0 18px;background:var(--c-ink,#0b0b0b);color:var(--c-ground,#f0f3f0);font-family:var(--f-mono,monospace);font-size:20px}.ds-copy{appearance:none;border:0;background:none;color:inherit;font:inherit;cursor:pointer;padding:4px 0}.ds-copy:hover{color:var(--c-signal,#ff4a1c)}.ds-copy:focus-visible{outline:2px solid var(--c-signal,#ff4a1c);outline-offset:3px}"
+    },
+    {
+      "name": "Guide Link",
+      "kind": "custom",
+      "refersTo": "guide-link",
+      "description": "Secondary action with arrow and 2px rule.",
+      "html": "<a class=\"ds-guide\" href=\"#\">Read the guide <svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 8h10M9 4l4 4-4 4\"/></svg></a>",
+      "css": ".ds-guide{display:inline-flex;align-items:center;gap:6px;color:var(--c-ink,#0b0b0b);font-family:var(--f-sans,sans-serif);font-size:20px;letter-spacing:-0.015em;text-decoration:none;border-bottom:2px solid currentColor}.ds-guide:hover{color:var(--c-signal,#ff4a1c)}.ds-guide:focus-visible{outline:2px solid var(--c-signal,#ff4a1c);outline-offset:3px}"
+    },
+    {
+      "name": "Figure Panel",
+      "kind": "card",
+      "refersTo": "figure-panel",
+      "description": "The single signal field: numbered figure with mono caption and real data.",
+      "html": "<figure class=\"ds-fig\"><figcaption>Fig. 1</figcaption><div class=\"ds-fig-lines\"></div><p class=\"ds-fig-num\">0</p></figure>",
+      "css": ".ds-fig{margin:0;width:280px;padding:18px 20px 22px;background:var(--c-signal,#ff4a1c);color:var(--c-ink,#0b0b0b);display:grid;gap:12px}.ds-fig figcaption{font-family:var(--f-mono,monospace);font-size:14px}.ds-fig-lines{height:120px;background:repeating-linear-gradient(to bottom,#0b0b0b 0 1px,transparent 1px 4px)}.ds-fig-num{margin:0;font-family:var(--f-sans,sans-serif);font-weight:700;font-size:96px;line-height:0.8;letter-spacing:-0.05em}"
+    },
+    {
+      "name": "Section Head",
+      "kind": "custom",
+      "description": "Bold headline set on a 1.5px ink rule at the gutter.",
+      "html": "<h2 class=\"ds-h2\">Getting started</h2>",
+      "css": ".ds-h2{margin:0;padding:18px 0 0 12px;border-top:1.5px solid var(--c-ink,#0b0b0b);font-family:var(--f-sans,sans-serif);font-weight:700;font-size:48px;line-height:1.04;letter-spacing:-0.035em;color:var(--c-ink,#0b0b0b)}"
+    },
+    {
+      "name": "Code Block",
+      "kind": "custom",
+      "refersTo": "code-block",
+      "description": "Black square code field.",
+      "html": "<pre class=\"ds-code\"><code>canon gate check <span>// 0 violations</span></code></pre>",
+      "css": ".ds-code{margin:0;padding:22px 26px;background:var(--c-ink,#0b0b0b);color:var(--c-ground,#f0f3f0);font-family:var(--f-mono,monospace);font-size:17px;line-height:1.6}.ds-code span{color:#a3a39b}"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "description": "Bold wordmark and plain underlined-on-hover links.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-wm\" href=\"#\">canon</a><span><a href=\"#\">Docs</a><a href=\"#\">GitHub</a></span></nav>",
+      "css": ".ds-nav{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--f-sans,sans-serif);color:var(--c-ink,#0b0b0b)}.ds-nav a{color:inherit;text-decoration:none}.ds-nav span{display:flex;gap:28px;font-size:16px}.ds-nav span a:hover{text-decoration:underline;text-decoration-thickness:1px}.ds-nav a:focus-visible{outline:2px solid var(--c-signal,#ff4a1c);outline-offset:3px}.ds-wm{font-weight:700;font-size:30px;letter-spacing:-0.035em}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Grid Manual",
+    "overview": "canon reads as an engineering standard set in the International Typographic Style: every claim sits flush-left on a strict twelve-column grid, and every proof is a numbered figure the reader can check. The landing page and the Starlight docs are one world: the same off-white ground, near-black ink, grey hairline column rules, and a signal orange that marks canon's own.\n\nThe first viewport is scaled from the approved 1536x1024 comp through a single unit (`--u`, one comp pixel, bounded by viewport width, height, and 1.35px), so the composition holds its proportions rather than reflowing. Below the fold the page switches to fluid `clamp()` sizes on the same twelve columns. Density is low and typographic; there are no cards, no shadows, no gradients, no rounded corners.\n\nThe world refuses the dev-tool hero with a glowing terminal and a feature-card grid. Proof is drawn from real build-time data (Fig. 1 is generated from canon's own corpus), never illustrated.",
+    "keyCharacteristics": [
+      "Twelve visible hairline column rules over the whole page (four on mobile).",
+      "Signal orange marks canon's own: the Fig. 1 field (canon's own corpus) and canon's row in the Fig. 3 comparison table; elsewhere orange is state (hover, focus, selection) or a single marker.",
+      "Spline Sans bold at poster scale with tight negative tracking; Inconsolata for commands, captions, and data.",
+      "Square corners everywhere; black command bar and black code blocks.",
+      "Numbered \"Fig.\" captions and black rules that carry stations and section heads."
+    ],
+    "rules": [
+      {
+        "name": "The Canon's Own Rule",
+        "body": "Signal orange fills only what is canon's own: the Fig. 1 field (canon's own corpus) and canon's own row in the Fig. 3 comparison table. Other tools' rows and every other region stay ground and ink. Elsewhere orange appears only as state (hover, focus, selection, active tab), as the gate node on Fig. 2, and as the docs danger aside.",
+        "section": "colors"
+      },
+      {
+        "name": "The Visible Grid Rule",
+        "body": "Column rules are always drawn, behind content, never hidden at any breakpoint.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tight Display Rule",
+        "body": "Bold display sizes always carry negative tracking (-0.02em to -0.05em); text sizes stay near zero.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono Means Checkable Rule",
+        "body": "Monospace is for commands, data, and captions, never for headings or prose.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flush-Left Rule",
+        "body": "Every text block starts on a column gutter line; nothing is centred.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Page Rule",
+        "body": "Separation is a rule or a fill, never a shadow, blur, or gradient.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep the twelve column rules visible behind every surface.",
+      "**Do** reserve the signal-orange fill for canon's own figure (Fig. 1) and canon's own comparison row (Fig. 3), and use it otherwise only for hover, focus (2px outline, 3px offset; ink inside the orange Fig. 1 field), selection, and the Fig. 2 gate node.",
+      "**Do** set every proof as a numbered \"Fig.\" with a mono caption and real data.",
+      "**Do** keep corners square and separation flat: rules and fills only.",
+      "**Do** start every text block on a gutter line, flush-left."
+    ],
+    "donts": [
+      "**Don't** add shadows, gradients, blur, or rounded corners.",
+      "**Don't** use a glowing-terminal hero or a grid of feature cards.",
+      "**Don't** set headings or prose in the monospace.",
+      "**Don't** put white text on signal orange; text on it is ink."
+    ]
+  }
+}

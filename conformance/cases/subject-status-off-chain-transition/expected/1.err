@@ -1,0 +1,1 @@
+canon subject status: refused — invalid transition proposed → shipped (allowed: the chain proposed → specced → building → verifying → shipped, or any non-retired state → retired)

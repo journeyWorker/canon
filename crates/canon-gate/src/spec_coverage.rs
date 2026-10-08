@@ -45,12 +45,19 @@
 //!   wrong, missing, or refused.
 //!
 //! All three surface as [`FailureClass::UncoveredCell`] with a
-//! distinguishing detail. The closed eight-member class set is NOT
-//! extended: `canon-cli`'s `verifying → shipped` subject gate already
+//! distinguishing detail. The closed class set is NOT extended for
+//! them: `canon-cli`'s `verifying → shipped` subject gate already
 //! set that precedent for exactly this situation, reporting both "no
 //! verdict" and "divergent verdict" under one class with different
 //! details, because the class vocabulary describes gate OUTCOMES, not
 //! causes.
+//!
+//! With `require_review` (issue #2), this check also runs
+//! [`crate::review_gate`]'s rule: an in-scope scenario without a
+//! qualifying review is `unreviewed-promotion`, and an open blocker
+//! finding on an in-scope subject's change is `open-blocker`. See that
+//! module for the rule and for how a recorded waiver turns a gap into an
+//! advisory.
 //!
 //! # Joins on the composite key, never the bare scenario id
 //! `Scenario`'s identity is `(project_id, scenario_id)` — `project_id`
@@ -65,7 +72,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use canon_model::fold::{fold_to_current_state, FoldedState};
 use canon_model::{EvidenceVerdict, ProjectId, Scenario, ScenarioId, SubjectId, SubjectStatus};
 
-use crate::context::{GateCheck, GateContext};
+use crate::context::{GateCheck, GateContext, SPEC_CORPUS_KINDS};
+use crate::review_gate;
 use crate::failure_class::{FailureClass, Violation};
 use crate::ledger::latest_verdicts;
 use crate::policy::SpecCoverage;
@@ -94,7 +102,7 @@ impl GateCheck for SpecCoverageCheck {
                     format!("policy.yaml's `spec_coverage` section is unusable ({detail}); refusing rather than treating it as absent"),
                 )];
             }
-            Some(SpecCoverage::Active { require_evidence: false, require_cases, .. }) if require_cases.is_empty() => return Vec::new(),
+            Some(SpecCoverage::Active { require_evidence: false, require_cases, require_review: None, .. }) if require_cases.is_empty() => return Vec::new(),
             Some(active @ SpecCoverage::Active { .. }) => active,
         };
 
@@ -103,8 +111,9 @@ impl GateCheck for SpecCoverageCheck {
         // on that input would be a gate that reports clean because it
         // saw nothing — the failure mode that hid `Task` from
         // `canon report`. Refuse before deriving anything.
-        if !ctx.unreadable_kinds.is_empty() {
-            let kinds = ctx.unreadable_kinds.iter().map(|k| k.as_str()).collect::<Vec<_>>().join(", ");
+        let unreadable: Vec<&str> = ctx.unreadable_kinds.iter().filter(|k| SPEC_CORPUS_KINDS.contains(k)).map(|k| k.as_str()).collect();
+        if !unreadable.is_empty() {
+            let kinds = unreadable.join(", ");
             return vec![Violation::new(
                 FailureClass::UncoveredCell,
                 "spec_coverage",
@@ -114,7 +123,7 @@ impl GateCheck for SpecCoverageCheck {
             )];
         }
 
-        let SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases } = policy else {
+        let SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review } = policy else {
             unreachable!("the non-Active arms return above");
         };
 
@@ -179,6 +188,14 @@ impl GateCheck for SpecCoverageCheck {
             }
         }
         violations.extend(case_gaps(in_scope, require_cases).iter().map(CaseGap::violation));
+        if let Some(require_review) = require_review {
+            let unreadable = review_gate::unreadable_review_kinds(ctx, require_review);
+            if unreadable.is_empty() {
+                violations.extend(review_gate::evaluate(ctx, require_review, exclude_lanes).violations);
+            } else {
+                violations.push(review_gate::unreadable_violation(&unreadable));
+            }
+        }
         violations
     }
 }
@@ -442,33 +459,48 @@ mod tests {
         evidence: Vec<EvidenceRecord>,
         divergences: Vec<Divergence>,
         subjects: Vec<Subject>,
+        reviews: Vec<canon_model::Review>,
+        findings: Vec<canon_model::Finding>,
         unreadable: Vec<RecordKind>,
     }
 
     impl Corpus {
         fn new() -> Self {
-            Self { scenarios: Vec::new(), evidence: Vec::new(), divergences: Vec::new(), subjects: Vec::new(), unreadable: Vec::new() }
+            Self {
+                scenarios: Vec::new(),
+                evidence: Vec::new(),
+                divergences: Vec::new(),
+                subjects: Vec::new(),
+                reviews: Vec::new(),
+                findings: Vec::new(),
+                unreadable: Vec::new(),
+            }
         }
     }
 
-    fn run(corpus: Corpus, spec_coverage: Option<SpecCoverage>) -> Vec<Violation> {
-        let ctx = GateContext {
+    fn context(corpus: Corpus, spec_coverage: Option<SpecCoverage>) -> GateContext {
+        GateContext {
             ctx: crate::context::GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/.canon/ledger".into() },
             policy: policy(spec_coverage),
             evidence: corpus.evidence,
             scenarios: corpus.scenarios,
             divergences: corpus.divergences,
             subjects: corpus.subjects,
+            reviews: corpus.reviews,
+            findings: corpus.findings,
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: corpus.unreadable,
             now: Utc::now(),
-        };
-        SpecCoverageCheck.run(&ctx)
+        }
+    }
+
+    fn run(corpus: Corpus, spec_coverage: Option<SpecCoverage>) -> Vec<Violation> {
+        SpecCoverageCheck.run(&context(corpus, spec_coverage))
     }
 
     fn active(scope: Vec<SubjectStatus>) -> Option<SpecCoverage> {
-        Some(SpecCoverage::Active { require_evidence: true, scope, exclude_lanes: Vec::new(), require_cases: Vec::new() })
+        Some(SpecCoverage::Active { require_evidence: true, scope, exclude_lanes: Vec::new(), require_cases: Vec::new(), require_review: None })
     }
 
     fn requiring(cases: &[&str], exclude_lanes: &[&str]) -> Option<SpecCoverage> {
@@ -477,6 +509,7 @@ mod tests {
             scope: Vec::new(),
             exclude_lanes: exclude_lanes.iter().map(|s| s.to_string()).collect(),
             require_cases: cases.iter().map(|s| s.to_string()).collect(),
+            require_review: None,
         })
     }
 
@@ -553,7 +586,11 @@ mod tests {
     fn require_evidence_false_is_also_silent() {
         let mut corpus = Corpus::new();
         corpus.scenarios = vec![scenario("p.a.01", None)];
-        assert!(run(corpus, Some(SpecCoverage::Active { require_evidence: false, scope: Vec::new(), exclude_lanes: Vec::new(), require_cases: Vec::new() })).is_empty());
+        assert!(run(
+            corpus,
+            Some(SpecCoverage::Active { require_evidence: false, scope: Vec::new(), exclude_lanes: Vec::new(), require_cases: Vec::new(), require_review: None })
+        )
+        .is_empty());
     }
 
     /// The defect the whole change exists for: a spec nobody attested
@@ -581,6 +618,7 @@ mod tests {
             scope: Vec::new(),
             exclude_lanes: vec!["process".to_string()],
             require_cases: Vec::new(),
+            require_review: None,
         });
         assert!(run(corpus, policy).is_empty());
     }
@@ -596,6 +634,7 @@ mod tests {
             scope: Vec::new(),
             exclude_lanes: vec!["process".to_string()],
             require_cases: Vec::new(),
+            require_review: None,
         });
         assert_eq!(run(corpus, policy).len(), 1);
     }
@@ -712,18 +751,9 @@ mod tests {
         fresh.envelope.at = stale.envelope.at + chrono::Duration::seconds(1);
         let other = scenario("p.a.02", Some("old"));
 
-        let ctx = GateContext {
-            ctx: crate::context::GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/.canon/ledger".into() },
-            policy: policy(None),
-            evidence: Vec::new(),
-            scenarios: vec![stale, fresh, other],
-            divergences: Vec::new(),
-            subjects: Vec::new(),
-            violations: Vec::new(),
-            corpus_violations: Vec::new(),
-            unreadable_kinds: Vec::new(),
-            now: Utc::now(),
-        };
+        let mut corpus = Corpus::new();
+        corpus.scenarios = vec![stale, fresh, other];
+        let ctx = context(corpus, None);
         let ids = |s: &str| subject_scenarios(&ctx, &SubjectId::parse(s).unwrap()).into_iter().map(|sc| sc.scenario_id.as_str().to_string()).collect::<Vec<_>>();
         assert_eq!(ids("old"), vec!["p.a.02".to_string()]);
         assert_eq!(ids("new"), vec!["p.a.01".to_string()]);
@@ -795,5 +825,218 @@ mod tests {
         let mut corpus = Corpus::new();
         corpus.unreadable = vec![RecordKind::Scenario];
         assert!(run(corpus, None).is_empty(), "an opted-out repo must not be told about routing it never engaged");
+    }
+
+    // ── require_review (issue #2) ──
+
+    use crate::policy::RequireReview;
+    use canon_model::{ChangeId, Finding, FindingDisposition, FindingSeverity, ProvenanceRef, Review, StatusOverride, WaivedViolation};
+
+    fn reviewing(scope: Vec<SubjectStatus>, distinct_actor: bool) -> Option<SpecCoverage> {
+        Some(SpecCoverage::Active {
+            require_evidence: false,
+            scope: Vec::new(),
+            exclude_lanes: vec!["process".to_string()],
+            require_cases: Vec::new(),
+            require_review: Some(RequireReview { scope, distinct_actor, block_on_findings: true }),
+        })
+    }
+
+    fn review(scenario_id: &str, reviewer: &str, actor: &str) -> Review {
+        let envelope = Envelope::new(1, RecordKind::Review, Utc::now(), Actor::new(actor, RoleId::parse("reviewer").unwrap()));
+        Review::new(envelope, project(), ScenarioId::parse(scenario_id).unwrap(), reviewer, "pin-1", ProvenanceRef::OriginalSpecRef("spec".into()))
+    }
+
+    fn finding(change: &str, seq: u32, severity: FindingSeverity, disposition: FindingDisposition, at_offset: i64) -> Finding {
+        let mut envelope = Envelope::new(1, RecordKind::Finding, Utc::now(), Actor::new("reviewer-1", RoleId::parse("reviewer").unwrap()));
+        envelope.at += chrono::Duration::seconds(at_offset);
+        let f = Finding::new(envelope, ChangeId::parse(change).unwrap(), 1, seq, severity, "reviewer-1", "unbounded wait");
+        match disposition {
+            FindingDisposition::Open => f,
+            FindingDisposition::Fixed => f.fixed_by(canon_model::Sha::parse("b".repeat(40)).unwrap()),
+            FindingDisposition::Rejected => f.rejected(),
+            FindingDisposition::Deferred => f.deferred(),
+        }
+    }
+
+    fn verifying_subject(id: &str, changes: &[&str]) -> Subject {
+        subject(id, SubjectStatus::Verifying).with_change_ids(changes.iter().map(|c| ChangeId::parse(*c).unwrap()).collect())
+    }
+
+    /// The issue's own scenario: implementer evidence, no review, subject
+    /// at `verifying`. Clean before 0.12; `unreviewed-promotion` now.
+    #[test]
+    fn an_in_scope_scenario_without_a_review_is_unreviewed_promotion() {
+        let mut corpus = Corpus::new();
+        corpus.scenarios = vec![scenario("p.a.01", Some("live")), scenario("p.b.01", Some("wip"))];
+        corpus.subjects = vec![subject("live", SubjectStatus::Verifying), subject("wip", SubjectStatus::Building)];
+        corpus.evidence = vec![evidence("p.a.01", EvidenceVerdict::Faithful)];
+
+        let out = run(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert_eq!(out[0].class, FailureClass::UnreviewedPromotion);
+        assert_eq!(out[0].subject, "p.a.01", "the building subject is out of review scope");
+        assert!(out[0].detail.contains("no review record"), "{}", out[0].detail);
+    }
+
+    #[test]
+    fn a_review_by_the_evidence_actor_counts_only_without_distinct_actor() {
+        let corpus = || {
+            let mut c = Corpus::new();
+            c.scenarios = vec![scenario("p.a.01", Some("live"))];
+            c.subjects = vec![subject("live", SubjectStatus::Verifying)];
+            c.evidence = vec![evidence("p.a.01", EvidenceVerdict::Faithful)];
+            // `agent-a` attested the evidence; a review naming another
+            // reviewer but authored BY agent-a is still self-review.
+            c.reviews = vec![review("p.a.01", "agent-a", "agent-a"), review("p.a.01", "someone-else", "agent-a")];
+            c
+        };
+        let out = run(corpus(), reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert!(out[0].detail.contains("`agent-a`") && out[0].detail.contains("distinct_actor"), "{}", out[0].detail);
+
+        assert!(run(corpus(), reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), false)).is_empty());
+    }
+
+    #[test]
+    fn a_distinct_review_passes_and_an_excluded_lane_needs_none() {
+        let mut corpus = Corpus::new();
+        let mut process = scenario("p.b.01", Some("live"));
+        process.lane = Some("process".to_string());
+        corpus.scenarios = vec![scenario("p.a.01", Some("live")), process];
+        corpus.subjects = vec![subject("live", SubjectStatus::Shipped)];
+        corpus.evidence = vec![evidence("p.a.01", EvidenceVerdict::Faithful)];
+        corpus.reviews = vec![review("p.a.01", "reviewer-2", "reviewer-2")];
+        assert!(run(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true)).is_empty());
+    }
+
+    /// Findings fold latest-by-natural-key first: a blocker later closed
+    /// as fixed no longer counts; a still-open one does; a should-fix or
+    /// a finding on an unlisted change never does.
+    #[test]
+    fn only_a_latest_open_blocker_on_an_in_scope_subjects_change_is_open_blocker() {
+        let mut corpus = Corpus::new();
+        corpus.subjects = vec![verifying_subject("live", &["c-live"]), subject("wip", SubjectStatus::Building).with_change_ids(vec![ChangeId::parse("c-wip").unwrap()])];
+        corpus.findings = vec![
+            finding("c-live", 1, FindingSeverity::Blocker, FindingDisposition::Open, 0),
+            finding("c-live", 2, FindingSeverity::Blocker, FindingDisposition::Open, 0),
+            finding("c-live", 2, FindingSeverity::Blocker, FindingDisposition::Fixed, 5),
+            finding("c-live", 3, FindingSeverity::ShouldFix, FindingDisposition::Open, 0),
+            finding("c-wip", 1, FindingSeverity::Blocker, FindingDisposition::Open, 0),
+            finding("c-other", 1, FindingSeverity::Blocker, FindingDisposition::Open, 0),
+        ];
+        let out = run(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+        assert_eq!(out.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(FailureClass::OpenBlocker, "c-live#1.1")]);
+        assert!(out[0].detail.contains("`live`"), "{}", out[0].detail);
+    }
+
+    fn waiver(waived: &[(&str, &str)]) -> StatusOverride {
+        StatusOverride {
+            to: SubjectStatus::Verifying,
+            reason: "reviewer out".into(),
+            waived: waived.iter().map(|(class, subject)| WaivedViolation { class: class.to_string(), subject: subject.to_string() }).collect(),
+            actor: Actor::new_unattributed("lead"),
+        }
+    }
+
+    /// A subject moved under `--override-reason` reports the gaps its
+    /// waiver recorded as advisories naming the waiver, not violations,
+    /// while it stays at the waived status.
+    #[test]
+    fn a_waived_subjects_recorded_gaps_are_advisories_not_violations() {
+        let mut waived = verifying_subject("live", &["c-live"]);
+        waived.status_override = Some(waiver(&[("open-blocker", "c-live#1.1"), ("unreviewed-promotion", "p.a.01")]));
+        let mut corpus = Corpus::new();
+        corpus.scenarios = vec![scenario("p.a.01", Some("live"))];
+        corpus.subjects = vec![waived];
+        corpus.findings = vec![finding("c-live", 1, FindingSeverity::Blocker, FindingDisposition::Open, 0)];
+        let ctx = context(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+
+        assert!(SpecCoverageCheck.run(&ctx).is_empty());
+        let advisories = crate::review_gate::review_advisories(&ctx).unwrap();
+        assert_eq!(advisories.len(), 2);
+        assert!(advisories.iter().all(|a| a.line().contains("[waiver: subject `live` moved to verifying by `lead`: reviewer out]")), "{advisories:?}");
+    }
+
+    /// The bug a class-level waiver had: waiving only the unreviewed
+    /// scenario must not also waive a blocker raised afterwards.
+    #[test]
+    fn a_new_blocker_after_an_unreviewed_only_waiver_is_a_violation() {
+        let mut waived = verifying_subject("live", &["c-live"]);
+        waived.status_override = Some(waiver(&[("unreviewed-promotion", "p.a.01")]));
+        let mut corpus = Corpus::new();
+        corpus.scenarios = vec![scenario("p.a.01", Some("live"))];
+        corpus.subjects = vec![waived];
+        corpus.findings = vec![finding("c-live", 1, FindingSeverity::Blocker, FindingDisposition::Open, 0)];
+        let ctx = context(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+
+        let out = SpecCoverageCheck.run(&ctx);
+        assert_eq!(out.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(FailureClass::OpenBlocker, "c-live#1.1")]);
+        let advisories = crate::review_gate::review_advisories(&ctx).unwrap();
+        assert_eq!(advisories.iter().map(|a| a.violation.subject.as_str()).collect::<Vec<_>>(), vec!["p.a.01"]);
+    }
+
+    /// A scenario tagged to the subject after the waiver was granted is
+    /// not covered by it, though the same class was waived for another.
+    #[test]
+    fn a_new_unreviewed_scenario_after_a_waiver_is_a_violation() {
+        let mut waived = verifying_subject("live", &[]);
+        waived.status_override = Some(waiver(&[("unreviewed-promotion", "p.a.01")]));
+        let mut corpus = Corpus::new();
+        corpus.scenarios = vec![scenario("p.a.01", Some("live")), scenario("p.a.02", Some("live"))];
+        corpus.subjects = vec![waived];
+        let ctx = context(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+
+        let out = SpecCoverageCheck.run(&ctx);
+        assert_eq!(out.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(FailureClass::UnreviewedPromotion, "p.a.02")]);
+        assert_eq!(crate::review_gate::review_advisories(&ctx).unwrap().len(), 1);
+    }
+
+    /// A Finding row the ledger read refused blocks as `malformed-evidence`
+    /// named by its file, even with no subject in scope: it might be an
+    /// open blocker. Other kinds' read problems are not this rule's, and
+    /// `block_on_findings: false` turns it off.
+    #[test]
+    fn an_unreadable_finding_blocks_as_malformed_evidence_naming_its_file() {
+        use canon_model::EvidenceViolation;
+        let path = "kind=finding/c-live__0001__0001__0123456789ab.json";
+        let corpus_violations = vec![
+            (RecordKind::Finding, EvidenceViolation::new(canon_model::FailureClass::Malformed, path, "resolution_sha: fixed with no `resolution_sha`")),
+            (RecordKind::Scenario, EvidenceViolation::new(canon_model::FailureClass::Malformed, "kind=scenario/x.json", "bad")),
+        ];
+        let mut ctx = context(Corpus::new(), reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+        ctx.corpus_violations = corpus_violations.clone();
+
+        let out = SpecCoverageCheck.run(&ctx);
+        assert_eq!(out.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(FailureClass::MalformedEvidence, path)]);
+        assert!(out[0].detail.contains("resolution_sha") && out[0].detail.contains("fails closed"), "{}", out[0].detail);
+
+        let mut off = RequireReview { scope: RequireReview::DEFAULT_SCOPE.to_vec(), distinct_actor: true, block_on_findings: false };
+        let mut ctx = context(Corpus::new(), None);
+        ctx.corpus_violations = corpus_violations;
+        assert!(crate::review_gate::malformed_findings(&ctx, &off).is_empty());
+        off.block_on_findings = true;
+        assert_eq!(crate::review_gate::malformed_findings(&ctx, &off).len(), 1);
+    }
+
+    #[test]
+    fn absent_require_review_reads_neither_reviews_nor_findings() {
+        let mut corpus = Corpus::new();
+        corpus.scenarios = vec![scenario("p.a.01", Some("live"))];
+        corpus.subjects = vec![verifying_subject("live", &["c-live"])];
+        corpus.findings = vec![finding("c-live", 1, FindingSeverity::Blocker, FindingDisposition::Open, 0)];
+        corpus.unreadable = vec![RecordKind::Review, RecordKind::Finding];
+        let ctx = context(corpus, requiring(&[], &[]));
+        assert!(SpecCoverageCheck.run(&ctx).is_empty());
+        assert!(crate::review_gate::review_advisories(&ctx).is_none());
+    }
+
+    #[test]
+    fn a_review_kind_routed_off_the_read_rung_refuses() {
+        let mut corpus = Corpus::new();
+        corpus.unreadable = vec![RecordKind::Review];
+        let out = run(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].subject, "spec_coverage.require_review");
     }
 }

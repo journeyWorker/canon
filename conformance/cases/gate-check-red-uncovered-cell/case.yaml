@@ -1,0 +1,4 @@
+description: "`canon gate check` exits 1 (gate red) with one `uncovered-cell` line per subject when `risk_routing` requires a role no evidence record carries"
+steps:
+  - args: [gate, check]
+    exit: 1

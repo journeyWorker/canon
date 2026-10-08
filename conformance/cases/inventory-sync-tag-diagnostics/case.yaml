@@ -1,0 +1,4 @@
+description: "`canon inventory sync` exits 0, indexes every scenario, and prints one `[tag]` diagnostic per malformed `@case:`/`@lane:` value and per unrecognized tag namespace — a well-formed scenario gets none"
+steps:
+  - args: [inventory, sync]
+    exit: 0

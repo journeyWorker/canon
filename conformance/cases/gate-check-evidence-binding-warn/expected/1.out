@@ -1,0 +1,5 @@
+canon gate check: clean (0 violations)
+
+experimental evidence binding (warn, requires artifact): report 1, artifact 0, attested-only 1
+  1 advisory(ies) — not failing the gate:
+  warn cart.add.02 — latest evidence is attested but experimental evidence binding requires artifact — bind it with `canon evidence add --artifact <path>` or `--report <junit|cucumber>:<path>`

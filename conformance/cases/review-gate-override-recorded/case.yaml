@@ -1,0 +1,8 @@
+description: "`canon subject status <id> verifying --override-reason <text>` lets an unreviewed subject through (exit 0), `canon query --kind subject --json` shows the recorded `status_override`, and `canon gate check` exits 0 listing the waived gap as an advisory"
+steps:
+  - args: [subject, status, cart, verifying, --override-reason, reviewer out until Monday, --actor-id, lead]
+    exit: 0
+  - args: [query, --kind, subject, --json]
+    exit: 0
+  - args: [gate, check]
+    exit: 0

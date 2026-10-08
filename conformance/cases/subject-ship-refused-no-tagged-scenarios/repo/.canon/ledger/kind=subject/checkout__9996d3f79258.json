@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T17:15:15.149348Z",
+  "domain": "commerce",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "building",
+  "subject_id": "checkout",
+  "summary": "",
+  "title": "Checkout"
+}

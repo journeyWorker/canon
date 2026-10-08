@@ -56,6 +56,7 @@ pub mod markers;
 pub mod policy;
 pub mod promote;
 pub mod report;
+pub mod review_gate;
 pub mod selftest;
 pub mod spec_coverage;
 pub mod risk;
@@ -65,7 +66,7 @@ pub mod trust_ladder;
 
 pub use checkbox::{gate_task, TaskFlipDecision};
 pub use approval::{verify_risk_approval, verify_ssh_signature};
-pub use context::{GateCheck, GateContext, GateContextError, GateCtx};
+pub use context::{CanonYamlError, GateCheck, GateContext, GateContextError, GateCtx};
 pub use coverage::CoverageCheck;
 pub use risk::{artifact_changed_paths, RiskApprovalCheck};
 pub use dispatch::check_set;
@@ -76,8 +77,9 @@ pub use markers::{evidence_note_of, scan_fake_markers, EvidenceNote, FABRICATION
 pub use evidence_binding::{binding_summary, strength_of, BindingGap, BindingSummary, EvidenceBindingCheck};
 pub use policy::{
     allowed_signers_path, BindingMode, BindingStrength, EvidenceBinding, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError,
-    RiskTierRule, SpecCoverage, StalenessPolicy,
+    RequireReview, RiskTierRule, SpecCoverage, StalenessPolicy,
 };
+pub use review_gate::{review_advisories, ReviewAdvisory};
 pub use promote::{
     commit_divergence, divergence_staging_dir, promote, promote_divergence, stage_divergence, DivergenceCandidate, Promoted, PromoteReport, Refused, RunSeqAssignment,
     StagedAssignment, StagedKind, STAGED_KINDS,

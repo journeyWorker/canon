@@ -52,7 +52,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use canon_gate::{PolicyField, PolicyResolution, RiskTierRule, SpecCoverage};
+use canon_gate::{PolicyField, PolicyResolution, RequireReview, RiskTierRule, SpecCoverage};
 use canon_model::SubjectStatus;
 use canon_policy::SchemaRegistry;
 use canon_vocab::CapabilitySnapshot;
@@ -68,8 +68,9 @@ use serde::Serialize;
 /// can never advertise a generation nothing writes, while this constant
 /// keeps describing the CLI surface itself (design D1's "resolve, then
 /// render" split — the registry call site stays singular either way).
-/// Bumped to `3` for the effect-aware `risk_tiers` policy projection.
-const CURRENT_CAPABILITY_VERSION: u32 = 3;
+/// Bumped to `3` for the effect-aware `risk_tiers` policy projection,
+/// and to `4` for the `review` section (issue #2).
+const CURRENT_CAPABILITY_VERSION: u32 = 4;
 
 /// Resolution-time options beyond the repo root itself. Empty today —
 /// `canon context` takes only `--repo`/`--json`, and `--json` selects a
@@ -218,6 +219,25 @@ pub struct CelSurface {
     pub functions: Vec<String>,
 }
 
+/// The review vocabulary (issue #2): what `canon finding` and `canon
+/// review` accept, and whether this repo requires review before a
+/// subject is claimed done. Static vocabulary plus the resolved policy;
+/// never a corpus read (invariant 1).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewSurface {
+    /// `canon finding add --severity` values, in blocking order.
+    pub finding_severities: Vec<String>,
+    /// `canon finding add/close --disposition` values.
+    pub finding_dispositions: Vec<String>,
+    /// The `review` kind's fields → required, the SAME map
+    /// `kinds.review.envelopeFields` carries.
+    pub review_fields: BTreeMap<String, bool>,
+    /// `spec_coverage.require_review`, one line. `None` = not required
+    /// here (absent, or `spec_coverage` itself is absent or invalid).
+    pub require_review: Option<String>,
+}
+
 /// The full authoring surface (design D3): everything an agent needs to
 /// know BEFORE writing a canon artifact against this repo. Every map is a
 /// `BTreeMap`; every array is sorted or built from an already-sorted
@@ -241,6 +261,8 @@ pub struct AuthoringSurface {
     /// canon-vocab's own resolved directive/enum/evidence-kind index,
     /// never a second hand-projected view of it (invariant 2).
     pub vocab: VocabularySurface,
+    /// Issue #2's review vocabulary and requirement ([`ReviewSurface`]).
+    pub review: ReviewSurface,
     /// S13 5.1/5.2/5.3 (design D6): by `RecordKind::as_str()`, the SAME
     /// key set `kinds` uses — the CEL binding surface (`record.<field>`
     /// types + allowlisted functions) `policy.yaml`'s own write-time
@@ -318,9 +340,12 @@ pub fn resolve_surface(repo: &Path, _opts: ContextOptions) -> AuthoringSurface {
     // resolution call `canon-vocab`'s own checker uses — see module doc.
     let (vocab_snapshot, vocab_diagnostics) = canon_vocab::resolve_snapshot(repo, None);
 
+    let kinds = collect_kinds(&registry);
+    let review = summarize_review(&policy, &kinds);
+
     AuthoringSurface {
         capability_version: CURRENT_CAPABILITY_VERSION,
-        kinds: collect_kinds(&registry),
+        kinds,
         enums: collect_enums(&registry),
         join_keys: collect_join_keys(),
         policy: summarize_policy(&policy),
@@ -328,8 +353,30 @@ pub fn resolve_surface(repo: &Path, _opts: ContextOptions) -> AuthoringSurface {
             snapshot: vocab_snapshot,
             diagnostics: vocab_diagnostics.into_iter().map(|d| format!("{}: {} ({})", d.code, d.message, d.subject)).collect(),
         },
+        review,
         cel: collect_cel(&registry),
     }
+}
+
+/// `review` (issue #2): the finding vocabulary from the parsers that
+/// accept it, the review kind's fields from the `kinds` projection, and
+/// the resolved `require_review` settings.
+fn summarize_review(policy: &PolicyResolution, kinds: &BTreeMap<String, KindSurface>) -> ReviewSurface {
+    let require_review = match &policy.spec_coverage {
+        Some(SpecCoverage::Active { require_review: Some(rr), .. }) => Some(summarize_require_review(rr)),
+        _ => None,
+    };
+    ReviewSurface {
+        finding_severities: crate::finding::SEVERITY_VALUES.iter().map(|s| s.to_string()).collect(),
+        finding_dispositions: crate::finding::DISPOSITION_VALUES.iter().map(|s| s.to_string()).collect(),
+        review_fields: kinds.get(canon_model::RecordKind::Review.as_str()).map(|k| k.envelope_fields.clone()).unwrap_or_default(),
+        require_review,
+    }
+}
+
+fn summarize_require_review(rr: &RequireReview) -> String {
+    let scope = if rr.scope.is_empty() { "<every scenario>".to_string() } else { rr.scope.iter().map(subject_status_slug).collect::<Vec<_>>().join(", ") };
+    format!("scope={scope} distinct_actor={} block_on_findings={}", rr.distinct_actor, rr.block_on_findings)
 }
 
 /// `kinds` (design D3/task 2.2): walks whatever kinds `registry` actually
@@ -426,7 +473,7 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
         risk_routing: policy.risk_routing.iter().map(|(k, v)| (k.clone(), summarize_field(v))).collect(),
         risk_tiers: policy.risk_tiers.iter().map(|(name, rule)| (name.clone(), summarize_risk_tier(rule))).collect(),
         spec_coverage: policy.spec_coverage.as_ref().map(|sc| match sc {
-            SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases } => {
+            SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review } => {
                 let scope = if scope.is_empty() {
                     "<every scenario>".to_string()
                 } else {
@@ -438,6 +485,9 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
                 }
                 if !require_cases.is_empty() {
                     summary.push_str(&format!(" require_cases={}", require_cases.join(", ")));
+                }
+                if let Some(rr) = require_review {
+                    summary.push_str(&format!(" require_review=({})", summarize_require_review(rr)));
                 }
                 summary
             }
@@ -574,6 +624,15 @@ pub fn render_outline(surface: &AuthoringSurface) -> String {
     for diag in &surface.policy.diagnostics {
         let _ = writeln!(out, "    {diag}");
     }
+    let _ = writeln!(out, "review:");
+    let _ = writeln!(out, "  findingSeverities: {}", surface.review.finding_severities.join(", "));
+    let _ = writeln!(out, "  findingDispositions: {}", surface.review.finding_dispositions.join(", "));
+    let fields: Vec<String> = surface.review.review_fields.iter().map(|(name, required)| format!("{name}{}", if *required { "*" } else { "" })).collect();
+    let _ = writeln!(out, "  reviewFields: {}", fields.join(", "));
+    let _ = match &surface.review.require_review {
+        Some(summary) => writeln!(out, "  require_review: {summary}"),
+        None => writeln!(out, "  require_review: <absent — review is not required before a subject is claimed done>"),
+    };
     let _ = writeln!(out, "vocab:");
     let _ = writeln!(
         out,

@@ -25,7 +25,7 @@ Feature: gate check
   @subject:gate-trust-spine
   @case:failure
   @gate.check.03
-  Scenario: Each of the eight failure classes fires on its own fixture and only there
+  Scenario: Each of the nine failure classes fires on its own fixture and only there
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given the shipped fixture corpus, one fixture per failure class
     When every fixture is evaluated against its own recorded expectations
@@ -36,11 +36,11 @@ Feature: gate check
   @subject:gate-trust-spine
   @case:edge
   @gate.check.04
-  Scenario: The failure-class vocabulary is closed at eight grep-stable strings
+  Scenario: The failure-class vocabulary is closed at nine grep-stable strings
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a hook or a fixture that matches violations by substring rather than by type
     When the published wire strings are compared against the classes the gate raises
-    Then the eight strings are that set, in that order, with no duplicates
+    Then the nine strings are that set, in that order, with no duplicates
     And every string parses back to the class it names
     And a plausible-looking class name the gate never raises does not parse
 
@@ -173,3 +173,36 @@ Feature: gate check
     When the policy is resolved
     Then the section is invalid and the gate reports it as an uncovered cell
     And the spec coverage section beside it still resolves
+
+  # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.17
+  Scenario: With require_review the gate reports unreviewed and open-blocker gaps on a subject claimed done
+    Given a verifying subject whose scenario carries only its implementer's evidence and no review
+    And an open blocker finding on a change the subject adopted
+    And a spec_coverage policy whose require_review section takes its defaults
+    When the gate checks the repository
+    Then it reports unreviewed-promotion naming the scenario and the missing review
+    And it reports open-blocker naming the change, round and seq of the finding
+
+  # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:happy
+  @gate.check.18
+  Scenario: require_review takes its defaults from an empty section and resolves each field on its own
+    Given a spec_coverage section with an empty require_review mapping
+    When the policy is resolved
+    Then review is required at verifying and shipped, by a distinct actor, with open blockers blocking
+    And setting scope, distinct_actor or block_on_findings changes only that field
+    And a section without require_review resolves exactly as it did before
+
+  # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.19
+  Scenario: A malformed require_review fails the gate instead of reading as off
+    Given a require_review section with an unknown status, an unknown key, a null or a scalar
+    When the policy is resolved
+    Then the whole spec_coverage section is invalid and names the problem
+    And the gate reports it rather than skipping review

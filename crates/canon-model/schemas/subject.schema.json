@@ -35,6 +35,17 @@
     "status": {
       "$ref": "#/$defs/SubjectStatus"
     },
+    "status_override": {
+      "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StatusOverride"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "subject_id": {
       "$ref": "#/$defs/SubjectId"
     },
@@ -128,6 +139,37 @@
       "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
       "type": "string"
     },
+    "StatusOverride": {
+      "description": "A recorded waiver of the `spec_coverage.require_review` status guard\n(see [`Subject::status_override`]). `canon gate check` reports a gap\nas an advisory naming this waiver only when it matches one of\n`waived` exactly, and only while the subject stays at `to`. A gap that\nappears later (a new blocker, a newly tagged scenario) is not covered\nand stays a violation.",
+      "type": "object",
+      "properties": {
+        "actor": {
+          "description": "Who waived it.",
+          "$ref": "#/$defs/Actor"
+        },
+        "reason": {
+          "description": "The operator's reason, verbatim (one line).",
+          "type": "string"
+        },
+        "to": {
+          "description": "The status the transition moved to under this waiver.",
+          "$ref": "#/$defs/SubjectStatus"
+        },
+        "waived": {
+          "description": "Exactly the guard violations this waiver let through, sorted.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WaivedViolation"
+          }
+        }
+      },
+      "required": [
+        "to",
+        "reason",
+        "waived",
+        "actor"
+      ]
+    },
     "SubjectId": {
       "description": "subject slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the durable product-unit identifier — joins: subject ↔ change ↔ scenario",
       "type": "string"
@@ -142,6 +184,22 @@
         "verifying",
         "shipped",
         "retired"
+      ]
+    },
+    "WaivedViolation": {
+      "description": "One violation a [`StatusOverride`] let through: the gate failure\nclass (`unreviewed-promotion`, `open-blocker`) and the violation's\nsubject (a scenario id, or `<change_id>#<round>.<seq>` for a\nblocker), as `canon gate check` prints them.",
+      "type": "object",
+      "properties": {
+        "class": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "class",
+        "subject"
       ]
     }
   }

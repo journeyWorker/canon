@@ -1,0 +1,1 @@
+canon subject status: uncovered-cell checkout.pay — verifying → shipped: feature surface `checkout.pay` (root `root`) has no `@case:failure` scenario among its 2 in-scope scenario(s) — its spec covers only other paths; specify what happens on that path

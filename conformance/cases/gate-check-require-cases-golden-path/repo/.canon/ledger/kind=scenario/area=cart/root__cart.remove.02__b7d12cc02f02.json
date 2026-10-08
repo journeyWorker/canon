@@ -1,0 +1,13 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-08T17:13:52.232182Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "root",
+  "scenario_id": "cart.remove.02",
+  "schema": 1,
+  "source_digest": "a6cffac277375d829eb190063a308a5b3ec0f15419552ed1de4d4b77427b4c72",
+  "title": "Removing an item not in the cart is refused"
+}

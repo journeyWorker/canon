@@ -180,16 +180,17 @@ fn a_core_kind_body_the_rust_reader_refuses_moves_a_mart_under_an_unchanged_sour
     let baseline_digest = digest();
     assert_eq!(scope_status_carried_scenarios(&roots), vec![VALID_SCENARIO_ID.to_string()], "the fixture starts with exactly one scenario carried by a task");
 
-    plant_refused_task(&git_root);
+    let planted = plant_refused_task(&git_root);
 
     // The Rust reader refuses it — LOUDLY, as a violation, and on the
-    // BODY gate specifically (`validate_body`'s `<candidate>`
-    // subject), not the layout gate the sibling pin covers.
+    // BODY gate specifically (named by the refused file, not the
+    // `layout` subject the sibling pin covers).
     let read = tier.read(&TierQuery::kind(RecordKind::Task)).unwrap();
     assert_eq!(read.records.len(), 1, "the planted file must be refused, leaving one readable task, got {:?}", read.records);
     assert_eq!(read.records[0].0["task_id"], json!(VALID_TASK_ID));
     assert_eq!(read.violations.len(), 1, "…and refused loudly: {:?}", read.violations);
-    assert_eq!(read.violations[0].subject, "<candidate>", "refused by the body-schema gate, got {:?}", read.violations[0]);
+    let planted_relative = planted.strip_prefix(&git_root).unwrap().display().to_string();
+    assert_eq!(read.violations[0].subject, planted_relative, "refused by the body-schema gate, naming the file, got {:?}", read.violations[0]);
 
     // …so the digest, which is that same validated read, cannot see it.
     assert_eq!(baseline_digest, digest(), "a record the validated read refuses contributes nothing to `source_digest` — this is the documented exception, not a wish");

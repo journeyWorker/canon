@@ -24,7 +24,7 @@
 
 use std::path::{Path, PathBuf};
 
-use canon_model::{validate_evidence_batch, Divergence, EvidenceRecord, EvidenceViolation, RecordKind, Scenario, Subject};
+use canon_model::{validate_evidence_batch, Divergence, EvidenceRecord, EvidenceViolation, Finding, RecordKind, Review, Scenario, Subject};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{StoreError, Tier, TierQuery};
@@ -65,10 +65,19 @@ impl GateCtx {
     /// from — never a second, gate-only config path) when that file
     /// exists and declares one (a relative `root` is joined against
     /// `repo`; an absolute one is used as-is), else the fixed
-    pub fn from_repo(repo: impl Into<PathBuf>) -> Self {
+    /// [`DEFAULT_LEDGER_RELATIVE_PATH`]. An ABSENT `canon.yaml` is the
+    /// default layout; a present one that cannot be read or parsed is an
+    /// `Err` — falling back would read (or write) a ledger the repo's
+    /// own config never named and report it as the truth.
+    pub fn from_repo(repo: impl Into<PathBuf>) -> Result<Self, CanonYamlError> {
         let repo = repo.into();
-        let ledger_root = canon_yaml_git_root(&repo).unwrap_or_else(|| repo.join(DEFAULT_LEDGER_RELATIVE_PATH));
-        Self { repo, ledger_root }
+        let configured_root = load_tier_policy(&repo)?.and_then(|policy| policy.local_git().map(|cfg| cfg.root.clone()));
+        let ledger_root = match configured_root {
+            Some(root) if root.is_absolute() => root,
+            Some(root) => repo.join(root),
+            None => repo.join(DEFAULT_LEDGER_RELATIVE_PATH),
+        };
+        Ok(Self { repo, ledger_root })
     }
 
     /// Fixture binding: every root under one fixture directory
@@ -84,25 +93,33 @@ impl GateCtx {
     }
 }
 
-/// Best-effort canonical `<repo>/canon.yaml` → the `local` rung's
-/// git root resolution — reuses
-/// [`canon_store::policy::TierPolicy::from_yaml`] (S2's own parser,
-/// never a second hand-rolled YAML reader) against the SAME on-disk
-/// file S2's `TierPolicy`/`canon tier age`/`canon query` resolve the
-/// local rung's `root` from (`crates/canon-cli/src/tiers.rs::
-/// build_tiers`'s identical `<canon.yaml's own dir>.join(&cfg.root)`
-/// semantics), so a consumer's override is honored identically for
-/// `canon gate` and every S2 CLI path. `None` on any problem (file
-/// absent, unparseable, no git-backed `local` rung) —
-/// [`GateCtx::from_repo`]'s caller always has a usable fallback,
-/// matching this crate's fail-soft-load discipline
-/// ([`crate::policy`]'s module doc).
-fn canon_yaml_git_root(repo: &Path) -> Option<PathBuf> {
-    let canon_yaml_path = repo.join("canon.yaml");
-    let content = std::fs::read_to_string(canon_yaml_path).ok()?;
-    let tier_policy = canon_store::policy::TierPolicy::from_yaml(&content).ok()?;
-    let root = tier_policy.local_git()?.root.clone();
-    Some(if root.is_absolute() { root } else { repo.join(root) })
+/// `<repo>/canon.yaml` is present but unusable. Mirrors
+/// `canon-cli`'s `TierCliError` wording so every verb that refuses the
+/// file names it the same way.
+#[derive(Debug, thiserror::Error)]
+pub enum CanonYamlError {
+    #[error("reading `{}`: {source}", path.display())]
+    Read { path: PathBuf, source: std::io::Error },
+    #[error("parsing `{}`: {source}", path.display())]
+    Policy { path: PathBuf, source: canon_store::policy::PolicyError },
+}
+
+/// The canonical `<repo>/canon.yaml`'s [`TierPolicy`], parsed with S2's
+/// own parser ([`TierPolicy::from_yaml_at`], resolved against `repo`
+/// exactly as `crates/canon-cli/src/tiers.rs::build_tiers` does).
+/// `Ok(None)` only when the file does not exist; any other read error,
+/// or a file the parser rejects, is an `Err` naming the file.
+///
+/// [`TierPolicy`]: canon_store::policy::TierPolicy
+/// [`TierPolicy::from_yaml_at`]: canon_store::policy::TierPolicy::from_yaml_at
+fn load_tier_policy(repo: &Path) -> Result<Option<canon_store::policy::TierPolicy>, CanonYamlError> {
+    let path = repo.join("canon.yaml");
+    let content = match std::fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => return Err(CanonYamlError::Read { path, source }),
+    };
+    canon_store::policy::TierPolicy::from_yaml_at(&content, repo).map(Some).map_err(|source| CanonYamlError::Policy { path, source })
 }
 
 /// Every piece an S5 wave-2 [`GateCheck`] needs, loaded once per gate
@@ -141,17 +158,24 @@ pub struct GateContext {
     /// documented "loaded once per gate run" seam and a check that
     /// opened its own tier would fork that contract.
     pub subjects: Vec<Subject>,
+    /// Review attestations and code-review findings, read for
+    /// `spec_coverage.require_review` (issue #2) the same way and for the
+    /// same reason as the three corpus kinds above: loaded once here,
+    /// unfolded, with read problems in `corpus_violations`.
+    pub reviews: Vec<Review>,
+    pub findings: Vec<Finding>,
     pub violations: Vec<EvidenceViolation>,
-    /// Read problems from the three corpus kinds above, kept OUT of
-    /// `violations` deliberately. [`crate::ledger`]'s `LedgerCheck`
-    /// maps every `violations` entry to
+    /// Read problems from the corpus kinds above, each tagged with the
+    /// kind it was read as, kept OUT of `violations` deliberately.
+    /// [`crate::ledger`]'s `LedgerCheck` maps every `violations` entry to
     /// [`crate::FailureClass::MalformedEvidence`] and is
     /// unconditionally in `crate::dispatch::check_set`, so folding
     /// these in would turn a green repo red on upgrade with no policy
-    /// change — the opposite of `spec_coverage` being opt-in. Only
-    /// [`crate::spec_coverage`] reads this, and only when the policy
-    /// section is present.
-    pub corpus_violations: Vec<EvidenceViolation>,
+    /// change — the opposite of `spec_coverage` being opt-in. Only an
+    /// opted-in rule reads this: [`crate::review_gate`] blocks on the
+    /// `Finding` entries when `require_review.block_on_findings` is on,
+    /// because a finding it cannot read might be an open blocker.
+    pub corpus_violations: Vec<(RecordKind, EvidenceViolation)>,
     /// Kinds whose configured routing sends them somewhere this
     /// context's [`GitTier`] does not read, so their vector above is
     /// empty for a reason that is NOT "the corpus is empty".
@@ -200,9 +224,11 @@ impl GateContext {
         let scenarios = read_corpus_kind(&tier, RecordKind::Scenario, &mut corpus_violations)?;
         let divergences = read_corpus_kind(&tier, RecordKind::Divergence, &mut corpus_violations)?;
         let subjects = read_corpus_kind(&tier, RecordKind::Subject, &mut corpus_violations)?;
-        let unreadable_kinds = unreadable_corpus_kinds(&ctx.repo);
+        let reviews = read_corpus_kind(&tier, RecordKind::Review, &mut corpus_violations)?;
+        let findings = read_corpus_kind(&tier, RecordKind::Finding, &mut corpus_violations)?;
+        let unreadable_kinds = unreadable_corpus_kinds(&ctx.repo)?;
 
-        Ok(Self { ctx, policy, evidence, scenarios, divergences, subjects, violations, corpus_violations, unreadable_kinds, now })
+        Ok(Self { ctx, policy, evidence, scenarios, divergences, subjects, reviews, findings, violations, corpus_violations, unreadable_kinds, now })
     }
 }
 
@@ -217,30 +243,38 @@ impl GateContext {
 fn read_corpus_kind<T: serde::de::DeserializeOwned>(
     tier: &GitTier,
     kind: RecordKind,
-    corpus_violations: &mut Vec<EvidenceViolation>,
+    corpus_violations: &mut Vec<(RecordKind, EvidenceViolation)>,
 ) -> Result<Vec<T>, GateContextError> {
     let read = tier.read(&TierQuery::kind(kind))?;
-    corpus_violations.extend(read.violations);
+    corpus_violations.extend(read.violations.into_iter().map(|violation| (kind, violation)));
     let mut out = Vec::with_capacity(read.records.len());
     for raw in &read.records {
         match serde_json::from_value::<T>(raw.0.clone()) {
             Ok(record) => out.push(record),
             // `RawRecord` is a bare body with no path, so the subject is
-            // the kind itself — enough for an operator to know WHICH
-            // corpus is malformed, and this vector is diagnostic input
-            // to one check rather than a reported violation set.
-            Err(e) => corpus_violations.push(EvidenceViolation::new(
-                canon_model::FailureClass::Malformed,
-                kind.as_str(),
-                format!("{} row does not deserialize: {e}", kind.as_str()),
+            // the kind itself. The tier's own `validate_body` already
+            // deserialized this row into the same type and refused it
+            // against its file, so this arm is a backstop only.
+            Err(e) => corpus_violations.push((
+                kind,
+                EvidenceViolation::new(canon_model::FailureClass::Malformed, kind.as_str(), format!("{} row does not deserialize: {e}", kind.as_str())),
             )),
         }
     }
     Ok(out)
 }
 
-/// Which of the three spec-corpus kinds this repo routes somewhere the
-/// gate's [`GitTier`] does not read.
+/// The kinds `spec_coverage`'s evidence, case, and mismatch rules read.
+pub const SPEC_CORPUS_KINDS: [RecordKind; 3] = [RecordKind::Scenario, RecordKind::Divergence, RecordKind::Subject];
+
+/// The kinds only `spec_coverage.require_review` reads. Kept apart from
+/// [`SPEC_CORPUS_KINDS`] so a repo that routes `review` elsewhere and
+/// never opted into review checking sees no change.
+pub const REVIEW_CORPUS_KINDS: [RecordKind; 2] = [RecordKind::Review, RecordKind::Finding];
+
+/// Which corpus kinds ([`SPEC_CORPUS_KINDS`] and
+/// [`REVIEW_CORPUS_KINDS`]) this repo routes somewhere the gate's
+/// [`GitTier`] does not read.
 ///
 /// `GateContext` reads ONE tier — the `local` rung's git root — which is
 /// safe for `EvidenceRecord` only by convention. `routing` is per-repo
@@ -251,28 +285,28 @@ fn read_corpus_kind<T: serde::de::DeserializeOwned>(
 /// view), and an inert gate that reports clean is worse than one that
 /// refuses.
 ///
-/// A repo with no readable `canon.yaml`, or one whose routing is absent
-/// for a kind, yields nothing here: [`GateCtx::from_repo`] already falls
-/// back to the default ledger path in that case, so the git tier IS
-/// where those records live.
-fn unreadable_corpus_kinds(repo: &Path) -> Vec<RecordKind> {
-    const CORPUS_KINDS: [RecordKind; 3] = [RecordKind::Scenario, RecordKind::Divergence, RecordKind::Subject];
-    let Ok(content) = std::fs::read_to_string(repo.join("canon.yaml")) else {
-        return Vec::new();
+/// A repo with no `canon.yaml`, or one whose routing is absent for a
+/// kind, yields nothing here: [`GateCtx::from_repo`] uses the default
+/// ledger path in that case, so the git tier IS where those records
+/// live. A present but unusable `canon.yaml` is an `Err`, as in
+/// [`GateCtx::from_repo`].
+fn unreadable_corpus_kinds(repo: &Path) -> Result<Vec<RecordKind>, CanonYamlError> {
+    let Some(tier_policy) = load_tier_policy(repo)? else {
+        return Ok(Vec::new());
     };
-    let Ok(tier_policy) = canon_store::policy::TierPolicy::from_yaml(&content) else {
-        return Vec::new();
-    };
-    CORPUS_KINDS
+    Ok(SPEC_CORPUS_KINDS
         .into_iter()
+        .chain(REVIEW_CORPUS_KINDS)
         .filter(|kind| matches!(tier_policy.routing.get(kind), Some(rung) if *rung != canon_store::policy::Rung::Local))
-        .collect()
+        .collect())
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum GateContextError {
     #[error("canon-store: {0}")]
     Store(#[from] StoreError),
+    #[error(transparent)]
+    CanonYaml(#[from] CanonYamlError),
 }
 
 /// One S5 wave-2 check (static coverage/D3a, dynamic verdict-ledger/
@@ -319,7 +353,7 @@ mod tests {
     #[test]
     fn from_repo_defaults_ledger_root_when_no_canon_yaml() {
         let dir = TempDir::new().unwrap();
-        let ctx = GateCtx::from_repo(dir.path());
+        let ctx = GateCtx::from_repo(dir.path()).unwrap();
         assert_eq!(ctx.repo, dir.path());
         assert_eq!(ctx.ledger_root, dir.path().join(".canon").join("ledger"));
     }
@@ -340,7 +374,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local:\n    backend: git\n    root: custom/ledger-root\n").unwrap();
 
-        let ctx = GateCtx::from_repo(dir.path());
+        let ctx = GateCtx::from_repo(dir.path()).unwrap();
         assert_eq!(ctx.ledger_root, dir.path().join("custom").join("ledger-root"));
     }
 
@@ -355,8 +389,32 @@ mod tests {
         std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
         std::fs::write(dir.path().join(".canon").join("canon.yaml"), "tiers:\n  local:\n    backend: git\n    root: custom/ledger-root\n").unwrap();
 
-        let ctx = GateCtx::from_repo(dir.path());
+        let ctx = GateCtx::from_repo(dir.path()).unwrap();
         assert_eq!(ctx.ledger_root, dir.path().join(DEFAULT_LEDGER_RELATIVE_PATH), "a `.canon/canon.yaml` override must NOT be honored");
+    }
+
+    /// A present `canon.yaml` the tier parser rejects is refused, naming
+    /// the file — never silently resolved to the default ledger.
+    #[test]
+    fn from_repo_refuses_an_unparseable_canon_yaml() {
+        let dir = TempDir::new().unwrap();
+        let canon_yaml = dir.path().join("canon.yaml");
+        for broken in ["tiers: [unclosed\n", "tiers:\n  git: { root: .canon/ledger }\n"] {
+            std::fs::write(&canon_yaml, broken).unwrap();
+            let err = GateCtx::from_repo(dir.path()).expect_err(broken);
+            assert!(matches!(err, CanonYamlError::Policy { ref path, .. } if *path == canon_yaml), "{err:?}");
+            assert!(err.to_string().contains(&canon_yaml.display().to_string()), "{err}");
+        }
+    }
+
+    /// Even a context not built by `from_repo` refuses the load when the
+    /// repo's `canon.yaml` is unusable: the corpus routing check reads it.
+    #[test]
+    fn load_refuses_an_unparseable_canon_yaml() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("canon.yaml"), "tiers: [unclosed\n").unwrap();
+        let result = GateContext::load(GateCtx::from_fixture(dir.path()), &SchemaRegistry::load(), fixed_now());
+        assert!(matches!(result, Err(GateContextError::CanonYaml(_))), "an unusable canon.yaml must not load");
     }
 
     #[test]
@@ -395,5 +453,78 @@ mod tests {
         assert_eq!(gate_context.evidence.len(), 1);
         assert!(gate_context.violations.is_empty());
         assert_eq!(gate_context.evidence[0].verdict, EvidenceVerdict::Faithful);
+    }
+
+    /// Plant `body` at the exact ledger path its own content resolves to,
+    /// so only the body-schema gate can refuse it.
+    fn plant(ledger_root: &Path, kind: RecordKind, body: &serde_json::Value) -> String {
+        let relative = canon_store::partition::expected_relative_path(kind, body).unwrap();
+        std::fs::create_dir_all(ledger_root.join(&relative).parent().unwrap()).unwrap();
+        std::fs::write(ledger_root.join(&relative), serde_json::to_vec_pretty(body).unwrap()).unwrap();
+        relative.display().to_string()
+    }
+
+    /// The read problems of the review kinds reach `corpus_violations`
+    /// tagged with their kind and named by their file. A refused Finding
+    /// is what `review_gate::malformed_findings` blocks on; a refused
+    /// Review is simply absent, which leaves its scenario unreviewed —
+    /// the review rule fails closed on it without any extra handling.
+    #[test]
+    fn load_tags_unreadable_review_and_finding_rows_with_kind_and_file() {
+        use canon_model::{Actor, Envelope, ProjectId, ProvenanceRef, Review, RoleId, Scenario, ScenarioId, SpecDigest};
+
+        let dir = TempDir::new().unwrap();
+        let ctx = GateCtx::from_fixture(dir.path());
+        let finding_path = plant(
+            &ctx.ledger_root,
+            RecordKind::Finding,
+            &serde_json::json!({
+                "actor": { "agent_id": "reviewer-2", "role": "reviewer" },
+                "at": "2026-10-08T17:56:58.886973Z",
+                "change_id": "c-cart",
+                "disposition": "fixed",
+                "kind": "finding",
+                "reviewer": "reviewer-2",
+                "round": 1,
+                "schema": 1,
+                "seq": 1,
+                "severity": "blocker",
+                "summary": "fixed, but no commit names the fix"
+            }),
+        );
+        let project = ProjectId::parse("root").unwrap();
+        let scenario_id = ScenarioId::parse("cart.add.01").unwrap();
+        let review = Review::new(
+            Envelope::new(1, RecordKind::Review, fixed_now(), Actor::new("reviewer-2", RoleId::parse("reviewer").unwrap())),
+            project.clone(),
+            scenario_id.clone(),
+            "reviewer-2",
+            "pin-1",
+            ProvenanceRef::OriginalSpecRef("spec".into()),
+        );
+        let mut review_body = serde_json::to_value(&review).unwrap();
+        review_body["actor"]["role"] = serde_json::json!(7);
+        let review_path = plant(&ctx.ledger_root, RecordKind::Review, &review_body);
+
+        let gate_context = GateContext::load(ctx, &SchemaRegistry::load(), fixed_now()).unwrap();
+        assert!(gate_context.findings.is_empty() && gate_context.reviews.is_empty());
+        let tagged: Vec<(RecordKind, &str)> = gate_context.corpus_violations.iter().map(|(kind, v)| (*kind, v.subject.as_str())).collect();
+        assert_eq!(tagged, vec![(RecordKind::Review, review_path.as_str()), (RecordKind::Finding, finding_path.as_str())]);
+        assert!(gate_context.violations.is_empty(), "review-corpus problems never reach the always-on ledger check");
+
+        let require_review = crate::RequireReview { scope: crate::RequireReview::DEFAULT_SCOPE.to_vec(), distinct_actor: true, block_on_findings: true };
+        let blocking = crate::review_gate::malformed_findings(&gate_context, &require_review);
+        assert_eq!(blocking.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(crate::FailureClass::MalformedEvidence, finding_path.as_str())]);
+
+        let scenario = Scenario::new(
+            Envelope::new(1, RecordKind::Scenario, fixed_now(), Actor::new("canon", RoleId::parse("implementer").unwrap())),
+            project,
+            scenario_id,
+            "t",
+            "",
+            SpecDigest::of(b"cart.add.01"),
+        );
+        let gap = crate::review_gate::review_gap(&gate_context, &scenario, true).expect("an unreadable review is no review");
+        assert_eq!(gap.class, crate::FailureClass::UnreviewedPromotion);
     }
 }

@@ -90,7 +90,7 @@ fn context_with_no_repo_flag_defaults_to_cwd_and_still_exits_zero() {
 #[test]
 fn context_from_a_subdirectory_resolves_the_ancestor_repo_root_policy() {
     let repo = tempfile::tempdir().unwrap();
-    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  git: { root: .canon/ledger }\n").unwrap();
+    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
     std::fs::create_dir_all(repo.path().join(".canon")).unwrap();
     std::fs::write(repo.path().join(".canon/policy.yaml"), "trust_required:\n  p1: human\n").unwrap();
 

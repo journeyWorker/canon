@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T17:41:13.212791Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject an_override_never_waives_the_ship_gate_and_a_blank_reason_is_refused"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 17,
+  "scenario_id": "subject.lifecycle.17",
+  "schema": 1,
+  "staging_id": "7f30b6c35e00",
+  "verdict": "faithful"
+}
