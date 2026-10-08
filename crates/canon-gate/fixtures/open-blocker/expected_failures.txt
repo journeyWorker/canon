@@ -1,0 +1,4 @@
+# canon gate selftest fixture — open-blocker (issue #2).
+# `spec_coverage.require_review` with its defaults; a `verifying` subject
+# whose adopted change carries an open `blocker` finding.
+open-blocker selftest-open-blocker#1.1

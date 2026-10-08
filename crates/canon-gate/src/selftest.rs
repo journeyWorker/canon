@@ -33,15 +33,15 @@
 //! with no runtime dependency on this repo's own checkout layout.
 //!
 //! # Two fixture shapes, one oracle format
-//! Six of the eight classes (`uncovered-cell`, `unreviewed-promotion`,
+//! Seven of the nine classes (`uncovered-cell`, `unreviewed-promotion`,
 //! `trust-below-required`, `stale-evidence`, `malformed-evidence`,
-//! `flagged`) are reachable through the assembled [`crate::dispatch::check_set`]
-//! over a loaded [`crate::GateContext`] — `canon gate check`'s own
-//! dispatcher, engaged here with `release: true` so the release-scoped
-//! `trust-below-required` class can fire too (this crate's OWN corpus
-//! proving every class fires, unlike an ordinary non-release `canon gate
-//! check` run, spec.md "does not block ordinary (non-release)
-//! evaluation"). The remaining two (`unevidenced-flip`,
+//! `flagged`, `open-blocker`) are reachable through the assembled
+//! [`crate::dispatch::check_set`] over a loaded [`crate::GateContext`] —
+//! `canon gate check`'s own dispatcher, engaged here with `release: true`
+//! so the release-scoped `trust-below-required` class can fire too (this
+//! crate's OWN corpus proving every class fires, unlike an ordinary
+//! non-release `canon gate check` run, spec.md "does not block ordinary
+//! (non-release) evaluation"). The remaining two (`unevidenced-flip`,
 //! `fabricated-evidence`) are `gated-task-completion`'s own territory —
 //! never a registered [`crate::GateCheck`] at all (`checkbox::gate_task`/
 //! `markers::scan_fake_markers` are pure functions over a `tasks.md`
@@ -64,7 +64,10 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, FlaggedOverlay, ProjectId, ProvenanceRef, RecordKind, Review, RoleId, ScenarioId, Sha, TaskId, TrustLifecycle};
+use canon_model::{
+    Actor, ChangeId, Envelope, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, FlaggedOverlay, ProjectId, ProvenanceRef, RecordKind, Review, RoleId, ScenarioId,
+    Sha, Subject, SubjectId, SubjectStatus, TaskId, TrustLifecycle,
+};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier};
@@ -142,7 +145,7 @@ fn git_output(dir: &Path, args: &[&str]) -> String {
     String::from_utf8(output.stdout).expect("git output is UTF-8")
 }
 
-// ── the eight fixture corpus builders ──
+// ── the nine fixture corpus builders ──
 
 fn build_uncovered_cell(dir: &Path) {
     write_policy_yaml(dir, "risk_routing:\n  reviewer: true\n");
@@ -214,6 +217,33 @@ fn build_flagged(dir: &Path) {
         .with_lifecycle(TrustLifecycle::Ratified)
         .with_flagged(FlaggedOverlay::set(flagged_by, Utc::now()));
     GitTier::new(ledger_root(dir)).write(&record).expect("write flagged fixture evidence");
+}
+
+fn build_open_blocker(dir: &Path) {
+    write_policy_yaml(dir, "spec_coverage:\n  require_review: {}\n");
+    let change_id = ChangeId::parse("selftest-open-blocker").expect("valid ChangeId");
+    let subject = Subject::new(
+        Envelope::new(1, RecordKind::Subject, Utc::now(), Actor::new("selftest-agent", RoleId::parse("implementer").expect("valid RoleId"))),
+        SubjectId::parse("selftest-open-blocker").expect("valid SubjectId"),
+        "selftest",
+        "open blocker fixture",
+        "dev",
+        SubjectStatus::Verifying,
+        RoleId::parse("implementer").expect("valid RoleId"),
+    )
+    .with_change_ids(vec![change_id.clone()]);
+    let finding = Finding::new(
+        Envelope::new(1, RecordKind::Finding, Utc::now(), Actor::new("selftest-reviewer", RoleId::parse("reviewer").expect("valid RoleId"))),
+        change_id,
+        1,
+        1,
+        FindingSeverity::Blocker,
+        "selftest-reviewer",
+        "an open blocker on a verifying subject's change",
+    );
+    let tier = GitTier::new(ledger_root(dir));
+    tier.write(&subject).expect("write open-blocker fixture subject");
+    tier.write(&finding).expect("write open-blocker fixture finding");
 }
 
 fn build_unevidenced_flip(_dir: &Path) -> (String, TaskId, Vec<EvidenceNote>) {
@@ -290,6 +320,9 @@ fn run_unevidenced_flip(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String)> 
 fn run_fabricated_evidence(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String)> {
     run_taskflip_fixture(build_fabricated_evidence, now)
 }
+fn run_open_blocker(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String)> {
+    run_check_fixture(build_open_blocker, now)
+}
 
 fn fixtures() -> Vec<Fixture> {
     vec![
@@ -301,6 +334,7 @@ fn fixtures() -> Vec<Fixture> {
         Fixture { class: FailureClass::Flagged, run: run_flagged, expected: include_str!("../fixtures/flagged/expected_failures.txt") },
         Fixture { class: FailureClass::UnevidencedFlip, run: run_unevidenced_flip, expected: include_str!("../fixtures/unevidenced-flip/expected_failures.txt") },
         Fixture { class: FailureClass::FabricatedEvidence, run: run_fabricated_evidence, expected: include_str!("../fixtures/fabricated-evidence/expected_failures.txt") },
+        Fixture { class: FailureClass::OpenBlocker, run: run_open_blocker, expected: include_str!("../fixtures/open-blocker/expected_failures.txt") },
     ]
 }
 
@@ -417,7 +451,7 @@ mod tests {
     use super::*;
 
     /// Tests lock this (assignment acceptance criterion): every one of
-    /// the eight `FAILURE_CLASSES` strings fires on its own fixture,
+    /// the nine `FAILURE_CLASSES` strings fires on its own fixture,
     /// exactly (missing AND extra both empty, every fixture).
     #[test]
     fn every_failure_class_fires_exactly_on_its_own_fixture() {

@@ -1150,7 +1150,7 @@ enum SubjectCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Transition a subject's lifecycle status (shipping is evidence-gated)
+    /// Transition a subject's lifecycle status (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated)
     Status {
         /// The subject to transition
         #[arg(value_parser = canon_cli::subject::parse_subject_id)]
@@ -1158,6 +1158,12 @@ enum SubjectCommand {
         /// Target state (proposed/specced/building/verifying/shipped/retired)
         #[arg(value_parser = canon_cli::subject::parse_status)]
         state: canon_model::SubjectStatus,
+        /// Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories
+        #[arg(long)]
+        override_reason: Option<String>,
+        /// The invoking actor's id, recorded with an --override-reason waiver
+        #[arg(long, default_value = "canon")]
+        actor_id: String,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1418,7 +1424,9 @@ fn main() -> ExitCode {
                 ExitCode::from(canon_cli::subject::run_new(&repo, &id, &domain, &title, &summary, &owner_role, &actor_id, json) as u8)
             }
             SubjectCommand::Adopt { change_id, subject, repo, json } => ExitCode::from(canon_cli::subject::run_adopt(&repo, &change_id, &subject, json) as u8),
-            SubjectCommand::Status { id, state, repo, json } => ExitCode::from(canon_cli::subject::run_status(&repo, &id, state, json) as u8),
+            SubjectCommand::Status { id, state, override_reason, actor_id, repo, json } => {
+                ExitCode::from(canon_cli::subject::run_status(&repo, &id, state, override_reason.as_deref(), &actor_id, json) as u8)
+            }
         },
         Command::Init { repo, check_config } => run_init(&repo, check_config),
         Command::Demo { action } => match action {

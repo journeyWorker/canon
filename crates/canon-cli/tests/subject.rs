@@ -11,8 +11,8 @@ use std::path::Path;
 use std::process::{Command, Output};
 
 use canon_model::{
-    Actor, Change, ChangeId, ChangeStatus, Envelope, EvidenceRecord, EvidenceVerdict, ProjectId, RecordKind, RoleId, Scenario,
-    ScenarioId, SpecDigest, Subject, SubjectId, SubjectStatus,
+    Actor, Change, ChangeId, ChangeStatus, Envelope, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, ProjectId, ProvenanceRef, RecordKind, Review,
+    RoleId, Scenario, ScenarioId, Sha, SpecDigest, Subject, SubjectId, SubjectStatus,
 };
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -68,8 +68,13 @@ fn seed_change(repo: &Path, change_id: &str) {
 /// way a subject owns scenarios, and the only way to reach the
 /// `verifying → shipped` gate's per-scenario checks.
 fn seed_subject(repo: &Path, id: &str, status: SubjectStatus, scenarios: &[&str]) {
+    seed_subject_with_changes(repo, id, status, scenarios, &[]);
+}
+
+fn seed_subject_with_changes(repo: &Path, id: &str, status: SubjectStatus, scenarios: &[&str], changes: &[&str]) {
     let envelope = Envelope::new(1, RecordKind::Subject, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
-    let subject = Subject::new(envelope, SubjectId::parse(id).unwrap(), "Seeded", "s", "dev", status, RoleId::parse("implementer").unwrap());
+    let subject = Subject::new(envelope, SubjectId::parse(id).unwrap(), "Seeded", "s", "dev", status, RoleId::parse("implementer").unwrap())
+        .with_change_ids(changes.iter().map(|c| ChangeId::parse(*c).unwrap()).collect());
     ledger(repo).write(&subject).unwrap();
     for scenario_id in scenarios {
         let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
@@ -399,4 +404,234 @@ fn a_malformed_domain_is_refused_on_shape_before_membership() {
     let err = stderr(&out);
     assert!(err.contains("kebab-case slug"), "shape must be the reported cause: {err}");
     assert!(!err.contains("expected one of"), "membership must not also fire: {err}");
+}
+
+// ── spec_coverage.require_review (issue #2) ──
+
+const REQUIRE_REVIEW: &str = "spec_coverage:\n  require_evidence: true\n  require_review: {}\n";
+
+fn write_policy(repo: &Path, yaml: &str) {
+    std::fs::create_dir_all(repo.join(".canon")).unwrap();
+    std::fs::write(repo.join(".canon/policy.yaml"), yaml).unwrap();
+}
+
+/// A `building` subject owning `world.demo.01`, adopted change `c-demo`,
+/// with implementer evidence by `impl-agent` — the issue's own starting
+/// point: attested by its author, never reviewed.
+fn seed_attested_subject(repo: &Path) {
+    seed_subject_with_changes(repo, "demo-subject", SubjectStatus::Building, &["world.demo.01"], &["c-demo"]);
+    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
+    let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("world.demo.01").unwrap()), None, EvidenceVerdict::Faithful)
+        .with_project_id(ProjectId::parse("demo").unwrap());
+    ledger(repo).write(&record).unwrap();
+}
+
+fn seed_review(repo: &Path, reviewer: &str, actor: &str) {
+    let envelope = Envelope::new(1, RecordKind::Review, Utc::now(), Actor::new(actor, RoleId::parse("reviewer").unwrap()));
+    let review = Review::new(
+        envelope,
+        ProjectId::parse("demo").unwrap(),
+        ScenarioId::parse("world.demo.01").unwrap(),
+        reviewer,
+        format!("pin-{reviewer}-{actor}"),
+        ProvenanceRef::OriginalSpecRef("specs/demo.feature".into()),
+    );
+    ledger(repo).write(&review).unwrap();
+}
+
+fn seed_blocker(repo: &Path, fixed_after: Option<i64>) {
+    let envelope = Envelope::new(1, RecordKind::Finding, Utc::now(), Actor::new("reviewer-2", RoleId::parse("reviewer").unwrap()));
+    let finding = Finding::new(envelope, ChangeId::parse("c-demo").unwrap(), 1, 1, FindingSeverity::Blocker, "reviewer-2", "unbounded subprocess wait");
+    let finding = match fixed_after {
+        None => finding,
+        Some(seconds) => {
+            let mut fixed = finding.fixed_by(Sha::parse("c".repeat(40)).unwrap());
+            fixed.envelope.at += chrono::Duration::seconds(seconds);
+            fixed
+        }
+    };
+    ledger(repo).write(&finding).unwrap();
+}
+
+fn current_subject(repo: &Path) -> Value {
+    query_subjects(repo, &[])["records"][0].clone()
+}
+
+#[test]
+fn require_review_refuses_entering_its_scope_without_a_review() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject(dir.path());
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    assert_eq!(out.status.code(), Some(1), "an unreviewed subject must not reach verifying: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("ran unreviewed-promotion"), "the guard must say which checks it ran: {err}");
+    assert!(err.contains("ran open-blocker"), "{err}");
+    assert!(err.contains("unreviewed-promotion world.demo.01 — building → verifying: no review record"), "{err}");
+    assert!(err.contains("--override-reason"), "the refusal must name the way through: {err}");
+    assert_eq!(current_subject(dir.path())["status"], "building", "a refusal leaves the record unchanged");
+}
+
+#[test]
+fn require_review_skips_and_says_so_outside_its_scope() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "specced"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("skipped unreviewed-promotion — `specced` is not in require_review.scope"), "{err}");
+    assert!(err.contains("skipped open-blocker"), "{err}");
+}
+
+#[test]
+fn a_self_review_does_not_count_under_distinct_actor() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject(dir.path());
+    // Authored by the evidence actor, whatever reviewer it names.
+    seed_review(dir.path(), "someone-else", "impl-agent");
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("`impl-agent`") && err.contains("distinct_actor"), "the detail must name the rule and the actor: {err}");
+    assert_eq!(current_subject(dir.path())["status"], "building");
+}
+
+#[test]
+fn a_distinct_review_lets_the_subject_through_with_no_waiver() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject(dir.path());
+    seed_review(dir.path(), "reviewer-2", "reviewer-2");
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let subject = current_subject(dir.path());
+    assert_eq!(subject["status"], "verifying");
+    assert!(subject.get("status_override").is_none(), "nothing was waived: {subject}");
+
+    let gate = run(dir.path(), &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(0), "stdout: {}", stdout(&gate));
+}
+
+#[test]
+fn an_open_blocker_refuses_and_a_fixed_one_clears() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject(dir.path());
+    seed_review(dir.path(), "reviewer-2", "reviewer-2");
+    seed_blocker(dir.path(), None);
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("open-blocker c-demo#1.1"), "stderr: {}", stderr(&out));
+    assert_eq!(current_subject(dir.path())["status"], "building");
+
+    // The same natural key, closed later as fixed: the fold reads the
+    // latest version, so the blocker no longer counts.
+    seed_blocker(dir.path(), Some(5));
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(current_subject(dir.path())["status"], "verifying");
+}
+
+#[test]
+fn gate_check_reports_unreviewed_and_open_blocker_for_an_in_scope_subject() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject(dir.path());
+    seed_blocker(dir.path(), None);
+    // Reached `verifying` with no guard in the way (e.g. before the
+    // policy existed): the gate must still see it.
+    let envelope = Envelope::new(1, RecordKind::Subject, Utc::now() + chrono::Duration::seconds(2), Actor::new("canon", RoleId::parse("implementer").unwrap()));
+    let subject = Subject::new(envelope, SubjectId::parse("demo-subject").unwrap(), "Seeded", "s", "dev", SubjectStatus::Verifying, RoleId::parse("implementer").unwrap())
+        .with_change_ids(vec![ChangeId::parse("c-demo").unwrap()]);
+    ledger(dir.path()).write(&subject).unwrap();
+
+    let out = run(dir.path(), &["gate", "check"]);
+    assert_eq!(out.status.code(), Some(1), "stdout: {}", stdout(&out));
+    let text = stdout(&out);
+    assert!(text.contains("unreviewed-promotion (1):\n  unreviewed-promotion world.demo.01 — no review record"), "{text}");
+    assert!(text.contains("open-blocker (1):\n  open-blocker c-demo#1.1 — open blocker finding by `reviewer-2`"), "{text}");
+}
+
+#[test]
+fn an_override_records_the_reason_and_gate_check_lists_an_advisory() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject(dir.path());
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying", "--override-reason", "reviewer out until Monday", "--actor-id", "lead"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("waived unreviewed-promotion world.demo.01"), "{err}");
+    assert!(err.contains("override recorded by `lead`: reviewer out until Monday"), "{err}");
+
+    let subject = current_subject(dir.path());
+    assert_eq!(subject["status"], "verifying");
+    assert_eq!(
+        subject["status_override"],
+        serde_json::json!({"to": "verifying", "reason": "reviewer out until Monday", "checks": ["unreviewed-promotion"], "actor": {"agent_id": "lead"}})
+    );
+
+    let gate = run(dir.path(), &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(0), "a waived gap is an advisory, never a violation: {}", stdout(&gate));
+    let text = stdout(&gate);
+    assert!(text.contains("review waivers: 1 advisory(ies) — not failing the gate:"), "{text}");
+    assert!(
+        text.contains("  waived unreviewed-promotion world.demo.01 — no review record") && text.contains("[waiver: subject `demo-subject` moved to verifying by `lead`: reviewer out until Monday]"),
+        "{text}"
+    );
+
+    // The waiver belongs to the transition that needed it: the next
+    // write (retired is outside the default scope) drops it.
+    assert!(run(dir.path(), &["subject", "status", "demo-subject", "retired"]).status.success());
+    assert!(current_subject(dir.path()).get("status_override").is_none());
+}
+
+#[test]
+fn an_override_never_waives_the_ship_gate_and_a_blank_reason_is_refused() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped", "--override-reason", "ship it"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("no ledger verdict") && err.contains("waives only the review checks"), "{err}");
+    assert_eq!(current_subject(dir.path())["status"], "verifying");
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped", "--override-reason", "  "]);
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
+}
+
+/// R1: without `require_review`, reviews and findings change nothing —
+/// `subject status` and `gate check` output is byte-identical to a
+/// corpus that has none, and no subject gains a `status_override` key.
+#[test]
+fn an_absent_require_review_is_byte_identical() {
+    let outputs = |with_review_records: bool| {
+        let dir = repo();
+        write_policy(dir.path(), "spec_coverage:\n  require_evidence: true\n");
+        seed_attested_subject(dir.path());
+        if with_review_records {
+            seed_blocker(dir.path(), None);
+            seed_review(dir.path(), "impl-agent", "impl-agent");
+        }
+        let status = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+        let gate = run(dir.path(), &["gate", "check"]);
+        let subject = current_subject(dir.path());
+        (status.status.code(), stdout(&status), stderr(&status), gate.status.code(), stdout(&gate), subject.get("status_override").is_some())
+    };
+    let plain = outputs(false);
+    assert_eq!(plain.0, Some(0));
+    assert_eq!(plain.1, "canon subject status: demo-subject → verifying\n");
+    assert_eq!(plain.2, "", "no guard output without the policy");
+    assert_eq!(plain.4, "canon gate check: clean (0 violations)\n");
+    assert!(!plain.5);
+    assert_eq!(outputs(true), plain, "review records must not change anything while require_review is absent");
 }

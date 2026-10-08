@@ -1099,10 +1099,13 @@ fn canons_own_policy_enables_spec_coverage_against_its_own_corpus() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
 
     let resolution = canon_gate::PolicyResolution::resolve(repo, &canon_policy::SchemaRegistry::load());
-    let Some(canon_gate::SpecCoverage::Active { require_evidence, scope, .. }) = resolution.spec_coverage.clone() else {
+    let Some(canon_gate::SpecCoverage::Active { require_evidence, scope, require_review, .. }) = resolution.spec_coverage.clone() else {
         panic!("canon's own policy must resolve spec_coverage to Active, got {:?}", resolution.spec_coverage);
     };
     assert!(require_evidence, "the section exists to require evidence; a false here would be a section that enforces nothing");
+    // 0.12 plan R6: turning review on for canon's own corpus is a
+    // separate, deliberate dogfooding change, never a release side effect.
+    assert_eq!(require_review, None, "canon's own policy must not enable spec_coverage.require_review in 0.12");
     assert_eq!(
         scope,
         vec![canon_model::SubjectStatus::Building, canon_model::SubjectStatus::Verifying],

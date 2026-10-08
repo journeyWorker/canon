@@ -327,6 +327,8 @@ mod tests {
             scenarios: Vec::new(),
             divergences: Vec::new(),
             subjects: Vec::new(),
+            reviews: Vec::new(),
+            findings: Vec::new(),
             violations: read.violations,
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),

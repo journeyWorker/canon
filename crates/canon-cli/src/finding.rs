@@ -294,6 +294,14 @@ use chrono::Utc;
 use crate::context::resolve_repo_root;
 use crate::gate::evidence_staging_dir;
 
+/// `--severity`'s accepted values, in blocking order: `blocker` must be
+/// resolved before the reviewed work is claimed done, `should-fix` may be
+/// scheduled, `note` carries no obligation. `canon context` lists these.
+pub const SEVERITY_VALUES: [&str; 3] = ["blocker", "should-fix", "note"];
+
+/// `--disposition`'s accepted values. `canon context` lists these.
+pub const DISPOSITION_VALUES: [&str; 4] = ["open", "fixed", "rejected", "deferred"];
+
 /// `--severity`'s clap `value_parser`. Kebab-cased on the CLI, matching
 /// `crate::divergence::parse_status`'s established spelling for a
 /// snake_case-serialized model enum, and exhaustive over
@@ -303,7 +311,7 @@ pub fn parse_severity(s: &str) -> Result<FindingSeverity, String> {
         "blocker" => Ok(FindingSeverity::Blocker),
         "should-fix" => Ok(FindingSeverity::ShouldFix),
         "note" => Ok(FindingSeverity::Note),
-        other => Err(format!("`{other}` is not a finding severity — expected one of: blocker, should-fix, note")),
+        other => Err(format!("`{other}` is not a finding severity — expected one of: {}", SEVERITY_VALUES.join(", "))),
     }
 }
 
@@ -315,7 +323,7 @@ pub fn parse_disposition(s: &str) -> Result<FindingDisposition, String> {
         "fixed" => Ok(FindingDisposition::Fixed),
         "rejected" => Ok(FindingDisposition::Rejected),
         "deferred" => Ok(FindingDisposition::Deferred),
-        other => Err(format!("`{other}` is not a finding disposition — expected one of: open, fixed, rejected, deferred")),
+        other => Err(format!("`{other}` is not a finding disposition — expected one of: {}", DISPOSITION_VALUES.join(", "))),
     }
 }
 

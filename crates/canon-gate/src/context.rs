@@ -24,7 +24,7 @@
 
 use std::path::{Path, PathBuf};
 
-use canon_model::{validate_evidence_batch, Divergence, EvidenceRecord, EvidenceViolation, RecordKind, Scenario, Subject};
+use canon_model::{validate_evidence_batch, Divergence, EvidenceRecord, EvidenceViolation, Finding, RecordKind, Review, Scenario, Subject};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{StoreError, Tier, TierQuery};
@@ -158,6 +158,12 @@ pub struct GateContext {
     /// documented "loaded once per gate run" seam and a check that
     /// opened its own tier would fork that contract.
     pub subjects: Vec<Subject>,
+    /// Review attestations and code-review findings, read for
+    /// `spec_coverage.require_review` (issue #2) the same way and for the
+    /// same reason as the three corpus kinds above: loaded once here,
+    /// unfolded, with read problems in `corpus_violations`.
+    pub reviews: Vec<Review>,
+    pub findings: Vec<Finding>,
     pub violations: Vec<EvidenceViolation>,
     /// Read problems from the three corpus kinds above, kept OUT of
     /// `violations` deliberately. [`crate::ledger`]'s `LedgerCheck`
@@ -217,9 +223,11 @@ impl GateContext {
         let scenarios = read_corpus_kind(&tier, RecordKind::Scenario, &mut corpus_violations)?;
         let divergences = read_corpus_kind(&tier, RecordKind::Divergence, &mut corpus_violations)?;
         let subjects = read_corpus_kind(&tier, RecordKind::Subject, &mut corpus_violations)?;
+        let reviews = read_corpus_kind(&tier, RecordKind::Review, &mut corpus_violations)?;
+        let findings = read_corpus_kind(&tier, RecordKind::Finding, &mut corpus_violations)?;
         let unreadable_kinds = unreadable_corpus_kinds(&ctx.repo)?;
 
-        Ok(Self { ctx, policy, evidence, scenarios, divergences, subjects, violations, corpus_violations, unreadable_kinds, now })
+        Ok(Self { ctx, policy, evidence, scenarios, divergences, subjects, reviews, findings, violations, corpus_violations, unreadable_kinds, now })
     }
 }
 
@@ -256,8 +264,17 @@ fn read_corpus_kind<T: serde::de::DeserializeOwned>(
     Ok(out)
 }
 
-/// Which of the three spec-corpus kinds this repo routes somewhere the
-/// gate's [`GitTier`] does not read.
+/// The kinds `spec_coverage`'s evidence, case, and mismatch rules read.
+pub const SPEC_CORPUS_KINDS: [RecordKind; 3] = [RecordKind::Scenario, RecordKind::Divergence, RecordKind::Subject];
+
+/// The kinds only `spec_coverage.require_review` reads. Kept apart from
+/// [`SPEC_CORPUS_KINDS`] so a repo that routes `review` elsewhere and
+/// never opted into review checking sees no change.
+pub const REVIEW_CORPUS_KINDS: [RecordKind; 2] = [RecordKind::Review, RecordKind::Finding];
+
+/// Which corpus kinds ([`SPEC_CORPUS_KINDS`] and
+/// [`REVIEW_CORPUS_KINDS`]) this repo routes somewhere the gate's
+/// [`GitTier`] does not read.
 ///
 /// `GateContext` reads ONE tier — the `local` rung's git root — which is
 /// safe for `EvidenceRecord` only by convention. `routing` is per-repo
@@ -274,12 +291,12 @@ fn read_corpus_kind<T: serde::de::DeserializeOwned>(
 /// live. A present but unusable `canon.yaml` is an `Err`, as in
 /// [`GateCtx::from_repo`].
 fn unreadable_corpus_kinds(repo: &Path) -> Result<Vec<RecordKind>, CanonYamlError> {
-    const CORPUS_KINDS: [RecordKind; 3] = [RecordKind::Scenario, RecordKind::Divergence, RecordKind::Subject];
     let Some(tier_policy) = load_tier_policy(repo)? else {
         return Ok(Vec::new());
     };
-    Ok(CORPUS_KINDS
+    Ok(SPEC_CORPUS_KINDS
         .into_iter()
+        .chain(REVIEW_CORPUS_KINDS)
         .filter(|kind| matches!(tier_policy.routing.get(kind), Some(rung) if *rung != canon_store::policy::Rung::Local))
         .collect())
 }

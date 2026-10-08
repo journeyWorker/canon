@@ -1,7 +1,8 @@
 //! Stable failure-class strings (design decision 9, D9): the SAME
-//! eight strings every wave-2 check (coverage/D3a, verdict-ledger/D3b,
-//! staleness, trust-ladder promotion, the flag ratchet, and
-//! `gated-task-completion`'s checkbox-flip guard) emits, grep-stable
+//! nine strings every wave-2 check (coverage/D3a, verdict-ledger/D3b,
+//! staleness, trust-ladder promotion, the flag ratchet,
+//! `gated-task-completion`'s checkbox-flip guard, and
+//! `spec_coverage.require_review`'s open-blocker rule) emits, grep-stable
 //! like `tools/parity.py::FAILURE_CLASSES`
 //! (the donor parity-harness audit's static-gate notes §3.1) —
 //! never renamed without migrating every fixture + hook in the same
@@ -17,14 +18,14 @@
 //! `as_str`/`from_str_exact` shape, `canon-model/src/evidence.rs` — a
 //! DIFFERENT closed vocabulary for a different gate layer: S1's five
 //! classes cover evidence-INTEGRITY malformed-input; this crate's
-//! eight cover the trust-SPINE gate's own violations. `malformed` (S1)
+//! nine cover the trust-SPINE gate's own violations. `malformed` (S1)
 //! and `malformed-evidence` (here) are deliberately distinct strings
 //! for exactly that reason.).
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// The trust-spine gate's eight closed failure classes (design
+/// The trust-spine gate's nine closed failure classes (design
 /// decision 9). Renaming a variant's [`FailureClass::as_str`] value is
 /// a coordinated migration (fixtures + hooks in the same change) —
 /// never a silent rename.
@@ -41,7 +42,9 @@ pub enum FailureClass {
     /// is a violation"). [`crate::trust_ladder::TrustRung::classify`]
     /// already produces the `UnreviewedPromotion` rung this class
     /// names; S5 wave-2's trust-ladder check (task 1.4/1.9) emits the
-    /// violation.
+    /// violation. `spec_coverage.require_review` (issue #2) emits it
+    /// too, for a scenario whose subject is claimed done without a
+    /// qualifying review; the detail says which rule failed.
     UnreviewedPromotion,
     /// An artifact's achieved trust level is below `policy.yaml`'s
     /// `trust_required` for its class, scoped to a release check only
@@ -78,14 +81,20 @@ pub enum FailureClass {
     /// `scanFakeMarkers` shape). S5 wave-2's fabrication scanner (task
     /// 3.3/3.4) emits this.
     FabricatedEvidence,
+    /// An open `blocker` [`canon_model::Finding`] (latest version per
+    /// `(change_id, round, seq)`) sits on a change listed in the
+    /// `change_ids` of a subject `spec_coverage.require_review` puts in
+    /// scope (issue #2). Silent unless that policy is present with
+    /// `block_on_findings`.
+    OpenBlocker,
 }
 
 impl FailureClass {
-    /// All eight classes, in [`FAILURE_CLASSES`]'s own order — the one
+    /// All nine classes, in [`FAILURE_CLASSES`]'s own order — the one
     /// iteration point [`FAILURE_CLASSES`] and
-    /// [`FailureClass::from_str_exact`] both walk, so "eight classes"
+    /// [`FailureClass::from_str_exact`] both walk, so "nine classes"
     /// is asserted structurally, not by a comment that can drift.
-    pub const ALL: [FailureClass; 8] = [
+    pub const ALL: [FailureClass; 9] = [
         FailureClass::UncoveredCell,
         FailureClass::UnreviewedPromotion,
         FailureClass::TrustBelowRequired,
@@ -94,6 +103,7 @@ impl FailureClass {
         FailureClass::Flagged,
         FailureClass::UnevidencedFlip,
         FailureClass::FabricatedEvidence,
+        FailureClass::OpenBlocker,
     ];
 
     /// The stable, grep-able wire string. Matches
@@ -110,6 +120,7 @@ impl FailureClass {
             FailureClass::Flagged => "flagged",
             FailureClass::UnevidencedFlip => "unevidenced-flip",
             FailureClass::FabricatedEvidence => "fabricated-evidence",
+            FailureClass::OpenBlocker => "open-blocker",
         }
     }
 
@@ -127,7 +138,7 @@ impl FailureClass {
 /// enum, is what a shell hook or a fixture's `expected_failures.txt`
 /// greps against (static-gate.md §3.1's rationale for a plain string
 /// list over an `Enum`).
-pub const FAILURE_CLASSES: [&str; 8] = [
+pub const FAILURE_CLASSES: [&str; 9] = [
     "uncovered-cell",
     "unreviewed-promotion",
     "trust-below-required",
@@ -136,6 +147,7 @@ pub const FAILURE_CLASSES: [&str; 8] = [
     "flagged",
     "unevidenced-flip",
     "fabricated-evidence",
+    "open-blocker",
 ];
 
 /// One gate violation — mirrors `tools/parity.py::Violation(cls,
@@ -175,7 +187,7 @@ mod tests {
     use super::*;
 
     /// `FAILURE_CLASSES` stability test (acceptance criterion): the
-    /// eight wire strings are exactly [`FailureClass::ALL`]'s
+    /// nine wire strings are exactly [`FailureClass::ALL`]'s
     /// `as_str()` output, in the same order, and every string
     /// round-trips through [`FailureClass::from_str_exact`] — the two
     /// representations (grep-stable const, typed enum) can never
@@ -209,11 +221,11 @@ mod tests {
     }
 
     #[test]
-    fn all_has_exactly_eight_classes_no_duplicates() {
+    fn all_has_exactly_nine_classes_no_duplicates() {
         let mut seen = std::collections::HashSet::new();
         for class in FailureClass::ALL {
             assert!(seen.insert(class.as_str()), "duplicate failure class: {}", class.as_str());
         }
-        assert_eq!(seen.len(), 8);
+        assert_eq!(seen.len(), 9);
     }
 }

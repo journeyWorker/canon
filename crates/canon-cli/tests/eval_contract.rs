@@ -78,10 +78,14 @@ fn context_json_is_byte_stable_and_has_the_public_capability_shape() {
     keys.sort_unstable();
     assert_eq!(
         keys,
-        ["capabilityVersion", "cel", "enums", "joinKeys", "kinds", "policy", "vocab"],
+        ["capabilityVersion", "cel", "enums", "joinKeys", "kinds", "policy", "review", "vocab"],
         "context JSON public top-level shape changed"
     );
-    assert_eq!(surface["capabilityVersion"], 3);
+    assert_eq!(surface["capabilityVersion"], 4);
+    assert_eq!(surface["review"]["findingSeverities"], serde_json::json!(["blocker", "should-fix", "note"]));
+    assert_eq!(surface["review"]["findingDispositions"], serde_json::json!(["open", "fixed", "rejected", "deferred"]));
+    assert_eq!(surface["review"]["reviewFields"], surface["kinds"]["review"]["envelope_fields"], "review fields come from the kinds projection");
+    assert!(surface["review"]["requireReview"].is_null(), "a repo with no policy does not require review");
     assert_eq!(surface["kinds"].as_object().map(|k| k.len()), Some(14));
     assert_eq!(
         surface["cel"].as_object().map(|k| k.len()),

@@ -138,7 +138,26 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     if let Some(summary) = canon_gate::binding_summary(&gate_context) {
         print!("{}", format_binding_summary(&summary));
     }
+    if let Some(advisories) = canon_gate::review_advisories(&gate_context) {
+        print!("{}", format_review_advisories(&advisories));
+    }
     report.exit_code()
+}
+
+/// `spec_coverage.require_review`'s waived gaps (issue #2): a subject
+/// moved under `canon subject status --override-reason` keeps its gaps
+/// visible here, named with the waiver, without failing the gate.
+/// Prints nothing when there are none, so a repo without waivers sees
+/// no new output.
+fn format_review_advisories(advisories: &[canon_gate::ReviewAdvisory]) -> String {
+    if advisories.is_empty() {
+        return String::new();
+    }
+    let mut out = format!("\nreview waivers: {} advisory(ies) — not failing the gate:\n", advisories.len());
+    for advisory in advisories {
+        out.push_str(&format!("  waived {}\n", advisory.line()));
+    }
+    out
 }
 
 /// The experimental evidence-binding block, printed only when the policy
