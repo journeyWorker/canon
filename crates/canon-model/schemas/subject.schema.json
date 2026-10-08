@@ -35,6 +35,17 @@
     "status": {
       "$ref": "#/$defs/SubjectStatus"
     },
+    "status_override": {
+      "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StatusOverride"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "subject_id": {
       "$ref": "#/$defs/SubjectId"
     },
@@ -127,6 +138,37 @@
     "SessionId": {
       "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
       "type": "string"
+    },
+    "StatusOverride": {
+      "description": "A recorded waiver of the `spec_coverage.require_review` status guard\n(see [`Subject::status_override`]). `canon gate check` reports the\nwaived subject's review gaps as advisories naming this waiver rather\nthan as violations, for as long as the subject stays at `to`.",
+      "type": "object",
+      "properties": {
+        "actor": {
+          "description": "Who waived it.",
+          "$ref": "#/$defs/Actor"
+        },
+        "checks": {
+          "description": "The gate failure classes the guard reported and this waiver let\nthrough, sorted (`open-blocker`, `unreviewed-promotion`).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reason": {
+          "description": "The operator's reason, verbatim (one line).",
+          "type": "string"
+        },
+        "to": {
+          "description": "The status the transition moved to under this waiver.",
+          "$ref": "#/$defs/SubjectStatus"
+        }
+      },
+      "required": [
+        "to",
+        "reason",
+        "checks",
+        "actor"
+      ]
     },
     "SubjectId": {
       "description": "subject slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the durable product-unit identifier — joins: subject ↔ change ↔ scenario",
