@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "figure:data": "bun scripts/build-corpus-figure.ts"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.36.0",
