@@ -261,7 +261,7 @@ impl PluginSyncOutcome {
 /// SAME git tier `canon query --plugin porting` reads.
 pub fn run_sync(repo: &std::path::Path, plugin_id: &str, spec_root_override: Option<&std::path::Path>) -> Result<PluginSyncOutcome, PluginSyncError> {
     let repo = resolve_repo_root(repo);
-    let ctx = SyncCtx::from_repo(&repo);
+    let ctx = SyncCtx::from_repo(&repo)?;
     let spec_roots = ctx.spec_roots(spec_root_override)?;
 
     let (snapshot, _diags) = resolve_plugin_snapshot(&ctx.repo);

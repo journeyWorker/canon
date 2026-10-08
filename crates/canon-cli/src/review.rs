@@ -71,7 +71,13 @@ pub fn run_add(
     };
 
     let repo = resolve_repo_root(repo);
-    let gate_ctx = GateCtx::from_repo(&repo);
+    let gate_ctx = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            eprintln!("canon review add: {e}");
+            return 2;
+        }
+    };
     let committed = GitTier::new(&gate_ctx.ledger_root);
 
     let review = Review::new(
@@ -114,7 +120,7 @@ mod tests {
         let code = run_add(dir.path(), &project_id, &scenario_id, "reviewer-1", "abc123pin", Some("routes/world.firstbuy-hotdeal.26#onReview"), None, "agent-x", &role);
         assert_eq!(code, 0);
 
-        let committed = GitTier::new(GateCtx::from_repo(dir.path()).ledger_root);
+        let committed = GitTier::new(GateCtx::from_repo(dir.path()).unwrap().ledger_root);
         let read = committed.read(&TierQuery::kind(RecordKind::Review)).unwrap();
         assert_eq!(read.records.len(), 1);
         let review: Review = serde_json::from_value(read.records[0].0.clone()).unwrap();
@@ -131,7 +137,7 @@ mod tests {
         let code = run_add(dir.path(), &project_id, &scenario_id, "reviewer-1", "abc123pin", None, None, "agent-x", &role);
         assert_eq!(code, 2);
 
-        let committed = GitTier::new(GateCtx::from_repo(dir.path()).ledger_root);
+        let committed = GitTier::new(GateCtx::from_repo(dir.path()).unwrap().ledger_root);
         let read = committed.read(&TierQuery::kind(RecordKind::Review)).unwrap();
         assert!(read.records.is_empty(), "a refused review add must write nothing");
     }
@@ -144,7 +150,7 @@ mod tests {
         let code = run_add(dir.path(), &project_id, &scenario_id, "reviewer-1", "abc123pin", Some("routes/x#onReview"), Some("spec/x.md"), "agent-x", &role);
         assert_eq!(code, 2);
 
-        let committed = GitTier::new(GateCtx::from_repo(dir.path()).ledger_root);
+        let committed = GitTier::new(GateCtx::from_repo(dir.path()).unwrap().ledger_root);
         let read = committed.read(&TierQuery::kind(RecordKind::Review)).unwrap();
         assert!(read.records.is_empty());
     }

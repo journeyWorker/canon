@@ -110,7 +110,13 @@ use crate::context::resolve_repo_root;
 /// engaged) and runs it over the resolved repo's `GateContext`.
 pub fn run_check(repo: &Path, release: bool) -> i32 {
     let repo = resolve_repo_root(repo);
-    let ctx = GateCtx::from_repo(&repo);
+    let ctx = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            eprintln!("canon gate check: {e}");
+            return 2;
+        }
+    };
     let registry = SchemaRegistry::load();
     // The ONE `Utc::now()` call for this invocation (s21
     // `deterministic-gate-clock` D6, mirroring `scaffold.rs`'s
@@ -289,7 +295,13 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
         }
     };
 
-    let ctx = GateCtx::from_repo(&repo);
+    let ctx = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            eprintln!("canon gate task: {e}");
+            return 2;
+        }
+    };
     let registry = SchemaRegistry::load();
     // The ONE `Utc::now()` call for this invocation (s21
     // `deterministic-gate-clock` D6) — mirrors `run_check`'s identical
@@ -641,7 +653,13 @@ pub(crate) fn evidence_staging_dir(ledger_root: &Path) -> PathBuf {
 /// committing it twice, and still exits `0`.
 pub fn run_promote(repo: &Path, dry_run: bool) -> i32 {
     let repo = resolve_repo_root(repo);
-    let ctx = GateCtx::from_repo(&repo);
+    let ctx = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            eprintln!("canon gate promote: {e}");
+            return 2;
+        }
+    };
     let staging = GitTier::new(evidence_staging_dir(&ctx.ledger_root));
     let committed = GitTier::new(ctx.ledger_root.clone());
     match gate_promote(&staging, &committed, dry_run) {

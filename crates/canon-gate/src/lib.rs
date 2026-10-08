@@ -65,7 +65,7 @@ pub mod trust_ladder;
 
 pub use checkbox::{gate_task, TaskFlipDecision};
 pub use approval::{verify_risk_approval, verify_ssh_signature};
-pub use context::{GateCheck, GateContext, GateContextError, GateCtx};
+pub use context::{CanonYamlError, GateCheck, GateContext, GateContextError, GateCtx};
 pub use coverage::CoverageCheck;
 pub use risk::{artifact_changed_paths, RiskApprovalCheck};
 pub use dispatch::check_set;

@@ -1,1 +1,1 @@
-canon inventory sync: canon.yaml is not valid YAML (fail-loud so an intended `specs.roots[]` override is never silently dropped to the default root): did not find expected ',' or ']' at line 3 column 6, while parsing a flow sequence at line 2 column 10
+canon inventory sync: parsing `<repo>/canon.yaml`: canon.yaml TierPolicy: did not find expected ',' or ']' at line 3 column 6, while parsing a flow sequence at line 2 column 10

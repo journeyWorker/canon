@@ -524,7 +524,13 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         }
     };
 
-    let ledger_root = GateCtx::from_repo(&repo).ledger_root;
+    let ledger_root = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx.ledger_root,
+        Err(e) => {
+            eprintln!("canon finding add: {e}");
+            return 2;
+        }
+    };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
     let committed = GitTier::new(&ledger_root);
     match occupied_by(&natural_key, &staging, &committed) {
@@ -660,7 +666,13 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         }
     }
 
-    let ledger_root = GateCtx::from_repo(&repo).ledger_root;
+    let ledger_root = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx.ledger_root,
+        Err(e) => {
+            eprintln!("canon finding close: {e}");
+            return 2;
+        }
+    };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
     let committed = GitTier::new(&ledger_root);
 
@@ -980,7 +992,7 @@ mod tests {
     }
 
     fn staged_bodies(repo: &Path) -> Vec<serde_json::Value> {
-        let staging = GitTier::new(evidence_staging_dir(&GateCtx::from_repo(repo).ledger_root));
+        let staging = GitTier::new(evidence_staging_dir(&GateCtx::from_repo(repo).unwrap().ledger_root));
         staging.read(&TierQuery::kind(RecordKind::Finding)).expect("reading staging").records.into_iter().map(|raw| raw.0).collect()
     }
 
@@ -1127,7 +1139,7 @@ mod tests {
             assert_eq!(run_add(dir.path(), &authored), 0, "seq {seq}");
         }
 
-        let staging = GitTier::new(evidence_staging_dir(&GateCtx::from_repo(dir.path()).ledger_root));
+        let staging = GitTier::new(evidence_staging_dir(&GateCtx::from_repo(dir.path()).unwrap().ledger_root));
         let read_back = staging.read(&TierQuery::kind(RecordKind::Finding)).expect("reading staging");
         assert!(read_back.violations.is_empty(), "canon wrote records canon cannot read: {:?}", read_back.violations);
         assert_eq!(read_back.records.len(), 4);
@@ -1298,7 +1310,7 @@ mod tests {
     }
 
     fn committed_bodies(repo: &Path) -> Vec<serde_json::Value> {
-        let committed = GitTier::new(GateCtx::from_repo(repo).ledger_root);
+        let committed = GitTier::new(GateCtx::from_repo(repo).unwrap().ledger_root);
         committed.read(&TierQuery::kind(RecordKind::Finding)).expect("reading ledger").records.into_iter().map(|raw| raw.0).collect()
     }
 
@@ -1307,7 +1319,7 @@ mod tests {
     /// through the tier rather than by moving files, so the committed
     /// copy lands at its own content-derived path.
     fn promote_staged(repo: &Path) {
-        let ledger_root = GateCtx::from_repo(repo).ledger_root;
+        let ledger_root = GateCtx::from_repo(repo).unwrap().ledger_root;
         let staging = GitTier::new(evidence_staging_dir(&ledger_root));
         let committed = GitTier::new(&ledger_root);
         for raw in staging.read(&TierQuery::kind(RecordKind::Finding)).expect("reading staging").records {

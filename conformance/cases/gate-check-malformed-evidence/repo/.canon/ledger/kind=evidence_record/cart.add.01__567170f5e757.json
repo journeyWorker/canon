@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T17:13:39.100000Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test"
+  },
+  "kind": "evidence_record",
+  "project_id": "root",
+  "run_seq": 3,
+  "scenario_id": "cart.add.01",
+  "schema": 1,
+  "staging_id": "5e7d0c1a9b42",
+  "verdict": "maybe"
+}

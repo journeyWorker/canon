@@ -684,7 +684,14 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         object.insert("evidence_note".to_string(), serde_json::Value::Object(companion));
     }
 
-    let staging = GitTier::new(evidence_staging_dir(&GateCtx::from_repo(&repo).ledger_root));
+    let ledger_root = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx.ledger_root,
+        Err(e) => {
+            eprintln!("canon evidence add: {e}");
+            return 2;
+        }
+    };
+    let staging = GitTier::new(evidence_staging_dir(&ledger_root));
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
             // The next step differs by subject: a task-keyed record
@@ -782,12 +789,12 @@ mod tests {
     }
 
     fn staged_count(repo: &Path) -> usize {
-        let root = evidence_staging_dir(&GateCtx::from_repo(repo).ledger_root);
+        let root = evidence_staging_dir(&GateCtx::from_repo(repo).unwrap().ledger_root);
         GitTier::new(root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).map(|read| read.records.len()).unwrap_or(0)
     }
 
     fn committed(repo: &Path) -> Vec<RawRecord> {
-        GitTier::new(GateCtx::from_repo(repo).ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).expect("reading the committed ledger").records
+        GitTier::new(GateCtx::from_repo(repo).unwrap().ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).expect("reading the committed ledger").records
     }
 
     /// s42 task 4.3, the whole point of the change: a checkbox flips on
@@ -1014,7 +1021,7 @@ mod tests {
         let object = body.as_object_mut().expect("an EvidenceRecord's serialized body is always a JSON object");
         object.insert("evidence".to_string(), serde_json::json!({ "kind": "test-run", "ref": "cargo test -p canon-cli evidence" }));
         object.insert("evidence_note".to_string(), serde_json::json!({ "summary": summary }));
-        GitTier::new(evidence_staging_dir(&GateCtx::from_repo(repo).ledger_root))
+        GitTier::new(evidence_staging_dir(&GateCtx::from_repo(repo).unwrap().ledger_root))
             .write(&RawWrite(RawRecord(body)))
             .expect("staging a hand-built record");
     }

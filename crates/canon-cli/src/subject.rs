@@ -509,7 +509,7 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, js
 ///   [`case_gaps`] rule `canon gate check` applies), so a subject cannot
 ///   ship on a spec that only describes its golden path.
 fn ship_gate_violations(repo: &Path, subject_id: &SubjectId) -> Result<Vec<Violation>, String> {
-    let ctx = GateCtx::from_repo(repo);
+    let ctx = GateCtx::from_repo(repo).map_err(|e| e.to_string())?;
     let registry = SchemaRegistry::load();
     let now = Utc::now();
     let gate_context = GateContext::load(ctx, &registry, now).map_err(|e| e.to_string())?;

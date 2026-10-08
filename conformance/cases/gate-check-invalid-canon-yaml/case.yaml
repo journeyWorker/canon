@@ -1,0 +1,4 @@
+description: "`canon gate check` exits 2 (usage error) naming `canon.yaml` and its parse error when the file is present but unparseable, rather than falling back to the default ledger (whose truncated record would otherwise gate red with exit 1)"
+steps:
+  - args: [gate, check]
+    exit: 2

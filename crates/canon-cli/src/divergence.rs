@@ -92,7 +92,13 @@ pub fn run_stage(
     role: &RoleId,
 ) -> i32 {
     let repo = resolve_repo_root(repo);
-    let gate_ctx = GateCtx::from_repo(&repo);
+    let gate_ctx = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            eprintln!("canon divergence stage: {e}");
+            return 2;
+        }
+    };
     let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
 
     let candidate = DivergenceCandidate {
@@ -122,7 +128,13 @@ pub fn run_stage(
 /// every currently-staged candidate.
 pub fn run_promote(repo: &Path, dry_run: bool) -> i32 {
     let repo = resolve_repo_root(repo);
-    let gate_ctx = GateCtx::from_repo(&repo);
+    let gate_ctx = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            eprintln!("canon divergence promote: {e}");
+            return 2;
+        }
+    };
     let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
     let committed = GitTier::new(&gate_ctx.ledger_root);
 
@@ -160,7 +172,13 @@ fn run_commit(
     role: &RoleId,
 ) -> i32 {
     let repo = resolve_repo_root(repo);
-    let gate_ctx = GateCtx::from_repo(&repo);
+    let gate_ctx = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            eprintln!("canon divergence {verb}: {e}");
+            return 2;
+        }
+    };
     let committed = GitTier::new(&gate_ctx.ledger_root);
 
     let candidate = DivergenceCandidate {
@@ -247,7 +265,13 @@ pub fn run_defer(
 /// whatever is currently on the ledger, never a gate.
 pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>) -> i32 {
     let repo = resolve_repo_root(repo);
-    let gate_ctx = GateCtx::from_repo(&repo);
+    let gate_ctx = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            eprintln!("canon divergence status: {e}");
+            return 2;
+        }
+    };
     let as_of = as_of.unwrap_or_else(Utc::now);
 
     let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, as_of);
@@ -304,7 +328,7 @@ mod tests {
         let code = run_promote(dir.path(), false);
         assert_eq!(code, 0);
 
-        let gate_ctx = GateCtx::from_repo(dir.path());
+        let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let committed = GitTier::new(&gate_ctx.ledger_root);
         let landed = committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap();
         assert_eq!(landed.records.len(), 2);
@@ -323,7 +347,7 @@ mod tests {
         let (project_id, scenario_id, role, sha) = ids();
 
         // Refused: no `actor.role` at all.
-        let staging_dir = divergence_staging_dir(&GateCtx::from_repo(dir.path()).ledger_root);
+        let staging_dir = divergence_staging_dir(&GateCtx::from_repo(dir.path()).unwrap().ledger_root);
         let malformed = DivergenceCandidate {
             envelope: Envelope::new(1, RecordKind::Divergence, Utc::now(), Actor::new_unattributed("legacy-writer")),
             project_id: project_id.clone(),
@@ -341,7 +365,7 @@ mod tests {
         let code = run_promote(dir.path(), false);
         assert_eq!(code, 1, "a refusal reports a non-zero (but not usage-error) exit code");
 
-        let gate_ctx = GateCtx::from_repo(dir.path());
+        let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let committed = GitTier::new(&gate_ctx.ledger_root);
         let landed = committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap();
         assert_eq!(landed.records.len(), 1);
@@ -364,7 +388,7 @@ mod tests {
             0
         );
 
-        let gate_ctx = GateCtx::from_repo(dir.path());
+        let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let committed = GitTier::new(&gate_ctx.ledger_root);
         let landed = committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap();
         assert_eq!(landed.records.len(), 2, "resolve + defer both committed");
@@ -384,7 +408,7 @@ mod tests {
         // Read-only capability query — always exits 0.
         assert_eq!(run_status(dir.path(), None), 0);
 
-        let gate_ctx = GateCtx::from_repo(dir.path());
+        let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, Utc::now());
         assert_eq!(states.get(&(project_id, scenario_id)), Some(&canon_model::FoldedState::Resolved));
     }

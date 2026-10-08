@@ -1,0 +1,4 @@
+experimental:
+  evidence_binding:
+    mode: require
+    strength: report

@@ -300,8 +300,7 @@ pub fn run_scenario_new(
     at: DateTime<Utc>,
 ) -> i32 {
     let repo_root = resolve_repo_root(repo);
-    let ctx = SyncCtx::from_repo(&repo_root);
-    let roots = match ctx.spec_roots(None) {
+    let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
         Ok(roots) => roots,
         Err(e) => {
             eprintln!("canon scenario new: {e}");
@@ -446,8 +445,7 @@ pub fn run_feature_new(
     at: DateTime<Utc>,
 ) -> i32 {
     let repo_root = resolve_repo_root(repo);
-    let ctx = SyncCtx::from_repo(&repo_root);
-    let roots = match ctx.spec_roots(None) {
+    let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
         Ok(roots) => roots,
         Err(e) => {
             eprintln!("canon feature new: {e}");
@@ -588,7 +586,7 @@ mod tests {
     }
 
     fn spec_roots_of(dir: &tempfile::TempDir) -> Vec<SpecRoot> {
-        SyncCtx::from_repo(dir.path()).spec_roots(None).unwrap()
+        SyncCtx::from_repo(dir.path()).unwrap().spec_roots(None).unwrap()
     }
 
     fn project(id: &str) -> ProjectId {

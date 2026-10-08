@@ -73,6 +73,10 @@ pub enum InventoryError {
     Config(String),
     #[error(transparent)]
     Store(#[from] StoreError),
+    /// A present `canon.yaml` the tier parser rejects: the ledger this
+    /// sync would write to cannot be resolved ([`GateCtx::from_repo`]).
+    #[error(transparent)]
+    CanonYaml(#[from] canon_gate::CanonYamlError),
 }
 
 /// `canon.yaml`'s `specs:` section, parsed STRICTLY
@@ -179,10 +183,11 @@ pub struct SyncCtx {
 impl SyncCtx {
     /// Production binding: `ledger_root` resolved off `<repo>/canon.yaml`
     /// exactly as [`GateCtx::from_repo`] does (reused directly, never a
-    /// second copy of that resolution).
-    pub fn from_repo(repo: impl Into<PathBuf>) -> Self {
-        let gate_ctx = GateCtx::from_repo(repo);
-        Self { repo: gate_ctx.repo, ledger_root: gate_ctx.ledger_root }
+    /// second copy of that resolution), including its refusal of a
+    /// present but unusable `canon.yaml`.
+    pub fn from_repo(repo: impl Into<PathBuf>) -> Result<Self, InventoryError> {
+        let gate_ctx = GateCtx::from_repo(repo)?;
+        Ok(Self { repo: gate_ctx.repo, ledger_root: gate_ctx.ledger_root })
     }
 
     /// Fixture binding (spec-ledger-selftest Req 2's "fixture constructor
@@ -286,7 +291,7 @@ impl SyncOutcome {
 /// fixture-corpus `canon selftest` run drives.
 pub fn run_sync(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
     let repo = resolve_repo_root(repo);
-    let ctx = SyncCtx::from_repo(&repo);
+    let ctx = SyncCtx::from_repo(&repo)?;
     run_sync_with_ctx(&ctx, spec_root)
 }
 
@@ -667,7 +672,7 @@ mod tests {
     }
 
     fn only_scenario(repo: &Path) -> Scenario {
-        let gate_ctx = GateCtx::from_repo(repo);
+        let gate_ctx = GateCtx::from_repo(repo).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         assert_eq!(result.records.len(), 1, "expected exactly one Scenario record");
@@ -675,7 +680,7 @@ mod tests {
     }
 
     fn record_json(repo: &Path) -> serde_json::Value {
-        let gate_ctx = GateCtx::from_repo(repo);
+        let gate_ctx = GateCtx::from_repo(repo).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         assert_eq!(result.records.len(), 1, "expected exactly one Scenario record");
@@ -687,7 +692,7 @@ mod tests {
     #[test]
     fn missing_specs_key_resolves_the_default_single_root() {
         let dir = TempDir::new().unwrap();
-        write(dir.path(), "canon.yaml", "tiers:\n  git:\n    root: .canon/ledger\n");
+        write(dir.path(), "canon.yaml", "tiers:\n  local:\n    backend: git\n    root: .canon/ledger\n");
         let roots = load_spec_roots(&dir.path().join("canon.yaml")).unwrap();
         assert_eq!(roots, vec![SpecRoot { id: ProjectId::parse("root").unwrap(), root: dir.path().join("specs") }]);
     }
@@ -776,7 +781,7 @@ mod tests {
         assert!(outcome.is_clean());
         assert_eq!(outcome.total_written(), 1);
 
-        let gate_ctx = GateCtx::from_repo(repo.path());
+        let gate_ctx = GateCtx::from_repo(repo.path()).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         assert_eq!(result.records.len(), 1);
@@ -800,7 +805,7 @@ mod tests {
         assert_eq!(outcome.total_written(), 0);
         assert!(!outcome.roots[0].violations.is_empty());
 
-        let gate_ctx = GateCtx::from_repo(repo.path());
+        let gate_ctx = GateCtx::from_repo(repo.path()).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         assert!(result.records.is_empty(), "an aborted root must write zero Scenario records");
@@ -816,7 +821,7 @@ mod tests {
         let second = run_sync(repo.path(), None).unwrap();
         assert_eq!(second.total_written(), 0, "an unchanged corpus must re-sync as a no-op");
 
-        let gate_ctx = GateCtx::from_repo(repo.path());
+        let gate_ctx = GateCtx::from_repo(repo.path()).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         assert_eq!(result.records.len(), 1, "still exactly one record after two syncs");
@@ -832,7 +837,7 @@ mod tests {
         let second = run_sync(repo.path(), None).unwrap();
         assert_eq!(second.total_written(), 1, "a changed .feature file must append exactly one new record");
 
-        let gate_ctx = GateCtx::from_repo(repo.path());
+        let gate_ctx = GateCtx::from_repo(repo.path()).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         assert_eq!(result.records.len(), 2, "the prior record is appended alongside, never overwritten");
@@ -855,7 +860,7 @@ mod tests {
         assert!(outcome.is_clean());
         assert_eq!(outcome.total_written(), 1, "the inventory/ file must not itself produce a Scenario record");
 
-        let gate_ctx = GateCtx::from_repo(repo.path());
+        let gate_ctx = GateCtx::from_repo(repo.path()).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         assert_eq!(result.records.len(), 1);
@@ -879,7 +884,7 @@ mod tests {
         assert!(outcome.is_clean());
         assert_eq!(outcome.total_written(), 2);
 
-        let gate_ctx = GateCtx::from_repo(repo.path());
+        let gate_ctx = GateCtx::from_repo(repo.path()).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         assert_eq!(result.records.len(), 2);
@@ -935,7 +940,7 @@ mod tests {
         assert_eq!(ok.written, 1);
 
         // Only the clean sibling's single record persists in the tier.
-        let gate_ctx = GateCtx::from_repo(repo.path());
+        let gate_ctx = GateCtx::from_repo(repo.path()).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         assert_eq!(result.records.len(), 1, "only the clean sibling root's record is written");
@@ -1064,7 +1069,7 @@ mod tests {
         let outcome = run_sync(repo.path(), None).unwrap();
         assert_eq!(outcome.roots[0].tag_diagnostics.len(), 1);
         assert!(outcome.roots[0].tag_diagnostics[0].contains("@case:sad"), "{}", outcome.roots[0].tag_diagnostics[0]);
-        let gate_ctx = GateCtx::from_repo(repo.path());
+        let gate_ctx = GateCtx::from_repo(repo.path()).unwrap();
         let result = GitTier::new(&gate_ctx.ledger_root).read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         let latest = fold_latest_by_key(
             result.records.iter().filter_map(|r| serde_json::from_value::<Scenario>(r.0.clone()).ok()).collect::<Vec<_>>(),
@@ -1097,7 +1102,7 @@ mod tests {
         let second = run_sync(repo.path(), None).unwrap();
         assert_eq!(second.total_written(), 1, "adding a subject tag changes the file bytes, so a new record is appended");
 
-        let gate_ctx = GateCtx::from_repo(repo.path());
+        let gate_ctx = GateCtx::from_repo(repo.path()).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         let latest = fold_latest_by_key(

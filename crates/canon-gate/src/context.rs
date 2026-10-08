@@ -65,10 +65,19 @@ impl GateCtx {
     /// from — never a second, gate-only config path) when that file
     /// exists and declares one (a relative `root` is joined against
     /// `repo`; an absolute one is used as-is), else the fixed
-    pub fn from_repo(repo: impl Into<PathBuf>) -> Self {
+    /// [`DEFAULT_LEDGER_RELATIVE_PATH`]. An ABSENT `canon.yaml` is the
+    /// default layout; a present one that cannot be read or parsed is an
+    /// `Err` — falling back would read (or write) a ledger the repo's
+    /// own config never named and report it as the truth.
+    pub fn from_repo(repo: impl Into<PathBuf>) -> Result<Self, CanonYamlError> {
         let repo = repo.into();
-        let ledger_root = canon_yaml_git_root(&repo).unwrap_or_else(|| repo.join(DEFAULT_LEDGER_RELATIVE_PATH));
-        Self { repo, ledger_root }
+        let configured_root = load_tier_policy(&repo)?.and_then(|policy| policy.local_git().map(|cfg| cfg.root.clone()));
+        let ledger_root = match configured_root {
+            Some(root) if root.is_absolute() => root,
+            Some(root) => repo.join(root),
+            None => repo.join(DEFAULT_LEDGER_RELATIVE_PATH),
+        };
+        Ok(Self { repo, ledger_root })
     }
 
     /// Fixture binding: every root under one fixture directory
@@ -84,25 +93,33 @@ impl GateCtx {
     }
 }
 
-/// Best-effort canonical `<repo>/canon.yaml` → the `local` rung's
-/// git root resolution — reuses
-/// [`canon_store::policy::TierPolicy::from_yaml`] (S2's own parser,
-/// never a second hand-rolled YAML reader) against the SAME on-disk
-/// file S2's `TierPolicy`/`canon tier age`/`canon query` resolve the
-/// local rung's `root` from (`crates/canon-cli/src/tiers.rs::
-/// build_tiers`'s identical `<canon.yaml's own dir>.join(&cfg.root)`
-/// semantics), so a consumer's override is honored identically for
-/// `canon gate` and every S2 CLI path. `None` on any problem (file
-/// absent, unparseable, no git-backed `local` rung) —
-/// [`GateCtx::from_repo`]'s caller always has a usable fallback,
-/// matching this crate's fail-soft-load discipline
-/// ([`crate::policy`]'s module doc).
-fn canon_yaml_git_root(repo: &Path) -> Option<PathBuf> {
-    let canon_yaml_path = repo.join("canon.yaml");
-    let content = std::fs::read_to_string(canon_yaml_path).ok()?;
-    let tier_policy = canon_store::policy::TierPolicy::from_yaml(&content).ok()?;
-    let root = tier_policy.local_git()?.root.clone();
-    Some(if root.is_absolute() { root } else { repo.join(root) })
+/// `<repo>/canon.yaml` is present but unusable. Mirrors
+/// `canon-cli`'s `TierCliError` wording so every verb that refuses the
+/// file names it the same way.
+#[derive(Debug, thiserror::Error)]
+pub enum CanonYamlError {
+    #[error("reading `{}`: {source}", path.display())]
+    Read { path: PathBuf, source: std::io::Error },
+    #[error("parsing `{}`: {source}", path.display())]
+    Policy { path: PathBuf, source: canon_store::policy::PolicyError },
+}
+
+/// The canonical `<repo>/canon.yaml`'s [`TierPolicy`], parsed with S2's
+/// own parser ([`TierPolicy::from_yaml_at`], resolved against `repo`
+/// exactly as `crates/canon-cli/src/tiers.rs::build_tiers` does).
+/// `Ok(None)` only when the file does not exist; any other read error,
+/// or a file the parser rejects, is an `Err` naming the file.
+///
+/// [`TierPolicy`]: canon_store::policy::TierPolicy
+/// [`TierPolicy::from_yaml_at`]: canon_store::policy::TierPolicy::from_yaml_at
+fn load_tier_policy(repo: &Path) -> Result<Option<canon_store::policy::TierPolicy>, CanonYamlError> {
+    let path = repo.join("canon.yaml");
+    let content = match std::fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => return Err(CanonYamlError::Read { path, source }),
+    };
+    canon_store::policy::TierPolicy::from_yaml_at(&content, repo).map(Some).map_err(|source| CanonYamlError::Policy { path, source })
 }
 
 /// Every piece an S5 wave-2 [`GateCheck`] needs, loaded once per gate
@@ -200,7 +217,7 @@ impl GateContext {
         let scenarios = read_corpus_kind(&tier, RecordKind::Scenario, &mut corpus_violations)?;
         let divergences = read_corpus_kind(&tier, RecordKind::Divergence, &mut corpus_violations)?;
         let subjects = read_corpus_kind(&tier, RecordKind::Subject, &mut corpus_violations)?;
-        let unreadable_kinds = unreadable_corpus_kinds(&ctx.repo);
+        let unreadable_kinds = unreadable_corpus_kinds(&ctx.repo)?;
 
         Ok(Self { ctx, policy, evidence, scenarios, divergences, subjects, violations, corpus_violations, unreadable_kinds, now })
     }
@@ -251,28 +268,28 @@ fn read_corpus_kind<T: serde::de::DeserializeOwned>(
 /// view), and an inert gate that reports clean is worse than one that
 /// refuses.
 ///
-/// A repo with no readable `canon.yaml`, or one whose routing is absent
-/// for a kind, yields nothing here: [`GateCtx::from_repo`] already falls
-/// back to the default ledger path in that case, so the git tier IS
-/// where those records live.
-fn unreadable_corpus_kinds(repo: &Path) -> Vec<RecordKind> {
+/// A repo with no `canon.yaml`, or one whose routing is absent for a
+/// kind, yields nothing here: [`GateCtx::from_repo`] uses the default
+/// ledger path in that case, so the git tier IS where those records
+/// live. A present but unusable `canon.yaml` is an `Err`, as in
+/// [`GateCtx::from_repo`].
+fn unreadable_corpus_kinds(repo: &Path) -> Result<Vec<RecordKind>, CanonYamlError> {
     const CORPUS_KINDS: [RecordKind; 3] = [RecordKind::Scenario, RecordKind::Divergence, RecordKind::Subject];
-    let Ok(content) = std::fs::read_to_string(repo.join("canon.yaml")) else {
-        return Vec::new();
+    let Some(tier_policy) = load_tier_policy(repo)? else {
+        return Ok(Vec::new());
     };
-    let Ok(tier_policy) = canon_store::policy::TierPolicy::from_yaml(&content) else {
-        return Vec::new();
-    };
-    CORPUS_KINDS
+    Ok(CORPUS_KINDS
         .into_iter()
         .filter(|kind| matches!(tier_policy.routing.get(kind), Some(rung) if *rung != canon_store::policy::Rung::Local))
-        .collect()
+        .collect())
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum GateContextError {
     #[error("canon-store: {0}")]
     Store(#[from] StoreError),
+    #[error(transparent)]
+    CanonYaml(#[from] CanonYamlError),
 }
 
 /// One S5 wave-2 check (static coverage/D3a, dynamic verdict-ledger/
@@ -319,7 +336,7 @@ mod tests {
     #[test]
     fn from_repo_defaults_ledger_root_when_no_canon_yaml() {
         let dir = TempDir::new().unwrap();
-        let ctx = GateCtx::from_repo(dir.path());
+        let ctx = GateCtx::from_repo(dir.path()).unwrap();
         assert_eq!(ctx.repo, dir.path());
         assert_eq!(ctx.ledger_root, dir.path().join(".canon").join("ledger"));
     }
@@ -340,7 +357,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local:\n    backend: git\n    root: custom/ledger-root\n").unwrap();
 
-        let ctx = GateCtx::from_repo(dir.path());
+        let ctx = GateCtx::from_repo(dir.path()).unwrap();
         assert_eq!(ctx.ledger_root, dir.path().join("custom").join("ledger-root"));
     }
 
@@ -355,8 +372,32 @@ mod tests {
         std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
         std::fs::write(dir.path().join(".canon").join("canon.yaml"), "tiers:\n  local:\n    backend: git\n    root: custom/ledger-root\n").unwrap();
 
-        let ctx = GateCtx::from_repo(dir.path());
+        let ctx = GateCtx::from_repo(dir.path()).unwrap();
         assert_eq!(ctx.ledger_root, dir.path().join(DEFAULT_LEDGER_RELATIVE_PATH), "a `.canon/canon.yaml` override must NOT be honored");
+    }
+
+    /// A present `canon.yaml` the tier parser rejects is refused, naming
+    /// the file — never silently resolved to the default ledger.
+    #[test]
+    fn from_repo_refuses_an_unparseable_canon_yaml() {
+        let dir = TempDir::new().unwrap();
+        let canon_yaml = dir.path().join("canon.yaml");
+        for broken in ["tiers: [unclosed\n", "tiers:\n  git: { root: .canon/ledger }\n"] {
+            std::fs::write(&canon_yaml, broken).unwrap();
+            let err = GateCtx::from_repo(dir.path()).expect_err(broken);
+            assert!(matches!(err, CanonYamlError::Policy { ref path, .. } if *path == canon_yaml), "{err:?}");
+            assert!(err.to_string().contains(&canon_yaml.display().to_string()), "{err}");
+        }
+    }
+
+    /// Even a context not built by `from_repo` refuses the load when the
+    /// repo's `canon.yaml` is unusable: the corpus routing check reads it.
+    #[test]
+    fn load_refuses_an_unparseable_canon_yaml() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("canon.yaml"), "tiers: [unclosed\n").unwrap();
+        let result = GateContext::load(GateCtx::from_fixture(dir.path()), &SchemaRegistry::load(), fixed_now());
+        assert!(matches!(result, Err(GateContextError::CanonYaml(_))), "an unusable canon.yaml must not load");
     }
 
     #[test]
