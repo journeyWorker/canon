@@ -96,6 +96,13 @@ jobs:
           chmod +x /usr/local/bin/duckdb
           duckdb --version
 
+      # `--offline` keeps the TESTS off the network, but it can only
+      # resolve crates already in the registry cache. On a cache miss
+      # (any Cargo.lock change) the cache is empty and resolution fails
+      # before a single test runs, so fetch the locked set first.
+      - name: cargo fetch --locked
+        run: cargo fetch --locked
+
       - name: cargo test --workspace
         run: cargo test --workspace --locked --offline
 
