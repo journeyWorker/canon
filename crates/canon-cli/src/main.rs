@@ -749,7 +749,7 @@ enum EvidenceCommand {
         repo: PathBuf,
     },
     /// Stage one attributed EvidenceRecord for a task (commit it with `canon gate promote`)
-    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.")]
+    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs a passing case). Enforcement is opt-in via policy experimental.evidence_binding (off by default).")]
     Add {
         /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
@@ -802,6 +802,15 @@ enum EvidenceCommand {
         /// Exact Git SHA bound by the evidence and any approval.
         #[arg(long, value_parser = canon_cli::divergence::parse_sha)]
         artifact_sha: Option<canon_model::Sha>,
+        /// EXPERIMENTAL: bind any file (trace, screenshots, agent QA log, report) by sha256; repeatable; must be inside the repo
+        #[arg(long = "artifact", value_name = "PATH")]
+        artifacts: Vec<PathBuf>,
+        /// EXPERIMENTAL: bind and parse a test report, `junit:<path>` or `cucumber:<path>`; repeatable
+        #[arg(long = "report", value_name = "FORMAT:PATH", value_parser = canon_cli::evidence_attach::parse_report_spec)]
+        reports: Vec<(canon_model::ReportFormat, PathBuf)>,
+        /// EXPERIMENTAL: the report case to bind when its name does not carry the scenario id (a Rust test: its function name)
+        #[arg(long)]
+        report_case: Option<String>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1288,6 +1297,9 @@ fn main() -> ExitCode {
                 approval_signature_file,
                 approval_at,
                 artifact_sha,
+                artifacts,
+                reports,
+                report_case,
                 repo,
             } => ExitCode::from(
                 canon_cli::evidence::run_add(
@@ -1310,6 +1322,9 @@ fn main() -> ExitCode {
                         approval_signature_file,
                         approval_at,
                         artifact_sha,
+                        artifacts,
+                        reports,
+                        report_case,
                     },
                 ) as u8,
             ),

@@ -934,6 +934,61 @@ pub struct EvidenceApproval {
     pub effects: Vec<String>,
 }
 
+/// The machine-readable test-report formats `canon evidence add
+/// --report` parses (experimental evidence binding). Canon never runs a
+/// test; it reads the report the team's own runner already wrote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ReportFormat {
+    /// JUnit XML — emitted or convertible from nearly every ecosystem.
+    Junit,
+    /// Cucumber JSON — Gherkin runners; scenario tags travel in it.
+    Cucumber,
+}
+
+/// The outcome a parsed report records for the case an attachment names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ReportOutcome {
+    Passed,
+    Failed,
+    Skipped,
+}
+
+/// A file an [`EvidenceRecord`] is bound to (experimental evidence
+/// binding). Canon reads the file when the evidence is added — it never
+/// executes anything — and records what it found: the bytes' sha256, and
+/// for a parsed report the case it matched and that case's outcome. The
+/// digest lets a reviewer later confirm exactly which file backed the
+/// claim; an attachment with no `format` is an opaque artifact (a trace,
+/// screenshots, an agent QA log) bound by digest alone.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct EvidenceAttachment {
+    /// Repository-relative path, `/`-separated, as read at attestation.
+    pub path: String,
+    /// 64 lowercase hex characters: sha256 over the file's bytes.
+    #[serde(deserialize_with = "deserialize_sha256_hex")]
+    pub sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<ReportFormat>,
+    /// The report case this evidence was matched to (parsed reports only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<ReportOutcome>,
+}
+
+fn deserialize_sha256_hex<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if s.len() != 64 || !s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+        return Err(serde::de::Error::custom(format!("attachment sha256 {s:?} is not 64 lowercase hex characters")));
+    }
+    Ok(s)
+}
+
 /// The evidence-integrity spec's own record kind: the candidate shape
 /// [`crate::evidence::validate_evidence`] validates. Carries whichever
 /// join keys are relevant to what it attests (join-spine `task_id`
@@ -973,6 +1028,11 @@ pub struct EvidenceRecord {
     pub surface_ref: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approval: Option<EvidenceApproval>,
+    /// Files this evidence is bound to (experimental evidence binding;
+    /// additive and skipped when empty, so unbound records are unchanged
+    /// on the wire).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<EvidenceAttachment>,
 }
 
 impl EvidenceRecord {
@@ -997,6 +1057,7 @@ impl EvidenceRecord {
             run_seq: None,
             surface_ref: Vec::new(),
             approval: None,
+            attachments: Vec::new(),
         }
     }
 
@@ -1031,6 +1092,11 @@ impl EvidenceRecord {
     }
     pub fn with_approval(mut self, approval: EvidenceApproval) -> Self {
         self.approval = Some(approval);
+        self
+    }
+
+    pub fn with_attachments(mut self, attachments: Vec<EvidenceAttachment>) -> Self {
+        self.attachments = attachments;
         self
     }
 }
@@ -1645,6 +1711,33 @@ mod tests {
         let subject: Subject = serde_json::from_value(json).expect("legacy subject must still deserialize");
         assert_eq!(subject.status, SubjectStatus::Verifying);
         assert!(serde_json::to_value(&subject).unwrap().get("scenario_ids").is_none(), "the stale key is not written back");
+    }
+
+    /// An attachment-bound record round-trips, an unbound one carries no
+    /// `attachments` key at all (so every existing record's digest is
+    /// unchanged), and a malformed sha256 fails the whole record rather
+    /// than reading as an unbound attestation.
+    #[test]
+    fn evidence_attachments_round_trip_and_reject_a_malformed_digest() {
+        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
+        let unbound = EvidenceRecord::new(envelope.clone(), None, Some(ScenarioId::parse("a.b.01").unwrap()), None, EvidenceVerdict::Faithful);
+        assert!(serde_json::to_value(&unbound).unwrap().get("attachments").is_none());
+
+        let bound = unbound.with_attachments(vec![EvidenceAttachment {
+            path: "reports/junit.xml".into(),
+            sha256: "a".repeat(64),
+            format: Some(ReportFormat::Junit),
+            case: Some("cart refuses out-of-stock".into()),
+            outcome: Some(ReportOutcome::Passed),
+        }]);
+        let value = serde_json::to_value(&bound).unwrap();
+        assert_eq!(value["attachments"][0]["format"], "junit");
+        assert_eq!(value["attachments"][0]["outcome"], "passed");
+        assert_eq!(serde_json::from_value::<EvidenceRecord>(value.clone()).unwrap(), bound);
+
+        let mut bad = value;
+        bad["attachments"][0]["sha256"] = serde_json::json!("not-a-digest");
+        assert!(serde_json::from_value::<EvidenceRecord>(bad).is_err());
     }
 
     /// A pre-s36 `Change` (no `subject_id` key at all) still

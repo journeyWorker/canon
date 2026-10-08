@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T15:15:12.946087Z",
+  "attachments": [
+    {
+      "case": "require_mode_holds_a_scenario_to_a_passing_report_and_warn_never_fails",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ef8985e5ae5dbe0d3d2647e391fc301f3a98a5a5c99a4f1d74ced775749890f1"
+    }
+  ],
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run (junit)"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "gate.check.15",
+  "schema": 1,
+  "staging_id": "f48d7531c159",
+  "verdict": "faithful"
+}

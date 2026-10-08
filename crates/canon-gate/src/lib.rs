@@ -48,6 +48,7 @@ pub mod checkbox;
 pub mod context;
 pub mod coverage;
 pub mod dispatch;
+pub mod evidence_binding;
 pub mod failure_class;
 pub mod hooks;
 pub mod ledger;
@@ -72,7 +73,11 @@ pub use failure_class::{FailureClass, Violation, FAILURE_CLASSES};
 pub use hooks::{install_hooks, HookEntry, InstallOutcome, PRE_COMMIT_SCRIPT};
 pub use ledger::{latest_verdicts, CellKey, LedgerCheck, LedgerEntry};
 pub use markers::{evidence_note_of, scan_fake_markers, EvidenceNote, FABRICATION_BLOCKLIST};
-pub use policy::{allowed_signers_path, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError, RiskTierRule, SpecCoverage, StalenessPolicy};
+pub use evidence_binding::{binding_summary, strength_of, BindingGap, BindingSummary, EvidenceBindingCheck};
+pub use policy::{
+    allowed_signers_path, BindingMode, BindingStrength, EvidenceBinding, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError,
+    RiskTierRule, SpecCoverage, StalenessPolicy,
+};
 pub use promote::{
     commit_divergence, divergence_staging_dir, promote, promote_divergence, stage_divergence, DivergenceCandidate, Promoted, PromoteReport, Refused, RunSeqAssignment,
     StagedAssignment, StagedKind, STAGED_KINDS,

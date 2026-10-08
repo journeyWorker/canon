@@ -21,6 +21,13 @@
       "type": "string",
       "format": "date-time"
     },
+    "attachments": {
+      "description": "Files this evidence is bound to (experimental evidence binding;\nadditive and skipped when empty, so unbound records are unchanged\non the wire).",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/EvidenceAttachment"
+      }
+    },
     "evidence_sha": {
       "anyOf": [
         {
@@ -246,6 +253,51 @@
         "at"
       ]
     },
+    "EvidenceAttachment": {
+      "description": "A file an [`EvidenceRecord`] is bound to (experimental evidence\nbinding). Canon reads the file when the evidence is added — it never\nexecutes anything — and records what it found: the bytes' sha256, and\nfor a parsed report the case it matched and that case's outcome. The\ndigest lets a reviewer later confirm exactly which file backed the\nclaim; an attachment with no `format` is an opaque artifact (a trace,\nscreenshots, an agent QA log) bound by digest alone.",
+      "type": "object",
+      "properties": {
+        "case": {
+          "description": "The report case this evidence was matched to (parsed reports only).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReportFormat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReportOutcome"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "description": "Repository-relative path, `/`-separated, as read at attestation.",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "64 lowercase hex characters: sha256 over the file's bytes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ]
+    },
     "EvidenceVerdict": {
       "description": "The three-way verdict an evidence record carries. `Divergent` is an\nexplicit third value rather than \"no record exists\" — the donor\nparity harness represents non-faithful as *absence* of a\ndesign-review/code-review record, which works for a directory-scanned\nledger but not for a single, standalone canon record whose own\n`Deserialize` must always succeed or fail on its own — so canon makes\nthe state explicit instead of leaning on record-absence.",
       "type": "string",
@@ -306,6 +358,30 @@
         "evidence_record",
         "subject",
         "finding"
+      ]
+    },
+    "ReportFormat": {
+      "description": "The machine-readable test-report formats `canon evidence add\n--report` parses (experimental evidence binding). Canon never runs a\ntest; it reads the report the team's own runner already wrote.",
+      "oneOf": [
+        {
+          "description": "JUnit XML — emitted or convertible from nearly every ecosystem.",
+          "type": "string",
+          "const": "junit"
+        },
+        {
+          "description": "Cucumber JSON — Gherkin runners; scenario tags travel in it.",
+          "type": "string",
+          "const": "cucumber"
+        }
+      ]
+    },
+    "ReportOutcome": {
+      "description": "The outcome a parsed report records for the case an attachment names.",
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "skipped"
       ]
     },
     "RoleId": {

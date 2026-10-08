@@ -152,3 +152,24 @@ Feature: gate check
     When the gate checks the repository
     Then it reports uncovered-cell for the golden-path-only surface naming the missing case
     And an untagged or out-of-scope failure scenario does not satisfy its surface
+
+  # canon: {"schema":1,"at":"2026-10-08T15:13:25Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.15
+  Scenario: Experimental evidence binding is off by default, advisory in warn and enforced in require
+    Given scenario evidence that carries no bound file
+    When the gate checks a repository without the experimental section
+    Then nothing about binding is checked or printed
+    And in warn mode the scenario is listed as an advisory while the gate still passes
+    And in require mode it is an uncovered cell until a passing report is bound
+
+  # canon: {"schema":1,"at":"2026-10-08T15:13:25Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.16
+  Scenario: A malformed evidence binding section fails the gate instead of reading as off
+    Given an experimental evidence binding section with an unknown mode or key
+    When the policy is resolved
+    Then the section is invalid and the gate reports it as an uncovered cell
+    And the spec coverage section beside it still resolves

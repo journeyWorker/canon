@@ -11,6 +11,7 @@ pub mod demo;
 pub mod dispatch;
 pub mod divergence;
 pub mod evidence;
+pub mod evidence_attach;
 pub mod finding;
 pub mod fmt;
 pub mod gate;

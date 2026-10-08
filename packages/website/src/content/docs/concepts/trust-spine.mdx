@@ -95,6 +95,37 @@ A present-but-malformed section is never silently equivalent to an absent
 one — it is reported and then fails the check, so a typo (or a
 non-slug lane) cannot quietly disable the gate.
 
+## Experimental: evidence binding
+
+An evidence record is an attestation — canon never runs `--ref`, and it
+cannot run every language and agent-driven QA tool a team uses. Binding
+(off by default) lets a record point at files the team's own runner or
+agent already produced:
+
+```bash
+# any file — a trace, screenshots, an agent QA log — bound by sha256
+canon evidence add ... --artifact test-results/cart-trace.zip
+# a JUnit XML / Cucumber JSON report: also records the matched case and outcome
+canon evidence add ... --report junit:target/nextest/default/junit.xml
+```
+
+The report case is found by the scenario id in its name or tag (or named
+with `--report-case`); a `faithful` verdict over a failed case is
+refused. Whether the gate cares is a policy switch:
+
+```yaml
+experimental:
+  evidence_binding:
+    mode: warn          # off (default) | warn | require
+    strength: artifact  # artifact (any bound file) | report (a passing case)
+    case: [failure]     # optional: only these scenarios are held
+```
+
+`warn` lists scenarios below `strength` after the gate result without
+failing it; `require` makes each an `uncovered-cell`. Canon still cannot
+tell whether a bound test truly exercises the scenario — binding narrows
+the trust gap, it does not close it.
+
 ## The trust ladder
 
 Artifacts climb: **draft → reviewed** (agent + review-record) **→

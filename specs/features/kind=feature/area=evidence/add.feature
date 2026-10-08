@@ -103,3 +103,23 @@ Feature: evidence add
     When the add is invoked
     Then it is refused before staging, even when --approval-by and --approval-role are both supplied
     And CANON_ACTOR does not substitute for authenticated approval
+
+  # canon: {"schema":1,"at":"2026-10-08T15:13:25Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.11
+  Scenario: A report binds the matched case and refuses a faithful claim over a failed case
+    Given a JUnit report whose case names the scenario id and failed
+    When faithful evidence is added with that report
+    Then the command exits 1 naming the failed case and stages nothing
+    And once the case passes, the record carries the report path, digest, matched case and passed outcome
+
+  # canon: {"schema":1,"at":"2026-10-08T15:13:25Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.12
+  Scenario: Any repository file binds by digest without being run
+    Given a trace file inside the repository
+    When evidence is added with it as an artifact
+    Then the record carries its repository-relative path and sha256
+    And a file outside the repository is refused because no reviewer could find it

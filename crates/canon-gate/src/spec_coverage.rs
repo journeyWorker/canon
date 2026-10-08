@@ -259,7 +259,7 @@ pub fn case_gaps<'a>(scenarios: impl IntoIterator<Item = &'a Scenario>, required
 /// `Divergence` is deliberately NOT folded this way: its supersession is
 /// `(run_seq, round)`, not `(at, schema, digest)`, and
 /// [`fold_to_current_state`] owns that rule and needs every row.
-fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], key: impl Fn(&T) -> K) -> Vec<&'a T> {
+pub(crate) fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], key: impl Fn(&T) -> K) -> Vec<&'a T> {
     struct Row<'a, T> {
         record: &'a T,
         at: chrono::DateTime<chrono::Utc>,
@@ -340,7 +340,7 @@ fn mismatch_detail(state: &FoldedState) -> Option<String> {
     }
 }
 
-enum ScopeDecision<'a> {
+pub(crate) enum ScopeDecision<'a> {
     InScope,
     OutOfScope,
     /// The scenario names a subject no `Subject` record carries. Not
@@ -353,7 +353,7 @@ enum ScopeDecision<'a> {
 /// every scenario is in scope regardless of its subject link — the
 /// opposite reading would make an omitted `scope:` silently disable the
 /// whole check.
-fn scope_decision<'a>(
+pub(crate) fn scope_decision<'a>(
     scope: &[SubjectStatus],
     subject_id: Option<&'a SubjectId>,
     subject_status: &BTreeMap<&str, SubjectStatus>,
@@ -432,6 +432,7 @@ mod tests {
             risk_routing: BTreeMap::new(),
             risk_tiers: BTreeMap::new(),
             spec_coverage,
+            evidence_binding: None,
             diagnostics: Vec::new(),
         }
     }

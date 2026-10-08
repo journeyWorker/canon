@@ -129,7 +129,38 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     let checks = canon_gate::check_set(release);
     let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).collect());
     print!("{}", format_gate_report(&report));
+    if let Some(summary) = canon_gate::binding_summary(&gate_context) {
+        print!("{}", format_binding_summary(&summary));
+    }
     report.exit_code()
+}
+
+/// The experimental evidence-binding block, printed only when the policy
+/// turns it on. In `warn` mode the gaps are advisories (listed here and
+/// nowhere else); in `require` mode they are already violations above,
+/// so only the distribution is printed.
+fn format_binding_summary(summary: &canon_gate::BindingSummary) -> String {
+    use canon_gate::{BindingMode, BindingStrength};
+    let mode = match summary.mode {
+        BindingMode::Off => "off",
+        BindingMode::Warn => "warn",
+        BindingMode::Require => "require",
+    };
+    let count = |s| summary.counts.get(&s).copied().unwrap_or(0);
+    let mut out = format!(
+        "\nexperimental evidence binding ({mode}, requires {}): report {}, artifact {}, attested-only {}\n",
+        summary.required.as_str(),
+        count(BindingStrength::Report),
+        count(BindingStrength::Artifact),
+        count(BindingStrength::Attested)
+    );
+    if summary.mode == BindingMode::Warn && !summary.gaps.is_empty() {
+        out.push_str(&format!("  {} advisory(ies) — not failing the gate:\n", summary.gaps.len()));
+        for gap in &summary.gaps {
+            out.push_str(&format!("  warn {} — {}\n", gap.scenario_id.as_str(), gap.detail()));
+        }
+    }
+    out
 }
 
 fn format_gate_report(report: &GateReport) -> String {

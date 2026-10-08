@@ -28,6 +28,9 @@ chrono = { version = "0.4.45" }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# JUnit XML test reports (`canon evidence add --report junit:<path>`).
+# Already in the lockfile transitively; a pure-Rust pull parser.
+quick-xml = "0.40"
 serde_yaml = "0.9"
 sha2 = { workspace = true }
 thiserror = { workspace = true }

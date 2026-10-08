@@ -152,6 +152,10 @@ pub struct PolicySurface {
     /// fact from `require_evidence: false` and stays distinguishable
     /// here: an author needs to see whether the repo opted in at all.
     pub spec_coverage: Option<String>,
+    /// `experimental.evidence_binding`, one line. Skipped when absent
+    /// (off by default) so an existing context JSON is byte-identical.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence_binding: Option<String>,
     /// `PolicyResolution::is_clean()` — whether `policy.yaml` loaded with
     /// zero problems for this repo.
     pub clean: bool,
@@ -439,6 +443,24 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
             }
             SpecCoverage::Invalid { detail } => format!("INVALID — {detail}"),
         }),
+        evidence_binding: policy.evidence_binding.as_ref().map(|binding| match binding {
+            canon_gate::EvidenceBinding::Active { mode, strength, cases, lanes, scope } => {
+                let mode = match mode {
+                    canon_gate::BindingMode::Off => "off",
+                    canon_gate::BindingMode::Warn => "warn",
+                    canon_gate::BindingMode::Require => "require",
+                };
+                let mut summary = format!("mode={mode} strength={}", strength.as_str());
+                let scope: Vec<String> = scope.iter().map(|s| subject_status_slug(s).to_string()).collect();
+                for (field, values) in [("case", cases), ("lane", lanes), ("scope", &scope)] {
+                    if !values.is_empty() {
+                        summary.push_str(&format!(" {field}={}", values.join(", ")));
+                    }
+                }
+                summary
+            }
+            canon_gate::EvidenceBinding::Invalid { detail } => format!("INVALID — {detail}"),
+        }),
         clean: policy.is_clean(),
         diagnostics: policy.diagnostics.iter().map(ToString::to_string).collect(),
     }
@@ -544,6 +566,9 @@ pub fn render_outline(surface: &AuthoringSurface) -> String {
         // fact an author most needs before writing a `.feature` file.
         None => writeln!(out, "  spec_coverage: <absent — spec-corpus coverage is not enforced here>"),
     };
+    if let Some(summary) = &surface.policy.evidence_binding {
+        let _ = writeln!(out, "  experimental.evidence_binding: {summary}");
+    }
     let _ = writeln!(out, "  clean: {}", surface.policy.clean);
     let _ = writeln!(out, "  diagnostics ({}):", surface.policy.diagnostics.len());
     for diag in &surface.policy.diagnostics {

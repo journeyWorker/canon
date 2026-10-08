@@ -297,6 +297,7 @@ mod tests {
             risk_routing: Default::default(),
             risk_tiers: Default::default(),
             spec_coverage: None,
+            evidence_binding: None,
             diagnostics: Vec::new(),
         }
     }

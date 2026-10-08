@@ -67,6 +67,21 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.11.0 release (experimental evidence binding)
+
+Version 0.11.0 adds an **experimental, off-by-default** way to bind
+evidence to files the team's own runner or agent already produced. Canon
+still never runs a test. `canon evidence add --artifact <path>` binds any
+repository file by sha256 (a trace, screenshots, an agent QA log);
+`--report junit:<path>` or `--report cucumber:<path>` also parses the report,
+records the case matched to the scenario and its outcome, and refuses a
+`faithful` verdict over a failed case. Enforcement is a policy switch,
+`experimental.evidence_binding` with `mode: off | warn | require`, a minimum
+`strength` (`artifact` or `report`), and optional `case`/`lane`/`scope`
+filters; `warn` only lists advisories after `canon gate check`. Nothing
+changes for a repo that does not set it. The API and policy shape may change
+while experimental.
+
 ## 0.10.0 release
 
 Version 0.10.0 makes golden-path-only specs visible. A scenario can carry a

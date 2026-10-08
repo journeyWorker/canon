@@ -310,7 +310,7 @@ mod tests {
             policy: PolicyResolution {
                 trust_required: BTreeMap::new(), trust_sample: BTreeMap::new(),
                 staleness: StalenessPolicy { max_commits_behind: PolicyField::Flat(50), surface_scoped: PolicyField::Flat(true) },
-                risk_routing: BTreeMap::new(), risk_tiers, spec_coverage: None, diagnostics: Vec::new(),
+                risk_routing: BTreeMap::new(), risk_tiers, spec_coverage: None, evidence_binding: None, diagnostics: Vec::new(),
             },
             evidence, scenarios: Vec::new(), divergences: Vec::new(), subjects: Vec::new(),
             violations: Vec::new(), corpus_violations: Vec::new(), unreadable_kinds: Vec::new(), now: now(),

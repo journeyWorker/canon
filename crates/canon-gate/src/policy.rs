@@ -300,6 +300,10 @@ struct RawPolicy {
     /// to this section.
     #[serde(default)]
     spec_coverage: Option<serde_yaml::Value>,
+    /// Experimental, opt-in features — parsed per feature, like
+    /// `spec_coverage`, so a typo in one never discards the rest.
+    #[serde(default)]
+    experimental: Option<serde_yaml::Value>,
 }
 
 /// One effect-aware approval tier in `policy.yaml`. The simple wildcard
@@ -506,6 +510,131 @@ fn resolve_spec_coverage(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<P
     })
 }
 
+/// How `experimental.evidence_binding` treats a scenario whose latest
+/// evidence is weaker than `strength` (experimental, OFF by default).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BindingMode {
+    /// The default and the absent-section behavior: nothing is checked.
+    Off,
+    /// Reported by `canon gate check` as advisories; never a violation.
+    Warn,
+    /// A scenario in the filtered set below `strength` is an
+    /// `uncovered-cell` violation.
+    Require,
+}
+
+/// How strongly an `EvidenceRecord` is bound to something Canon can
+/// check, weakest first. Canon never executes a test: it reads files the
+/// team's own runner (or agent) already produced.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BindingStrength {
+    /// No attachment — a claim naming a test (`--ref`) only.
+    Attested,
+    /// At least one file bound by sha256 (any format: a report, a trace,
+    /// screenshots, an agent QA log).
+    Artifact,
+    /// A parsed test report whose matched case passed.
+    Report,
+}
+
+impl BindingStrength {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BindingStrength::Attested => "attested",
+            BindingStrength::Artifact => "artifact",
+            BindingStrength::Report => "report",
+        }
+    }
+}
+
+/// `experimental.evidence_binding`, resolved. `None` on
+/// [`PolicyResolution::evidence_binding`] means the section is absent,
+/// which behaves exactly like `mode: off`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidenceBinding {
+    Active {
+        mode: BindingMode,
+        /// The minimum strength a scenario's latest evidence must reach.
+        strength: BindingStrength,
+        /// Only scenarios whose `@case:` is listed (empty = any case,
+        /// including untagged).
+        cases: Vec<String>,
+        /// Only scenarios whose `@lane:` is listed (empty = any lane).
+        lanes: Vec<String>,
+        /// Only scenarios linked to a Subject in one of these statuses
+        /// (empty = every scenario).
+        scope: Vec<SubjectStatus>,
+    },
+    /// Present but unusable: the gate reports it instead of silently
+    /// behaving like `off`.
+    Invalid { detail: String },
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+struct RawExperimental {
+    #[serde(default)]
+    evidence_binding: Option<serde_yaml::Value>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+struct RawEvidenceBinding {
+    #[serde(default)]
+    mode: Option<String>,
+    #[serde(default)]
+    strength: Option<String>,
+    #[serde(default)]
+    case: Vec<String>,
+    #[serde(default)]
+    lane: Vec<String>,
+    #[serde(default)]
+    scope: Vec<String>,
+}
+
+/// Parse `experimental.evidence_binding`, poisoning (never dropping) a
+/// present-but-broken section exactly like [`resolve_spec_coverage`].
+fn resolve_evidence_binding(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<PolicyDiagnostic>) -> Option<EvidenceBinding> {
+    const SECTION: &str = "experimental.evidence_binding";
+    let invalid = |detail: String, diagnostics: &mut Vec<PolicyDiagnostic>| {
+        diagnostics.push(PolicyDiagnostic::InvalidSection { section: SECTION, detail: detail.clone() });
+        Some(EvidenceBinding::Invalid { detail })
+    };
+    let experimental: RawExperimental = match serde_yaml::from_value(raw?) {
+        Ok(e) => e,
+        Err(e) => return invalid(format!("`experimental`: {e}"), diagnostics),
+    };
+    let parsed: RawEvidenceBinding = match serde_yaml::from_value(experimental.evidence_binding?) {
+        Ok(p) => p,
+        Err(e) => return invalid(e.to_string(), diagnostics),
+    };
+
+    let mode = match parsed.mode.as_deref().unwrap_or("off") {
+        "off" => BindingMode::Off,
+        "warn" => BindingMode::Warn,
+        "require" => BindingMode::Require,
+        other => return invalid(format!("`{other}` is not a valid value for `mode` (expected one of: off, warn, require)"), diagnostics),
+    };
+    let strength = match parsed.strength.as_deref().unwrap_or("artifact") {
+        "artifact" => BindingStrength::Artifact,
+        "report" => BindingStrength::Report,
+        other => return invalid(format!("`{other}` is not a valid value for `strength` (expected one of: artifact, report)"), diagnostics),
+    };
+    let mut scope = Vec::with_capacity(parsed.scope.len());
+    for name in &parsed.scope {
+        match subject_status_from_str(name) {
+            Some(status) => scope.push(status),
+            None => return invalid(format!("`{name}` is not a valid value for `scope` (expected one of: {})", SUBJECT_STATUS_NAMES.join(", ")), diagnostics),
+        }
+    }
+    for (field, values) in [("case", &parsed.case), ("lane", &parsed.lane)] {
+        if let Some(value) = values.iter().find(|v| !is_kebab_slug(v)) {
+            return invalid(format!("`{value}` is not a valid value for `{field}` (expected a kebab-case slug)"), diagnostics);
+        }
+    }
+    Some(EvidenceBinding::Active { mode, strength, cases: parsed.case, lanes: parsed.lane, scope })
+}
+
 /// Validate a lane/case slug's shape before policy resolution accepts it.
 fn is_kebab_slug(s: &str) -> bool {
     !s.is_empty()
@@ -568,6 +697,8 @@ pub struct PolicyResolution {
     /// [`SpecCoverage`] for why a BROKEN section resolves to
     /// `Some(Invalid)` rather than `None`.
     pub spec_coverage: Option<SpecCoverage>,
+    /// `experimental.evidence_binding` (OFF by default). `None` = absent.
+    pub evidence_binding: Option<EvidenceBinding>,
     /// Every load/compile problem `resolve()` encountered — see
     /// [`PolicyDiagnostic`].
     pub diagnostics: Vec<PolicyDiagnostic>,
@@ -624,8 +755,9 @@ impl PolicyResolution {
         // per-record predicate, so it needs no bindings and is
         // unaffected by `SchemaUnavailable`.
         let spec_coverage = resolve_spec_coverage(raw.spec_coverage, &mut diagnostics);
+        let evidence_binding = resolve_evidence_binding(raw.experimental, &mut diagnostics);
 
-        Self { trust_required, trust_sample, staleness, risk_routing, risk_tiers, spec_coverage, diagnostics }
+        Self { trust_required, trust_sample, staleness, risk_routing, risk_tiers, spec_coverage, evidence_binding, diagnostics }
     }
 
     /// The required [`TrustLevel`] for `key` (whatever vocabulary this
@@ -1138,6 +1270,48 @@ trust_required:
             panic!("expected a poisoned section, got {:?}", resolution.spec_coverage);
         };
         assert!(detail.contains("Failure") && detail.contains("require_cases"), "must name the offender and field: {detail}");
+    }
+
+    /// Absent and an empty `experimental:` both mean off; `mode` defaults
+    /// to off and `strength` to artifact; a typo or bad value poisons the
+    /// section rather than silently reading as off — and never touches
+    /// any other section.
+    #[test]
+    fn evidence_binding_defaults_off_and_a_broken_section_is_invalid_not_off() {
+        let (resolution, _dir) = resolve_with("spec_coverage:\n  require_evidence: true\n");
+        assert_eq!(resolution.evidence_binding, None);
+        let (resolution, _dir) = resolve_with("experimental: {}\n");
+        assert_eq!(resolution.evidence_binding, None);
+
+        let (resolution, _dir) = resolve_with("experimental:\n  evidence_binding: {}\n");
+        assert_eq!(
+            resolution.evidence_binding,
+            Some(EvidenceBinding::Active { mode: BindingMode::Off, strength: BindingStrength::Artifact, cases: vec![], lanes: vec![], scope: vec![] })
+        );
+
+        let (resolution, _dir) =
+            resolve_with("experimental:\n  evidence_binding:\n    mode: require\n    strength: report\n    case: [failure]\n    scope: [verifying]\n");
+        assert_eq!(
+            resolution.evidence_binding,
+            Some(EvidenceBinding::Active {
+                mode: BindingMode::Require,
+                strength: BindingStrength::Report,
+                cases: vec!["failure".into()],
+                lanes: vec![],
+                scope: vec![SubjectStatus::Verifying]
+            })
+        );
+
+        for broken in [
+            "experimental:\n  evidence_binding:\n    mode: enforce\n",
+            "experimental:\n  evidence_binding:\n    strength: proven\n",
+            "experimental:\n  evidence_binding:\n    mod: warn\n",
+            "experimental:\n  evidence_bindings:\n    mode: warn\n",
+        ] {
+            let (resolution, _dir) = resolve_with(&format!("spec_coverage:\n  require_evidence: true\n{broken}"));
+            assert!(matches!(resolution.evidence_binding, Some(EvidenceBinding::Invalid { .. })), "{broken}: {:?}", resolution.evidence_binding);
+            assert!(matches!(resolution.spec_coverage, Some(SpecCoverage::Active { .. })), "a broken experimental section must not discard spec_coverage");
+        }
     }
 
     #[test]

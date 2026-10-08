@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T15:15:12.894100Z",
+  "attachments": [
+    {
+      "case": "evidence_attach::tests::bind_records_digests_and_refuses_contradictions_and_outside_files",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ef8985e5ae5dbe0d3d2647e391fc301f3a98a5a5c99a4f1d74ced775749890f1"
+    }
+  ],
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run (junit)"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 12,
+  "scenario_id": "evidence.add.12",
+  "schema": 1,
+  "staging_id": "fffee973695a",
+  "verdict": "faithful"
+}

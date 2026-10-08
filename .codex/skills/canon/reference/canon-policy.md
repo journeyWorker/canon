@@ -113,7 +113,16 @@ not proof that the caller's path is authoritative; configured rules cannot
 be bypassed by declaring a safe ref.
 
 Approval text is also only an attestation unless identity is verified.
-`canon evidence add` marks an approval verified only when `--approval-by`
-equals non-empty `CANON_ACTOR` and `--approval-role human` is supplied.
-The persisted verification bit is what later gates count; arbitrary caller
-strings, empty identities, and agent roles do not count.
+An approval counts only with a detached SSH signature that verifies
+against the signers pinned by `approval.allowed_signers`, and
+`--approval-role human`. `CANON_ACTOR`, arbitrary caller strings, and
+agent roles do not count.
+
+## Experimental: `experimental.evidence_binding`
+
+Off by default. Holds scenario evidence to a minimum strength —
+`artifact` (a file bound by `canon evidence add --artifact`) or `report`
+(a JUnit/Cucumber report whose matched case passed, `--report`) — in
+`mode: warn` (advisories only) or `mode: require` (gate violations),
+optionally narrowed by `case`, `lane`, and subject-status `scope`. See
+`canon-gate` for the full contract.

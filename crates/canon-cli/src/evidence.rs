@@ -184,7 +184,10 @@ use std::path::{Path, PathBuf};
 
 use canon_gate::{verify_risk_approval, scan_fake_markers, EvidenceNote, GateCtx};
 use canon_ingest::task_rows::first_row_line_break;
-use canon_model::{approval_payload_bytes, Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, RunId, ScenarioId, Sha, TaskId, APPROVAL_NAMESPACE};
+use canon_model::{
+    approval_payload_bytes, Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, ReportFormat, RoleId, RunId,
+    ScenarioId, Sha, TaskId, APPROVAL_NAMESPACE,
+};
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier};
 use chrono::{DateTime, Utc};
@@ -309,6 +312,13 @@ pub struct EvidenceArgs {
     pub approval_at: Option<String>,
     /// Exact Git artifact SHA bound by an approval and persisted on the record.
     pub artifact_sha: Option<Sha>,
+    /// Experimental evidence binding: files bound by sha256
+    /// ([`crate::evidence_attach`]). Never executed.
+    pub artifacts: Vec<PathBuf>,
+    /// Experimental evidence binding: parsed test reports.
+    pub reports: Vec<(ReportFormat, PathBuf)>,
+    /// The report case to bind, when the scenario id is not in its name.
+    pub report_case: Option<String>,
 }
 
 /// Inputs shared by payload export and authenticated evidence staging.
@@ -547,6 +557,26 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             }
         }
     }
+    // Experimental binding: read (never run) the files the caller names,
+    // before anything is staged, so a refused binding leaves no record.
+    if args.report_case.is_some() && args.reports.is_empty() {
+        eprintln!("canon evidence add: refused — --report-case names a case in a --report; none was given");
+        return 2;
+    }
+    let attachments = match crate::evidence_attach::bind(&crate::evidence_attach::BindRequest {
+        repo: &repo,
+        artifacts: &args.artifacts,
+        reports: &args.reports,
+        report_case: args.report_case.as_deref(),
+        scenario_id: args.scenario_id.as_ref().map(ScenarioId::as_str),
+        verdict: args.verdict,
+    }) {
+        Ok(attachments) => attachments,
+        Err(error) => {
+            eprintln!("canon evidence add: refused — {}", error.message());
+            return error.exit_code();
+        }
+    };
 
     let at = Utc::now();
     let mut record = EvidenceRecord::new(
@@ -555,7 +585,8 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         args.scenario_id.clone(),
         args.run_id.clone(),
         args.verdict,
-    );
+    )
+    .with_attachments(attachments);
     if !args.surface_ref.is_empty() {
         record = record.with_surface_ref(normalized_strings(&args.surface_ref));
     }
@@ -744,6 +775,9 @@ mod tests {
             approval_signature_file: None,
             approval_at: None,
             artifact_sha: None,
+            artifacts: Vec::new(),
+            reports: Vec::new(),
+            report_case: None,
         }
     }
 

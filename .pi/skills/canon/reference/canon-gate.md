@@ -104,6 +104,54 @@ Malformed rows in those three kinds do NOT surface as
 `malformed-evidence`; they are kept off the evidence violation set on
 purpose, so enabling nothing changes no existing verdict.
 
+## Experimental: evidence binding (`experimental.evidence_binding`, off by default)
+
+An evidence record is an attestation: canon never runs `--ref`, and it
+never will — it cannot run every language and every agent-driven QA
+tool a team uses. Binding lets a record point at files the team's own
+runner or agent ALREADY produced, so a reviewer (and the gate) can check
+what backed the claim:
+
+```bash
+# any file: a Playwright trace, screenshots, an agent QA log — by sha256
+canon evidence add --scenario-id cart.add.04 --project-id root \
+  --kind agent-qa --ref "stagehand run 7" --role implementer \
+  --artifact test-results/cart-trace.zip
+# a JUnit XML or Cucumber JSON report: also records the matched case + outcome
+canon evidence add ... --report junit:target/nextest/default/junit.xml
+canon evidence add ... --report cucumber:reports/cucumber.json
+```
+
+The case is found by the scenario id in its name, classname, or Cucumber
+tag — dotted (`cart.add.04`) or underscored (`cart_add_04`, the form a
+test function carries) — or named exactly with `--report-case <name>`
+(a Rust test by its function name). No match refuses (exit 2); a
+`faithful` verdict over a failed or skipped case refuses (exit 1). Files
+must be inside the repository and are recorded by relative path.
+
+Strength, weakest first: `attested` (no attachment) < `artifact` (any
+bound file) < `report` (a parsed report whose case passed). The policy
+decides whether the gate cares:
+
+```yaml
+experimental:
+  evidence_binding:
+    mode: warn          # off (default) | warn | require
+    strength: artifact  # artifact (default) | report
+    case: [failure]     # optional filters — only these scenarios are held
+    lane: [behavior]
+    scope: [verifying]  # subject statuses
+```
+
+`off` checks nothing. `warn` prints the distribution and lists each
+scenario below `strength` as `warn <id>` after the gate result, never
+failing it. `require` reports each as `uncovered-cell`. The latest
+evidence record per scenario decides; scenarios with no evidence are
+`spec_coverage`'s finding, not this one's. A malformed section is a
+violation in every mode. Canon still cannot know whether the bound test
+actually exercises the scenario — binding narrows the trust gap, it does
+not close it.
+
 ## Effect-aware risk approvals (`risk_tiers`)
 
 `risk_tiers` is absent by default and remains a no-op when absent. When it
@@ -121,11 +169,14 @@ binding. This is still attestation input, not proof of the changed paths;
 run/diff metadata is authoritative when available, and an unavailable
 binding is a gate violation rather than a clean result.
 
-Approval identity is separate from attestation text. `--approval-by` is
-accepted as a verified approval only when it equals a non-empty
-`CANON_ACTOR` environment identity and `--approval-role human` is supplied.
-The record persists that verification bit for replay; arbitrary caller
-strings, empty identities, and `agent` roles never satisfy a risk tier.
+Approval identity is separate from attestation text. An approval counts
+only when it carries a detached SSH signature (`ssh-keygen -Y sign -n
+canon-approval-v1` over `canon evidence approval-payload`'s bytes) that
+verifies against the signers pinned by policy `approval.allowed_signers`,
+with `--approval-role human`. `CANON_ACTOR`, caller-supplied strings, and
+`agent` roles never satisfy a risk tier, and canon never signs on a
+user's behalf.
+
 Malformed `risk_tiers` sections produce a stable `uncovered-cell` policy
 violation (`risk_tiers policy-invalid: ...`) instead of degrading to an
 empty clean map.

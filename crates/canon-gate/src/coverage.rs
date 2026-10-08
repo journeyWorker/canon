@@ -192,6 +192,7 @@ mod tests {
             risk_routing,
             risk_tiers: BTreeMap::new(),
             spec_coverage: None,
+            evidence_binding: None,
             diagnostics: Vec::new(),
         }
     }
