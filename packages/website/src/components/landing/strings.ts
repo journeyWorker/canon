@@ -5,9 +5,8 @@ export type Lang = "en" | "ko";
 
 type Station = { name: string; lines: string[]; href: string };
 
-// The hero's pull request. Words are the approved comp's; the log line uses
-// `canon gate check`'s real violation format (conformance case
-// gate-check-spec-coverage-unevidenced), which ends in the detail string.
+// The hero's pull request, in the approved comp's words. The log is the comp's
+// line verbatim (user decision), not translated in KO.
 type CheckState = "pass" | "fail" | "wait";
 type Check = { name: string; state: CheckState; summary: string; log?: string[] };
 
@@ -19,9 +18,7 @@ type Row = { tool: string; href: string; cells: Cell[] };
 type MatrixCell = { state: CellState; source: string; href: string; note: { en: string; ko: string } };
 type MatrixRow = { tool: string; href: string; cells: MatrixCell[] };
 
-const GATE_LOG = [
-  "uncovered-cell cart.add.04 — spec scenario has no evidence record — specified, never attested to",
-];
+const GATE_LOG = ["uncovered-cell cart.add.04 — spec scenario has no evidence record"];
 
 const SPECKIT = "https://github.com/github/spec-kit";
 const SPECKIT_DOCS = "https://github.github.io/spec-kit";

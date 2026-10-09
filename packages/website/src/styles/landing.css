@@ -111,13 +111,13 @@ body.lp {
 
 .hero {
   display: grid;
-  grid-template-columns: calc(771 * var(--u)) calc(823 * var(--u));
-  column-gap: calc(67 * var(--u));
+  grid-template-columns: calc(771 * var(--u)) calc(824 * var(--u));
+  column-gap: calc(69 * var(--u));
   align-items: start;
   max-width: 1774px;
   margin-inline: auto;
   min-height: calc(777 * var(--u));
-  padding: 0 calc(52 * var(--u)) calc(40 * var(--u)) calc(59 * var(--u));
+  padding: 0 calc(51 * var(--u)) calc(40 * var(--u)) calc(59 * var(--u));
 }
 
 .hero-copy {
@@ -142,7 +142,7 @@ body.lp {
   align-items: stretch;
   margin-top: calc(51 * var(--u));
   height: calc(97 * var(--u));
-  background: #11161d;
+  background: var(--c-panel);
   border: 1px solid #353d47;
   border-radius: calc(9 * var(--u));
 }
@@ -154,31 +154,32 @@ body.lp {
   padding-inline: calc(30 * var(--u));
   font-family: var(--f-mono);
   font-size: calc(26 * var(--u));
-  color: #c9d4e0;
+  color: #c6d8ec;
   white-space: pre;
   overflow-x: auto;
   scrollbar-width: none;
 }
 
 .cmd-prompt {
-  color: #c9d4e0;
+  color: #c6d8ec;
 }
 
 .cmd-copy {
   display: inline-flex;
   align-items: center;
-  gap: calc(12 * var(--u));
+  gap: calc(14 * var(--u));
   align-self: center;
-  margin: 0 calc(15 * var(--u)) 0 calc(11 * var(--u));
+  margin: 0 calc(13 * var(--u)) 0 calc(11 * var(--u));
   height: calc(57 * var(--u));
-  padding: 0 calc(15 * var(--u)) 0 calc(13 * var(--u));
+  padding: 0 calc(17 * var(--u));
   font: inherit;
-  font-size: calc(24 * var(--u));
+  font-size: calc(22 * var(--u));
   font-weight: 500;
   color: #e6edf3;
-  background: #1a2029;
-  border: 1px solid #3a424c;
+  background: #1a2027;
+  border: 1px solid #2c333b;
   border-radius: calc(9 * var(--u));
+  box-shadow: 0 0 0 1px #0e1318;
   cursor: pointer;
   transition: background-color 160ms ease-out, border-color 160ms ease-out;
   position: relative;
@@ -188,19 +189,19 @@ body.lp {
 .cmd-copy::before {
   content: "";
   position: absolute;
-  left: calc(-12 * var(--u));
+  left: calc(-14 * var(--u));
   top: calc(-21 * var(--u));
   bottom: calc(-21 * var(--u));
   width: 1px;
-  background: #353d47;
+  background: #20272f;
 }
 
 .cmd-copy svg {
-  width: calc(31 * var(--u));
-  height: calc(31 * var(--u));
+  width: calc(27 * var(--u));
+  height: calc(29 * var(--u));
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.25;
+  stroke-width: 2;
 }
 
 .cmd-copy:hover {
@@ -216,9 +217,11 @@ body.lp {
 /* ── PR panel ───────────────────────────────────────────── */
 
 .pr {
-  margin-top: calc(64 * var(--u));
+  --c-border: #272d35;
+  --c-border-soft: #1e242c;
+  margin-top: calc(63 * var(--u));
   background: var(--c-panel);
-  border: 1px solid #343b45;
+  border: 1px solid #313943;
   border-radius: calc(12 * var(--u));
   overflow: hidden;
 }
@@ -262,6 +265,8 @@ body.lp {
   background: var(--c-fail-fill);
   border-radius: calc(9 * var(--u));
   white-space: nowrap;
+  position: relative;
+  top: calc(-2 * var(--u));
 }
 
 .check + .check {
@@ -275,6 +280,10 @@ body.lp {
   padding: 0 calc(34 * var(--u)) 0 calc(32 * var(--u));
   font-size: calc(24 * var(--u));
   line-height: 1.2;
+}
+
+.check:last-child .check-row {
+  height: calc(95 * var(--u));
 }
 
 .check-dot {
@@ -300,7 +309,7 @@ body.lp {
 }
 
 .check-sep {
-  margin-inline: calc(17 * var(--u));
+  margin-inline: calc(20 * var(--u));
   color: var(--c-text-2);
 }
 
@@ -311,10 +320,10 @@ body.lp {
 
 .check-chev {
   flex: none;
-  width: calc(27 * var(--u));
-  height: calc(27 * var(--u));
+  width: calc(20 * var(--u));
+  height: calc(12 * var(--u));
   margin-left: auto;
-  color: #e6edf3;
+  color: #c8d8ec;
 }
 
 .check-d > summary {
@@ -332,22 +341,22 @@ body.lp {
 
 .check-d[open] .check-chev {
   transform: rotate(180deg);
+  color: #f2f6fa;
 }
 
 .check-d[open] > summary {
-  height: calc(90 * var(--u));
-  padding-top: calc(2 * var(--u));
+  height: calc(88 * var(--u));
 }
 
 .check-log {
-  margin: 0 calc(22 * var(--u)) calc(23 * var(--u)) calc(26 * var(--u));
-  padding: calc(13 * var(--u)) calc(23 * var(--u)) calc(14 * var(--u));
+  margin: 0 calc(22 * var(--u)) calc(25 * var(--u)) calc(26 * var(--u));
+  padding: calc(24 * var(--u)) calc(23 * var(--u)) calc(25 * var(--u));
   background: var(--c-inset);
   border: 1px solid var(--c-border-soft);
   border-radius: calc(7 * var(--u));
   font-family: var(--f-mono);
-  font-size: calc(20.5 * var(--u));
-  line-height: calc(28 * var(--u));
+  font-size: calc(18.5 * var(--u));
+  line-height: calc(29 * var(--u));
   color: #d1dbe5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -360,7 +369,7 @@ body.lp {
 }
 
 .log-exit {
-  color: var(--c-text-2);
+  color: #d1dbe5;
 }
 
 /* One authored moment: the checks resolve in order, the gate turns red, the
@@ -378,6 +387,10 @@ body.lp {
 
   .pr-badge {
     animation: badge-answer 1100ms cubic-bezier(0.16, 1, 0.3, 1) 1300ms backwards;
+  }
+
+  .check-chev {
+    transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1), color 160ms ease-out;
   }
 }
 
@@ -956,8 +969,8 @@ body.lp {
   }
 
   .cmd-copy svg {
-    width: 17px;
-    height: 17px;
+    width: 15px;
+    height: 16px;
   }
 
   .pr {
@@ -1009,8 +1022,8 @@ body.lp {
   }
 
   .check-chev {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 9px;
     margin-left: auto;
     padding-left: 0;
   }

@@ -6,9 +6,9 @@
 
 :root {
   /* Ground and surfaces, darkest to lightest. */
-  --c-inset: #0a0d12;
   --c-ground: #0d1117;
-  --c-panel: #151b23;
+  --c-inset: #0e1218;
+  --c-panel: #11161b;
   --c-raise: #1d242d;
   --c-raise-hover: #262e38;
 
