@@ -1,0 +1,60 @@
+---
+// The hero's pull request: four checks, the canon gate red with its log open,
+// merge blocked. Only the gate row expands; the others carry the comp's
+// chevron as a marker.
+import type { Strings } from "./strings";
+
+interface Props {
+  t: Strings;
+}
+const { t } = Astro.props;
+const { pr } = t;
+---
+
+<figure class="pr" aria-labelledby="pr-title">
+  <div class="pr-head">
+    <p class="pr-branch" id="pr-title">
+      <span>{pr.head}</span>
+      <svg class="pr-arrow" viewBox="0 0 16 16" width="16" height="16" role="img" aria-label="→">
+        <path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <span>{pr.base}</span>
+    </p>
+    <span class="pr-badge">{pr.blocked}</span>
+  </div>
+
+  <ul class="pr-checks">
+    {
+      pr.checks.map((c, i) =>
+        c.log ? (
+          <li class:list={["check", `is-${c.state}`]} style={`--i:${i}`}>
+            <details class="check-d" open>
+              <summary class="check-row">
+                <span class="check-dot" aria-hidden="true" />
+                <span class="check-name">{c.name}</span>
+                <span class="check-sep" aria-hidden="true">—</span>
+                <span class="check-sum">{c.summary}</span>
+                <svg class="check-chev" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                  <path d="m3.5 6 4.5 4.5L12.5 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </summary>
+              <pre class="check-log" lang="en"><code>{c.log.map((line) => <span class="log-ln">{line}</span>)}<span class="log-ln log-exit">{pr.exit}</span></code></pre>
+            </details>
+          </li>
+        ) : (
+          <li class:list={["check", `is-${c.state}`]} style={`--i:${i}`}>
+            <div class="check-row">
+              <span class="check-dot" aria-hidden="true" />
+              <span class="check-name">{c.name}</span>
+              <span class="check-sep" aria-hidden="true">—</span>
+              <span class="check-sum">{c.summary}</span>
+              <svg class="check-chev" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                <path d="m3.5 6 4.5 4.5L12.5 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+          </li>
+        ),
+      )
+    }
+  </ul>
+</figure>

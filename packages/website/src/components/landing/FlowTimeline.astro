@@ -1,0 +1,55 @@
+---
+// The loop as a pull request's timeline: six events, the gate among them,
+// each linking the doc that defines it.
+import type { Strings } from "./strings";
+
+interface Props {
+  t: Strings;
+}
+const { t } = Astro.props;
+const { loop } = t;
+
+// One 16px glyph per station, same stroke throughout.
+const icons = [
+  // intent: a spec document
+  "M4 1.75h5.5L12.25 4.5v9.75H4zM9.25 1.75V4.75h3M6.25 8h3.5M6.25 10.75h3.5",
+  // run: play
+  "M5 3.25v9.5L12.5 8z",
+  // evidence: a checklist
+  "M2.5 4.25 3.75 5.5 6 3.25M2.5 10.25l1.25 1.25L6 9.25M8.5 4.5h5M8.5 10.5h5",
+  // gate: a shield
+  "M8 1.75 13 3.5v4.25c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.5zM5.75 8 7.25 9.5 10.25 6.5",
+  // decision: a key
+  "M10.5 1.75a3.75 3.75 0 1 1-2.6 6.45L3.75 12.4v1.85H1.75v-2.1l4.6-4.5A3.75 3.75 0 0 1 10.5 1.75zM11 4.5h.01",
+  // learning: a loop back to intent
+  "M13.25 8a5.25 5.25 0 1 1-1.54-3.71M13.25 2.25v2.5h-2.5",
+];
+---
+
+<section class="sec flow" aria-labelledby="flow-h">
+  <div class="sec-head flow-head">
+    <h2 class="sec-h" id="flow-h">{loop.heading}</h2>
+    <p class="flow-path">{loop.title}</p>
+  </div>
+  <ol class="tl">
+    {
+      loop.stations.map((s, i) => (
+        <li class:list={["tl-item", { "is-gate": i === 3 }]} id={`flow-${i + 1}`}>
+          <span class="tl-badge" aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="16" height="16">
+              <path d={icons[i]} fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <div class="tl-body">
+            <h3 class="tl-name">
+              <a href={s.href}>{s.name}</a>
+            </h3>
+            {s.lines.map((line) => (
+              <p>{line}</p>
+            ))}
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+</section>
