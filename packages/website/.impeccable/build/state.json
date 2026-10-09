@@ -381,7 +381,7 @@
     "review": {
       "status": "closed",
       "openedAt": "2026-10-09T05:08:16.974Z",
-      "closedAt": "2026-10-09T05:22:27.270Z",
+      "closedAt": "2026-10-09T05:30:10.250Z",
       "attempts": 0,
       "notes": [],
       "gate": null,
@@ -389,8 +389,8 @@
     }
   },
   "finish": {
-    "disposition": "fix",
-    "at": "2026-10-09T05:22:27.270Z",
+    "disposition": "ship",
+    "at": "2026-10-09T05:30:10.249Z",
     "phaseAtFinish": "review"
   },
   "plates": {}
