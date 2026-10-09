@@ -40,7 +40,7 @@ Feature: query read
     When its natural key is resolved
     Then the key is the project, the scenario and the pin joined together
     And two attestations of the same scenario at two commits are two distinct keys, not two versions of one
-    And folding by key would therefore drop an attestation rather than collapse a duplicate
+    And a review query returns both attestations, because reviews are never folded by key and so neither is dropped as a stale version
 
   @subject:query-reads
   @case:edge

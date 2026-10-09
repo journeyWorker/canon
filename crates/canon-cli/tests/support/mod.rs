@@ -18,7 +18,7 @@ use std::process::{Command, Output};
 use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::handoff::{DomainId, Handoff, HandoffBody};
 use canon_model::ids::{ChangeId, HandoffId, ProjectId, RoleId, RunId, ScenarioId, SpecDigest, TaskId};
-use canon_model::records::{Change, ChangeStatus, Scenario, Task, TaskStatus, Trajectory};
+use canon_model::records::{Change, ChangeStatus, ProvenanceRef, Review, Scenario, Task, TaskStatus, Trajectory};
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{Tier, WriteReceipt};
 use chrono::{DateTime, Utc};
@@ -83,6 +83,21 @@ impl Fixture {
             title,
             "",
             SpecDigest::parse("a".repeat(64)).unwrap(),
+        );
+        git.write(&record).unwrap()
+    }
+
+    /// Write a `Review` attesting `scenario_id` at commit `pin` straight
+    /// into the git tier, independently of the CLI under test.
+    pub fn plant_review_in_git(&self, project_id: &str, scenario_id: &str, pin: &str, at: DateTime<Utc>) -> WriteReceipt {
+        let git = GitTier::new(self.git_root());
+        let record = Review::new(
+            Envelope::new(1, RecordKind::Review, at, actor()),
+            ProjectId::parse(project_id).unwrap(),
+            ScenarioId::parse(scenario_id).unwrap(),
+            "reviewer",
+            pin,
+            ProvenanceRef::UpstreamRef("routes/world.tsx#onPurchased".to_string()),
         );
         git.write(&record).unwrap()
     }
