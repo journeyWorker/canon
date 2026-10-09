@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-g1",
+    "role": "reviewer"
+  },
+  "at": "2026-10-09T05:55:54.917823Z",
+  "change_id": "canon-0-13-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "b556ab7529a332aa0b28d0a0f98bdd62fcbb9a63",
+  "reviewer": "canon-reviewer-g1",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Release-trust test never asserts that the --release run reports trust-below-required"
+}

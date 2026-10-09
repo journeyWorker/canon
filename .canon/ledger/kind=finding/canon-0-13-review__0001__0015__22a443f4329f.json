@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-r2",
+    "role": "reviewer"
+  },
+  "at": "2026-10-09T05:55:57.131334Z",
+  "change_id": "canon-0-13-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "9ff435f83ec0774405bdd00c488ba4ba7a49bb68",
+  "reviewed_sha": "b556ab7529a332aa0b28d0a0f98bdd62fcbb9a63",
+  "reviewer": "canon-reviewer-g6",
+  "round": 1,
+  "schema": 1,
+  "seq": 15,
+  "severity": "blocker",
+  "summary": "Align the snapshot scenario, evidence ref, and test table count"
+}

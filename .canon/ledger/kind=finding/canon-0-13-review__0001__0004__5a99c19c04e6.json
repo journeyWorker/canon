@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-r2",
+    "role": "reviewer"
+  },
+  "at": "2026-10-09T05:55:56.444968Z",
+  "change_id": "canon-0-13-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "5b8567f76262d2fb07e916c157220680762bbe8e",
+  "reviewed_sha": "b556ab7529a332aa0b28d0a0f98bdd62fcbb9a63",
+  "reviewer": "canon-reviewer-g5",
+  "round": 1,
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "The missing-project evidence test does not assert refusal leaves storage empty."
+}

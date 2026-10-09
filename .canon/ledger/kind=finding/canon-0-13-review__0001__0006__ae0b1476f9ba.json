@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-r2",
+    "role": "reviewer"
+  },
+  "at": "2026-10-09T05:55:56.573244Z",
+  "change_id": "canon-0-13-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "7c2e8c02ca0dacf71a2db9b0cf0678824c2760c9",
+  "reviewed_sha": "b556ab7529a332aa0b28d0a0f98bdd62fcbb9a63",
+  "reviewer": "canon-reviewer-g5",
+  "round": 1,
+  "schema": 1,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "Direct resolve/defer proof checks counts rather than record identity, state payloads and untouched staged bytes."
+}

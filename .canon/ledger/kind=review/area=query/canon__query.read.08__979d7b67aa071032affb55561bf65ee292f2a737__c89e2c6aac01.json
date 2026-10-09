@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-r2",
+    "role": "reviewer"
+  },
+  "at": "2026-10-09T05:56:01.891834Z",
+  "kind": "review",
+  "pin": "979d7b67aa071032affb55561bf65ee292f2a737",
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "docs/superpowers/plans/2026-10-09-canon-0.13.0-reviewed-corpus.md#RV3"
+  },
+  "reviewer": "canon-reviewer-r2",
+  "scenario_id": "query.read.08",
+  "schema": 1
+}

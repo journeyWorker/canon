@@ -36,6 +36,10 @@ spec_coverage:
   # Every feature surface must specify at least one failure path; a
   # surface whose scenarios are all attested golden paths is still red.
   require_cases: [failure]
+  # Every scenario on a verifying/shipped subject needs a review by an actor
+  # other than its evidence actor, and an open blocker finding on an adopted
+  # change blocks (0.13: canon's own 257 scenarios were reviewed to get here).
+  require_review: {}
 
 
 # Authenticated risk approvals use external SSH trust. Uncomment and pin a

@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "test-voice",
+    "role": "test"
+  },
+  "at": "2026-07-14T21:37:06.852070Z",
+  "kind": "review",
+  "pin": "505a668efedaed6dfb5e125a0d927f118b2dfad1",
+  "project_id": "platformer",
+  "provenance_ref": {
+    "original_spec_ref": "examples/platformer/specs/features/kind=feature/area=platformer/session.feature"
+  },
+  "reviewer": "test-voice",
+  "scenario_id": "platformer.session.04",
+  "schema": 1
+}
