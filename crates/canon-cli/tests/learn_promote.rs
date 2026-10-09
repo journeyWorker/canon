@@ -3,7 +3,9 @@
 //! `execution-graph-topology`), run as a real subprocess against the
 //! real `canon` binary: seed a distilled `StrategyItem` into the
 //! operator-local parquet warm tier, then prove direct promotion is
-//! refused without paired evaluation and verified approval.
+//! refused without paired evaluation and verified approval, and that
+//! promotion with a valid paired evaluation and an SSH-signed human
+//! approval writes the git-tier file.
 //!
 //! # Why every promoting fixture now also seeds trajectories
 //! S6 shipped `canon learn promote` before S7's statistical gates
@@ -13,27 +15,17 @@
 //! gate is the primary enforcement point"): promotion into the
 //! git-tracked, PR-reviewed tier was reachable with zero corroborating
 //! evidence. The gate is wired now, so a promoting fixture must supply
-//! the evidence a promotion claims to rest on — and direct activation
-//! additionally requires paired evaluation and verified approval.
-//!
-//! # Why every promoting fixture now also seeds trajectories
-//! S6 shipped `canon learn promote` before S7's statistical gates
-//! existed, so the original version of this file seeded ONLY a
-//! `StrategyItem` and asserted exit `0`. That encoded the gap S6's own
-//! design named as temporary ("[Mitigation] S7's statistical-promotion
-//! gate is the primary enforcement point"): promotion into the
-//! git-tracked, PR-reviewed tier was reachable with zero corroborating
-//! evidence. The gate is wired now, so a promoting fixture must supply
-//! the evidence a promotion claims to rest on — and the blocked cases
-//! below are the other half of that contract.
+//! the evidence a promotion claims to rest on — direct activation
+//! additionally requires paired evaluation and verified approval, and
+//! the blocked cases below are the other half of that contract.
 
 use std::path::Path;
 use std::process::Command;
 
 use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
 use canon_learn::{
-    ParquetStrategyStore, ParquetTrajectoryStore, StrategyId, StrategyItem, StrategyStore, Trajectory, TrajectoryId,
-    TrajectoryStore, TrajectoryVerdict, VerdictOutcome,
+    ParquetStrategyStore, ParquetTrajectoryStore, PromotionApproval, PromotionEvaluation, StrategyId, StrategyItem, StrategyLifecycle,
+    StrategyStore, Trajectory, TrajectoryId, TrajectoryStore, TrajectoryVerdict, VerdictOutcome,
 };
 use canon_model::ids::{regime_key, RegimeKey, RoleId};
 use chrono::{Duration, Utc};
@@ -111,22 +103,122 @@ fn git_tier_file(repo: &Path, id: &StrategyId) -> std::path::PathBuf {
     repo.join(".canon").join("strategies").join("dev").join(format!("{id}.md"))
 }
 
+/// Configures `.canon/policy.yaml` to pin an `allowed_signers` file
+/// holding a freshly generated ed25519 key for principal `alice`, and
+/// returns the private key path an external signer would use.
+fn pin_approval_signer(repo: &Path) -> std::path::PathBuf {
+    let canon_dir = repo.join(".canon");
+    std::fs::create_dir_all(&canon_dir).unwrap();
+    let private_key = repo.join("approval_ed25519");
+    let generated = Command::new("ssh-keygen")
+        .args(["-q", "-t", "ed25519", "-N", "", "-C", "canon-learn-promote-test", "-f"])
+        .arg(&private_key)
+        .output()
+        .expect("spawn ssh-keygen");
+    assert!(generated.status.success(), "ssh-keygen key generation failed: {}", String::from_utf8_lossy(&generated.stderr));
+    let public_key = std::fs::read_to_string(private_key.with_extension("pub")).unwrap();
+    std::fs::write(canon_dir.join("allowed_signers"), format!("alice {public_key}")).unwrap();
+    std::fs::write(canon_dir.join("policy.yaml"), "approval:\n  allowed_signers: .canon/allowed_signers\n").unwrap();
+    private_key
+}
+
+fn ssh_sign(private_key: &Path, namespace: &str, payload: &[u8]) -> String {
+    let payload_file = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(payload_file.path(), payload).unwrap();
+    let output = Command::new("ssh-keygen").args(["-Y", "sign", "-f"]).arg(private_key).args(["-n", namespace]).arg(payload_file.path()).output().unwrap();
+    assert!(output.status.success(), "ssh-keygen signing failed: {}", String::from_utf8_lossy(&output.stderr));
+    std::fs::read_to_string(format!("{}.sig", payload_file.path().display())).unwrap()
+}
+
+/// Writes a passing paired evaluation for `candidate` and a human
+/// approval of it signed by `alice`, returning their file paths.
+fn write_approved_bundle(repo: &Path, candidate: &StrategyItem, private_key: &Path) -> (std::path::PathBuf, std::path::PathBuf, PromotionEvaluation, PromotionApproval) {
+    let evaluation = PromotionEvaluation::new(
+        candidate,
+        "candidate-v2",
+        vec!["baseline-panel-0".to_string(), "baseline-panel-1".to_string()],
+        vec!["candidate-panel-0".to_string(), "candidate-panel-1".to_string()],
+        "corpus-v1",
+        "paired-eval-v1",
+        "context-digest-v1",
+        "policy-digest-v1",
+        "model-digest-v1",
+        "tool-digest-v1",
+        [("pairs".to_string(), 2.0), ("uplift".to_string(), 0.75), ("regressions".to_string(), 0.0)].into_iter().collect(),
+        true,
+        "promote",
+    );
+    let approved_at = Utc::now();
+    let mut approval = PromotionApproval::new(candidate.id, evaluation.digest(), "alice", "human", true, approved_at);
+    let payload = canon_model::approval_payload_bytes(
+        "canon-learning-approval-v1",
+        &format!("strategy:{}", candidate.id),
+        None,
+        &evaluation.digest(),
+        None,
+        &[],
+        &[],
+        "alice",
+        &approved_at,
+    );
+    approval.signature = Some(ssh_sign(private_key, "canon-learning-approval-v1", &payload));
+    approval.signer_key = Some("alice".to_string());
+    approval.integrity_digest = approval.recomputed_integrity_digest();
+    let evaluation_path = repo.join("evaluation.json");
+    let approval_path = repo.join("approval.json");
+    std::fs::write(&evaluation_path, serde_json::to_vec_pretty(&evaluation).unwrap()).unwrap();
+    std::fs::write(&approval_path, serde_json::to_vec_pretty(&approval).unwrap()).unwrap();
+    (evaluation_path, approval_path, evaluation, approval)
+}
+
+/// The scenario's whole contract through the real binary: a quarantined
+/// candidate whose regime clears the gate is still refused (exit 1,
+/// nothing written) without approval; with a valid paired evaluation and
+/// a verified human approval the command succeeds, the git-tier file
+/// appears carrying the strategy and both digests, and the warm-tier
+/// lifecycle flips to active.
 #[test]
 fn promote_materializes_a_seeded_strategy_as_a_git_tier_file() {
     let dir = tempfile::tempdir().unwrap();
-    let id = seed_strategy(dir.path(), "prefer the boring, correct option");
+    let private_key = pin_approval_signer(dir.path());
+    let store = ParquetStrategyStore::open(dir.path().join(".canon").join("learn").join("strategies"));
+    let candidate = StrategyItem::new(
+        StrategyId::new(),
+        fixture_regime(),
+        dev_role(),
+        "review guidance",
+        "one-liner",
+        "prefer the boring, correct option",
+        vec![TrajectoryId::new()],
+        Utc::now(),
+    )
+    .with_lifecycle(StrategyLifecycle::Quarantined);
+    store.append(&candidate).expect("seed strategy");
+    let id = candidate.id;
     seed_proven_regime(dir.path());
+    let written_at = git_tier_file(dir.path(), &id);
 
-    let output = run_promote(dir.path(), &id, &[]);
-    assert!(!output.status.success(), "direct promotion without approval must be refused");
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let refused = run_promote(dir.path(), &id, &[]);
+    assert_eq!(refused.status.code(), Some(1), "direct promotion without approval must be refused");
+    let stderr = String::from_utf8_lossy(&refused.stderr);
     assert!(
         stderr.contains("strategy promotion requires a valid paired evaluation and verified human approval"),
         "stable refusal reason must be reported: {stderr}"
     );
-
-    let written_at = git_tier_file(dir.path(), &id);
     assert!(!written_at.exists(), "refused direct promotion must not write the git-tier file");
+
+    let (evaluation_path, approval_path, evaluation, approval) = write_approved_bundle(dir.path(), &candidate, &private_key);
+    let output = run_promote(dir.path(), &id, &["--evaluation", evaluation_path.to_str().unwrap(), "--approval", approval_path.to_str().unwrap()]);
+    assert!(output.status.success(), "approved promotion must succeed; stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), format!("promoted {id} -> {}", written_at.display()));
+
+    let written = std::fs::read_to_string(&written_at).expect("the git-tier file must exist after an approved promotion");
+    assert!(written.starts_with("---\n"), "the file opens with front matter: {written}");
+    assert!(written.contains("status: active"), "{written}");
+    assert!(written.contains("prefer the boring, correct option"), "the body carries the strategy's content: {written}");
+    assert!(written.contains(&format!("evaluation_digest: {}", evaluation.digest())), "{written}");
+    assert!(written.contains(&format!("approval_digest: {}", approval.integrity_digest)), "{written}");
+    assert_eq!(store.find_by_id(&id).unwrap().unwrap().lifecycle, Some(StrategyLifecycle::Active), "the warm-tier candidate is now active");
 }
 
 #[test]
