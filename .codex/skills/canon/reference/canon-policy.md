@@ -6,6 +6,23 @@ mapping guards, retrieval filters, and a template's `applies_when:`
 section. Wherever a `policy.yaml` predicate or an `applies_when:` string
 appears, it is a CEL expression evaluated against the target record.
 
+## Top-level keys
+
+`.canon/policy.yaml` accepts exactly these top-level keys:
+`adapter_capabilities`, `allowed_signers`, `approval`, `experimental`,
+`query`, `risk_approvals`, `risk_routing`, `risk_tiers`, `schema`,
+`spec_coverage`, `staleness`, `trust_required`, `trust_sample`
+(`risk_approvals` and a top-level `allowed_signers` are compatibility
+aliases for `approval.allowed_signers`). Any other key, usually a typo,
+is a policy diagnostic, and `canon gate check` fails on it:
+
+```
+uncovered-cell spec_coverag — `spec_coverag` is not a known top-level policy.yaml key (known keys: adapter_capabilities, allowed_signers, approval, experimental, query, risk_approvals, risk_routing, risk_tiers, schema, spec_coverage, staleness, trust_required, trust_sample); fix it or remove it — an unknown key is never silently ignored
+```
+
+The known keys still resolve normally, and `canon context` lists the
+diagnostic and reports `clean: false`.
+
 ## The closed CEL profile
 
 Every expression is evaluated against exactly one variable, `record` (the

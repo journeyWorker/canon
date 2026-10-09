@@ -103,6 +103,31 @@ fn gate_check_exits_gate_red_on_a_seeded_uncovered_cell_violation() {
     assert!(text.contains("seed-change#1"), "{text}");
 }
 
+/// A misspelled top-level `policy.yaml` key fails the gate, naming the
+/// key and the known keys, instead of silently reading as "not opted in";
+/// a file using only known keys gates green.
+#[test]
+fn gate_check_fails_on_an_unknown_top_level_policy_key() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  test-run: agent\nspec_coverag:\n  require_evidence: true\n").unwrap();
+
+    let output = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    assert_eq!(output.status.code(), Some(1), "stdout: {}\nstderr: {}", stdout(&output), stderr(&output));
+    let text = stdout(&output);
+    assert!(
+        text.contains(&format!(
+            "uncovered-cell spec_coverag — `spec_coverag` is not a known top-level policy.yaml key (known keys: {}); fix it or remove it",
+            canon_gate::KNOWN_TOP_LEVEL_KEYS.join(", ")
+        )),
+        "{text}"
+    );
+
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  test-run: agent\nquery:\n  allow_sensitive: false\n").unwrap();
+    let output = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    assert!(output.status.success(), "known keys must gate green; stdout: {}", stdout(&output));
+}
+
 #[test]
 fn gate_check_release_flag_engages_release_trust_check_but_ordinary_run_stays_silent_on_it() {
     let dir = tempfile::tempdir().unwrap();

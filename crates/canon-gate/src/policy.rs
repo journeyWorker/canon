@@ -66,6 +66,30 @@ use crate::trust_ladder::TrustLevel;
 /// `tiers.git.root`, this path is NOT per-repo-configurable.
 pub const POLICY_YAML_RELATIVE_PATH: &str = canon_model::paths::POLICY_FILE;
 
+/// Every top-level `policy.yaml` key some canon reader consumes, sorted.
+/// Anything else is a [`PolicyDiagnostic::UnknownKey`]. The readers:
+/// `RawPolicy` (`schema`, `trust_required`, `trust_sample`, `staleness`,
+/// `risk_routing`, `risk_tiers`, `spec_coverage`, `experimental`),
+/// [`allowed_signers_path`] (`approval`, plus its compatibility aliases
+/// `risk_approvals` and `allowed_signers`), `canon-cli`'s retention
+/// (`query.allow_sensitive`), and `canon-cli`'s adapter authorization
+/// (`adapter_capabilities`). A new reader adds its key here.
+pub const KNOWN_TOP_LEVEL_KEYS: &[&str] = &[
+    "adapter_capabilities",
+    "allowed_signers",
+    "approval",
+    "experimental",
+    "query",
+    "risk_approvals",
+    "risk_routing",
+    "risk_tiers",
+    "schema",
+    "spec_coverage",
+    "staleness",
+    "trust_required",
+    "trust_sample",
+];
+
 /// The [`RecordKind`] every `policy.yaml` CEL predicate binds against
 /// (module doc) — the one `bindings_for` call [`PolicyResolution::resolve`]
 /// makes.
@@ -216,6 +240,12 @@ pub enum PolicyDiagnostic {
     /// typo silently equivalent to not opting in. The owning check
     /// turns the poison into a violation at CHECK time instead.
     InvalidSection { section: &'static str, detail: String },
+    /// A top-level key no canon reader of `policy.yaml` consumes — most
+    /// often a typo (`spec_coverag:`) that would otherwise be silently
+    /// ignored, leaving the intended section absent. Every known key
+    /// still resolves normally; [`crate::PolicyKeysCheck`] turns this
+    /// into a gate violation.
+    UnknownKey { key: String },
 }
 
 impl std::fmt::Display for PolicyDiagnostic {
@@ -231,6 +261,9 @@ impl std::fmt::Display for PolicyDiagnostic {
             }
             PolicyDiagnostic::InvalidSection { section, detail } => {
                 write!(f, "{section}: section is present but unusable ({detail}) — the owning check refuses rather than treating it as absent")
+            }
+            PolicyDiagnostic::UnknownKey { key } => {
+                write!(f, "{key}: unknown top-level key (known keys: {}) — the gate refuses rather than ignoring it", KNOWN_TOP_LEVEL_KEYS.join(", "))
             }
         }
     }
@@ -896,10 +929,16 @@ impl PolicyResolution {
 
 fn load_raw_policy(path: &Path, diagnostics: &mut Vec<PolicyDiagnostic>) -> RawPolicy {
     match std::fs::read_to_string(path) {
-        Ok(content) => serde_yaml::from_str(&content).unwrap_or_else(|e| {
-            diagnostics.push(PolicyDiagnostic::Malformed { path: path.to_path_buf(), detail: e.to_string() });
-            RawPolicy::default()
-        }),
+        Ok(content) => match serde_yaml::from_str(&content) {
+            Ok(raw) => {
+                diagnose_unknown_keys(&content, diagnostics);
+                raw
+            }
+            Err(e) => {
+                diagnostics.push(PolicyDiagnostic::Malformed { path: path.to_path_buf(), detail: e.to_string() });
+                RawPolicy::default()
+            }
+        },
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             diagnostics.push(PolicyDiagnostic::Missing { path: path.to_path_buf() });
             RawPolicy::default()
@@ -907,6 +946,23 @@ fn load_raw_policy(path: &Path, diagnostics: &mut Vec<PolicyDiagnostic>) -> RawP
         Err(e) => {
             diagnostics.push(PolicyDiagnostic::Malformed { path: path.to_path_buf(), detail: e.to_string() });
             RawPolicy::default()
+        }
+    }
+}
+
+/// One [`PolicyDiagnostic::UnknownKey`] per top-level key outside
+/// [`KNOWN_TOP_LEVEL_KEYS`], in file order. Only called once the file
+/// already parsed as a `RawPolicy`, so a non-mapping document never
+/// reaches here with keys to report.
+fn diagnose_unknown_keys(content: &str, diagnostics: &mut Vec<PolicyDiagnostic>) {
+    let Ok(serde_yaml::Value::Mapping(entries)) = serde_yaml::from_str::<serde_yaml::Value>(content) else { return };
+    for key in entries.keys() {
+        let key = match key {
+            serde_yaml::Value::String(key) => key.clone(),
+            other => serde_yaml::to_string(other).map(|rendered| rendered.trim_end().to_string()).unwrap_or_default(),
+        };
+        if !KNOWN_TOP_LEVEL_KEYS.contains(&key.as_str()) {
+            diagnostics.push(PolicyDiagnostic::UnknownKey { key });
         }
     }
 }
@@ -1497,5 +1553,62 @@ trust_required:
         let (resolution, _dir) = resolve_with("trust_required:\n  test-run: agent\nspec_coverage:\n  scope: [nonsense]\n");
         assert!(matches!(resolution.spec_coverage, Some(SpecCoverage::Invalid { .. })));
         assert!(resolution.trust_required.contains_key("test-run"), "the sibling section must survive: {:?}", resolution.trust_required.keys());
+    }
+
+    fn unknown_keys(resolution: &PolicyResolution) -> Vec<&str> {
+        resolution
+            .diagnostics
+            .iter()
+            .filter_map(|d| match d {
+                PolicyDiagnostic::UnknownKey { key } => Some(key.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// An unknown top-level key is a diagnostic naming the key and the
+    /// known keys; every known key still resolves.
+    #[test]
+    fn an_unknown_top_level_key_is_diagnosed_and_known_keys_still_resolve() {
+        let (resolution, _dir) = resolve_with("trust_required:\n  test-run: agent\nspec_coverag:\n  require_evidence: true\n42: x\n");
+        assert_eq!(unknown_keys(&resolution), vec!["spec_coverag", "42"]);
+        assert!(!resolution.is_clean());
+        assert!(resolution.trust_required.contains_key("test-run"));
+        assert_eq!(resolution.spec_coverage, None, "the misspelled section is not read as spec_coverage");
+        let rendered = resolution.diagnostics.iter().find(|d| matches!(d, PolicyDiagnostic::UnknownKey { .. })).unwrap().to_string();
+        assert_eq!(
+            rendered,
+            "spec_coverag: unknown top-level key (known keys: adapter_capabilities, allowed_signers, approval, experimental, query, risk_approvals, \
+             risk_routing, risk_tiers, schema, spec_coverage, staleness, trust_required, trust_sample) — the gate refuses rather than ignoring it"
+        );
+    }
+
+    #[test]
+    fn known_top_level_keys_are_sorted_and_none_is_diagnosed() {
+        assert!(KNOWN_TOP_LEVEL_KEYS.windows(2).all(|w| w[0] < w[1]));
+        let contents: String = KNOWN_TOP_LEVEL_KEYS.iter().map(|key| format!("{key}: {}\n", if *key == "schema" { "1" } else { "{}" })).collect();
+        let (resolution, _dir) = resolve_with(&contents);
+        assert_eq!(unknown_keys(&resolution), Vec::<&str>::new(), "{:?}", resolution.diagnostics);
+    }
+
+    /// Canon's own policy and every conformance fixture policy use only
+    /// known keys, so the strict check breaks none of them — except the
+    /// case that pins the unknown-key refusal itself.
+    #[test]
+    fn canon_and_conformance_policies_carry_no_unknown_key() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut repos = vec![root.clone()];
+        for case in std::fs::read_dir(root.join("conformance/cases")).unwrap() {
+            let case = case.unwrap().path();
+            let repo = case.join("repo");
+            if case.file_name().is_some_and(|name| name != "gate-check-unknown-policy-key") && repo.join(POLICY_YAML_RELATIVE_PATH).is_file() {
+                repos.push(repo);
+            }
+        }
+        assert!(repos.len() > 1, "conformance fixtures with a policy.yaml must be found");
+        for repo in repos {
+            let resolution = PolicyResolution::resolve(&repo, &SchemaRegistry::load());
+            assert_eq!(unknown_keys(&resolution), Vec::<&str>::new(), "{}", repo.display());
+        }
     }
 }

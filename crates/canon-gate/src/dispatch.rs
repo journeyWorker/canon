@@ -61,6 +61,8 @@ pub fn check_set(release: bool) -> Vec<Box<dyn GateCheck>> {
         // Experimental, silent unless `experimental.evidence_binding`
         // is present (and only fails the gate in `mode: require`).
         Box::new(crate::evidence_binding::EvidenceBindingCheck),
+        // Silent unless `policy.yaml` carries an unknown top-level key.
+        Box::new(crate::policy_keys::PolicyKeysCheck),
     ];
     if release {
         checks.push(Box::new(ReleaseTrustCheck));
@@ -86,7 +88,8 @@ mod tests {
         assert!(!checks.iter().any(|c| c.name() == "release-trust-required"));
         assert!(checks.iter().any(|c| c.name() == "spec-coverage"), "s44's check is unconditionally REGISTERED; it is silent by policy, not by omission");
         assert!(checks.iter().any(|c| c.name() == "evidence-binding"), "registered always; off by policy, not by omission");
-        assert_eq!(checks.len(), 7);
+        assert!(checks.iter().any(|c| c.name() == "policy-keys"));
+        assert_eq!(checks.len(), 8);
     }
 
     #[test]
@@ -94,7 +97,7 @@ mod tests {
         let checks = check_set(true);
         assert!(checks.iter().any(|c| c.name() == "trust-ladder"), "a release profile must never drop the always-on trust-ladder check");
         assert!(checks.iter().any(|c| c.name() == "release-trust-required"));
-        assert_eq!(checks.len(), 8);
+        assert_eq!(checks.len(), 9);
     }
 
     #[test]

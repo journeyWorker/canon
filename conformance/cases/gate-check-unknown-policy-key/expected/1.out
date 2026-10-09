@@ -1,0 +1,4 @@
+canon gate check: 1 violation(s)
+
+uncovered-cell (1):
+  uncovered-cell spec_coverag — `spec_coverag` is not a known top-level policy.yaml key (known keys: adapter_capabilities, allowed_signers, approval, experimental, query, risk_approvals, risk_routing, risk_tiers, schema, spec_coverage, staleness, trust_required, trust_sample); fix it or remove it — an unknown key is never silently ignored

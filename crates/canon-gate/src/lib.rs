@@ -54,6 +54,7 @@ pub mod hooks;
 pub mod ledger;
 pub mod markers;
 pub mod policy;
+pub mod policy_keys;
 pub mod promote;
 pub mod report;
 pub mod review_gate;
@@ -77,8 +78,9 @@ pub use markers::{evidence_note_of, scan_fake_markers, EvidenceNote, FABRICATION
 pub use evidence_binding::{binding_summary, strength_of, BindingGap, BindingSummary, EvidenceBindingCheck};
 pub use policy::{
     allowed_signers_path, BindingMode, BindingStrength, EvidenceBinding, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError,
-    RequireReview, RiskTierRule, SpecCoverage, StalenessPolicy,
+    RequireReview, RiskTierRule, SpecCoverage, StalenessPolicy, KNOWN_TOP_LEVEL_KEYS,
 };
+pub use policy_keys::PolicyKeysCheck;
 pub use review_gate::{review_advisories, ReviewAdvisory};
 pub use promote::{
     commit_divergence, divergence_staging_dir, promote, promote_divergence, stage_divergence, DivergenceCandidate, Promoted, PromoteReport, Refused, RunSeqAssignment,

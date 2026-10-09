@@ -1,0 +1,4 @@
+trust_required:
+  test-run: agent
+spec_coverag:
+  require_evidence: true
