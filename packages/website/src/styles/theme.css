@@ -1,121 +1,144 @@
-/* canon docs — Grid Manual, applied to Starlight through its documented
-   custom properties plus a few element overrides. Tokens: tokens.css. */
+/* canon docs — Checks Panel, applied to Starlight through its documented
+   custom properties plus a few element overrides. Tokens: tokens.css.
+   Dark is the designed world; light stays available and readable. Lines are
+   horizontal rules and panel edges only. */
 
 @import "./tokens.css";
 
 /* ---------- Palette ---------- */
 
-/* Dark: the same manual printed in reverse. */
 :root {
   --sl-font: var(--f-sans);
   --sl-font-mono: var(--f-mono);
 
-  --sl-color-white: #f0f3f0;
-  --sl-color-gray-1: #e2e2dc;
-  --sl-color-gray-2: #c9c9c2;
-  --sl-color-gray-3: #a0a09a;
-  --sl-color-gray-4: #6d6d68;
-  --sl-color-gray-5: #3a3a37;
-  --sl-color-gray-6: #1a1a19;
-  --sl-color-black: #0b0b0b;
+  --sl-color-white: #f0f6fc;
+  --sl-color-gray-1: #e6edf3;
+  --sl-color-gray-2: #d1d9e0;
+  --sl-color-gray-3: #9198a1;
+  --sl-color-gray-4: #6e7681;
+  --sl-color-gray-5: #30363d;
+  --sl-color-gray-6: #151b23;
+  --sl-color-black: #0d1117;
 
-  --sl-color-accent-low: #3a160b;
-  --sl-color-accent: var(--c-signal);
-  --sl-color-accent-high: #ffb59f;
+  --sl-color-accent-low: #262c36;
+  --sl-color-accent: #9198a1;
+  --sl-color-accent-high: #f0f6fc;
 
-  --sl-color-text: var(--sl-color-gray-1);
-  --sl-color-text-accent: var(--sl-color-white);
-  --sl-color-text-invert: var(--c-ink);
-  --sl-color-bg: var(--sl-color-black);
-  --sl-color-bg-nav: var(--sl-color-black);
-  --sl-color-bg-sidebar: var(--sl-color-black);
-  --sl-color-bg-inline-code: var(--sl-color-gray-6);
-  --sl-color-bg-accent: var(--c-signal);
-  --sl-color-hairline-light: var(--sl-color-gray-5);
-  --sl-color-hairline: var(--sl-color-gray-4);
-  --sl-color-hairline-shade: var(--sl-color-white);
+  --sl-color-text: #d1d9e0;
+  --sl-color-text-accent: #f0f6fc;
+  --sl-color-text-invert: #0d1117;
+  --sl-color-bg: #0d1117;
+  --sl-color-bg-nav: #0d1117;
+  --sl-color-bg-sidebar: #0d1117;
+  --sl-color-bg-inline-code: #1d242d;
+  --sl-color-bg-accent: #f0f6fc;
+  --sl-color-hairline-light: #30363d;
+  --sl-color-hairline: #232a32;
+  --sl-color-hairline-shade: #010409;
 
-  --docs-rule: #2a2a28;
-  --docs-strong-rule: var(--sl-color-white);
+  --sl-color-green: var(--c-pass);
+  --sl-color-green-low: #12261b;
+  --sl-color-green-high: #aff5b4;
+  --sl-color-orange: var(--c-pending);
+  --sl-color-orange-low: #2b2111;
+  --sl-color-orange-high: #f8e3a1;
+  --sl-color-red: var(--c-fail);
+  --sl-color-red-low: #2a1416;
+  --sl-color-red-high: #ffc1bc;
+  --sl-color-blue: #9198a1;
+  --sl-color-blue-low: #1b222c;
+  --sl-color-blue-high: #e6edf3;
+  --sl-color-purple: #9198a1;
+  --sl-color-purple-low: #1b222c;
+  --sl-color-purple-high: #e6edf3;
 
-  --sl-shadow-sm: none;
-  --sl-shadow-md: none;
-  --sl-shadow-lg: none;
+  --sl-color-backdrop-overlay: rgba(1, 4, 9, 0.72);
 
-  --sl-text-h1: clamp(2.5rem, 4vw, 3.5rem);
-  --sl-text-h2: 2rem;
-  --sl-text-h3: 1.5rem;
-  --sl-text-h4: 1.25rem;
-  --sl-line-height: 1.65;
-  --sl-line-height-headings: 1.1;
-  --sl-content-width: 46rem;
+  --sl-shadow-sm: 0 1px 2px rgba(1, 4, 9, 0.4);
+  --sl-shadow-md: 0 8px 24px rgba(1, 4, 9, 0.5);
+  --sl-shadow-lg: 0 16px 40px rgba(1, 4, 9, 0.6);
+
+  --docs-panel: #151b23;
+  --docs-inset: #0a0d12;
+  --docs-rule: #30363d;
+  --docs-rule-soft: #232a32;
+  --docs-link-line: #59636e;
 }
 
-/* Light (the default world): white stock, black ink, one signal orange. */
 :root[data-theme="light"] {
-  --sl-color-white: var(--c-ink);
-  --sl-color-gray-1: #1e1e1c;
-  --sl-color-gray-2: #2f2f2c;
-  --sl-color-gray-3: var(--c-ink-2);
-  --sl-color-gray-4: #85857f;
-  --sl-color-gray-5: #c4c4be;
-  --sl-color-gray-6: #e6e6e0;
-  --sl-color-gray-7: #ecece7;
-  --sl-color-black: var(--c-ground);
+  color-scheme: light;
 
-  --sl-color-accent-low: #ffd9cd;
-  --sl-color-accent: var(--c-signal);
-  --sl-color-accent-high: #8f2200;
+  --sl-color-white: #1f2328;
+  --sl-color-gray-1: #1f2328;
+  --sl-color-gray-2: #31373d;
+  --sl-color-gray-3: #59636e;
+  --sl-color-gray-4: #818b98;
+  --sl-color-gray-5: #d1d9e0;
+  --sl-color-gray-6: #eff2f5;
+  --sl-color-gray-7: #f6f8fa;
+  --sl-color-black: #ffffff;
 
-  --sl-color-text: var(--sl-color-gray-1);
-  --sl-color-text-accent: var(--c-ink);
-  --sl-color-text-invert: var(--c-ink);
-  --sl-color-bg: var(--c-ground);
-  --sl-color-bg-nav: var(--c-ground);
-  --sl-color-bg-sidebar: var(--c-ground);
-  --sl-color-bg-inline-code: #e4e4de;
-  --sl-color-bg-accent: var(--c-signal);
-  --sl-color-hairline-light: var(--c-rule-soft);
-  --sl-color-hairline: var(--c-rule);
-  --sl-color-hairline-shade: var(--c-ink);
+  --sl-color-accent-low: #eef1f4;
+  --sl-color-accent: #59636e;
+  --sl-color-accent-high: #1f2328;
 
-  --docs-rule: var(--c-rule-soft);
-  --docs-strong-rule: var(--c-ink);
+  --sl-color-text: #1f2328;
+  --sl-color-text-accent: #1f2328;
+  --sl-color-text-invert: #ffffff;
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #ffffff;
+  --sl-color-bg-sidebar: #ffffff;
+  --sl-color-bg-inline-code: #eff2f5;
+  --sl-color-bg-accent: #1f2328;
+  --sl-color-hairline-light: #d1d9e0;
+  --sl-color-hairline: #d1d9e0;
+  --sl-color-hairline-shade: #d1d9e0;
+
+  --sl-color-green: #1a7f37;
+  --sl-color-green-low: #dafbe1;
+  --sl-color-green-high: #116329;
+  --sl-color-orange: #9a6700;
+  --sl-color-orange-low: #fff8c5;
+  --sl-color-orange-high: #7d4e00;
+  --sl-color-red: #cf222e;
+  --sl-color-red-low: #ffebe9;
+  --sl-color-red-high: #a40e26;
+  --sl-color-blue: #59636e;
+  --sl-color-blue-low: #f6f8fa;
+  --sl-color-blue-high: #1f2328;
+  --sl-color-purple: #59636e;
+  --sl-color-purple-low: #f6f8fa;
+  --sl-color-purple-high: #1f2328;
+
+  --sl-color-backdrop-overlay: rgba(31, 35, 40, 0.45);
+
+  --sl-shadow-sm: 0 1px 2px rgba(31, 35, 40, 0.08);
+  --sl-shadow-md: 0 8px 24px rgba(31, 35, 40, 0.12);
+  --sl-shadow-lg: 0 16px 40px rgba(31, 35, 40, 0.16);
+
+  --docs-panel: #f6f8fa;
+  --docs-inset: #f6f8fa;
+  --docs-rule: #d1d9e0;
+  --docs-rule-soft: #e4e8ec;
+  --docs-link-line: #818b98;
 }
 
 ::selection {
-  background: var(--c-signal);
-  color: var(--c-ink);
+  background: rgba(145, 152, 161, 0.35);
 }
 
 :focus-visible {
-  outline-color: var(--c-signal);
+  outline-color: var(--sl-color-white);
 }
-
-/* ---------- Column rules behind the reading area ---------- */
 
 body {
   -webkit-font-smoothing: antialiased;
-  font-kerning: normal;
+  -moz-osx-font-smoothing: grayscale;
+  scrollbar-color: var(--sl-color-gray-5) var(--sl-color-bg);
 }
 
-.main-frame {
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--docs-rule) 0 1px,
-    transparent 1px calc((100vw - 2rem) / 12)
-  );
-  background-position: 1rem 0;
-}
-
-@media (max-width: 50rem) {
-  .main-frame {
-    background-image: repeating-linear-gradient(
-      to right,
-      var(--docs-rule) 0 1px,
-      transparent 1px calc((100vw - 2rem) / 4)
-    );
-  }
+.sl-markdown-content {
+  line-height: 1.7;
 }
 
 :lang(ko) .sl-markdown-content {
@@ -126,36 +149,31 @@ body {
 /* ---------- Header ---------- */
 
 header.header {
-  border-bottom: 1.5px solid var(--docs-strong-rule);
+  border-bottom: 1px solid var(--docs-rule);
 }
 
 .site-title {
   font-weight: 700;
-  font-size: 1.625rem;
-  letter-spacing: -0.035em;
+  font-size: 1.5rem;
+  letter-spacing: -0.03em;
   color: var(--sl-color-white);
 }
 
 site-search button[data-open-modal] {
-  border-radius: 0;
-  border: 1px solid var(--sl-color-hairline);
-  background: transparent;
-  color: var(--sl-color-gray-2);
+  background: var(--docs-panel);
+  border: 1px solid var(--docs-rule);
+  border-radius: var(--radius-sm);
+  color: var(--sl-color-gray-3);
 }
 
 site-search button[data-open-modal]:hover {
-  border-color: var(--sl-color-white);
+  border-color: var(--sl-color-gray-4);
   color: var(--sl-color-white);
 }
 
 site-search kbd {
-  border-radius: 0;
-  font-family: var(--sl-font-mono);
-}
-
-mobile-starlight-toc .toggle,
-starlight-menu-button button {
-  border-radius: 0;
+  border-radius: 4px;
+  font-family: var(--f-mono);
 }
 
 starlight-theme-select select,
@@ -166,106 +184,113 @@ starlight-lang-select select {
 /* ---------- Sidebar ---------- */
 
 .sidebar-pane {
-  border-inline-end: 1px solid var(--sl-color-hairline);
+  border-inline-end: 0;
 }
 
 .sidebar-content a {
-  border-radius: 0;
-  font-size: 0.9375rem;
+  border-radius: var(--radius-sm);
 }
 
 .sidebar-content a[aria-current="page"],
 .sidebar-content a[aria-current="page"]:hover,
 .sidebar-content a[aria-current="page"]:focus {
-  background: var(--c-signal);
-  color: var(--c-ink);
+  background: var(--sl-color-accent-low);
+  color: var(--sl-color-white);
   font-weight: 600;
 }
 
 .sidebar-content .group-label .large,
 .sidebar-content .top-level > li > a .large {
-  font-family: var(--sl-font);
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  font-weight: 650;
+  color: var(--sl-color-white);
 }
 
 /* ---------- Page title and headings ---------- */
 
 .content-panel {
-  border-top-color: var(--sl-color-hairline);
+  border-top-color: var(--docs-rule-soft);
 }
 
 h1#_top {
   font-weight: 700;
-  letter-spacing: -0.035em;
-  line-height: 1.04;
-  -webkit-text-stroke: 0.01em currentColor;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--sl-color-white);
 }
 
 .sl-markdown-content :is(h1, h2, h3, h4, h5, h6) {
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-weight: 650;
+  letter-spacing: -0.015em;
   color: var(--sl-color-white);
 }
 
-/* h2 opens a section under a full-width black rule, as on the landing. */
+/* h2 opens a section under a horizontal rule, as a README does. */
 .sl-markdown-content .sl-heading-wrapper.level-h2,
 .sl-markdown-content h2:not(.sl-heading-wrapper > h2) {
-  margin-top: 3rem;
-  padding-top: 0.875rem;
-  border-top: 1.5px solid var(--docs-strong-rule);
+  margin-top: 2.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--docs-rule-soft);
 }
 
-.sl-markdown-content h2 {
-  letter-spacing: -0.03em;
-}
-
-:lang(ko) :is(h1#_top, .sl-markdown-content :is(h1, h2, h3, h4)) {
-  letter-spacing: -0.015em;
-  word-break: keep-all;
-}
-
-.sl-markdown-content a {
-  color: var(--sl-color-white);
-  text-underline-offset: 0.2em;
+.sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--sl-color-text-accent);
+  text-decoration: underline;
+  text-decoration-color: var(--docs-link-line);
   text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
 }
 
-.sl-markdown-content a:hover {
-  text-decoration-thickness: 2px;
-  text-decoration-color: var(--c-signal);
+.sl-markdown-content a:hover:not(:where(.not-content *)) {
+  color: var(--sl-color-white);
+  text-decoration-color: currentColor;
 }
 
 /* ---------- Inline code, tables, rules ---------- */
 
+.sl-markdown-content td:first-child code {
+  white-space: nowrap;
+}
+
 .sl-markdown-content code:not(pre code) {
-  border-radius: 0;
-  padding: 0.1em 0.3em;
-  font-size: 0.92em;
+  border-radius: 5px;
+  font-size: 0.875em;
   color: var(--sl-color-white);
 }
 
+/* Tables: horizontal rules only, the header on the panel tone. */
 .sl-markdown-content table {
-  border-collapse: collapse;
-  font-size: var(--sl-text-sm);
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--docs-rule);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  line-height: 1.55;
 }
 
 .sl-markdown-content :is(th, td) {
-  padding: 0.625rem 0.875rem 0.75rem;
+  padding: 0.6rem 0.85rem;
   border: 0;
-  border-top: 1px solid var(--docs-strong-rule);
+  border-bottom: 1px solid var(--docs-rule-soft);
   vertical-align: top;
 }
 
 .sl-markdown-content thead th {
-  border-top-width: 2px;
-  font-family: var(--sl-font-mono);
-  font-weight: 400;
-  font-size: var(--sl-text-sm);
+  background: var(--docs-panel);
+  font-weight: 650;
+  color: var(--sl-color-white);
+  border-bottom-color: var(--docs-rule);
+}
+
+.sl-markdown-content thead th:first-child {
+  border-start-start-radius: calc(var(--radius-md) - 1px);
+}
+
+.sl-markdown-content thead th:last-child {
+  border-start-end-radius: calc(var(--radius-md) - 1px);
 }
 
 .sl-markdown-content tbody tr:last-child > * {
-  border-bottom: 1px solid var(--docs-strong-rule);
+  border-bottom: 0;
 }
 
 .sl-markdown-content tr:nth-child(2n) {
@@ -273,14 +298,18 @@ h1#_top {
 }
 
 .sl-markdown-content hr {
-  border-top: 1.5px solid var(--docs-strong-rule);
+  border-top: 1px solid var(--docs-rule);
 }
 
 .sl-markdown-content blockquote {
-  border-inline-start: 1px solid var(--docs-strong-rule);
+  border-inline-start: 0;
+  padding: 0.75rem 1rem;
+  background: var(--docs-panel);
+  border-radius: var(--radius-sm);
+  color: var(--sl-color-gray-2);
 }
 
-/* ---------- Code: untitled terminal frames drop their empty title bar ---------- */
+/* ---------- Code ---------- */
 
 .expressive-code .frame.is-terminal:not(.has-title) .header {
   display: none;
@@ -290,72 +319,87 @@ h1#_top {
   border-top: 0;
 }
 
-:root[data-theme="dark"] .expressive-code .frame {
-  outline: 1px solid var(--sl-color-gray-5);
-}
-
-/* ---------- Asides: a ruled box, the label set in mono ---------- */
+/* ---------- Asides: a bordered panel, the state in its title ---------- */
 
 .starlight-aside {
-  border: 1px solid var(--docs-strong-rule);
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid var(--docs-rule);
+  border-radius: var(--radius-md);
+  background: var(--docs-panel);
 }
 
 .starlight-aside__title {
-  font-family: var(--sl-font-mono);
-  font-weight: 400;
+  font-weight: 650;
+}
+
+.starlight-aside--note,
+.starlight-aside--tip {
+  border-color: var(--docs-rule);
+}
+
+.starlight-aside--note .starlight-aside__title,
+.starlight-aside--note .starlight-aside__icon {
   color: var(--sl-color-white);
 }
 
-.starlight-aside__icon {
-  color: var(--sl-color-white);
+.starlight-aside--tip .starlight-aside__title,
+.starlight-aside--tip .starlight-aside__icon {
+  color: var(--sl-color-green);
 }
 
-.starlight-aside--caution,
+.starlight-aside--caution {
+  border-color: color-mix(in srgb, var(--sl-color-orange) 45%, var(--docs-rule));
+  background: var(--sl-color-orange-low);
+}
+
+.starlight-aside--caution .starlight-aside__title,
+.starlight-aside--caution .starlight-aside__icon {
+  color: var(--sl-color-orange);
+}
+
 .starlight-aside--danger {
-  background: var(--c-signal);
-  border-color: var(--c-signal);
-  color: var(--c-ink);
+  border-color: color-mix(in srgb, var(--sl-color-red) 45%, var(--docs-rule));
+  background: var(--sl-color-red-low);
 }
 
-.starlight-aside--caution :is(.starlight-aside__title, .starlight-aside__icon, a, code),
-.starlight-aside--danger :is(.starlight-aside__title, .starlight-aside__icon, a, code) {
-  color: var(--c-ink);
+.starlight-aside--danger .starlight-aside__title,
+.starlight-aside--danger .starlight-aside__icon {
+  color: var(--sl-color-red);
 }
 
 /* ---------- Cards and steps ---------- */
 
 .card {
-  border: 1px solid var(--docs-strong-rule);
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid var(--docs-rule);
+  border-radius: var(--radius-md);
+  background: var(--docs-panel);
   box-shadow: none;
 }
 
 .card .icon {
-  border-radius: 0;
-  border: 0;
-  background: var(--c-signal);
-  color: var(--c-ink);
+  border: 1px solid var(--docs-rule);
+  border-radius: var(--radius-sm);
+  background: var(--sl-color-bg);
+  color: var(--sl-color-white);
 }
 
 .card .title {
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 650;
+  color: var(--sl-color-white);
 }
 
 .sl-steps > li::before {
-  border-radius: 0;
-  font-family: var(--sl-font-mono);
-  background: var(--sl-color-white);
-  color: var(--sl-color-black);
-  border: 0;
+  border-radius: 50%;
+  background: var(--docs-panel);
+  border: 1px solid var(--docs-rule);
+  color: var(--sl-color-white);
+  font-family: var(--sl-font);
+  font-weight: 650;
 }
 
 .sl-steps > li::after {
-  width: 1px;
-  background: var(--docs-strong-rule);
+  background: var(--docs-rule-soft);
+  width: 2px;
+  border-radius: 1px;
 }
 
 /* ---------- Table of contents, pagination ---------- */
@@ -364,33 +408,25 @@ starlight-toc a[aria-current="true"],
 starlight-toc a[aria-current="true"]:hover {
   color: var(--sl-color-white);
   font-weight: 600;
-  text-decoration: underline;
-  text-decoration-color: var(--c-signal);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 0.25em;
 }
 
 .right-sidebar {
-  border-inline-start-color: var(--sl-color-hairline);
+  border-inline-start: 0;
 }
 
 .pagination-links a {
-  border-radius: 0;
-  border: 1px solid var(--docs-strong-rule);
+  border: 1px solid var(--docs-rule);
+  border-radius: var(--radius-md);
   box-shadow: none;
+  background: var(--sl-color-bg);
 }
 
 .pagination-links a:hover {
-  background: var(--c-signal);
-  border-color: var(--c-signal);
-  color: var(--c-ink);
-}
-
-.pagination-links a:hover .link-title {
-  color: var(--c-ink);
+  border-color: var(--sl-color-gray-4);
+  background: var(--docs-panel);
 }
 
 .pagination-links .link-title {
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  color: var(--sl-color-white);
+  font-weight: 650;
 }

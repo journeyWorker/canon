@@ -1,10 +1,10 @@
 {
   "tool": "build-phase",
   "version": 2,
-  "startedAt": "2026-10-08T17:08:18.322Z",
-  "comp": ".impeccable/comps/landing.png",
+  "startedAt": "2026-10-09T04:18:08.253Z",
+  "comp": ".impeccable/comps/landing-pr.png",
   "direction": null,
-  "breakpoint": "1536x1024",
+  "breakpoint": "1774x887",
   "artifact": null,
   "phase": "review",
   "phases": {
@@ -15,7 +15,7 @@
       "attempts": 0,
       "notes": [
         {
-          "at": "2026-10-08T17:08:18.322Z",
+          "at": "2026-10-09T04:18:08.253Z",
           "text": "started with an approved comp; the comp round happened before this state (surface round or manual)"
         }
       ],
@@ -24,208 +24,311 @@
     },
     "spec": {
       "status": "closed",
-      "openedAt": "2026-10-08T17:08:18.321Z",
-      "closedAt": "2026-10-08T17:14:13.515Z",
-      "attempts": 1,
+      "openedAt": "2026-10-09T04:18:08.252Z",
+      "closedAt": "2026-10-09T04:22:19.288Z",
+      "attempts": 2,
       "notes": [],
       "gate": {
         "ok": true,
         "reasons": [],
-        "summary": "13 regions, 0 plates, 6 text regions measured",
-        "at": "2026-10-08T17:14:13.515Z"
+        "summary": "16 regions, 0 plates, 9 text regions measured",
+        "at": "2026-10-09T04:22:19.288Z"
       },
       "forced": null
     },
     "plates": {
       "status": "closed",
-      "openedAt": "2026-10-08T17:14:13.515Z",
-      "closedAt": "2026-10-08T17:14:15.724Z",
+      "openedAt": "2026-10-09T04:22:19.288Z",
+      "closedAt": "2026-10-09T04:22:29.092Z",
       "attempts": 1,
       "notes": [],
       "gate": {
         "ok": true,
         "reasons": [],
         "summary": "no plates owed",
-        "at": "2026-10-08T17:14:15.724Z"
+        "at": "2026-10-09T04:22:29.092Z"
       },
       "forced": null
     },
     "hero": {
       "status": "closed",
-      "openedAt": "2026-10-08T17:14:15.724Z",
-      "closedAt": "2026-10-08T17:24:21.453Z",
-      "attempts": 3,
+      "openedAt": "2026-10-09T04:22:29.092Z",
+      "closedAt": "2026-10-09T05:06:24.911Z",
+      "attempts": 10,
       "notes": [],
       "gate": {
         "ok": true,
         "reasons": [],
-        "summary": "hero 83% (match)",
-        "score": 0.8259,
+        "summary": "hero 95% (match)",
+        "score": 0.9543,
         "verdict": "match",
         "report": ".impeccable/review/diff/hero/report.json",
-        "sideBySide": "/Users/journey/Workspace/canon/packages/website/.impeccable/review/diff/hero/side-by-side.png",
+        "sideBySide": "/Users/journey/Workspace/canon-0.13-web/packages/website/.impeccable/review/diff/hero/side-by-side.png",
         "worst": [
-          "subline drift 66%",
-          "fig-total drift 67%",
-          "fig-chart drift 67%"
+          "headline drift 67%",
+          "wordmark drift 73%",
+          "check-cargo drift 76%"
         ],
         "worstIds": [
-          "subline",
-          "fig-total",
-          "fig-chart"
+          "headline",
+          "wordmark",
+          "check-cargo"
         ],
         "worstCrops": [
           {
-            "id": "subline",
+            "id": "headline",
             "verdict": "drift",
             "score": {
-              "overall": 0.6581,
-              "structure": 0.6669,
-              "color": 0.5759,
-              "colorIntersection": 0.2191,
-              "paletteMatch": 0.768,
-              "detail": 0.7319,
-              "detailRaw": 0.758,
+              "overall": 0.6739,
+              "structure": 0.5216,
+              "color": 0.8209,
+              "colorIntersection": 0.681,
+              "paletteMatch": 0.8962,
+              "detail": 0.7597,
+              "detailRaw": 0.7858,
               "detailAdded": 0.0521,
-              "bands": 0.7086
+              "bands": 0.9396
             },
-            "file": ".impeccable/review/diff/hero/regions/subline.png"
+            "file": ".impeccable/review/diff/hero/regions/headline.png"
           },
           {
-            "id": "fig-total",
+            "id": "wordmark",
             "verdict": "drift",
             "score": {
-              "overall": 0.6651,
-              "structure": 0.4925,
-              "color": 0.8801,
-              "colorIntersection": 0.7719,
-              "paletteMatch": 0.9384,
-              "detail": 0.7698,
-              "detailRaw": 0.7906,
-              "detailAdded": 0.0417,
-              "bands": 0.8333
+              "overall": 0.7313,
+              "structure": 0.6753,
+              "color": 0.7498,
+              "colorIntersection": 0.5833,
+              "paletteMatch": 0.8394,
+              "detail": 0.7081,
+              "detailRaw": 0.7186,
+              "detailAdded": 0.0208,
+              "bands": 1
             },
-            "file": ".impeccable/review/diff/hero/regions/fig-total.png"
+            "file": ".impeccable/review/diff/hero/regions/wordmark.png"
           },
           {
-            "id": "fig-chart",
+            "id": "check-cargo",
             "verdict": "drift",
             "score": {
-              "overall": 0.673,
-              "structure": 0.6542,
-              "color": 0.625,
-              "colorIntersection": 0.3657,
-              "paletteMatch": 0.7646,
-              "detail": 0.5723,
-              "detailRaw": 0.6296,
-              "detailAdded": 0.1146,
-              "bands": 0.9647
+              "overall": 0.7594,
+              "structure": 0.7687,
+              "color": 0.8653,
+              "colorIntersection": 0.7509,
+              "paletteMatch": 0.9269,
+              "detail": 0.6866,
+              "detailRaw": 0.7335,
+              "detailAdded": 0.0938,
+              "bands": 0.5571
             },
-            "file": ".impeccable/review/diff/hero/regions/fig-chart.png"
+            "file": ".impeccable/review/diff/hero/regions/check-cargo.png"
           }
         ],
         "advisories": [
           "(advisory, above the 72% bar; fix in the polish pass before responsive) 2 readings:",
-          "  text wordmark: ink is #090909 in the build, #f3f3f3 in the comp; use the comp's colour",
-          "  text fig-caption: ink is #5d2012 in the build, #0f0808 in the comp; use the comp's colour"
+          "  text command-text: ink is #c4d5e5 in the build, #3c4651 in the comp; use the comp's colour",
+          "  control merge-badge: its rule sits 22px into the box in the comp and 33px in the build (+11px), so the strip is taller than the comp's; match the height, not only the position"
         ],
         "regionVerdicts": {
-          "column-rules": "match",
           "wordmark": "drift",
-          "nav": "drift",
+          "nav": "match",
           "headline": "drift",
-          "subline": "drift",
-          "command": "match",
-          "guide-link": "drift",
-          "fig-caption": "match",
-          "fig-chart": "drift",
-          "fig-panel": "drift",
-          "fig-total": "drift",
-          "stations-rule": "drift",
-          "stations": "match"
+          "command-field": "match",
+          "command-text": "match",
+          "copy-button": "drift",
+          "pr-panel": "match",
+          "pr-branch": "drift",
+          "merge-badge": "drift",
+          "check-cargo": "drift",
+          "check-lint": "match",
+          "check-gate": "match",
+          "gate-log": "match",
+          "gate-log-text": "match",
+          "check-deploy": "drift",
+          "chevrons": "match"
         },
-        "at": "2026-10-08T17:24:21.452Z"
+        "at": "2026-10-09T05:06:24.911Z"
       },
       "forced": null,
       "readingsSeen": {
-        "text wordmark: ink is #181818 in the build, #f3f3f3 in the comp; use the comp's colour": 2,
-        "text fig-total: ink is #181818 in the build, #f74d19 in the comp; use the comp's colour": 2,
-        "text wordmark: ink is #090909 in the build, #f3f3f3 in the comp; use the comp's colour": 1,
-        "text fig-caption: ink is #5d2012 in the build, #0f0808 in the comp; use the comp's colour": 1
+        "text command-text: ink is #c7d6e4 in the build, #3c4651 in the comp; use the comp's colour": 7,
+        "control merge-badge: its rule sits 22px into the box in the comp and 1px in the build (-21px), so the strip is shorter than the comp's; match the height, not only the position": 12,
+        "chrome gate-log: its ink is 95px tall in the build and 45px in the comp (+50px); match the height, not only the position": 4,
+        "chrome gate-log: its rule sits 35px into the box in the comp and 101px in the build (+66px), so the strip is taller than the comp's; match the height, not only the position": 2,
+        "text gate-log-text: cap height 10.2px in the build, 14.6px in the comp (-30%); set font-size so the cap height renders at 14.6px": 1,
+        "chrome gate-log: its rule sits 35px into the box in the comp and 3px in the build (-32px), so the strip is shorter than the comp's; match the height, not only the position": 6,
+        "text gate-log-text: cap height 11.2px in the build, 14.6px in the comp (-23%); set font-size so the cap height renders at 14.6px": 2,
+        "text command-text: ink is #c5d3e2 in the build, #3c4651 in the comp; use the comp's colour": 5,
+        "text command-text: ink is #c4d5e5 in the build, #3c4651 in the comp; use the comp's colour": 1,
+        "control merge-badge: its rule sits 22px into the box in the comp and 33px in the build (+11px), so the strip is taller than the comp's; match the height, not only the position": 1
       },
+      "records": 3,
       "history": [
         {
-          "at": "2026-10-08T17:21:16.864Z",
-          "score": 0.8069,
+          "at": "2026-10-09T04:40:01.878Z",
+          "score": 0.9127,
           "worstIds": [
-            "guide-link",
-            "command",
-            "fig-total"
+            "gate-log",
+            "check-deploy",
+            "gate-log-text"
           ],
           "regionVerdicts": {
-            "column-rules": "match",
             "wordmark": "drift",
-            "nav": "drift",
+            "nav": "match",
             "headline": "drift",
-            "subline": "drift",
-            "command": "drift",
-            "guide-link": "drift",
-            "fig-caption": "match",
-            "fig-chart": "drift",
-            "fig-panel": "drift",
-            "fig-total": "drift",
-            "stations-rule": "drift",
-            "stations": "match"
+            "command-field": "drift",
+            "command-text": "drift",
+            "copy-button": "drift",
+            "pr-panel": "drift",
+            "pr-branch": "drift",
+            "merge-badge": "drift",
+            "check-cargo": "drift",
+            "check-lint": "drift",
+            "check-gate": "drift",
+            "gate-log": "contradicted",
+            "gate-log-text": "contradicted",
+            "check-deploy": "contradicted",
+            "chevrons": "drift"
           },
           "artifactHash": null
         },
         {
-          "at": "2026-10-08T17:22:04.131Z",
-          "score": 0.8089,
+          "at": "2026-10-09T04:40:19.835Z",
+          "score": 0.8992,
           "worstIds": [
-            "command",
-            "fig-total",
-            "subline"
+            "gate-log-text",
+            "gate-log",
+            "copy-button"
           ],
           "regionVerdicts": {
-            "column-rules": "match",
             "wordmark": "drift",
-            "nav": "drift",
+            "nav": "match",
             "headline": "drift",
-            "subline": "drift",
-            "command": "drift",
-            "guide-link": "drift",
-            "fig-caption": "match",
-            "fig-chart": "drift",
-            "fig-panel": "drift",
-            "fig-total": "drift",
-            "stations-rule": "drift",
-            "stations": "match"
+            "command-field": "drift",
+            "command-text": "drift",
+            "copy-button": "drift",
+            "pr-panel": "drift",
+            "pr-branch": "drift",
+            "merge-badge": "drift",
+            "check-cargo": "drift",
+            "check-lint": "drift",
+            "check-gate": "drift",
+            "gate-log": "contradicted",
+            "gate-log-text": "contradicted",
+            "check-deploy": "drift",
+            "chevrons": "drift"
           },
           "artifactHash": null
         },
         {
-          "at": "2026-10-08T17:24:21.453Z",
-          "score": 0.8259,
+          "at": "2026-10-09T04:58:22.436Z",
+          "score": 0.9168,
           "worstIds": [
-            "subline",
-            "fig-total",
-            "fig-chart"
+            "check-deploy",
+            "gate-log",
+            "pr-branch"
           ],
           "regionVerdicts": {
-            "column-rules": "match",
             "wordmark": "drift",
-            "nav": "drift",
+            "nav": "match",
             "headline": "drift",
-            "subline": "drift",
-            "command": "match",
-            "guide-link": "drift",
-            "fig-caption": "match",
-            "fig-chart": "drift",
-            "fig-panel": "drift",
-            "fig-total": "drift",
-            "stations-rule": "drift",
-            "stations": "match"
+            "command-field": "match",
+            "command-text": "match",
+            "copy-button": "drift",
+            "pr-panel": "match",
+            "pr-branch": "drift",
+            "merge-badge": "drift",
+            "check-cargo": "drift",
+            "check-lint": "drift",
+            "check-gate": "drift",
+            "gate-log": "drift",
+            "gate-log-text": "drift",
+            "check-deploy": "contradicted",
+            "chevrons": "drift"
+          },
+          "artifactHash": null
+        },
+        {
+          "at": "2026-10-09T04:59:01.900Z",
+          "score": 0.9166,
+          "worstIds": [
+            "gate-log",
+            "pr-branch",
+            "gate-log-text"
+          ],
+          "regionVerdicts": {
+            "wordmark": "drift",
+            "nav": "match",
+            "headline": "drift",
+            "command-field": "match",
+            "command-text": "match",
+            "copy-button": "drift",
+            "pr-panel": "drift",
+            "pr-branch": "drift",
+            "merge-badge": "drift",
+            "check-cargo": "drift",
+            "check-lint": "drift",
+            "check-gate": "drift",
+            "gate-log": "drift",
+            "gate-log-text": "drift",
+            "check-deploy": "drift",
+            "chevrons": "drift"
+          },
+          "artifactHash": null
+        },
+        {
+          "at": "2026-10-09T05:00:15.956Z",
+          "score": 0.9164,
+          "worstIds": [
+            "copy-button",
+            "gate-log",
+            "pr-branch"
+          ],
+          "regionVerdicts": {
+            "wordmark": "drift",
+            "nav": "match",
+            "headline": "drift",
+            "command-field": "match",
+            "command-text": "match",
+            "copy-button": "drift",
+            "pr-panel": "drift",
+            "pr-branch": "drift",
+            "merge-badge": "drift",
+            "check-cargo": "drift",
+            "check-lint": "drift",
+            "check-gate": "drift",
+            "gate-log": "drift",
+            "gate-log-text": "drift",
+            "check-deploy": "drift",
+            "chevrons": "drift"
+          },
+          "artifactHash": null
+        },
+        {
+          "at": "2026-10-09T05:06:24.911Z",
+          "score": 0.9543,
+          "worstIds": [
+            "headline",
+            "wordmark",
+            "check-cargo"
+          ],
+          "regionVerdicts": {
+            "wordmark": "drift",
+            "nav": "match",
+            "headline": "drift",
+            "command-field": "match",
+            "command-text": "match",
+            "copy-button": "drift",
+            "pr-panel": "match",
+            "pr-branch": "drift",
+            "merge-badge": "drift",
+            "check-cargo": "drift",
+            "check-lint": "match",
+            "check-gate": "match",
+            "gate-log": "match",
+            "gate-log-text": "match",
+            "check-deploy": "drift",
+            "chevrons": "match"
           },
           "artifactHash": null
         }
@@ -233,52 +336,52 @@
     },
     "sections": {
       "status": "closed",
-      "openedAt": "2026-10-08T17:24:21.453Z",
-      "closedAt": "2026-10-08T17:32:48.548Z",
+      "openedAt": "2026-10-09T05:06:24.911Z",
+      "closedAt": "2026-10-09T05:07:26.200Z",
       "attempts": 1,
       "notes": [],
       "gate": {
         "ok": true,
         "reasons": [],
         "summary": "no mechanical gate",
-        "at": "2026-10-08T17:32:48.548Z"
+        "at": "2026-10-09T05:07:26.199Z"
       },
       "forced": null
     },
     "motion": {
       "status": "closed",
-      "openedAt": "2026-10-08T17:32:48.548Z",
-      "closedAt": "2026-10-08T17:33:10.631Z",
+      "openedAt": "2026-10-09T05:07:26.200Z",
+      "closedAt": "2026-10-09T05:07:46.660Z",
       "attempts": 1,
       "notes": [],
       "gate": {
         "ok": true,
         "reasons": [],
         "summary": "no mechanical gate",
-        "at": "2026-10-08T17:33:10.631Z"
+        "at": "2026-10-09T05:07:46.660Z"
       },
       "forced": null
     },
     "responsive": {
       "status": "closed",
-      "openedAt": "2026-10-08T17:33:10.631Z",
-      "closedAt": "2026-10-08T17:34:41.466Z",
-      "attempts": 2,
+      "openedAt": "2026-10-09T05:07:46.660Z",
+      "closedAt": "2026-10-09T05:08:16.974Z",
+      "attempts": 1,
       "notes": [],
       "gate": {
         "ok": true,
         "reasons": [],
-        "summary": "desktop 82% (match)",
-        "score": 0.8169,
-        "sideBySide": "/Users/journey/Workspace/canon/packages/website/.impeccable/review/diff/desktop/side-by-side.png",
-        "at": "2026-10-08T17:34:41.466Z"
+        "summary": "desktop 95% (match)",
+        "score": 0.9486,
+        "sideBySide": "/Users/journey/Workspace/canon-0.13-web/packages/website/.impeccable/review/diff/desktop/side-by-side.png",
+        "at": "2026-10-09T05:08:16.974Z"
       },
       "forced": null
     },
     "review": {
       "status": "closed",
-      "openedAt": "2026-10-08T17:34:41.466Z",
-      "closedAt": "2026-10-08T17:43:52.933Z",
+      "openedAt": "2026-10-09T05:08:16.974Z",
+      "closedAt": "2026-10-09T05:30:10.250Z",
       "attempts": 0,
       "notes": [],
       "gate": null,
@@ -286,8 +389,8 @@
     }
   },
   "finish": {
-    "disposition": "fix",
-    "at": "2026-10-08T17:43:52.933Z",
+    "disposition": "ship",
+    "at": "2026-10-09T05:30:10.249Z",
     "phaseAtFinish": "review"
   },
   "plates": {}

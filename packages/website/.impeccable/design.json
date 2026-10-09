@@ -1,299 +1,942 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-08T17:41:12.795106+00:00",
+  "generatedAt": "2026-10-09T05:28:08+00:00",
   "title": "Design System: canon",
   "extensions": {
     "colorMeta": {
-      "signal": {
-        "role": "primary",
-        "displayName": "Signal Orange",
-        "canonical": "#ff4a1c",
-        "tonalRamp": [
-          "#3a160b",
-          "#6b2410",
-          "#8f2200",
-          "#c43510",
-          "#ff4a1c",
-          "#ff8a68",
-          "#ffb59f",
-          "#ffd9cd"
-        ]
-      },
       "ground": {
         "role": "neutral",
-        "displayName": "Manual Ground",
-        "canonical": "#f0f3f0",
+        "displayName": "Ground",
+        "canonical": "#0d1117",
         "tonalRamp": [
-          "oklch(15% 0.006 105)",
-          "oklch(25% 0.006 105)",
-          "oklch(35% 0.006 105)",
-          "oklch(48% 0.006 105)",
-          "oklch(60% 0.006 105)",
-          "oklch(72% 0.006 105)",
-          "oklch(84% 0.006 105)",
-          "oklch(95% 0.006 105)"
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
         ]
       },
-      "ink": {
+      "inset": {
         "role": "neutral",
-        "displayName": "Press Ink",
-        "canonical": "#0b0b0b",
+        "displayName": "Log Inset",
+        "canonical": "#0e1218",
         "tonalRamp": [
-          "#0b0b0b",
-          "#1a1a19",
-          "#3a3a37",
-          "#4a4a45",
-          "#6d6d68",
-          "#a0a09a",
-          "#c9c9c2",
-          "#e2e2dc"
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
         ]
       },
-      "ink-2": {
+      "panel": {
         "role": "neutral",
-        "displayName": "Graphite",
-        "canonical": "#4a4a45",
+        "displayName": "Panel",
+        "canonical": "#11161b",
         "tonalRamp": [
-          "oklch(15% 0.008 105)",
-          "oklch(25% 0.008 105)",
-          "oklch(35% 0.008 105)",
-          "oklch(48% 0.008 105)",
-          "oklch(60% 0.008 105)",
-          "oklch(72% 0.008 105)",
-          "oklch(84% 0.008 105)",
-          "oklch(95% 0.008 105)"
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
         ]
       },
-      "rule": {
+      "raise": {
         "role": "neutral",
-        "displayName": "Column Rule",
-        "canonical": "#b4b6b1",
+        "displayName": "Raise",
+        "canonical": "#1d242d",
         "tonalRamp": [
-          "oklch(15% 0.006 130)",
-          "oklch(25% 0.006 130)",
-          "oklch(35% 0.006 130)",
-          "oklch(48% 0.006 130)",
-          "oklch(60% 0.006 130)",
-          "oklch(72% 0.006 130)",
-          "oklch(84% 0.006 130)",
-          "oklch(95% 0.006 130)"
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
         ]
       },
-      "rule-soft": {
+      "raise-hover": {
         "role": "neutral",
-        "displayName": "Soft Rule",
-        "canonical": "#d9dad4",
+        "displayName": "Raise Hover",
+        "canonical": "#262e38",
         "tonalRamp": [
-          "oklch(15% 0.007 115)",
-          "oklch(25% 0.007 115)",
-          "oklch(35% 0.007 115)",
-          "oklch(48% 0.007 115)",
-          "oklch(60% 0.007 115)",
-          "oklch(72% 0.007 115)",
-          "oklch(84% 0.007 115)",
-          "oklch(95% 0.007 115)"
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
         ]
       },
-      "paper": {
+      "canon-row": {
         "role": "neutral",
-        "displayName": "Paper",
+        "displayName": "Canon Row Tint",
+        "canonical": "#1b222c",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "docs-panel": {
+        "role": "neutral",
+        "displayName": "Docs Panel",
+        "canonical": "#151b23",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "docs-inset": {
+        "role": "neutral",
+        "displayName": "Docs Inset",
+        "canonical": "#0a0d12",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "docs-current": {
+        "role": "neutral",
+        "displayName": "Current Page",
+        "canonical": "#262c36",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "shade": {
+        "role": "neutral",
+        "displayName": "Shade",
+        "canonical": "#010409",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border",
+        "canonical": "#30363d",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "border-soft": {
+        "role": "neutral",
+        "displayName": "Soft Border",
+        "canonical": "#232a32",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "pr-border": {
+        "role": "neutral",
+        "displayName": "PR Border",
+        "canonical": "#272d35",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "pr-border-soft": {
+        "role": "neutral",
+        "displayName": "PR Soft Border",
+        "canonical": "#1e242c",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "canonical": "#e6edf3",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "text-bright": {
+        "role": "neutral",
+        "displayName": "Bright Text",
+        "canonical": "#f0f6fc",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "text-soft": {
+        "role": "neutral",
+        "displayName": "Soft Text",
+        "canonical": "#d1d9e0",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "log-text": {
+        "role": "neutral",
+        "displayName": "Log Text",
+        "canonical": "#d1dbe5",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "text-2": {
+        "role": "neutral",
+        "displayName": "Secondary Text",
+        "canonical": "#9198a1",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "text-3": {
+        "role": "neutral",
+        "displayName": "Tertiary Text",
+        "canonical": "#6e7681",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "link-line": {
+        "role": "neutral",
+        "displayName": "Link Underline",
+        "canonical": "#59636e",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "pass": {
+        "role": "primary",
+        "displayName": "Passed Green",
+        "canonical": "#4ac26b",
+        "tonalRamp": [
+          "#12261b",
+          "#116329",
+          "#1a7f37",
+          "#4ac26b",
+          "#7fd58f",
+          "#aff5b4",
+          "#c9f8cc",
+          "#dafbe1"
+        ]
+      },
+      "fail": {
+        "role": "primary",
+        "displayName": "Gate Red",
+        "canonical": "#f0514a",
+        "tonalRamp": [
+          "#2a1416",
+          "#a40e26",
+          "#a8282b",
+          "#cf222e",
+          "#f0514a",
+          "#ff8f88",
+          "#ffc1bc",
+          "#ffebe9"
+        ]
+      },
+      "fail-fill": {
+        "role": "primary",
+        "displayName": "Blocked Fill",
+        "canonical": "#a8282b",
+        "tonalRamp": [
+          "#2a1416",
+          "#a40e26",
+          "#a8282b",
+          "#cf222e",
+          "#f0514a",
+          "#ff8f88",
+          "#ffc1bc",
+          "#ffebe9"
+        ]
+      },
+      "pending": {
+        "role": "primary",
+        "displayName": "Pending Amber",
+        "canonical": "#d29922",
+        "tonalRamp": [
+          "#2b2111",
+          "#7d4e00",
+          "#9a6700",
+          "#bf8700",
+          "#d29922",
+          "#e8bf5c",
+          "#f8e3a1",
+          "#fff8c5"
+        ]
+      },
+      "wait": {
+        "role": "primary",
+        "displayName": "Waiting Grey",
+        "canonical": "#6e7681",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "fail-low": {
+        "role": "primary",
+        "displayName": "Red Wash",
+        "canonical": "#2a1416",
+        "tonalRamp": [
+          "#2a1416",
+          "#a40e26",
+          "#a8282b",
+          "#cf222e",
+          "#f0514a",
+          "#ff8f88",
+          "#ffc1bc",
+          "#ffebe9"
+        ]
+      },
+      "pending-low": {
+        "role": "primary",
+        "displayName": "Amber Wash",
+        "canonical": "#2b2111",
+        "tonalRamp": [
+          "#2b2111",
+          "#7d4e00",
+          "#9a6700",
+          "#bf8700",
+          "#d29922",
+          "#e8bf5c",
+          "#f8e3a1",
+          "#fff8c5"
+        ]
+      },
+      "light-ground": {
+        "role": "neutral",
+        "displayName": "Light Ground",
         "canonical": "#ffffff",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(25% 0 0)",
-          "oklch(35% 0 0)",
-          "oklch(48% 0 0)",
-          "oklch(60% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
         ]
       },
-      "code-hairline": {
+      "light-panel": {
         "role": "neutral",
-        "displayName": "Code Hairline",
-        "canonical": "#2a2a28",
+        "displayName": "Light Panel",
+        "canonical": "#f6f8fa",
         "tonalRamp": [
-          "oklch(15% 0.004 105)",
-          "oklch(25% 0.004 105)",
-          "oklch(35% 0.004 105)",
-          "oklch(48% 0.004 105)",
-          "oklch(60% 0.004 105)",
-          "oklch(72% 0.004 105)",
-          "oklch(84% 0.004 105)",
-          "oklch(95% 0.004 105)"
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
         ]
       },
-      "code-muted": {
+      "light-inline-code": {
         "role": "neutral",
-        "displayName": "Code Muted",
-        "canonical": "#a3a39b",
+        "displayName": "Light Inline Code",
+        "canonical": "#eff2f5",
         "tonalRamp": [
-          "oklch(15% 0.01 105)",
-          "oklch(25% 0.01 105)",
-          "oklch(35% 0.01 105)",
-          "oklch(48% 0.01 105)",
-          "oklch(60% 0.01 105)",
-          "oklch(72% 0.01 105)",
-          "oklch(84% 0.01 105)",
-          "oklch(95% 0.01 105)"
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "light-border": {
+        "role": "neutral",
+        "displayName": "Light Border",
+        "canonical": "#d1d9e0",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "light-border-soft": {
+        "role": "neutral",
+        "displayName": "Light Soft Border",
+        "canonical": "#e4e8ec",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "light-text": {
+        "role": "neutral",
+        "displayName": "Light Text",
+        "canonical": "#1f2328",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "light-text-2": {
+        "role": "neutral",
+        "displayName": "Light Secondary Text",
+        "canonical": "#59636e",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "light-text-3": {
+        "role": "neutral",
+        "displayName": "Light Tertiary Text",
+        "canonical": "#818b98",
+        "tonalRamp": [
+          "#010409",
+          "#0d1117",
+          "#151b23",
+          "#262e38",
+          "#59636e",
+          "#9198a1",
+          "#d1d9e0",
+          "#f0f6fc"
+        ]
+      },
+      "light-pass": {
+        "role": "primary",
+        "displayName": "Light Pass",
+        "canonical": "#1a7f37",
+        "tonalRamp": [
+          "#12261b",
+          "#116329",
+          "#1a7f37",
+          "#4ac26b",
+          "#7fd58f",
+          "#aff5b4",
+          "#c9f8cc",
+          "#dafbe1"
+        ]
+      },
+      "light-fail": {
+        "role": "primary",
+        "displayName": "Light Fail",
+        "canonical": "#cf222e",
+        "tonalRamp": [
+          "#2a1416",
+          "#a40e26",
+          "#a8282b",
+          "#cf222e",
+          "#f0514a",
+          "#ff8f88",
+          "#ffc1bc",
+          "#ffebe9"
+        ]
+      },
+      "light-pending": {
+        "role": "primary",
+        "displayName": "Light Pending",
+        "canonical": "#9a6700",
+        "tonalRamp": [
+          "#2b2111",
+          "#7d4e00",
+          "#9a6700",
+          "#bf8700",
+          "#d29922",
+          "#e8bf5c",
+          "#f8e3a1",
+          "#fff8c5"
+        ]
+      },
+      "light-fail-low": {
+        "role": "primary",
+        "displayName": "Light Red Wash",
+        "canonical": "#ffebe9",
+        "tonalRamp": [
+          "#2a1416",
+          "#a40e26",
+          "#a8282b",
+          "#cf222e",
+          "#f0514a",
+          "#ff8f88",
+          "#ffc1bc",
+          "#ffebe9"
+        ]
+      },
+      "light-pending-low": {
+        "role": "primary",
+        "displayName": "Light Amber Wash",
+        "canonical": "#fff8c5",
+        "tonalRamp": [
+          "#2b2111",
+          "#7d4e00",
+          "#9a6700",
+          "#bf8700",
+          "#d29922",
+          "#e8bf5c",
+          "#f8e3a1",
+          "#fff8c5"
         ]
       }
     },
     "typographyMeta": {
       "display": {
         "displayName": "Display",
-        "purpose": "Hero headline only; 0.014em text-stroke."
+        "purpose": "The three-line hero statement in the scaled first viewport only."
       },
-      "figure-numeral": {
-        "displayName": "Figure Numeral",
-        "purpose": "Gate count at the foot of Fig. 1."
+      "display-stacked": {
+        "displayName": "Display (stacked)",
+        "purpose": "The hero statement at 1099px and below."
       },
       "headline": {
         "displayName": "Headline",
-        "purpose": "Section heads on a 1.5px ink rule."
+        "purpose": "Section headings."
       },
       "title": {
         "displayName": "Title",
-        "purpose": "Sub-heads, docs-list and Fig. 3 product names."
+        "purpose": "Timeline event names."
+      },
+      "subtitle": {
+        "displayName": "Subtitle",
+        "purpose": "Sub-headings inside a section."
       },
       "lead": {
         "displayName": "Lead",
-        "purpose": "Section introductions, max 44ch."
+        "purpose": "The sentence under a section heading, in secondary grey."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Running text, 52-62ch."
+        "purpose": "Landing prose at about 62ch."
+      },
+      "row": {
+        "displayName": "Row",
+        "purpose": "Comparison row tool names; stacked nav."
+      },
+      "row-detail": {
+        "displayName": "Row Detail",
+        "purpose": "Docs-list descriptions; stacked check rows."
+      },
+      "small": {
+        "displayName": "Small",
+        "purpose": "Footer, flow path, stacked command and badge text."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "Figure captions and table notes."
+        "purpose": "Capability-cell state words and table body."
       },
-      "mono": {
-        "displayName": "Mono",
-        "purpose": "Commands and code."
+      "column-head": {
+        "displayName": "Column Head",
+        "purpose": "Comparison column headings."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "canon wordmark in the scaled header."
+      },
+      "wordmark-stacked": {
+        "displayName": "Wordmark (stacked)",
+        "purpose": "canon wordmark at 1099px and below."
+      },
+      "command": {
+        "displayName": "Command",
+        "purpose": "The install command in the hero field."
+      },
+      "log": {
+        "displayName": "Log",
+        "purpose": "The expanded canon gate check log in the scaled hero."
+      },
+      "log-stacked": {
+        "displayName": "Log (stacked)",
+        "purpose": "The check log at 1099px and below."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Terminal panels and docs code frames."
+      },
+      "wordmark-small": {
+        "displayName": "Wordmark (small)",
+        "purpose": "canon wordmark in the landing footer and the docs header."
       }
     },
-    "shadows": [],
-    "motion": [],
-    "breakpoints": [
+    "shadows": [
       {
-        "name": "mobile",
-        "value": "900px"
+        "name": "sticky-column-edge",
+        "value": "10px 0 14px -10px rgba(1, 4, 9, 0.9)",
+        "purpose": "Comparison sticky first column at 1099px and below, so scrolled cells pass beneath it."
+      },
+      {
+        "name": "copy-ring",
+        "value": "0 0 0 1px #0e1318",
+        "purpose": "The Copy button's 1px outer ring inside the command field."
+      },
+      {
+        "name": "badge-pulse",
+        "value": "0 0 0 calc(12 * var(--u)) rgba(240, 81, 74, 0)",
+        "purpose": "Merge blocked badge answer: expands from rgba(240, 81, 74, 0.55) at 0 spread, once, during the opening motion."
+      },
+      {
+        "name": "docs-sm",
+        "value": "0 1px 2px rgba(1, 4, 9, 0.4)",
+        "purpose": "Starlight --sl-shadow-sm (dark); light theme uses rgba(31, 35, 40, 0.08)."
+      },
+      {
+        "name": "docs-md",
+        "value": "0 8px 24px rgba(1, 4, 9, 0.5)",
+        "purpose": "Starlight --sl-shadow-md (dark); light theme uses rgba(31, 35, 40, 0.12)."
+      },
+      {
+        "name": "docs-lg",
+        "value": "0 16px 40px rgba(1, 4, 9, 0.6)",
+        "purpose": "Starlight --sl-shadow-lg for the search dialog (dark); light theme uses rgba(31, 35, 40, 0.16)."
       }
     ],
-    "focus": {
-      "value": "outline: 2px solid var(--c-signal); outline-offset: 3px",
-      "purpose": "All focus-visible states."
-    },
-    "unit": {
-      "name": "--u",
-      "value": "min(calc(100vw / 1536), calc(100svh / 1024), 1.35px)",
-      "purpose": "One comp pixel; scales the first viewport."
-    }
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The one easing of the orchestrated opening and the chevron rotation."
+      },
+      {
+        "name": "check-resolve",
+        "value": "520ms ease-out-expo, delay calc(350ms + var(--i) * 300ms)",
+        "purpose": "Each pass/fail check dot resolves from a Pending Amber ring at 0.82 scale, in row order."
+      },
+      {
+        "name": "log-arrive",
+        "value": "1400ms ease-out-expo, delay 1150ms",
+        "purpose": "The gate log well arrives from a red-tinted border and ground."
+      },
+      {
+        "name": "badge-answer",
+        "value": "1100ms ease-out-expo, delay 1300ms",
+        "purpose": "The Merge blocked badge pulses a Gate Red ring once."
+      },
+      {
+        "name": "chevron-turn",
+        "value": "transform 240ms ease-out-expo, color 160ms ease-out",
+        "purpose": "The gate row chevron rotates 180deg when its log opens."
+      },
+      {
+        "name": "hover",
+        "value": "160ms ease-out",
+        "purpose": "Copy button background and border."
+      },
+      {
+        "name": "row-hover",
+        "value": "140ms ease-out",
+        "purpose": "Docs file-list row fill."
+      },
+      {
+        "name": "copied-reset",
+        "value": "1600ms",
+        "purpose": "How long the Copy button shows its copied state."
+      },
+      {
+        "name": "reduced-motion-gate",
+        "value": "@media (prefers-reduced-motion: no-preference)",
+        "purpose": "All of the above animations and the chevron transition run only inside this query; every word is visible from the first frame."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "frame",
+        "value": "1774px",
+        "purpose": "Design width of the first-viewport frame; --u = min(1px, 100vw / 1774) and section max-width."
+      },
+      {
+        "name": "stack",
+        "value": "1099px",
+        "purpose": "max-width: the scaled frame stops at 1100px; at 1099px and below everything stacks to one column with fixed sizes."
+      },
+      {
+        "name": "narrow",
+        "value": "560px",
+        "purpose": "max-width: Copy collapses to its icon, check summaries wrap under the name, footer goes single-column."
+      }
+    ]
   },
   "components": [
     {
-      "name": "Command Bar",
-      "kind": "custom",
-      "refersTo": "command-bar",
-      "description": "Primary action: install command with Copy.",
-      "html": "<div class=\"ds-cmd\"><code><span>$ </span>bunx @journeykit/canon init</code><button class=\"ds-copy\">Copy</button></div>",
-      "css": ".ds-cmd{display:flex;align-items:center;justify-content:space-between;gap:24px;height:56px;padding:0 18px;background:var(--c-ink,#0b0b0b);color:var(--c-ground,#f0f3f0);font-family:var(--f-mono,monospace);font-size:20px}.ds-copy{appearance:none;border:0;background:none;color:inherit;font:inherit;cursor:pointer;padding:4px 0}.ds-copy:hover{color:var(--c-signal,#ff4a1c)}.ds-copy:focus-visible{outline:2px solid var(--c-signal,#ff4a1c);outline-offset:3px}"
+      "name": "Command Field + Copy",
+      "kind": "input",
+      "refersTo": "command-field",
+      "description": "The primary action: the install command as a terminal line in a panel field, with a divider and a Copy button that turns green when copied.",
+      "html": "<div class=\"ds-cmd\"><code class=\"ds-cmd-text\"><span aria-hidden=\"true\">$ </span>bunx @journeykit/canon init</code><button type=\"button\" class=\"ds-cmd-copy\" aria-label=\"Copy install command\"><svg viewBox=\"0 0 27 29\" width=\"15\" height=\"16\" aria-hidden=\"true\"><path d=\"M7.5 20.5h-3a3 3 0 0 1-3-3V4a3 3 0 0 1 3-3H16a3 3 0 0 1 3 3v3\"/><rect x=\"7.5\" y=\"7\" width=\"18\" height=\"20.5\" rx=\"3\"/></svg><span>Copy</span></button></div>",
+      "css": ".ds-cmd { display: grid; grid-template-columns: 1fr auto; align-items: stretch; height: 60px; max-width: 460px; background: var(--c-panel, #11161b); border: 1px solid #353d47; border-radius: 8px; } .ds-cmd-text { display: flex; align-items: center; min-width: 0; padding-inline: 18px; font-family: var(--f-mono, \"Geist Mono Variable\", ui-monospace, Menlo, monospace); font-size: 15px; color: #c6d8ec; white-space: pre; overflow-x: auto; scrollbar-width: none; } .ds-cmd-copy { position: relative; display: inline-flex; align-items: center; gap: 8px; align-self: center; margin: 0 10px 0 11px; height: 40px; padding: 0 14px 0 12px; font-family: var(--f-sans, \"Mona Sans Variable\", system-ui, sans-serif); font-size: 15px; font-weight: 500; color: var(--c-text, #e6edf3); background: #1a2027; border: 1px solid #2c333b; border-radius: var(--radius-sm, 6px); box-shadow: 0 0 0 1px #0e1318; cursor: pointer; transition: background-color 160ms ease-out, border-color 160ms ease-out; } .ds-cmd-copy::before { content: \"\"; position: absolute; left: -12px; top: -11px; bottom: -11px; width: 1px; background: #20272f; } .ds-cmd-copy svg { fill: none; stroke: currentColor; stroke-width: 2; } .ds-cmd-copy:hover { background: var(--c-raise-hover, #262e38); border-color: #3d444d; } .ds-cmd-copy:focus-visible { outline: 2px solid var(--c-text, #e6edf3); outline-offset: 3px; } .ds-cmd-copy:active { color: var(--c-pass, #4ac26b); border-color: var(--c-pass, #4ac26b); }"
     },
     {
-      "name": "Guide Link",
+      "name": "PR Panel",
       "kind": "custom",
-      "refersTo": "guide-link",
-      "description": "Secondary action with arrow and 2px rule.",
-      "html": "<a class=\"ds-guide\" href=\"#\">Read the guide <svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 8h10M9 4l4 4-4 4\"/></svg></a>",
-      "css": ".ds-guide{display:inline-flex;align-items:center;gap:6px;color:var(--c-ink,#0b0b0b);font-family:var(--f-sans,sans-serif);font-size:20px;letter-spacing:-0.015em;text-decoration:none;border-bottom:2px solid currentColor}.ds-guide:hover{color:var(--c-signal,#ff4a1c)}.ds-guide:focus-visible{outline:2px solid var(--c-signal,#ff4a1c);outline-offset:3px}"
+      "refersTo": "pr-panel",
+      "description": "The hero signature: branch line, Merge blocked badge, check rows with status dot and word, and the canon gate row expanded with its log.",
+      "html": "<figure class=\"ds-pr\"><div class=\"ds-pr-head\"><p class=\"ds-pr-branch\"><span>agent/feat-cart</span><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" role=\"img\" aria-label=\"→\"><path d=\"M2.5 8h10M9 4.5 12.5 8 9 11.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg><span>main</span></p><span class=\"ds-pr-badge\">Merge blocked</span></div><ul class=\"ds-pr-checks\"><li class=\"ds-check ds-pass\"><div class=\"ds-check-row\"><span class=\"ds-dot\" aria-hidden=\"true\"></span><span class=\"ds-check-name\">cargo test</span><span class=\"ds-check-sep\" aria-hidden=\"true\">—</span><span class=\"ds-check-sum\">passed</span></div></li><li class=\"ds-check ds-fail\"><details open><summary class=\"ds-check-row\"><span class=\"ds-dot\" aria-hidden=\"true\"></span><span class=\"ds-check-name\">canon gate check</span><span class=\"ds-check-sep\" aria-hidden=\"true\">—</span><span class=\"ds-check-sum\">2 scenarios lack evidence</span><svg class=\"ds-chev\" viewBox=\"0 0 20 12\" width=\"15\" height=\"9\" aria-hidden=\"true\"><path d=\"M1.25 1.5 10 10.25l8.75-8.75\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></summary><pre class=\"ds-log\"><code>uncovered-cell cart.add.04 — spec scenario has no evidence record\nexit 1</code></pre></details></li><li class=\"ds-check\"><div class=\"ds-check-row\"><span class=\"ds-dot\" aria-hidden=\"true\"></span><span class=\"ds-check-name\">deploy</span><span class=\"ds-check-sep\" aria-hidden=\"true\">—</span><span class=\"ds-check-sum\">waiting</span></div></li></ul></figure>",
+      "css": ".ds-pr { margin: 0; max-width: 560px; background: var(--c-panel, #11161b); border: 1px solid #313943; border-radius: var(--radius-md, 10px); overflow: hidden; font-family: var(--f-sans, \"Mona Sans Variable\", system-ui, sans-serif); color: var(--c-text, #e6edf3); } .ds-pr-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; min-height: 64px; padding: 14px 16px; border-bottom: 1px solid #272d35; } .ds-pr-branch { display: flex; align-items: center; gap: 12px; margin: 0; font-weight: 650; font-size: 17px; letter-spacing: -0.01em; } .ds-pr-branch svg { color: #c9d1d9; } .ds-pr-badge { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; font-weight: 600; font-size: 15px; color: #fff; background: var(--c-fail-fill, #a8282b); border-radius: var(--radius-sm, 6px); } .ds-pr-checks { margin: 0; padding: 0; list-style: none; } .ds-check + .ds-check { border-top: 1px solid #272d35; } .ds-check-row { display: flex; align-items: center; min-height: 56px; padding: 14px 16px; font-size: 15.5px; line-height: 1.2; list-style: none; } .ds-check-row::-webkit-details-marker { display: none; } summary.ds-check-row { cursor: pointer; } summary.ds-check-row:hover { background: rgba(230, 237, 243, 0.03); } summary.ds-check-row:focus-visible { outline: 2px solid var(--c-text, #e6edf3); outline-offset: -2px; } .ds-dot { flex: none; width: 14px; height: 14px; margin-right: 12px; border-radius: 50%; background: var(--c-wait, #6e7681); } .ds-pass .ds-dot { background: var(--c-pass, #4ac26b); } .ds-fail .ds-dot { background: var(--c-fail, #f0514a); } .ds-check-name { font-weight: 600; white-space: nowrap; } .ds-check-sep { margin-inline: 8px; color: var(--c-text-2, #9198a1); } .ds-check-sum { color: #a9b4c0; padding-right: 10px; } .ds-chev { margin-left: auto; color: #c8d8ec; transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1); } details[open] .ds-chev { transform: rotate(180deg); color: #f2f6fa; } .ds-log { margin: 0 12px 14px; padding: 12px 14px; background: var(--c-inset, #0e1218); border: 1px solid #1e242c; border-radius: var(--radius-sm, 6px); font-family: var(--f-mono, \"Geist Mono Variable\", ui-monospace, Menlo, monospace); font-size: 12.5px; line-height: 1.65; color: #d1dbe5; white-space: pre-wrap; overflow-wrap: anywhere; }"
     },
     {
-      "name": "Figure Panel",
+      "name": "Timeline Item",
+      "kind": "custom",
+      "refersTo": "timeline-badge",
+      "description": "One event in the loop rendered as a pull-request timeline: circular badge with a stroked icon, a 2px thread to the next event, and a linked name; the gate event turns red.",
+      "html": "<ol class=\"ds-tl\"><li class=\"ds-tl-item\"><span class=\"ds-tl-badge\" aria-hidden=\"true\"><svg viewBox=\"0 0 16 16\" width=\"18\" height=\"18\"><path d=\"M5 3.25v9.5L12.5 8z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/></svg></span><div class=\"ds-tl-body\"><h3 class=\"ds-tl-name\"><a href=\"#\">run</a></h3><p>Session adapters write one root run per session plus one child run per subagent.</p></div></li><li class=\"ds-tl-item ds-is-gate\"><span class=\"ds-tl-badge\" aria-hidden=\"true\"><svg viewBox=\"0 0 16 16\" width=\"18\" height=\"18\"><path d=\"M8 1.75 13 3.5v4.25c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.5zM5.75 8 7.25 9.5 10.25 6.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></span><div class=\"ds-tl-body\"><h3 class=\"ds-tl-name\"><a href=\"#\">gate</a></h3><p>Fails closed — the row stays unflipped — on missing, malformed, or fabricated evidence.</p><p>Exit 0 clean, 1 gate-red, 2 usage/load failure.</p></div></li></ol>",
+      "css": ".ds-tl { margin: 0; padding: 0; list-style: none; font-family: var(--f-sans, \"Mona Sans Variable\", system-ui, sans-serif); color: var(--c-text, #e6edf3); } .ds-tl-item { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 20px; padding-bottom: 36px; } .ds-tl-item:not(:last-child)::before { content: \"\"; position: absolute; left: 19px; top: 44px; bottom: 4px; width: 2px; border-radius: 1px; background: var(--c-border-soft, #232a32); } .ds-tl-badge { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--c-panel, #11161b); border: 1px solid var(--c-border, #30363d); color: var(--c-text-2, #9198a1); } .ds-is-gate .ds-tl-badge { color: var(--c-fail, #f0514a); border-color: rgba(240, 81, 74, 0.55); background: #1c1215; } .ds-tl-body { padding-top: 7px; } .ds-tl-name { margin: 0 0 6px; font-weight: 650; font-size: 21px; line-height: 1.25; letter-spacing: -0.01em; } .ds-tl-name a { color: inherit; text-decoration: none; text-underline-offset: 0.2em; } .ds-tl-name a:hover { text-decoration: underline; text-decoration-thickness: 1px; } .ds-tl-name a:focus-visible { outline: 2px solid var(--c-text, #e6edf3); outline-offset: 3px; border-radius: 4px; } .ds-tl-body p { margin: 0; max-width: 62ch; color: var(--c-text-2, #9198a1); font-size: 17px; line-height: 1.6; }"
+    },
+    {
+      "name": "Capability Matrix",
+      "kind": "custom",
+      "refersTo": "matrix-panel",
+      "description": "A real table in a labelled scroll region with a sticky first column; each cell states its verdict as icon plus word with a sourced note; the canon row is a full tint.",
+      "html": "<div class=\"ds-cmp\" role=\"region\" aria-label=\"Capability matrix\" tabindex=\"0\"><table class=\"ds-cmp-table\"><thead><tr><th scope=\"col\" class=\"ds-cmp-corner\">Tool</th><th scope=\"col\">Sandboxed execution</th><th scope=\"col\">Per-scenario evidence record</th></tr></thead><tbody><tr><th scope=\"row\">OpenHands</th><td class=\"ds-yes\"><span class=\"ds-state\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"6.75\"/><path d=\"M4.5 8.25 7 10.75l4.5-5\"/></svg>Yes</span><a class=\"ds-note\" href=\"#\">Docker sandbox recommended; process mode has no isolation</a></td><td class=\"ds-partial\"><span class=\"ds-state\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"6.75\"/><path d=\"M8 3.25a4.75 4.75 0 0 1 0 9.5z\"/></svg>Partial</span><a class=\"ds-note\" href=\"#\">An optional QA plugin posts a per-PR report with a PASS/FAIL verdict</a></td></tr><tr class=\"ds-is-canon\"><th scope=\"row\">canon</th><td class=\"ds-no\"><span class=\"ds-state\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"6.75\"/><path d=\"M5.5 5.5l5 5M10.5 5.5l-5 5\"/></svg>No</span><a class=\"ds-note\" href=\"#\">Sandboxing is left to the external provider</a></td><td class=\"ds-yes\"><span class=\"ds-state\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"6.75\"/><path d=\"M4.5 8.25 7 10.75l4.5-5\"/></svg>Yes</span><a class=\"ds-note\" href=\"#\">An attributed evidence record per scenario, in the ledger</a></td></tr></tbody></table></div>",
+      "css": ".ds-cmp { overflow-x: auto; background: var(--c-panel, #11161b); border: 1px solid var(--c-border, #30363d); border-radius: var(--radius-md, 10px); overscroll-behavior-x: contain; font-family: var(--f-sans, \"Mona Sans Variable\", system-ui, sans-serif); color: var(--c-text, #e6edf3); } .ds-cmp:focus-visible { outline: 2px solid var(--c-text, #e6edf3); outline-offset: 3px; } .ds-cmp-table { width: 100%; min-width: 560px; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 14px; line-height: 1.45; } .ds-cmp-table th, .ds-cmp-table td { padding: 16px 14px 18px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--c-border-soft, #232a32); } .ds-cmp-table tbody tr:last-child > * { border-bottom: 0; } .ds-cmp-table thead th { padding-block: 16px; font-weight: 600; font-size: 13.5px; line-height: 1.35; color: var(--c-text-2, #9198a1); vertical-align: bottom; border-bottom-color: var(--c-border, #30363d); } .ds-cmp-table th[scope=\"row\"], .ds-cmp-corner { position: sticky; left: 0; z-index: 1; width: 128px; padding-left: 16px; background: var(--c-panel, #11161b); box-shadow: 10px 0 14px -10px rgba(1, 4, 9, 0.9); } .ds-cmp-table th[scope=\"row\"] { font-weight: 650; font-size: 16px; line-height: 1.3; } .ds-cmp-table tr.ds-is-canon > * { background: var(--c-canon-row, #1b222c); } .ds-state { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 6px; font-weight: 600; font-size: 14px; line-height: 1.3; } .ds-state svg { flex: none; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; } .ds-yes .ds-state { color: var(--c-pass, #4ac26b); } .ds-partial .ds-state { color: var(--c-pending, #d29922); } .ds-partial .ds-state path { fill: currentColor; stroke: none; } .ds-no .ds-state { color: var(--c-text-2, #9198a1); } .ds-note { display: block; color: var(--c-text-2, #9198a1); text-decoration: underline dotted; text-decoration-color: #4a535e; text-underline-offset: 3px; } .ds-note:hover { color: var(--c-text, #e6edf3); text-decoration-style: solid; text-decoration-color: currentColor; } .ds-note:focus-visible { outline: 2px solid var(--c-text, #e6edf3); outline-offset: 3px; border-radius: 4px; }"
+    },
+    {
+      "name": "Terminal Panel",
       "kind": "card",
-      "refersTo": "figure-panel",
-      "description": "The single signal field: numbered figure with mono caption and real data.",
-      "html": "<figure class=\"ds-fig\"><figcaption>Fig. 1</figcaption><div class=\"ds-fig-lines\"></div><p class=\"ds-fig-num\">0</p></figure>",
-      "css": ".ds-fig{margin:0;width:280px;padding:18px 20px 22px;background:var(--c-signal,#ff4a1c);color:var(--c-ink,#0b0b0b);display:grid;gap:12px}.ds-fig figcaption{font-family:var(--f-mono,monospace);font-size:14px}.ds-fig-lines{height:120px;background:repeating-linear-gradient(to bottom,#0b0b0b 0 1px,transparent 1px 4px)}.ds-fig-num{margin:0;font-family:var(--f-sans,sans-serif);font-weight:700;font-size:96px;line-height:0.8;letter-spacing:-0.05em}"
+      "refersTo": "terminal",
+      "description": "A run log in an inset well: Geist Mono, unwrapped lines, comments in secondary grey.",
+      "html": "<pre class=\"ds-term\"><code><span class=\"ds-ln\">bunx @journeykit/canon demo init      <span class=\"ds-cm\"># scaffolds a throwaway evidence loop</span></span><span class=\"ds-ln\">bunx @journeykit/canon gate check     <span class=\"ds-cm\"># RED</span></span><span class=\"ds-ln\">bunx @journeykit/canon demo attest    <span class=\"ds-cm\"># records the reviewer's evidence</span></span><span class=\"ds-ln\">bunx @journeykit/canon gate check     <span class=\"ds-cm\"># GREEN</span></span><span class=\"ds-ln\"><span class=\"ds-cm\"># canon gate check: clean (0 violations)</span></span></code></pre>",
+      "css": ".ds-term { margin: 0; padding: 20px 22px; background: var(--c-inset, #0e1218); border: 1px solid var(--c-border, #30363d); border-radius: var(--radius-md, 10px); font-family: var(--f-mono, \"Geist Mono Variable\", ui-monospace, Menlo, monospace); font-size: 14px; line-height: 1.7; color: #d1dbe5; overflow-x: auto; } .ds-term:focus-visible { outline: 2px solid var(--c-text, #e6edf3); outline-offset: 3px; } .ds-ln { display: block; white-space: pre; } .ds-cm { color: var(--c-text-2, #9198a1); }"
     },
     {
-      "name": "Section Head",
-      "kind": "custom",
-      "description": "Bold headline set on a 1.5px ink rule at the gutter.",
-      "html": "<h2 class=\"ds-h2\">Getting started</h2>",
-      "css": ".ds-h2{margin:0;padding:18px 0 0 12px;border-top:1.5px solid var(--c-ink,#0b0b0b);font-family:var(--f-sans,sans-serif);font-weight:700;font-size:48px;line-height:1.04;letter-spacing:-0.035em;color:var(--c-ink,#0b0b0b)}"
+      "name": "Check-Summary Panel",
+      "kind": "card",
+      "refersTo": "summary-panel",
+      "description": "What canon proves and what it does not, as two check summaries: a lead line under a rule, then icon rows.",
+      "html": "<div class=\"ds-sum\"><div class=\"ds-sum-col ds-yes\"><p class=\"ds-sum-lead\">Canon strongly verifies:</p><ul class=\"ds-sum-list\"><li><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><path d=\"M3.5 8.5 6.5 11.5l6-7\"/></svg>that policy-required evidence exists</li><li><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><path d=\"M3.5 8.5 6.5 11.5l6-7\"/></svg>who recorded it</li></ul></div><div class=\"ds-sum-col ds-not\"><p class=\"ds-sum-lead\">Canon does not prove:</p><ul class=\"ds-sum-list\"><li><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"5.75\"/><path d=\"M4 12 12 4\"/></svg>whether a test actually verifies the requirement</li></ul></div></div>",
+      "css": ".ds-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; font-family: var(--f-sans, \"Mona Sans Variable\", system-ui, sans-serif); color: var(--c-text, #e6edf3); } .ds-sum-col { background: var(--c-panel, #11161b); border: 1px solid var(--c-border, #30363d); border-radius: var(--radius-md, 10px); overflow: hidden; } .ds-sum-lead { margin: 0; padding: 18px 22px; font-weight: 650; font-size: 17px; border-bottom: 1px solid var(--c-border, #30363d); } .ds-sum-list { margin: 0; padding: 0; list-style: none; } .ds-sum-list li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 14px; padding: 14px 22px; line-height: 1.5; font-size: 17px; } .ds-sum-list li + li { border-top: 1px solid var(--c-border-soft, #232a32); } .ds-sum-list svg { margin-top: 4px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; } .ds-yes svg { color: var(--c-pass, #4ac26b); } .ds-not svg { color: var(--c-text-2, #9198a1); } .ds-not li { color: #c4ccd5; }"
     },
     {
-      "name": "Code Block",
-      "kind": "custom",
-      "refersTo": "code-block",
-      "description": "Black square code field.",
-      "html": "<pre class=\"ds-code\"><code>canon gate check <span>// 0 violations</span></code></pre>",
-      "css": ".ds-code{margin:0;padding:22px 26px;background:var(--c-ink,#0b0b0b);color:var(--c-ground,#f0f3f0);font-family:var(--f-mono,monospace);font-size:17px;line-height:1.6}.ds-code span{color:#a3a39b}"
-    },
-    {
-      "name": "Navigation",
+      "name": "Docs File List",
       "kind": "nav",
-      "description": "Bold wordmark and plain underlined-on-hover links.",
-      "html": "<nav class=\"ds-nav\"><a class=\"ds-wm\" href=\"#\">canon</a><span><a href=\"#\">Docs</a><a href=\"#\">GitHub</a></span></nav>",
-      "css": ".ds-nav{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--f-sans,sans-serif);color:var(--c-ink,#0b0b0b)}.ds-nav a{color:inherit;text-decoration:none}.ds-nav span{display:flex;gap:28px;font-size:16px}.ds-nav span a:hover{text-decoration:underline;text-decoration-thickness:1px}.ds-nav a:focus-visible{outline:2px solid var(--c-signal,#ff4a1c);outline-offset:3px}.ds-wm{font-weight:700;font-size:30px;letter-spacing:-0.035em}"
+      "refersTo": "docs-list-row",
+      "description": "The docs index as a repository file list: title, description, chevron per row; rows fill with Raise on hover.",
+      "html": "<ul class=\"ds-files\"><li><a href=\"#\"><span class=\"ds-files-title\">Getting Started</span><span class=\"ds-files-desc\">Install canon, scaffold canon.yaml, and run your first gate check.</span><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><path d=\"M6 3.5 10.5 8 6 12.5\"/></svg></a></li><li><a href=\"#\"><span class=\"ds-files-title\">Trust Spine</span><span class=\"ds-files-desc\">How canon gate turns task completion from self-reported to evidence-gated, and reads the nine stable failure classes.</span><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><path d=\"M6 3.5 10.5 8 6 12.5\"/></svg></a></li></ul>",
+      "css": ".ds-files { margin: 0; padding: 0; list-style: none; background: var(--c-panel, #11161b); border: 1px solid var(--c-border, #30363d); border-radius: var(--radius-md, 10px); overflow: hidden; font-family: var(--f-sans, \"Mona Sans Variable\", system-ui, sans-serif); color: var(--c-text, #e6edf3); } .ds-files li + li { border-top: 1px solid var(--c-border-soft, #232a32); } .ds-files a { display: grid; grid-template-columns: minmax(140px, 3fr) minmax(0, 8fr) 16px; gap: 8px 28px; align-items: baseline; padding: 16px 22px; color: inherit; text-decoration: none; transition: background-color 140ms ease-out; } .ds-files a:hover { background: var(--c-raise, #1d242d); } .ds-files a:hover .ds-files-title { text-decoration: underline; text-underline-offset: 0.2em; text-decoration-thickness: 1px; } .ds-files a:focus-visible { outline: 2px solid var(--c-text, #e6edf3); outline-offset: -2px; } .ds-files-title { font-weight: 650; font-size: 17px; } .ds-files-desc { font-size: 15.5px; line-height: 1.5; color: var(--c-text-2, #9198a1); } .ds-files svg { align-self: center; fill: none; stroke: var(--c-text-2, #9198a1); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }"
+    },
+    {
+      "name": "Site Navigation",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Wordmark at top left, Docs / CLI / Concepts / GitHub at top right in Soft Text; hover brightens and underlines.",
+      "html": "<header class=\"ds-head\"><a class=\"ds-wordmark\" href=\"#\">canon</a><nav class=\"ds-nav\" aria-label=\"Main\"><a href=\"#\">Docs</a><a href=\"#\">CLI</a><a href=\"#\">Concepts</a><a href=\"#\">GitHub</a></nav></header>",
+      "css": ".ds-head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding: 22px 0 0; font-family: var(--f-sans, \"Mona Sans Variable\", system-ui, sans-serif); } .ds-wordmark { font-weight: 700; font-size: 28px; line-height: 1; letter-spacing: -0.03em; color: var(--c-text, #e6edf3); text-decoration: none; } .ds-nav { display: flex; gap: 20px; font-size: 16px; line-height: 1; } .ds-nav a { color: #d1d9e0; text-decoration: none; text-underline-offset: 0.3em; } .ds-nav a:hover { color: var(--c-text, #e6edf3); text-decoration: underline; text-decoration-thickness: 1px; } .ds-head a:focus-visible { outline: 2px solid var(--c-text, #e6edf3); outline-offset: 3px; border-radius: 4px; }"
+    },
+    {
+      "name": "Docs Aside",
+      "kind": "card",
+      "refersTo": "docs-aside",
+      "description": "A Starlight aside as a bordered panel; the state lives in the title colour and word; caution and danger add their wash.",
+      "html": "<div class=\"ds-aside-stack\"><aside class=\"ds-aside ds-tip\"><p class=\"ds-aside-title\">Tip</p><p><code class=\"ds-code\">local</code> (git) and <code class=\"ds-code\">hot</code> (sqlite, <code class=\"ds-code\">canon init</code>'s default) both need zero network.</p></aside><aside class=\"ds-aside ds-caution\"><p class=\"ds-aside-title\">Caution</p><p>Experimental (0.11.0, off by default): evidence binding to artifacts and JUnit/Cucumber reports.</p></aside></div>",
+      "css": ".ds-aside-stack { display: grid; gap: 16px; font-family: var(--f-sans, \"Mona Sans Variable\", system-ui, sans-serif); } .ds-aside { padding: 1rem; border: 1px solid #30363d; border-radius: var(--radius-md, 10px); background: #151b23; color: #d1d9e0; line-height: 1.7; } .ds-aside p { margin: 0; } .ds-aside .ds-aside-title { margin-bottom: 0.4rem; font-weight: 650; } .ds-tip .ds-aside-title { color: var(--c-pass, #4ac26b); } .ds-caution { border-color: color-mix(in srgb, var(--c-pending, #d29922) 45%, #30363d); background: #2b2111; } .ds-caution .ds-aside-title { color: var(--c-pending, #d29922); } .ds-code { padding: 0.1em 0.35em; border-radius: 5px; background: var(--c-raise, #1d242d); font-family: var(--f-mono, \"Geist Mono Variable\", ui-monospace, Menlo, monospace); font-size: 0.875em; color: #f0f6fc; }"
     }
   ],
   "narrative": {
-    "northStar": "The Grid Manual",
-    "overview": "canon reads as an engineering standard set in the International Typographic Style: every claim sits flush-left on a strict twelve-column grid, and every proof is a numbered figure the reader can check. The landing page and the Starlight docs are one world: the same off-white ground, near-black ink, grey hairline column rules, and a signal orange that marks canon's own.\n\nThe first viewport is scaled from the approved 1536x1024 comp through a single unit (`--u`, one comp pixel, bounded by viewport width, height, and 1.35px), so the composition holds its proportions rather than reflowing. Below the fold the page switches to fluid `clamp()` sizes on the same twelve columns. Density is low and typographic; there are no cards, no shadows, no gradients, no rounded corners.\n\nThe world refuses the dev-tool hero with a glowing terminal and a feature-card grid. Proof is drawn from real build-time data (Fig. 1 is generated from canon's own corpus), never illustrated.",
+    "northStar": "The Checks Panel",
+    "overview": "**Creative North Star: \"The Checks Panel\"**\n\ncanon is drawn as the screen its audience already trusts: a pull request whose checks block the merge. The landing page and the docs share one GitHub-dark ground, panels with 1px edges, rows divided by horizontal rules, and state colours that always arrive with a word. Nothing is decorated; every surface is a panel, a row, a log, or a table, and the composition borrows its authority from the tooling engineers already read every day.\n\nDensity is that of a code-review screen, not a marketing page. The first viewport is a fixed composition (a three-line statement and an install command on the left, the pull-request panel on the right) scaled as one frame; everything after it is fluid sections of panels and tables at a comfortable reading measure. Emphasis comes from weight and from the single red verdict, never from a brand colour: the system has no accent hue of its own, only the colours of check states.\n\nThe docs (Starlight) are the same world in reading mode: the same ground, panel, rule, and text values mapped onto Starlight's custom properties, code frames styled as the inset log field, and a readable GitHub-light theme kept available. The rejected Grid Manual world (warm paper, orange signal, twelve vertical column hairlines) does not survive anywhere.",
     "keyCharacteristics": [
-      "Twelve visible hairline column rules over the whole page (four on mobile).",
-      "Signal orange marks canon's own: the Fig. 1 field (canon's own corpus) and canon's row in the Fig. 3 comparison table; elsewhere orange is state (hover, focus, selection) or a single marker.",
-      "Spline Sans bold at poster scale with tight negative tracking; Inconsolata for commands, captions, and data.",
-      "Square corners everywhere; black command bar and black code blocks.",
-      "Numbered \"Fig.\" captions and black rules that carry stations and section heads."
+      "GitHub-dark ground with tonal panels a few steps lighter; depth by tone and 1px edges, not shadow.",
+      "Horizontal row dividers and panel edges only; no vertical grid hairlines.",
+      "Check-state colours (pass, fail, pending, waiting) are the only hues, and each is paired with a word or an icon.",
+      "Mona Sans bold for statements and UI; Geist Mono for commands, logs, and code.",
+      "One orchestrated motion: the checks resolve, the gate log arrives, the Merge blocked badge answers once.",
+      "The first viewport scales as a single 1774px frame down to 1100px, then stacks."
     ],
     "rules": [
       {
-        "name": "The Canon's Own Rule",
-        "body": "Signal orange fills only what is canon's own: the Fig. 1 field (canon's own corpus) and canon's own row in the Fig. 3 comparison table. Other tools' rows and every other region stay ground and ink. Elsewhere orange appears only as state (hover, focus, selection, active tab), as the gate node on Fig. 2, and as the docs danger aside.",
+        "name": "The Word Beside the Colour Rule",
+        "body": "A state colour never stands alone. Every dot, ring, or tint sits beside its word (\"passed\", \"waiting\", \"Merge blocked\", \"Yes\", \"Partial\", \"No\", \"Not documented\") or a distinct icon shape, so the panel reads the same in greyscale.",
         "section": "colors"
       },
       {
-        "name": "The Visible Grid Rule",
-        "body": "Column rules are always drawn, behind content, never hidden at any breakpoint.",
+        "name": "The No Brand Accent Rule",
+        "body": "There is no accent hue. Links, focus, and the current page use the text and grey steps; red, green, and amber appear only where they report a check state.",
         "section": "colors"
       },
       {
-        "name": "The Tight Display Rule",
-        "body": "Bold display sizes always carry negative tracking (-0.02em to -0.05em); text sizes stay near zero.",
+        "name": "The Tint Not Stripe Rule",
+        "body": "A highlighted row (the canon row in the comparison) is a full-row background tint. Never a coloured side stripe or a thick left border.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weight Not Size Rule",
+        "body": "Hierarchy inside panels is carried by weight (600–700 for names, 400 for summaries) and by text grey, not by extra sizes. Headings use 650 or 700; nothing uses a light weight.",
         "section": "typography"
       },
       {
-        "name": "The Mono Means Checkable Rule",
-        "body": "Monospace is for commands, data, and captions, never for headings or prose.",
+        "name": "The Mono Means Machine Rule",
+        "body": "Geist Mono is reserved for what a machine reads or prints: commands, logs, paths, code. Never for headings or decoration.",
         "section": "typography"
       },
       {
-        "name": "The Flush-Left Rule",
-        "body": "Every text block starts on a column gutter line; nothing is centred.",
+        "name": "The Rows Not Columns Rule",
+        "body": "Lines run horizontally: panel edges and the dividers between rows. There are no vertical grid hairlines or column rules anywhere, including inside tables. The only vertical strokes are the 2px thread joining timeline badges (beside the text, never through it) and the 1px divider inside the command field before Copy.",
         "section": "layout"
       },
       {
-        "name": "The Flat Page Rule",
-        "body": "Separation is a rule or a fill, never a shadow, blur, or gradient.",
+        "name": "The Real Table Rule",
+        "body": "The comparison is a real `<table>` at every width: inside a labelled, focusable scroll region, with a minimum width (1220px, 1100px stacked) and a sticky first column of tool names. It never reflows into cards.",
+        "section": "layout"
+      },
+      {
+        "name": "The Edge Before Shadow Rule",
+        "body": "A surface separates from the ground with a tone step and a 1px border. A shadow is never the primary separator.",
         "section": "elevation"
       }
     ],
     "dos": [
-      "**Do** keep the twelve column rules visible behind every surface.",
-      "**Do** reserve the signal-orange fill for canon's own figure (Fig. 1) and canon's own comparison row (Fig. 3), and use it otherwise only for hover, focus (2px outline, 3px offset; ink inside the orange Fig. 1 field), selection, and the Fig. 2 gate node.",
-      "**Do** set every proof as a numbered \"Fig.\" with a mono caption and real data.",
-      "**Do** keep corners square and separation flat: rules and fills only.",
-      "**Do** start every text block on a gutter line, flush-left."
+      "**Do** draw every new surface from the pull-request vocabulary: panels with a 1px edge, rows divided by horizontal rules, logs in an inset well.",
+      "**Do** pair every state colour with its word or a distinct icon shape (The Word Beside the Colour Rule).",
+      "**Do** keep the comparison a real `<table>` in a labelled scroll region with a sticky first column at every width.",
+      "**Do** express first-viewport sizes in `--u` units so the composition scales as one frame down to 1100px, and stack at 1099px and below.",
+      "**Do** keep motion to the one orchestrated sequence (checks resolve on 300ms steps with a 520ms ease-out-expo pop, the gate log arrives, the badge pulses once) and only under `prefers-reduced-motion: no-preference`; every word is visible from the first frame.",
+      "**Do** mirror landing tokens into Starlight through its custom properties, and keep the docs light theme on GitHub's light palette."
     ],
     "donts": [
-      "**Don't** add shadows, gradients, blur, or rounded corners.",
-      "**Don't** use a glowing-terminal hero or a grid of feature cards.",
-      "**Don't** set headings or prose in the monospace.",
-      "**Don't** put white text on signal orange; text on it is ink."
+      "**Don't** draw vertical grid hairlines or column rules; the rejected Grid Manual world is gone (The Rows Not Columns Rule).",
+      "**Don't** introduce a brand accent hue or use red, green, or amber for anything other than a check state.",
+      "**Don't** mark a highlighted row with a coloured side stripe; tint the whole row.",
+      "**Don't** reflow the comparison into cards on small screens.",
+      "**Don't** use Geist Mono for headings or decorative labels.",
+      "**Don't** separate surfaces with drop shadows; use a tone step and a 1px edge."
     ]
   }
 }
