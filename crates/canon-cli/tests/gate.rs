@@ -1233,9 +1233,19 @@ fn canons_own_policy_enables_spec_coverage_against_its_own_corpus() {
         panic!("canon's own policy must resolve spec_coverage to Active, got {:?}", resolution.spec_coverage);
     };
     assert!(require_evidence, "the section exists to require evidence; a false here would be a section that enforces nothing");
-    // 0.12 plan R6: turning review on for canon's own corpus is a
-    // separate, deliberate dogfooding change, never a release side effect.
-    assert_eq!(require_review, None, "canon's own policy must not enable spec_coverage.require_review in 0.12");
+    // 0.12 plan R6 kept review off until a separate, deliberate
+    // dogfooding change; 0.13 RV3 is that change: canon's own 257
+    // scenarios were independently reviewed, then `require_review: {}`
+    // was switched on with its defaults.
+    assert_eq!(
+        require_review,
+        Some(canon_gate::RequireReview {
+            scope: vec![canon_model::SubjectStatus::Verifying, canon_model::SubjectStatus::Shipped],
+            distinct_actor: true,
+            block_on_findings: true,
+        }),
+        "canon's own policy enables spec_coverage.require_review with its defaults since 0.13 RV3"
+    );
     assert_eq!(
         scope,
         vec![canon_model::SubjectStatus::Building, canon_model::SubjectStatus::Verifying],
