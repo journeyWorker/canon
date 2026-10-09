@@ -76,6 +76,11 @@ fn inventory_file_without_a_surface_segment_is_still_accepted() {
     assert!(hit.is_none(), "did not expect a layout-grammar violation for an inventory file omitting the optional surface segment: {report:#?}");
 }
 
+/// format.corpus.06, both halves on ONE file's content: under a
+/// `surface=lounge/` segment that disagrees with its declared `hub`
+/// surface it is a layout-grammar violation; the identical bytes with the
+/// segment omitted are accepted, because the segment is optional and only
+/// the agreement is enforced.
 #[test]
 fn inventory_file_with_a_surface_segment_disagreeing_with_content_is_rejected() {
     let report = check(&fixture_root());
@@ -83,6 +88,23 @@ fn inventory_file_with_a_surface_segment_disagreeing_with_content_is_rejected() 
         v.class == FmtFailureClass::LayoutGrammar && v.path.to_string_lossy().contains("surface=lounge/idolive-hub-wrong-surface.yaml")
     });
     assert!(hit.is_some(), "expected a layout-grammar violation for a surface segment that disagrees with the file's own content: {report:#?}");
+
+    let content = std::fs::read(fixture_root().join("inventory/kind=inventory/area=idolive/surface=lounge/idolive-hub-wrong-surface.yaml")).unwrap();
+    let corpus = tempfile::tempdir().unwrap();
+    let area = corpus.path().join("inventory/kind=inventory/area=idolive");
+    std::fs::create_dir_all(area.join("surface=lounge")).unwrap();
+    std::fs::write(area.join("surface=lounge/idolive-hub-mismatched.yaml"), &content).unwrap();
+    std::fs::write(area.join("idolive-hub-omitted.yaml"), &content).unwrap();
+
+    let report = check(corpus.path());
+    assert_eq!(report.files_checked, 2, "both copies must be checked: {report:#?}");
+    let layout: Vec<_> = report.violations.iter().filter(|v| v.class == FmtFailureClass::LayoutGrammar).collect();
+    assert_eq!(layout.len(), 1, "only the mismatched copy is a layout-grammar violation: {report:#?}");
+    assert!(layout[0].path.to_string_lossy().contains("surface=lounge/idolive-hub-mismatched.yaml"), "{report:#?}");
+    assert!(
+        !report.violations.iter().any(|v| v.path.to_string_lossy().contains("idolive-hub-omitted.yaml")),
+        "the same content with the optional segment omitted must be accepted: {report:#?}"
+    );
 }
 
 #[test]
