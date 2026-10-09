@@ -1094,6 +1094,85 @@ fn evidence_files(ledger_root: &Path) -> Vec<PathBuf> {
     out
 }
 
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn scenario_add_args<'a>(extra: &[&'a str]) -> Vec<&'a str> {
+    let mut args = vec!["evidence", "add", "--scenario-id", "core.login.01", "--project-id", "core", "--kind", "test-run", "--ref", "cargo test login", "--role", "implementer", "--repo", "."];
+    args.extend_from_slice(extra);
+    args
+}
+
+fn the_only_staged_record(ledger_root: &Path) -> serde_json::Value {
+    let files = evidence_files(ledger_root);
+    assert_eq!(files.len(), 1, "exactly one evidence record must be staged: {files:?}");
+    assert!(files[0].components().any(|c| c.as_os_str() == "_staging"), "the record is staged, not committed: {}", files[0].display());
+    serde_json::from_slice(&std::fs::read(&files[0]).unwrap()).unwrap()
+}
+
+/// evidence.add.11 through the real command: a faithful add citing a
+/// JUnit report whose matching case failed exits 1 naming that case and
+/// stages nothing; once the case passes the staged record carries the
+/// report's path, sha256, matched case and passed outcome.
+#[test]
+fn evidence_add_with_a_report_refuses_a_failed_case_and_binds_a_passing_one() {
+    let dir = repo_with_spec_corpus();
+    let ledger_root = dir.path().join(".canon/ledger");
+    let failing = r#"<testsuites><testsuite name="login"><testcase classname="login" name="core.login.01 signs in"><failure message="boom"/></testcase></testsuite></testsuites>"#;
+    std::fs::write(dir.path().join("junit.xml"), failing).unwrap();
+
+    let refused = run_canon(&scenario_add_args(&["--report", "junit:junit.xml"]), dir.path());
+    assert_eq!(refused.status.code(), Some(1), "stdout: {}\nstderr: {}", stdout(&refused), stderr(&refused));
+    assert!(stderr(&refused).contains("records case `core.login.01 signs in` as failed"), "stderr: {}", stderr(&refused));
+    assert_eq!(evidence_files(&ledger_root), Vec::<PathBuf>::new(), "a refused add stages nothing");
+
+    let passing = r#"<testsuites><testsuite name="login"><testcase classname="login" name="core.login.01 signs in"/></testsuite></testsuites>"#;
+    std::fs::write(dir.path().join("junit.xml"), passing).unwrap();
+    let added = run_canon(&scenario_add_args(&["--report", "junit:junit.xml"]), dir.path());
+    assert!(added.status.success(), "stderr: {}", stderr(&added));
+
+    let record = the_only_staged_record(&ledger_root);
+    assert_eq!(
+        record["attachments"],
+        serde_json::json!([{
+            "path": "junit.xml",
+            "sha256": sha256_hex(passing.as_bytes()),
+            "format": "junit",
+            "case": "core.login.01 signs in",
+            "outcome": "passed"
+        }]),
+        "{record}"
+    );
+}
+
+/// evidence.add.12 through the real command: an in-repository file binds
+/// by its repository-relative path and sha256 (no case, no outcome — it
+/// is never run); a file outside the repository is refused as a usage
+/// error and stages nothing.
+#[test]
+fn evidence_add_with_an_artifact_binds_path_and_digest_and_refuses_an_outside_file() {
+    let dir = repo_with_spec_corpus();
+    let ledger_root = dir.path().join(".canon/ledger");
+
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::write(outside.path().join("trace.zip"), b"elsewhere").unwrap();
+    let outside_path = outside.path().join("trace.zip");
+    let refused = run_canon(&scenario_add_args(&["--artifact", outside_path.to_str().unwrap()]), dir.path());
+    assert_eq!(refused.status.code(), Some(2), "stdout: {}\nstderr: {}", stdout(&refused), stderr(&refused));
+    assert!(stderr(&refused).contains("outside the repository"), "stderr: {}", stderr(&refused));
+    assert_eq!(evidence_files(&ledger_root), Vec::<PathBuf>::new(), "a refused add stages nothing");
+
+    std::fs::create_dir_all(dir.path().join("traces")).unwrap();
+    std::fs::write(dir.path().join("traces/run.zip"), b"trace-bytes").unwrap();
+    let added = run_canon(&scenario_add_args(&["--artifact", "traces/run.zip"]), dir.path());
+    assert!(added.status.success(), "stderr: {}", stderr(&added));
+
+    let record = the_only_staged_record(&ledger_root);
+    assert_eq!(record["attachments"], serde_json::json!([{ "path": "traces/run.zip", "sha256": sha256_hex(b"trace-bytes") }]), "{record}");
+}
+
 /// `--task` stays fully supported and unchanged — this change widens
 /// the command, it does not migrate it.
 #[test]

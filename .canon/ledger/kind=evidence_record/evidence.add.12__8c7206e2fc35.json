@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-09T05:30:19.747521Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate evidence_add_with_an_artifact_binds_path_and_digest_and_refuses_an_outside_file"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "evidence.add.12",
+  "schema": 1,
+  "staging_id": "ef82c7095950",
+  "verdict": "faithful"
+}
