@@ -51,7 +51,7 @@ fn dispatch_begin(repo: &Path) -> serde_json::Value {
 #[test]
 fn dispatch_begin_records_retrieved_guidance_into_the_manifest() {
     let dir = tempfile::tempdir().unwrap();
-    seed(dir.path(), "always check Option before unwrap");
+    let id = seed(dir.path(), "always check Option before unwrap");
 
     let summary = dispatch_begin(dir.path());
     let manifest_path = summary["manifest"].as_str().expect("summary carries the manifest path");
@@ -59,11 +59,15 @@ fn dispatch_begin_records_retrieved_guidance_into_the_manifest() {
 
     let guidance = summary["injected_guidance"].as_array().expect("injected_guidance is an array");
     assert_eq!(guidance.len(), 1, "the one seeded strategy is recorded: {summary}");
+    assert_eq!(guidance[0]["strategy_id"], id.to_string(), "the injected guidance is the seeded strategy");
+    assert_eq!(guidance[0]["title"], "guidance");
     assert_eq!(guidance[0]["content"], "always check Option before unwrap");
 
-    // The written file itself deserializes as a Run carrying the same snapshot.
+    // The written file itself deserializes as a Run carrying the SAME
+    // snapshot the summary reported — identity and content, not a count.
     let run: Run = serde_json::from_str(&std::fs::read_to_string(manifest_path).unwrap()).expect("the manifest is a valid Run");
-    assert_eq!(run.injected_guidance.len(), 1);
+    assert_eq!(serde_json::to_value(&run.injected_guidance).unwrap(), summary["injected_guidance"], "the on-disk guidance must equal the injected summary snapshot");
+    assert_eq!(run.run_id.to_string(), summary["run_id"].as_str().expect("summary carries the run id"), "the manifest is the reported run");
 }
 
 #[test]
