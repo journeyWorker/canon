@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-09T05:29:08.814673Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib divergence::tests::resolve_and_defer_commit_directly_without_touching_staging"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "divergence.lifecycle.03",
+  "schema": 1,
+  "staging_id": "28c11cce9375",
+  "verdict": "faithful"
+}

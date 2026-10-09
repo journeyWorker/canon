@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-09T05:29:08.934235Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib divergence::tests::a_moved_live_binding_reads_resolved_invalid_without_rewriting_the_resolution"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 11,
+  "scenario_id": "divergence.lifecycle.08",
+  "schema": 1,
+  "staging_id": "d395257903fc",
+  "verdict": "faithful"
+}
