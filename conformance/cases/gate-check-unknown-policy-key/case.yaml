@@ -1,0 +1,4 @@
+description: "an unknown top-level `policy.yaml` key (here the typo `spec_coverag`) makes `canon gate check` exit 1 with an `uncovered-cell` line naming the key and the known keys — a misspelled section never reads as not opted in"
+steps:
+  - args: [gate, check]
+    exit: 1

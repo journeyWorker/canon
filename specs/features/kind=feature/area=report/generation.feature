@@ -69,8 +69,8 @@ Feature: report generation
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a repository and an output directory for the snapshot
     When the report is run in snapshot mode against that directory
-    Then it reports nine tables and writes one Parquet file per mart
-    And the manifest beside them lists exactly those nine tables
+    Then it reports ten tables and writes one Parquet file per mart
+    And the manifest beside them lists exactly those ten tables
     And the markdown report is not written, because exporting and generating are different actions
 
   @subject:report-generation

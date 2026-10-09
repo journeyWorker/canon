@@ -100,7 +100,7 @@ fn snapshot_writes_ten_parquet_files_and_a_manifest_under_the_given_dir() {
     assert!(stdout(&output).contains("10 table(s)"), "{}", stdout(&output));
 
     // New marts append; established table order never moves.
-    for table in [
+    let tables = [
         "mart_trust_matrix",
         "mart_session_costs",
         "mart_role_memory",
@@ -111,13 +111,24 @@ fn snapshot_writes_ten_parquet_files_and_a_manifest_under_the_given_dir() {
         "mart_review_rounds",
         "mart_review_totals",
         "mart_run_observability",
-    ] {
-        assert!(snapshot_dir.join(format!("{table}.parquet")).is_file(), "missing {table}.parquet");
-    }
+    ];
+    let mut parquet_files: Vec<String> = std::fs::read_dir(&snapshot_dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name.ends_with(".parquet"))
+        .collect();
+    parquet_files.sort();
+    let mut expected_files: Vec<String> = tables.iter().map(|table| format!("{table}.parquet")).collect();
+    expected_files.sort();
+    assert_eq!(parquet_files, expected_files, "exactly one Parquet file per mart");
+
     let manifest_path = snapshot_dir.join("manifest.json");
     assert!(manifest_path.is_file());
     let manifest: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&manifest_path).unwrap()).unwrap();
-    assert_eq!(manifest["tables"].as_array().unwrap().len(), 10);
+    let listed: Vec<(&str, &str)> =
+        manifest["tables"].as_array().unwrap().iter().map(|entry| (entry["table"].as_str().unwrap(), entry["file"].as_str().unwrap())).collect();
+    let expected_listing: Vec<(&str, String)> = tables.iter().map(|table| (*table, format!("{table}.parquet"))).collect();
+    assert_eq!(listed, expected_listing.iter().map(|(table, file)| (*table, file.as_str())).collect::<Vec<_>>(), "the manifest lists exactly those ten tables");
 
     // `--snapshot` never wrote/touched `.canon/REPORT.md` — it is a
     // distinct action from the default write mode.

@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-g5",
+    "role": "reviewer"
+  },
+  "at": "2026-10-09T05:55:55.469469Z",
+  "change_id": "canon-0-13-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "b556ab7529a332aa0b28d0a0f98bdd62fcbb9a63",
+  "reviewer": "canon-reviewer-g5",
+  "round": 1,
+  "schema": 1,
+  "seq": 9,
+  "severity": "blocker",
+  "summary": "Unbound-dispatch evidence names a removed test, leaving the exact-manifest claim without its cited proof."
+}

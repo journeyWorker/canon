@@ -12,7 +12,7 @@ packages/core-*/bin/*
 # written by `canon ingest`/`sync` and tests; derived from committed
 # openspec/ + specs/ sources, regenerable, never committed).
 #
-# THREE exceptions, all for the same reason: the record is not
+# FOUR exceptions, all for the same reason: the record is not
 # regenerable from any committed source because it is AUTHORED.
 #
 # s42 (`close-the-open-loops`) carved out `EvidenceRecord` — an
@@ -36,6 +36,11 @@ packages/core-*/bin/*
 # missing subject on any fresh checkout (CI included), so the gate's
 # answer depended on whose laptop ran it.
 #
+# Review records join them in 0.13 (`spec_coverage.require_review`): a
+# Review is a reviewer's attestation that no source regenerates, and with
+# the policy on, a fresh checkout without them reads every scenario as
+# unreviewed — CI included.
+#
 # Written as `ledger/*` + re-includes because a negation cannot
 # resurrect a path whose PARENT directory is excluded. `_staging/` is
 # still matched by the `*` line, so a STAGED (unpromoted) record stays
@@ -43,6 +48,7 @@ packages/core-*/bin/*
 .canon/ledger/*
 !.canon/ledger/kind=evidence_record/
 !.canon/ledger/kind=finding/
+!.canon/ledger/kind=review/
 !.canon/ledger/kind=subject/
 .canon/learn/
 .canon/r2/

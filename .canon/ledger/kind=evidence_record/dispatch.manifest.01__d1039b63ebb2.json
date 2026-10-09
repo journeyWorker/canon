@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-09T05:26:51.593887Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test dispatch dispatch_begin_records_retrieved_guidance_into_the_manifest"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "dispatch.manifest.01",
+  "schema": 1,
+  "staging_id": "6bd01f55353b",
+  "verdict": "faithful"
+}

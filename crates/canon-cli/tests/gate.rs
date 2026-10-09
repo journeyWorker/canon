@@ -103,6 +103,31 @@ fn gate_check_exits_gate_red_on_a_seeded_uncovered_cell_violation() {
     assert!(text.contains("seed-change#1"), "{text}");
 }
 
+/// A misspelled top-level `policy.yaml` key fails the gate, naming the
+/// key and the known keys, instead of silently reading as "not opted in";
+/// a file using only known keys gates green.
+#[test]
+fn gate_check_fails_on_an_unknown_top_level_policy_key() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  test-run: agent\nspec_coverag:\n  require_evidence: true\n").unwrap();
+
+    let output = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    assert_eq!(output.status.code(), Some(1), "stdout: {}\nstderr: {}", stdout(&output), stderr(&output));
+    let text = stdout(&output);
+    assert!(
+        text.contains(&format!(
+            "uncovered-cell spec_coverag — `spec_coverag` is not a known top-level policy.yaml key (known keys: {}); fix it or remove it",
+            canon_gate::KNOWN_TOP_LEVEL_KEYS.join(", ")
+        )),
+        "{text}"
+    );
+
+    std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  test-run: agent\nquery:\n  allow_sensitive: false\n").unwrap();
+    let output = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    assert!(output.status.success(), "known keys must gate green; stdout: {}", stdout(&output));
+}
+
 #[test]
 fn gate_check_release_flag_engages_release_trust_check_but_ordinary_run_stays_silent_on_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -129,7 +154,12 @@ fn gate_check_release_flag_engages_release_trust_check_but_ordinary_run_stays_si
 
     let release = run_canon(&["gate", "check", "--repo", ".", "--release"], dir.path());
     assert_eq!(release.status.code(), Some(1));
-    assert!(stdout(&release).contains("unreviewed-promotion"), "TrustLadderCheck must still be present under --release");
+    let release_text = stdout(&release);
+    assert!(release_text.contains("unreviewed-promotion"), "TrustLadderCheck must still be present under --release:\n{release_text}");
+    assert!(
+        release_text.lines().any(|line| line.trim_start().starts_with("trust-below-required seed-change#1 — class `p1` requires `human` trust")),
+        "the release run must report trust-below-required for the seeded p1 record:\n{release_text}"
+    );
 }
 
 /// D7/task 1.4-equivalent for `canon gate`: run from a SUBDIRECTORY of a
@@ -1041,6 +1071,106 @@ fn evidence_add_refuses_a_scenario_id_without_a_project_id() {
     let out = run_canon(&["evidence", "add", "--scenario-id", "core.login.01", "--kind", "test-run", "--ref", "x", "--role", "implementer", "--repo", "."], dir.path());
     assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
     assert!(stderr(&out).contains("--project-id"), "stderr: {}", stderr(&out));
+    assert!(stdout(&out).is_empty(), "a refused add must not report a staged record: {}", stdout(&out));
+    assert_eq!(evidence_files(&dir.path().join(".canon/ledger")), Vec::<PathBuf>::new(), "a refused add must leave no staged or committed evidence");
+}
+
+/// Every evidence record file under `ledger_root`, staged (`_staging/`)
+/// or committed.
+fn evidence_files(ledger_root: &Path) -> Vec<PathBuf> {
+    fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.components().any(|c| c.as_os_str() == "kind=evidence_record") {
+                out.push(path);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(ledger_root, &mut out);
+    out
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn scenario_add_args<'a>(extra: &[&'a str]) -> Vec<&'a str> {
+    let mut args = vec!["evidence", "add", "--scenario-id", "core.login.01", "--project-id", "core", "--kind", "test-run", "--ref", "cargo test login", "--role", "implementer", "--repo", "."];
+    args.extend_from_slice(extra);
+    args
+}
+
+fn the_only_staged_record(ledger_root: &Path) -> serde_json::Value {
+    let files = evidence_files(ledger_root);
+    assert_eq!(files.len(), 1, "exactly one evidence record must be staged: {files:?}");
+    assert!(files[0].components().any(|c| c.as_os_str() == "_staging"), "the record is staged, not committed: {}", files[0].display());
+    serde_json::from_slice(&std::fs::read(&files[0]).unwrap()).unwrap()
+}
+
+/// evidence.add.11 through the real command: a faithful add citing a
+/// JUnit report whose matching case failed exits 1 naming that case and
+/// stages nothing; once the case passes the staged record carries the
+/// report's path, sha256, matched case and passed outcome.
+#[test]
+fn evidence_add_with_a_report_refuses_a_failed_case_and_binds_a_passing_one() {
+    let dir = repo_with_spec_corpus();
+    let ledger_root = dir.path().join(".canon/ledger");
+    let failing = r#"<testsuites><testsuite name="login"><testcase classname="login" name="core.login.01 signs in"><failure message="boom"/></testcase></testsuite></testsuites>"#;
+    std::fs::write(dir.path().join("junit.xml"), failing).unwrap();
+
+    let refused = run_canon(&scenario_add_args(&["--report", "junit:junit.xml"]), dir.path());
+    assert_eq!(refused.status.code(), Some(1), "stdout: {}\nstderr: {}", stdout(&refused), stderr(&refused));
+    assert!(stderr(&refused).contains("records case `core.login.01 signs in` as failed"), "stderr: {}", stderr(&refused));
+    assert_eq!(evidence_files(&ledger_root), Vec::<PathBuf>::new(), "a refused add stages nothing");
+
+    let passing = r#"<testsuites><testsuite name="login"><testcase classname="login" name="core.login.01 signs in"/></testsuite></testsuites>"#;
+    std::fs::write(dir.path().join("junit.xml"), passing).unwrap();
+    let added = run_canon(&scenario_add_args(&["--report", "junit:junit.xml"]), dir.path());
+    assert!(added.status.success(), "stderr: {}", stderr(&added));
+
+    let record = the_only_staged_record(&ledger_root);
+    assert_eq!(
+        record["attachments"],
+        serde_json::json!([{
+            "path": "junit.xml",
+            "sha256": sha256_hex(passing.as_bytes()),
+            "format": "junit",
+            "case": "core.login.01 signs in",
+            "outcome": "passed"
+        }]),
+        "{record}"
+    );
+}
+
+/// evidence.add.12 through the real command: an in-repository file binds
+/// by its repository-relative path and sha256 (no case, no outcome — it
+/// is never run); a file outside the repository is refused as a usage
+/// error and stages nothing.
+#[test]
+fn evidence_add_with_an_artifact_binds_path_and_digest_and_refuses_an_outside_file() {
+    let dir = repo_with_spec_corpus();
+    let ledger_root = dir.path().join(".canon/ledger");
+
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::write(outside.path().join("trace.zip"), b"elsewhere").unwrap();
+    let outside_path = outside.path().join("trace.zip");
+    let refused = run_canon(&scenario_add_args(&["--artifact", outside_path.to_str().unwrap()]), dir.path());
+    assert_eq!(refused.status.code(), Some(2), "stdout: {}\nstderr: {}", stdout(&refused), stderr(&refused));
+    assert!(stderr(&refused).contains("outside the repository"), "stderr: {}", stderr(&refused));
+    assert_eq!(evidence_files(&ledger_root), Vec::<PathBuf>::new(), "a refused add stages nothing");
+
+    std::fs::create_dir_all(dir.path().join("traces")).unwrap();
+    std::fs::write(dir.path().join("traces/run.zip"), b"trace-bytes").unwrap();
+    let added = run_canon(&scenario_add_args(&["--artifact", "traces/run.zip"]), dir.path());
+    assert!(added.status.success(), "stderr: {}", stderr(&added));
+
+    let record = the_only_staged_record(&ledger_root);
+    assert_eq!(record["attachments"], serde_json::json!([{ "path": "traces/run.zip", "sha256": sha256_hex(b"trace-bytes") }]), "{record}");
 }
 
 /// `--task` stays fully supported and unchanged — this change widens
@@ -1103,9 +1233,19 @@ fn canons_own_policy_enables_spec_coverage_against_its_own_corpus() {
         panic!("canon's own policy must resolve spec_coverage to Active, got {:?}", resolution.spec_coverage);
     };
     assert!(require_evidence, "the section exists to require evidence; a false here would be a section that enforces nothing");
-    // 0.12 plan R6: turning review on for canon's own corpus is a
-    // separate, deliberate dogfooding change, never a release side effect.
-    assert_eq!(require_review, None, "canon's own policy must not enable spec_coverage.require_review in 0.12");
+    // 0.12 plan R6 kept review off until a separate, deliberate
+    // dogfooding change; 0.13 RV3 is that change: canon's own 257
+    // scenarios were independently reviewed, then `require_review: {}`
+    // was switched on with its defaults.
+    assert_eq!(
+        require_review,
+        Some(canon_gate::RequireReview {
+            scope: vec![canon_model::SubjectStatus::Verifying, canon_model::SubjectStatus::Shipped],
+            distinct_actor: true,
+            block_on_findings: true,
+        }),
+        "canon's own policy enables spec_coverage.require_review with its defaults since 0.13 RV3"
+    );
     assert_eq!(
         scope,
         vec![canon_model::SubjectStatus::Building, canon_model::SubjectStatus::Verifying],

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-r2",
+    "role": "reviewer"
+  },
+  "at": "2026-10-09T05:55:56.324673Z",
+  "change_id": "canon-0-13-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "02fc7ffdb5d46e51941d8b936b70b7555785afb9",
+  "reviewed_sha": "b556ab7529a332aa0b28d0a0f98bdd62fcbb9a63",
+  "reviewer": "canon-reviewer-g2",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "blocker",
+  "summary": "Align the promotion scenario with the approval-gated command path"
+}

@@ -67,6 +67,57 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.13.0 release
+
+Version 0.13.0 makes `canon context --json` parseable, makes an unknown
+`policy.yaml` key fail the gate, and has canon pass its own review
+requirement.
+
+**Typed policy summary in `canon context --json`.** `spec_coverage`,
+`evidence_binding`, and `review.requireReview` are now JSON objects
+instead of one-line summary strings. `spec_coverage` and
+`evidence_binding` are keyed like `policy.yaml`, with booleans as booleans
+and lists as arrays (`{"require_evidence": true, "scope": ["verifying",
+"shipped"], "exclude_lanes": [], "require_cases": ["failure"],
+"require_review": null}`); `review.requireReview` is
+`{"scope": [...], "distinctActor": true, "blockOnFindings": true}` or
+`null`. A present but unusable section is `{"invalid": "<detail>"}`
+instead of an `INVALID — …` string. `capabilityVersion` is 5. The text
+outline is unchanged. *Migration:* a consumer that parsed the old strings
+(`require_evidence=true scope=verifying, shipped …`) reads the fields
+directly, and checks for an `invalid` key instead of an `INVALID` prefix.
+
+**Unknown `policy.yaml` keys fail the gate.** A top-level key canon does
+not know, such as the typo `spec_coverag`, used to be ignored, so a
+misspelled section read as not opted in. The new `policy-keys` check makes
+`canon gate check` report it as `uncovered-cell <key>`, naming the known
+keys: `adapter_capabilities`, `allowed_signers`, `approval`,
+`experimental`, `query`, `risk_approvals`, `risk_routing`, `risk_tiers`,
+`schema`, `spec_coverage`, `staleness`, `trust_required`, `trust_sample`.
+Parsing of the known keys is unchanged. *Migration:* fix or remove any
+unknown top-level key before upgrading.
+
+**Canon reviews its own corpus.** Six independent reviewers, none of them
+the evidence actor, read each of canon's 257 scenarios, its proving test,
+and the code under test. They withheld 17 sign-offs and raised 16 findings
+(3 blocker, 13 should-fix). All 16 are fixed, mostly by strengthening the
+tests, plus three corrected spec claims (`learn.promotion.01`,
+`query.read.04`/`05`, `report.generation.07`); the withheld scenarios were
+re-reviewed and every finding is closed as fixed.
+`spec_coverage.require_review` is now on in canon's own policy, and review
+records (`.canon/ledger/kind=review/`) are tracked in git, so a fresh
+checkout, CI included, sees the same reviews.
+
+**Changed conformance expectations.** `version` re-blessed for
+`canon 0.13.0`. `context-json-policy-summary` was re-blessed for the typed
+`spec_coverage` object, `evidence_binding` as `{"invalid": …}`, and
+`capabilityVersion` 5. New case `gate-check-unknown-policy-key` pins the
+`uncovered-cell spec_coverag` violation and exit 1. Every other case is
+unchanged.
+
+**Website.** The docs site is redesigned as the "Checks Panel" (a
+PR-checks hero and a real HTML comparison table, no grid hairlines).
+
 ## 0.12.0 release
 
 Version 0.12.0 pins canon's command-line behavior in a conformance corpus,

@@ -2301,6 +2301,31 @@ mod begin_tests {
         tmp
     }
 
+    /// dispatch.manifest.02's byte-identity half. The comparison is
+    /// against a `Run` built with a literal `None` task_id and no
+    /// `with_parent_run_id` call, carrying only the guidance and lineage
+    /// the dispatch captured — so this fails the moment either binding
+    /// key starts serializing as `null` instead of vanishing.
+    /// Load-bearing beyond cosmetics: canon's write-time idempotence
+    /// keys on a content digest over exactly these bytes.
+    #[test]
+    fn a_dispatch_with_neither_flag_writes_todays_exact_manifest() {
+        let tmp = repo_without_plan_sources();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default())
+            .expect("a dispatch with no binding always succeeds");
+
+        let manifest = std::fs::read_to_string(&begun.manifest_path).expect("the manifest was written");
+        assert!(!manifest.contains("task_id"), "a no-flag manifest must carry NO task_id key at all:\n{manifest}");
+        assert!(!manifest.contains("parent_run_id"), "a no-flag manifest must carry NO parent_run_id key at all:\n{manifest}");
+
+        let lineage = begun.run.lineage.clone().expect("a dispatch always records lineage");
+        let unbound = Run::new(begun.run.envelope.clone(), begun.run.run_id, None, None, begun.run.status, begun.run.started_at, begun.run.ended_at)
+            .with_injected_guidance(begun.run.injected_guidance.clone())
+            .with_lineage(lineage);
+        let expected = serde_json::to_string_pretty(&unbound).expect("a Run is always serializable");
+        assert_eq!(manifest, expected, "an unbound dispatch must write the run serialized without binding fields, byte for byte");
+    }
+
     #[test]
     fn an_unbound_dispatch_omits_binding_keys_but_records_deterministic_lineage() {
         let tmp = repo_without_plan_sources();

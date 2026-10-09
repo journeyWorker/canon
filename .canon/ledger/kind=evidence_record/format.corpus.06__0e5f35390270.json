@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-09T05:25:15.154545Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --test schema_and_surface_checks inventory_file_with_a_surface_segment_disagreeing_with_content_is_rejected"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 11,
+  "scenario_id": "format.corpus.06",
+  "schema": 1,
+  "staging_id": "8359d798e45c",
+  "verdict": "faithful"
+}

@@ -373,29 +373,58 @@ mod tests {
         assert_eq!(run_seq, 1, "the refused candidate must not have consumed run_seq 1");
     }
 
+    /// Every file under `dir`, with its bytes, in path order.
+    fn files_with_bytes(dir: &Path) -> Vec<(std::path::PathBuf, Vec<u8>)> {
+        fn walk(dir: &Path, out: &mut Vec<(std::path::PathBuf, Vec<u8>)>) {
+            let Ok(entries) = std::fs::read_dir(dir) else { return };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else {
+                    let bytes = std::fs::read(&path).unwrap();
+                    out.push((path, bytes));
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(dir, &mut out);
+        out.sort();
+        out
+    }
+
     #[test]
     fn resolve_and_defer_commit_directly_without_touching_staging() {
         let dir = TempDir::new().unwrap();
         let (project_id, scenario_id, role, sha) = ids();
+        let deferred_id = ScenarioId::parse("world.firstbuy-hotdeal.51").unwrap();
 
         // Something else is mid-`stage`.
         assert_eq!(run_stage(dir.path(), &project_id, &ScenarioId::parse("world.firstbuy-hotdeal.50").unwrap(), &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role), 0);
+        let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
+        let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
+        let staged_before = files_with_bytes(&staging_dir);
+        assert_eq!(staged_before.len(), 1, "exactly the one unrelated candidate is staged");
 
         assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role), 0);
-        let expiry = Utc::now() + chrono::Duration::days(7);
-        assert_eq!(
-            run_defer(dir.path(), &project_id, &ScenarioId::parse("world.firstbuy-hotdeal.51").unwrap(), &sha, 1, "reviewer-1", "needs another look", expiry, "agent-x", &role),
-            0
-        );
+        // Whole seconds so the persisted expiry compares exactly.
+        let expiry = chrono::DateTime::from_timestamp((Utc::now() + chrono::Duration::days(7)).timestamp(), 0).unwrap();
+        assert_eq!(run_defer(dir.path(), &project_id, &deferred_id, &sha, 1, "reviewer-1", "needs another look", expiry, "agent-x", &role), 0);
 
-        let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let committed = GitTier::new(&gate_ctx.ledger_root);
         let landed = committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap();
-        assert_eq!(landed.records.len(), 2, "resolve + defer both committed");
+        let mut records: Vec<canon_model::records::Divergence> =
+            landed.records.into_iter().map(|record| serde_json::from_value(record.0).expect("a committed divergence")).collect();
+        records.sort_by(|a, b| a.scenario_id.as_str().cmp(b.scenario_id.as_str()));
+        assert_eq!(records.len(), 2, "resolve + defer both committed without a promote step");
+        assert_eq!((&records[0].project_id, &records[0].scenario_id, &records[0].status), (&project_id, &scenario_id, &DivergenceStatus::Resolved));
+        assert_eq!(
+            (&records[1].project_id, &records[1].scenario_id, &records[1].status),
+            (&project_id, &deferred_id, &DivergenceStatus::Deferred { reason: "needs another look".to_string(), expiry })
+        );
 
-        // The unrelated staged candidate is still sitting there, untouched.
-        let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
-        assert_eq!(std::fs::read_dir(&staging_dir).unwrap().count(), 1);
+        // The unrelated staged candidate is still sitting there, byte-identical.
+        assert_eq!(files_with_bytes(&staging_dir), staged_before, "a direct commit must never touch staged work");
     }
 
     #[test]
@@ -411,5 +440,38 @@ mod tests {
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, Utc::now());
         assert_eq!(states.get(&(project_id, scenario_id)), Some(&canon_model::FoldedState::Resolved));
+    }
+
+    /// divergence.lifecycle.08 against a real ledger: a committed
+    /// resolution against sha `a` reads back as resolved-invalid once the
+    /// scenario's live evidence binding names sha `b`, and neither
+    /// `canon divergence status` nor the fold rewrites the persisted
+    /// resolved record — the downgrade is derived at read time.
+    #[test]
+    fn a_moved_live_binding_reads_resolved_invalid_without_rewriting_the_resolution() {
+        let dir = TempDir::new().unwrap();
+        let (project_id, scenario_id, role, sha) = ids();
+        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role), 0);
+
+        let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
+        let moved = Sha::parse("b".repeat(40)).unwrap();
+        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent-x", RoleId::parse("implementer").unwrap()));
+        let binding = canon_model::EvidenceRecord::new(envelope, None, Some(scenario_id.clone()), None, canon_model::EvidenceVerdict::Faithful)
+            .with_project_id(project_id.clone())
+            .with_evidence_sha(moved);
+        GitTier::new(&gate_ctx.ledger_root).write(&binding).expect("writing the live binding");
+
+        let divergence_dir = gate_ctx.ledger_root.join("kind=divergence");
+        let persisted_before = files_with_bytes(&divergence_dir);
+        assert_eq!(persisted_before.len(), 1, "exactly the one committed resolution");
+
+        assert_eq!(run_status(dir.path(), None), 0);
+        let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, Utc::now());
+        assert_eq!(states.get(&(project_id, scenario_id)), Some(&canon_model::FoldedState::ResolvedInvalid));
+
+        assert_eq!(files_with_bytes(&divergence_dir), persisted_before, "reading must never rewrite the persisted resolution");
+        let persisted: canon_model::records::Divergence = serde_json::from_slice(&persisted_before[0].1).unwrap();
+        assert_eq!(persisted.status, DivergenceStatus::Resolved, "the record on disk still says resolved");
+        assert_eq!(persisted.sha, sha);
     }
 }

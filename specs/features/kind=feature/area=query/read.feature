@@ -40,17 +40,17 @@ Feature: query read
     When its natural key is resolved
     Then the key is the project, the scenario and the pin joined together
     And two attestations of the same scenario at two commits are two distinct keys, not two versions of one
-    And folding by key would therefore drop an attestation rather than collapse a duplicate
+    And a review query returns both attestations, because reviews are never folded by key and so neither is dropped as a stale version
 
   @subject:query-reads
   @case:edge
   @query.read.05
   Scenario: A since cutoff admits records at or after it and nothing older
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given two records of one kind, one five days old and one written now
+    Given records of one kind five days old, stamped exactly two days ago, and written now
     When the corpus is queried with a cutoff two days ago
-    Then only the record at or after the cutoff is returned
-    And the older record is filtered out even though it lives in a different tier than the newer one
+    Then the record stamped exactly at the cutoff and the newer record are returned
+    And the older record is filtered out even though it lives in a different tier than the newer ones
 
   @subject:query-reads
   @case:happy

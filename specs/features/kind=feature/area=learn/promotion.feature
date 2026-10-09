@@ -4,12 +4,14 @@ Feature: learn promotion
   @subject:learn-promotion
   @case:happy
   @learn.promotion.01
-  Scenario: A proven strategy graduates into a git-tracked file
+  Scenario: A proven strategy with a verified human approval graduates into a git-tracked file
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given a distilled strategy and a regime carrying enough corroborating successes to clear its gate
-    When that strategy is promoted
+    Given a quarantined distilled strategy and a regime carrying enough corroborating successes to clear its gate
+    And a valid paired evaluation of it and a human approval signed by a policy-pinned signer
+    When that strategy is promoted with the evaluation and the approval
     Then the command succeeds and a file appears in the git-tracked strategies tier
     And the strategy has moved from derived memory into something a person can review in a diff
+    And the same promotion without the evaluation and the approval is refused and writes nothing
 
   @subject:learn-promotion
   @case:happy

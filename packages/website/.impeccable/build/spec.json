@@ -1,200 +1,125 @@
 {
   "tool": "comp-spec",
   "version": 1,
-  "createdAt": "2026-10-08T17:12:00.224Z",
-  "comp": ".impeccable/comps/landing.png",
+  "createdAt": "2026-10-09T04:19:07.531Z",
+  "comp": ".impeccable/comps/landing-pr.png",
   "warnings": [
-    "region column-rules: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)",
-    "region fig-chart: \"codeDrawn\": true set in the regions file (the painted-material refusal is overridden: code draws this region)",
-    "region fig-panel: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)"
+    "region pr-panel: \"container\": true set in the regions file (the region-size refusal is overridden: one undivided element)"
   ],
-  "uncoveredInkCells": [],
+  "uncoveredInkCells": [
+    "H0",
+    "I0",
+    "E3"
+  ],
   "compSize": {
-    "width": 1536,
-    "height": 1024
+    "width": 1774,
+    "height": 887
   },
-  "aspect": 1.5,
+  "aspect": 2,
   "orientation": "landscape",
   "palette": [
     {
-      "hex": "#f5f8f3",
-      "coverage": 0.6287
+      "hex": "#0d1818",
+      "coverage": 0.9456
     },
     {
-      "hex": "#f74f18",
-      "coverage": 0.2435
+      "hex": "#ecf2f7",
+      "coverage": 0.0344
     },
     {
-      "hex": "#090909",
-      "coverage": 0.1102
+      "hex": "#313641",
+      "coverage": 0.0134
     },
     {
-      "hex": "#b4b4b4",
-      "coverage": 0.0088
+      "hex": "#a42828",
+      "coverage": 0.0048
     },
     {
-      "hex": "#370f08",
-      "coverage": 0.0087
+      "hex": "#696979",
+      "coverage": 0.0018
     }
   ],
   "bands": [
     {
-      "y": 0.0235,
-      "strength": 0.2281
+      "y": 0.0781,
+      "strength": 0.233
     },
     {
-      "y": 0.1176,
-      "strength": 0.625
+      "y": 0.2656,
+      "strength": 0.2639
     },
     {
-      "y": 0.2235,
-      "strength": 0.5795
+      "y": 0.3281,
+      "strength": 0.3766
     },
     {
-      "y": 0.2824,
-      "strength": 0.5409
+      "y": 0.3906,
+      "strength": 0.5866
     },
     {
-      "y": 0.3294,
-      "strength": 0.9785
+      "y": 0.4375,
+      "strength": 0.6148
     },
     {
-      "y": 0.3882,
-      "strength": 0.8134
+      "y": 0.5,
+      "strength": 0.2863
     },
     {
-      "y": 0.4353,
-      "strength": 0.3222
+      "y": 0.5469,
+      "strength": 0.6129
     },
     {
-      "y": 0.4941,
-      "strength": 0.29
+      "y": 0.5938,
+      "strength": 0.4444
     },
     {
-      "y": 0.5882,
-      "strength": 0.3105
-    },
-    {
-      "y": 0.6235,
-      "strength": 0.7547
-    },
-    {
-      "y": 0.6471,
-      "strength": 0.2482
-    },
-    {
-      "y": 0.6824,
-      "strength": 1
-    },
-    {
-      "y": 0.7765,
-      "strength": 0.3208
-    },
-    {
-      "y": 0.8353,
-      "strength": 0.3761
-    },
-    {
-      "y": 0.8706,
-      "strength": 0.7966
-    },
-    {
-      "y": 0.9294,
-      "strength": 0.4589
+      "y": 0.6406,
+      "strength": 0.248
     }
   ],
   "regions": [
     {
-      "id": "column-rules",
-      "kind": "chrome",
-      "note": "twelve-column grid: thin grey vertical hairline column rules over the bright white ground, full height",
-      "grid": "A0:J9",
-      "container": true,
-      "snap": false,
-      "box": {
-        "x": 0,
-        "y": 0,
-        "w": 1,
-        "h": 1
-      },
-      "px": {
-        "x": 0,
-        "y": 0,
-        "w": 1536,
-        "h": 1024
-      },
-      "aspect": 1.5,
-      "palette": [
-        {
-          "hex": "#f5f8f3",
-          "coverage": 0.6287
-        },
-        {
-          "hex": "#f74f18",
-          "coverage": 0.2435
-        },
-        {
-          "hex": "#090909",
-          "coverage": 0.1102
-        },
-        {
-          "hex": "#b4b4b4",
-          "coverage": 0.0088
-        },
-        {
-          "hex": "#370f08",
-          "coverage": 0.0087
-        }
-      ],
-      "detail": {
-        "energy": 33.9983
-      },
-      "medium": "semantic",
-      "plate": null,
-      "text": null
-    },
-    {
       "id": "wordmark",
       "kind": "text",
-      "note": "canon wordmark, bold black grotesk, lowercase",
+      "note": "canon wordmark, bold light grotesk, lowercase, top left",
       "grid": null,
       "box": {
-        "x": 0.0371,
-        "y": 0.0244,
-        "w": 0.0612,
-        "h": 0.0195
+        "x": 0.0466,
+        "y": 0.0421,
+        "w": 0.067,
+        "h": 0.037
       },
       "px": {
-        "x": 57,
-        "y": 25,
-        "w": 94,
-        "h": 20
+        "x": 83,
+        "y": 37,
+        "w": 119,
+        "h": 33
       },
-      "aspect": 4.7,
+      "aspect": 3.6061,
       "palette": [
         {
-          "hex": "#0a0a0a",
-          "coverage": 0.5561
+          "hex": "#0c1417",
+          "coverage": 0.5427
         },
         {
-          "hex": "#f3f3f3",
-          "coverage": 0.3004
+          "hex": "#ebf0f4",
+          "coverage": 0.3246
         },
         {
-          "hex": "#4b4b4a",
-          "coverage": 0.0987
+          "hex": "#50555e",
+          "coverage": 0.0545
         },
         {
-          "hex": "#b6b8b8",
-          "coverage": 0.0314
+          "hex": "#9c9fa9",
+          "coverage": 0.0427
         },
         {
-          "hex": "#8d8d8d",
-          "coverage": 0.0135
+          "hex": "#2d313c",
+          "coverage": 0.0355
         }
       ],
       "detail": {
-        "energy": 44.4415
+        "energy": 41.2156
       },
       "medium": "semantic",
       "plate": null,
@@ -202,115 +127,137 @@
       "type": {
         "comp": {
           "lines": 1,
-          "glyphs": 6,
-          "capHeightPx": 20,
+          "glyphs": 5,
+          "capHeightPx": 23.3,
           "inkIsDark": false,
           "allCaps": false,
-          "advance": 0.3125,
-          "advTall": 0.3125,
+          "advance": 0.9032,
+          "advTall": 0.9032,
           "advX": null,
-          "gap": 0.25,
-          "xRatio": 0.7599,
-          "stemW": 0.1539,
-          "contrast": 1.7342,
-          "serif": 1.0634,
-          "densTall": 0.5266,
+          "gap": 0.1075,
+          "xRatio": 0.8394,
+          "stemW": 0.2695,
+          "contrast": 1.1525,
+          "serif": 0.8297,
+          "densTall": 0.6354,
           "densX": null,
-          "weight": 0.5266
+          "weight": 0.6354
         },
-        "widthClass": "compressed",
-        "weightClass": "medium"
+        "widthClass": "wide",
+        "weightClass": "bold"
       }
     },
     {
       "id": "nav",
       "kind": "control",
-      "note": "nav links Docs, CLI, Concepts, GitHub in black grotesk regular, right-aligned on column lines",
+      "note": "nav links Docs, CLI, Concepts, GitHub in light grey regular sans, right aligned",
       "grid": null,
       "box": {
-        "x": 0.7533,
-        "y": 0.0264,
-        "w": 0.2051,
-        "h": 0.0156
+        "x": 0.7219,
+        "y": 0.0536,
+        "w": 0.2232,
+        "h": 0.0281
       },
       "px": {
-        "x": 1157,
-        "y": 27,
-        "w": 315,
-        "h": 16
+        "x": 1281,
+        "y": 48,
+        "w": 396,
+        "h": 25
       },
-      "aspect": 19.6875,
+      "aspect": 15.84,
       "palette": [
         {
-          "hex": "#f2f6f1",
-          "coverage": 0.762
+          "hex": "#091517",
+          "coverage": 0.8332
         },
         {
-          "hex": "#100f10",
-          "coverage": 0.1118
+          "hex": "#a7b5c4",
+          "coverage": 0.0579
         },
         {
-          "hex": "#4b4c4c",
-          "coverage": 0.0575
+          "hex": "#d4e3f0",
+          "coverage": 0.057
         },
         {
-          "hex": "#b7bbb9",
-          "coverage": 0.0367
+          "hex": "#78828e",
+          "coverage": 0.0349
         },
         {
-          "hex": "#8a8b8b",
-          "coverage": 0.0319
+          "hex": "#333845",
+          "coverage": 0.017
         }
       ],
       "detail": {
-        "energy": 114.8882
+        "energy": 71.4876
       },
       "medium": "semantic",
       "plate": null,
-      "text": null
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 21,
+          "capHeightPx": 17,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6038,
+          "advTall": 0.648,
+          "advX": 0.5891,
+          "gap": 0.1178,
+          "xRatio": 0.7239,
+          "stemW": 0.1495,
+          "contrast": 1.052,
+          "serif": 0.5856,
+          "densTall": 0.4345,
+          "densX": 0.5324,
+          "weight": 0.4345
+        },
+        "widthClass": "normal",
+        "weightClass": "regular"
+      }
     },
     {
       "id": "headline",
       "kind": "text",
-      "note": "huge flush-left black heavy grotesk headline, three lines: Agents say done. / canon makes them / prove it.",
+      "note": "huge bold light-grey grotesk headline, three lines: Agents say done. / canon makes / them prove it.",
       "grid": null,
       "box": {
-        "x": 0.0352,
-        "y": 0.1924,
-        "w": 0.5391,
-        "h": 0.3291
+        "x": 0.0338,
+        "y": 0.3099,
+        "w": 0.3903,
+        "h": 0.2997
       },
       "px": {
-        "x": 54,
-        "y": 197,
-        "w": 828,
-        "h": 337
+        "x": 60,
+        "y": 275,
+        "w": 692,
+        "h": 266
       },
-      "aspect": 2.457,
+      "aspect": 2.6015,
       "palette": [
         {
-          "hex": "#f4f7f2",
-          "coverage": 0.6797
+          "hex": "#091618",
+          "coverage": 0.707
         },
         {
-          "hex": "#090909",
-          "coverage": 0.2933
+          "hex": "#edf2f7",
+          "coverage": 0.2612
         },
         {
-          "hex": "#b9b9b9",
-          "coverage": 0.0129
+          "hex": "#afb4bc",
+          "coverage": 0.0139
         },
         {
-          "hex": "#818181",
-          "coverage": 0.0077
+          "hex": "#757d85",
+          "coverage": 0.0112
         },
         {
-          "hex": "#454545",
-          "coverage": 0.0064
+          "hex": "#494c57",
+          "coverage": 0.0066
         }
       ],
       "detail": {
-        "energy": 67.111
+        "energy": 68.6209
       },
       "medium": "semantic",
       "plate": null,
@@ -318,93 +265,141 @@
       "type": {
         "comp": {
           "lines": 3,
-          "glyphs": 24,
-          "capHeightPx": 86.5,
-          "inkIsDark": true,
+          "glyphs": 29,
+          "capHeightPx": 66.3,
+          "inkIsDark": false,
           "allCaps": false,
-          "advance": 0.6226,
-          "advTall": 0.588,
-          "advX": 0.6226,
-          "gap": 0.0346,
-          "xRatio": 0.7263,
-          "stemW": 0.2076,
-          "contrast": 1.1534,
-          "serif": 0.9919,
-          "densTall": 0.6305,
-          "densX": 0.7009,
-          "weight": 0.6305
+          "advance": 0.6774,
+          "advTall": 0.4959,
+          "advX": 0.6818,
+          "gap": 0.0756,
+          "xRatio": 0.7139,
+          "stemW": 0.2108,
+          "contrast": 1.1887,
+          "serif": 0.9939,
+          "densTall": 0.5795,
+          "densX": 0.658,
+          "weight": 0.5795
         },
         "widthClass": "normal",
         "weightClass": "bold",
         "chosen": {
-          "family": "Spline Sans",
+          "family": "Mona Sans",
           "weight": 700,
-          "fontSizePx": 111,
+          "fontSizePx": 91,
           "source": "index",
           "fp": {
             "lines": 1,
             "glyphs": 13,
-            "capHeightPx": 86.5,
+            "capHeightPx": 67,
             "inkIsDark": true,
             "allCaps": false,
-            "advance": 0.6243,
-            "advTall": 0.659,
-            "advX": 0.6243,
-            "gap": 0.1156,
-            "xRatio": 0.698,
-            "stemW": 0.2077,
-            "contrast": 1.2028,
-            "serif": 1,
-            "densTall": 0.605,
-            "densX": 0.6799,
-            "weight": 0.605
+            "advance": 0.7015,
+            "advTall": 0.7313,
+            "advX": 0.7015,
+            "gap": 0.1194,
+            "xRatio": 0.7352,
+            "stemW": 0.2134,
+            "contrast": 1.2469,
+            "serif": 1.035,
+            "densTall": 0.5727,
+            "densX": 0.6548,
+            "weight": 0.5727
           },
-          "stamp": "866e4b5571ac"
+          "stamp": "3e6cd874dca4"
         }
       }
     },
     {
-      "id": "subline",
-      "kind": "text",
-      "note": "line: A verification gate for agent-written work. regular black grotesk",
+      "id": "command-field",
+      "kind": "chrome",
+      "note": "dark command field with thin grey border, small radius, divider before the Copy button",
       "grid": null,
+      "snap": false,
       "box": {
-        "x": 0.0371,
-        "y": 0.5664,
-        "w": 0.2982,
-        "h": 0.0244
+        "x": 0.0344,
+        "y": 0.6594,
+        "w": 0.4343,
+        "h": 0.1097
       },
       "px": {
-        "x": 57,
-        "y": 580,
-        "w": 458,
-        "h": 25
+        "x": 61,
+        "y": 585,
+        "w": 770,
+        "h": 97
       },
-      "aspect": 18.32,
+      "aspect": 7.9381,
       "palette": [
         {
-          "hex": "#f3f6f3",
-          "coverage": 0.6967
+          "hex": "#16181a",
+          "coverage": 0.8827
         },
         {
-          "hex": "#0a0a0a",
-          "coverage": 0.1899
+          "hex": "#353d44",
+          "coverage": 0.0825
         },
         {
-          "hex": "#363637",
-          "coverage": 0.0458
+          "hex": "#becee2",
+          "coverage": 0.0176
         },
         {
-          "hex": "#c5c7c6",
-          "coverage": 0.0375
+          "hex": "#8292a0",
+          "coverage": 0.0116
         },
         {
-          "hex": "#696968",
-          "coverage": 0.03
+          "hex": "#606776",
+          "coverage": 0.0056
         }
       ],
       "detail": {
-        "energy": 153.7478
+        "energy": 18.1913
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "command-text",
+      "kind": "text",
+      "note": "monospace command: $ bunx @journeykit/canon init",
+      "grid": null,
+      "box": {
+        "x": 0.0523,
+        "y": 0.6977,
+        "w": 0.2519,
+        "h": 0.0332
+      },
+      "px": {
+        "x": 93,
+        "y": 619,
+        "w": 447,
+        "h": 29
+      },
+      "aspect": 15.4138,
+      "palette": [
+        {
+          "hex": "#14171b",
+          "coverage": 0.806
+        },
+        {
+          "hex": "#3c4651",
+          "coverage": 0.0604
+        },
+        {
+          "hex": "#c1d4e7",
+          "coverage": 0.0557
+        },
+        {
+          "hex": "#6a7886",
+          "coverage": 0.0389
+        },
+        {
+          "hex": "#9aaabc",
+          "coverage": 0.0389
+        }
+      ],
+      "detail": {
+        "energy": 86.3179
       },
       "medium": "semantic",
       "plate": null,
@@ -412,515 +407,189 @@
       "type": {
         "comp": {
           "lines": 1,
-          "glyphs": 35,
-          "capHeightPx": 20,
-          "inkIsDark": true,
+          "glyphs": 26,
+          "capHeightPx": 19.4,
+          "inkIsDark": false,
           "allCaps": false,
-          "advance": 0.5888,
-          "advTall": 0.4009,
-          "advX": 0.6014,
-          "gap": 0.0752,
-          "xRatio": 0.6992,
+          "advance": 0.6193,
+          "advTall": 0.6193,
+          "advX": 0.6193,
+          "gap": 0.1806,
+          "xRatio": 0.7088,
           "stemW": 0.1446,
-          "contrast": 1.0852,
-          "serif": 0.9231,
-          "densTall": 0.4712,
-          "densX": 0.5165,
-          "weight": 0.4712
+          "contrast": 1.101,
+          "serif": 1.0162,
+          "densTall": 0.3557,
+          "densX": 0.5213,
+          "weight": 0.3557
         },
         "widthClass": "normal",
         "weightClass": "regular",
         "chosen": {
-          "family": "Spline Sans",
+          "family": "Geist Mono",
           "weight": 400,
-          "fontSizePx": 25,
-          "source": "index",
-          "fp": {
-            "lines": 1,
-            "glyphs": 37,
-            "capHeightPx": 20.1,
-            "inkIsDark": true,
-            "allCaps": false,
-            "advance": 0.5475,
-            "advTall": 0.423,
-            "advX": 0.5724,
-            "gap": 0.1244,
-            "xRatio": 0.694,
-            "stemW": 0.1456,
-            "contrast": 1.0704,
-            "serif": 0.9982,
-            "densTall": 0.4736,
-            "densX": 0.554,
-            "weight": 0.4736
-          },
-          "stamp": "36b78bae89bf"
-        }
-      }
-    },
-    {
-      "id": "command",
-      "kind": "control",
-      "note": "black command field with monospace $ bunx @journeykit/canon init in white and a Copy control at its right end",
-      "grid": null,
-      "box": {
-        "x": 0.0371,
-        "y": 0.6172,
-        "w": 0.4434,
-        "h": 0.0664
-      },
-      "px": {
-        "x": 57,
-        "y": 632,
-        "w": 681,
-        "h": 68
-      },
-      "aspect": 10.0147,
-      "palette": [
-        {
-          "hex": "#0a0a0a",
-          "coverage": 0.9315
-        },
-        {
-          "hex": "#f1f1f1",
-          "coverage": 0.0326
-        },
-        {
-          "hex": "#b1b1b3",
-          "coverage": 0.0139
-        },
-        {
-          "hex": "#414141",
-          "coverage": 0.0135
-        },
-        {
-          "hex": "#787878",
-          "coverage": 0.0085
-        }
-      ],
-      "detail": {
-        "energy": 27.7101
-      },
-      "medium": "semantic",
-      "plate": null,
-      "text": null,
-      "type": {
-        "comp": {
-          "lines": 1,
-          "glyphs": 30,
-          "capHeightPx": 18.6,
-          "inkIsDark": false,
-          "allCaps": false,
-          "advance": 0.5647,
-          "advTall": 0.5916,
-          "advX": 0.5647,
-          "gap": 0.1345,
-          "xRatio": 0.7406,
-          "stemW": 0.1491,
-          "contrast": 1.0519,
-          "serif": 0.6089,
-          "densTall": 0.4108,
-          "densX": 0.5538,
-          "weight": 0.4108
-        },
-        "widthClass": "condensed",
-        "weightClass": "regular",
-        "chosen": {
-          "family": "Inconsolata",
-          "weight": 400,
-          "fontSizePx": 28,
+          "fontSizePx": 26,
           "source": "index",
           "fp": {
             "lines": 1,
             "glyphs": 26,
-            "capHeightPx": 18.7,
+            "capHeightPx": 19.1,
             "inkIsDark": true,
             "allCaps": false,
-            "advance": 0.5752,
-            "advTall": 0.5618,
-            "advX": 0.5886,
-            "gap": 0.1605,
-            "xRatio": 0.7161,
-            "stemW": 0.1411,
-            "contrast": 1.0576,
-            "serif": 0.8139,
-            "densTall": 0.3983,
-            "densX": 0.5287,
-            "weight": 0.3983
+            "advance": 0.6545,
+            "advTall": 0.6545,
+            "advX": 0.6414,
+            "gap": 0.1571,
+            "xRatio": 0.7326,
+            "stemW": 0.1456,
+            "contrast": 1.0594,
+            "serif": 0.9986,
+            "densTall": 0.3619,
+            "densX": 0.5133,
+            "weight": 0.3619
           },
-          "stamp": "1e011243bfac"
+          "stamp": "53137fd931f0"
         }
       }
     },
     {
-      "id": "guide-link",
+      "id": "copy-button",
       "kind": "control",
-      "note": "underlined text link: Read the getting started guide with a right arrow",
+      "note": "Copy button: copy icon plus the word Copy, slightly raised dark fill, rounded",
       "grid": null,
       "box": {
-        "x": 0.0371,
-        "y": 0.7188,
-        "w": 0.2142,
-        "h": 0.0244
+        "x": 0.3852,
+        "y": 0.6824,
+        "w": 0.0746,
+        "h": 0.0638
       },
       "px": {
-        "x": 57,
-        "y": 736,
-        "w": 329,
-        "h": 25
+        "x": 683,
+        "y": 605,
+        "w": 132,
+        "h": 57
       },
-      "aspect": 13.16,
+      "aspect": 2.3158,
       "palette": [
         {
-          "hex": "#f4f7f5",
-          "coverage": 0.615
+          "hex": "#181828",
+          "coverage": 0.5919
         },
         {
-          "hex": "#161616",
-          "coverage": 0.2659
+          "hex": "#182525",
+          "coverage": 0.3297
         },
         {
-          "hex": "#424242",
-          "coverage": 0.0575
+          "hex": "#cdd5e1",
+          "coverage": 0.0355
         },
         {
-          "hex": "#7b7e7d",
-          "coverage": 0.0472
+          "hex": "#96a0ab",
+          "coverage": 0.0233
         },
         {
-          "hex": "#d0cfd0",
-          "coverage": 0.0144
+          "hex": "#eef6f6",
+          "coverage": 0.0196
         }
       ],
       "detail": {
-        "energy": 133.6811
+        "energy": 17.0379
       },
       "medium": "semantic",
       "plate": null,
       "text": null
     },
     {
-      "id": "fig-caption",
-      "kind": "text",
-      "note": "monospace caption line: Fig. 1 canon's own corpus · 246 scenarios, black on orange",
-      "grid": null,
-      "box": {
-        "x": 0.6068,
-        "y": 0.1465,
-        "w": 0.2702,
-        "h": 0.0166
-      },
-      "px": {
-        "x": 932,
-        "y": 150,
-        "w": 415,
-        "h": 17
-      },
-      "aspect": 24.4118,
-      "palette": [
-        {
-          "hex": "#f64f19",
-          "coverage": 0.7758
-        },
-        {
-          "hex": "#0f0808",
-          "coverage": 0.0904
-        },
-        {
-          "hex": "#2f0908",
-          "coverage": 0.0471
-        },
-        {
-          "hex": "#9b2e0d",
-          "coverage": 0.0471
-        },
-        {
-          "hex": "#c33f14",
-          "coverage": 0.0395
-        }
-      ],
-      "detail": {
-        "energy": 60.1633
-      },
-      "medium": "semantic",
-      "plate": null,
-      "text": null,
-      "type": {
-        "comp": {
-          "lines": 1,
-          "glyphs": 33,
-          "capHeightPx": 13.4,
-          "inkIsDark": true,
-          "allCaps": false,
-          "advance": 0.6322,
-          "advTall": 0.595,
-          "advX": 0.6322,
-          "gap": 0.1488,
-          "xRatio": 0.7636,
-          "stemW": 0.1823,
-          "contrast": 1.1237,
-          "serif": 0.54,
-          "densTall": 0.4547,
-          "densX": 0.5768,
-          "weight": 0.4547
-        },
-        "widthClass": "normal",
-        "weightClass": "regular",
-        "chosen": {
-          "family": "Cousine",
-          "weight": 400,
-          "fontSizePx": 18,
-          "source": "index",
-          "fp": {
-            "lines": 1,
-            "glyphs": 33,
-            "capHeightPx": 13.2,
-            "inkIsDark": true,
-            "allCaps": false,
-            "advance": 0.6439,
-            "advTall": 0.6817,
-            "advX": 0.6439,
-            "gap": 0.1894,
-            "xRatio": 0.7506,
-            "stemW": 0.1768,
-            "contrast": 1.0974,
-            "serif": 0.8362,
-            "densTall": 0.5031,
-            "densX": 0.5997,
-            "weight": 0.5031
-          },
-          "stamp": "1f7079d05aef"
-        }
-      }
-    },
-    {
-      "id": "fig-chart",
+      "id": "pr-panel",
       "kind": "chrome",
-      "note": "data chart the page draws from corpus JSON at build time: black hairlines, one per scenario, each starting at its authored time on a time axis and running to the right edge; a few lines carry a short white gap",
-      "grid": null,
-      "codeDrawn": true,
-      "box": {
-        "x": 0.6055,
-        "y": 0.1875,
-        "w": 0.3496,
-        "h": 0.5391
-      },
-      "px": {
-        "x": 930,
-        "y": 192,
-        "w": 537,
-        "h": 552
-      },
-      "aspect": 0.9728,
-      "palette": [
-        {
-          "hex": "#f75018",
-          "coverage": 0.8651
-        },
-        {
-          "hex": "#120808",
-          "coverage": 0.0438
-        },
-        {
-          "hex": "#380f08",
-          "coverage": 0.0425
-        },
-        {
-          "hex": "#b73e16",
-          "coverage": 0.0283
-        },
-        {
-          "hex": "#892c08",
-          "coverage": 0.0202
-        }
-      ],
-      "detail": {
-        "energy": 24.9042
-      },
-      "medium": "semantic",
-      "plate": null,
-      "text": null
-    },
-    {
-      "id": "fig-panel",
-      "kind": "chrome",
-      "note": "flat signal-orange field, one undivided rectangle",
+      "note": "PR checks panel: dark surface, thin grey border, rounded corners, rows divided by thin rules",
       "grid": null,
       "container": true,
+      "snap": false,
       "box": {
-        "x": 0.5892,
-        "y": 0.1201,
-        "w": 0.3815,
-        "h": 0.751
+        "x": 0.507,
+        "y": 0.1964,
+        "w": 0.4636,
+        "h": 0.6709
       },
       "px": {
-        "x": 905,
-        "y": 123,
-        "w": 586,
-        "h": 769
+        "x": 899,
+        "y": 174,
+        "w": 822,
+        "h": 595
       },
-      "aspect": 0.762,
+      "aspect": 1.3815,
       "palette": [
         {
-          "hex": "#f74f18",
-          "coverage": 0.8516
+          "hex": "#151819",
+          "coverage": 0.9498
         },
         {
-          "hex": "#0c0808",
-          "coverage": 0.0808
+          "hex": "#303340",
+          "coverage": 0.0218
         },
         {
-          "hex": "#370f08",
-          "coverage": 0.0303
+          "hex": "#a42727",
+          "coverage": 0.017
         },
         {
-          "hex": "#912d0c",
-          "coverage": 0.023
+          "hex": "#f3f6f8",
+          "coverage": 0.0062
         },
         {
-          "hex": "#be4115",
-          "coverage": 0.0143
+          "hex": "#c5d4df",
+          "coverage": 0.0052
         }
       ],
       "detail": {
-        "energy": 21.9507
+        "energy": 12.9757
       },
       "medium": "semantic",
       "plate": null,
       "text": null
     },
     {
-      "id": "fig-total",
+      "id": "pr-branch",
       "kind": "text",
-      "note": "0 violations set huge in black heavy grotesk at the bottom of the orange field",
+      "note": "bold branch line: agent/feat-cart → main",
       "grid": null,
       "box": {
-        "x": 0.6055,
-        "y": 0.7568,
-        "w": 0.3516,
-        "h": 0.084
+        "x": 0.523,
+        "y": 0.2334,
+        "w": 0.1932,
+        "h": 0.0357
       },
       "px": {
-        "x": 930,
-        "y": 775,
-        "w": 540,
-        "h": 86
+        "x": 928,
+        "y": 207,
+        "w": 343,
+        "h": 32
       },
-      "aspect": 6.2791,
+      "aspect": 10.7188,
       "palette": [
         {
-          "hex": "#080808",
-          "coverage": 0.4816
+          "hex": "#14171a",
+          "coverage": 0.7575
         },
         {
-          "hex": "#f74d19",
-          "coverage": 0.4783
+          "hex": "#e3ecf2",
+          "coverage": 0.1293
         },
         {
-          "hex": "#310908",
-          "coverage": 0.0151
+          "hex": "#3a414b",
+          "coverage": 0.0453
         },
         {
-          "hex": "#932d0e",
-          "coverage": 0.0135
+          "hex": "#6e7480",
+          "coverage": 0.042
         },
         {
-          "hex": "#741f0a",
-          "coverage": 0.0116
+          "hex": "#b8c1c9",
+          "coverage": 0.0259
         }
       ],
       "detail": {
-        "energy": 33.6387
-      },
-      "medium": "semantic",
-      "plate": null,
-      "text": null,
-      "type": {
-        "comp": null,
-        "measuredAt": "2026-10-08T17:12:02.602Z",
-        "note": "no separable lettering in the crop; size by the region box"
-      }
-    },
-    {
-      "id": "stations-rule",
-      "kind": "chrome",
-      "note": "single black horizontal rule across the full grid near the bottom",
-      "grid": null,
-      "box": {
-        "x": 0.0215,
-        "y": 0.9248,
-        "w": 0.9577,
-        "h": 0.0039
-      },
-      "px": {
-        "x": 33,
-        "y": 947,
-        "w": 1471,
-        "h": 4
-      },
-      "aspect": 367.75,
-      "palette": [
-        {
-          "hex": "#f8f8f8",
-          "coverage": 0.9878
-        },
-        {
-          "hex": "#cdcfcd",
-          "coverage": 0.0071
-        },
-        {
-          "hex": "#aeabab",
-          "coverage": 0.0051
-        }
-      ],
-      "detail": {
-        "energy": 109.6219
-      },
-      "medium": "semantic",
-      "plate": null,
-      "text": null
-    },
-    {
-      "id": "stations",
-      "kind": "text",
-      "note": "station labels under the rule on column lines: intent, run, evidence, gate, decision, learning",
-      "grid": null,
-      "box": {
-        "x": 0.0384,
-        "y": 0.9453,
-        "w": 0.9219,
-        "h": 0.0176
-      },
-      "px": {
-        "x": 59,
-        "y": 968,
-        "w": 1416,
-        "h": 18
-      },
-      "aspect": 78.6667,
-      "palette": [
-        {
-          "hex": "#f3f7f1",
-          "coverage": 0.9187
-        },
-        {
-          "hex": "#0c0b0c",
-          "coverage": 0.0292
-        },
-        {
-          "hex": "#b0b2b2",
-          "coverage": 0.0278
-        },
-        {
-          "hex": "#353635",
-          "coverage": 0.016
-        },
-        {
-          "hex": "#707072",
-          "coverage": 0.0082
-        }
-      ],
-      "detail": {
-        "energy": 15.5057
+        "energy": 83.2207
       },
       "medium": "semantic",
       "plate": null,
@@ -928,25 +597,538 @@
       "type": {
         "comp": {
           "lines": 1,
-          "glyphs": 36,
-          "capHeightPx": 14,
-          "inkIsDark": true,
+          "glyphs": 20,
+          "capHeightPx": 21,
+          "inkIsDark": false,
           "allCaps": false,
-          "advance": 0.5722,
-          "advTall": 0.2503,
-          "advX": 0.5901,
-          "gap": 0.0715,
-          "xRatio": 0.7037,
-          "stemW": 0.1615,
-          "contrast": 1.044,
-          "serif": 0.8061,
-          "densTall": 0.6319,
-          "densX": 0.5859,
-          "weight": 0.6319
+          "advance": 0.6177,
+          "advTall": 0.3326,
+          "advX": 0.6177,
+          "gap": 0.095,
+          "xRatio": 0.7094,
+          "stemW": 0.1824,
+          "contrast": 1.1971,
+          "serif": 0.8751,
+          "densTall": 0.6303,
+          "densX": 0.6728,
+          "weight": 0.6303
         },
         "widthClass": "normal",
         "weightClass": "bold"
       }
+    },
+    {
+      "id": "merge-badge",
+      "kind": "control",
+      "note": "red filled rounded badge with white text Merge blocked",
+      "grid": null,
+      "box": {
+        "x": 0.8374,
+        "y": 0.2207,
+        "w": 0.1173,
+        "h": 0.0587
+      },
+      "px": {
+        "x": 1486,
+        "y": 196,
+        "w": 208,
+        "h": 52
+      },
+      "aspect": 4,
+      "palette": [
+        {
+          "hex": "#a42728",
+          "coverage": 0.8247
+        },
+        {
+          "hex": "#f4f1f1",
+          "coverage": 0.0794
+        },
+        {
+          "hex": "#b45d60",
+          "coverage": 0.0385
+        },
+        {
+          "hex": "#dec0bf",
+          "coverage": 0.0328
+        },
+        {
+          "hex": "#cb9293",
+          "coverage": 0.0246
+        }
+      ],
+      "detail": {
+        "energy": 30.2155
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "check-cargo",
+      "kind": "text",
+      "note": "green status dot, bold cargo test, em dash, grey passed",
+      "grid": null,
+      "box": {
+        "x": 0.5242,
+        "y": 0.3418,
+        "w": 0.1658,
+        "h": 0.0344
+      },
+      "px": {
+        "x": 930,
+        "y": 303,
+        "w": 294,
+        "h": 31
+      },
+      "aspect": 9.4839,
+      "palette": [
+        {
+          "hex": "#151719",
+          "coverage": 0.8239
+        },
+        {
+          "hex": "#e2e8ec",
+          "coverage": 0.0671
+        },
+        {
+          "hex": "#4edb6a",
+          "coverage": 0.0457
+        },
+        {
+          "hex": "#575c6a",
+          "coverage": 0.036
+        },
+        {
+          "hex": "#868f97",
+          "coverage": 0.0272
+        }
+      ],
+      "detail": {
+        "energy": 61.2795
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 17,
+          "capHeightPx": 17.6,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.569,
+          "advTall": 0.5121,
+          "advX": 0.6402,
+          "gap": 0.1138,
+          "xRatio": 0.7778,
+          "stemW": 0.1844,
+          "contrast": 1.1979,
+          "serif": null,
+          "densTall": 0.4883,
+          "densX": 0.5943,
+          "weight": 0.4883
+        },
+        "widthClass": "normal",
+        "weightClass": "medium"
+      }
+    },
+    {
+      "id": "check-lint",
+      "kind": "text",
+      "note": "green status dot, bold lint, em dash, grey passed",
+      "grid": null,
+      "box": {
+        "x": 0.5242,
+        "y": 0.4413,
+        "w": 0.1205,
+        "h": 0.0319
+      },
+      "px": {
+        "x": 930,
+        "y": 391,
+        "w": 214,
+        "h": 28
+      },
+      "aspect": 7.6429,
+      "palette": [
+        {
+          "hex": "#151719",
+          "coverage": 0.8157
+        },
+        {
+          "hex": "#50db6a",
+          "coverage": 0.07
+        },
+        {
+          "hex": "#c2d2e3",
+          "coverage": 0.0614
+        },
+        {
+          "hex": "#666f79",
+          "coverage": 0.0314
+        },
+        {
+          "hex": "#f2f4f4",
+          "coverage": 0.0214
+        }
+      ],
+      "detail": {
+        "energy": 43.5152
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 12,
+          "capHeightPx": 18.4,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.4897,
+          "advTall": 0.1632,
+          "advX": 0.5441,
+          "gap": 0.1088,
+          "xRatio": 0.6141,
+          "stemW": 0.147,
+          "contrast": 1.2374,
+          "serif": 1.0339,
+          "densTall": 0.8277,
+          "densX": 0.5672,
+          "weight": 0.8277
+        },
+        "widthClass": "condensed",
+        "weightClass": "black"
+      }
+    },
+    {
+      "id": "check-gate",
+      "kind": "text",
+      "note": "red status dot, bold canon gate check, em dash, grey 2 scenarios lack evidence",
+      "grid": null,
+      "box": {
+        "x": 0.5242,
+        "y": 0.5421,
+        "w": 0.3195,
+        "h": 0.0332
+      },
+      "px": {
+        "x": 930,
+        "y": 481,
+        "w": 567,
+        "h": 29
+      },
+      "aspect": 19.5517,
+      "palette": [
+        {
+          "hex": "#141719",
+          "coverage": 0.8025
+        },
+        {
+          "hex": "#b5c2d1",
+          "coverage": 0.0683
+        },
+        {
+          "hex": "#f0f3f4",
+          "coverage": 0.0504
+        },
+        {
+          "hex": "#616b78",
+          "coverage": 0.0453
+        },
+        {
+          "hex": "#373d48",
+          "coverage": 0.0336
+        }
+      ],
+      "detail": {
+        "energy": 79.6229
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 38,
+          "capHeightPx": 19,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.5521,
+          "advTall": 0.5784,
+          "advX": 0.5258,
+          "gap": 0.1052,
+          "xRatio": 0.6227,
+          "stemW": 0.1474,
+          "contrast": 1.0639,
+          "serif": 0.8818,
+          "densTall": 0.5133,
+          "densX": 0.5331,
+          "weight": 0.5133
+        },
+        "widthClass": "condensed",
+        "weightClass": "medium",
+        "chosen": {
+          "family": "Harmattan",
+          "weight": 400,
+          "fontSizePx": 32,
+          "source": "index",
+          "fp": {
+            "lines": 1,
+            "glyphs": 37,
+            "capHeightPx": 19.2,
+            "inkIsDark": true,
+            "allCaps": false,
+            "advance": 0.574,
+            "advTall": 0.5349,
+            "advX": 0.574,
+            "gap": 0.1044,
+            "xRatio": 0.6506,
+            "stemW": 0.1548,
+            "contrast": 1.112,
+            "serif": 0.9721,
+            "densTall": 0.4973,
+            "densX": 0.5849,
+            "weight": 0.4973
+          },
+          "stamp": "8d07836d14b6"
+        }
+      }
+    },
+    {
+      "id": "gate-log",
+      "kind": "chrome",
+      "note": "expanded log box, darker inset with thin border, small radius",
+      "grid": null,
+      "snap": false,
+      "box": {
+        "x": 0.5217,
+        "y": 0.6071,
+        "w": 0.4369,
+        "h": 0.125
+      },
+      "px": {
+        "x": 925,
+        "y": 538,
+        "w": 775,
+        "h": 111
+      },
+      "aspect": 6.982,
+      "palette": [
+        {
+          "hex": "#091818",
+          "coverage": 0.9081
+        },
+        {
+          "hex": "#121222",
+          "coverage": 0.0591
+        },
+        {
+          "hex": "#cad6e2",
+          "coverage": 0.0149
+        },
+        {
+          "hex": "#6a737e",
+          "coverage": 0.0111
+        },
+        {
+          "hex": "#3b444b",
+          "coverage": 0.0068
+        }
+      ],
+      "detail": {
+        "energy": 15.5298
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
+    },
+    {
+      "id": "gate-log-text",
+      "kind": "text",
+      "note": "monospace log: uncovered-cell cart.add.04 — spec scenario has no evidence record / exit 1",
+      "grid": null,
+      "box": {
+        "x": 0.5344,
+        "y": 0.6365,
+        "w": 0.4018,
+        "h": 0.0599
+      },
+      "px": {
+        "x": 948,
+        "y": 565,
+        "w": 713,
+        "h": 53
+      },
+      "aspect": 13.4528,
+      "palette": [
+        {
+          "hex": "#091618",
+          "coverage": 0.9197
+        },
+        {
+          "hex": "#d1dde7",
+          "coverage": 0.036
+        },
+        {
+          "hex": "#959fab",
+          "coverage": 0.0206
+        },
+        {
+          "hex": "#666c7b",
+          "coverage": 0.0125
+        },
+        {
+          "hex": "#4a5858",
+          "coverage": 0.0111
+        }
+      ],
+      "detail": {
+        "energy": 36.2063
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 55,
+          "capHeightPx": 14.6,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.6173,
+          "advTall": 0.6173,
+          "advX": 0.6173,
+          "gap": 0.1372,
+          "xRatio": 0.711,
+          "stemW": 0.1666,
+          "contrast": 1.1061,
+          "serif": 0.5452,
+          "densTall": 0.4752,
+          "densX": 0.5633,
+          "weight": 0.4752
+        },
+        "widthClass": "normal",
+        "weightClass": "regular"
+      }
+    },
+    {
+      "id": "check-deploy",
+      "kind": "text",
+      "note": "grey status dot, bold deploy, em dash, grey waiting",
+      "grid": null,
+      "box": {
+        "x": 0.5242,
+        "y": 0.7972,
+        "w": 0.1422,
+        "h": 0.0332
+      },
+      "px": {
+        "x": 930,
+        "y": 707,
+        "w": 252,
+        "h": 29
+      },
+      "aspect": 8.6897,
+      "palette": [
+        {
+          "hex": "#15171a",
+          "coverage": 0.7637
+        },
+        {
+          "hex": "#737c8a",
+          "coverage": 0.1002
+        },
+        {
+          "hex": "#eff2f5",
+          "coverage": 0.0525
+        },
+        {
+          "hex": "#b9c7d5",
+          "coverage": 0.0442
+        },
+        {
+          "hex": "#414854",
+          "coverage": 0.0394
+        }
+      ],
+      "detail": {
+        "energy": 57.4006
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null,
+      "type": {
+        "comp": {
+          "lines": 1,
+          "glyphs": 15,
+          "capHeightPx": 18.9,
+          "inkIsDark": false,
+          "allCaps": false,
+          "advance": 0.5172,
+          "advTall": 0.4111,
+          "advX": 0.6366,
+          "gap": 0.1061,
+          "xRatio": 0.6244,
+          "stemW": 0.1753,
+          "contrast": 1.1756,
+          "serif": 1.9291,
+          "densTall": 0.7594,
+          "densX": 0.5918,
+          "weight": 0.7594
+        },
+        "widthClass": "normal",
+        "weightClass": "black"
+      }
+    },
+    {
+      "id": "chevrons",
+      "kind": "control",
+      "note": "four row chevrons at the right edge: down, down, up (expanded), down",
+      "grid": null,
+      "snap": false,
+      "box": {
+        "x": 0.9375,
+        "y": 0.3418,
+        "w": 0.0166,
+        "h": 0.4847
+      },
+      "px": {
+        "x": 1663,
+        "y": 303,
+        "w": 29,
+        "h": 430
+      },
+      "aspect": 0.0674,
+      "palette": [
+        {
+          "hex": "#131819",
+          "coverage": 0.9735
+        },
+        {
+          "hex": "#282838",
+          "coverage": 0.0077
+        },
+        {
+          "hex": "#78869a",
+          "coverage": 0.0063
+        },
+        {
+          "hex": "#afc1d1",
+          "coverage": 0.0063
+        },
+        {
+          "hex": "#e8f3f8",
+          "coverage": 0.0063
+        }
+      ],
+      "detail": {
+        "energy": 1.3234
+      },
+      "medium": "semantic",
+      "plate": null,
+      "text": null
     }
   ]
 }

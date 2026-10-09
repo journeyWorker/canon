@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-r2",
+    "role": "reviewer"
+  },
+  "at": "2026-10-09T05:55:56.940014Z",
+  "change_id": "canon-0-13-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "d9025ae62187ec715d5b191192151fe202da746a",
+  "reviewed_sha": "b556ab7529a332aa0b28d0a0f98bdd62fcbb9a63",
+  "reviewer": "canon-reviewer-g5",
+  "round": 1,
+  "schema": 1,
+  "seq": 12,
+  "severity": "should_fix",
+  "summary": "Review natural-key proof never compares two commit pins or checks both attestations survive folding."
+}

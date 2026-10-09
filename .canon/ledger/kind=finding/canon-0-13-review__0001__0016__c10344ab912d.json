@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-r2",
+    "role": "reviewer"
+  },
+  "at": "2026-10-09T05:55:57.189295Z",
+  "change_id": "canon-0-13-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "68f631026154180e8656681faaaacd0701f7c4ee",
+  "reviewed_sha": "b556ab7529a332aa0b28d0a0f98bdd62fcbb9a63",
+  "reviewer": "canon-reviewer-g6",
+  "round": 1,
+  "schema": 1,
+  "seq": 16,
+  "severity": "should_fix",
+  "summary": "Assert that the invalid-provider diagnostic names the provider"
+}

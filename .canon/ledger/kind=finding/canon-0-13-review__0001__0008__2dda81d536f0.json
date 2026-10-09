@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-r2",
+    "role": "reviewer"
+  },
+  "at": "2026-10-09T05:55:56.694456Z",
+  "change_id": "canon-0-13-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "14d10df27d57ec2b3c9dcfe9ce256cad4d7fe7eb",
+  "reviewed_sha": "b556ab7529a332aa0b28d0a0f98bdd62fcbb9a63",
+  "reviewer": "canon-reviewer-g5",
+  "round": 1,
+  "schema": 1,
+  "seq": 8,
+  "severity": "should_fix",
+  "summary": "Dispatch proof would accept a different one-item guidance snapshot on disk."
+}

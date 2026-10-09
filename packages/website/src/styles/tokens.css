@@ -1,20 +1,38 @@
-/* canon — Grid Manual. Shared tokens for the landing page and the Starlight docs. */
+/* canon — Checks Panel. Shared tokens for the landing page and the Starlight docs. */
 
-@import "@fontsource-variable/spline-sans";
-@import "@fontsource-variable/inconsolata";
+@import "@fontsource-variable/mona-sans";
+@import "@fontsource-variable/geist-mono";
 @import "@fontsource-variable/noto-sans-kr";
 
 :root {
-  --c-ground: #f0f3f0;
-  --c-ink: #0b0b0b;
-  --c-ink-2: #4a4a45;
-  --c-signal: #ff4a1c;
-  --c-rule: #b4b6b1;
-  --c-rule-soft: #d9dad4;
-  --c-paper: #ffffff;
+  /* Ground and surfaces, darkest to lightest. */
+  --c-ground: #0d1117;
+  --c-inset: #0e1218;
+  --c-panel: #11161b;
+  --c-raise: #1d242d;
+  --c-raise-hover: #262e38;
 
-  --f-sans: "Spline Sans Variable", "Noto Sans KR Variable", "Apple SD Gothic Neo",
-    "Malgun Gothic", system-ui, sans-serif;
-  --f-mono: "Inconsolata Variable", "Noto Sans KR Variable", ui-monospace, "SFMono-Regular", Menlo,
+  /* Lines. Horizontal rules and panel edges only. */
+  --c-border: #30363d;
+  --c-border-soft: #232a32;
+
+  /* Text. */
+  --c-text: #e6edf3;
+  --c-text-2: #9198a1;
+  --c-text-3: #6e7681;
+
+  /* Check states. Always paired with a word, never colour alone. */
+  --c-pass: #4ac26b;
+  --c-fail: #f0514a;
+  --c-fail-fill: #a8282b;
+  --c-wait: #6e7681;
+  --c-pending: #d29922;
+
+  --f-sans: "Mona Sans Variable", "Noto Sans KR Variable", "Apple SD Gothic Neo", "Malgun Gothic",
+    system-ui, sans-serif;
+  --f-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", Menlo, "Noto Sans KR Variable",
     monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
 }

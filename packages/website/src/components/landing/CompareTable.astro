@@ -1,7 +1,8 @@
 ---
-// Fig. 3: what each tool owns next to what canon owns. Every claim about
-// another tool links its primary source.
-import type { Strings } from "./strings";
+// Capability matrix: tools as rows, capabilities as columns. Each cell states
+// yes / partial / no / not documented in words, and its note links the
+// primary source the state was checked against.
+import type { Strings, CellState } from "./strings";
 
 interface Props {
   t: Strings;
@@ -9,61 +10,65 @@ interface Props {
 const { t } = Astro.props;
 const { compare } = t;
 const external = (href: string) => href.startsWith("http");
+
+const glyph: Record<CellState, string> = {
+  yes: "M4.5 8.25 7 10.75l4.5-5",
+  partial: "M8 3.25a4.75 4.75 0 0 1 0 9.5z",
+  no: "M5.5 5.5l5 5M10.5 5.5l-5 5",
+  nd: "M5.25 8h5.5",
+};
 ---
 
-<section class="lp-sec lp-compare" aria-labelledby="compare-h">
-  <h2 class="lp-h2" id="compare-h">{compare.heading}</h2>
-  <p class="lp-lead">{compare.lead}</p>
-  <figure class="fig3">
-    <figcaption class="lp-cap">
-      <span>{compare.number}</span>
-      <span>{compare.title}</span>
-    </figcaption>
-    <table class="fig3-table">
-      <colgroup>
-        <col class="c-tool" />
-        <col class="c-owns" />
-        <col class="c-checks" />
-        <col class="c-src" />
-      </colgroup>
+<section class="sec cmp" aria-labelledby="cmp-h">
+  <div class="sec-head">
+    <h2 class="sec-h" id="cmp-h">{compare.heading}</h2>
+    <p class="sec-lead">{compare.lead}</p>
+  </div>
+  <div class="cmp-scroll" role="region" aria-labelledby="cmp-h" tabindex="0">
+    <table class="cmp-table">
       <thead>
         <tr>
-          <th scope="col">{compare.cols.tool}</th>
-          <th scope="col">{compare.cols.owns}</th>
-          <th scope="col">{compare.cols.checks}</th>
-          <th scope="col">{compare.cols.sources}</th>
+          <th scope="col" class="cmp-corner">{compare.tool}</th>
+          {compare.cols.map((c) => <th scope="col">{c}</th>)}
         </tr>
       </thead>
       <tbody>
         {
           compare.rows.map((row) => (
             <tr class:list={{ "is-canon": row.tool === "canon" }}>
-              <th scope="row">{row.tool}</th>
-              <td data-label={compare.cols.owns}>{row.owns}</td>
-              <td data-label={compare.cols.checks}>
-                {row.checks}
-                {row.note && <span class="fig3-note">{row.note}</span>}
-              </td>
-              <td data-label={compare.cols.sources}>
-                <ul class="fig3-src">
-                  {row.sources.map((s) => (
-                    <li>
-                      {external(s.href) ? (
-                        <a href={s.href} rel="noopener" target="_blank">
-                          {s.label}
-                        </a>
-                      ) : (
-                        <a href={s.href}>{s.label}</a>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </td>
+              <th scope="row">
+                <a href={row.href} {...(external(row.href) ? { rel: "noopener", target: "_blank" } : {})}>
+                  {row.tool}
+                </a>
+              </th>
+              {row.cells.map((cell) => (
+                <td class={`st-${cell.state}`}>
+                  <span class="cmp-state">
+                    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                      <circle cx="8" cy="8" r="6.75" />
+                      <path d={glyph[cell.state]} />
+                    </svg>
+                    {compare.states[cell.state]}
+                  </span>
+                  <a
+                    class="cmp-note"
+                    href={cell.href}
+                    title={`${compare.source}: ${cell.source}`}
+                    {...(external(cell.href) ? { rel: "noopener", target: "_blank" } : {})}
+                  >
+                    {cell.note}
+                    <span class="sr"> ({compare.source}: {cell.source})</span>
+                  </a>
+                </td>
+              ))}
             </tr>
           ))
         }
       </tbody>
     </table>
-    <p class="fig3-foot">{compare.footnote}</p>
-  </figure>
+  </div>
+  <div class="cmp-foot">
+    <p><strong>canon</strong> · {compare.canonNote}</p>
+    <p>{compare.footnote}</p>
+  </div>
 </section>

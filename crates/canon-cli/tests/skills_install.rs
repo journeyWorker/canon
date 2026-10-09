@@ -155,8 +155,10 @@ fn canonical_invalid_provider_fails_before_writing() {
     let target = tmp.path().join("target");
     fs::create_dir_all(&source).unwrap();
     fs::write(source.join("SKILL.src.md"), "# canon\n").unwrap();
-    assert!(matches!(skills::install_canonical(&source, &target, Some("gemini")), Err(skills::SkillsError::InvalidProvider(_))));
-    assert!(!target.exists());
+    let error = skills::install_canonical(&source, &target, Some("gemini")).expect_err("an unknown provider must be refused");
+    assert!(matches!(&error, skills::SkillsError::InvalidProvider(provider) if provider == "gemini"), "{error:?}");
+    assert!(error.to_string().contains("`gemini`"), "the rendered diagnostic must name the provider: {error}");
+    assert!(!target.exists(), "no projection or lock file may be written");
 }
 #[test]
 fn canonical_install_without_provider_selects_claude_and_codex() {

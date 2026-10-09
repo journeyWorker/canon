@@ -100,7 +100,27 @@ output form includes captured prompt bytes.
 - **`joinKeys`** — the join-spine grammar string per key (`regime_key`,
   `session_id`, `task_id`, …).
 - **`policy`** — the resolved `policy.yaml`-derived evidence/trust
-  requirements per kind.
+  requirements per kind, plus `clean` and the policy `diagnostics`
+  (an unknown top-level key is one). In `--json`, `spec_coverage` and
+  `evidence_binding` are objects keyed like `policy.yaml`, with booleans
+  as booleans and lists as arrays (an empty `scope`/`case`/`lane` means
+  unfiltered):
+
+  ```json
+  "spec_coverage": {"require_evidence": true, "scope": ["building", "verifying"],
+    "exclude_lanes": ["process"], "require_cases": ["failure"],
+    "require_review": {"scope": ["verifying", "shipped"], "distinct_actor": true, "block_on_findings": true}},
+  "evidence_binding": {"mode": "warn", "strength": "report", "case": ["failure"], "lane": [], "scope": []}
+  ```
+
+  `spec_coverage` is `null` when absent, `require_review` is `null` when
+  its sub-section is absent, and `evidence_binding` is omitted when absent.
+  A present but unusable section is `{"invalid": "<detail>"}`. The text
+  outline keeps its one-line summaries (`spec_coverage: INVALID — …`).
+- **`review`** — finding severities and dispositions, the Review fields,
+  and `requireReview`: `{"scope": [...], "distinctActor": true,
+  "blockOnFindings": true}`, or `null` when review is not required
+  (absent, or `spec_coverage` is absent or invalid).
 - **`vocab`** — the typed authoring vocabulary (directive/enum/evidence-
   kind index) + its content-hash version.
 - **`cel`** — the per-kind CEL binding surface: the bindable

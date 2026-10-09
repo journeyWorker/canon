@@ -7,32 +7,32 @@ related_targets: ["src/pages/ko/index.astro"]
 
 # Landing surface brief
 
-Scope: the canon site landing (`/` and `/ko/`), Persuade mode. The docs pages (Read mode) re-themed into the same world.
+Scope: the canon site landing (`/` and `/ko/`), Persuade mode. The Starlight docs (Read mode) are re-themed into the same world.
 
-Audience: leads and engineers on teams shipping with AI coding agents, judging whether canon fits and how to install it.
-Job: understand that canon gates "done" on recorded evidence, see proof on canon's own corpus, copy the install command or open the docs.
-Proof: Fig. 1 is generated at build time from canon's own specs, git history, evidence ledger, and a real `canon gate check` run (`src/data/corpus-figure.json`, `bun run figure:data`).
-Constraints: comp words verbatim; no invented taglines or claims; other-tool claims only with a linked primary source; experimental features labeled; EN and KO.
-Approved comp: `.impeccable/comps/landing.png` (Grid Manual, 1536x1024).
+Audience: leads and engineers on teams shipping with AI coding agents, deciding whether canon fits and how to install it.
+Job: see in one viewport that canon refuses "done" without evidence, copy the install command, then read the flow, the comparison, and the docs.
+Proof: the hero's PR panel uses the comp's words. Below it, every claim reuses existing site, README, or docs content, and other-tool claims link primary sources.
+Constraints: comp words verbatim; never invent copy, taglines, or subtitles; the comparison is a real `<table>` at every width (horizontal scroll and a sticky first column on mobile); no vertical grid hairlines; EN and KO (KO is a faithful translation); experimental features labeled.
+Approved comp: `.impeccable/comps/landing-pr.png` (Checks Panel, 1774x887). The previous Grid Manual comp `.impeccable/comps/landing.png` was rejected.
 
 ## Direction contract
 
-THESIS: canon's contract set as an engineering standard: every claim flush-left on a strict twelve-column grid, every proof a numbered figure the reader can check. Refuses the dev-tool hero with a glowing terminal and a feature-card grid.
+THESIS: canon's promise is shown as the screen its audience already trusts: a pull request whose checks block the merge because canon's gate found scenarios with no evidence. Refuses the marketing hero with a feature grid, and refuses the rejected Grid Manual's vertical hairlines.
 
-OWN-WORLD: bright white ground #f3f3ef, ink #111, one signal-orange field #ff4a1c that owns a whole region, grey hairline column rules always visible. Spline Sans bold at poster scale, Spline Sans regular for text, Cousine for commands, captions, and data. Square corners, black command bar, underlined links, numbered Fig. captions, one black rule carrying the stations.
+OWN-WORLD: GitHub-dark ground #0d1117, text #e6edf3, panel surfaces with 1px #30363d borders and 10–12px radii, horizontal row dividers only. State colours always come with a word: green passed, red failed and Merge blocked, grey waiting. Mona Sans bold for statements, Geist Mono for commands and logs.
 
-STORY: the visitor reads "Agents say done. canon makes them prove it.", sees canon's own 246 scenarios with 0 violations, copies the install command, then follows the loop (Fig. 2), sees where canon sits beside process and runtime tools (Fig. 3), and enters the docs.
+STORY: the visitor reads "Agents say done. canon makes them prove it.", sees the canon gate check row red with its log open and the merge blocked, and copies `bunx @journeykit/canon init`. Then they follow the loop as a PR timeline, compare tools in a sourced capability matrix, run the 60-second demo, read what canon does and does not prove, and enter the docs.
 
-FIRST VIEWPORT: left seven columns: headline at 111px, the line "A verification gate for agent-written work.", black command field with Copy, guide link. Right five columns: orange Fig. 1 panel, caption, one hairline per scenario on a time axis, "0 violations" huge at its foot. Full-width black rule at the bottom with six stations on column lines. Primary action: the command field.
+FIRST VIEWPORT: left column: headline at about 92px, three lines; below it the command field with a divider and a Copy button (the primary action). Right column: the PR panel `agent/feat-cart → main` with a red Merge blocked badge and four check rows; the third row is expanded with its log `uncovered-cell cart.add.04 — spec scenario has no evidence record` and `exit 1`. Wordmark at top left, nav Docs, CLI, Concepts, GitHub at top right.
 
-FORM: Grid Manual, International Typographic Style engineering manual; the assigned direction (kind assigned, first on the ordered list). Seed key: not recorded in this checkout; the build started from the approved comp with `build-phase start --comp`.
+FORM: Checks Panel, the native grammar of pull-request checks (GitHub-style). Approved by the user as a comp. Seed key: not recorded; the build started with `build-phase start --comp`.
 
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+FINISH: unreviewed and undocumented is unfinished. This build ends with the finish review, the verdict, a new DESIGN.md plus `.impeccable/design.json`, and provenance on any shipping raster (none ship).
 
 ## Memorable moment
 
-Fig. 1: canon's real corpus drawn as hairlines, nine of them carrying a white gap where evidence came later, ending in the gate's real count.
+The checks resolve one by one, the canon gate turns red with its log open, and the Merge blocked badge answers once.
 
 ## Unresolved
 
-None.
+- Only the canon gate check row toggles; the other chevrons are markers, because their logs would be invented copy.

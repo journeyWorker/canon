@@ -101,3 +101,47 @@ fn a_finding_whose_round_reviewed_a_worktree_round_trips_through_git_tier() {
     assert_eq!(result.records.len(), 1);
     assert_eq!(result.records[0].0, json, "round-tripped content must equal what was written");
 }
+
+/// review.add.04: the pin is part of a review's identity. Two reviews of
+/// one scenario in one project, identical except for the pinned commit,
+/// resolve two distinct natural keys, land as two committed files, and
+/// read back as two records — never as two versions of one.
+#[test]
+fn reviews_of_one_scenario_at_two_pins_are_two_stored_records() {
+    let dir = tempfile::tempdir().unwrap();
+    let tier = GitTier::new(dir.path());
+    let review_at = |pin: &str| {
+        serde_json::json!({
+            "schema": 1,
+            "kind": "review",
+            "at": "2026-07-10T12:00:00Z",
+            "actor": {"agent_id": "codex-cli", "role": "implementer"},
+            "project_id": "root",
+            "scenario_id": "world.place-lock.01",
+            "reviewer": "reviewer",
+            "pin": pin,
+            "provenance_ref": {"upstream_ref": "routes/world.tsx#onPurchased"}
+        })
+    };
+    let first = review_at("9c93d024b1a2");
+    let second = review_at("0d1e2f3a4b5c");
+
+    let first_key = canon_store::partition::resolve_partition(RecordKind::Review, &first).unwrap();
+    let second_key = canon_store::partition::resolve_partition(RecordKind::Review, &second).unwrap();
+    assert_eq!(first_key.natural_key, "root__world.place-lock.01__9c93d024b1a2", "project, scenario and pin joined");
+    assert_eq!(second_key.natural_key, "root__world.place-lock.01__0d1e2f3a4b5c");
+    assert_ne!(first_key.natural_key, second_key.natural_key, "a different pin must resolve a different key");
+
+    let first_receipt = tier.write(&RawWrite(RawRecord(first.clone()))).unwrap();
+    let second_receipt = tier.write(&RawWrite(RawRecord(second.clone()))).unwrap();
+    assert!(first_receipt.location.contains(&format!("{}__", first_key.natural_key)), "{}", first_receipt.location);
+    assert!(second_receipt.location.contains(&format!("{}__", second_key.natural_key)), "{}", second_receipt.location);
+    assert_ne!(first_receipt.location, second_receipt.location, "two attestations are two files");
+    assert!(dir.path().join(&first_receipt.location).is_file() && dir.path().join(&second_receipt.location).is_file());
+
+    let result = tier.read(&TierQuery::kind(RecordKind::Review)).expect("reading the reviews back");
+    assert!(result.violations.is_empty(), "unexpected violations {:?}", result.violations);
+    let mut read: Vec<serde_json::Value> = result.records.into_iter().map(|record| record.0).collect();
+    read.sort_by(|a, b| a["pin"].as_str().cmp(&b["pin"].as_str()));
+    assert_eq!(read, vec![second, first], "both committed records read back unchanged");
+}
