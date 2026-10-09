@@ -1,5 +1,5 @@
 {
-  "capabilityVersion": 4,
+  "capabilityVersion": 5,
   "kinds": {
     "change": {
       "schema_version": 1,
@@ -383,8 +383,21 @@
       }
     },
     "risk_tiers": {},
-    "spec_coverage": "require_evidence=true scope=verifying, shipped require_cases=failure",
-    "evidence_binding": "INVALID — `strict` is not a valid value for `mode` (expected one of: off, warn, require)",
+    "spec_coverage": {
+      "require_evidence": true,
+      "scope": [
+        "verifying",
+        "shipped"
+      ],
+      "exclude_lanes": [],
+      "require_cases": [
+        "failure"
+      ],
+      "require_review": null
+    },
+    "evidence_binding": {
+      "invalid": "`strict` is not a valid value for `mode` (expected one of: off, warn, require)"
+    },
     "clean": false,
     "diagnostics": [
       "experimental.evidence_binding: section is present but unusable (`strict` is not a valid value for `mode` (expected one of: off, warn, require)) — the owning check refuses rather than treating it as absent"

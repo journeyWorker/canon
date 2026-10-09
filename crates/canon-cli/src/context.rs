@@ -52,7 +52,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use canon_gate::{PolicyField, PolicyResolution, RequireReview, RiskTierRule, SpecCoverage};
+use canon_gate::{PolicyField, PolicyResolution, RiskTierRule, SpecCoverage};
 use canon_model::SubjectStatus;
 use canon_policy::SchemaRegistry;
 use canon_vocab::CapabilitySnapshot;
@@ -69,8 +69,11 @@ use serde::Serialize;
 /// keeps describing the CLI surface itself (design D1's "resolve, then
 /// render" split — the registry call site stays singular either way).
 /// Bumped to `3` for the effect-aware `risk_tiers` policy projection,
-/// and to `4` for the `review` section (issue #2).
-const CURRENT_CAPABILITY_VERSION: u32 = 4;
+/// to `4` for the `review` section (issue #2), and to `5` when
+/// `policy.spec_coverage`, `policy.evidence_binding`, and
+/// `review.requireReview` became typed JSON objects instead of one-line
+/// summaries.
+const CURRENT_CAPABILITY_VERSION: u32 = 5;
 
 /// Resolution-time options beyond the repo root itself. Empty today —
 /// `canon context` takes only `--repo`/`--json`, and `--json` selects a
@@ -136,6 +139,54 @@ pub struct RiskTierSurface {
     pub min_human_approvals: u32,
 }
 
+/// `spec_coverage.require_review` in the `policy` section, keyed like
+/// `policy.yaml`. `scope` is the resolved status list (the default
+/// `[verifying, shipped]` when the key is omitted); empty means every
+/// scenario.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RequireReviewSurface {
+    pub scope: Vec<String>,
+    pub distinct_actor: bool,
+    pub block_on_findings: bool,
+}
+
+/// The same requirement in the camelCase `review` section.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewRequirementSurface {
+    pub scope: Vec<String>,
+    pub distinct_actor: bool,
+    pub block_on_findings: bool,
+}
+
+/// `spec_coverage`, keyed like `policy.yaml`. Serialized untagged: an
+/// active section is its fields; a present-but-unusable one is
+/// `{"invalid": "<detail>"}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(untagged)]
+pub enum SpecCoverageSurface {
+    Active {
+        require_evidence: bool,
+        /// Empty means every scenario.
+        scope: Vec<String>,
+        exclude_lanes: Vec<String>,
+        require_cases: Vec<String>,
+        /// `null` when the sub-section is absent.
+        require_review: Option<RequireReviewSurface>,
+    },
+    Invalid { invalid: String },
+}
+
+/// `experimental.evidence_binding`, keyed like `policy.yaml` (`case`,
+/// `lane`, `scope`; each empty means unfiltered). Untagged like
+/// [`SpecCoverageSurface`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(untagged)]
+pub enum EvidenceBindingSurface {
+    Active { mode: &'static str, strength: &'static str, case: Vec<String>, lane: Vec<String>, scope: Vec<String> },
+    Invalid { invalid: String },
+}
+
 
 /// `canon_gate::PolicyResolution`'s own fields, summarized field-by-field
 /// via [`PolicyFieldSurface`] — one Rust field per `PolicyResolution` field,
@@ -148,15 +199,15 @@ pub struct PolicySurface {
     pub staleness: StalenessSurface,
     pub risk_routing: BTreeMap<String, PolicyFieldSurface>,
     pub risk_tiers: BTreeMap<String, RiskTierSurface>,
-    /// s44's opt-in spec-corpus requirement, rendered as a one-line
-    /// summary. `None` = the section is absent, which is a DIFFERENT
-    /// fact from `require_evidence: false` and stays distinguishable
-    /// here: an author needs to see whether the repo opted in at all.
-    pub spec_coverage: Option<String>,
-    /// `experimental.evidence_binding`, one line. Skipped when absent
-    /// (off by default) so an existing context JSON is byte-identical.
+    /// s44's opt-in spec-corpus requirement. `None` (JSON `null`) = the
+    /// section is absent, which is a DIFFERENT fact from
+    /// `require_evidence: false` and stays distinguishable here: an
+    /// author needs to see whether the repo opted in at all.
+    pub spec_coverage: Option<SpecCoverageSurface>,
+    /// `experimental.evidence_binding`. Skipped when absent (off by
+    /// default).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub evidence_binding: Option<String>,
+    pub evidence_binding: Option<EvidenceBindingSurface>,
     /// `PolicyResolution::is_clean()` — whether `policy.yaml` loaded with
     /// zero problems for this repo.
     pub clean: bool,
@@ -233,9 +284,9 @@ pub struct ReviewSurface {
     /// The `review` kind's fields → required, the SAME map
     /// `kinds.review.envelopeFields` carries.
     pub review_fields: BTreeMap<String, bool>,
-    /// `spec_coverage.require_review`, one line. `None` = not required
-    /// here (absent, or `spec_coverage` itself is absent or invalid).
-    pub require_review: Option<String>,
+    /// `spec_coverage.require_review`. `None` = not required here
+    /// (absent, or `spec_coverage` itself is absent or invalid).
+    pub require_review: Option<ReviewRequirementSurface>,
 }
 
 /// The full authoring surface (design D3): everything an agent needs to
@@ -363,7 +414,11 @@ pub fn resolve_surface(repo: &Path, _opts: ContextOptions) -> AuthoringSurface {
 /// the resolved `require_review` settings.
 fn summarize_review(policy: &PolicyResolution, kinds: &BTreeMap<String, KindSurface>) -> ReviewSurface {
     let require_review = match &policy.spec_coverage {
-        Some(SpecCoverage::Active { require_review: Some(rr), .. }) => Some(summarize_require_review(rr)),
+        Some(SpecCoverage::Active { require_review: Some(rr), .. }) => Some(ReviewRequirementSurface {
+            scope: status_slugs(&rr.scope),
+            distinct_actor: rr.distinct_actor,
+            block_on_findings: rr.block_on_findings,
+        }),
         _ => None,
     };
     ReviewSurface {
@@ -374,9 +429,62 @@ fn summarize_review(policy: &PolicyResolution, kinds: &BTreeMap<String, KindSurf
     }
 }
 
-fn summarize_require_review(rr: &RequireReview) -> String {
-    let scope = if rr.scope.is_empty() { "<every scenario>".to_string() } else { rr.scope.iter().map(subject_status_slug).collect::<Vec<_>>().join(", ") };
-    format!("scope={scope} distinct_actor={} block_on_findings={}", rr.distinct_actor, rr.block_on_findings)
+fn status_slugs(statuses: &[SubjectStatus]) -> Vec<String> {
+    statuses.iter().map(|s| subject_status_slug(s).to_string()).collect()
+}
+
+/// The outline's one-line `require_review` summary.
+fn require_review_line(scope: &[String], distinct_actor: bool, block_on_findings: bool) -> String {
+    format!("scope={} distinct_actor={distinct_actor} block_on_findings={block_on_findings}", scope_text(scope))
+}
+
+/// An outline status list; empty reads as every scenario.
+fn scope_text(scope: &[String]) -> String {
+    if scope.is_empty() {
+        "<every scenario>".to_string()
+    } else {
+        scope.join(", ")
+    }
+}
+
+impl SpecCoverageSurface {
+    /// The outline's one-line summary.
+    fn outline(&self) -> String {
+        match self {
+            SpecCoverageSurface::Active { require_evidence, scope, exclude_lanes, require_cases, require_review } => {
+                let mut summary = format!("require_evidence={require_evidence} scope={}", scope_text(scope));
+                if !exclude_lanes.is_empty() {
+                    summary.push_str(&format!(" exclude_lanes={}", exclude_lanes.join(", ")));
+                }
+                if !require_cases.is_empty() {
+                    summary.push_str(&format!(" require_cases={}", require_cases.join(", ")));
+                }
+                if let Some(rr) = require_review {
+                    summary.push_str(&format!(" require_review=({})", require_review_line(&rr.scope, rr.distinct_actor, rr.block_on_findings)));
+                }
+                summary
+            }
+            SpecCoverageSurface::Invalid { invalid } => format!("INVALID — {invalid}"),
+        }
+    }
+}
+
+impl EvidenceBindingSurface {
+    /// The outline's one-line summary.
+    fn outline(&self) -> String {
+        match self {
+            EvidenceBindingSurface::Active { mode, strength, case, lane, scope } => {
+                let mut summary = format!("mode={mode} strength={strength}");
+                for (field, values) in [("case", case), ("lane", lane), ("scope", scope)] {
+                    if !values.is_empty() {
+                        summary.push_str(&format!(" {field}={}", values.join(", ")));
+                    }
+                }
+                summary
+            }
+            EvidenceBindingSurface::Invalid { invalid } => format!("INVALID — {invalid}"),
+        }
+    }
 }
 
 /// `kinds` (design D3/task 2.2): walks whatever kinds `registry` actually
@@ -473,43 +581,32 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
         risk_routing: policy.risk_routing.iter().map(|(k, v)| (k.clone(), summarize_field(v))).collect(),
         risk_tiers: policy.risk_tiers.iter().map(|(name, rule)| (name.clone(), summarize_risk_tier(rule))).collect(),
         spec_coverage: policy.spec_coverage.as_ref().map(|sc| match sc {
-            SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review } => {
-                let scope = if scope.is_empty() {
-                    "<every scenario>".to_string()
-                } else {
-                    scope.iter().map(subject_status_slug).collect::<Vec<_>>().join(", ")
-                };
-                let mut summary = format!("require_evidence={require_evidence} scope={scope}");
-                if !exclude_lanes.is_empty() {
-                    summary.push_str(&format!(" exclude_lanes={}", exclude_lanes.join(", ")));
-                }
-                if !require_cases.is_empty() {
-                    summary.push_str(&format!(" require_cases={}", require_cases.join(", ")));
-                }
-                if let Some(rr) = require_review {
-                    summary.push_str(&format!(" require_review=({})", summarize_require_review(rr)));
-                }
-                summary
-            }
-            SpecCoverage::Invalid { detail } => format!("INVALID — {detail}"),
+            SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review } => SpecCoverageSurface::Active {
+                require_evidence: *require_evidence,
+                scope: status_slugs(scope),
+                exclude_lanes: exclude_lanes.clone(),
+                require_cases: require_cases.clone(),
+                require_review: require_review.as_ref().map(|rr| RequireReviewSurface {
+                    scope: status_slugs(&rr.scope),
+                    distinct_actor: rr.distinct_actor,
+                    block_on_findings: rr.block_on_findings,
+                }),
+            },
+            SpecCoverage::Invalid { detail } => SpecCoverageSurface::Invalid { invalid: detail.clone() },
         }),
         evidence_binding: policy.evidence_binding.as_ref().map(|binding| match binding {
-            canon_gate::EvidenceBinding::Active { mode, strength, cases, lanes, scope } => {
-                let mode = match mode {
+            canon_gate::EvidenceBinding::Active { mode, strength, cases, lanes, scope } => EvidenceBindingSurface::Active {
+                mode: match mode {
                     canon_gate::BindingMode::Off => "off",
                     canon_gate::BindingMode::Warn => "warn",
                     canon_gate::BindingMode::Require => "require",
-                };
-                let mut summary = format!("mode={mode} strength={}", strength.as_str());
-                let scope: Vec<String> = scope.iter().map(|s| subject_status_slug(s).to_string()).collect();
-                for (field, values) in [("case", cases), ("lane", lanes), ("scope", &scope)] {
-                    if !values.is_empty() {
-                        summary.push_str(&format!(" {field}={}", values.join(", ")));
-                    }
-                }
-                summary
-            }
-            canon_gate::EvidenceBinding::Invalid { detail } => format!("INVALID — {detail}"),
+                },
+                strength: strength.as_str(),
+                case: cases.clone(),
+                lane: lanes.clone(),
+                scope: status_slugs(scope),
+            },
+            canon_gate::EvidenceBinding::Invalid { detail } => EvidenceBindingSurface::Invalid { invalid: detail.clone() },
         }),
         clean: policy.is_clean(),
         diagnostics: policy.diagnostics.iter().map(ToString::to_string).collect(),
@@ -611,13 +708,13 @@ pub fn render_outline(surface: &AuthoringSurface) -> String {
         );
     }
     let _ = match &surface.policy.spec_coverage {
-        Some(summary) => writeln!(out, "  spec_coverage: {summary}"),
+        Some(section) => writeln!(out, "  spec_coverage: {}", section.outline()),
         // Printed even when absent: "this repo has not opted in" is the
         // fact an author most needs before writing a `.feature` file.
         None => writeln!(out, "  spec_coverage: <absent — spec-corpus coverage is not enforced here>"),
     };
-    if let Some(summary) = &surface.policy.evidence_binding {
-        let _ = writeln!(out, "  experimental.evidence_binding: {summary}");
+    if let Some(section) = &surface.policy.evidence_binding {
+        let _ = writeln!(out, "  experimental.evidence_binding: {}", section.outline());
     }
     let _ = writeln!(out, "  clean: {}", surface.policy.clean);
     let _ = writeln!(out, "  diagnostics ({}):", surface.policy.diagnostics.len());
@@ -630,7 +727,7 @@ pub fn render_outline(surface: &AuthoringSurface) -> String {
     let fields: Vec<String> = surface.review.review_fields.iter().map(|(name, required)| format!("{name}{}", if *required { "*" } else { "" })).collect();
     let _ = writeln!(out, "  reviewFields: {}", fields.join(", "));
     let _ = match &surface.review.require_review {
-        Some(summary) => writeln!(out, "  require_review: {summary}"),
+        Some(rr) => writeln!(out, "  require_review: {}", require_review_line(&rr.scope, rr.distinct_actor, rr.block_on_findings)),
         None => writeln!(out, "  require_review: <absent — review is not required before a subject is claimed done>"),
     };
     let _ = writeln!(out, "vocab:");
@@ -1054,13 +1151,92 @@ mod tests {
     fn a_malformed_spec_coverage_surfaces_as_invalid_and_a_valid_one_names_its_cases() {
         let broken = fixture_repo(Some("spec_coverage:\n  require_evidence: true\n  require_cases: [Not-A-Case]\n"));
         let surface = resolve_surface(broken.path(), ContextOptions::default());
-        let summary = surface.policy.spec_coverage.as_deref().expect("a present section is never reported absent");
-        assert!(summary.starts_with("INVALID") && summary.contains("Not-A-Case"), "{summary}");
+        let section = surface.policy.spec_coverage.as_ref().expect("a present section is never reported absent");
+        assert!(matches!(section, SpecCoverageSurface::Invalid { invalid } if invalid.contains("Not-A-Case")), "{section:?}");
         assert!(!surface.policy.clean, "a poisoned section makes the policy unclean");
-        assert!(render_outline(&surface).contains("spec_coverage: INVALID"));
+        assert!(render_outline(&surface).contains("spec_coverage: INVALID — "));
+        let json: serde_json::Value = serde_json::from_str(&render_json(&surface)).unwrap();
+        let invalid = json["policy"]["spec_coverage"].as_object().expect("an invalid section is an object");
+        assert_eq!(invalid.keys().collect::<Vec<_>>(), ["invalid"]);
+        assert!(invalid["invalid"].as_str().unwrap().contains("Not-A-Case"));
+        assert!(json["review"]["requireReview"].is_null(), "an invalid spec_coverage requires no review");
 
         let valid = fixture_repo(Some("spec_coverage:\n  require_evidence: true\n  exclude_lanes: [process]\n  require_cases: [failure]\n"));
-        let summary = resolve_surface(valid.path(), ContextOptions::default()).policy.spec_coverage.unwrap();
-        assert_eq!(summary, "require_evidence=true scope=<every scenario> exclude_lanes=process require_cases=failure");
+        let surface = resolve_surface(valid.path(), ContextOptions::default());
+        assert!(render_outline(&surface).contains("\n  spec_coverage: require_evidence=true scope=<every scenario> exclude_lanes=process require_cases=failure\n"));
+    }
+
+    /// D4: `spec_coverage`, `evidence_binding`, and `review.requireReview`
+    /// are typed JSON objects (booleans, arrays), keyed like their
+    /// surrounding section, while the outline lines stay the 0.12 ones.
+    #[test]
+    fn policy_sections_are_typed_json_and_the_outline_is_unchanged() {
+        let dir = fixture_repo(Some(
+            "spec_coverage:\n  require_evidence: true\n  scope: [building, verifying]\n  exclude_lanes: [process]\n  require_cases: [failure]\n  require_review:\n    distinct_actor: true\n    block_on_findings: true\nexperimental:\n  evidence_binding:\n    mode: warn\n    strength: report\n    case: [failure]\n    lane: [e2e, unit]\n    scope: [verifying]\n",
+        ));
+        let surface = resolve_surface(dir.path(), ContextOptions::default());
+        assert!(surface.policy.clean, "{:?}", surface.policy.diagnostics);
+        let json: serde_json::Value = serde_json::from_str(&render_json(&surface)).unwrap();
+        assert_eq!(json["capabilityVersion"], 5);
+        assert_eq!(
+            json["policy"]["spec_coverage"],
+            serde_json::json!({
+                "require_evidence": true,
+                "scope": ["building", "verifying"],
+                "exclude_lanes": ["process"],
+                "require_cases": ["failure"],
+                "require_review": {"scope": ["verifying", "shipped"], "distinct_actor": true, "block_on_findings": true},
+            })
+        );
+        assert_eq!(
+            json["policy"]["evidence_binding"],
+            serde_json::json!({"mode": "warn", "strength": "report", "case": ["failure"], "lane": ["e2e", "unit"], "scope": ["verifying"]})
+        );
+        assert_eq!(json["review"]["requireReview"], serde_json::json!({"scope": ["verifying", "shipped"], "distinctActor": true, "blockOnFindings": true}));
+
+        let outline = render_outline(&surface);
+        for line in [
+            "  spec_coverage: require_evidence=true scope=building, verifying exclude_lanes=process require_cases=failure require_review=(scope=verifying, shipped distinct_actor=true block_on_findings=true)\n",
+            "  experimental.evidence_binding: mode=warn strength=report case=failure lane=e2e, unit scope=verifying\n",
+            "  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n",
+        ] {
+            assert!(outline.contains(line), "missing {line:?} in:\n{outline}");
+        }
+
+        let defaults = fixture_repo(Some("spec_coverage:\n  require_evidence: false\n  require_review:\n    scope: []\nexperimental:\n  evidence_binding: {}\n"));
+        let surface = resolve_surface(defaults.path(), ContextOptions::default());
+        let json: serde_json::Value = serde_json::from_str(&render_json(&surface)).unwrap();
+        assert_eq!(
+            json["policy"]["spec_coverage"],
+            serde_json::json!({
+                "require_evidence": false,
+                "scope": [],
+                "exclude_lanes": [],
+                "require_cases": [],
+                "require_review": {"scope": [], "distinct_actor": true, "block_on_findings": true},
+            })
+        );
+        assert_eq!(json["policy"]["evidence_binding"], serde_json::json!({"mode": "off", "strength": "artifact", "case": [], "lane": [], "scope": []}));
+        let outline = render_outline(&surface);
+        assert!(outline.contains("\n  spec_coverage: require_evidence=false scope=<every scenario> require_review=(scope=<every scenario> distinct_actor=true block_on_findings=true)\n"), "{outline}");
+        assert!(outline.contains("\n  experimental.evidence_binding: mode=off strength=artifact\n"), "{outline}");
+    }
+
+    #[test]
+    fn an_invalid_evidence_binding_is_an_invalid_object_and_absent_sections_stay_null_or_omitted() {
+        let dir = fixture_repo(Some("experimental:\n  evidence_binding:\n    mode: strict\n"));
+        let surface = resolve_surface(dir.path(), ContextOptions::default());
+        let json: serde_json::Value = serde_json::from_str(&render_json(&surface)).unwrap();
+        let invalid = json["policy"]["evidence_binding"]["invalid"].as_str().expect("an invalid section is {\"invalid\": ...}");
+        assert!(invalid.contains("`strict`"), "{invalid}");
+        assert_eq!(json["policy"]["evidence_binding"].as_object().unwrap().len(), 1);
+        assert!(render_outline(&surface).contains(&format!("\n  experimental.evidence_binding: INVALID — {invalid}\n")));
+        assert!(json["policy"]["spec_coverage"].is_null());
+
+        let absent = fixture_repo(Some("trust_required:\n  p1: human\n"));
+        let json: serde_json::Value = serde_json::from_str(&render_json(&resolve_surface(absent.path(), ContextOptions::default()))).unwrap();
+        assert!(json["policy"]["spec_coverage"].is_null());
+        assert!(json["policy"].get("evidence_binding").is_none(), "an absent evidence_binding is omitted");
+        assert!(json["review"]["requireReview"].is_null());
     }
 }
