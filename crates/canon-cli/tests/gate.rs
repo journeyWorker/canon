@@ -154,7 +154,12 @@ fn gate_check_release_flag_engages_release_trust_check_but_ordinary_run_stays_si
 
     let release = run_canon(&["gate", "check", "--repo", ".", "--release"], dir.path());
     assert_eq!(release.status.code(), Some(1));
-    assert!(stdout(&release).contains("unreviewed-promotion"), "TrustLadderCheck must still be present under --release");
+    let release_text = stdout(&release);
+    assert!(release_text.contains("unreviewed-promotion"), "TrustLadderCheck must still be present under --release:\n{release_text}");
+    assert!(
+        release_text.lines().any(|line| line.trim_start().starts_with("trust-below-required seed-change#1 — class `p1` requires `human` trust")),
+        "the release run must report trust-below-required for the seeded p1 record:\n{release_text}"
+    );
 }
 
 /// D7/task 1.4-equivalent for `canon gate`: run from a SUBDIRECTORY of a
@@ -1066,6 +1071,27 @@ fn evidence_add_refuses_a_scenario_id_without_a_project_id() {
     let out = run_canon(&["evidence", "add", "--scenario-id", "core.login.01", "--kind", "test-run", "--ref", "x", "--role", "implementer", "--repo", "."], dir.path());
     assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
     assert!(stderr(&out).contains("--project-id"), "stderr: {}", stderr(&out));
+    assert!(stdout(&out).is_empty(), "a refused add must not report a staged record: {}", stdout(&out));
+    assert_eq!(evidence_files(&dir.path().join(".canon/ledger")), Vec::<PathBuf>::new(), "a refused add must leave no staged or committed evidence");
+}
+
+/// Every evidence record file under `ledger_root`, staged (`_staging/`)
+/// or committed.
+fn evidence_files(ledger_root: &Path) -> Vec<PathBuf> {
+    fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.components().any(|c| c.as_os_str() == "kind=evidence_record") {
+                out.push(path);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(ledger_root, &mut out);
+    out
 }
 
 /// `--task` stays fully supported and unchanged — this change widens
