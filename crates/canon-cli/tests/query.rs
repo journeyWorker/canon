@@ -42,8 +42,11 @@ fn merges_records_split_across_the_routed_tier_and_its_aging_destination() {
 #[test]
 fn since_filters_to_records_at_or_after_the_given_timestamp() {
     let fixture = support::Fixture::new(ROUTING, AGING);
-    let cutoff = Utc::now() - Duration::days(2);
+    // Whole seconds, so the boundary record's stored `at` and the
+    // `--since` argument name the identical instant.
+    let cutoff = chrono::DateTime::from_timestamp((Utc::now() - Duration::days(2)).timestamp(), 0).unwrap();
     fixture.plant_trajectory_in_r2(Utc::now() - Duration::days(5), 0.1); // before cutoff
+    fixture.plant_trajectory_in_git(cutoff, 0.15); // exactly at cutoff
     fixture.plant_trajectory_in_git(Utc::now(), 0.2); // after cutoff
 
     let output = fixture.run_canon(&["query", "--kind", "trajectory", "--since", &cutoff.to_rfc3339(), "--json"]);
@@ -51,8 +54,8 @@ fn since_filters_to_records_at_or_after_the_given_timestamp() {
 
     let payload: Value = serde_json::from_str(&support::stdout(&output)).expect("valid JSON on stdout");
     let records = payload["records"].as_array().expect("records array");
-    assert_eq!(records.len(), 1, "only the at-or-after-cutoff record must be returned");
-    assert_eq!(records[0]["reward"], 0.2);
+    let rewards: Vec<f64> = records.iter().map(|record| record["reward"].as_f64().unwrap()).collect();
+    assert_eq!(rewards, vec![0.15, 0.2], "the at-cutoff and newer records must be returned, the older one filtered out");
 }
 
 /// query.read.04: two otherwise-identical attestations of one scenario at
