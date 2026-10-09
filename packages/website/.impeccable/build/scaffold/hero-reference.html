@@ -2,27 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Scaffold reference: landing.png</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@700&family=Spline+Sans:wght@400&family=Cousine:wght@400&display=swap">
+  <title>Scaffold reference: landing-pr.png</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wght@700&family=Geist+Mono:wght@400&family=Harmattan:wght@400&display=swap">
   <link rel="stylesheet" href="layout.css">
-  <style>html,body{margin:0}body{background:#f5f8f3}.region{box-sizing:border-box}.region.text p{white-space:pre-wrap}</style>
+  <style>html,body{margin:0}body{background:#0d1818}.region{box-sizing:border-box}.region.text p{white-space:pre-wrap}</style>
 </head>
 <body>
 <!-- Reference only. Every region sits at its measured box inside a comp-aspect frame. Take the boxes (layout.css), keep your own semantic structure. -->
-<main class="comp-frame" style="max-width:1536px">
-  <div class="r-column-rules region chrome" data-region="column-rules"><!-- twelve-column grid: thin grey vertical hairline column rules over the bright white ground, full height --></div>
-  <div class="r-wordmark region text" data-region="wordmark"><!-- canon wordmark, bold black grotesk, lowercase --><p style="font-size:var(--r-wordmark-font);line-height:1.05;margin:0">wordmark</p></div>
-  <div class="r-nav region control" data-region="nav"><!-- nav links Docs, CLI, Concepts, GitHub in black grotesk regular, right-aligned on column lines: rebuild the control's chrome from the crop (comp-spec.mjs --crop nav); its ink box, border, fill, radius, and label size are the comp's --></div>
-  <div class="r-headline region text" data-region="headline"><!-- huge flush-left black heavy grotesk headline, three lines: Agents say done. / canon makes them / prove it. --><p style="font-size:var(--r-headline-font);font-family:var(--r-headline-family),sans-serif;font-weight:var(--r-headline-weight);line-height:1.05;margin:0">headline</p></div>
-  <div class="r-subline region text" data-region="subline"><!-- line: A verification gate for agent-written work. regular black grotesk --><p style="font-size:var(--r-subline-font);font-family:var(--r-subline-family),sans-serif;font-weight:var(--r-subline-weight);line-height:1.05;margin:0">subline</p></div>
-  <div class="r-command region control" data-region="command"><!-- black command field with monospace $ bunx @journeykit/canon init in white and a Copy control at its right end: rebuild the control's chrome from the crop (comp-spec.mjs --crop command); its ink box, border, fill, radius, and label size are the comp's --></div>
-  <div class="r-guide-link region control" data-region="guide-link"><!-- underlined text link: Read the getting started guide with a right arrow: rebuild the control's chrome from the crop (comp-spec.mjs --crop guide-link); its ink box, border, fill, radius, and label size are the comp's --></div>
-  <div class="r-fig-caption region text" data-region="fig-caption"><!-- monospace caption line: Fig. 1 canon's own corpus · 246 scenarios, black on orange --><p style="font-size:var(--r-fig-caption-font);font-family:var(--r-fig-caption-family),sans-serif;font-weight:var(--r-fig-caption-weight);line-height:1.05;margin:0">fig-caption</p></div>
-  <div class="r-fig-chart region chrome" data-region="fig-chart"><!-- data chart the page draws from corpus JSON at build time: black hairlines, one per scenario, each starting at its authored time on a time axis and running to the right edge; a few lines carry a short white gap --></div>
-  <div class="r-fig-panel region chrome" data-region="fig-panel"><!-- flat signal-orange field, one undivided rectangle --></div>
-  <div class="r-fig-total region text" data-region="fig-total"><!-- 0 violations set huge in black heavy grotesk at the bottom of the orange field --><p style="line-height:1.05;margin:0">fig-total</p></div>
-  <div class="r-stations-rule region chrome" data-region="stations-rule"><!-- single black horizontal rule across the full grid near the bottom --></div>
-  <div class="r-stations region text" data-region="stations"><!-- station labels under the rule on column lines: intent, run, evidence, gate, decision, learning --><p style="font-size:var(--r-stations-font);line-height:1.05;margin:0">stations</p></div>
+<main class="comp-frame" style="max-width:1774px">
+  <div class="r-wordmark region text" data-region="wordmark"><!-- canon wordmark, bold light grotesk, lowercase, top left --><p style="font-size:var(--r-wordmark-font);line-height:1.05;margin:0">wordmark</p></div>
+  <div class="r-nav region control" data-region="nav"><!-- nav links Docs, CLI, Concepts, GitHub in light grey regular sans, right aligned: rebuild the control's chrome from the crop (comp-spec.mjs --crop nav); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-headline region text" data-region="headline"><!-- huge bold light-grey grotesk headline, three lines: Agents say done. / canon makes / them prove it. --><p style="font-size:var(--r-headline-font);font-family:var(--r-headline-family),sans-serif;font-weight:var(--r-headline-weight);line-height:1.05;margin:0">headline</p></div>
+  <div class="r-command-field region chrome" data-region="command-field"><!-- dark command field with thin grey border, small radius, divider before the Copy button --></div>
+  <div class="r-command-text region text" data-region="command-text"><!-- monospace command: $ bunx @journeykit/canon init --><p style="font-size:var(--r-command-text-font);font-family:var(--r-command-text-family),sans-serif;font-weight:var(--r-command-text-weight);line-height:1.05;margin:0">command-text</p></div>
+  <div class="r-copy-button region control" data-region="copy-button"><!-- Copy button: copy icon plus the word Copy, slightly raised dark fill, rounded: rebuild the control's chrome from the crop (comp-spec.mjs --crop copy-button); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-pr-panel region chrome" data-region="pr-panel"><!-- PR checks panel: dark surface, thin grey border, rounded corners, rows divided by thin rules --></div>
+  <div class="r-pr-branch region text" data-region="pr-branch"><!-- bold branch line: agent/feat-cart → main --><p style="font-size:var(--r-pr-branch-font);line-height:1.05;margin:0">pr-branch</p></div>
+  <div class="r-merge-badge region control" data-region="merge-badge"><!-- red filled rounded badge with white text Merge blocked: rebuild the control's chrome from the crop (comp-spec.mjs --crop merge-badge); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-check-cargo region text" data-region="check-cargo"><!-- green status dot, bold cargo test, em dash, grey passed --><p style="font-size:var(--r-check-cargo-font);line-height:1.05;margin:0">check-cargo</p></div>
+  <div class="r-check-lint region text" data-region="check-lint"><!-- green status dot, bold lint, em dash, grey passed --><p style="font-size:var(--r-check-lint-font);line-height:1.05;margin:0">check-lint</p></div>
+  <div class="r-check-gate region text" data-region="check-gate"><!-- red status dot, bold canon gate check, em dash, grey 2 scenarios lack evidence --><p style="font-size:var(--r-check-gate-font);font-family:var(--r-check-gate-family),sans-serif;font-weight:var(--r-check-gate-weight);line-height:1.05;margin:0">check-gate</p></div>
+  <div class="r-gate-log region chrome" data-region="gate-log"><!-- expanded log box, darker inset with thin border, small radius --></div>
+  <div class="r-gate-log-text region text" data-region="gate-log-text"><!-- monospace log: uncovered-cell cart.add.04 — spec scenario has no evidence record / exit 1 --><p style="font-size:var(--r-gate-log-text-font);line-height:1.05;margin:0">gate-log-text</p></div>
+  <div class="r-check-deploy region text" data-region="check-deploy"><!-- grey status dot, bold deploy, em dash, grey waiting --><p style="font-size:var(--r-check-deploy-font);line-height:1.05;margin:0">check-deploy</p></div>
+  <div class="r-chevrons region control" data-region="chevrons"><!-- four row chevrons at the right edge: down, down, up (expanded), down: rebuild the control's chrome from the crop (comp-spec.mjs --crop chevrons); its ink box, border, fill, radius, and label size are the comp's --></div>
 </main>
 </body>
 </html>
