@@ -174,12 +174,15 @@ fn pg_routed_kind_query_fails_naming_pg_and_the_no_live_dsn_reason() {
         "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_S22_QD_T2, schema: canon_v1 }\nrouting:\n  change: local\n  task: hot\n",
     );
 
-    let output = run_canon(&["query", "--kind", "task"], dir.path(), &[]);
-    assert!(!output.status.success(), "an unavailable OWN-routed tier must fail the command, never a silent empty result");
-    let err = stderr(&output);
-    assert!(err.contains("hot"), "error must name the rung: {err}");
-    assert!(err.contains("postgres"), "error must name the backend: {err}");
-    assert!(err.contains("no live DSN"), "error must name the reason: {err}");
+    for args in [&["query", "--kind", "task"][..], &["query", "--kind", "task", "--json"][..]] {
+        let output = run_canon(args, dir.path(), &[]);
+        assert!(!output.status.success(), "{args:?}: an unavailable OWN-routed tier must fail the command, never a silent empty result");
+        let err = stderr(&output);
+        assert!(err.contains("hot"), "{args:?}: error must name the rung: {err}");
+        assert!(err.contains("postgres"), "{args:?}: error must name the backend: {err}");
+        assert!(err.contains("no live DSN"), "{args:?}: error must name the reason: {err}");
+        assert_eq!(stdout(&output), "", "{args:?}: no result payload or empty-result report may be emitted");
+    }
 }
 
 /// spec "A cold-routed kind's query fails naming the rung and backend,
