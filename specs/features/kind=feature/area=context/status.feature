@@ -139,3 +139,13 @@ Feature: context status
     Given a policy that narrows the coverage scope, excludes a lane, requires no case and has no review rule
     When status is run
     Then the header prints each setting as resolved, with no case required and the review rule absent
+
+  # canon: {"schema":1,"at":"2026-10-10T18:06:29Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.14
+  Scenario: Every status write suggestion names the unit and its session
+    Given a subject with an unevidenced scenario, an open blocker finding and a due review
+    When status is run
+    Then every suggested command parses as printed
+    And every write suggestion carries `--actor-id <unit>` and `--session-id <session>` wherever its command takes them

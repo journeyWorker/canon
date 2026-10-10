@@ -301,7 +301,8 @@ exits `1` with the blocking violation on stderr. After a flip, the plan
 source is re-ingested so the record store's task status agrees with the
 checkbox (`canon query --kind task` reads `done`); a failed re-ingest is
 a stderr warning naming `canon ingest plans`, never a failed flip.
-An already-`[x]` row is an idempotent no-op (exit `0`). An unknown
+The success line is `canon gate task: <task_id> flipped — written
+directly; nothing to promote`. An already-`[x]` row is an idempotent no-op (exit `0`). An unknown
 `task_id` is reported (exit `1`).
 
 ```bash
@@ -331,7 +332,8 @@ Which writes need this step: `evidence add`, `finding add` and `finding
 close` stage, and their success line ends ``— run `canon gate promote`
 to commit it``. `divergence stage` stages for `canon divergence promote`
 and names it. Every other write — `review add`, `divergence
-resolve|defer`, `subject new|adopt|status`, `change new`, `scenario new`, `feature new`
+resolve|defer`, `subject new|adopt|status`, `change new`, `scenario new`, `feature new`,
+`gate task` (it edits the plan document and re-ingests it)
 — is final when it returns, and its success line ends `— written
 directly; nothing to promote`.
 

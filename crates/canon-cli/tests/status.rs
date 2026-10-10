@@ -113,7 +113,73 @@ fn subject<'a>(report: &'a Value, id: &str) -> &'a Value {
 }
 
 fn commands(report: &Value) -> Vec<String> {
-    report["next"].as_array().unwrap().iter().map(|n| n["command"].as_str().unwrap().to_string()).collect()
+    let commands: Vec<String> = report["next"].as_array().unwrap().iter().map(|n| n["command"].as_str().unwrap().to_string()).collect();
+    for command in &commands {
+        assert_suggestion_parses_and_names_the_unit(command);
+    }
+    commands
+}
+
+/// Splits a suggested command the way a POSIX shell would: whitespace
+/// outside double quotes separates words, `\"` inside them is a quote.
+fn shell_words(command: &str) -> Vec<String> {
+    let (mut words, mut word, mut quoted, mut chars) = (Vec::new(), String::new(), false, command.chars());
+    let mut started = false;
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => (quoted, started) = (!quoted, true),
+            '\\' if quoted => word.extend(chars.next()),
+            c if c.is_whitespace() && !quoted => {
+                if started {
+                    words.push(std::mem::take(&mut word));
+                }
+                started = false;
+            }
+            c => {
+                word.push(c);
+                started = true;
+            }
+        }
+    }
+    assert!(!quoted, "unbalanced quote in {command}");
+    if started {
+        words.push(word);
+    }
+    words
+}
+
+/// Fills each `<placeholder>` the way an operator would: `<sha>` with a
+/// commit sha, any other with its name as a kebab-case slug, so typed
+/// values parse.
+fn fill_placeholders(word: &str) -> String {
+    let mut out = String::new();
+    let mut rest = word;
+    while let Some((before, after)) = rest.split_once('<') {
+        let (name, tail) = after.split_once('>').unwrap_or_else(|| panic!("unclosed placeholder in {word}"));
+        out.push_str(before);
+        out.push_str(&if name == "sha" { "a".repeat(40) } else { name.replace([' ', '_'], "-").to_lowercase() });
+        rest = tail;
+    }
+    out.push_str(rest);
+    out
+}
+
+/// context.status.14: every suggested command parses through clap as
+/// printed (an unknown flag is a parse error before `--help` is reached),
+/// and every write suggestion names the unit and its session wherever the
+/// command takes `--actor-id` / `--session-id`.
+fn assert_suggestion_parses_and_names_the_unit(command: &str) {
+    let words = shell_words(command);
+    assert_eq!(words.first().map(String::as_str), Some("canon"), "{command}");
+    let filled: Vec<String> = words[1..].iter().map(|w| fill_placeholders(w)).collect();
+    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(&filled).arg("--help").output().expect("spawn canon binary");
+    assert!(out.status.success(), "`{command}` must parse as printed: {}", stderr(&out));
+    let help = stdout(&out);
+    for flag in ["--actor-id", "--session-id"] {
+        if help.contains(&format!("{flag} <")) {
+            assert!(words.iter().any(|w| w == flag), "`{command}` takes {flag} but the suggestion omits it");
+        }
+    }
 }
 
 /// Every file under `dir`, recursively, with its bytes.
@@ -211,9 +277,9 @@ fn status_next_names_the_command_for_each_gap() {
         commands(&report),
         [
             "canon scenario new world.demo.03 --title \"<what happens on this path>\" --subject demo-subject --case failure",
-            "canon evidence add --scenario-id world.demo.02 --project-id demo --kind test-run --role implementer --session-id <session> --verdict faithful --ref \"<test command>\"",
-            "canon finding close --change-id c-demo --round 1 --seq 1 --disposition fixed --resolution-sha <sha>",
-            "canon review add --project-id demo --scenario-id world.demo.01 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref <feature file>",
+            "canon evidence add --scenario-id world.demo.02 --project-id demo --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
+            "canon finding close --change-id c-demo --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
+            "canon review add --project-id demo --scenario-id world.demo.01 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
             "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject empty-subject --case happy",
         ]
     );
@@ -329,7 +395,7 @@ fn status_on_a_repo_with_no_subject_points_at_subject_new() {
     write_policy(dir.path(), FULL_POLICY);
     let report = status_json(dir.path());
     assert_eq!(report["subjects"], serde_json::json!([]));
-    assert_eq!(commands(&report), ["canon subject new <id> --domain <domain> --title \"<title>\""]);
+    assert_eq!(commands(&report), ["canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>"]);
 }
 
 /// The advance rule fires only for a subject the transition gates accept:
@@ -347,7 +413,7 @@ fn status_suggests_shipping_only_what_the_ship_gate_accepts() {
     }
 
     let report = status_json(dir.path());
-    assert_eq!(commands(&report), ["canon subject status demo-subject shipped"]);
+    assert_eq!(commands(&report), ["canon subject status demo-subject shipped --actor-id <unit>"]);
     let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
     assert!(out.status.success(), "the suggested transition must pass its gates: {}", stderr(&out));
     let report = status_json(dir.path());

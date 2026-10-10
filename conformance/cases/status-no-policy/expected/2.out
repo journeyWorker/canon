@@ -12,7 +12,7 @@
   "unowned": [],
   "next": [
     {
-      "command": "canon subject new <id> --domain <domain> --title \"<title>\"",
+      "command": "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>",
       "why": "no subject exists yet; a subject is the unit status, review and shipping track"
     }
   ],

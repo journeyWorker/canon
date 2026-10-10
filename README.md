@@ -191,6 +191,11 @@ unchanged.
 - `review-gate-distinct-review-passes`, `review-gate-open-blocker`,
   `review-gate-override-recorded`, `subject-ship-allowed` — `subject status`
   ends with `— written directly; nothing to promote`.
+- `status-gaps`, `status-no-policy`, `status-ship-ready` — every write
+  suggestion names the unit and its session: `finding close` carries
+  `--actor-id <unit> --session-id <session>`, and `subject new` and
+  `subject status` carry `--actor-id <unit>`; `review add` quotes
+  `"<feature file>"` so it pastes into a shell.
 
 New cases: `change-new`, `init-scaffold-and-rerun`,
 `evidence-vault-stores-unstored`, `evidence-vault-reports-unstorable`,

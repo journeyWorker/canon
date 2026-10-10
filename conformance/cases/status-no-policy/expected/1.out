@@ -8,4 +8,4 @@ unowned: none
 
 next:
   # no subject exists yet; a subject is the unit status, review and shipping track
-  canon subject new <id> --domain <domain> --title "<title>"
+  canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit>

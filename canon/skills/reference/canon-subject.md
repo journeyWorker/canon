@@ -324,8 +324,8 @@ Status fails closed rather than suggest progress the gate would refuse:
   ],
   "unowned": ["cart.promo.01"],
   "next": [
-    { "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha>", "why": "cart: 1 open blocker finding(s) (first: …); fix it, commit, then close it" },
-    { "command": "canon review add --project-id root --scenario-id cart.add.02 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref <feature file>", "why": "cart: 1 of 2 scenario(s) lack a qualifying review; …" },
+    { "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>", "why": "cart: 1 open blocker finding(s) (first: …); fix it, commit, then close it" },
+    { "command": "canon review add --project-id root --scenario-id cart.add.02 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"", "why": "cart: 1 of 2 scenario(s) lack a qualifying review; …" },
     { "command": "canon inventory sync", "why": "1 scenario(s) carry no @subject tag (first: cart.promo.01); …" }
   ],
   "nextOmitted": 0

@@ -37,7 +37,7 @@
   "unowned": [],
   "next": [
     {
-      "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha>",
+      "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
       "why": "cart: 1 open blocker finding(s) (first: adding an item twice duplicates the line); fix it, commit, then close it"
     }
   ],

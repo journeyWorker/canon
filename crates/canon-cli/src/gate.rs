@@ -456,7 +456,7 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
                 eprintln!("canon gate task: failed to write {}: {e}", document_path.display());
                 return 2;
             }
-            println!("canon gate task: {task_id} flipped");
+            println!("canon gate task: {task_id} flipped — {}", crate::write_mode::DIRECT);
             refresh_task_status(&repo, &dialect, &source_root);
             0
         }

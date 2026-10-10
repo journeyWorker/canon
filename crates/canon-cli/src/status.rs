@@ -255,13 +255,13 @@ pub fn resolve(repo: &Path) -> StatusReport {
     for (id, tagged) in &dangling {
         warnings.push(format!("{} scenario(s) are tagged `@subject:{id}` but no subject `{id}` exists (first: {})", tagged.len(), tagged[0]));
         next.push(NextStep {
-            command: format!("canon subject new {id} --domain <domain> --title \"<title>\""),
+            command: format!("canon subject new {id} --domain <domain> --title \"<title>\" --actor-id <unit>"),
             why: format!("{} scenario(s) are tagged @subject:{id}, which no subject record carries", tagged.len()),
         });
     }
     if subjects.is_empty() && dangling.is_empty() {
         next.push(NextStep {
-            command: "canon subject new <id> --domain <domain> --title \"<title>\"".into(),
+            command: "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>".into(),
             why: "no subject exists yet; a subject is the unit status, review and shipping track".into(),
         });
     }
@@ -480,7 +480,7 @@ fn subject_steps(
         if let Some(first) = counted.iter().find(|s| !joins.verdict_state(s).0) {
             next.push(NextStep {
                 command: format!(
-                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --session-id <session> --verdict faithful --ref \"<test command>\"",
+                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
@@ -490,7 +490,7 @@ fn subject_steps(
         if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1) {
             next.push(NextStep {
                 command: format!(
-                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --session-id <session> --verdict faithful --ref \"<test command>\"",
+                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
@@ -502,7 +502,7 @@ fn subject_steps(
     if let Some(blocker) = joins.blockers_of(subject).first() {
         next.push(NextStep {
             command: format!(
-                "canon finding close --change-id {} --round {} --seq {} --disposition fixed --resolution-sha <sha>",
+                "canon finding close --change-id {} --round {} --seq {} --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
                 blocker.change_id.as_str(),
                 blocker.round,
                 blocker.seq
@@ -516,7 +516,7 @@ fn subject_steps(
         if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).0 && review_gap(ctx, s, distinct_actor).is_some()) {
             next.push(NextStep {
                 command: format!(
-                    "canon review add --project-id {} --scenario-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref <feature file>",
+                    "canon review add --project-id {} --scenario-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
                     first.project_id.as_str(),
                     first.scenario_id.as_str()
                 ),
@@ -537,7 +537,7 @@ fn subject_steps(
     if let Some(to) = next_status(status) {
         let to = subject_status_name(to);
         next.push(NextStep {
-            command: format!("canon subject status {id} {to}"),
+            command: format!("canon subject status {id} {to} --actor-id <unit>"),
             why: match status {
                 SubjectStatus::Proposed | SubjectStatus::Specced => format!("{id} has its scenarios and every required case; move it on"),
                 _ => format!("{id}: every scenario is evidenced{}, with no blocker or case gap", if summary.review_due { " and reviewed" } else { "" }),
