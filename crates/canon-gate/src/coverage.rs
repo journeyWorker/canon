@@ -228,6 +228,8 @@ mod tests {
             ctx: GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/.canon/ledger".into() },
             policy,
             evidence,
+            audits: Vec::new(),
+            evidence_file_digests: Default::default(),
             scenarios: Vec::new(),
             divergences: Vec::new(),
             subjects: Vec::new(),

@@ -114,3 +114,13 @@ Feature: authoring init
     When canon init runs
     Then the fenced sample is kept byte for byte and the canon block is appended after it
     And a rerun finds the block current and changes no byte
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @authoring.init.80
+  Scenario: Init names the command that approves its starter policy
+    Given an empty repository
+    When canon init writes the starter policy
+    Then its output says a human approves the policy with `canon policy approve --by <who>`
+    And the AGENTS.md block names the same command

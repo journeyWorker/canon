@@ -82,3 +82,23 @@ Feature: query read
     Then the command exits nonzero
     And the message names the unreachable rung and the reason it could not be attached
     And no empty result is reported, because an empty read and an unreachable tier are different facts
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
+  @subject:query-reads
+  @case:failure
+  @query.read.80
+  Scenario: A read run where canon was never set up writes nothing there
+    Given a directory with no canon.yaml in it or above it
+    When canon query, status, context or gate check runs there
+    Then the directory is left exactly as it was
+    And no .canon/audit directory is created
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
+  @subject:query-reads
+  @case:happy
+  @query.read.81
+  Scenario: A query audits into the repository it read, never the current directory
+    Given a canon repository and an unrelated current directory
+    When canon query reads the repository through --repo or --canon-yaml
+    Then the access event is appended to that repository's .canon/audit/access.jsonl
+    And the current directory is left unchanged

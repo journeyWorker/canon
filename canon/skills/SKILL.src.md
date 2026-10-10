@@ -17,8 +17,9 @@ a feature, a one-line request included. Two points stop for a human:
 
 - **The brief** (step 1): the request, your assumptions, your open questions.
 - **The policy**: `.canon/policy.yaml` (written by `canon init`) is what the
-  gate grades the work against. A human approves it; never edit it to make
-  the gate pass.
+  gate grades the work against. A human approves it with
+  `canon policy approve --by <who>` (and again after every change to it);
+  never edit it to make the gate pass, and never approve it yourself.
 
 When no human can answer, write the question into the brief, proceed on the
 assumption you state there, and say so in your final report.
@@ -43,18 +44,27 @@ assumption you state there, and say so in your final report.
    so the ledger shows which unit did what. A delegated unit attests its own
    work; never attest another unit's work under your id.
 5. **Implement.** Write the code with tests whose names carry the scenario
-   id (`game.run.01: …`), so a test report binds to its scenario.
+   id (`game.run.01: …`), so a test report binds to its scenario. Record a
+   defect you find in your own work as a finding the moment you find it,
+   before review:
+   `canon finding add --change-id <slug> --round <n> --seq <n> --severity <s> --reviewer <me> --actor-id <me> --session-id <session> --summary "…"`.
 6. **Evidence.** Per scenario:
    `canon evidence add --project-id <root-id> --scenario-id <id> --kind test-run --role implementer --ref "<command>" --actor-id <unit> --session-id <session>`,
    with `--report junit:<path>` or `--artifact <path>` when files prove it.
    canon stores those bytes in `.canon/artifacts/sha256/` (commit it with the
    ledger) and `canon gate check` re-checks them. Then `canon gate promote`.
+   An external evaluator's audit is recorded with `canon evidence add --kind
+   audit`; canon never generates one.
+   Evidence for a plan task (`--task <id>`, before `canon gate task`) must
+   bind the artifact or report that proves the task; a canon command
+   (`canon status`, `canon gate check`) is never that proof.
 7. **Independent review.** A different session from the one that wrote the
-   code and evidence reviews the change. Record every defect as a finding,
-   including the ones the author found and fixed during implementation:
+   code and evidence reviews the change. The reviewer records every defect
+   the review finds as a finding:
    `canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <me> --actor-id <me> --session-id <session> --summary "…"`,
    then `canon gate promote`; once fixed,
    `canon finding close --change-id <slug> --round <n> --seq <n> --disposition fixed --resolution-sha <sha>`
+   (a short sha is fine; canon resolves it)
    and `canon gate promote`. Every bug fix adds or extends a scenario. The
    reviewer signs off each scenario:
    `canon review add --project-id <root-id> --scenario-id <id> --reviewer <who> --actor-id <who> --role reviewer --session-id <review-session> --pin <sha> --upstream-ref <ref>`

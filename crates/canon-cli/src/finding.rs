@@ -221,12 +221,11 @@
 //! # A named sha must EXIST — checked, best-effort
 //! `--reviewed-sha`, `--resolution-sha` and `--introduced-by` are
 //! refused when this repository does not hold the commit they name.
-//! [`parse_sha`] proves 40 hex characters and nothing else, and s43's
-//! own round 2 proved that is not enough: findings were authored with
-//! a short sha zero-padded to 40, all of them were accepted, and all
-//! of them cited a commit that has never existed — a fabricated
-//! provenance recorded, permanently, by the command built to stop
-//! fabricated release facts.
+//! Grammar alone proves nothing, and s43's own round 2 proved it:
+//! findings were authored with a short sha zero-padded to 40, all of
+//! them were accepted, and all of them cited a commit that has never
+//! existed — a fabricated provenance recorded, permanently, by the
+//! command built to stop fabricated release facts.
 //!
 //! AN EXISTING COMMIT OBJECT, and deliberately nothing else. `git
 //! cat-file -t <sha>` must answer exactly `commit` — the object's OWN
@@ -263,6 +262,20 @@
 //! answers from what it already holds instead of an authoring command
 //! silently reaching the network.
 //!
+//! # A short sha is resolved, never padded (0.15 D6, dogfood G8)
+//! Each flag takes a full 40-character sha or an abbreviation of 4 or
+//! more lowercase hex characters ([`parse_commit`]). An abbreviation is
+//! resolved with `git rev-parse --verify <sha>^{commit}` in this
+//! repository and the record stores the FULL sha git answers — never
+//! the abbreviation, which a later commit can make ambiguous. An
+//! abbreviation that names no commit, or more than one, is refused
+//! (`2`), and so is one that only resolves by peeling a tag: the full
+//! sha git answers must itself begin with the abbreviation typed, which
+//! keeps the commit-only contract above. An abbreviation needs git to
+//! mean anything, so the best-effort skips above never apply to it:
+//! outside a work tree it is refused, and the author passes the full
+//! sha instead.
+//!
 //! # Coherence is enforced by the TYPE; this command adds the diagnostic
 //! `FindingDisposition::Fixed` is unreachable without a closing sha on
 //! every construction path canon-model has — `Finding::fixed_by` is the
@@ -282,7 +295,7 @@
 //! separator in a free-text field, an empty required field, a sha this
 //! repository does not hold, an occupied natural key, a tier write
 //! failure). A malformed SHA never reaches [`run_add`] at all —
-//! [`parse_sha`] is a clap `value_parser`, so clap refuses it by flag
+//! [`parse_commit`] is a clap `value_parser`, so clap refuses it by flag
 //! name and grammar and exits `2` before this module runs.
 //!
 //! There is deliberately no `1`. `crate::evidence` grades `1` for "the
@@ -345,29 +358,62 @@ pub fn parse_change_id(s: &str) -> Result<ChangeId, String> {
     ChangeId::parse(s).map_err(|e| e.to_string())
 }
 
-/// The clap `value_parser` behind every sha-shaped flag on this command
-/// (module doc's exit-code section): a malformed value is refused by
-/// clap, by flag name, before [`run_add`] is entered — so there is no
-/// runtime sha check in this module to drift from the grammar.
-pub fn parse_sha(s: &str) -> Result<Sha, String> {
-    Sha::parse(s).map_err(|e| e.to_string())
+/// The fewest hex characters an abbreviation may have — git's own
+/// floor for an abbreviated object name.
+const MIN_ABBREV: usize = 4;
+
+/// A sha-shaped flag's value as typed: a full 40-character sha, or an
+/// abbreviation that [`run_add`]/[`run_close`] resolve through git
+/// (module doc). Never stored: only the resolved [`Sha`] reaches a
+/// record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommitArg(String);
+
+impl CommitArg {
+    /// A full 40-character sha rather than an abbreviation.
+    fn is_full(&self) -> bool {
+        self.0.len() == 40
+    }
 }
 
-/// `--introduced-by`'s value parser: [`parse_sha`], except that `self`
+impl From<Sha> for CommitArg {
+    fn from(sha: Sha) -> Self {
+        Self(sha.to_string())
+    }
+}
+
+impl std::fmt::Display for CommitArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+/// The clap `value_parser` behind every sha-shaped flag on these
+/// commands (module doc's exit-code section): a malformed value is
+/// refused by clap, by flag name, before [`run_add`] is entered.
+pub fn parse_commit(s: &str) -> Result<CommitArg, String> {
+    if (MIN_ABBREV..=40).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+        Ok(CommitArg(s.to_string()))
+    } else {
+        Err(format!("`{s}` is not a commit sha: expected {MIN_ABBREV} to 40 lowercase hex characters (a full sha, or a short one git resolves in this repository)"))
+    }
+}
+
+/// `--introduced-by`'s value parser: [`parse_commit`], except that `self`
 /// (the spelling an author reaches for when recording its own defect)
 /// is refused with a pointer to the flag that records who found it.
-pub fn parse_introduced_by(s: &str) -> Result<Sha, String> {
+pub fn parse_introduced_by(s: &str) -> Result<CommitArg, String> {
     if s == "self" {
         return Err("--introduced-by names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --reviewer (and --actor-id) to your own id, and leave --introduced-by unset unless that commit is sourced".to_string());
     }
-    parse_sha(s)
+    parse_commit(s)
 }
 
 /// One `canon finding add` invocation's already-parsed flags.
 ///
 /// A named struct rather than a positional parameter list, for
 /// `crate::evidence::EvidenceArgs`'s reason and more acutely: thirteen
-/// arguments, of which three are `Option<Sha>` and four are plain
+/// arguments, of which three are `Option<CommitArg>` and four are plain
 /// strings — `reviewed_sha`/`resolution_sha`/`introduced_by` mean three
 /// completely different things and would all compile if transposed,
 /// and transposing them would silently produce a WRONG fix-of-fix
@@ -381,7 +427,7 @@ pub struct FindingArgs {
     /// an uncommitted working tree, and canon-model makes the field
     /// optional precisely so those rounds are recordable. Never
     /// borrow an adjacent sha to fill it.
-    pub reviewed_sha: Option<Sha>,
+    pub reviewed_sha: Option<CommitArg>,
     /// Which review round on this change raised it (1-based).
     pub round: u32,
     /// This finding's index within `round` (1-based). REQUIRED and
@@ -402,12 +448,12 @@ pub struct FindingArgs {
     pub summary: String,
     /// The commit that closed it. Required by, and permitted only
     /// with, `disposition == Fixed`.
-    pub resolution_sha: Option<Sha>,
+    pub resolution_sha: Option<CommitArg>,
     /// The SOURCED introducing commit, or `None`. `None` means
     /// UNSOURCED — never "no cause" — and is one of the two reasons a
     /// derived fix-of-fix count UNDER-counts. See the module doc's
     /// canonical sentence before setting this.
-    pub introduced_by: Option<Sha>,
+    pub introduced_by: Option<CommitArg>,
     /// Where in the tree, as `path/to/file.rs:120-134`. Refused when it
     /// carries a line separator.
     pub file_ref: Option<String>,
@@ -511,14 +557,18 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     }
 
     // Every sha-shaped flag must name a commit this repository actually
-    // holds (module doc's sha-existence section). Placed here, after the
+    // holds, and a short one is resolved to the full sha the record
+    // stores (module doc's sha sections). Placed here, after the
     // pure-string refusals and before anything is constructed, so a
     // refused add still writes nothing — and so the two cheap local
     // checks run before this one ever spawns `git`.
-    if let Some(refusal) = unresolvable_sha(&repo, args) {
-        eprintln!("{refusal}");
-        return 2;
-    }
+    let shas = match resolve_shas(&repo, args) {
+        Ok(shas) => shas,
+        Err(refusal) => {
+            eprintln!("{refusal}");
+            return 2;
+        }
+    };
 
     // Constructed through the builder that makes the pair above
     // unconstructible: `fixed_by` is the ONLY path to `Fixed` and takes
@@ -532,7 +582,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         args.reviewer.as_str(),
         args.summary.as_str(),
     );
-    finding = match (args.disposition, args.resolution_sha.clone()) {
+    finding = match (args.disposition, shas.resolution) {
         (FindingDisposition::Fixed, Some(sha)) => finding.fixed_by(sha),
         (FindingDisposition::Rejected, _) => finding.rejected(),
         (FindingDisposition::Deferred, _) => finding.deferred(),
@@ -546,10 +596,10 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
             return 2;
         }
     };
-    if let Some(sha) = args.reviewed_sha.clone() {
+    if let Some(sha) = shas.reviewed {
         finding = finding.reviewing_sha(sha);
     }
-    if let Some(sha) = args.introduced_by.clone() {
+    if let Some(sha) = shas.introduced_by {
         finding = finding.with_introduced_by(sha);
     }
     if let Some(file_ref) = &args.file_ref {
@@ -639,7 +689,7 @@ pub struct FindingCloseArgs {
     /// after a fix that did not hold is a real transition, and refusing
     /// it would leave the ledger able to record only one direction.
     pub disposition: FindingDisposition,
-    pub resolution_sha: Option<Sha>,
+    pub resolution_sha: Option<CommitArg>,
     pub actor_id: String,
     pub role: RoleId,
     /// The session that authored the transition, recorded as
@@ -702,14 +752,20 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         _ => {}
     }
 
-    if let Some(sha) = &args.resolution_sha {
-        if !commit_exists(&repo, sha) {
+    let resolution_sha = match args.resolution_sha.as_ref().map(|arg| resolve_commit(&repo, arg, true)).transpose() {
+        Ok(sha) => sha,
+        Err(Unresolved::NoCommit) => {
             eprintln!(
-                "canon finding close: refused — --resolution-sha {sha} does not name a commit this repository holds; a resolution sha nobody can check out closes nothing"
+                "canon finding close: refused — --resolution-sha {} does not name a commit this repository holds; a resolution sha nobody can check out closes nothing",
+                args.resolution_sha.as_ref().expect("only a present flag can fail to resolve")
             );
             return 2;
         }
-    }
+        Err(Unresolved::Abbreviation(why)) => {
+            eprintln!("{}", abbreviation_refusal("canon finding close", "--resolution-sha", args.resolution_sha.as_ref().expect("only a present flag can fail to resolve"), &why));
+            return 2;
+        }
+    };
 
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
@@ -789,7 +845,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         existing.reviewer.as_str(),
         existing.summary.as_str(),
     );
-    transitioned = match (args.disposition, args.resolution_sha.clone()) {
+    transitioned = match (args.disposition, resolution_sha) {
         (FindingDisposition::Fixed, Some(sha)) => transitioned.fixed_by(sha),
         (FindingDisposition::Rejected, _) => transitioned.rejected(),
         (FindingDisposition::Deferred, _) => transitioned.deferred(),
@@ -914,44 +970,100 @@ fn occupied_by(natural_key: &str, staging: &GitTier, committed: &GitTier) -> Res
     Ok(None)
 }
 
-/// The refusal for the first sha-shaped flag naming a commit `repo` does
-/// not hold, or `None` when every present sha resolves — or when the
-/// check does not apply at all (module doc's sha-existence section).
+/// The three sha-shaped flags of one `canon finding add`, each resolved
+/// to the full sha its record stores.
+struct ResolvedShas {
+    reviewed: Option<Sha>,
+    resolution: Option<Sha>,
+    introduced_by: Option<Sha>,
+}
+
+/// Resolve every sha-shaped flag, or the refusal for the first one that
+/// does not resolve (module doc's sha sections).
 ///
 /// Returns the whole message rather than a bool so the flag NAME and the
 /// value travel with the failure: "a sha did not resolve" is unusable
 /// when three flags could have carried it.
-fn unresolvable_sha(repo: &Path, args: &FindingArgs) -> Option<String> {
+fn resolve_shas(repo: &Path, args: &FindingArgs) -> Result<ResolvedShas, String> {
     let flags = [
         ("--reviewed-sha", args.reviewed_sha.as_ref()),
         ("--resolution-sha", args.resolution_sha.as_ref()),
         ("--introduced-by", args.introduced_by.as_ref()),
     ];
-    // No sha, no git: an authoring command must not spawn a subprocess
-    // to check nothing. (The common case — most findings carry none.)
-    if flags.iter().all(|(_, sha)| sha.is_none()) {
-        return None;
-    }
-    // Both skip conditions, in the order that makes the cheap negative
-    // first: a non-checkout answers `false`/non-zero to both, so the
-    // second call only ever runs inside a real work tree.
-    if !git_answers(repo, &["rev-parse", "--is-inside-work-tree"], "true") {
-        return None;
-    }
-    if git_answers(repo, &["rev-parse", "--is-shallow-repository"], "true") {
-        return None;
-    }
+    // A full sha's existence check is best-effort (module doc): it runs
+    // only inside a non-shallow work tree. No full sha, no git spawned
+    // to ask — the common case, since most findings carry none. The
+    // skip conditions are asked cheap negative first: a non-checkout
+    // answers `false`/non-zero to both, so the second call only ever
+    // runs inside a real work tree.
+    let verify_full = flags.iter().any(|(_, arg)| arg.is_some_and(CommitArg::is_full))
+        && git_answers(repo, &["rev-parse", "--is-inside-work-tree"], "true")
+        && !git_answers(repo, &["rev-parse", "--is-shallow-repository"], "true");
 
-    for (flag, sha) in flags {
-        let Some(sha) = sha else { continue };
-        if commit_exists(repo, sha) {
-            continue;
-        }
-        return Some(format!(
-            "canon finding add: refused — {flag} {sha} is well-formed but names no commit in this repository. Canon does not read the commit's message or diff and is not doing so now; it only refuses a record whose provenance points at nothing. This flag is commit-only, so an object id that names a tag, a tree or a blob is refused here too. Check the sha (a short sha padded to 40 characters is the way this has actually happened), or omit the flag."
-        ));
+    let mut resolved: [Option<Sha>; 3] = [None, None, None];
+    for (slot, (flag, arg)) in resolved.iter_mut().zip(flags) {
+        let Some(arg) = arg else { continue };
+        *slot = Some(resolve_commit(repo, arg, verify_full).map_err(|unresolved| match unresolved {
+            Unresolved::NoCommit => format!(
+                "canon finding add: refused — {flag} {arg} is well-formed but names no commit in this repository. Canon does not read the commit's message or diff and is not doing so now; it only refuses a record whose provenance points at nothing. This flag is commit-only, so an object id that names a tag, a tree or a blob is refused here too. Check the sha (a short sha padded to 40 characters is the way this has actually happened), or omit the flag."
+            ),
+            Unresolved::Abbreviation(why) => abbreviation_refusal("canon finding add", flag, arg, &why),
+        })?);
     }
-    None
+    let [reviewed, resolution, introduced_by] = resolved;
+    Ok(ResolvedShas { reviewed, resolution, introduced_by })
+}
+
+/// Why a sha-shaped flag did not resolve to a commit this repository
+/// holds.
+enum Unresolved {
+    /// A full sha that names no commit object here, or names an object
+    /// that is not a commit.
+    NoCommit,
+    /// An abbreviation git could not resolve to exactly one commit's own
+    /// sha; the payload says why.
+    Abbreviation(String),
+}
+
+/// Resolve one flag's value to the full commit sha a record stores
+/// (module doc). A full sha is checked with [`commit_exists`] only when
+/// `verify_full` — `finding add` skips that check outside a checkout,
+/// `finding close` never does. An abbreviation is always resolved
+/// through `git rev-parse --verify <abbrev>^{commit}`, and the answer
+/// must itself begin with the abbreviation: `^{commit}` peels a tag
+/// through to its commit, and a commit-only field must not take a tag's
+/// id by way of that peel.
+fn resolve_commit(repo: &Path, arg: &CommitArg, verify_full: bool) -> Result<Sha, Unresolved> {
+    if let Ok(sha) = Sha::parse(arg.0.as_str()) {
+        return if !verify_full || commit_exists(repo, &sha) { Ok(sha) } else { Err(Unresolved::NoCommit) };
+    }
+    let output = git_command(repo)
+        .args(["rev-parse", "--verify", &format!("{arg}^{{commit}}")])
+        .output()
+        .map_err(|e| Unresolved::Abbreviation(format!("git could not be run ({e})")))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let why = if stderr.contains("ambiguous") {
+            "it is ambiguous here: more than one commit starts with it"
+        } else if stderr.contains("not a git repository") {
+            "this directory is not a git repository, so nothing can resolve it"
+        } else {
+            "it names no commit in this repository"
+        };
+        return Err(Unresolved::Abbreviation(why.to_string()));
+    }
+    let answer = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    match Sha::parse(answer.as_str()) {
+        Ok(sha) if answer.starts_with(arg.0.as_str()) => Ok(sha),
+        Ok(_) => Err(Unresolved::Abbreviation(format!("it resolves only by peeling a tag or ref through to commit {answer}, and this flag records a commit's own sha"))),
+        Err(_) => Err(Unresolved::Abbreviation(format!("git answered `{answer}`, which is not a 40-character commit sha"))),
+    }
+}
+
+/// The refusal for an abbreviation that did not resolve, naming the
+/// command, the flag, the value and why.
+fn abbreviation_refusal(command: &str, flag: &str, arg: &CommitArg, why: &str) -> String {
+    format!("{command}: refused — {flag} {arg} cannot be resolved to a commit: {why}. Pass more of the sha, or the full sha (`git rev-parse <rev>` prints it).")
 }
 
 /// `true` iff `git -C repo <args>` succeeds and prints exactly
@@ -1087,11 +1199,11 @@ mod tests {
     /// coherence refusal fires first and the sha check never runs.
     fn sha_flags() -> [(&'static str, fn(&mut FindingArgs, Sha)); 3] {
         [
-            ("--reviewed-sha", |a: &mut FindingArgs, s: Sha| a.reviewed_sha = Some(s)),
-            ("--introduced-by", |a: &mut FindingArgs, s: Sha| a.introduced_by = Some(s)),
+            ("--reviewed-sha", |a: &mut FindingArgs, s: Sha| a.reviewed_sha = Some(s.into())),
+            ("--introduced-by", |a: &mut FindingArgs, s: Sha| a.introduced_by = Some(s.into())),
             ("--resolution-sha", |a: &mut FindingArgs, s: Sha| {
                 a.disposition = FindingDisposition::Fixed;
-                a.resolution_sha = Some(s);
+                a.resolution_sha = Some(s.into());
             }),
         ]
     }
@@ -1139,10 +1251,10 @@ mod tests {
     fn a_sha_this_repository_holds_is_accepted_on_every_flag() {
         let (dir, head) = git_repo();
         let mut resolvable = args("s43-findings-are-records", 2, 11);
-        resolvable.reviewed_sha = Some(head.clone());
-        resolvable.introduced_by = Some(head.clone());
+        resolvable.reviewed_sha = Some(head.clone().into());
+        resolvable.introduced_by = Some(head.clone().into());
         resolvable.disposition = FindingDisposition::Fixed;
-        resolvable.resolution_sha = Some(head.clone());
+        resolvable.resolution_sha = Some(head.clone().into());
         assert_eq!(run_add(dir.path(), &resolvable), 0);
         assert_eq!(staged_bodies(dir.path()).len(), 1);
     }
@@ -1157,7 +1269,7 @@ mod tests {
         assert!(!dir.path().join(".git").exists(), "the premise: this fixture is not a checkout");
 
         let mut unverifiable = args("s43-findings-are-records", 2, 12);
-        unverifiable.reviewed_sha = Some(Sha::parse("f".repeat(40)).unwrap());
+        unverifiable.reviewed_sha = Some(Sha::parse("f".repeat(40)).unwrap().into());
         assert_eq!(run_add(dir.path(), &unverifiable), 0, "a non-checkout must skip the check, not refuse");
         assert_eq!(staged_bodies(dir.path()).len(), 1);
     }
@@ -1176,7 +1288,7 @@ mod tests {
             (1, (|_: &mut FindingArgs| {}) as fn(&mut FindingArgs)),
             (2, |a: &mut FindingArgs| {
                 a.disposition = FindingDisposition::Fixed;
-                a.resolution_sha = Some(Sha::parse("b".repeat(40)).unwrap());
+                a.resolution_sha = Some(Sha::parse("b".repeat(40)).unwrap().into());
             }),
             (3, |a: &mut FindingArgs| a.disposition = FindingDisposition::Rejected),
             (4, |a: &mut FindingArgs| a.disposition = FindingDisposition::Deferred),
@@ -1247,8 +1359,8 @@ mod tests {
         let dir = repo();
         let mut fixed = args("s43-findings-are-records", 2, 1);
         fixed.disposition = FindingDisposition::Fixed;
-        fixed.resolution_sha = Some(Sha::parse("b".repeat(40)).unwrap());
-        fixed.introduced_by = Some(Sha::parse("c".repeat(40)).unwrap());
+        fixed.resolution_sha = Some(Sha::parse("b".repeat(40)).unwrap().into());
+        fixed.introduced_by = Some(Sha::parse("c".repeat(40)).unwrap().into());
         assert_eq!(run_add(dir.path(), &fixed), 0);
 
         let body = &staged_bodies(dir.path())[0];
@@ -1276,7 +1388,7 @@ mod tests {
             let dir = repo();
             let mut incoherent = args("s43-findings-are-records", 4, 1);
             incoherent.disposition = disposition;
-            incoherent.resolution_sha = Some(Sha::parse("d".repeat(40)).unwrap());
+            incoherent.resolution_sha = Some(Sha::parse("d".repeat(40)).unwrap().into());
             assert_eq!(run_add(dir.path(), &incoherent), 2, "{disposition:?} must not accept a resolution sha");
             assert!(staged_bodies(dir.path()).is_empty(), "{disposition:?} staged something");
         }
@@ -1385,13 +1497,13 @@ mod tests {
         let (dir, head) = git_repo();
         let mut raised = args("s44-spec-derived-worklist", 1, 1);
         raised.file_ref = Some("crates/canon-cli/src/finding.rs:1-2".to_string());
-        raised.introduced_by = Some(head.clone());
-        raised.reviewed_sha = Some(head.clone());
+        raised.introduced_by = Some(head.clone().into());
+        raised.reviewed_sha = Some(head.clone().into());
         assert_eq!(run_add(dir.path(), &raised), 0);
         promote_staged(dir.path());
 
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head.clone());
+        close.resolution_sha = Some(head.clone().into());
         close.actor_id = "someone-who-fixed-it".to_string();
         assert_eq!(run_close(dir.path(), &close), 0);
 
@@ -1423,7 +1535,7 @@ mod tests {
         let before = committed_bodies(dir.path());
 
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head);
+        close.resolution_sha = Some(head.into());
         assert_eq!(run_close(dir.path(), &close), 0);
         assert_eq!(committed_bodies(dir.path()), before, "close appends; it must never rewrite the committed corpus");
     }
@@ -1439,7 +1551,7 @@ mod tests {
         promote_staged(dir.path());
 
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head);
+        close.resolution_sha = Some(head.into());
         assert_eq!(run_close(dir.path(), &close), 0);
         promote_staged(dir.path());
 
@@ -1457,7 +1569,7 @@ mod tests {
         assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
         promote_staged(dir.path());
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head);
+        close.resolution_sha = Some(head.into());
         assert_eq!(run_close(dir.path(), &close), 0);
         promote_staged(dir.path());
         assert_eq!(committed_bodies(dir.path()).len(), 2, "the key legitimately carries two versions now");
@@ -1489,7 +1601,7 @@ mod tests {
         assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
 
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head);
+        close.resolution_sha = Some(head.into());
         assert_eq!(run_close(dir.path(), &close), 2);
         assert_eq!(staged_bodies(dir.path()).len(), 1, "the staged original is left exactly as it was");
     }
@@ -1506,7 +1618,7 @@ mod tests {
         assert_eq!(run_close(dir.path(), &close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed)), 2, "`fixed` with no sha is a fix nobody can go look at");
 
         let mut with_sha = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Rejected);
-        with_sha.resolution_sha = Some(head);
+        with_sha.resolution_sha = Some(head.into());
         assert_eq!(run_close(dir.path(), &with_sha), 2, "only a `fixed` finding was closed by a commit");
         assert!(staged_bodies(dir.path()).is_empty(), "neither refusal stages anything");
     }
@@ -1519,7 +1631,7 @@ mod tests {
         promote_staged(dir.path());
 
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(Sha::parse(&"b".repeat(40)).unwrap());
+        close.resolution_sha = Some(Sha::parse(&"b".repeat(40)).unwrap().into());
         assert_eq!(run_close(dir.path(), &close), 2);
         assert!(staged_bodies(dir.path()).is_empty());
     }
@@ -1533,7 +1645,7 @@ mod tests {
         assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
         promote_staged(dir.path());
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head);
+        close.resolution_sha = Some(head.into());
         assert_eq!(run_close(dir.path(), &close), 0);
         promote_staged(dir.path());
 

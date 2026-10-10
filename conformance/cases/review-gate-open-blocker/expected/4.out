@@ -1,1 +1,5 @@
 canon gate check: clean (0 violations)
+
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+
+advisory: 1 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw

@@ -397,6 +397,17 @@ pub struct Scenario {
     /// the freshness signal `sync`'s logical-idempotence check compares
     /// against, NOT `ids::Sha` (a 40-hex git commit sha).
     pub source_digest: SpecDigest,
+    /// sha256-hex over this one scenario's meaning (0.15 D1): its own
+    /// block and tags plus the context it inherits — the Feature's tags,
+    /// the Feature Background, and an enclosing Rule with its tags and
+    /// Background — normalized so comments, blank lines and indentation
+    /// do not count, and other scenarios never do
+    /// (`canon_fmt::gherkin::scenario_digests` defines it exactly). A
+    /// review pins this instead of the file-wide `source_digest`, so
+    /// adding or editing a sibling scenario leaves the review current.
+    /// Additive: records written before 0.15 lack it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scenario_digest: Option<SpecDigest>,
     /// The optional classification axis for the scenario (s49), retained
     /// as a shape-validated kebab slug. Vocabulary membership is checked
     /// by `canon inventory sync` against the repository's activated
@@ -429,7 +440,7 @@ pub struct Scenario {
 impl Scenario {
     pub fn new(envelope: Envelope, project_id: ProjectId, scenario_id: ScenarioId, title: impl Into<String>, description: impl Into<String>, source_digest: SpecDigest) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Scenario);
-        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, lane: None, case: None, subject_id: None }
+        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, scenario_digest: None, lane: None, case: None, subject_id: None }
     }
 }
 
@@ -737,6 +748,18 @@ pub enum ProvenanceRef {
 /// ledger ↔ divergence). Mirrors the donor parity harness's required
 /// review fields (`scenario_id`, `reviewer`, `pin`) plus its
 /// provenance-ref requirement.
+///
+/// 0.15 adds what the review saw and how the reviewer's run ended, all
+/// optional and absent when unset, so a review written before 0.15
+/// reserializes byte-identically:
+/// - `pins` (D1): the scenario's source digest and its latest evidence
+///   records at review time. `canon review add` computes them; a pinned
+///   review only counts while both still match the corpus.
+/// - `outcome` (D4): `signed` (the default, and what every pre-0.15
+///   review is), `indeterminate` or `unavailable`. Only `signed` is an
+///   approval; the other two are recorded gaps.
+/// - `reviewer_provider`/`reviewer_model`/`reviewer_harness` (D4): the
+///   runtime that produced the review, as the caller reports it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Review {
     #[serde(flatten)]
@@ -746,6 +769,23 @@ pub struct Review {
     pub reviewer: String,
     pub pin: String,
     pub provenance_ref: ProvenanceRef,
+    /// What the review saw (D1). `None` on every review written before
+    /// 0.15: such a review keeps counting without the freshness check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pins: Option<ReviewPins>,
+    /// How the reviewer's run ended (D4). Absent on the wire when
+    /// `signed`, so a pre-0.15 review (no key) reads as signed.
+    #[serde(default, skip_serializing_if = "ReviewOutcome::is_signed")]
+    pub outcome: ReviewOutcome,
+    /// The reviewer runtime's provider (D4), e.g. `anthropic`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewer_provider: Option<String>,
+    /// The reviewer runtime's model id (D4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewer_model: Option<String>,
+    /// The harness that ran the reviewer (D4), e.g. `omp` or `codex`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewer_harness: Option<String>,
 }
 
 impl Review {
@@ -758,7 +798,19 @@ impl Review {
         provenance_ref: ProvenanceRef,
     ) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Review);
-        Self { envelope, project_id, scenario_id, reviewer: reviewer.into(), pin: pin.into(), provenance_ref }
+        Self {
+            envelope,
+            project_id,
+            scenario_id,
+            reviewer: reviewer.into(),
+            pin: pin.into(),
+            provenance_ref,
+            pins: None,
+            outcome: ReviewOutcome::Signed,
+            reviewer_provider: None,
+            reviewer_model: None,
+            reviewer_harness: None,
+        }
     }
 }
 
@@ -766,6 +818,87 @@ impl CanonRecord for Review {
     const KIND: RecordKind = RecordKind::Review;
     fn envelope(&self) -> &Envelope {
         &self.envelope
+    }
+}
+
+/// What a [`Review`] saw (0.15 D1): the reviewed scenario's digest
+/// (`scenario_digest`, of the kind `scenario_digest_scope` names) and the
+/// latest evidence record per role for that scenario. `evidence` is
+/// always written, empty when the scenario had none, so "pinned with no
+/// evidence" never reads as "unpinned".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ReviewPins {
+    pub scenario_digest: SpecDigest,
+    /// Which digest `scenario_digest` holds, so the gate compares like
+    /// with like. Absent means `file`: the review was pinned to the
+    /// `.feature` file's `source_digest`, the only kind before
+    /// `Scenario.scenario_digest` existed.
+    #[serde(default, skip_serializing_if = "PinnedSpec::is_file")]
+    pub scenario_digest_scope: PinnedSpec,
+    pub evidence: Vec<EvidencePin>,
+}
+
+/// What a review's spec pin covers (0.15 D1).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PinnedSpec {
+    /// The whole `.feature` file (`Scenario.source_digest`): any edit to
+    /// the file stales the review.
+    #[default]
+    File,
+    /// The scenario alone (`Scenario.scenario_digest`): only an edit to
+    /// the scenario or the context it inherits stales the review.
+    Scenario,
+}
+
+impl PinnedSpec {
+    pub fn is_file(&self) -> bool {
+        *self == PinnedSpec::File
+    }
+}
+
+/// One pinned evidence record: its ledger natural key (the `task_id`,
+/// else the `scenario_id`, it is filed under) and its 12-hex content
+/// digest, together the record's ledger file stem `<key>__<digest>`.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+pub struct EvidencePin {
+    pub key: String,
+    pub digest: String,
+}
+
+/// How a reviewer's run ended (0.15 D4). Only `Signed` is an approval.
+/// `Indeterminate` (the reviewer ran but could not reach a verdict) and
+/// `Unavailable` (the reviewer could not run) are recorded so a failed
+/// review is visible, never mistaken for a sign-off or a rejection.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewOutcome {
+    #[default]
+    Signed,
+    Indeterminate,
+    Unavailable,
+}
+
+impl ReviewOutcome {
+    pub const ALL: [ReviewOutcome; 3] = [ReviewOutcome::Signed, ReviewOutcome::Indeterminate, ReviewOutcome::Unavailable];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReviewOutcome::Signed => "signed",
+            ReviewOutcome::Indeterminate => "indeterminate",
+            ReviewOutcome::Unavailable => "unavailable",
+        }
+    }
+
+    pub fn parse(s: &str) -> Result<Self, String> {
+        Self::ALL
+            .into_iter()
+            .find(|o| o.as_str() == s)
+            .ok_or_else(|| format!("unknown review outcome `{s}` (expected one of: signed, indeterminate, unavailable)"))
+    }
+
+    pub fn is_signed(&self) -> bool {
+        *self == ReviewOutcome::Signed
     }
 }
 
@@ -1034,6 +1167,60 @@ where
     Ok(s)
 }
 
+/// What an external evaluator concluded when it re-audited a scenario's
+/// declared success (0.15 D3). `Indeterminate` is a real outcome — the
+/// evaluator ran and could not decide — never an approval.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuditResult {
+    /// The evaluator re-checked the requirement and the declared success holds.
+    Confirmed,
+    /// The evaluator found the declared success false (a counterexample).
+    Refuted,
+    /// The evaluator ran but could not decide either way.
+    Indeterminate,
+}
+
+impl AuditResult {
+    /// This result's wire string — the value `#[serde(rename_all =
+    /// "kebab-case")]` produces, exposed for diagnostics.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuditResult::Confirmed => "confirmed",
+            AuditResult::Refuted => "refuted",
+            AuditResult::Indeterminate => "indeterminate",
+        }
+    }
+}
+
+/// An external evaluator's re-audit of a scenario (0.15 D3), carried on
+/// an [`EvidenceRecord`] written by `canon evidence add --kind audit`.
+/// Canon never generates or runs the audit; it records which evaluator
+/// ran (id, version, and the sha256 of the evaluator itself) and what it
+/// concluded. A record carrying this is an AUDITED outcome and is folded
+/// apart from declared evidence: it never becomes a scenario's latest
+/// declared verdict.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct EvidenceAudit {
+    pub evaluator_id: String,
+    pub evaluator_version: String,
+    /// 64 lowercase hex characters: sha256 of the evaluator (its binary,
+    /// image, or prompt bundle), as the evaluator's operator reports it.
+    #[serde(deserialize_with = "deserialize_sha256_hex")]
+    pub evaluator_digest: String,
+    pub result: AuditResult,
+}
+
+/// Files a re-attestation deliberately stopped binding (0.15 D2): the
+/// repository-relative paths the scenario's previous latest record bound
+/// and this record does not, and the author's one-line reason. Without
+/// it `canon evidence add` refuses a record that would drop them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AttachmentDrop {
+    pub paths: Vec<String>,
+    pub reason: String,
+}
+
 /// The evidence-integrity spec's own record kind: the candidate shape
 /// [`crate::evidence::validate_evidence`] validates. Carries whichever
 /// join keys are relevant to what it attests (join-spine `task_id`
@@ -1078,6 +1265,14 @@ pub struct EvidenceRecord {
     /// on the wire).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<EvidenceAttachment>,
+    /// Bound files of the scenario's previous latest record this one
+    /// deliberately no longer binds, and why (0.15 D2). Additive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachment_drop: Option<AttachmentDrop>,
+    /// Present only on an audit record (`--kind audit`, 0.15 D3): the
+    /// external evaluator and its result. Additive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audit: Option<EvidenceAudit>,
 }
 
 impl EvidenceRecord {
@@ -1103,6 +1298,8 @@ impl EvidenceRecord {
             surface_ref: Vec::new(),
             approval: None,
             attachments: Vec::new(),
+            attachment_drop: None,
+            audit: None,
         }
     }
 
@@ -1143,6 +1340,21 @@ impl EvidenceRecord {
     pub fn with_attachments(mut self, attachments: Vec<EvidenceAttachment>) -> Self {
         self.attachments = attachments;
         self
+    }
+
+    pub fn with_attachment_drop(mut self, attachment_drop: AttachmentDrop) -> Self {
+        self.attachment_drop = Some(attachment_drop);
+        self
+    }
+
+    pub fn with_audit(mut self, audit: EvidenceAudit) -> Self {
+        self.audit = Some(audit);
+        self
+    }
+
+    /// Whether this is an audited outcome rather than a declared one.
+    pub fn is_audit(&self) -> bool {
+        self.audit.is_some()
     }
 }
 
@@ -2236,6 +2448,68 @@ mod tests {
             ProvenanceRef::UpstreamRef("routes/world.tsx#onPurchased".into())
         )
     );
+
+    /// 0.15 D1/D4: a pre-0.15 review (no `pins`, `outcome` or reviewer
+    /// runtime keys) reads back signed and unpinned, and reserializes
+    /// byte-identically, so its content digest is unchanged.
+    #[test]
+    fn a_pre_015_review_is_byte_identical_and_reads_as_signed_and_unpinned() {
+        let legacy = serde_json::json!({
+            "schema": 1,
+            "kind": "review",
+            "at": "2026-07-01T09:00:00Z",
+            "actor": {"agent_id": "reviewer-2", "role": "reviewer"},
+            "project_id": "root",
+            "scenario_id": "cart.add.01",
+            "reviewer": "reviewer-2",
+            "pin": "r1",
+            "provenance_ref": {"original_spec_ref": "specs/x.feature"},
+        });
+        let review: Review = serde_json::from_value(legacy.clone()).unwrap();
+        assert_eq!(review.pins, None);
+        assert_eq!(review.outcome, ReviewOutcome::Signed);
+        assert_eq!(serde_json::to_value(&review).unwrap(), legacy);
+    }
+
+    /// A pinned review with no evidence keeps its empty `evidence` list on
+    /// the wire (pinned-with-nothing is not unpinned), a non-signed
+    /// outcome and the reviewer runtime round-trip, and an unknown
+    /// outcome is refused rather than read as signed.
+    #[test]
+    fn review_pins_and_outcome_round_trip_and_an_unknown_outcome_is_refused() {
+        let mut review = Review::new(
+            envelope(RecordKind::Review),
+            project_id(),
+            ScenarioId::parse("world.place-lock.01").unwrap(),
+            "reviewer",
+            "9c93d024b1a2",
+            ProvenanceRef::UpstreamRef("pr#1".into()),
+        );
+        review.pins = Some(ReviewPins { scenario_digest: SpecDigest::of(b"feature"), scenario_digest_scope: PinnedSpec::File, evidence: Vec::new() });
+        let json = serde_json::to_value(&review).unwrap();
+        assert_eq!(json["pins"]["evidence"], serde_json::json!([]));
+        assert!(json["pins"].get("scenario_digest_scope").is_none(), "a file pin is the default and is not written, so pre-scope pins read as file pins");
+        review.pins.as_mut().unwrap().scenario_digest_scope = PinnedSpec::Scenario;
+        let json = serde_json::to_value(&review).unwrap();
+        assert_eq!(json["pins"]["scenario_digest_scope"], "scenario");
+        assert!(json.get("outcome").is_none(), "signed is the default and is not written");
+        assert_eq!(serde_json::from_value::<Review>(json).unwrap(), review);
+
+        review.outcome = ReviewOutcome::Indeterminate;
+        review.reviewer_provider = Some("openai".into());
+        review.reviewer_model = Some("gpt-x".into());
+        review.reviewer_harness = Some("codex".into());
+        review.pins.as_mut().unwrap().evidence.push(EvidencePin { key: "world.place-lock.01".into(), digest: "0123456789ab".into() });
+        let json = serde_json::to_value(&review).unwrap();
+        assert_eq!(json["outcome"], "indeterminate");
+        assert_eq!(serde_json::from_value::<Review>(json.clone()).unwrap(), review);
+
+        let mut bad = json;
+        bad["outcome"] = serde_json::json!("approved");
+        assert!(serde_json::from_value::<Review>(bad).is_err());
+        assert_eq!(ReviewOutcome::parse("unavailable"), Ok(ReviewOutcome::Unavailable));
+        assert!(ReviewOutcome::parse("approved").is_err());
+    }
 
     round_trip_test!(
         divergence_round_trips,

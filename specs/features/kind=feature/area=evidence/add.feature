@@ -221,3 +221,62 @@ Feature: evidence add
     When faithful evidence is added for the scenario with that report
     Then the record binds only the case the scenario id leads, and the faithful claim is accepted
     And naming the mentioning case with --report-case binds it, so its failure refuses the faithful claim with exit 1
+
+  # canon: {"schema":1,"at":"2026-10-10T19:35:32Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.40
+  Scenario: Re-attesting a scenario with fewer bound files is refused, naming the dropped paths
+    Given a scenario whose latest evidence record binds two files
+    When evidence is added for it binding only one of them
+    Then the add exits 2 naming the left-out path
+    And the refusal names both ways out: re-bind it, or --drop-attachment with --drop-reason
+    And nothing is staged
+
+  # canon: {"schema":1,"at":"2026-10-10T19:35:32Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.41
+  Scenario: A deliberate drop is recorded with its reason and listed by canon status
+    Given a scenario whose latest evidence record binds a screenshot and a log
+    When evidence is added binding the screenshot again with new bytes, then binding only the log with --drop-attachment for the screenshot and a --drop-reason
+    Then both adds are accepted and the second record carries attachment_drop with that path and reason
+    And canon status lists the drop with its reason, actor and time
+
+  # canon: {"schema":1,"at":"2026-10-10T19:35:32Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.42
+  Scenario: A staged, unpromoted record is the latest record the drop guard compares with
+    Given a staged, unpromoted record for a scenario that binds two files
+    When evidence is added for the scenario binding only one of them
+    Then the add exits 2 naming the other file
+
+  # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.43
+  Scenario: Malformed drop flags are refused before anything is staged
+    Given a scenario with bound evidence
+    When evidence is added with --drop-attachment but no --drop-reason, a reason but no path, a path that is not being dropped, a multi-line reason, or a drop on task-only evidence
+    Then each add exits 2 naming what is wrong and nothing is staged
+
+  # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.44
+  Scenario: Audit flags are required with --kind audit and refused on every other kind
+    Given a scenario
+    When an audit is added without the evaluator flags, or evaluator flags are given on a test-run, or an audit carries --verdict or --task, an unknown result, or a digest that is not a sha256
+    Then each add exits 2 naming the flag and nothing is staged
+
+  # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.45
+  Scenario: An audit is recorded beside the declared verdict and never replaces it
+    Given a scenario with a faithful declared record
+    When an external evaluator's refuted audit with a counterexample report is added with --kind audit
+    Then the record carries the evaluator id, version, digest and result, and a divergent verdict
+    And the counterexample report is bound and stored like any report
+    And the scenario's declared verdict is still the faithful one

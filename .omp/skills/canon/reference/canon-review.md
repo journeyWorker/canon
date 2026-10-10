@@ -34,7 +34,8 @@ The order an agent follows to claim a subject done:
    ```
 
 3. **One Review per scenario**, by someone other than the evidence actor,
-   from a session other than the one that attested the evidence:
+   from a session other than the one that attested the evidence, after
+   the evidence is in (the review pins what it saw):
 
    ```bash
    canon review add --project-id root --scenario-id world.demo.01 \
@@ -43,7 +44,11 @@ The order an agent follows to claim a subject done:
      --pin "$(git rev-parse HEAD)" --upstream-ref "pr#41"
    ```
 
-   `review add` writes directly; there is nothing to promote.
+   `review add` writes directly; there is nothing to promote. If the
+   reviewer could not reach a verdict, record that instead of signing:
+   `--outcome indeterminate` (or `unavailable` when it could not run).
+   Changing the scenario or re-attesting it afterwards makes the review
+   stale; review it again.
 
 4. **Move the subject**: `canon subject status <id> verifying`, later
    `shipped`. See `canon-subject`.
@@ -73,14 +78,24 @@ appends a second version at the same natural key — the first stays. Its
 `--actor-id` and `--session-id` name who authored the transition; the
 raiser's stay on the first version.
 
+Every sha flag (`--reviewed-sha`, `--resolution-sha`, `--introduced-by`)
+takes a full 40-character sha or a short one (4 or more lowercase hex
+characters). A short sha is resolved with `git rev-parse --verify
+<sha>^{commit}` in the repo, and the record stores the full sha. It is
+refused (exit `2`) when it names no commit, when more than one commit
+starts with it (pass more characters), when it only resolves by peeling a
+tag, or outside a git work tree.
+
 ### A defect the author found in its own work
 
-Record it like any other finding, with `--reviewer` and `--actor-id` set
-to the author's own id. Nothing refuses a finding whose reviewer is also
-the implementer, and an open `blocker` the author raised blocks under
-`block_on_findings` exactly like a reviewer's. `--introduced-by` names the
-commit that introduced the defect, not who found it: `--introduced-by self`
-is a usage error (exit 2) that points at `--reviewer`.
+Record it like any other finding, at the moment you find it and before
+review, with `--reviewer` and `--actor-id` set to your own id; never ask
+the reviewer to record it later under theirs. Nothing refuses a finding
+whose reviewer is also the implementer, and an open `blocker` the author
+raised blocks under `block_on_findings` exactly like a reviewer's.
+`--introduced-by` names the commit that introduced the defect, not who
+found it: `--introduced-by self` is a usage error (exit 2) that points at
+`--reviewer`.
 
 ### Severities
 
@@ -113,18 +128,65 @@ fixed finding reopened with `--disposition open` counts as open again.
 ```bash
 canon review add --project-id <root-id> --scenario-id <id> \
   --reviewer <who> --pin <sha-or-ref> --role <role> \
-  (--upstream-ref <ref> | --original-spec-ref <ref>) [--actor-id <id>] [--session-id <id>]
+  (--upstream-ref <ref> | --original-spec-ref <ref>) [--actor-id <id>] [--session-id <id>] \
+  [--outcome signed|indeterminate|unavailable] \
+  [--reviewer-provider <p>] [--reviewer-model <m>] [--reviewer-harness <h>]
 ```
 
 One attributed Review record for one scenario, joined on
 `(project_id, scenario_id)` — both are required because two spec roots
 may carry the same scenario id. Exactly one provenance ref is required.
 `--actor-id` defaults to `canon`; `--session-id` fills `actor.session_id`.
-A Review carries no verdict; the `verifying → shipped` ship gate still
-refuses missing or `Divergent` evidence verdicts on its own. It is
-written directly to the ledger, with no staging step, and says so:
-`canon review add: wrote <path> (new) — written directly; nothing to
+A Review carries no verdict about the behavior; the `verifying → shipped`
+ship gate still refuses missing or `Divergent` evidence verdicts on its
+own. It is written directly to the ledger, with no staging step, and says
+so: `canon review add: wrote <path> (new) — written directly; nothing to
 promote`.
+
+### What the review saw (pins)
+
+`review add` reads the corpus and records `pins` on the review; the
+reviewer never types them:
+
+- `scenario_digest` — the scenario record's `scenario_digest`: a sha256
+  over that scenario alone, as `canon inventory sync` stores it. It
+  covers the scenario's tags and block (header, steps, doc strings,
+  tables, `Examples:`) and the context it inherits: the Feature's tags,
+  the Feature `Background:`, and an enclosing `Rule:` with its tags and
+  `Background:`. Layout does not count: comments, blank lines, line
+  indentation, tag order, and table alignment (cells are compared
+  trimmed and unescaped). Values do: any step, tag or cell change, and
+  whitespace inside a doc string after the delimiter's own indentation
+  is removed. Other scenarios never count. A record synced before 0.15 has no
+  `scenario_digest`; then the review pins its `source_digest` (the
+  sha256 of the whole `.feature` file) and records
+  `scenario_digest_scope: file`;
+- `evidence` — the scenario's latest evidence record per role, each as
+  `{key, digest}`: the ledger file `kind=evidence_record/<key>__<digest>.json`.
+  A scenario with no evidence yet is pinned with an empty list.
+
+It prints `canon review add: pinned <id> at scenario digest <12 hex> and
+<n> latest evidence record(s); …` (`at source digest` for a file pin). A
+scenario with no record (never synced) is refused with exit 2 and nothing
+is written: there is nothing to pin.
+
+The gate compares each pin like for like: a scenario pin with the
+scenario's current `scenario_digest`, a file pin with its current
+`source_digest`. Adding or editing another scenario in the file leaves a
+scenario-pinned review current; editing this scenario, or a Background
+or Rule it inherits, makes it stale. A file-pinned review stays a file
+pin until it is reviewed again. Review after the spec and evidence are
+final.
+
+### The reviewer's outcome and runtime
+
+`--outcome` records how the reviewer's run ended: `signed` (the default:
+an approval), `indeterminate` (it ran and reached no verdict) or
+`unavailable` (it could not run). Only `signed` counts; the other two
+are recorded so a failed review is visible, never mistaken for a
+sign-off or a rejection, and `review add` says so. `--reviewer-provider`,
+`--reviewer-model` and `--reviewer-harness` record the runtime that
+produced the review, as given. An empty or padded label is a usage error.
 
 `--session-id` (on `evidence add`, `review add`, `finding add` and
 `finding close`) takes one opaque token: non-empty, no surrounding
@@ -169,9 +231,41 @@ the starter policy `canon init` writes.
 
 ## How it meets the gate
 
+### Which review counts
+
+The reviews of a scenario are folded to the **latest per `reviewer`**
+first (by `at`, then schema, then content digest — the fold every reader
+uses). A reviewer's later review replaces their earlier one: a reviewer
+who signed and later recorded `indeterminate` no longer counts as
+signing, and a later `signed` review counts again. Reviews by different
+reviewers never replace each other.
+
+The scenario is reviewed when at least one of those latest reviews:
+
+1. is `signed`;
+2. still matches its pins — the scenario record's current
+   `source_digest`, and its current latest evidence record per role —
+   when it has pins;
+3. passes `distinct_actor`, when that is on.
+
+A review written before 0.15 has no pins. It keeps counting under rules
+1 and 3, without the freshness check, and `canon gate check` prints one
+advisory line counting such in-effect reviews (exit code unchanged):
+
+```
+advisory: 340 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw
+```
+
+`canon status` prints the same line as a warning, and `canon subject
+status` prints it on stderr for the subject's own scenarios. Reviewing
+the scenario again pins it and drops it from the count.
+
 ### `unreviewed-promotion`
 
-An in-scope scenario with no qualifying review:
+An in-scope scenario with no qualifying review. When several latest
+reviews fail for different reasons, the detail names the one closest to
+counting: a current signed review failing only `distinct_actor`, then a
+stale review, then non-signed outcomes.
 
 ```
 unreviewed-promotion world.demo.01 — no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review add`) once its subject is claimed done
@@ -189,6 +283,22 @@ evidence:
 ```
 unreviewed-promotion world.demo.01 — every review of this scenario is by an actor that also attested its evidence (`impl-agent`) or from a session that did (`sess-impl`); spec_coverage.require_review.distinct_actor wants a reviewer other than the evidence actor, in a session other than any evidence session
 ```
+
+or, when the scenario's spec, its evidence, or both changed after the
+review (`its spec changed`, `its evidence changed`, `its spec and its
+evidence changed`):
+
+```
+unreviewed-promotion world.demo.01 — stale review by `reviewer-2`: its evidence changed (the latest evidence records are not the pinned ones) since the review; a pinned review counts only while what it saw is current — review it again (`canon review add`)
+```
+
+or, when every latest review recorded no sign-off:
+
+```
+unreviewed-promotion world.demo.01 — no signed review: the latest review recorded no sign-off (`reviewer-2` indeterminate); an indeterminate or unavailable review is a gap, never an approval — run the review again and record `--outcome signed`
+```
+
+A non-signed review is a gap even without `distinct_actor`.
 
 ### `open-blocker`
 
@@ -222,7 +332,7 @@ prints on stderr which review checks it ran or skipped:
 
 ```
 canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
-  ran unreviewed-promotion — every owned scenario needs a review by an actor, and from a session, other than its evidence's
+  ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
   ran open-blocker — 1 adopted change(s) checked for open blocker findings
 ```
 

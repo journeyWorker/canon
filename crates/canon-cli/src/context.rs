@@ -150,6 +150,17 @@ pub struct RequireReviewSurface {
     pub block_on_findings: bool,
 }
 
+/// `spec_coverage.require_audit` in the `policy` section, keyed like
+/// `policy.yaml` (0.15 D3). `scope` is the resolved status list (the
+/// default `[verifying, shipped]` when the key is omitted); empty means
+/// every scenario.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RequireAuditSurface {
+    pub rate: serde_json::Number,
+    pub seed: String,
+    pub scope: Vec<String>,
+}
+
 /// The same requirement in the camelCase `review` section.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -173,6 +184,9 @@ pub enum SpecCoverageSurface {
         require_cases: Vec<String>,
         /// `null` when the sub-section is absent.
         require_review: Option<RequireReviewSurface>,
+        /// Omitted when the sub-section is absent.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        require_audit: Option<RequireAuditSurface>,
     },
     Invalid { invalid: String },
 }
@@ -454,11 +468,17 @@ fn scope_text(scope: &[String]) -> String {
     }
 }
 
+/// The one-line `require_audit` summary `canon context` and `canon
+/// status` print.
+pub fn require_audit_line(ra: &RequireAuditSurface) -> String {
+    format!("rate={} seed=`{}` scope={}", ra.rate, ra.seed, scope_text(&ra.scope))
+}
+
 impl SpecCoverageSurface {
     /// The outline's one-line summary.
     fn outline(&self) -> String {
         match self {
-            SpecCoverageSurface::Active { require_evidence, scope, exclude_lanes, require_cases, require_review } => {
+            SpecCoverageSurface::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit } => {
                 let mut summary = format!("require_evidence={require_evidence} scope={}", scope_text(scope));
                 if !exclude_lanes.is_empty() {
                     summary.push_str(&format!(" exclude_lanes={}", exclude_lanes.join(", ")));
@@ -468,6 +488,9 @@ impl SpecCoverageSurface {
                 }
                 if let Some(rr) = require_review {
                     summary.push_str(&format!(" require_review=({})", require_review_line(&rr.scope, rr.distinct_actor, rr.block_on_findings)));
+                }
+                if let Some(ra) = require_audit {
+                    summary.push_str(&format!(" require_audit=({})", require_audit_line(ra)));
                 }
                 summary
             }
@@ -611,7 +634,7 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
 /// `canon status` both print, keyed like `policy.yaml`.
 pub fn spec_coverage_surface(policy: &PolicyResolution) -> Option<SpecCoverageSurface> {
     policy.spec_coverage.as_ref().map(|sc| match sc {
-        SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review } => SpecCoverageSurface::Active {
+        SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit } => SpecCoverageSurface::Active {
             require_evidence: *require_evidence,
             scope: status_slugs(scope),
             exclude_lanes: exclude_lanes.clone(),
@@ -620,6 +643,11 @@ pub fn spec_coverage_surface(policy: &PolicyResolution) -> Option<SpecCoverageSu
                 scope: status_slugs(&rr.scope),
                 distinct_actor: rr.distinct_actor,
                 block_on_findings: rr.block_on_findings,
+            }),
+            require_audit: require_audit.as_ref().map(|ra| RequireAuditSurface {
+                rate: serde_json::Number::from_f64(ra.rate.get()).expect("a resolved audit rate is finite"),
+                seed: ra.seed.clone(),
+                scope: status_slugs(&ra.scope),
             }),
         },
         SpecCoverage::Invalid { detail } => SpecCoverageSurface::Invalid { invalid: detail.clone() },

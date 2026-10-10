@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-l4-impl",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T20:28:11.652066Z",
+  "change_id": "canon-0-15-l4-self",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "e3c8ba0d83ffbd9fa1cdcdb5bed3cb91b3f674de",
+  "reviewer": "canon-l4-impl",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "author-found during the eval-2 recheck: review pins used the whole .feature file digest, so any sibling edit or append staled every pinned review in that file"
+}

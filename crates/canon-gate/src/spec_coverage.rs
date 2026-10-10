@@ -70,7 +70,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use canon_model::fold::{fold_to_current_state, FoldedState};
-use canon_model::{EvidenceVerdict, ProjectId, Scenario, ScenarioId, Subject, SubjectId, SubjectStatus};
+use canon_model::{EvidenceRecord, EvidenceVerdict, ProjectId, Scenario, ScenarioId, Subject, SubjectId, SubjectStatus};
 
 use crate::context::{GateCheck, GateContext, SPEC_CORPUS_KINDS};
 use crate::review_gate;
@@ -102,7 +102,9 @@ impl GateCheck for SpecCoverageCheck {
                     format!("policy.yaml's `spec_coverage` section is unusable ({detail}); refusing rather than treating it as absent"),
                 )];
             }
-            Some(SpecCoverage::Active { require_evidence: false, require_cases, require_review: None, .. }) if require_cases.is_empty() => return Vec::new(),
+            Some(SpecCoverage::Active { require_evidence: false, require_cases, require_review: None, require_audit: None, .. }) if require_cases.is_empty() => {
+                return Vec::new()
+            }
             Some(active @ SpecCoverage::Active { .. }) => active,
         };
 
@@ -123,7 +125,7 @@ impl GateCheck for SpecCoverageCheck {
             )];
         }
 
-        let SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review } = policy else {
+        let SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit } = policy else {
             unreachable!("the non-Active arms return above");
         };
 
@@ -194,6 +196,9 @@ impl GateCheck for SpecCoverageCheck {
             } else {
                 violations.push(review_gate::unreadable_violation(&unreadable));
             }
+        }
+        if let Some(require_audit) = require_audit {
+            violations.extend(crate::audit::evaluate(ctx, require_audit, exclude_lanes));
         }
         violations
     }
@@ -292,6 +297,19 @@ pub(crate) fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], k
     canon_store::fold::fold_latest_by_key(rows, |r| key(r.record), |r| r.at, |r| r.schema, |r| r.digest.as_str())
         .into_values()
         .map(|r| r.record)
+        .collect()
+}
+
+/// The latest evidence record per `(project_id, scenario_id)` among
+/// `records`, through the same fold as [`latest_by_key`]. A record
+/// missing either key joins no scenario and is skipped. Callers pass ONE
+/// fold's records — declared (`GateContext::evidence`) or audited
+/// (`GateContext::audits`) — never both.
+pub fn latest_by_scenario(records: &[EvidenceRecord]) -> BTreeMap<(ProjectId, ScenarioId), &EvidenceRecord> {
+    let keyed: Vec<&EvidenceRecord> = records.iter().filter(|r| r.project_id.is_some() && r.scenario_id.is_some()).collect();
+    latest_by_key(&keyed, |r| (r.project_id.clone(), r.scenario_id.clone()))
+        .into_iter()
+        .filter_map(|r| Some(((r.project_id.clone()?, r.scenario_id.clone()?), *r)))
         .collect()
 }
 
@@ -481,6 +499,7 @@ mod tests {
     struct Corpus {
         scenarios: Vec<Scenario>,
         evidence: Vec<EvidenceRecord>,
+        audits: Vec<EvidenceRecord>,
         divergences: Vec<Divergence>,
         subjects: Vec<Subject>,
         reviews: Vec<canon_model::Review>,
@@ -493,6 +512,7 @@ mod tests {
             Self {
                 scenarios: Vec::new(),
                 evidence: Vec::new(),
+                audits: Vec::new(),
                 divergences: Vec::new(),
                 subjects: Vec::new(),
                 reviews: Vec::new(),
@@ -507,6 +527,8 @@ mod tests {
             ctx: crate::context::GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/.canon/ledger".into() },
             policy: policy(spec_coverage),
             evidence: corpus.evidence,
+            audits: corpus.audits,
+            evidence_file_digests: Default::default(),
             scenarios: corpus.scenarios,
             divergences: corpus.divergences,
             subjects: corpus.subjects,
@@ -524,7 +546,7 @@ mod tests {
     }
 
     fn active(scope: Vec<SubjectStatus>) -> Option<SpecCoverage> {
-        Some(SpecCoverage::Active { require_evidence: true, scope, exclude_lanes: Vec::new(), require_cases: Vec::new(), require_review: None })
+        Some(SpecCoverage::Active { require_evidence: true, scope, exclude_lanes: Vec::new(), require_cases: Vec::new(), require_review: None, require_audit: None })
     }
 
     fn requiring(cases: &[&str], exclude_lanes: &[&str]) -> Option<SpecCoverage> {
@@ -534,6 +556,7 @@ mod tests {
             exclude_lanes: exclude_lanes.iter().map(|s| s.to_string()).collect(),
             require_cases: cases.iter().map(|s| s.to_string()).collect(),
             require_review: None,
+            require_audit: None,
         })
     }
 
@@ -612,7 +635,14 @@ mod tests {
         corpus.scenarios = vec![scenario("p.a.01", None)];
         assert!(run(
             corpus,
-            Some(SpecCoverage::Active { require_evidence: false, scope: Vec::new(), exclude_lanes: Vec::new(), require_cases: Vec::new(), require_review: None })
+            Some(SpecCoverage::Active {
+                require_evidence: false,
+                scope: Vec::new(),
+                exclude_lanes: Vec::new(),
+                require_cases: Vec::new(),
+                require_review: None,
+                require_audit: None,
+            })
         )
         .is_empty());
     }
@@ -643,6 +673,7 @@ mod tests {
             exclude_lanes: vec!["process".to_string()],
             require_cases: Vec::new(),
             require_review: None,
+            require_audit: None,
         });
         assert!(run(corpus, policy).is_empty());
     }
@@ -659,6 +690,7 @@ mod tests {
             exclude_lanes: vec!["process".to_string()],
             require_cases: Vec::new(),
             require_review: None,
+            require_audit: None,
         });
         assert_eq!(run(corpus, policy).len(), 1);
     }
@@ -863,6 +895,7 @@ mod tests {
             exclude_lanes: vec!["process".to_string()],
             require_cases: Vec::new(),
             require_review: Some(RequireReview { scope, distinct_actor, block_on_findings: true }),
+            require_audit: None,
         })
     }
 
@@ -965,6 +998,195 @@ mod tests {
         corpus.evidence = vec![evidence("p.a.01", EvidenceVerdict::Faithful)];
         corpus.reviews = vec![review("p.a.01", "reviewer-2", "reviewer-2")];
         assert!(run(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true)).is_empty());
+    }
+
+    /// One verifying subject owning `p.a.01`, with implementer evidence,
+    /// under `require_review` with `distinct_actor`. Its records carry a
+    /// fixed `at`, so every call builds byte-identical records (and the
+    /// same pins).
+    fn pinned_corpus() -> GateContext {
+        let fixed: chrono::DateTime<Utc> = "2026-10-01T00:00:00Z".parse().unwrap();
+        let mut corpus = Corpus::new();
+        let mut s = scenario("p.a.01", Some("live"));
+        s.envelope.at = fixed;
+        let mut e = evidence("p.a.01", EvidenceVerdict::Faithful);
+        e.envelope.at = fixed;
+        corpus.scenarios = vec![s];
+        corpus.subjects = vec![subject("live", SubjectStatus::Verifying)];
+        corpus.evidence = vec![e];
+        context(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true))
+    }
+
+    /// A review by `reviewer`, `offset` seconds after now, pinned to what
+    /// `ctx` holds at that moment.
+    fn pinned_review(ctx: &GateContext, reviewer: &str, outcome: canon_model::ReviewOutcome, offset: i64) -> Review {
+        let mut r = review("p.a.01", reviewer, reviewer);
+        r.envelope.at += chrono::Duration::seconds(offset);
+        r.pins = Some(crate::review_gate::current_pins(ctx, latest_scenarios(ctx)[0]));
+        r.outcome = outcome;
+        r
+    }
+
+    /// review.add.22/23 (0.15 D1): a pinned review counts while its pins match, and turns
+    /// stale, naming what changed, when the scenario's source digest or
+    /// its latest evidence moves on.
+    #[test]
+    fn a_pinned_review_counts_only_while_its_spec_and_evidence_are_current() {
+        use canon_model::ReviewOutcome::Signed;
+        let mut ctx = pinned_corpus();
+        let review = pinned_review(&ctx, "reviewer-2", Signed, 1);
+        assert_eq!(review.pins.as_ref().unwrap().evidence.len(), 1, "the latest implementer record is pinned");
+        ctx.reviews.push(review);
+        assert!(SpecCoverageCheck.run(&ctx).is_empty(), "a current pinned review qualifies");
+
+        // The .feature file changed and was re-synced.
+        let mut spec_changed = pinned_corpus();
+        spec_changed.reviews = ctx.reviews.clone();
+        let mut edited = scenario("p.a.01", Some("live"));
+        edited.envelope.at += chrono::Duration::seconds(5);
+        edited.source_digest = SpecDigest::of(b"edited bytes");
+        spec_changed.scenarios.push(edited);
+        let out = SpecCoverageCheck.run(&spec_changed);
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert_eq!(out[0].class, FailureClass::UnreviewedPromotion);
+        assert!(out[0].detail.starts_with("stale review by `reviewer-2`: its spec changed"), "{}", out[0].detail);
+        let gap = crate::review_gate::review_gap(&spec_changed, latest_scenarios(&spec_changed)[0], true).unwrap();
+        assert_eq!(gap.kind, crate::review_gate::ReviewGapKind::Stale);
+
+        // The scenario was re-attested.
+        let mut reattested = pinned_corpus();
+        reattested.reviews = ctx.reviews.clone();
+        let mut again = evidence("p.a.01", EvidenceVerdict::Faithful);
+        again.envelope.at += chrono::Duration::seconds(5);
+        reattested.evidence.push(again);
+        let out = SpecCoverageCheck.run(&reattested);
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert!(out[0].detail.starts_with("stale review by `reviewer-2`: its evidence changed"), "{}", out[0].detail);
+
+        // Both.
+        let mut both = reattested;
+        both.scenarios = spec_changed.scenarios.clone();
+        assert!(SpecCoverageCheck.run(&both)[0].detail.starts_with("stale review by `reviewer-2`: its spec and its evidence changed"));
+
+        // Reviewing again pins the new state and clears it.
+        let fresh = pinned_review(&both, "reviewer-2", Signed, 10);
+        both.reviews.push(fresh);
+        assert!(SpecCoverageCheck.run(&both).is_empty());
+    }
+
+    /// review.add.28 (0.15 D1): a review pins the scenario's own digest when
+    /// its record has one, so a re-sync that moves only the file digest (a
+    /// sibling changed) leaves it current, while a moved scenario digest
+    /// stales it with wording that names the scenario. A review pinned to
+    /// the file digest keeps being compared with the file digest, even
+    /// once the record gains a scenario digest.
+    #[test]
+    fn a_spec_pin_is_compared_like_for_like() {
+        use canon_model::ReviewOutcome::Signed;
+        use canon_model::PinnedSpec;
+        let resynced = |ctx: &mut GateContext, offset: i64, file: &[u8], own: Option<&[u8]>| {
+            let mut s = scenario("p.a.01", Some("live"));
+            s.envelope.at += chrono::Duration::seconds(offset);
+            s.source_digest = SpecDigest::of(file);
+            s.scenario_digest = own.map(SpecDigest::of);
+            ctx.scenarios.push(s);
+        };
+
+        let mut ctx = pinned_corpus();
+        resynced(&mut ctx, 1, b"file v1", Some(b"own v1"));
+        let review = pinned_review(&ctx, "reviewer-2", Signed, 2);
+        let pins = review.pins.clone().unwrap();
+        assert_eq!((pins.scenario_digest_scope, pins.scenario_digest), (PinnedSpec::Scenario, SpecDigest::of(b"own v1")));
+        ctx.reviews.push(review);
+        resynced(&mut ctx, 3, b"file v2: a sibling was appended", Some(b"own v1"));
+        assert!(SpecCoverageCheck.run(&ctx).is_empty(), "a sibling's change leaves a scenario pin current");
+        resynced(&mut ctx, 4, b"file v3", Some(b"own v2"));
+        let out = SpecCoverageCheck.run(&ctx);
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert!(out[0].detail.contains("its spec changed (the scenario's digest is not the pinned one)"), "{}", out[0].detail);
+
+        // A review pinned before the record had a scenario digest is a file
+        // pin: the field appearing does not stale it, a file change does.
+        let mut ctx = pinned_corpus();
+        resynced(&mut ctx, 1, b"file v1", None);
+        let review = pinned_review(&ctx, "reviewer-2", Signed, 2);
+        assert_eq!(review.pins.as_ref().unwrap().scenario_digest_scope, PinnedSpec::File);
+        ctx.reviews.push(review);
+        resynced(&mut ctx, 3, b"file v1", Some(b"own v1"));
+        assert!(SpecCoverageCheck.run(&ctx).is_empty(), "gaining a scenario digest does not stale a file pin");
+        resynced(&mut ctx, 4, b"file v2", Some(b"own v1"));
+        let out = SpecCoverageCheck.run(&ctx);
+        assert!(out[0].detail.contains("its spec changed (the .feature file's source digest is not the pinned one)"), "{}", out[0].detail);
+    }
+
+    /// A pinned review of a scenario with no evidence pins an empty list,
+    /// and the first evidence record makes it stale.
+    #[test]
+    fn a_review_pinned_before_any_evidence_turns_stale_when_evidence_arrives() {
+        let mut ctx = pinned_corpus();
+        ctx.evidence.clear();
+        let review = pinned_review(&ctx, "reviewer-2", canon_model::ReviewOutcome::Signed, 1);
+        assert_eq!(review.pins.as_ref().unwrap().evidence, Vec::new());
+        ctx.reviews.push(review);
+        assert!(SpecCoverageCheck.run(&ctx).is_empty());
+        ctx.evidence.push(evidence("p.a.01", EvidenceVerdict::Faithful));
+        assert!(SpecCoverageCheck.run(&ctx)[0].detail.contains("its evidence changed"));
+    }
+
+    /// review.add.24/25 (0.15 D4): only `signed` qualifies. The latest review per reviewer
+    /// wins, so a reviewer who signed and then recorded `indeterminate`
+    /// is a gap; another reviewer's current signed review still counts.
+    #[test]
+    fn only_a_signed_latest_review_per_reviewer_qualifies() {
+        use canon_model::ReviewOutcome::{Indeterminate, Signed, Unavailable};
+        let base = pinned_corpus();
+        let with = |reviews: Vec<Review>| {
+            let mut ctx = pinned_corpus();
+            ctx.reviews = reviews;
+            ctx
+        };
+
+        let ctx = with(vec![pinned_review(&base, "reviewer-2", Indeterminate, 1), pinned_review(&base, "reviewer-3", Unavailable, 1)]);
+        let out = SpecCoverageCheck.run(&ctx);
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert_eq!(out[0].class, FailureClass::UnreviewedPromotion);
+        assert!(out[0].detail.contains("no signed review") && out[0].detail.contains("`reviewer-2` indeterminate, `reviewer-3` unavailable"), "{}", out[0].detail);
+        assert_eq!(crate::review_gate::review_gap(&ctx, latest_scenarios(&ctx)[0], true).unwrap().kind, crate::review_gate::ReviewGapKind::Unsigned);
+        // Not even without distinct_actor: an unsigned review is never an approval.
+        let mut lax = with(vec![pinned_review(&base, "reviewer-2", Indeterminate, 1)]);
+        lax.policy = policy(reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), false));
+        assert_eq!(SpecCoverageCheck.run(&lax).len(), 1);
+
+        // Signed, then indeterminate, by the same reviewer: the later one wins.
+        let ctx = with(vec![pinned_review(&base, "reviewer-2", Signed, 1), pinned_review(&base, "reviewer-2", Indeterminate, 2)]);
+        assert!(SpecCoverageCheck.run(&ctx)[0].detail.contains("`reviewer-2` indeterminate"));
+        // ...and the other way round, the later signature counts.
+        let ctx = with(vec![pinned_review(&base, "reviewer-2", Indeterminate, 1), pinned_review(&base, "reviewer-2", Signed, 2)]);
+        assert!(SpecCoverageCheck.run(&ctx).is_empty());
+        // Another reviewer's signature is untouched by one reviewer's indeterminate run.
+        let ctx = with(vec![pinned_review(&base, "reviewer-3", Signed, 1), pinned_review(&base, "reviewer-2", Indeterminate, 2)]);
+        assert!(SpecCoverageCheck.run(&ctx).is_empty());
+    }
+
+    /// gate.check.40: a legacy (unpinned) review keeps qualifying with no freshness
+    /// check, and is what the unpinned-review advisory counts, once per
+    /// reviewer and scenario.
+    #[test]
+    fn an_unpinned_review_still_counts_and_is_counted_by_the_advisory() {
+        let mut ctx = pinned_corpus();
+        let mut earlier = review("p.a.01", "reviewer-2", "reviewer-2");
+        earlier.envelope.at -= chrono::Duration::seconds(5);
+        ctx.reviews = vec![earlier, review("p.a.01", "reviewer-2", "reviewer-2")];
+        let mut edited = scenario("p.a.01", Some("live"));
+        edited.envelope.at += chrono::Duration::seconds(5);
+        edited.source_digest = SpecDigest::of(b"edited bytes");
+        ctx.scenarios.push(edited);
+        assert!(SpecCoverageCheck.run(&ctx).is_empty(), "an unpinned review cannot be stale");
+        assert_eq!(crate::review_gate::unpinned_review_advisory(&ctx), Some(1));
+
+        let pinned = pinned_review(&ctx, "reviewer-2", canon_model::ReviewOutcome::Signed, 10);
+        ctx.reviews.push(pinned);
+        assert_eq!(crate::review_gate::unpinned_review_advisory(&ctx), None, "a pinned re-review supersedes the reviewer's legacy one");
     }
 
     /// Findings fold latest-by-natural-key first: a blocker later closed

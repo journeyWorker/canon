@@ -4,7 +4,9 @@
 //! `canon context` answers what CAN be authored; this answers what HAS
 //! been: each subject's scenario, evidence and review counts, its open
 //! blockers and missing required cases, the scenarios no subject owns,
-//! and a short `next:` list of concrete commands.
+//! the bindings a re-attestation dropped on purpose (0.15 D2), the audit
+//! obligations `spec_coverage.require_audit` sampled and every refuted
+//! audit (0.15 D3), and a short `next:` list of concrete commands.
 //!
 //! # One set of joins
 //! Every count is read through the joins the gate itself uses, over a
@@ -39,11 +41,12 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use canon_gate::policy::subject_status_name;
-use canon_gate::review_gate::{open_blockers, review_gap};
+use canon_gate::review_gate::{open_blockers, review_gap, unpinned_review_advisory, unpinned_review_note, ReviewGapKind};
 use canon_gate::spec_coverage::{case_gaps, latest_scenarios, latest_subjects, subject_scenarios};
 use canon_gate::review_gate::active_require_review;
+use canon_gate::audit;
 use canon_gate::{latest_verdicts, CellKey, GateContext, GateCtx, LedgerEntry, PolicyDiagnostic, PolicyResolution, RequireReview, SpecCoverage};
-use canon_model::{EvidenceVerdict, Finding, ProjectId, RecordKind, Scenario, Subject, SubjectStatus};
+use canon_model::{AuditResult, EvidenceVerdict, Finding, ProjectId, RecordKind, Scenario, Subject, SubjectStatus};
 use canon_policy::SchemaRegistry;
 use chrono::Utc;
 use serde::Serialize;
@@ -79,10 +82,62 @@ pub struct StatusReport {
     pub subjects: Vec<SubjectSummary>,
     /// Scenario ids (latest generation) whose `@subject:` tag is absent.
     pub unowned: Vec<String>,
+    /// Every recorded `--drop-attachment` (0.15 D2), oldest first.
+    /// Omitted when none was recorded.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub drops: Vec<DropSummary>,
+    /// Audit obligations and refutations (0.15 D3). Omitted when
+    /// `require_audit` is off and no latest audit is refuted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audits: Option<AuditSummary>,
     pub next: Vec<NextStep>,
     /// How many further `next` entries the rules produced past
     /// [`NEXT_LIMIT`].
     pub next_omitted: usize,
+}
+
+/// One recorded binding drop: which record dropped which files, and why.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DropSummary {
+    pub scenario: String,
+    pub project_id: String,
+    pub paths: Vec<String>,
+    pub reason: String,
+    /// The dropping record's actor.
+    pub by: String,
+    pub at: String,
+    /// Whether the dropping record is an audit (its own fold).
+    pub audit: bool,
+}
+
+/// Where audits stand (0.15 D3).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditSummary {
+    /// In-scope scenarios `spec_coverage.require_audit` sampled (0 when
+    /// it is off).
+    pub sampled: usize,
+    /// Sampled scenarios whose latest audit is `confirmed`.
+    pub confirmed: usize,
+    /// Sampled scenarios still owing an audit: none recorded, or the
+    /// latest is `indeterminate`.
+    pub owed: Vec<AuditEntry>,
+    /// Every scenario whose latest audit is `refuted` (`false-success`),
+    /// sampled or not.
+    pub refuted: Vec<AuditEntry>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditEntry {
+    pub scenario: String,
+    pub project_id: String,
+    /// `missing`, `indeterminate`, or `refuted`.
+    pub state: &'static str,
+    /// The latest audit's evaluator, when there is one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evaluator: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -109,8 +164,14 @@ pub struct SubjectSummary {
     /// Counted scenarios whose latest verdict (for some role) is divergent.
     pub divergent: usize,
     /// Counted scenarios with a qualifying review under the
-    /// `require_review` rule (any review record when it is off).
+    /// `require_review` rule (any current signed review when it is off).
     pub reviewed: usize,
+    /// Counted scenarios whose only signed reviews are stale: pinned to a
+    /// spec or evidence that has since changed (0.15 D1).
+    pub stale_reviews: usize,
+    /// Counted scenarios whose latest reviews are all `indeterminate` or
+    /// `unavailable` (0.15 D4).
+    pub unsigned_reviews: usize,
     /// Whether `require_review` covers this subject's status or the next
     /// one on the chain, i.e. whether its reviews are due now.
     pub review_due: bool,
@@ -188,13 +249,15 @@ pub fn resolve(repo: &Path) -> StatusReport {
             // The ledger cannot be read, so nothing below can be counted.
             let policy = PolicyResolution::resolve(repo, &registry);
             warnings.extend(policy_warning(&policy));
+            warnings.extend(crate::policy_approval::advisory(repo));
             warnings.push(format!("cannot read this repo's ledger: {e}"));
             next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into() });
-            return finish(&policy, warnings, Vec::new(), Vec::new(), next);
+            return finish(&policy, warnings, Vec::new(), Vec::new(), Vec::new(), None, next);
         }
     };
 
     warnings.extend(policy_warning(&ctx.policy));
+    warnings.extend(crate::policy_approval::advisory(repo));
     let routed_away: Vec<&str> = ctx
         .unreadable_kinds
         .iter()
@@ -207,6 +270,9 @@ pub fn resolve(repo: &Path) -> StatusReport {
     let unreadable = ctx.violations.len() + ctx.corpus_violations.len();
     if unreadable > 0 {
         warnings.push(format!("{unreadable} ledger record(s) could not be read and are not counted; `canon gate check` names them"));
+    }
+    if let Some(count) = unpinned_review_advisory(&ctx) {
+        warnings.push(unpinned_review_note(count));
     }
 
     let joins = Joins { verdicts: latest_verdicts(&ctx), blockers: open_blockers(&ctx) };
@@ -225,6 +291,8 @@ pub fn resolve(repo: &Path) -> StatusReport {
             dangling.entry(id).or_default().push(scenario.scenario_id.as_str());
         }
     }
+    let drops = recorded_drops(&ctx);
+    let audits = audit_summary(&ctx);
 
     // ── fail closed: a corpus read as empty for a routing reason ──
     if !routed_away.is_empty() {
@@ -237,7 +305,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
         });
         let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
         let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
-        return finish(&ctx.policy, warnings, summaries, unowned, next);
+        return finish(&ctx.policy, warnings, summaries, unowned, drops, audits, next);
     }
 
     // ── next: global rules ──
@@ -306,10 +374,18 @@ pub fn resolve(repo: &Path) -> StatusReport {
 
     let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
     let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
-    finish(&ctx.policy, warnings, summaries, unowned, next)
+    finish(&ctx.policy, warnings, summaries, unowned, drops, audits, next)
 }
 
-fn finish(policy: &PolicyResolution, warnings: Vec<String>, subjects: Vec<SubjectSummary>, unowned: Vec<String>, mut next: Vec<NextStep>) -> StatusReport {
+fn finish(
+    policy: &PolicyResolution,
+    warnings: Vec<String>,
+    subjects: Vec<SubjectSummary>,
+    unowned: Vec<String>,
+    drops: Vec<DropSummary>,
+    audits: Option<AuditSummary>,
+    mut next: Vec<NextStep>,
+) -> StatusReport {
     let next_omitted = next.len().saturating_sub(NEXT_LIMIT);
     next.truncate(NEXT_LIMIT);
     StatusReport {
@@ -322,9 +398,74 @@ fn finish(policy: &PolicyResolution, warnings: Vec<String>, subjects: Vec<Subjec
         warnings,
         subjects,
         unowned,
+        drops,
+        audits,
         next,
         next_omitted,
     }
+}
+
+/// Every recorded binding drop, declared and audit records alike,
+/// oldest first.
+fn recorded_drops(ctx: &GateContext) -> Vec<DropSummary> {
+    let mut records: Vec<_> = ctx.evidence.iter().chain(&ctx.audits).filter(|r| r.attachment_drop.is_some()).collect();
+    records.sort_by_key(|r| r.envelope.at);
+    records
+        .into_iter()
+        .filter_map(|r| {
+            let drop = r.attachment_drop.as_ref()?;
+            Some(DropSummary {
+                scenario: r.scenario_id.as_ref().map(|s| s.as_str().to_string()).unwrap_or_default(),
+                project_id: r.project_id.as_ref().map(|p| p.as_str().to_string()).unwrap_or_default(),
+                paths: drop.paths.clone(),
+                reason: drop.reason.clone(),
+                by: r.envelope.actor.agent_id.clone(),
+                at: r.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                audit: r.is_audit(),
+            })
+        })
+        .collect()
+}
+
+/// The `require_audit` sample's state and every refuted latest audit,
+/// through the gate's own folds ([`canon_gate::audit`]). `None` when the
+/// rule is off and nothing is refuted.
+fn audit_summary(ctx: &GateContext) -> Option<AuditSummary> {
+    let evaluator = |record: &canon_model::EvidenceRecord| record.audit.as_ref().map(|a| format!("{} {}", a.evaluator_id, a.evaluator_version));
+    let refuted: Vec<AuditEntry> = audit::latest_audits(ctx)
+        .into_iter()
+        .filter(|(_, record)| record.audit.as_ref().is_some_and(|a| a.result == AuditResult::Refuted))
+        .map(|((project, scenario), record)| AuditEntry {
+            scenario: scenario.as_str().to_string(),
+            project_id: project.as_str().to_string(),
+            state: "refuted",
+            evaluator: evaluator(record),
+        })
+        .collect();
+    let active = audit::active_require_audit(ctx);
+    if active.is_none() && refuted.is_empty() {
+        return None;
+    }
+    let sampled = active.map(|(ra, lanes)| audit::sampled(ctx, ra, lanes)).unwrap_or_default();
+    let owed = sampled
+        .iter()
+        .filter(|o| o.state.is_owed())
+        .map(|o| AuditEntry {
+            scenario: o.scenario.scenario_id.as_str().to_string(),
+            project_id: o.scenario.project_id.as_str().to_string(),
+            state: o.state.as_str(),
+            evaluator: match o.state {
+                audit::AuditState::Indeterminate(record) => evaluator(record),
+                _ => None,
+            },
+        })
+        .collect();
+    Some(AuditSummary {
+        sampled: sampled.len(),
+        confirmed: sampled.iter().filter(|o| matches!(o.state, audit::AuditState::Confirmed(_))).count(),
+        owed,
+        refuted,
+    })
 }
 
 fn rank(order: &[SubjectStatus], status: SubjectStatus) -> usize {
@@ -401,7 +542,9 @@ fn summarize(ctx: &GateContext, joins: &Joins, subject: &Subject) -> SubjectSumm
         evidenced += usize::from(has);
         divergent += usize::from(diverged);
     }
-    let reviewed = counted.iter().filter(|s| review_gap(ctx, s, distinct_actor).is_none()).count();
+    let gaps: Vec<ReviewGapKind> = counted.iter().filter_map(|s| review_gap(ctx, s, distinct_actor)).map(|gap| gap.kind).collect();
+    let reviewed = counted.len() - gaps.len();
+    let gap_count = |kind| gaps.iter().filter(|k| **k == kind).count();
     let open_blockers = joins.blockers_of(subject).len();
     let missing_cases = case_gaps(counted.iter().copied(), require_cases)
         .into_iter()
@@ -417,6 +560,8 @@ fn summarize(ctx: &GateContext, joins: &Joins, subject: &Subject) -> SubjectSumm
         evidenced,
         divergent,
         reviewed,
+        stale_reviews: gap_count(ReviewGapKind::Stale),
+        unsigned_reviews: gap_count(ReviewGapKind::Unsigned),
         review_due: rr.is_some_and(|rr| rr.covers(subject.status) || next_status(subject.status).is_some_and(|n| rr.covers(n))),
         open_blockers,
         missing_cases,
@@ -532,11 +677,52 @@ fn subject_steps(
                     first.scenario_id.as_str()
                 ),
                 why: format!(
-                    "{id}: {} of {} scenario(s) lack a qualifying review; review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor",
+                    "{id}: {} of {} scenario(s) lack a qualifying review{}; review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor",
                     summary.scenarios - summary.reviewed,
-                    summary.scenarios
+                    summary.scenarios,
+                    review_breakdown(summary)
                 ),
             });
+        }
+    }
+
+    // Audits (0.15 D3): a refuted latest audit always blocks; an owed
+    // sampled audit blocks once `require_audit` covers this status or
+    // the next one — the same rule the ship guard applies.
+    let audit_target = audit::active_require_audit(ctx)
+        .and_then(|(ra, _)| [Some(status), next_status(status)].into_iter().flatten().find(|s| ra.covers(*s)))
+        .unwrap_or(status);
+    let audit_gaps = audit::subject_audit_gaps(ctx, &subject.subject_id, audit_target);
+    let owned = subject_scenarios(ctx, &subject.subject_id);
+    let project_of = |scenario: &str| owned.iter().find(|s| s.scenario_id.as_str() == scenario).map_or("<root-id>", |s| s.project_id.as_str());
+    let audit_command = |scenario: &str| {
+        format!(
+            "canon evidence add --kind audit --scenario-id {scenario} --project-id {} --evaluator-id <evaluator> --evaluator-version <version> --evaluator-digest <sha256> --audit-result <confirmed|refuted|indeterminate> --ref \"<evaluator run>\" --role auditor --actor-id <evaluator>",
+            project_of(scenario)
+        )
+    };
+    // A re-audit that leaves out a refutation's counterexamples passes
+    // the drop guard only by naming them, so the command does.
+    let latest_audits = audit::latest_audits(ctx);
+    let counterexample_drops = |scenario: &str| {
+        latest_audits
+            .iter()
+            .find(|((project, id), _)| id.as_str() == scenario && project.as_str() == project_of(scenario))
+            .and_then(|(_, record)| audit::counterexample_drop_flags(record))
+            .map(|flags| format!(" {flags}"))
+            .unwrap_or_default()
+    };
+    for (class, why) in [
+        (canon_gate::FailureClass::FalseSuccess, "scenario(s) have a refuted latest audit (false-success); fix the behavior, re-attest, and have the external evaluator re-audit"),
+        (canon_gate::FailureClass::UncoveredCell, "sampled scenario(s) owe an audit; an external evaluator re-audits each, canon only records the result"),
+    ] {
+        let gaps: Vec<&canon_gate::Violation> = audit_gaps.iter().filter(|v| v.class == class).collect();
+        if let Some(first) = gaps.first() {
+            let mut command = audit_command(&first.subject);
+            if class == canon_gate::FailureClass::FalseSuccess {
+                command.push_str(&counterexample_drops(&first.subject));
+            }
+            next.push(NextStep { command, why: format!("{id}: {} {why} (first: {})", gaps.len(), first.subject) });
         }
     }
 
@@ -571,7 +757,7 @@ pub fn render(report: &StatusReport) -> String {
         (true, Some(SpecCoverageSurface::Invalid { invalid })) => {
             let _ = writeln!(out, "policy: .canon/policy.yaml (spec_coverage INVALID — {invalid})");
         }
-        (true, Some(SpecCoverageSurface::Active { require_evidence, scope, exclude_lanes, require_cases, require_review })) => {
+        (true, Some(SpecCoverageSurface::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit })) => {
             let _ = writeln!(out, "policy: .canon/policy.yaml");
             let mut coverage = format!("require_evidence={require_evidence} scope={}", list_or(scope, "<every scenario>"));
             if !exclude_lanes.is_empty() {
@@ -589,6 +775,9 @@ pub fn render(report: &StatusReport) -> String {
                 ),
                 None => writeln!(out, "  require_review: <absent>"),
             };
+            if let Some(ra) = require_audit {
+                let _ = writeln!(out, "  require_audit: {}", crate::context::require_audit_line(ra));
+            }
         }
     }
     for warning in &report.warnings {
@@ -617,6 +806,12 @@ pub fn render(report: &StatusReport) -> String {
             if s.review_due && s.reviewed < s.scenarios {
                 let _ = write!(line, " ({} due)", s.scenarios - s.reviewed);
             }
+            if s.stale_reviews > 0 {
+                let _ = write!(line, ", {} stale review(s)", s.stale_reviews);
+            }
+            if s.unsigned_reviews > 0 {
+                let _ = write!(line, ", {} unsigned review(s)", s.unsigned_reviews);
+            }
             let _ = write!(line, ", {} open blockers", s.open_blockers);
             let _ = writeln!(out, "    {}: {line}", s.id);
             for gap in &s.missing_cases {
@@ -634,6 +829,23 @@ pub fn render(report: &StatusReport) -> String {
         let _ = writeln!(out, "unowned ({}, no @subject): {shown}{}", report.unowned.len(), if more > 0 { format!(", … {more} more") } else { String::new() });
     }
 
+    if !report.drops.is_empty() {
+        let _ = writeln!(out);
+        let _ = writeln!(out, "dropped bindings ({}):", report.drops.len());
+        for drop in &report.drops {
+            let fold = if drop.audit { " (audit)" } else { "" };
+            let _ = writeln!(out, "  {}{fold}: {} — {:?} (by {} at {})", drop.scenario, drop.paths.join(", "), drop.reason, drop.by, drop.at);
+        }
+    }
+    if let Some(audits) = &report.audits {
+        let _ = writeln!(out);
+        let _ = writeln!(out, "audits: {} sampled, {} confirmed, {} owed, {} refuted", audits.sampled, audits.confirmed, audits.owed.len(), audits.refuted.len());
+        for entry in audits.owed.iter().chain(&audits.refuted) {
+            let evaluator = entry.evaluator.as_ref().map(|e| format!(" by {e}")).unwrap_or_default();
+            let label = if entry.state == "refuted" { "false-success" } else { "owes an audit" };
+            let _ = writeln!(out, "  {label}: {} ({}{evaluator})", entry.scenario, entry.state);
+        }
+    }
     let _ = writeln!(out);
     if report.next.is_empty() {
         let _ = writeln!(out, "next: nothing — every subject is shipped or retired and every scenario has a subject");
@@ -655,5 +867,22 @@ fn list_or(values: &[String], empty: &str) -> String {
         empty.to_string()
     } else {
         values.join(", ")
+    }
+}
+
+/// The review next step's breakdown of stale and unsigned gaps, empty
+/// when there are none.
+fn review_breakdown(summary: &SubjectSummary) -> String {
+    let mut parts = Vec::new();
+    if summary.stale_reviews > 0 {
+        parts.push(format!("{} with a stale review (spec or evidence changed since it was reviewed)", summary.stale_reviews));
+    }
+    if summary.unsigned_reviews > 0 {
+        parts.push(format!("{} with only indeterminate or unavailable reviews", summary.unsigned_reviews));
+    }
+    if parts.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", parts.join("; "))
     }
 }

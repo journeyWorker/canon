@@ -30,7 +30,9 @@
 //! one scenario, and every scenario it owns to carry a latest
 //! NON-`Divergent` verdict in the ledger; with `spec_coverage.
 //! require_cases`, each owned feature surface must also specify a
-//! scenario of every required case. A subject owns the scenarios
+//! scenario of every required case; and no owned scenario may have a
+//! `refuted` latest audit (`false-success`) or, under
+//! `spec_coverage.require_audit`, an audit still owed. A subject owns the scenarios
 //! whose `@subject:<id>` Gherkin tag `canon inventory sync` indexed onto
 //! `Scenario.subject_id` — read through
 //! [`canon_gate::spec_coverage::subject_scenarios`], the same join the
@@ -61,11 +63,14 @@
 
 use std::path::Path;
 
-use canon_gate::review_gate::{active_require_review, malformed_findings, subject_guard, unreadable_review_kinds, unreadable_violation};
+use canon_gate::review_gate::{
+    active_require_review, malformed_findings, subject_guard, unpinned_review_note, unpinned_reviews, unreadable_review_kinds, unreadable_violation,
+};
 use canon_gate::spec_coverage::{case_gaps, subject_scenarios};
 use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, PolicyResolution, RequireReview, SpecCoverage, Violation};
 use canon_model::{
-    Actor, Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, RoleId, StatusOverride, Subject, SubjectId, SubjectStatus, WaivedViolation,
+    Actor, Change, ChangeId, Envelope, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, ScenarioId, StatusOverride, Subject, SubjectId, SubjectStatus,
+    WaivedViolation,
 };
 use canon_policy::SchemaRegistry;
 use canon_store::registry::TierRegistry;
@@ -587,6 +592,12 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
             for violation in &mut waivable {
                 violation.detail = format!("{} → {}: {}", status_str(current), status_str(target), violation.detail);
             }
+            let owned: std::collections::BTreeSet<(&ProjectId, &ScenarioId)> =
+                subject_scenarios(ctx, subject_id).into_iter().map(|s| (&s.project_id, &s.scenario_id)).collect();
+            let unpinned = unpinned_reviews(ctx).into_iter().filter(|r| owned.contains(&(&r.project_id, &r.scenario_id))).count();
+            if unpinned > 0 {
+                eprintln!("canon subject status: advisory: {}", unpinned_review_note(unpinned));
+            }
         } else {
             blocking.push(unreadable_violation(&unreadable));
         }
@@ -667,7 +678,11 @@ fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: Subje
         eprintln!("canon subject status:   skipped open-blocker — `{}` is not in require_review.scope", status_str(to));
         return;
     }
-    let rule = if rr.distinct_actor { "a review by an actor, and from a session, other than its evidence's" } else { "a review record" };
+    let rule = if rr.distinct_actor {
+        "a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's"
+    } else {
+        "a signed review, current with the spec and evidence it pinned"
+    };
     eprintln!("canon subject status:   ran unreviewed-promotion — every owned scenario needs {rule}");
     if rr.block_on_findings {
         eprintln!("canon subject status:   ran open-blocker — {changes} adopted change(s) checked for open blocker findings");
@@ -695,7 +710,13 @@ fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: Subje
 /// - `spec_coverage.require_cases` is set and an owned feature surface
 ///   carries no scenario of a required case (through the SAME
 ///   [`case_gaps`] rule `canon gate check` applies), so a subject cannot
-///   ship on a spec that only describes its golden path.
+///   ship on a spec that only describes its golden path;
+/// - an owned scenario's latest audit is `refuted` — `false-success`
+///   (0.15 D3), whatever its declared verdict — or, with
+///   `spec_coverage.require_audit` covering `shipped`, an owned scenario
+///   in the audit sample still owes an audit (`uncovered-cell`), through
+///   [`canon_gate::audit::subject_audit_gaps`], the rule `canon gate
+///   check` applies.
 fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> Vec<Violation> {
     let subject = subject_id.as_str();
 
@@ -740,6 +761,10 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
             violations.push(violation);
         }
     }
+    violations.extend(canon_gate::audit::subject_audit_gaps(gate_context, subject_id, SubjectStatus::Shipped).into_iter().map(|mut violation| {
+        violation.detail = format!("verifying → shipped: {}", violation.detail);
+        violation
+    }));
     violations
 }
 

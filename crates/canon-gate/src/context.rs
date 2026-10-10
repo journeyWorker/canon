@@ -22,9 +22,10 @@
 //! verdict-ledger check (task 1.3), staleness (task 1.7), and `canon
 //! gate check`'s dispatcher (task 1.9) are S5 wave-2.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use canon_model::{validate_evidence_batch, Divergence, EvidenceRecord, EvidenceViolation, Finding, RecordKind, Review, Scenario, Subject};
+use canon_model::{validate_evidence_batch, Divergence, EvidenceRecord, EvidenceViolation, Finding, RawRecord, RecordKind, Review, Scenario, Subject};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{StoreError, Tier, TierQuery};
@@ -138,7 +139,22 @@ fn load_tier_policy(repo: &Path) -> Result<Option<canon_store::policy::TierPolic
 pub struct GateContext {
     pub ctx: GateCtx,
     pub policy: PolicyResolution,
+    /// DECLARED evidence only: every well-formed record that is not an
+    /// audit. Every declared fold (`crate::latest_verdicts`, coverage,
+    /// staleness, risk, trust, the task flip) reads this, so an audit can
+    /// never become a scenario's latest declared verdict.
     pub evidence: Vec<EvidenceRecord>,
+    /// AUDITED outcomes (0.15 D3): every well-formed record carrying
+    /// `audit` (`canon evidence add --kind audit`), split out of
+    /// `evidence` at load. Read by `crate::audit` only.
+    pub audits: Vec<EvidenceRecord>,
+    /// The ledger file digest of each record in `evidence` (the 12 hex
+    /// characters of `<natural_key>__<digest>.json`), keyed by the content
+    /// digest of the record as deserialized. The typed record leaves out
+    /// raw-only keys (`evidence.ref`, `staging_id`, …), so its own digest
+    /// is not its file's. [`crate::review_gate::current_pins`] names a
+    /// pinned record by its file through this map ([`evidence_file_digests`]).
+    pub evidence_file_digests: BTreeMap<String, String>,
     /// The spec corpus `canon inventory sync` materializes — the
     /// enumeration side of a coverage question `evidence` structurally
     /// cannot answer. Grouping evidence can only ever surface artifacts
@@ -215,7 +231,9 @@ impl GateContext {
 
         let tier = GitTier::new(&ctx.ledger_root);
         let read = tier.read(&TierQuery::kind(RecordKind::EvidenceRecord))?;
-        let (evidence, validation_violations) = validate_evidence_batch(&read.records);
+        let (records, validation_violations) = validate_evidence_batch(&read.records);
+        let (audits, evidence): (Vec<EvidenceRecord>, Vec<EvidenceRecord>) = records.into_iter().partition(EvidenceRecord::is_audit);
+        let evidence_file_digests = evidence_file_digests(&read.records);
 
         let mut violations = read.violations;
         violations.extend(validation_violations);
@@ -228,8 +246,37 @@ impl GateContext {
         let findings = read_corpus_kind(&tier, RecordKind::Finding, &mut corpus_violations)?;
         let unreadable_kinds = unreadable_corpus_kinds(&ctx.repo)?;
 
-        Ok(Self { ctx, policy, evidence, scenarios, divergences, subjects, reviews, findings, violations, corpus_violations, unreadable_kinds, now })
+        Ok(Self {
+            ctx,
+            policy,
+            evidence,
+            evidence_file_digests,
+            audits,
+            scenarios,
+            divergences,
+            subjects,
+            reviews,
+            findings,
+            violations,
+            corpus_violations,
+            unreadable_kinds,
+            now,
+        })
     }
+}
+
+/// [`GateContext::evidence_file_digests`] for the raw evidence rows a
+/// tier read returned: each row that deserializes, keyed by its typed
+/// content digest, mapped to the digest of the row itself (its file's).
+pub fn evidence_file_digests(records: &[RawRecord]) -> BTreeMap<String, String> {
+    records
+        .iter()
+        .filter_map(|raw| {
+            let typed: EvidenceRecord = serde_json::from_value(raw.0.clone()).ok()?;
+            let typed = serde_json::to_value(&typed).ok()?;
+            Some((canon_store::partition::content_digest12(&typed), canon_store::partition::content_digest12(&raw.0)))
+        })
+        .collect()
 }
 
 /// Read one spec-corpus kind off `tier`, deserializing each row into
@@ -464,6 +511,41 @@ mod tests {
         relative.display().to_string()
     }
 
+    /// A promoted evidence record carries raw-only keys (`evidence`,
+    /// `staging_id`) the typed record drops, so its typed content digest
+    /// is not its file's. A review pins it by its file: `current_pins`
+    /// names `kind=evidence_record/<key>__<digest>.json` exactly.
+    #[test]
+    fn review_pins_name_an_evidence_record_by_its_ledger_file() {
+        let dir = TempDir::new().unwrap();
+        let ctx = GateCtx::from_fixture(dir.path());
+        let body = serde_json::json!({
+            "schema": 1,
+            "kind": "evidence_record",
+            "at": "2026-10-08T17:55:59.425241Z",
+            "actor": {"agent_id": "impl-agent", "role": "implementer"},
+            "project_id": "root",
+            "scenario_id": "cart.add.01",
+            "verdict": "faithful",
+            "run_seq": 1,
+            "staging_id": "1b89f55265da",
+            "evidence": {"kind": "test-run", "ref": "cargo test cart_add"},
+        });
+        let path = plant(&ctx.ledger_root, RecordKind::EvidenceRecord, &body);
+        let gate_context = GateContext::load(ctx, &SchemaRegistry::load(), fixed_now()).unwrap();
+        let scenario = Scenario::new(
+            canon_model::Envelope::new(1, RecordKind::Scenario, fixed_now(), canon_model::Actor::new_unattributed("canon")),
+            canon_model::ProjectId::parse("root").unwrap(),
+            canon_model::ScenarioId::parse("cart.add.01").unwrap(),
+            "t",
+            "",
+            canon_model::SpecDigest::of(b"feature"),
+        );
+        let pins = crate::review_gate::current_pins(&gate_context, &scenario);
+        assert_eq!(pins.evidence.len(), 1);
+        assert_eq!(format!("kind=evidence_record/{}__{}.json", pins.evidence[0].key, pins.evidence[0].digest), path);
+    }
+
     /// The read problems of the review kinds reach `corpus_violations`
     /// tagged with their kind and named by their file. A refused Finding
     /// is what `review_gate::malformed_findings` blocks on; a refused
@@ -525,6 +607,7 @@ mod tests {
             SpecDigest::of(b"cart.add.01"),
         );
         let gap = crate::review_gate::review_gap(&gate_context, &scenario, true).expect("an unreadable review is no review");
-        assert_eq!(gap.class, crate::FailureClass::UnreviewedPromotion);
+        assert_eq!(gap.violation.class, crate::FailureClass::UnreviewedPromotion);
+        assert_eq!(gap.kind, crate::review_gate::ReviewGapKind::Missing);
     }
 }

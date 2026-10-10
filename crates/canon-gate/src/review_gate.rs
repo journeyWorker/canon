@@ -11,15 +11,36 @@
 //! writes a transition.
 //!
 //! # What counts as a qualifying review
-//! A [`Review`] record for the scenario's `(project_id, scenario_id)`.
-//! With `distinct_actor`, its `reviewer` and its envelope actor must both
-//! differ from every actor on that scenario's evidence records, and when
-//! the review's envelope carries a `session_id`, that session must differ
-//! from every `session_id` on those evidence records. A record without a
-//! session never matches one, so records written before sessions were
-//! recorded keep counting by actor alone. Review carries no verdict: the
-//! `verifying → shipped` ship gate already refuses missing and
-//! `divergent` verdicts, and that stays the verdict rule.
+//! The reviews of the scenario's `(project_id, scenario_id)` are folded to
+//! the LATEST per `reviewer` first, with the store's supersession order
+//! (`at`, then `schema`, then content digest). A reviewer's later review
+//! replaces their earlier one, so a reviewer who signed and then recorded
+//! `indeterminate` no longer counts as signing. One of those latest
+//! reviews must:
+//! - be `signed` (0.15 D4). `indeterminate` and `unavailable` are gaps
+//!   with their own detail, never an approval and never a rejection.
+//! - still match what it pinned (0.15 D1), when it carries `pins`: the
+//!   scenario's current digest of the kind it pinned — its own
+//!   `scenario_digest` when the record had one at review time, else the
+//!   file-wide `source_digest` — and the current latest evidence record
+//!   per role for the scenario ([`current_pins`]). Each pin is compared
+//!   like for like, so a file-pinned review never goes stale just because
+//!   the scenario record gained a `scenario_digest`. Otherwise it is a
+//!   stale review, and the detail names whether the spec, the evidence,
+//!   or both changed. A review without `pins` predates pinning (0.15); it
+//!   keeps counting under the older rules, and [`unpinned_reviews`] feeds
+//!   the one advisory line `canon gate check`, `canon subject status` and
+//!   `canon status` print about them.
+//! - with `distinct_actor`, have a `reviewer` and an envelope actor that
+//!   both differ from every actor on that scenario's evidence records, and
+//!   when its envelope carries a `session_id`, that session must differ
+//!   from every `session_id` on those evidence records. A record without a
+//!   session never matches one, so records written before sessions were
+//!   recorded keep counting by actor alone.
+//!
+//! Review carries no verdict about the behavior: the `verifying → shipped`
+//! ship gate already refuses missing and `divergent` verdicts, and that
+//! stays the verdict rule.
 //!
 //! # Open blockers
 //! A [`Finding`] is folded to its latest version per natural key
@@ -51,7 +72,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use canon_model::{ChangeId, Finding, FindingDisposition, FindingSeverity, RecordKind, Review, Scenario, StatusOverride, Subject, SubjectId, SubjectStatus};
+use canon_model::{
+    ChangeId, EvidencePin, EvidenceRecord, Finding, FindingDisposition, FindingSeverity, PinnedSpec, RecordKind, Review, ReviewPins, Scenario, StatusOverride, Subject, SubjectId,
+    SubjectStatus,
+};
 
 use crate::context::GateContext;
 use crate::failure_class::{FailureClass, Violation};
@@ -86,7 +110,7 @@ impl ReviewAdvisory {
 
 /// The two halves of one evaluation.
 #[derive(Debug, Default)]
-pub(crate) struct ReviewOutcome {
+pub(crate) struct Evaluation {
     pub violations: Vec<Violation>,
     pub advisories: Vec<ReviewAdvisory>,
 }
@@ -134,14 +158,14 @@ pub fn review_advisories(ctx: &GateContext) -> Option<Vec<ReviewAdvisory>> {
 }
 
 /// The corpus-wide rule `canon gate check` applies.
-pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclude_lanes: &[String]) -> ReviewOutcome {
+pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclude_lanes: &[String]) -> Evaluation {
     let subjects: BTreeMap<&str, &Subject> = latest_subjects(ctx).into_iter().map(|s| (s.subject_id.as_str(), s)).collect();
     let status: BTreeMap<&str, SubjectStatus> = subjects.iter().map(|(id, s)| (*id, s.status)).collect();
     // The waiver of `id`'s subject, if it recorded exactly `violation`.
     let waiver_for =
         |id: &str, violation: &Violation| subjects.get(id).and_then(|s| current_waiver(s)).filter(|w| w.covers(violation.class.as_str(), &violation.subject));
 
-    let mut outcome = ReviewOutcome::default();
+    let mut outcome = Evaluation::default();
     for scenario in latest_scenarios(ctx) {
         // A scenario naming a subject no record carries has no status
         // that could put it in scope; `spec_coverage` reports the
@@ -152,7 +176,7 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
         if is_excluded(scenario, exclude_lanes) {
             continue;
         }
-        let Some(violation) = review_gap(ctx, scenario, require_review.distinct_actor) else { continue };
+        let Some(ReviewGap { violation, .. }) = review_gap(ctx, scenario, require_review.distinct_actor) else { continue };
         match scenario.subject_id.as_ref().and_then(|id| waiver_for(id.as_str(), &violation).map(|w| (id, w))) {
             Some((subject_id, waiver)) => outcome.advisories.push(ReviewAdvisory { violation, subject_id: subject_id.clone(), waiver: waiver.clone() }),
             None => outcome.violations.push(violation),
@@ -208,7 +232,7 @@ pub fn subject_guard(
     let mut violations: Vec<Violation> = subject_scenarios(ctx, subject_id)
         .into_iter()
         .filter(|s| !is_excluded(s, exclude_lanes))
-        .filter_map(|s| review_gap(ctx, s, require_review.distinct_actor))
+        .filter_map(|s| review_gap(ctx, s, require_review.distinct_actor).map(|gap| gap.violation))
         .collect();
     if require_review.block_on_findings {
         let changes: BTreeSet<&str> = change_ids.iter().map(ChangeId::as_str).collect();
@@ -255,55 +279,217 @@ fn is_excluded(scenario: &Scenario, exclude_lanes: &[String]) -> bool {
     scenario.lane.as_ref().is_some_and(|lane| exclude_lanes.contains(lane))
 }
 
-/// `Some(violation)` when `scenario` has no qualifying review (module
-/// doc), naming which rule failed.
-///
-/// Evidence actors and sessions are collected from every evidence record
-/// for the scenario's id whose `project_id` matches or is absent.
-/// Counting a project-less record here is the stricter reading: it can
-/// only make a review not count, never let one count.
-pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) -> Option<Violation> {
-    let reviews: Vec<_> = ctx.reviews.iter().filter(|r| r.project_id == scenario.project_id && r.scenario_id == scenario.scenario_id).collect();
-    let subject = scenario.scenario_id.as_str();
-    if reviews.is_empty() {
-        return Some(Violation::new(
-            FailureClass::UnreviewedPromotion,
-            subject,
-            "no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review add`) once its subject is claimed done",
-        ));
-    }
-    if !distinct_actor {
-        return None;
-    }
-    let evidence: Vec<_> = ctx
-        .evidence
+/// Why a scenario has no qualifying review (module doc), most actionable
+/// first: `canon status` counts the kinds, the gate reports the detail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReviewGapKind {
+    /// No review record at all.
+    Missing,
+    /// Every latest review is `indeterminate` or `unavailable` (D4).
+    Unsigned,
+    /// Every signed latest review is pinned to a spec or evidence that
+    /// has since changed (D1).
+    Stale,
+    /// A current signed review exists, but none by an actor and session
+    /// other than the evidence's (`distinct_actor`).
+    NotDistinct,
+}
+
+/// One scenario's review gap: its kind and the `unreviewed-promotion`
+/// violation the gate reports for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReviewGap {
+    pub kind: ReviewGapKind,
+    pub violation: Violation,
+}
+
+/// What changed under a pinned review since it was written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Staleness {
+    /// The spec pin no longer matches; names which kind of pin it was.
+    spec: Option<PinnedSpec>,
+    evidence: bool,
+}
+
+/// Every evidence record for the scenario's id whose `project_id`
+/// matches or is absent. Counting a project-less record is the stricter
+/// reading: it can only make a review not count, never let one count.
+fn scenario_evidence<'a>(ctx: &'a GateContext, scenario: &Scenario) -> Vec<&'a EvidenceRecord> {
+    ctx.evidence
         .iter()
         .filter(|e| e.scenario_id.as_ref() == Some(&scenario.scenario_id) && e.project_id.as_ref().is_none_or(|p| *p == scenario.project_id))
+        .collect()
+}
+
+/// What a review of `scenario` pins right now (0.15 D1): its
+/// `scenario_digest` (scope `scenario`) when the record carries one, else
+/// its file-wide `source_digest` (scope `file`), and the latest evidence
+/// record per role for it (the fold `latest_verdicts` applies), each
+/// named by its ledger file: the natural key and digest of
+/// `kind=evidence_record/<key>__<digest>.json`, in `(key, digest)` order.
+/// A record not read from a file (built in memory) is named by its own
+/// content digest. `canon review add` writes this; [`review_gap`]
+/// compares a pinned review against the scenario and these evidence pins.
+pub fn current_pins(ctx: &GateContext, scenario: &Scenario) -> ReviewPins {
+    let evidence = scenario_evidence(ctx, scenario);
+    let mut pins: Vec<EvidencePin> = latest_by_key(&evidence, |e| e.envelope.actor.role.as_ref().map(|r| r.as_str().to_string()))
+        .into_iter()
+        .map(|record| {
+            let body = serde_json::to_value(record).unwrap_or_default();
+            let key = canon_store::partition::resolve_partition(RecordKind::EvidenceRecord, &body)
+                .expect("an evidence record's natural key always resolves (`unscoped` at worst)")
+                .natural_key;
+            let typed = canon_store::partition::content_digest12(&body);
+            let digest = ctx.evidence_file_digests.get(&typed).cloned().unwrap_or(typed);
+            EvidencePin { key, digest }
+        })
         .collect();
-    let evidence_actors: BTreeSet<&str> = evidence.iter().map(|e| e.envelope.actor.agent_id.as_str()).collect();
-    let evidence_sessions: BTreeSet<&str> = evidence.iter().filter_map(|e| e.envelope.actor.session_id.as_ref()).map(|s| s.as_str()).collect();
-    let distinct_actors = |r: &Review| !evidence_actors.contains(r.reviewer.as_str()) && !evidence_actors.contains(r.envelope.actor.agent_id.as_str());
-    let distinct_session = |r: &Review| r.envelope.actor.session_id.as_ref().is_none_or(|s| !evidence_sessions.contains(s.as_str()));
-    if reviews.iter().any(|&r| distinct_actors(r) && distinct_session(r)) {
+    pins.sort();
+    let (scenario_digest, scenario_digest_scope) = match &scenario.scenario_digest {
+        Some(digest) => (digest.clone(), PinnedSpec::Scenario),
+        None => (scenario.source_digest.clone(), PinnedSpec::File),
+    };
+    ReviewPins { scenario_digest, scenario_digest_scope, evidence: pins }
+}
+
+/// `None` when `review` is unpinned (it predates 0.15) or still matches
+/// `scenario` and the `current` evidence pins; otherwise what changed.
+/// The spec pin is compared like for like: a file pin against the
+/// scenario's `source_digest`, a scenario pin against its
+/// `scenario_digest` (a record without one no longer matches it).
+fn staleness(review: &Review, scenario: &Scenario, current: &ReviewPins) -> Option<Staleness> {
+    let pins = review.pins.as_ref()?;
+    let spec_current = match pins.scenario_digest_scope {
+        PinnedSpec::File => pins.scenario_digest == scenario.source_digest,
+        PinnedSpec::Scenario => scenario.scenario_digest.as_ref() == Some(&pins.scenario_digest),
+    };
+    let pinned: BTreeSet<&EvidencePin> = pins.evidence.iter().collect();
+    let now: BTreeSet<&EvidencePin> = current.evidence.iter().collect();
+    let changed = Staleness { spec: (!spec_current).then_some(pins.scenario_digest_scope), evidence: pinned != now };
+    (changed.spec.is_some() || changed.evidence).then_some(changed)
+}
+
+/// The latest review per `reviewer` of `(project_id, scenario_id)`
+/// (module doc), in reviewer order.
+fn latest_reviews<'a>(ctx: &'a GateContext, scenario: &Scenario) -> Vec<&'a Review> {
+    let reviews: Vec<&Review> = ctx.reviews.iter().filter(|r| r.project_id == scenario.project_id && r.scenario_id == scenario.scenario_id).collect();
+    latest_by_key(&reviews, |r| r.reviewer.clone()).into_iter().copied().collect()
+}
+
+/// The in-effect reviews (the latest per `(project_id, scenario_id,
+/// reviewer)`) that carry no pins: written before review pinning (0.15),
+/// they count without the freshness check. `canon gate check`, `canon
+/// subject status` and `canon status` print their count as one advisory
+/// ([`unpinned_review_note`]).
+pub fn unpinned_reviews(ctx: &GateContext) -> Vec<&Review> {
+    latest_by_key(&ctx.reviews, |r| (r.project_id.clone(), r.scenario_id.clone(), r.reviewer.clone())).into_iter().filter(|r| r.pins.is_none()).collect()
+}
+
+/// The one advisory line about [`unpinned_reviews`], without a prefix.
+pub fn unpinned_review_note(count: usize) -> String {
+    format!(
+        "{count} review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw"
+    )
+}
+
+/// `canon gate check`'s unpinned-review advisory count: `Some(n)` when
+/// `require_review` is active and readable and `n > 0` in-effect reviews
+/// carry no pins. Advisory only; it never changes the exit code.
+pub fn unpinned_review_advisory(ctx: &GateContext) -> Option<usize> {
+    let (require_review, _) = active_require_review(ctx)?;
+    if !unreadable_review_kinds(ctx, require_review).is_empty() {
         return None;
     }
-    let actors = evidence_actors.iter().map(|a| format!("`{a}`")).collect::<Vec<_>>().join(", ");
-    // A review by another actor that still failed did so on the session
-    // rule alone; name it, or the operator is told the actors collide
-    // when they do not.
-    let shared_sessions: BTreeSet<&str> =
-        reviews.iter().filter(|&&r| distinct_actors(r)).filter_map(|r| r.envelope.actor.session_id.as_ref()).map(|s| s.as_str()).collect();
-    let detail = if shared_sessions.is_empty() {
+    let count = unpinned_reviews(ctx).len();
+    (count > 0).then_some(count)
+}
+
+/// `Some(gap)` when `scenario` has no qualifying review (module doc),
+/// naming which rule failed. When several latest reviews fail for
+/// different reasons, the one closest to qualifying is reported: a
+/// current signed review failing only `distinct_actor`, then a stale
+/// signed review, then non-signed outcomes.
+pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) -> Option<ReviewGap> {
+    let subject = scenario.scenario_id.as_str();
+    let gap = |kind, detail: String| Some(ReviewGap { kind, violation: Violation::new(FailureClass::UnreviewedPromotion, subject, detail) });
+    let reviews = latest_reviews(ctx, scenario);
+    if reviews.is_empty() {
+        return gap(
+            ReviewGapKind::Missing,
+            "no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review add`) once its subject is claimed done".to_string(),
+        );
+    }
+    let current = current_pins(ctx, scenario);
+    let (signed, unsigned): (Vec<&Review>, Vec<&Review>) = reviews.into_iter().partition(|r| r.outcome.is_signed());
+    let mut stale: Vec<(&Review, Staleness)> = Vec::new();
+    let mut fresh: Vec<&Review> = Vec::new();
+    for review in signed {
+        match staleness(review, scenario, &current) {
+            Some(changed) => stale.push((review, changed)),
+            None => fresh.push(review),
+        }
+    }
+
+    if !fresh.is_empty() {
+        if !distinct_actor {
+            return None;
+        }
+        let evidence = scenario_evidence(ctx, scenario);
+        let evidence_actors: BTreeSet<&str> = evidence.iter().map(|e| e.envelope.actor.agent_id.as_str()).collect();
+        let evidence_sessions: BTreeSet<&str> = evidence.iter().filter_map(|e| e.envelope.actor.session_id.as_ref()).map(|s| s.as_str()).collect();
+        let distinct_actors = |r: &Review| !evidence_actors.contains(r.reviewer.as_str()) && !evidence_actors.contains(r.envelope.actor.agent_id.as_str());
+        let distinct_session = |r: &Review| r.envelope.actor.session_id.as_ref().is_none_or(|s| !evidence_sessions.contains(s.as_str()));
+        if fresh.iter().any(|&r| distinct_actors(r) && distinct_session(r)) {
+            return None;
+        }
+        let actors = evidence_actors.iter().map(|a| format!("`{a}`")).collect::<Vec<_>>().join(", ");
+        // A review by another actor that still failed did so on the session
+        // rule alone; name it, or the operator is told the actors collide
+        // when they do not.
+        let shared_sessions: BTreeSet<&str> =
+            fresh.iter().filter(|&&r| distinct_actors(r)).filter_map(|r| r.envelope.actor.session_id.as_ref()).map(|s| s.as_str()).collect();
+        let detail = if shared_sessions.is_empty() {
+            format!(
+                "every review of this scenario is by an actor that also attested its evidence ({actors}); spec_coverage.require_review.distinct_actor wants a reviewer other than the evidence actor"
+            )
+        } else {
+            let sessions = shared_sessions.iter().map(|s| format!("`{s}`")).collect::<Vec<_>>().join(", ");
+            format!(
+                "every review of this scenario is by an actor that also attested its evidence ({actors}) or from a session that did ({sessions}); spec_coverage.require_review.distinct_actor wants a reviewer other than the evidence actor, in a session other than any evidence session"
+            )
+        };
+        return gap(ReviewGapKind::NotDistinct, detail);
+    }
+
+    if !stale.is_empty() {
+        let who = stale.iter().map(|(r, _)| format!("`{}`", r.reviewer)).collect::<Vec<_>>().join(", ");
+        let scenario_spec = stale.iter().any(|(_, c)| c.spec == Some(PinnedSpec::Scenario));
+        let file_spec = stale.iter().any(|(_, c)| c.spec == Some(PinnedSpec::File));
+        let evidence = stale.iter().any(|(_, c)| c.evidence);
+        let spec_what = match (scenario_spec, file_spec) {
+            (true, false) => Some("the scenario's digest"),
+            (false, true) => Some("the .feature file's source digest"),
+            (true, true) => Some("the scenario's digest, or the .feature file's source digest a file-pinned review saw,"),
+            (false, false) => None,
+        };
+        let changed = match (spec_what, evidence) {
+            (Some(what), true) => format!("its spec and its evidence changed ({what} and the latest evidence records are not the pinned ones)"),
+            (Some(what), false) => format!("its spec changed ({what} is not the pinned one)"),
+            (None, _) => "its evidence changed (the latest evidence records are not the pinned ones)".to_string(),
+        };
+        return gap(
+            ReviewGapKind::Stale,
+            format!("stale review by {who}: {changed} since the review; a pinned review counts only while what it saw is current — review it again (`canon review add`)"),
+        );
+    }
+
+    let outcomes = unsigned.iter().map(|r| format!("`{}` {}", r.reviewer, r.outcome.as_str())).collect::<Vec<_>>().join(", ");
+    gap(
+        ReviewGapKind::Unsigned,
         format!(
-            "every review of this scenario is by an actor that also attested its evidence ({actors}); spec_coverage.require_review.distinct_actor wants a reviewer other than the evidence actor"
-        )
-    } else {
-        let sessions = shared_sessions.iter().map(|s| format!("`{s}`")).collect::<Vec<_>>().join(", ");
-        format!(
-            "every review of this scenario is by an actor that also attested its evidence ({actors}) or from a session that did ({sessions}); spec_coverage.require_review.distinct_actor wants a reviewer other than the evidence actor, in a session other than any evidence session"
-        )
-    };
-    Some(Violation::new(FailureClass::UnreviewedPromotion, subject, detail))
+            "no signed review: the latest review recorded no sign-off ({outcomes}); an indeterminate or unavailable review is a gap, never an approval — run the review again and record `--outcome signed`"
+        ),
+    )
 }
 
 /// The latest version of every Finding per `(change_id, round, seq)`

@@ -1,0 +1,1 @@
+canon gate task: warning — it-circular#1.1's evidence binds no file, and its --ref is a canon command (`canon gate check`), which reports on canon's own records rather than proving the task; bind the artifact or report that proves it: canon evidence add --task it-circular#1.1 --artifact <path> (or --report <format>:<path>)

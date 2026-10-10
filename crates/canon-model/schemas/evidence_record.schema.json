@@ -21,12 +21,34 @@
       "type": "string",
       "format": "date-time"
     },
+    "attachment_drop": {
+      "description": "Bound files of the scenario's previous latest record this one\ndeliberately no longer binds, and why (0.15 D2). Additive.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AttachmentDrop"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "attachments": {
       "description": "Files this evidence is bound to (experimental evidence binding;\nadditive and skipped when empty, so unbound records are unchanged\non the wire).",
       "type": "array",
       "items": {
         "$ref": "#/$defs/EvidenceAttachment"
       }
+    },
+    "audit": {
+      "description": "Present only on an audit record (`--kind audit`, 0.15 D3): the\nexternal evaluator and its result. Additive.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceAudit"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "evidence_sha": {
       "anyOf": [
@@ -173,6 +195,45 @@
         "agent_id"
       ]
     },
+    "AttachmentDrop": {
+      "description": "Files a re-attestation deliberately stopped binding (0.15 D2): the\nrepository-relative paths the scenario's previous latest record bound\nand this record does not, and the author's one-line reason. Without\nit `canon evidence add` refuses a record that would drop them.",
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "paths",
+        "reason"
+      ]
+    },
+    "AuditResult": {
+      "description": "What an external evaluator concluded when it re-audited a scenario's\ndeclared success (0.15 D3). `Indeterminate` is a real outcome — the\nevaluator ran and could not decide — never an approval.",
+      "oneOf": [
+        {
+          "description": "The evaluator re-checked the requirement and the declared success holds.",
+          "type": "string",
+          "const": "confirmed"
+        },
+        {
+          "description": "The evaluator found the declared success false (a counterexample).",
+          "type": "string",
+          "const": "refuted"
+        },
+        {
+          "description": "The evaluator ran but could not decide either way.",
+          "type": "string",
+          "const": "indeterminate"
+        }
+      ]
+    },
     "EvidenceApproval": {
       "description": "An approval attestation attached to an [`EvidenceRecord`].\n\n`verified` is retained only as a non-authoritative display field for wire\ncompatibility. Gate decisions MUST reverify `signature` over the canonical\nartifact-bound payload and MUST ignore this bit and process environment.",
       "type": "object",
@@ -296,6 +357,31 @@
       "required": [
         "path",
         "sha256"
+      ]
+    },
+    "EvidenceAudit": {
+      "description": "An external evaluator's re-audit of a scenario (0.15 D3), carried on\nan [`EvidenceRecord`] written by `canon evidence add --kind audit`.\nCanon never generates or runs the audit; it records which evaluator\nran (id, version, and the sha256 of the evaluator itself) and what it\nconcluded. A record carrying this is an AUDITED outcome and is folded\napart from declared evidence: it never becomes a scenario's latest\ndeclared verdict.",
+      "type": "object",
+      "properties": {
+        "evaluator_digest": {
+          "description": "64 lowercase hex characters: sha256 of the evaluator (its binary,\nimage, or prompt bundle), as the evaluator's operator reports it.",
+          "type": "string"
+        },
+        "evaluator_id": {
+          "type": "string"
+        },
+        "evaluator_version": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/AuditResult"
+        }
+      },
+      "required": [
+        "evaluator_id",
+        "evaluator_version",
+        "evaluator_digest",
+        "result"
       ]
     },
     "EvidenceVerdict": {

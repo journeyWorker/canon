@@ -159,8 +159,9 @@ const STARTER_POLICY_YAML: &str = "\
 # .canon/policy.yaml -- scaffolded by `canon init`.
 #
 # This file is what `canon gate check` grades the work against. A human
-# should review and approve it, and every later change to it: the agent
-# doing the work should not write the rules it is graded by.
+# should review and approve it, and every later change to it, with
+# `canon policy approve --by <who>`: the agent doing the work should not
+# write the rules it is graded by.
 spec_coverage:
   # Every scenario in the spec corpus needs evidence (`canon evidence
   # add`). Add `scope: [building, verifying]` to check only scenarios
@@ -203,7 +204,7 @@ The loop:
 7. Independent review: a different session records `canon review add` and `canon finding add`.
 8. Transition: `canon subject status`, with `canon gate check` clean.
 
-`.canon/policy.yaml` is what the gate grades against; a human approves it.
+`.canon/policy.yaml` is what the gate grades against; a human approves it with `canon policy approve --by <who>`.
 <!-- canon:end -->";
 
 /// A fence opener/closer line: up to three spaces, then three or more
@@ -318,7 +319,10 @@ fn scaffold_policy(repo: &Path) -> std::io::Result<()> {
     match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
         Ok(mut file) => {
             file.write_all(STARTER_POLICY_YAML.as_bytes())?;
-            println!("canon init: wrote {} — a human should review and approve it: the gate grades the work against it", path.display());
+            println!(
+                "canon init: wrote {} — a human reviews it and approves it with `canon policy approve --by <who>`: the gate grades the work against it, and `canon status` and `canon gate check` say so until it is approved",
+                path.display()
+            );
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             println!("canon init: {} already exists — left unchanged", path.display());

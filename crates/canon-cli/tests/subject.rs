@@ -619,7 +619,10 @@ fn a_review_from_the_evidence_session_does_not_count_under_distinct_actor() {
     let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
-    assert!(err.contains("every owned scenario needs a review by an actor, and from a session, other than its evidence's"), "{err}");
+    assert!(
+        err.contains("every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's"),
+        "{err}"
+    );
     assert!(err.contains("(`sess-impl`)") && err.contains("in a session other than any evidence session"), "the detail must name the session rule: {err}");
     assert_eq!(current_subject(dir.path())["status"], "building");
 
@@ -840,6 +843,7 @@ fn an_absent_require_review_is_byte_identical() {
     let outputs = |with_review_records: bool| {
         let dir = repo();
         write_policy(dir.path(), "spec_coverage:\n  require_evidence: true\n");
+        assert!(run(dir.path(), &["policy", "approve", "--by", "alice"]).status.success());
         seed_attested_subject(dir.path());
         if with_review_records {
             seed_blocker(dir.path(), None);
@@ -857,4 +861,101 @@ fn an_absent_require_review_is_byte_identical() {
     assert_eq!(plain.4, "canon gate check: clean (0 violations)\n");
     assert!(!plain.5);
     assert_eq!(outputs(true), plain, "review records must not change anything while require_review is absent");
+}
+
+/// review.add.21: a review of a scenario no record carries is refused
+/// with exit 2, the refusal names `canon inventory sync`, and nothing is
+/// written.
+#[test]
+fn review_add_refuses_an_unsynced_scenario_and_names_inventory_sync() {
+    let dir = repo();
+    let out = run(
+        dir.path(),
+        &[
+            "review", "add", "--project-id", "demo", "--scenario-id", "world.demo.99", "--reviewer", "reviewer-2", "--pin", "p1", "--original-spec-ref",
+            "specs/demo.feature", "--actor-id", "reviewer-2", "--role", "reviewer",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("refused — no scenario record for `world.demo.99` in spec root `demo`"), "{err}");
+    assert!(err.contains("(`canon inventory sync`)"), "the refusal must name the repair: {err}");
+    assert!(!dir.path().join(".canon/ledger/kind=review").exists(), "a refused review add writes nothing");
+}
+
+/// review.add.24: an `unavailable` reviewer run is recorded but is a gap,
+/// end to end: `canon gate check` reports it (exit 1), the status guard
+/// refuses the move (exit 1), both naming the reviewer and the outcome.
+#[test]
+fn an_unavailable_review_is_a_gap_at_the_gate_and_the_status_guard() {
+    let dir = repo();
+    write_policy(dir.path(), "spec_coverage:\n  require_evidence: true\n  require_review:\n    scope: []\n");
+    seed_attested_subject(dir.path());
+    let out = run(
+        dir.path(),
+        &[
+            "review", "add", "--project-id", "demo", "--scenario-id", "world.demo.01", "--reviewer", "reviewer-2", "--pin", "p1", "--original-spec-ref",
+            "specs/demo.feature", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--outcome", "unavailable",
+        ],
+    );
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("outcome `unavailable` is recorded as a review gap, never as an approval"), "{}", stdout(&out));
+
+    let detail = "unreviewed-promotion world.demo.01 — no signed review: the latest review recorded no sign-off (`reviewer-2` unavailable)";
+    let gate = run(dir.path(), &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
+    assert!(stdout(&gate).contains(detail), "{}", stdout(&gate));
+
+    let guard = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    assert_eq!(guard.status.code(), Some(1), "stderr: {}", stderr(&guard));
+    assert!(stderr(&guard).contains("no signed review: the latest review recorded no sign-off (`reviewer-2` unavailable)"), "{}", stderr(&guard));
+    assert_eq!(current_subject(dir.path())["status"], "building", "an unavailable review approves nothing");
+}
+
+/// gate.check.40: a review written before 0.15 (planted by hand, no
+/// `pins`/`outcome` keys) keeps qualifying even after its scenario's spec
+/// changes; `canon gate check`, `canon subject status` and `canon status`
+/// each print the one advisory line counting it, and all exit 0.
+#[test]
+fn a_pre_015_review_still_qualifies_and_every_surface_prints_the_advisory() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject(dir.path());
+    let legacy = serde_json::json!({
+        "schema": 1,
+        "kind": "review",
+        "at": "2026-10-01T00:00:00Z",
+        "actor": {"agent_id": "reviewer-2", "role": "reviewer"},
+        "project_id": "demo",
+        "scenario_id": "world.demo.01",
+        "reviewer": "reviewer-2",
+        "pin": "r1",
+        "provenance_ref": {"original_spec_ref": "specs/demo.feature"},
+    });
+    let relative = canon_store::partition::expected_relative_path(RecordKind::Review, &legacy).unwrap();
+    let path = dir.path().join(".canon/ledger").join(relative);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
+    // The spec changes after the review and is re-synced: a new scenario
+    // generation with another source digest.
+    let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now() + chrono::Duration::seconds(5), Actor::new("canon", RoleId::parse("implementer").unwrap()));
+    let mut edited = Scenario::new(envelope, ProjectId::parse("demo").unwrap(), ScenarioId::parse("world.demo.01").unwrap(), "seeded", "", SpecDigest::of(b"edited"));
+    edited.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
+    ledger(dir.path()).write(&edited).unwrap();
+
+    let advisory = "1 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw";
+    let guard = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    assert_eq!(guard.status.code(), Some(0), "the unpinned review still qualifies: {}", stderr(&guard));
+    assert!(stderr(&guard).contains(&format!("canon subject status: advisory: {advisory}\n")), "{}", stderr(&guard));
+    assert_eq!(current_subject(dir.path())["status"], "verifying");
+
+    let gate = run(dir.path(), &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(0), "{}", stdout(&gate));
+    let unapproved = "policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`";
+    assert_eq!(stdout(&gate), format!("canon gate check: clean (0 violations)\n\nadvisory: {unapproved}\n\nadvisory: {advisory}\n"));
+
+    let status = run(dir.path(), &["status"]);
+    assert_eq!(status.status.code(), Some(0));
+    assert!(stdout(&status).contains(&format!("warning: {advisory}\n")), "{}", stdout(&status));
+    assert!(stdout(&status).contains("demo-subject: 1 scenarios, 1 evidenced, 1 reviewed"), "{}", stdout(&status));
 }

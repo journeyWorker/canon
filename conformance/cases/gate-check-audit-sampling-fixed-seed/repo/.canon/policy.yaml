@@ -1,0 +1,5 @@
+spec_coverage:
+  require_audit:
+    rate: 0.5
+    seed: canon-0.15
+    scope: []

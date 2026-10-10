@@ -1,0 +1,13 @@
+{
+  "actor": {
+    "agent_id": "canon-plan-import-openspec"
+  },
+  "at": "2026-10-08T17:55:56.450545Z",
+  "change_id": "c-cart",
+  "kind": "change",
+  "schema": 1,
+  "status": "completed",
+  "subject_id": "cart",
+  "summary": "Cart.",
+  "title": "c-cart"
+}

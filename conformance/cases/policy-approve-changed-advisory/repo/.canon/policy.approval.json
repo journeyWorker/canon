@@ -1,0 +1,6 @@
+{
+  "policy_digest": "sha256:6105250ca5b6fe06d67d0342f24d3458a5831469d54f1ad4533cf360bc19570e",
+  "approved_by": "alice",
+  "approved_at": "2026-10-09T00:00:00Z",
+  "note": "approved require_evidence: true"
+}

@@ -236,14 +236,56 @@ fn status_counts_each_subject_through_the_gates_joins() {
     assert_eq!(s["missingCases"], serde_json::json!([{"projectId": "demo", "surface": "world.demo", "case": "failure"}]));
 
     let text = stdout(&run(dir.path(), &["status"]));
-    // The header: the version, then the effective coverage, case and review settings.
+    // The header: the version, then the effective coverage, case and review
+    // settings, then the warning that both seeded reviews predate pinning.
     let header = format!(
-        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=true scope=<every scenario>\n  require_cases: failure\n  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n\n",
+        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=true scope=<every scenario>\n  require_cases: failure\n  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n{UNAPPROVED}\nwarning: 2 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw\n\n",
         env!("CARGO_PKG_VERSION")
     );
     assert!(text.starts_with(&header), "expected the header\n{header}\ngot\n{text}");
     assert!(text.contains("  building (1):\n    demo-subject: 3 scenarios, 2 evidenced, 1 divergent, 1 reviewed (2 due), 1 open blockers\n"), "{text}");
     assert!(text.contains("      missing @case:failure on world.demo\n"), "{text}");
+}
+
+/// review.add.27 (0.15 D1/D4): a review whose scenario was re-attested after it is
+/// counted stale, a scenario with only an indeterminate review is counted
+/// unsigned, and the review step names both.
+#[test]
+fn status_counts_stale_and_unsigned_reviews() {
+    let dir = repo();
+    write_policy(dir.path(), FULL_POLICY);
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[]);
+    seed_scenario(dir.path(), "world.demo.01", Some("demo-subject"), Some("happy"));
+    seed_scenario(dir.path(), "world.demo.02", Some("demo-subject"), Some("failure"));
+    seed_evidence(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
+    seed_evidence(dir.path(), "world.demo.02", EvidenceVerdict::Faithful);
+    let review = |scenario: &str, outcome: &str| {
+        let out = run(
+            dir.path(),
+            &[
+                "review", "add", "--project-id", "demo", "--scenario-id", scenario, "--reviewer", "reviewer-2", "--actor-id", "reviewer-2", "--role", "reviewer",
+                "--session-id", "sess-review", "--pin", "p1", "--original-spec-ref", "specs/demo.feature", "--outcome", outcome,
+            ],
+        );
+        assert!(out.status.success(), "{}", stderr(&out));
+    };
+    review("world.demo.01", "signed");
+    review("world.demo.02", "indeterminate");
+    assert_eq!(subject(&status_json(dir.path()), "demo-subject")["reviewed"], 1, "the current signed review counts");
+    // Re-attest world.demo.01 after its review.
+    seed_evidence(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
+
+    let report = status_json(dir.path());
+    let s = subject(&report, "demo-subject");
+    assert_eq!((s["reviewed"].as_u64(), s["staleReviews"].as_u64(), s["unsignedReviews"].as_u64()), (Some(0), Some(1), Some(1)), "{s}");
+    assert_eq!(report["warnings"], serde_json::json!([UNAPPROVED.strip_prefix("warning: ").unwrap()]), "pinned reviews draw no legacy warning: {report}");
+    let why = report["next"].as_array().unwrap().iter().find(|n| n["command"].as_str().unwrap().starts_with("canon review add")).expect("a review step")["why"].as_str().unwrap().to_string();
+    assert!(
+        why.contains("2 of 2 scenario(s) lack a qualifying review (1 with a stale review (spec or evidence changed since it was reviewed); 1 with only indeterminate or unavailable reviews)"),
+        "{why}"
+    );
+    let text = stdout(&run(dir.path(), &["status"]));
+    assert!(text.contains("demo-subject: 2 scenarios, 2 evidenced, 0 reviewed (2 due), 1 stale review(s), 1 unsigned review(s), 0 open blockers\n"), "{text}");
 }
 
 /// A policy whose settings differ from the defaults prints them as
@@ -255,11 +297,15 @@ fn status_header_prints_the_effective_settings() {
     write_policy(dir.path(), "spec_coverage:\n  require_evidence: false\n  scope: [building]\n  exclude_lanes: [process]\n");
     let text = stdout(&run(dir.path(), &["status"]));
     let header = format!(
-        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=false scope=building exclude_lanes=process\n  require_cases: <none>\n  require_review: <absent>\n\n",
+        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=false scope=building exclude_lanes=process\n  require_cases: <none>\n  require_review: <absent>\n{UNAPPROVED}\n",
         env!("CARGO_PKG_VERSION")
     );
     assert!(text.starts_with(&header), "expected the header\n{header}\ngot\n{text}");
 }
+
+/// The approval warning every fixture policy here carries: none of them
+/// is approved (`canon policy approve`).
+const UNAPPROVED: &str = "warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`";
 
 #[test]
 fn status_next_names_the_command_for_each_gap() {

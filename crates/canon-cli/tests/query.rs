@@ -236,6 +236,67 @@ fn query_with_no_canon_yaml_anywhere_fails_loud_naming_the_attempted_path() {
     assert!(stderr.contains("canon.yaml"), "the error must name the canon.yaml path the ancestor walk ultimately attempted to read: {stderr}");
 }
 
+/// Every entry under `dir`, recursively, as sorted relative paths.
+fn tree(dir: &std::path::Path) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(next) = stack.pop() {
+        for entry in std::fs::read_dir(&next).unwrap().filter_map(Result::ok) {
+            let path = entry.path();
+            out.push(path.strip_prefix(dir).unwrap().display().to_string());
+            if path.is_dir() {
+                stack.push(path);
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// 0.15 D6 (dogfood eval 2 G14): a read command run in a directory canon
+/// was never set up in leaves it exactly as it was. `canon query` used to
+/// create `.canon/audit/access.jsonl` there, an untracked write into a
+/// repository the operator had only read.
+///
+/// `canon report --check` is held to the audit half only: it seeds
+/// `.canon/learn/` on its own, a separate write this change does not
+/// touch.
+#[test]
+fn read_commands_leave_a_directory_without_canon_yaml_unchanged() {
+    let cwd = tempfile::tempdir().unwrap();
+    for args in [&["query", "--kind", "change"][..], &["query", "--kind", "subject", "--json"][..], &["status"][..], &["context"][..], &["gate", "check"][..]] {
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd.path()).output().expect("spawn canon binary");
+        assert_eq!(tree(cwd.path()), Vec::<String>::new(), "`canon {}` wrote into a directory without canon.yaml; stderr: {}", args.join(" "), support::stderr(&output));
+    }
+    let report = tempfile::tempdir().unwrap();
+    std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(["report", "--check"]).current_dir(report.path()).output().expect("spawn canon binary");
+    assert!(!report.path().join(".canon/audit").exists(), "`canon report --check` must not write an access audit here");
+}
+
+/// The access audit lands in the repository whose `canon.yaml` was read
+/// — through `--repo` or `--canon-yaml` — never in the directory the
+/// command happened to run from.
+#[test]
+fn query_audits_into_the_repo_it_read_never_into_the_cwd() {
+    let repo = tempfile::tempdir().unwrap();
+    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
+    let cwd = tempfile::tempdir().unwrap();
+
+    for flag in ["--repo", "--canon-yaml"] {
+        let target = if flag == "--repo" { repo.path().to_path_buf() } else { repo.path().join("canon.yaml") };
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
+            .args(["query", "--kind", "change", flag])
+            .arg(&target)
+            .current_dir(cwd.path())
+            .output()
+            .expect("spawn canon binary");
+        assert!(output.status.success(), "{flag}: {}", support::stderr(&output));
+        assert_eq!(tree(cwd.path()), Vec::<String>::new(), "{flag}: the cwd must be left unchanged");
+    }
+    let audit = std::fs::read_to_string(repo.path().join(".canon/audit/access.jsonl")).expect("the target repo carries the audit");
+    assert_eq!(audit.lines().count(), 2, "one event per query: {audit}");
+}
+
 // ── s19 `query-scope-filters`: --change-id/--status + rollup + deterministic sort ──
 
 use canon_model::records::{ChangeStatus, TaskStatus};

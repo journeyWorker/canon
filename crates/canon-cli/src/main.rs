@@ -43,6 +43,7 @@ use std::process::ExitCode;
 use canon_model::envelope::RecordKind;
 use canon_model::{regime_key, Actor, ChangeId, EvidenceVerdict, ProjectId, RegimeKey, RoleId, RunId, RunStatus, ScenarioId, Sha, SubjectId, TaskId};
 use canon_learn::StrategyId;
+use canon_cli::finding::CommitArg;
 use canon_cli::scaffold::AreaSurface;
 use chrono::{DateTime, Timelike, Utc};
 use clap::{Parser, Subcommand};
@@ -93,6 +94,12 @@ enum Command {
         /// Do not write the starter .canon/policy.yaml
         #[arg(long)]
         no_policy: bool,
+    },
+    /// Record who approved the gate's policy (.canon/policy.yaml) and which bytes
+    #[command(after_help = "Examples:\n  canon policy approve --by alice --note 'reviewed the starter policy'\n\nWrites .canon/policy.approval.json (commit it): the policy's sha256, who\napproved it, when, and the note. `canon gate check` and `canon status` print an\nadvisory while the policy is unapproved or has changed since its approval;\nthe advisory never changes an exit code.")]
+    Policy {
+        #[command(subcommand)]
+        action: PolicyCommand,
     },
     /// Try the evidence loop end-to-end in a throwaway demo repo
     #[command(after_help = "Examples:\n  canon demo init --repo /tmp/canon-demo && cd /tmp/canon-demo\n  canon gate check   # RED\n  canon demo attest && canon gate check   # GREEN")]
@@ -379,6 +386,22 @@ enum Command {
         /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum PolicyCommand {
+    /// Approve the current .canon/policy.yaml (written directly; nothing to promote)
+    Approve {
+        /// Who approved it (a human's name or id)
+        #[arg(long)]
+        by: String,
+        /// Why, or what was reviewed
+        #[arg(long)]
+        note: Option<String>,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
     },
 }
 
@@ -771,7 +794,7 @@ enum EvidenceCommand {
         repo: PathBuf,
     },
     /// Stage one attributed EvidenceRecord for a task or scenario (commit it with `canon gate promote`)
-    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).")]
+    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).\n\nRE-ATTESTING NEVER DROPS A BINDING SILENTLY (--drop-attachment).\nFor a scenario, a record that leaves out a file the scenario's latest record binds is refused (exit 2) until it re-binds the file (new bytes at the same path are fine) or names it with --drop-attachment <path> (repeatable) --drop-reason <text>. The drop is recorded on the record and listed by canon status. Task-only evidence has no drop guard.\n\nAUDITS (--kind audit).\nRecords an external evaluator's re-audit of one scenario: --evaluator-id, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
     Add {
         /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
@@ -779,15 +802,15 @@ enum EvidenceCommand {
         /// Spec corpus id for --scenario-id (canon keys a scenario by the composite (project_id, scenario_id))
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: Option<ProjectId>,
-        /// What CLASS of evidence is attested to (test-run, review, ...) — the `evidence.kind` companion
+        /// What CLASS of evidence is attested to (test-run, review, ...) — the `evidence.kind` companion. `audit` records an external evaluator's re-audit (needs --evaluator-id/--evaluator-version/--evaluator-digest/--audit-result)
         #[arg(long)]
         kind: String,
         /// The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon
         #[arg(long = "ref", value_name = "REF")]
         evidence_ref: String,
-        /// faithful / not-applicable / divergent
-        #[arg(long, default_value = "faithful", value_parser = canon_cli::evidence::parse_verdict)]
-        verdict: EvidenceVerdict,
+        /// faithful (default) / not-applicable / divergent; refused with --kind audit, whose verdict follows --audit-result
+        #[arg(long, value_parser = canon_cli::evidence::parse_verdict)]
+        verdict: Option<EvidenceVerdict>,
         /// One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)
         #[arg(long)]
         summary: Option<String>,
@@ -839,6 +862,24 @@ enum EvidenceCommand {
         /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
         #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
         max_artifact_mib: u64,
+        /// --kind audit: the external evaluator that re-audited the scenario (canon never runs it)
+        #[arg(long)]
+        evaluator_id: Option<String>,
+        /// --kind audit: the evaluator's version
+        #[arg(long)]
+        evaluator_version: Option<String>,
+        /// --kind audit: sha256 of the evaluator (64 lowercase hex)
+        #[arg(long)]
+        evaluator_digest: Option<String>,
+        /// --kind audit: confirmed / refuted / indeterminate
+        #[arg(long)]
+        audit_result: Option<String>,
+        /// A file the scenario's latest record binds that this one deliberately does not (repository-relative path, as the refusal names it); repeatable; needs --drop-reason
+        #[arg(long = "drop-attachment", value_name = "PATH")]
+        drop_attachments: Vec<String>,
+        /// Why the --drop-attachment files are no longer bound (one line, recorded on the record)
+        #[arg(long)]
+        drop_reason: Option<String>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -881,15 +922,15 @@ enum FindingCommand {
         /// One line of what the finding IS, in the reviewer's own words. NEVER checked against the code (line breaks refused)
         #[arg(long)]
         summary: String,
-        /// The commit whose state this round reviewed. Omit when the round reviewed an uncommitted working tree — canon never infers one. Must name a COMMIT object this repo holds (existence only; never its message or diff)
-        #[arg(long, value_parser = canon_cli::finding::parse_sha)]
-        reviewed_sha: Option<Sha>,
-        /// The commit that closed it. Required by, and permitted only with, --disposition fixed. Must name a COMMIT object this repo holds (existence only; never its message or diff)
-        #[arg(long, value_parser = canon_cli::finding::parse_sha)]
-        resolution_sha: Option<Sha>,
-        /// The SOURCED introducing commit. Leave unset when it is not known — never guess (see --help). Must name a COMMIT object this repo holds (existence only; never its message or diff)
+        /// The commit whose state this round reviewed. Omit when the round reviewed an uncommitted working tree — canon never infers one. A full or short sha; a short one is resolved through git to the full sha. Must name a COMMIT object this repo holds (existence only; never its message or diff)
+        #[arg(long, value_parser = canon_cli::finding::parse_commit)]
+        reviewed_sha: Option<CommitArg>,
+        /// The commit that closed it. Required by, and permitted only with, --disposition fixed. A full or short sha (resolved through git). Must name a COMMIT object this repo holds (existence only; never its message or diff)
+        #[arg(long, value_parser = canon_cli::finding::parse_commit)]
+        resolution_sha: Option<CommitArg>,
+        /// The SOURCED introducing commit. Leave unset when it is not known — never guess (see --help). A full or short sha (resolved through git). Must name a COMMIT object this repo holds (existence only; never its message or diff)
         #[arg(long, value_parser = canon_cli::finding::parse_introduced_by)]
-        introduced_by: Option<Sha>,
+        introduced_by: Option<CommitArg>,
         /// Where in the tree, as path/to/file.rs:120-134 (line breaks refused)
         #[arg(long)]
         file_ref: Option<String>,
@@ -921,9 +962,9 @@ enum FindingCommand {
         /// Where it lands: fixed / rejected / deferred / open (reopening is a real transition). fixed requires --resolution-sha, and only fixed may carry one
         #[arg(long, value_parser = canon_cli::finding::parse_disposition)]
         disposition: canon_model::FindingDisposition,
-        /// The commit that closed it. Required by, and permitted only with, --disposition fixed. Must name a COMMIT object this repo holds
-        #[arg(long, value_parser = canon_cli::finding::parse_sha)]
-        resolution_sha: Option<Sha>,
+        /// The commit that closed it. Required by, and permitted only with, --disposition fixed. A full or short sha (resolved through git). Must name a COMMIT object this repo holds
+        #[arg(long, value_parser = canon_cli::finding::parse_commit)]
+        resolution_sha: Option<CommitArg>,
         /// The actor recorded as authoring the TRANSITION — not the original finding's author, which is preserved on the record this supersedes
         #[arg(long, default_value = "canon")]
         actor_id: String,
@@ -941,10 +982,11 @@ enum FindingCommand {
 
 #[derive(Subcommand)]
 enum ReviewCommand {
-    /// Write one attributed Review record directly to the ledger, nothing to promote (exactly one provenance ref required)
+    /// Write one attributed Review record directly to the ledger, nothing to promote (exactly one provenance ref required). The review pins the scenario's source digest and its latest evidence; it counts only while both are unchanged
     Add {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
+        /// The reviewed scenario; it must have a record (`canon inventory sync`), or the review is refused (exit 2)
         #[arg(long, value_parser = canon_cli::review::parse_scenario_id)]
         scenario_id: ScenarioId,
         #[arg(long)]
@@ -965,6 +1007,18 @@ enum ReviewCommand {
         /// The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count
         #[arg(long, value_parser = canon_cli::review::parse_session_id)]
         session_id: Option<canon_model::SessionId>,
+        /// How the reviewer's run ended: signed (an approval), indeterminate (ran, reached no verdict) or unavailable (could not run). Only signed counts; the others are recorded as review gaps
+        #[arg(long, default_value = "signed", value_parser = canon_cli::review::parse_outcome)]
+        outcome: canon_model::ReviewOutcome,
+        /// The reviewer runtime's provider (e.g. anthropic, openai)
+        #[arg(long, value_parser = canon_cli::review::parse_runtime_label)]
+        reviewer_provider: Option<String>,
+        /// The reviewer runtime's model id
+        #[arg(long, value_parser = canon_cli::review::parse_runtime_label)]
+        reviewer_model: Option<String>,
+        /// The harness that ran the reviewer (e.g. omp, codex, claude)
+        #[arg(long, value_parser = canon_cli::review::parse_runtime_label)]
+        reviewer_harness: Option<String>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1377,6 +1431,12 @@ fn main() -> ExitCode {
                 reports,
                 report_cases,
                 max_artifact_mib,
+                evaluator_id,
+                evaluator_version,
+                evaluator_digest,
+                audit_result,
+                drop_attachments,
+                drop_reason,
                 repo,
             } => ExitCode::from(
                 canon_cli::evidence::run_add(
@@ -1404,6 +1464,12 @@ fn main() -> ExitCode {
                         reports,
                         report_cases,
                         max_artifact_mib,
+                        evaluator_id,
+                        evaluator_version,
+                        evaluator_digest,
+                        audit_result,
+                        drop_attachments,
+                        drop_reason,
                     },
                 ) as u8,
             ),
@@ -1453,20 +1519,39 @@ fn main() -> ExitCode {
             }
         },
         Command::Review { action } => match action {
-            ReviewCommand::Add { project_id, scenario_id, reviewer, pin, upstream_ref, original_spec_ref, actor_id, role, session_id, repo } => ExitCode::from(
-                canon_cli::review::run_add(
-                    &repo,
-                    &project_id,
-                    &scenario_id,
-                    &reviewer,
-                    &pin,
-                    upstream_ref.as_deref(),
-                    original_spec_ref.as_deref(),
-                    &actor_id,
-                    &role,
-                    session_id.as_ref(),
-                ) as u8,
-            ),
+            ReviewCommand::Add {
+                project_id,
+                scenario_id,
+                reviewer,
+                pin,
+                upstream_ref,
+                original_spec_ref,
+                actor_id,
+                role,
+                session_id,
+                outcome,
+                reviewer_provider,
+                reviewer_model,
+                reviewer_harness,
+                repo,
+            } => ExitCode::from(canon_cli::review::run_add(
+                &repo,
+                &canon_cli::review::ReviewAddArgs {
+                    project_id,
+                    scenario_id,
+                    reviewer,
+                    pin,
+                    upstream_ref,
+                    original_spec_ref,
+                    actor_id,
+                    role,
+                    session_id,
+                    outcome,
+                    reviewer_provider,
+                    reviewer_model,
+                    reviewer_harness,
+                },
+            ) as u8),
         },
         Command::Divergence { action } => match action {
             DivergenceCliCommand::Stage { project_id, scenario_id, sha, status, reason, expiry, round, reviewer, detail, actor_id, role, repo } => {
@@ -1521,6 +1606,9 @@ fn main() -> ExitCode {
         Command::Init { repo, check_config, no_agents_md, no_policy } => {
             run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy: !no_policy })
         }
+        Command::Policy { action } => match action {
+            PolicyCommand::Approve { by, note, repo } => ExitCode::from(canon_cli::policy_approval::run_approve(&repo, &by, note.as_deref()) as u8),
+        },
         Command::Demo { action } => match action {
             DemoCommand::Init { repo } => ExitCode::from(canon_cli::demo::run_demo_init(&repo) as u8),
             DemoCommand::Attest { repo } => ExitCode::from(canon_cli::demo::run_demo_attest(&repo) as u8),
@@ -1642,19 +1730,19 @@ fn run_query(
     // fault here is a clean, nothing-read `2`, never a store error.
     if let Err(e) = canon_cli::query::validate_scope(kind, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
         eprintln!("canon query: {e}");
-        let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, 0);
+        let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
         return ExitCode::from(2);
     }
 
     if let Err(err) = canon_cli::retention::validate_sensitive(repo, include_sensitive) {
         eprintln!("canon query: {err}");
-        let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, 0);
+        let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
         return ExitCode::from(2);
     }
     let Some(plugin_id) = plugin else {
         return match canon_cli::query::run(repo, canon_yaml, kind, since, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
             Ok(outcome) => {
-                let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, outcome.records.len());
+                let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, outcome.records.len());
                 if json {
                     println!("{}", canon_cli::query::format_json_with_sensitive(&outcome, include_sensitive));
                 } else {
@@ -1663,7 +1751,7 @@ fn run_query(
                 ExitCode::SUCCESS
             }
             Err(err) => {
-                let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, 0);
+                let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
                 eprintln!("canon query: {err}");
                 ExitCode::FAILURE
             }
@@ -1672,7 +1760,7 @@ fn run_query(
 
     match canon_cli::query::run_with_plugin(repo, canon_yaml, kind, since, &plugin_id, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
         Ok((outcome, plugin_outcome)) => {
-            let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, outcome.records.len());
+            let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, outcome.records.len());
             for msg in &plugin_outcome.diagnostics {
                 eprintln!("canon query --plugin {plugin_id}: {msg}");
             }
@@ -1690,7 +1778,7 @@ fn run_query(
             ExitCode::SUCCESS
         }
         Err(err) => {
-            let _ = canon_cli::retention::audit_query(repo, kind, since, include_sensitive, 0);
+            let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
             eprintln!("canon query: {err}");
             ExitCode::FAILURE
         }

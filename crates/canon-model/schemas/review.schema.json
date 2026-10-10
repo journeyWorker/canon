@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Review",
-  "description": "A review attestation (join-spine `scenario_id` row: spec ↔ test ↔\nledger ↔ divergence). Mirrors the donor parity harness's required\nreview fields (`scenario_id`, `reviewer`, `pin`) plus its\nprovenance-ref requirement.",
+  "description": "A review attestation (join-spine `scenario_id` row: spec ↔ test ↔\nledger ↔ divergence). Mirrors the donor parity harness's required\nreview fields (`scenario_id`, `reviewer`, `pin`) plus its\nprovenance-ref requirement.\n\n0.15 adds what the review saw and how the reviewer's run ended, all\noptional and absent when unset, so a review written before 0.15\nreserializes byte-identically:\n- `pins` (D1): the scenario's source digest and its latest evidence\n  records at review time. `canon review add` computes them; a pinned\n  review only counts while both still match the corpus.\n- `outcome` (D4): `signed` (the default, and what every pre-0.15\n  review is), `indeterminate` or `unavailable`. Only `signed` is an\n  approval; the other two are recorded gaps.\n- `reviewer_provider`/`reviewer_model`/`reviewer_harness` (D4): the\n  runtime that produced the review, as the caller reports it.",
   "type": "object",
   "properties": {
     "actor": {
@@ -14,8 +14,23 @@
     "kind": {
       "$ref": "#/$defs/RecordKind"
     },
+    "outcome": {
+      "description": "How the reviewer's run ended (D4). Absent on the wire when\n`signed`, so a pre-0.15 review (no key) reads as signed.",
+      "$ref": "#/$defs/ReviewOutcome"
+    },
     "pin": {
       "type": "string"
+    },
+    "pins": {
+      "description": "What the review saw (D1). `None` on every review written before\n0.15: such a review keeps counting without the freshness check.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReviewPins"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "project_id": {
       "$ref": "#/$defs/ProjectId"
@@ -25,6 +40,27 @@
     },
     "reviewer": {
       "type": "string"
+    },
+    "reviewer_harness": {
+      "description": "The harness that ran the reviewer (D4), e.g. `omp` or `codex`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reviewer_model": {
+      "description": "The reviewer runtime's model id (D4).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reviewer_provider": {
+      "description": "The reviewer runtime's provider (D4), e.g. `anthropic`.",
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "scenario_id": {
       "$ref": "#/$defs/ScenarioId"
@@ -86,6 +122,37 @@
         "agent_id"
       ]
     },
+    "EvidencePin": {
+      "description": "One pinned evidence record: its ledger natural key (the `task_id`,\nelse the `scenario_id`, it is filed under) and its 12-hex content\ndigest, together the record's ledger file stem `<key>__<digest>`.",
+      "type": "object",
+      "properties": {
+        "digest": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "digest"
+      ]
+    },
+    "PinnedSpec": {
+      "description": "What a review's spec pin covers (0.15 D1).",
+      "oneOf": [
+        {
+          "description": "The whole `.feature` file (`Scenario.source_digest`): any edit to\nthe file stales the review.",
+          "type": "string",
+          "const": "file"
+        },
+        {
+          "description": "The scenario alone (`Scenario.scenario_digest`): only an edit to\nthe scenario or the context it inherits stales the review.",
+          "type": "string",
+          "const": "scenario"
+        }
+      ]
+    },
     "ProjectId": {
       "description": "`[a-z0-9][a-z0-9-]*` — lowercase alnum + hyphen, first character alphanumeric, no underscore (keeps the `__` natural-key separator unambiguous) — joins: not a join-spine key; composite identity prefix on Scenario/Review/Divergence natural keys (`<project_id>__<scenario_id>…`), optional on EvidenceRecord",
       "type": "string"
@@ -139,6 +206,38 @@
         "finding"
       ]
     },
+    "ReviewOutcome": {
+      "description": "How a reviewer's run ended (0.15 D4). Only `Signed` is an approval.\n`Indeterminate` (the reviewer ran but could not reach a verdict) and\n`Unavailable` (the reviewer could not run) are recorded so a failed\nreview is visible, never mistaken for a sign-off or a rejection.",
+      "type": "string",
+      "enum": [
+        "signed",
+        "indeterminate",
+        "unavailable"
+      ]
+    },
+    "ReviewPins": {
+      "description": "What a [`Review`] saw (0.15 D1): the reviewed scenario's digest\n(`scenario_digest`, of the kind `scenario_digest_scope` names) and the\nlatest evidence record per role for that scenario. `evidence` is\nalways written, empty when the scenario had none, so \"pinned with no\nevidence\" never reads as \"unpinned\".",
+      "type": "object",
+      "properties": {
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidencePin"
+          }
+        },
+        "scenario_digest": {
+          "$ref": "#/$defs/SpecDigest"
+        },
+        "scenario_digest_scope": {
+          "description": "Which digest `scenario_digest` holds, so the gate compares like\nwith like. Absent means `file`: the review was pinned to the\n`.feature` file's `source_digest`, the only kind before\n`Scenario.scenario_digest` existed.",
+          "$ref": "#/$defs/PinnedSpec"
+        }
+      },
+      "required": [
+        "scenario_digest",
+        "evidence"
+      ]
+    },
     "RoleId": {
       "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
       "type": "string"
@@ -149,6 +248,10 @@
     },
     "SessionId": {
       "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    },
+    "SpecDigest": {
+      "description": "sha256-hex: exactly 64 lowercase hex characters, over a `.feature` file's raw bytes, or over one scenario's normalized block and inherited context — joins: not a join-spine key; Scenario.source_digest (the inventory-sync freshness signal) and Scenario.scenario_digest (what a review pins)",
       "type": "string"
     }
   }

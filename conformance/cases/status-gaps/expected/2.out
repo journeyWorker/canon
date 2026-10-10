@@ -1,6 +1,6 @@
 {
   "statusVersion": 1,
-  "canonVersion": "0.14.0",
+  "canonVersion": "0.15.0",
   "policy": {
     "present": true,
     "spec_coverage": {
@@ -18,7 +18,10 @@
       }
     }
   },
-  "warnings": [],
+  "warnings": [
+    "policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`",
+    "1 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw"
+  ],
   "subjects": [
     {
       "id": "cart",
@@ -29,6 +32,8 @@
       "evidenced": 1,
       "divergent": 0,
       "reviewed": 1,
+      "staleReviews": 0,
+      "unsignedReviews": 0,
       "reviewDue": true,
       "openBlockers": 1,
       "missingCases": []

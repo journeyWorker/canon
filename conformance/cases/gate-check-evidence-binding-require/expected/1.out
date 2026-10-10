@@ -5,4 +5,6 @@ uncovered-cell (1):
 
 advisory: spec_coverage is off — 2 scenario(s) are not checked for evidence; see .canon/policy.yaml
 
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+
 experimental evidence binding (require, requires artifact): report 1, artifact 0, attested-only 1

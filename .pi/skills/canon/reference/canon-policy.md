@@ -37,10 +37,56 @@ spec_coverage:
 
 The file carries comments explaining each field. It loads with zero
 diagnostics. It is what `canon gate check` grades the work against, so a
-human should review and approve it, and every later change to it. The
-agent doing the work should not write its own grading policy. Narrow it
-with `scope: [building, verifying]` to check evidence only for subjects
-in those statuses (see `canon-gate`).
+human should review and approve it, and every later change to it (next
+section). The agent doing the work should not write its own grading
+policy. Narrow it with `scope: [building, verifying]` to check evidence
+only for subjects in those statuses (see `canon-gate`).
+
+## Approving the policy
+
+```bash
+canon policy approve --by <who> [--note <text>] [--repo <dir>]
+```
+
+A human runs this after reviewing `.canon/policy.yaml`. It writes
+`.canon/policy.approval.json` directly (nothing to promote):
+
+```json
+{
+  "policy_digest": "sha256:<sha256 of the policy.yaml bytes>",
+  "approved_by": "<who>",
+  "approved_at": "2026-10-11T09:00:00Z",
+  "note": "<text, or null>"
+}
+```
+
+Commit it with the policy: the file is tracked, and neither canon's
+`.gitignore` nor the one `canon init` writes ignores it. Running the
+command again replaces the record. With no `.canon/policy.yaml` it is
+refused (exit `2`), and so is an empty `--by`.
+
+While a policy exists with no approval, `canon gate check` prints after
+its result:
+
+```
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+```
+
+Once the policy's bytes no longer match the approved digest, it prints
+this instead:
+
+```
+advisory: policy changed since approval: .canon/policy.yaml is sha256:<now>, but `<who>` approved sha256:<then> at <time>; a human reviews it and runs `canon policy approve --by <who>`
+```
+
+An approval file that does not parse reads
+`advisory: policy approval unreadable: …`.
+`canon status` prints the same text as a `warning:` line (and in
+`--json` `warnings`). The advisory never changes an exit code: canon
+cannot tell whether a human or an agent ran the command, so the record
+names who approved which bytes, and the advisory says when that no
+longer holds. An agent never runs `canon policy approve` on its own
+behalf.
 
 ## The closed CEL profile
 
@@ -123,6 +169,40 @@ its own evaluation logic," it is out of scope — raise it as a design
 question rather than adding an expression field. Conditional logic about
 what a record *means* lives in `policy.yaml`/`applies_when:`, evaluated
 against the record's fields, never inside the record.
+
+## Sampled audits: `spec_coverage.require_audit`
+
+Optional; absent means no audit is ever owed (a recorded `refuted` audit
+is still `false-success` regardless — see `canon-gate`).
+
+```yaml
+spec_coverage:
+  require_audit:
+    rate: 0.1                  # required: a number in [0, 1]
+    seed: "2026-q4"            # optional string; default ""
+    scope: [verifying, shipped] # optional subject statuses; this is the default; [] = every scenario
+```
+
+`spec_coverage.exclude_lanes` applies. A malformed `require_audit` —
+unknown key, missing `rate`, `rate` out of range or a string, bad
+`scope`, `null` or a non-mapping — poisons the whole `spec_coverage`
+section: the gate reports `uncovered-cell spec_coverage — ... unusable`
+rather than checking anything under it.
+
+Sampling is deterministic. A scenario is in the sample iff the first 8
+bytes of
+
+```
+sha256(seed || 0x00 || project_id || 0x00 || scenario_id)
+```
+
+read as a big-endian u64, are less than `rate · 2^64` — computed exactly,
+as a comparison against `ceil(rate · 2^64)`, so `rate: 0` samples nothing
+and `rate: 1` samples everything. A sampled in-scope scenario whose
+latest audit is missing or `indeterminate` is `uncovered-cell`; with
+`shipped` in `scope`, `canon subject status <id> shipped` also refuses
+it. `canon context` and the `canon status` policy line show
+`require_audit=(rate=… seed=`…` scope=…)`.
 
 ## Effect-aware risk tiers
 

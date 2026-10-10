@@ -297,8 +297,8 @@ join_key_newtype!(
 
 join_key_newtype!(
     SpecDigest,
-    grammar: "sha256-hex: exactly 64 lowercase hex characters, over a `.feature` file's raw bytes",
-    joins: "not a join-spine key; Scenario.source_digest, the inventory-sync freshness signal"
+    grammar: "sha256-hex: exactly 64 lowercase hex characters, over a `.feature` file's raw bytes, or over one scenario's normalized block and inherited context",
+    joins: "not a join-spine key; Scenario.source_digest (the inventory-sync freshness signal) and Scenario.scenario_digest (what a review pins)"
 );
 
 join_key_newtype!(

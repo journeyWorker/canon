@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-015-l4",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T20:28:12.914899Z",
+  "change_id": "canon-0-15-l4-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "b78dcbf30f56fda6a8bfc1c7ee699ae61f263e40",
+  "reviewer": "canon-reviewer-015-l4",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "scenario digest trimmed every doc-string line, so a meaningful indentation change left a pinned review fresh"
+}

@@ -71,7 +71,8 @@ redacts known secrets and PII patterns before storage. No detector can
 guarantee that every sensitive value is found, so do not treat redaction as
 a complete PII filter. Canon supports `purge` for removing ingested records,
 redacted `export` for sharing a sanitized extract, and an access audit log at
-`.canon/audit/access.jsonl`. These controls do not delete the source
+`.canon/audit/access.jsonl` of the repository whose `canon.yaml` was read
+(nothing is written where there is no `canon.yaml`). These controls do not delete the source
 transcripts read by adapters or rewrite Git history; manage those separately.
 
 

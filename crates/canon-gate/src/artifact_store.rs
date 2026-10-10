@@ -23,8 +23,10 @@
 //! # What the gate checks ([`ArtifactStoreCheck`])
 //! Every attachment on every LATEST evidence record: the latest record
 //! per task, and the latest per `(project_id, scenario_id)`, the same
-//! last-wins rule every other evidence fold uses. A superseded record is
-//! not checked; re-attesting is how stale evidence is fixed.
+//! last-wins rule every other evidence fold uses — and, beside it, the
+//! latest AUDIT record per `(project_id, scenario_id)` (0.15 D3), whose
+//! counterexample reports are bound like any other. A superseded record
+//! is not checked; re-attesting is how stale evidence is fixed.
 //!
 //! - The stored blob exists and hashes to the recorded digest: clean.
 //! - The blob is missing, and the working-tree path still hashes to the
@@ -278,8 +280,9 @@ fn working_tree(repo: &Path, relative: &str) -> Observed {
     working_tree_path(repo, relative).map_or(Observed::Missing, |path| Observed::of(&path))
 }
 
-/// The latest record per task and per `(project_id, scenario_id)`
-/// (module doc), each once, in ledger order.
+/// The latest declared record per task and per `(project_id,
+/// scenario_id)`, then the latest audit per `(project_id, scenario_id)`
+/// (module doc), each once, every one carrying an attachment.
 fn latest_records(ctx: &GateContext) -> Vec<&EvidenceRecord> {
     let by_task: Vec<&EvidenceRecord> = ctx.evidence.iter().filter(|r| r.task_id.is_some()).collect();
     let by_scenario: Vec<&EvidenceRecord> = ctx.evidence.iter().filter(|r| r.scenario_id.is_some()).collect();
@@ -290,7 +293,9 @@ fn latest_records(ctx: &GateContext) -> Vec<&EvidenceRecord> {
     for record in latest_by_key(&by_scenario, |r| (r.project_id.clone(), r.scenario_id.clone())) {
         latest.insert(*record as *const _);
     }
-    ctx.evidence.iter().filter(|r| !r.attachments.is_empty() && latest.contains(&(*r as *const _))).collect()
+    let declared = ctx.evidence.iter().filter(|r| latest.contains(&(*r as *const _)));
+    let audits = crate::audit::latest_audits(ctx).into_values();
+    declared.chain(audits).filter(|r| !r.attachments.is_empty()).collect()
 }
 
 /// Each distinct `(path, sha256)` a record binds (one report can carry
@@ -420,6 +425,8 @@ mod tests {
                 diagnostics: Vec::new(),
             },
             evidence,
+            audits: Vec::new(),
+            evidence_file_digests: Default::default(),
             scenarios: Vec::new(),
             divergences: Vec::new(),
             subjects: Vec::new(),

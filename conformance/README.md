@@ -118,6 +118,27 @@ broken policy files, and other deliberately invalid inputs under
 `cases/*/repo/` are authored by hand; no script or code path rewrites them.
 Only `expected/` is ever blessed.
 
+## Tamper suite (0.15)
+
+Each tamper an author or agent could apply after the work was checked has a
+case that turns the gate red, refuses, or (for the policy) prints an advisory:
+
+| Tamper | Case | What a consumer sees |
+|---|---|---|
+| Scenario text changed after review (stale spec) | `review-pin-stale-spec` | `gate check` exit 1, `unreviewed-promotion` "its spec changed" |
+| Evidence re-attested after review (stale evidence) | `review-pin-stale-evidence` | `gate check` exit 1, `unreviewed-promotion` "its evidence changed"; `subject status … shipped` exit 1 |
+| Re-attest dropping a bound file | `evidence-add-drop-attachment` | `evidence add` exit 2; with `--drop-attachment/--drop-reason` the drop is recorded and listed by `status` |
+| Refuted audit | `gate-check-audit-false-success` | `gate check` exit 1, `false-success` despite a faithful verdict |
+| Indeterminate reviewer | `review-outcome-indeterminate-gap` | `gate check` exit 1, `unreviewed-promotion` "no signed review"; transition refused |
+| Unavailable reviewer | `review-outcome-unavailable-gap` | as indeterminate |
+| Sampled scenario with no audit | `gate-check-audit-sampled-missing` | `gate check` exit 1, `uncovered-cell` "sampled for audit" |
+| Policy changed after approval | `policy-approve-changed-advisory` | `policy changed since approval` advisory in `gate check` and `status`, exit 0 (advisory by design) |
+| Short SHA that names no commit in a finding | `finding-add-refused-unresolvable-short-sha` | `finding add` exit 2 |
+
+A conformance fixture repository has no commits, so the resolving side of short
+SHAs (`finding add/close` storing the full SHA) is pinned by
+`crates/canon-cli/tests/finding.rs` instead.
+
 ## The version case (live stamp)
 
 `cases/version` pins `canon --version` to the workspace version, and the

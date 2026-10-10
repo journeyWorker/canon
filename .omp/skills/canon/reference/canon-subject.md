@@ -162,7 +162,10 @@ unreviewed-promotion — `specced` is not in require_review.scope`. A
 transition INTO an in-scope status with gaps — an owned scenario with no
 qualifying review (`unreviewed-promotion`), or an open blocker finding
 on an adopted change (`open-blocker`) — prints the violations, exits 1,
-leaves the record unchanged, and names `--override-reason`.
+leaves the record unchanged, and names `--override-reason`. `shipped`
+also refuses a `false-success` (a scenario whose latest audit is
+`refuted`) and, when `require_audit.scope` covers `shipped`, an owed
+sampled audit; see `canon-gate`.
 
 ```bash
 canon subject status demo-subject verifying \
@@ -274,12 +277,25 @@ uses, so status and the gate cannot disagree about a gap:
   scenarios it owns through `@subject:` (after `exclude_lanes`, which
   are counted separately), how many carry a ledger verdict (the
   `verifying → shipped` gate's reading; divergent ones are counted too),
-  how many carry a review that satisfies `require_review` (any review
-  when it is off; with `distinct_actor`, a self-review does not count),
-  open blocker findings on its adopted changes, and each feature surface
-  missing a `require_cases` case. `(N due)` marks reviews the next
-  transition will require.
+  how many carry a review that satisfies `require_review` (any current
+  signed review when it is off; with `distinct_actor`, a self-review does
+  not count), open blocker findings on its adopted changes, and each
+  feature surface missing a `require_cases` case. `(N due)` marks reviews
+  the next transition will require; `N stale review(s)` and `N unsigned
+  review(s)` (printed when non-zero) count scenarios whose review went
+  stale or whose latest reviews are all `indeterminate`/`unavailable`
+  (see `canon-review`), and the `canon review add` step names both. With
+  `require_review` on, a `warning:` line counts the in-effect reviews that
+  predate review pinning (0.15).
 - **Unowned** — scenarios with no `@subject:` tag.
+- **Audits** — how many scenarios are sampled for
+  `spec_coverage.require_audit`, confirmed, owed (no audit or
+  `indeterminate`) and refuted (`false-success`). An owed or
+  refuted audit adds a `next:` step suggesting `canon evidence add
+  --kind audit …` (recorded from an external evaluator; canon never runs
+  one).
+- **Dropped bindings** — `dropped bindings (N):` lists every recorded
+  `--drop-attachment` (scenario, paths, reason); `drops[]` in `--json`.
 - **`next:`** — at most five commands, each with a one-line reason; the
   rest are counted. Rules, in order: no `canon.yaml` → `canon init`; an
   unreadable one → `canon init --check-config`; a scenario tagged with a
@@ -320,7 +336,7 @@ Status fails closed rather than suggest progress the gate would refuse:
   "warnings": [],
   "subjects": [
     { "id": "cart", "title": "Cart", "status": "building", "scenarios": 2, "excluded": 0, "evidenced": 2, "divergent": 0,
-      "reviewed": 1, "reviewDue": true, "openBlockers": 1, "missingCases": [] }
+      "reviewed": 1, "staleReviews": 0, "unsignedReviews": 0, "reviewDue": true, "openBlockers": 1, "missingCases": [] }
   ],
   "unowned": ["cart.promo.01"],
   "next": [

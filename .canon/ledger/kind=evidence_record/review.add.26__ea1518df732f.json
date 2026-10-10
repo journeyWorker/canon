@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "l1-impl"
+  },
+  "at": "2026-10-10T19:35:39.455944Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib review::tests::records_a_non_signed_outcome_and_the_reviewer_runtime && cargo test -p canon-model --lib records::tests::review_pins_and_outcome_round_trip_and_an_unknown_outcome_is_refused"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 18,
+  "scenario_id": "review.add.26",
+  "schema": 1,
+  "staging_id": "bc7fd90d9614",
+  "verdict": "faithful"
+}
