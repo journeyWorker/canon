@@ -121,6 +121,15 @@ subject가 `require_review.scope`에 있는 모든 시나리오(`spec_coverage.s
 판단합니다. 리뷰가 없거나 본인 리뷰뿐이면 `unreviewed-promotion`입니다.
 리뷰에는 판정이 없으며, 판정은 여전히 ship 게이트가 확인합니다.
 
+리뷰는 본 것을 고정합니다: `review add`가 시나리오의 source digest와 최신
+증거 레코드를 기록하고, 둘 다 그대로일 때만 리뷰가 인정됩니다. `.feature`
+파일을 고쳐 sync하거나 시나리오를 다시 증명하면 리뷰는 낡은 것이 되어, 스펙·증거
+또는 둘 다를 명시한 `unreviewed-promotion`이 됩니다. `signed` 리뷰만 인정되며,
+`--outcome indeterminate`나 `unavailable`로 기록된 리뷰어 실행은 공백이고,
+리뷰어별 최신 리뷰가 이깁니다. 0.15 이전에 쓴 리뷰는 pin이 없으므로 계속
+인정되며, `gate check`는 `advisory: N review(s) predate review pinning (0.15) …`
+한 줄을 출력합니다.
+
 `block_on_findings`이면 리뷰 finding(`canon finding add --severity
 blocker|should-fix|note`)은 `(change_id, round, seq)`별 최신 버전으로
 읽힙니다. 범위 안 subject가 adopt한 change에 열린 `blocker`가 있으면, 닫힐

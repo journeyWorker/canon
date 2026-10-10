@@ -1,0 +1,4 @@
+canon gate check: 1 violation(s)
+
+unreviewed-promotion (1):
+  unreviewed-promotion cart.add.01 — stale review by `reviewer-2`: its spec changed (the .feature file's source digest is not the pinned one) since the review; a pinned review counts only while what it saw is current — review it again (`canon review add`)

@@ -136,14 +136,14 @@ mod tests {
             Some(r) => Actor::new("s15-fixture", RoleId::parse(r).unwrap()),
             None => Actor::new_unattributed("s15-fixture"),
         };
-        Review {
-            envelope: Envelope::new(1, RecordKind::Review, at, actor),
-            project_id: ProjectId::parse("canon").unwrap(),
-            scenario_id: ScenarioId::parse(scenario).unwrap(),
-            reviewer: "reviewer-1".to_string(),
-            pin: "abcdef123456".to_string(),
-            provenance_ref: ProvenanceRef::UpstreamRef("upstream://scenario/1".to_string()),
-        }
+        Review::new(
+            Envelope::new(1, RecordKind::Review, at, actor),
+            ProjectId::parse("canon").unwrap(),
+            ScenarioId::parse(scenario).unwrap(),
+            "reviewer-1",
+            "abcdef123456",
+            ProvenanceRef::UpstreamRef("upstream://scenario/1".to_string()),
+        )
     }
 
     fn records(reviews: &[Review]) -> ArtifactSourceHandle {

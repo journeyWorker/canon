@@ -619,7 +619,10 @@ fn a_review_from_the_evidence_session_does_not_count_under_distinct_actor() {
     let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
-    assert!(err.contains("every owned scenario needs a review by an actor, and from a session, other than its evidence's"), "{err}");
+    assert!(
+        err.contains("every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's"),
+        "{err}"
+    );
     assert!(err.contains("(`sess-impl`)") && err.contains("in a session other than any evidence session"), "the detail must name the session rule: {err}");
     assert_eq!(current_subject(dir.path())["status"], "building");
 

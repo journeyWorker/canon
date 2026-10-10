@@ -61,11 +61,14 @@
 
 use std::path::Path;
 
-use canon_gate::review_gate::{active_require_review, malformed_findings, subject_guard, unreadable_review_kinds, unreadable_violation};
+use canon_gate::review_gate::{
+    active_require_review, malformed_findings, subject_guard, unpinned_review_note, unpinned_reviews, unreadable_review_kinds, unreadable_violation,
+};
 use canon_gate::spec_coverage::{case_gaps, subject_scenarios};
 use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, PolicyResolution, RequireReview, SpecCoverage, Violation};
 use canon_model::{
-    Actor, Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, RoleId, StatusOverride, Subject, SubjectId, SubjectStatus, WaivedViolation,
+    Actor, Change, ChangeId, Envelope, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, ScenarioId, StatusOverride, Subject, SubjectId, SubjectStatus,
+    WaivedViolation,
 };
 use canon_policy::SchemaRegistry;
 use canon_store::registry::TierRegistry;
@@ -587,6 +590,12 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
             for violation in &mut waivable {
                 violation.detail = format!("{} → {}: {}", status_str(current), status_str(target), violation.detail);
             }
+            let owned: std::collections::BTreeSet<(&ProjectId, &ScenarioId)> =
+                subject_scenarios(ctx, subject_id).into_iter().map(|s| (&s.project_id, &s.scenario_id)).collect();
+            let unpinned = unpinned_reviews(ctx).into_iter().filter(|r| owned.contains(&(&r.project_id, &r.scenario_id))).count();
+            if unpinned > 0 {
+                eprintln!("canon subject status: advisory: {}", unpinned_review_note(unpinned));
+            }
         } else {
             blocking.push(unreadable_violation(&unreadable));
         }
@@ -667,7 +676,11 @@ fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: Subje
         eprintln!("canon subject status:   skipped open-blocker — `{}` is not in require_review.scope", status_str(to));
         return;
     }
-    let rule = if rr.distinct_actor { "a review by an actor, and from a session, other than its evidence's" } else { "a review record" };
+    let rule = if rr.distinct_actor {
+        "a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's"
+    } else {
+        "a signed review, current with the spec and evidence it pinned"
+    };
     eprintln!("canon subject status:   ran unreviewed-promotion — every owned scenario needs {rule}");
     if rr.block_on_findings {
         eprintln!("canon subject status:   ran open-blocker — {changes} adopted change(s) checked for open blocker findings");

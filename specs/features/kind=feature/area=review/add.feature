@@ -102,3 +102,85 @@ Feature: review add
     Given a session on the evidence or on the review, but not on both
     When the subject moves into require_review scope
     Then a review by another actor counts, as it did before sessions were recorded
+
+  # canon: {"schema":1,"at":"2026-10-10T19:30:45Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:happy
+  @review.add.20
+  Scenario: A review pins the scenario's source digest and its latest evidence, computed rather than typed
+    Given a scenario with a record and one promoted evidence record
+    When a review is added without naming any digest
+    Then the review carries the scenario's source digest from its record
+    And it carries the evidence record's natural key and ledger file digest
+    And a scenario with no evidence yet is pinned with an empty evidence list, never left unpinned
+
+  # canon: {"schema":1,"at":"2026-10-10T19:30:45Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.21
+  Scenario: A review of a scenario with no record is refused and writes nothing
+    Given a scenario id that no scenario record carries
+    When a review of it is added
+    Then the command refuses with exit 2 and names `canon inventory sync`
+    And no review record exists, because there is nothing to pin
+
+  # canon: {"schema":1,"at":"2026-10-10T19:30:45Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.22
+  Scenario: A pinned review turns stale when its scenario's text changes
+    Given a pinned review that lets its subject enter verifying with the gate clean
+    When the scenario's text changes and `canon inventory sync` records the new source digest
+    Then `canon gate check` exits 1 with unreviewed-promotion
+    And the detail says the review is stale because the spec changed
+
+  # canon: {"schema":1,"at":"2026-10-10T19:30:45Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.23
+  Scenario: A pinned review turns stale when its scenario is re-attested
+    Given a pinned review that lets its subject enter verifying
+    When the scenario is attested again and promoted
+    Then `canon gate check` exits 1 with unreviewed-promotion saying the review is stale because the evidence changed
+    And the move to shipped is refused on the same stale review
+
+  # canon: {"schema":1,"at":"2026-10-10T19:30:45Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.24
+  Scenario: An indeterminate or unavailable review is a gap, never an approval
+    Given a review recorded with --outcome indeterminate or unavailable
+    When the gate and the status guard check the scenario
+    Then it is unreviewed-promotion with a detail naming the reviewer and the outcome
+    And it counts as no approval even without distinct_actor, and as no rejection either
+
+  # canon: {"schema":1,"at":"2026-10-10T19:30:45Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:edge
+  @review.add.25
+  Scenario: The latest review per reviewer wins, so a later indeterminate run withdraws that reviewer's signature
+    Given a reviewer who signed a scenario and later recorded an indeterminate review of it
+    When the gate folds the reviews to the latest per reviewer
+    Then that reviewer's signature no longer counts
+    And a later signed review by the same reviewer counts again
+    And another reviewer's current signed review still counts
+
+  # canon: {"schema":1,"at":"2026-10-10T19:30:46Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:happy
+  @review.add.26
+  Scenario: A review records the reviewer runtime that produced it
+    Given --reviewer-provider, --reviewer-model and --reviewer-harness on review add
+    When the review is written
+    Then the record carries each value exactly as given
+    And an empty or padded label is a usage error
+
+  # canon: {"schema":1,"at":"2026-10-10T19:30:46Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:edge
+  @review.add.27
+  Scenario: canon status counts stale and unsigned reviews and names them in its review step
+    Given one scenario whose review went stale and one whose only review is indeterminate
+    When `canon status` runs
+    Then the subject line counts one stale and one unsigned review, and neither as reviewed
+    And the review step names how many scenarios have each kind of gap

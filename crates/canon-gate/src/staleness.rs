@@ -332,6 +332,7 @@ mod tests {
             ctx: GateCtx { repo: repo.to_path_buf(), ledger_root: ledger_root.to_path_buf() },
             policy,
             evidence,
+            evidence_file_digests: crate::context::evidence_file_digests(&read.records),
             scenarios: Vec::new(),
             divergences: Vec::new(),
             subjects: Vec::new(),

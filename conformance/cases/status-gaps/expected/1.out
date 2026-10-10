@@ -3,6 +3,7 @@ policy: .canon/policy.yaml
   spec_coverage: require_evidence=true scope=<every scenario>
   require_cases: <none>
   require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true
+warning: 1 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw
 
 subjects (1):
   building (1):

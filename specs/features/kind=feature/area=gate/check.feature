@@ -254,3 +254,14 @@ Feature: gate check
     When the gate checks the repository
     Then the gate exits 1 with stale-evidence naming the blob's actual digest
     And the line says the stored blob does not match its name, never that the bound bytes are gone
+
+  # canon: {"schema":1,"at":"2026-10-10T19:30:46Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.40
+  Scenario: Reviews written before pinning keep counting, and the gate names them in one advisory line
+    Given require_review and a review written before 0.15, with no pins
+    When its scenario's spec changes and `canon gate check` runs
+    Then the review still counts and the gate exits 0
+    And one advisory line names how many in-effect reviews predate review pinning
+    And `canon status` prints the same advisory, and `canon subject status` prints it for the subject's own scenarios

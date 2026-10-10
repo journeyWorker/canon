@@ -320,6 +320,7 @@ mod tests {
                 diagnostics: Vec::new(),
             },
             evidence,
+            evidence_file_digests: Default::default(),
             scenarios,
             divergences: Vec::new(),
             subjects,

@@ -40,7 +40,7 @@ pub use ids::{
 pub use records::{
     Change, ChangeStatus, Divergence, DivergenceStatus, Event, EvidenceApproval, EvidenceAttachment, EvidenceRecord, EvidenceVerdict, Finding,
     FindingDisposition, ReportFormat, ReportOutcome,
-    FindingSeverity, ProvenanceRef, Review, Run, RunLineage, RunStatus, SkillSnapshot, ContextSnapshot, PolicySnapshot, Scenario,
+    FindingSeverity, ProvenanceRef, Review, ReviewOutcome, ReviewPins, EvidencePin, Run, RunLineage, RunStatus, SkillSnapshot, ContextSnapshot, PolicySnapshot, Scenario,
     Session, StatusOverride, StrategyItem, StrategyRef, Subject, WaivedViolation,
     SubjectStatus, Task, TaskStatus, Trajectory,
 };

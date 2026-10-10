@@ -1,1 +1,3 @@
 canon gate check: clean (0 violations)
+
+advisory: 1 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw

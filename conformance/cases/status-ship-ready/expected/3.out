@@ -24,6 +24,8 @@
       "evidenced": 2,
       "divergent": 0,
       "reviewed": 0,
+      "staleReviews": 0,
+      "unsignedReviews": 0,
       "reviewDue": false,
       "openBlockers": 0,
       "missingCases": []

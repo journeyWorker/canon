@@ -22,7 +22,7 @@ Every violation carries one of these stable, grep-able strings:
 | Class | Meaning |
 |---|---|
 | `uncovered-cell` | Either a policy-required evidence cell (role × artifact) with no matching record, or — with `spec_coverage` enabled — a spec scenario that is unimplemented or mismatched, or a feature surface missing a `require_cases` case. The detail string distinguishes them. Coverage means "a test exists", not "a test passed": even a `Divergent` verdict satisfies the role-cell form. |
-| `unreviewed-promotion` | An artifact tagged `reviewed` has no matching ledger review record — or, with `spec_coverage.require_review` set, an in-scope scenario has no qualifying `Review` (none at all, or only reviews by its own evidence actor). See `canon-review`. |
+| `unreviewed-promotion` | An artifact tagged `reviewed` has no matching ledger review record — or, with `spec_coverage.require_review` set, an in-scope scenario has no qualifying `Review`: none at all, only self-reviews, only stale reviews (the spec or evidence it pinned changed since), or only `indeterminate`/`unavailable` ones. See `canon-review`. |
 | `trust-below-required` | Achieved trust level is below `policy.yaml`'s `trust_required` for its class — RELEASE-scoped only (`canon gate check --release`); never fires on an ordinary run. |
 | `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. Also: a file bound to a latest evidence record whose bytes are gone — no intact blob in `.canon/artifacts/sha256/` and no working-tree copy with the recorded digest (see Bound evidence stays provable below). |
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
@@ -111,14 +111,18 @@ A present section, even `require_evidence: false` or a malformed one
 - **Independent review** (`require_review`) — scenarios whose subject is
   in `require_review.scope` (default `[verifying, shipped]`; `[]` = every
   scenario; independent of `scope` above) need a `Review` record
-  (`canon review add`), by a reviewer and actor other than the
-  scenario's evidence actor, and from a session other than any evidence
-  session when both carry one (`--session-id`), when `distinct_actor`
-  (default `true`);
-  gaps are `unreviewed-promotion`. With `block_on_findings` (default
-  `true`), an open `blocker` Finding on a change an in-scope subject
-  adopted is `open-blocker`. `exclude_lanes` also exempts scenarios
-  from review. Full contract: `canon-review`.
+  (`canon review add`) whose latest version per reviewer is `signed`,
+  still matches the scenario source digest and latest evidence it pinned
+  (a review written before 0.15 has no pins and skips this check), and,
+  when `distinct_actor` (default `true`), is by a reviewer and actor
+  other than the scenario's evidence actor and from a session other than
+  any evidence session when both carry one (`--session-id`);
+  gaps are `unreviewed-promotion`, and the detail says whether the
+  review is missing, a self-review, stale (naming whether the spec, the
+  evidence or both changed), or not signed. With `block_on_findings`
+  (default `true`), an open `blocker` Finding on a change an in-scope
+  subject adopted is `open-blocker`. `exclude_lanes` also exempts
+  scenarios from review. Full contract: `canon-review`.
 
   ```yaml
   spec_coverage:
@@ -159,6 +163,17 @@ review waivers: 1 advisory(ies) — not failing the gate:
 ```
 
 The waiver lasts only until the subject's next status write.
+
+### Reviews that predate pinning
+
+With `require_review` on, the reviews in effect (latest per reviewer and
+scenario) that carry no pins were written before 0.15. They keep
+counting, and one advisory line after the violations counts them; the
+exit code is unchanged:
+
+```
+advisory: 340 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw
+```
 
 ## Experimental: evidence binding (`experimental.evidence_binding`, off by default)
 

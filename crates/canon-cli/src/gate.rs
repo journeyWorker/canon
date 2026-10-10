@@ -144,6 +144,9 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     if let Some(advisories) = canon_gate::review_advisories(&gate_context) {
         print!("{}", format_review_advisories(&advisories));
     }
+    if let Some(count) = canon_gate::review_gate::unpinned_review_advisory(&gate_context) {
+        print!("\nadvisory: {}\n", canon_gate::review_gate::unpinned_review_note(count));
+    }
     print!("{}", format_unstored_attachments(&canon_gate::unstored_attachments(&gate_context)));
     report.exit_code()
 }
