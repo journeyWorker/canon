@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-k6",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T16:47:47.312621Z",
+  "change_id": "canon-0-14-k6-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "33cd723d898e27109e7cfe964c1b291e877cd58a",
+  "reviewer": "canon-reviewer-k6",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "the loop's evidence command omitted the required --project-id, so following the skill literally failed at step 6"
+}

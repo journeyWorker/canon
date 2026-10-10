@@ -23,6 +23,25 @@ uncovered-cell spec_coverag — `spec_coverag` is not a known top-level policy.y
 The known keys still resolve normally, and `canon context` lists the
 diagnostic and reports `clean: false`.
 
+## The starter policy `canon init` writes
+
+A fresh `canon init` writes `.canon/policy.yaml` (skip it with
+`--no-policy`; an existing file is never overwritten):
+
+```yaml
+spec_coverage:
+  require_evidence: true    # every scenario needs evidence
+  require_cases: [failure]  # every feature surface needs a @case:failure scenario
+  require_review: {}        # verifying/shipped subjects need an independent review
+```
+
+The file carries comments explaining each field. It loads with zero
+diagnostics. It is what `canon gate check` grades the work against, so a
+human should review and approve it, and every later change to it. The
+agent doing the work should not write its own grading policy. Narrow it
+with `scope: [building, verifying]` to check evidence only for subjects
+in those statuses (see `canon-gate`).
+
 ## The closed CEL profile
 
 Every expression is evaluated against exactly one variable, `record` (the
