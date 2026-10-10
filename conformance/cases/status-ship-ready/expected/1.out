@@ -1,4 +1,4 @@
-canon 0.13.1
+canon 0.14.0
 policy: .canon/policy.yaml
   spec_coverage: require_evidence=false scope=<every scenario>
   require_cases: failure
