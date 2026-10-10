@@ -1,0 +1,10 @@
+description: "`canon init` in an empty repo writes canon.yaml, the plans home, the starter policy and the AGENTS.md block (exit 0); `canon ingest plans` is clean on it; a rerun leaves canon.yaml alone and finds the AGENTS.md block current (exit 0); a rerun with `--no-agents-md` has nothing to do and refuses (exit 2)"
+steps:
+  - args: [init]
+    exit: 0
+  - args: [ingest, plans]
+    exit: 0
+  - args: [init]
+    exit: 0
+  - args: [init, --no-agents-md]
+    exit: 2

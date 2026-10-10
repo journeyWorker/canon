@@ -1,0 +1,12 @@
+description: "`canon change new <slug> --subject <id> --title <t>` on a fresh `canon init` repo scaffolds openspec/changes/<slug>/{proposal,tasks}.md, imports the change and adopts it into the subject (exit 0); an existing slug (exit 2) and an unknown subject (exit 2) are refused"
+steps:
+  - args: [init, --no-agents-md, --no-policy]
+    exit: 0
+  - args: [subject, new, auth, --domain, dev, --title, Auth]
+    exit: 0
+  - args: [change, new, add-login, --subject, auth, --title, Add login]
+    exit: 0
+  - args: [change, new, add-login, --subject, auth, --title, Add login again]
+    exit: 2
+  - args: [change, new, add-signup, --subject, no-such-subject, --title, Add signup]
+    exit: 2

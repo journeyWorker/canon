@@ -1,9 +1,13 @@
-//! `canon init [--repo <dir>]` + `canon init --check-config [--repo
-//! <dir>]` (s19 `canon-init-scaffold` spec): scaffolds a fresh, WORKING
-//! `canon.yaml` skeleton (design D8/D9) at `<repo>/canon.yaml` --
-//! refuses to overwrite an existing one, mirroring
-//! `crate::scaffold::run_feature_new`'s own `create_new` refusal
-//! convention -- or, with `--check-config`, READ-ONLY validates an
+//! `canon init [--repo <dir>] [--no-agents-md] [--no-policy]` + `canon
+//! init --check-config [--repo <dir>]` (s19 `canon-init-scaffold` spec,
+//! 0.14 D2): scaffolds a fresh, WORKING `canon.yaml` skeleton (design
+//! D8/D9) at `<repo>/canon.yaml`, plus what a repo needs to start the
+//! working loop: a starter `.canon/policy.yaml` a human approves, the
+//! `openspec/changes/` home the default plans source points at, and a
+//! canon block in `AGENTS.md` between `<!-- canon:begin -->`/`<!-- canon:end -->`.
+//! It never overwrites an existing `canon.yaml` or `policy.yaml`; a
+//! second `init` on a repo that already has `canon.yaml` only refreshes
+//! the `AGENTS.md` block. With `--check-config` it READ-ONLY validates an
 //! EXISTING `canon.yaml` by chaining the SAME three independently
 //! strict loaders `canon inventory sync`/`canon ingest plans`/`canon
 //! tier age` already use: [`TierPolicy::from_yaml`],
@@ -59,11 +63,11 @@ const GITIGNORE_LINE: &str = paths::HOT_DB_GITIGNORE;
 /// unlike postgres/s3) -- commented `tiers.hot` (postgres swap) /
 /// `tiers.cold` stanzas documenting the scale-up path, one working
 /// `specs.roots[]` entry (D9: a present `specs:` section requires at
-/// least one root, so this ships real rather than empty), and a
-/// present-but-empty `plans: { sources: [] }` (D9:
-/// `load_plan_sources_from_config` treats an empty `sources: []` as a
-/// legitimate, already-configured zero-source state, never a parse
-/// failure).
+/// least one root, so this ships real rather than empty), and one
+/// `openspec` plans source rooted at the repo (0.14 D2), so the
+/// changes `canon change new` scaffolds under [`CHANGES_DIR`] are
+/// imported by `canon ingest plans` and flipped by `canon gate task`
+/// with no hand edit.
 fn skeleton_yaml() -> String {
     let mut routing = String::new();
     for kind in RecordKind::ALL {
@@ -107,7 +111,11 @@ fn skeleton_yaml() -> String {
     out.push_str("    - id: root\n");
     out.push_str("      root: specs\n");
     out.push_str("plans:\n");
-    out.push_str("  sources: []\n");
+    out.push_str("  # Where changes and their tasks live: `canon change new` scaffolds\n");
+    out.push_str("  # openspec/changes/<slug>/, `canon ingest plans` imports it.\n");
+    out.push_str("  sources:\n");
+    out.push_str("    - dialect: openspec\n");
+    out.push_str("      root: .\n");
     out
 }
 
@@ -134,45 +142,239 @@ fn scaffold_gitignore(repo: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// `canon init [--repo <dir>]` (task 4.1). Returns the process exit
-/// code: `0` on a fresh `canon.yaml` written, `2` on a refused
-/// invocation (an existing `canon.yaml`) -- `create_new` (atomic
-/// create-fails-if-exists), so the existing file's bytes are UNTOUCHED
-/// either way.
-pub fn run_init(repo: &Path) -> i32 {
+/// The repo-relative directory the default `openspec` plans source
+/// ([`skeleton_yaml`]) reads changes from. `init` creates it (with a
+/// `.gitkeep`, so a clone keeps it): without it the openspec adapter
+/// would fall back to treating the repo root itself as the changes dir
+/// and report every top-level directory as a malformed change.
+pub(crate) const CHANGES_DIR: &str = "openspec/changes";
+
+/// The starter `.canon/policy.yaml` (0.14 D2). It turns `spec_coverage`
+/// on so the gate reports unevidenced scenarios, golden-path-only
+/// surfaces and unreviewed work from the first scenario on, instead of
+/// passing on zero evidence. It parses with zero diagnostics through
+/// `canon_gate::PolicyResolution::resolve` (pinned by a unit test
+/// below).
+const STARTER_POLICY_YAML: &str = "\
+# .canon/policy.yaml -- scaffolded by `canon init`.
+#
+# This file is what `canon gate check` grades the work against. A human
+# should review and approve it, and every later change to it: the agent
+# doing the work should not write the rules it is graded by.
+spec_coverage:
+  # Every scenario in the spec corpus needs evidence (`canon evidence
+  # add`). Add `scope: [building, verifying]` to check only scenarios
+  # whose subject is in one of those statuses.
+  require_evidence: true
+  # Every feature surface (`<area>.<surface>`) needs at least one
+  # `@case:failure` scenario, so no feature is specified by its golden
+  # path alone.
+  require_cases: [failure]
+  # Every scenario of a subject in `verifying` or `shipped` needs a
+  # review (`canon review add`) by an actor other than its evidence
+  # author, and an open blocker finding on an adopted change blocks.
+  require_review: {}
+";
+
+/// Opening marker of the canon block `init` owns in `AGENTS.md`.
+pub(crate) const AGENTS_BEGIN: &str = "<!-- canon:begin -->";
+/// Closing marker of the canon block `init` owns in `AGENTS.md`.
+pub(crate) const AGENTS_END: &str = "<!-- canon:end -->";
+
+/// The canon block, markers included, no trailing newline (0.14 D2):
+/// harness-neutral, short, and pointing at `canon status` and the skill
+/// for everything else.
+const AGENTS_BLOCK: &str = "\
+<!-- canon:begin -->
+## Canon
+
+Features in this repo are managed with canon. Start with `canon status`,
+and read the canon skill (`canon skills install`) before you change a
+feature.
+
+The loop:
+
+1. Brief: record the request and your assumptions; a human approves it.
+2. Subject: `canon subject new`, then `canon change new` for the change.
+3. Scenarios: `canon scenario new`, failure paths included (`--case failure`).
+4. Units: split the work; one actor id and session per unit.
+5. Implement: tests named by scenario id.
+6. Evidence: `canon evidence add`, then `canon gate promote`.
+7. Independent review: a different session records `canon review add` and `canon finding add`.
+8. Transition: `canon subject status`, with `canon gate check` clean.
+
+`.canon/policy.yaml` is what the gate grades against; a human approves it.
+<!-- canon:end -->";
+
+/// `AGENTS.md`'s content with the canon block merged in. `existing` is
+/// the current file (`None` when absent). The first
+/// [`AGENTS_BEGIN`]..[`AGENTS_END`] span is replaced in place; with no
+/// begin marker the block is appended after a blank line. Bytes outside
+/// the markers are never changed, and merging the result again is a
+/// byte-identical no-op. A begin marker with no end marker after it is
+/// refused rather than guessed at.
+fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
+    let Some(text) = existing else {
+        return Ok(format!("{AGENTS_BLOCK}\n"));
+    };
+    if let Some(begin) = text.find(AGENTS_BEGIN) {
+        let Some(end_rel) = text[begin..].find(AGENTS_END) else {
+            return Err(format!("AGENTS.md has `{AGENTS_BEGIN}` without a matching `{AGENTS_END}` after it; fix the markers by hand and rerun"));
+        };
+        let end = begin + end_rel + AGENTS_END.len();
+        return Ok(format!("{}{AGENTS_BLOCK}{}", &text[..begin], &text[end..]));
+    }
+    let mut out = text.to_string();
+    if !out.is_empty() {
+        if !out.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push('\n');
+    }
+    out.push_str(AGENTS_BLOCK);
+    out.push('\n');
+    Ok(out)
+}
+
+/// What `canon init` writes besides `canon.yaml` (the opt-out flags).
+#[derive(Debug, Clone, Copy)]
+pub struct InitOptions {
+    /// Write or refresh the canon block in `AGENTS.md`.
+    pub agents_md: bool,
+    /// Write the starter `.canon/policy.yaml`.
+    pub policy: bool,
+}
+
+/// Write `merged` to `AGENTS.md` unless it already holds exactly those
+/// bytes, and print what happened.
+fn write_agents_md(path: &Path, existing: Option<&str>, merged: &str) -> std::io::Result<()> {
+    if existing == Some(merged) {
+        println!("canon init: the canon block in {} is already current", path.display());
+        return Ok(());
+    }
+    fs::write(path, merged)?;
+    let verb = if existing.is_some() { "refreshed" } else { "wrote" };
+    println!("canon init: {verb} the canon block in {}", path.display());
+    Ok(())
+}
+
+/// Write the starter policy unless `.canon/policy.yaml` exists, which
+/// is left byte-for-byte alone.
+fn scaffold_policy(repo: &Path) -> std::io::Result<()> {
+    let path = repo.join(paths::POLICY_FILE);
+    fs::create_dir_all(repo.join(paths::CANON_DIR))?;
+    match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+        Ok(mut file) => {
+            file.write_all(STARTER_POLICY_YAML.as_bytes())?;
+            println!("canon init: wrote {} — a human should review and approve it: the gate grades the work against it", path.display());
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            println!("canon init: {} already exists — left unchanged", path.display());
+        }
+        Err(e) => return Err(e),
+    }
+    Ok(())
+}
+
+/// Create [`CHANGES_DIR`] with a `.gitkeep` when it is absent or empty.
+fn scaffold_changes_dir(repo: &Path) -> std::io::Result<()> {
+    let dir = repo.join(CHANGES_DIR);
+    fs::create_dir_all(&dir)?;
+    if fs::read_dir(&dir)?.next().is_none() {
+        fs::write(dir.join(".gitkeep"), "")?;
+        println!("canon init: created {}", dir.display());
+    }
+    Ok(())
+}
+
+/// `canon init [--repo <dir>] [--no-agents-md] [--no-policy]` (task 4.1,
+/// 0.14 D2). Returns the process exit code.
+///
+/// - A fresh repo gets `canon.yaml`, the `.gitignore` line, the
+///   `openspec/changes/` plans home, the starter policy (unless
+///   `--no-policy`) and the `AGENTS.md` block (unless `--no-agents-md`):
+///   exit `0`.
+/// - A repo whose `canon.yaml` exists keeps it byte-identical
+///   (`create_new` is the atomic refusal) and only refreshes the
+///   `AGENTS.md` block: exit `0`. With `--no-agents-md` there is nothing
+///   left to do, so that is the pre-0.14 refusal, exit `2`.
+/// - Unbalanced `AGENTS.md` markers refuse (exit `2`) before anything is
+///   written.
+pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
     if let Err(e) = fs::create_dir_all(repo) {
         eprintln!("canon init: failed to create `{}`: {e}", repo.display());
         return 2;
     }
-    let canon_yaml_path = repo.join("canon.yaml");
-    let content = skeleton_yaml();
-    match fs::OpenOptions::new().write(true).create_new(true).open(&canon_yaml_path) {
-        Ok(mut file) => match file.write_all(content.as_bytes()) {
-            Ok(()) => match scaffold_gitignore(repo) {
-                Ok(()) => {
-                    println!("canon init: wrote {}", canon_yaml_path.display());
-                    println!("canon init: next: `canon skills install` to install authoring guidance");
-                    0
-                }
-                Err(e) => {
-                    eprintln!("canon init: wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display());
-                    2
-                }
-            },
+    let agents_path = repo.join("AGENTS.md");
+    let agents = if options.agents_md {
+        let existing = match fs::read_to_string(&agents_path) {
+            Ok(text) => Some(text),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
             Err(e) => {
-                eprintln!("canon init: failed to write `{}`: {e}", canon_yaml_path.display());
-                2
+                eprintln!("canon init: failed to read `{}`: {e}", agents_path.display());
+                return 2;
             }
-        },
+        };
+        match merge_agents_md(existing.as_deref()) {
+            Ok(merged) => Some((existing, merged)),
+            Err(e) => {
+                eprintln!("canon init: refused — {e}");
+                return 2;
+            }
+        }
+    } else {
+        None
+    };
+
+    let canon_yaml_path = repo.join("canon.yaml");
+    match fs::OpenOptions::new().write(true).create_new(true).open(&canon_yaml_path) {
+        Ok(mut file) => {
+            if let Err(e) = file.write_all(skeleton_yaml().as_bytes()) {
+                eprintln!("canon init: failed to write `{}`: {e}", canon_yaml_path.display());
+                return 2;
+            }
+            println!("canon init: wrote {}", canon_yaml_path.display());
+        }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            eprintln!("canon init: refused — `{}` already exists; never overwriting an existing config", canon_yaml_path.display());
-            2
+            let Some((existing, merged)) = agents else {
+                eprintln!("canon init: refused — `{}` already exists; never overwriting an existing config", canon_yaml_path.display());
+                return 2;
+            };
+            println!("canon init: {} already exists — left unchanged; only the AGENTS.md block is refreshed", canon_yaml_path.display());
+            if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged) {
+                eprintln!("canon init: failed to write `{}`: {e}", agents_path.display());
+                return 2;
+            }
+            return 0;
         }
         Err(e) => {
             eprintln!("canon init: failed to create `{}`: {e}", canon_yaml_path.display());
-            2
+            return 2;
         }
     }
+
+    if let Err(e) = scaffold_gitignore(repo) {
+        eprintln!("canon init: wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display());
+        return 2;
+    }
+    if let Err(e) = scaffold_changes_dir(repo) {
+        eprintln!("canon init: failed to create `{}`: {e}", repo.join(CHANGES_DIR).display());
+        return 2;
+    }
+    if options.policy {
+        if let Err(e) = scaffold_policy(repo) {
+            eprintln!("canon init: failed to write `{}`: {e}", repo.join(paths::POLICY_FILE).display());
+            return 2;
+        }
+    }
+    if let Some((existing, merged)) = agents {
+        if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged) {
+            eprintln!("canon init: failed to write `{}`: {e}", agents_path.display());
+            return 2;
+        }
+    }
+    println!("canon init: next: `canon skills install` to install authoring guidance");
+    0
 }
 
 /// `canon init --check-config [--repo <dir>]` (task 4.2). Returns the
@@ -321,5 +523,46 @@ mod tests {
         scaffold_gitignore(dir.path()).unwrap();
         let text = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
         assert_eq!(text.matches(GITIGNORE_LINE).count(), 1, "the line must never be duplicated across repeated scaffolds: {text}");
+    }
+
+    #[test]
+    fn starter_policy_resolves_with_zero_diagnostics_and_turns_spec_coverage_on() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+        std::fs::write(dir.path().join(paths::POLICY_FILE), STARTER_POLICY_YAML).unwrap();
+        let policy = canon_gate::PolicyResolution::resolve(dir.path(), &canon_policy::SchemaRegistry::load());
+        assert!(policy.diagnostics.is_empty(), "the starter policy must load clean, unknown-key check included: {:?}", policy.diagnostics);
+        match policy.spec_coverage {
+            Some(canon_gate::SpecCoverage::Active { require_evidence, require_cases, require_review, .. }) => {
+                assert!(require_evidence);
+                assert_eq!(require_cases, vec!["failure".to_string()]);
+                assert!(require_review.is_some(), "require_review must be on");
+            }
+            other => panic!("expected an active spec_coverage section, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn merge_agents_md_creates_appends_and_is_idempotent() {
+        let fresh = merge_agents_md(None).unwrap();
+        assert!(fresh.starts_with(AGENTS_BEGIN) && fresh.ends_with(&format!("{AGENTS_END}\n")), "{fresh}");
+        assert_eq!(merge_agents_md(Some(&fresh)).unwrap(), fresh);
+
+        let existing = "# Project\n\nOur rules.";
+        let merged = merge_agents_md(Some(existing)).unwrap();
+        assert!(merged.starts_with("# Project\n\nOur rules.\n\n"), "{merged}");
+        assert_eq!(merge_agents_md(Some(&merged)).unwrap(), merged);
+    }
+
+    #[test]
+    fn merge_agents_md_replaces_only_the_marked_span() {
+        let existing = format!("before\n{AGENTS_BEGIN}\nstale text\n{AGENTS_END}\nafter {AGENTS_END}\n");
+        let merged = merge_agents_md(Some(&existing)).unwrap();
+        assert_eq!(merged, format!("before\n{AGENTS_BLOCK}\nafter {AGENTS_END}\n"));
+    }
+
+    #[test]
+    fn merge_agents_md_refuses_a_begin_marker_without_an_end() {
+        assert!(merge_agents_md(Some(&format!("{AGENTS_BEGIN}\nhalf a block\n"))).is_err());
     }
 }

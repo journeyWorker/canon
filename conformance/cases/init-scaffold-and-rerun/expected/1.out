@@ -1,0 +1,5 @@
+canon init: wrote ./canon.yaml
+canon init: created ./openspec/changes
+canon init: wrote ./.canon/policy.yaml — a human should review and approve it: the gate grades the work against it
+canon init: wrote the canon block in ./AGENTS.md
+canon init: next: `canon skills install` to install authoring guidance

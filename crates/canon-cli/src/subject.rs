@@ -359,63 +359,11 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 }
 
 /// `canon subject adopt <change_id> --subject <id>` (module doc): link
-/// an imported plan [`Change`] to a [`Subject`]. Loads the latest of
-/// each (fold-latest), refusing (exit `2`) if either is absent, then
-/// writes BOTH re-stamped through the routed tiers: the change with
-/// `subject_id` set (design D3 — stamped at adoption time, never
-/// derived in canon-model), and the subject with `change_id` appended
-/// to `change_ids` (deduped). Both carry a fresh envelope `at` so the
-/// update deterministically supersedes the prior version in the query
-/// fold.
+/// an imported plan [`Change`] to a [`Subject`] via [`adopt_change`],
+/// printing the result. Exit `2` on any refusal or store failure.
 pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json: bool) -> i32 {
-    let repo = resolve_repo_root(repo);
-    let canon_yaml_path = resolve_canon_yaml(&repo, None);
-    let registry = match registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject]) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("canon subject adopt: {e}");
-            return EXIT_REFUSED;
-        }
-    };
-
-    let mut subject = match find_subject(&registry, subject_id) {
-        Ok(Some(s)) => s,
-        Ok(None) => {
-            eprintln!("canon subject adopt: refused — subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str());
-            return EXIT_REFUSED;
-        }
-        Err(e) => {
-            eprintln!("canon subject adopt: {e}");
-            return EXIT_REFUSED;
-        }
-    };
-
-    let mut change = match find_change(&registry, change_id) {
-        Ok(Some(c)) => c,
-        Ok(None) => {
-            eprintln!("canon subject adopt: refused — change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str());
-            return EXIT_REFUSED;
-        }
-        Err(e) => {
-            eprintln!("canon subject adopt: {e}");
-            return EXIT_REFUSED;
-        }
-    };
-
-    let now = Utc::now();
-    change.subject_id = Some(subject_id.clone());
-    change.envelope.at = now;
-    if !subject.change_ids.contains(change_id) {
-        subject.change_ids.push(change_id.clone());
-    }
-    subject.envelope.at = now;
-
-    if let Err(e) = registry.persist(&change) {
-        eprintln!("canon subject adopt: {e}");
-        return EXIT_REFUSED;
-    }
-    match registry.persist(&subject) {
-        Ok(_) => {
+    match adopt_change(repo, change_id, subject_id) {
+        Ok(subject) => {
             if json {
                 report_subject(&subject, "adopt", true);
             } else {
@@ -428,6 +376,50 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
             EXIT_REFUSED
         }
     }
+}
+
+/// The adopt write itself, shared by `canon subject adopt` and `canon
+/// change new`. Loads the latest of each record (fold-latest), refusing
+/// if either is absent, then writes BOTH re-stamped through the routed
+/// tiers: the change with `subject_id` set (design D3 — stamped at
+/// adoption time, never derived in canon-model), and the subject with
+/// `change_id` appended to `change_ids` (deduped). Both carry a fresh
+/// envelope `at` so the update deterministically supersedes the prior
+/// version in the query fold. Returns the updated subject, or the
+/// operator-facing message (without the command prefix).
+pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId) -> Result<Subject, String> {
+    let repo = resolve_repo_root(repo);
+    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject]).map_err(|e| e.to_string())?;
+
+    let Some(mut subject) = find_subject(&registry, subject_id)? else {
+        return Err(format!("refused — subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str()));
+    };
+    let Some(mut change) = find_change(&registry, change_id)? else {
+        return Err(format!("refused — change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str()));
+    };
+
+    let now = Utc::now();
+    change.subject_id = Some(subject_id.clone());
+    change.envelope.at = now;
+    if !subject.change_ids.contains(change_id) {
+        subject.change_ids.push(change_id.clone());
+    }
+    subject.envelope.at = now;
+
+    registry.persist(&change).map_err(|e| e.to_string())?;
+    registry.persist(&subject).map_err(|e| e.to_string())?;
+    Ok(subject)
+}
+
+/// Which of `subject_id` and `change_id` already have a record, read
+/// through the same routed tiers and fold [`adopt_change`] uses —
+/// `canon change new`'s pre-write refusal check.
+pub(crate) fn subject_and_change_exist(repo: &Path, subject_id: &SubjectId, change_id: &ChangeId) -> Result<(bool, bool), String> {
+    let repo = resolve_repo_root(repo);
+    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject]).map_err(|e| e.to_string())?;
+    Ok((find_subject(&registry, subject_id)?.is_some(), find_change(&registry, change_id)?.is_some()))
 }
 
 /// `canon subject status <id> <state>` (module doc): apply a lifecycle
