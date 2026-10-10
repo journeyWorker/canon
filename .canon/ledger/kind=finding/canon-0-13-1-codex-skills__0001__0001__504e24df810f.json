@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-codexfix",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T14:29:41.825791Z",
+  "change_id": "canon-0-13-1-codex-skills",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "d14e209049a289fd6c7126567389660858cae21c",
+  "reviewer": "canon-reviewer-codexfix",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Legacy codex cleanup unlinked by path after a symlink check: a parent swapped to a symlink in between could delete a file outside the target"
+}
