@@ -331,7 +331,7 @@ Which writes need this step: `evidence add`, `finding add` and `finding
 close` stage, and their success line ends ``— run `canon gate promote`
 to commit it``. `divergence stage` stages for `canon divergence promote`
 and names it. Every other write — `review add`, `divergence
-resolve|defer`, `subject new|adopt|status`, `scenario new`, `feature new`
+resolve|defer`, `subject new|adopt|status`, `change new`, `scenario new`, `feature new`
 — is final when it returns, and its success line ends `— written
 directly; nothing to promote`.
 

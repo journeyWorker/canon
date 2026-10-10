@@ -211,9 +211,10 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, title: &str
         println!("canon change new: wrote {}", display_rel(&dir.join(name), &repo));
     }
     println!(
-        "canon change new: recorded change `{}` adopted into subject `{}` — written directly; nothing to promote",
+        "canon change new: recorded change `{}` adopted into subject `{}` — {}",
         slug.as_str(),
-        subject_id.as_str()
+        subject_id.as_str(),
+        crate::write_mode::DIRECT
     );
     0
 }

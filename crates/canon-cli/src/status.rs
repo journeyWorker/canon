@@ -480,7 +480,7 @@ fn subject_steps(
         if let Some(first) = counted.iter().find(|s| !joins.verdict_state(s).0) {
             next.push(NextStep {
                 command: format!(
-                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --verdict faithful --ref \"<test command>\"",
+                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
@@ -490,7 +490,7 @@ fn subject_steps(
         if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1) {
             next.push(NextStep {
                 command: format!(
-                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --verdict faithful --ref \"<test command>\"",
+                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
@@ -516,12 +516,12 @@ fn subject_steps(
         if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).0 && review_gap(ctx, s, distinct_actor).is_some()) {
             next.push(NextStep {
                 command: format!(
-                    "canon review add --project-id {} --scenario-id {} --reviewer <reviewer> --actor-id <reviewer> --role reviewer --pin <sha> --original-spec-ref <feature file>",
+                    "canon review add --project-id {} --scenario-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref <feature file>",
                     first.project_id.as_str(),
                     first.scenario_id.as_str()
                 ),
                 why: format!(
-                    "{id}: {} of {} scenario(s) lack a qualifying review; review from another session, as an actor other than the evidence actor",
+                    "{id}: {} of {} scenario(s) lack a qualifying review; review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor",
                     summary.scenarios - summary.reviewed,
                     summary.scenarios
                 ),

@@ -19,17 +19,17 @@ fn ok(repo: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
-/// `git init` + `canon init` + an openspec plan source holding change
-/// `cats`, imported.
+/// `git init` + `canon init --no-policy` + change `cats` under the
+/// openspec plan source `canon init` configures (`root: .`), imported.
+/// The write-mode test moves a subject, so it opts out of the starter
+/// policy (0.14 D2) whose require_review would gate that move.
 fn setup() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
-    ok(repo, &["init", "--repo", "."]);
+    ok(repo, &["init", "--repo", ".", "--no-policy"]);
     let yaml = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
-    let yaml = yaml.replace("plans:\n  sources: []", "plans:\n  sources:\n    - dialect: openspec\n      root: openspec/changes");
-    assert!(yaml.contains("root: openspec/changes"), "the plan source must be configured:\n{yaml}");
-    std::fs::write(repo.join("canon.yaml"), yaml).unwrap();
+    assert!(yaml.contains("- dialect: openspec\n      root: ."), "init must configure the openspec plan source:\n{yaml}");
     let change = repo.join("openspec/changes/cats");
     std::fs::create_dir_all(&change).unwrap();
     std::fs::write(change.join("proposal.md"), "# cats\n\n## Why\n\nA cat-themed run.\n").unwrap();
@@ -144,6 +144,7 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
     direct(&["subject", "new", "runs", "--domain", "dev", "--title", "Runs"]);
     direct(&["subject", "adopt", "cats", "--subject", "runs"]);
     direct(&["subject", "status", "runs", "specced"]);
+    direct(&["change", "new", "runs-boss", "--subject", "runs", "--title", "A boss wave"]);
 
     staged(
         &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer"],
