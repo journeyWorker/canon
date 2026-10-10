@@ -30,7 +30,9 @@
 //! one scenario, and every scenario it owns to carry a latest
 //! NON-`Divergent` verdict in the ledger; with `spec_coverage.
 //! require_cases`, each owned feature surface must also specify a
-//! scenario of every required case. A subject owns the scenarios
+//! scenario of every required case; and no owned scenario may have a
+//! `refuted` latest audit (`false-success`) or, under
+//! `spec_coverage.require_audit`, an audit still owed. A subject owns the scenarios
 //! whose `@subject:<id>` Gherkin tag `canon inventory sync` indexed onto
 //! `Scenario.subject_id` — read through
 //! [`canon_gate::spec_coverage::subject_scenarios`], the same join the
@@ -695,7 +697,13 @@ fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: Subje
 /// - `spec_coverage.require_cases` is set and an owned feature surface
 ///   carries no scenario of a required case (through the SAME
 ///   [`case_gaps`] rule `canon gate check` applies), so a subject cannot
-///   ship on a spec that only describes its golden path.
+///   ship on a spec that only describes its golden path;
+/// - an owned scenario's latest audit is `refuted` — `false-success`
+///   (0.15 D3), whatever its declared verdict — or, with
+///   `spec_coverage.require_audit` covering `shipped`, an owned scenario
+///   in the audit sample still owes an audit (`uncovered-cell`), through
+///   [`canon_gate::audit::subject_audit_gaps`], the rule `canon gate
+///   check` applies.
 fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> Vec<Violation> {
     let subject = subject_id.as_str();
 
@@ -740,6 +748,10 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
             violations.push(violation);
         }
     }
+    violations.extend(canon_gate::audit::subject_audit_gaps(gate_context, subject_id, SubjectStatus::Shipped).into_iter().map(|mut violation| {
+        violation.detail = format!("verifying → shipped: {}", violation.detail);
+        violation
+    }));
     violations
 }
 

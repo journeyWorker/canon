@@ -45,6 +45,7 @@
 
 pub mod approval;
 pub mod artifact_store;
+pub mod audit;
 pub mod checkbox;
 pub mod context;
 pub mod coverage;
@@ -67,6 +68,7 @@ pub mod trust;
 pub mod trust_ladder;
 
 pub use artifact_store::{unstored_attachments, ArtifactStoreCheck, UnstoredAttachment, DEFAULT_MAX_ARTIFACT_MIB, MAX_ARTIFACT_FLAG};
+pub use audit::AuditCheck;
 pub use checkbox::{gate_task, TaskFlipDecision};
 pub use approval::{verify_risk_approval, verify_ssh_signature};
 pub use context::{CanonYamlError, GateCheck, GateContext, GateContextError, GateCtx};
@@ -79,8 +81,8 @@ pub use ledger::{latest_verdicts, CellKey, LedgerCheck, LedgerEntry};
 pub use markers::{evidence_note_of, scan_fake_markers, scan_note_text, EvidenceNote, FABRICATION_BLOCKLIST};
 pub use evidence_binding::{binding_summary, strength_of, BindingGap, BindingSummary, EvidenceBindingCheck};
 pub use policy::{
-    allowed_signers_path, BindingMode, BindingStrength, EvidenceBinding, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError,
-    RequireReview, RiskTierRule, SpecCoverage, StalenessPolicy, KNOWN_TOP_LEVEL_KEYS,
+    allowed_signers_path, AuditRate, BindingMode, BindingStrength, EvidenceBinding, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution,
+    PolicyResolveError, RequireAudit, RequireReview, RiskTierRule, SpecCoverage, StalenessPolicy, KNOWN_TOP_LEVEL_KEYS,
 };
 pub use policy_keys::PolicyKeysCheck;
 pub use review_gate::{review_advisories, ReviewAdvisory};

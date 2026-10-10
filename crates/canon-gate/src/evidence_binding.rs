@@ -320,6 +320,7 @@ mod tests {
                 diagnostics: Vec::new(),
             },
             evidence,
+            audits: Vec::new(),
             scenarios,
             divergences: Vec::new(),
             subjects,

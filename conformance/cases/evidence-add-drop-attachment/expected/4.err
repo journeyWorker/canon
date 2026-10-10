@@ -1,0 +1,1 @@
+canon evidence add: refused — the latest evidence record for cart.add.01 (project root), by `impl-agent` at <ts>, binds file(s) this record does not: `reports/shot.txt`; re-bind them (--artifact <path> or --report <format>:<path>; new bytes at the same path are fine), or record the drop with --drop-attachment <path> (repeatable) --drop-reason <text>

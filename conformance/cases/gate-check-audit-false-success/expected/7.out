@@ -1,0 +1,18 @@
+canon 0.14.0
+policy: .canon/policy.yaml
+  spec_coverage: require_evidence=true scope=<every scenario>
+  require_cases: <none>
+  require_review: <absent>
+
+subjects (0):
+
+unowned (1, no @subject): cart.add.01
+
+audits: 0 sampled, 0 confirmed, 0 owed, 1 refuted
+  false-success: cart.add.01 (refuted by testjack 1.4.0)
+
+next:
+  # no subject exists yet; a subject is the unit status, review and shipping track
+  canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit>
+  # 1 scenario(s) carry no @subject tag (first: cart.add.01); add `@subject:<id>` above each in its .feature file, then sync
+  canon inventory sync

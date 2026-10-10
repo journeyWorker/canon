@@ -794,7 +794,7 @@ enum EvidenceCommand {
         repo: PathBuf,
     },
     /// Stage one attributed EvidenceRecord for a task or scenario (commit it with `canon gate promote`)
-    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).")]
+    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).\n\nRE-ATTESTING NEVER DROPS A BINDING SILENTLY (--drop-attachment).\nFor a scenario, a record that leaves out a file the scenario's latest record binds is refused (exit 2) until it re-binds the file (new bytes at the same path are fine) or names it with --drop-attachment <path> (repeatable) --drop-reason <text>. The drop is recorded on the record and listed by canon status. Task-only evidence has no drop guard.\n\nAUDITS (--kind audit).\nRecords an external evaluator's re-audit of one scenario: --evaluator-id, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
     Add {
         /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
@@ -802,15 +802,15 @@ enum EvidenceCommand {
         /// Spec corpus id for --scenario-id (canon keys a scenario by the composite (project_id, scenario_id))
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: Option<ProjectId>,
-        /// What CLASS of evidence is attested to (test-run, review, ...) — the `evidence.kind` companion
+        /// What CLASS of evidence is attested to (test-run, review, ...) — the `evidence.kind` companion. `audit` records an external evaluator's re-audit (needs --evaluator-id/--evaluator-version/--evaluator-digest/--audit-result)
         #[arg(long)]
         kind: String,
         /// The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon
         #[arg(long = "ref", value_name = "REF")]
         evidence_ref: String,
-        /// faithful / not-applicable / divergent
-        #[arg(long, default_value = "faithful", value_parser = canon_cli::evidence::parse_verdict)]
-        verdict: EvidenceVerdict,
+        /// faithful (default) / not-applicable / divergent; refused with --kind audit, whose verdict follows --audit-result
+        #[arg(long, value_parser = canon_cli::evidence::parse_verdict)]
+        verdict: Option<EvidenceVerdict>,
         /// One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)
         #[arg(long)]
         summary: Option<String>,
@@ -862,6 +862,24 @@ enum EvidenceCommand {
         /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
         #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
         max_artifact_mib: u64,
+        /// --kind audit: the external evaluator that re-audited the scenario (canon never runs it)
+        #[arg(long)]
+        evaluator_id: Option<String>,
+        /// --kind audit: the evaluator's version
+        #[arg(long)]
+        evaluator_version: Option<String>,
+        /// --kind audit: sha256 of the evaluator (64 lowercase hex)
+        #[arg(long)]
+        evaluator_digest: Option<String>,
+        /// --kind audit: confirmed / refuted / indeterminate
+        #[arg(long)]
+        audit_result: Option<String>,
+        /// A file the scenario's latest record binds that this one deliberately does not (repository-relative path, as the refusal names it); repeatable; needs --drop-reason
+        #[arg(long = "drop-attachment", value_name = "PATH")]
+        drop_attachments: Vec<String>,
+        /// Why the --drop-attachment files are no longer bound (one line, recorded on the record)
+        #[arg(long)]
+        drop_reason: Option<String>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1400,6 +1418,12 @@ fn main() -> ExitCode {
                 reports,
                 report_cases,
                 max_artifact_mib,
+                evaluator_id,
+                evaluator_version,
+                evaluator_digest,
+                audit_result,
+                drop_attachments,
+                drop_reason,
                 repo,
             } => ExitCode::from(
                 canon_cli::evidence::run_add(
@@ -1427,6 +1451,12 @@ fn main() -> ExitCode {
                         reports,
                         report_cases,
                         max_artifact_mib,
+                        evaluator_id,
+                        evaluator_version,
+                        evaluator_digest,
+                        audit_result,
+                        drop_attachments,
+                        drop_reason,
                     },
                 ) as u8,
             ),

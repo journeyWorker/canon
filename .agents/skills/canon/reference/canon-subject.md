@@ -162,7 +162,10 @@ unreviewed-promotion — `specced` is not in require_review.scope`. A
 transition INTO an in-scope status with gaps — an owned scenario with no
 qualifying review (`unreviewed-promotion`), or an open blocker finding
 on an adopted change (`open-blocker`) — prints the violations, exits 1,
-leaves the record unchanged, and names `--override-reason`.
+leaves the record unchanged, and names `--override-reason`. `shipped`
+also refuses a `false-success` (a scenario whose latest audit is
+`refuted`) and, when `require_audit.scope` covers `shipped`, an owed
+sampled audit; see `canon-gate`.
 
 ```bash
 canon subject status demo-subject verifying \
@@ -280,6 +283,14 @@ uses, so status and the gate cannot disagree about a gap:
   missing a `require_cases` case. `(N due)` marks reviews the next
   transition will require.
 - **Unowned** — scenarios with no `@subject:` tag.
+- **Audits** — how many scenarios are sampled for
+  `spec_coverage.require_audit`, confirmed, owed (no audit or
+  `indeterminate`) and refuted (`false-success`). An owed or
+  refuted audit adds a `next:` step suggesting `canon evidence add
+  --kind audit …` (recorded from an external evaluator; canon never runs
+  one).
+- **Dropped bindings** — `dropped bindings (N):` lists every recorded
+  `--drop-attachment` (scenario, paths, reason); `drops[]` in `--json`.
 - **`next:`** — at most five commands, each with a one-line reason; the
   rest are counted. Rules, in order: no `canon.yaml` → `canon init`; an
   unreadable one → `canon init --check-config`; a scenario tagged with a

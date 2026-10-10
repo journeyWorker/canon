@@ -15,7 +15,7 @@ release-scoped check (below) enforces it. A human-only `flagged` overlay
 overrides the ladder — a flagged artifact is never green regardless of
 evidence. (Author `policy.yaml`'s trust/staleness fields via `canon-policy`.)
 
-## The nine failure classes
+## The ten failure classes
 
 Every violation carries one of these stable, grep-able strings:
 
@@ -30,6 +30,7 @@ Every violation carries one of these stable, grep-able strings:
 | `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` evidence record. |
 | `fabricated-evidence` | An evidence note contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) or a bare `verified` claim with no attached command result. |
 | `open-blocker` | With `spec_coverage.require_review` set (and `block_on_findings`, the default), a Finding whose latest version is severity `blocker`, disposition `open`, on a change an in-scope subject adopted. Subject string `<change_id>#<round>.<seq>`. See `canon-review`. |
+| `false-success` | The latest audit record (`canon evidence add --kind audit`) of a scenario says `refuted`: an external evaluator found a counterexample to the claimed success. Always on, regardless of policy or sampling, and takes precedence over any declared faithful verdict; only a newer audit (`confirmed` or `indeterminate`) clears it. The detail names the evaluator, its version, its sha256 and the counterexample paths. |
 
 ## `canon gate check [--repo <dir>] [--release]`
 
@@ -135,12 +136,28 @@ A present section, even `require_evidence: false` or a malformed one
       block_on_findings: true       # default
   ```
 
+- **Sampled audits** (`require_audit`) — a deterministic sample of
+  in-scope scenarios (`require_audit.scope`, default `[verifying,
+  shipped]`; `exclude_lanes` applies) must carry an external audit
+  (`canon evidence add --kind audit`, see Audit records below). A sampled
+  scenario whose latest audit is missing or `indeterminate` is
+  `uncovered-cell`:
+
+  ```
+  uncovered-cell cart.add.01 — sampled for audit by spec_coverage.require_audit (rate 0.1, seed `s1`) and has no audit record — …
+  uncovered-cell cart.add.01 — sampled for audit by spec_coverage.require_audit (rate 0.1, seed `s1`), but its latest audit is indeterminate (evaluator `judge` 1.2) — …
+  ```
+
+  Keys, defaults and the exact sampling formula: `canon-policy`.
+
 Two refusals rather than a silent pass, both surfacing as
 `uncovered-cell` on the subject `spec_coverage`:
 
 - A **malformed section** (unknown key, unknown `scope` status, or a
-  malformed `require_cases`/`require_review` — unknown key, bad status,
-  `null`, non-mapping) refuses at check time. It is never treated as
+  malformed `require_cases`/`require_review`/`require_audit` — unknown
+  key, bad status, `null`, non-mapping, a missing or out-of-range
+  `rate`) refuses at check time (`uncovered-cell spec_coverage — ...
+  unusable`). It is never treated as
   absent — a typo must not be silently equivalent to not opting in.
 - A **corpus kind routed off the gate's rung** (`scenario`,
   `divergence`, or `subject` sent anywhere but `local`) refuses, because
@@ -149,6 +166,54 @@ Two refusals rather than a silent pass, both surfacing as
 Malformed rows in those three kinds do NOT surface as
 `malformed-evidence`; they are kept off the evidence violation set on
 purpose, so enabling nothing changes no existing verdict.
+
+### Audit records (`--kind audit`)
+
+canon never generates or runs an audit. An external evaluator does, and
+canon records its result:
+
+```bash
+canon evidence add --kind audit --project-id root --scenario-id cart.add.01 \
+  --ref "judge run 42" --role reviewer \
+  --evaluator-id judge --evaluator-version 1.2 \
+  --evaluator-digest <64 lowercase hex sha256> \
+  --audit-result refuted --report junit:audit/counterexample.xml
+```
+
+- `--kind audit` requires `--evaluator-id`, `--evaluator-version`,
+  `--evaluator-digest` (sha256, 64 lowercase hex), `--audit-result
+  confirmed|refuted|indeterminate`, and `--scenario-id` with
+  `--project-id`. It refuses `--task`, `--verdict`, `--surface-ref` and
+  `--approval-*`; the four evaluator flags are refused on any other kind.
+  All refusals exit `2`.
+- The record carries `audit: {evaluator_id, evaluator_version,
+  evaluator_digest, result}`; its verdict is derived (`confirmed` →
+  faithful, `refuted` → divergent, `indeterminate` → not-applicable).
+- Optional `--report`/`--artifact` counterexamples are bound and stored
+  like any report; the latest audit's bindings are re-hashed by the
+  artifact check.
+- Audits fold apart: per `(project_id, scenario_id)` there is a latest
+  declared record and a latest audit. An audit never becomes the
+  scenario's latest declared verdict.
+- `canon subject status <id> shipped` refuses `false-success`, and an
+  owed sampled audit when `require_audit.scope` covers `shipped`.
+- `canon status` shows an `audits` section (sampled / confirmed / owed /
+  refuted) and suggests `canon evidence add --kind audit …` in `next:`.
+
+### Dropping a binding (`--drop-attachment`)
+
+`canon evidence add` for a scenario refuses (exit `2`) when the
+scenario's current latest record of the same fold (declared records, or
+audit records for an audit) — committed ledger plus `_staging` — binds
+files the new record does not. The refusal names the paths and two ways
+out: re-bind them (`--artifact`/`--report`; new bytes at the same path
+are fine), or drop them on purpose with `--drop-attachment <path>`
+(repeatable) and one single-line `--drop-reason <text>`. The drop is
+recorded as `attachment_drop: {paths, reason}`. Refused (`2`): a drop
+without a reason, a reason without a drop, a drop path that is not
+actually dropped, a multi-line reason, or a drop without
+`--scenario-id` (task-only evidence has no drop guard). `canon status`
+lists recorded drops (`dropped bindings (N):`; `drops[]` in `--json`).
 
 ### Review-waiver advisories
 
@@ -381,8 +446,8 @@ Prefer this over hand-editing `settings.json`/`hooks.json`.
 
 ## `canon gate selftest`
 
-Runs the shipped fixture corpus — one fixture per failure class (nine,
-including `open-blocker`), each a
+Runs the shipped fixture corpus — one fixture per failure class (ten,
+including `false-success`), each a
 deliberately broken corpus proving that class fires and ONLY that class
 (both under-detection and over-triggering fail the run). Takes no
 `--repo`; self-contained. Run it before trusting any other `canon gate

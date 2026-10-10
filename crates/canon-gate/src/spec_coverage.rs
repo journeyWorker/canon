@@ -70,7 +70,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use canon_model::fold::{fold_to_current_state, FoldedState};
-use canon_model::{EvidenceVerdict, ProjectId, Scenario, ScenarioId, Subject, SubjectId, SubjectStatus};
+use canon_model::{EvidenceRecord, EvidenceVerdict, ProjectId, Scenario, ScenarioId, Subject, SubjectId, SubjectStatus};
 
 use crate::context::{GateCheck, GateContext, SPEC_CORPUS_KINDS};
 use crate::review_gate;
@@ -102,7 +102,9 @@ impl GateCheck for SpecCoverageCheck {
                     format!("policy.yaml's `spec_coverage` section is unusable ({detail}); refusing rather than treating it as absent"),
                 )];
             }
-            Some(SpecCoverage::Active { require_evidence: false, require_cases, require_review: None, .. }) if require_cases.is_empty() => return Vec::new(),
+            Some(SpecCoverage::Active { require_evidence: false, require_cases, require_review: None, require_audit: None, .. }) if require_cases.is_empty() => {
+                return Vec::new()
+            }
             Some(active @ SpecCoverage::Active { .. }) => active,
         };
 
@@ -123,7 +125,7 @@ impl GateCheck for SpecCoverageCheck {
             )];
         }
 
-        let SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review } = policy else {
+        let SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit } = policy else {
             unreachable!("the non-Active arms return above");
         };
 
@@ -194,6 +196,9 @@ impl GateCheck for SpecCoverageCheck {
             } else {
                 violations.push(review_gate::unreadable_violation(&unreadable));
             }
+        }
+        if let Some(require_audit) = require_audit {
+            violations.extend(crate::audit::evaluate(ctx, require_audit, exclude_lanes));
         }
         violations
     }
@@ -292,6 +297,19 @@ pub(crate) fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], k
     canon_store::fold::fold_latest_by_key(rows, |r| key(r.record), |r| r.at, |r| r.schema, |r| r.digest.as_str())
         .into_values()
         .map(|r| r.record)
+        .collect()
+}
+
+/// The latest evidence record per `(project_id, scenario_id)` among
+/// `records`, through the same fold as [`latest_by_key`]. A record
+/// missing either key joins no scenario and is skipped. Callers pass ONE
+/// fold's records — declared (`GateContext::evidence`) or audited
+/// (`GateContext::audits`) — never both.
+pub fn latest_by_scenario(records: &[EvidenceRecord]) -> BTreeMap<(ProjectId, ScenarioId), &EvidenceRecord> {
+    let keyed: Vec<&EvidenceRecord> = records.iter().filter(|r| r.project_id.is_some() && r.scenario_id.is_some()).collect();
+    latest_by_key(&keyed, |r| (r.project_id.clone(), r.scenario_id.clone()))
+        .into_iter()
+        .filter_map(|r| Some(((r.project_id.clone()?, r.scenario_id.clone()?), *r)))
         .collect()
 }
 
@@ -481,6 +499,7 @@ mod tests {
     struct Corpus {
         scenarios: Vec<Scenario>,
         evidence: Vec<EvidenceRecord>,
+        audits: Vec<EvidenceRecord>,
         divergences: Vec<Divergence>,
         subjects: Vec<Subject>,
         reviews: Vec<canon_model::Review>,
@@ -493,6 +512,7 @@ mod tests {
             Self {
                 scenarios: Vec::new(),
                 evidence: Vec::new(),
+                audits: Vec::new(),
                 divergences: Vec::new(),
                 subjects: Vec::new(),
                 reviews: Vec::new(),
@@ -507,6 +527,7 @@ mod tests {
             ctx: crate::context::GateCtx { repo: "/tmp/repo".into(), ledger_root: "/tmp/repo/.canon/ledger".into() },
             policy: policy(spec_coverage),
             evidence: corpus.evidence,
+            audits: corpus.audits,
             scenarios: corpus.scenarios,
             divergences: corpus.divergences,
             subjects: corpus.subjects,
@@ -524,7 +545,7 @@ mod tests {
     }
 
     fn active(scope: Vec<SubjectStatus>) -> Option<SpecCoverage> {
-        Some(SpecCoverage::Active { require_evidence: true, scope, exclude_lanes: Vec::new(), require_cases: Vec::new(), require_review: None })
+        Some(SpecCoverage::Active { require_evidence: true, scope, exclude_lanes: Vec::new(), require_cases: Vec::new(), require_review: None, require_audit: None })
     }
 
     fn requiring(cases: &[&str], exclude_lanes: &[&str]) -> Option<SpecCoverage> {
@@ -534,6 +555,7 @@ mod tests {
             exclude_lanes: exclude_lanes.iter().map(|s| s.to_string()).collect(),
             require_cases: cases.iter().map(|s| s.to_string()).collect(),
             require_review: None,
+            require_audit: None,
         })
     }
 
@@ -612,7 +634,14 @@ mod tests {
         corpus.scenarios = vec![scenario("p.a.01", None)];
         assert!(run(
             corpus,
-            Some(SpecCoverage::Active { require_evidence: false, scope: Vec::new(), exclude_lanes: Vec::new(), require_cases: Vec::new(), require_review: None })
+            Some(SpecCoverage::Active {
+                require_evidence: false,
+                scope: Vec::new(),
+                exclude_lanes: Vec::new(),
+                require_cases: Vec::new(),
+                require_review: None,
+                require_audit: None,
+            })
         )
         .is_empty());
     }
@@ -643,6 +672,7 @@ mod tests {
             exclude_lanes: vec!["process".to_string()],
             require_cases: Vec::new(),
             require_review: None,
+            require_audit: None,
         });
         assert!(run(corpus, policy).is_empty());
     }
@@ -659,6 +689,7 @@ mod tests {
             exclude_lanes: vec!["process".to_string()],
             require_cases: Vec::new(),
             require_review: None,
+            require_audit: None,
         });
         assert_eq!(run(corpus, policy).len(), 1);
     }
@@ -863,6 +894,7 @@ mod tests {
             exclude_lanes: vec!["process".to_string()],
             require_cases: Vec::new(),
             require_review: Some(RequireReview { scope, distinct_actor, block_on_findings: true }),
+            require_audit: None,
         })
     }
 
