@@ -1,0 +1,4 @@
+description: "a bound report rewritten after attestation stays provable when its bytes are in `.canon/artifacts/sha256/`: `canon gate check` is clean (exit 0) with no advisory"
+steps:
+  - args: [gate, check]
+    exit: 0

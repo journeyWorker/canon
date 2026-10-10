@@ -1,0 +1,4 @@
+description: "dogfood F9: a bound report rewritten after attestation, with no stored blob, is a `stale-evidence` violation (exit 1) naming the path, the recorded digest, and what the store and working tree hold now"
+steps:
+  - args: [gate, check]
+    exit: 1

@@ -1,0 +1,4 @@
+description: "a bound file with no stored blob whose working-tree copy still hashes to the recorded digest (a 0.11–0.13 record) keeps `canon gate check` clean (exit 0) and is listed as an advisory naming `canon evidence vault`"
+steps:
+  - args: [gate, check]
+    exit: 0

@@ -1,1 +1,1 @@
-canon evidence add: refused — reports/junit.xml records case `cart.add.01 adding an item puts it in the cart` as failed; a faithful verdict needs a passing case (attest the verdict the report shows, or fix the test)
+canon evidence add: refused — reports/junit.xml records case `cart.add.01 adding an item puts it in the cart` as failed; a faithful verdict needs every bound case to pass (attest the verdict the report shows, or fix the test)
