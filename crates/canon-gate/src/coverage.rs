@@ -90,6 +90,22 @@ impl CellSubject {
         }
     }
 
+    /// EVERY cell a record answers (0.14): its task cell AND its scenario
+    /// cell when it carries both keys. One attestation answering two
+    /// joins counts for both — [`crate::ledger::latest_verdicts`] reads
+    /// this, so a task+scenario record gives its scenario a verdict for
+    /// `spec_coverage`, the `verifying → shipped` gate and `canon status`.
+    /// [`Self::of`] stays the ONE subject a violation is reported
+    /// against, so per-record checks (coverage, staleness, risk) never
+    /// report the same record's gap twice.
+    pub(crate) fn all_of(record: &EvidenceRecord) -> impl Iterator<Item = Self> + '_ {
+        record
+            .task_id
+            .iter()
+            .map(|task_id| CellSubject::Task(task_id.to_string()))
+            .chain(record.scenario_id.iter().map(|scenario_id| CellSubject::Scenario(scenario_id.to_string())))
+    }
+
     /// The `Violation::subject` this cell's violations cite.
     pub(crate) fn as_str(&self) -> &str {
         match self {

@@ -50,6 +50,13 @@ packages/core-*/bin/*
 !.canon/ledger/kind=finding/
 !.canon/ledger/kind=review/
 !.canon/ledger/kind=subject/
+# The evidence artifact store (0.14): the bytes `canon evidence add
+# --artifact/--report` bound, one file per sha256. Authored on the same
+# argument as the ledger re-includes above -- no source regenerates a
+# rewritten report's earlier bytes, and `canon gate check` reports a
+# latest record whose bytes are gone as stale-evidence -- so it is
+# tracked, and this negation keeps a broader rule from ever hiding it.
+!.canon/artifacts/
 .canon/learn/
 .canon/r2/
 .canon/ingest/

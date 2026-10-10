@@ -21,8 +21,9 @@
 //! repo's [`EvidenceRecord`]s, and their paired [`EvidenceNote`]s, it
 //! returns [`TaskFlipDecision::Approved`] (carrying the evidence-note
 //! TEXT a `- [x] ` row's ` — ✅ ` suffix is built from) ONLY when a
-//! matching, non-`Divergent` record exists AND the paired note (if any)
-//! passes [`scan_fake_markers`] cleanly. Every other outcome is
+//! matching, non-`Divergent` record exists AND every note paired with
+//! the task passes [`scan_fake_markers`] cleanly. The approved text
+//! aggregates every record bound to the task (0.14 D5). Every other outcome is
 //! [`TaskFlipDecision::Blocked`] carrying the [`Violation`]s that
 //! blocked it (`unevidenced-flip` / `fabricated-evidence`) — missing,
 //! non-`Faithful`, or fabricated evidence all fail CLOSED (§7 "malformed
@@ -57,9 +58,10 @@ use crate::{FailureClass, Violation};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskFlipDecision {
     /// Evidence clears the flip. `evidence_note` is the one-line text a
-    /// flipped row's ` — ✅ <evidence>` suffix is built from — the paired
-    /// [`EvidenceNote::summary`] when one exists, else a default derived
-    /// from the matching record's verdict/actor/timestamp.
+    /// flipped row's ` — ✅ <evidence>` suffix is built from: the count of
+    /// every record bound to the task by verdict, then the latest
+    /// [`EvidenceNote::summary`] (or, with none, a default derived from
+    /// the latest passing record's verdict/actor/timestamp).
     Approved { evidence_note: String },
     /// Evidence does NOT clear the flip — the row must stay unflipped.
     /// Carries every [`Violation`] that blocked it (`unevidenced-flip`
@@ -71,23 +73,50 @@ fn default_evidence_text(record: &EvidenceRecord) -> String {
     format!("{:?} evidence recorded {} by {}", record.verdict, record.envelope.at.to_rfc3339(), record.envelope.actor.agent_id)
 }
 
+/// The one-line row suffix (0.14 D5): every record bound to the task,
+/// counted by verdict, then the latest summary —
+/// `3 evidence records (2 faithful, 1 not-applicable); latest: <summary>`.
+/// A row used to carry ONE record's summary, so a task backed by nine
+/// records read as if one test had run.
+fn aggregate_note(records: &[&EvidenceRecord], latest: &str) -> String {
+    let count = |verdict| records.iter().filter(|r| r.verdict == verdict).count();
+    let counts: Vec<String> = [
+        (EvidenceVerdict::Faithful, "faithful"),
+        (EvidenceVerdict::NotApplicable, "not-applicable"),
+        (EvidenceVerdict::Divergent, "divergent"),
+    ]
+    .into_iter()
+    .filter_map(|(verdict, name)| match count(verdict) {
+        0 => None,
+        n => Some(format!("{n} {name}")),
+    })
+    .collect();
+    let noun = if records.len() == 1 { "record" } else { "records" };
+    format!("{} evidence {noun} ({}); latest: {latest}", records.len(), counts.join(", "))
+}
+
 /// `canon gate task <task_id>`'s pure evidence decision (design decision
 /// 6; spec.md "Evidence-gated task flip"/"Fabrication-marker scanning").
 /// Approves the flip — returning the evidence-note TEXT a caller appends
 /// as the row's ` — ✅ ` suffix — ONLY when `evidence` carries a
-/// matching, non-`Divergent` [`EvidenceRecord`] for `task_id` AND the
-/// paired [`EvidenceNote`] (by `task_id`, if any) passes
-/// [`scan_fake_markers`] cleanly. Every other path is
-/// [`TaskFlipDecision::Blocked`] with the violation(s) that blocked it
-/// (module doc: fail closed).
+/// matching, non-`Divergent` [`EvidenceRecord`] for `task_id` AND every
+/// [`EvidenceNote`] paired with the task passes [`scan_fake_markers`]
+/// cleanly (the row aggregates them all, so any fabricated note taints
+/// it). Every other path is [`TaskFlipDecision::Blocked`] with the
+/// violation(s) that blocked it (module doc: fail closed).
+///
+/// `notes` are in ledger time order, oldest first: the LAST note for the
+/// task is its latest summary. The approved text is [`aggregate_note`]
+/// over every record bound to the task.
 ///
 /// This function knows NOTHING about the plan document: locating the
 /// row, detecting an already-flipped/absent row, and applying the flip
 /// are the caller's job (via `canon-ingest`'s `PlanWriteBack`, s35).
 pub fn gate_task(task_id: &TaskId, evidence: &[EvidenceRecord], notes: &[EvidenceNote]) -> TaskFlipDecision {
-    let matching = evidence.iter().find(|record| record.task_id.as_ref() == Some(task_id) && record.verdict != EvidenceVerdict::Divergent);
+    let records: Vec<&EvidenceRecord> = evidence.iter().filter(|record| record.task_id.as_ref() == Some(task_id)).collect();
+    let latest_passing = records.iter().copied().filter(|record| record.verdict != EvidenceVerdict::Divergent).max_by_key(|record| record.envelope.at);
 
-    let Some(record) = matching else {
+    let Some(record) = latest_passing else {
         let violation = Violation::new(
             FailureClass::UnevidencedFlip,
             task_id.to_string(),
@@ -96,16 +125,14 @@ pub fn gate_task(task_id: &TaskId, evidence: &[EvidenceRecord], notes: &[Evidenc
         return TaskFlipDecision::Blocked { violations: vec![violation] };
     };
 
-    let note = notes.iter().find(|note| &note.task_id == task_id);
-    if let Some(note) = note {
-        let scan_violations = scan_fake_markers(note);
-        if !scan_violations.is_empty() {
-            return TaskFlipDecision::Blocked { violations: scan_violations };
-        }
+    let task_notes: Vec<&EvidenceNote> = notes.iter().filter(|note| &note.task_id == task_id).collect();
+    let scan_violations: Vec<Violation> = task_notes.iter().flat_map(|note| scan_fake_markers(note)).collect();
+    if !scan_violations.is_empty() {
+        return TaskFlipDecision::Blocked { violations: scan_violations };
     }
 
-    let evidence_note = note.map(|note| note.summary.clone()).unwrap_or_else(|| default_evidence_text(record));
-    TaskFlipDecision::Approved { evidence_note }
+    let latest = task_notes.last().map(|note| note.summary.clone()).unwrap_or_else(|| default_evidence_text(record));
+    TaskFlipDecision::Approved { evidence_note: aggregate_note(&records, &latest) }
 }
 
 #[cfg(test)]
@@ -154,7 +181,7 @@ mod tests {
 
         let decision = gate_task(&task_id, &[record], &[note]);
 
-        assert_eq!(decision, TaskFlipDecision::Approved { evidence_note: "cargo test -p canon-gate: 40 passed".to_string() });
+        assert_eq!(decision, TaskFlipDecision::Approved { evidence_note: "1 evidence record (1 faithful); latest: cargo test -p canon-gate: 40 passed".to_string() });
     }
 
     #[test]
@@ -166,7 +193,7 @@ mod tests {
 
         match decision {
             TaskFlipDecision::Approved { evidence_note } => {
-                assert!(evidence_note.starts_with("Faithful evidence recorded"), "{evidence_note}");
+                assert!(evidence_note.starts_with("1 evidence record (1 faithful); latest: Faithful evidence recorded"), "{evidence_note}");
             }
             TaskFlipDecision::Blocked { .. } => panic!("clean faithful evidence must approve"),
         }
@@ -191,5 +218,30 @@ mod tests {
         let classes = blocked_classes(&decision);
         assert!(!classes.is_empty());
         assert!(classes.iter().all(|c| *c == FailureClass::FabricatedEvidence), "{classes:?}");
+    }
+
+    /// 0.14 D5 (dogfood F8): the row names every record bound to the task
+    /// and the latest summary, not one record's text.
+    #[test]
+    fn the_approved_note_aggregates_every_record_and_carries_the_latest_summary() {
+        let task_id = TaskId::parse("s5-trust-spine-gate#3.2").unwrap();
+        let records = vec![
+            evidence_record(&task_id, EvidenceVerdict::Faithful),
+            evidence_record(&task_id, EvidenceVerdict::NotApplicable),
+            evidence_record(&task_id, EvidenceVerdict::Faithful),
+        ];
+        let notes = vec![EvidenceNote::new(task_id.clone(), "1 vitest case", None), EvidenceNote::new(task_id.clone(), "9 vitest cases, 2 smoke checks", None)];
+        assert_eq!(
+            gate_task(&task_id, &records, &notes),
+            TaskFlipDecision::Approved { evidence_note: "3 evidence records (2 faithful, 1 not-applicable); latest: 9 vitest cases, 2 smoke checks".to_string() }
+        );
+    }
+
+    #[test]
+    fn a_fabricated_note_on_any_record_blocks_the_aggregated_flip() {
+        let task_id = TaskId::parse("s5-trust-spine-gate#3.2").unwrap();
+        let record = evidence_record(&task_id, EvidenceVerdict::Faithful);
+        let notes = vec![EvidenceNote::new(task_id.clone(), "TBD", None), EvidenceNote::new(task_id.clone(), "cargo test: ok", None)];
+        assert_eq!(blocked_classes(&gate_task(&task_id, &[record], &notes)), vec![FailureClass::FabricatedEvidence]);
     }
 }

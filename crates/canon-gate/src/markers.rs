@@ -108,11 +108,20 @@ pub fn evidence_note_of(raw: &serde_json::Value, task_id: &TaskId) -> Option<Res
 /// finding as a [`FailureClass::FabricatedEvidence`] [`Violation`];
 /// empty means clean.
 pub fn scan_fake_markers(note: &EvidenceNote) -> Vec<Violation> {
+    scan_note_text(note.task_id.as_str(), &note.summary, note.command_result.as_deref())
+}
+
+/// [`scan_fake_markers`]'s rules over a note's two fields, reported
+/// against `subject`. Split out (0.14 D5) so a SCENARIO-only record's
+/// `--summary` is scanned by the identical rules: it never reaches a plan
+/// row, but it lands in the same `evidence_note` companion a reader
+/// trusts.
+pub fn scan_note_text(subject: &str, summary: &str, command_result: Option<&str>) -> Vec<Violation> {
     let mut violations = Vec::new();
 
-    let mut fields: Vec<(&'static str, &str)> = vec![("summary", note.summary.as_str())];
-    if let Some(command_result) = &note.command_result {
-        fields.push(("command_result", command_result.as_str()));
+    let mut fields: Vec<(&'static str, &str)> = vec![("summary", summary)];
+    if let Some(command_result) = command_result {
+        fields.push(("command_result", command_result));
     }
 
     for (field_name, text) in &fields {
@@ -121,17 +130,17 @@ pub fn scan_fake_markers(note: &EvidenceNote) -> Vec<Violation> {
             if lower.contains(marker) {
                 violations.push(Violation::new(
                     FailureClass::FabricatedEvidence,
-                    note.task_id.to_string(),
+                    subject,
                     format!("{field_name} field contains fabrication marker {marker:?}: {text:?}"),
                 ));
             }
         }
     }
 
-    if note.summary.trim().eq_ignore_ascii_case("verified") && note.command_result.is_none() {
+    if summary.trim().eq_ignore_ascii_case("verified") && command_result.is_none() {
         violations.push(Violation::new(
             FailureClass::FabricatedEvidence,
-            note.task_id.to_string(),
+            subject,
             "summary is a bare 'verified' claim with no attached command result".to_string(),
         ));
     }

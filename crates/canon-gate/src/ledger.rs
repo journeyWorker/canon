@@ -91,8 +91,11 @@ impl LedgerEntry {
 /// `s38-evidence-bearing-memory`): winner per cell is the greatest
 /// `(envelope.at, envelope.schema, content_digest)` triple — a total,
 /// machine-independent order, never corpus/iteration order.
-/// Records with neither `task_id` nor `scenario_id` carry no cell
-/// identity ([`CellSubject::of`]) and are excluded, mirroring
+/// A record carrying both a `task_id` and a `scenario_id` answers BOTH
+/// cells ([`CellSubject::all_of`], 0.14): it is one attestation for two
+/// joins, so the scenario cell must not read as unevidenced because the
+/// task key happened to be present. Records with neither key carry no
+/// cell identity and are excluded, mirroring
 /// [`crate::coverage::CoverageCheck`]'s identical interface-gap
 /// treatment (one shared `CellSubject`, module doc).
 pub fn latest_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
@@ -105,12 +108,13 @@ pub fn latest_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
         schema: u32,
         digest: String,
     }
-    let candidates = ctx.evidence.iter().filter_map(|record| {
-        let subject = CellSubject::of(record)?;
+    let candidates = ctx.evidence.iter().flat_map(|record| {
         let role = record.envelope.actor.role.as_ref().map(|r| r.as_str().to_string());
-        let entry = LedgerEntry { subject: subject.as_str().to_string(), role, verdict: record.verdict, agent_id: record.envelope.actor.agent_id.clone(), at: record.envelope.at };
         let digest = canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default());
-        Some(Candidate { entry, schema: record.envelope.schema, digest })
+        CellSubject::all_of(record).map(move |subject| {
+            let entry = LedgerEntry { subject: subject.as_str().to_string(), role: role.clone(), verdict: record.verdict, agent_id: record.envelope.actor.agent_id.clone(), at: record.envelope.at };
+            Candidate { entry, schema: record.envelope.schema, digest: digest.clone() }
+        })
     });
     fold_latest_by_key(candidates, |c| (c.entry.subject.clone(), c.entry.role.clone()), |c| c.entry.at, |c| c.schema, |c| c.digest.as_str())
         .into_iter()
@@ -267,5 +271,21 @@ mod tests {
         let ctx = ctx_with(evidence, Vec::new());
 
         assert!(latest_verdicts(&ctx).is_empty());
+    }
+
+    /// 0.14 (dogfood nyan-omp): a record keyed by BOTH a task and a
+    /// scenario is the latest verdict of both cells — before, the task
+    /// key shadowed the scenario, so `verifying → shipped` and `canon
+    /// status` saw no verdict for scenarios `spec_coverage` counted.
+    #[test]
+    fn a_task_and_scenario_keyed_record_is_the_verdict_of_both_cells() {
+        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent-a", RoleId::parse("implementer").unwrap()));
+        let record = EvidenceRecord::new(envelope, Some(TaskId::parse("cats#1").unwrap()), Some(canon_model::ScenarioId::parse("game.run.01").unwrap()), None, EvidenceVerdict::Faithful);
+        let ctx = ctx_with(vec![record], Vec::new());
+        let verdicts = latest_verdicts(&ctx);
+        assert_eq!(verdicts.len(), 2, "{verdicts:?}");
+        for subject in ["cats#1", "game.run.01"] {
+            assert!(verdicts.get(&(subject.to_string(), Some("implementer".to_string()))).is_some_and(LedgerEntry::is_green), "{subject}");
+        }
     }
 }
