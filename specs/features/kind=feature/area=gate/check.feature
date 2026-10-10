@@ -206,3 +206,22 @@ Feature: gate check
     When the policy is resolved
     Then the whole spec_coverage section is invalid and names the problem
     And the gate reports it rather than skipping review
+
+  # canon: {"schema":1,"at":"2026-10-10T15:34:48Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.20
+  Scenario: The gate says when spec coverage is off without changing its exit code
+    Given a spec corpus with scenarios and a policy without a spec_coverage section
+    When the gate checks the repository
+    Then it prints one advisory on stdout naming the scenario count and .canon/policy.yaml
+    And the exit code is what it would be without the advisory
+
+  # canon: {"schema":1,"at":"2026-10-10T15:34:48Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.21
+  Scenario: The coverage-off advisory is silent with the section present or no scenarios
+    Given a spec_coverage section, even one with require_evidence false, or a corpus with no scenarios
+    When the gate checks the repository
+    Then no coverage-off advisory is printed

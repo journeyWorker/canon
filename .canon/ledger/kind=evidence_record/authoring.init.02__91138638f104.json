@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:37:07.367069Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init init_appends_the_block_to_an_existing_agents_md_without_touching_its_text"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "authoring.init.02",
+  "schema": 1,
+  "staging_id": "2e81bd0c33b2",
+  "verdict": "faithful"
+}

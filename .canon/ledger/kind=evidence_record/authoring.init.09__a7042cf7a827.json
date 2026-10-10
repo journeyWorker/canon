@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:37:07.645135Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init init_then_ingest_plans_exits_0_as_a_clean_no_op"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "authoring.init.09",
+  "schema": 1,
+  "staging_id": "88e44194ce72",
+  "verdict": "faithful"
+}

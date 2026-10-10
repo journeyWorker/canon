@@ -206,6 +206,30 @@ canon subject adopt subject-domain-loop-plan \
 `change_ids`, so `canon query --kind change --change-id …` and `canon
 query --kind subject` agree on the link from both ends.
 
+### Starting a new change: `canon change new`
+
+For a change that does not exist yet, one command scaffolds, imports and
+adopts it:
+
+```bash
+canon change new add-login --subject auth --title "Add login"
+```
+
+- **Writes** `openspec/changes/<slug>/proposal.md` (the title is its
+  `## Why`, which imports as the change summary) and `tasks.md` (no rows
+  yet, so the change imports as `proposed`), under the repo's first
+  `openspec` plans source. `canon init` configures that source
+  (`{dialect: openspec, root: .}`), so `canon.yaml` needs no edit.
+- **Imports** that source exactly as `canon ingest plans` does, then
+  **adopts** the change through the same write as `canon subject adopt`.
+- **Refuses** with exit `2`, writing nothing, when the subject does not
+  exist, when the slug already has a change dir (active or archived) or a
+  `change` record, or when `canon.yaml` has no `openspec` plans source.
+
+Add task rows to `tasks.md` as `- [ ] <n> <title>`, rerun `canon ingest
+plans`, and flip each with `canon gate task <slug>#<n>` once evidence
+exists.
+
 ## Reading the per-domain management view
 
 ```bash

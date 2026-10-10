@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:37:07.412267Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init init_rerun_keeps_canon_yaml_and_policy_and_refreshes_only_the_agents_md_block"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "authoring.init.03",
+  "schema": 1,
+  "staging_id": "aa1a6ed2c6ac",
+  "verdict": "faithful"
+}
