@@ -17,15 +17,15 @@ state they are in.
 The order an agent follows to claim a subject done:
 
 1. **Test-run evidence** per owned scenario (`canon evidence add
-   --scenario-id <id> --project-id <root-id> ...`, then `canon gate
-   promote`). See `canon-gate`.
+   --scenario-id <id> --project-id <root-id> ... --session-id <session>`,
+   then `canon gate promote`). See `canon-gate`.
 2. **Independent review** of the change(s) the subject adopted. Record
    each issue the reviewer raises as a Finding, fix it, then close it:
 
    ```bash
    canon finding add --change-id c-demo --round 1 --seq 1 \
      --severity blocker --disposition open --reviewer reviewer-2 \
-     --summary "unbounded subprocess wait"
+     --summary "unbounded subprocess wait" --session-id review-session-1
    canon gate promote
    # ... fix, commit ...
    canon finding close --change-id c-demo --round 1 --seq 1 \
@@ -33,14 +33,17 @@ The order an agent follows to claim a subject done:
    canon gate promote
    ```
 
-3. **One Review per scenario**, by someone other than the evidence actor:
+3. **One Review per scenario**, by someone other than the evidence actor,
+   from a session other than the one that attested the evidence:
 
    ```bash
    canon review add --project-id root --scenario-id world.demo.01 \
      --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer \
+     --session-id review-session-1 \
      --pin "$(git rev-parse HEAD)" --upstream-ref "pr#41"
-   canon gate promote
    ```
+
+   `review add` writes directly; there is nothing to promote.
 
 4. **Move the subject**: `canon subject status <id> verifying`, later
    `shipped`. See `canon-subject`.
@@ -57,15 +60,27 @@ work collapsed into one identity.
 canon finding add --change-id <c> --round <n> --seq <n> \
   --severity blocker|should-fix|note --disposition open \
   --reviewer <who> --summary "<one line>" \
-  [--reviewed-sha <sha>] [--file-ref path/to/file.rs:120-134] [--actor-id <id>]
+  [--reviewed-sha <sha>] [--file-ref path/to/file.rs:120-134] [--actor-id <id>] [--session-id <id>]
 canon finding close --change-id <c> --round <n> --seq <n> \
-  --disposition fixed --resolution-sha <sha>     # or rejected / deferred / open
+  --disposition fixed --resolution-sha <sha> [--session-id <id>]   # or rejected / deferred / open
 ```
 
-Both stage a candidate; `canon gate promote` commits it. `finding close`
+Both stage a candidate; `canon gate promote` commits it, and both say so
+(``… — run `canon gate promote` to commit it``). `finding close`
 changes only the disposition (and `resolution_sha` with it); severity,
 reviewer, summary, and refs are copied from the committed record. It
-appends a second version at the same natural key — the first stays.
+appends a second version at the same natural key — the first stays. Its
+`--actor-id` and `--session-id` name who authored the transition; the
+raiser's stay on the first version.
+
+### A defect the author found in its own work
+
+Record it like any other finding, with `--reviewer` and `--actor-id` set
+to the author's own id. Nothing refuses a finding whose reviewer is also
+the implementer, and an open `blocker` the author raised blocks under
+`block_on_findings` exactly like a reviewer's. `--introduced-by` names the
+commit that introduced the defect, not who found it: `--introduced-by self`
+is a usage error (exit 2) that points at `--reviewer`.
 
 ### Severities
 
@@ -98,15 +113,23 @@ fixed finding reopened with `--disposition open` counts as open again.
 ```bash
 canon review add --project-id <root-id> --scenario-id <id> \
   --reviewer <who> --pin <sha-or-ref> --role <role> \
-  (--upstream-ref <ref> | --original-spec-ref <ref>) [--actor-id <id>]
+  (--upstream-ref <ref> | --original-spec-ref <ref>) [--actor-id <id>] [--session-id <id>]
 ```
 
 One attributed Review record for one scenario, joined on
 `(project_id, scenario_id)` — both are required because two spec roots
 may carry the same scenario id. Exactly one provenance ref is required.
-`--actor-id` defaults to `canon`. A Review carries no verdict; the
-`verifying → shipped` ship gate still refuses missing or `Divergent`
-evidence verdicts on its own. Commit with `canon gate promote`.
+`--actor-id` defaults to `canon`; `--session-id` fills `actor.session_id`.
+A Review carries no verdict; the `verifying → shipped` ship gate still
+refuses missing or `Divergent` evidence verdicts on its own. It is
+written directly to the ledger, with no staging step, and says so:
+`canon review add: wrote <path> (new) — written directly; nothing to
+promote`.
+
+`--session-id` (on `evidence add`, `review add`, `finding add` and
+`finding close`) takes one opaque token: non-empty, no surrounding
+whitespace, no control characters. Anything else is a usage error
+(exit 2) and nothing is written.
 
 ## The `require_review` policy (opt-in)
 
@@ -129,8 +152,11 @@ spec_coverage:
   scenarios from review.
 - **`distinct_actor`** — a review only counts when both its `reviewer`
   and its actor (`--actor-id`) differ from every actor on that
-  scenario's evidence records. An agent cannot review its own attested
-  work.
+  scenario's evidence records, and, when the review carries a session,
+  that session differs from every session on those evidence records. An
+  agent cannot review its own attested work, under another id or from
+  the same session. A record with no session never matches one, so
+  records written before sessions were recorded count by actor alone.
 - **`block_on_findings`** — fail on open blocker findings (below).
 
 A malformed `require_review` (an unknown key, an unknown status, `null`,
@@ -138,7 +164,8 @@ a non-mapping) poisons the whole `spec_coverage` section: `canon gate
 check` reports it invalid rather than treating it as off, the same as a
 malformed `require_cases`.
 
-Canon's own `.canon/policy.yaml` does not enable `require_review`.
+Canon's own `.canon/policy.yaml` enables `require_review: {}`, and so does
+the starter policy `canon init` writes.
 
 ## How it meets the gate
 
@@ -154,6 +181,13 @@ or, when the only reviews are self-reviews:
 
 ```
 unreviewed-promotion world.demo.01 — every review of this scenario is by an actor that also attested its evidence (`impl-agent`); spec_coverage.require_review.distinct_actor wants a reviewer other than the evidence actor
+```
+
+or, when another actor id reviewed from a session that attested the
+evidence:
+
+```
+unreviewed-promotion world.demo.01 — every review of this scenario is by an actor that also attested its evidence (`impl-agent`) or from a session that did (`sess-impl`); spec_coverage.require_review.distinct_actor wants a reviewer other than the evidence actor, in a session other than any evidence session
 ```
 
 ### `open-blocker`
@@ -188,7 +222,7 @@ prints on stderr which review checks it ran or skipped:
 
 ```
 canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
-  ran unreviewed-promotion — every owned scenario needs a review by an actor other than its evidence actor
+  ran unreviewed-promotion — every owned scenario needs a review by an actor, and from a session, other than its evidence's
   ran open-blocker — 1 adopted change(s) checked for open blocker findings
 ```
 

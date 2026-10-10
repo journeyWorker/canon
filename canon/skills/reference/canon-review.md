@@ -164,7 +164,8 @@ a non-mapping) poisons the whole `spec_coverage` section: `canon gate
 check` reports it invalid rather than treating it as off, the same as a
 malformed `require_cases`.
 
-Canon's own `.canon/policy.yaml` does not enable `require_review`.
+Canon's own `.canon/policy.yaml` enables `require_review: {}`, and so does
+the starter policy `canon init` writes.
 
 ## How it meets the gate
 

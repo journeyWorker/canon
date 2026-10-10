@@ -135,7 +135,8 @@ what brings a scenario into that scope. See `canon-gate`.
 requires that the Subject OWNS at least one scenario (one whose latest
 synced generation carries `@subject:<id>`), and that EVERY owned
 scenario carries a latest, non-`Divergent` verdict in the ledger (the
-same last-wins rule `canon gate check` uses). With
+same last-wins rule `canon gate check` uses; a record keyed by both a
+task and the scenario counts for the scenario). With
 `spec_coverage.require_cases` set, every feature surface the Subject
 owns must also carry a scenario of each required `@case:` (e.g. one
 `@case:failure`) — attested golden-path scenarios alone do not ship. A
@@ -152,7 +153,7 @@ prints on stderr which it ran or skipped:
 
 ```
 canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
-  ran unreviewed-promotion — every owned scenario needs a review by an actor other than its evidence actor
+  ran unreviewed-promotion — every owned scenario needs a review by an actor, and from a session, other than its evidence's
   ran open-blocker — 1 adopted change(s) checked for open blocker findings
 ```
 
@@ -204,7 +205,143 @@ canon subject adopt subject-domain-loop-plan \
 
 `adopt` stamps the change's `subject_id` and adds it to the Subject's
 `change_ids`, so `canon query --kind change --change-id …` and `canon
-query --kind subject` agree on the link from both ends.
+query --kind subject` agree on the link from both ends. It writes only
+the side that lacks the link, so rerunning it on a linked pair writes
+nothing and exits `0`.
+
+The two records cannot be written atomically, so the subject is written
+first: its `change_ids` is what the gate reads a subject's adopted
+changes from (`open-blocker`, the status guard), so a half-done adoption
+still has that change's open blockers counted. If the change write then
+fails, `adopt` exits `2`, names the subject that now lists the change,
+and prints `canon subject adopt <change_id> --subject <id>` to complete
+it.
+
+### Starting a new change: `canon change new`
+
+For a change that does not exist yet, one command scaffolds it and
+records it adopted:
+
+```bash
+canon change new add-login --subject auth --title "Add login"
+```
+
+- **Writes** `openspec/changes/<slug>/proposal.md` (the title is its
+  `## Why`, which imports as the change summary) and `tasks.md` (no rows
+  yet, so the change imports as `proposed`), under the repo's first
+  `openspec` plans source. `canon init` configures that source
+  (`{dialect: openspec, root: .}`), so `canon.yaml` needs no edit.
+- **Reads** the files with the same `openspec` adapter `canon ingest
+  plans` uses, then **records** the change already adopted, through the
+  same write as `canon subject adopt`.
+- **What a failure leaves behind.** The files are staged under `.canon/`
+  and the change dir is moved into place only once they parse. A failure
+  before any record is written (staging, publishing the dir, or the
+  first record write) removes the change dir, the staged files and any
+  directory created for them: nothing is left behind. The two records
+  cannot be written atomically. If the change record fails after the
+  subject record was written, the command exits `2`, keeps the change
+  dir and that one subject record, and prints the repair, `canon ingest
+  plans && canon subject adopt <slug> --subject <id>`, which completes
+  the link and is safe to rerun.
+- **Refuses** with exit `2`, writing nothing, when the subject does not
+  exist, when the slug already has a change dir (active or archived) or a
+  `change` record, or when `canon.yaml` has no `openspec` plans source.
+
+Add task rows to `tasks.md` as `- [ ] <n> <title>`, rerun `canon ingest
+plans`, and flip each with `canon gate task <slug>#<n>` once evidence
+exists.
+
+## Where are we: `canon status`
+
+```bash
+canon status                 # subjects by status, their gaps, next commands
+canon status --json          # the same report, stable shape
+canon status --repo ../other
+```
+
+A read: it always exits 0 and writes nothing (no ledger record, no
+`.canon/audit` line). Every count comes from the joins the gate itself
+uses, so status and the gate cannot disagree about a gap:
+
+- **Header** — the canon version, and the policy in force:
+  `spec_coverage` (with `scope`/`exclude_lanes`), `require_cases` and
+  `require_review`. When `.canon/policy.yaml` is absent, unreadable, has
+  no `spec_coverage` section, or has an invalid one, a `warning:` line
+  says the gate requires no evidence, failure cases or review (or refuses
+  until it is fixed).
+- **Subjects grouped by status** (lifecycle order). Per subject:
+  scenarios it owns through `@subject:` (after `exclude_lanes`, which
+  are counted separately), how many carry a ledger verdict (the
+  `verifying → shipped` gate's reading; divergent ones are counted too),
+  how many carry a review that satisfies `require_review` (any review
+  when it is off; with `distinct_actor`, a self-review does not count),
+  open blocker findings on its adopted changes, and each feature surface
+  missing a `require_cases` case. `(N due)` marks reviews the next
+  transition will require.
+- **Unowned** — scenarios with no `@subject:` tag.
+- **`next:`** — at most five commands, each with a one-line reason; the
+  rest are counted. Rules, in order: no `canon.yaml` → `canon init`; an
+  unreadable one → `canon init --check-config`; a scenario tagged with a
+  subject that has no record → `canon subject new <that id>`; no subject
+  at all → `canon subject new`; subjects but no scenario records →
+  `canon inventory sync`. Then per subject, verifying first, then
+  building, specced, proposed, shipped: no scenario → `canon scenario new
+  … --subject <id>`; a missing case → `canon scenario new <surface>.<next
+  nn> … --case <case>`; (building and later) an unevidenced or divergent
+  scenario → `canon evidence add --scenario-id …`; an open blocker →
+  `canon finding close …`; a due, unreviewed, evidenced scenario →
+  `canon review add …` from another session; none of these →
+  `canon subject status <id> <next status>`. Last, unowned scenarios →
+  tag them and `canon inventory sync`. With more than one `specs.roots[]`
+  entry, every suggested `canon scenario new` carries `--project`: the
+  owning root for a missing case, `<root-id>` (the reason lists the
+  roots) for a subject that owns no scenario yet.
+
+Status fails closed rather than suggest progress the gate would refuse:
+
+- When `scenario`, `subject`, `review` or `finding` routes away from the
+  `local` rung (the only rung status and the gate read), its records
+  would read as empty. The only `next:` step is
+  `canon init --check-config`, with the reason naming the
+  `routing.<kind>: local` setting to restore.
+- When `spec_coverage` is present but unusable, `canon gate check`
+  refuses. The first `next:` step is `canon gate check`, with the reason
+  naming the section to fix, and no subject is suggested to move to its
+  next status until it parses.
+
+`--json` prints one object:
+
+```json
+{
+  "statusVersion": 1,
+  "canonVersion": "0.14.0",
+  "policy": { "present": true, "spec_coverage": { "require_evidence": true, "scope": [], "exclude_lanes": [], "require_cases": ["failure"], "require_review": { "scope": ["verifying", "shipped"], "distinct_actor": true, "block_on_findings": true } } },
+  "warnings": [],
+  "subjects": [
+    { "id": "cart", "title": "Cart", "status": "building", "scenarios": 2, "excluded": 0, "evidenced": 2, "divergent": 0,
+      "reviewed": 1, "reviewDue": true, "openBlockers": 1, "missingCases": [] }
+  ],
+  "unowned": ["cart.promo.01"],
+  "next": [
+    { "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha>", "why": "cart: 1 open blocker finding(s) (first: …); fix it, commit, then close it" },
+    { "command": "canon review add --project-id root --scenario-id cart.add.02 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref <feature file>", "why": "cart: 1 of 2 scenario(s) lack a qualifying review; …" },
+    { "command": "canon inventory sync", "why": "1 scenario(s) carry no @subject tag (first: cart.promo.01); …" }
+  ],
+  "nextOmitted": 0
+}
+```
+
+Each `missingCases` entry is `{ "projectId", "surface", "case" }`: the
+spec root, the `<area>.<surface>`, and the required case it lacks.
+
+`policy.spec_coverage` has the shape `canon context --json` prints
+(`null` when absent, `{"invalid": …}` when unusable). `statusVersion`
+changes only when a field changes meaning or is removed.
+
+`subject new`, `adopt` and `status` write their records directly; the
+human-readable success line ends `— written directly; nothing to
+promote` (`--json` prints the record and nothing else).
 
 ## Reading the per-domain management view
 
