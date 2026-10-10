@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-015-final",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T20:38:56.995234Z",
+  "change_id": "canon-0-15-final-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "06ff2029e95c5f1fa38b8c616b98447facbea672",
+  "reviewer": "canon-reviewer-015-final",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "release notes and plan D6 claimed status, context and gate check write the access audit; only query, export and purge do, by design"
+}
