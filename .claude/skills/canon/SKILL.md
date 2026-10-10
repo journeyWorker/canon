@@ -11,17 +11,19 @@ Use this single skill when working with Canon in a consumer repository. Canon's 
 
 ```bash
 canon init
-canon skills install                         # detects .claude/.codex/.omp/.pi; if none exists, installs Claude+Codex
+canon skills install                         # detects .claude/.agents|.codex/.omp/.pi; if none exists, installs Claude+Codex
 canon skills install --providers=claude,codex,omp,pi
 canon skills check                           # read-only drift check
 canon skills doctor                          # diagnostics; never deletes user files
 ```
 
 The canonical bundle is read-only. Claude receives
-`.claude/skills/canon/SKILL.md`; Codex receives the flattened
-`.codex/skills/canon.md`; OMP receives `.omp/skills/canon/SKILL.md`; and Pi
-receives `.pi/skills/canon/SKILL.md`. Every selected provider receives matching
-`reference/**` and `scripts/**` sidecars under its `canon` bundle. OMP and Pi
+`.claude/skills/canon/SKILL.md`; Codex receives
+`.agents/skills/canon/SKILL.md`; OMP receives `.omp/skills/canon/SKILL.md`; and
+Pi receives `.pi/skills/canon/SKILL.md`. Every selected provider receives
+matching `reference/**` and `scripts/**` sidecars under its `canon` bundle. A
+legacy `.codex/skills/canon*` projection from canon 0.13.0 or earlier is
+migrated by `canon skills install` and reported by `check`/`doctor`. OMP and Pi
 projections are project-local passive skill bundles: the
 `scripts/canon-retrieve-pre-dispatch.sh` file is available as a sidecar, not
 installed as a native hook. Load only the reference needed for the current

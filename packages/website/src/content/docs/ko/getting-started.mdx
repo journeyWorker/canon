@@ -128,12 +128,13 @@ canon gate check: clean (0 violations)
 
 레포에서 코딩 에이전트를 실행한다면, 하나의 canonical `canon` 스킬을
 선택한 provider의 레포 로컬 형식으로 투영해 설치합니다. Claude에는
-`.claude/skills/canon/SKILL.md`, Codex에는 `.codex/skills/canon.md`, OMP에는
+`.claude/skills/canon/SKILL.md`, Codex에는 `.agents/skills/canon/SKILL.md`
+(Codex는 `.codex/skills`가 아니라 `.agents/skills`를 탐색합니다), OMP에는
 `.omp/skills/canon/SKILL.md`, Pi에는 `.pi/skills/canon/SKILL.md`가 생성됩니다.
 OMP/Pi는 passive bundle이며 retrieve pre-dispatch 스크립트는 sidecar일 뿐
-native hook이 아닙니다. `--providers`를 생략하면 `.claude`/`.codex`/`.omp`/
-`.pi` root를 감지하고 아무 root도 없으면 Claude+Codex를 기본 선택합니다.
-투영 대상을 고정하려면 provider를 명시하세요:
+native hook이 아닙니다. `--providers`를 생략하면 `.claude`, `.agents` 또는
+`.codex`(Codex), `.omp`, `.pi` root를 감지하고 아무 root도 없으면
+Claude+Codex를 기본 선택합니다. 투영 대상을 고정하려면 provider를 명시하세요:
 
 ```bash
 # 네 provider에 하나의 canonical canon 스킬 투영
@@ -151,6 +152,13 @@ bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon re
 오래된 투영을 보고하고, `doctor`는 네 관리 root 전체의 provider·drift·legacy
 잔재를 진단하며 사용자 파일을 삭제하지 않습니다.
 
+canon 0.13.0 이하에서 업그레이드한다면: 이전 릴리스는 Codex 스킬을 Codex가
+읽지 않는 `.codex/skills/canon.md`에 썼습니다. `skills install`을 다시 실행하면
+canon 설치 lock의 해시와 바이트가 일치하는 legacy 파일만 제거하고,
+`.codex/skills` 아래에서 수정했거나 직접 작성한 파일은 남기며,
+`.codex/skills`는 비었을 때만 제거합니다. 남은 legacy 투영은 `check`와
+`doctor`가 마이그레이션 명령과 함께 알려 줍니다.
+
 전략은 팀 자신의 판정(verdict)에서 증류되며 기본적으로 quarantine됩니다.
 paired evaluation과 policy-pinned SSH approval 이후에만 활성화됩니다 —
 전체 플라이휠은 [전략 메모리](/ko/concepts/strategy-memory/)를
@@ -161,7 +169,7 @@ paired evaluation과 policy-pinned SSH approval 이후에만 활성화됩니다 
 
 canon 데이터는 레포 루트의 `canon.yaml`과 함께 단일 `.canon/` 디렉토리에
 보관됩니다. 프로젝트 로컬 skill 투영은 선택한 provider root
-(`.claude`, `.codex`, `.omp`, `.pi`)에도 생성됩니다. 완전히 되돌리려면
+(`.claude`, `.agents`, `.omp`, `.pi`)에도 생성됩니다. 완전히 되돌리려면
 `canon.yaml`, `.canon/`, 더 이상 필요하지 않은 skill root를 지우면 됩니다
 — 이것이 프로젝트 로컬 footprint의 전부입니다.
 

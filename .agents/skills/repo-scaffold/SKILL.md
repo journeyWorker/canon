@@ -1,6 +1,7 @@
-# repo-scaffold
-
-> How to extend canon's Rust workspace and Bun packaging scaffold — adding a crate to the Cargo workspace, adding a CI matrix target / platform package, and running the skill materializer. Use when adding a new crates/canon-* member, a new packages/core-<platform> platform package, a new CI matrix row, or running `canon skills install`.
+---
+name: repo-scaffold
+description: How to extend canon's Rust workspace and Bun packaging scaffold — adding a crate to the Cargo workspace, adding a CI matrix target / platform package, and running the skill materializer. Use when adding a new crates/canon-* member, a new packages/core-<platform> platform package, a new CI matrix row, or running `canon skills install`.
+---
 
 # repo-scaffold
 

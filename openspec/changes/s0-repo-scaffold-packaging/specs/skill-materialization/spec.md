@@ -11,23 +11,26 @@ individual `<name>/SKILL.md` files for developer-only compatibility.
   runs inside a consumer repo
 - **THEN** the consumer gains one Claude skill at
   `.claude/skills/canon/SKILL.md`, one Codex skill at
-  `.codex/skills/canon.md`, one OMP skill at
-  `.omp/skills/canon/SKILL.md`, and one Pi skill at
+  `.agents/skills/canon/SKILL.md` (Codex scans `.agents/skills` from the
+  working directory up to the repository root, never `.codex/skills`), one OMP
+  skill at `.omp/skills/canon/SKILL.md`, and one Pi skill at
   `.pi/skills/canon/SKILL.md`, plus matching `reference/**` and `scripts/**`
   sidecars under each selected provider's `canon` bundle
-- **AND** Claude, OMP, and Pi preserve the source frontmatter/body verbatim
+- **AND** every provider preserves the source frontmatter (`name`,
+  `description`) and body verbatim; no provider receives a flattened form
 - **AND** OMP/Pi projections are project-local passive bundles; the
   `canon-retrieve-pre-dispatch.sh` file is only a sidecar, not a native hook
 - **AND** no old per-topic user skill directory/file is generated
-- **AND** no `.agents/` or `.gemini/` file is created or modified.
+- **AND** no `.codex/` or `.gemini/` file is created or modified.
 
 #### Scenario: Provider selection and detection are deterministic
 - **WHEN** `--providers=claude,codex,omp,pi` is supplied, or when existing
-  `.claude`, `.codex`, `.omp`, and `.pi` targets are detected without the flag
+  `.claude`, `.agents` or `.codex`, `.omp`, and `.pi` targets are detected
+  without the flag (either `.agents` or `.codex` selects Codex)
 - **THEN** only the selected/detected providers are projected in stable enum
   order (`claude`, `codex`, `omp`, `pi`)
 - **AND** an invalid provider name fails before any target write.
-- **AND** when none of the four target roots exists, Claude and Codex are
+- **AND** when none of the provider markers exists, Claude and Codex are
   selected for backwards compatibility.
 
 ### Requirement: Canonical installation is target-owned and read-only at source
@@ -50,10 +53,34 @@ MUST NOT be overwritten.
 - **AND** `canon skills doctor` reports the missing/stale projection or legacy
   remnant without deleting user data.
 
+### Requirement: A legacy `.codex/skills` Codex projection is migrated
+Canon 0.13.0 and earlier projected Codex to a flattened
+`.codex/skills/canon.md` plus `.codex/skills/canon/**`. The installer SHALL
+remove exactly the legacy files the target manifest records whose bytes still
+match the recorded hash, and MUST keep every edited or unrecorded file.
+
+#### Scenario: Install migrates only what canon's install lock proves it wrote
+- **WHEN** `canon skills install` runs in a target whose manifest records a
+  legacy `.codex/skills` Codex projection
+- **THEN** each recorded legacy file whose bytes match its recorded hash is
+  removed, and each directory under `.codex/skills` (including `.codex/skills`
+  itself) is removed only if it ends up empty
+- **AND** an edited legacy file, an unrecorded file, and `.codex/` itself are
+  kept
+- **AND** a rerun reports unchanged.
+
+#### Scenario: A leftover legacy Codex projection is a reported remnant
+- **WHEN** `.codex/skills/canon.md` or `.codex/skills/canon/` remains
+- **THEN** `canon skills check` lists it as a legacy remnant with the fix
+  command (`canon skills install --providers=<selected>`) and exits non-zero
+- **AND** `canon skills doctor` reports it as `legacy-remnant` with the same
+  fix, deleting nothing.
+
 ### Requirement: Developer-only legacy materialization remains compatible
 - **WHEN** `canon skills install --source canon/skills-dev` runs
-- **THEN** it retains `.claude/skills/<name>/SKILL.md`, `.codex/skills/<name>.md`,
-  and the source-local legacy `.install-lock.json` behavior.
+- **THEN** it writes `.claude/skills/<name>/SKILL.md` and
+  `.agents/skills/<name>/SKILL.md` verbatim, and keeps the source-local legacy
+  `.install-lock.json` behavior.
 
 ### Requirement: Published npm packages resolve the canonical source
 The npm build SHALL package the canonical bundle under the CLI package's

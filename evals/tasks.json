@@ -142,7 +142,7 @@
       "setup_seed": {"files": [{"path": "projection.txt", "content": "canonical source and Claude view have drifted\n"}]},
       "expected_contract": {"checks": [{"name": "skills-tests", "kind": "command", "command": ["cargo", "test", "-p", "canon-cli", "--test", "skills_install"], "exit_code": 0}]},
       "allowed_diff_paths": ["canon/skills/**", ".claude/skills/**", "crates/canon-cli/src/skills.rs", "crates/canon-cli/tests/skills_install.rs"],
-      "forbidden_side_effects": {"paths": ["Cargo.lock", ".github/**", "target/**", ".env*", ".codex/**"]},
+      "forbidden_side_effects": {"paths": ["Cargo.lock", ".github/**", "target/**", ".env*", ".agents/**"]},
       "grader": {"command": ["cargo", "test", "-p", "canon-cli", "--test", "skills_install"], "exit_code": 0, "output_schema": {"type": "text"}},
       "required_evidence": [{"path": ".canon/evidence/projection-claude.json", "format": "json", "required_keys": ["status", "source_digest", "projection_digest", "commands"]}],
       "gate": {"evidence_path": ".canon/evidence/gate.json", "required_keys": ["status", "checks", "evidence"]}
@@ -153,7 +153,7 @@
       "instructions": "Materialize the canonical Canon guidance into the Codex projection and prove it is generated from the same source as the Claude view. Do not add provider-only policy text.",
       "setup_seed": {"files": [{"path": "projection.txt", "content": "Codex projection missing the latest gate contract\n"}]},
       "expected_contract": {"checks": [{"name": "skills-tests", "kind": "command", "command": ["cargo", "test", "-p", "canon-cli", "--test", "skills_install"], "exit_code": 0}]},
-      "allowed_diff_paths": ["canon/skills/**", ".codex/skills/**", "crates/canon-cli/src/skills.rs", "crates/canon-cli/tests/skills_install.rs"],
+      "allowed_diff_paths": ["canon/skills/**", ".agents/skills/**", "crates/canon-cli/src/skills.rs", "crates/canon-cli/tests/skills_install.rs"],
       "forbidden_side_effects": {"paths": ["Cargo.lock", ".github/**", "target/**", ".claude/**"]},
       "grader": {"command": ["cargo", "test", "-p", "canon-cli", "--test", "skills_install"], "exit_code": 0, "output_schema": {"type": "text"}},
       "required_evidence": [{"path": ".canon/evidence/projection-codex.json", "format": "json", "required_keys": ["status", "source_digest", "projection_digest", "commands"]}],
