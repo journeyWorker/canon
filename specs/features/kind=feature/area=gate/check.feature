@@ -206,3 +206,22 @@ Feature: gate check
     When the policy is resolved
     Then the whole spec_coverage section is invalid and names the problem
     And the gate reports it rather than skipping review
+
+  # canon: {"schema":1,"at":"2026-10-10T15:43:50Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.22
+  Scenario: A bound file whose bytes are gone from both the store and the working tree is stale evidence
+    Given a committed record bound to a report, whose stored blob is deleted
+    When the report is rewritten in the working tree
+    Then the gate exits 1 with stale-evidence for the scenario
+    And the line names the path, the recorded digest, the missing blob and the working tree's new digest
+
+  # canon: {"schema":1,"at":"2026-10-10T15:43:50Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.23
+  Scenario: An unstored binding the working tree still proves is an advisory, not a violation
+    Given a committed record bound to a report that has no stored blob
+    When the working-tree report still hashes to the recorded digest
+    Then the gate stays clean and lists the binding as unstored, pointing to canon evidence vault

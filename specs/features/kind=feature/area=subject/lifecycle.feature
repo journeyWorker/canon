@@ -194,3 +194,13 @@ Feature: subject lifecycle
     When a proposed subject is moved to specced
     Then the move succeeds
     And the guard reports both review checks as skipped because specced is not in its scope
+
+  # canon: {"schema":1,"at":"2026-10-10T15:43:50Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:edge
+  @subject.lifecycle.20
+  Scenario: One record keyed by a task and a scenario ships the scenario and still flips the task
+    Given a verifying subject owning one scenario, and a plan task
+    When one record keyed by both the task and the scenario is added and promoted
+    Then the subject ships, because the scenario cell has that record's faithful verdict
+    And the same record still flips the task's checkbox

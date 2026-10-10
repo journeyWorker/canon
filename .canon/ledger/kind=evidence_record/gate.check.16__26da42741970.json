@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:50:09.592929Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib policy::tests::evidence_binding_defaults_off_and_a_broken_section_is_invalid_not_off"
+  },
+  "evidence_note": {
+    "summary": "re-attested in 0.14: the bound nextest junit.xml it cited was never stored and is gone"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 22,
+  "scenario_id": "gate.check.16",
+  "schema": 1,
+  "staging_id": "9bc6836a0b39",
+  "verdict": "faithful"
+}
