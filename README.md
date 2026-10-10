@@ -76,6 +76,181 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.15.0 release
+
+Version 0.15.0 makes the evidence chain hold over time: a review counts only
+for what it saw, a re-attest cannot quietly drop proof, an external audit sits
+beside the declared result, a reviewer's failed run is visible, and the
+policy has an approver.
+
+**Why.** Two inputs. The 2026-10-09 research briefing
+(`docs/research/2026-10-09-canon-bard-weekly-briefing.md`) concludes that
+success scores, approval records and independent reviews can all silently
+turn false unless context, execution and evaluator are bound together; 0.15
+takes its TestJack-style audited outcome
+([arXiv:2610.10619](https://arxiv.org/abs/2610.10619)) and the reviewer half
+of the cross-provider review contract
+([arXiv:2610.10961](https://arxiv.org/abs/2610.10961)). Dogfood eval 2, the
+0.14 acceptance rerun, showed records going stale or vanishing unnoticed: a
+review kept counting after its scenario and evidence changed, a re-attest
+dropped bound files from checking, nobody was recorded as approving the
+policy, and a reviewer's failure looked like a review never run.
+
+**D1: reviews pin what they saw.** `canon review add` now computes and
+pins the reviewed scenario's digest and the ids and digests of its latest
+evidence records; the reviewer types neither. The scenario digest covers the
+scenario's own block and tags plus what it inherits (Feature tags, Feature
+Background, Rule and its Background), normalized, so editing a sibling
+scenario in the same `.feature` file leaves the review current. Under
+`require_review` a pinned review qualifies only while both pins match;
+otherwise the scenario is `unreviewed-promotion` with a "stale review"
+detail naming what changed (its spec or its evidence), and `canon status`
+counts stale reviews. Reviews written before 0.15 carry no pins: they keep
+qualifying, and `gate check`, `status` and the ship guard print one advisory
+naming their count (`N review(s) predate review pinning (0.15) …`). Reviews
+fold to the latest one per reviewer, so a reviewer's new review replaces
+their own earlier one, including a legacy one.
+
+**D4: reviewer outcome and runtime.** `review add` takes
+`--outcome signed|indeterminate|unavailable` (default `signed`) and
+optional `--reviewer-provider`, `--reviewer-model` and `--reviewer-harness`.
+Only a `signed` review qualifies; when a reviewer's latest review is
+`indeterminate` or `unavailable`, the gap says "no signed review" and names
+each reviewer's outcome, and `canon status` counts unsigned reviews.
+
+**D2: drop guard.** `canon evidence add` refuses (exit 2) a new latest
+record for a scenario that leaves out files the previous latest record
+bound, naming the missing paths. Re-bind them, or pass
+`--drop-attachment <path>` (repeatable) with `--drop-reason <text>`; the
+drop is recorded on the record and listed by `canon status`. Naming a path
+that was never bound is refused.
+
+**D3: audit evidence.** `canon evidence add --kind audit` records an
+external evaluator's re-check (`--evaluator-id`, `--evaluator-version`,
+`--evaluator-digest`, `--audit-result confirmed|refuted|indeterminate`, and
+counterexample `--report`s, bound and stored like any report) beside the
+declared record, never replacing it. `spec_coverage.require_audit: { rate,
+seed, scope }` samples deterministically: a scenario is sampled when the
+first 8 bytes of `sha256(seed \0 project_id \0 scenario_id)`, read
+big-endian, fall below `ceil(rate × 2^64)`; `scope` defaults to
+`[verifying, shipped]`. A sampled scenario whose latest audit is missing or
+indeterminate is `uncovered-cell`, and `canon status` lists audits sampled,
+confirmed, owed and refuted with the command to run. A latest `refuted`
+audit is the new tenth failure class, `false-success`: the ship guard
+refuses it even with `--override-reason`, and a later `faithful` declared
+record does not clear it. The re-audit command the gate and `status`
+suggest includes `--drop-attachment` for the refuted audit's
+counterexamples. canon never generates or runs audits; an external
+evaluator does, and canon records the result.
+
+**D5: policy approval.** `canon policy approve --by <who> [--note]` writes
+the tracked `.canon/policy.approval.json` with the policy digest, approver,
+time and note. `gate check` and `canon status` print an advisory while the
+policy is unapproved or has changed since approval; the exit code is
+unchanged. `canon init`'s starter policy is unapproved until a human runs
+the command, and `init` and the skill's stop point say so.
+
+**D6: small integrity fixes.**
+
+- `finding add` and `finding close` resolve short SHAs through git and store
+  the full SHA; a short SHA that names no commit is refused.
+- Read commands (`query`, `status`, `context`, `gate check`) write
+  `.canon/audit` only beside the `canon.yaml` they read, never into another
+  repo or one without `canon.yaml`. The stray tracked
+  `crates/canon-cli/.canon/audit/access.jsonl` was removed.
+- The skill tells an author to record defects they find in their own work
+  when they find them, before review, and that task evidence must bind the
+  artifact or report proving the task.
+- `canon gate task` warns when a task's evidence has no attachment and its
+  ref is a canon command.
+
+**Acceptance.** The eval-2 repo (`nyan-omp-014`) was rechecked on a copy
+with the 0.15 build: it stays clean with only the two advisories (33
+unpinned reviews, unapproved policy), and every D1–D5 rule refused, turned
+the gate red or printed its advisory as planned. The recheck found two
+defects, fixed before release: review pins were whole-file digests (now
+per-scenario) and the re-audit suggested after a refuted audit tripped the
+drop guard (now suggests `--drop-attachment`). Its remaining risk is that
+legacy reviews keep qualifying, so D1 and D4 bite in an upgraded repo only
+after re-review.
+
+*Migration:*
+
+- Reviews recorded before 0.15 keep counting, with an advisory naming how
+  many.
+- Re-review (`canon review add` by the same reviewer) to pin a scenario;
+  until then its spec and evidence can change without the review going
+  stale.
+- Have a human run `canon policy approve --by <who>` and commit
+  `.canon/policy.approval.json`.
+- Scripts that parsed the failure-class list now see ten classes
+  (`false-success` added).
+- A re-attest that binds fewer files than the previous record now needs
+  `--drop-attachment <path> --drop-reason <text>`.
+- Re-run `canon skills install` to project the updated skill.
+
+**Changed conformance expectations.** `version` and the `status-*` cases
+re-blessed for `canon 0.15.0` (including the new cases that print the
+version: `evidence-add-drop-attachment`, `gate-check-audit-false-success`,
+`gate-check-audit-sampling-fixed-seed`, `policy-approve-and-advisory`,
+`policy-approve-changed-advisory`, `review-pin-stale-spec`). Existing cases
+re-blessed:
+
+- `context-json-policy-summary` — the schema lists the new record fields
+  (`pins`, `scenario_digest`, `outcome`, `reviewer_provider|model|harness`,
+  `audit`, `attachment_drop`) and the `ReviewOutcome` enum.
+- `evidence-vault-reports-unstorable`, `evidence-vault-stores-unstored`,
+  `gate-check-artifact-stale-evidence`,
+  `gate-check-artifact-stored-survives-rewrite`,
+  `gate-check-artifact-tampered-blob`,
+  `gate-check-artifact-unstored-advisory`, `gate-check-clean`,
+  `gate-check-evidence-binding-malformed`, `gate-check-evidence-binding-off`,
+  `gate-check-evidence-binding-require`,
+  `gate-check-evidence-binding-require-report`,
+  `gate-check-evidence-binding-warn`, `gate-check-red-uncovered-cell`,
+  `gate-check-require-cases-golden-path`,
+  `gate-check-spec-coverage-unevidenced`, `gate-check-unknown-policy-key`,
+  `review-gate-unreviewed-refused`, `review-gate-override-recorded` — the
+  `policy not approved` advisory.
+- `review-gate-distinct-review-passes`, `review-gate-malformed-finding`,
+  `review-gate-open-blocker`, `review-gate-override-recorded`,
+  `review-gate-same-session-not-counted`,
+  `review-gate-self-review-not-counted`, `review-gate-unreviewed-refused`,
+  `finding-add-self-found-blocker` — the guard line now reads "a signed
+  review, current with the spec and evidence it pinned, by an actor, and
+  from a session, other than its evidence's"; cases with an unpinned review
+  add the legacy-review advisory (and `gate check` the policy advisory).
+- `review-gate-same-session-not-counted` — `review add` prints what it
+  pinned.
+- `init-scaffold-and-rerun`, `status-no-scenarios` — `init`'s policy line
+  names `canon policy approve --by <who>`.
+- `status-gaps`, `status-ship-ready`, `status-no-scenarios` — the policy
+  (and, in `status-gaps`, legacy-review) warnings; `--json` adds
+  `staleReviews` and `unsignedReviews`.
+
+New cases (the tamper suite, see `conformance/README.md`):
+`review-pin-stale-spec`, `review-pin-stale-evidence`,
+`evidence-add-drop-attachment`, `gate-check-audit-false-success`,
+`gate-check-audit-confirmed-clean`, `gate-check-audit-sampled-missing`,
+`gate-check-audit-sampling-fixed-seed`, `review-outcome-indeterminate-gap`,
+`review-outcome-unavailable-gap`, `policy-approve-and-advisory`,
+`policy-approve-changed-advisory`, `policy-approve-refused-no-policy`,
+`finding-add-refused-unresolvable-short-sha`,
+`gate-task-warns-canon-command-proof`. Every other case is unchanged.
+
+**Deferred to 0.16** (from the briefing):
+
+- Skill-resolution and supply-chain provenance
+  ([arXiv:2610.11647](https://arxiv.org/abs/2610.11647),
+  [arXiv:2610.11169](https://arxiv.org/abs/2610.11169)): needs a run-lineage
+  design dispatch consumers agree on.
+- Tool-operation policy results ([GitHub changelog](https://github.blog/changelog/2026-10-07-local-sandboxing-for-github-copilot-now-generally-available/)):
+  needs an adapter contract with a runtime that produces them.
+- Spec-graph/code divergence ([arXiv:2610.11725](https://arxiv.org/abs/2610.11725)):
+  large, and needs an external analyzer.
+- Review-quality scoreboard (ReviewBench, GitHub Blog): follows the
+  provenance work so its numbers are grounded.
+
 ## 0.14.0 release
 
 Version 0.14.0 teaches agents how to work with canon: the skill is a working
