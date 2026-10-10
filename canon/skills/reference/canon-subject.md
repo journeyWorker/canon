@@ -153,7 +153,7 @@ prints on stderr which it ran or skipped:
 
 ```
 canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
-  ran unreviewed-promotion — every owned scenario needs a review by an actor other than its evidence actor
+  ran unreviewed-promotion — every owned scenario needs a review by an actor, and from a session, other than its evidence's
   ran open-blocker — 1 adopted change(s) checked for open blocker findings
 ```
 
@@ -325,7 +325,7 @@ Status fails closed rather than suggest progress the gate would refuse:
   "unowned": ["cart.promo.01"],
   "next": [
     { "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha>", "why": "cart: 1 open blocker finding(s) (first: …); fix it, commit, then close it" },
-    { "command": "canon review add --project-id root --scenario-id cart.add.02 --reviewer <reviewer> --actor-id <reviewer> --role reviewer --pin <sha> --original-spec-ref <feature file>", "why": "cart: 1 of 2 scenario(s) lack a qualifying review; …" },
+    { "command": "canon review add --project-id root --scenario-id cart.add.02 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref <feature file>", "why": "cart: 1 of 2 scenario(s) lack a qualifying review; …" },
     { "command": "canon inventory sync", "why": "1 scenario(s) carry no @subject tag (first: cart.promo.01); …" }
   ],
   "nextOmitted": 0
@@ -338,6 +338,10 @@ spec root, the `<area>.<surface>`, and the required case it lacks.
 `policy.spec_coverage` has the shape `canon context --json` prints
 (`null` when absent, `{"invalid": …}` when unusable). `statusVersion`
 changes only when a field changes meaning or is removed.
+
+`subject new`, `adopt` and `status` write their records directly; the
+human-readable success line ends `— written directly; nothing to
+promote` (`--json` prints the record and nothing else).
 
 ## Reading the per-domain management view
 

@@ -12,7 +12,7 @@ use std::process::{Command, Output};
 
 use canon_model::{
     Actor, Change, ChangeId, ChangeStatus, Envelope, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, ProjectId, ProvenanceRef, RecordKind, Review,
-    RoleId, Scenario, ScenarioId, Sha, SpecDigest, Subject, SubjectId, SubjectStatus,
+    RoleId, Scenario, ScenarioId, SessionId, Sha, SpecDigest, Subject, SubjectId, SubjectStatus,
 };
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -482,11 +482,47 @@ fn write_policy(repo: &Path, yaml: &str) {
 /// with implementer evidence by `impl-agent` — the issue's own starting
 /// point: attested by its author, never reviewed.
 fn seed_attested_subject(repo: &Path) {
+    seed_attested_subject_in_session(repo, None);
+}
+
+/// [`seed_attested_subject`], with the evidence attested from `session`.
+fn seed_attested_subject_in_session(repo: &Path, session: Option<&str>) {
     seed_subject_with_changes(repo, "demo-subject", SubjectStatus::Building, &["world.demo.01"], &["c-demo"]);
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
+    let mut actor = Actor::new("impl-agent", RoleId::parse("implementer").unwrap());
+    if let Some(session) = session {
+        actor = actor.with_session(SessionId::parse(session).unwrap());
+    }
+    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor);
     let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("world.demo.01").unwrap()), None, EvidenceVerdict::Faithful)
         .with_project_id(ProjectId::parse("demo").unwrap());
     ledger(repo).write(&record).unwrap();
+}
+
+/// `canon review add` for `world.demo.01` by `actor`, from `session`.
+fn review_via_cli(repo: &Path, actor: &str, session: Option<&str>) -> Output {
+    let pin = format!("pin-{actor}-{}", session.unwrap_or("none"));
+    let mut args = vec![
+        "review",
+        "add",
+        "--project-id",
+        "demo",
+        "--scenario-id",
+        "world.demo.01",
+        "--reviewer",
+        actor,
+        "--pin",
+        pin.as_str(),
+        "--original-spec-ref",
+        "specs/demo.feature",
+        "--actor-id",
+        actor,
+        "--role",
+        "reviewer",
+    ];
+    if let Some(session) = session {
+        args.extend(["--session-id", session]);
+    }
+    run(repo, &args)
 }
 
 fn seed_review(repo: &Path, reviewer: &str, actor: &str) {
@@ -562,6 +598,115 @@ fn a_self_review_does_not_count_under_distinct_actor() {
     let err = stderr(&out);
     assert!(err.contains("`impl-agent`") && err.contains("distinct_actor"), "the detail must name the rule and the actor: {err}");
     assert_eq!(current_subject(dir.path())["status"], "building");
+}
+
+/// D6 (F11): a second actor id is a label the implementer can pick. The
+/// session is harder to fake by accident, so a review written from a
+/// session that also attested the evidence does not count, and the
+/// refusal names the session rule.
+#[test]
+fn a_review_from_the_evidence_session_does_not_count_under_distinct_actor() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject_in_session(dir.path(), Some("sess-impl"));
+
+    let out = review_via_cli(dir.path(), "reviewer-2", Some("sess-impl"));
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("— written directly; nothing to promote"), "review add must say it committed directly: {}", stdout(&out));
+    let review: Value = serde_json::from_slice(&std::fs::read(review_files(dir.path())[0].clone()).unwrap()).unwrap();
+    assert_eq!(review["actor"]["session_id"], "sess-impl", "--session-id fills actor.session_id: {review}");
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("every owned scenario needs a review by an actor, and from a session, other than its evidence's"), "{err}");
+    assert!(err.contains("(`sess-impl`)") && err.contains("in a session other than any evidence session"), "the detail must name the session rule: {err}");
+    assert_eq!(current_subject(dir.path())["status"], "building");
+
+    // The same reviewer from its own session counts.
+    assert!(review_via_cli(dir.path(), "reviewer-2", Some("sess-review")).status.success());
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+}
+
+/// Records written before sessions existed keep counting by actor: a
+/// session on one side only never matches.
+#[test]
+fn a_session_on_one_side_only_leaves_the_actor_rule_in_charge() {
+    for (evidence_session, review_session) in [(Some("sess-impl"), None), (None, Some("sess-impl"))] {
+        let dir = repo();
+        write_policy(dir.path(), REQUIRE_REVIEW);
+        seed_attested_subject_in_session(dir.path(), evidence_session);
+        assert!(review_via_cli(dir.path(), "reviewer-2", review_session).status.success());
+
+        let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+        assert!(out.status.success(), "evidence {evidence_session:?}, review {review_session:?}: {}", stderr(&out));
+    }
+}
+
+/// D6 (F12): the author records a defect it found in its own work. No
+/// guard treats that finding as illegitimate, and an open blocker the
+/// author raised blocks exactly like one a reviewer raised.
+#[test]
+fn a_blocker_the_author_found_in_its_own_work_is_accepted_and_still_blocks() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject(dir.path());
+    seed_review(dir.path(), "reviewer-2", "reviewer-2");
+
+    let out = run(
+        dir.path(),
+        &[
+            "finding",
+            "add",
+            "--change-id",
+            "c-demo",
+            "--round",
+            "1",
+            "--seq",
+            "1",
+            "--severity",
+            "blocker",
+            "--reviewer",
+            "impl-agent",
+            "--summary",
+            "restart leaves the old timer running",
+            "--actor-id",
+            "impl-agent",
+            "--role",
+            "implementer",
+            "--session-id",
+            "sess-impl",
+        ],
+    );
+    assert!(out.status.success(), "an author-raised finding must be accepted: {}", stderr(&out));
+    assert!(stdout(&out).contains("— run `canon gate promote` to commit it"), "{}", stdout(&out));
+    let out = run(dir.path(), &["gate", "promote"]);
+    assert!(out.status.success(), "the author's finding must promote: {}{}", stdout(&out), stderr(&out));
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("open-blocker c-demo#1.1 — building → verifying: open blocker finding by `impl-agent`"), "{}", stderr(&out));
+    assert_eq!(current_subject(dir.path())["status"], "building");
+
+    let gate = run(dir.path(), &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(0), "the subject never reached review scope, so the gate has nothing to report: {}", stdout(&gate));
+}
+
+fn review_files(repo: &Path) -> Vec<std::path::PathBuf> {
+    let mut files = Vec::new();
+    let mut stack = vec![repo.join(".canon/ledger/kind=review")];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                files.push(path);
+            }
+        }
+    }
+    files
 }
 
 #[test]
@@ -707,7 +852,7 @@ fn an_absent_require_review_is_byte_identical() {
     };
     let plain = outputs(false);
     assert_eq!(plain.0, Some(0));
-    assert_eq!(plain.1, "canon subject status: demo-subject → verifying\n");
+    assert_eq!(plain.1, "canon subject status: demo-subject → verifying — written directly; nothing to promote\n");
     assert_eq!(plain.2, "", "no guard output without the policy");
     assert_eq!(plain.4, "canon gate check: clean (0 violations)\n");
     assert!(!plain.5);

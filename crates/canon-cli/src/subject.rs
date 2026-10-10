@@ -225,7 +225,13 @@ fn report_subject(subject: &Subject, verb: &str, json: bool) {
         // contract's "`--json` emits the updated record".
         println!("{}", serde_json::to_string_pretty(subject).unwrap_or_default());
     } else {
-        println!("canon subject {verb}: {} ({}, {})", subject.subject_id.as_str(), subject.domain, status_str(subject.status));
+        println!(
+            "canon subject {verb}: {} ({}, {}) — {}",
+            subject.subject_id.as_str(),
+            subject.domain,
+            status_str(subject.status),
+            crate::write_mode::DIRECT
+        );
     }
 }
 
@@ -368,7 +374,12 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
             if json {
                 report_subject(&subject, "adopt", true);
             } else if wrote {
-                println!("canon subject adopt: linked change `{}` to subject `{}`", change_id.as_str(), subject_id.as_str());
+                println!(
+                    "canon subject adopt: linked change `{}` to subject `{}` — {}",
+                    change_id.as_str(),
+                    subject_id.as_str(),
+                    crate::write_mode::DIRECT
+                );
             } else {
                 println!("canon subject adopt: change `{}` is already linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str());
             }
@@ -626,7 +637,7 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
             if json {
                 report_subject(&subject, "status", true);
             } else {
-                println!("canon subject status: {} → {}", subject_id.as_str(), status_str(target));
+                println!("canon subject status: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT);
             }
             0
         }
@@ -656,7 +667,7 @@ fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: Subje
         eprintln!("canon subject status:   skipped open-blocker — `{}` is not in require_review.scope", status_str(to));
         return;
     }
-    let rule = if rr.distinct_actor { "a review by an actor other than its evidence actor" } else { "a review record" };
+    let rule = if rr.distinct_actor { "a review by an actor, and from a session, other than its evidence's" } else { "a review record" };
     eprintln!("canon subject status:   ran unreviewed-promotion — every owned scenario needs {rule}");
     if rr.block_on_findings {
         eprintln!("canon subject status:   ran open-blocker — {changes} adopted change(s) checked for open blocker findings");

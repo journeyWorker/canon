@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-k4",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T16:30:55.377183Z",
+  "change_id": "canon-0-14-k4-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "9a0050d00d8fe1cf06ebd8631abeb7756a604c15",
+  "reviewer": "canon-reviewer-k4",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "plan D6 said to accept --introduced-by self; the slice refuses it. Rejected: introduced_by is the introducing commit SHA read by the fix-of-fix count, so self-found defects use finding add --reviewer <me> (plan amended in ac609d0e)"
+}

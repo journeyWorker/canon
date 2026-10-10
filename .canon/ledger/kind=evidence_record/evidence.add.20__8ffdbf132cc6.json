@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T16:03:06.068222Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test sessions a_session_id_outside_the_grammar_is_refused_and_nothing_is_written"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 23,
+  "scenario_id": "evidence.add.20",
+  "schema": 1,
+  "staging_id": "925bd9fa6bc9",
+  "verdict": "faithful"
+}

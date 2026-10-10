@@ -115,10 +115,14 @@ spec_coverage:
 Every scenario whose subject is in `require_review.scope` (independent of
 `spec_coverage.scope`; `exclude_lanes` still exempts) needs a `Review`
 record — `canon review add --project-id <root> --scenario-id <id>
---reviewer <who> --role reviewer --pin <sha> --upstream-ref <ref>`, then
-`canon gate promote`. With `distinct_actor`, both the review's `reviewer` and its
-actor must differ from every actor on that scenario's evidence, so an
-agent cannot review its own work. A missing or self-only review is
+--reviewer <who> --role reviewer --pin <sha> --upstream-ref <ref>
+--session-id <session>`, which writes directly (there is nothing to promote).
+With `distinct_actor`, both the review's `reviewer` and its actor must differ
+from every actor on that scenario's evidence, and a review that carries a
+session must come from a session other than any evidence session
+(`evidence add --session-id`), so an agent cannot review its own work under
+another id. A record without a session never matches one, so older records
+count by actor alone. A missing or self-only review is
 `unreviewed-promotion`. A review carries no verdict; the ship gate still
 checks verdicts.
 

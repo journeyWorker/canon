@@ -211,9 +211,9 @@ fn status_next_names_the_command_for_each_gap() {
         commands(&report),
         [
             "canon scenario new world.demo.03 --title \"<what happens on this path>\" --subject demo-subject --case failure",
-            "canon evidence add --scenario-id world.demo.02 --project-id demo --kind test-run --role implementer --verdict faithful --ref \"<test command>\"",
+            "canon evidence add --scenario-id world.demo.02 --project-id demo --kind test-run --role implementer --session-id <session> --verdict faithful --ref \"<test command>\"",
             "canon finding close --change-id c-demo --round 1 --seq 1 --disposition fixed --resolution-sha <sha>",
-            "canon review add --project-id demo --scenario-id world.demo.01 --reviewer <reviewer> --actor-id <reviewer> --role reviewer --pin <sha> --original-spec-ref <feature file>",
+            "canon review add --project-id demo --scenario-id world.demo.01 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref <feature file>",
             "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject empty-subject --case happy",
         ]
     );

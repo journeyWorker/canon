@@ -93,3 +93,33 @@ Feature: finding add
     And it states that canon never resolves or reads the commits the record cites, never verifies or guesses the introducing commit, and gates nothing here
     And it admits the author and the beneficiary are the same party
     And it still names what the record is good for: attribution, and a count that stops being typed from memory
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.add.10
+  Scenario: A defect the author found in its own work is accepted and blocks like a reviewer's
+    Given a subject whose evidence the author attested and an independent review
+    When the author raises an open blocker against its own change with --reviewer set to itself
+    Then the finding is staged and promotes like any other
+    And the subject cannot enter verifying while that blocker is open
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:37Z","actor":{"agent_id":"canon"}}
+  @subject:finding-lifecycle
+  @case:failure
+  @finding.add.11
+  Scenario: An introduced-by of self is refused, pointing at the reviewer flag
+    Given an author recording a defect it found itself
+    When it passes --introduced-by self
+    Then the command exits 2, saying --introduced-by names a commit and pointing at --reviewer
+    And nothing is staged
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:37Z","actor":{"agent_id":"canon"}}
+  @subject:finding-lifecycle
+  @case:failure
+  @finding.add.12
+  Scenario: A finding session id outside the SessionId grammar is refused
+    Given a session id with surrounding whitespace
+    When finding add is run with it
+    Then the command exits 2 naming --session-id and the SessionId grammar
+    And nothing is staged

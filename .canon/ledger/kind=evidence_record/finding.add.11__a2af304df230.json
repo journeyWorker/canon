@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T16:03:06.187489Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test finding finding_add_refuses_introduced_by_self_and_points_at_reviewer"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 11,
+  "scenario_id": "finding.add.11",
+  "schema": 1,
+  "staging_id": "302329417eca",
+  "verdict": "faithful"
+}

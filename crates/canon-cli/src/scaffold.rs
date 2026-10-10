@@ -396,7 +396,7 @@ pub fn run_scenario_new(
         eprintln!("canon scenario new: failed to write `{}`: {e}", feature_path.display());
         return 2;
     }
-    println!("canon scenario new: wrote `@{}` to {}", tag.as_str(), feature_path.display());
+    println!("canon scenario new: wrote `@{}` to {} — {}", tag.as_str(), feature_path.display(), crate::write_mode::DIRECT);
     0
 }
 
@@ -479,7 +479,7 @@ pub fn run_feature_new(
     match fs::OpenOptions::new().write(true).create_new(true).open(&feature_path) {
         Ok(mut file) => match file.write_all(content.as_bytes()) {
             Ok(()) => {
-                println!("canon feature new: wrote {}", feature_path.display());
+                println!("canon feature new: wrote {} — {}", feature_path.display(), crate::write_mode::DIRECT);
                 println!(
                     "canon feature new: next: `canon scenario new {}.{}.01 --title '<label>'{project_hint} [--feature <path>]` to make it fmt-clean",
                     area_surface.area, area_surface.surface

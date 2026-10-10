@@ -114,7 +114,7 @@ pub fn run_stage(
 
     match stage_divergence(&staging_dir, &candidate) {
         Ok(path) => {
-            println!("canon divergence stage: wrote {}", path.display());
+            println!("canon divergence stage: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
             0
         }
         Err(e) => {
@@ -194,7 +194,7 @@ fn run_commit(
 
     match commit_divergence(&candidate, &committed) {
         Ok(Ok(promoted)) => {
-            println!("canon divergence {verb}: committed {} -> {}", promoted.label(), promoted.target.display());
+            println!("canon divergence {verb}: committed {} -> {} — {}", promoted.label(), promoted.target.display(), crate::write_mode::DIRECT);
             0
         }
         Ok(Err(refused)) => {

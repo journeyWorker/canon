@@ -1,3 +1,3 @@
 canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
-canon subject status:   ran unreviewed-promotion — every owned scenario needs a review by an actor other than its evidence actor
+canon subject status:   ran unreviewed-promotion — every owned scenario needs a review by an actor, and from a session, other than its evidence's
 canon subject status:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
