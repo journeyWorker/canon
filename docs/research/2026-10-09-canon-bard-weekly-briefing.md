@@ -11,8 +11,8 @@
 | 3 | [arXiv:2610.12269](https://arxiv.org/abs/2610.12269) | mini-swe-agent +25.33%(76개 추가 해결), Moatless +15.67% | 검사 빈도를 조절한다는 설명은 초록에서 찾지 못했다. |
 | 4 | [arXiv:2610.11725](https://arxiv.org/abs/2610.11725) | 독립 스위치 세 개(draft gate, breaking-change delegation, run mode)와 project floor 두 방식을 조합해 18가지 운영 방식 | 없음 |
 | 5 | [arXiv:2610.11169](https://arxiv.org/abs/2610.11169) | 스킬 채택 2,193,119건. 복사 네트워크 기준 상위 100개 저장소를 검토하면 이후 고위험 스킬 채택의 14.9%를 막는다. 별점 상위 100개는 0.5%. | 없음 |
-| 6 | [GitHub Blog](https://github.blog/ai-and-ml/github-copilot/reviewbench-an-open-benchmark-for-ai-code-review/) | (대조 중) | |
-| 7 | [GitHub Changelog](https://github.blog/changelog/2026-10-07-local-sandboxing-for-github-copilot-now-generally-available/) | (대조 중) | |
+| 6 | [GitHub Blog](https://github.blog/ai-and-ml/github-copilot/reviewbench-an-open-benchmark-for-ai-code-review/), [review-bench.ai](https://review-bench.ai/) | PR 103.9M개 분석. PR 219개, 저장소 187개, 언어 19개. golden set은 사람 리뷰, frontier LLM, 정적 분석(그리고 작성자의 후속 커밋에서 추론한 이슈)을 합쳐 만든다. 시니어 엔지니어 재라벨링 일치율 96.6%. 지표는 grounded와 augmented 두 계열이고, 계열마다 precision·recall·F1이 있다. dataset, judge, matcher에는 평가마다 버전을 붙인다. 온라인 A/B 결과: addressed rate +8.0%, recall +13.6%, cost per review −8.0%, 댓글량 +61%. critical 댓글 증가는 오프라인 예측 227%, 온라인 실측 262%. | 브리핑은 "지표 4개"라고 했지만 원문은 계열 2개에 지표 6개다. recall의 온라인 대응 지표는 "추가로 필요했던 사람 리뷰의 양"이다. |
+| 7 | [GitHub Changelog](https://github.blog/changelog/2026-10-07-local-sandboxing-for-github-copilot-now-generally-available/) | Copilot CLI, Copilot 앱, VS Code Agent Host에서 GA. 정책 하나를 [Microsoft eXecution Container (MXC)](https://github.com/microsoft/mxc)가 Windows·macOS·Linux 네이티브 통제로 변환한다. 통제 범위는 파일시스템, 인터넷, 로컬 네트워크, Git·GitHub CLI 자격증명이다. 지원되는 경우 로컬 MCP와 language server에도 적용된다. 엔터프라이즈 정책으로 강제하면 개발자가 약화할 수 없다. 원문: "Model execution and tool isolation are separate concerns." | 없음 |
 | 8 | [arXiv:2610.10961](https://arxiv.org/abs/2610.10961) | paired development turn 20건 가운데 8건에서 material finding (95% 정확 신뢰구간 19.1–63.9%) | 없음 |
 
 같은 대화에서 인용됐지만 브리핑 본문에는 들어가지 않은 관련 원문:
