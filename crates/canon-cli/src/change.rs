@@ -207,6 +207,10 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, title: &str
     for name in ["proposal.md", "tasks.md"] {
         println!("canon change new: wrote {}", display_rel(&dir.join(name), &repo));
     }
-    println!("canon change new: recorded change `{}` adopted into subject `{}`", slug.as_str(), subject_id.as_str());
+    println!(
+        "canon change new: recorded change `{}` adopted into subject `{}` — written directly; nothing to promote",
+        slug.as_str(),
+        subject_id.as_str()
+    );
     0
 }
