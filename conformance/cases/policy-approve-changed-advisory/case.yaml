@@ -1,0 +1,10 @@
+description: "0.15 D5 tamper: a policy edited after its approval (`.canon/policy.approval.json` records `alice` approving the digest of `require_evidence: true`, the file now says `false`) is a `policy changed since approval` advisory naming the current and the approved digest in `canon gate check` and `canon status`, never a violation (exit 0); `canon policy approve --by <who>` re-approves the current bytes (exit 0) and the advisory is gone"
+steps:
+  - args: [gate, check]
+    exit: 0
+  - args: [status]
+    exit: 0
+  - args: [policy, approve, --by, bob, --note, re-approved after the require_evidence change]
+    exit: 0
+  - args: [gate, check]
+    exit: 0

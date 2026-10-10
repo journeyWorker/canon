@@ -1,0 +1,8 @@
+description: "0.15 D4 tamper: under `require_review: {scope: []}` a review recorded with `--outcome unavailable` (the reviewer could not run) is written (exit 0) but is a gap, never an approval: `canon gate check` exits 1 with `unreviewed-promotion` naming the unavailable review, and `canon subject status <id> verifying` refuses (exit 1)"
+steps:
+  - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --reviewer, reviewer-2, --pin, r1, --original-spec-ref, specs/features/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review, --outcome, unavailable, --reviewer-provider, anthropic, --reviewer-model, claude-x, --reviewer-harness, omp]
+    exit: 0
+  - args: [gate, check]
+    exit: 1
+  - args: [subject, status, cart, verifying]
+    exit: 1
