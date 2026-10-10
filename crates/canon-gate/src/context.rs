@@ -138,7 +138,15 @@ fn load_tier_policy(repo: &Path) -> Result<Option<canon_store::policy::TierPolic
 pub struct GateContext {
     pub ctx: GateCtx,
     pub policy: PolicyResolution,
+    /// DECLARED evidence only: every well-formed record that is not an
+    /// audit. Every declared fold (`crate::latest_verdicts`, coverage,
+    /// staleness, risk, trust, the task flip) reads this, so an audit can
+    /// never become a scenario's latest declared verdict.
     pub evidence: Vec<EvidenceRecord>,
+    /// AUDITED outcomes (0.15 D3): every well-formed record carrying
+    /// `audit` (`canon evidence add --kind audit`), split out of
+    /// `evidence` at load. Read by `crate::audit` only.
+    pub audits: Vec<EvidenceRecord>,
     /// The spec corpus `canon inventory sync` materializes — the
     /// enumeration side of a coverage question `evidence` structurally
     /// cannot answer. Grouping evidence can only ever surface artifacts
@@ -215,7 +223,8 @@ impl GateContext {
 
         let tier = GitTier::new(&ctx.ledger_root);
         let read = tier.read(&TierQuery::kind(RecordKind::EvidenceRecord))?;
-        let (evidence, validation_violations) = validate_evidence_batch(&read.records);
+        let (records, validation_violations) = validate_evidence_batch(&read.records);
+        let (audits, evidence): (Vec<EvidenceRecord>, Vec<EvidenceRecord>) = records.into_iter().partition(EvidenceRecord::is_audit);
 
         let mut violations = read.violations;
         violations.extend(validation_violations);
@@ -228,7 +237,7 @@ impl GateContext {
         let findings = read_corpus_kind(&tier, RecordKind::Finding, &mut corpus_violations)?;
         let unreadable_kinds = unreadable_corpus_kinds(&ctx.repo)?;
 
-        Ok(Self { ctx, policy, evidence, scenarios, divergences, subjects, reviews, findings, violations, corpus_violations, unreadable_kinds, now })
+        Ok(Self { ctx, policy, evidence, audits, scenarios, divergences, subjects, reviews, findings, violations, corpus_violations, unreadable_kinds, now })
     }
 }
 

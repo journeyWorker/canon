@@ -1,0 +1,5 @@
+# canon gate selftest fixture — false-success (0.15 D3).
+# A scenario's latest audit record is `refuted`, beside a declared
+# `faithful` record for the same scenario: the declared verdict does not
+# override the audit. No policy: the class is always on.
+false-success selftest.false-success.01

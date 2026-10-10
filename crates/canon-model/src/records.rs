@@ -1034,6 +1034,60 @@ where
     Ok(s)
 }
 
+/// What an external evaluator concluded when it re-audited a scenario's
+/// declared success (0.15 D3). `Indeterminate` is a real outcome — the
+/// evaluator ran and could not decide — never an approval.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuditResult {
+    /// The evaluator re-checked the requirement and the declared success holds.
+    Confirmed,
+    /// The evaluator found the declared success false (a counterexample).
+    Refuted,
+    /// The evaluator ran but could not decide either way.
+    Indeterminate,
+}
+
+impl AuditResult {
+    /// This result's wire string — the value `#[serde(rename_all =
+    /// "kebab-case")]` produces, exposed for diagnostics.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuditResult::Confirmed => "confirmed",
+            AuditResult::Refuted => "refuted",
+            AuditResult::Indeterminate => "indeterminate",
+        }
+    }
+}
+
+/// An external evaluator's re-audit of a scenario (0.15 D3), carried on
+/// an [`EvidenceRecord`] written by `canon evidence add --kind audit`.
+/// Canon never generates or runs the audit; it records which evaluator
+/// ran (id, version, and the sha256 of the evaluator itself) and what it
+/// concluded. A record carrying this is an AUDITED outcome and is folded
+/// apart from declared evidence: it never becomes a scenario's latest
+/// declared verdict.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct EvidenceAudit {
+    pub evaluator_id: String,
+    pub evaluator_version: String,
+    /// 64 lowercase hex characters: sha256 of the evaluator (its binary,
+    /// image, or prompt bundle), as the evaluator's operator reports it.
+    #[serde(deserialize_with = "deserialize_sha256_hex")]
+    pub evaluator_digest: String,
+    pub result: AuditResult,
+}
+
+/// Files a re-attestation deliberately stopped binding (0.15 D2): the
+/// repository-relative paths the scenario's previous latest record bound
+/// and this record does not, and the author's one-line reason. Without
+/// it `canon evidence add` refuses a record that would drop them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AttachmentDrop {
+    pub paths: Vec<String>,
+    pub reason: String,
+}
+
 /// The evidence-integrity spec's own record kind: the candidate shape
 /// [`crate::evidence::validate_evidence`] validates. Carries whichever
 /// join keys are relevant to what it attests (join-spine `task_id`
@@ -1078,6 +1132,14 @@ pub struct EvidenceRecord {
     /// on the wire).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<EvidenceAttachment>,
+    /// Bound files of the scenario's previous latest record this one
+    /// deliberately no longer binds, and why (0.15 D2). Additive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachment_drop: Option<AttachmentDrop>,
+    /// Present only on an audit record (`--kind audit`, 0.15 D3): the
+    /// external evaluator and its result. Additive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audit: Option<EvidenceAudit>,
 }
 
 impl EvidenceRecord {
@@ -1103,6 +1165,8 @@ impl EvidenceRecord {
             surface_ref: Vec::new(),
             approval: None,
             attachments: Vec::new(),
+            attachment_drop: None,
+            audit: None,
         }
     }
 
@@ -1143,6 +1207,21 @@ impl EvidenceRecord {
     pub fn with_attachments(mut self, attachments: Vec<EvidenceAttachment>) -> Self {
         self.attachments = attachments;
         self
+    }
+
+    pub fn with_attachment_drop(mut self, attachment_drop: AttachmentDrop) -> Self {
+        self.attachment_drop = Some(attachment_drop);
+        self
+    }
+
+    pub fn with_audit(mut self, audit: EvidenceAudit) -> Self {
+        self.audit = Some(audit);
+        self
+    }
+
+    /// Whether this is an audited outcome rather than a declared one.
+    pub fn is_audit(&self) -> bool {
+        self.audit.is_some()
     }
 }
 

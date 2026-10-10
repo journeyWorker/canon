@@ -33,9 +33,9 @@
 //! with no runtime dependency on this repo's own checkout layout.
 //!
 //! # Two fixture shapes, one oracle format
-//! Seven of the nine classes (`uncovered-cell`, `unreviewed-promotion`,
+//! Eight of the ten classes (`uncovered-cell`, `unreviewed-promotion`,
 //! `trust-below-required`, `stale-evidence`, `malformed-evidence`,
-//! `flagged`, `open-blocker`) are reachable through the assembled
+//! `flagged`, `open-blocker`, `false-success`) are reachable through the assembled
 //! [`crate::dispatch::check_set`] over a loaded [`crate::GateContext`] —
 //! `canon gate check`'s own dispatcher, engaged here with `release: true`
 //! so the release-scoped `trust-below-required` class can fire too (this
@@ -65,8 +65,8 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use canon_model::{
-    Actor, ChangeId, Envelope, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, FlaggedOverlay, ProjectId, ProvenanceRef, RecordKind, Review, RoleId, ScenarioId,
-    Sha, Subject, SubjectId, SubjectStatus, TaskId, TrustLifecycle,
+    Actor, AuditResult, ChangeId, Envelope, EvidenceAudit, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, FlaggedOverlay, ProjectId, ProvenanceRef,
+    RecordKind, Review, RoleId, ScenarioId, Sha, Subject, SubjectId, SubjectStatus, TaskId, TrustLifecycle,
 };
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
@@ -145,7 +145,7 @@ fn git_output(dir: &Path, args: &[&str]) -> String {
     String::from_utf8(output.stdout).expect("git output is UTF-8")
 }
 
-// ── the nine fixture corpus builders ──
+// ── the ten fixture corpus builders ──
 
 fn build_uncovered_cell(dir: &Path) {
     write_policy_yaml(dir, "risk_routing:\n  reviewer: true\n");
@@ -246,6 +246,23 @@ fn build_open_blocker(dir: &Path) {
     tier.write(&finding).expect("write open-blocker fixture finding");
 }
 
+/// A refuted audit beside a declared `faithful` record for the same
+/// scenario: the declared verdict does not override the audit.
+fn build_false_success(dir: &Path) {
+    let project = ProjectId::parse("selftest").expect("valid ProjectId");
+    let scenario = ScenarioId::parse("selftest.false-success.01").expect("valid ScenarioId");
+    let declared = EvidenceRecord::new(envelope("implementer"), None, Some(scenario.clone()), None, EvidenceVerdict::Faithful).with_project_id(project.clone());
+    let audit = EvidenceRecord::new(envelope("auditor"), None, Some(scenario), None, EvidenceVerdict::Divergent).with_project_id(project).with_audit(EvidenceAudit {
+        evaluator_id: "selftest-evaluator".to_string(),
+        evaluator_version: "1.0.0".to_string(),
+        evaluator_digest: "a".repeat(64),
+        result: AuditResult::Refuted,
+    });
+    let tier = GitTier::new(ledger_root(dir));
+    tier.write(&declared).expect("write false-success fixture declared evidence");
+    tier.write(&audit).expect("write false-success fixture audit");
+}
+
 fn build_unevidenced_flip(_dir: &Path) -> (String, TaskId, Vec<EvidenceNote>) {
     let task_id = TaskId::parse("s5-selftest-unevidenced-flip#1").expect("valid TaskId");
     ("- [ ] 1 Do the selftest thing\n".to_string(), task_id, Vec::new())
@@ -323,6 +340,9 @@ fn run_fabricated_evidence(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String
 fn run_open_blocker(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String)> {
     run_check_fixture(build_open_blocker, now)
 }
+fn run_false_success(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String)> {
+    run_check_fixture(build_false_success, now)
+}
 
 fn fixtures() -> Vec<Fixture> {
     vec![
@@ -335,6 +355,7 @@ fn fixtures() -> Vec<Fixture> {
         Fixture { class: FailureClass::UnevidencedFlip, run: run_unevidenced_flip, expected: include_str!("../fixtures/unevidenced-flip/expected_failures.txt") },
         Fixture { class: FailureClass::FabricatedEvidence, run: run_fabricated_evidence, expected: include_str!("../fixtures/fabricated-evidence/expected_failures.txt") },
         Fixture { class: FailureClass::OpenBlocker, run: run_open_blocker, expected: include_str!("../fixtures/open-blocker/expected_failures.txt") },
+        Fixture { class: FailureClass::FalseSuccess, run: run_false_success, expected: include_str!("../fixtures/false-success/expected_failures.txt") },
     ]
 }
 
@@ -451,7 +472,7 @@ mod tests {
     use super::*;
 
     /// Tests lock this (assignment acceptance criterion): every one of
-    /// the nine `FAILURE_CLASSES` strings fires on its own fixture,
+    /// the ten `FAILURE_CLASSES` strings fires on its own fixture,
     /// exactly (missing AND extra both empty, every fixture).
     #[test]
     fn every_failure_class_fires_exactly_on_its_own_fixture() {

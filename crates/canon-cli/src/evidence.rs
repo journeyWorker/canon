@@ -199,8 +199,8 @@ use std::path::{Path, PathBuf};
 use canon_gate::{scan_note_text, verify_risk_approval, GateCtx};
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{
-    approval_payload_bytes, Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, ReportFormat, RoleId, RunId,
-    ScenarioId, SessionId, Sha, TaskId, APPROVAL_NAMESPACE,
+    approval_payload_bytes, Actor, AttachmentDrop, AuditResult, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord,
+    RecordKind, ReportFormat, RoleId, RunId, ScenarioId, SessionId, Sha, TaskId, APPROVAL_NAMESPACE,
 };
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier, TierQuery};
@@ -288,7 +288,10 @@ pub struct EvidenceArgs {
     /// attestation section): the record says what was claimed, not what
     /// was observed.
     pub evidence_ref: String,
-    pub verdict: EvidenceVerdict,
+    /// `None` means `faithful` on a declared record. Refused with
+    /// `--kind audit`, whose verdict is derived from `audit_result`
+    /// ([`audit_verdict`]).
+    pub verdict: Option<EvidenceVerdict>,
     /// The `evidence_note.summary` companion: the one line a flipped
     /// row's ` — ✅ ` suffix is built from. Absent, `canon_gate::
     /// gate_task` falls back to its own `default_evidence_text`. Refused
@@ -340,6 +343,196 @@ pub struct EvidenceArgs {
     pub report_cases: Vec<String>,
     /// The artifact store's per-file size limit, in MiB.
     pub max_artifact_mib: u64,
+    /// `--kind audit` only (0.15 D3): the external evaluator's id,
+    /// version, and sha256, and what it concluded. Required together with
+    /// `--kind audit`, refused on every other kind. The digest and result
+    /// are validated here, not by clap, so a `canon status` suggestion
+    /// with placeholders still parses as printed.
+    pub evaluator_id: Option<String>,
+    pub evaluator_version: Option<String>,
+    pub evaluator_digest: Option<String>,
+    pub audit_result: Option<String>,
+    /// 0.15 D2: repository-relative paths the scenario's previous latest
+    /// record bound that this record deliberately does not, with the one
+    /// `drop_reason` recorded for all of them.
+    pub drop_attachments: Vec<String>,
+    pub drop_reason: Option<String>,
+}
+
+/// The `--kind` value that marks an audited outcome (0.15 D3).
+pub const AUDIT_KIND: &str = "audit";
+
+/// `--audit-result`'s accepted values.
+fn parse_audit_result(s: &str) -> Result<AuditResult, String> {
+    match s {
+        "confirmed" => Ok(AuditResult::Confirmed),
+        "refuted" => Ok(AuditResult::Refuted),
+        "indeterminate" => Ok(AuditResult::Indeterminate),
+        other => Err(format!("--audit-result `{other}` is not an audit result — expected one of: confirmed, refuted, indeterminate")),
+    }
+}
+
+/// `--evaluator-digest`: a sha256, 64 lowercase hex characters, as every
+/// other digest canon records.
+fn parse_sha256(s: &str) -> Result<String, String> {
+    if s.len() == 64 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+        Ok(s.to_string())
+    } else {
+        Err(format!("--evaluator-digest `{s}` is not a sha256 — expected 64 lowercase hex characters"))
+    }
+}
+
+/// The verdict an audit record carries, derived from its result so a
+/// reader that ignores `audit` still fails closed on a refutation:
+/// `confirmed` → faithful, `refuted` → divergent, `indeterminate` →
+/// not-applicable. The gate never reads it as the scenario's declared
+/// verdict — audits are folded apart (`canon_gate::audit`).
+pub fn audit_verdict(result: AuditResult) -> EvidenceVerdict {
+    match result {
+        AuditResult::Confirmed => EvidenceVerdict::Faithful,
+        AuditResult::Refuted => EvidenceVerdict::Divergent,
+        AuditResult::Indeterminate => EvidenceVerdict::NotApplicable,
+    }
+}
+
+/// The audit an `--kind audit` invocation records, or `None` for every
+/// other kind (0.15 D3). The four evaluator/result flags are required
+/// with `--kind audit` and refused elsewhere; the declared-record flags
+/// the gate reads only off declared evidence (`--task`, `--verdict`,
+/// `--surface-ref`, the approval set) are refused on an audit, so no
+/// value is recorded that nothing would ever read.
+fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
+    let audit_flags = [
+        ("--evaluator-id", args.evaluator_id.is_some()),
+        ("--evaluator-version", args.evaluator_version.is_some()),
+        ("--evaluator-digest", args.evaluator_digest.is_some()),
+        ("--audit-result", args.audit_result.is_some()),
+    ];
+    if args.kind != AUDIT_KIND {
+        let given: Vec<&str> = audit_flags.iter().filter(|(_, set)| *set).map(|(flag, _)| *flag).collect();
+        if given.is_empty() {
+            return Ok(None);
+        }
+        return Err(format!("{} belong(s) to `--kind {AUDIT_KIND}` only; this record is `--kind {}`", given.join(", "), args.kind));
+    }
+    let missing: Vec<&str> = audit_flags.iter().filter(|(_, set)| !*set).map(|(flag, _)| *flag).collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "`--kind {AUDIT_KIND}` records an external evaluator's re-audit and needs {}; canon never generates or runs the audit, it records the evaluator's result",
+            missing.join(", ")
+        ));
+    }
+    let declared_only = [
+        ("--task", args.task_id.is_some()),
+        ("--verdict", args.verdict.is_some()),
+        ("--surface-ref", !args.surface_ref.is_empty()),
+        ("--approval-by", args.approval_by.is_some()),
+        ("--approval-role", args.approval_role.is_some()),
+        ("--approval-signature-file", args.approval_signature_file.is_some()),
+        ("--approval-at", args.approval_at.is_some()),
+    ];
+    let refused: Vec<&str> = declared_only.iter().filter(|(_, set)| *set).map(|(flag, _)| *flag).collect();
+    if !refused.is_empty() {
+        return Err(format!(
+            "{} do(es) not apply to `--kind {AUDIT_KIND}`: an audit re-checks one scenario (--scenario-id/--project-id), its verdict is its --audit-result, and it never flips a task or approves a risk",
+            refused.join(", ")
+        ));
+    }
+    if args.scenario_id.is_none() {
+        return Err(format!("`--kind {AUDIT_KIND}` needs --scenario-id and --project-id: an audit re-checks one scenario's declared success"));
+    }
+    let (Some(evaluator_id), Some(evaluator_version), Some(evaluator_digest), Some(result)) =
+        (&args.evaluator_id, &args.evaluator_version, &args.evaluator_digest, &args.audit_result)
+    else {
+        unreachable!("every audit flag is present, checked above");
+    };
+    for (flag, value) in [("--evaluator-id", evaluator_id), ("--evaluator-version", evaluator_version)] {
+        if value.is_empty() || value.trim() != value || first_row_line_break(value).is_some() {
+            return Err(format!("{flag} must be a non-empty, trimmed, single-line value"));
+        }
+    }
+    Ok(Some(EvidenceAudit {
+        evaluator_id: evaluator_id.clone(),
+        evaluator_version: evaluator_version.clone(),
+        evaluator_digest: parse_sha256(evaluator_digest)?,
+        result: parse_audit_result(result)?,
+    }))
+}
+
+/// `--drop-attachment` and `--drop-reason` come together, on scenario
+/// evidence only (0.15 D2): task-only evidence has no drop guard.
+fn check_drop_flags(args: &EvidenceArgs) -> Result<(), String> {
+    match (args.drop_attachments.is_empty(), &args.drop_reason) {
+        (true, None) => return Ok(()),
+        (true, Some(_)) => return Err("--drop-reason explains a --drop-attachment; none was given".to_string()),
+        (false, None) => return Err("--drop-attachment needs --drop-reason <text>: a dropped binding is recorded with why it was dropped".to_string()),
+        (false, Some(reason)) => {
+            if reason.trim().is_empty() || first_row_line_break(reason).is_some() {
+                return Err("--drop-reason must be non-empty, single-line text".to_string());
+            }
+        }
+    }
+    if args.scenario_id.is_none() {
+        return Err("--drop-attachment applies to scenario evidence (--scenario-id); task-only evidence carries no drop guard".to_string());
+    }
+    Ok(())
+}
+
+/// The drop guard (0.15 D2). The scenario's current latest record of the
+/// SAME fold — declared, or audit for an audit — is read from the
+/// committed ledger and the staging area together, so an unpromoted
+/// record counts too. Every path it binds that the new record does not
+/// must be named by `--drop-attachment`, and every `--drop-attachment`
+/// must name such a path. Re-binding a path to new bytes is not a drop.
+/// `Ok(Some)` is the drop to record on the new record; `Ok(None)` when
+/// nothing is dropped or the record is not scenario-keyed.
+fn drop_guard(ledger_root: &Path, args: &EvidenceArgs, is_audit: bool, attachments: &[canon_model::EvidenceAttachment]) -> Result<Option<AttachmentDrop>, String> {
+    use std::collections::BTreeSet;
+
+    let (Some(project_id), Some(scenario_id)) = (&args.project_id, &args.scenario_id) else {
+        return Ok(None);
+    };
+    let mut same_fold = Vec::new();
+    for root in [ledger_root.to_path_buf(), evidence_staging_dir(ledger_root)] {
+        if !root.is_dir() {
+            continue;
+        }
+        let read = GitTier::new(&root)
+            .read(&TierQuery::kind(RecordKind::EvidenceRecord))
+            .map_err(|e| format!("cannot read {} to compare this record's bindings with the latest one: {e}", root.display()))?;
+        let (records, _malformed) = canon_model::validate_evidence_batch(&read.records);
+        same_fold.extend(
+            records.into_iter().filter(|r| r.is_audit() == is_audit && r.project_id.as_ref() == Some(project_id) && r.scenario_id.as_ref() == Some(scenario_id)),
+        );
+    }
+    let latest = canon_gate::spec_coverage::latest_by_scenario(&same_fold);
+    let previous = latest.get(&(project_id.clone(), scenario_id.clone())).copied();
+    let bound: BTreeSet<&str> = attachments.iter().map(|a| a.path.as_str()).collect();
+    let dropped: BTreeSet<&str> = previous.map(|p| p.attachments.iter().map(|a| a.path.as_str()).filter(|path| !bound.contains(path)).collect()).unwrap_or_default();
+    let requested: BTreeSet<&str> = args.drop_attachments.iter().map(String::as_str).collect();
+    let fold = if is_audit { "audit record" } else { "evidence record" };
+    let scenario = scenario_id.as_str();
+
+    if let Some(stray) = requested.iter().find(|path| !dropped.contains(*path)) {
+        let leaves_out = if dropped.is_empty() { "nothing".to_string() } else { dropped.iter().map(|p| format!("`{p}`")).collect::<Vec<_>>().join(", ") };
+        return Err(format!(
+            "--drop-attachment `{stray}` is not a file the latest {fold} for {scenario} binds and this record leaves out (it leaves out: {leaves_out})"
+        ));
+    }
+    let unexplained: Vec<String> = dropped.difference(&requested).map(|p| format!("`{p}`")).collect();
+    if let (false, Some(previous)) = (unexplained.is_empty(), previous) {
+        return Err(format!(
+            "the latest {fold} for {scenario} (project {}), by `{}` at {}, binds file(s) this record does not: {}; re-bind them (--artifact <path> or --report <format>:<path>; new bytes at the same path are fine), or record the drop with --drop-attachment <path> (repeatable) --drop-reason <text>",
+            project_id.as_str(),
+            previous.envelope.actor.agent_id,
+            previous.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            unexplained.join(", ")
+        ));
+    }
+    Ok(args.drop_reason.as_ref().filter(|_| !requested.is_empty()).map(|reason| AttachmentDrop {
+        paths: requested.iter().map(|path| path.to_string()).collect(),
+        reason: reason.clone(),
+    }))
 }
 
 /// Inputs shared by payload export and authenticated evidence staging.
@@ -430,6 +623,21 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
 
     if args.kind.trim().is_empty() || args.evidence_ref.trim().is_empty() {
         eprintln!("canon evidence add: refused — --kind and --ref must both be non-empty; an empty companion narrows the gate's typed evidence slice to nothing");
+        return 2;
+    }
+    let audit = match audit_of(args) {
+        Ok(audit) => audit,
+        Err(error) => {
+            eprintln!("canon evidence add: refused — {error}");
+            return 2;
+        }
+    };
+    let verdict = match &audit {
+        Some(audit) => audit_verdict(audit.result),
+        None => args.verdict.unwrap_or(EvidenceVerdict::Faithful),
+    };
+    if let Err(error) = check_drop_flags(args) {
+        eprintln!("canon evidence add: refused — {error}");
         return 2;
     }
     for surface in &args.surface_ref {
@@ -584,13 +792,31 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         reports: &args.reports,
         report_cases: &args.report_cases,
         scenario_id: args.scenario_id.as_ref().map(ScenarioId::as_str),
-        verdict: args.verdict,
+        verdict,
         max_bytes: args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB),
     }) {
         Ok(bound) => bound,
         Err(error) => {
             eprintln!("canon evidence add: refused — {}", error.message());
             return error.exit_code();
+        }
+    };
+
+    let ledger_root = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx.ledger_root,
+        Err(e) => {
+            eprintln!("canon evidence add: {e}");
+            return 2;
+        }
+    };
+    // 0.15 D2: a new latest record never silently drops what the
+    // previous one bound. Checked after binding (the new paths are known)
+    // and before anything is stored or staged.
+    let attachment_drop = match drop_guard(&ledger_root, args, audit.is_some(), &bound.attachments) {
+        Ok(attachment_drop) => attachment_drop,
+        Err(error) => {
+            eprintln!("canon evidence add: refused — {error}");
+            return 2;
         }
     };
 
@@ -604,9 +830,16 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         args.task_id.clone(),
         args.scenario_id.clone(),
         args.run_id.clone(),
-        args.verdict,
+        verdict,
     )
     .with_attachments(bound.attachments);
+    if let Some(attachment_drop) = attachment_drop {
+        record = record.with_attachment_drop(attachment_drop);
+    }
+    if let Some(audit) = audit {
+        record = record.with_audit(audit);
+    }
+    let record_audit_result = record.audit.as_ref().map(|a| a.result);
     if !args.surface_ref.is_empty() {
         record = record.with_surface_ref(normalized_strings(&args.surface_ref));
     }
@@ -704,13 +937,6 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         object.insert("evidence_note".to_string(), serde_json::Value::Object(companion));
     }
 
-    let ledger_root = match GateCtx::from_repo(&repo) {
-        Ok(ctx) => ctx.ledger_root,
-        Err(e) => {
-            eprintln!("canon evidence add: {e}");
-            return 2;
-        }
-    };
     // Store the bound bytes before staging (module doc): every refusal
     // is behind us, and a record must never name a blob the store lacks.
     // A file that changed since `bind` hashed it is refused rather than
@@ -751,11 +977,14 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
                     (scenario.as_str().to_string(), "then `canon gate check`".to_string())
                 }
             };
+            let outcome = match &record_audit_result {
+                Some(result) => format!("audit {}", result.as_str()),
+                None => format!("verdict {}", verdict_slug(verdict)),
+            };
             println!(
-                "canon evidence add: staged {} for {} (verdict {}) — {}, {}",
+                "canon evidence add: staged {} for {} ({outcome}) — {}, {}",
                 receipt.location,
                 subject,
-                verdict_slug(args.verdict),
                 crate::write_mode::STAGED_FOR_GATE_PROMOTE,
                 next
             );
@@ -909,7 +1138,7 @@ mod tests {
             project_id: None,
             kind: "test-run".to_string(),
             evidence_ref: "cargo test -p canon-cli evidence".to_string(),
-            verdict: EvidenceVerdict::Faithful,
+            verdict: None,
             summary: summary.map(str::to_string),
             command_result: None,
             scenario_id: None,
@@ -927,6 +1156,12 @@ mod tests {
             reports: Vec::new(),
             report_cases: Vec::new(),
             max_artifact_mib: canon_gate::DEFAULT_MAX_ARTIFACT_MIB,
+            evaluator_id: None,
+            evaluator_version: None,
+            evaluator_digest: None,
+            audit_result: None,
+            drop_attachments: Vec::new(),
+            drop_reason: None,
         }
     }
 
@@ -1068,7 +1303,7 @@ mod tests {
     fn a_divergent_verdict_stages_and_promotes_but_never_flips() {
         let tmp = repo_with_plan_corpus();
         let mut divergent = args(Some("the implementation contradicts the scenario"));
-        divergent.verdict = EvidenceVerdict::Divergent;
+        divergent.verdict = Some(EvidenceVerdict::Divergent);
 
         assert_eq!(run_add(tmp.path(), &divergent), 0, "recording a divergent verdict is a real operation");
         assert_eq!(crate::gate::run_promote(tmp.path(), false), 0);

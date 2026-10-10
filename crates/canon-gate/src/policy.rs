@@ -472,6 +472,9 @@ pub enum SpecCoverage {
         /// absent, and nothing about review is checked — the
         /// pre-existing behavior, byte for byte.
         require_review: Option<RequireReview>,
+        /// `require_audit:` (0.15 D3). `None` = the sub-section is
+        /// absent, and no scenario is sampled for audit.
+        require_audit: Option<RequireAudit>,
     },
     /// Present but unusable — see [`PolicyDiagnostic::InvalidSection`].
     /// `crate::spec_coverage` emits a violation carrying `detail`
@@ -505,6 +508,82 @@ impl RequireReview {
     pub fn covers(&self, status: SubjectStatus) -> bool {
         self.scope.is_empty() || self.scope.contains(&status)
     }
+}
+
+/// `spec_coverage.require_audit`, resolved (0.15 D3): a deterministic
+/// sample of in-scope scenarios needs an external evaluator's audit
+/// (`canon evidence add --kind audit`) whose latest result is not
+/// `indeterminate`. Sampling is [`RequireAudit::samples`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequireAudit {
+    pub rate: AuditRate,
+    /// Mixed into the sampling hash so a repo can re-draw its sample on
+    /// purpose. Empty when omitted.
+    pub seed: String,
+    /// Subject statuses whose scenarios are sampled. EMPTY means every
+    /// scenario; omitted means [`RequireAudit::DEFAULT_SCOPE`].
+    pub scope: Vec<SubjectStatus>,
+}
+
+/// A sampling rate in `[0, 1]`, finite by construction (so `Eq` holds).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AuditRate(f64);
+
+impl Eq for AuditRate {}
+
+impl AuditRate {
+    /// `None` unless `rate` is finite and within `[0, 1]`.
+    pub fn new(rate: f64) -> Option<Self> {
+        (rate.is_finite() && (0.0..=1.0).contains(&rate)).then_some(Self(rate))
+    }
+
+    pub fn get(self) -> f64 {
+        self.0
+    }
+}
+
+impl RequireAudit {
+    /// `scope`'s default when the key is omitted: an audit re-checks a
+    /// success claim, and a subject claims success once it is verifying.
+    pub const DEFAULT_SCOPE: [SubjectStatus; 2] = [SubjectStatus::Verifying, SubjectStatus::Shipped];
+
+    /// Whether a subject at `status` is in this requirement's scope.
+    pub fn covers(&self, status: SubjectStatus) -> bool {
+        self.scope.is_empty() || self.scope.contains(&status)
+    }
+
+    /// Whether `(project_id, scenario_id)` is in the audit sample. The
+    /// scenario is sampled iff the first 8 bytes of
+    /// `sha256(seed || 0x00 || project_id || 0x00 || scenario_id)`,
+    /// read as a big-endian u64, are less than `rate * 2^64` (computed
+    /// exactly: `rate * 2^64` is exact in binary floating point, and an
+    /// integer `v` is below it iff `v < ceil(rate * 2^64)`). `rate: 0`
+    /// samples nothing; `rate: 1` samples everything.
+    pub fn samples(&self, project_id: &str, scenario_id: &str) -> bool {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(self.seed.as_bytes());
+        hasher.update([0u8]);
+        hasher.update(project_id.as_bytes());
+        hasher.update([0u8]);
+        hasher.update(scenario_id.as_bytes());
+        let digest = hasher.finalize();
+        let mut head = [0u8; 8];
+        head.copy_from_slice(&digest[..8]);
+        let value = u128::from(u64::from_be_bytes(head));
+        let threshold = (self.rate.get() * 18_446_744_073_709_551_616.0).ceil() as u128;
+        value < threshold
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+struct RawRequireAudit {
+    rate: f64,
+    #[serde(default)]
+    seed: String,
+    #[serde(default)]
+    scope: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -541,6 +620,9 @@ struct RawSpecCoverage {
     /// can be told apart from a malformed body.
     #[serde(default, deserialize_with = "present_yaml")]
     require_review: Option<serde_yaml::Value>,
+    /// Untyped for the same reason as `require_review`.
+    #[serde(default, deserialize_with = "present_yaml")]
+    require_audit: Option<serde_yaml::Value>,
 }
 
 /// A key that is present deserializes to `Some`, whatever its value —
@@ -597,12 +679,21 @@ fn resolve_spec_coverage(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<P
         }
     };
 
+    let require_audit = match parsed.require_audit.map(resolve_require_audit).transpose() {
+        Ok(require_audit) => require_audit,
+        Err(detail) => {
+            diagnostics.push(PolicyDiagnostic::InvalidSection { section: SECTION, detail: detail.clone() });
+            return Some(SpecCoverage::Invalid { detail });
+        }
+    };
+
     Some(SpecCoverage::Active {
         require_evidence: parsed.require_evidence,
         scope,
         exclude_lanes: parsed.exclude_lanes,
         require_cases: parsed.require_cases,
         require_review,
+        require_audit,
     })
 }
 
@@ -631,6 +722,22 @@ fn resolve_require_review(raw: serde_yaml::Value) -> Result<RequireReview, Strin
         Some(names) => parse_statuses("require_review.scope", names)?,
     };
     Ok(RequireReview { scope, distinct_actor: parsed.distinct_actor, block_on_findings: parsed.block_on_findings })
+}
+
+/// Parse `spec_coverage.require_audit`. A present `null` or a
+/// non-mapping is malformed; `rate` is required and must be a number in
+/// `[0, 1]`.
+fn resolve_require_audit(raw: serde_yaml::Value) -> Result<RequireAudit, String> {
+    if !raw.is_mapping() {
+        return Err("`require_audit` must be a mapping with at least `rate: <0..1>`".to_string());
+    }
+    let parsed: RawRequireAudit = serde_yaml::from_value(raw).map_err(|e| format!("`require_audit`: {e}"))?;
+    let rate = AuditRate::new(parsed.rate).ok_or_else(|| format!("`require_audit.rate` must be a number from 0 to 1, got {}", parsed.rate))?;
+    let scope = match &parsed.scope {
+        None => RequireAudit::DEFAULT_SCOPE.to_vec(),
+        Some(names) => parse_statuses("require_audit.scope", names)?,
+    };
+    Ok(RequireAudit { rate, seed: parsed.seed, scope })
 }
 
 /// How `experimental.evidence_binding` treats a scenario whose latest
@@ -1365,7 +1472,8 @@ trust_required:
                 scope: vec![SubjectStatus::Building, SubjectStatus::Verifying],
                 exclude_lanes: Vec::new(),
                 require_cases: Vec::new(),
-                require_review: None
+                require_review: None,
+                require_audit: None
             })
         );
     }
@@ -1382,7 +1490,8 @@ trust_required:
                 scope: Vec::new(),
                 exclude_lanes: Vec::new(),
                 require_cases: Vec::new(),
-                require_review: None
+                require_review: None,
+                require_audit: None
             })
         );
     }
@@ -1421,7 +1530,8 @@ trust_required:
                 scope: Vec::new(),
                 exclude_lanes: Vec::new(),
                 require_cases: vec!["failure".to_string(), "edge".to_string()],
-                require_review: None
+                require_review: None,
+                require_audit: None
             })
         );
 

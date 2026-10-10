@@ -67,6 +67,9 @@ pub fn check_set(release: bool) -> Vec<Box<dyn GateCheck>> {
         Box::new(crate::artifact_store::ArtifactStoreCheck),
         // Silent unless `policy.yaml` carries an unknown top-level key.
         Box::new(crate::policy_keys::PolicyKeysCheck),
+        // 0.15 D3: a scenario whose latest audit is refuted is
+        // `false-success`. Silent when no audit record is refuted.
+        Box::new(crate::audit::AuditCheck),
     ];
     if release {
         checks.push(Box::new(ReleaseTrustCheck));
@@ -94,7 +97,8 @@ mod tests {
         assert!(checks.iter().any(|c| c.name() == "evidence-binding"), "registered always; off by policy, not by omission");
         assert!(checks.iter().any(|c| c.name() == "evidence-artifacts"), "registered always; silent when no record binds a file");
         assert!(checks.iter().any(|c| c.name() == "policy-keys"));
-        assert_eq!(checks.len(), 9);
+        assert!(checks.iter().any(|c| c.name() == "audit"), "registered always; silent when no audit is refuted");
+        assert_eq!(checks.len(), 10);
     }
 
     #[test]
@@ -102,7 +106,7 @@ mod tests {
         let checks = check_set(true);
         assert!(checks.iter().any(|c| c.name() == "trust-ladder"), "a release profile must never drop the always-on trust-ladder check");
         assert!(checks.iter().any(|c| c.name() == "release-trust-required"));
-        assert_eq!(checks.len(), 10);
+        assert_eq!(checks.len(), 11);
     }
 
     #[test]
