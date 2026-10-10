@@ -8,12 +8,14 @@
 //!    reporting the violation(s); never a partial sync.
 //! 2. Scan `features/` via the extended `canon_fmt::gherkin::scan`
 //!    (task 3.2) — each tag paired with its header's label as `title`,
-//!    `source_digest` a sha256 over the `.feature` file's raw bytes.
+//!    `source_digest` a sha256 over the `.feature` file's raw bytes, and
+//!    `scenario_digest` a sha256 over that one scenario's meaning
+//!    (`canon_fmt::gherkin::scenario_digests`, 0.15 D1).
 //! 3. Materialize ONE `Scenario` index record per `(project_id,
 //!    scenario_id)` via the normal append-only `GitTier::write`.
 //!    Idempotence is LOGICAL (design D5): fold latest-per-key first
 //!    (`canon_store::fold_latest_by_key`), no-op when the candidate's
-//!    `source_digest`/`title` already match the latest folded record.
+//!    digests/title/tags already match the latest folded record.
 //!
 //! # General index — never `upstream`/`InventoryEntry.covered_by`
 //! The index derives ONLY from the `.feature` corpus — this module
@@ -340,6 +342,9 @@ pub struct ScannedScenario {
     pub scenario_id: ScenarioId,
     pub title: String,
     pub source_digest: SpecDigest,
+    /// This scenario's own digest (0.15 D1); `None` only when the digest
+    /// walk found no block for a tag the scan paired.
+    pub scenario_digest: Option<SpecDigest>,
     pub subject_tags: Vec<String>,
     pub lane_tags: Vec<String>,
     pub case_tags: Vec<String>,
@@ -359,12 +364,14 @@ pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
         let Ok(text) = std::str::from_utf8(&bytes) else { continue };
         let scan = canon_fmt::gherkin::scan(text);
         let digest = canon_fmt::gherkin::source_digest(&bytes);
+        let scenario_digests = canon_fmt::gherkin::scenario_digests(text);
         for candidate in scan.scenarios {
             if let Ok(scenario_id) = ScenarioId::parse(&candidate.scenario_id) {
                 scanned.push(ScannedScenario {
                     scenario_id,
                     title: candidate.title,
                     source_digest: digest.clone(),
+                    scenario_digest: scenario_digests.get(&candidate.scenario_id).cloned(),
                     subject_tags: candidate.subject_tags,
                     lane_tags: candidate.lane_tags,
                     case_tags: candidate.case_tags,
@@ -563,6 +570,7 @@ fn sync_one_root(tier: &GitTier, repo: &Path, spec_root: &SpecRoot, actor: &Acto
             .get(&key)
             .is_some_and(|latest| {
                 latest.scenario.source_digest == candidate.source_digest
+                    && latest.scenario.scenario_digest == candidate.scenario_digest
                     && latest.scenario.title == candidate.title
                     && latest.scenario.subject_id == subject_id
                     && latest.scenario.lane.as_deref() == lane.as_deref()
@@ -579,6 +587,7 @@ fn sync_one_root(tier: &GitTier, repo: &Path, spec_root: &SpecRoot, actor: &Acto
             "",
             candidate.source_digest.clone(),
         );
+        record.scenario_digest = candidate.scenario_digest.clone();
         record.lane = lane;
         record.case = case;
         record.subject_id = subject_id;

@@ -1074,6 +1074,51 @@ mod tests {
         assert!(SpecCoverageCheck.run(&both).is_empty());
     }
 
+    /// review.add.28 (0.15 D1): a review pins the scenario's own digest when
+    /// its record has one, so a re-sync that moves only the file digest (a
+    /// sibling changed) leaves it current, while a moved scenario digest
+    /// stales it with wording that names the scenario. A review pinned to
+    /// the file digest keeps being compared with the file digest, even
+    /// once the record gains a scenario digest.
+    #[test]
+    fn a_spec_pin_is_compared_like_for_like() {
+        use canon_model::ReviewOutcome::Signed;
+        use canon_model::PinnedSpec;
+        let resynced = |ctx: &mut GateContext, offset: i64, file: &[u8], own: Option<&[u8]>| {
+            let mut s = scenario("p.a.01", Some("live"));
+            s.envelope.at += chrono::Duration::seconds(offset);
+            s.source_digest = SpecDigest::of(file);
+            s.scenario_digest = own.map(SpecDigest::of);
+            ctx.scenarios.push(s);
+        };
+
+        let mut ctx = pinned_corpus();
+        resynced(&mut ctx, 1, b"file v1", Some(b"own v1"));
+        let review = pinned_review(&ctx, "reviewer-2", Signed, 2);
+        let pins = review.pins.clone().unwrap();
+        assert_eq!((pins.scenario_digest_scope, pins.scenario_digest), (PinnedSpec::Scenario, SpecDigest::of(b"own v1")));
+        ctx.reviews.push(review);
+        resynced(&mut ctx, 3, b"file v2: a sibling was appended", Some(b"own v1"));
+        assert!(SpecCoverageCheck.run(&ctx).is_empty(), "a sibling's change leaves a scenario pin current");
+        resynced(&mut ctx, 4, b"file v3", Some(b"own v2"));
+        let out = SpecCoverageCheck.run(&ctx);
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert!(out[0].detail.contains("its spec changed (the scenario's digest is not the pinned one)"), "{}", out[0].detail);
+
+        // A review pinned before the record had a scenario digest is a file
+        // pin: the field appearing does not stale it, a file change does.
+        let mut ctx = pinned_corpus();
+        resynced(&mut ctx, 1, b"file v1", None);
+        let review = pinned_review(&ctx, "reviewer-2", Signed, 2);
+        assert_eq!(review.pins.as_ref().unwrap().scenario_digest_scope, PinnedSpec::File);
+        ctx.reviews.push(review);
+        resynced(&mut ctx, 3, b"file v1", Some(b"own v1"));
+        assert!(SpecCoverageCheck.run(&ctx).is_empty(), "gaining a scenario digest does not stale a file pin");
+        resynced(&mut ctx, 4, b"file v2", Some(b"own v1"));
+        let out = SpecCoverageCheck.run(&ctx);
+        assert!(out[0].detail.contains("its spec changed (the .feature file's source digest is not the pinned one)"), "{}", out[0].detail);
+    }
+
     /// A pinned review of a scenario with no evidence pins an empty list,
     /// and the first evidence record makes it stale.
     #[test]

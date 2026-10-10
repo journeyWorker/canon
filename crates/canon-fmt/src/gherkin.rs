@@ -13,6 +13,8 @@
 //! scenario's `title` (design D4). This is retention of information
 //! the scan already walks past, never a new parser.
 
+use std::collections::BTreeMap;
+
 use canon_model::family::feature::FeatureProvenance;
 use canon_model::ids::SpecDigest;
 
@@ -201,9 +203,180 @@ fn looks_like_scenario_id(s: &str) -> bool {
 /// digest over anything the line-scan interprets — the file's exact
 /// byte content, so any edit (including one the scan can't see through,
 /// e.g. a body step) changes it (design R8: file-granularity churn is
-/// accepted).
+/// accepted). A review pins [`scenario_digests`] instead (0.15 D1).
 pub fn source_digest(bytes: &[u8]) -> SpecDigest {
     SpecDigest::of(bytes)
+}
+
+/// Version tag at the head of every [`scenario_digests`] input, so a
+/// change to what the digest covers can never collide with the old one.
+const SCENARIO_DIGEST_FORMAT: &str = "canon-scenario-digest/1";
+
+/// What one scenario means, as `Scenario.scenario_digest` (0.15 D1): a
+/// sha256 per scenario-id tag in `text`, over a normalized rendering of
+/// exactly what gives that scenario its meaning and nothing else:
+///
+/// 1. the Feature's tag lines (Gherkin scenarios inherit them);
+/// 2. the Feature-level `Background:` block, when there is one;
+/// 3. the enclosing `Rule:` header line and its tag lines, and that
+///    Rule's own `Background:` block, when the scenario is inside one;
+/// 4. the scenario's own tag lines and its block: the
+///    `Scenario:`/`Scenario Outline:`/`Example:` header, description,
+///    steps, doc strings, data tables and `Examples:` (with their tags).
+///
+/// Normalization: every line is trimmed at both ends; blank lines and
+/// `#` comment lines (which include the `# canon:` provenance comments)
+/// are dropped, except inside a doc string (`"""` or ```` ``` ````),
+/// whose lines are kept trimmed, blank ones included. The Feature's own
+/// header and description, other scenarios, and other Rules never count:
+/// appending, removing or editing a sibling scenario leaves this digest
+/// alone, and editing a Background moves the digest of every scenario
+/// that inherits it. Every scenario-id tag on one scenario gets that
+/// scenario's digest.
+pub fn scenario_digests(text: &str) -> BTreeMap<String, SpecDigest> {
+    let mut walk = DigestWalk::default();
+    let mut fence: Option<&str> = None;
+    for raw in text.lines() {
+        let line = raw.trim();
+        if let Some(open) = fence {
+            if line.starts_with(open) {
+                fence = None;
+            }
+            walk.content(line);
+            continue;
+        }
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if line.starts_with('@') {
+            walk.pending_tags.push(line.to_string());
+            continue;
+        }
+        match ["Feature:", "Rule:", "Background:", "Scenario Outline:", "Scenario Template:", "Scenario:", "Example:"].into_iter().find(|k| line.starts_with(k)) {
+            Some("Feature:") => walk.feature(),
+            Some("Rule:") => walk.rule(line),
+            Some("Background:") => walk.background(line),
+            Some(_) => walk.scenario(line),
+            None => {
+                // Tags above a non-header line (an `Examples:` table)
+                // belong to the block they sit in.
+                for tag in std::mem::take(&mut walk.pending_tags) {
+                    walk.content(&tag);
+                }
+                if line.starts_with("```") {
+                    fence = Some("```");
+                } else if line.starts_with("\"\"\"") {
+                    fence = Some("\"\"\"");
+                }
+                walk.content(line);
+            }
+        }
+    }
+    walk.close();
+    walk.digests
+}
+
+/// Which block a content line belongs to in [`scenario_digests`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum Block {
+    /// The Feature's or a Rule's header and description: no scenario's
+    /// meaning, dropped.
+    #[default]
+    Description,
+    FeatureBackground,
+    RuleBackground,
+    Scenario,
+}
+
+/// [`scenario_digests`]'s state: the inherited context and the open
+/// scenario.
+#[derive(Default)]
+struct DigestWalk {
+    pending_tags: Vec<String>,
+    feature_tags: Vec<String>,
+    feature_background: Vec<String>,
+    /// The enclosing Rule's tag lines and header; empty outside a Rule.
+    rule: Vec<String>,
+    rule_background: Vec<String>,
+    /// The open scenario's scenario-id tags and normalized lines.
+    scenario_ids: Vec<String>,
+    scenario_lines: Vec<String>,
+    block: Block,
+    digests: BTreeMap<String, SpecDigest>,
+}
+
+impl DigestWalk {
+    fn feature(&mut self) {
+        self.close();
+        self.feature_tags = std::mem::take(&mut self.pending_tags);
+        self.feature_background.clear();
+        self.rule.clear();
+        self.rule_background.clear();
+        self.block = Block::Description;
+    }
+
+    fn rule(&mut self, line: &str) {
+        self.close();
+        self.rule = std::mem::take(&mut self.pending_tags);
+        self.rule.push(line.to_string());
+        self.rule_background.clear();
+        self.block = Block::Description;
+    }
+
+    fn background(&mut self, line: &str) {
+        self.close();
+        let (target, block) = if self.rule.is_empty() { (&mut self.feature_background, Block::FeatureBackground) } else { (&mut self.rule_background, Block::RuleBackground) };
+        *target = std::mem::take(&mut self.pending_tags);
+        target.push(line.to_string());
+        self.block = block;
+    }
+
+    fn scenario(&mut self, line: &str) {
+        self.close();
+        let tags = std::mem::take(&mut self.pending_tags);
+        self.scenario_ids = tags.iter().flat_map(|t| t.split_whitespace()).filter_map(|t| t.strip_prefix('@')).filter(|t| looks_like_scenario_id(t)).map(str::to_string).collect();
+        self.scenario_lines = tags;
+        self.scenario_lines.push(line.to_string());
+        self.block = Block::Scenario;
+    }
+
+    fn content(&mut self, line: &str) {
+        match self.block {
+            Block::Description => {}
+            Block::FeatureBackground => self.feature_background.push(line.to_string()),
+            Block::RuleBackground => self.rule_background.push(line.to_string()),
+            Block::Scenario => self.scenario_lines.push(line.to_string()),
+        }
+    }
+
+    /// Digest the open scenario, if any, under its inherited context.
+    fn close(&mut self) {
+        if self.block != Block::Scenario {
+            return;
+        }
+        self.block = Block::Description;
+        let lines = std::mem::take(&mut self.scenario_lines);
+        let mut input = String::from(SCENARIO_DIGEST_FORMAT);
+        for (label, part) in [
+            ("feature-tags", &self.feature_tags),
+            ("background", &self.feature_background),
+            ("rule", &self.rule),
+            ("rule-background", &self.rule_background),
+            ("scenario", &lines),
+        ] {
+            input.push_str("\n[");
+            input.push_str(label);
+            input.push(']');
+            for line in part {
+                input.push('\n');
+                input.push_str(line);
+            }
+        }
+        let digest = SpecDigest::of(input.as_bytes());
+        for id in std::mem::take(&mut self.scenario_ids) {
+            self.digests.insert(id, digest.clone());
+        }
+    }
 }
 
 #[cfg(test)]
@@ -373,5 +546,69 @@ mod tests {
         let unchanged = source_digest(SAMPLE.as_bytes());
         let changed = source_digest(format!("{SAMPLE}\n  # an added line\n").as_bytes());
         assert_ne!(unchanged, changed, "any byte-level edit must change the digest");
+    }
+
+    const RULED: &str = "@feature-tag\nFeature: Cart\n  Some description.\n\n  Background:\n    Given an empty cart\n\n  # canon: {\"schema\":1}\n  @a.b.01 @case:happy\n  Scenario: One\n    Given a\n    \"\"\"\n    # kept inside a doc string\n\n    \"\"\"\n\n  @a.b.02\n  Scenario Outline: Two\n    Given <n>\n    @examples-tag\n    Examples:\n      | n |\n      | 1 |\n\n  @rule-tag\n  Rule: Within a rule\n    Background:\n      Given a rule background\n\n    @a.b.03\n    Example: Three\n      Given c\n";
+
+    fn digests_of(text: &str) -> BTreeMap<String, SpecDigest> {
+        let digests = scenario_digests(text);
+        assert_eq!(digests.keys().map(String::as_str).collect::<Vec<_>>(), ["a.b.01", "a.b.02", "a.b.03"], "{digests:?}");
+        digests
+    }
+
+    /// Appending or editing a sibling scenario, the Feature's header or
+    /// description, comments, blank lines and indentation leave a
+    /// scenario's digest alone.
+    #[test]
+    fn a_scenario_digest_ignores_siblings_and_formatting() {
+        let base = digests_of(RULED);
+        let appended = scenario_digests(&format!("{RULED}\n    @a.b.04\n    Scenario: Four\n      Given d\n"));
+        assert_eq!(appended["a.b.01"], base["a.b.01"]);
+        assert_eq!(appended["a.b.03"], base["a.b.03"], "a scenario appended to the same Rule leaves its sibling alone");
+        let sibling = digests_of(&RULED.replace("Given <n>", "Given <n> items"));
+        assert_eq!((sibling["a.b.01"].clone(), sibling["a.b.03"].clone()), (base["a.b.01"].clone(), base["a.b.03"].clone()));
+        assert_ne!(sibling["a.b.02"], base["a.b.02"]);
+        let reformatted = digests_of(&RULED.replace("Feature: Cart\n  Some description.", "Feature: Shopping cart\n  Another description.").replace("# canon: {\"schema\":1}", "# canon: {\"schema\":1,\"at\":\"x\"}").replace("    Given a\n", "        Given a   \n\n"));
+        assert_eq!(reformatted, base);
+    }
+
+    /// A scenario's own steps, tags, doc string, examples and their tags
+    /// move only that scenario's digest.
+    #[test]
+    fn a_scenario_digest_covers_its_own_block_and_tags() {
+        let base = digests_of(RULED);
+        for (from, to, moved) in [
+            ("    Given a\n", "    Given b\n", "a.b.01"),
+            ("@a.b.01 @case:happy", "@a.b.01 @case:failure", "a.b.01"),
+            ("# kept inside a doc string", "# changed inside a doc string", "a.b.01"),
+            ("| 1 |", "| 2 |", "a.b.02"),
+            ("@examples-tag", "@other-examples-tag", "a.b.02"),
+            ("Given c", "Given cc", "a.b.03"),
+        ] {
+            let edited = digests_of(&RULED.replace(from, to));
+            for id in ["a.b.01", "a.b.02", "a.b.03"] {
+                assert_eq!(edited[id] != base[id], id == moved, "{from} → {to}: {id}");
+            }
+        }
+    }
+
+    /// A Background, a Rule and the Feature's tags are inherited context:
+    /// editing the Feature Background moves every scenario, editing a
+    /// Rule or its Background moves only that Rule's scenarios.
+    #[test]
+    fn a_scenario_digest_covers_the_context_it_inherits() {
+        let base = digests_of(RULED);
+        for (from, to, moved) in [
+            ("Given an empty cart", "Given a full cart", &["a.b.01", "a.b.02", "a.b.03"][..]),
+            ("@feature-tag", "@other-feature-tag", &["a.b.01", "a.b.02", "a.b.03"][..]),
+            ("Given a rule background", "Given another rule background", &["a.b.03"][..]),
+            ("Rule: Within a rule", "Rule: Within another rule", &["a.b.03"][..]),
+            ("@rule-tag", "@other-rule-tag", &["a.b.03"][..]),
+        ] {
+            let edited = digests_of(&RULED.replace(from, to));
+            for id in ["a.b.01", "a.b.02", "a.b.03"] {
+                assert_eq!(edited[id] != base[id], moved.contains(&id), "{from} → {to}: {id}");
+            }
+        }
     }
 }

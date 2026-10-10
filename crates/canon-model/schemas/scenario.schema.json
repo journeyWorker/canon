@@ -34,6 +34,17 @@
     "project_id": {
       "$ref": "#/$defs/ProjectId"
     },
+    "scenario_digest": {
+      "description": "sha256-hex over this one scenario's meaning (0.15 D1): its own\nblock and tags plus the context it inherits — the Feature's tags,\nthe Feature Background, and an enclosing Rule with its tags and\nBackground — normalized so comments, blank lines and indentation\ndo not count, and other scenarios never do\n(`canon_fmt::gherkin::scenario_digests` defines it exactly). A\nreview pins this instead of the file-wide `source_digest`, so\nadding or editing a sibling scenario leaves the review current.\nAdditive: records written before 0.15 lack it.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SpecDigest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "scenario_id": {
       "$ref": "#/$defs/ScenarioId"
     },
@@ -148,7 +159,7 @@
       "type": "string"
     },
     "SpecDigest": {
-      "description": "sha256-hex: exactly 64 lowercase hex characters, over a `.feature` file's raw bytes — joins: not a join-spine key; Scenario.source_digest, the inventory-sync freshness signal",
+      "description": "sha256-hex: exactly 64 lowercase hex characters, over a `.feature` file's raw bytes, or over one scenario's normalized block and inherited context — joins: not a join-spine key; Scenario.source_digest (the inventory-sync freshness signal) and Scenario.scenario_digest (what a review pins)",
       "type": "string"
     },
     "SubjectId": {

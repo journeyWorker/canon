@@ -148,20 +148,32 @@ promote`.
 `review add` reads the corpus and records `pins` on the review; the
 reviewer never types them:
 
-- `scenario_digest` — the scenario record's `source_digest`, the sha256 of
-  its `.feature` file that `canon inventory sync` stores;
+- `scenario_digest` — the scenario record's `scenario_digest`: a sha256
+  over that scenario alone, as `canon inventory sync` stores it. It
+  covers the scenario's tags and block (header, steps, doc strings,
+  tables, `Examples:`) and the context it inherits: the Feature's tags,
+  the Feature `Background:`, and an enclosing `Rule:` with its tags and
+  `Background:`. Comments, blank lines and indentation do not count, and
+  neither do other scenarios. A record synced before 0.15 has no
+  `scenario_digest`; then the review pins its `source_digest` (the
+  sha256 of the whole `.feature` file) and records
+  `scenario_digest_scope: file`;
 - `evidence` — the scenario's latest evidence record per role, each as
   `{key, digest}`: the ledger file `kind=evidence_record/<key>__<digest>.json`.
   A scenario with no evidence yet is pinned with an empty list.
 
-It prints `canon review add: pinned <id> at source digest <12 hex> and <n>
-latest evidence record(s); …`. A scenario with no record (never synced)
-is refused with exit 2 and nothing is written: there is nothing to pin.
+It prints `canon review add: pinned <id> at scenario digest <12 hex> and
+<n> latest evidence record(s); …` (`at source digest` for a file pin). A
+scenario with no record (never synced) is refused with exit 2 and nothing
+is written: there is nothing to pin.
 
-The source digest covers the whole `.feature` file, so any edit to that
-file that `inventory sync` records — to this scenario or another one in
-the file — makes the review stale. Review after the spec and evidence
-are final.
+The gate compares each pin like for like: a scenario pin with the
+scenario's current `scenario_digest`, a file pin with its current
+`source_digest`. Adding or editing another scenario in the file leaves a
+scenario-pinned review current; editing this scenario, or a Background
+or Rule it inherits, makes it stale. A file-pinned review stays a file
+pin until it is reviewed again. Review after the spec and evidence are
+final.
 
 ### The reviewer's outcome and runtime
 

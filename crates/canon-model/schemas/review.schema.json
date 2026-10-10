@@ -138,6 +138,21 @@
         "digest"
       ]
     },
+    "PinnedSpec": {
+      "description": "What a review's spec pin covers (0.15 D1).",
+      "oneOf": [
+        {
+          "description": "The whole `.feature` file (`Scenario.source_digest`): any edit to\nthe file stales the review.",
+          "type": "string",
+          "const": "file"
+        },
+        {
+          "description": "The scenario alone (`Scenario.scenario_digest`): only an edit to\nthe scenario or the context it inherits stales the review.",
+          "type": "string",
+          "const": "scenario"
+        }
+      ]
+    },
     "ProjectId": {
       "description": "`[a-z0-9][a-z0-9-]*` — lowercase alnum + hyphen, first character alphanumeric, no underscore (keeps the `__` natural-key separator unambiguous) — joins: not a join-spine key; composite identity prefix on Scenario/Review/Divergence natural keys (`<project_id>__<scenario_id>…`), optional on EvidenceRecord",
       "type": "string"
@@ -201,7 +216,7 @@
       ]
     },
     "ReviewPins": {
-      "description": "What a [`Review`] saw (0.15 D1): the reviewed scenario's\n`source_digest` (the digest `canon inventory sync` stores on its\n[`Scenario`] record) and the latest evidence record per role for that\nscenario. `evidence` is always written, empty when the scenario had\nnone, so \"pinned with no evidence\" never reads as \"unpinned\".",
+      "description": "What a [`Review`] saw (0.15 D1): the reviewed scenario's digest\n(`scenario_digest`, of the kind `scenario_digest_scope` names) and the\nlatest evidence record per role for that scenario. `evidence` is\nalways written, empty when the scenario had none, so \"pinned with no\nevidence\" never reads as \"unpinned\".",
       "type": "object",
       "properties": {
         "evidence": {
@@ -212,6 +227,10 @@
         },
         "scenario_digest": {
           "$ref": "#/$defs/SpecDigest"
+        },
+        "scenario_digest_scope": {
+          "description": "Which digest `scenario_digest` holds, so the gate compares like\nwith like. Absent means `file`: the review was pinned to the\n`.feature` file's `source_digest`, the only kind before\n`Scenario.scenario_digest` existed.",
+          "$ref": "#/$defs/PinnedSpec"
         }
       },
       "required": [
@@ -232,7 +251,7 @@
       "type": "string"
     },
     "SpecDigest": {
-      "description": "sha256-hex: exactly 64 lowercase hex characters, over a `.feature` file's raw bytes — joins: not a join-spine key; Scenario.source_digest, the inventory-sync freshness signal",
+      "description": "sha256-hex: exactly 64 lowercase hex characters, over a `.feature` file's raw bytes, or over one scenario's normalized block and inherited context — joins: not a join-spine key; Scenario.source_digest (the inventory-sync freshness signal) and Scenario.scenario_digest (what a review pins)",
       "type": "string"
     }
   }

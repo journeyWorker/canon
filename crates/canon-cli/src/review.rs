@@ -40,7 +40,7 @@ use std::path::Path;
 use canon_gate::review_gate::current_pins;
 use canon_gate::spec_coverage::latest_scenarios;
 use canon_gate::{GateContext, GateCtx};
-use canon_model::{Actor, Envelope, ProjectId, ProvenanceRef, RecordKind, Review, ReviewOutcome, RoleId, ScenarioId, SessionId};
+use canon_model::{Actor, Envelope, PinnedSpec, ProjectId, ProvenanceRef, RecordKind, Review, ReviewOutcome, RoleId, ScenarioId, SessionId};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -153,8 +153,12 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     review.reviewer_model = args.reviewer_model.clone();
     review.reviewer_harness = args.reviewer_harness.clone();
     let pinned = format!(
-        "canon review add: pinned {} at source digest {} and {} latest evidence record(s); the review counts only while both are unchanged",
+        "canon review add: pinned {} at {} {} and {} latest evidence record(s); the review counts only while both are unchanged",
         args.scenario_id.as_str(),
+        match pins.scenario_digest_scope {
+            PinnedSpec::Scenario => "scenario digest",
+            PinnedSpec::File => "source digest",
+        },
         &pins.scenario_digest.as_str()[..12],
         pins.evidence.len()
     );

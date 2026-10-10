@@ -107,10 +107,10 @@ Feature: review add
   @subject:review-attestation
   @case:happy
   @review.add.20
-  Scenario: A review pins the scenario's source digest and its latest evidence, computed rather than typed
+  Scenario: A review pins the scenario's digest and its latest evidence, computed rather than typed
     Given a scenario with a record and one promoted evidence record
     When a review is added without naming any digest
-    Then the review carries the scenario's source digest from its record
+    Then the review carries the scenario's digest from its record: its own scenario digest, or the file's source digest when the record has none
     And it carries the evidence record's natural key and ledger file digest
     And a scenario with no evidence yet is pinned with an empty evidence list, never left unpinned
 
@@ -130,7 +130,7 @@ Feature: review add
   @review.add.22
   Scenario: A pinned review turns stale when its scenario's text changes
     Given a pinned review that lets its subject enter verifying with the gate clean
-    When the scenario's text changes and `canon inventory sync` records the new source digest
+    When the scenario's text changes and `canon inventory sync` records its new digest
     Then `canon gate check` exits 1 with unreviewed-promotion
     And the detail says the review is stale because the spec changed
 
@@ -184,3 +184,15 @@ Feature: review add
     When `canon status` runs
     Then the subject line counts one stale and one unsigned review, and neither as reviewed
     And the review step names how many scenarios have each kind of gap
+
+  # canon: {"schema":1,"at":"2026-10-10T20:10:17Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:edge
+  @review.add.28
+  Scenario: A review pins its scenario's own digest, so a sibling's edit never stales it
+    Given require_review over a .feature file with a Background and two scenarios, each attested and reviewed with its scenario digest pinned
+    When a third scenario is appended to the file and synced
+    Then the first two reviews stay current and only the new scenario lacks a review
+    And editing one scenario's steps stales only that scenario's review, naming the scenario's digest
+    And editing the Background stales the review of every scenario that inherits it
+    And a review pinned to the file's source digest keeps being compared with the file's source digest

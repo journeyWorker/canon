@@ -119,7 +119,7 @@ A present section, even `require_evidence: false` or a malformed one
   in `require_review.scope` (default `[verifying, shipped]`; `[]` = every
   scenario; independent of `scope` above) need a `Review` record
   (`canon review add`) whose latest version per reviewer is `signed`,
-  still matches the scenario source digest and latest evidence it pinned
+  still matches the scenario digest and latest evidence it pinned
   (a review written before 0.15 has no pins and skips this check), and,
   when `distinct_actor` (default `true`), is by a reviewer and actor
   other than the scenario's evidence actor and from a session other than

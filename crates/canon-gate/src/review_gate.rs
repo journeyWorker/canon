@@ -20,9 +20,13 @@
 //! - be `signed` (0.15 D4). `indeterminate` and `unavailable` are gaps
 //!   with their own detail, never an approval and never a rejection.
 //! - still match what it pinned (0.15 D1), when it carries `pins`: the
-//!   scenario's current `source_digest`, and the current latest evidence
-//!   record per role for the scenario ([`current_pins`]). Otherwise it is
-//!   a stale review, and the detail names whether the spec, the evidence,
+//!   scenario's current digest of the kind it pinned — its own
+//!   `scenario_digest` when the record had one at review time, else the
+//!   file-wide `source_digest` — and the current latest evidence record
+//!   per role for the scenario ([`current_pins`]). Each pin is compared
+//!   like for like, so a file-pinned review never goes stale just because
+//!   the scenario record gained a `scenario_digest`. Otherwise it is a
+//!   stale review, and the detail names whether the spec, the evidence,
 //!   or both changed. A review without `pins` predates pinning (0.15); it
 //!   keeps counting under the older rules, and [`unpinned_reviews`] feeds
 //!   the one advisory line `canon gate check`, `canon subject status` and
@@ -69,7 +73,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use canon_model::{
-    ChangeId, EvidencePin, EvidenceRecord, Finding, FindingDisposition, FindingSeverity, RecordKind, Review, ReviewPins, Scenario, StatusOverride, Subject, SubjectId,
+    ChangeId, EvidencePin, EvidenceRecord, Finding, FindingDisposition, FindingSeverity, PinnedSpec, RecordKind, Review, ReviewPins, Scenario, StatusOverride, Subject, SubjectId,
     SubjectStatus,
 };
 
@@ -302,7 +306,8 @@ pub struct ReviewGap {
 /// What changed under a pinned review since it was written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Staleness {
-    spec: bool,
+    /// The spec pin no longer matches; names which kind of pin it was.
+    spec: Option<PinnedSpec>,
     evidence: bool,
 }
 
@@ -317,12 +322,14 @@ fn scenario_evidence<'a>(ctx: &'a GateContext, scenario: &Scenario) -> Vec<&'a E
 }
 
 /// What a review of `scenario` pins right now (0.15 D1): its
-/// `source_digest`, and the latest evidence record per role for it (the
-/// fold `latest_verdicts` applies), each named by its ledger file: the
-/// natural key and digest of `kind=evidence_record/<key>__<digest>.json`,
-/// in `(key, digest)` order. A record not read from a file (built in
-/// memory) is named by its own content digest. `canon review add` writes
-/// this; [`review_gap`] compares a pinned review against it.
+/// `scenario_digest` (scope `scenario`) when the record carries one, else
+/// its file-wide `source_digest` (scope `file`), and the latest evidence
+/// record per role for it (the fold `latest_verdicts` applies), each
+/// named by its ledger file: the natural key and digest of
+/// `kind=evidence_record/<key>__<digest>.json`, in `(key, digest)` order.
+/// A record not read from a file (built in memory) is named by its own
+/// content digest. `canon review add` writes this; [`review_gap`]
+/// compares a pinned review against the scenario and these evidence pins.
 pub fn current_pins(ctx: &GateContext, scenario: &Scenario) -> ReviewPins {
     let evidence = scenario_evidence(ctx, scenario);
     let mut pins: Vec<EvidencePin> = latest_by_key(&evidence, |e| e.envelope.actor.role.as_ref().map(|r| r.as_str().to_string()))
@@ -338,17 +345,28 @@ pub fn current_pins(ctx: &GateContext, scenario: &Scenario) -> ReviewPins {
         })
         .collect();
     pins.sort();
-    ReviewPins { scenario_digest: scenario.source_digest.clone(), evidence: pins }
+    let (scenario_digest, scenario_digest_scope) = match &scenario.scenario_digest {
+        Some(digest) => (digest.clone(), PinnedSpec::Scenario),
+        None => (scenario.source_digest.clone(), PinnedSpec::File),
+    };
+    ReviewPins { scenario_digest, scenario_digest_scope, evidence: pins }
 }
 
 /// `None` when `review` is unpinned (it predates 0.15) or still matches
-/// `current`; otherwise what changed.
-fn staleness(review: &Review, current: &ReviewPins) -> Option<Staleness> {
+/// `scenario` and the `current` evidence pins; otherwise what changed.
+/// The spec pin is compared like for like: a file pin against the
+/// scenario's `source_digest`, a scenario pin against its
+/// `scenario_digest` (a record without one no longer matches it).
+fn staleness(review: &Review, scenario: &Scenario, current: &ReviewPins) -> Option<Staleness> {
     let pins = review.pins.as_ref()?;
+    let spec_current = match pins.scenario_digest_scope {
+        PinnedSpec::File => pins.scenario_digest == scenario.source_digest,
+        PinnedSpec::Scenario => scenario.scenario_digest.as_ref() == Some(&pins.scenario_digest),
+    };
     let pinned: BTreeSet<&EvidencePin> = pins.evidence.iter().collect();
     let now: BTreeSet<&EvidencePin> = current.evidence.iter().collect();
-    let changed = Staleness { spec: pins.scenario_digest != current.scenario_digest, evidence: pinned != now };
-    (changed.spec || changed.evidence).then_some(changed)
+    let changed = Staleness { spec: (!spec_current).then_some(pins.scenario_digest_scope), evidence: pinned != now };
+    (changed.spec.is_some() || changed.evidence).then_some(changed)
 }
 
 /// The latest review per `reviewer` of `(project_id, scenario_id)`
@@ -406,7 +424,7 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
     let mut stale: Vec<(&Review, Staleness)> = Vec::new();
     let mut fresh: Vec<&Review> = Vec::new();
     for review in signed {
-        match staleness(review, &current) {
+        match staleness(review, scenario, &current) {
             Some(changed) => stale.push((review, changed)),
             None => fresh.push(review),
         }
@@ -445,12 +463,19 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
 
     if !stale.is_empty() {
         let who = stale.iter().map(|(r, _)| format!("`{}`", r.reviewer)).collect::<Vec<_>>().join(", ");
-        let spec = stale.iter().any(|(_, c)| c.spec);
+        let scenario_spec = stale.iter().any(|(_, c)| c.spec == Some(PinnedSpec::Scenario));
+        let file_spec = stale.iter().any(|(_, c)| c.spec == Some(PinnedSpec::File));
         let evidence = stale.iter().any(|(_, c)| c.evidence);
-        let changed = match (spec, evidence) {
-            (true, true) => "its spec and its evidence changed (the .feature file's source digest and the latest evidence records are not the pinned ones)",
-            (true, false) => "its spec changed (the .feature file's source digest is not the pinned one)",
-            _ => "its evidence changed (the latest evidence records are not the pinned ones)",
+        let spec_what = match (scenario_spec, file_spec) {
+            (true, false) => Some("the scenario's digest"),
+            (false, true) => Some("the .feature file's source digest"),
+            (true, true) => Some("the scenario's digest, or the .feature file's source digest a file-pinned review saw,"),
+            (false, false) => None,
+        };
+        let changed = match (spec_what, evidence) {
+            (Some(what), true) => format!("its spec and its evidence changed ({what} and the latest evidence records are not the pinned ones)"),
+            (Some(what), false) => format!("its spec changed ({what} is not the pinned one)"),
+            (None, _) => "its evidence changed (the latest evidence records are not the pinned ones)".to_string(),
         };
         return gap(
             ReviewGapKind::Stale,

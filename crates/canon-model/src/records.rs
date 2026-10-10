@@ -397,6 +397,17 @@ pub struct Scenario {
     /// the freshness signal `sync`'s logical-idempotence check compares
     /// against, NOT `ids::Sha` (a 40-hex git commit sha).
     pub source_digest: SpecDigest,
+    /// sha256-hex over this one scenario's meaning (0.15 D1): its own
+    /// block and tags plus the context it inherits — the Feature's tags,
+    /// the Feature Background, and an enclosing Rule with its tags and
+    /// Background — normalized so comments, blank lines and indentation
+    /// do not count, and other scenarios never do
+    /// (`canon_fmt::gherkin::scenario_digests` defines it exactly). A
+    /// review pins this instead of the file-wide `source_digest`, so
+    /// adding or editing a sibling scenario leaves the review current.
+    /// Additive: records written before 0.15 lack it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scenario_digest: Option<SpecDigest>,
     /// The optional classification axis for the scenario (s49), retained
     /// as a shape-validated kebab slug. Vocabulary membership is checked
     /// by `canon inventory sync` against the repository's activated
@@ -429,7 +440,7 @@ pub struct Scenario {
 impl Scenario {
     pub fn new(envelope: Envelope, project_id: ProjectId, scenario_id: ScenarioId, title: impl Into<String>, description: impl Into<String>, source_digest: SpecDigest) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Scenario);
-        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, lane: None, case: None, subject_id: None }
+        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, scenario_digest: None, lane: None, case: None, subject_id: None }
     }
 }
 
@@ -810,15 +821,40 @@ impl CanonRecord for Review {
     }
 }
 
-/// What a [`Review`] saw (0.15 D1): the reviewed scenario's
-/// `source_digest` (the digest `canon inventory sync` stores on its
-/// [`Scenario`] record) and the latest evidence record per role for that
-/// scenario. `evidence` is always written, empty when the scenario had
-/// none, so "pinned with no evidence" never reads as "unpinned".
+/// What a [`Review`] saw (0.15 D1): the reviewed scenario's digest
+/// (`scenario_digest`, of the kind `scenario_digest_scope` names) and the
+/// latest evidence record per role for that scenario. `evidence` is
+/// always written, empty when the scenario had none, so "pinned with no
+/// evidence" never reads as "unpinned".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ReviewPins {
     pub scenario_digest: SpecDigest,
+    /// Which digest `scenario_digest` holds, so the gate compares like
+    /// with like. Absent means `file`: the review was pinned to the
+    /// `.feature` file's `source_digest`, the only kind before
+    /// `Scenario.scenario_digest` existed.
+    #[serde(default, skip_serializing_if = "PinnedSpec::is_file")]
+    pub scenario_digest_scope: PinnedSpec,
     pub evidence: Vec<EvidencePin>,
+}
+
+/// What a review's spec pin covers (0.15 D1).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PinnedSpec {
+    /// The whole `.feature` file (`Scenario.source_digest`): any edit to
+    /// the file stales the review.
+    #[default]
+    File,
+    /// The scenario alone (`Scenario.scenario_digest`): only an edit to
+    /// the scenario or the context it inherits stales the review.
+    Scenario,
+}
+
+impl PinnedSpec {
+    pub fn is_file(&self) -> bool {
+        *self == PinnedSpec::File
+    }
 }
 
 /// One pinned evidence record: its ledger natural key (the `task_id`,
@@ -2449,10 +2485,15 @@ mod tests {
             "9c93d024b1a2",
             ProvenanceRef::UpstreamRef("pr#1".into()),
         );
-        review.pins = Some(ReviewPins { scenario_digest: SpecDigest::of(b"feature"), evidence: Vec::new() });
+        review.pins = Some(ReviewPins { scenario_digest: SpecDigest::of(b"feature"), scenario_digest_scope: PinnedSpec::File, evidence: Vec::new() });
         let json = serde_json::to_value(&review).unwrap();
         assert_eq!(json["pins"]["evidence"], serde_json::json!([]));
+        assert!(json["pins"].get("scenario_digest_scope").is_none(), "a file pin is the default and is not written, so pre-scope pins read as file pins");
+        review.pins.as_mut().unwrap().scenario_digest_scope = PinnedSpec::Scenario;
+        let json = serde_json::to_value(&review).unwrap();
+        assert_eq!(json["pins"]["scenario_digest_scope"], "scenario");
         assert!(json.get("outcome").is_none(), "signed is the default and is not written");
+        assert_eq!(serde_json::from_value::<Review>(json).unwrap(), review);
 
         review.outcome = ReviewOutcome::Indeterminate;
         review.reviewer_provider = Some("openai".into());
