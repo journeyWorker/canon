@@ -1,0 +1,6 @@
+spec_coverage:
+  require_evidence: true
+  require_audit:
+    rate: 1
+    seed: conformance
+    scope: []

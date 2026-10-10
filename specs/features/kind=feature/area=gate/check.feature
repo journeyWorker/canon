@@ -25,7 +25,7 @@ Feature: gate check
   @subject:gate-trust-spine
   @case:failure
   @gate.check.03
-  Scenario: Each of the nine failure classes fires on its own fixture and only there
+  Scenario: Each of the ten failure classes fires on its own fixture and only there
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given the shipped fixture corpus, one fixture per failure class
     When every fixture is evaluated against its own recorded expectations
@@ -36,11 +36,11 @@ Feature: gate check
   @subject:gate-trust-spine
   @case:edge
   @gate.check.04
-  Scenario: The failure-class vocabulary is closed at nine grep-stable strings
+  Scenario: The failure-class vocabulary is closed at ten grep-stable strings
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a hook or a fixture that matches violations by substring rather than by type
     When the published wire strings are compared against the classes the gate raises
-    Then the nine strings are that set, in that order, with no duplicates
+    Then the ten strings are that set, in that order, with no duplicates
     And every string parses back to the class it names
     And a plausible-looking class name the gate never raises does not parse
 
@@ -254,3 +254,53 @@ Feature: gate check
     When the gate checks the repository
     Then the gate exits 1 with stale-evidence naming the blob's actual digest
     And the line says the stored blob does not match its name, never that the bound bytes are gone
+
+  # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.60
+  Scenario: A refuted latest audit is false-success even beside a faithful declared verdict
+    Given a scenario with a faithful declared verdict and a refuted latest audit
+    When the gate is checked
+    Then it exits 1 with false-success naming the evaluator and the counterexample path
+    And a later faithful declared re-attest does not clear it
+    And moving the owning subject to shipped is refused with false-success
+
+  # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:happy
+  @gate.check.61
+  Scenario: A newer confirmed audit clears false-success and lets the subject ship
+    Given a scenario whose latest audit is refuted
+    When a newer confirmed audit is recorded, naming the counterexample report with --drop-attachment
+    Then the gate is clean and the owning subject can ship
+
+  # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.62
+  Scenario: A scenario the require_audit sample selects is uncovered-cell until a decided audit exists
+    Given spec_coverage.require_audit with rate 0.5, seed canon-0.15 and every scenario in scope
+    When the gate is checked
+    Then exactly the scenarios whose sha256(seed, 0x00, project, 0x00, scenario) first 8 bytes fall below rate times 2^64 are uncovered-cell with an audit detail
+    And an indeterminate latest audit still owes one, and a confirmed audit clears it
+    And canon status lists the owed audits
+
+  # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.63
+  Scenario: require_audit scope defaults to claimed-done subjects and its rate bounds are inclusive
+    Given require_audit with rate 1 and no scope
+    When the owning subject is building, then verifying
+    Then the gate is clean while building and red while verifying, and the ship guard refuses the owed audit
+    And with rate 0 nothing is sampled
+
+  # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.64
+  Scenario: A malformed require_audit poisons the spec_coverage section
+    Given require_audit with a rate out of range, no rate, an unknown key, a string rate, an unknown scope status, or null
+    When the gate is checked
+    Then it exits 1 with spec_coverage unusable, naming the problem

@@ -282,7 +282,7 @@ fn expected_sample(seed: &str, rate: f64, ids: &[&str]) -> Vec<String> {
         .collect()
 }
 
-/// gate.check.62 / context.status.60: the sample is a pure function of
+/// gate.check.62: the sample is a pure function of
 /// (seed, project, scenario, rate); a sampled scenario without an audit
 /// is `uncovered-cell` with an audit detail, an indeterminate audit still
 /// owes one, and a confirmed audit clears it.
@@ -348,7 +348,7 @@ fn require_audit_scope_defaults_to_claimed_done_subjects_and_rate_is_inclusive()
     ok(repo, &["gate", "check"]);
 }
 
-/// policy.expressions.60 (D3): a malformed `require_audit` poisons the
+/// gate.check.64: a malformed `require_audit` poisons the
 /// whole `spec_coverage` section.
 #[test]
 fn a_malformed_require_audit_poisons_spec_coverage() {

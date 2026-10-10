@@ -1,0 +1,16 @@
+description: "0.15 D2: re-attesting a scenario with fewer bound files is refused (exit 2) naming the dropped path and both ways out; `--drop-attachment <path> --drop-reason <text>` records the drop on the record (exit 0), and `canon status` lists it"
+steps:
+  - args: [inventory, sync]
+    exit: 0
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --artifact, reports/shot.txt, --artifact, reports/run.log]
+    exit: 0
+  - args: [gate, promote]
+    exit: 0
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --artifact, reports/run.log]
+    exit: 2
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --artifact, reports/run.log, --drop-attachment, reports/shot.txt, --drop-reason, "screenshots moved to the e2e lane"]
+    exit: 0
+  - args: [gate, promote]
+    exit: 0
+  - args: [status]
+    exit: 0

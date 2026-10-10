@@ -49,6 +49,8 @@ assumption you state there, and say so in your final report.
    with `--report junit:<path>` or `--artifact <path>` when files prove it.
    canon stores those bytes in `.canon/artifacts/sha256/` (commit it with the
    ledger) and `canon gate check` re-checks them. Then `canon gate promote`.
+   An external evaluator's audit is recorded with `canon evidence add --kind
+   audit`; canon never generates one.
 7. **Independent review.** A different session from the one that wrote the
    code and evidence reviews the change. Record every defect as a finding,
    including the ones the author found and fixed during implementation:

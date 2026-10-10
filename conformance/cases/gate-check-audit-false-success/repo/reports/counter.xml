@@ -1,0 +1,1 @@
+<testsuite><testcase name="cart.add.01: adding a sold-out item still fills the cart"><failure/></testcase></testsuite>

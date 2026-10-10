@@ -1,0 +1,8 @@
+description: "0.15 D3: `require_audit` sampling is deterministic — at rate 0.5, seed `canon-0.15`, root `root`, exactly shop.cart.02, .05 and .06 of shop.cart.01..06 are sampled (sha256(seed 0x00 project 0x00 scenario)[..8] big-endian < rate*2^64), so exactly those are `uncovered-cell` (exit 1) and listed as owed by `canon status`"
+steps:
+  - args: [inventory, sync]
+    exit: 0
+  - args: [gate, check]
+    exit: 1
+  - args: [status, --json]
+    exit: 0

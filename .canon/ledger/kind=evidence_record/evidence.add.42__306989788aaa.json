@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "l2-impl"
+  },
+  "at": "2026-10-10T19:38:06.164770Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_audit an_unpromoted_record_is_the_latest_the_guard_compares_with"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 28,
+  "scenario_id": "evidence.add.42",
+  "schema": 1,
+  "staging_id": "8f681c006b00",
+  "verdict": "faithful"
+}

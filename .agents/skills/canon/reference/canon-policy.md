@@ -124,6 +124,40 @@ question rather than adding an expression field. Conditional logic about
 what a record *means* lives in `policy.yaml`/`applies_when:`, evaluated
 against the record's fields, never inside the record.
 
+## Sampled audits: `spec_coverage.require_audit`
+
+Optional; absent means no audit is ever owed (a recorded `refuted` audit
+is still `false-success` regardless — see `canon-gate`).
+
+```yaml
+spec_coverage:
+  require_audit:
+    rate: 0.1                  # required: a number in [0, 1]
+    seed: "2026-q4"            # optional string; default ""
+    scope: [verifying, shipped] # optional subject statuses; this is the default; [] = every scenario
+```
+
+`spec_coverage.exclude_lanes` applies. A malformed `require_audit` —
+unknown key, missing `rate`, `rate` out of range or a string, bad
+`scope`, `null` or a non-mapping — poisons the whole `spec_coverage`
+section: the gate reports `uncovered-cell spec_coverage — ... unusable`
+rather than checking anything under it.
+
+Sampling is deterministic. A scenario is in the sample iff the first 8
+bytes of
+
+```
+sha256(seed || 0x00 || project_id || 0x00 || scenario_id)
+```
+
+read as a big-endian u64, are less than `rate · 2^64` — computed exactly,
+as a comparison against `ceil(rate · 2^64)`, so `rate: 0` samples nothing
+and `rate: 1` samples everything. A sampled in-scope scenario whose
+latest audit is missing or `indeterminate` is `uncovered-cell`; with
+`shipped` in `scope`, `canon subject status <id> shipped` also refuses
+it. `canon context` and the `canon status` policy line show
+`require_audit=(rate=… seed=`…` scope=…)`.
+
 ## Effect-aware risk tiers
 
 The optional `risk_tiers` section is not CEL. Absent means no risk-approval
