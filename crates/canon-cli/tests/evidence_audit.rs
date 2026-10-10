@@ -268,6 +268,58 @@ fn a_refuted_audit_is_false_success_until_a_newer_audit_confirms() {
     ok(repo, &["subject", "status", "run", "shipped", "--actor-id", "lead"]);
 }
 
+/// gate.check.65: the false-success fix names the counterexamples a
+/// re-audit must drop on purpose. The gate line and `canon status`'s next
+/// command both carry `--drop-attachment <path>` and `--drop-reason`, and
+/// the re-audit those flags describe is accepted and clears the gate.
+#[test]
+fn the_false_success_fix_names_the_counterexample_drop() {
+    let dir = setup();
+    let repo = dir.path();
+    subject_at(repo, "run", "verifying");
+    scenario(repo, "game.run.01", Some("run"));
+    record(repo, &attest_args("game.run.01", &[]));
+    write(repo, "reports/counter.xml", br#"<testsuite><testcase name="game.run.01: health below zero keeps the run alive"><failure/></testcase></testsuite>"#);
+    record(repo, &audit_args("game.run.01", "refuted", &["--report", "junit:reports/counter.xml"]));
+
+    let gate = text(&canon(repo, &["gate", "check"]));
+    assert!(gate.contains("a new audit that no longer binds the counterexamples records why: --drop-attachment reports/counter.xml --drop-reason <text>"), "{gate}");
+
+    let report = status_json(repo);
+    let command = report["next"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|n| n["command"].as_str())
+        .find(|c| c.contains("--kind audit --scenario-id game.run.01"))
+        .unwrap_or_else(|| panic!("a re-audit next step: {report}"))
+        .to_string();
+    assert!(command.contains(" --drop-attachment reports/counter.xml --drop-reason \"<why the counterexample no longer applies>\""), "{command}");
+
+    // The command without the drop is what the guard refuses; with it, the
+    // re-audit is recorded and false-success clears.
+    refused(repo, &audit_args("game.run.01", "confirmed", &[]));
+    record(repo, &audit_args("game.run.01", "confirmed", &["--drop-attachment", "reports/counter.xml", "--drop-reason", "the counterexample is fixed"]));
+    let gate = canon(repo, &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(0), "{}", text(&gate));
+}
+
+/// gate.check.65: a refutation with no counterexample bound has nothing
+/// to drop, so neither the gate line nor the next command names a drop.
+#[test]
+fn a_refutation_without_counterexamples_names_no_drop() {
+    let dir = setup();
+    let repo = dir.path();
+    subject_at(repo, "run", "verifying");
+    scenario(repo, "game.run.01", Some("run"));
+    record(repo, &attest_args("game.run.01", &[]));
+    record(repo, &audit_args("game.run.01", "refuted", &[]));
+    let gate = text(&canon(repo, &["gate", "check"]));
+    assert!(gate.contains("false-success game.run.01") && !gate.contains("--drop-attachment"), "{gate}");
+    let report = status_json(repo);
+    assert!(report["next"].as_array().unwrap().iter().all(|n| !n["command"].as_str().unwrap_or_default().contains("--drop-attachment")), "{report}");
+}
+
 /// The scenarios a `require_audit` policy with `seed` and `rate` samples,
 /// computed here independently of canon: sha256(seed 0x00 project 0x00
 /// scenario), first 8 bytes big-endian, below rate * 2^64.

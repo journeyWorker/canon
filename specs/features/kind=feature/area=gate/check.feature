@@ -315,3 +315,14 @@ Feature: gate check
     Then the review still counts and the gate exits 0
     And one advisory line names how many in-effect reviews predate review pinning
     And `canon status` prints the same advisory, and `canon subject status` prints it for the subject's own scenarios
+
+  # canon: {"schema":1,"at":"2026-10-10T20:02:32Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.65
+  Scenario: The false-success fix names the counterexamples a re-audit must drop
+    Given a scenario whose latest audit is refuted and binds a counterexample report
+    When the gate is checked and canon status is read
+    Then the false-success line and the re-audit next command name --drop-attachment with the counterexample path and --drop-reason
+    And the re-audit those flags describe is accepted and clears the gate
+    And a refutation that binds no counterexample names no drop

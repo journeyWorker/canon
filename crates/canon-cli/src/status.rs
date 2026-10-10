@@ -694,11 +694,27 @@ fn subject_steps(
         .unwrap_or(status);
     let audit_gaps = audit::subject_audit_gaps(ctx, &subject.subject_id, audit_target);
     let owned = subject_scenarios(ctx, &subject.subject_id);
+    let project_of = |scenario: &str| owned.iter().find(|s| s.scenario_id.as_str() == scenario).map_or("<root-id>", |s| s.project_id.as_str());
     let audit_command = |scenario: &str| {
-        let project = owned.iter().find(|s| s.scenario_id.as_str() == scenario).map_or("<root-id>", |s| s.project_id.as_str());
         format!(
-            "canon evidence add --kind audit --scenario-id {scenario} --project-id {project} --evaluator-id <evaluator> --evaluator-version <version> --evaluator-digest <sha256> --audit-result <confirmed|refuted|indeterminate> --ref \"<evaluator run>\" --role auditor --actor-id <evaluator>"
+            "canon evidence add --kind audit --scenario-id {scenario} --project-id {} --evaluator-id <evaluator> --evaluator-version <version> --evaluator-digest <sha256> --audit-result <confirmed|refuted|indeterminate> --ref \"<evaluator run>\" --role auditor --actor-id <evaluator>",
+            project_of(scenario)
         )
+    };
+    // A re-audit that leaves out a refutation's counterexamples passes
+    // the drop guard only by naming them, so the command does.
+    let latest_audits = audit::latest_audits(ctx);
+    let counterexample_drops = |scenario: &str| {
+        let paths: Vec<&str> = latest_audits
+            .iter()
+            .find(|((project, id), _)| id.as_str() == scenario && project.as_str() == project_of(scenario))
+            .map(|(_, record)| record.attachments.iter().map(|a| a.path.as_str()).collect())
+            .unwrap_or_default();
+        let mut flags: String = paths.iter().map(|path| format!(" --drop-attachment {path}")).collect();
+        if !flags.is_empty() {
+            flags.push_str(" --drop-reason \"<why the counterexample no longer applies>\"");
+        }
+        flags
     };
     for (class, why) in [
         (canon_gate::FailureClass::FalseSuccess, "scenario(s) have a refuted latest audit (false-success); fix the behavior, re-attest, and have the external evaluator re-audit"),
@@ -706,7 +722,11 @@ fn subject_steps(
     ] {
         let gaps: Vec<&canon_gate::Violation> = audit_gaps.iter().filter(|v| v.class == class).collect();
         if let Some(first) = gaps.first() {
-            next.push(NextStep { command: audit_command(&first.subject), why: format!("{id}: {} {why} (first: {})", gaps.len(), first.subject) });
+            let mut command = audit_command(&first.subject);
+            if class == canon_gate::FailureClass::FalseSuccess {
+                command.push_str(&counterexample_drops(&first.subject));
+            }
+            next.push(NextStep { command, why: format!("{id}: {} {why} (first: {})", gaps.len(), first.subject) });
         }
     }
 

@@ -60,17 +60,24 @@ impl GateCheck for AuditCheck {
 }
 
 /// `Some(false-success)` when `record` (a scenario's latest audit) is
-/// `refuted`.
+/// `refuted`. When the refutation bound counterexamples, the fix names
+/// them: a newer audit that leaves them out passes the drop guard only
+/// with `--drop-attachment` and `--drop-reason`.
 pub fn false_success(scenario_id: &str, record: &EvidenceRecord) -> Option<Violation> {
     let audit = record.audit.as_ref().filter(|a| a.result == AuditResult::Refuted)?;
     let mut counterexamples: Vec<&str> = record.attachments.iter().map(|a| a.path.as_str()).collect();
     counterexamples.dedup();
-    let counterexamples = if counterexamples.is_empty() { String::new() } else { format!(", counterexamples: {}", counterexamples.join(", ")) };
+    let (listed, drop) = if counterexamples.is_empty() {
+        (String::new(), String::new())
+    } else {
+        let flags: Vec<String> = counterexamples.iter().map(|path| format!("--drop-attachment {path}")).collect();
+        (format!(", counterexamples: {}", counterexamples.join(", ")), format!("; a new audit that no longer binds the counterexamples records why: {} --drop-reason <text>", flags.join(" ")))
+    };
     Some(Violation::new(
         FailureClass::FalseSuccess,
         scenario_id,
         format!(
-            "latest audit refuted this scenario's declared success (evaluator `{}` {}, sha256 {}{counterexamples}); a declared faithful verdict does not override it — fix the behavior, re-attest, and record the evaluator's new audit with `canon evidence add --kind audit`",
+            "latest audit refuted this scenario's declared success (evaluator `{}` {}, sha256 {}{listed}); a declared faithful verdict does not override it — fix the behavior, re-attest, and record the evaluator's new audit with `canon evidence add --kind audit`{drop}",
             audit.evaluator_id, audit.evaluator_version, audit.evaluator_digest
         ),
     ))
