@@ -154,10 +154,11 @@ the command, and `init` and the skill's stop point say so.
 
 - `finding add` and `finding close` resolve short SHAs through git and store
   the full SHA; a short SHA that names no commit is refused.
-- Read commands (`query`, `status`, `context`, `gate check`) write
-  `.canon/audit` only beside the `canon.yaml` they read, never into another
-  repo or one without `canon.yaml`. The stray tracked
-  `crates/canon-cli/.canon/audit/access.jsonl` was removed.
+- The access audit (`.canon/audit/access.jsonl`, written by `query`,
+  `export` and `purge`) is written only beside the `canon.yaml` the command
+  read, never into another repo or into one without `canon.yaml`. `status`,
+  `context` and `gate check` read without auditing, as before. The stray
+  tracked `crates/canon-cli/.canon/audit/access.jsonl` was removed.
 - The skill tells an author to record defects they find in their own work
   when they find them, before review, and that task evidence must bind the
   artifact or report proving the task.
