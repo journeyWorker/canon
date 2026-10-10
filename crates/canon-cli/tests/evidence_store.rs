@@ -200,8 +200,21 @@ fn every_report_case_carrying_the_scenario_id_is_bound_and_any_failure_refuses_f
     .unwrap();
     let added = attest(repo, &["--report", "junit:reports/junit.xml", "--report-case", "hud_survives_restart"]);
     assert!(added.status.success(), "{}", text(&added));
-    let cases: Vec<String> = committed_records(repo)[0]["attachments"].as_array().unwrap().iter().map(|a| a["case"].as_str().unwrap().to_string()).collect();
-    assert_eq!(cases, ["game.run.01: hp hits zero", "game.run.01: result screen shows", "hud_survives_restart"]);
+    let bound: Vec<(String, String)> = committed_records(repo)[0]["attachments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| (a["case"].as_str().unwrap().to_string(), a["outcome"].as_str().unwrap().to_string()))
+        .collect();
+    assert_eq!(
+        bound,
+        [
+            ("game.run.01: hp hits zero".to_string(), "passed".to_string()),
+            ("game.run.01: result screen shows".to_string(), "passed".to_string()),
+            ("hud_survives_restart".to_string(), "passed".to_string()),
+        ],
+        "every bound case is recorded with its own outcome"
+    );
 
     std::fs::write(
         repo.join("reports/junit.xml"),
@@ -211,6 +224,20 @@ fn every_report_case_carrying_the_scenario_id_is_bound_and_any_failure_refuses_f
     let refused = attest(repo, &["--report", "junit:reports/junit.xml", "--report-case", "hud_survives_restart"]);
     assert_eq!(refused.status.code(), Some(1), "{}", text(&refused));
     assert!(text(&refused).contains("game.run.01: result screen shows` as failed"), "{}", text(&refused));
+    assert_eq!(committed_records(repo).len(), 1, "a refused faithful claim stages nothing");
+
+    // An honest divergent verdict over the same report records each
+    // case's own outcome: the failed one as failed, the rest as passed.
+    let honest = attest(repo, &["--report", "junit:reports/junit.xml", "--report-case", "hud_survives_restart", "--verdict", "divergent"]);
+    assert!(honest.status.success(), "{}", text(&honest));
+    let records = committed_records(repo);
+    let divergent = records.iter().find(|r| r["verdict"] == "divergent").expect("the divergent record is committed");
+    let outcomes: Vec<(&str, &str)> =
+        divergent["attachments"].as_array().unwrap().iter().map(|a| (a["case"].as_str().unwrap(), a["outcome"].as_str().unwrap())).collect();
+    assert_eq!(
+        outcomes,
+        [("game.run.01: hp hits zero", "passed"), ("game.run.01: result screen shows", "failed"), ("hud_survives_restart", "passed")]
+    );
 }
 
 fn task_records(repo: &Path) -> serde_json::Value {
@@ -260,4 +287,24 @@ fn a_task_and_scenario_keyed_record_ships_its_scenario_and_still_flips_its_task(
     assert!(shipped.status.success(), "the scenario cell has the record's faithful verdict: {}", text(&shipped));
     ok(repo, &["gate", "task", "cats#1"]);
     assert!(std::fs::read_to_string(repo.join("openspec/changes/cats/tasks.md")).unwrap().contains("- [x] 1 Ship the run"));
+}
+
+/// 0.14 review: the gate judges the same cells the ship gate credits. A
+/// task+scenario record missing a policy-required role fails the
+/// scenario cell in `canon gate check`, not only the task cell.
+#[test]
+fn a_task_and_scenario_keyed_record_missing_a_required_role_fails_its_scenario_cell() {
+    let dir = setup(true);
+    let repo = dir.path();
+    scenario(repo, "game.run.01", None);
+    ok(repo, &["evidence", "add", "--task", "cats#1", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
+    ok(repo, &["gate", "promote"]);
+    std::fs::write(repo.join(".canon/policy.yaml"), "risk_routing:\n  reviewer: true\n").unwrap();
+
+    let red = canon(repo, &["gate", "check"]);
+    assert_eq!(red.status.code(), Some(1), "{}", text(&red));
+    let out = text(&red);
+    for cell in ["cats#1", "game.run.01"] {
+        assert!(out.contains(&format!("uncovered-cell {cell} — policy-required cell 'reviewer'")), "the {cell} cell is judged: {out}");
+    }
 }

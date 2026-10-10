@@ -66,6 +66,13 @@ pub const MAX_ARTIFACT_FLAG: &str = "--max-artifact-mib";
 /// Bytes in one MiB, for converting the limit flag.
 pub const MIB: u64 = 1024 * 1024;
 
+/// Whether `sha256` is exactly 64 lowercase hex characters — the only
+/// shape a blob may be named by. Checked before any path is built from
+/// it, so a digest can never name `..`, a separator, or anything else.
+pub fn is_sha256_hex(sha256: &str) -> bool {
+    sha256.len() == 64 && sha256.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
 /// `<repo>/.canon/artifacts/sha256`.
 pub fn store_dir(repo: &Path) -> PathBuf {
     repo.join(paths::ARTIFACTS_SHA256_DIR)
@@ -88,6 +95,37 @@ pub fn sha256_reader(mut reader: impl Read) -> std::io::Result<String> {
     let mut hasher = Sha256::new();
     std::io::copy(&mut reader, &mut hasher)?;
     Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// What the store holds for `sha256`, WITHOUT following links: only a
+/// regular file at `<store>/<sha256>`, inside a store directory that is
+/// itself a real directory, counts. A symlink there (pointing anywhere)
+/// or a store directory that is a symlink reads as [`Observed::Missing`]
+/// — a link can make an outside file look stored, and the gate must
+/// never vouch for bytes that live outside the store.
+pub fn stored_blob(repo: &Path, sha256: &str) -> Observed {
+    if !is_sha256_hex(sha256) || !store_dir_is_real(repo) {
+        return Observed::Missing;
+    }
+    let path = blob_path(repo, sha256);
+    match std::fs::symlink_metadata(&path) {
+        Ok(meta) if meta.file_type().is_file() => Observed::of(&path),
+        _ => Observed::Missing,
+    }
+}
+
+/// The store directory exists as a real directory (not a symlink), and
+/// so does each `.canon`/`artifacts` component above it.
+fn store_dir_is_real(repo: &Path) -> bool {
+    let mut path = repo.to_path_buf();
+    for component in Path::new(paths::ARTIFACTS_SHA256_DIR).components() {
+        path.push(component);
+        match std::fs::symlink_metadata(&path) {
+            Ok(meta) if meta.file_type().is_dir() => {}
+            _ => return false,
+        }
+    }
+    true
 }
 
 /// What a file at a path holds now.
@@ -134,6 +172,14 @@ pub enum StoreError {
     /// the file changed after it was bound. Nothing is stored.
     #[error("its bytes now hash to {actual}, not the bound {expected}")]
     Changed { expected: String, actual: String },
+    /// The digest is not 64 lowercase hex characters; no path is built.
+    #[error("`{0}` is not a sha256 digest (64 lowercase hex characters)")]
+    InvalidDigest(String),
+    /// A component of `.canon/artifacts/sha256` exists but is not a real
+    /// directory (e.g. a symlink); writing through it could land outside
+    /// the store.
+    #[error("{} is not a real directory; refusing to write the artifact store through it", paths::ARTIFACTS_SHA256_DIR)]
+    UnsafeStoreDir,
     #[error("{0}")]
     Io(#[from] std::io::Error),
 }
@@ -144,13 +190,23 @@ pub enum StoreError {
 /// writing nothing, when the bytes do not hash to `expected` — the
 /// caller recorded that digest, and the store must hold exactly those
 /// bytes or nothing.
+///
+/// "Already stored" is decided by [`stored_blob`], which never follows a
+/// link: a pre-existing symlink (or any non-file) at the blob path is
+/// replaced by the rename, which swaps the link itself, never its target.
 pub fn store(repo: &Path, expected: &str, mut reader: impl Read) -> Result<StoreOutcome, StoreError> {
+    if !is_sha256_hex(expected) {
+        return Err(StoreError::InvalidDigest(expected.to_string()));
+    }
     let target = blob_path(repo, expected);
-    if Observed::of(&target).matches(expected) {
+    if stored_blob(repo, expected).matches(expected) {
         return Ok(StoreOutcome::AlreadyStored);
     }
     let dir = store_dir(repo);
     std::fs::create_dir_all(&dir)?;
+    if !store_dir_is_real(repo) {
+        return Err(StoreError::UnsafeStoreDir);
+    }
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     let temp = dir.join(format!(".tmp-{expected}-{}-{nanos}", std::process::id()));
     let result = (|| {
@@ -246,7 +302,7 @@ pub fn unstored_attachments(ctx: &GateContext) -> Vec<UnstoredAttachment> {
     let mut out = Vec::new();
     for record in latest_records(ctx) {
         for attachment in distinct_files(record) {
-            if blob_path(repo, &attachment.sha256).exists() {
+            if stored_blob(repo, &attachment.sha256) != Observed::Missing {
                 continue;
             }
             if working_tree(repo, &attachment.path).matches(&attachment.sha256) {
@@ -271,7 +327,7 @@ impl GateCheck for ArtifactStoreCheck {
         let mut violations = Vec::new();
         for record in latest_records(ctx) {
             for attachment in distinct_files(record) {
-                let blob = Observed::of(&blob_path(repo, &attachment.sha256));
+                let blob = stored_blob(repo, &attachment.sha256);
                 if blob.matches(&attachment.sha256) {
                     continue;
                 }
@@ -431,5 +487,53 @@ mod tests {
         assert!(working_tree_path(Path::new("/repo"), "../outside").is_none());
         assert!(working_tree_path(Path::new("/repo"), "/etc/passwd").is_none());
         assert_eq!(working_tree_path(Path::new("/repo"), "reports/a.json"), Some(PathBuf::from("/repo/reports/a.json")));
+    }
+
+    #[test]
+    fn a_digest_that_is_not_64_lowercase_hex_builds_no_path() {
+        let dir = TempDir::new().unwrap();
+        for bad in ["../../etc/passwd", &"A".repeat(64), &"a".repeat(63), ""] {
+            assert!(matches!(store(dir.path(), bad, &b"x"[..]), Err(StoreError::InvalidDigest(_))), "{bad}");
+            assert_eq!(stored_blob(dir.path(), bad), Observed::Missing);
+        }
+        assert!(!dir.path().join(".canon").exists(), "nothing is created for an invalid digest");
+    }
+
+    /// A pre-existing `<digest>` symlink pointing outside the store (at
+    /// a file whose bytes match) is never "already stored": the gate
+    /// reads it as missing, and `store` replaces the link itself with a
+    /// regular file, leaving the link's target untouched.
+    #[cfg(unix)]
+    #[test]
+    fn a_symlinked_blob_is_not_stored_and_is_replaced_by_a_regular_file() {
+        let dir = TempDir::new().unwrap();
+        let outside = TempDir::new().unwrap();
+        let digest = sha(b"v1");
+        let target = outside.path().join("elsewhere.json");
+        std::fs::write(&target, b"v1").unwrap();
+        std::fs::create_dir_all(store_dir(dir.path())).unwrap();
+        std::os::unix::fs::symlink(&target, blob_path(dir.path(), &digest)).unwrap();
+
+        assert_eq!(stored_blob(dir.path(), &digest), Observed::Missing, "a link never counts as stored");
+        let violations = ArtifactStoreCheck.run(&ctx(dir.path(), vec![evidence("a.b.01", "gone.json", &digest, 0)]));
+        assert_eq!(violations.len(), 1, "a linked blob does not prove the record: {violations:?}");
+
+        assert_eq!(store(dir.path(), &digest, &b"v1"[..]).unwrap(), StoreOutcome::Stored);
+        let meta = std::fs::symlink_metadata(blob_path(dir.path(), &digest)).unwrap();
+        assert!(meta.file_type().is_file(), "the link was replaced by a regular file");
+        assert_eq!(std::fs::read(&target).unwrap(), b"v1", "the link's target is untouched");
+        assert!(stored_blob(dir.path(), &digest).matches(&digest));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_symlinked_store_directory_is_refused() {
+        let dir = TempDir::new().unwrap();
+        let outside = TempDir::new().unwrap();
+        std::fs::create_dir_all(dir.path().join(".canon/artifacts")).unwrap();
+        std::os::unix::fs::symlink(outside.path(), store_dir(dir.path())).unwrap();
+        let digest = sha(b"v1");
+        assert!(matches!(store(dir.path(), &digest, &b"v1"[..]), Err(StoreError::UnsafeStoreDir)));
+        assert!(std::fs::read_dir(outside.path()).unwrap().next().is_none(), "nothing written through the link");
     }
 }

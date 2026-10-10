@@ -63,10 +63,12 @@ use canon_model::EvidenceRecord;
 use crate::context::{GateCheck, GateContext};
 use crate::failure_class::{FailureClass, Violation};
 
-/// One coverage subject's join-spine identity — `task_id` preferred
-/// (join-spine table: "task ↔ evidence ↔ trajectory"), falling back to
-/// `scenario_id` (join-spine table: "spec ↔ test ↔ ledger ↔
-/// divergence") when a record carries no `task_id`. A record with
+/// One coverage cell's join-spine identity — a `task_id` (join-spine
+/// table: "task ↔ evidence ↔ trajectory") or a `scenario_id` (join-spine
+/// table: "spec ↔ test ↔ ledger ↔ divergence"). A record carrying both
+/// answers both cells ([`CellSubject::all_of`]); [`CellSubject::of`]
+/// picks the task cell first, and only NAMES a record (the artifact
+/// check's violation subject), never groups records into cells. A record with
 /// neither carries no coverage subject at all and is excluded from
 /// this check (module doc's interface-gap note) — it is not, itself, a
 /// violation; a bare `run`/`event`-shaped evidence record with no join
@@ -95,9 +97,10 @@ impl CellSubject {
     /// joins counts for both — [`crate::ledger::latest_verdicts`] reads
     /// this, so a task+scenario record gives its scenario a verdict for
     /// `spec_coverage`, the `verifying → shipped` gate and `canon status`.
-    /// [`Self::of`] stays the ONE subject a violation is reported
-    /// against, so per-record checks (coverage, staleness, risk) never
-    /// report the same record's gap twice.
+    /// Every per-cell check (coverage, staleness, risk, the ledger fold)
+    /// groups by this, so the gate and the ship decision judge the same
+    /// cells; a record failing in both cells is reported once per cell,
+    /// each violation naming its own cell as the subject.
     pub(crate) fn all_of(record: &EvidenceRecord) -> impl Iterator<Item = Self> + '_ {
         record
             .task_id
@@ -131,8 +134,11 @@ impl GateCheck for CoverageCheck {
         // `task_id` nor `scenario_id` are simply not a coverage
         // subject and never enter a group.
         let mut groups: BTreeMap<CellSubject, Vec<&EvidenceRecord>> = BTreeMap::new();
+        // A task+scenario record answers BOTH cells (`all_of`), the same
+        // keying `crate::ledger::latest_verdicts` uses, so coverage and
+        // the ship decision judge the same cells.
         for record in &ctx.evidence {
-            if let Some(subject) = CellSubject::of(record) {
+            for subject in CellSubject::all_of(record) {
                 groups.entry(subject).or_default().push(record);
             }
         }
@@ -307,5 +313,17 @@ mod tests {
         let ctx = ctx_with(policy, evidence);
 
         assert!(CoverageCheck.run(&ctx).is_empty(), "a record with neither task_id nor scenario_id has no coverage subject to check");
+    }
+
+    /// 0.14 review: a task+scenario record answers both cells, so a
+    /// missing required role fails BOTH — each violation naming its own
+    /// cell — exactly the cells the ledger fold and the ship gate credit.
+    #[test]
+    fn a_task_and_scenario_record_missing_a_required_role_fails_both_cells() {
+        let mut both = record("cats#1", "implementer", EvidenceVerdict::Faithful);
+        both.scenario_id = Some(canon_model::ScenarioId::parse("game.run.01").unwrap());
+        let ctx = ctx_with(policy_with_required_roles(&["reviewer"]), vec![both]);
+        let subjects: Vec<String> = CoverageCheck.run(&ctx).into_iter().map(|v| v.subject).collect();
+        assert_eq!(subjects, vec!["cats#1".to_string(), "game.run.01".to_string()]);
     }
 }
