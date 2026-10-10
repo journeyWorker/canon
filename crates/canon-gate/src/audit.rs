@@ -62,17 +62,12 @@ impl GateCheck for AuditCheck {
 /// `Some(false-success)` when `record` (a scenario's latest audit) is
 /// `refuted`. When the refutation bound counterexamples, the fix names
 /// them: a newer audit that leaves them out passes the drop guard only
-/// with `--drop-attachment` and `--drop-reason`.
+/// with `--drop-attachment` and `--drop-reason` ([`counterexample_drop_flags`]).
 pub fn false_success(scenario_id: &str, record: &EvidenceRecord) -> Option<Violation> {
     let audit = record.audit.as_ref().filter(|a| a.result == AuditResult::Refuted)?;
-    let mut counterexamples: Vec<&str> = record.attachments.iter().map(|a| a.path.as_str()).collect();
-    counterexamples.dedup();
-    let (listed, drop) = if counterexamples.is_empty() {
-        (String::new(), String::new())
-    } else {
-        let flags: Vec<String> = counterexamples.iter().map(|path| format!("--drop-attachment {path}")).collect();
-        (format!(", counterexamples: {}", counterexamples.join(", ")), format!("; a new audit that no longer binds the counterexamples records why: {} --drop-reason <text>", flags.join(" ")))
-    };
+    let counterexamples = counterexample_paths(record);
+    let listed = if counterexamples.is_empty() { String::new() } else { format!(", counterexamples: {}", counterexamples.join(", ")) };
+    let drop = counterexample_drop_flags(record).map(|flags| format!("; a new audit that no longer binds the counterexamples records why: {flags}")).unwrap_or_default();
     Some(Violation::new(
         FailureClass::FalseSuccess,
         scenario_id,
@@ -81,6 +76,40 @@ pub fn false_success(scenario_id: &str, record: &EvidenceRecord) -> Option<Viola
             audit.evaluator_id, audit.evaluator_version, audit.evaluator_digest
         ),
     ))
+}
+
+/// The files an audit record binds, in binding order, consecutive repeats
+/// folded.
+fn counterexample_paths(record: &EvidenceRecord) -> Vec<&str> {
+    let mut paths: Vec<&str> = record.attachments.iter().map(|a| a.path.as_str()).collect();
+    paths.dedup();
+    paths
+}
+
+/// The flags a re-audit that leaves out `record`'s bound files must pass:
+/// `--drop-attachment <path>` per file, each path shell-quoted so the
+/// command runs as printed, then `--drop-reason "<why …>"`. `None` when
+/// `record` binds nothing. `canon gate check` and `canon status` both
+/// print this.
+pub fn counterexample_drop_flags(record: &EvidenceRecord) -> Option<String> {
+    let paths = counterexample_paths(record);
+    if paths.is_empty() {
+        return None;
+    }
+    let mut flags: Vec<String> = paths.iter().map(|path| format!("--drop-attachment {}", shell_quote(path))).collect();
+    flags.push("--drop-reason \"<why the counterexample no longer applies>\"".to_string());
+    Some(flags.join(" "))
+}
+
+/// `value` as one POSIX shell word: bare when it is made only of
+/// characters no shell treats specially, else single-quoted with each
+/// `'` written as `'\''`.
+fn shell_quote(value: &str) -> String {
+    if !value.is_empty() && value.bytes().all(|b| b.is_ascii_alphanumeric() || b"_-./:=@%+,".contains(&b)) {
+        value.to_string()
+    } else {
+        format!("'{}'", value.replace('\'', "'\\''"))
+    }
 }
 
 /// Where a sampled scenario's audit stands.
@@ -294,6 +323,16 @@ mod tests {
         let violations = AuditCheck.run(&c);
         assert_eq!(violations.len(), 1);
         assert_eq!((violations[0].class, violations[0].subject.as_str()), (FailureClass::FalseSuccess, "shop.cart.02"));
+    }
+
+    /// gate.check.65: a drop path is one shell word: bare when nothing in
+    /// it is special to a shell, single-quoted otherwise.
+    #[test]
+    fn drop_paths_are_shell_quoted() {
+        assert_eq!(shell_quote("reports/counter.xml"), "reports/counter.xml");
+        assert_eq!(shell_quote("reports/a b.xml"), "'reports/a b.xml'");
+        assert_eq!(shell_quote("it's;$(x).xml"), r"'it'\''s;$(x).xml'");
+        assert_eq!(shell_quote(""), "''");
     }
 
     /// The latest audit decides: a newer confirmed audit clears a

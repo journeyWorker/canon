@@ -705,16 +705,12 @@ fn subject_steps(
     // the drop guard only by naming them, so the command does.
     let latest_audits = audit::latest_audits(ctx);
     let counterexample_drops = |scenario: &str| {
-        let paths: Vec<&str> = latest_audits
+        latest_audits
             .iter()
             .find(|((project, id), _)| id.as_str() == scenario && project.as_str() == project_of(scenario))
-            .map(|(_, record)| record.attachments.iter().map(|a| a.path.as_str()).collect())
-            .unwrap_or_default();
-        let mut flags: String = paths.iter().map(|path| format!(" --drop-attachment {path}")).collect();
-        if !flags.is_empty() {
-            flags.push_str(" --drop-reason \"<why the counterexample no longer applies>\"");
-        }
-        flags
+            .and_then(|(_, record)| audit::counterexample_drop_flags(record))
+            .map(|flags| format!(" {flags}"))
+            .unwrap_or_default()
     };
     for (class, why) in [
         (canon_gate::FailureClass::FalseSuccess, "scenario(s) have a refuted latest audit (false-success); fix the behavior, re-attest, and have the external evaluator re-audit"),

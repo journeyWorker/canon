@@ -270,8 +270,9 @@ fn a_refuted_audit_is_false_success_until_a_newer_audit_confirms() {
 
 /// gate.check.65: the false-success fix names the counterexamples a
 /// re-audit must drop on purpose. The gate line and `canon status`'s next
-/// command both carry `--drop-attachment <path>` and `--drop-reason`, and
-/// the re-audit those flags describe is accepted and clears the gate.
+/// command both carry `--drop-attachment <path>`, shell-quoted, and
+/// `--drop-reason`; the printed command, placeholders filled in, runs
+/// through a shell and the real binary, is accepted, and clears the gate.
 #[test]
 fn the_false_success_fix_names_the_counterexample_drop() {
     let dir = setup();
@@ -279,11 +280,14 @@ fn the_false_success_fix_names_the_counterexample_drop() {
     subject_at(repo, "run", "verifying");
     scenario(repo, "game.run.01", Some("run"));
     record(repo, &attest_args("game.run.01", &[]));
-    write(repo, "reports/counter.xml", br#"<testsuite><testcase name="game.run.01: health below zero keeps the run alive"><failure/></testcase></testsuite>"#);
-    record(repo, &audit_args("game.run.01", "refuted", &["--report", "junit:reports/counter.xml"]));
+    let path = "reports/counter example's.xml";
+    write(repo, path, br#"<testsuite><testcase name="game.run.01: health below zero keeps the run alive"><failure/></testcase></testsuite>"#);
+    let report_arg = format!("junit:{path}");
+    record(repo, &audit_args("game.run.01", "refuted", &["--report", &report_arg]));
 
+    let quoted = r#"--drop-attachment 'reports/counter example'\''s.xml' --drop-reason "<why the counterexample no longer applies>""#;
     let gate = text(&canon(repo, &["gate", "check"]));
-    assert!(gate.contains("a new audit that no longer binds the counterexamples records why: --drop-attachment reports/counter.xml --drop-reason <text>"), "{gate}");
+    assert!(gate.contains(&format!("a new audit that no longer binds the counterexamples records why: {quoted}")), "{gate}");
 
     let report = status_json(repo);
     let command = report["next"]
@@ -294,12 +298,32 @@ fn the_false_success_fix_names_the_counterexample_drop() {
         .find(|c| c.contains("--kind audit --scenario-id game.run.01"))
         .unwrap_or_else(|| panic!("a re-audit next step: {report}"))
         .to_string();
-    assert!(command.contains(" --drop-attachment reports/counter.xml --drop-reason \"<why the counterexample no longer applies>\""), "{command}");
+    assert!(command.ends_with(&format!(" {quoted}")), "{command}");
 
-    // The command without the drop is what the guard refuses; with it, the
-    // re-audit is recorded and false-success clears.
+    // The command without the drop is what the guard refuses; the printed
+    // one, run as a shell would, is recorded and false-success clears.
     refused(repo, &audit_args("game.run.01", "confirmed", &[]));
-    record(repo, &audit_args("game.run.01", "confirmed", &["--drop-attachment", "reports/counter.xml", "--drop-reason", "the counterexample is fixed"]));
+    let runnable = command
+        .strip_prefix("canon ")
+        .expect("the next step is a canon command")
+        .replace("<evaluator>", "testjack")
+        .replace("<version>", "1.4.1")
+        .replace("<sha256>", DIGEST)
+        .replace("<confirmed|refuted|indeterminate>", "confirmed")
+        .replace("<evaluator run>", "testjack run 43")
+        .replace("<why the counterexample no longer applies>", "the counterexample is fixed");
+    let shell = Command::new("sh")
+        .arg("-c")
+        .arg(format!("\"$CANON_BIN\" {runnable}"))
+        .env("CANON_BIN", env!("CARGO_BIN_EXE_canon"))
+        .env("CANON_ACTOR", "canon")
+        .current_dir(repo)
+        .output()
+        .expect("spawn sh");
+    assert!(shell.status.success(), "the printed command must run as printed: {runnable}\n{}", text(&shell));
+    ok(repo, &["gate", "promote"]);
+    let dropped = committed(repo).pop().unwrap();
+    assert_eq!(dropped["attachment_drop"]["paths"][0], path, "{dropped}");
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(0), "{}", text(&gate));
 }

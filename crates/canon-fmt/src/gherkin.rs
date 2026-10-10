@@ -213,43 +213,58 @@ pub fn source_digest(bytes: &[u8]) -> SpecDigest {
 const SCENARIO_DIGEST_FORMAT: &str = "canon-scenario-digest/1";
 
 /// What one scenario means, as `Scenario.scenario_digest` (0.15 D1): a
-/// sha256 per scenario-id tag in `text`, over a normalized rendering of
+/// sha256 per scenario-id tag in `text`, over a canonical rendering of
 /// exactly what gives that scenario its meaning and nothing else:
 ///
-/// 1. the Feature's tag lines (Gherkin scenarios inherit them);
+/// 1. the Feature's tags (Gherkin scenarios inherit them);
 /// 2. the Feature-level `Background:` block, when there is one;
-/// 3. the enclosing `Rule:` header line and its tag lines, and that
-///    Rule's own `Background:` block, when the scenario is inside one;
-/// 4. the scenario's own tag lines and its block: the
+/// 3. the enclosing `Rule:` header line and its tags, and that Rule's
+///    own `Background:` block, when the scenario is inside one;
+/// 4. the scenario's own tags and its block: the
 ///    `Scenario:`/`Scenario Outline:`/`Example:` header, description,
 ///    steps, doc strings, data tables and `Examples:` (with their tags).
 ///
-/// Normalization: every line is trimmed at both ends; blank lines and
-/// `#` comment lines (which include the `# canon:` provenance comments)
-/// are dropped, except inside a doc string (`"""` or ```` ``` ````),
-/// whose lines are kept trimmed, blank ones included. The Feature's own
-/// header and description, other scenarios, and other Rules never count:
-/// appending, removing or editing a sibling scenario leaves this digest
-/// alone, and editing a Background moves the digest of every scenario
-/// that inherits it. Every scenario-id tag on one scenario gets that
-/// scenario's digest.
+/// Canonical rendering, so that layout never counts and values always do:
+/// - header, description and step lines are trimmed at both ends; blank
+///   lines and `#` comment lines (including the `# canon:` provenance
+///   comments) are dropped;
+/// - the tags in front of one header (over any number of lines, up to a
+///   `#` comment on the line) are one set: sorted, de-duplicated, single
+///   spaces, so reordering or re-wrapping tags never counts;
+/// - a table row (`| a | b |`) is its cells, each trimmed and unescaped as
+///   Gherkin does (`\|`, `\\`, `\n`), written length-prefixed, so
+///   re-aligning a table never counts and any cell value change does;
+/// - a doc string (`"""` or ```` ``` ````) keeps its delimiters trimmed
+///   (with any media type) and each content line dedented by the opening
+///   delimiter's indentation, as Gherkin does, with escaped delimiters
+///   unescaped. The remaining whitespace, including indentation inside the
+///   doc string and trailing spaces, counts.
+///
+/// The Feature's own header and description, other scenarios, and other
+/// Rules never count: appending, removing or editing a sibling scenario
+/// leaves this digest alone, and editing a Background moves the digest of
+/// every scenario that inherits it. Every scenario-id tag on one scenario
+/// gets that scenario's digest.
 pub fn scenario_digests(text: &str) -> BTreeMap<String, SpecDigest> {
     let mut walk = DigestWalk::default();
-    let mut fence: Option<&str> = None;
+    // An open doc string: its delimiter and the opening line's indentation.
+    let mut doc_string: Option<(&str, usize)> = None;
     for raw in text.lines() {
         let line = raw.trim();
-        if let Some(open) = fence {
-            if line.starts_with(open) {
-                fence = None;
+        if let Some((delimiter, indent)) = doc_string {
+            if line.starts_with(delimiter) {
+                doc_string = None;
+                walk.content(line);
+            } else {
+                walk.content(&doc_string_line(raw, delimiter, indent));
             }
-            walk.content(line);
             continue;
         }
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
         if line.starts_with('@') {
-            walk.pending_tags.push(line.to_string());
+            walk.pending_tags.extend(line.split_whitespace().take_while(|t| !t.starts_with('#')).filter(|t| t.starts_with('@')).map(str::to_string));
             continue;
         }
         match ["Feature:", "Rule:", "Background:", "Scenario Outline:", "Scenario Template:", "Scenario:", "Example:"].into_iter().find(|k| line.starts_with(k)) {
@@ -260,13 +275,17 @@ pub fn scenario_digests(text: &str) -> BTreeMap<String, SpecDigest> {
             None => {
                 // Tags above a non-header line (an `Examples:` table)
                 // belong to the block they sit in.
-                for tag in std::mem::take(&mut walk.pending_tags) {
-                    walk.content(&tag);
+                if let Some(tags) = walk.take_tags() {
+                    walk.content(&tags);
                 }
-                if line.starts_with("```") {
-                    fence = Some("```");
-                } else if line.starts_with("\"\"\"") {
-                    fence = Some("\"\"\"");
+                if line.starts_with('|') {
+                    walk.content(&table_row(line));
+                    continue;
+                }
+                for delimiter in ["\"\"\"", "```"] {
+                    if line.starts_with(delimiter) {
+                        doc_string = Some((delimiter, raw.chars().take_while(|c| c.is_whitespace()).count()));
+                    }
                 }
                 walk.content(line);
             }
@@ -274,6 +293,47 @@ pub fn scenario_digests(text: &str) -> BTreeMap<String, SpecDigest> {
     }
     walk.close();
     walk.digests
+}
+
+/// One doc string content line as Gherkin reads it: up to `indent`
+/// leading whitespace characters removed (the opening delimiter's
+/// indentation), an escaped delimiter unescaped, everything else kept.
+fn doc_string_line(raw: &str, delimiter: &str, indent: usize) -> String {
+    let leading = raw.chars().take(indent).take_while(|c| c.is_whitespace()).map(char::len_utf8).sum::<usize>();
+    let escaped: String = delimiter.chars().flat_map(|c| ['\\', c]).collect();
+    raw[leading..].replace(&escaped, delimiter)
+}
+
+/// A table row's canonical form: `|` then each cell, trimmed and
+/// unescaped (`\|` → `|`, `\\` → `\`, `\n` → newline; any other escape
+/// kept as written), as `<byte length>:<cell>`. Text after the last `|`
+/// is not a cell.
+fn table_row(line: &str) -> String {
+    let mut cells: Vec<String> = Vec::new();
+    let mut cell = String::new();
+    let mut chars = line.trim().chars().skip(1);
+    while let Some(c) = chars.next() {
+        match c {
+            '|' => cells.push(std::mem::take(&mut cell)),
+            '\\' => match chars.next() {
+                Some('|') => cell.push('|'),
+                Some('\\') => cell.push('\\'),
+                Some('n') => cell.push('\n'),
+                Some(other) => {
+                    cell.push('\\');
+                    cell.push(other);
+                }
+                None => cell.push('\\'),
+            },
+            other => cell.push(other),
+        }
+    }
+    let mut row = String::from("|");
+    for cell in cells {
+        let cell = cell.trim();
+        row.push_str(&format!("{}:{cell}", cell.len()));
+    }
+    row
 }
 
 /// Which block a content line belongs to in [`scenario_digests`].
@@ -292,13 +352,14 @@ enum Block {
 /// scenario.
 #[derive(Default)]
 struct DigestWalk {
-    pending_tags: Vec<String>,
+    /// The tags seen since the last header, as a set.
+    pending_tags: std::collections::BTreeSet<String>,
     feature_tags: Vec<String>,
     feature_background: Vec<String>,
-    /// The enclosing Rule's tag lines and header; empty outside a Rule.
+    /// The enclosing Rule's tags and header; empty outside a Rule.
     rule: Vec<String>,
     rule_background: Vec<String>,
-    /// The open scenario's scenario-id tags and normalized lines.
+    /// The open scenario's scenario-id tags and canonical lines.
     scenario_ids: Vec<String>,
     scenario_lines: Vec<String>,
     block: Block,
@@ -306,9 +367,16 @@ struct DigestWalk {
 }
 
 impl DigestWalk {
+    /// The pending tags as one canonical line (sorted, single-spaced), or
+    /// `None` when there are none.
+    fn take_tags(&mut self) -> Option<String> {
+        let tags = std::mem::take(&mut self.pending_tags);
+        (!tags.is_empty()).then(|| tags.into_iter().collect::<Vec<_>>().join(" "))
+    }
+
     fn feature(&mut self) {
         self.close();
-        self.feature_tags = std::mem::take(&mut self.pending_tags);
+        self.feature_tags = self.take_tags().into_iter().collect();
         self.feature_background.clear();
         self.rule.clear();
         self.rule_background.clear();
@@ -317,7 +385,7 @@ impl DigestWalk {
 
     fn rule(&mut self, line: &str) {
         self.close();
-        self.rule = std::mem::take(&mut self.pending_tags);
+        self.rule = self.take_tags().into_iter().collect();
         self.rule.push(line.to_string());
         self.rule_background.clear();
         self.block = Block::Description;
@@ -325,17 +393,17 @@ impl DigestWalk {
 
     fn background(&mut self, line: &str) {
         self.close();
+        let tags: Vec<String> = self.take_tags().into_iter().collect();
         let (target, block) = if self.rule.is_empty() { (&mut self.feature_background, Block::FeatureBackground) } else { (&mut self.rule_background, Block::RuleBackground) };
-        *target = std::mem::take(&mut self.pending_tags);
+        *target = tags;
         target.push(line.to_string());
         self.block = block;
     }
 
     fn scenario(&mut self, line: &str) {
         self.close();
-        let tags = std::mem::take(&mut self.pending_tags);
-        self.scenario_ids = tags.iter().flat_map(|t| t.split_whitespace()).filter_map(|t| t.strip_prefix('@')).filter(|t| looks_like_scenario_id(t)).map(str::to_string).collect();
-        self.scenario_lines = tags;
+        self.scenario_ids = self.pending_tags.iter().filter_map(|t| t.strip_prefix('@')).filter(|t| looks_like_scenario_id(t)).map(str::to_string).collect();
+        self.scenario_lines = self.take_tags().into_iter().collect();
         self.scenario_lines.push(line.to_string());
         self.block = Block::Scenario;
     }
@@ -610,5 +678,44 @@ mod tests {
                 assert_eq!(edited[id] != base[id], moved.contains(&id), "{from} → {to}: {id}");
             }
         }
+    }
+
+    /// Layout never counts: re-aligned table cells, reordered or re-wrapped
+    /// tags, and a doc string moved as a whole (delimiters with it).
+    #[test]
+    fn a_scenario_digest_ignores_table_alignment_tag_order_and_doc_string_placement() {
+        let base = digests_of(RULED);
+        for (from, to) in [
+            ("      | n |\n      | 1 |", "      |n|\n  |   1    |"),
+            ("@a.b.01 @case:happy", "@case:happy   @a.b.01"),
+            ("@a.b.01 @case:happy", "@case:happy\n  @a.b.01 @case:happy # a trailing comment"),
+            ("    \"\"\"\n    # kept inside a doc string\n\n    \"\"\"", "        \"\"\"\n        # kept inside a doc string\n\n        \"\"\""),
+        ] {
+            assert!(RULED.contains(from), "{from}");
+            assert_eq!(digests_of(&RULED.replace(from, to)), base, "{from} → {to}");
+        }
+    }
+
+    /// Values always count: a cell value, an escaped pipe, a tag, and
+    /// whitespace inside a doc string (its relative indentation and
+    /// trailing spaces).
+    #[test]
+    fn a_scenario_digest_counts_cell_values_and_doc_string_whitespace() {
+        let base = digests_of(RULED);
+        for (from, to, moved) in [
+            ("| 1 |", "| 1 | 2 |", "a.b.02"),
+            ("| 1 |", "| 1\\|2 |", "a.b.02"),
+            ("@examples-tag", "@examples-tag @more", "a.b.02"),
+            ("    # kept inside a doc string", "      # kept inside a doc string", "a.b.01"),
+            ("    # kept inside a doc string", "    # kept inside a doc string  ", "a.b.01"),
+        ] {
+            assert!(RULED.contains(from), "{from}");
+            let edited = digests_of(&RULED.replace(from, to));
+            for id in ["a.b.01", "a.b.02", "a.b.03"] {
+                assert_eq!(edited[id] != base[id], id == moved, "{from} → {to}: {id}");
+            }
+        }
+        assert_ne!(table_row("| a\\|b |"), table_row("| a | b |"), "an escaped pipe is part of one cell");
+        assert_eq!(table_row("|  a  |b\\\\|"), "|1:a2:b\\", "cells are trimmed and unescaped");
     }
 }

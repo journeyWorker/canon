@@ -153,8 +153,11 @@ reviewer never types them:
   covers the scenario's tags and block (header, steps, doc strings,
   tables, `Examples:`) and the context it inherits: the Feature's tags,
   the Feature `Background:`, and an enclosing `Rule:` with its tags and
-  `Background:`. Comments, blank lines and indentation do not count, and
-  neither do other scenarios. A record synced before 0.15 has no
+  `Background:`. Layout does not count: comments, blank lines, line
+  indentation, tag order, and table alignment (cells are compared
+  trimmed and unescaped). Values do: any step, tag or cell change, and
+  whitespace inside a doc string after the delimiter's own indentation
+  is removed. Other scenarios never count. A record synced before 0.15 has no
   `scenario_digest`; then the review pins its `source_digest` (the
   sha256 of the whole `.feature` file) and records
   `scenario_digest_scope: file`;

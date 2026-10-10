@@ -196,3 +196,4 @@ Feature: review add
     And editing one scenario's steps stales only that scenario's review, naming the scenario's digest
     And editing the Background stales the review of every scenario that inherits it
     And a review pinned to the file's source digest keeps being compared with the file's source digest
+    And re-aligning a table, reordering tags or moving a whole doc string never stales a review, while a changed cell, tag or doc string line does

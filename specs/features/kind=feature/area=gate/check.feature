@@ -321,8 +321,8 @@ Feature: gate check
   @case:edge
   @gate.check.65
   Scenario: The false-success fix names the counterexamples a re-audit must drop
-    Given a scenario whose latest audit is refuted and binds a counterexample report
+    Given a scenario whose latest audit is refuted and binds a counterexample report whose path has a space and a quote
     When the gate is checked and canon status is read
-    Then the false-success line and the re-audit next command name --drop-attachment with the counterexample path and --drop-reason
-    And the re-audit those flags describe is accepted and clears the gate
+    Then the false-success line and the re-audit next command name --drop-attachment with the counterexample path shell-quoted, and --drop-reason
+    And the printed command, placeholders filled in, runs through a shell, is accepted and clears the gate
     And a refutation that binds no counterexample names no drop
