@@ -198,7 +198,7 @@ Feature: subject lifecycle
   # canon: {"schema":1,"at":"2026-10-10T16:01:46Z","actor":{"agent_id":"canon"}}
   @subject:subject-lifecycle
   @case:edge
-  @subject.lifecycle.20
+  @subject.lifecycle.22
   Scenario: Adopting a change that is already linked writes nothing
     Given a change and a subject that already carry the adoption link on both sides
     When the change is adopted into the subject again
@@ -208,7 +208,7 @@ Feature: subject lifecycle
   # canon: {"schema":1,"at":"2026-10-10T16:01:46Z","actor":{"agent_id":"canon"}}
   @subject:subject-lifecycle
   @case:failure
-  @subject.lifecycle.21
+  @subject.lifecycle.23
   Scenario: An adoption that fails between its two writes names what was written and the command that completes it
     Given a change record that cannot be written while the subject record can
     When the change is adopted into the subject
