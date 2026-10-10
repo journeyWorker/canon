@@ -32,10 +32,10 @@ MUST NOT treat one class as another:
    policy or behavior; its owner and review criteria are recorded in the
    [knowledge index](canon/knowledge-index.json).
 2. **Provider projection** is a generated/materialized view for one agent
-   provider. `.claude/`, `.codex/`, `.omp/`, and `.pi/` projections are not
-   alternate authorities. `canon skills install` derives them from
-   `canon/skills/`; `canon skills check` detects drift. Codex is flattened,
-   while Claude, OMP, and Pi use directory-shaped entrypoints. OMP and Pi's
+   provider. `.claude/`, `.agents/` (Codex), `.omp/`, and `.pi/` projections
+   are not alternate authorities. `canon skills install` derives them from
+   `canon/skills/`; `canon skills check` detects drift. Every provider uses a
+   directory-shaped `<root>/skills/canon/SKILL.md` entrypoint. OMP and Pi's
    retrieve script is a passive sidecar, not a native hook. The website
    architecture page is a public documentation surface, not this repository's
    contract.

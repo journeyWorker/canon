@@ -124,12 +124,14 @@ is attributed, and is fresh — never on a self-report. See
 
 If your repo runs coding agents, install canon's one canonical `canon` skill
 projected into each selected provider's project-local location: Claude gets
-`.claude/skills/canon/SKILL.md`, Codex gets `.codex/skills/canon.md`, OMP gets
+`.claude/skills/canon/SKILL.md`, Codex gets `.agents/skills/canon/SKILL.md`
+(Codex scans `.agents/skills`, never `.codex/skills`), OMP gets
 `.omp/skills/canon/SKILL.md`, and Pi gets `.pi/skills/canon/SKILL.md`. OMP/Pi
 are passive bundles; their retrieve pre-dispatch script is a sidecar only, not
 a native hook. When `--providers` is omitted, canon detects existing
-`.claude`, `.codex`, `.omp`, and `.pi` roots and defaults to Claude+Codex when
-none exist. Select providers explicitly when you want to pin the projection:
+`.claude`, `.agents` or `.codex` (Codex), `.omp`, and `.pi` roots and defaults
+to Claude+Codex when none exist. Select providers explicitly when you want to
+pin the projection:
 
 ```bash
 # project one canonical canon skill for all four providers
@@ -147,6 +149,13 @@ bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon re
 stale projections, while `doctor` reports provider, drift, and legacy-remnant
 diagnostics across all four managed roots without deleting user files.
 
+Upgrading from canon 0.13.0 or earlier? Those releases wrote Codex's skill to
+`.codex/skills/canon.md`, which Codex never reads. Re-run `skills install`: it
+removes the legacy files whose bytes still match canon's install lock, keeps
+anything you edited or authored under `.codex/skills`, and removes
+`.codex/skills` only if it ends up empty. `check` and `doctor` flag whatever
+legacy projection remains, with the command that migrates it.
+
 Strategies are distilled from your team's own verdicts, quarantined by
 default, and activated only after paired evaluation plus policy-pinned SSH
 approval — see [Strategy memory](/concepts/strategy-memory/) for the full
@@ -156,7 +165,7 @@ flywheel. This repository publishes no measured uplift result.
 
 canon keeps its data under a single `.canon/` directory (with `canon.yaml` at
 the repo root). Project-local skill projections additionally live under the
-selected provider roots (`.claude`, `.codex`, `.omp`, and/or `.pi`). To back
+selected provider roots (`.claude`, `.agents`, `.omp`, and/or `.pi`). To back
 out completely, delete `canon.yaml`, `.canon/`, and any selected skill roots
 you no longer want — that's the whole project-local footprint.
 

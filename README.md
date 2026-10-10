@@ -24,19 +24,28 @@ Run `canon <command> --help` for any explicit CLI command. Install the
 provider-neutral user-facing companion bundle with:
 
 ```bash
-canon skills install                         # detect .claude/.codex/.omp/.pi
+canon skills install                         # detect .claude/.agents|.codex/.omp/.pi
 canon skills install --providers=claude,codex,omp,pi
 canon skills check                           # read-only drift check
 canon skills doctor                          # diagnostics, never deletes
 ```
 
-The canonical projection is one `canon` skill per selected provider:
-Claude uses `.claude/skills/canon/SKILL.md`, Codex uses flattened
-`.codex/skills/canon.md`, and OMP/Pi use directory-shaped
-`.omp/skills/canon/SKILL.md` and `.pi/skills/canon/SKILL.md`. Every selected
-provider receives lazy `reference/**` and `scripts/**` sidecars. OMP/Pi are
-project-local passive bundles; the retrieve pre-dispatch script is a sidecar,
-not a native hook.
+The canonical projection is one directory-shaped `canon` skill per selected
+provider: Claude uses `.claude/skills/canon/SKILL.md`, Codex uses
+`.agents/skills/canon/SKILL.md` (the directory Codex scans for skills), and
+OMP/Pi use `.omp/skills/canon/SKILL.md` and `.pi/skills/canon/SKILL.md`. Every
+selected provider receives lazy `reference/**` and `scripts/**` sidecars.
+Without `--providers`, an existing `.agents` or `.codex` directory selects
+Codex. OMP/Pi are project-local passive bundles; the retrieve pre-dispatch
+script is a sidecar, not a native hook.
+
+Canon 0.13.0 and earlier wrote Codex to `.codex/skills/canon.md` and
+`.codex/skills/canon/**`, which Codex never reads. `canon skills install`
+removes the legacy files whose bytes still match the hash in
+`.canon/skills/.install-lock.json`, keeps everything else (including your own
+files under `.codex/skills`), and drops `.codex/skills` only if it ends up
+empty. `skills check` and `skills doctor` report any leftover legacy Codex
+projection as a remnant with the command that migrates it.
 
 `canon/skills-dev/` is contributor-only legacy tooling. It is not part of the
 user-facing install; maintainers may materialize it explicitly when developing
@@ -66,6 +75,22 @@ Public pre-alpha. Core workflows are implemented and dogfooded; interfaces
 and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
+
+## 0.13.1 fix
+
+0.13.0 and earlier installed the Codex skill as a flattened
+`.codex/skills/canon.md`, a directory Codex never reads, so Codex agents never
+discovered canon. `canon skills install` now projects Codex the same way as
+every other provider, to `.agents/skills/canon/SKILL.md` with its `reference/**`
+and `scripts/**` sidecars, and an existing `.agents` or `.codex` directory
+selects Codex when `--providers` is omitted. Re-running install migrates the
+old projection: it removes each legacy file whose bytes still match the hash in
+`.canon/skills/.install-lock.json`, keeps edited and user-authored files, and
+removes `.codex/skills` only if it ends up empty. `skills check` (exit 1) and
+`skills doctor` report whatever legacy projection remains, with the fix
+command. The developer-only `canon/skills-dev` materializer now writes
+`.agents/skills/<name>/SKILL.md` instead of `.codex/skills/<name>.md`; its lock
+records no output hashes, so delete old `.codex/skills/<name>.md` files by hand.
 
 ## 0.13.0 release
 

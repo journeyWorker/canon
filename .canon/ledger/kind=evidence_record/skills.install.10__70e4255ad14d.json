@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T14:10:04.405905Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test skills_install canonical_check_and_doctor_report_legacy_codex_remnant_with_fix"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 13,
+  "scenario_id": "skills.install.10",
+  "schema": 1,
+  "staging_id": "be42d1ccc385",
+  "verdict": "faithful"
+}

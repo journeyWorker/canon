@@ -133,6 +133,7 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
     }
     assert!(!target.join(".claude").exists());
     assert!(!target.join(".codex").exists());
+    assert!(!target.join(".agents").exists());
 
     let manifest: Value = serde_json::from_slice(&std::fs::read(target.join(".canon/skills/.install-lock.json")).unwrap())
         .expect("install manifest must be valid JSON");

@@ -1,6 +1,7 @@
-# state-model
-
-> How to extend canon-model's closed record-kind set, join-spine keys, and Handoff body template registry — adding/bumping a record kind, adding a join-key newtype, and registering a new Handoff domain template. Use when touching crates/canon-model, adding a new canon.yaml handoff_templates entry, or regenerating JOIN_SPINE.md / schemas/*.schema.json.
+---
+name: state-model
+description: How to extend canon-model's closed record-kind set, join-spine keys, and Handoff body template registry — adding/bumping a record kind, adding a join-key newtype, and registering a new Handoff domain template. Use when touching crates/canon-model, adding a new canon.yaml handoff_templates entry, or regenerating JOIN_SPINE.md / schemas/*.schema.json.
+---
 
 # state-model
 

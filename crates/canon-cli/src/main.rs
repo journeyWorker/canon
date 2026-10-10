@@ -1184,6 +1184,8 @@ enum SkillsCommand {
         #[arg(long, default_value = ".")]
         target: PathBuf,
         /// Providers to project (`claude`, `codex`, `omp`, `pi`, or a comma-separated list).
+        /// Omitted: detected from `.claude`, `.agents` or `.codex` (codex), `.omp`, `.pi`;
+        /// none present selects claude,codex. Codex is projected to `.agents/skills/canon/`.
         #[arg(long)]
         providers: Option<String>,
     },
@@ -1495,7 +1497,8 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
     match canon_cli::skills::check(&source, target, providers) {
         Ok(report) => {
             for status in &report.statuses { println!("{} — {} ({})", status.path.display(), status.state, status.provider.as_str()); }
-            if report.manifest_ok && report.statuses.iter().all(|status| status.state == "ok") { ExitCode::SUCCESS } else { ExitCode::from(1) }
+            for remnant in &report.remnants { println!("{} — legacy-remnant (codex reads .agents/skills; fix: `{}`)", remnant.display(), canon_cli::skills::legacy_codex_fix(&report.providers)); }
+            if report.manifest_ok && report.remnants.is_empty() && report.statuses.iter().all(|status| status.state == "ok") { ExitCode::SUCCESS } else { ExitCode::from(1) }
         }
         Err(err) => { eprintln!("canon skills check: {err}"); ExitCode::FAILURE }
     }

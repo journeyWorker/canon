@@ -1,10 +1,17 @@
 //! Canon skill bundle materialization.
 //!
 //! The canonical user-facing source is a read-only bundle rooted at
-//! `SKILL.src.md`. It projects one `canon` skill to Claude, Codex, OMP, and Pi
-//! and keeps references and scripts as lazy sidecars. Directory-shaped sources
-//! (notably `canon/skills-dev`) retain the legacy materializer for backwards
-//! compatibility.
+//! `SKILL.src.md`. It projects one directory-shaped `canon` skill
+//! (`<root>/skills/canon/SKILL.md` plus `reference/**` and `scripts/**`
+//! sidecars) to Claude (`.claude`), Codex (`.agents`), OMP (`.omp`), and Pi
+//! (`.pi`). Directory-shaped sources (notably `canon/skills-dev`) retain the
+//! legacy per-skill materializer for backwards compatibility.
+//!
+//! Canon 0.13.0 and earlier projected Codex to a flattened
+//! `.codex/skills/canon.md` plus `.codex/skills/canon/**`, a directory Codex
+//! never reads. Install removes exactly the files of that legacy projection
+//! whose bytes still match the hash canon's own install lock recorded for
+//! them; `check` and `doctor` report whatever remains as a remnant.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -58,8 +65,12 @@ pub enum Provider {
 #[derive(Debug, Clone, Copy)]
 struct ProviderDescriptor {
     name: &'static str,
+    /// The provider's project skill root: canon projects to
+    /// `<root>/skills/canon/`.
     root: &'static str,
-    directory_shaped: bool,
+    /// Directories whose presence selects the provider when `--providers`
+    /// is omitted.
+    markers: &'static [&'static str],
 }
 
 impl Provider {
@@ -68,22 +79,27 @@ impl Provider {
             Self::Claude => ProviderDescriptor {
                 name: "claude",
                 root: ".claude",
-                directory_shaped: true,
+                markers: &[".claude"],
             },
+            // Codex discovers skills in `.agents/skills` from the working
+            // directory up to the repository root (and `$HOME/.agents/skills`),
+            // never in `.codex/skills`. `.agents` is therefore both the
+            // projection root and a detection marker; `.codex` (Codex's own
+            // config directory) still marks a repository as a Codex user.
             Self::Codex => ProviderDescriptor {
                 name: "codex",
-                root: ".codex",
-                directory_shaped: false,
+                root: ".agents",
+                markers: &[".agents", ".codex"],
             },
             Self::Omp => ProviderDescriptor {
                 name: "omp",
                 root: ".omp",
-                directory_shaped: true,
+                markers: &[".omp"],
             },
             Self::Pi => ProviderDescriptor {
                 name: "pi",
                 root: ".pi",
-                directory_shaped: true,
+                markers: &[".pi"],
             },
         }
     }
@@ -123,6 +139,8 @@ pub struct SkillsCheckReport {
     pub source_hash: String,
     pub statuses: Vec<SkillStatus>,
     pub manifest_ok: bool,
+    /// Paths of a legacy `.codex/skills` canon projection still on disk.
+    pub remnants: Vec<PathBuf>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -277,41 +295,6 @@ pub fn discover_skills(source_dir: &Path) -> Result<Vec<DiscoveredSkill>, Skills
         .collect()
 }
 
-fn parse_frontmatter(fallback_name: &str, content: &str) -> (String, String, String) {
-    let mut name = fallback_name.to_string();
-    let mut description = String::new();
-    if let Some(rest) = content.strip_prefix("---\n") {
-        if let Some(end) = rest.find("\n---\n") {
-            let frontmatter = &rest[..end];
-            let body = &rest[end + "\n---\n".len()..];
-            for line in frontmatter.lines() {
-                if let Some((key, value)) = line.split_once(':') {
-                    match key.trim() {
-                        "name" => name = value.trim().to_string(),
-                        "description" => description = value.trim().to_string(),
-                        _ => {}
-                    }
-                }
-            }
-            return (name, description, body.trim_start_matches('\n').to_string());
-        }
-    }
-    (name, description, content.to_string())
-}
-
-pub fn flatten_for_codex(name: &str, description: &str, body: &str) -> String {
-    let mut out = format!("# {name}\n");
-    if !description.is_empty() {
-        out.push_str("\n> ");
-        out.push_str(description);
-        out.push('\n');
-    }
-    out.push('\n');
-    out.push_str(body.trim_end());
-    out.push('\n');
-    out
-}
-
 fn load_lock(source_dir: &Path) -> Result<Lock, SkillsError> {
     let lock_path = source_dir.join(".install-lock.json");
     if !lock_path.is_file() {
@@ -337,7 +320,6 @@ fn install_legacy(source_dir: &Path, target_dir: &Path) -> Result<InstallReport,
     let mut installed = Vec::with_capacity(discovered.len());
     for skill in &discovered {
         let hash = content_hash(skill.content.as_bytes());
-        let (name, description, body) = parse_frontmatter(&skill.name, &skill.content);
         let (version, changed) = match previous_lock.skills.get(&skill.name) {
             Some(prev) if prev.content_hash == hash => (prev.version, false),
             Some(prev) => (prev.version + 1, true),
@@ -350,21 +332,15 @@ fn install_legacy(source_dir: &Path, target_dir: &Path) -> Result<InstallReport,
                 version,
             },
         );
-        write_file_under(
-            target_dir,
-            &target_dir
-                .join(".claude/skills")
-                .join(&skill.name)
-                .join("SKILL.md"),
-            &skill.content,
-        )?;
-        write_file_under(
-            target_dir,
-            &target_dir
-                .join(".codex/skills")
-                .join(format!("{}.md", skill.name)),
-            &flatten_for_codex(&name, &description, &body),
-        )?;
+        for provider in [Provider::Claude, Provider::Codex] {
+            write_file_under(
+                target_dir,
+                &provider_skill_root(target_dir, provider)
+                    .join(&skill.name)
+                    .join("SKILL.md"),
+                &skill.content,
+            )?;
+        }
         installed.push(InstalledSkill {
             name: skill.name.clone(),
             version,
@@ -463,15 +439,6 @@ fn provider_bundle_root(target_dir: &Path, provider: Provider) -> PathBuf {
     provider_skill_root(target_dir, provider).join("canon")
 }
 
-fn provider_entrypoint_path(target_dir: &Path, provider: Provider) -> PathBuf {
-    let descriptor = provider.descriptor();
-    if descriptor.directory_shaped {
-        provider_bundle_root(target_dir, provider).join("SKILL.md")
-    } else {
-        provider_skill_root(target_dir, provider).join("canon.md")
-    }
-}
-
 fn parse_providers(value: Option<&str>, target_dir: &Path) -> Result<Vec<Provider>, SkillsError> {
     let mut providers = if let Some(value) = value {
         let mut parsed = Vec::new();
@@ -486,8 +453,9 @@ fn parse_providers(value: Option<&str>, target_dir: &Path) -> Result<Vec<Provide
         let detected = ALL_PROVIDERS
             .into_iter()
             .map(|provider| {
+                let markers = provider.descriptor().markers;
                 (
-                    target_dir.join(provider.descriptor().root).exists(),
+                    markers.iter().any(|marker| target_dir.join(marker).exists()),
                     provider,
                 )
             })
@@ -529,46 +497,27 @@ fn load_manifest(target_dir: &Path) -> Result<Option<CanonicalManifest>, SkillsE
         .map_err(|source| SkillsError::ManifestParse { path, source })
 }
 
-fn projected_relative(provider: Provider, relative: &Path) -> Option<PathBuf> {
+/// Where a bundle file lands inside `<root>/skills/canon/`.
+fn projected_relative(relative: &Path) -> PathBuf {
     if relative == Path::new("SKILL.src.md") {
-        return provider
-            .descriptor()
-            .directory_shaped
-            .then(|| PathBuf::from("SKILL.md"));
+        PathBuf::from("SKILL.md")
+    } else {
+        relative.to_path_buf()
     }
-    Some(relative.to_path_buf())
 }
 
 fn manifest_for(files: &[BundleFile], providers: &[Provider]) -> CanonicalManifest {
     let source_hash = bundle_hash(files);
     let mut hashes = BTreeMap::new();
     for provider in providers {
-        let descriptor = provider.descriptor();
         for file in files {
-            let Some(relative) = projected_relative(*provider, &file.relative) else {
-                continue;
-            };
-            let path = Path::new(descriptor.root)
+            let path = Path::new(provider.descriptor().root)
                 .join("skills/canon")
-                .join(relative);
+                .join(projected_relative(&file.relative));
             hashes.insert(
                 path.to_string_lossy().into_owned(),
                 content_hash(&file.bytes),
             );
-        }
-        if !descriptor.directory_shaped {
-            if let Some(skill) = files
-                .iter()
-                .find(|file| file.relative == Path::new("SKILL.src.md"))
-            {
-                let (_, description, body) =
-                    parse_frontmatter("canon", &String::from_utf8_lossy(&skill.bytes));
-                let path = Path::new(descriptor.root).join("skills/canon.md");
-                hashes.insert(
-                    path.to_string_lossy().into_owned(),
-                    content_hash(flatten_for_codex("canon", &description, &body).as_bytes()),
-                );
-            }
         }
     }
     CanonicalManifest {
@@ -579,9 +528,116 @@ fn manifest_for(files: &[BundleFile], providers: &[Provider]) -> CanonicalManife
     }
 }
 
-fn project_path(target_dir: &Path, provider: Provider, relative: &Path) -> Option<PathBuf> {
-    let relative = projected_relative(provider, relative)?;
-    Some(provider_bundle_root(target_dir, provider).join(relative))
+fn project_path(target_dir: &Path, provider: Provider, relative: &Path) -> PathBuf {
+    provider_bundle_root(target_dir, provider).join(projected_relative(relative))
+}
+
+/// The skill root canon 0.13.0 and earlier projected Codex into. Codex never
+/// reads it.
+const LEGACY_CODEX_SKILLS: &str = ".codex/skills";
+/// The legacy flattened Codex entrypoint.
+const LEGACY_CODEX_ENTRYPOINT: &str = ".codex/skills/canon.md";
+/// The legacy Codex sidecar directory (`reference/**`, `scripts/**`).
+const LEGACY_CODEX_BUNDLE: &str = ".codex/skills/canon";
+
+/// Whether a manifest key names a file of the legacy Codex projection.
+/// Keys come from a file in the target repository, so anything but plain
+/// path components is refused.
+fn is_legacy_codex_key(key: &str) -> bool {
+    let in_projection = key == LEGACY_CODEX_ENTRYPOINT
+        || key
+            .strip_prefix(LEGACY_CODEX_BUNDLE)
+            .is_some_and(|rest| rest.starts_with('/'));
+    in_projection
+        && Path::new(key)
+            .components()
+            .all(|component| matches!(component, std::path::Component::Normal(_)))
+}
+
+/// The legacy Codex files canon's previous install lock proves canon wrote:
+/// recorded under the legacy projection, and still holding exactly the bytes
+/// whose hash the lock recorded. An edited, replaced, symlinked, or unrecorded
+/// file is never selected.
+fn legacy_codex_removals(target_dir: &Path, previous: Option<&CanonicalManifest>) -> Vec<PathBuf> {
+    let Some(previous) = previous else {
+        return Vec::new();
+    };
+    previous
+        .files
+        .iter()
+        .filter(|(key, _)| is_legacy_codex_key(key))
+        .filter_map(|(key, hash)| {
+            let path = target_dir.join(key);
+            reject_symlink_path_under(target_dir, &path).ok()?;
+            let bytes = fs::read(&path).ok()?;
+            (content_hash(&bytes) == *hash).then_some(path)
+        })
+        .collect()
+}
+
+/// Removes the proven legacy Codex files, then each directory they left
+/// empty, up to and including `.codex/skills`. `.codex` itself, any
+/// non-empty directory, and every file canon cannot prove it wrote stay.
+fn remove_legacy_codex(target_dir: &Path, removals: &[PathBuf]) -> Result<(), SkillsError> {
+    let skills_root = target_dir.join(LEGACY_CODEX_SKILLS);
+    let mut dirs = Vec::new();
+    for path in removals {
+        fs::remove_file(path).map_err(|source| SkillsError::Io {
+            path: path.clone(),
+            source,
+        })?;
+        let mut dir = path.parent();
+        while let Some(current) = dir.filter(|current| current.starts_with(&skills_root)) {
+            dirs.push(current.to_path_buf());
+            dir = current.parent();
+        }
+    }
+    // Deepest first, so a parent is only inspected after its children; the
+    // path tie-break makes duplicates adjacent for `dedup`.
+    dirs.sort_by(|a, b| {
+        b.components()
+            .count()
+            .cmp(&a.components().count())
+            .then_with(|| a.cmp(b))
+    });
+    dirs.dedup();
+    for dir in dirs {
+        let empty = fs::read_dir(&dir)
+            .map_err(|source| SkillsError::Io {
+                path: dir.clone(),
+                source,
+            })?
+            .next()
+            .is_none();
+        if empty {
+            fs::remove_dir(&dir).map_err(|source| SkillsError::Io {
+                path: dir.clone(),
+                source,
+            })?;
+        }
+    }
+    Ok(())
+}
+
+/// Legacy Codex projection paths still present in `target_dir`.
+fn legacy_codex_remnants(target_dir: &Path) -> Vec<PathBuf> {
+    [LEGACY_CODEX_ENTRYPOINT, LEGACY_CODEX_BUNDLE]
+        .into_iter()
+        .map(|relative| target_dir.join(relative))
+        .filter(|path| fs::symlink_metadata(path).is_ok())
+        .collect()
+}
+
+/// The command that migrates a legacy Codex projection for `providers`.
+pub fn legacy_codex_fix(providers: &[Provider]) -> String {
+    format!(
+        "canon skills install --providers={}",
+        providers
+            .iter()
+            .map(|p| p.as_str())
+            .collect::<Vec<_>>()
+            .join(",")
+    )
 }
 
 pub fn install_canonical(
@@ -594,22 +650,11 @@ pub fn install_canonical(
     let manifest = manifest_for(&files, &selected);
     let previous = load_manifest(target_dir)?;
     let mut writes: Vec<(PathBuf, Vec<u8>)> = Vec::new();
-    let source_skill = files
-        .iter()
-        .find(|file| file.relative == Path::new("SKILL.src.md"))
-        .expect("canonical source exists");
-    let (_, description, body) =
-        parse_frontmatter("canon", &String::from_utf8_lossy(&source_skill.bytes));
     for provider in &selected {
         for file in &files {
-            if let Some(path) = project_path(target_dir, *provider, &file.relative) {
-                writes.push((path, file.bytes.clone()));
-            }
-        }
-        if !provider.descriptor().directory_shaped {
             writes.push((
-                provider_entrypoint_path(target_dir, *provider),
-                flatten_for_codex("canon", &description, &body).into_bytes(),
+                project_path(target_dir, *provider, &file.relative),
+                file.bytes.clone(),
             ));
         }
     }
@@ -617,7 +662,9 @@ pub fn install_canonical(
         reject_symlink_path_under(target_dir, path)?;
     }
     reject_symlink_path_under(target_dir, &manifest_path(target_dir))?;
+    let removals = legacy_codex_removals(target_dir, previous.as_ref());
     let changed = previous.as_ref() != Some(&manifest)
+        || !removals.is_empty()
         || writes
             .iter()
             .any(|(path, bytes)| fs::read(path).ok().as_deref() != Some(bytes.as_slice()));
@@ -625,6 +672,7 @@ pub fn install_canonical(
         for (path, bytes) in writes {
             write_bytes_under(target_dir, &path, &bytes)?;
         }
+        remove_legacy_codex(target_dir, &removals)?;
         let mut json =
             serde_json::to_string_pretty(&manifest).expect("manifest serialization is infallible");
         json.push('\n');
@@ -672,35 +720,11 @@ pub fn check(
     let mut statuses = Vec::new();
     for provider in &selected {
         for file in &files {
-            let Some(path) = project_path(target_dir, *provider, &file.relative) else {
-                continue;
-            };
+            let path = project_path(target_dir, *provider, &file.relative);
             let expected_bytes = file.bytes.as_slice();
             let state = if !path.is_file() {
                 "missing"
             } else if fs::read(&path).ok().as_deref() != Some(expected_bytes) {
-                "stale"
-            } else {
-                "ok"
-            };
-            statuses.push(SkillStatus {
-                provider: *provider,
-                path,
-                state,
-            });
-        }
-        if !provider.descriptor().directory_shaped {
-            let path = provider_entrypoint_path(target_dir, *provider);
-            let skill = files
-                .iter()
-                .find(|file| file.relative == Path::new("SKILL.src.md"))
-                .unwrap();
-            let (_, description, body) =
-                parse_frontmatter("canon", &String::from_utf8_lossy(&skill.bytes));
-            let expected_bytes = flatten_for_codex("canon", &description, &body).into_bytes();
-            let state = if !path.is_file() {
-                "missing"
-            } else if fs::read(&path).ok().as_deref() != Some(expected_bytes.as_slice()) {
                 "stale"
             } else {
                 "ok"
@@ -718,6 +742,7 @@ pub fn check(
         source_hash: expected.source_hash,
         statuses,
         manifest_ok,
+        remnants: legacy_codex_remnants(target_dir),
     })
 }
 
@@ -756,8 +781,18 @@ pub fn doctor(
     if !report.manifest_ok {
         lines.push(format!("stale: {}", manifest_path(target_dir).display()));
     }
-    for provider in ALL_PROVIDERS {
-        let root = provider_skill_root(target_dir, provider);
+    for remnant in &report.remnants {
+        lines.push(format!(
+            "legacy-remnant: {} (codex reads .agents/skills, never .codex/skills; fix: `{}`, which removes what canon's install lock proves it wrote; remove anything it keeps by hand)",
+            remnant.display(),
+            legacy_codex_fix(&report.providers)
+        ));
+    }
+    let roots = ALL_PROVIDERS
+        .into_iter()
+        .map(|provider| provider_skill_root(target_dir, provider))
+        .chain([target_dir.join(LEGACY_CODEX_SKILLS)]);
+    for root in roots {
         if let Ok(entries) = fs::read_dir(&root) {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().into_owned();
@@ -785,10 +820,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn codex_flattening_removes_frontmatter() {
-        let output = flatten_for_codex("canon", "desc", "body\n");
-        assert_eq!(output, "# canon\n\n> desc\n\nbody\n");
-        assert!(!output.contains("---"));
+    fn legacy_codex_keys_are_confined_to_the_legacy_projection() {
+        assert!(is_legacy_codex_key(".codex/skills/canon.md"));
+        assert!(is_legacy_codex_key(".codex/skills/canon/reference/topic.md"));
+        assert!(!is_legacy_codex_key(".codex/skills/canonical.md"));
+        assert!(!is_legacy_codex_key(".codex/skills/canon-old.md"));
+        assert!(!is_legacy_codex_key(".codex/skills/user.md"));
+        assert!(!is_legacy_codex_key(".codex/skills/canon/../../../etc/passwd"));
+        assert!(!is_legacy_codex_key(".claude/skills/canon/SKILL.md"));
     }
 
     #[test]

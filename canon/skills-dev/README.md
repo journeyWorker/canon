@@ -18,8 +18,11 @@ From the repository root:
 canon skills install --source canon/skills-dev --target .
 ```
 
-The legacy materializer continues to produce `.claude/skills/<name>/SKILL.md`
-and `.codex/skills/<name>.md` and keeps its own source `.install-lock.json`.
+The legacy materializer produces `.claude/skills/<name>/SKILL.md` and
+`.agents/skills/<name>/SKILL.md` (the directory Codex scans) and keeps its own
+source `.install-lock.json`. Its lock records source hashes, not output
+hashes, so it cannot prove which `.codex/skills/<name>.md` files an earlier
+release wrote; delete those by hand after reinstalling.
 The canonical installer never mutates this source or its lock. Do not use
 `--providers` with this legacy source; provider selection applies to the
 canonical `SKILL.src.md` bundle only.

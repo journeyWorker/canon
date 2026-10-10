@@ -36,7 +36,7 @@ const REPORT_RENDER_RS = readFileSync(join(REPO_ROOT, "crates/canon-report/src/r
 const REPORT_MARTS_RS = readFileSync(join(REPO_ROOT, "crates/canon-report/src/marts.rs"), "utf-8");
 const STORE_VIEWS_SQL = readFileSync(join(REPO_ROOT, "crates/canon-store/sql/views.sql"), "utf-8");
 const CLAUDE_SKILL = ".claude/skills/canon/reference/canon-report-dashboard.md";
-const CODEX_SKILL = ".codex/skills/canon/reference/canon-report-dashboard.md";
+const CODEX_SKILL = ".agents/skills/canon/reference/canon-report-dashboard.md";
 const OMP_SKILL = ".omp/skills/canon/reference/canon-report-dashboard.md";
 const PI_SKILL = ".pi/skills/canon/reference/canon-report-dashboard.md";
 
