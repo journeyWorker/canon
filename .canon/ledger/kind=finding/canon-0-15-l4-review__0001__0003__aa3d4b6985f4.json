@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-015-l4",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T20:28:13.373438Z",
+  "change_id": "canon-0-15-l4-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "e96921f8a4566da1b471034c78a8eb75e28cf6ca",
+  "reviewed_sha": "b78dcbf30f56fda6a8bfc1c7ee699ae61f263e40",
+  "reviewer": "canon-reviewer-015-l4",
+  "round": 1,
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "the re-audit hint did not shell-quote counterexample paths, so a path with spaces produced a non-executable command"
+}

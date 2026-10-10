@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-l4-impl",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T20:28:11.571247Z",
+  "change_id": "canon-0-15-l4-self",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "e3c8ba0d83ffbd9fa1cdcdb5bed3cb91b3f674de",
+  "reviewer": "canon-l4-impl",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "author-found during the eval-2 recheck: the false-success hint told the user to record a new audit, which the D2 drop guard refused when the refuted audit had bound counterexamples"
+}
