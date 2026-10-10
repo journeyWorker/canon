@@ -177,6 +177,18 @@ unchanged.
   link to a re-import; `canon subject adopt <change> --subject <id>`
   restores it.
 
+**Acceptance.** The release was checked by rerunning eval 1's one-line
+request ("make a cat-themed Vampire-Survivors-like") in a fresh repo
+initialized with this build, on omp. The agent read the skill on its first
+call and stopped at the brief for approval. After approval it followed the
+loop to `verifying`: 33 scenarios (9 `failure`), all evidenced and
+independently reviewed, 17 review findings recorded and closed with
+resolution SHAs, and the starter policy left untouched. It left `shipped` to
+the human. Of eval 1's sixteen applicable friction items, twelve are
+resolved and four partly resolved: unit, session and finder identities are
+recorded but are labels the lead chooses, not proven. The run also exposed
+the defects fixed below.
+
 **Acceptance rerun fixes.**
 
 - G1: `canon gate task` took ~10 s per flip in a JS repo, because the plan
