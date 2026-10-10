@@ -200,7 +200,7 @@ use canon_gate::{scan_note_text, verify_risk_approval, GateCtx};
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{
     approval_payload_bytes, Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, ReportFormat, RoleId, RunId,
-    ScenarioId, Sha, TaskId, APPROVAL_NAMESPACE,
+    ScenarioId, SessionId, Sha, TaskId, APPROVAL_NAMESPACE,
 };
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier, TierQuery};
@@ -317,6 +317,10 @@ pub struct EvidenceArgs {
     /// `run_seq` partition key from `actor.role`, and refuses a record
     /// that carries none.
     pub role: RoleId,
+    /// The attesting session, recorded as `actor.session_id`. Under
+    /// `require_review.distinct_actor` a review from this session does
+    /// not count for the scenario.
+    pub session_id: Option<SessionId>,
     /// Optional authenticated approval. A complete approval additionally
     /// requires a detached SSH signature and exact artifact SHA binding.
     pub approval_by: Option<String>,
@@ -591,8 +595,12 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     };
 
     let at = Utc::now();
+    let mut actor = Actor::new(args.actor_id.as_str(), args.role.clone());
+    if let Some(session_id) = &args.session_id {
+        actor = actor.with_session(session_id.clone());
+    }
     let mut record = EvidenceRecord::new(
-        Envelope::current(RecordKind::EvidenceRecord, at, Actor::new(args.actor_id.as_str(), args.role.clone())),
+        Envelope::current(RecordKind::EvidenceRecord, at, actor),
         args.task_id.clone(),
         args.scenario_id.clone(),
         args.run_id.clone(),
@@ -744,10 +752,11 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
                 }
             };
             println!(
-                "canon evidence add: staged {} for {} (verdict {}) — run `canon gate promote` to commit it, {}",
+                "canon evidence add: staged {} for {} (verdict {}) — {}, {}",
                 receipt.location,
                 subject,
                 verdict_slug(args.verdict),
+                crate::write_mode::STAGED_FOR_GATE_PROMOTE,
                 next
             );
             0
@@ -908,6 +917,7 @@ mod tests {
             surface_ref: Vec::new(),
             actor_id: "canon".to_string(),
             role: RoleId::parse("implementer").expect("a literal role"),
+            session_id: None,
             approval_by: None,
             approval_role: None,
             approval_signature_file: None,

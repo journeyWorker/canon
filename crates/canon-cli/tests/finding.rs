@@ -162,6 +162,57 @@ fn the_two_command_loop_commits_a_finding_nobody_hand_wrote() {
     assert!(stdout(&added).contains("UNSOURCED"), "an add with no --introduced-by must say so: {}", stdout(&added));
 }
 
+/// D6: `--session-id` on `finding add` and `finding close` fills each
+/// record's own `actor.session_id`; the close records the session that
+/// authored the TRANSITION, never the raiser's.
+#[test]
+fn session_ids_on_add_and_close_land_on_each_records_actor() {
+    let dir = repo();
+    let repo = dir.path();
+
+    let added = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "impl-agent", "--summary", "found it myself", "--session-id", "sess-raise"]);
+    assert!(added.status.success(), "stderr: {}", stderr(&added));
+    assert!(stdout(&added).contains("— run `canon gate promote` to commit it"), "{}", stdout(&added));
+    assert!(run_canon(&["gate", "promote"], repo).status.success());
+
+    let closed = run_canon(
+        &["finding", "close", "--change-id", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "rejected", "--session-id", "sess-close"],
+        repo,
+    );
+    assert!(closed.status.success(), "stderr: {}", stderr(&closed));
+    assert!(stdout(&closed).contains("— run `canon gate promote` to commit it"), "{}", stdout(&closed));
+    assert!(run_canon(&["gate", "promote"], repo).status.success());
+
+    let mut sessions: Vec<(String, String)> = committed_findings(repo)
+        .iter()
+        .map(|path| body_at(path))
+        .map(|b| (b["disposition"].as_str().unwrap().to_string(), b["actor"]["session_id"].as_str().unwrap().to_string()))
+        .collect();
+    sessions.sort();
+    assert_eq!(sessions, [("open".to_string(), "sess-raise".to_string()), ("rejected".to_string(), "sess-close".to_string())]);
+}
+
+#[test]
+fn finding_add_refuses_a_session_id_outside_the_grammar() {
+    let dir = repo();
+    let out = add(dir.path(), &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", "--session-id", " padded"]);
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("--session-id") && stderr(&out).contains("SessionId"), "{}", stderr(&out));
+    assert!(staged_findings(dir.path()).is_empty(), "a refused add writes nothing");
+}
+
+/// D6 (F12): `--introduced-by` names the commit that introduced a
+/// defect, so `self` (who FOUND it) is a usage error that points at the
+/// flag that records the finder.
+#[test]
+fn finding_add_refuses_introduced_by_self_and_points_at_reviewer() {
+    let dir = repo();
+    let out = add(dir.path(), &["--round", "1", "--seq", "1", "--reviewer", "impl-agent", "--summary", "s", "--actor-id", "impl-agent", "--introduced-by", "self"]);
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("set --reviewer (and --actor-id) to your own id"), "{}", stderr(&out));
+    assert!(staged_findings(dir.path()).is_empty(), "a refused add writes nothing");
+}
+
 /// Every optional flag, set, surviving promotion unmodified — the
 /// committed body of a `Finding` is the staged body byte for byte
 /// (`canon_gate::StagedAssignment::Nothing`), so this also pins that

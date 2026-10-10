@@ -809,6 +809,9 @@ enum EvidenceCommand {
         /// Required: `canon gate promote` derives its run_seq partition key from it
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// The attesting session (recorded as actor.session_id). Under require_review.distinct_actor a review from this session does not count
+        #[arg(long, value_parser = canon_cli::review::parse_session_id)]
+        session_id: Option<canon_model::SessionId>,
         /// Human approval identity; authentication comes only from the detached signature.
         #[arg(long)]
         approval_by: Option<String>,
@@ -885,7 +888,7 @@ enum FindingCommand {
         #[arg(long, value_parser = canon_cli::finding::parse_sha)]
         resolution_sha: Option<Sha>,
         /// The SOURCED introducing commit. Leave unset when it is not known — never guess (see --help). Must name a COMMIT object this repo holds (existence only; never its message or diff)
-        #[arg(long, value_parser = canon_cli::finding::parse_sha)]
+        #[arg(long, value_parser = canon_cli::finding::parse_introduced_by)]
         introduced_by: Option<Sha>,
         /// Where in the tree, as path/to/file.rs:120-134 (line breaks refused)
         #[arg(long)]
@@ -896,6 +899,9 @@ enum FindingCommand {
         /// Attribution only — unlike `canon evidence add`, no partition key derives from it
         #[arg(long, default_value = "reviewer", value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// The authoring session (recorded as actor.session_id)
+        #[arg(long, value_parser = canon_cli::review::parse_session_id)]
+        session_id: Option<canon_model::SessionId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -924,6 +930,9 @@ enum FindingCommand {
         /// Attribution only — no partition key derives from it
         #[arg(long, default_value = "reviewer", value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// The session that authored the TRANSITION (recorded as actor.session_id)
+        #[arg(long, value_parser = canon_cli::review::parse_session_id)]
+        session_id: Option<canon_model::SessionId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -932,7 +941,7 @@ enum FindingCommand {
 
 #[derive(Subcommand)]
 enum ReviewCommand {
-    /// Write one attributed Review record (exactly one provenance ref required)
+    /// Write one attributed Review record directly to the ledger, nothing to promote (exactly one provenance ref required)
     Add {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
@@ -953,6 +962,9 @@ enum ReviewCommand {
         actor_id: String,
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count
+        #[arg(long, value_parser = canon_cli::review::parse_session_id)]
+        session_id: Option<canon_model::SessionId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -961,7 +973,7 @@ enum ReviewCommand {
 
 #[derive(Subcommand)]
 enum DivergenceCliCommand {
-    /// Stage a divergence candidate (no run_seq yet)
+    /// Stage a divergence candidate, no run_seq yet (commit it with `canon divergence promote`)
     Stage {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
@@ -1355,6 +1367,7 @@ fn main() -> ExitCode {
                 surface_ref,
                 actor_id,
                 role,
+                session_id,
                 approval_by,
                 approval_role,
                 approval_signature_file,
@@ -1381,6 +1394,7 @@ fn main() -> ExitCode {
                         surface_ref,
                         actor_id,
                         role,
+                        session_id,
                         approval_by,
                         approval_role,
                         approval_signature_file,
@@ -1410,6 +1424,7 @@ fn main() -> ExitCode {
                 file_ref,
                 actor_id,
                 role,
+                session_id,
                 repo,
             } => ExitCode::from(canon_cli::finding::run_add(
                 &repo,
@@ -1427,18 +1442,30 @@ fn main() -> ExitCode {
                     file_ref,
                     actor_id,
                     role,
+                    session_id,
                 },
             ) as u8),
-            FindingCommand::Close { change_id, round, seq, disposition, resolution_sha, actor_id, role, repo } => {
+            FindingCommand::Close { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, repo } => {
                 ExitCode::from(canon_cli::finding::run_close(
                     &repo,
-                    &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role },
+                    &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id },
                 ) as u8)
             }
         },
         Command::Review { action } => match action {
-            ReviewCommand::Add { project_id, scenario_id, reviewer, pin, upstream_ref, original_spec_ref, actor_id, role, repo } => ExitCode::from(
-                canon_cli::review::run_add(&repo, &project_id, &scenario_id, &reviewer, &pin, upstream_ref.as_deref(), original_spec_ref.as_deref(), &actor_id, &role) as u8,
+            ReviewCommand::Add { project_id, scenario_id, reviewer, pin, upstream_ref, original_spec_ref, actor_id, role, session_id, repo } => ExitCode::from(
+                canon_cli::review::run_add(
+                    &repo,
+                    &project_id,
+                    &scenario_id,
+                    &reviewer,
+                    &pin,
+                    upstream_ref.as_deref(),
+                    original_spec_ref.as_deref(),
+                    &actor_id,
+                    &role,
+                    session_id.as_ref(),
+                ) as u8,
             ),
         },
         Command::Divergence { action } => match action {

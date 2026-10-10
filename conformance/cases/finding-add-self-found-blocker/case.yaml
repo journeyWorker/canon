@@ -1,0 +1,10 @@
+description: "A defect the author found in its own work is recorded with `--reviewer` set to the author: `finding add --introduced-by self` is a usage error (exit 2) pointing at `--reviewer`, the author's own `finding add` stages (exit 0), and once promoted its open blocker refuses `canon subject status <id> verifying` with `open-blocker` (exit 1) like a reviewer's would"
+steps:
+  - args: [finding, add, --change-id, c-cart, --round, "1", --seq, "1", --severity, blocker, --reviewer, impl-agent, --summary, a second add leaves two rows, --actor-id, impl-agent, --role, implementer, --session-id, sess-impl, --introduced-by, self]
+    exit: 2
+  - args: [finding, add, --change-id, c-cart, --round, "1", --seq, "1", --severity, blocker, --reviewer, impl-agent, --summary, a second add leaves two rows, --actor-id, impl-agent, --role, implementer, --session-id, sess-impl]
+    exit: 0
+  - args: [gate, promote]
+    exit: 0
+  - args: [subject, status, cart, verifying]
+    exit: 1

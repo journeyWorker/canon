@@ -35,3 +35,4 @@ pub mod skills;
 pub mod status;
 pub mod tier;
 pub mod tiers;
+pub mod write_mode;

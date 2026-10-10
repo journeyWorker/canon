@@ -52,6 +52,17 @@
 //! a strict improvement on a review round's findings evaporating with
 //! its transcript. Neither is verification.
 //!
+//! # A defect the author found in its own work
+//! Record it like any other: `--reviewer` and `--actor-id` name the
+//! author itself. Nothing refuses a finding whose reviewer is also the
+//! change's implementer or evidence actor, and none should: hiding a
+//! defect because nobody else saw it is exactly how a review round looks
+//! cleaner than it was. An open `blocker` the author raised blocks under
+//! `require_review.block_on_findings` like one a reviewer raised.
+//! `--introduced-by` is not where "the author found it" goes: it names
+//! the commit that introduced the defect, so `--introduced-by self` is
+//! refused with a pointer to `--reviewer`.
+//!
 //! # `--introduced-by` must be SOURCED, and unset is the CORRECT answer
 //! This is the decision the CLI is where a user makes, so it is where
 //! the guidance belongs. Set `--introduced-by` only when the
@@ -284,7 +295,7 @@ use std::process::Command;
 
 use canon_gate::GateCtx;
 use canon_ingest::task_rows::first_row_line_break;
-use canon_model::{Actor, ChangeId, Envelope, Finding, FindingDisposition, FindingSeverity, RawRecord, RecordKind, RoleId, Sha};
+use canon_model::{Actor, ChangeId, Envelope, Finding, FindingDisposition, FindingSeverity, RawRecord, RecordKind, RoleId, SessionId, Sha};
 use canon_store::fold::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
 use canon_store::partition::{content_digest12, resolve_partition};
@@ -340,6 +351,16 @@ pub fn parse_change_id(s: &str) -> Result<ChangeId, String> {
 /// runtime sha check in this module to drift from the grammar.
 pub fn parse_sha(s: &str) -> Result<Sha, String> {
     Sha::parse(s).map_err(|e| e.to_string())
+}
+
+/// `--introduced-by`'s value parser: [`parse_sha`], except that `self`
+/// (the spelling an author reaches for when recording its own defect)
+/// is refused with a pointer to the flag that records who found it.
+pub fn parse_introduced_by(s: &str) -> Result<Sha, String> {
+    if s == "self" {
+        return Err("--introduced-by names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --reviewer (and --actor-id) to your own id, and leave --introduced-by unset unless that commit is sourced".to_string());
+    }
+    parse_sha(s)
 }
 
 /// One `canon finding add` invocation's already-parsed flags.
@@ -403,6 +424,18 @@ pub struct FindingArgs {
     /// so this is attribution only and a wrong default costs nothing
     /// but an inaccurate author label.
     pub role: RoleId,
+    /// The authoring session, recorded as `actor.session_id`.
+    pub session_id: Option<SessionId>,
+}
+
+/// The envelope actor for a record this module stages: the id, the role,
+/// and the session when one was given.
+fn authoring_actor(actor_id: &str, role: &RoleId, session_id: Option<&SessionId>) -> Actor {
+    let actor = Actor::new(actor_id, role.clone());
+    match session_id {
+        Some(session_id) => actor.with_session(session_id.clone()),
+        None => actor,
+    }
 }
 
 /// `canon finding add` (module doc). Returns the process exit code.
@@ -491,7 +524,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     // unconstructible: `fixed_by` is the ONLY path to `Fixed` and takes
     // the sha by value, `rejected`/`deferred` clear it.
     let mut finding = Finding::new(
-        Envelope::current(RecordKind::Finding, Utc::now(), Actor::new(args.actor_id.as_str(), args.role.clone())),
+        Envelope::current(RecordKind::Finding, Utc::now(), authoring_actor(&args.actor_id, &args.role, args.session_id.as_ref())),
         args.change_id.clone(),
         args.round,
         args.seq,
@@ -559,13 +592,14 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
             println!(
-                "canon finding add: staged {} — {} round {} seq {} ({}, {}) — run `canon gate promote` to commit it",
+                "canon finding add: staged {} — {} round {} seq {} ({}, {}) — {}",
                 receipt.location,
                 args.change_id,
                 args.round,
                 args.seq,
                 severity_slug(args.severity),
-                args.disposition.as_str()
+                args.disposition.as_str(),
+                crate::write_mode::STAGED_FOR_GATE_PROMOTE
             );
             if args.introduced_by.is_none() {
                 // Said on the success path, not only in `--help`: this
@@ -608,6 +642,9 @@ pub struct FindingCloseArgs {
     pub resolution_sha: Option<Sha>,
     pub actor_id: String,
     pub role: RoleId,
+    /// The session that authored the transition, recorded as
+    /// `actor.session_id`.
+    pub session_id: Option<SessionId>,
 }
 
 /// Stage the DISPOSITION TRANSITION of one already-committed finding
@@ -744,7 +781,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     // this, and stamping the original author's `at` would lose exactly
     // the fact that makes the pair a history.
     let mut transitioned = Finding::new(
-        Envelope::current(RecordKind::Finding, Utc::now(), Actor::new(args.actor_id.as_str(), args.role.clone())),
+        Envelope::current(RecordKind::Finding, Utc::now(), authoring_actor(&args.actor_id, &args.role, args.session_id.as_ref())),
         existing.change_id.clone(),
         existing.round,
         existing.seq,
@@ -787,13 +824,14 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
             println!(
-                "canon finding close: staged {} — {} round {} seq {} ({} → {}) — run `canon gate promote` to commit it",
+                "canon finding close: staged {} — {} round {} seq {} ({} → {}) — {}",
                 receipt.location,
                 args.change_id,
                 args.round,
                 args.seq,
                 existing.disposition().as_str(),
-                args.disposition.as_str()
+                args.disposition.as_str(),
+                crate::write_mode::STAGED_FOR_GATE_PROMOTE
             );
             0
         }
@@ -990,6 +1028,7 @@ mod tests {
             file_ref: None,
             actor_id: "canon".to_string(),
             role: RoleId::parse("reviewer").unwrap(),
+            session_id: None,
         }
     }
 
@@ -1314,6 +1353,7 @@ mod tests {
             resolution_sha: None,
             actor_id: "canon".to_string(),
             role: RoleId::parse("reviewer").unwrap(),
+            session_id: None,
         }
     }
 

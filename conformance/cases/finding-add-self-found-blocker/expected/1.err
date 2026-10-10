@@ -1,0 +1,3 @@
+error: invalid value 'self' for '--introduced-by <INTRODUCED_BY>': --introduced-by names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --reviewer (and --actor-id) to your own id, and leave --introduced-by unset unless that commit is sourced
+
+For more information, try '--help'.

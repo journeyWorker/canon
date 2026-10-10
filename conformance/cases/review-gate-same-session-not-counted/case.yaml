@@ -1,0 +1,14 @@
+description: "Under `require_review.distinct_actor`, a review by another actor id from a session that attested the scenario's evidence does not count: `evidence add --session-id` stages (then `gate promote`), `review add --session-id` writes directly, `canon subject status <id> verifying` exits 1 with `unreviewed-promotion` naming the session rule, and a review from a different session lets it through (exit 0)"
+steps:
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, cargo test cart_add, --role, implementer, --actor-id, impl-agent, --session-id, sess-impl]
+    exit: 0
+  - args: [gate, promote]
+    exit: 0
+  - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --reviewer, reviewer-2, --pin, r1, --original-spec-ref, specs/features/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-impl]
+    exit: 0
+  - args: [subject, status, cart, verifying]
+    exit: 1
+  - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --reviewer, reviewer-2, --pin, r2, --original-spec-ref, specs/features/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review]
+    exit: 0
+  - args: [subject, status, cart, verifying]
+    exit: 0

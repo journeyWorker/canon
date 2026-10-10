@@ -923,6 +923,39 @@ mod tests {
     }
 
     #[test]
+    fn a_review_from_an_evidence_session_does_not_count_and_a_missing_session_never_matches() {
+        let session = |s: &str| canon_model::SessionId::parse(s).unwrap();
+        let corpus = |evidence_session: Option<&str>, review_session: Option<&str>| {
+            let mut c = Corpus::new();
+            c.scenarios = vec![scenario("p.a.01", Some("live"))];
+            c.subjects = vec![subject("live", SubjectStatus::Verifying)];
+            let mut e = evidence("p.a.01", EvidenceVerdict::Faithful);
+            e.envelope.actor.session_id = evidence_session.map(session);
+            c.evidence = vec![e];
+            let mut r = review("p.a.01", "reviewer-2", "reviewer-2");
+            r.envelope.actor.session_id = review_session.map(session);
+            c.reviews = vec![r];
+            c
+        };
+        let distinct = || reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true);
+
+        // Another actor id, but the same session: the implementer
+        // re-labelled itself. The detail names the session rule.
+        let out = run(corpus(Some("s-impl"), Some("s-impl")), distinct());
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert_eq!(out[0].class, FailureClass::UnreviewedPromotion);
+        assert!(out[0].detail.contains("`s-impl`") && out[0].detail.contains("session other than any evidence session"), "{}", out[0].detail);
+
+        // A different session, or a session missing on either side,
+        // leaves the actor rule alone in charge.
+        assert!(run(corpus(Some("s-impl"), Some("s-review")), distinct()).is_empty());
+        assert!(run(corpus(None, Some("s-impl")), distinct()).is_empty());
+        assert!(run(corpus(Some("s-impl"), None), distinct()).is_empty());
+        // Without distinct_actor no identity rule applies.
+        assert!(run(corpus(Some("s-impl"), Some("s-impl")), reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), false)).is_empty());
+    }
+
+    #[test]
     fn a_distinct_review_passes_and_an_excluded_lane_needs_none() {
         let mut corpus = Corpus::new();
         let mut process = scenario("p.b.01", Some("live"));
