@@ -31,19 +31,20 @@ fn blob(repo: &Path, bytes: &[u8]) -> std::path::PathBuf {
     repo.join(".canon/artifacts/sha256").join(sha(bytes))
 }
 
-/// `git init` + `canon init` + one scenario, synced. With `plan`, the
-/// repo also gets an openspec plan source holding change `cats` with one
-/// open task.
+/// `git init` + `canon init --no-policy` + one scenario, synced. These
+/// tests pin the artifact store and cell keying, so they opt out of the
+/// starter policy (0.14 D2) whose require_review would gate their
+/// status moves; a test that needs a policy writes its own. With `plan`,
+/// the repo also gets change `cats` with one open task under the openspec
+/// plan source `canon init` configures (`root: .`).
 fn setup(plan: bool) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
-    ok(repo, &["init", "--repo", "."]);
+    ok(repo, &["init", "--repo", ".", "--no-policy"]);
     if plan {
         let yaml = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
-        let yaml = yaml.replace("plans:\n  sources: []", "plans:\n  sources:\n    - dialect: openspec\n      root: openspec/changes");
-        assert!(yaml.contains("root: openspec/changes"), "the plan source must be configured:\n{yaml}");
-        std::fs::write(repo.join("canon.yaml"), yaml).unwrap();
+        assert!(yaml.contains("- dialect: openspec\n      root: ."), "init must configure the openspec plan source:\n{yaml}");
         let change = repo.join("openspec/changes/cats");
         std::fs::create_dir_all(&change).unwrap();
         std::fs::write(change.join("proposal.md"), "# cats\n\n## Why\n\nA cat-themed run.\n").unwrap();
