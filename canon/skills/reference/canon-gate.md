@@ -60,7 +60,7 @@ adds the other direction: it starts from the Scenario corpus
 an unimplemented or mismatched spec becomes a reported violation.
 
 ```yaml
-# .canon/policy.yaml — ABSENT by default; absent means zero violations
+# .canon/policy.yaml — absent means zero violations; `canon init` writes a starter
 spec_coverage:
   require_evidence: true
   scope: [building, verifying]   # optional; omit for the whole corpus
@@ -68,6 +68,19 @@ spec_coverage:
   require_cases: [failure]       # optional; see Golden-path only below
   require_review: {}             # optional; see Independent review below
 ```
+
+`canon init` writes a starter `.canon/policy.yaml` with this section on
+(`require_evidence: true`, `require_cases: [failure]`,
+`require_review: {}`; see `canon-policy`). When the section is absent and
+the indexed corpus has scenarios, the gate says so after its result, on
+stdout like its other advisories, and the exit code is unchanged:
+
+```
+advisory: spec_coverage is off — 12 scenario(s) are not checked for evidence; see .canon/policy.yaml
+```
+
+A present section, even `require_evidence: false` or a malformed one
+(already a violation), and an empty corpus print no advisory.
 
 - **Unimplemented** — no `EvidenceRecord` carries the scenario's
   `(project_id, scenario_id)`. Author one with

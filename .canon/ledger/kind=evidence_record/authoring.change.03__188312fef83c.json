@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:51:55.428858Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test change change_new_refuses_an_existing_slug_and_leaves_it_untouched"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "authoring.change.03",
+  "schema": 1,
+  "staging_id": "61df83cfbbdb",
+  "verdict": "faithful"
+}

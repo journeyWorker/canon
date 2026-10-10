@@ -17,6 +17,8 @@ plans:
       root: .              # resolved relative to canon.yaml's directory
 ```
 
+- `canon init` writes exactly this source, plus an empty
+  `openspec/changes/` (so the adapter never scans the repo root itself).
 - An absent `plans:` section = zero sources (a clean no-op).
 - A present section parses STRICTLY: a typo'd key, an unregistered
   `dialect`, or a nonexistent `root` fails the command loud, naming the
@@ -135,8 +137,8 @@ downstream reader's job.
 ## What this skill does NOT cover
 
 - **Authoring an openspec change dir** (`proposal.md`/`tasks.md`
-  conventions) — see the openspec CLI's own docs; this skill covers
-  IMPORTING that shape, not producing it.
+  conventions) — `canon change new` scaffolds one and adopts it into a
+  subject (see `canon-subject`); this skill covers IMPORTING that shape.
 - **`canon gate check`/`canon gate task`** (the hand-authored one-task-at-
   a-time path this complements at bulk) — see `canon-gate`.
 - **Wiring an imported `Task`/`Change` into a `canon gate` decision** —

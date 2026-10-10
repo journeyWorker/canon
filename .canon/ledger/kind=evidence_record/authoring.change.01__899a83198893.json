@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:37:07.682479Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test change change_new_scaffolds_imports_and_adopts_with_no_config_edit"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "authoring.change.01",
+  "schema": 1,
+  "staging_id": "179ee69245c4",
+  "verdict": "faithful"
+}

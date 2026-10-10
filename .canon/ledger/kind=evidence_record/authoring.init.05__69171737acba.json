@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:37:07.489719Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init init_rerun_with_no_agents_md_refuses_to_overwrite_an_existing_canon_yaml"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "authoring.init.05",
+  "schema": 1,
+  "staging_id": "a998c148d87c",
+  "verdict": "faithful"
+}

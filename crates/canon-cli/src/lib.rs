@@ -4,6 +4,7 @@
 
 pub mod adapter;
 pub mod artifact_ingest;
+pub mod change;
 pub mod context;
 pub mod context_pack;
 pub mod dashboard;

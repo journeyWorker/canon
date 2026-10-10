@@ -135,6 +135,9 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     let checks = canon_gate::check_set(release);
     let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).collect());
     print!("{}", format_gate_report(&report));
+    if let Some(count) = canon_gate::spec_coverage::coverage_off_scenarios(&gate_context) {
+        print!("{}", format_coverage_off_advisory(count));
+    }
     if let Some(summary) = canon_gate::binding_summary(&gate_context) {
         print!("{}", format_binding_summary(&summary));
     }
@@ -142,6 +145,14 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
         print!("{}", format_review_advisories(&advisories));
     }
     report.exit_code()
+}
+
+/// The one-line advisory (0.14 D3) printed when the spec corpus has
+/// scenarios but `policy.yaml` has no `spec_coverage` section, so none
+/// of them is checked for evidence. Stdout, after the gate result, like
+/// every other gate advisory; it never changes the exit code.
+fn format_coverage_off_advisory(count: usize) -> String {
+    format!("\nadvisory: spec_coverage is off — {count} scenario(s) are not checked for evidence; see .canon/policy.yaml\n")
 }
 
 /// `spec_coverage.require_review`'s waived gaps (issue #2): a subject

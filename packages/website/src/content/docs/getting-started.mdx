@@ -68,11 +68,36 @@ is attributed, and is fresh — never on a self-report. See
    ```
 
    This writes a working `canon.yaml` skeleton — storage `tiers:`, record
-   `routing:`, `specs:` roots, and `plans:` sources. It refuses to overwrite
-   an existing file. Validate an existing config any time with:
+   `routing:`, `specs:` roots, and a `plans:` source (`openspec`, rooted at
+   the repo, with an empty `openspec/changes/`). It also writes:
+
+   - **`.canon/policy.yaml`**, a starter policy that turns `spec_coverage`
+     on: every scenario needs evidence, every feature surface needs a
+     `@case:failure` scenario, and work on a subject claimed done needs an
+     independent review. A human should review and approve it, since the
+     gate grades the work against it.
+   - **A canon block in `AGENTS.md`**, between `<!-- canon:begin -->` and
+     `<!-- canon:end -->`. It tells any agent that features are managed
+     with canon, lists the working loop, and points to `canon status` and
+     the canon skill. The file is created if absent; otherwise only the text
+     between the markers is canon's. Markers count only as standalone lines
+     outside code fences; a duplicate or unmatched marker is refused and
+     nothing is written.
+
+   `--no-agents-md` and `--no-policy` skip those two. `init` never
+   overwrites an existing `canon.yaml` or `policy.yaml`; rerunning it only
+   refreshes the `AGENTS.md` block. Validate an existing config any time
+   with:
 
    ```bash
    bunx @journeykit/canon init --check-config
+   ```
+
+   Start a change under a subject with no config edits:
+
+   ```bash
+   bunx @journeykit/canon subject new auth --domain dev --title "Auth"
+   bunx @journeykit/canon change new add-login --subject auth --title "Add login"
    ```
 
 2. **See the authoring surface.** Before writing any canon artifact, ask

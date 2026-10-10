@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:37:07.875956Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate gate_check_is_silent_about_coverage_with_the_section_or_without_scenarios"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 22,
+  "scenario_id": "gate.check.21",
+  "schema": 1,
+  "staging_id": "76357d480de6",
+  "verdict": "faithful"
+}

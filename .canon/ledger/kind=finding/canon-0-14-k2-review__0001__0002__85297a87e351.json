@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-k2",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T16:11:40.018303Z",
+  "change_id": "canon-0-14-k2-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "600e515d632e8e3d703e96a123e892880601e48c",
+  "reviewed_sha": "37d8affdfc0dd6b26620850db5737a6fc1d1f496",
+  "reviewer": "canon-reviewer-k2",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "init accepted a duplicate canon:begin marker in AGENTS.md instead of refusing before writing"
+}

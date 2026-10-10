@@ -69,12 +69,37 @@ canon gate check: clean (0 violations)
    ```
 
    바로 동작하는 `canon.yaml` 스켈레톤을 씁니다 — 스토리지
-   `tiers:`, 레코드 `routing:`, `specs:` root, `plans:` 소스까지.
-   기존 파일은 절대 덮어쓰지 않고 거부합니다. 기존 설정은 언제든
-   다음으로 검증할 수 있습니다:
+   `tiers:`, 레코드 `routing:`, `specs:` root, 그리고 `plans:` 소스
+   (레포 루트를 가리키는 `openspec` 소스와 빈 `openspec/changes/`)까지.
+   함께 쓰는 파일은 둘입니다:
+
+   - **`.canon/policy.yaml`**: `spec_coverage`를 켜는 시작 정책입니다.
+     모든 시나리오에 evidence가, 모든 feature surface에 `@case:failure`
+     시나리오가, 완료를 주장한 subject의 작업에는 독립 리뷰가
+     필요합니다. gate가 이 정책으로 작업을 채점하므로 사람이 검토하고
+     승인해야 합니다.
+   - **`AGENTS.md`의 canon 블록**: `<!-- canon:begin -->`과
+     `<!-- canon:end -->` 사이에 씁니다. 어떤 에이전트에게든 기능을
+     canon으로 관리한다는 것, 작업 루프, `canon status`와 canon 스킬을
+     알려 줍니다. 파일이 없으면 만들고, 있으면 마커 사이의 텍스트만
+     canon이 관리합니다. 마커는 코드 펜스 밖의 단독 줄일 때만
+     인정되며, 중복되거나 짝이 맞지 않는 마커는 거부하고 아무것도 쓰지
+     않습니다.
+
+   `--no-agents-md`와 `--no-policy`로 둘을 건너뜁니다. `init`은 기존
+   `canon.yaml`과 `policy.yaml`을 절대 덮어쓰지 않으며, 다시 실행하면
+   `AGENTS.md` 블록만 갱신합니다. 기존 설정은 언제든 다음으로 검증할
+   수 있습니다:
 
    ```bash
    bunx @journeykit/canon init --check-config
+   ```
+
+   설정을 손으로 고치지 않고 subject 아래에 change를 시작합니다:
+
+   ```bash
+   bunx @journeykit/canon subject new auth --domain dev --title "Auth"
+   bunx @journeykit/canon change new add-login --subject auth --title "Add login"
    ```
 
 2. **저작 표면(authoring surface) 확인.** canon 아티팩트를 작성하기

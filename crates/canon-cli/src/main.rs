@@ -78,15 +78,21 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     // ── Getting started ──
-    /// Set up canon in a repo (writes a starter canon.yaml)
-    #[command(after_help = "Examples:\n  canon init\n  canon init --check-config")]
+    /// Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)
+    #[command(after_help = "Examples:\n  canon init\n  canon init --no-agents-md --no-policy\n  canon init --check-config\n\nRerunning in a repo that has canon.yaml leaves canon.yaml and .canon/policy.yaml\nalone and only refreshes the canon block in AGENTS.md.")]
     Init {
         /// Directory to set up (used as-is)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
         /// Validate an existing canon.yaml instead of writing one
-        #[arg(long)]
+        #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy"])]
         check_config: bool,
+        /// Do not write or refresh the canon block in AGENTS.md
+        #[arg(long)]
+        no_agents_md: bool,
+        /// Do not write the starter .canon/policy.yaml
+        #[arg(long)]
+        no_policy: bool,
     },
     /// Try the evidence loop end-to-end in a throwaway demo repo
     #[command(after_help = "Examples:\n  canon demo init --repo /tmp/canon-demo && cd /tmp/canon-demo\n  canon gate check   # RED\n  canon demo attest && canon gate check   # GREEN")]
@@ -152,6 +158,12 @@ enum Command {
     Subject {
         #[command(subcommand)]
         action: SubjectCommand,
+    },
+    /// Scaffold a plan change (openspec proposal + tasks) adopted into a subject
+    #[command(after_help = "Examples:\n  canon change new add-login --subject auth --title 'Add login'")]
+    Change {
+        #[command(subcommand)]
+        action: ChangeCommand,
     },
     /// Index a validated .feature corpus into the scenario ledger
     Inventory {
@@ -1107,6 +1119,25 @@ enum FeatureCommand {
 }
 
 #[derive(Subcommand)]
+enum ChangeCommand {
+    /// Scaffold openspec/changes/<slug>/{proposal,tasks}.md, import it, and adopt it into a subject
+    New {
+        /// The change's slug (its change_id)
+        #[arg(value_parser = canon_cli::subject::parse_change_id)]
+        slug: ChangeId,
+        /// The existing subject to adopt the change under
+        #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
+        subject: SubjectId,
+        /// The change's title (also its proposal summary)
+        #[arg(long)]
+        title: String,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
 enum SubjectCommand {
     /// Author a new subject at status `proposed`
     New {
@@ -1430,7 +1461,12 @@ fn main() -> ExitCode {
                 ExitCode::from(canon_cli::subject::run_status(&repo, &id, state, override_reason.as_deref(), &actor_id, json) as u8)
             }
         },
-        Command::Init { repo, check_config } => run_init(&repo, check_config),
+        Command::Change { action } => match action {
+            ChangeCommand::New { slug, subject, title, repo } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject, &title) as u8),
+        },
+        Command::Init { repo, check_config, no_agents_md, no_policy } => {
+            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy: !no_policy })
+        }
         Command::Demo { action } => match action {
             DemoCommand::Init { repo } => ExitCode::from(canon_cli::demo::run_demo_init(&repo) as u8),
             DemoCommand::Attest { repo } => ExitCode::from(canon_cli::demo::run_demo_attest(&repo) as u8),
@@ -1722,14 +1758,16 @@ fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, p
     ExitCode::from(canon_cli::scaffold::run_feature_new(repo, surface, title, project, &actor, at) as u8)
 }
 
-/// `canon init [--repo <dir>]` / `canon init --check-config` (s19 P4,
-/// `canon_cli::init`'s module doc): `check_config: false` writes a
-/// fresh skeleton (`2` on an existing `canon.yaml`, `0` written);
-/// `check_config: true` READ-ONLY validates an existing one instead
-/// (`2` on a missing file, `0` when every present section parses
-/// clean, `1` when a present section fails).
-fn run_init(repo: &std::path::Path, check_config: bool) -> ExitCode {
-    let code = if check_config { canon_cli::init::run_check_config(repo) } else { canon_cli::init::run_init(repo) };
+/// `canon init [--repo <dir>] [--no-agents-md] [--no-policy]` / `canon
+/// init --check-config` (s19 P4, `canon_cli::init`'s module doc):
+/// `check_config: false` scaffolds a fresh repo, or on an existing
+/// `canon.yaml` refreshes only the AGENTS.md block (see
+/// `canon_cli::init::run_init` for the exit codes); `check_config: true`
+/// READ-ONLY validates an existing config instead (`2` on a missing
+/// file, `0` when every present section parses clean, `1` when a
+/// present section fails).
+fn run_init(repo: &std::path::Path, check_config: bool, options: canon_cli::init::InitOptions) -> ExitCode {
+    let code = if check_config { canon_cli::init::run_check_config(repo) } else { canon_cli::init::run_init(repo, options) };
     ExitCode::from(code as u8)
 }
 

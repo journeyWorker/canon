@@ -204,7 +204,52 @@ canon subject adopt subject-domain-loop-plan \
 
 `adopt` stamps the change's `subject_id` and adds it to the Subject's
 `change_ids`, so `canon query --kind change --change-id …` and `canon
-query --kind subject` agree on the link from both ends.
+query --kind subject` agree on the link from both ends. It writes only
+the side that lacks the link, so rerunning it on a linked pair writes
+nothing and exits `0`.
+
+The two records cannot be written atomically, so the subject is written
+first: its `change_ids` is what the gate reads a subject's adopted
+changes from (`open-blocker`, the status guard), so a half-done adoption
+still has that change's open blockers counted. If the change write then
+fails, `adopt` exits `2`, names the subject that now lists the change,
+and prints `canon subject adopt <change_id> --subject <id>` to complete
+it.
+
+### Starting a new change: `canon change new`
+
+For a change that does not exist yet, one command scaffolds it and
+records it adopted:
+
+```bash
+canon change new add-login --subject auth --title "Add login"
+```
+
+- **Writes** `openspec/changes/<slug>/proposal.md` (the title is its
+  `## Why`, which imports as the change summary) and `tasks.md` (no rows
+  yet, so the change imports as `proposed`), under the repo's first
+  `openspec` plans source. `canon init` configures that source
+  (`{dialect: openspec, root: .}`), so `canon.yaml` needs no edit.
+- **Reads** the files with the same `openspec` adapter `canon ingest
+  plans` uses, then **records** the change already adopted, through the
+  same write as `canon subject adopt`.
+- **What a failure leaves behind.** The files are staged under `.canon/`
+  and the change dir is moved into place only once they parse. A failure
+  before any record is written (staging, publishing the dir, or the
+  first record write) removes the change dir, the staged files and any
+  directory created for them: nothing is left behind. The two records
+  cannot be written atomically. If the change record fails after the
+  subject record was written, the command exits `2`, keeps the change
+  dir and that one subject record, and prints the repair, `canon ingest
+  plans && canon subject adopt <slug> --subject <id>`, which completes
+  the link and is safe to rerun.
+- **Refuses** with exit `2`, writing nothing, when the subject does not
+  exist, when the slug already has a change dir (active or archived) or a
+  `change` record, or when `canon.yaml` has no `openspec` plans source.
+
+Add task rows to `tasks.md` as `- [ ] <n> <title>`, rerun `canon ingest
+plans`, and flip each with `canon gate task <slug>#<n>` once evidence
+exists.
 
 ## Reading the per-domain management view
 

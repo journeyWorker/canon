@@ -194,3 +194,24 @@ Feature: subject lifecycle
     When a proposed subject is moved to specced
     Then the move succeeds
     And the guard reports both review checks as skipped because specced is not in its scope
+
+  # canon: {"schema":1,"at":"2026-10-10T16:01:46Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:edge
+  @subject.lifecycle.22
+  Scenario: Adopting a change that is already linked writes nothing
+    Given a change and a subject that already carry the adoption link on both sides
+    When the change is adopted into the subject again
+    Then it exits 0 saying the change is already linked and nothing was written
+    And no record is added to the ledger
+
+  # canon: {"schema":1,"at":"2026-10-10T16:01:46Z","actor":{"agent_id":"canon"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.23
+  Scenario: An adoption that fails between its two writes names what was written and the command that completes it
+    Given a change record that cannot be written while the subject record can
+    When the change is adopted into the subject
+    Then the subject record, which the gate reads adopted changes from, is written first
+    And the command exits 2 naming the subject that now lists the change and the exact command that completes the link
+    And running that command completes the link, and running it again writes nothing
