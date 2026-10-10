@@ -70,7 +70,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use canon_model::fold::{fold_to_current_state, FoldedState};
-use canon_model::{EvidenceVerdict, ProjectId, Scenario, ScenarioId, SubjectId, SubjectStatus};
+use canon_model::{EvidenceVerdict, ProjectId, Scenario, ScenarioId, Subject, SubjectId, SubjectStatus};
 
 use crate::context::{GateCheck, GateContext, SPEC_CORPUS_KINDS};
 use crate::review_gate;
@@ -130,12 +130,11 @@ impl GateCheck for SpecCoverageCheck {
         let evidenced = evidenced_scenarios(ctx);
         let divergence_states = fold_to_current_state(&ctx.divergences, &live_bindings(ctx), ctx.now);
         let verdicts = latest_verdicts(ctx);
-        let subject_status: BTreeMap<&str, SubjectStatus> =
-            latest_by_key(&ctx.subjects, |s| s.subject_id.as_str().to_string()).into_iter().map(|s| (s.subject_id.as_str(), s.status)).collect();
+        let subject_status: BTreeMap<&str, SubjectStatus> = latest_subjects(ctx).into_iter().map(|s| (s.subject_id.as_str(), s.status)).collect();
 
         let mut violations = Vec::new();
         let mut in_scope = Vec::new();
-        for scenario in latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone())) {
+        for scenario in latest_scenarios(ctx) {
             match scope_decision(scope, scenario.subject_id.as_ref(), &subject_status) {
                 ScopeDecision::OutOfScope => continue,
                 ScopeDecision::DanglingSubject(subject_id) => {
@@ -308,12 +307,22 @@ pub(crate) fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], k
 /// whose tag was removed or moved to another subject still has its old
 /// tagged generation on disk, and reading that row would keep it linked.
 pub fn subject_scenarios<'a>(ctx: &'a GateContext, subject: &SubjectId) -> Vec<&'a Scenario> {
-    let mut owned: Vec<&Scenario> = latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone()))
-        .into_iter()
-        .filter(|s| s.subject_id.as_ref() == Some(subject))
-        .collect();
-    owned.sort_by(|a, b| (&a.project_id, &a.scenario_id).cmp(&(&b.project_id, &b.scenario_id)));
-    owned
+    latest_scenarios(ctx).into_iter().filter(|s| s.subject_id.as_ref() == Some(subject)).collect()
+}
+
+/// The LATEST generation of every `(project_id, scenario_id)` in the
+/// corpus, ordered by that key (the fold's own key order) — the fold
+/// [`subject_scenarios`] filters, exposed so a reader that needs the whole
+/// corpus (`canon status`'s unowned list) folds it the same way.
+pub fn latest_scenarios(ctx: &GateContext) -> Vec<&Scenario> {
+    latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone()))
+}
+
+/// The LATEST record of every Subject, ordered by `subject_id` — the
+/// fold this check's `scope` filter and [`crate::review_gate`] read
+/// subject status from.
+pub fn latest_subjects(ctx: &GateContext) -> Vec<&Subject> {
+    latest_by_key(&ctx.subjects, |s| s.subject_id.as_str().to_string())
 }
 
 /// Every `(project_id, scenario_id)` an `EvidenceRecord` attests to.

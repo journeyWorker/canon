@@ -31,5 +31,6 @@ pub mod scaffold;
 pub mod subject;
 pub mod selftest;
 pub mod skills;
+pub mod status;
 pub mod tier;
 pub mod tiers;

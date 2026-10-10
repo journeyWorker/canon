@@ -53,7 +53,7 @@ use canon_model::{ChangeId, Finding, FindingDisposition, FindingSeverity, Record
 use crate::context::GateContext;
 use crate::failure_class::{FailureClass, Violation};
 use crate::policy::{subject_status_name, RequireReview, SpecCoverage};
-use crate::spec_coverage::{latest_by_key, scope_decision, subject_scenarios, ScopeDecision};
+use crate::spec_coverage::{latest_by_key, latest_scenarios, latest_subjects, scope_decision, subject_scenarios, ScopeDecision};
 
 /// One review gap a recorded waiver let through: reported by `canon gate
 /// check` as an advisory, never as a violation.
@@ -132,15 +132,14 @@ pub fn review_advisories(ctx: &GateContext) -> Option<Vec<ReviewAdvisory>> {
 
 /// The corpus-wide rule `canon gate check` applies.
 pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclude_lanes: &[String]) -> ReviewOutcome {
-    let subjects: BTreeMap<&str, &Subject> =
-        latest_by_key(&ctx.subjects, |s| s.subject_id.as_str().to_string()).into_iter().map(|s| (s.subject_id.as_str(), s)).collect();
+    let subjects: BTreeMap<&str, &Subject> = latest_subjects(ctx).into_iter().map(|s| (s.subject_id.as_str(), s)).collect();
     let status: BTreeMap<&str, SubjectStatus> = subjects.iter().map(|(id, s)| (*id, s.status)).collect();
     // The waiver of `id`'s subject, if it recorded exactly `violation`.
     let waiver_for =
         |id: &str, violation: &Violation| subjects.get(id).and_then(|s| current_waiver(s)).filter(|w| w.covers(violation.class.as_str(), &violation.subject));
 
     let mut outcome = ReviewOutcome::default();
-    for scenario in latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone())) {
+    for scenario in latest_scenarios(ctx) {
         // A scenario naming a subject no record carries has no status
         // that could put it in scope; `spec_coverage` reports the
         // dangling link itself.
