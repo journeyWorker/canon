@@ -1029,6 +1029,36 @@ fn spec_coverage_reports_every_unevidenced_scenario_in_the_corpus() {
     assert!(text.contains("no evidence record"), "{text}");
 }
 
+/// 0.14 D3: with scenarios in the corpus and no `spec_coverage` section,
+/// the gate says it is not enforcing — one stdout advisory naming the
+/// count and the policy file — and still exits 0.
+#[test]
+fn gate_check_advises_when_spec_coverage_is_off_without_changing_the_exit_code() {
+    let dir = repo_with_spec_corpus();
+    let out = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    assert_eq!(out.status.code(), Some(0), "an advisory never fails the gate: {}", stdout(&out));
+    let text = stdout(&out);
+    assert_eq!(
+        text,
+        "canon gate check: clean (0 violations)\n\nadvisory: spec_coverage is off — 2 scenario(s) are not checked for evidence; see .canon/policy.yaml\n"
+    );
+    assert!(stderr(&out).is_empty(), "{}", stderr(&out));
+}
+
+/// The advisory is silent once the section exists (even with
+/// `require_evidence: false`) and on an empty corpus.
+#[test]
+fn gate_check_is_silent_about_coverage_with_the_section_or_without_scenarios() {
+    let dir = repo_with_spec_corpus();
+    enable_spec_coverage(dir.path(), "spec_coverage:\n  require_evidence: false\n");
+    let out = run_canon(&["gate", "check", "--repo", "."], dir.path());
+    assert!(!stdout(&out).contains("spec_coverage is off"), "{}", stdout(&out));
+
+    let empty = tempfile::tempdir().unwrap();
+    let out = run_canon(&["gate", "check", "--repo", "."], empty.path());
+    assert!(!stdout(&out).contains("spec_coverage is off"), "{}", stdout(&out));
+}
+
 /// End-to-end through the real authoring path: a scenario-keyed
 /// attestation clears exactly its own scenario. Before s44 this record
 /// was not authorable at all — `--task` was required and no

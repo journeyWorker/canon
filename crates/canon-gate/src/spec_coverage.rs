@@ -296,6 +296,21 @@ pub(crate) fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], k
         .collect()
 }
 
+/// The scenario count behind `canon gate check`'s "spec_coverage is off"
+/// advisory (0.14 D3): `Some(n)` when `policy.yaml` has NO
+/// `spec_coverage` section and the corpus holds `n > 0` scenarios
+/// (latest generation per `(project_id, scenario_id)`), else `None`. A
+/// present section, including an invalid one (already a violation), is
+/// never "off". Advisory only: it never adds a violation, so the exit
+/// code is unchanged.
+pub fn coverage_off_scenarios(ctx: &GateContext) -> Option<usize> {
+    if ctx.policy.spec_coverage.is_some() {
+        return None;
+    }
+    let count = latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone())).len();
+    (count > 0).then_some(count)
+}
+
 /// The scenarios a Subject owns: the LATEST `Scenario` generation of
 /// every `(project_id, scenario_id)` whose latest generation carries
 /// `subject_id == subject`, ordered by that key.
