@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-k3",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T16:15:03.277705Z",
+  "change_id": "canon-0-14-k3-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "96df870d18ee2352372bcd32addc0d84d54c5b8e",
+  "reviewer": "canon-reviewer-k3",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "a pre-existing digest-named symlink pointing outside the artifact store was reported as already stored"
+}
