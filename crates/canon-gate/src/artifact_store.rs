@@ -34,7 +34,9 @@
 //! - Anything else (a corrupt blob, or a missing blob and a working-tree
 //!   file that is gone or changed): a `stale-evidence` violation naming
 //!   the path, the recorded digest, and what the blob and working tree
-//!   hold now.
+//!   hold now. It says which: a blob that exists but no longer hashes
+//!   to its name "does not match its name, so its bytes were altered";
+//!   a missing one means "the bound bytes are gone".
 //!
 //! The check is NOT narrowed to `spec_coverage.scope`. A binding is a
 //! claim the record makes about bytes, whatever its subject's lifecycle
@@ -359,11 +361,15 @@ impl GateCheck for ArtifactStoreCheck {
                 if blob == Observed::Missing && tree.matches(&attachment.sha256) {
                     continue;
                 }
+                // A blob that exists but no longer hashes to its own
+                // name was altered in place; one that is absent took the
+                // only proof with it (0.14 acceptance rerun G11).
+                let diagnosis = if blob == Observed::Missing { "the bound bytes are gone" } else { "the stored blob does not match its name, so its bytes were altered" };
                 violations.push(Violation::new(
                     FailureClass::StaleEvidence,
                     subject_of(record),
                     format!(
-                        "bound file `{}` recorded sha256 {}; stored blob {}: {}; working tree: {} — the bound bytes are gone, re-run and re-attest with `canon evidence add`",
+                        "bound file `{}` recorded sha256 {}; stored blob {}: {}; working tree: {} — {diagnosis}, re-run and re-attest with `canon evidence add`",
                         attachment.path,
                         attachment.sha256,
                         blob_display(&attachment.sha256),
@@ -481,6 +487,7 @@ mod tests {
         assert_eq!(violations[0].subject, "a.b.01");
         assert!(violations[0].detail.contains("`smoke.json`") && violations[0].detail.contains(&digest) && violations[0].detail.contains(&sha(b"v2")), "{}", violations[0].detail);
         assert!(violations[1].detail.contains("working tree: missing"), "{}", violations[1].detail);
+        assert!(violations.iter().all(|v| v.detail.contains("the bound bytes are gone") && !v.detail.contains("altered")), "a missing blob is gone, not altered: {violations:?}");
         assert!(unstored_attachments(&ctx_changed).is_empty());
     }
 
@@ -494,6 +501,11 @@ mod tests {
         let violations = ArtifactStoreCheck.run(&ctx(dir.path(), vec![evidence("a.b.01", "smoke.json", &digest, 0)]));
         assert_eq!(violations.len(), 1, "{violations:?}");
         assert!(violations[0].detail.contains(&sha(b"tampered")), "{}", violations[0].detail);
+        assert!(
+            violations[0].detail.contains("the stored blob does not match its name, so its bytes were altered") && !violations[0].detail.contains("gone"),
+            "an altered blob is named as altered, never as gone: {}",
+            violations[0].detail
+        );
     }
 
     #[test]

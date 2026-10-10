@@ -92,6 +92,12 @@ impl PlanAdapter for FixtureLineDialectAdapter {
         }
         outcome
     }
+
+    fn source_files(&self, source: &PlanSourceHandle) -> Vec<std::path::PathBuf> {
+        let PlanSourceHandle::Path(root) = source;
+        let file = root.join("changes.txt");
+        if file.is_file() { vec![file] } else { Vec::new() }
+    }
 }
 
 fn parse_status(token: &str) -> Option<ChangeStatus> {

@@ -113,6 +113,34 @@ impl PlanAdapter for OpenspecPlanAdapter {
         }
         outcome
     }
+
+    /// Per discovered change dir, exactly the files [`parse_change_dir`]
+    /// reads: `proposal.md`, `tasks.md`, `design.md` (its presence is a
+    /// diagnostic) and `specs/**/spec.md`. Discovery never recurses
+    /// beyond the change dirs' own level, so a source rooted at a
+    /// repository root reads `openspec/changes/**` and nothing else —
+    /// never `node_modules`, `target` or any other tree beside it.
+    fn source_files(&self, source: &PlanSourceHandle) -> Vec<PathBuf> {
+        let PlanSourceHandle::Path(root) = source;
+        let mut files = Vec::new();
+        for dir in discover_change_dirs(root) {
+            files.extend(["proposal.md", "tasks.md", "design.md"].into_iter().map(|name| dir.join(name)).filter(|path| path.is_file()));
+            files.extend(spec_delta_files(&dir));
+        }
+        files.sort_unstable();
+        files
+    }
+
+    /// Reads only the change dir whose basename is `change_id` (live or
+    /// archived), never its siblings.
+    fn parse_change(&self, source: &PlanSourceHandle, change_id: &ChangeId) -> PlanParseOutcome {
+        let PlanSourceHandle::Path(root) = source;
+        let mut outcome = PlanParseOutcome::empty();
+        for dir in discover_change_dirs(root).into_iter().filter(|dir| dir.file_name() == Some(OsStr::new(change_id.as_str()))) {
+            parse_change_dir(&dir, root, &mut outcome);
+        }
+        outcome
+    }
 }
 
 /// s35 `gate-plan-dialect-seam` (design D1): the openspec dialect owns
@@ -657,11 +685,7 @@ fn count_drop_diagnostics(dir: &Path, outcome: &mut PlanParseOutcome) {
         outcome.record_unmapped(DIAG_DESIGN_DOC);
     }
 
-    let specs_dir = dir.join("specs");
-    if !specs_dir.is_dir() {
-        return;
-    }
-    for spec_file in scan_dir(&specs_dir, |p| p.file_name().and_then(|n| n.to_str()) == Some("spec.md")) {
+    for spec_file in spec_delta_files(dir) {
         let Ok(text) = fs::read_to_string(&spec_file) else {
             continue; // an unreadable spec-delta file drops nothing to diagnose, never a crash
         };
@@ -669,6 +693,15 @@ fn count_drop_diagnostics(dir: &Path, outcome: &mut PlanParseOutcome) {
             outcome.record_unmapped(DIAG_SPEC_DELTA_SCENARIO);
         }
     }
+}
+
+/// `<dir>/specs/**/spec.md`, the spec-delta files of one change dir.
+fn spec_delta_files(dir: &Path) -> Vec<PathBuf> {
+    let specs_dir = dir.join("specs");
+    if !specs_dir.is_dir() {
+        return Vec::new();
+    }
+    scan_dir(&specs_dir, |p| p.file_name().and_then(|n| n.to_str()) == Some("spec.md"))
 }
 
 /// `tasks.md`/proposal.md carry no per-record timestamp of their own —
@@ -1261,5 +1294,87 @@ mod tests {
                 assert!(!hint.contains(root_str), "malformed entry hint leaked the absolute fixture root: {hint}");
             }
         }
+    }
+
+    /// A repository root (`root: .`, what `canon init` writes) holding
+    /// one openspec change beside a large unrelated tree: a JS
+    /// `node_modules` (including files named like plan documents), a
+    /// build dir and sources.
+    fn repo_with_unrelated_trees() -> tempfile::TempDir {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let write = |rel: &str, text: &str| {
+            let path = root.join(rel);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        };
+        write("openspec/changes/demo/proposal.md", "## Why\nA demo.\n");
+        write("openspec/changes/demo/tasks.md", "- [ ] 1 First\n- [x] 2 Second\n");
+        write("openspec/changes/demo/design.md", "# Design\n");
+        write("openspec/changes/demo/specs/cap/spec.md", "#### Scenario: x\n");
+        write("openspec/changes/other/proposal.md", "## Why\nAnother.\n");
+        write("openspec/changes/archive/old/proposal.md", "## Why\nOld.\n");
+        for pkg in 0..40 {
+            for depth in ["", "lib/", "lib/deep/", "lib/deep/er/"] {
+                write(&format!("node_modules/pkg-{pkg}/{depth}index.js"), "module.exports = 1;\n");
+            }
+        }
+        write("node_modules/pkg-0/proposal.md", "## Why\nnot a change\n");
+        write("node_modules/pkg-0/tasks.md", "- [ ] 1 not a task\n");
+        write("node_modules/pkg-0/specs/x/spec.md", "#### Scenario: not a delta\n");
+        write("target/debug/build/out.txt", "x\n");
+        write("src/main.ts", "export {}\n");
+        tmp
+    }
+
+    /// 0.14 acceptance rerun G1: the plan-import cursor digests exactly
+    /// the files the dialect reads, so with a repository-root source
+    /// they are all under `openspec/changes/`, never `node_modules` or
+    /// any other tree beside it.
+    #[test]
+    fn source_files_at_a_repository_root_never_leave_openspec_changes() {
+        let tmp = repo_with_unrelated_trees();
+        let root = tmp.path().to_path_buf();
+        let files = OpenspecPlanAdapter.source_files(&PlanSourceHandle::Path(root.clone()));
+        let relative: Vec<String> = files.iter().map(|path| path.strip_prefix(&root).unwrap().display().to_string()).collect();
+        assert_eq!(
+            relative,
+            [
+                "openspec/changes/archive/old/proposal.md",
+                "openspec/changes/demo/design.md",
+                "openspec/changes/demo/proposal.md",
+                "openspec/changes/demo/specs/cap/spec.md",
+                "openspec/changes/demo/tasks.md",
+                "openspec/changes/other/proposal.md",
+            ]
+        );
+    }
+
+    /// The same tree parses to the openspec changes alone: nothing under
+    /// `node_modules` (even a `proposal.md`/`tasks.md`) becomes a change,
+    /// a task or a diagnostic.
+    #[test]
+    fn parse_at_a_repository_root_reads_only_openspec_changes() {
+        let tmp = repo_with_unrelated_trees();
+        let outcome = OpenspecPlanAdapter.parse(&PlanSourceHandle::Path(tmp.path().to_path_buf()));
+        let ids: BTreeSet<&str> = outcome.changes.iter().map(|c| c.change_id.as_str()).collect();
+        assert_eq!(ids, BTreeSet::from(["demo", "old", "other"]));
+        assert_eq!(outcome.tasks.len(), 2);
+        assert!(outcome.malformed.is_empty(), "{:?}", outcome.malformed);
+        assert_eq!(outcome.unmapped.get(DIAG_SPEC_DELTA_SCENARIO), Some(&1), "only the change's own spec delta counts");
+    }
+
+    /// `parse_change` (what `canon gate task` re-imports) reads only the
+    /// named change dir, live or archived.
+    #[test]
+    fn parse_change_reads_only_the_named_change() {
+        let tmp = repo_with_unrelated_trees();
+        let source = PlanSourceHandle::Path(tmp.path().to_path_buf());
+        let demo = OpenspecPlanAdapter.parse_change(&source, &ChangeId::parse("demo").unwrap());
+        assert_eq!(demo.changes.iter().map(|c| c.change_id.as_str()).collect::<Vec<_>>(), ["demo"]);
+        assert_eq!(demo.tasks.len(), 2);
+        let old = OpenspecPlanAdapter.parse_change(&source, &ChangeId::parse("old").unwrap());
+        assert_eq!(old.changes.iter().map(|c| (c.change_id.as_str(), c.status)).collect::<Vec<_>>(), [("old", ChangeStatus::Archived)]);
+        assert_eq!(OpenspecPlanAdapter.parse_change(&source, &ChangeId::parse("absent").unwrap()), PlanParseOutcome::empty());
     }
 }

@@ -49,7 +49,7 @@ use chrono::Utc;
 use serde::Serialize;
 
 use crate::context::{resolve_repo_root, spec_coverage_surface, SpecCoverageSurface};
-use crate::inventory::load_spec_roots;
+use crate::inventory::{load_spec_roots, scan_feature_corpus};
 
 /// `canon status --json`'s shape version. Bumped when a field changes
 /// meaning or is removed; an added field does not bump it.
@@ -211,7 +211,8 @@ pub fn resolve(repo: &Path) -> StatusReport {
 
     let joins = Joins { verdicts: latest_verdicts(&ctx), blockers: open_blockers(&ctx) };
     let subjects = latest_subjects(&ctx);
-    let roots: Vec<ProjectId> = load_spec_roots(&repo.join("canon.yaml")).map(|roots| roots.into_iter().map(|r| r.id).collect()).unwrap_or_default();
+    let spec_roots = load_spec_roots(&repo.join("canon.yaml")).unwrap_or_default();
+    let roots: Vec<ProjectId> = spec_roots.iter().map(|r| r.id.clone()).collect();
     let mut summaries: Vec<(&Subject, SubjectSummary)> = subjects.iter().map(|s| (*s, summarize(&ctx, &joins, s))).collect();
     summaries.sort_by_key(|(s, _)| (rank(&DISPLAY_ORDER, s.status), s.subject_id.as_str().to_string()));
 
@@ -270,11 +271,21 @@ pub fn resolve(repo: &Path) -> StatusReport {
     // An empty scenario corpus under existing subjects is almost always an
     // index never built (scenario records are derived and often
     // gitignored), not a dozen subjects with no spec: say that once
-    // instead of one "owns no scenario" step per subject.
-    if scenarios.is_empty() && !subjects.is_empty() {
+    // instead of one "owns no scenario" step per subject. But when the
+    // .feature corpus itself holds no scenario, a sync indexes nothing:
+    // the next step is writing features and scenarios, so each subject
+    // gets its `scenario new … --subject` step below.
+    let corpus_has_scenarios = || spec_roots.iter().any(|root| !scan_feature_corpus(&root.root).is_empty());
+    if scenarios.is_empty() && !subjects.is_empty() && corpus_has_scenarios() {
         warnings.push("the ledger holds no scenario records, so every subject reads as owning none".into());
         next.push(NextStep { command: "canon inventory sync".into(), why: "index the .feature corpus into scenario records; status counts nothing until then".into() });
     } else {
+        if scenarios.is_empty() && !subjects.is_empty() {
+            next.push(NextStep {
+                command: format!("canon feature new <area>.<surface> --title \"<feature>\"{}", project_flag(&roots, None)),
+                why: "no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject <id>`".into(),
+            });
+        }
         let mut by_priority: Vec<&(&Subject, SubjectSummary)> = summaries.iter().filter(|(s, _)| NEXT_ORDER.contains(&s.status)).collect();
         by_priority.sort_by_key(|(s, _)| (rank(&NEXT_ORDER, s.status), s.subject_id.as_str().to_string()));
         for (subject, summary) in by_priority {

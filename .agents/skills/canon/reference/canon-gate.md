@@ -178,11 +178,16 @@ canon evidence add ... --report junit:target/nextest/default/junit.xml
 canon evidence add ... --report cucumber:reports/cucumber.json
 ```
 
-Every case carrying the scenario id in its name, classname, or Cucumber
-tag — dotted (`cart.add.04`) or underscored (`cart_add_04`, the form a
-test function carries) — is bound, each as its own attachment with its
-name and outcome. `--report-case <name>` (repeatable; a Rust test by its
-function name) ADDS cases; it never hides an id-carrying one. No match,
+A case is bound when the scenario id is its OWN: the first
+scenario-id-shaped token (`<area>.<surface>.<nn>`) in its full name —
+classname (a describe path) first, then name — dotted (`cart.add.04`) or
+underscored (`cart_add_04`, the form a test function carries), equals
+the scenario id; a Cucumber tag equal to it binds too. Start each test
+name with its scenario id: `game.session.04: restarting as in
+game.session.01` binds to `game.session.04` only, never to the id it
+mentions. Each bound case is its own attachment with its name and
+outcome. `--report-case <name>` (repeatable; a Rust test by its
+function name) ADDS cases; it never hides the scenario's own. No match,
 or a `--report-case` naming no case, refuses (exit 2); a `faithful`
 verdict when ANY bound case failed or was skipped refuses (exit 1). Files
 must be inside the repository, are recorded by relative path, and are
@@ -236,7 +241,10 @@ raise the limit with `--max-artifact-mib <N>`.
   ```
 - anything else → `stale-evidence` naming the path, the recorded digest,
   and what the store and the working tree hold now (`missing` or a
-  digest). Re-run the test and re-attest with `canon evidence add`.
+  digest), ending with why: a stored blob that no longer hashes to its
+  name "does not match its name, so its bytes were altered"; a missing
+  one means "the bound bytes are gone". Re-run the test and re-attest
+  with `canon evidence add`.
 
 The check applies to every latest record, not only subjects in
 `spec_coverage.scope`: a binding is a claim about bytes whatever the

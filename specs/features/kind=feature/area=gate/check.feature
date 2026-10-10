@@ -244,3 +244,13 @@ Feature: gate check
     Given a committed record bound to a report that has no stored blob
     When the working-tree report still hashes to the recorded digest
     Then the gate stays clean and lists the binding as unstored, pointing to canon evidence vault
+
+  # canon: {"schema":1,"at":"2026-10-10T18:33:15Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.24
+  Scenario: An altered stored blob is stale evidence that says it was altered, not gone
+    Given a committed record whose stored blob's bytes were changed while the working-tree report still matches
+    When the gate checks the repository
+    Then the gate exits 1 with stale-evidence naming the blob's actual digest
+    And the line says the stored blob does not match its name, never that the bound bytes are gone

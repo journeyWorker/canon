@@ -132,7 +132,7 @@ over 25 MiB are refused; `--max-artifact-mib <N>` raises the limit on
 
 **Evidence is not shaped by tasks.** `--summary` is allowed on
 scenario-only evidence. `--report-case` is repeatable and adds cases; every
-case whose name carries the scenario id is bound, and a `faithful` verdict
+case whose own leading scenario id is this one is bound, and a `faithful` verdict
 is refused when any bound case failed. A flipped task row's note aggregates
 every record bound to the task (`— ✅ 3 evidence records (2 faithful, 1
 not-applicable); latest: <summary>`), and `gate task` re-ingests the plan
@@ -173,6 +173,37 @@ unchanged.
   before 0.14, before their working-tree files change.
 - Scripts that parse write-command output see the new write-mode suffixes.
 - Re-run `canon skills install` to project the new skill.
+- A change adopted before this release may already have lost its subject
+  link to a re-import; `canon subject adopt <change> --subject <id>`
+  restores it.
+
+**Acceptance rerun fixes.**
+
+- G1: `canon gate task` took ~10 s per flip in a JS repo, because the plan
+  import that refreshes the task store digested every file under the
+  `root: .` source `init` writes, `node_modules` included. The import now
+  digests only the files the dialect reads (for `openspec`, the change
+  dirs under `openspec/changes/`), and `gate task` re-imports only the
+  flipped change. On a copy of the dogfood repo with its 204 MB
+  `node_modules`, a flip went from 9.8 s to 0.06 s (debug build) and from
+  1.4 s to 0.02 s (release).
+- G7: a report case binds to a scenario only when the scenario id is its
+  own: the first scenario-id-shaped token (`<area>.<surface>.<nn>`, dotted
+  or underscored) of its full name, classname first, then name; or a
+  Cucumber tag equal to it. A case named `game.session.04: restarting as
+  in game.session.01` binds to `game.session.04` only. `--report-case`
+  still binds any case by name.
+- G9: a plan import keeps the `subject_id` the latest change record carries
+  when the plan document names none, so a `gate task` flip or a ticked
+  checkbox no longer unlinks a change from the subject `change new` or
+  `subject adopt` linked it to.
+- G10: with subjects but no `.feature` scenario anywhere, `canon status`
+  suggests `canon feature new` and each subject's `canon scenario new …
+  --subject <id>` instead of `canon inventory sync`, which would index
+  nothing.
+- G11: a `stale-evidence` line for a stored blob whose bytes were changed
+  says "the stored blob does not match its name, so its bytes were
+  altered"; "the bound bytes are gone" is kept for a missing blob.
 
 **Changed conformance expectations.** `version` re-blessed for
 `canon 0.14.0`. Existing cases re-blessed:
@@ -196,6 +227,8 @@ unchanged.
   `--actor-id <unit> --session-id <session>`, and `subject new` and
   `subject status` carry `--actor-id <unit>`; `review add` quotes
   `"<feature file>"` so it pastes into a shell.
+- `evidence-add-refused-no-matching-case` — the no-match refusal now says
+  "start the test name with the scenario id or tag it" (G7).
 
 New cases: `change-new`, `init-scaffold-and-rerun`,
 `evidence-vault-stores-unstored`, `evidence-vault-reports-unstorable`,
@@ -205,7 +238,9 @@ New cases: `change-new`, `init-scaffold-and-rerun`,
 `review-gate-same-session-not-counted`, `status-gaps`, `status-no-policy`,
 `status-ship-ready` (the `status-*` cases print the canon version and were
 re-blessed with it). The `gate-check-evidence-binding-*` fixtures also gained
-their stored artifact blobs. Every other case is unchanged.
+their stored artifact blobs. The acceptance rerun added
+`gate-check-artifact-tampered-blob` (G11) and `status-no-scenarios` (G10).
+Every other case is unchanged.
 
 ## 0.13.1 fix
 

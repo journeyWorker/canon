@@ -90,7 +90,7 @@ Feature: context status
   @case:edge
   @context.status.09
   Scenario: Status on subjects with no scenario records points at the inventory sync
-    Given subjects but no scenario records in the ledger
+    Given subjects and a .feature corpus with scenarios, but no scenario records in the ledger
     When status is run
     Then it warns that the ledger holds no scenario records
     And its only next command is the inventory sync, not one empty-subject step per subject
@@ -149,3 +149,13 @@ Feature: context status
     When status is run
     Then every suggested command parses as printed
     And every write suggestion carries `--actor-id <unit>` and `--session-id <session>` wherever its command takes them
+
+  # canon: {"schema":1,"at":"2026-10-10T18:33:15Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.15
+  Scenario: With no feature scenarios at all, status says to write them rather than sync
+    Given a subject and no .feature file holding any scenario
+    When status is run
+    Then the next list names canon feature new, then a scenario new step with --subject for the subject
+    And it never suggests canon inventory sync, which would index nothing

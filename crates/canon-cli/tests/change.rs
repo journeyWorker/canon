@@ -72,6 +72,47 @@ fn change_new_scaffolds_imports_and_adopts_with_no_config_edit() {
     assert!(task_rows.iter().any(|t| t["task_id"] == "add-login#1"), "{task_rows:?}");
 }
 
+/// 0.14 acceptance rerun G9: `canon gate task` re-imports the flipped
+/// change, and the re-imported change version used to carry
+/// `subject_id: null`, superseding the adoption `change new` wrote. The
+/// latest change still names its subject after the flip, and after a
+/// full `canon ingest plans`.
+#[test]
+fn a_task_flip_keeps_the_changes_adopted_subject() {
+    let dir = inited_repo_with_subject();
+    let repo = dir.path();
+    let created = run(repo, &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
+    assert!(created.status.success(), "{}", stderr(&created));
+    let tasks_path = repo.join("openspec/changes/add-login/tasks.md");
+    let mut tasks = std::fs::read_to_string(&tasks_path).unwrap();
+    tasks.push_str("\n- [ ] 1 Write the failure-path scenarios\n");
+    std::fs::write(&tasks_path, tasks).unwrap();
+    assert!(run(repo, &["ingest", "plans"]).status.success());
+
+    let evidence = run(repo, &["evidence", "add", "--task", "add-login#1", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"]);
+    assert!(evidence.status.success(), "{}", stderr(&evidence));
+    assert!(run(repo, &["gate", "promote"]).status.success());
+    let flip = run(repo, &["gate", "task", "add-login#1"]);
+    assert!(flip.status.success(), "{}{}", stdout(&flip), stderr(&flip));
+    assert!(!stderr(&flip).contains("WARN"), "the re-import is clean: {}", stderr(&flip));
+
+    // `canon query --kind change` lists every version; the latest by
+    // `at` is the one every folded reader (gate, status) sees.
+    let latest = |repo: &Path| {
+        query(repo, "change")
+            .into_iter()
+            .filter(|c| c["change_id"] == "add-login")
+            .max_by_key(|c| chrono::DateTime::parse_from_rfc3339(c["at"].as_str().unwrap()).unwrap())
+            .expect("the change is in the store")
+    };
+    let change = latest(repo);
+    assert_eq!(change["subject_id"], "auth", "the flip's re-import keeps the adoption: {change}");
+    assert_eq!(change["status"], "completed", "the re-import did land: {change}");
+
+    assert!(run(repo, &["ingest", "plans"]).status.success());
+    assert_eq!(latest(repo)["subject_id"], "auth", "a full import keeps it too");
+}
+
 #[test]
 fn change_new_refuses_an_unknown_subject_and_writes_nothing() {
     let dir = inited_repo_with_subject();

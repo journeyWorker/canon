@@ -185,8 +185,8 @@ fn fold_latest(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
 }
 
 /// The current, folded-to-latest set of `kind` records read through
-/// `registry`.
-fn latest_records(registry: &TierRegistry, kind: RecordKind) -> Result<Vec<RawRecord>, StoreError> {
+/// `registry` (also `crate::plans`' adoption read).
+pub(crate) fn latest_records(registry: &TierRegistry, kind: RecordKind) -> Result<Vec<RawRecord>, StoreError> {
     let result = registry.query(&TierQuery::kind(kind))?;
     Ok(fold_latest(kind, result.records))
 }

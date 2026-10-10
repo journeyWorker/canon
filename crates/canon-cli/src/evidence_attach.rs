@@ -12,18 +12,25 @@
 //!   scenario, and records the case and its outcome alongside the digest.
 //!
 //! # Finding the cases
-//! Every case whose name, classname, or (Cucumber) tag contains the
-//! scenario id — dotted (`cart.add.04`) or with dots and hyphens as
-//! underscores (`cart_add_04`, the form a test function can carry) — as a
-//! whole token, PLUS every case named by a `--report-case <name>`
-//! (repeatable; the case whose name equals it, or ends with `::<name>`,
-//! so a Rust test is named by its function). Each bound case is its own
-//! attachment, carrying that case's name and outcome — a Scenario
-//! Outline's examples, or three tests for one scenario, are all recorded,
-//! never folded into one. Naming a case cannot hide another: the
-//! id-carrying cases are bound whether or not `--report-case` is given.
-//! No match at all refuses, and so does a `--report-case` that names no
-//! case: a binding that names nothing is not a binding.
+//! A case is bound when it is the scenario's OWN case: its leading
+//! scenario id — the first scenario-id-shaped token
+//! (`<area>.<surface>.<nn>`) in its full name, read as the runner
+//! writes it: classname (a JUnit describe path) first, then name;
+//! dotted (`cart.add.04`) or with dots and hyphens as underscores
+//! (`cart_add_04`, the form a test function can carry) — equals the
+//! scenario id. A Cucumber tag equal to the scenario id also binds. A
+//! case that only MENTIONS another id after its own
+//! (`game.session.04: restarting as in game.session.01`) is never bound
+//! to the mentioned one. PLUS every case named by a
+//! `--report-case <name>` (repeatable; the case whose name equals it,
+//! or ends with `::<name>`, so a Rust test is named by its function).
+//! Each bound case is its own attachment, carrying that case's name and
+//! outcome — a Scenario Outline's examples, or three tests for one
+//! scenario, are all recorded, never folded into one. Naming a case
+//! cannot hide another: the scenario's own cases are bound whether or
+//! not `--report-case` is given. No match at all refuses, and so does a
+//! `--report-case` that names no case: a binding that names nothing is
+//! not a binding.
 //!
 //! # Storing the bytes (0.14 D4)
 //! [`bind`] only reads. It returns each bound file's resolved path and
@@ -293,9 +300,9 @@ fn names_case(case: &ReportCase, name: &str) -> bool {
     case.name == name || case.name.ends_with(&format!("::{name}"))
 }
 
-/// Every case this evidence binds (module doc): the ones carrying the
-/// scenario id, plus the ones `explicit` names, each once, in report
-/// order. Empty is an error.
+/// Every case this evidence binds (module doc): the ones whose own
+/// scenario id is this one, plus the ones `explicit` names, each once,
+/// in report order. Empty is an error.
 pub fn match_cases<'c>(
     cases: &'c [ReportCase],
     explicit: &[String],
@@ -307,19 +314,9 @@ pub fn match_cases<'c>(
                 .to_string(),
         );
     }
-    let underscored = scenario_id.map(|id| id.replace(['.', '-'], "_"));
-    let carries_id = |c: &ReportCase| {
-        let (Some(id), Some(underscored)) = (scenario_id, underscored.as_deref()) else {
-            return false;
-        };
-        c.tags.iter().any(|t| t == id)
-            || [&c.name, &c.group]
-                .iter()
-                .any(|text| contains_token(text, id) || contains_token(text, underscored))
-    };
     let matched: Vec<&ReportCase> = cases
         .iter()
-        .filter(|c| carries_id(c) || explicit.iter().any(|name| names_case(c, name)))
+        .filter(|c| scenario_id.is_some_and(|id| owns_scenario(c, id)) || explicit.iter().any(|name| names_case(c, name)))
         .collect();
     if matched.is_empty() {
         let mut wanted = Vec::new();
@@ -328,7 +325,7 @@ pub fn match_cases<'c>(
         }
         wanted.extend(explicit.iter().map(|n| format!("named `{n}`")));
         return Err(format!(
-            "no case {} among its {} case(s); put the scenario id in the test name or tag, or name the case with --report-case",
+            "no case {} among its {} case(s); start the test name with the scenario id or tag it, or name the case with --report-case",
             wanted.join(" or "),
             cases.len()
         ));
@@ -336,15 +333,63 @@ pub fn match_cases<'c>(
     Ok(matched)
 }
 
-/// `needle` occurs in `haystack` with no ASCII alphanumeric directly on
-/// either side, so `cart.add.04` never matches `cart.add.040`.
-fn contains_token(haystack: &str, needle: &str) -> bool {
-    haystack.match_indices(needle).any(|(start, _)| {
-        let before = haystack[..start].chars().next_back();
-        let after = haystack[start + needle.len()..].chars().next();
-        !before.is_some_and(|c| c.is_ascii_alphanumeric())
-            && !after.is_some_and(|c| c.is_ascii_alphanumeric())
+/// Whether `case` is `id`'s own case (module doc): a Cucumber tag equal
+/// to `id`, or `id` as the case's LEADING scenario id — the first
+/// scenario-id-shaped token of its full name, read as a runner writes
+/// it: the classname (a describe path) first, then the name. A case
+/// for `game.session.04` that mentions `game.session.01` later is
+/// `.04`'s alone.
+fn owns_scenario(case: &ReportCase, id: &str) -> bool {
+    if case.tags.iter().any(|t| t == id) {
+        return true;
+    }
+    let underscored = id.replace(['.', '-'], "_");
+    let text = if leading_id_end(&case.group).is_some() { &case.group } else { &case.name };
+    leading_id_end(text).is_some_and(|end| {
+        let lead = &text[..end];
+        [id, underscored.as_str()].iter().any(|form| {
+            lead.strip_suffix(form).is_some_and(|before| !before.chars().next_back().is_some_and(|c| c.is_ascii_alphanumeric()))
+        })
     })
+}
+
+/// The byte offset where `text`'s first scenario-id-shaped token ends,
+/// or `None` when it has none. A token is shaped like a scenario id
+/// (`<area>.<surface>.<nn>`, `nn` two or more digits) when it ends in
+/// a run of 2+ digits with no ASCII alphanumeric after it, preceded by
+/// either `.` and two dot-joined `[a-z0-9-]` segments (`cart.add.04`)
+/// or `_` and two underscore-joined `[a-z0-9]` segments (`cart_add_04`,
+/// the form a test function carries, hyphens and dots both `_`).
+fn leading_id_end(text: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if !bytes[i].is_ascii_digit() {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < bytes.len() && bytes[i].is_ascii_digit() {
+            i += 1;
+        }
+        let bounded = i == bytes.len() || !bytes[i].is_ascii_alphanumeric();
+        if bounded && i - start >= 2 && start > 0 && ends_with_two_segments(&bytes[..start - 1], bytes[start - 1]) {
+            return Some(i);
+        }
+    }
+    None
+}
+
+/// Whether `before` ends with two `separator`-joined, non-empty
+/// segments (`.`: `[a-z0-9-]+`; `_`: `[a-z0-9]+`).
+fn ends_with_two_segments(before: &[u8], separator: u8) -> bool {
+    let segment = |b: u8| b.is_ascii_lowercase() || b.is_ascii_digit() || (separator == b'.' && b == b'-');
+    if separator != b'.' && separator != b'_' {
+        return false;
+    }
+    let surface = before.iter().rev().take_while(|b| segment(**b)).count();
+    let rest = &before[..before.len() - surface];
+    surface > 0 && rest.last() == Some(&separator) && rest[..rest.len() - 1].last().is_some_and(|b| segment(*b))
 }
 
 /// Parse JUnit XML: every `<testcase>`, failed when it holds `<failure>`
@@ -569,6 +614,38 @@ mod tests {
             "--report-case names a Rust test by its function"
         );
         assert!(match_cases(&cases, &[], None).is_err());
+    }
+
+    /// 0.14 acceptance rerun G7: a case binds only to its OWN leading
+    /// scenario id. A case for `game.session.04` that mentions
+    /// `game.session.01` binds to `.04` and never to `.01`, in dotted or
+    /// underscored form; an id in the classname (a describe path) leads
+    /// the name.
+    #[test]
+    fn a_case_binds_to_its_leading_scenario_id_never_to_one_it_mentions() {
+        let report = r#"<testsuite>
+            <testcase classname="src/session.test.ts" name="game.session.01: a new run starts at wave one"/>
+            <testcase classname="src/session.test.ts" name="game.session.04: restarting resets the run as in game.session.01"><failure/></testcase>
+            <testcase classname="session" name="tests::game_session_05_restart_mirrors_game_session_01"/>
+            <testcase classname="game.session.06 &gt; pause" name="freezes the clock, unlike game.session.01"/>
+            <testcase classname="session" name="build v1.2.10 then game.session.07"/>
+        </testsuite>"#;
+        let cases = parse_junit(report).unwrap();
+        let bound = |id: &str| names(&match_cases(&cases, &[], Some(id)).unwrap()).into_iter().map(|(name, _)| name).collect::<Vec<_>>();
+
+        assert_eq!(bound("game.session.01"), ["game.session.01: a new run starts at wave one"], "the mentions in .04, .05 and .06 bind nothing to .01");
+        assert_eq!(bound("game.session.04"), ["game.session.04: restarting resets the run as in game.session.01"]);
+        assert_eq!(bound("game.session.05"), ["tests::game_session_05_restart_mirrors_game_session_01"], "underscored leading id");
+        assert_eq!(bound("game.session.06"), ["freezes the clock, unlike game.session.01"], "the describe path's id leads the name's mention");
+        assert!(
+            match_cases(&cases, &[], Some("game.session.07")).unwrap_err().contains("start the test name with the scenario id"),
+            "an earlier id-shaped token (v1.2.10) leads, so the case is not .07's own"
+        );
+        assert_eq!(
+            names(&match_cases(&cases, &["build v1.2.10 then game.session.07".to_string()], Some("game.session.07")).unwrap())[0].0,
+            "build v1.2.10 then game.session.07",
+            "--report-case still binds a case by name"
+        );
     }
 
     /// 0.14 D5: `--report-case` is repeatable and ADDS to the id-carrying

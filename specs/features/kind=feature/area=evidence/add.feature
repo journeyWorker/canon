@@ -211,3 +211,13 @@ Feature: evidence add
     When each succeeds
     Then a staged write ends with the promote command that commits it
     And a direct write ends with written directly; nothing to promote
+
+  # canon: {"schema":1,"at":"2026-10-10T18:33:15Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.22
+  Scenario: A report case binds only to its own leading scenario id, never to one it mentions
+    Given a report with a passing case led by the scenario id and a failing case led by another id that mentions it
+    When faithful evidence is added for the scenario with that report
+    Then the record binds only the case the scenario id leads, and the faithful claim is accepted
+    And naming the mentioning case with --report-case binds it, so its failure refuses the faithful claim with exit 1

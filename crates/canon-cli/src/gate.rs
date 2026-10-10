@@ -94,7 +94,7 @@ use canon_gate::{
 };
 use canon_ingest::{find_plan_adapter, PlanWriteBack, WriteBackError};
 use canon_model::paths;
-use canon_model::{validate_evidence_batch, Actor, Envelope, RawRecord, RecordKind, TaskId};
+use canon_model::{validate_evidence_batch, Actor, ChangeId, Envelope, RawRecord, RecordKind, TaskId};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{Tier, TierQuery};
@@ -249,7 +249,6 @@ fn format_gate_report(report: &GateReport) -> String {
 /// compile while silently resolving the typed-atoms file against the
 /// document path.
 pub(crate) struct LocatedTask {
-    pub dialect: String,
     pub write_back: &'static dyn PlanWriteBack,
     pub document_path: PathBuf,
     pub source_root: PathBuf,
@@ -295,7 +294,7 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
             continue;
         };
         if let Some(location) = write_back.locate_task(src.root(), task_id) {
-            return Ok(LocatedTask { dialect: src.dialect().to_string(), write_back, document_path: location.document_path, source_root: src.root().to_path_buf() });
+            return Ok(LocatedTask { write_back, document_path: location.document_path, source_root: src.root().to_path_buf() });
         }
     }
     Err(format!("no plan source locates {task_id} (consulted: {})", consulted.join("; ")))
@@ -328,7 +327,7 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
     // carries the winning dialect's write-back, its document path, and
     // that source's root (the typed-atoms file is resolved from the
     // SAME source).
-    let LocatedTask { dialect, write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
+    let LocatedTask { write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
         Ok(located) => located,
         Err(e) => {
             eprintln!("canon gate task: {e}");
@@ -457,7 +456,7 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
                 return 2;
             }
             println!("canon gate task: {task_id} flipped — {}", crate::write_mode::DIRECT);
-            refresh_task_status(&repo, &dialect, &source_root);
+            refresh_task_status(&repo, &task_id.change_id());
             0
         }
         TaskFlipDecision::Blocked { violations } => {
@@ -469,19 +468,21 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
     }
 }
 
-/// Re-ingest the plan source that owns a just-flipped row (0.14 D5,
-/// dogfood F14), so the record store's `Task` status agrees with the
-/// checkbox and `canon query --kind task` matches the plan document. The
-/// SAME `canon ingest plans` pass, narrowed to the one source: the new
-/// `Task` version carries the document's fresh mtime, so it supersedes
-/// the open one in every folded read. A repo that routes no tier for
-/// tasks has nothing to disagree with, so an unwritten task is silent.
-/// The flip itself already succeeded; a failure here is reported, never
-/// turned into a failed flip.
-fn refresh_task_status(repo: &Path, dialect: &str, source_root: &Path) {
-    match crate::plans::run(repo, Some(dialect), Some(source_root)) {
-        Ok(outcome) if outcome.non_clean_sources.is_empty() => {}
-        Ok(_) => eprintln!("canon gate task: WARN the plan source re-ingest found malformed constructs; run `canon ingest plans` to see them"),
+/// Re-import the change that owns a just-flipped row (0.14 D5, dogfood
+/// F14), so the record store's `Task` status agrees with the checkbox
+/// and `canon query --kind task` matches the plan document. Only that
+/// change is read ([`crate::plans::refresh_change`]), never the whole
+/// plan source: a source rooted at a JS repository root used to cost
+/// ~10 s per flip (0.14 acceptance rerun G1). The new `Task` version
+/// carries the document's fresh mtime, so it supersedes the open one in
+/// every folded read, and the change keeps its adopted subject. A repo
+/// that routes no tier for tasks has nothing to disagree with, so an
+/// unwritten task is silent. The flip itself already succeeded; a
+/// failure here is reported, never turned into a failed flip.
+fn refresh_task_status(repo: &Path, change_id: &ChangeId) {
+    match crate::plans::refresh_change(repo, change_id) {
+        Ok(refresh) if refresh.changes_parsed > 0 && refresh.malformed == 0 => {}
+        Ok(_) => eprintln!("canon gate task: WARN the change `{}` did not re-import cleanly; run `canon ingest plans` to see why", change_id.as_str()),
         Err(e) => eprintln!("canon gate task: WARN the task status record was not refreshed ({e}); run `canon ingest plans` so `canon query --kind task` matches the plan"),
     }
 }

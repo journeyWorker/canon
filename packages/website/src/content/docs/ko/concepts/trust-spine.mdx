@@ -159,9 +159,13 @@ canon evidence add ... --artifact test-results/cart-trace.zip
 canon evidence add ... --report junit:target/nextest/default/junit.xml
 ```
 
-이름이나 태그에 시나리오 id가 들어 있는 리포트 케이스는 모두 묶이며,
-케이스마다 결과가 따로 기록됩니다. `--report-case`(반복 가능)는 케이스를
-더할 뿐 숨기지 않습니다. 묶인 케이스 중 하나라도 실패하면 `faithful`
+리포트 케이스는 시나리오 id가 그 케이스 자신의 id일 때 묶입니다. 전체
+이름(classname, 그다음 name)에서 처음 나오는 시나리오 id 형태의 토큰이
+그 id이거나, 같은 Cucumber 태그가 붙은 경우입니다. 이름이
+`game.session.04: restarting as in game.session.01`인 케이스는
+`game.session.04`에만 묶입니다. 케이스마다 결과가 따로 기록됩니다.
+`--report-case`(반복 가능)는 케이스를 더할 뿐 숨기지 않습니다. 묶인
+케이스 중 하나라도 실패하면 `faithful`
 판정은 거부됩니다. 게이트가 강도를 볼지는 policy 스위치로 정합니다:
 
 ```yaml
@@ -192,7 +196,9 @@ experimental:
   `canon evidence vault`를 안내하는 advisory가 붙고, 이 명령이 그 바이트를
   저장합니다(0.14 이전 레코드).
 - 그 밖의 경우 → `stale-evidence`. 경로, 기록된 digest, 저장소와 작업
-  트리에 지금 있는 것을 함께 보여줍니다. 다시 실행하고 다시 신고하세요.
+  트리에 지금 있는 것을 함께 보여주고, 저장된 blob이 바뀌었는지(이름과
+  내용이 맞지 않음) 사라졌는지 구분해 알려줍니다. 다시 실행하고 다시
+  신고하세요.
 
 ## 트러스트 래더
 

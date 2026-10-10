@@ -166,8 +166,11 @@ canon evidence add ... --artifact test-results/cart-trace.zip
 canon evidence add ... --report junit:target/nextest/default/junit.xml
 ```
 
-Every report case carrying the scenario id in its name or tag is bound,
-each with its own outcome; `--report-case` (repeatable) adds more and
+A report case is bound when the scenario id is its own: the first
+scenario-id-shaped token of its full name (classname, then name), or a
+Cucumber tag equal to it. A case named `game.session.04: restarting as
+in game.session.01` binds to `game.session.04` only. Each bound case
+keeps its own outcome; `--report-case` (repeatable) adds more and
 never hides one. A `faithful` verdict is refused when any bound case
 failed. Whether the gate cares about strength is a policy switch:
 
@@ -199,7 +202,9 @@ file bound to a latest evidence record, whatever its subject's status:
   clean, with an advisory pointing to `canon evidence vault`, which stores
   those bytes (records from before 0.14);
 - anything else → `stale-evidence`, naming the path, the recorded digest,
-  and what the store and working tree hold now. Re-run and re-attest.
+  and what the store and working tree hold now, and whether the stored
+  blob was altered (it no longer matches its name) or is gone. Re-run and
+  re-attest.
 
 ## The trust ladder
 

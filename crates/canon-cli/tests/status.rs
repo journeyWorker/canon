@@ -508,8 +508,34 @@ fn status_on_an_unsynced_corpus_points_at_inventory_sync() {
     write_policy(dir.path(), FULL_POLICY);
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &[]);
     seed_subject(dir.path(), "other-subject", SubjectStatus::Building, &[]);
+    let feature = dir.path().join("specs/features/kind=feature/area=world/demo.feature");
+    std::fs::create_dir_all(feature.parent().unwrap()).unwrap();
+    std::fs::write(&feature, "Feature: demo\n\n  @subject:demo-subject\n  @world.demo.01\n  Scenario: A demo\n    Given a step\n").unwrap();
 
     let report = status_json(dir.path());
     assert_eq!(commands(&report), ["canon inventory sync"]);
     assert!(report["warnings"].as_array().unwrap().iter().any(|w| w == "the ledger holds no scenario records, so every subject reads as owning none"), "{report}");
+}
+
+/// 0.14 acceptance rerun G10: with no `.feature` scenario at all, a sync
+/// has nothing to index, so status says to write features and each
+/// subject's scenarios instead of `canon inventory sync`.
+#[test]
+fn status_with_no_feature_scenarios_points_at_writing_them() {
+    let dir = repo();
+    write_policy(dir.path(), FULL_POLICY);
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[]);
+
+    let report = status_json(dir.path());
+    let commands = commands(&report);
+    assert_eq!(
+        commands,
+        ["canon feature new <area>.<surface> --title \"<feature>\"", "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject demo-subject --case happy"],
+        "{report}"
+    );
+    assert!(!commands.iter().any(|c| c.contains("inventory sync")), "{report}");
+    assert!(!report["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().contains("no scenario records")), "{report}");
+    for command in &commands {
+        assert_suggestion_parses_and_names_the_unit(command);
+    }
 }

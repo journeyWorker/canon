@@ -57,6 +57,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use canon_model::ids::ChangeId;
 use canon_model::records::{Change, Task};
 use serde::{Deserialize, Serialize};
 
@@ -239,6 +240,29 @@ pub trait PlanAdapter: Send + Sync {
     /// construct is dropped with a NAMED `unmapped` diagnostic, never
     /// an invented mapping onto `Change`/`Task`.
     fn parse(&self, source: &PlanSourceHandle) -> PlanParseOutcome;
+
+    /// Every file [`Self::parse`] reads for `source` — its whole input
+    /// set and nothing else. `canon-cli`'s plan-import cursor digests
+    /// exactly these files to decide whether a source changed, so a
+    /// file outside this set never costs a read: a source rooted at a
+    /// repository root (`root: .`, what `canon init` writes) must not
+    /// walk `node_modules` or any other tree its dialect never reads.
+    /// REQUIRED, never defaulted: only the dialect knows its layout.
+    fn source_files(&self, source: &PlanSourceHandle) -> Vec<PathBuf>;
+
+    /// Parse only `change_id`'s plan document(s) out of `source`: the
+    /// `Change` and `Task` candidates [`Self::parse`] yields for that id,
+    /// and the diagnostics of reading them. `canon gate task` re-imports
+    /// just the change it flipped through this. The default parses the
+    /// whole source and keeps that change's candidates (its diagnostics
+    /// still cover the whole source); a dialect whose layout locates one
+    /// change directly should read only that.
+    fn parse_change(&self, source: &PlanSourceHandle, change_id: &ChangeId) -> PlanParseOutcome {
+        let mut outcome = self.parse(source);
+        outcome.changes.retain(|change| &change.change_id == change_id);
+        outcome.tasks.retain(|task| &task.task_id.change_id() == change_id);
+        outcome
+    }
 }
 
 /// Trivial accessor mirroring
@@ -320,6 +344,10 @@ mod tests {
 
         fn parse(&self, _source: &PlanSourceHandle) -> PlanParseOutcome {
             PlanParseOutcome::empty()
+        }
+
+        fn source_files(&self, _source: &PlanSourceHandle) -> Vec<PathBuf> {
+            Vec::new()
         }
     }
 

@@ -241,6 +241,30 @@ fn every_report_case_carrying_the_scenario_id_is_bound_and_any_failure_refuses_f
     );
 }
 
+/// 0.14 acceptance rerun G7: report cases bound by substring, so a
+/// failing case for `game.run.02` that mentions `game.run.01` refused a
+/// faithful `game.run.01` record. A case binds only to its own leading
+/// scenario id; `--report-case` still binds any case by name.
+#[test]
+fn a_case_that_mentions_another_scenario_id_binds_only_to_its_own() {
+    let dir = setup(false);
+    let repo = dir.path();
+    scenario(repo, "game.run.01", None);
+    std::fs::create_dir_all(repo.join("reports")).unwrap();
+    std::fs::write(
+        repo.join("reports/junit.xml"),
+        r#"<testsuite><testcase name="game.run.01: hp hits zero"/><testcase name="game.run.02: restarting resets hp as in game.run.01"><failure/></testcase></testsuite>"#,
+    )
+    .unwrap();
+    let added = attest(repo, &["--report", "junit:reports/junit.xml"]);
+    assert!(added.status.success(), "the failed .02 case is not .01's: {}", text(&added));
+    let cases: Vec<String> = committed_records(repo)[0]["attachments"].as_array().unwrap().iter().map(|a| a["case"].as_str().unwrap().to_string()).collect();
+    assert_eq!(cases, ["game.run.01: hp hits zero"]);
+
+    let named = attest(repo, &["--report", "junit:reports/junit.xml", "--report-case", "game.run.02: restarting resets hp as in game.run.01"]);
+    assert_eq!(named.status.code(), Some(1), "a case named with --report-case is bound, and its failure refuses faithful: {}", text(&named));
+}
+
 fn task_records(repo: &Path) -> serde_json::Value {
     let out = ok(repo, &["query", "--kind", "task", "--json"]);
     serde_json::from_slice(&out.stdout).unwrap()

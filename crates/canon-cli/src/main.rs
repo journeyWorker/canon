@@ -771,7 +771,7 @@ enum EvidenceCommand {
         repo: PathBuf,
     },
     /// Stage one attributed EvidenceRecord for a task or scenario (commit it with `canon gate promote`)
-    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case carrying the scenario id is bound; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).")]
+    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).")]
     Add {
         /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
@@ -833,7 +833,7 @@ enum EvidenceCommand {
         /// EXPERIMENTAL: bind and parse a test report, `junit:<path>` or `cucumber:<path>`; repeatable
         #[arg(long = "report", value_name = "FORMAT:PATH", value_parser = canon_cli::evidence_attach::parse_report_spec)]
         reports: Vec<(canon_model::ReportFormat, PathBuf)>,
-        /// EXPERIMENTAL: also bind this report case (a Rust test: its function name); repeatable. Cases carrying the scenario id are always bound
+        /// EXPERIMENTAL: also bind this report case (a Rust test: its function name); repeatable. Cases whose own scenario id is this one are always bound
         #[arg(long = "report-case", value_name = "NAME")]
         report_cases: Vec<String>,
         /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused

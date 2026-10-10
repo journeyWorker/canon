@@ -1,1 +1,1 @@
-canon evidence add: refused — reports/junit.xml: no case for scenario `cart.add.02` among its 1 case(s); put the scenario id in the test name or tag, or name the case with --report-case
+canon evidence add: refused — reports/junit.xml: no case for scenario `cart.add.02` among its 1 case(s); start the test name with the scenario id or tag it, or name the case with --report-case

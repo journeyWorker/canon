@@ -1,0 +1,4 @@
+canon gate check: 1 violation(s)
+
+stale-evidence (1):
+  stale-evidence cart.add.01 — bound file `reports/junit.xml` recorded sha256 b7cbf09d38648bf6cab5ccf5a647f737a3b49fda43b5679209f84ded60ed1e9f; stored blob .canon/artifacts/sha256/b7cbf09d38648bf6cab5ccf5a647f737a3b49fda43b5679209f84ded60ed1e9f: f0e40feccade661a36f35962ea7879f140e8824fe726b5c47c053be6387b3771; working tree: b7cbf09d38648bf6cab5ccf5a647f737a3b49fda43b5679209f84ded60ed1e9f — the stored blob does not match its name, so its bytes were altered, re-run and re-attest with `canon evidence add`

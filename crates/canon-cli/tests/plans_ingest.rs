@@ -255,6 +255,58 @@ fn one_shot_source_dot_at_repo_root_excludes_its_own_ledger_and_cursor_output_fr
     assert_eq!(second["sources"][0]["skipped_unchanged"], true, "{second}");
 }
 
+/// 0.14 acceptance rerun G1: `canon init` writes `root: .`, and the
+/// import digested every file under it — in a JS repo, all of
+/// `node_modules`, ~10 s per `canon gate task`. The digest now covers
+/// only what the openspec dialect reads: editing, adding or making
+/// unreadable a file under `node_modules` (or any other tree beside
+/// `openspec/`) leaves the source skipped unchanged, while an edit under
+/// `openspec/changes/` still re-imports it.
+#[test]
+fn a_repository_root_source_ignores_trees_outside_openspec_changes() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    write_canon_yaml(
+        repo,
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: .\n",
+    );
+    write_change_dir(repo, "add-widget", "Adds a widget.", &["- [ ] 1.1 wire it", "- [ ] 1.2 ship it"]);
+    for pkg in 0..50 {
+        let lib = repo.join(format!("node_modules/pkg-{pkg}/lib/deep"));
+        std::fs::create_dir_all(&lib).unwrap();
+        std::fs::write(lib.join("index.js"), "module.exports = 1;\n").unwrap();
+    }
+    std::fs::write(repo.join("node_modules/pkg-0/tasks.md"), "- [ ] 1 not a task\n").unwrap();
+    std::fs::create_dir_all(repo.join("src")).unwrap();
+    std::fs::write(repo.join("src/main.ts"), "export {}\n").unwrap();
+
+    let first = ingest_json(repo, &[]);
+    assert_eq!(first["changes_persisted"], 1, "{first}");
+    assert_eq!(first["tasks_persisted"], 2, "{first}");
+    assert_eq!(first["sources"][0]["cursor_advanced"], true, "{first}");
+    let cursor_dir = repo.join(".canon/ingest/cursors");
+    let cursor = std::fs::read_dir(&cursor_dir).unwrap().map(|e| std::fs::read_to_string(e.unwrap().path()).unwrap()).collect::<String>();
+    assert!(cursor.contains("add-widget/tasks.md"), "the cursor records the plan files: {cursor}");
+    assert!(!cursor.contains("node_modules") && !cursor.contains("src/main.ts"), "the cursor never records a file outside openspec/changes: {cursor}");
+
+    std::fs::write(repo.join("node_modules/pkg-1/lib/deep/index.js"), "module.exports = 2;\n").unwrap();
+    std::fs::write(repo.join("node_modules/pkg-0/tasks.md"), "- [x] 1 still not a task\n").unwrap();
+    std::fs::write(repo.join("node_modules/pkg-2/new.js"), "x\n").unwrap();
+    std::fs::write(repo.join("src/main.ts"), "export const x = 1\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(repo.join("node_modules/pkg-3/lib/deep/index.js"), std::fs::Permissions::from_mode(0o000)).unwrap();
+    }
+    let second = ingest_json(repo, &[]);
+    assert_eq!(second["sources"][0]["skipped_unchanged"], true, "nothing the dialect reads changed: {second}");
+
+    write_change_dir(repo, "add-widget", "Adds a widget.", &["- [x] 1.1 wire it", "- [ ] 1.2 ship it"]);
+    let third = ingest_json(repo, &[]);
+    assert_eq!(third["sources"][0]["skipped_unchanged"], false, "a plan edit still re-imports: {third}");
+    assert_eq!(third["sources"][0]["cursor_advanced"], true, "{third}");
+}
+
 // ── task 3.5: persistence + the `unwritten` seam ──
 
 #[test]

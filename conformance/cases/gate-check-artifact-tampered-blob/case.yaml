@@ -1,0 +1,4 @@
+description: "0.14 acceptance rerun G11: a stored blob whose bytes were altered (it no longer hashes to its name) is `stale-evidence` (exit 1) even though the working-tree report still matches, and the line says the blob does not match its name rather than that the bytes are gone"
+steps:
+  - args: [gate, check]
+    exit: 1

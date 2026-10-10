@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "acceptance-rerun-014"
+  },
+  "at": "2026-10-10T18:33:49.324487Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_store a_case_that_mentions_another_scenario_id_binds_only_to_its_own; cargo test -p canon-cli --lib a_case_binds_to_its_leading_scenario_id_never_to_one_it_mentions"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 25,
+  "scenario_id": "evidence.add.22",
+  "schema": 1,
+  "staging_id": "45ed07a75a3f",
+  "verdict": "faithful"
+}

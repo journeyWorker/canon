@@ -92,3 +92,13 @@ Feature: gate task
     When the task is asked to complete
     Then the row's suffix counts both records by verdict and carries the later summary
     And the record store's task status reads done, matching the checkbox
+
+  # canon: {"schema":1,"at":"2026-10-10T18:33:15Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.task.10
+  Scenario: A flip re-imports only its own change and keeps the change's adopted subject
+    Given a change created with change new for a subject, one open task row and promoted evidence for it
+    When the task is asked to complete
+    Then only that change dir is re-read, and the latest change record is completed and still names the subject
+    And a later full plan import keeps the subject too
