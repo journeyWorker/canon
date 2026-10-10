@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T16:03:06.278216Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test finding session_ids_on_add_and_close_land_on_each_records_actor"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "finding.close.09",
+  "schema": 1,
+  "staging_id": "4f1796e7d462",
+  "verdict": "faithful"
+}

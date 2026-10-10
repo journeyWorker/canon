@@ -182,3 +182,32 @@ Feature: evidence add
     Given a fresh repository after git init and canon init
     When git is asked whether a path under .canon/artifacts is ignored
     Then it is not, so stored evidence bytes are committed with the ledger
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.19
+  Scenario: Evidence records the attesting session
+    Given a scenario
+    When evidence is added with --actor-id and --session-id and promoted
+    Then the committed record's actor carries the agent id, the role and the session_id
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.20
+  Scenario: A session id outside the SessionId grammar is refused and nothing is written
+    Given a session id with a control character, surrounding whitespace, or nothing at all
+    When evidence add or review add is run with it
+    Then the command exits 2 naming --session-id
+    And nothing is staged or committed
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.21
+  Scenario: Every write command says whether it staged or wrote directly
+    Given the write commands evidence add, finding add and close, review add, divergence stage and resolve, subject new, adopt and status, scenario new and feature new
+    When each succeeds
+    Then a staged write ends with the promote command that commits it
+    And a direct write ends with written directly; nothing to promote

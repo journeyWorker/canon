@@ -84,3 +84,12 @@ Feature: finding close
     Then the command refuses before reading the corpus
     And a disposition other than fixed carrying a resolution sha is refused too
     And nothing is staged in either case
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:37Z","actor":{"agent_id":"canon"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.close.09
+  Scenario: A close records the session that authored the transition, not the raiser's
+    Given a finding raised with --session-id sess-raise and promoted
+    When it is closed with --session-id sess-close and promoted
+    Then the raised version keeps sess-raise and the transition carries sess-close
