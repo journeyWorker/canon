@@ -128,6 +128,34 @@ fn store_dir_is_real(repo: &Path) -> bool {
     true
 }
 
+/// Create `.canon`, `artifacts`, `sha256` one component at a time from
+/// the repo root, never following a link: an existing component must be
+/// a real directory (checked with `symlink_metadata`), a missing one is
+/// made with `create_dir` and checked again. `create_dir_all` would
+/// follow a symlinked `.canon/artifacts` and create `sha256` outside the
+/// store before any check could refuse it.
+fn create_store_dir(repo: &Path) -> Result<PathBuf, StoreError> {
+    let mut path = repo.to_path_buf();
+    for component in Path::new(paths::ARTIFACTS_SHA256_DIR).components() {
+        path.push(component);
+        match std::fs::symlink_metadata(&path) {
+            Ok(meta) if meta.file_type().is_dir() => continue,
+            Ok(_) => return Err(StoreError::UnsafeStoreDir),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
+        }
+        match std::fs::create_dir(&path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e.into()),
+        }
+        if !std::fs::symlink_metadata(&path).is_ok_and(|meta| meta.file_type().is_dir()) {
+            return Err(StoreError::UnsafeStoreDir);
+        }
+    }
+    Ok(path)
+}
+
 /// What a file at a path holds now.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Observed {
@@ -202,11 +230,7 @@ pub fn store(repo: &Path, expected: &str, mut reader: impl Read) -> Result<Store
     if stored_blob(repo, expected).matches(expected) {
         return Ok(StoreOutcome::AlreadyStored);
     }
-    let dir = store_dir(repo);
-    std::fs::create_dir_all(&dir)?;
-    if !store_dir_is_real(repo) {
-        return Err(StoreError::UnsafeStoreDir);
-    }
+    let dir = create_store_dir(repo)?;
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     let temp = dir.join(format!(".tmp-{expected}-{}-{nanos}", std::process::id()));
     let result = (|| {
@@ -535,5 +559,20 @@ mod tests {
         let digest = sha(b"v1");
         assert!(matches!(store(dir.path(), &digest, &b"v1"[..]), Err(StoreError::UnsafeStoreDir)));
         assert!(std::fs::read_dir(outside.path()).unwrap().next().is_none(), "nothing written through the link");
+    }
+
+    /// Review fix: a symlinked `.canon/artifacts` must be refused BEFORE
+    /// anything is created through it — `create_dir_all` used to make
+    /// `sha256` inside the link's outside target first.
+    #[cfg(unix)]
+    #[test]
+    fn a_symlinked_ancestor_of_the_store_is_refused_before_anything_is_created() {
+        let dir = TempDir::new().unwrap();
+        let outside = TempDir::new().unwrap();
+        std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
+        std::os::unix::fs::symlink(outside.path(), dir.path().join(".canon/artifacts")).unwrap();
+        let digest = sha(b"v1");
+        assert!(matches!(store(dir.path(), &digest, &b"v1"[..]), Err(StoreError::UnsafeStoreDir)));
+        assert!(std::fs::read_dir(outside.path()).unwrap().next().is_none(), "the outside directory stays empty");
     }
 }
