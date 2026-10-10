@@ -1,0 +1,6 @@
+description: "`canon status` on a repo with no `.canon/policy.yaml` exits 0, reports the policy absent with a warning that the gate enforces nothing, and points at `canon subject new`"
+steps:
+  - args: [status]
+    exit: 0
+  - args: [status, --json]
+    exit: 0

@@ -1,0 +1,8 @@
+description: "`canon status` names `canon subject status <id> shipped` for a verifying subject with every scenario evidenced and every required case present; following it exits 0, after which status reports the subject shipped and nothing next"
+steps:
+  - args: [status]
+    exit: 0
+  - args: [subject, status, checkout, shipped]
+    exit: 0
+  - args: [status, --json]
+    exit: 0

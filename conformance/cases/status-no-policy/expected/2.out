@@ -1,0 +1,20 @@
+{
+  "statusVersion": 1,
+  "canonVersion": "0.13.1",
+  "policy": {
+    "present": false,
+    "spec_coverage": null
+  },
+  "warnings": [
+    "no policy: .canon/policy.yaml not found, so `canon gate check` requires no evidence, failure cases or review here"
+  ],
+  "subjects": [],
+  "unowned": [],
+  "next": [
+    {
+      "command": "canon subject new <id> --domain <domain> --title \"<title>\"",
+      "why": "no subject exists yet; a subject is the unit status, review and shipping track"
+    }
+  ],
+  "nextOmitted": 0
+}

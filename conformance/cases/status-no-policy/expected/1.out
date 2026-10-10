@@ -1,0 +1,11 @@
+canon 0.13.1
+policy: absent
+warning: no policy: .canon/policy.yaml not found, so `canon gate check` requires no evidence, failure cases or review here
+
+subjects (0):
+
+unowned: none
+
+next:
+  # no subject exists yet; a subject is the unit status, review and shipping track
+  canon subject new <id> --domain <domain> --title "<title>"
