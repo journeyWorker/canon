@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:36:20.030515Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status status_next_names_the_command_for_each_gap"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "context.status.02",
+  "schema": 1,
+  "staging_id": "1d493360a391",
+  "verdict": "faithful"
+}

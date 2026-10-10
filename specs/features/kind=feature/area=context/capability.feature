@@ -114,3 +114,23 @@ Feature: context capability
     When the capability surface is resolved
     Then spec_coverage reads INVALID and names the offending value
     And the policy is reported unclean rather than as a repository that never opted in
+
+  # canon: {"schema":1,"at":"2026-10-10T15:35:48Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.12
+  Scenario: The outline opens with a pointer to status and leaves the JSON surface unchanged
+    Given a repository whose policy enforces spec coverage
+    When the capability outline is printed
+    Then its first line points to status, followed by a blank line and the capability version
+    And the JSON surface carries exactly the same top-level keys and capability version as before
+
+  # canon: {"schema":1,"at":"2026-10-10T15:35:48Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.13
+  Scenario: The outline header warns when no policy makes the gate enforce coverage
+    Given a repository with a manifest but no policy file
+    When the capability outline is printed
+    Then its second line warns that the gate requires no evidence, failure cases or review here
+    And the schema outline follows after a blank line

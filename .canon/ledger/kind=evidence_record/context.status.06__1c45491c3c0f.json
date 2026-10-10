@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:36:20.195512Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status status_reports_an_unreadable_canon_yaml_and_still_exits_zero"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "context.status.06",
+  "schema": 1,
+  "staging_id": "cfd222fc8b49",
+  "verdict": "faithful"
+}

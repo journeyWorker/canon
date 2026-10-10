@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:36:20.395038Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test context context_header_warns_when_no_policy_enforces_coverage"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 13,
+  "scenario_id": "context.capability.13",
+  "schema": 1,
+  "staging_id": "61e9f21152d6",
+  "verdict": "faithful"
+}
