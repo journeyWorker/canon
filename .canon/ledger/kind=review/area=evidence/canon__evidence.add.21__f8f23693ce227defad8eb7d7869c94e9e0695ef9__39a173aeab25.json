@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-k4",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T16:30:55.778868Z",
+  "kind": "review",
+  "pin": "f8f23693ce227defad8eb7d7869c94e9e0695ef9",
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "docs/superpowers/plans/2026-10-11-canon-0.14.0-working-loop.md#K4"
+  },
+  "reviewer": "canon-reviewer-k4",
+  "scenario_id": "evidence.add.21",
+  "schema": 1
+}
