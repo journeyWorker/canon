@@ -117,7 +117,20 @@
 //! here (the attestation section above). `--summary`/`--command-result`
 //! likewise land as the `evidence_note` companion
 //! `canon_gate::evidence_note_of` reads, which is what a flipped row's
-//! ` — ✅ ` suffix is built from.
+//! ` — ✅ ` suffix is built from. A scenario-only record carries the same
+//! companion (0.14 D5): the summary is part of the attestation whether or
+//! not a task row exists, and only a task-keyed record's flip turns it
+//! into a row suffix.
+//!
+//! # Bound files are stored (0.14 D4)
+//! `--artifact`/`--report` bytes are copied into the content-addressed
+//! store `.canon/artifacts/sha256/<hex>` (`canon_gate::artifact_store`)
+//! after every refusal has passed and before the record is staged, so a
+//! staged record never names bytes the store lacks. `canon gate check`
+//! re-hashes them. `--max-artifact-mib` raises the per-file limit
+//! (`canon_gate::DEFAULT_MAX_ARTIFACT_MIB`); a larger file is refused.
+//! [`run_vault`] stores the bytes for records written before the store
+//! existed.
 //!
 //! # The suffix is a DOCUMENT write, so its inputs are refused, not escaped
 //! `--summary` becomes that suffix verbatim (`canon_gate::gate_task`
@@ -155,8 +168,9 @@
 //! condition an authored record can actually fail downstream, through
 //! the gate's OWN functions rather than a second copy of their rules:
 //!
-//! - `canon_gate::scan_fake_markers` over the `evidence_note` being
-//!   authored (the identical call `canon_gate::gate_task` makes).
+//! - `canon_gate::scan_note_text` over the `evidence_note` being
+//!   authored (the rules `canon_gate::gate_task` applies through
+//!   `scan_fake_markers`, which delegates to it).
 //! - `canon_ingest::task_rows::first_row_line_break` over the two
 //!   document-bound fields (section above) — the identical predicate
 //!   `canon_ingest::reject_multi_line_note` refuses the flip with.
@@ -182,14 +196,14 @@
 
 use std::path::{Path, PathBuf};
 
-use canon_gate::{verify_risk_approval, scan_fake_markers, EvidenceNote, GateCtx};
+use canon_gate::{scan_note_text, verify_risk_approval, GateCtx};
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{
     approval_payload_bytes, Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, ReportFormat, RoleId, RunId,
     ScenarioId, Sha, TaskId, APPROVAL_NAMESPACE,
 };
 use canon_store::git_tier::GitTier;
-use canon_store::tier::{RawWrite, Tier};
+use canon_store::tier::{RawWrite, Tier, TierQuery};
 use chrono::{DateTime, Utc};
 
 use crate::context::resolve_repo_root;
@@ -317,8 +331,11 @@ pub struct EvidenceArgs {
     pub artifacts: Vec<PathBuf>,
     /// Experimental evidence binding: parsed test reports.
     pub reports: Vec<(ReportFormat, PathBuf)>,
-    /// The report case to bind, when the scenario id is not in its name.
-    pub report_case: Option<String>,
+    /// Report cases to bind IN ADDITION to every case carrying the
+    /// scenario id (repeatable; 0.14 D5).
+    pub report_cases: Vec<String>,
+    /// The artifact store's per-file size limit, in MiB.
+    pub max_artifact_mib: u64,
 }
 
 /// Inputs shared by payload export and authenticated evidence staging.
@@ -507,27 +524,21 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         }
     }
 
-    // `EvidenceNote` is keyed by `TaskId` because its only consumer is
-    // the checkbox flip, which is a task-side operation. A
-    // scenario-only record therefore carries no note — and `--summary`
-    // on one would be silently dropped, so it is refused instead.
-    if args.task_id.is_none() && args.summary.is_some() {
-        eprintln!(
-            "canon evidence add: refused — --summary is the flipped checkbox row's suffix and is keyed by task; a scenario-only attestation has no row to flip"
-        );
-        return 2;
-    }
-    let note = args
-        .task_id
-        .as_ref()
-        .zip(args.summary.as_ref())
-        .map(|(task_id, summary)| EvidenceNote::new(task_id.clone(), summary.clone(), args.command_result.clone()));
-    if let Some(note) = &note {
+    // A summary is allowed with or without a task (0.14 D5, dogfood F8:
+    // refusing it on scenario-only evidence pushed an agent into
+    // inventing a scenario→task mapping just to keep its notes). Only a
+    // task-keyed record's flip turns it into a row suffix.
+    if let Some(summary) = &args.summary {
         // The gate's own scan, run here so a fabricated note is refused
         // while it is still a flag value — after `canon gate promote`
         // the record is in the append-only committed ledger and the
         // refusal is no longer fixable by re-running the command.
-        let violations = scan_fake_markers(note);
+        let subject = match (&args.task_id, &args.scenario_id) {
+            (Some(task_id), _) => task_id.to_string(),
+            (None, Some(scenario_id)) => scenario_id.as_str().to_string(),
+            (None, None) => unreachable!("one of --task/--scenario-id is required, checked above"),
+        };
+        let violations = scan_note_text(&subject, summary, args.command_result.as_deref());
         if !violations.is_empty() {
             for violation in &violations {
                 eprintln!("{}", violation.line());
@@ -559,19 +570,20 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     }
     // Experimental binding: read (never run) the files the caller names,
     // before anything is staged, so a refused binding leaves no record.
-    if args.report_case.is_some() && args.reports.is_empty() {
+    if !args.report_cases.is_empty() && args.reports.is_empty() {
         eprintln!("canon evidence add: refused — --report-case names a case in a --report; none was given");
         return 2;
     }
-    let attachments = match crate::evidence_attach::bind(&crate::evidence_attach::BindRequest {
+    let bound = match crate::evidence_attach::bind(&crate::evidence_attach::BindRequest {
         repo: &repo,
         artifacts: &args.artifacts,
         reports: &args.reports,
-        report_case: args.report_case.as_deref(),
+        report_cases: &args.report_cases,
         scenario_id: args.scenario_id.as_ref().map(ScenarioId::as_str),
         verdict: args.verdict,
+        max_bytes: args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB),
     }) {
-        Ok(attachments) => attachments,
+        Ok(bound) => bound,
         Err(error) => {
             eprintln!("canon evidence add: refused — {}", error.message());
             return error.exit_code();
@@ -586,7 +598,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         args.run_id.clone(),
         args.verdict,
     )
-    .with_attachments(attachments);
+    .with_attachments(bound.attachments);
     if !args.surface_ref.is_empty() {
         record = record.with_surface_ref(normalized_strings(&args.surface_ref));
     }
@@ -671,14 +683,14 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     let mut body = serde_json::to_value(&record).expect("an EvidenceRecord always serializes");
     let object = body.as_object_mut().expect("an EvidenceRecord's serialized body is always a JSON object");
     object.insert("evidence".to_string(), serde_json::json!({ "kind": args.kind, "ref": args.evidence_ref }));
-    if let Some(note) = &note {
-        // Serialized from the SAME `EvidenceNote` that was scanned, so
-        // the bytes on disk are the bytes the scan cleared. `task_id` is
-        // already the record's own typed field; the companion carries
-        // only what `evidence_note_of` reads back.
+    if let Some(summary) = &args.summary {
+        // The SAME values that were scanned, so the bytes on disk are the
+        // bytes the scan cleared. `task_id` is already the record's own
+        // typed field; the companion carries only what
+        // `evidence_note_of` reads back.
         let mut companion = serde_json::Map::new();
-        companion.insert("summary".to_string(), serde_json::Value::String(note.summary.clone()));
-        if let Some(command_result) = &note.command_result {
+        companion.insert("summary".to_string(), serde_json::Value::String(summary.clone()));
+        if let Some(command_result) = &args.command_result {
             companion.insert("command_result".to_string(), serde_json::Value::String(command_result.clone()));
         }
         object.insert("evidence_note".to_string(), serde_json::Value::Object(companion));
@@ -691,6 +703,32 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             return 2;
         }
     };
+    // Store the bound bytes before staging (module doc): every refusal
+    // is behind us, and a record must never name a blob the store lacks.
+    // A file that changed since `bind` hashed it is refused rather than
+    // stored under a digest its bytes no longer have.
+    let mut stored = 0usize;
+    for file in &bound.files {
+        let outcome = std::fs::File::open(&file.resolved)
+            .map_err(canon_gate::artifact_store::StoreError::from)
+            .and_then(|reader| canon_gate::artifact_store::store(&repo, &file.sha256, reader));
+        match outcome {
+            Ok(canon_gate::artifact_store::StoreOutcome::Stored) => stored += 1,
+            Ok(canon_gate::artifact_store::StoreOutcome::AlreadyStored) => {}
+            Err(e) => {
+                eprintln!("canon evidence add: refused — could not store {} in the artifact store: {e}", file.resolved.display());
+                return 2;
+            }
+        }
+    }
+    if !bound.files.is_empty() {
+        println!(
+            "canon evidence add: artifact store holds {} bound file(s) under {}/ ({stored} newly stored) — commit them with the ledger",
+            bound.files.len(),
+            canon_model::paths::ARTIFACTS_SHA256_DIR
+        );
+    }
+
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
@@ -719,6 +757,99 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             2
         }
     }
+}
+
+/// `canon evidence vault` (0.14 D4): store the bytes for committed
+/// evidence records written before the artifact store existed.
+///
+/// Every distinct `(path, sha256)` attachment across the committed
+/// ledger: already stored intact → counted; otherwise the working-tree
+/// file is stored when it still hashes to the recorded digest and fits
+/// the size limit. Everything else is listed as not stored, with why —
+/// those bytes are gone, and `canon gate check` reports a LATEST record
+/// bound to them as `stale-evidence` (re-attest to fix). Exit `0` when
+/// the pass ran, whatever it could store: whether an unstored file
+/// matters is the gate's question, and a superseded record's lost file
+/// never does. `2` when the ledger cannot be read or a write fails.
+pub fn run_vault(repo: &Path, max_artifact_mib: u64) -> i32 {
+    use canon_gate::artifact_store::{blob_display, store, stored_blob, working_tree_path, StoreError, StoreOutcome, MIB};
+
+    let repo = resolve_repo_root(repo);
+    let ledger_root = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx.ledger_root,
+        Err(e) => {
+            eprintln!("canon evidence vault: {e}");
+            return 2;
+        }
+    };
+    let raw = match GitTier::new(ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)) {
+        Ok(read) => read.records,
+        Err(e) => {
+            eprintln!("canon evidence vault: {e}");
+            return 2;
+        }
+    };
+    let (records, _malformed) = canon_model::validate_evidence_batch(&raw);
+    let files: std::collections::BTreeSet<(String, String)> =
+        records.iter().flat_map(|r| r.attachments.iter().map(|a| (a.path.clone(), a.sha256.clone()))).collect();
+
+    let max_bytes = max_artifact_mib.saturating_mul(MIB);
+    let (mut stored, mut already) = (Vec::new(), 0usize);
+    let mut missing = Vec::new();
+    for (path, sha256) in &files {
+        if stored_blob(&repo, sha256).as_str() == sha256 {
+            already += 1;
+            continue;
+        }
+        let Some(source) = working_tree_path(&repo, path) else {
+            missing.push(format!("{path} (recorded sha256 {sha256}): the recorded path leaves the repository"));
+            continue;
+        };
+        let file = match std::fs::File::open(&source) {
+            Ok(file) => file,
+            Err(_) => {
+                missing.push(format!("{path} (recorded sha256 {sha256}): working tree: missing"));
+                continue;
+            }
+        };
+        let size = file.metadata().map(|m| m.len()).unwrap_or(0);
+        if size > max_bytes {
+            missing.push(format!(
+                "{path} (recorded sha256 {sha256}): {size} bytes, over the limit of {max_bytes} bytes; raise it with {} <MiB>",
+                canon_gate::MAX_ARTIFACT_FLAG
+            ));
+            continue;
+        }
+        match store(&repo, sha256, file) {
+            Ok(StoreOutcome::Stored) => stored.push(format!("{} <- {path}", blob_display(sha256))),
+            Ok(StoreOutcome::AlreadyStored) => already += 1,
+            Err(StoreError::Changed { actual, .. }) => missing.push(format!("{path} (recorded sha256 {sha256}): working tree: {actual}")),
+            Err(e @ (StoreError::Io(_) | StoreError::InvalidDigest(_) | StoreError::UnsafeStoreDir)) => {
+                eprintln!("canon evidence vault: could not write {}: {e}", blob_display(sha256));
+                return 2;
+            }
+        }
+    }
+
+    println!(
+        "canon evidence vault: {} bound file(s) — stored {}, already stored {already}, could not store {}",
+        files.len(),
+        stored.len(),
+        missing.len()
+    );
+    for line in &stored {
+        println!("  stored {line}");
+    }
+    for line in &missing {
+        println!("  not stored {line}");
+    }
+    if !stored.is_empty() {
+        println!("commit {}/ with the ledger", canon_model::paths::ARTIFACTS_SHA256_DIR);
+    }
+    if !missing.is_empty() {
+        println!("the bytes behind a file not stored are gone; `canon gate check` reports a latest record bound to one as stale-evidence — re-run and re-attest it with `canon evidence add`");
+    }
+    0
 }
 
 /// An [`EvidenceVerdict`]'s operator-facing spelling, matching
@@ -784,7 +915,8 @@ mod tests {
             artifact_sha: None,
             artifacts: Vec::new(),
             reports: Vec::new(),
-            report_case: None,
+            report_cases: Vec::new(),
+            max_artifact_mib: canon_gate::DEFAULT_MAX_ARTIFACT_MIB,
         }
     }
 

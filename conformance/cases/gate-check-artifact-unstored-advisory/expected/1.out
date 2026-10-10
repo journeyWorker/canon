@@ -1,0 +1,4 @@
+canon gate check: clean (0 violations)
+
+evidence artifacts: 1 bound file(s) not in the artifact store — not failing the gate; run `canon evidence vault` to store them before the working tree changes:
+  unstored cart.add.01 reports/junit.xml (sha256 b7cbf09d38648bf6cab5ccf5a647f737a3b49fda43b5679209f84ded60ed1e9f) is verified against the working tree only

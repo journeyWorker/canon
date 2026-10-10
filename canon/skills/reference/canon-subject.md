@@ -135,7 +135,8 @@ what brings a scenario into that scope. See `canon-gate`.
 requires that the Subject OWNS at least one scenario (one whose latest
 synced generation carries `@subject:<id>`), and that EVERY owned
 scenario carries a latest, non-`Divergent` verdict in the ledger (the
-same last-wins rule `canon gate check` uses). With
+same last-wins rule `canon gate check` uses; a record keyed by both a
+task and the scenario counts for the scenario). With
 `spec_coverage.require_cases` set, every feature surface the Subject
 owns must also carry a scenario of each required `@case:` (e.g. one
 `@case:failure`) — attested golden-path scenarios alone do not ship. A

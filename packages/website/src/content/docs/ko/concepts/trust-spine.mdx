@@ -28,7 +28,7 @@ description: canon gate가 태스크 완료를 자가 보고에서 증거 기반
 | `uncovered-cell` | 정책상 요구되는 증거 셀(역할 × 아티팩트)에 대응하는 레코드가 아예 없음 — 또는 `spec_coverage`가 켜진 경우, 스펙 코퍼스의 시나리오 중 어떤 증거도 없거나, 열린 divergence를 갖거나, 최신 판정이 `Divergent`인 것. 어느 쪽인지는 detail 문자열이 밝힙니다. |
 | `unreviewed-promotion` | 아티팩트의 `reviewed` 라이프사이클 태그에 대응하는 레저 리뷰-레코드가 없음 — 또는 `spec_coverage.require_review`가 켜진 경우, 범위 안 시나리오에 유효한 `Review`가 없음(아예 없거나, 그 시나리오의 증거를 남긴 액터 본인의 리뷰뿐임). |
 | `trust-below-required` | 아티팩트의 트러스트 레벨이 `policy.yaml`의 `trust_required`보다 낮음 — release 스코프 전용(`canon gate check --release`). |
-| `stale-evidence` | 통과했던 레코드가 stale로 저하됨: `evidence_sha` 이후 선언된 표면이 변경됐거나, HEAD가 `staleness.max_commits_behind`를 넘어섬. 이미 green인 레코드만 저하시킴. |
+| `stale-evidence` | 통과했던 레코드가 stale로 저하됨: `evidence_sha` 이후 선언된 표면이 변경됐거나, HEAD가 `staleness.max_commits_behind`를 넘어섬. 이미 green인 레코드만 저하시킴. 또한: 최신 증거 레코드에 묶인 파일의 바이트가 아티팩트 저장소와 작업 트리 양쪽에서 모두 사라진 경우. |
 | `malformed-evidence` | 후보 레코드가 파싱되지 않거나, 잘못된 위치에 있거나, 파싱 불가능한 임시 태그를 가짐. 잘못된 형식의 증거는 증거가 아님. |
 | `flagged` | 사람만 설정 가능한 `flagged` 오버레이가 켜짐 — 어떤 통과 증거가 있어도 절대 green이 되지 않음. |
 | `unevidenced-flip` | `canon gate task <task_id>`가 대응하는 non-`Divergent` `EvidenceRecord` 없이 체크박스 플립을 요청받음. |
@@ -156,9 +156,10 @@ canon evidence add ... --artifact test-results/cart-trace.zip
 canon evidence add ... --report junit:target/nextest/default/junit.xml
 ```
 
-리포트 케이스는 이름이나 태그에 들어 있는 시나리오 id로 찾으며
-(`--report-case`로 직접 지정 가능), 실패한 케이스에 `faithful` 판정을
-붙이면 거부됩니다. 게이트가 이를 볼지는 policy 스위치로 정합니다:
+이름이나 태그에 시나리오 id가 들어 있는 리포트 케이스는 모두 묶이며,
+케이스마다 결과가 따로 기록됩니다. `--report-case`(반복 가능)는 케이스를
+더할 뿐 숨기지 않습니다. 묶인 케이스 중 하나라도 실패하면 `faithful`
+판정은 거부됩니다. 게이트가 강도를 볼지는 policy 스위치로 정합니다:
 
 ```yaml
 experimental:
@@ -172,6 +173,23 @@ experimental:
 실패시키지 않고, `require`는 각각을 `uncovered-cell`로 보고합니다. 묶인
 테스트가 정말 그 시나리오를 검증하는지는 여전히 canon이 알 수 없습니다 —
 바인딩은 신뢰의 빈틈을 좁힐 뿐 메우지는 않습니다.
+
+## 묶인 증거는 계속 증명 가능해야 함
+
+`--artifact`/`--report`는 묶은 파일을 `.canon/artifacts/sha256/<hex>`에
+복사합니다. 이 내용 주소 저장소는 git으로 추적되므로 레저와 함께 커밋합니다.
+25 MiB를 넘는 파일은 `--max-artifact-mib`로 한도를 올리지 않으면 거부됩니다
+(종료 코드 `2`). `canon gate check`는 서브젝트 상태와 상관없이 최신 증거
+레코드에 묶인 모든 파일을 다시 검사합니다:
+
+- 저장된 blob이 온전하면 → 깨끗함. 작업 트리 파일을 다시 써도 마찬가지입니다
+  (실행할 때마다 리포트를 덮어쓰는 smoke 스크립트가 더는 증거를 고아로 만들지
+  않습니다).
+- blob은 없지만 작업 트리 파일이 기록된 digest와 같으면 → 깨끗함. 다만
+  `canon evidence vault`를 안내하는 advisory가 붙고, 이 명령이 그 바이트를
+  저장합니다(0.14 이전 레코드).
+- 그 밖의 경우 → `stale-evidence`. 경로, 기록된 digest, 저장소와 작업
+  트리에 지금 있는 것을 함께 보여줍니다. 다시 실행하고 다시 신고하세요.
 
 ## 트러스트 래더
 
@@ -189,7 +207,7 @@ canon gate check --repo . --release  # + trust-below-required
 ```
 
 `canon gate check`는 디스패처입니다: 커버리지 + 레저 + staleness +
-스펙 커버리지 + 항상 켜져 있는 트러스트 래더 검사를 모아 실행하고, 모든 위반을 실패 클래스별로
+스펙 커버리지 + 묶인 아티팩트 + 항상 켜져 있는 트러스트 래더 검사를 모아 실행하고, 모든 위반을 실패 클래스별로
 묶어 출력합니다. `--release`는 release 스코프의 `trust-below-required`
 검사를 추가로 켭니다 — `--release`가 전달되어도 트러스트 래더 검사는
 절대 빠지지 않습니다. 종료 코드: 깨끗하면 `0`, 게이트 red(위반 존재)면
@@ -209,6 +227,10 @@ canon gate task s5-trust-spine-gate#5.2 --repo .
 기본값 `[{ dialect: openspec, root: <repo> }]`로 폴백합니다.
 레저에서 대응하는 non-`Divergent` `EvidenceRecord`를 요구하며, 검사가
 깨끗할 때에만 `- [ ]` → `- [x]`로 플립하면서 증거 노트를 덧붙입니다.
+노트는 그 태스크에 묶인 모든 레코드를 한 줄로 요약합니다 —
+`3 evidence records (2 faithful, 1 not-applicable); latest: <summary>`.
+플립 뒤에는 plan 소스를 다시 수집하므로 `canon query --kind task`도
+체크박스와 같은 상태를 보여줍니다.
 증거가 없거나, `Divergent` 판정이거나, 조작된 증거 노트인 경우 해당 행은
 바이트 단위로 변경되지 않고 `1`로 종료하며 차단 위반을 stderr에
 출력합니다. 이미 `[x]`인 행은 멱등 no-op입니다. 알 수 없는 `task_id`는

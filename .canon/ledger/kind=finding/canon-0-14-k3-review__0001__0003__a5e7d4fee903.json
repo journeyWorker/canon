@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-k3",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T16:15:03.351378Z",
+  "change_id": "canon-0-14-k3-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "09c2ac6bb36e70a54bab96b8c53a887b2ab3a0d8",
+  "reviewer": "canon-reviewer-k3",
+  "round": 1,
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "store ran create_dir_all before checking the store chain, so a symlinked .canon/artifacts ancestor let it create directories outside the store"
+}

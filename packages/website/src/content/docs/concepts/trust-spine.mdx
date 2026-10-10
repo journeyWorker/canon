@@ -30,7 +30,7 @@ migration:
 | `uncovered-cell` | A policy-required evidence cell (role × artifact) has no matching record at all — or, when `spec_coverage` is on, a scenario in the spec corpus that no evidence attests to, carries an open divergence, or whose latest verdict is `Divergent`. The detail string names which. |
 | `unreviewed-promotion` | An artifact's `reviewed` lifecycle tag has no matching ledger review-record — or, with `spec_coverage.require_review` on, an in-scope scenario has no qualifying `Review` (none at all, or only reviews by its own evidence actor). |
 | `trust-below-required` | The artifact's trust level is below `policy.yaml`'s `trust_required` — release-scoped only (`canon gate check --release`). |
-| `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only ever degrades an already-green record. |
+| `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only ever degrades an already-green record. Also: a file bound to a latest evidence record whose bytes are gone from both the artifact store and the working tree. |
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of any passing evidence. |
 | `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` `EvidenceRecord`. |
@@ -162,9 +162,10 @@ canon evidence add ... --artifact test-results/cart-trace.zip
 canon evidence add ... --report junit:target/nextest/default/junit.xml
 ```
 
-The report case is found by the scenario id in its name or tag (or named
-with `--report-case`); a `faithful` verdict over a failed case is
-refused. Whether the gate cares is a policy switch:
+Every report case carrying the scenario id in its name or tag is bound,
+each with its own outcome; `--report-case` (repeatable) adds more and
+never hides one. A `faithful` verdict is refused when any bound case
+failed. Whether the gate cares about strength is a policy switch:
 
 ```yaml
 experimental:
@@ -178,6 +179,23 @@ experimental:
 failing it; `require` makes each an `uncovered-cell`. Canon still cannot
 tell whether a bound test truly exercises the scenario — binding narrows
 the trust gap, it does not close it.
+
+## Bound evidence stays provable
+
+`--artifact`/`--report` copy each bound file into
+`.canon/artifacts/sha256/<hex>`, a content-addressed store tracked in git
+— commit it with the ledger. Files over 25 MiB are refused (exit 2) unless
+`--max-artifact-mib` raises the limit. `canon gate check` re-checks every
+file bound to a latest evidence record, whatever its subject's status:
+
+- an intact stored blob → clean, even after the working-tree file is
+  rewritten (a smoke script that rewrites its report every run no longer
+  orphans the evidence);
+- no blob, but the working-tree file still has the recorded digest →
+  clean, with an advisory pointing to `canon evidence vault`, which stores
+  those bytes (records from before 0.14);
+- anything else → `stale-evidence`, naming the path, the recorded digest,
+  and what the store and working tree hold now. Re-run and re-attest.
 
 ## The trust ladder
 
@@ -194,7 +212,7 @@ canon gate check --repo . --release  # + trust-below-required
 ```
 
 `canon gate check` is the dispatcher: it assembles coverage + ledger +
-staleness + spec-coverage + the always-on trust-ladder check and prints
+staleness + spec-coverage + bound artifacts + the always-on trust-ladder check and prints
 every violation grouped by failure class. `--release` additionally engages
 the release-scoped `trust-below-required` check — the trust-ladder check is
 never dropped when `--release` is passed. Exit `0` clean, `1` gate-red (any
@@ -216,9 +234,12 @@ agnostic (`openspec` change dirs, `superpowers` plan docs). A repo with no
 `[{ dialect: openspec, root: <repo> }]`. It
 requires a matching, non-`Divergent` `EvidenceRecord` in the ledger, and
 flips `- [ ]` → `- [x]` with an appended evidence note **only** on a clean
-check. Missing evidence, a `Divergent` verdict, or a fabricated evidence
+check. The note sums up every record bound to the task on one line —
+`3 evidence records (2 faithful, 1 not-applicable); latest: <summary>`.
+Missing evidence, a `Divergent` verdict, or a fabricated evidence
 note leaves the row byte-unchanged and exits `1` with the blocking
-violation on stderr. An already-`[x]` row is an idempotent no-op. An
+violation on stderr. After a flip the plan source is re-ingested, so
+`canon query --kind task` agrees with the checkbox. An already-`[x]` row is an idempotent no-op. An
 unknown `task_id` is reported, never silently ignored.
 
 ## Staging → promote

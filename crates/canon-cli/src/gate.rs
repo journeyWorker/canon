@@ -144,6 +144,7 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     if let Some(advisories) = canon_gate::review_advisories(&gate_context) {
         print!("{}", format_review_advisories(&advisories));
     }
+    print!("{}", format_unstored_attachments(&canon_gate::unstored_attachments(&gate_context)));
     report.exit_code()
 }
 
@@ -155,6 +156,23 @@ fn format_coverage_off_advisory(count: usize) -> String {
     format!("\nadvisory: spec_coverage is off — {count} scenario(s) are not checked for evidence; see .canon/policy.yaml\n")
 }
 
+/// Bound files with no stored blob that the gate verified against the
+/// working tree instead (0.14 D4's back-compat path for 0.11–0.13
+/// records). Advisories, never violations; prints nothing when every
+/// bound file is stored.
+fn format_unstored_attachments(unstored: &[canon_gate::UnstoredAttachment]) -> String {
+    if unstored.is_empty() {
+        return String::new();
+    }
+    let mut out = format!(
+        "\nevidence artifacts: {} bound file(s) not in the artifact store — not failing the gate; run `canon evidence vault` to store them before the working tree changes:\n",
+        unstored.len()
+    );
+    for attachment in unstored {
+        out.push_str(&format!("  unstored {}\n", attachment.line()));
+    }
+    out
+}
 /// `spec_coverage.require_review`'s waived gaps (issue #2): a subject
 /// moved under `canon subject status --override-reason` keeps its gaps
 /// visible here, named with the waiver, without failing the gate.
@@ -231,6 +249,7 @@ fn format_gate_report(report: &GateReport) -> String {
 /// compile while silently resolving the typed-atoms file against the
 /// document path.
 pub(crate) struct LocatedTask {
+    pub dialect: String,
     pub write_back: &'static dyn PlanWriteBack,
     pub document_path: PathBuf,
     pub source_root: PathBuf,
@@ -276,7 +295,7 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
             continue;
         };
         if let Some(location) = write_back.locate_task(src.root(), task_id) {
-            return Ok(LocatedTask { write_back, document_path: location.document_path, source_root: src.root().to_path_buf() });
+            return Ok(LocatedTask { dialect: src.dialect().to_string(), write_back, document_path: location.document_path, source_root: src.root().to_path_buf() });
         }
     }
     Err(format!("no plan source locates {task_id} (consulted: {})", consulted.join("; ")))
@@ -309,7 +328,7 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
     // carries the winning dialect's write-back, its document path, and
     // that source's root (the typed-atoms file is resolved from the
     // SAME source).
-    let LocatedTask { write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
+    let LocatedTask { dialect, write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
         Ok(located) => located,
         Err(e) => {
             eprintln!("canon gate task: {e}");
@@ -438,6 +457,7 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
                 return 2;
             }
             println!("canon gate task: {task_id} flipped");
+            refresh_task_status(&repo, &dialect, &source_root);
             0
         }
         TaskFlipDecision::Blocked { violations } => {
@@ -446,6 +466,23 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
             }
             1
         }
+    }
+}
+
+/// Re-ingest the plan source that owns a just-flipped row (0.14 D5,
+/// dogfood F14), so the record store's `Task` status agrees with the
+/// checkbox and `canon query --kind task` matches the plan document. The
+/// SAME `canon ingest plans` pass, narrowed to the one source: the new
+/// `Task` version carries the document's fresh mtime, so it supersedes
+/// the open one in every folded read. A repo that routes no tier for
+/// tasks has nothing to disagree with, so an unwritten task is silent.
+/// The flip itself already succeeded; a failure here is reported, never
+/// turned into a failed flip.
+fn refresh_task_status(repo: &Path, dialect: &str, source_root: &Path) {
+    match crate::plans::run(repo, Some(dialect), Some(source_root)) {
+        Ok(outcome) if outcome.non_clean_sources.is_empty() => {}
+        Ok(_) => eprintln!("canon gate task: WARN the plan source re-ingest found malformed constructs; run `canon ingest plans` to see them"),
+        Err(e) => eprintln!("canon gate task: WARN the task status record was not refreshed ({e}); run `canon ingest plans` so `canon query --kind task` matches the plan"),
     }
 }
 
@@ -458,18 +495,26 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
 /// excluded (stale, wrong kind, whatever the filter was) can never
 /// still slip its `evidence_note` companion into the notes `gate_task`
 /// pairs against the narrowed evidence slice.
+///
+/// Returned oldest first by each record's own `at` (0.14 D5): `gate_task`
+/// reads the LAST note as the task's latest summary, and a tier read is
+/// in path order, not time order.
 fn notes_of<'a>(records: impl IntoIterator<Item = &'a RawRecord>, task_id: &TaskId) -> Result<Vec<EvidenceNote>, String> {
     let mut notes = Vec::new();
     for raw in records {
         match evidence_note_of(&raw.0, task_id) {
-            Some(Ok(note)) => notes.push(note),
+            Some(Ok(note)) => {
+                let at = raw.0.get("at").and_then(|v| v.as_str()).and_then(|s| s.parse::<chrono::DateTime<Utc>>().ok());
+                notes.push((at, note));
+            }
             Some(Err(e)) => {
                 return Err(format!("{task_id}'s `evidence_note` companion is present but unparseable ({e}) — never silently treated as absent"));
             }
             None => {}
         }
     }
-    Ok(notes)
+    notes.sort_by_key(|(at, _)| *at);
+    Ok(notes.into_iter().map(|(_, note)| note).collect())
 }
 
 /// Look up `task_id` in the typed-atoms file the winning dialect

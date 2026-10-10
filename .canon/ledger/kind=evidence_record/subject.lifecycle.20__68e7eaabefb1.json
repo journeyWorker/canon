@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:49:32.370289Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_store a_task_and_scenario_keyed_record_ships_its_scenario_and_still_flips_its_task"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 20,
+  "scenario_id": "subject.lifecycle.20",
+  "schema": 1,
+  "staging_id": "cce83307b071",
+  "verdict": "faithful"
+}

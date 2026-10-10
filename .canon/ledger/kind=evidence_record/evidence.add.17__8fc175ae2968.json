@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:49:32.174947Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_store an_unstored_binding_is_an_advisory_until_canon_evidence_vault_stores_it"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 20,
+  "scenario_id": "evidence.add.17",
+  "schema": 1,
+  "staging_id": "bab42dd798e2",
+  "verdict": "faithful"
+}

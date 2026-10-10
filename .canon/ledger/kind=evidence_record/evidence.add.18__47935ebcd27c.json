@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:49:32.214089Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_store canon_init_never_gitignores_the_artifact_store"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 21,
+  "scenario_id": "evidence.add.18",
+  "schema": 1,
+  "staging_id": "89b470ba61ad",
+  "verdict": "faithful"
+}

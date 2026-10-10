@@ -770,8 +770,8 @@ enum EvidenceCommand {
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
-    /// Stage one attributed EvidenceRecord for a task (commit it with `canon gate promote`)
-    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs a passing case). Enforcement is opt-in via policy experimental.evidence_binding (off by default).")]
+    /// Stage one attributed EvidenceRecord for a task or scenario (commit it with `canon gate promote`)
+    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case carrying the scenario id is bound; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).")]
     Add {
         /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
@@ -788,7 +788,7 @@ enum EvidenceCommand {
         /// faithful / not-applicable / divergent
         #[arg(long, default_value = "faithful", value_parser = canon_cli::evidence::parse_verdict)]
         verdict: EvidenceVerdict,
-        /// One-line note; becomes the flipped row's ✅ suffix (scanned for fabrication markers; line breaks refused)
+        /// One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)
         #[arg(long)]
         summary: Option<String>,
         /// The real captured output backing --summary (requires --summary; scanned for fabrication markers)
@@ -830,9 +830,22 @@ enum EvidenceCommand {
         /// EXPERIMENTAL: bind and parse a test report, `junit:<path>` or `cucumber:<path>`; repeatable
         #[arg(long = "report", value_name = "FORMAT:PATH", value_parser = canon_cli::evidence_attach::parse_report_spec)]
         reports: Vec<(canon_model::ReportFormat, PathBuf)>,
-        /// EXPERIMENTAL: the report case to bind when its name does not carry the scenario id (a Rust test: its function name)
-        #[arg(long)]
-        report_case: Option<String>,
+        /// EXPERIMENTAL: also bind this report case (a Rust test: its function name); repeatable. Cases carrying the scenario id are always bound
+        #[arg(long = "report-case", value_name = "NAME")]
+        report_cases: Vec<String>,
+        /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
+        #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+        max_artifact_mib: u64,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+    },
+    /// Store the bound files of existing evidence records in the artifact store (.canon/artifacts/sha256/)
+    #[command(after_help = "For records written before canon stored bound bytes (0.11-0.13). Each attachment whose working-tree file still hashes to the recorded digest is copied into .canon/artifacts/sha256/<hex>; everything else is listed as not stored, with why. Commit the store with the ledger.\n\nExit 0 when the pass ran (the gate decides whether an unstored file matters), 2 when the ledger cannot be read or a write fails.")]
+    Vault {
+        /// Per-file size limit for the artifact store, in MiB
+        #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+        max_artifact_mib: u64,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1349,7 +1362,8 @@ fn main() -> ExitCode {
                 artifact_sha,
                 artifacts,
                 reports,
-                report_case,
+                report_cases,
+                max_artifact_mib,
                 repo,
             } => ExitCode::from(
                 canon_cli::evidence::run_add(
@@ -1374,10 +1388,12 @@ fn main() -> ExitCode {
                         artifact_sha,
                         artifacts,
                         reports,
-                        report_case,
+                        report_cases,
+                        max_artifact_mib,
                     },
                 ) as u8,
             ),
+            EvidenceCommand::Vault { max_artifact_mib, repo } => ExitCode::from(canon_cli::evidence::run_vault(&repo, max_artifact_mib) as u8),
         },
         Command::Finding { action } => match action {
             FindingCommand::Add {

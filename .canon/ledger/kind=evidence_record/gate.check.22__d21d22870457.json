@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:49:32.252129Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_store a_stored_blob_keeps_a_rewritten_report_provable_and_a_lost_one_is_stale_evidence"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 23,
+  "scenario_id": "gate.check.22",
+  "schema": 1,
+  "staging_id": "4b45cf3d12f7",
+  "verdict": "faithful"
+}
