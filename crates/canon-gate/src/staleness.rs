@@ -333,6 +333,7 @@ mod tests {
             policy,
             evidence,
             audits: Vec::new(),
+            evidence_file_digests: crate::context::evidence_file_digests(&read.records),
             scenarios: Vec::new(),
             divergences: Vec::new(),
             subjects: Vec::new(),

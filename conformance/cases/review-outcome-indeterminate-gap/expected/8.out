@@ -1,0 +1,64 @@
+{
+  "count": 2,
+  "kind": "review",
+  "records": [
+    {
+      "actor": {
+        "agent_id": "reviewer-2",
+        "role": "reviewer",
+        "session_id": "sess-review"
+      },
+      "at": "<ts>",
+      "kind": "review",
+      "outcome": "indeterminate",
+      "pin": "r1",
+      "pins": {
+        "evidence": [
+          {
+            "digest": "ca470d326b9c",
+            "key": "cart.add.01"
+          }
+        ],
+        "scenario_digest": "b2520759011c45d9f4face51d3af0ce2f0d11ef676d7c822b9d4bfe0e578e4bc"
+      },
+      "project_id": "root",
+      "provenance_ref": {
+        "original_spec_ref": "specs/features/kind=feature/area=cart/add.feature"
+      },
+      "reviewer": "reviewer-2",
+      "reviewer_harness": "codex",
+      "reviewer_model": "gpt-x",
+      "reviewer_provider": "openai",
+      "scenario_id": "cart.add.01",
+      "schema": 1
+    },
+    {
+      "actor": {
+        "agent_id": "reviewer-2",
+        "role": "reviewer",
+        "session_id": "sess-review"
+      },
+      "at": "<ts>",
+      "kind": "review",
+      "pin": "r2",
+      "pins": {
+        "evidence": [
+          {
+            "digest": "ca470d326b9c",
+            "key": "cart.add.01"
+          }
+        ],
+        "scenario_digest": "b2520759011c45d9f4face51d3af0ce2f0d11ef676d7c822b9d4bfe0e578e4bc"
+      },
+      "project_id": "root",
+      "provenance_ref": {
+        "original_spec_ref": "specs/features/kind=feature/area=cart/add.feature"
+      },
+      "reviewer": "reviewer-2",
+      "scenario_id": "cart.add.01",
+      "schema": 1
+    }
+  ],
+  "since": null,
+  "violations": 0
+}

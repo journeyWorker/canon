@@ -127,6 +127,16 @@ count by actor alone. A missing or self-only review is
 `unreviewed-promotion`. A review carries no verdict; the ship gate still
 checks verdicts.
 
+A review pins what it saw: `review add` records the scenario's source
+digest and its latest evidence records, and the review counts only while
+both are unchanged. Edit the `.feature` file (and sync it) or re-attest
+the scenario, and the review is stale — `unreviewed-promotion` naming the
+spec, the evidence, or both. Only a `signed` review counts; a reviewer run
+recorded `--outcome indeterminate` or `unavailable` is a gap, and the
+latest review per reviewer wins. Reviews written before 0.15 carry no
+pins: they keep counting, and `gate check` prints one `advisory: N
+review(s) predate review pinning (0.15) …` line.
+
 With `block_on_findings`, review findings (`canon finding add
 --severity blocker|should-fix|note`) are read at their latest version per
 `(change_id, round, seq)`. An open `blocker` on a change an in-scope

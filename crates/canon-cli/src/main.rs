@@ -982,10 +982,11 @@ enum FindingCommand {
 
 #[derive(Subcommand)]
 enum ReviewCommand {
-    /// Write one attributed Review record directly to the ledger, nothing to promote (exactly one provenance ref required)
+    /// Write one attributed Review record directly to the ledger, nothing to promote (exactly one provenance ref required). The review pins the scenario's source digest and its latest evidence; it counts only while both are unchanged
     Add {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
+        /// The reviewed scenario; it must have a record (`canon inventory sync`), or the review is refused (exit 2)
         #[arg(long, value_parser = canon_cli::review::parse_scenario_id)]
         scenario_id: ScenarioId,
         #[arg(long)]
@@ -1006,6 +1007,18 @@ enum ReviewCommand {
         /// The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count
         #[arg(long, value_parser = canon_cli::review::parse_session_id)]
         session_id: Option<canon_model::SessionId>,
+        /// How the reviewer's run ended: signed (an approval), indeterminate (ran, reached no verdict) or unavailable (could not run). Only signed counts; the others are recorded as review gaps
+        #[arg(long, default_value = "signed", value_parser = canon_cli::review::parse_outcome)]
+        outcome: canon_model::ReviewOutcome,
+        /// The reviewer runtime's provider (e.g. anthropic, openai)
+        #[arg(long, value_parser = canon_cli::review::parse_runtime_label)]
+        reviewer_provider: Option<String>,
+        /// The reviewer runtime's model id
+        #[arg(long, value_parser = canon_cli::review::parse_runtime_label)]
+        reviewer_model: Option<String>,
+        /// The harness that ran the reviewer (e.g. omp, codex, claude)
+        #[arg(long, value_parser = canon_cli::review::parse_runtime_label)]
+        reviewer_harness: Option<String>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1506,20 +1519,39 @@ fn main() -> ExitCode {
             }
         },
         Command::Review { action } => match action {
-            ReviewCommand::Add { project_id, scenario_id, reviewer, pin, upstream_ref, original_spec_ref, actor_id, role, session_id, repo } => ExitCode::from(
-                canon_cli::review::run_add(
-                    &repo,
-                    &project_id,
-                    &scenario_id,
-                    &reviewer,
-                    &pin,
-                    upstream_ref.as_deref(),
-                    original_spec_ref.as_deref(),
-                    &actor_id,
-                    &role,
-                    session_id.as_ref(),
-                ) as u8,
-            ),
+            ReviewCommand::Add {
+                project_id,
+                scenario_id,
+                reviewer,
+                pin,
+                upstream_ref,
+                original_spec_ref,
+                actor_id,
+                role,
+                session_id,
+                outcome,
+                reviewer_provider,
+                reviewer_model,
+                reviewer_harness,
+                repo,
+            } => ExitCode::from(canon_cli::review::run_add(
+                &repo,
+                &canon_cli::review::ReviewAddArgs {
+                    project_id,
+                    scenario_id,
+                    reviewer,
+                    pin,
+                    upstream_ref,
+                    original_spec_ref,
+                    actor_id,
+                    role,
+                    session_id,
+                    outcome,
+                    reviewer_provider,
+                    reviewer_model,
+                    reviewer_harness,
+                },
+            ) as u8),
         },
         Command::Divergence { action } => match action {
             DivergenceCliCommand::Stage { project_id, scenario_id, sha, status, reason, expiry, round, reviewer, detail, actor_id, role, repo } => {

@@ -321,6 +321,7 @@ mod tests {
             },
             evidence,
             audits: Vec::new(),
+            evidence_file_digests: Default::default(),
             scenarios,
             divergences: Vec::new(),
             subjects,

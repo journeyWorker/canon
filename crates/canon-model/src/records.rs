@@ -737,6 +737,18 @@ pub enum ProvenanceRef {
 /// ledger ↔ divergence). Mirrors the donor parity harness's required
 /// review fields (`scenario_id`, `reviewer`, `pin`) plus its
 /// provenance-ref requirement.
+///
+/// 0.15 adds what the review saw and how the reviewer's run ended, all
+/// optional and absent when unset, so a review written before 0.15
+/// reserializes byte-identically:
+/// - `pins` (D1): the scenario's source digest and its latest evidence
+///   records at review time. `canon review add` computes them; a pinned
+///   review only counts while both still match the corpus.
+/// - `outcome` (D4): `signed` (the default, and what every pre-0.15
+///   review is), `indeterminate` or `unavailable`. Only `signed` is an
+///   approval; the other two are recorded gaps.
+/// - `reviewer_provider`/`reviewer_model`/`reviewer_harness` (D4): the
+///   runtime that produced the review, as the caller reports it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Review {
     #[serde(flatten)]
@@ -746,6 +758,23 @@ pub struct Review {
     pub reviewer: String,
     pub pin: String,
     pub provenance_ref: ProvenanceRef,
+    /// What the review saw (D1). `None` on every review written before
+    /// 0.15: such a review keeps counting without the freshness check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pins: Option<ReviewPins>,
+    /// How the reviewer's run ended (D4). Absent on the wire when
+    /// `signed`, so a pre-0.15 review (no key) reads as signed.
+    #[serde(default, skip_serializing_if = "ReviewOutcome::is_signed")]
+    pub outcome: ReviewOutcome,
+    /// The reviewer runtime's provider (D4), e.g. `anthropic`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewer_provider: Option<String>,
+    /// The reviewer runtime's model id (D4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewer_model: Option<String>,
+    /// The harness that ran the reviewer (D4), e.g. `omp` or `codex`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewer_harness: Option<String>,
 }
 
 impl Review {
@@ -758,7 +787,19 @@ impl Review {
         provenance_ref: ProvenanceRef,
     ) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Review);
-        Self { envelope, project_id, scenario_id, reviewer: reviewer.into(), pin: pin.into(), provenance_ref }
+        Self {
+            envelope,
+            project_id,
+            scenario_id,
+            reviewer: reviewer.into(),
+            pin: pin.into(),
+            provenance_ref,
+            pins: None,
+            outcome: ReviewOutcome::Signed,
+            reviewer_provider: None,
+            reviewer_model: None,
+            reviewer_harness: None,
+        }
     }
 }
 
@@ -766,6 +807,62 @@ impl CanonRecord for Review {
     const KIND: RecordKind = RecordKind::Review;
     fn envelope(&self) -> &Envelope {
         &self.envelope
+    }
+}
+
+/// What a [`Review`] saw (0.15 D1): the reviewed scenario's
+/// `source_digest` (the digest `canon inventory sync` stores on its
+/// [`Scenario`] record) and the latest evidence record per role for that
+/// scenario. `evidence` is always written, empty when the scenario had
+/// none, so "pinned with no evidence" never reads as "unpinned".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ReviewPins {
+    pub scenario_digest: SpecDigest,
+    pub evidence: Vec<EvidencePin>,
+}
+
+/// One pinned evidence record: its ledger natural key (the `task_id`,
+/// else the `scenario_id`, it is filed under) and its 12-hex content
+/// digest, together the record's ledger file stem `<key>__<digest>`.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+pub struct EvidencePin {
+    pub key: String,
+    pub digest: String,
+}
+
+/// How a reviewer's run ended (0.15 D4). Only `Signed` is an approval.
+/// `Indeterminate` (the reviewer ran but could not reach a verdict) and
+/// `Unavailable` (the reviewer could not run) are recorded so a failed
+/// review is visible, never mistaken for a sign-off or a rejection.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewOutcome {
+    #[default]
+    Signed,
+    Indeterminate,
+    Unavailable,
+}
+
+impl ReviewOutcome {
+    pub const ALL: [ReviewOutcome; 3] = [ReviewOutcome::Signed, ReviewOutcome::Indeterminate, ReviewOutcome::Unavailable];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReviewOutcome::Signed => "signed",
+            ReviewOutcome::Indeterminate => "indeterminate",
+            ReviewOutcome::Unavailable => "unavailable",
+        }
+    }
+
+    pub fn parse(s: &str) -> Result<Self, String> {
+        Self::ALL
+            .into_iter()
+            .find(|o| o.as_str() == s)
+            .ok_or_else(|| format!("unknown review outcome `{s}` (expected one of: signed, indeterminate, unavailable)"))
+    }
+
+    pub fn is_signed(&self) -> bool {
+        *self == ReviewOutcome::Signed
     }
 }
 
@@ -2315,6 +2412,63 @@ mod tests {
             ProvenanceRef::UpstreamRef("routes/world.tsx#onPurchased".into())
         )
     );
+
+    /// 0.15 D1/D4: a pre-0.15 review (no `pins`, `outcome` or reviewer
+    /// runtime keys) reads back signed and unpinned, and reserializes
+    /// byte-identically, so its content digest is unchanged.
+    #[test]
+    fn a_pre_015_review_is_byte_identical_and_reads_as_signed_and_unpinned() {
+        let legacy = serde_json::json!({
+            "schema": 1,
+            "kind": "review",
+            "at": "2026-07-01T09:00:00Z",
+            "actor": {"agent_id": "reviewer-2", "role": "reviewer"},
+            "project_id": "root",
+            "scenario_id": "cart.add.01",
+            "reviewer": "reviewer-2",
+            "pin": "r1",
+            "provenance_ref": {"original_spec_ref": "specs/x.feature"},
+        });
+        let review: Review = serde_json::from_value(legacy.clone()).unwrap();
+        assert_eq!(review.pins, None);
+        assert_eq!(review.outcome, ReviewOutcome::Signed);
+        assert_eq!(serde_json::to_value(&review).unwrap(), legacy);
+    }
+
+    /// A pinned review with no evidence keeps its empty `evidence` list on
+    /// the wire (pinned-with-nothing is not unpinned), a non-signed
+    /// outcome and the reviewer runtime round-trip, and an unknown
+    /// outcome is refused rather than read as signed.
+    #[test]
+    fn review_pins_and_outcome_round_trip_and_an_unknown_outcome_is_refused() {
+        let mut review = Review::new(
+            envelope(RecordKind::Review),
+            project_id(),
+            ScenarioId::parse("world.place-lock.01").unwrap(),
+            "reviewer",
+            "9c93d024b1a2",
+            ProvenanceRef::UpstreamRef("pr#1".into()),
+        );
+        review.pins = Some(ReviewPins { scenario_digest: SpecDigest::of(b"feature"), evidence: Vec::new() });
+        let json = serde_json::to_value(&review).unwrap();
+        assert_eq!(json["pins"]["evidence"], serde_json::json!([]));
+        assert!(json.get("outcome").is_none(), "signed is the default and is not written");
+
+        review.outcome = ReviewOutcome::Indeterminate;
+        review.reviewer_provider = Some("openai".into());
+        review.reviewer_model = Some("gpt-x".into());
+        review.reviewer_harness = Some("codex".into());
+        review.pins.as_mut().unwrap().evidence.push(EvidencePin { key: "world.place-lock.01".into(), digest: "0123456789ab".into() });
+        let json = serde_json::to_value(&review).unwrap();
+        assert_eq!(json["outcome"], "indeterminate");
+        assert_eq!(serde_json::from_value::<Review>(json.clone()).unwrap(), review);
+
+        let mut bad = json;
+        bad["outcome"] = serde_json::json!("approved");
+        assert!(serde_json::from_value::<Review>(bad).is_err());
+        assert_eq!(ReviewOutcome::parse("unavailable"), Ok(ReviewOutcome::Unavailable));
+        assert!(ReviewOutcome::parse("approved").is_err());
+    }
 
     round_trip_test!(
         divergence_round_trips,

@@ -277,11 +277,16 @@ uses, so status and the gate cannot disagree about a gap:
   scenarios it owns through `@subject:` (after `exclude_lanes`, which
   are counted separately), how many carry a ledger verdict (the
   `verifying → shipped` gate's reading; divergent ones are counted too),
-  how many carry a review that satisfies `require_review` (any review
-  when it is off; with `distinct_actor`, a self-review does not count),
-  open blocker findings on its adopted changes, and each feature surface
-  missing a `require_cases` case. `(N due)` marks reviews the next
-  transition will require.
+  how many carry a review that satisfies `require_review` (any current
+  signed review when it is off; with `distinct_actor`, a self-review does
+  not count), open blocker findings on its adopted changes, and each
+  feature surface missing a `require_cases` case. `(N due)` marks reviews
+  the next transition will require; `N stale review(s)` and `N unsigned
+  review(s)` (printed when non-zero) count scenarios whose review went
+  stale or whose latest reviews are all `indeterminate`/`unavailable`
+  (see `canon-review`), and the `canon review add` step names both. With
+  `require_review` on, a `warning:` line counts the in-effect reviews that
+  predate review pinning (0.15).
 - **Unowned** — scenarios with no `@subject:` tag.
 - **Audits** — how many scenarios are sampled for
   `spec_coverage.require_audit`, confirmed, owed (no audit or
@@ -331,7 +336,7 @@ Status fails closed rather than suggest progress the gate would refuse:
   "warnings": [],
   "subjects": [
     { "id": "cart", "title": "Cart", "status": "building", "scenarios": 2, "excluded": 0, "evidenced": 2, "divergent": 0,
-      "reviewed": 1, "reviewDue": true, "openBlockers": 1, "missingCases": [] }
+      "reviewed": 1, "staleReviews": 0, "unsignedReviews": 0, "reviewDue": true, "openBlockers": 1, "missingCases": [] }
   ],
   "unowned": ["cart.promo.01"],
   "next": [

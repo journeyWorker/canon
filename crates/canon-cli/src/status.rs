@@ -41,7 +41,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use canon_gate::policy::subject_status_name;
-use canon_gate::review_gate::{open_blockers, review_gap};
+use canon_gate::review_gate::{open_blockers, review_gap, unpinned_review_advisory, unpinned_review_note, ReviewGapKind};
 use canon_gate::spec_coverage::{case_gaps, latest_scenarios, latest_subjects, subject_scenarios};
 use canon_gate::review_gate::active_require_review;
 use canon_gate::audit;
@@ -164,8 +164,14 @@ pub struct SubjectSummary {
     /// Counted scenarios whose latest verdict (for some role) is divergent.
     pub divergent: usize,
     /// Counted scenarios with a qualifying review under the
-    /// `require_review` rule (any review record when it is off).
+    /// `require_review` rule (any current signed review when it is off).
     pub reviewed: usize,
+    /// Counted scenarios whose only signed reviews are stale: pinned to a
+    /// spec or evidence that has since changed (0.15 D1).
+    pub stale_reviews: usize,
+    /// Counted scenarios whose latest reviews are all `indeterminate` or
+    /// `unavailable` (0.15 D4).
+    pub unsigned_reviews: usize,
     /// Whether `require_review` covers this subject's status or the next
     /// one on the chain, i.e. whether its reviews are due now.
     pub review_due: bool,
@@ -264,6 +270,9 @@ pub fn resolve(repo: &Path) -> StatusReport {
     let unreadable = ctx.violations.len() + ctx.corpus_violations.len();
     if unreadable > 0 {
         warnings.push(format!("{unreadable} ledger record(s) could not be read and are not counted; `canon gate check` names them"));
+    }
+    if let Some(count) = unpinned_review_advisory(&ctx) {
+        warnings.push(unpinned_review_note(count));
     }
 
     let joins = Joins { verdicts: latest_verdicts(&ctx), blockers: open_blockers(&ctx) };
@@ -533,7 +542,9 @@ fn summarize(ctx: &GateContext, joins: &Joins, subject: &Subject) -> SubjectSumm
         evidenced += usize::from(has);
         divergent += usize::from(diverged);
     }
-    let reviewed = counted.iter().filter(|s| review_gap(ctx, s, distinct_actor).is_none()).count();
+    let gaps: Vec<ReviewGapKind> = counted.iter().filter_map(|s| review_gap(ctx, s, distinct_actor)).map(|gap| gap.kind).collect();
+    let reviewed = counted.len() - gaps.len();
+    let gap_count = |kind| gaps.iter().filter(|k| **k == kind).count();
     let open_blockers = joins.blockers_of(subject).len();
     let missing_cases = case_gaps(counted.iter().copied(), require_cases)
         .into_iter()
@@ -549,6 +560,8 @@ fn summarize(ctx: &GateContext, joins: &Joins, subject: &Subject) -> SubjectSumm
         evidenced,
         divergent,
         reviewed,
+        stale_reviews: gap_count(ReviewGapKind::Stale),
+        unsigned_reviews: gap_count(ReviewGapKind::Unsigned),
         review_due: rr.is_some_and(|rr| rr.covers(subject.status) || next_status(subject.status).is_some_and(|n| rr.covers(n))),
         open_blockers,
         missing_cases,
@@ -664,9 +677,10 @@ fn subject_steps(
                     first.scenario_id.as_str()
                 ),
                 why: format!(
-                    "{id}: {} of {} scenario(s) lack a qualifying review; review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor",
+                    "{id}: {} of {} scenario(s) lack a qualifying review{}; review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor",
                     summary.scenarios - summary.reviewed,
-                    summary.scenarios
+                    summary.scenarios,
+                    review_breakdown(summary)
                 ),
             });
         }
@@ -776,6 +790,12 @@ pub fn render(report: &StatusReport) -> String {
             if s.review_due && s.reviewed < s.scenarios {
                 let _ = write!(line, " ({} due)", s.scenarios - s.reviewed);
             }
+            if s.stale_reviews > 0 {
+                let _ = write!(line, ", {} stale review(s)", s.stale_reviews);
+            }
+            if s.unsigned_reviews > 0 {
+                let _ = write!(line, ", {} unsigned review(s)", s.unsigned_reviews);
+            }
             let _ = write!(line, ", {} open blockers", s.open_blockers);
             let _ = writeln!(out, "    {}: {line}", s.id);
             for gap in &s.missing_cases {
@@ -831,5 +851,22 @@ fn list_or(values: &[String], empty: &str) -> String {
         empty.to_string()
     } else {
         values.join(", ")
+    }
+}
+
+/// The review next step's breakdown of stale and unsigned gaps, empty
+/// when there are none.
+fn review_breakdown(summary: &SubjectSummary) -> String {
+    let mut parts = Vec::new();
+    if summary.stale_reviews > 0 {
+        parts.push(format!("{} with a stale review (spec or evidence changed since it was reviewed)", summary.stale_reviews));
+    }
+    if summary.unsigned_reviews > 0 {
+        parts.push(format!("{} with only indeterminate or unavailable reviews", summary.unsigned_reviews));
+    }
+    if parts.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", parts.join("; "))
     }
 }
