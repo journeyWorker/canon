@@ -121,6 +121,13 @@ impl PlanAdapter for SuperpowersPlanAdapter {
         }
         outcome
     }
+
+    /// The plan docs [`parse_plan_doc`] reads, one per discovered file —
+    /// the flat, non-recursive set [`discover_plan_files`] lists.
+    fn source_files(&self, source: &PlanSourceHandle) -> Vec<PathBuf> {
+        let PlanSourceHandle::Path(root) = source;
+        discover_plan_files(root)
+    }
 }
 
 /// s35 `gate-plan-dialect-seam` (design D1): the superpowers dialect can

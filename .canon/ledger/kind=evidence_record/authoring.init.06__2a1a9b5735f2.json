@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:37:07.526710Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init init_starter_policy_makes_the_gate_report_an_unevidenced_scenario"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "authoring.init.06",
+  "schema": 1,
+  "staging_id": "f2ae4dbc999f",
+  "verdict": "faithful"
+}

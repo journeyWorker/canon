@@ -18,6 +18,23 @@ canon context --json          # the full machine-readable surface
 canon context --repo ../other # resolve a specific repo's surface
 ```
 
+The outline opens with a short header, then a blank line, then the
+schema outline starting at `capabilityVersion:`:
+
+```text
+status: run `canon status` for this repo's subjects, gaps and next commands
+warning: no policy: .canon/policy.yaml not found, so `canon gate check` requires no evidence, failure cases or review here
+```
+
+The `warning:` line appears when the policy file is absent or unreadable
+or has no `spec_coverage` section (the gate then requires no evidence,
+cases or review), or when that section is invalid (the gate refuses until
+it is fixed); it is omitted when coverage is in force. `context` describes what CAN be
+authored; `canon status` (see `canon-subject`) says where the repo stands
+and what to run next. `--json` is unchanged: the header adds no field,
+and `policy.spec_coverage`/`policy.diagnostics` already carry the same
+fact.
+
 ## Reproducible context packs and prompt bundles
 
 Use an explicit, repository-relative JSON manifest when a run needs a

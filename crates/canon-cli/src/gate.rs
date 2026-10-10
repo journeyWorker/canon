@@ -94,7 +94,7 @@ use canon_gate::{
 };
 use canon_ingest::{find_plan_adapter, PlanWriteBack, WriteBackError};
 use canon_model::paths;
-use canon_model::{validate_evidence_batch, Actor, Envelope, RawRecord, RecordKind, TaskId};
+use canon_model::{validate_evidence_batch, Actor, ChangeId, Envelope, RawRecord, RecordKind, TaskId};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{Tier, TierQuery};
@@ -135,15 +135,44 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     let checks = canon_gate::check_set(release);
     let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).collect());
     print!("{}", format_gate_report(&report));
+    if let Some(count) = canon_gate::spec_coverage::coverage_off_scenarios(&gate_context) {
+        print!("{}", format_coverage_off_advisory(count));
+    }
     if let Some(summary) = canon_gate::binding_summary(&gate_context) {
         print!("{}", format_binding_summary(&summary));
     }
     if let Some(advisories) = canon_gate::review_advisories(&gate_context) {
         print!("{}", format_review_advisories(&advisories));
     }
+    print!("{}", format_unstored_attachments(&canon_gate::unstored_attachments(&gate_context)));
     report.exit_code()
 }
 
+/// The one-line advisory (0.14 D3) printed when the spec corpus has
+/// scenarios but `policy.yaml` has no `spec_coverage` section, so none
+/// of them is checked for evidence. Stdout, after the gate result, like
+/// every other gate advisory; it never changes the exit code.
+fn format_coverage_off_advisory(count: usize) -> String {
+    format!("\nadvisory: spec_coverage is off — {count} scenario(s) are not checked for evidence; see .canon/policy.yaml\n")
+}
+
+/// Bound files with no stored blob that the gate verified against the
+/// working tree instead (0.14 D4's back-compat path for 0.11–0.13
+/// records). Advisories, never violations; prints nothing when every
+/// bound file is stored.
+fn format_unstored_attachments(unstored: &[canon_gate::UnstoredAttachment]) -> String {
+    if unstored.is_empty() {
+        return String::new();
+    }
+    let mut out = format!(
+        "\nevidence artifacts: {} bound file(s) not in the artifact store — not failing the gate; run `canon evidence vault` to store them before the working tree changes:\n",
+        unstored.len()
+    );
+    for attachment in unstored {
+        out.push_str(&format!("  unstored {}\n", attachment.line()));
+    }
+    out
+}
 /// `spec_coverage.require_review`'s waived gaps (issue #2): a subject
 /// moved under `canon subject status --override-reason` keeps its gaps
 /// visible here, named with the waiver, without failing the gate.
@@ -426,7 +455,8 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
                 eprintln!("canon gate task: failed to write {}: {e}", document_path.display());
                 return 2;
             }
-            println!("canon gate task: {task_id} flipped");
+            println!("canon gate task: {task_id} flipped — {}", crate::write_mode::DIRECT);
+            refresh_task_status(&repo, &task_id.change_id());
             0
         }
         TaskFlipDecision::Blocked { violations } => {
@@ -435,6 +465,25 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
             }
             1
         }
+    }
+}
+
+/// Re-import the change that owns a just-flipped row (0.14 D5, dogfood
+/// F14), so the record store's `Task` status agrees with the checkbox
+/// and `canon query --kind task` matches the plan document. Only that
+/// change is read ([`crate::plans::refresh_change`]), never the whole
+/// plan source: a source rooted at a JS repository root used to cost
+/// ~10 s per flip (0.14 acceptance rerun G1). The new `Task` version
+/// carries the document's fresh mtime, so it supersedes the open one in
+/// every folded read, and the change keeps its adopted subject. A repo
+/// that routes no tier for tasks has nothing to disagree with, so an
+/// unwritten task is silent. The flip itself already succeeded; a
+/// failure here is reported, never turned into a failed flip.
+fn refresh_task_status(repo: &Path, change_id: &ChangeId) {
+    match crate::plans::refresh_change(repo, change_id) {
+        Ok(refresh) if refresh.changes_parsed > 0 && refresh.malformed == 0 => {}
+        Ok(_) => eprintln!("canon gate task: WARN the change `{}` did not re-import cleanly; run `canon ingest plans` to see why", change_id.as_str()),
+        Err(e) => eprintln!("canon gate task: WARN the task status record was not refreshed ({e}); run `canon ingest plans` so `canon query --kind task` matches the plan"),
     }
 }
 
@@ -447,18 +496,26 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
 /// excluded (stale, wrong kind, whatever the filter was) can never
 /// still slip its `evidence_note` companion into the notes `gate_task`
 /// pairs against the narrowed evidence slice.
+///
+/// Returned oldest first by each record's own `at` (0.14 D5): `gate_task`
+/// reads the LAST note as the task's latest summary, and a tier read is
+/// in path order, not time order.
 fn notes_of<'a>(records: impl IntoIterator<Item = &'a RawRecord>, task_id: &TaskId) -> Result<Vec<EvidenceNote>, String> {
     let mut notes = Vec::new();
     for raw in records {
         match evidence_note_of(&raw.0, task_id) {
-            Some(Ok(note)) => notes.push(note),
+            Some(Ok(note)) => {
+                let at = raw.0.get("at").and_then(|v| v.as_str()).and_then(|s| s.parse::<chrono::DateTime<Utc>>().ok());
+                notes.push((at, note));
+            }
             Some(Err(e)) => {
                 return Err(format!("{task_id}'s `evidence_note` companion is present but unparseable ({e}) — never silently treated as absent"));
             }
             None => {}
         }
     }
-    Ok(notes)
+    notes.sort_by_key(|(at, _)| *at);
+    Ok(notes.into_iter().map(|(_, note)| note).collect())
 }
 
 /// Look up `task_id` in the typed-atoms file the winning dialect

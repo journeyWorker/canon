@@ -1,1 +1,3 @@
 canon gate check: clean (0 violations)
+
+advisory: spec_coverage is off — 2 scenario(s) are not checked for evidence; see .canon/policy.yaml

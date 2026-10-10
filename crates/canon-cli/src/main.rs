@@ -78,21 +78,37 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     // ── Getting started ──
-    /// Set up canon in a repo (writes a starter canon.yaml)
-    #[command(after_help = "Examples:\n  canon init\n  canon init --check-config")]
+    /// Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)
+    #[command(after_help = "Examples:\n  canon init\n  canon init --no-agents-md --no-policy\n  canon init --check-config\n\nRerunning in a repo that has canon.yaml leaves canon.yaml and .canon/policy.yaml\nalone and only refreshes the canon block in AGENTS.md.")]
     Init {
         /// Directory to set up (used as-is)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
         /// Validate an existing canon.yaml instead of writing one
-        #[arg(long)]
+        #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy"])]
         check_config: bool,
+        /// Do not write or refresh the canon block in AGENTS.md
+        #[arg(long)]
+        no_agents_md: bool,
+        /// Do not write the starter .canon/policy.yaml
+        #[arg(long)]
+        no_policy: bool,
     },
     /// Try the evidence loop end-to-end in a throwaway demo repo
     #[command(after_help = "Examples:\n  canon demo init --repo /tmp/canon-demo && cd /tmp/canon-demo\n  canon gate check   # RED\n  canon demo attest && canon gate check   # GREEN")]
     Demo {
         #[command(subcommand)]
         action: DemoCommand,
+    },
+    /// Show where this repo stands: subjects by status, their gaps, and the next commands
+    #[command(after_help = "Examples:\n  canon status\n  canon status --json\n\nA read: exits 0 whatever it finds, and writes nothing. The counts come from the\nsame joins `canon gate check` and `canon subject status` use.")]
+    Status {
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Show what you can author here: record kinds, fields, enums, policies
     Context {
@@ -152,6 +168,12 @@ enum Command {
     Subject {
         #[command(subcommand)]
         action: SubjectCommand,
+    },
+    /// Scaffold a plan change (openspec proposal + tasks) adopted into a subject
+    #[command(after_help = "Examples:\n  canon change new add-login --subject auth --title 'Add login'")]
+    Change {
+        #[command(subcommand)]
+        action: ChangeCommand,
     },
     /// Index a validated .feature corpus into the scenario ledger
     Inventory {
@@ -748,8 +770,8 @@ enum EvidenceCommand {
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
-    /// Stage one attributed EvidenceRecord for a task (commit it with `canon gate promote`)
-    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs a passing case). Enforcement is opt-in via policy experimental.evidence_binding (off by default).")]
+    /// Stage one attributed EvidenceRecord for a task or scenario (commit it with `canon gate promote`)
+    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).")]
     Add {
         /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
@@ -766,7 +788,7 @@ enum EvidenceCommand {
         /// faithful / not-applicable / divergent
         #[arg(long, default_value = "faithful", value_parser = canon_cli::evidence::parse_verdict)]
         verdict: EvidenceVerdict,
-        /// One-line note; becomes the flipped row's ✅ suffix (scanned for fabrication markers; line breaks refused)
+        /// One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)
         #[arg(long)]
         summary: Option<String>,
         /// The real captured output backing --summary (requires --summary; scanned for fabrication markers)
@@ -787,6 +809,9 @@ enum EvidenceCommand {
         /// Required: `canon gate promote` derives its run_seq partition key from it
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// The attesting session (recorded as actor.session_id). Under require_review.distinct_actor a review from this session does not count
+        #[arg(long, value_parser = canon_cli::review::parse_session_id)]
+        session_id: Option<canon_model::SessionId>,
         /// Human approval identity; authentication comes only from the detached signature.
         #[arg(long)]
         approval_by: Option<String>,
@@ -808,9 +833,22 @@ enum EvidenceCommand {
         /// EXPERIMENTAL: bind and parse a test report, `junit:<path>` or `cucumber:<path>`; repeatable
         #[arg(long = "report", value_name = "FORMAT:PATH", value_parser = canon_cli::evidence_attach::parse_report_spec)]
         reports: Vec<(canon_model::ReportFormat, PathBuf)>,
-        /// EXPERIMENTAL: the report case to bind when its name does not carry the scenario id (a Rust test: its function name)
-        #[arg(long)]
-        report_case: Option<String>,
+        /// EXPERIMENTAL: also bind this report case (a Rust test: its function name); repeatable. Cases whose own scenario id is this one are always bound
+        #[arg(long = "report-case", value_name = "NAME")]
+        report_cases: Vec<String>,
+        /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
+        #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+        max_artifact_mib: u64,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+    },
+    /// Store the bound files of existing evidence records in the artifact store (.canon/artifacts/sha256/)
+    #[command(after_help = "For records written before canon stored bound bytes (0.11-0.13). Each attachment whose working-tree file still hashes to the recorded digest is copied into .canon/artifacts/sha256/<hex>; everything else is listed as not stored, with why. Commit the store with the ledger.\n\nExit 0 when the pass ran (the gate decides whether an unstored file matters), 2 when the ledger cannot be read or a write fails.")]
+    Vault {
+        /// Per-file size limit for the artifact store, in MiB
+        #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+        max_artifact_mib: u64,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -850,7 +888,7 @@ enum FindingCommand {
         #[arg(long, value_parser = canon_cli::finding::parse_sha)]
         resolution_sha: Option<Sha>,
         /// The SOURCED introducing commit. Leave unset when it is not known — never guess (see --help). Must name a COMMIT object this repo holds (existence only; never its message or diff)
-        #[arg(long, value_parser = canon_cli::finding::parse_sha)]
+        #[arg(long, value_parser = canon_cli::finding::parse_introduced_by)]
         introduced_by: Option<Sha>,
         /// Where in the tree, as path/to/file.rs:120-134 (line breaks refused)
         #[arg(long)]
@@ -861,6 +899,9 @@ enum FindingCommand {
         /// Attribution only — unlike `canon evidence add`, no partition key derives from it
         #[arg(long, default_value = "reviewer", value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// The authoring session (recorded as actor.session_id)
+        #[arg(long, value_parser = canon_cli::review::parse_session_id)]
+        session_id: Option<canon_model::SessionId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -889,6 +930,9 @@ enum FindingCommand {
         /// Attribution only — no partition key derives from it
         #[arg(long, default_value = "reviewer", value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// The session that authored the TRANSITION (recorded as actor.session_id)
+        #[arg(long, value_parser = canon_cli::review::parse_session_id)]
+        session_id: Option<canon_model::SessionId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -897,7 +941,7 @@ enum FindingCommand {
 
 #[derive(Subcommand)]
 enum ReviewCommand {
-    /// Write one attributed Review record (exactly one provenance ref required)
+    /// Write one attributed Review record directly to the ledger, nothing to promote (exactly one provenance ref required)
     Add {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
@@ -918,6 +962,9 @@ enum ReviewCommand {
         actor_id: String,
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        /// The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count
+        #[arg(long, value_parser = canon_cli::review::parse_session_id)]
+        session_id: Option<canon_model::SessionId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -926,7 +973,7 @@ enum ReviewCommand {
 
 #[derive(Subcommand)]
 enum DivergenceCliCommand {
-    /// Stage a divergence candidate (no run_seq yet)
+    /// Stage a divergence candidate, no run_seq yet (commit it with `canon divergence promote`)
     Stage {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
@@ -1107,6 +1154,25 @@ enum FeatureCommand {
 }
 
 #[derive(Subcommand)]
+enum ChangeCommand {
+    /// Scaffold openspec/changes/<slug>/{proposal,tasks}.md, import it, and adopt it into a subject
+    New {
+        /// The change's slug (its change_id)
+        #[arg(value_parser = canon_cli::subject::parse_change_id)]
+        slug: ChangeId,
+        /// The existing subject to adopt the change under
+        #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
+        subject: SubjectId,
+        /// The change's title (also its proposal summary)
+        #[arg(long)]
+        title: String,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
 enum SubjectCommand {
     /// Author a new subject at status `proposed`
     New {
@@ -1247,6 +1313,7 @@ fn main() -> ExitCode {
         Command::Purge { kind, before, repo, dry_run, json } => ExitCode::from(canon_cli::retention::run_purge(&repo, kind, before, dry_run, json)),
         Command::Format { check: _, root, repo } => run_fmt(&root, repo.as_deref()),
         Command::Context { repo, json } => run_context(&repo, json),
+        Command::Status { repo, json } => ExitCode::from(canon_cli::status::run(&repo, json) as u8),
         Command::ContextPack { action } => match action {
             ContextPackCommand::Create { manifest, repo, json } => run_context_pack_create(&repo, &manifest, json),
             ContextPackCommand::Show { id, repo, json } => run_context_pack_show(&repo, &id, json),
@@ -1300,6 +1367,7 @@ fn main() -> ExitCode {
                 surface_ref,
                 actor_id,
                 role,
+                session_id,
                 approval_by,
                 approval_role,
                 approval_signature_file,
@@ -1307,7 +1375,8 @@ fn main() -> ExitCode {
                 artifact_sha,
                 artifacts,
                 reports,
-                report_case,
+                report_cases,
+                max_artifact_mib,
                 repo,
             } => ExitCode::from(
                 canon_cli::evidence::run_add(
@@ -1325,6 +1394,7 @@ fn main() -> ExitCode {
                         surface_ref,
                         actor_id,
                         role,
+                        session_id,
                         approval_by,
                         approval_role,
                         approval_signature_file,
@@ -1332,10 +1402,12 @@ fn main() -> ExitCode {
                         artifact_sha,
                         artifacts,
                         reports,
-                        report_case,
+                        report_cases,
+                        max_artifact_mib,
                     },
                 ) as u8,
             ),
+            EvidenceCommand::Vault { max_artifact_mib, repo } => ExitCode::from(canon_cli::evidence::run_vault(&repo, max_artifact_mib) as u8),
         },
         Command::Finding { action } => match action {
             FindingCommand::Add {
@@ -1352,6 +1424,7 @@ fn main() -> ExitCode {
                 file_ref,
                 actor_id,
                 role,
+                session_id,
                 repo,
             } => ExitCode::from(canon_cli::finding::run_add(
                 &repo,
@@ -1369,18 +1442,30 @@ fn main() -> ExitCode {
                     file_ref,
                     actor_id,
                     role,
+                    session_id,
                 },
             ) as u8),
-            FindingCommand::Close { change_id, round, seq, disposition, resolution_sha, actor_id, role, repo } => {
+            FindingCommand::Close { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, repo } => {
                 ExitCode::from(canon_cli::finding::run_close(
                     &repo,
-                    &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role },
+                    &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id },
                 ) as u8)
             }
         },
         Command::Review { action } => match action {
-            ReviewCommand::Add { project_id, scenario_id, reviewer, pin, upstream_ref, original_spec_ref, actor_id, role, repo } => ExitCode::from(
-                canon_cli::review::run_add(&repo, &project_id, &scenario_id, &reviewer, &pin, upstream_ref.as_deref(), original_spec_ref.as_deref(), &actor_id, &role) as u8,
+            ReviewCommand::Add { project_id, scenario_id, reviewer, pin, upstream_ref, original_spec_ref, actor_id, role, session_id, repo } => ExitCode::from(
+                canon_cli::review::run_add(
+                    &repo,
+                    &project_id,
+                    &scenario_id,
+                    &reviewer,
+                    &pin,
+                    upstream_ref.as_deref(),
+                    original_spec_ref.as_deref(),
+                    &actor_id,
+                    &role,
+                    session_id.as_ref(),
+                ) as u8,
             ),
         },
         Command::Divergence { action } => match action {
@@ -1430,7 +1515,12 @@ fn main() -> ExitCode {
                 ExitCode::from(canon_cli::subject::run_status(&repo, &id, state, override_reason.as_deref(), &actor_id, json) as u8)
             }
         },
-        Command::Init { repo, check_config } => run_init(&repo, check_config),
+        Command::Change { action } => match action {
+            ChangeCommand::New { slug, subject, title, repo } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject, &title) as u8),
+        },
+        Command::Init { repo, check_config, no_agents_md, no_policy } => {
+            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy: !no_policy })
+        }
         Command::Demo { action } => match action {
             DemoCommand::Init { repo } => ExitCode::from(canon_cli::demo::run_demo_init(&repo) as u8),
             DemoCommand::Attest { repo } => ExitCode::from(canon_cli::demo::run_demo_attest(&repo) as u8),
@@ -1722,14 +1812,16 @@ fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, p
     ExitCode::from(canon_cli::scaffold::run_feature_new(repo, surface, title, project, &actor, at) as u8)
 }
 
-/// `canon init [--repo <dir>]` / `canon init --check-config` (s19 P4,
-/// `canon_cli::init`'s module doc): `check_config: false` writes a
-/// fresh skeleton (`2` on an existing `canon.yaml`, `0` written);
-/// `check_config: true` READ-ONLY validates an existing one instead
-/// (`2` on a missing file, `0` when every present section parses
-/// clean, `1` when a present section fails).
-fn run_init(repo: &std::path::Path, check_config: bool) -> ExitCode {
-    let code = if check_config { canon_cli::init::run_check_config(repo) } else { canon_cli::init::run_init(repo) };
+/// `canon init [--repo <dir>] [--no-agents-md] [--no-policy]` / `canon
+/// init --check-config` (s19 P4, `canon_cli::init`'s module doc):
+/// `check_config: false` scaffolds a fresh repo, or on an existing
+/// `canon.yaml` refreshes only the AGENTS.md block (see
+/// `canon_cli::init::run_init` for the exit codes); `check_config: true`
+/// READ-ONLY validates an existing config instead (`2` on a missing
+/// file, `0` when every present section parses clean, `1` when a
+/// present section fails).
+fn run_init(repo: &std::path::Path, check_config: bool, options: canon_cli::init::InitOptions) -> ExitCode {
+    let code = if check_config { canon_cli::init::run_check_config(repo) } else { canon_cli::init::run_init(repo, options) };
     ExitCode::from(code as u8)
 }
 

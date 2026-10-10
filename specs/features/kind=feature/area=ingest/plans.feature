@@ -92,3 +92,13 @@ Feature: ingest plans
     When plans are imported
     Then the command succeeds and its summary totals are zero changes, zero tasks, zero skipped
     And it reports zero sources, never a hardcoded default root
+
+  # canon: {"schema":1,"at":"2026-10-10T18:33:15Z","actor":{"agent_id":"canon"}}
+  @subject:ingest-pipelines
+  @case:edge
+  @ingest.plans.10
+  Scenario: A plan source at the repository root reads only the openspec change dirs
+    Given an openspec source rooted at the repository root beside a large node_modules tree that holds plan-named files
+    When plans are imported, a file under node_modules is edited, added or made unreadable, and plans are imported again
+    Then the cursor records only files under openspec/changes and the second import reports the source skipped unchanged
+    And an edit under openspec/changes still re-imports the source

@@ -82,3 +82,23 @@ Feature: gate task
     Then promotion commits the record, because promotion validates records and not note shape
     And the flip is refused instead
     And the document carries no forged row and no checked row at all, with the real row still open
+
+  # canon: {"schema":1,"at":"2026-10-10T15:43:50Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:happy
+  @gate.task.09
+  Scenario: A flipped row aggregates every record for its task, and the task store agrees with it
+    Given an imported plan task and two promoted records for it, a faithful one and a later not-applicable one, each with a summary
+    When the task is asked to complete
+    Then the row's suffix counts both records by verdict and carries the later summary
+    And the record store's task status reads done, matching the checkbox
+
+  # canon: {"schema":1,"at":"2026-10-10T18:33:15Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.task.10
+  Scenario: A flip re-imports only its own change and keeps the change's adopted subject
+    Given a change created with change new for a subject, one open task row and promoted evidence for it
+    When the task is asked to complete
+    Then only that change dir is re-read, and the latest change record is completed and still names the subject
+    And a later full plan import keeps the subject too

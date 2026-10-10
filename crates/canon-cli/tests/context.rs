@@ -51,7 +51,7 @@ fn context_exits_zero_with_a_full_surface_even_when_the_corpus_fails_fmt_check()
     );
 
     let text = stdout(&context_output);
-    assert!(text.starts_with("capabilityVersion:"), "expected the default outline to lead with capabilityVersion:\n{text}");
+    assert!(text.contains("\n\ncapabilityVersion:"), "expected the outline body to lead with capabilityVersion: after the header:\n{text}");
     assert!(text.contains("kinds (14):"), "expected all fourteen record kinds regardless of corpus violations:\n{text}");
     assert!(text.contains("enums ("), "expected the enums section present:\n{text}");
     assert!(text.contains("joinKeys ("), "expected the joinKeys section present:\n{text}");
@@ -110,5 +110,48 @@ fn context_from_a_subdirectory_resolves_the_ancestor_repo_root_policy() {
         json["policy"]["trust_required"]["p1"]["value"],
         serde_json::json!("human"),
         "the repo ROOT's trust_required.p1 must surface from the subdirectory invocation:\n{json}"
+    );
+}
+
+/// 0.14 D7: the outline opens with a pointer to `canon status` and a blank
+/// line, then the unchanged body; `--json` gains no field.
+#[test]
+fn context_outline_opens_with_a_status_pointer_and_leaves_json_unchanged() {
+    let repo = tempfile::tempdir().unwrap();
+    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
+    std::fs::create_dir_all(repo.path().join(".canon")).unwrap();
+    std::fs::write(repo.path().join(".canon/policy.yaml"), "spec_coverage:\n  require_evidence: true\n").unwrap();
+    let path = repo.path().to_string_lossy().into_owned();
+
+    let text = stdout(&run_canon(&["context", "--repo", &path]));
+    assert!(
+        text.starts_with("status: run `canon status` for this repo's subjects, gaps and next commands\n\ncapabilityVersion: 5\n"),
+        "an enforcing policy gets the pointer alone:\n{text}"
+    );
+
+    let json: serde_json::Value = serde_json::from_slice(&run_canon(&["context", "--repo", &path, "--json"]).stdout).unwrap();
+    let mut keys: Vec<&str> = json.as_object().unwrap().keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    assert_eq!(keys, ["capabilityVersion", "cel", "enums", "joinKeys", "kinds", "policy", "review", "vocab"], "the header adds nothing to JSON");
+    assert_eq!(json["capabilityVersion"], 5);
+}
+
+/// 0.14 D7: with no policy file, the header's second line says the gate
+/// enforces nothing here, before the schema.
+#[test]
+fn context_header_warns_when_no_policy_enforces_coverage() {
+    let repo = tempfile::tempdir().unwrap();
+    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
+    let text = stdout(&run_canon(&["context", "--repo", &repo.path().to_string_lossy()]));
+    let header: Vec<&str> = text.lines().take(4).collect();
+    assert_eq!(
+        header,
+        [
+            "status: run `canon status` for this repo's subjects, gaps and next commands",
+            "warning: no policy: .canon/policy.yaml not found, so `canon gate check` requires no evidence, failure cases or review here",
+            "",
+            "capabilityVersion: 5",
+        ],
+        "{text}"
     );
 }

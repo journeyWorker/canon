@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-k5",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T16:11:56.242463Z",
+  "change_id": "canon-0-14-k5-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "46cea2fd2e3c5b696766fe155a3bc08f83077612",
+  "reviewed_sha": "b04c73e2b128841943ab0ee711521eb5c031b9b4",
+  "reviewer": "canon-reviewer-k5",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "status treated an invalid spec_coverage section as empty and suggested shipping a subject the gate refuses"
+}

@@ -507,7 +507,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "canon-cli"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "canon-fmt",
  "canon-gate",
@@ -534,7 +534,7 @@ dependencies = [
 
 [[package]]
 name = "canon-fmt"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "canon-model",
  "chrono",
@@ -548,7 +548,7 @@ dependencies = [
 
 [[package]]
 name = "canon-gate"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "canon-model",
  "canon-policy",
@@ -558,13 +558,14 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "sha2 0.10.9",
  "tempfile",
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "canon-ingest"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "canon-model",
  "canon-store",
@@ -583,7 +584,7 @@ dependencies = [
 
 [[package]]
 name = "canon-learn"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "arrow",
  "canon-gate",
@@ -602,7 +603,7 @@ dependencies = [
 
 [[package]]
 name = "canon-model"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "schemars",
@@ -617,7 +618,7 @@ dependencies = [
 
 [[package]]
 name = "canon-plugin"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "canon-model",
  "canon-store",
@@ -630,7 +631,7 @@ dependencies = [
 
 [[package]]
 name = "canon-policy"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "canon-model",
  "cel",
@@ -644,7 +645,7 @@ dependencies = [
 
 [[package]]
 name = "canon-report"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "arrow",
  "canon-ingest",
@@ -663,7 +664,7 @@ dependencies = [
 
 [[package]]
 name = "canon-store"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "arrow",
  "async-trait",
@@ -687,7 +688,7 @@ dependencies = [
 
 [[package]]
 name = "canon-vocab"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "canon-gate",
  "canon-model",

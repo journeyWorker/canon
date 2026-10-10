@@ -70,7 +70,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use canon_model::fold::{fold_to_current_state, FoldedState};
-use canon_model::{EvidenceVerdict, ProjectId, Scenario, ScenarioId, SubjectId, SubjectStatus};
+use canon_model::{EvidenceVerdict, ProjectId, Scenario, ScenarioId, Subject, SubjectId, SubjectStatus};
 
 use crate::context::{GateCheck, GateContext, SPEC_CORPUS_KINDS};
 use crate::review_gate;
@@ -130,12 +130,11 @@ impl GateCheck for SpecCoverageCheck {
         let evidenced = evidenced_scenarios(ctx);
         let divergence_states = fold_to_current_state(&ctx.divergences, &live_bindings(ctx), ctx.now);
         let verdicts = latest_verdicts(ctx);
-        let subject_status: BTreeMap<&str, SubjectStatus> =
-            latest_by_key(&ctx.subjects, |s| s.subject_id.as_str().to_string()).into_iter().map(|s| (s.subject_id.as_str(), s.status)).collect();
+        let subject_status: BTreeMap<&str, SubjectStatus> = latest_subjects(ctx).into_iter().map(|s| (s.subject_id.as_str(), s.status)).collect();
 
         let mut violations = Vec::new();
         let mut in_scope = Vec::new();
-        for scenario in latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone())) {
+        for scenario in latest_scenarios(ctx) {
             match scope_decision(scope, scenario.subject_id.as_ref(), &subject_status) {
                 ScopeDecision::OutOfScope => continue,
                 ScopeDecision::DanglingSubject(subject_id) => {
@@ -296,6 +295,21 @@ pub(crate) fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], k
         .collect()
 }
 
+/// The scenario count behind `canon gate check`'s "spec_coverage is off"
+/// advisory (0.14 D3): `Some(n)` when `policy.yaml` has NO
+/// `spec_coverage` section and the corpus holds `n > 0` scenarios
+/// (latest generation per `(project_id, scenario_id)`), else `None`. A
+/// present section, including an invalid one (already a violation), is
+/// never "off". Advisory only: it never adds a violation, so the exit
+/// code is unchanged.
+pub fn coverage_off_scenarios(ctx: &GateContext) -> Option<usize> {
+    if ctx.policy.spec_coverage.is_some() {
+        return None;
+    }
+    let count = latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone())).len();
+    (count > 0).then_some(count)
+}
+
 /// The scenarios a Subject owns: the LATEST `Scenario` generation of
 /// every `(project_id, scenario_id)` whose latest generation carries
 /// `subject_id == subject`, ordered by that key.
@@ -308,12 +322,22 @@ pub(crate) fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], k
 /// whose tag was removed or moved to another subject still has its old
 /// tagged generation on disk, and reading that row would keep it linked.
 pub fn subject_scenarios<'a>(ctx: &'a GateContext, subject: &SubjectId) -> Vec<&'a Scenario> {
-    let mut owned: Vec<&Scenario> = latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone()))
-        .into_iter()
-        .filter(|s| s.subject_id.as_ref() == Some(subject))
-        .collect();
-    owned.sort_by(|a, b| (&a.project_id, &a.scenario_id).cmp(&(&b.project_id, &b.scenario_id)));
-    owned
+    latest_scenarios(ctx).into_iter().filter(|s| s.subject_id.as_ref() == Some(subject)).collect()
+}
+
+/// The LATEST generation of every `(project_id, scenario_id)` in the
+/// corpus, ordered by that key (the fold's own key order) — the fold
+/// [`subject_scenarios`] filters, exposed so a reader that needs the whole
+/// corpus (`canon status`'s unowned list) folds it the same way.
+pub fn latest_scenarios(ctx: &GateContext) -> Vec<&Scenario> {
+    latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone()))
+}
+
+/// The LATEST record of every Subject, ordered by `subject_id` — the
+/// fold this check's `scope` filter and [`crate::review_gate`] read
+/// subject status from.
+pub fn latest_subjects(ctx: &GateContext) -> Vec<&Subject> {
+    latest_by_key(&ctx.subjects, |s| s.subject_id.as_str().to_string())
 }
 
 /// Every `(project_id, scenario_id)` an `EvidenceRecord` attests to.
@@ -896,6 +920,39 @@ mod tests {
         assert!(out[0].detail.contains("`agent-a`") && out[0].detail.contains("distinct_actor"), "{}", out[0].detail);
 
         assert!(run(corpus(), reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), false)).is_empty());
+    }
+
+    #[test]
+    fn a_review_from_an_evidence_session_does_not_count_and_a_missing_session_never_matches() {
+        let session = |s: &str| canon_model::SessionId::parse(s).unwrap();
+        let corpus = |evidence_session: Option<&str>, review_session: Option<&str>| {
+            let mut c = Corpus::new();
+            c.scenarios = vec![scenario("p.a.01", Some("live"))];
+            c.subjects = vec![subject("live", SubjectStatus::Verifying)];
+            let mut e = evidence("p.a.01", EvidenceVerdict::Faithful);
+            e.envelope.actor.session_id = evidence_session.map(session);
+            c.evidence = vec![e];
+            let mut r = review("p.a.01", "reviewer-2", "reviewer-2");
+            r.envelope.actor.session_id = review_session.map(session);
+            c.reviews = vec![r];
+            c
+        };
+        let distinct = || reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true);
+
+        // Another actor id, but the same session: the implementer
+        // re-labelled itself. The detail names the session rule.
+        let out = run(corpus(Some("s-impl"), Some("s-impl")), distinct());
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert_eq!(out[0].class, FailureClass::UnreviewedPromotion);
+        assert!(out[0].detail.contains("`s-impl`") && out[0].detail.contains("session other than any evidence session"), "{}", out[0].detail);
+
+        // A different session, or a session missing on either side,
+        // leaves the actor rule alone in charge.
+        assert!(run(corpus(Some("s-impl"), Some("s-review")), distinct()).is_empty());
+        assert!(run(corpus(None, Some("s-impl")), distinct()).is_empty());
+        assert!(run(corpus(Some("s-impl"), None), distinct()).is_empty());
+        // Without distinct_actor no identity rule applies.
+        assert!(run(corpus(Some("s-impl"), Some("s-impl")), reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), false)).is_empty());
     }
 
     #[test]

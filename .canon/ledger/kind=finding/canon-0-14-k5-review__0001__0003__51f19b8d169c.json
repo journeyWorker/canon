@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-k5",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T16:11:55.790381Z",
+  "change_id": "canon-0-14-k5-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "b04c73e2b128841943ab0ee711521eb5c031b9b4",
+  "reviewer": "canon-reviewer-k5",
+  "round": 1,
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "status suggested scenario new without --project in a multi-root repo, which the CLI rejects"
+}

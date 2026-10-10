@@ -1,0 +1,2 @@
+canon init: ./canon.yaml already exists — left unchanged; only the AGENTS.md block is refreshed
+canon init: the canon block in ./AGENTS.md is already current

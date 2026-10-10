@@ -58,7 +58,7 @@ impl GateCheck for RiskApprovalCheck {
             .collect();
         let mut groups: BTreeMap<(CellSubject, Option<String>), Vec<&EvidenceRecord>> = BTreeMap::new();
         for record in &ctx.evidence {
-            if let Some(subject) = CellSubject::of(record) {
+            for subject in CellSubject::all_of(record) {
                 groups.entry((subject, record.project_id.as_ref().map(ToString::to_string))).or_default().push(record);
             }
         }

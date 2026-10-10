@@ -512,3 +512,52 @@ fn canonical_check_and_doctor_report_legacy_codex_remnant_with_fix() {
     skills::install_canonical(&source, &target, Some("claude,codex")).unwrap();
     assert!(remnant.is_file(), "an unproven legacy file is reported, never deleted");
 }
+
+/// The working loop's step names, in order: the skill's numbered steps
+/// (`N. **Name.**`) and the `canon init` AGENTS.md block's (`N. Name:`)
+/// must both say exactly these.
+const LOOP_STEPS: [&str; 8] =
+    ["Brief", "Subject", "Scenarios", "Units", "Implement", "Evidence", "Independent review", "Transition"];
+
+/// skills.install.11: canon's own projected SKILL.md (Claude, Codex, OMP,
+/// Pi) claims build work in a canon repo, ahead of generic builder skills,
+/// and opens with the working loop the `canon init` AGENTS.md block names.
+#[test]
+fn skills_install_11_projected_skill_claims_build_work_and_opens_with_the_loop() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let source = fs::read_to_string(repo.join("canon/skills/SKILL.src.md")).unwrap();
+    for root in [".claude", ".agents", ".omp", ".pi"] {
+        let projected = fs::read_to_string(repo.join(root).join("skills/canon/SKILL.md")).unwrap();
+        assert_eq!(projected, source, "{root}: the projection must be the source byte for byte");
+    }
+
+    let fields = frontmatter(&source).expect("SKILL.src.md opens with a closed frontmatter block");
+    let description = fields.get("description").expect("a description");
+    for claim in ["build", "implement", "feature", "fix", "canon.yaml", "prefer it there over generic site, app or game builder skills"] {
+        assert!(description.contains(claim), "the description must claim {claim:?}: {description}");
+    }
+    assert!(description.chars().count() <= 1024, "skill loaders cap a description at 1024 characters: {}", description.chars().count());
+
+    let body = &source[source.find("\n---\n").unwrap() + 5..];
+    let sections: Vec<&str> = body.lines().filter(|line| line.starts_with("## ")).collect();
+    assert_eq!(sections.first(), Some(&"## The working loop"), "the loop is the first section: {sections:?}");
+    assert!(sections.contains(&"## Command reference"), "the command reference follows the loop: {sections:?}");
+    let loop_section = &body[body.find("## The working loop").unwrap()..body.find("## Command reference").unwrap()];
+    let skill_steps: Vec<&str> = loop_section
+        .lines()
+        .filter_map(|line| line.split_once(". **").filter(|(n, _)| n.parse::<u8>().is_ok()))
+        .filter_map(|(_, rest)| rest.split_once(".**").map(|(name, _)| name))
+        .collect();
+    assert_eq!(skill_steps, LOOP_STEPS, "the skill's loop steps");
+
+    let tmp = tempfile::tempdir().unwrap();
+    let init = Command::new(env!("CARGO_BIN_EXE_canon")).arg("init").arg("--repo").arg(tmp.path()).output().unwrap();
+    assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
+    let agents = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
+    let block_steps: Vec<&str> = agents
+        .lines()
+        .filter_map(|line| line.split_once(". ").filter(|(n, _)| n.parse::<u8>().is_ok()))
+        .filter_map(|(_, rest)| rest.split_once(':').map(|(name, _)| name))
+        .collect();
+    assert_eq!(block_steps, LOOP_STEPS, "the AGENTS.md block's loop steps");
+}

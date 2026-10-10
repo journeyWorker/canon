@@ -13,10 +13,13 @@
 //! # What counts as a qualifying review
 //! A [`Review`] record for the scenario's `(project_id, scenario_id)`.
 //! With `distinct_actor`, its `reviewer` and its envelope actor must both
-//! differ from every actor on that scenario's evidence records. Review
-//! carries no verdict: the `verifying → shipped` ship gate already
-//! refuses missing and `divergent` verdicts, and that stays the verdict
-//! rule.
+//! differ from every actor on that scenario's evidence records, and when
+//! the review's envelope carries a `session_id`, that session must differ
+//! from every `session_id` on those evidence records. A record without a
+//! session never matches one, so records written before sessions were
+//! recorded keep counting by actor alone. Review carries no verdict: the
+//! `verifying → shipped` ship gate already refuses missing and
+//! `divergent` verdicts, and that stays the verdict rule.
 //!
 //! # Open blockers
 //! A [`Finding`] is folded to its latest version per natural key
@@ -48,12 +51,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use canon_model::{ChangeId, Finding, FindingDisposition, FindingSeverity, RecordKind, Scenario, StatusOverride, Subject, SubjectId, SubjectStatus};
+use canon_model::{ChangeId, Finding, FindingDisposition, FindingSeverity, RecordKind, Review, Scenario, StatusOverride, Subject, SubjectId, SubjectStatus};
 
 use crate::context::GateContext;
 use crate::failure_class::{FailureClass, Violation};
 use crate::policy::{subject_status_name, RequireReview, SpecCoverage};
-use crate::spec_coverage::{latest_by_key, scope_decision, subject_scenarios, ScopeDecision};
+use crate::spec_coverage::{latest_by_key, latest_scenarios, latest_subjects, scope_decision, subject_scenarios, ScopeDecision};
 
 /// One review gap a recorded waiver let through: reported by `canon gate
 /// check` as an advisory, never as a violation.
@@ -132,15 +135,14 @@ pub fn review_advisories(ctx: &GateContext) -> Option<Vec<ReviewAdvisory>> {
 
 /// The corpus-wide rule `canon gate check` applies.
 pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclude_lanes: &[String]) -> ReviewOutcome {
-    let subjects: BTreeMap<&str, &Subject> =
-        latest_by_key(&ctx.subjects, |s| s.subject_id.as_str().to_string()).into_iter().map(|s| (s.subject_id.as_str(), s)).collect();
+    let subjects: BTreeMap<&str, &Subject> = latest_subjects(ctx).into_iter().map(|s| (s.subject_id.as_str(), s)).collect();
     let status: BTreeMap<&str, SubjectStatus> = subjects.iter().map(|(id, s)| (*id, s.status)).collect();
     // The waiver of `id`'s subject, if it recorded exactly `violation`.
     let waiver_for =
         |id: &str, violation: &Violation| subjects.get(id).and_then(|s| current_waiver(s)).filter(|w| w.covers(violation.class.as_str(), &violation.subject));
 
     let mut outcome = ReviewOutcome::default();
-    for scenario in latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone())) {
+    for scenario in latest_scenarios(ctx) {
         // A scenario naming a subject no record carries has no status
         // that could put it in scope; `spec_coverage` reports the
         // dangling link itself.
@@ -256,10 +258,10 @@ fn is_excluded(scenario: &Scenario, exclude_lanes: &[String]) -> bool {
 /// `Some(violation)` when `scenario` has no qualifying review (module
 /// doc), naming which rule failed.
 ///
-/// Evidence actors are collected from every evidence record for the
-/// scenario's id whose `project_id` matches or is absent. Counting a
-/// project-less record here is the stricter reading: it can only make a
-/// review not count, never let one count.
+/// Evidence actors and sessions are collected from every evidence record
+/// for the scenario's id whose `project_id` matches or is absent.
+/// Counting a project-less record here is the stricter reading: it can
+/// only make a review not count, never let one count.
 pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) -> Option<Violation> {
     let reviews: Vec<_> = ctx.reviews.iter().filter(|r| r.project_id == scenario.project_id && r.scenario_id == scenario.scenario_id).collect();
     let subject = scenario.scenario_id.as_str();
@@ -273,24 +275,35 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
     if !distinct_actor {
         return None;
     }
-    let evidence_actors: BTreeSet<&str> = ctx
+    let evidence: Vec<_> = ctx
         .evidence
         .iter()
         .filter(|e| e.scenario_id.as_ref() == Some(&scenario.scenario_id) && e.project_id.as_ref().is_none_or(|p| *p == scenario.project_id))
-        .map(|e| e.envelope.actor.agent_id.as_str())
         .collect();
-    let independent = reviews.iter().any(|r| !evidence_actors.contains(r.reviewer.as_str()) && !evidence_actors.contains(r.envelope.actor.agent_id.as_str()));
-    if independent {
+    let evidence_actors: BTreeSet<&str> = evidence.iter().map(|e| e.envelope.actor.agent_id.as_str()).collect();
+    let evidence_sessions: BTreeSet<&str> = evidence.iter().filter_map(|e| e.envelope.actor.session_id.as_ref()).map(|s| s.as_str()).collect();
+    let distinct_actors = |r: &Review| !evidence_actors.contains(r.reviewer.as_str()) && !evidence_actors.contains(r.envelope.actor.agent_id.as_str());
+    let distinct_session = |r: &Review| r.envelope.actor.session_id.as_ref().is_none_or(|s| !evidence_sessions.contains(s.as_str()));
+    if reviews.iter().any(|&r| distinct_actors(r) && distinct_session(r)) {
         return None;
     }
     let actors = evidence_actors.iter().map(|a| format!("`{a}`")).collect::<Vec<_>>().join(", ");
-    Some(Violation::new(
-        FailureClass::UnreviewedPromotion,
-        subject,
+    // A review by another actor that still failed did so on the session
+    // rule alone; name it, or the operator is told the actors collide
+    // when they do not.
+    let shared_sessions: BTreeSet<&str> =
+        reviews.iter().filter(|&&r| distinct_actors(r)).filter_map(|r| r.envelope.actor.session_id.as_ref()).map(|s| s.as_str()).collect();
+    let detail = if shared_sessions.is_empty() {
         format!(
             "every review of this scenario is by an actor that also attested its evidence ({actors}); spec_coverage.require_review.distinct_actor wants a reviewer other than the evidence actor"
-        ),
-    ))
+        )
+    } else {
+        let sessions = shared_sessions.iter().map(|s| format!("`{s}`")).collect::<Vec<_>>().join(", ");
+        format!(
+            "every review of this scenario is by an actor that also attested its evidence ({actors}) or from a session that did ({sessions}); spec_coverage.require_review.distinct_actor wants a reviewer other than the evidence actor, in a session other than any evidence session"
+        )
+    };
+    Some(Violation::new(FailureClass::UnreviewedPromotion, subject, detail))
 }
 
 /// The latest version of every Finding per `(change_id, round, seq)`

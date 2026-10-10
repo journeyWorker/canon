@@ -1,0 +1,6 @@
+description: "`canon evidence vault` copies a bound file whose working-tree bytes still match the record into `.canon/artifacts/sha256/<hex>` (exit 0), after which `canon gate check` is clean with no advisory"
+steps:
+  - args: [evidence, vault]
+    exit: 0
+  - args: [gate, check]
+    exit: 0

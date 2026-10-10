@@ -4,6 +4,7 @@
 
 pub mod adapter;
 pub mod artifact_ingest;
+pub mod change;
 pub mod context;
 pub mod context_pack;
 pub mod dashboard;
@@ -31,5 +32,7 @@ pub mod scaffold;
 pub mod subject;
 pub mod selftest;
 pub mod skills;
+pub mod status;
 pub mod tier;
 pub mod tiers;
+pub mod write_mode;

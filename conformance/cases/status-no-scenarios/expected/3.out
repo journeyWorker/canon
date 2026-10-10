@@ -1,0 +1,17 @@
+canon 0.14.0
+policy: .canon/policy.yaml
+  spec_coverage: require_evidence=true scope=<every scenario>
+  require_cases: failure
+  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true
+
+subjects (1):
+  proposed (1):
+    demo: 0 scenarios, 0 evidenced, 0 reviewed, 0 open blockers
+
+unowned: none
+
+next:
+  # no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject <id>`
+  canon feature new <area>.<surface> --title "<feature>"
+  # demo owns no scenario; specify its behavior, then `canon inventory sync`
+  canon scenario new <area>.<surface>.01 --title "<behavior>" --subject demo --case happy

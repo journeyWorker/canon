@@ -64,6 +64,12 @@ pub const INGEST_CURSORS_DIR: &str = ".canon/ingest/cursors";
 /// The pre-commit gate script `canon gate install-hooks` materializes.
 pub const PRE_COMMIT_SCRIPT: &str = ".canon/scripts/canon-gate-pre-commit.sh";
 
+/// Content-addressed store of the bytes `canon evidence add --artifact/
+/// --report` bound, one file per digest at `<ARTIFACTS_SHA256_DIR>/<hex>`.
+/// Authored (no source regenerates a rewritten report's old bytes), so
+/// it is git-tracked, never ignored.
+pub const ARTIFACTS_SHA256_DIR: &str = ".canon/artifacts/sha256";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -85,6 +91,7 @@ mod tests {
             INGEST_DIR,
             INGEST_CURSORS_DIR,
             PRE_COMMIT_SCRIPT,
+            ARTIFACTS_SHA256_DIR,
         ];
         for path in all {
             assert!(

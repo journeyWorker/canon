@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T16:07:43.531706Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject adopt_failing_between_its_two_writes_prints_a_repair_that_completes_the_link"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 21,
+  "scenario_id": "subject.lifecycle.23",
+  "schema": 1,
+  "staging_id": "9e59d907568b",
+  "verdict": "faithful"
+}

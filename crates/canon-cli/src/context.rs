@@ -320,6 +320,12 @@ pub struct AuthoringSurface {
     /// validator checks a CEL expression against, never a second
     /// independently-derived projection (invariant 2).
     pub cel: BTreeMap<String, CelSurface>,
+    /// The outline header's policy warning ([`crate::status::policy_warning`]),
+    /// resolved from the same [`PolicyResolution`] as `policy`. Outline
+    /// only: the JSON surface is unchanged, and `policy.spec_coverage` /
+    /// `policy.diagnostics` already carry the same fact there.
+    #[serde(skip)]
+    pub policy_warning: Option<String>,
 }
 
 /// `--repo <dir>` root resolution (design D7, task 1.4): a bare `canon
@@ -406,6 +412,7 @@ pub fn resolve_surface(repo: &Path, _opts: ContextOptions) -> AuthoringSurface {
         },
         review,
         cel: collect_cel(&registry),
+        policy_warning: crate::status::policy_warning(&policy),
     }
 }
 
@@ -580,20 +587,7 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
         },
         risk_routing: policy.risk_routing.iter().map(|(k, v)| (k.clone(), summarize_field(v))).collect(),
         risk_tiers: policy.risk_tiers.iter().map(|(name, rule)| (name.clone(), summarize_risk_tier(rule))).collect(),
-        spec_coverage: policy.spec_coverage.as_ref().map(|sc| match sc {
-            SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review } => SpecCoverageSurface::Active {
-                require_evidence: *require_evidence,
-                scope: status_slugs(scope),
-                exclude_lanes: exclude_lanes.clone(),
-                require_cases: require_cases.clone(),
-                require_review: require_review.as_ref().map(|rr| RequireReviewSurface {
-                    scope: status_slugs(&rr.scope),
-                    distinct_actor: rr.distinct_actor,
-                    block_on_findings: rr.block_on_findings,
-                }),
-            },
-            SpecCoverage::Invalid { detail } => SpecCoverageSurface::Invalid { invalid: detail.clone() },
-        }),
+        spec_coverage: spec_coverage_surface(policy),
         evidence_binding: policy.evidence_binding.as_ref().map(|binding| match binding {
             canon_gate::EvidenceBinding::Active { mode, strength, cases, lanes, scope } => EvidenceBindingSurface::Active {
                 mode: match mode {
@@ -611,6 +605,25 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
         clean: policy.is_clean(),
         diagnostics: policy.diagnostics.iter().map(ToString::to_string).collect(),
     }
+}
+
+/// `policy.spec_coverage`'s surface: the shape `canon context` and
+/// `canon status` both print, keyed like `policy.yaml`.
+pub fn spec_coverage_surface(policy: &PolicyResolution) -> Option<SpecCoverageSurface> {
+    policy.spec_coverage.as_ref().map(|sc| match sc {
+        SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review } => SpecCoverageSurface::Active {
+            require_evidence: *require_evidence,
+            scope: status_slugs(scope),
+            exclude_lanes: exclude_lanes.clone(),
+            require_cases: require_cases.clone(),
+            require_review: require_review.as_ref().map(|rr| RequireReviewSurface {
+                scope: status_slugs(&rr.scope),
+                distinct_actor: rr.distinct_actor,
+                block_on_findings: rr.block_on_findings,
+            }),
+        },
+        SpecCoverage::Invalid { detail } => SpecCoverageSurface::Invalid { invalid: detail.clone() },
+    })
 }
 
 fn summarize_risk_tier(rule: &RiskTierRule) -> RiskTierSurface {
@@ -659,9 +672,17 @@ pub fn render_json(surface: &AuthoringSurface) -> String {
 /// Phase 2, default mode (design D5): a compact, per-section outline — name
 /// counts + name lists, then one indented summary line per entry — for
 /// prompt injection, never a full schema dump (ported from the donor's
-/// `context_outline`).
+/// `context_outline`). It opens with a short header: a pointer to `canon
+/// status` (this outline says what CAN be authored, never where the repo
+/// stands) and, when no `spec_coverage` section is in force, the policy
+/// warning, then a blank line before `capabilityVersion:`.
 pub fn render_outline(surface: &AuthoringSurface) -> String {
     let mut out = String::new();
+    let _ = writeln!(out, "status: run `canon status` for this repo's subjects, gaps and next commands");
+    if let Some(warning) = &surface.policy_warning {
+        let _ = writeln!(out, "warning: {warning}");
+    }
+    let _ = writeln!(out);
     let _ = writeln!(out, "capabilityVersion: {}", surface.capability_version);
 
     let _ = writeln!(out, "kinds ({}): {}", surface.kinds.len(), surface.kinds.keys().cloned().collect::<Vec<_>>().join(", "));

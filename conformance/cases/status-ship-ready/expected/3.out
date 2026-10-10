@@ -1,0 +1,35 @@
+{
+  "statusVersion": 1,
+  "canonVersion": "0.14.0",
+  "policy": {
+    "present": true,
+    "spec_coverage": {
+      "require_evidence": false,
+      "scope": [],
+      "exclude_lanes": [],
+      "require_cases": [
+        "failure"
+      ],
+      "require_review": null
+    }
+  },
+  "warnings": [],
+  "subjects": [
+    {
+      "id": "checkout",
+      "title": "Checkout",
+      "status": "shipped",
+      "scenarios": 2,
+      "excluded": 0,
+      "evidenced": 2,
+      "divergent": 0,
+      "reviewed": 0,
+      "reviewDue": false,
+      "openBlockers": 0,
+      "missingCases": []
+    }
+  ],
+  "unowned": [],
+  "next": [],
+  "nextOmitted": 0
+}

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:37:07.838999Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate gate_check_advises_when_spec_coverage_is_off_without_changing_the_exit_code"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 21,
+  "scenario_id": "gate.check.20",
+  "schema": 1,
+  "staging_id": "6d2b689f978e",
+  "verdict": "faithful"
+}

@@ -93,3 +93,17 @@ Feature: skills install
     Then the check lists the legacy path as a remnant, names the install command that migrates it, and exits non-zero
     And the doctor reports it as a legacy remnant naming the same fix
     And a following install keeps the file, because canon cannot prove it wrote it
+
+  # canon: {"schema":1,"at":"2026-10-10T16:35:35Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:edge
+  @skills.install.11
+  Scenario: The projected skill claims build work in a canon repo and opens with the working loop
+    Given canon's own skill source and its committed Claude, Codex, OMP and Pi projections
+    When each projected SKILL.md is read
+    Then it is the source byte for byte
+    And its description claims build, implement, feature and fix work in a repo that has canon.yaml, ahead of generic site, app or game builder skills
+    And its description stays within the 1024-character limit skill loaders enforce
+    And its first section is the working loop, naming brief, subject, scenarios, units, implement, evidence, independent review and transition in that order
+    And the command reference comes after the loop
+    And the AGENTS.md block canon init writes names the same steps in the same order

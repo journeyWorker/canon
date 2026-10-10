@@ -22,7 +22,7 @@
 
 use std::path::Path;
 
-use canon_model::{Actor, Envelope, ProjectId, ProvenanceRef, RecordKind, Review, RoleId, ScenarioId};
+use canon_model::{Actor, Envelope, ProjectId, ProvenanceRef, RecordKind, Review, RoleId, ScenarioId, SessionId};
 use canon_gate::GateCtx;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -38,6 +38,14 @@ pub fn parse_project_id(s: &str) -> Result<ProjectId, String> {
 /// `--scenario-id`'s `clap` value parser.
 pub fn parse_scenario_id(s: &str) -> Result<ScenarioId, String> {
     ScenarioId::parse(s).map_err(|e| e.to_string())
+}
+
+/// `--session-id`'s `clap` value parser, shared by every command that
+/// records an actor (`evidence add`, `review add`, `finding add|close`).
+/// The grammar is [`SessionId`]'s: one non-empty opaque token, no
+/// surrounding whitespace, no control characters.
+pub fn parse_session_id(s: &str) -> Result<SessionId, String> {
+    SessionId::parse(s).map_err(|e| e.to_string())
 }
 
 /// `canon review add` (module doc). `upstream_ref`/`original_spec_ref`
@@ -56,6 +64,7 @@ pub fn run_add(
     original_spec_ref: Option<&str>,
     actor_id: &str,
     role: &RoleId,
+    session_id: Option<&SessionId>,
 ) -> i32 {
     let provenance_ref = match (upstream_ref, original_spec_ref) {
         (Some(r), None) => ProvenanceRef::UpstreamRef(r.to_string()),
@@ -80,8 +89,12 @@ pub fn run_add(
     };
     let committed = GitTier::new(&gate_ctx.ledger_root);
 
+    let mut actor = Actor::new(actor_id, role.clone());
+    if let Some(session_id) = session_id {
+        actor = actor.with_session(session_id.clone());
+    }
     let review = Review::new(
-        Envelope::new(1, RecordKind::Review, Utc::now(), Actor::new(actor_id, role.clone())),
+        Envelope::new(1, RecordKind::Review, Utc::now(), actor),
         project_id.clone(),
         scenario_id.clone(),
         reviewer,
@@ -91,7 +104,12 @@ pub fn run_add(
 
     match committed.write(&review) {
         Ok(receipt) => {
-            println!("canon review add: wrote {} ({})", receipt.location, if receipt.deduped { "deduped" } else { "new" });
+            println!(
+                "canon review add: wrote {} ({}) — {}",
+                receipt.location,
+                if receipt.deduped { "deduped" } else { "new" },
+                crate::write_mode::DIRECT
+            );
             0
         }
         Err(e) => {
@@ -117,7 +135,19 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let (project_id, scenario_id, role) = args();
 
-        let code = run_add(dir.path(), &project_id, &scenario_id, "reviewer-1", "abc123pin", Some("routes/world.firstbuy-hotdeal.26#onReview"), None, "agent-x", &role);
+        let session = SessionId::parse("review-session-1").unwrap();
+        let code = run_add(
+            dir.path(),
+            &project_id,
+            &scenario_id,
+            "reviewer-1",
+            "abc123pin",
+            Some("routes/world.firstbuy-hotdeal.26#onReview"),
+            None,
+            "agent-x",
+            &role,
+            Some(&session),
+        );
         assert_eq!(code, 0);
 
         let committed = GitTier::new(GateCtx::from_repo(dir.path()).unwrap().ledger_root);
@@ -126,6 +156,7 @@ mod tests {
         let review: Review = serde_json::from_value(read.records[0].0.clone()).unwrap();
         assert_eq!(review.envelope.actor.agent_id, "agent-x");
         assert_eq!(review.envelope.actor.role.as_ref().map(|r| r.as_str()), Some("reviewer"));
+        assert_eq!(review.envelope.actor.session_id.as_ref(), Some(&session));
         assert_eq!(review.provenance_ref, ProvenanceRef::UpstreamRef("routes/world.firstbuy-hotdeal.26#onReview".to_string()));
     }
 
@@ -134,7 +165,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let (project_id, scenario_id, role) = args();
 
-        let code = run_add(dir.path(), &project_id, &scenario_id, "reviewer-1", "abc123pin", None, None, "agent-x", &role);
+        let code = run_add(dir.path(), &project_id, &scenario_id, "reviewer-1", "abc123pin", None, None, "agent-x", &role, None);
         assert_eq!(code, 2);
 
         let committed = GitTier::new(GateCtx::from_repo(dir.path()).unwrap().ledger_root);
@@ -147,7 +178,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let (project_id, scenario_id, role) = args();
 
-        let code = run_add(dir.path(), &project_id, &scenario_id, "reviewer-1", "abc123pin", Some("routes/x#onReview"), Some("spec/x.md"), "agent-x", &role);
+        let code = run_add(dir.path(), &project_id, &scenario_id, "reviewer-1", "abc123pin", Some("routes/x#onReview"), Some("spec/x.md"), "agent-x", &role, None);
         assert_eq!(code, 2);
 
         let committed = GitTier::new(GateCtx::from_repo(dir.path()).unwrap().ledger_root);

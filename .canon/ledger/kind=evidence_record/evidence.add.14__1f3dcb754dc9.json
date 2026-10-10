@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:49:32.052041Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_store evidence_add_refuses_a_bound_file_over_the_size_limit_and_names_the_override"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 17,
+  "scenario_id": "evidence.add.14",
+  "schema": 1,
+  "staging_id": "b7e6869ad8fc",
+  "verdict": "faithful"
+}

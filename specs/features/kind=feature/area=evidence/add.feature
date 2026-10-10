@@ -123,3 +123,101 @@ Feature: evidence add
     When evidence is added with it as an artifact
     Then the record carries its repository-relative path and sha256
     And a file outside the repository is refused because no reviewer could find it
+
+  # canon: {"schema":1,"at":"2026-10-10T15:43:50Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.13
+  Scenario: Bound files are copied into the artifact store, so a later rewrite cannot orphan the record
+    Given a scenario and a smoke report inside the repository
+    When evidence is added with the report bound as an artifact and promoted
+    Then the report's bytes are stored under .canon/artifacts/sha256/<digest> and the add names the store
+    And after the report is rewritten the gate is still clean, proven from the stored bytes
+
+  # canon: {"schema":1,"at":"2026-10-10T15:43:50Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.14
+  Scenario: A bound file over the store's size limit is refused, naming the override flag
+    Given a bound file larger than the store's size limit
+    When evidence is added with a one-MiB limit
+    Then the command exits 2 naming the --max-artifact-mib override, and stages and stores nothing
+    And raising the limit above the file's size lets the same add succeed and store the bytes
+
+  # canon: {"schema":1,"at":"2026-10-10T15:43:50Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.15
+  Scenario: A summary is kept on scenario-only evidence and still scanned for fabrication
+    Given a scenario and no plan task for it
+    When evidence naming only the scenario is added with a summary
+    Then the committed record carries the summary in its evidence note
+    And a summary carrying a fabrication marker is refused with exit 1, naming the scenario
+
+  # canon: {"schema":1,"at":"2026-10-10T15:43:50Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.16
+  Scenario: Every report case carrying the scenario id is bound, and any failed one refuses a faithful verdict
+    Given a test report with two cases carrying the scenario id and one helper case without it
+    When evidence is added with the report and a report-case naming the helper
+    Then the record binds all three cases, each with its own name and outcome
+    And once one id-carrying case fails, a faithful claim is refused with exit 1 naming it, even though the named case passed
+
+  # canon: {"schema":1,"at":"2026-10-10T15:43:50Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.17
+  Scenario: The vault stores the bytes of records written before the store existed
+    Given a committed record whose bound report has no stored blob but is unchanged in the working tree
+    When the vault runs
+    Then it stores the report's bytes under its digest and says it stored one file
+    And the gate stops advising the vault, and a second run stores nothing new
+
+  # canon: {"schema":1,"at":"2026-10-10T15:43:50Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.18
+  Scenario: A fresh init never ignores the artifact store
+    Given a fresh repository after git init and canon init
+    When git is asked whether a path under .canon/artifacts is ignored
+    Then it is not, so stored evidence bytes are committed with the ledger
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.19
+  Scenario: Evidence records the attesting session
+    Given a scenario
+    When evidence is added with --actor-id and --session-id and promoted
+    Then the committed record's actor carries the agent id, the role and the session_id
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.20
+  Scenario: A session id outside the SessionId grammar is refused and nothing is written
+    Given a session id with a control character, surrounding whitespace, or nothing at all
+    When evidence add or review add is run with it
+    Then the command exits 2 naming --session-id
+    And nothing is staged or committed
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.21
+  Scenario: Every write command says whether it staged or wrote directly
+    Given the write commands evidence add, finding add and close, review add, divergence stage and resolve, subject new, adopt and status, scenario new and feature new
+    When each succeeds
+    Then a staged write ends with the promote command that commits it
+    And a direct write ends with written directly; nothing to promote
+
+  # canon: {"schema":1,"at":"2026-10-10T18:33:15Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.22
+  Scenario: A report case binds only to its own leading scenario id, never to one it mentions
+    Given a report with a passing case led by the scenario id and a failing case led by another id that mentions it
+    When faithful evidence is added for the scenario with that report
+    Then the record binds only the case the scenario id leads, and the faithful claim is accepted
+    And naming the mentioning case with --report-case binds it, so its failure refuses the faithful claim with exit 1

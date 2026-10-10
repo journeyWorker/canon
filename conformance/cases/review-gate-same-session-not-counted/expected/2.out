@@ -1,0 +1,2 @@
+promoted evidence_record implementer/cart-add run_seq=1 -> kind=evidence_record/cart.add.01__<digest12>.json
+canon gate promote: promoted evidence_record=1, finding=0

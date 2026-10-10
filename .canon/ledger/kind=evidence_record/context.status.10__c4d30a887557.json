@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T16:00:19.852721Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status status_fails_closed_when_scenarios_route_away"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "context.status.10",
+  "schema": 1,
+  "staging_id": "f4b7d0f4d34e",
+  "verdict": "faithful"
+}

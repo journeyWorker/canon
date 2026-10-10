@@ -1,0 +1,6 @@
+description: "`canon evidence vault` lists a bound file whose working-tree bytes changed as not stored, naming both digests, and still exits 0 — the gate, not the vault, decides it is stale"
+steps:
+  - args: [evidence, vault]
+    exit: 0
+  - args: [gate, check]
+    exit: 1

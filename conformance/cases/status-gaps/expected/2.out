@@ -1,0 +1,45 @@
+{
+  "statusVersion": 1,
+  "canonVersion": "0.14.0",
+  "policy": {
+    "present": true,
+    "spec_coverage": {
+      "require_evidence": true,
+      "scope": [],
+      "exclude_lanes": [],
+      "require_cases": [],
+      "require_review": {
+        "scope": [
+          "verifying",
+          "shipped"
+        ],
+        "distinct_actor": true,
+        "block_on_findings": true
+      }
+    }
+  },
+  "warnings": [],
+  "subjects": [
+    {
+      "id": "cart",
+      "title": "Cart",
+      "status": "building",
+      "scenarios": 1,
+      "excluded": 0,
+      "evidenced": 1,
+      "divergent": 0,
+      "reviewed": 1,
+      "reviewDue": true,
+      "openBlockers": 1,
+      "missingCases": []
+    }
+  ],
+  "unowned": [],
+  "next": [
+    {
+      "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
+      "why": "cart: 1 open blocker finding(s) (first: adding an item twice duplicates the line); fix it, commit, then close it"
+    }
+  ],
+  "nextOmitted": 0
+}

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "acceptance-rerun-014"
+  },
+  "at": "2026-10-10T18:33:49.289764Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test change a_task_flip_keeps_the_changes_adopted_subject; cargo test -p canon-ingest parse_change_reads_only_the_named_change"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "gate.task.10",
+  "schema": 1,
+  "staging_id": "6517adba254f",
+  "verdict": "faithful"
+}

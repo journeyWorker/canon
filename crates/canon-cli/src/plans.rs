@@ -29,29 +29,30 @@
 //! One [`SourceCursor`] per configured `(dialect, root)` source, under
 //! the SAME `<repo>/.canon/ingest/cursors/` root session-ingest already
 //! uses (a distinct filename per source, [`plan_source_cursor_id`], so
-//! the two families never collide). Unlike a `SessionAdapter` (which
-//! exposes its own file-matching predicate), a `PlanAdapter` is only
-//! ever a [`canon_ingest::PlanSourceHandle::Path`] today — so the gate
-//! digests EVERY regular file under the configured root recursively
-//! ([`canon_ingest::scanner::scan_dir`]), never a dialect-specific
-//! subset — EXCEPT the importer's OWN repo-local write surface (the
-//! git ledger root under `tiers.git.root`, and the `<repo>/canon/
-//! ingest` cursor tree), excluded by a canonicalized `starts_with`
-//! check computed once per run: a source root that CONTAINS one of
-//! them (`--source .` / `root: .`) would otherwise self-churn
-//! forever, its own writes shifting the next pass's digest before it
-//! ever settles. This keeps the driver dialect-agnostic (it never
-//! encodes an openspec-specific `openspec/changes/` shape) at the
-//! cost of a wider digest surface than the adapter strictly reads —
-//! operators SHOULD scope a source's `root:` to the actual plan tree
-//! (not an entire monorepo) for the same reason `crate::ingest`'s own
-//! module doc recommends scoping session `roots:` to real client home
-//! dirs. The
+//! the two families never collide). The gate digests exactly the files
+//! the source's dialect reads ([`canon_ingest::PlanAdapter::source_files`];
+//! for `openspec`, the change dirs under `openspec/changes/`), never
+//! a walk of the whole root: `canon init` writes `root: .`, and a
+//! source rooted at a JS repository must not read `node_modules` on
+//! every pass (0.14 acceptance rerun G1, where it cost ~10 s per
+//! `canon gate task`). The importer's OWN repo-local write surface (the
+//! git ledger root under `tiers.git.root`, and the `<repo>/.canon/
+//! ingest` cursor tree) is still excluded by a canonicalized
+//! `starts_with` check computed once per run, so a dialect whose input
+//! set could reach them never self-churns. The
 //! predicate is content-digest ONLY (never mtime), so a `git checkout`
 //! / `touch` that doesn't change bytes never reaches parse. A source
 //! is (re-)parsed as a COMPLETE set whenever anything in it changed —
 //! never partially, so a multi-file change dir is never re-derived
-//! from a partial read.
+//! from a partial read. `canon gate task` re-imports only the change it
+//! flipped ([`refresh_change`]) and leaves the cursor alone.
+//!
+//! # Adoption survives a re-import (0.14 acceptance rerun G9)
+//! A plan document never names its subject; `canon change new` and
+//! `canon subject adopt` stamp `subject_id` on a newer change version.
+//! Every imported `Change` with no `subject_id` of its own carries the
+//! one its latest stored version has ([`Adoptions`]), so a re-import
+//! never unlinks an adopted change.
 //!
 //! # Cross-source `change_id` collision (design D8, task 3.7)
 //! Sources are processed in strict config/one-shot order. A
@@ -122,9 +123,8 @@ use std::path::{Path, PathBuf};
 
 use canon_ingest::plan_adapter::{MalformedEntry, PlanParseOutcome, PlanSourceConfig};
 use canon_ingest::plan_registry;
-use canon_ingest::scanner::scan_dir;
-use canon_model::envelope::CanonRecord;
-use canon_model::ids::ChangeId;
+use canon_model::envelope::{CanonRecord, RecordKind};
+use canon_model::ids::{ChangeId, SubjectId};
 use canon_model::records::{Change, Task};
 use canon_store::cursor::{file_digest, CursorStore, SourceCursor};
 use canon_store::policy::{PolicyError, TierPolicy};
@@ -297,17 +297,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
     }
     validate_source_roots(&sources)?;
 
-    // A missing/unreadable canon.yaml degrades to an empty policy
-    // (every candidate lands in the `unwritten` seam below) rather
-    // than a hard failure — a genuinely malformed (present but
-    // unparseable) canon.yaml still fails loud via `TierPolicy::from_yaml`.
-    let canon_yaml_text = std::fs::read_to_string(&canon_yaml_path).unwrap_or_default();
-    let policy = if canon_yaml_text.trim().is_empty() {
-        TierPolicy { tiers: HashMap::new(), routing: HashMap::new(), aging: HashMap::new() }
-    } else {
-        TierPolicy::from_yaml_at(&canon_yaml_text, &repo)?
-    };
-    let (git, pg, r2, sqlite) = crate::tiers::build_lenient_tiers(&policy, &repo)?;
+    let (store, git_root) = open_store(&repo, &canon_yaml_path)?;
 
     // F2 / design note: the digest below must never include this
     // driver's OWN repo-local write surface (the git ledger root, the
@@ -315,29 +305,37 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
     // absolute/canonicalized dir per [`canonicalize_or`], so the
     // per-file exclusion check is a real-filesystem `starts_with`,
     // never a text-level "any path segment named canon" match. A
-    // no-op whenever a source's `root:` (the common `root: openspec`
-    // case) never nests either dir.
+    // no-op whenever a dialect's input set (the common case) never
+    // nests either dir.
     let mut excluded_dirs: Vec<PathBuf> = Vec::new();
-    if let Some(tier) = &git {
-        excluded_dirs.push(canonicalize_or(tier.root()));
+    if let Some(root) = &git_root {
+        excluded_dirs.push(canonicalize_or(root));
     }
     excluded_dirs.push(canonicalize_or(&repo.join(".canon/ingest")));
-
-    let store = TierRegistry::new(policy, git, pg, r2, sqlite);
 
     let cursors = CursorStore::open(repo.join(".canon/ingest/cursors"));
 
     let mut outcome = PlansOutcome::default();
     let mut seen_change_ids: BTreeSet<ChangeId> = BTreeSet::new();
     let mut pending_cursors: Vec<SourceCursor> = Vec::new();
+    let mut adoptions = Adoptions::default();
 
     for src in &sources {
         // Validated at `resolve_sources`/`load_plan_sources_from_config`
         // time — every `src.dialect` is a registered id by construction.
         let entry = plan_registry::find(&src.dialect).expect("dialect validated before the scan loop");
         let cursor_id = plan_source_cursor_id(&src.dialect, entry.adapter.parse_version(), &src.root);
+        let handle = entry.adapter.resolve_source(&PlanSourceConfig { root: Some(src.root.clone()) });
 
-        let files = scan_dir(&src.root, |path| !excluded_dirs.iter().any(|dir| canonicalize_or(path).starts_with(dir)));
+        // The dialect's own input set (`PlanAdapter::source_files`),
+        // never a walk of the whole root (module doc).
+        let files: Vec<PathBuf> = handle
+            .as_ref()
+            .map(|h| entry.adapter.source_files(h))
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|path| !excluded_dirs.iter().any(|dir| canonicalize_or(path).starts_with(dir)))
+            .collect();
         let mut present_digests: BTreeMap<String, String> = BTreeMap::new();
         let mut readable: Vec<(PathBuf, i64, u64, String)> = Vec::new();
         let mut read_errors = 0usize;
@@ -375,7 +373,6 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
             continue;
         }
 
-        let handle = entry.adapter.resolve_source(&PlanSourceConfig { root: Some(src.root.clone()) });
         let PlanParseOutcome { changes, tasks, unmapped, malformed } = handle.map(|h| entry.adapter.parse(&h)).unwrap_or_default();
         let changes_parsed = changes.len();
         let tasks_parsed = tasks.len();
@@ -388,28 +385,8 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
             admit_source_candidates(&mut seen_change_ids, changes, tasks);
         let duplicate_change_id = duplicate_change_ids.len();
 
-        let mut changes_persisted = 0usize;
-        let mut changes_unwritten = 0usize;
-        for change in accepted_changes {
-            match persist_or_unwritten(&store, change)? {
-                None => changes_persisted += 1,
-                Some(unwritten) => {
-                    changes_unwritten += 1;
-                    outcome.unwritten_changes.push(unwritten);
-                }
-            }
-        }
-        let mut tasks_persisted = 0usize;
-        let mut tasks_unwritten = 0usize;
-        for task in accepted_tasks {
-            match persist_or_unwritten(&store, task)? {
-                None => tasks_persisted += 1,
-                Some(unwritten) => {
-                    tasks_unwritten += 1;
-                    outcome.unwritten_tasks.push(unwritten);
-                }
-            }
-        }
+        let Persisted { changes_persisted, changes_unwritten, tasks_persisted, tasks_unwritten } =
+            persist_candidates(&store, &mut adoptions, accepted_changes, accepted_tasks, &mut outcome)?;
 
         // s23 durable-import-diagnostics: a malformed-nonzero,
         // zero-persisted pass produced no durable evidence at all --
@@ -472,6 +449,140 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
     }
 
     Ok(outcome)
+}
+
+/// The routed store an import persists through, plus the git tier's
+/// root (the importer's own write surface [`run`] excludes from its
+/// digest). A missing/unreadable canon.yaml degrades to an empty policy
+/// (every candidate lands in the `unwritten` seam) rather than a hard
+/// failure — a genuinely malformed (present but unparseable) canon.yaml
+/// still fails loud via `TierPolicy::from_yaml`.
+fn open_store(repo: &Path, canon_yaml_path: &Path) -> Result<(TierRegistry, Option<PathBuf>), PlansError> {
+    let canon_yaml_text = std::fs::read_to_string(canon_yaml_path).unwrap_or_default();
+    let policy = if canon_yaml_text.trim().is_empty() {
+        TierPolicy { tiers: HashMap::new(), routing: HashMap::new(), aging: HashMap::new() }
+    } else {
+        TierPolicy::from_yaml_at(&canon_yaml_text, repo)?
+    };
+    let (git, pg, r2, sqlite) = crate::tiers::build_lenient_tiers(&policy, repo)?;
+    let git_root = git.as_ref().map(|tier| tier.root().to_path_buf());
+    Ok((TierRegistry::new(policy, git, pg, r2, sqlite), git_root))
+}
+
+/// One source's persisted/unwritten tallies.
+struct Persisted {
+    changes_persisted: usize,
+    changes_unwritten: usize,
+    tasks_persisted: usize,
+    tasks_unwritten: usize,
+}
+
+/// Persist admitted candidates (module doc "Persistence + the
+/// `unwritten` seam"), each `Change` first carrying its adoption
+/// ([`Adoptions::carry`]). Unwritten bodies land in `outcome`.
+fn persist_candidates(store: &TierRegistry, adoptions: &mut Adoptions, changes: Vec<Change>, tasks: Vec<Task>, outcome: &mut PlansOutcome) -> Result<Persisted, PlansError> {
+    let mut persisted = Persisted { changes_persisted: 0, changes_unwritten: 0, tasks_persisted: 0, tasks_unwritten: 0 };
+    for mut change in changes {
+        adoptions.carry(store, &mut change)?;
+        match persist_or_unwritten(store, change)? {
+            None => persisted.changes_persisted += 1,
+            Some(unwritten) => {
+                persisted.changes_unwritten += 1;
+                outcome.unwritten_changes.push(unwritten);
+            }
+        }
+    }
+    for task in tasks {
+        match persist_or_unwritten(store, task)? {
+            None => persisted.tasks_persisted += 1,
+            Some(unwritten) => {
+                persisted.tasks_unwritten += 1;
+                outcome.unwritten_tasks.push(unwritten);
+            }
+        }
+    }
+    Ok(persisted)
+}
+
+/// The subject each change was adopted into (`canon change new`,
+/// `canon subject adopt`), read from the latest change records the
+/// first time an import has a change to persist (0.14 acceptance rerun
+/// G9). A plan document never names its subject, so without this every
+/// re-import (a `canon gate task` flip, a ticked checkbox) appended a
+/// newer change version with `subject_id: null` that superseded the
+/// adoption in every folded read.
+#[derive(Default)]
+struct Adoptions(Option<BTreeMap<ChangeId, SubjectId>>);
+
+impl Adoptions {
+    /// Give `change` the subject its latest stored version carries, when
+    /// the plan source named none. A change tier this run cannot reach
+    /// reads as no adoptions: the change itself then degrades to the
+    /// `unwritten` seam at persist time, so nothing is lost.
+    fn carry(&mut self, store: &TierRegistry, change: &mut Change) -> Result<(), PlansError> {
+        if change.subject_id.is_some() {
+            return Ok(());
+        }
+        if self.0.is_none() {
+            let latest = match crate::subject::latest_records(store, RecordKind::Change) {
+                Ok(records) => records,
+                Err(StoreError::TierUnavailable { .. }) | Err(StoreError::UnroutedKind { .. }) => Vec::new(),
+                Err(err) => return Err(PlansError::Store(err)),
+            };
+            let adopted = latest
+                .iter()
+                .filter_map(|raw| {
+                    let change_id = ChangeId::parse(raw.0.get("change_id")?.as_str()?).ok()?;
+                    let subject_id = SubjectId::parse(raw.0.get("subject_id")?.as_str()?).ok()?;
+                    Some((change_id, subject_id))
+                })
+                .collect();
+            self.0 = Some(adopted);
+        }
+        change.subject_id = self.0.as_ref().and_then(|adopted| adopted.get(&change.change_id)).cloned();
+        Ok(())
+    }
+}
+
+/// What [`refresh_change`] found for its change across the configured
+/// sources.
+pub(crate) struct ChangeRefresh {
+    /// `Change` candidates parsed for the id (`0`: no source holds it).
+    pub(crate) changes_parsed: usize,
+    /// Constructs the adapters skipped while reading it.
+    pub(crate) malformed: usize,
+}
+
+/// Re-import ONE change, `change_id`, from the configured plan sources:
+/// `canon gate task`'s refresh after a flip (0.14 D5). Each source in
+/// config order reads only that change ([`PlanAdapter::parse_change`]),
+/// the first source carrying it owns it ([`admit_source_candidates`],
+/// exactly as in [`run`]), and its candidates persist exactly as [`run`]
+/// persists them, adoption included. No source is digested and no
+/// cursor moves: the next `canon ingest plans` re-reads the edited
+/// source and finds these records already written.
+///
+/// [`PlanAdapter::parse_change`]: canon_ingest::PlanAdapter::parse_change
+pub(crate) fn refresh_change(repo: &Path, change_id: &ChangeId) -> Result<ChangeRefresh, PlansError> {
+    let repo = resolve_repo_root(repo);
+    let sources = load_plan_sources_for_gate(&repo)?;
+    let (store, _) = open_store(&repo, &repo.join("canon.yaml"))?;
+    let mut adoptions = Adoptions::default();
+    let mut seen_change_ids: BTreeSet<ChangeId> = BTreeSet::new();
+    let mut unwritten = PlansOutcome::default();
+    let mut refresh = ChangeRefresh { changes_parsed: 0, malformed: 0 };
+    for src in &sources {
+        let entry = plan_registry::find(&src.dialect).ok_or_else(|| PlansError::Config(format!("`{}` is not a registered plan dialect", src.dialect)))?;
+        let Some(handle) = entry.adapter.resolve_source(&PlanSourceConfig { root: Some(src.root.clone()) }) else {
+            continue;
+        };
+        let PlanParseOutcome { changes, tasks, malformed, .. } = entry.adapter.parse_change(&handle, change_id);
+        refresh.changes_parsed += changes.len();
+        refresh.malformed += malformed.len();
+        let admitted = admit_source_candidates(&mut seen_change_ids, changes, tasks);
+        persist_candidates(&store, &mut adoptions, admitted.changes, admitted.tasks, &mut unwritten)?;
+    }
+    Ok(refresh)
 }
 
 /// One plan source's [`admit_source_candidates`] verdict. Named, not a

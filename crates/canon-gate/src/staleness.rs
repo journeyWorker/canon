@@ -108,11 +108,19 @@ struct Candidate<'a> {
 /// every content-malformed record (module doc) — no separate skip
 /// logic needed here.
 fn fold_latest_green_cells(ctx: &GateContext) -> Vec<GreenCell> {
-    let candidates = ctx.evidence.iter().filter_map(|record| {
-        let subject = CellSubject::of(record)?;
+    // Every cell the record answers (`CellSubject::all_of`): a
+    // task+scenario record's staleness degrades its scenario cell too.
+    let candidates = ctx.evidence.iter().flat_map(|record| {
         let role = record.envelope.actor.role.as_ref().map(|r| r.as_str().to_string());
         let digest = canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default());
-        Some(Candidate { subject: subject.as_str().to_string(), role, at: record.envelope.at, schema: record.envelope.schema, digest, record })
+        CellSubject::all_of(record).map(move |subject| Candidate {
+            subject: subject.as_str().to_string(),
+            role: role.clone(),
+            at: record.envelope.at,
+            schema: record.envelope.schema,
+            digest: digest.clone(),
+            record,
+        })
     });
 
     fold_latest_by_key(candidates, |c| (c.subject.clone(), c.role.clone()), |c| c.at, |c| c.schema, |c| c.digest.as_str())

@@ -1,0 +1,9 @@
+description: "0.14 acceptance rerun G10: `canon status` on a subject whose repo has no `.feature` scenario at all exits 0 and points at writing them (`canon feature new`, then `canon scenario new … --subject <id>`), never at `canon inventory sync`, which would index nothing"
+env: { CANON_ACTOR: canon }
+steps:
+  - args: [init, --no-agents-md]
+    exit: 0
+  - args: [subject, new, demo, --domain, dev, --title, Demo]
+    exit: 0
+  - args: [status]
+    exit: 0

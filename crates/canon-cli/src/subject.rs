@@ -185,8 +185,8 @@ fn fold_latest(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
 }
 
 /// The current, folded-to-latest set of `kind` records read through
-/// `registry`.
-fn latest_records(registry: &TierRegistry, kind: RecordKind) -> Result<Vec<RawRecord>, StoreError> {
+/// `registry` (also `crate::plans`' adoption read).
+pub(crate) fn latest_records(registry: &TierRegistry, kind: RecordKind) -> Result<Vec<RawRecord>, StoreError> {
     let result = registry.query(&TierQuery::kind(kind))?;
     Ok(fold_latest(kind, result.records))
 }
@@ -225,7 +225,13 @@ fn report_subject(subject: &Subject, verb: &str, json: bool) {
         // contract's "`--json` emits the updated record".
         println!("{}", serde_json::to_string_pretty(subject).unwrap_or_default());
     } else {
-        println!("canon subject {verb}: {} ({}, {})", subject.subject_id.as_str(), subject.domain, status_str(subject.status));
+        println!(
+            "canon subject {verb}: {} ({}, {}) — {}",
+            subject.subject_id.as_str(),
+            subject.domain,
+            status_str(subject.status),
+            crate::write_mode::DIRECT
+        );
     }
 }
 
@@ -359,67 +365,23 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 }
 
 /// `canon subject adopt <change_id> --subject <id>` (module doc): link
-/// an imported plan [`Change`] to a [`Subject`]. Loads the latest of
-/// each (fold-latest), refusing (exit `2`) if either is absent, then
-/// writes BOTH re-stamped through the routed tiers: the change with
-/// `subject_id` set (design D3 — stamped at adoption time, never
-/// derived in canon-model), and the subject with `change_id` appended
-/// to `change_ids` (deduped). Both carry a fresh envelope `at` so the
-/// update deterministically supersedes the prior version in the query
-/// fold.
+/// an imported plan [`Change`] to a [`Subject`] via [`adopt_change`],
+/// printing the result. Exit `2` on any refusal or store failure.
+/// Rerunning it on a linked pair writes nothing and exits `0`.
 pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json: bool) -> i32 {
-    let repo = resolve_repo_root(repo);
-    let canon_yaml_path = resolve_canon_yaml(&repo, None);
-    let registry = match registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject]) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("canon subject adopt: {e}");
-            return EXIT_REFUSED;
-        }
-    };
-
-    let mut subject = match find_subject(&registry, subject_id) {
-        Ok(Some(s)) => s,
-        Ok(None) => {
-            eprintln!("canon subject adopt: refused — subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str());
-            return EXIT_REFUSED;
-        }
-        Err(e) => {
-            eprintln!("canon subject adopt: {e}");
-            return EXIT_REFUSED;
-        }
-    };
-
-    let mut change = match find_change(&registry, change_id) {
-        Ok(Some(c)) => c,
-        Ok(None) => {
-            eprintln!("canon subject adopt: refused — change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str());
-            return EXIT_REFUSED;
-        }
-        Err(e) => {
-            eprintln!("canon subject adopt: {e}");
-            return EXIT_REFUSED;
-        }
-    };
-
-    let now = Utc::now();
-    change.subject_id = Some(subject_id.clone());
-    change.envelope.at = now;
-    if !subject.change_ids.contains(change_id) {
-        subject.change_ids.push(change_id.clone());
-    }
-    subject.envelope.at = now;
-
-    if let Err(e) = registry.persist(&change) {
-        eprintln!("canon subject adopt: {e}");
-        return EXIT_REFUSED;
-    }
-    match registry.persist(&subject) {
-        Ok(_) => {
+    match adopt_change(repo, change_id, subject_id) {
+        Ok((subject, wrote)) => {
             if json {
                 report_subject(&subject, "adopt", true);
+            } else if wrote {
+                println!(
+                    "canon subject adopt: linked change `{}` to subject `{}` — {}",
+                    change_id.as_str(),
+                    subject_id.as_str(),
+                    crate::write_mode::DIRECT
+                );
             } else {
-                println!("canon subject adopt: linked change `{}` to subject `{}`", change_id.as_str(), subject_id.as_str());
+                println!("canon subject adopt: change `{}` is already linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str());
             }
             0
         }
@@ -428,6 +390,116 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
             EXIT_REFUSED
         }
     }
+}
+
+/// Look up, then write, an adoption: `canon subject adopt`'s whole
+/// effect. Refuses (`Err` with the operator-facing message, no command
+/// prefix) when either record is absent; see [`persist_adoption`] for
+/// the write. `Ok` carries the subject and whether anything was written
+/// (`false`: both sides already carried the link).
+pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId) -> Result<(Subject, bool), String> {
+    let (subject, change) = lookup_adoption(repo, subject_id, change_id)?;
+    let Some(subject) = subject else {
+        return Err(format!("refused — subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str()));
+    };
+    let Some(change) = change else {
+        return Err(format!("refused — change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str()));
+    };
+    persist_adoption(repo, change, subject).map_err(|e| e.describe(change_id, subject_id, &adopt_command(change_id, subject_id)))
+}
+
+/// The latest `subject_id` Subject and `change_id` Change (fold-latest),
+/// each `None` when absent — read through the routed tiers the adopt
+/// write uses.
+pub(crate) fn lookup_adoption(repo: &Path, subject_id: &SubjectId, change_id: &ChangeId) -> Result<(Option<Subject>, Option<Change>), String> {
+    let repo = resolve_repo_root(repo);
+    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject]).map_err(|e| e.to_string())?;
+    Ok((find_subject(&registry, subject_id)?, find_change(&registry, change_id)?))
+}
+
+/// `canon subject adopt <change> --subject <subject>`: the command that
+/// completes a half-written adoption. Safe to rerun: [`persist_adoption`]
+/// writes only the side that still lacks the link, and nothing once both
+/// carry it.
+pub(crate) fn adopt_command(change_id: &ChangeId, subject_id: &SubjectId) -> String {
+    format!("canon subject adopt {} --subject {}", change_id.as_str(), subject_id.as_str())
+}
+
+/// A failed [`persist_adoption`]: the store error, and whether the
+/// subject record had already been written when the change write failed.
+pub(crate) struct AdoptionWriteError {
+    pub(crate) subject_written: bool,
+    pub(crate) message: String,
+}
+
+impl AdoptionWriteError {
+    /// The operator-facing message (no command prefix). Before any write:
+    /// the error and that nothing was written. Between the two writes:
+    /// which record exists, and `repair`, the command that completes the
+    /// link.
+    pub(crate) fn describe(&self, change_id: &ChangeId, subject_id: &SubjectId, repair: &str) -> String {
+        if self.subject_written {
+            format!(
+                "subject `{}` now lists change `{}`, but the change record could not be written: {}; complete the link with `{repair}`",
+                subject_id.as_str(),
+                change_id.as_str(),
+                self.message
+            )
+        } else {
+            format!("failed to record the adoption: {}; nothing was written", self.message)
+        }
+    }
+}
+
+/// The adopt write, shared by `canon subject adopt` and `canon change
+/// new`: the subject with the change appended to `change_ids`, and the
+/// change with `subject_id` set (design D3 — stamped at adoption time,
+/// never derived in canon-model), each re-stamped with a fresh envelope
+/// `at` so it deterministically supersedes the prior version in the
+/// query fold, persisted through the routed tiers. Returns the subject
+/// and whether anything was written.
+///
+/// # Two records, no transaction
+/// The ledger is append-only and the two kinds may route to different
+/// tiers, so the pair cannot be written atomically. Two rules make a
+/// failure between the writes recoverable:
+///
+/// - **Subject first.** `subject.change_ids` is the side the gate joins
+///   on: `spec_coverage.require_review`'s `open-blocker` check and the
+///   subject status guard read a subject's adopted changes from it. A
+///   subject that lists the change while the change record lacks the
+///   link still has that change's open blockers counted, so a half-done
+///   adoption errs toward enforcing. The other order would leave a
+///   change claiming a subject whose gate never looks at it.
+/// - **Only what is missing.** A side that already carries the link is
+///   not rewritten, and nothing is written once both do, so
+///   [`adopt_command`] completes a half-written adoption and is a no-op
+///   on a whole one.
+pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Subject) -> Result<(Subject, bool), AdoptionWriteError> {
+    let needs_subject = !subject.change_ids.contains(&change.change_id);
+    let needs_change = change.subject_id.as_ref() != Some(&subject.subject_id);
+    if !needs_subject && !needs_change {
+        return Ok((subject, false));
+    }
+
+    let repo = resolve_repo_root(repo);
+    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject])
+        .map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+
+    let now = Utc::now();
+    if needs_subject {
+        subject.change_ids.push(change.change_id.clone());
+        subject.envelope.at = now;
+        registry.persist(&subject).map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+    }
+    if needs_change {
+        change.subject_id = Some(subject.subject_id.clone());
+        change.envelope.at = now;
+        registry.persist(&change).map_err(|e| AdoptionWriteError { subject_written: needs_subject, message: e.to_string() })?;
+    }
+    Ok((subject, true))
 }
 
 /// `canon subject status <id> <state>` (module doc): apply a lifecycle
@@ -565,7 +637,7 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
             if json {
                 report_subject(&subject, "status", true);
             } else {
-                println!("canon subject status: {} → {}", subject_id.as_str(), status_str(target));
+                println!("canon subject status: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT);
             }
             0
         }
@@ -595,7 +667,7 @@ fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: Subje
         eprintln!("canon subject status:   skipped open-blocker — `{}` is not in require_review.scope", status_str(to));
         return;
     }
-    let rule = if rr.distinct_actor { "a review by an actor other than its evidence actor" } else { "a review record" };
+    let rule = if rr.distinct_actor { "a review by an actor, and from a session, other than its evidence's" } else { "a review record" };
     eprintln!("canon subject status:   ran unreviewed-promotion — every owned scenario needs {rule}");
     if rr.block_on_findings {
         eprintln!("canon subject status:   ran open-blocker — {changes} adopted change(s) checked for open blocker findings");

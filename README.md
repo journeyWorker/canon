@@ -76,6 +76,184 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.14.0 release
+
+Version 0.14.0 teaches agents how to work with canon: the skill is a working
+loop, `canon init` sets that loop up, bound evidence stays provable, units
+and reviews carry a session, and `canon status` says where a repo stands and
+what to run next.
+
+**The working loop.** The canon skill now opens with an 8-step loop: brief,
+subject, features and scenarios with failure paths, units (one actor id and
+session each), implement, evidence, independent review in a different
+session, status transition. It names the human stop points (approving the
+brief and the policy), and the command reference follows the loop. Its
+description now claims build, implement, add-a-feature, change-a-feature and
+fix requests in any repo with `canon.yaml`, ahead of generic site, app or
+game builder skills; it used to describe itself as a CLI companion.
+
+**`canon init` sets up the loop.** Next to `canon.yaml`, `init` now writes a
+starter `.canon/policy.yaml` (`spec_coverage` with `require_evidence: true`,
+`require_cases: [failure]` and `require_review: {}`), a canon block in
+`AGENTS.md` between `<!-- canon:begin -->` / `<!-- canon:end -->` (created,
+or merged without touching text outside the markers), and an `openspec`
+plans source rooted at `.` with `openspec/changes/` created. `--no-agents-md`
+and `--no-policy` opt out. Rerunning `init` on an existing repo leaves
+`canon.yaml` alone, refreshes only the AGENTS.md block and exits 0 (it used
+to exit 2); a rerun with nothing to do (`--no-agents-md`) still refuses.
+
+**`canon change new`.** `canon change new <slug> --subject <id> --title <t>`
+scaffolds `openspec/changes/<slug>/{proposal,tasks}.md`, imports the change
+and adopts it into the subject, with no hand edits to `canon.yaml`. It is
+all or nothing up to the adoption, and refuses an existing slug or an
+unknown subject. The adopt write it shares with `canon subject adopt` writes
+the subject record first (the gate reads adopted changes from it, so a
+half-done adoption still has its open blockers counted), writes only the
+side lacking the link, and writes nothing for a linked pair. That makes
+`canon subject adopt <change> --subject <id>` an idempotent repair: a
+failure between the two writes exits 2 and prints that exact command.
+
+**`canon gate check` says when it is not enforcing.** When the corpus has
+scenarios and `.canon/policy.yaml` has no `spec_coverage`, the gate prints
+`advisory: spec_coverage is off — N scenario(s) are not checked for
+evidence; see .canon/policy.yaml` after its result. The exit code is
+unchanged.
+
+**Bound evidence stays provable.** `canon evidence add --artifact/--report`
+copies each bound file into `.canon/artifacts/sha256/<hex>`, which is
+tracked in git. `canon gate check` re-checks every file bound to a latest
+evidence record: an intact stored blob is clean even after the working-tree
+file is rewritten; a missing blob with a working-tree file that still
+matches is clean with an advisory naming `canon evidence vault`; anything
+else is `stale-evidence`, naming the path and both digests. `canon evidence
+vault` stores the bytes for pre-0.14 records whose files still match. Files
+over 25 MiB are refused; `--max-artifact-mib <N>` raises the limit on
+`evidence add` and `evidence vault`.
+
+**Evidence is not shaped by tasks.** `--summary` is allowed on
+scenario-only evidence. `--report-case` is repeatable and adds cases; every
+case whose own leading scenario id is this one is bound, and a `faithful` verdict
+is refused when any bound case failed. A flipped task row's note aggregates
+every record bound to the task (`— ✅ 3 evidence records (2 faithful, 1
+not-applicable); latest: <summary>`), and `gate task` re-ingests the plan
+source so `canon query --kind task` agrees with `tasks.md`. A record keyed
+by both `--task` and `--scenario-id` now counts for both cells in
+`gate check`, the shipped gate and `canon status`.
+
+**Sessions.** `--session-id` on `evidence add`, `review add`, `finding add`
+and `finding close` fills `actor.session_id`.
+`require_review.distinct_actor` now also rejects a review whose session
+equals an evidence session on that scenario, when both are set.
+`finding add --introduced-by self` is refused (`introduced_by` is a commit
+SHA); an author records a defect in its own work with `--reviewer <me>`,
+and its open blocker still blocks.
+
+**Write mode in every write command.** Each write's success line now says
+how it landed: `evidence add`, `finding add` and `finding close` end with
+``— run `canon gate promote` to commit it``; `divergence stage` names
+`canon divergence promote`; every other write (`review add`,
+`divergence resolve|defer`, `subject new|adopt|status`, `change new`,
+`scenario new`, `feature new`) ends with `— written directly; nothing to
+promote`.
+
+**`canon status`.** The new `canon status [--json]` lists subjects by
+status with their scenario, evidence and review counts, gaps and policy
+warnings, and ends with a `next:` list of concrete commands. `canon
+context` now opens with a header pointing to `canon status`, plus a
+`warning:` line when no `spec_coverage` is in force; `--json` is
+unchanged.
+
+*Migration:*
+
+- Repos initialized before 0.14 keep `plans.sources: []`; `canon change
+  new` refuses and names the entry to add, `{ dialect: openspec, root: . }`
+  under `plans.sources`.
+- Commit `.canon/artifacts/` with the ledger.
+- Run `canon evidence vault` once to store bytes for bound records written
+  before 0.14, before their working-tree files change.
+- Scripts that parse write-command output see the new write-mode suffixes.
+- Re-run `canon skills install` to project the new skill.
+- A change adopted before this release may already have lost its subject
+  link to a re-import; `canon subject adopt <change> --subject <id>`
+  restores it.
+
+**Acceptance.** The release was checked by rerunning eval 1's one-line
+request ("make a cat-themed Vampire-Survivors-like") in a fresh repo
+initialized with this build, on omp. The agent read the skill on its first
+call and stopped at the brief for approval. After approval it followed the
+loop to `verifying`: 33 scenarios (9 `failure`), all evidenced and
+independently reviewed, 17 review findings recorded and closed with
+resolution SHAs, and the starter policy left untouched. It left `shipped` to
+the human. Of eval 1's sixteen applicable friction items, twelve are
+resolved and four partly resolved: unit, session and finder identities are
+recorded but are labels the lead chooses, not proven. The run also exposed
+the defects fixed below.
+
+**Acceptance rerun fixes.**
+
+- G1: `canon gate task` took ~10 s per flip in a JS repo, because the plan
+  import that refreshes the task store digested every file under the
+  `root: .` source `init` writes, `node_modules` included. The import now
+  digests only the files the dialect reads (for `openspec`, the change
+  dirs under `openspec/changes/`), and `gate task` re-imports only the
+  flipped change. On a copy of the dogfood repo with its 204 MB
+  `node_modules`, a flip went from 9.8 s to 0.06 s (debug build) and from
+  1.4 s to 0.02 s (release).
+- G7: a report case binds to a scenario only when the scenario id is its
+  own: the first scenario-id-shaped token (`<area>.<surface>.<nn>`, dotted
+  or underscored) of its full name, classname first, then name; or a
+  Cucumber tag equal to it. A case named `game.session.04: restarting as
+  in game.session.01` binds to `game.session.04` only. `--report-case`
+  still binds any case by name.
+- G9: a plan import keeps the `subject_id` the latest change record carries
+  when the plan document names none, so a `gate task` flip or a ticked
+  checkbox no longer unlinks a change from the subject `change new` or
+  `subject adopt` linked it to.
+- G10: with subjects but no `.feature` scenario anywhere, `canon status`
+  suggests `canon feature new` and each subject's `canon scenario new …
+  --subject <id>` instead of `canon inventory sync`, which would index
+  nothing.
+- G11: a `stale-evidence` line for a stored blob whose bytes were changed
+  says "the stored blob does not match its name, so its bytes were
+  altered"; "the bound bytes are gone" is kept for a missing blob.
+
+**Changed conformance expectations.** `version` re-blessed for
+`canon 0.14.0`. Existing cases re-blessed:
+
+- `evidence-add-refused-report-contradiction` — the refusal now says a
+  faithful verdict needs every bound case to pass.
+- `gate-check-evidence-binding-off`, `gate-check-evidence-binding-require`,
+  `gate-check-evidence-binding-require-report`,
+  `gate-check-evidence-binding-warn`, `gate-check-malformed-evidence`,
+  `gate-check-red-uncovered-cell` — the `spec_coverage is off` advisory.
+- `review-gate-distinct-review-passes`, `review-gate-malformed-finding`,
+  `review-gate-open-blocker`, `review-gate-override-recorded`,
+  `review-gate-self-review-not-counted`, `review-gate-unreviewed-refused` —
+  the guard line now reads "a review by an actor, and from a session, other
+  than its evidence's".
+- `review-gate-distinct-review-passes`, `review-gate-open-blocker`,
+  `review-gate-override-recorded`, `subject-ship-allowed` — `subject status`
+  ends with `— written directly; nothing to promote`.
+- `status-gaps`, `status-no-policy`, `status-ship-ready` — every write
+  suggestion names the unit and its session: `finding close` carries
+  `--actor-id <unit> --session-id <session>`, and `subject new` and
+  `subject status` carry `--actor-id <unit>`; `review add` quotes
+  `"<feature file>"` so it pastes into a shell.
+- `evidence-add-refused-no-matching-case` — the no-match refusal now says
+  "start the test name with the scenario id or tag it" (G7).
+
+New cases: `change-new`, `init-scaffold-and-rerun`,
+`evidence-vault-stores-unstored`, `evidence-vault-reports-unstorable`,
+`gate-check-artifact-stale-evidence`,
+`gate-check-artifact-stored-survives-rewrite`,
+`gate-check-artifact-unstored-advisory`, `finding-add-self-found-blocker`,
+`review-gate-same-session-not-counted`, `status-gaps`, `status-no-policy`,
+`status-ship-ready` (the `status-*` cases print the canon version and were
+re-blessed with it). The `gate-check-evidence-binding-*` fixtures also gained
+their stored artifact blobs. The acceptance rerun added
+`gate-check-artifact-tampered-blob` (G11) and `status-no-scenarios` (G10).
+Every other case is unchanged.
+
 ## 0.13.1 fix
 
 0.13.0 and earlier installed the Codex skill as a flattened

@@ -44,6 +44,7 @@
 //! (`trust`'s own module doc).
 
 pub mod approval;
+pub mod artifact_store;
 pub mod checkbox;
 pub mod context;
 pub mod coverage;
@@ -65,6 +66,7 @@ pub mod staleness;
 pub mod trust;
 pub mod trust_ladder;
 
+pub use artifact_store::{unstored_attachments, ArtifactStoreCheck, UnstoredAttachment, DEFAULT_MAX_ARTIFACT_MIB, MAX_ARTIFACT_FLAG};
 pub use checkbox::{gate_task, TaskFlipDecision};
 pub use approval::{verify_risk_approval, verify_ssh_signature};
 pub use context::{CanonYamlError, GateCheck, GateContext, GateContextError, GateCtx};
@@ -74,7 +76,7 @@ pub use dispatch::check_set;
 pub use failure_class::{FailureClass, Violation, FAILURE_CLASSES};
 pub use hooks::{install_hooks, HookEntry, InstallOutcome, PRE_COMMIT_SCRIPT};
 pub use ledger::{latest_verdicts, CellKey, LedgerCheck, LedgerEntry};
-pub use markers::{evidence_note_of, scan_fake_markers, EvidenceNote, FABRICATION_BLOCKLIST};
+pub use markers::{evidence_note_of, scan_fake_markers, scan_note_text, EvidenceNote, FABRICATION_BLOCKLIST};
 pub use evidence_binding::{binding_summary, strength_of, BindingGap, BindingSummary, EvidenceBindingCheck};
 pub use policy::{
     allowed_signers_path, BindingMode, BindingStrength, EvidenceBinding, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution, PolicyResolveError,

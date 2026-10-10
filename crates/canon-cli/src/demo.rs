@@ -64,8 +64,10 @@ fn write_evidence(repo: &Path, agent: &str, role: &str) -> Result<(), String> {
 /// any refusal/IO failure.
 pub fn run_demo_init(repo: &Path) -> i32 {
     // Real `canon init`: creates the dir, writes `canon.yaml`, scaffolds
-    // `.gitignore`. Refuses (non-zero) if a `canon.yaml` already exists.
-    let code = crate::init::run_init(repo);
+    // `.gitignore`. Refuses (non-zero) if a `canon.yaml` already exists:
+    // with no AGENTS.md block to refresh, a rerun has nothing to do. The
+    // demo writes its own policy below, so init's starter policy is off.
+    let code = crate::init::run_init(repo, crate::init::InitOptions { agents_md: false, policy: false });
     if code != 0 {
         return code;
     }

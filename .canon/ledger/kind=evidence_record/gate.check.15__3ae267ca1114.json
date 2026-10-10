@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:50:09.653698Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_binding require_mode_holds_a_scenario_to_a_passing_report_and_warn_never_fails"
+  },
+  "evidence_note": {
+    "summary": "re-attested in 0.14: the bound nextest junit.xml it cited was never stored and is gone"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 21,
+  "scenario_id": "gate.check.15",
+  "schema": 1,
+  "staging_id": "5e0b3dba93e1",
+  "verdict": "faithful"
+}

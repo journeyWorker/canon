@@ -24,7 +24,7 @@ Every violation carries one of these stable, grep-able strings:
 | `uncovered-cell` | Either a policy-required evidence cell (role × artifact) with no matching record, or — with `spec_coverage` enabled — a spec scenario that is unimplemented or mismatched, or a feature surface missing a `require_cases` case. The detail string distinguishes them. Coverage means "a test exists", not "a test passed": even a `Divergent` verdict satisfies the role-cell form. |
 | `unreviewed-promotion` | An artifact tagged `reviewed` has no matching ledger review record — or, with `spec_coverage.require_review` set, an in-scope scenario has no qualifying `Review` (none at all, or only reviews by its own evidence actor). See `canon-review`. |
 | `trust-below-required` | Achieved trust level is below `policy.yaml`'s `trust_required` for its class — RELEASE-scoped only (`canon gate check --release`); never fires on an ordinary run. |
-| `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. |
+| `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. Also: a file bound to a latest evidence record whose bytes are gone — no intact blob in `.canon/artifacts/sha256/` and no working-tree copy with the recorded digest (see Bound evidence stays provable below). |
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of passing evidence. |
 | `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` evidence record. |
@@ -34,7 +34,7 @@ Every violation carries one of these stable, grep-able strings:
 ## `canon gate check [--repo <dir>] [--release]`
 
 Assembles coverage + ledger + staleness + the always-on trust-ladder
-check, plus the opt-in spec-coverage check, over the resolved repo's
+check + the bound-artifact check, plus the opt-in spec-coverage check, over the resolved repo's
 corpus and runs them, printing every violation grouped by failure class.
 `--release` additionally engages the release-scoped
 `trust-below-required` check; the trust-ladder check is never dropped
@@ -60,7 +60,7 @@ adds the other direction: it starts from the Scenario corpus
 an unimplemented or mismatched spec becomes a reported violation.
 
 ```yaml
-# .canon/policy.yaml — ABSENT by default; absent means zero violations
+# .canon/policy.yaml — absent means zero violations; `canon init` writes a starter
 spec_coverage:
   require_evidence: true
   scope: [building, verifying]   # optional; omit for the whole corpus
@@ -69,11 +69,28 @@ spec_coverage:
   require_review: {}             # optional; see Independent review below
 ```
 
+`canon init` writes a starter `.canon/policy.yaml` with this section on
+(`require_evidence: true`, `require_cases: [failure]`,
+`require_review: {}`; see `canon-policy`). When the section is absent and
+the indexed corpus has scenarios, the gate says so after its result, on
+stdout like its other advisories, and the exit code is unchanged:
+
+```
+advisory: spec_coverage is off — 12 scenario(s) are not checked for evidence; see .canon/policy.yaml
+```
+
+A present section, even `require_evidence: false` or a malformed one
+(already a violation), and an empty corpus print no advisory.
+
 - **Unimplemented** — no `EvidenceRecord` carries the scenario's
   `(project_id, scenario_id)`. Author one with
   `canon evidence add --scenario-id <id> --project-id <root-id>`; both
   flags are required together, because two spec roots may carry the same
-  scenario id.
+  scenario id. `--summary` is allowed here too (scanned for fabrication
+  markers like a task's); it is a row suffix only when the record also
+  names a `--task`. A record carrying both `--task` and `--scenario-id`
+  is one attestation answering both joins: it counts for the task cell
+  and for the scenario cell (verdicts, the shipped gate, the review gate).
 - **Mismatched** — the folded divergence state is `open`,
   `still-divergent`, or `resolved-invalid` (a resolution whose app sha
   has moved), or the latest ledger verdict is `divergent`.
@@ -95,7 +112,9 @@ spec_coverage:
   in `require_review.scope` (default `[verifying, shipped]`; `[]` = every
   scenario; independent of `scope` above) need a `Review` record
   (`canon review add`), by a reviewer and actor other than the
-  scenario's evidence actor when `distinct_actor` (default `true`);
+  scenario's evidence actor, and from a session other than any evidence
+  session when both carry one (`--session-id`), when `distinct_actor`
+  (default `true`);
   gaps are `unreviewed-promotion`. With `block_on_findings` (default
   `true`), an open `blocker` Finding on a change an in-scope subject
   adopted is `open-blocker`. `exclude_lanes` also exempts scenarios
@@ -159,12 +178,20 @@ canon evidence add ... --report junit:target/nextest/default/junit.xml
 canon evidence add ... --report cucumber:reports/cucumber.json
 ```
 
-The case is found by the scenario id in its name, classname, or Cucumber
-tag — dotted (`cart.add.04`) or underscored (`cart_add_04`, the form a
-test function carries) — or named exactly with `--report-case <name>`
-(a Rust test by its function name). No match refuses (exit 2); a
-`faithful` verdict over a failed or skipped case refuses (exit 1). Files
-must be inside the repository and are recorded by relative path.
+A case is bound when the scenario id is its OWN: the first
+scenario-id-shaped token (`<area>.<surface>.<nn>`) in its full name —
+classname (a describe path) first, then name — dotted (`cart.add.04`) or
+underscored (`cart_add_04`, the form a test function carries), equals
+the scenario id; a Cucumber tag equal to it binds too. Start each test
+name with its scenario id: `game.session.04: restarting as in
+game.session.01` binds to `game.session.04` only, never to the id it
+mentions. Each bound case is its own attachment with its name and
+outcome. `--report-case <name>` (repeatable; a Rust test by its
+function name) ADDS cases; it never hides the scenario's own. No match,
+or a `--report-case` naming no case, refuses (exit 2); a `faithful`
+verdict when ANY bound case failed or was skipped refuses (exit 1). Files
+must be inside the repository, are recorded by relative path, and are
+stored (see Bound evidence stays provable).
 
 Strength, weakest first: `attested` (no attachment) < `artifact` (any
 bound file) < `report` (a parsed report whose case passed). The policy
@@ -188,6 +215,49 @@ evidence record per scenario decides; scenarios with no evidence are
 violation in every mode. Canon still cannot know whether the bound test
 actually exercises the scenario — binding narrows the trust gap, it does
 not close it.
+
+## Bound evidence stays provable (the artifact store)
+
+`canon evidence add --artifact/--report` copies each bound file into
+`.canon/artifacts/sha256/<hex>`, named by its sha256. Writes go through a
+temp file and a rename, and a digest already stored intact is not written
+again. The directory is tracked in git (`canon init` never ignores it):
+commit it with the ledger. A file larger than 25 MiB is refused (exit 2);
+raise the limit with `--max-artifact-mib <N>`.
+
+`canon gate check` re-checks every file bound to a LATEST evidence record
+(the latest per task and per `(project_id, scenario_id)`):
+
+- the stored blob exists and hashes to the recorded digest → clean, even
+  after the working-tree file is rewritten (a smoke script that rewrites
+  `reports/smoke.json` on every run no longer orphans the record);
+- no blob, but the working-tree path still hashes to the recorded digest
+  → clean, with an advisory naming `canon evidence vault` (records from
+  before the store existed):
+
+  ```
+  evidence artifacts: 1 bound file(s) not in the artifact store — not failing the gate; run `canon evidence vault` to store them before the working tree changes:
+    unstored cart.add.01 reports/junit.xml (sha256 b7cb…) is verified against the working tree only
+  ```
+- anything else → `stale-evidence` naming the path, the recorded digest,
+  and what the store and the working tree hold now (`missing` or a
+  digest), ending with why: a stored blob that no longer hashes to its
+  name "does not match its name, so its bytes were altered"; a missing
+  one means "the bound bytes are gone". Re-run the test and re-attest
+  with `canon evidence add`.
+
+The check applies to every latest record, not only subjects in
+`spec_coverage.scope`: a binding is a claim about bytes whatever the
+subject's status, and a repo with no `spec_coverage` would otherwise never
+have its bindings checked. A superseded record is not checked —
+re-attesting is the fix.
+
+`canon evidence vault [--max-artifact-mib <N>]` stores the bytes for
+existing records: every attachment whose working-tree file still matches
+its digest is copied in, and everything else is listed as not stored,
+with both digests. It exits `0` whenever it ran (the gate decides whether
+an unstored file matters), `2` when the ledger cannot be read or a write
+fails.
 
 ## Effect-aware risk approvals (`risk_tiers`)
 
@@ -229,10 +299,18 @@ the compat default `[{ dialect: openspec, root: <repo> }]`; no source
 locating the task at all is a loud failure naming every source consulted.
 It requires
 a matching non-`Divergent` evidence record, and flips `- [ ]` → `- [x]`
-with an appended evidence note ONLY on a clean check. Every other path —
-missing evidence, a `Divergent` verdict, a fabricated note — leaves the
-row byte-unchanged and exits `1` with the blocking violation on stderr.
-An already-`[x]` row is an idempotent no-op (exit `0`). An unknown
+with an appended evidence note ONLY on a clean check. The note
+aggregates every record bound to the task, on one line:
+`— ✅ 3 evidence records (2 faithful, 1 not-applicable); latest: <summary>`
+(the latest `--summary`, or a default naming the latest passing record).
+Every other path — missing evidence, a `Divergent` verdict, a fabricated
+note on any of the task's records — leaves the row byte-unchanged and
+exits `1` with the blocking violation on stderr. After a flip, the plan
+source is re-ingested so the record store's task status agrees with the
+checkbox (`canon query --kind task` reads `done`); a failed re-ingest is
+a stderr warning naming `canon ingest plans`, never a failed flip.
+The success line is `canon gate task: <task_id> flipped — written
+directly; nothing to promote`. An already-`[x]` row is an idempotent no-op (exit `0`). An unknown
 `task_id` is reported (exit `1`).
 
 ```bash
@@ -257,6 +335,15 @@ writing or deleting.
 canon gate promote --repo .            # land every staged candidate
 canon gate promote --repo . --dry-run  # preview only
 ```
+
+Which writes need this step: `evidence add`, `finding add` and `finding
+close` stage, and their success line ends ``— run `canon gate promote`
+to commit it``. `divergence stage` stages for `canon divergence promote`
+and names it. Every other write — `review add`, `divergence
+resolve|defer`, `subject new|adopt|status`, `change new`, `scenario new`, `feature new`,
+`gate task` (it edits the plan document and re-ingests it)
+— is final when it returns, and its success line ends `— written
+directly; nothing to promote`.
 
 ## `canon gate install-hooks [--repo] [--event] [--matcher] [--command] [--timeout]`
 

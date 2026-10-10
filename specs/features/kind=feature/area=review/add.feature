@@ -73,3 +73,32 @@ Feature: review add
     When the trust ladder is checked
     Then that evidence is an unreviewed promotion
     And the attestation is scoped to the project it names, so a shared scenario id borrows no trust
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:happy
+  @review.add.08
+  Scenario: A review records the reviewing session and says it was written directly
+    Given evidence attested for a scenario
+    When a review is added with --session-id
+    Then the review's actor carries that session_id
+    And the command says it was written directly, with nothing to promote
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.09
+  Scenario: A review from a session that attested the scenario's evidence does not count under distinct_actor
+    Given evidence attested from session sess-impl and require_review.distinct_actor on
+    When another actor id adds a review from the same session
+    Then the subject cannot enter verifying, and unreviewed-promotion names the session and the session rule
+    And a review by that reviewer from its own session lets the subject through
+
+  # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:edge
+  @review.add.10
+  Scenario: A session on only one side leaves the actor rule in charge
+    Given a session on the evidence or on the review, but not on both
+    When the subject moves into require_review scope
+    Then a review by another actor counts, as it did before sessions were recorded

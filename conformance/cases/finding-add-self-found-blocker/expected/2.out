@@ -1,0 +1,2 @@
+canon finding add: staged kind=finding/c-cart__0001__0001__<digest12>.json — c-cart round 1 seq 1 (blocker, open) — run `canon gate promote` to commit it
+canon finding add: note — no --introduced-by, so this finding is UNSOURCED for fix-of-fix derivation. That is the correct record when the introducing commit was not established; never guess one.

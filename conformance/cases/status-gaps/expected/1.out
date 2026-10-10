@@ -1,0 +1,15 @@
+canon 0.14.0
+policy: .canon/policy.yaml
+  spec_coverage: require_evidence=true scope=<every scenario>
+  require_cases: <none>
+  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true
+
+subjects (1):
+  building (1):
+    cart: 1 scenarios, 1 evidenced, 1 reviewed, 1 open blockers
+
+unowned: none
+
+next:
+  # cart: 1 open blocker finding(s) (first: adding an item twice duplicates the line); fix it, commit, then close it
+  canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>

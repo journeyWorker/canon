@@ -3,3 +3,5 @@ canon gate check: 2 violation(s)
 uncovered-cell (2):
   uncovered-cell cart.add.01 — policy-required cell 'reviewer' has no matching-role evidence record
   uncovered-cell cart.add.02 — policy-required cell 'reviewer' has no matching-role evidence record
+
+advisory: spec_coverage is off — 2 scenario(s) are not checked for evidence; see .canon/policy.yaml
