@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-k2",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T16:11:39.425946Z",
+  "change_id": "canon-0-14-k2-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "37d8affdfc0dd6b26620850db5737a6fc1d1f496",
+  "reviewer": "canon-reviewer-k2",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "change new was not transactional: a failure after scaffolding left proposal/tasks and records behind; the two-record adopt write is now ordered subject-first, idempotent, and prints an exact repair"
+}
