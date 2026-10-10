@@ -144,33 +144,97 @@ fn change_new_leaves_nothing_behind_when_publishing_the_change_dir_fails() {
     assert_nothing_left(dir.path());
 }
 
-/// The adopt write itself fails (the change ledger directory is read-only),
-/// after the change dir was published: the dir is taken back and no record
-/// or subject link remains.
+/// Make `dir` read-only so a ledger write into it fails. `false` when the
+/// process ignores directory permissions (root): there is no failure to
+/// force, and the caller skips.
+#[cfg(unix)]
+fn make_read_only(dir: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::create_dir_all(dir).unwrap();
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+    if std::fs::write(dir.join("probe"), "").is_ok() {
+        std::fs::remove_file(dir.join("probe")).unwrap();
+        make_writable(dir);
+        eprintln!("skipped: running with permissions that ignore a read-only directory");
+        return false;
+    }
+    true
+}
+
+#[cfg(unix)]
+fn make_writable(dir: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+/// Every record file in the git ledger, for "nothing was written" checks.
+fn ledger_file_count(repo: &Path) -> usize {
+    fn walk(dir: &Path) -> usize {
+        std::fs::read_dir(dir).map(|entries| entries.filter_map(Result::ok).map(|e| if e.path().is_dir() { walk(&e.path()) } else { 1 }).sum()).unwrap_or(0)
+    }
+    walk(&repo.join(".canon/ledger"))
+}
+
+/// The first record write (the subject) fails: nothing has been written,
+/// so the change dir is taken back and nothing remains.
 #[cfg(unix)]
 #[test]
-fn change_new_leaves_nothing_behind_when_the_adopt_write_fails() {
-    use std::os::unix::fs::PermissionsExt;
-
+fn change_new_leaves_nothing_behind_when_the_first_record_write_fails() {
     let dir = inited_repo_with_subject();
-    let ledger_change = dir.path().join(".canon/ledger/kind=change");
-    std::fs::create_dir_all(&ledger_change).unwrap();
-    std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o555)).unwrap();
-    // Root ignores directory permissions; there is no failure to force.
-    if std::fs::write(ledger_change.join("probe"), "").is_ok() {
-        std::fs::remove_file(ledger_change.join("probe")).unwrap();
-        std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o755)).unwrap();
-        eprintln!("skipped: running with permissions that ignore a read-only directory");
+    let ledger_subject = dir.path().join(".canon/ledger/kind=subject");
+    if !make_read_only(&ledger_subject) {
         return;
     }
-
     let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
-    std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o755)).unwrap();
+    make_writable(&ledger_subject);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
-    assert!(stderr(&out).contains("failed to record the change, nothing was kept"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("failed to record the adoption") && stderr(&out).contains("nothing was written"), "{}", stderr(&out));
     assert!(stdout(&out).is_empty(), "nothing may be reported written: {}", stdout(&out));
     assert!(dir.path().join("openspec/changes").is_dir(), "the pre-existing changes dir is kept");
     assert_nothing_left(dir.path());
+}
+
+/// The second record write (the change) fails after the subject was
+/// written: the subject record and the change dir stay, and the printed
+/// repair completes the link and is a no-op when run again.
+#[cfg(unix)]
+#[test]
+fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_link() {
+    let dir = inited_repo_with_subject();
+    let ledger_change = dir.path().join(".canon/ledger/kind=change");
+    if !make_read_only(&ledger_change) {
+        return;
+    }
+    let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
+    make_writable(&ledger_change);
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    assert!(
+        stderr(&out).contains("subject `auth` now lists change `add-login`, but the change record could not be written")
+            && stderr(&out).contains("complete the link with `canon ingest plans && canon subject adopt add-login --subject auth`"),
+        "{}",
+        stderr(&out)
+    );
+    assert!(dir.path().join("openspec/changes/add-login/proposal.md").is_file(), "the change dir stays for the repair to import");
+    assert!(staging_leftovers(dir.path()).is_empty(), "{:?}", staging_leftovers(dir.path()));
+    assert!(query(dir.path(), "change").is_empty());
+    let subjects = query(dir.path(), "subject");
+    assert!(subjects[0]["change_ids"].as_array().unwrap().iter().any(|c| c == "add-login"), "{subjects:?}");
+
+    // The printed repair, run as printed.
+    let ingest = run(dir.path(), &["ingest", "plans"]);
+    assert!(ingest.status.success(), "{}", stderr(&ingest));
+    let adopt = run(dir.path(), &["subject", "adopt", "add-login", "--subject", "auth"]);
+    assert!(adopt.status.success(), "{}", stderr(&adopt));
+    assert!(stdout(&adopt).contains("linked change `add-login` to subject `auth`"), "{}", stdout(&adopt));
+    let changes = query(dir.path(), "change");
+    assert!(changes.iter().any(|c| c["change_id"] == "add-login" && c["subject_id"] == "auth"), "{changes:?}");
+
+    // Idempotent: a second run writes nothing.
+    let before = ledger_file_count(dir.path());
+    let again = run(dir.path(), &["subject", "adopt", "add-login", "--subject", "auth"]);
+    assert!(again.status.success(), "{}", stderr(&again));
+    assert!(stdout(&again).contains("already linked") && stdout(&again).contains("nothing written"), "{}", stdout(&again));
+    assert_eq!(ledger_file_count(dir.path()), before, "a rerun on a linked pair must write no record");
 }
 
 #[test]

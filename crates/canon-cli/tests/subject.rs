@@ -171,6 +171,69 @@ fn adopt_refuses_an_unknown_change() {
     assert!(stderr(&out).contains("does not exist"), "stderr: {}", stderr(&out));
 }
 
+fn ledger_file_count(repo: &Path) -> usize {
+    fn walk(dir: &Path) -> usize {
+        std::fs::read_dir(dir).map(|entries| entries.filter_map(Result::ok).map(|e| if e.path().is_dir() { walk(&e.path()) } else { 1 }).sum()).unwrap_or(0)
+    }
+    walk(&repo.join(".canon/ledger"))
+}
+
+/// Adopting a pair that already carries the link writes nothing, so the
+/// command is safe to rerun.
+#[test]
+fn adopt_is_a_no_op_on_an_already_linked_pair() {
+    let dir = repo();
+    seed_change(dir.path(), "s36-demo");
+    assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
+    assert!(run(dir.path(), &["subject", "adopt", "s36-demo", "--subject", "demo-subject"]).status.success());
+
+    let before = ledger_file_count(dir.path());
+    let again = run(dir.path(), &["subject", "adopt", "s36-demo", "--subject", "demo-subject"]);
+    assert_eq!(again.status.code(), Some(0), "{}", stderr(&again));
+    assert!(stdout(&again).contains("already linked to subject `demo-subject`; nothing written"), "{}", stdout(&again));
+    assert_eq!(ledger_file_count(dir.path()), before);
+}
+
+/// The subject record is written first; when the change write after it
+/// fails, the refusal names the half-written state and the command that
+/// completes it, and that command — rerunning adopt — does.
+#[cfg(unix)]
+#[test]
+fn adopt_failing_between_its_two_writes_prints_a_repair_that_completes_the_link() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = repo();
+    seed_change(dir.path(), "s36-demo");
+    assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
+    let ledger_change = dir.path().join(".canon/ledger/kind=change");
+    std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o555)).unwrap();
+    if std::fs::write(ledger_change.join("probe"), "").is_ok() {
+        // Root ignores directory permissions; there is no failure to force.
+        std::fs::remove_file(ledger_change.join("probe")).unwrap();
+        std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o755)).unwrap();
+        return;
+    }
+
+    let out = run(dir.path(), &["subject", "adopt", "s36-demo", "--subject", "demo-subject"]);
+    std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    assert!(
+        stderr(&out).contains("subject `demo-subject` now lists change `s36-demo`, but the change record could not be written")
+            && stderr(&out).contains("complete the link with `canon subject adopt s36-demo --subject demo-subject`"),
+        "{}",
+        stderr(&out)
+    );
+    let subjects = query_subjects(dir.path(), &[]);
+    assert!(subjects["records"][0]["change_ids"].as_array().unwrap().iter().any(|c| c == "s36-demo"));
+
+    let repair = run(dir.path(), &["subject", "adopt", "s36-demo", "--subject", "demo-subject"]);
+    assert_eq!(repair.status.code(), Some(0), "{}", stderr(&repair));
+    let changes: Value = serde_json::from_str(&stdout(&run(dir.path(), &["query", "--kind", "change", "--json"]))).unwrap();
+    assert!(changes["records"].as_array().unwrap().iter().any(|c| c["subject_id"] == "demo-subject"), "{changes}");
+    let again = run(dir.path(), &["subject", "adopt", "s36-demo", "--subject", "demo-subject"]);
+    assert!(stdout(&again).contains("nothing written"), "{}", stdout(&again));
+}
+
 #[test]
 fn the_forward_status_chain_advances_and_folds_to_one_row() {
     let dir = repo();

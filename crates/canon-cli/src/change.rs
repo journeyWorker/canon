@@ -7,14 +7,18 @@
 //! ([`crate::subject::persist_adoption`]). Nothing in `canon.yaml` needs
 //! a hand edit: `canon init` configures the source.
 //!
-//! # All or nothing
+//! # What a failure leaves behind
 //! The files are staged in a private directory under `.canon/` and
 //! parsed there; only when that succeeds is the change dir moved into
-//! place, and only then are the records written. Any failure removes
-//! the staged files, the published change dir and any directory created
-//! for it. The one thing that cannot be taken back is a change record
-//! already written when the subject write after it fails (the ledger is
-//! append-only); the error names it.
+//! place, and only then are the records written. A failure before any
+//! record is written removes the staged files, the published change dir
+//! and any directory created for it: nothing is left behind. The two
+//! records (subject, then change; see
+//! [`crate::subject::persist_adoption`] for the order) cannot be written
+//! atomically, so a failure between them keeps the change dir and the
+//! subject record and prints the command that completes the link,
+//! `canon ingest plans && canon subject adopt <slug> --subject <id>`,
+//! which is safe to rerun.
 //!
 //! # Refusals (exit `2`, nothing written)
 //! - no `openspec` source in `canon.yaml`'s `plans.sources`;
@@ -192,13 +196,12 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, title: &str
     drop(staging);
 
     if let Err(e) = crate::subject::persist_adoption(&repo, change, subject) {
-        match e.change_written {
-            None => eprintln!("canon change new: failed to record the change, nothing was kept: {}", e.message),
-            Some(location) => eprintln!(
-                "canon change new: failed to update subject `{}`: {}; the change dir was removed, but change record `{location}` was already written and the ledger is append-only",
-                subject_id.as_str(),
-                e.message
-            ),
+        let repair = format!("canon ingest plans && {}", crate::subject::adopt_command(slug, subject_id));
+        eprintln!("canon change new: {}", e.describe(slug, subject_id, &repair));
+        if e.subject_written {
+            // The subject record exists and cannot be taken back; the
+            // change dir stays so the repair can import it.
+            published.keep();
         }
         return EXIT_REFUSED;
     }

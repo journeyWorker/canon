@@ -48,8 +48,19 @@ Feature: authoring change
   @subject:authoring-scaffold
   @case:failure
   @authoring.change.05
-  Scenario: A change whose later steps fail leaves nothing behind
-    Given a repo where the change dir cannot be created, or where the change record cannot be written
+  Scenario: A change that fails before any record is written leaves nothing behind
+    Given a repo where the change dir cannot be created, or where the first record, the subject, cannot be written
     When canon change new is run
     Then it exits 2 and reports nothing as written
     And no change dir, no staging dir under .canon, no change record and no subject link remain
+
+  # canon: {"schema":1,"at":"2026-10-10T16:01:46Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.change.06
+  Scenario: A change whose second record write fails keeps one record and prints the repair
+    Given a repo where the subject record can be written but the change record cannot
+    When canon change new is run
+    Then it exits 2, keeping the change dir and the subject record that now lists the change
+    And it prints the command that completes the link: canon ingest plans, then canon subject adopt
+    And running that command completes the link, and running the adopt again writes nothing
