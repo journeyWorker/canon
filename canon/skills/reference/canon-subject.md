@@ -153,7 +153,7 @@ prints on stderr which it ran or skipped:
 
 ```
 canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
-  ran unreviewed-promotion — every owned scenario needs a review by an actor other than its evidence actor
+  ran unreviewed-promotion — every owned scenario needs a review by an actor, and from a session, other than its evidence's
   ran open-blocker — 1 adopted change(s) checked for open blocker findings
 ```
 
@@ -338,6 +338,10 @@ spec root, the `<area>.<surface>`, and the required case it lacks.
 `policy.spec_coverage` has the shape `canon context --json` prints
 (`null` when absent, `{"invalid": …}` when unusable). `statusVersion`
 changes only when a field changes meaning or is removed.
+
+`subject new`, `adopt` and `status` write their records directly; the
+human-readable success line ends `— written directly; nothing to
+promote` (`--json` prints the record and nothing else).
 
 ## Reading the per-domain management view
 

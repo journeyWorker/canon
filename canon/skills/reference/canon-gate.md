@@ -112,7 +112,9 @@ A present section, even `require_evidence: false` or a malformed one
   in `require_review.scope` (default `[verifying, shipped]`; `[]` = every
   scenario; independent of `scope` above) need a `Review` record
   (`canon review add`), by a reviewer and actor other than the
-  scenario's evidence actor when `distinct_actor` (default `true`);
+  scenario's evidence actor, and from a session other than any evidence
+  session when both carry one (`--session-id`), when `distinct_actor`
+  (default `true`);
   gaps are `unreviewed-promotion`. With `block_on_findings` (default
   `true`), an open `blocker` Finding on a change an in-scope subject
   adopted is `open-blocker`. `exclude_lanes` also exempts scenarios
@@ -324,6 +326,14 @@ writing or deleting.
 canon gate promote --repo .            # land every staged candidate
 canon gate promote --repo . --dry-run  # preview only
 ```
+
+Which writes need this step: `evidence add`, `finding add` and `finding
+close` stage, and their success line ends ``— run `canon gate promote`
+to commit it``. `divergence stage` stages for `canon divergence promote`
+and names it. Every other write — `review add`, `divergence
+resolve|defer`, `subject new|adopt|status`, `scenario new`, `feature new`
+— is final when it returns, and its success line ends `— written
+directly; nothing to promote`.
 
 ## `canon gate install-hooks [--repo] [--event] [--matcher] [--command] [--timeout]`
 
