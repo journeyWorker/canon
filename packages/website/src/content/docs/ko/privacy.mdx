@@ -70,7 +70,8 @@ opt-in directive 수집은 설정된 문자 수 제한을 따르며, 알려진 s
 보장할 수 없으므로 redaction을 완전한 PII 필터로 취급해서는 안 됩니다.
 Canon은 ingest된 record를 제거하는 `purge`, 공유할 수 있는 정제된 추출물을
 만드는 redacted `export`, 그리고 `.canon/audit/access.jsonl`의 접근 감사
-로그를 지원합니다. 이 제어 기능들은 adapter가 읽은 원본 transcript를
+로그를 지원합니다. 감사 로그는 읽은 `canon.yaml`이 있는 레포에 쌓이며,
+`canon.yaml`이 없는 곳에는 아무것도 쓰지 않습니다. 이 제어 기능들은 adapter가 읽은 원본 transcript를
 삭제하거나 Git history를 다시 쓰지 않습니다. 원본은 별도로 관리해야 합니다.
 
 

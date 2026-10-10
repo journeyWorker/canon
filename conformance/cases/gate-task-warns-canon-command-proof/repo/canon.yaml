@@ -1,0 +1,4 @@
+plans:
+  sources:
+    - dialect: openspec
+      root: openspec/changes

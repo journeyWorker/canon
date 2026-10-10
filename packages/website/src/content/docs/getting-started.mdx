@@ -74,8 +74,9 @@ is attributed, and is fresh — never on a self-report. See
    - **`.canon/policy.yaml`**, a starter policy that turns `spec_coverage`
      on: every scenario needs evidence, every feature surface needs a
      `@case:failure` scenario, and work on a subject claimed done needs an
-     independent review. A human should review and approve it, since the
-     gate grades the work against it.
+     independent review. The gate grades the work against it, so a human
+     reviews it and approves it with `canon policy approve --by <who>`;
+     until then `canon gate check` and `canon status` print an advisory.
    - **A canon block in `AGENTS.md`**, between `<!-- canon:begin -->` and
      `<!-- canon:end -->`. It tells any agent that features are managed
      with canon, lists the working loop, and points to `canon status` and

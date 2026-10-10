@@ -159,3 +159,14 @@ Feature: context status
     When status is run
     Then the next list names canon feature new, then a scenario new step with --subject for the subject
     And it never suggests canon inventory sync, which would index nothing
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.40
+  Scenario: Status warns that the policy in force is not the approved one
+    Given a repository whose policy has no approval record, or whose policy changed after it was approved
+    When canon status runs
+    Then it warns that the policy is not approved, or changed since approval, and names `canon policy approve`
+    And the warning appears in the --json warnings too
+    And status still exits 0

@@ -77,7 +77,8 @@ canon gate check: clean (0 violations)
      모든 시나리오에 evidence가, 모든 feature surface에 `@case:failure`
      시나리오가, 완료를 주장한 subject의 작업에는 독립 리뷰가
      필요합니다. gate가 이 정책으로 작업을 채점하므로 사람이 검토하고
-     승인해야 합니다.
+     `canon policy approve --by <who>`로 승인합니다. 그 전까지
+     `canon gate check`와 `canon status`가 advisory를 출력합니다.
    - **`AGENTS.md`의 canon 블록**: `<!-- canon:begin -->`과
      `<!-- canon:end -->` 사이에 씁니다. 어떤 에이전트에게든 기능을
      canon으로 관리한다는 것, 작업 루프, `canon status`와 canon 스킬을

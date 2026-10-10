@@ -102,3 +102,22 @@ Feature: gate task
     When the task is asked to complete
     Then only that change dir is re-read, and the latest change record is completed and still names the subject
     And a later full plan import keeps the subject too
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.task.80
+  Scenario: A task flipped on a canon command with nothing bound draws a warning
+    Given a task whose only evidence binds no file and cites a canon command such as `canon gate check` as its --ref
+    When canon gate task flips it
+    Then the row still flips and the command exits 0
+    And stderr warns that the evidence is a canon command's output and names the artifact or report to bind
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:03Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:happy
+  @gate.task.81
+  Scenario: Task evidence that binds its proof flips without a warning
+    Given a task whose evidence binds an artifact, and another whose --ref is not a canon command
+    When canon gate task flips each
+    Then neither prints the warning

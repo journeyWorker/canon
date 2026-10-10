@@ -105,3 +105,34 @@ Feature: policy expressions
     Then rank selects the highest matching tier
     And malformed tier entries produce explicit diagnostics and are not enabled
     And the risk_tiers section remains declarative, adding no CEL expression or InvalidPredicate diagnostic
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
+  @subject:policy-expressions
+  @case:happy
+  @policy.expressions.30
+  Scenario: Approving the policy records its digest, approver, time and note
+    Given a repository with a .canon/policy.yaml
+    When a human runs canon policy approve --by <who> --note <text>
+    Then .canon/policy.approval.json records the sha256 of the policy bytes, the approver, the time and the note
+    And the success line says the file was written directly, with nothing to promote
+    And neither canon's .gitignore nor the one canon init writes ignores the approval file
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
+  @subject:policy-expressions
+  @case:failure
+  @policy.expressions.31
+  Scenario: Approving a repo with no policy is refused
+    Given a repository with no .canon/policy.yaml
+    When canon policy approve runs
+    Then it is refused with exit 2
+    And no approval file is written
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
+  @subject:policy-expressions
+  @case:edge
+  @policy.expressions.32
+  Scenario: The gate advises while the policy is unapproved or changed since approval
+    Given a repository with a policy
+    When canon gate check runs before any approval, after an approval, and after the policy changes
+    Then it prints a policy-not-approved advisory, then nothing, then a changed-since-approval advisory naming both digests
+    And the gate's exit code is the same in all three runs

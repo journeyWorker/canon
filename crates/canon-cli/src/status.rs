@@ -188,6 +188,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
             // The ledger cannot be read, so nothing below can be counted.
             let policy = PolicyResolution::resolve(repo, &registry);
             warnings.extend(policy_warning(&policy));
+            warnings.extend(crate::policy_approval::advisory(repo));
             warnings.push(format!("cannot read this repo's ledger: {e}"));
             next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into() });
             return finish(&policy, warnings, Vec::new(), Vec::new(), next);
@@ -195,6 +196,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
     };
 
     warnings.extend(policy_warning(&ctx.policy));
+    warnings.extend(crate::policy_approval::advisory(repo));
     let routed_away: Vec<&str> = ctx
         .unreadable_kinds
         .iter()

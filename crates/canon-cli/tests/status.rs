@@ -238,7 +238,7 @@ fn status_counts_each_subject_through_the_gates_joins() {
     let text = stdout(&run(dir.path(), &["status"]));
     // The header: the version, then the effective coverage, case and review settings.
     let header = format!(
-        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=true scope=<every scenario>\n  require_cases: failure\n  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n\n",
+        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=true scope=<every scenario>\n  require_cases: failure\n  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n{UNAPPROVED}\n",
         env!("CARGO_PKG_VERSION")
     );
     assert!(text.starts_with(&header), "expected the header\n{header}\ngot\n{text}");
@@ -255,11 +255,15 @@ fn status_header_prints_the_effective_settings() {
     write_policy(dir.path(), "spec_coverage:\n  require_evidence: false\n  scope: [building]\n  exclude_lanes: [process]\n");
     let text = stdout(&run(dir.path(), &["status"]));
     let header = format!(
-        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=false scope=building exclude_lanes=process\n  require_cases: <none>\n  require_review: <absent>\n\n",
+        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=false scope=building exclude_lanes=process\n  require_cases: <none>\n  require_review: <absent>\n{UNAPPROVED}\n",
         env!("CARGO_PKG_VERSION")
     );
     assert!(text.starts_with(&header), "expected the header\n{header}\ngot\n{text}");
 }
+
+/// The approval warning every fixture policy here carries: none of them
+/// is approved (`canon policy approve`).
+const UNAPPROVED: &str = "warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`";
 
 #[test]
 fn status_next_names_the_command_for_each_gap() {

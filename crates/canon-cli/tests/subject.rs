@@ -840,6 +840,7 @@ fn an_absent_require_review_is_byte_identical() {
     let outputs = |with_review_records: bool| {
         let dir = repo();
         write_policy(dir.path(), "spec_coverage:\n  require_evidence: true\n");
+        assert!(run(dir.path(), &["policy", "approve", "--by", "alice"]).status.success());
         seed_attested_subject(dir.path());
         if with_review_records {
             seed_blocker(dir.path(), None);

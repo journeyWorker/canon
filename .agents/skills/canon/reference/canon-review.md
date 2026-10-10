@@ -73,14 +73,24 @@ appends a second version at the same natural key — the first stays. Its
 `--actor-id` and `--session-id` name who authored the transition; the
 raiser's stay on the first version.
 
+Every sha flag (`--reviewed-sha`, `--resolution-sha`, `--introduced-by`)
+takes a full 40-character sha or a short one (4 or more lowercase hex
+characters). A short sha is resolved with `git rev-parse --verify
+<sha>^{commit}` in the repo, and the record stores the full sha. It is
+refused (exit `2`) when it names no commit, when more than one commit
+starts with it (pass more characters), when it only resolves by peeling a
+tag, or outside a git work tree.
+
 ### A defect the author found in its own work
 
-Record it like any other finding, with `--reviewer` and `--actor-id` set
-to the author's own id. Nothing refuses a finding whose reviewer is also
-the implementer, and an open `blocker` the author raised blocks under
-`block_on_findings` exactly like a reviewer's. `--introduced-by` names the
-commit that introduced the defect, not who found it: `--introduced-by self`
-is a usage error (exit 2) that points at `--reviewer`.
+Record it like any other finding, at the moment you find it and before
+review, with `--reviewer` and `--actor-id` set to your own id; never ask
+the reviewer to record it later under theirs. Nothing refuses a finding
+whose reviewer is also the implementer, and an open `blocker` the author
+raised blocks under `block_on_findings` exactly like a reviewer's.
+`--introduced-by` names the commit that introduced the defect, not who
+found it: `--introduced-by self` is a usage error (exit 2) that points at
+`--reviewer`.
 
 ### Severities
 

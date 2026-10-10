@@ -1,0 +1,1 @@
+canon finding add: refused — --reviewed-sha abcdef0 cannot be resolved to a commit: it names no commit in this repository. Pass more of the sha, or the full sha (`git rev-parse <rev>` prints it).

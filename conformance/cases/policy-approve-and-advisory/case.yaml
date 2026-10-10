@@ -1,0 +1,12 @@
+description: "`canon init`'s starter policy is unapproved: `canon gate check` and `canon status` print a `policy not approved` advisory naming `canon policy approve` and still exit 0; `canon policy approve --by <who> --note <text>` writes .canon/policy.approval.json directly (exit 0), after which the advisory is gone"
+steps:
+  - args: [init, --no-agents-md]
+    exit: 0
+  - args: [gate, check]
+    exit: 0
+  - args: [status]
+    exit: 0
+  - args: [policy, approve, --by, alice, --note, reviewed the starter policy]
+    exit: 0
+  - args: [gate, check]
+    exit: 0

@@ -301,19 +301,21 @@ fn finding_add_refuses_a_resolution_sha_on_every_non_fixed_disposition() {
 /// Task 2.2, third: a malformed SHA, on each of the three sha-shaped
 /// flags. Refused by clap's `value_parser` — so it is impossible for
 /// one to reach `run_add` at all — naming the flag, the value, and the
-/// grammar it failed.
+/// grammar it failed. Since 0.15 a short sha is well-formed (it is
+/// resolved through git, below), so "malformed" means not hex, upper
+/// case, or shorter than git's 4-character floor.
 #[test]
 fn finding_add_refuses_a_malformed_sha_naming_the_flag_and_the_grammar() {
-    for flag in ["--reviewed-sha", "--introduced-by"] {
+    for (flag, value) in [("--reviewed-sha", "not-a-sha"), ("--introduced-by", "DEADBEEF"), ("--reviewed-sha", "abc")] {
         let dir = repo();
         let repo = dir.path();
 
-        let output = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", flag, "deadbeef"]);
+        let output = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", flag, value]);
         assert_eq!(output.status.code(), Some(2), "{flag}; stdout: {}", stdout(&output));
         let err = stderr(&output);
         assert!(err.contains(flag), "the refusal must name the flag: {err}");
-        assert!(err.contains("deadbeef"), "and the offending value: {err}");
-        assert!(err.contains("40 lowercase hex"), "and the grammar it failed: {err}");
+        assert!(err.contains(value), "and the offending value: {err}");
+        assert!(err.contains("4 to 40 lowercase hex"), "and the grammar it failed: {err}");
         assert!(staged_findings(repo).is_empty(), "a refused add must stage nothing");
     }
 
@@ -326,6 +328,143 @@ fn finding_add_refuses_a_malformed_sha_naming_the_flag_and_the_grammar() {
     assert_eq!(output.status.code(), Some(2), "stdout: {}", stdout(&output));
     assert!(stderr(&output).contains("--resolution-sha"), "{}", stderr(&output));
     assert!(staged_findings(repo).is_empty());
+}
+
+/// Runs `git` in `repo` with a fixed identity and clock and no commit
+/// signing, so the commits a test makes have the same ids on every
+/// machine.
+fn git(repo: &Path, args: &[&str]) -> String {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"])
+        .args(args)
+        .env("GIT_AUTHOR_NAME", "a")
+        .env("GIT_AUTHOR_EMAIL", "a@a")
+        .env("GIT_COMMITTER_NAME", "a")
+        .env("GIT_COMMITTER_EMAIL", "a@a")
+        .env("GIT_AUTHOR_DATE", "2020-01-01T00:00:00Z")
+        .env("GIT_COMMITTER_DATE", "2020-01-01T00:00:00Z")
+        .output()
+        .expect("git must be on PATH for this test");
+    assert!(out.status.success(), "git {args:?}: {}", stderr(&out));
+    stdout(&out).trim().to_string()
+}
+
+/// [`repo`] as a git work tree with one commit; returns its full sha.
+fn git_repo() -> (tempfile::TempDir, String) {
+    let dir = repo();
+    git(dir.path(), &["init", "-q"]);
+    git(dir.path(), &["add", "canon.yaml"]);
+    git(dir.path(), &["commit", "-q", "-m", "initial"]);
+    let head = git(dir.path(), &["rev-parse", "HEAD"]);
+    (dir, head)
+}
+
+/// 0.15 D6 (dogfood eval 2 G8): every sha-shaped flag takes a short sha
+/// and the record stores the full one git resolves it to — on `finding
+/// add` and on `finding close` alike.
+#[test]
+fn a_short_sha_is_resolved_to_the_full_commit_on_add_and_close() {
+    let (dir, head) = git_repo();
+    let repo = dir.path();
+    let short = &head[..7];
+
+    let added = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", "--reviewed-sha", short, "--introduced-by", short]);
+    assert_eq!(added.status.code(), Some(0), "stderr: {}", stderr(&added));
+    let staged = body_at(&staged_findings(repo)[0]);
+    assert_eq!(staged["reviewed_sha"], head.as_str(), "the full sha is stored, never the abbreviation: {staged}");
+    assert_eq!(staged["introduced_by"], head.as_str(), "{staged}");
+    assert!(run_canon(&["gate", "promote"], repo).status.success());
+
+    let closed = run_canon(
+        &["finding", "close", "--change-id", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", short],
+        repo,
+    );
+    assert_eq!(closed.status.code(), Some(0), "stderr: {}", stderr(&closed));
+    let transition = body_at(&staged_findings(repo)[0]);
+    assert_eq!(transition["resolution_sha"], head.as_str(), "{transition}");
+
+    let fixed = add(repo, &["--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-sha", short, "--reviewer", "r", "--summary", "s"]);
+    assert_eq!(fixed.status.code(), Some(0), "stderr: {}", stderr(&fixed));
+    let staged_fixed = staged_findings(repo).iter().map(|path| body_at(path)).find(|body| body["seq"] == 2).expect("the fixed finding is staged");
+    assert_eq!(staged_fixed["resolution_sha"], head.as_str(), "the full 40-character sha is stored: {staged_fixed}");
+    assert_eq!(head.len(), 40);
+}
+
+/// A short sha that names no commit here is refused (`2`) by flag name,
+/// on add and on close, and nothing is staged.
+#[test]
+fn an_unknown_short_sha_is_refused() {
+    let (dir, head) = git_repo();
+    let repo = dir.path();
+    let unknown = if head.starts_with("abcdef0") { "abcdef1" } else { "abcdef0" };
+
+    let out = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", "--reviewed-sha", unknown]);
+    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
+    let err = stderr(&out);
+    assert!(err.contains("--reviewed-sha") && err.contains(unknown) && err.contains("names no commit"), "{err}");
+    assert!(staged_findings(repo).is_empty());
+
+    assert!(add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s"]).status.success());
+    assert!(run_canon(&["gate", "promote"], repo).status.success());
+    let closed = run_canon(
+        &["finding", "close", "--change-id", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", unknown],
+        repo,
+    );
+    assert_eq!(closed.status.code(), Some(2), "stdout: {}", stdout(&closed));
+    assert!(stderr(&closed).contains("--resolution-sha") && stderr(&closed).contains("cannot be resolved"), "{}", stderr(&closed));
+    assert!(staged_findings(repo).is_empty());
+}
+
+/// A short sha more than one commit starts with is refused rather than
+/// guessed. The two commits are fixed by content, identity and clock,
+/// so they share the prefix `9ea8` on every machine; the premise is
+/// asserted rather than assumed.
+#[test]
+fn an_ambiguous_short_sha_is_refused() {
+    let (dir, _head) = git_repo();
+    let repo = dir.path();
+    let tree = git(repo, &["mktree"]);
+    let first = git(repo, &["commit-tree", &tree, "-m", "c79"]);
+    let second = git(repo, &["commit-tree", &tree, "-m", "c218"]);
+    assert!(first.starts_with("9ea8") && second.starts_with("9ea8"), "the fixture must collide on 9ea8: {first} {second}");
+
+    let out = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", "--reviewed-sha", "9ea8"]);
+    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
+    let err = stderr(&out);
+    assert!(err.contains("ambiguous") && err.contains("--reviewed-sha") && err.contains("9ea8"), "names the flag and the value: {err}");
+    assert!(staged_findings(repo).is_empty());
+
+    let longer = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", "--reviewed-sha", &first[..8]]);
+    assert_eq!(longer.status.code(), Some(0), "more characters resolve it: {}", stderr(&longer));
+}
+
+/// The commit-only contract holds for a short sha too: an annotated
+/// tag's own id resolves only by peeling the tag, and is refused.
+#[test]
+fn a_short_sha_of_an_annotated_tag_is_refused() {
+    let (dir, _head) = git_repo();
+    let repo = dir.path();
+    git(repo, &["tag", "-a", "v-review", "-m", "an annotated tag", "HEAD"]);
+    let tag = git(repo, &["rev-parse", "v-review"]);
+
+    let out = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", "--reviewed-sha", &tag[..10]]);
+    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
+    let err = stderr(&out);
+    assert!(err.contains("peeling") && err.contains("--reviewed-sha") && err.contains(&tag[..10]), "names the flag and the value: {err}");
+    assert!(staged_findings(repo).is_empty());
+}
+
+/// Outside a git work tree a short sha cannot mean anything, so it is
+/// refused — unlike a full sha, whose existence check is skipped there.
+#[test]
+fn a_short_sha_outside_a_git_work_tree_is_refused() {
+    let dir = repo();
+    let out = add(dir.path(), &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", "--reviewed-sha", "deadbeef"]);
+    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
+    assert!(stderr(&out).contains("not a git repository"), "{}", stderr(&out));
+    assert!(staged_findings(dir.path()).is_empty());
 }
 
 /// Task 2.1, at the boundary the equivalent vector was actually

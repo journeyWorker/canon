@@ -1,0 +1,1 @@
+canon evidence add: staged kind=evidence_record/it-circular#1.1__<digest12>.json for it-circular#1.1 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate task it-circular#1.1`

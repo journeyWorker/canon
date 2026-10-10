@@ -50,6 +50,12 @@ Exit `0` clean, `1` gate-red (any violation), `2` usage/load failure
 resolves through the nearest-ancestor `canon.yaml` walk, so it reads the
 repo ROOT's `.canon/policy.yaml` and `.canon/ledger` from any subdirectory.
 
+When `.canon/policy.yaml` exists but has no approval, or its bytes no
+longer match the approved digest, the gate prints `advisory: policy not
+approved: …` or `advisory: policy changed since approval: …` after its
+result, naming `canon policy approve --by <who>`; the exit code is
+unchanged (see `canon-policy`).
+
 ### The spec-derived worklist (`spec_coverage`, opt-in)
 
 Coverage groups the EVIDENCE corpus, so it can only ever enumerate
@@ -312,6 +318,14 @@ a stderr warning naming `canon ingest plans`, never a failed flip.
 The success line is `canon gate task: <task_id> flipped — written
 directly; nothing to promote`. An already-`[x]` row is an idempotent no-op (exit `0`). An unknown
 `task_id` is reported (exit `1`).
+
+A flip on evidence that cannot prove the task still succeeds, but warns
+on stderr: when none of the task's evidence records binds a file and one
+of them cites a canon command as its `--ref` (`canon gate check`,
+`canon status`), the warning says to bind the artifact or report that
+proves the task (`canon evidence add --task <id> --artifact <path>` or
+`--report <format>:<path>`). A canon command reports on canon's own
+records, so it is never the proof of a task.
 
 ```bash
 canon gate task my-change#5.2 --repo .

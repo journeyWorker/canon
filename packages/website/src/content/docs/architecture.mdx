@@ -95,7 +95,8 @@ Retention is a separate lifecycle boundary: `canon purge` removes only the
 allowlisted operational records from every configured routed/aging destination.
 It does not rewrite Git history or delete operator-owned source transcripts.
 `canon export` produces a redacted manifest, and access to query/export/purge
-is appended to `.canon/audit/access.jsonl`; backend credentials and deployment
+is appended to `.canon/audit/access.jsonl` of the repository whose
+`canon.yaml` was read (nothing is written where there is no `canon.yaml`); backend credentials and deployment
 RBAC remain external prerequisites.
 
 Privacy and retention are explicit boundaries: session adapters read local

@@ -1,4 +1,6 @@
 canon gate check: clean (0 violations)
 
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+
 review waivers: 1 advisory(ies) — not failing the gate:
   waived unreviewed-promotion cart.add.01 — no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review add`) once its subject is claimed done [waiver: subject `cart` moved to verifying by `lead`: reviewer out until Monday]

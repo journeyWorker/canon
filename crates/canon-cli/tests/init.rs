@@ -70,7 +70,7 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
         assert!(policy.contains(line), "starter policy is missing `{line}`: {policy}");
     }
     assert!(policy.contains("A human"), "the starter policy must say a human approves it: {policy}");
-    assert!(stdout(&out).contains("a human should review and approve it"), "{}", stdout(&out));
+    assert!(stdout(&out).contains("a human reviews it and approves it with `canon policy approve --by <who>`"), "{}", stdout(&out));
 
     let agents = std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
     assert!(agents.starts_with("<!-- canon:begin -->\n") && agents.ends_with("<!-- canon:end -->\n"), "{agents}");

@@ -138,6 +138,9 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     if let Some(count) = canon_gate::spec_coverage::coverage_off_scenarios(&gate_context) {
         print!("{}", format_coverage_off_advisory(count));
     }
+    if let Some(line) = crate::policy_approval::advisory(&repo) {
+        print!("\nadvisory: {line}\n");
+    }
     if let Some(summary) = canon_gate::binding_summary(&gate_context) {
         print!("{}", format_binding_summary(&summary));
     }
@@ -456,6 +459,9 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
                 return 2;
             }
             println!("canon gate task: {task_id} flipped — {}", crate::write_mode::DIRECT);
+            if let Some(warning) = canon_command_proof_warning(&task_id, &raw_records) {
+                eprintln!("{warning}");
+            }
             refresh_task_status(&repo, &task_id.change_id());
             0
         }
@@ -466,6 +472,27 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
             1
         }
     }
+}
+
+/// The warning `canon gate task` prints, without refusing, when a task
+/// flips on evidence that cannot prove it (0.15 D6, dogfood eval 2
+/// G13): none of the task's evidence records binds a file, and one of
+/// them cites a canon command (`--ref "canon gate check"`) as its proof.
+/// A canon command reports on canon's own records, so citing one makes
+/// the task's evidence circular; the artifact or report that shows the
+/// task done is what belongs bound. Read from the raw records, where
+/// `evidence.ref` and `attachments` live.
+fn canon_command_proof_warning(task_id: &TaskId, raw_records: &[RawRecord]) -> Option<String> {
+    let task_records: Vec<&serde_json::Value> =
+        raw_records.iter().map(|raw| &raw.0).filter(|body| body.get("task_id").and_then(|v| v.as_str()) == Some(task_id.as_str())).collect();
+    let binds_a_file = task_records.iter().any(|body| body.get("attachments").and_then(|v| v.as_array()).is_some_and(|files| !files.is_empty()));
+    if binds_a_file {
+        return None;
+    }
+    let canon_ref = task_records.iter().find_map(|body| body.get("evidence").and_then(|e| e.get("ref")).and_then(|r| r.as_str()).filter(|r| r.starts_with("canon ")))?;
+    Some(format!(
+        "canon gate task: warning — {task_id}'s evidence binds no file, and its --ref is a canon command (`{canon_ref}`), which reports on canon's own records rather than proving the task; bind the artifact or report that proves it: canon evidence add --task {task_id} --artifact <path> (or --report <format>:<path>)"
+    ))
 }
 
 /// Re-import the change that owns a just-flipped row (0.14 D5, dogfood

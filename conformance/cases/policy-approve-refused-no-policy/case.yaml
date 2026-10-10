@@ -1,0 +1,6 @@
+description: "`canon policy approve` in a repo with no .canon/policy.yaml is refused (exit 2): there is no policy to approve"
+steps:
+  - args: [init, --no-agents-md, --no-policy]
+    exit: 0
+  - args: [policy, approve, --by, alice]
+    exit: 2
