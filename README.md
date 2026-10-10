@@ -83,14 +83,27 @@ for the machine-readable source/projection/memory map.
 discovered canon. `canon skills install` now projects Codex the same way as
 every other provider, to `.agents/skills/canon/SKILL.md` with its `reference/**`
 and `scripts/**` sidecars, and an existing `.agents` or `.codex` directory
-selects Codex when `--providers` is omitted. Re-running install migrates the
-old projection: it removes each legacy file whose bytes still match the hash in
-`.canon/skills/.install-lock.json`, keeps edited and user-authored files, and
-removes `.codex/skills` only if it ends up empty. `skills check` (exit 1) and
+selects Codex when `--providers` is omitted.
+
+*Migration:* after upgrading, re-run `canon skills install`; Codex does not
+see canon until you do. That run migrates the legacy `.codex/skills/canon.md`
+and `.codex/skills/canon/**` projection automatically, but only for files the
+lock proves canon wrote: it removes a legacy file only if it is recorded in
+`.canon/skills/.install-lock.json` and its bytes still match the recorded
+hash, keeps edited, replaced, symlinked, and user-authored files, and removes
+`.codex/skills` only if it ends up empty. On unix the cleanup is race-safe:
+every directory below the repo is opened without following symlinks and each
+file is hashed and unlinked through its parent's handle, so swapping a legacy
+directory for a symlink, before or during the run, cannot make it read or
+delete a file outside the repo (other platforms check for symlinks first,
+which narrows that window without closing it). `skills check` (exit 1) and
 `skills doctor` report whatever legacy projection remains, with the fix
 command. The developer-only `canon/skills-dev` materializer now writes
 `.agents/skills/<name>/SKILL.md` instead of `.codex/skills/<name>.md`; its lock
 records no output hashes, so delete old `.codex/skills/<name>.md` files by hand.
+
+**Changed conformance expectations.** `version` re-blessed for
+`canon 0.13.1`. Every other case is unchanged.
 
 ## 0.13.0 release
 

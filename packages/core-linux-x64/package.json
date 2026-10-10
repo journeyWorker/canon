@@ -1,6 +1,6 @@
 {
   "name": "@journeykit/canon-core-linux-x64",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "canon CLI binary for linux x64 (glibc)",
   "license": "MIT",
   "type": "module",
