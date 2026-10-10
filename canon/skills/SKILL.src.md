@@ -45,7 +45,7 @@ assumption you state there, and say so in your final report.
 5. **Implement.** Write the code with tests whose names carry the scenario
    id (`game.run.01: …`), so a test report binds to its scenario.
 6. **Evidence.** Per scenario:
-   `canon evidence add --scenario-id <id> --kind test-run --role implementer --ref "<command>" --actor-id <unit> --session-id <session>`,
+   `canon evidence add --project-id <root-id> --scenario-id <id> --kind test-run --role implementer --ref "<command>" --actor-id <unit> --session-id <session>`,
    with `--report junit:<path>` or `--artifact <path>` when files prove it.
    canon stores those bytes in `.canon/artifacts/sha256/` (commit it with the
    ledger) and `canon gate check` re-checks them. Then `canon gate promote`.
