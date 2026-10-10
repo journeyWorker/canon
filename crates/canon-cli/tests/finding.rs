@@ -387,6 +387,9 @@ fn a_short_sha_is_resolved_to_the_full_commit_on_add_and_close() {
 
     let fixed = add(repo, &["--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-sha", short, "--reviewer", "r", "--summary", "s"]);
     assert_eq!(fixed.status.code(), Some(0), "stderr: {}", stderr(&fixed));
+    let staged_fixed = staged_findings(repo).iter().map(|path| body_at(path)).find(|body| body["seq"] == 2).expect("the fixed finding is staged");
+    assert_eq!(staged_fixed["resolution_sha"], head.as_str(), "the full 40-character sha is stored: {staged_fixed}");
+    assert_eq!(head.len(), 40);
 }
 
 /// A short sha that names no commit here is refused (`2`) by flag name,
@@ -429,7 +432,8 @@ fn an_ambiguous_short_sha_is_refused() {
 
     let out = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", "--reviewed-sha", "9ea8"]);
     assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
-    assert!(stderr(&out).contains("ambiguous"), "{}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("ambiguous") && err.contains("--reviewed-sha") && err.contains("9ea8"), "names the flag and the value: {err}");
     assert!(staged_findings(repo).is_empty());
 
     let longer = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", "--reviewed-sha", &first[..8]]);
@@ -447,7 +451,8 @@ fn a_short_sha_of_an_annotated_tag_is_refused() {
 
     let out = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s", "--reviewed-sha", &tag[..10]]);
     assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
-    assert!(stderr(&out).contains("peeling"), "{}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("peeling") && err.contains("--reviewed-sha") && err.contains(&tag[..10]), "names the flag and the value: {err}");
     assert!(staged_findings(repo).is_empty());
 }
 

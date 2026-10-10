@@ -110,10 +110,18 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
     check(None);
 
     let policy_path = repo.join(".canon/policy.yaml");
+    let approved_digest = format!("sha256:{:x}", Sha256::digest(std::fs::read(&policy_path).unwrap()));
+    assert_eq!(approval(repo)["policy_digest"], approved_digest.as_str());
     let mut policy = std::fs::read_to_string(&policy_path).unwrap();
     policy.push_str("# loosened later\n");
-    std::fs::write(&policy_path, policy).unwrap();
+    std::fs::write(&policy_path, &policy).unwrap();
+    let current_digest = format!("sha256:{:x}", Sha256::digest(policy.as_bytes()));
     check(Some("policy changed since approval"));
+    let gate = stdout(&run_canon(&["gate", "check"], repo));
+    let changed = gate.lines().find(|line| line.starts_with("advisory: policy changed since approval")).expect("the changed-policy advisory");
+    assert!(changed.contains(&format!("is {current_digest}")), "the advisory names the current digest: {changed}");
+    assert!(changed.contains(&format!("approved {approved_digest}")), "and the approved one: {changed}");
+    assert_ne!(approved_digest, current_digest);
 
     let json = run_canon(&["status", "--json"], repo);
     let report: serde_json::Value = serde_json::from_str(&stdout(&json)).expect("status --json");
