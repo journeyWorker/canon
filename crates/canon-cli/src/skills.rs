@@ -554,11 +554,14 @@ fn is_legacy_codex_key(key: &str) -> bool {
             .all(|component| matches!(component, std::path::Component::Normal(_)))
 }
 
-/// The legacy Codex files canon's previous install lock proves canon wrote:
-/// recorded under the legacy projection, and still holding exactly the bytes
-/// whose hash the lock recorded. An edited, replaced, symlinked, or unrecorded
-/// file is never selected.
-fn legacy_codex_removals(target_dir: &Path, previous: Option<&CanonicalManifest>) -> Vec<PathBuf> {
+/// The legacy Codex files canon's previous install lock proves canon wrote,
+/// as `(key, recorded hash)`: recorded under the legacy projection, and still
+/// holding exactly the bytes whose hash the lock recorded. An edited,
+/// replaced, symlinked, or unrecorded file is never selected.
+fn legacy_codex_removals<'m>(
+    target_dir: &Path,
+    previous: Option<&'m CanonicalManifest>,
+) -> Vec<(&'m str, &'m str)> {
     let Some(previous) = previous else {
         return Vec::new();
     };
@@ -566,57 +569,181 @@ fn legacy_codex_removals(target_dir: &Path, previous: Option<&CanonicalManifest>
         .files
         .iter()
         .filter(|(key, _)| is_legacy_codex_key(key))
-        .filter_map(|(key, hash)| {
-            let path = target_dir.join(key);
-            reject_symlink_path_under(target_dir, &path).ok()?;
-            let bytes = fs::read(&path).ok()?;
-            (content_hash(&bytes) == *hash).then_some(path)
+        .filter(|(key, hash)| {
+            legacy_fs::read(target_dir, key).is_some_and(|bytes| content_hash(&bytes) == **hash)
         })
+        .map(|(key, hash)| (key.as_str(), hash.as_str()))
         .collect()
 }
 
 /// Removes the proven legacy Codex files, then each directory they left
 /// empty, up to and including `.codex/skills`. `.codex` itself, any
 /// non-empty directory, and every file canon cannot prove it wrote stay.
-fn remove_legacy_codex(target_dir: &Path, removals: &[PathBuf]) -> Result<(), SkillsError> {
-    let skills_root = target_dir.join(LEGACY_CODEX_SKILLS);
-    let mut dirs = Vec::new();
-    for path in removals {
-        fs::remove_file(path).map_err(|source| SkillsError::Io {
-            path: path.clone(),
-            source,
-        })?;
-        let mut dir = path.parent();
-        while let Some(current) = dir.filter(|current| current.starts_with(&skills_root)) {
-            dirs.push(current.to_path_buf());
-            dir = current.parent();
+/// Each file's hash is checked again at removal time; one that changed since
+/// [`legacy_codex_removals`] is kept.
+fn remove_legacy_codex(target_dir: &Path, removals: &[(&str, &str)]) -> Result<(), SkillsError> {
+    let mut dirs: Vec<&str> = Vec::new();
+    for (key, hash) in removals {
+        legacy_fs::remove_file_if_hash(target_dir, key, hash)?;
+        let mut current = *key;
+        while let Some((parent, _)) = current.rsplit_once('/') {
+            if parent.len() < LEGACY_CODEX_SKILLS.len() {
+                break;
+            }
+            dirs.push(parent);
+            current = parent;
         }
     }
-    // Deepest first, so a parent is only inspected after its children; the
-    // path tie-break makes duplicates adjacent for `dedup`.
+    // Deepest first, so a parent is only removed after its children; the
+    // key tie-break makes duplicates adjacent for `dedup`.
     dirs.sort_by(|a, b| {
-        b.components()
+        b.matches('/')
             .count()
-            .cmp(&a.components().count())
+            .cmp(&a.matches('/').count())
             .then_with(|| a.cmp(b))
     });
     dirs.dedup();
     for dir in dirs {
-        let empty = fs::read_dir(&dir)
+        legacy_fs::remove_dir_if_empty(target_dir, dir)?;
+    }
+    Ok(())
+}
+
+/// Filesystem access for the legacy Codex migration. Keys are
+/// [`is_legacy_codex_key`]-validated `/`-separated relative paths.
+///
+/// On unix every component below `target_dir` is opened with `O_NOFOLLOW`,
+/// and the file is hashed and unlinked relative to its parent's directory
+/// handle, so replacing `.codex`, `skills`, or `canon` with a symlink, before
+/// or during the migration, can never make it read or delete a file outside
+/// the target.
+#[cfg(unix)]
+mod legacy_fs {
+    use std::io::Read;
+    use std::os::fd::OwnedFd;
+    use std::path::Path;
+
+    use rustix::fs::{openat, unlinkat, AtFlags, Mode, OFlags, CWD};
+    use rustix::io::Errno;
+
+    use super::{content_hash, SkillsError};
+
+    fn io_error(target_dir: &Path, key: &str, errno: Errno) -> SkillsError {
+        SkillsError::Io {
+            path: target_dir.join(key),
+            source: errno.into(),
+        }
+    }
+
+    /// The directory holding `key`'s last component, reached without
+    /// following a symlink below `target_dir`, and that component's name.
+    /// `None` when any component is missing, a symlink, or not a directory.
+    fn open_parent<'k>(target_dir: &Path, key: &'k str) -> Option<(OwnedFd, &'k str)> {
+        let (dirs, name) = key.rsplit_once('/')?;
+        let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC;
+        let mut dir = openat(CWD, target_dir, flags, Mode::empty()).ok()?;
+        for component in dirs.split('/') {
+            dir = openat(&dir, component, flags | OFlags::NOFOLLOW, Mode::empty()).ok()?;
+        }
+        Some((dir, name))
+    }
+
+    /// The bytes of the regular file `name` in `dir`; `None` for a symlink,
+    /// a non-regular file, or any read failure.
+    fn read_in(dir: &OwnedFd, name: &str) -> Option<Vec<u8>> {
+        let flags = OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC;
+        let mut file = std::fs::File::from(openat(dir, name, flags, Mode::empty()).ok()?);
+        if !file.metadata().ok()?.is_file() {
+            return None;
+        }
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes).ok()?;
+        Some(bytes)
+    }
+
+    pub(super) fn read(target_dir: &Path, key: &str) -> Option<Vec<u8>> {
+        let (dir, name) = open_parent(target_dir, key)?;
+        read_in(&dir, name)
+    }
+
+    pub(super) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<(), SkillsError> {
+        let Some((dir, name)) = open_parent(target_dir, key) else {
+            return Ok(());
+        };
+        if read_in(&dir, name).is_none_or(|bytes| content_hash(&bytes) != hash) {
+            return Ok(());
+        }
+        match unlinkat(&dir, name, AtFlags::empty()) {
+            Ok(()) => Ok(()),
+            Err(errno) if errno == Errno::NOENT => Ok(()),
+            Err(errno) => Err(io_error(target_dir, key, errno)),
+        }
+    }
+
+    /// `rmdir` relative to the parent's handle: it never follows a symlink
+    /// and refuses a non-empty directory atomically.
+    pub(super) fn remove_dir_if_empty(target_dir: &Path, key: &str) -> Result<(), SkillsError> {
+        let Some((dir, name)) = open_parent(target_dir, key) else {
+            return Ok(());
+        };
+        match unlinkat(&dir, name, AtFlags::REMOVEDIR) {
+            Ok(()) => Ok(()),
+            Err(errno)
+                if [Errno::NOENT, Errno::NOTEMPTY, Errno::EXIST, Errno::NOTDIR].contains(&errno) =>
+            {
+                Ok(())
+            }
+            Err(errno) => Err(io_error(target_dir, key, errno)),
+        }
+    }
+}
+
+/// Non-unix fallback. LIMITATION: without no-follow directory handles, each
+/// operation checks the path for symlinks and then acts on it by path, so a
+/// component replaced by a symlink or junction between the check and the
+/// read, unlink, or rmdir is followed. The check narrows that window; it does
+/// not close it.
+#[cfg(not(unix))]
+mod legacy_fs {
+    use std::fs;
+    use std::path::Path;
+
+    use super::{content_hash, reject_symlink_path_under, SkillsError};
+
+    pub(super) fn read(target_dir: &Path, key: &str) -> Option<Vec<u8>> {
+        let path = target_dir.join(key);
+        reject_symlink_path_under(target_dir, &path).ok()?;
+        fs::symlink_metadata(&path).ok()?.is_file().then_some(())?;
+        fs::read(&path).ok()
+    }
+
+    pub(super) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<(), SkillsError> {
+        if read(target_dir, key).is_none_or(|bytes| content_hash(&bytes) != hash) {
+            return Ok(());
+        }
+        let path = target_dir.join(key);
+        fs::remove_file(&path).map_err(|source| SkillsError::Io { path, source })
+    }
+
+    pub(super) fn remove_dir_if_empty(target_dir: &Path, key: &str) -> Result<(), SkillsError> {
+        let path = target_dir.join(key);
+        if reject_symlink_path_under(target_dir, &path).is_err()
+            || !fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.is_dir())
+        {
+            return Ok(());
+        }
+        let empty = fs::read_dir(&path)
             .map_err(|source| SkillsError::Io {
-                path: dir.clone(),
+                path: path.clone(),
                 source,
             })?
             .next()
             .is_none();
         if empty {
-            fs::remove_dir(&dir).map_err(|source| SkillsError::Io {
-                path: dir.clone(),
-                source,
-            })?;
+            fs::remove_dir(&path).map_err(|source| SkillsError::Io { path, source })?;
         }
+        Ok(())
     }
-    Ok(())
 }
 
 /// Legacy Codex projection paths still present in `target_dir`.
@@ -828,6 +955,40 @@ mod tests {
         assert!(!is_legacy_codex_key(".codex/skills/user.md"));
         assert!(!is_legacy_codex_key(".codex/skills/canon/../../../etc/passwd"));
         assert!(!is_legacy_codex_key(".claude/skills/canon/SKILL.md"));
+    }
+
+    /// The race the no-follow walk closes: the removal set is proven, then a
+    /// legacy directory is swapped for a symlink to an outside copy before
+    /// the unlink. Removing by path would follow it and delete the copy.
+    #[cfg(unix)]
+    #[test]
+    fn legacy_codex_removal_never_follows_a_dir_swapped_after_the_proof() {
+        let key = ".codex/skills/canon/reference/topic.md";
+        for swapped in [".codex/skills/canon", ".codex/skills", ".codex"] {
+            let tmp = tempfile::tempdir().unwrap();
+            let target = tmp.path().join("target");
+            let outside = tmp.path().join("outside");
+            fs::create_dir_all(target.join(".codex/skills/canon/reference")).unwrap();
+            fs::write(target.join(key), "# topic\n").unwrap();
+            let manifest = CanonicalManifest {
+                version: 1,
+                source_hash: "sha256:legacy".into(),
+                providers: vec!["codex".into()],
+                files: BTreeMap::from([(key.to_string(), content_hash(b"# topic\n"))]),
+            };
+            let removals = legacy_codex_removals(&target, Some(&manifest));
+            assert_eq!(removals, vec![(key, manifest.files[key].as_str())], "{swapped}");
+
+            fs::create_dir_all(&outside).unwrap();
+            let moved = outside.join("moved");
+            fs::rename(target.join(swapped), &moved).unwrap();
+            std::os::unix::fs::symlink(&moved, target.join(swapped)).unwrap();
+            remove_legacy_codex(&target, &removals).unwrap();
+
+            let outside_file = moved.join(key.strip_prefix(swapped).unwrap().trim_start_matches('/'));
+            assert!(outside_file.is_file(), "swapping {swapped} let the unlink follow it");
+            assert!(fs::symlink_metadata(target.join(swapped)).unwrap().file_type().is_symlink());
+        }
     }
 
     #[test]

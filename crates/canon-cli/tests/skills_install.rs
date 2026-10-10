@@ -438,6 +438,41 @@ fn canonical_legacy_codex_migration_keeps_files_the_lock_does_not_prove() {
     assert!(!target.join(".codex/skills/canon/scripts").exists(), "the emptied scripts directory is removed");
 }
 
+/// A legacy directory swapped for a symlink after the lock was written must
+/// never let the migration delete through it: the outside files hold the
+/// same names and the same recorded hashes, so only the no-follow walk keeps
+/// them.
+#[cfg(unix)]
+#[test]
+fn canonical_legacy_codex_migration_never_deletes_through_a_symlinked_legacy_dir() {
+    for swapped in [".codex/skills/canon", ".codex/skills", ".codex"] {
+        let tmp = tempfile::tempdir().unwrap();
+        let source = tmp.path().join("source");
+        let target = tmp.path().join("target");
+        let outside = tmp.path().join("outside");
+        write_canonical_source(&source);
+        let legacy = write_legacy_codex_install(&target);
+        fs::create_dir_all(&outside).unwrap();
+        let moved = outside.join("moved");
+        fs::rename(target.join(swapped), &moved).unwrap();
+        std::os::unix::fs::symlink(&moved, target.join(swapped)).unwrap();
+        let outside_files: Vec<_> = legacy
+            .iter()
+            .filter_map(|relative| relative.strip_prefix(swapped)?.strip_prefix('/'))
+            .map(|rest| moved.join(rest))
+            .collect();
+        assert!(!outside_files.is_empty() && outside_files.iter().all(|path| path.is_file()), "{swapped}");
+
+        skills::install_canonical(&source, &target, Some("codex")).unwrap();
+
+        for path in &outside_files {
+            assert!(path.is_file(), "swapping {swapped} for a symlink let the migration delete {}", path.display());
+        }
+        assert!(fs::symlink_metadata(target.join(swapped)).unwrap().file_type().is_symlink(), "{swapped}");
+        assert!(target.join(".agents/skills/canon/SKILL.md").is_file());
+    }
+}
+
 #[test]
 fn canonical_check_and_doctor_report_legacy_codex_remnant_with_fix() {
     let tmp = tempfile::tempdir().unwrap();
