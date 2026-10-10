@@ -24,6 +24,15 @@
 //! Deterministic rules over the counts, at most [`NEXT_LIMIT`] entries
 //! (the rest are counted, never listed). Subjects are visited closest to
 //! done first: verifying, building, specced, proposed, then shipped.
+//!
+//! # Failing closed
+//! Status never suggests progress the gate would refuse. A corpus kind
+//! routed away from the rung status reads (`scenario`, `subject`,
+//! `review`, `finding`) would read as empty, so status then lists only
+//! the routing repair, like the ship gate and `spec_coverage` refuse
+//! rather than judge an empty corpus. An unusable `spec_coverage`
+//! section is a blocking gap: the policy repair comes first and no
+//! subject is suggested to move on until `canon gate check` can run.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -34,12 +43,13 @@ use canon_gate::review_gate::{open_blockers, review_gap};
 use canon_gate::spec_coverage::{case_gaps, latest_scenarios, latest_subjects, subject_scenarios};
 use canon_gate::review_gate::active_require_review;
 use canon_gate::{latest_verdicts, CellKey, GateContext, GateCtx, LedgerEntry, PolicyDiagnostic, PolicyResolution, RequireReview, SpecCoverage};
-use canon_model::{EvidenceVerdict, Finding, RecordKind, Scenario, Subject, SubjectStatus};
+use canon_model::{EvidenceVerdict, Finding, ProjectId, RecordKind, Scenario, Subject, SubjectStatus};
 use canon_policy::SchemaRegistry;
 use chrono::Utc;
 use serde::Serialize;
 
 use crate::context::{resolve_repo_root, spec_coverage_surface, SpecCoverageSurface};
+use crate::inventory::load_spec_roots;
 
 /// `canon status --json`'s shape version. Bumped when a field changes
 /// meaning or is removed; an added field does not bump it.
@@ -110,7 +120,10 @@ pub struct SubjectSummary {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MissingCase {
+    /// The `specs.roots[]` id the surface lives under.
+    pub project_id: String,
     /// `<area>.<surface>`.
     pub surface: String,
     pub case: String,
@@ -182,10 +195,14 @@ pub fn resolve(repo: &Path) -> StatusReport {
     };
 
     warnings.extend(policy_warning(&ctx.policy));
-    for kind in &ctx.unreadable_kinds {
-        if matches!(kind, RecordKind::Scenario | RecordKind::Subject | RecordKind::Review | RecordKind::Finding) {
-            warnings.push(format!("`{}` routes away from the `local` rung status reads, so its records are not counted", kind.as_str()));
-        }
+    let routed_away: Vec<&str> = ctx
+        .unreadable_kinds
+        .iter()
+        .filter(|kind| matches!(kind, RecordKind::Scenario | RecordKind::Subject | RecordKind::Review | RecordKind::Finding))
+        .map(|kind| kind.as_str())
+        .collect();
+    for kind in &routed_away {
+        warnings.push(format!("`{kind}` routes away from the `local` rung status reads, so its records are not counted"));
     }
     let unreadable = ctx.violations.len() + ctx.corpus_violations.len();
     if unreadable > 0 {
@@ -194,6 +211,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
 
     let joins = Joins { verdicts: latest_verdicts(&ctx), blockers: open_blockers(&ctx) };
     let subjects = latest_subjects(&ctx);
+    let roots: Vec<ProjectId> = load_spec_roots(&repo.join("canon.yaml")).map(|roots| roots.into_iter().map(|r| r.id).collect()).unwrap_or_default();
     let mut summaries: Vec<(&Subject, SubjectSummary)> = subjects.iter().map(|s| (*s, summarize(&ctx, &joins, s))).collect();
     summaries.sort_by_key(|(s, _)| (rank(&DISPLAY_ORDER, s.status), s.subject_id.as_str().to_string()));
 
@@ -207,7 +225,33 @@ pub fn resolve(repo: &Path) -> StatusReport {
         }
     }
 
+    // ── fail closed: a corpus read as empty for a routing reason ──
+    if !routed_away.is_empty() {
+        let settings = routed_away.iter().map(|kind| format!("routing.{kind}: local")).collect::<Vec<_>>().join(", ");
+        next.push(NextStep {
+            command: "canon init --check-config".into(),
+            why: format!(
+                "set `{settings}` in canon.yaml, then check it: status and the gate read only the local rung, so every count and step would rest on an empty corpus"
+            ),
+        });
+        let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
+        let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
+        return finish(&ctx.policy, warnings, summaries, unowned, next);
+    }
+
     // ── next: global rules ──
+    // An unusable `spec_coverage` makes `canon gate check` refuse, so it
+    // blocks every subject: repair it first, and suggest no status move.
+    let policy_blocks = match &ctx.policy.spec_coverage {
+        Some(SpecCoverage::Invalid { detail }) => {
+            next.push(NextStep {
+                command: "canon gate check".into(),
+                why: format!("fix `spec_coverage` in .canon/policy.yaml ({detail}); the gate refuses until it parses, so no subject is suggested to move on"),
+            });
+            true
+        }
+        _ => false,
+    };
     for (id, tagged) in &dangling {
         warnings.push(format!("{} scenario(s) are tagged `@subject:{id}` but no subject `{id}` exists (first: {})", tagged.len(), tagged[0]));
         next.push(NextStep {
@@ -234,7 +278,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
         let mut by_priority: Vec<&(&Subject, SubjectSummary)> = summaries.iter().filter(|(s, _)| NEXT_ORDER.contains(&s.status)).collect();
         by_priority.sort_by_key(|(s, _)| (rank(&NEXT_ORDER, s.status), s.subject_id.as_str().to_string()));
         for (subject, summary) in by_priority {
-            subject_steps(&ctx, &joins, &scenarios, subject, summary, &mut next);
+            subject_steps(&ctx, &joins, &scenarios, &roots, !policy_blocks, subject, summary, &mut next);
         }
     }
 
@@ -348,7 +392,10 @@ fn summarize(ctx: &GateContext, joins: &Joins, subject: &Subject) -> SubjectSumm
     }
     let reviewed = counted.iter().filter(|s| review_gap(ctx, s, distinct_actor).is_none()).count();
     let open_blockers = joins.blockers_of(subject).len();
-    let missing_cases = case_gaps(counted.iter().copied(), require_cases).into_iter().map(|gap| MissingCase { surface: gap.surface, case: gap.case }).collect();
+    let missing_cases = case_gaps(counted.iter().copied(), require_cases)
+        .into_iter()
+        .map(|gap| MissingCase { project_id: gap.project_id.as_str().to_string(), surface: gap.surface, case: gap.case })
+        .collect();
 
     SubjectSummary {
         id: subject.subject_id.as_str().to_string(),
@@ -365,10 +412,11 @@ fn summarize(ctx: &GateContext, joins: &Joins, subject: &Subject) -> SubjectSumm
     }
 }
 
-/// The next scenario number free on `surface` across the whole corpus.
-fn next_number(scenarios: &[&Scenario], surface: &str) -> String {
+/// The next scenario number free on `surface` within spec root `project`.
+fn next_number(scenarios: &[&Scenario], project: &str, surface: &str) -> String {
     let max = scenarios
         .iter()
+        .filter(|s| s.project_id.as_str() == project)
         .filter_map(|s| s.scenario_id.as_str().rsplit_once('.'))
         .filter(|(prefix, _)| *prefix == surface)
         .filter_map(|(_, n)| n.parse::<u32>().ok())
@@ -377,24 +425,51 @@ fn next_number(scenarios: &[&Scenario], surface: &str) -> String {
     format!("{surface}.{:02}", max + 1)
 }
 
+/// `canon scenario new`'s `--project` flag: needed (and refused when
+/// absent) only when the repo configures more than one spec root. A
+/// known owning root is named exactly; otherwise a placeholder.
+fn project_flag(roots: &[ProjectId], project: Option<&str>) -> String {
+    if roots.len() <= 1 {
+        return String::new();
+    }
+    format!(" --project {}", project.unwrap_or("<root-id>"))
+}
+
 /// The per-subject `next:` rules (module doc), each producing at most one
-/// step. Gap rules come first; the status advance only when none fired.
-fn subject_steps(ctx: &GateContext, joins: &Joins, all: &[&Scenario], subject: &Subject, summary: &SubjectSummary, next: &mut Vec<NextStep>) {
+/// step. Gap rules come first; the status advance only when none fired
+/// and `may_advance` (no blocking policy gap).
+#[allow(clippy::too_many_arguments)]
+fn subject_steps(
+    ctx: &GateContext,
+    joins: &Joins,
+    all: &[&Scenario],
+    roots: &[ProjectId],
+    may_advance: bool,
+    subject: &Subject,
+    summary: &SubjectSummary,
+    next: &mut Vec<NextStep>,
+) {
     let id = subject.subject_id.as_str();
     let status = subject.status;
     let before = next.len();
 
     if summary.scenarios + summary.excluded == 0 {
+        let roots_note = if roots.len() > 1 { format!(" (spec roots: {})", roots.iter().map(ProjectId::as_str).collect::<Vec<_>>().join(", ")) } else { String::new() };
         next.push(NextStep {
-            command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject {id} --case happy"),
-            why: format!("{id} owns no scenario; specify its behavior, then `canon inventory sync`"),
+            command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject {id} --case happy{}", project_flag(roots, None)),
+            why: format!("{id} owns no scenario; specify its behavior, then `canon inventory sync`{roots_note}"),
         });
         return;
     }
 
     if let Some(gap) = summary.missing_cases.first() {
         next.push(NextStep {
-            command: format!("canon scenario new {} --title \"<what happens on this path>\" --subject {id} --case {}", next_number(all, &gap.surface), gap.case),
+            command: format!(
+                "canon scenario new {} --title \"<what happens on this path>\" --subject {id} --case {}{}",
+                next_number(all, &gap.project_id, &gap.surface),
+                gap.case,
+                project_flag(roots, Some(&gap.project_id))
+            ),
             why: format!("{id}: {} surface(s) lack a @case:{} scenario (first: {}); add one, never retag an existing scenario", summary.missing_cases.len(), gap.case, gap.surface),
         });
     }
@@ -455,8 +530,8 @@ fn subject_steps(ctx: &GateContext, joins: &Joins, all: &[&Scenario], subject: &
     }
 
     // Every gap rule above was silent: the subject may move on (shipped
-    // and retired have nowhere to go).
-    if next.len() > before {
+    // and retired have nowhere to go), unless a policy gap blocks it.
+    if next.len() > before || !may_advance {
         return;
     }
     if let Some(to) = next_status(status) {

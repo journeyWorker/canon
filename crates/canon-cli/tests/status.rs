@@ -167,11 +167,32 @@ fn status_counts_each_subject_through_the_gates_joins() {
     // building → verifying enters require_review's default scope.
     assert_eq!(s["reviewDue"], true);
     assert_eq!(s["openBlockers"], 1);
-    assert_eq!(s["missingCases"], serde_json::json!([{"surface": "world.demo", "case": "failure"}]));
+    assert_eq!(s["missingCases"], serde_json::json!([{"projectId": "demo", "surface": "world.demo", "case": "failure"}]));
 
     let text = stdout(&run(dir.path(), &["status"]));
+    // The header: the version, then the effective coverage, case and review settings.
+    let header = format!(
+        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=true scope=<every scenario>\n  require_cases: failure\n  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n\n",
+        env!("CARGO_PKG_VERSION")
+    );
+    assert!(text.starts_with(&header), "expected the header\n{header}\ngot\n{text}");
     assert!(text.contains("  building (1):\n    demo-subject: 3 scenarios, 2 evidenced, 1 divergent, 1 reviewed (2 due), 1 open blockers\n"), "{text}");
     assert!(text.contains("      missing @case:failure on world.demo\n"), "{text}");
+}
+
+/// A policy whose settings differ from the defaults prints them as
+/// resolved: a `spec_coverage.scope`, `exclude_lanes`, no required case,
+/// and no review rule.
+#[test]
+fn status_header_prints_the_effective_settings() {
+    let dir = repo();
+    write_policy(dir.path(), "spec_coverage:\n  require_evidence: false\n  scope: [building]\n  exclude_lanes: [process]\n");
+    let text = stdout(&run(dir.path(), &["status"]));
+    let header = format!(
+        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=false scope=building exclude_lanes=process\n  require_cases: <none>\n  require_review: <absent>\n\n",
+        env!("CARGO_PKG_VERSION")
+    );
+    assert!(text.starts_with(&header), "expected the header\n{header}\ngot\n{text}");
 }
 
 #[test]
@@ -197,8 +218,109 @@ fn status_next_names_the_command_for_each_gap() {
         ]
     );
     assert_eq!(report["nextOmitted"], 0);
+    for step in report["next"].as_array().unwrap() {
+        let why = step["why"].as_str().unwrap();
+        assert!(!why.trim().is_empty() && !why.contains('\n'), "every step carries a one-line reason: {step}");
+    }
+
+    // The human form: each command line directly under its `# why` line.
     let text = stdout(&run(dir.path(), &["status"]));
-    assert!(text.contains("next:\n  # demo-subject: 1 surface(s) lack a @case:failure scenario (first: world.demo)"), "{text}");
+    let block = text.split_once("\nnext:\n").map(|(_, rest)| rest).unwrap_or_else(|| panic!("no next: block\n{text}"));
+    let lines: Vec<&str> = block.lines().collect();
+    assert_eq!(lines.len(), 10, "five `# why` + command pairs:\n{block}");
+    for (pair, step) in lines.chunks(2).zip(report["next"].as_array().unwrap()) {
+        assert_eq!(pair[0], format!("  # {}", step["why"].as_str().unwrap()), "{block}");
+        assert_eq!(pair[1], format!("  {}", step["command"].as_str().unwrap()), "{block}");
+    }
+    assert_eq!(lines[0], "  # demo-subject: 1 surface(s) lack a @case:failure scenario (first: world.demo); add one, never retag an existing scenario");
+}
+
+/// Finding 1: a corpus kind routed away from the rung status reads would
+/// read as empty. Status fails closed: only the routing repair is listed,
+/// never a step derived from the empty corpus.
+#[test]
+fn status_fails_closed_when_scenarios_route_away() {
+    let dir = repo();
+    std::fs::write(
+        dir.path().join("canon.yaml"),
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  subject: local\n  scenario: hot\n  evidence_record: local\n",
+    )
+    .unwrap();
+    write_policy(dir.path(), FULL_POLICY);
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &[]);
+
+    let report = status_json(dir.path());
+    assert_eq!(commands(&report), ["canon init --check-config"], "{report}");
+    assert!(report["next"][0]["why"].as_str().unwrap().starts_with("set `routing.scenario: local` in canon.yaml"), "{report}");
+    assert!(
+        report["warnings"].as_array().unwrap().iter().any(|w| w == "`scenario` routes away from the `local` rung status reads, so its records are not counted"),
+        "{report}"
+    );
+    assert_eq!(report["nextOmitted"], 0);
+}
+
+/// Finding 2: an unusable `spec_coverage` makes the gate refuse, so status
+/// lists the policy repair first and suggests no status move, even for a
+/// subject whose scenarios are all evidenced.
+#[test]
+fn status_treats_an_invalid_coverage_policy_as_a_blocking_gap() {
+    let dir = repo();
+    write_policy(dir.path(), "spec_coverage:\n  require_cases: [Not-A-Slug]\n");
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &[]);
+    seed_scenario(dir.path(), "world.demo.01", Some("demo-subject"), Some("failure"));
+    seed_evidence(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
+
+    let report = status_json(dir.path());
+    assert_eq!(commands(&report), ["canon gate check"], "{report}");
+    assert!(report["next"][0]["why"].as_str().unwrap().starts_with("fix `spec_coverage` in .canon/policy.yaml ("), "{report}");
+    assert!(report["policy"]["spec_coverage"]["invalid"].is_string(), "{report}");
+    assert!(report["warnings"][0].as_str().unwrap().starts_with("policy's `spec_coverage` section is unusable"), "{report}");
+    assert_eq!(run(dir.path(), &["gate", "check"]).status.code(), Some(1), "the gate this mirrors refuses the invalid section");
+}
+
+/// Finding 3: with several spec roots, `canon scenario new` refuses a call
+/// without `--project`. Status names the owning root exactly, and the
+/// suggested command runs as printed.
+#[test]
+fn status_names_the_spec_root_when_several_are_configured() {
+    let dir = repo();
+    std::fs::write(
+        dir.path().join("canon.yaml"),
+        format!("{CANON_YAML}specs:\n  roots:\n    - id: demo\n      root: specs/demo\n    - id: other\n      root: specs/other\n"),
+    )
+    .unwrap();
+    std::fs::create_dir_all(dir.path().join("specs/demo")).unwrap();
+    std::fs::create_dir_all(dir.path().join("specs/other")).unwrap();
+    write_policy(dir.path(), FULL_POLICY);
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[]);
+    seed_subject(dir.path(), "empty-subject", SubjectStatus::Building, &[]);
+    seed_scenario(dir.path(), "world.demo.01", Some("demo-subject"), Some("happy"));
+
+    let report = status_json(dir.path());
+    let next = commands(&report);
+    let case_step = "canon scenario new world.demo.02 --title \"<what happens on this path>\" --subject demo-subject --case failure --project demo";
+    assert_eq!(next[0], case_step, "{report}");
+    assert!(next.contains(&"canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject empty-subject --case happy --project <root-id>".to_string()), "{report}");
+    let empty = report["next"].as_array().unwrap().iter().find(|n| n["command"].as_str().unwrap().contains("empty-subject")).unwrap();
+    assert!(empty["why"].as_str().unwrap().ends_with("(spec roots: demo, other)"), "{empty}");
+
+    let bin_dir = Path::new(env!("CARGO_BIN_EXE_canon")).parent().unwrap().to_path_buf();
+    let path = format!("{}:{}", bin_dir.display(), std::env::var("PATH").unwrap_or_default());
+    let out = Command::new("sh").arg("-c").arg(case_step).env("PATH", path).current_dir(dir.path()).output().unwrap();
+    assert!(out.status.success(), "the suggested command must run as printed: {}", stderr(&out));
+    let written = stdout(&out);
+    assert!(written.contains("wrote `@world.demo.02` to ") && written.contains("/specs/demo/"), "written under the demo root: {written}");
+}
+
+/// One spec root: no `--project`, which `canon scenario new` would not need.
+#[test]
+fn status_omits_the_spec_root_flag_with_one_root() {
+    let dir = repo();
+    write_policy(dir.path(), FULL_POLICY);
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[]);
+    seed_scenario(dir.path(), "world.demo.01", Some("demo-subject"), Some("happy"));
+    let report = status_json(dir.path());
+    assert!(commands(&report).iter().all(|c| !c.contains("--project ")), "{report}");
 }
 
 #[test]

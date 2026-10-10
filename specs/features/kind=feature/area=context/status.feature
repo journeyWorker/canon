@@ -94,3 +94,48 @@ Feature: context status
     When status is run
     Then it warns that the ledger holds no scenario records
     And its only next command is the inventory sync, not one empty-subject step per subject
+
+  # canon: {"schema":1,"at":"2026-10-10T15:59:34Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.10
+  Scenario: Status fails closed when a corpus kind routes away from the rung it reads
+    Given a manifest that routes scenario records to a rung other than the local one status reads
+    And a verifying subject that would otherwise read as owning nothing
+    When status is run
+    Then it warns that the scenario kind routes away and its records are not counted
+    And its only next command is the configuration check, with the reason naming the routing setting to restore
+    And no step derived from the unread corpus is listed
+
+  # canon: {"schema":1,"at":"2026-10-10T15:59:34Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.11
+  Scenario: An unusable coverage policy is a blocking gap that withholds every move-on suggestion
+    Given a policy whose coverage section is unusable
+    And a verifying subject whose every scenario is evidenced
+    When status is run
+    Then it warns that the coverage section is unusable
+    And the first next command is the gate check, with the reason naming the section to fix
+    And no subject is suggested to move to its next status
+
+  # canon: {"schema":1,"at":"2026-10-10T15:59:34Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.12
+  Scenario: With several spec roots a suggested scenario command names its root
+    Given a manifest that configures two spec roots
+    And a subject owning a scenario under one root with no failure case, and a subject owning no scenario
+    When status is run
+    Then the suggested failure scenario names its owning root with the project flag, and running it as printed succeeds
+    And the empty subject's suggestion carries a root placeholder and its reason lists the configured roots
+    And with a single spec root no project flag is suggested
+
+  # canon: {"schema":1,"at":"2026-10-10T15:59:34Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.13
+  Scenario: The header prints the policy settings as resolved, not as defaults
+    Given a policy that narrows the coverage scope, excludes a lane, requires no case and has no review rule
+    When status is run
+    Then the header prints each setting as resolved, with no case required and the review rule absent

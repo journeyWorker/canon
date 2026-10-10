@@ -247,7 +247,22 @@ uses, so status and the gate cannot disagree about a gap:
   `canon finding close …`; a due, unreviewed, evidenced scenario →
   `canon review add …` from another session; none of these →
   `canon subject status <id> <next status>`. Last, unowned scenarios →
-  tag them and `canon inventory sync`.
+  tag them and `canon inventory sync`. With more than one `specs.roots[]`
+  entry, every suggested `canon scenario new` carries `--project`: the
+  owning root for a missing case, `<root-id>` (the reason lists the
+  roots) for a subject that owns no scenario yet.
+
+Status fails closed rather than suggest progress the gate would refuse:
+
+- When `scenario`, `subject`, `review` or `finding` routes away from the
+  `local` rung (the only rung status and the gate read), its records
+  would read as empty. The only `next:` step is
+  `canon init --check-config`, with the reason naming the
+  `routing.<kind>: local` setting to restore.
+- When `spec_coverage` is present but unusable, `canon gate check`
+  refuses. The first `next:` step is `canon gate check`, with the reason
+  naming the section to fix, and no subject is suggested to move to its
+  next status until it parses.
 
 `--json` prints one object:
 
@@ -270,6 +285,9 @@ uses, so status and the gate cannot disagree about a gap:
   "nextOmitted": 0
 }
 ```
+
+Each `missingCases` entry is `{ "projectId", "surface", "case" }`: the
+spec root, the `<area>.<surface>`, and the required case it lacks.
 
 `policy.spec_coverage` has the shape `canon context --json` prints
 (`null` when absent, `{"invalid": …}` when unusable). `statusVersion`
