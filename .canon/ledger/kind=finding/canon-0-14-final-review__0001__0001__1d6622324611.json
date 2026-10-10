@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-final014",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T18:12:36.889812Z",
+  "change_id": "canon-0-14-final-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "45f4eb72b26d8d16cee0115f68160ff8a7982dc3",
+  "reviewer": "canon-reviewer-final014",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "gate task success line did not state its write mode, breaking the every-write-command contract"
+}
