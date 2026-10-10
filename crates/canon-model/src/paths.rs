@@ -45,6 +45,10 @@ pub const PLUGINS_DIR: &str = ".canon/plugins";
 /// The gate's policy expressions (authored).
 pub const POLICY_FILE: &str = ".canon/policy.yaml";
 
+/// Who approved the policy, and which bytes (`canon policy approve`;
+/// authored, git-tracked).
+pub const POLICY_APPROVAL_FILE: &str = ".canon/policy.approval.json";
+
 /// `canon report`'s generated-never-edited markdown output.
 pub const REPORT_FILE: &str = ".canon/REPORT.md";
 
@@ -85,6 +89,7 @@ mod tests {
             VOCAB_DIR,
             PLUGINS_DIR,
             POLICY_FILE,
+            POLICY_APPROVAL_FILE,
             REPORT_FILE,
             DASHBOARD_SNAPSHOT_DIR,
             R2_LOCAL_DIR,

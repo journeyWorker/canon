@@ -123,3 +123,24 @@ Feature: finding add
     When finding add is run with it
     Then the command exits 2 naming --session-id and the SessionId grammar
     And nothing is staged
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.add.30
+  Scenario: A short sha is resolved to the full commit it names
+    Given a git repository holding a commit
+    When canon finding add names it by a short sha on --reviewed-sha, --resolution-sha or --introduced-by
+    Then git resolves the short sha in that repository
+    And the staged finding stores the full 40-character sha, never the abbreviation
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
+  @subject:finding-lifecycle
+  @case:failure
+  @finding.add.31
+  Scenario: A short sha that names no single commit is refused
+    Given a git repository
+    When canon finding add names a short sha that matches no commit, more than one commit, or only a tag that peels to a commit
+    Then the add is refused with exit 2 naming the flag and the value
+    And outside a git work tree a short sha is refused, since nothing can resolve it
+    And nothing is staged

@@ -146,7 +146,10 @@ query:
 ```
 
 Every query, export, and purge appends an actor-stamped record to
-`.canon/audit/access.jsonl` (mode `0600` on creation). `CANON_ACTOR` takes
+`.canon/audit/access.jsonl` (mode `0600` on creation) in the repository
+whose `canon.yaml` it read (through `--repo` or `--canon-yaml`), never in
+the current directory; with no `canon.yaml` there is no audit and nothing
+is written. `CANON_ACTOR` takes
 precedence over the OS username. Audit rows contain operation, kind, scope,
 sensitive flag, counts, and timestamp only—never query text, secrets, or
 record bodies.

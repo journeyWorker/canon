@@ -93,3 +93,13 @@ Feature: finding close
     Given a finding raised with --session-id sess-raise and promoted
     When it is closed with --session-id sess-close and promoted
     Then the raised version keeps sess-raise and the transition carries sess-close
+
+  # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.close.80
+  Scenario: Closing with a short resolution sha records the full commit
+    Given a committed open finding and the commit that fixed it
+    When canon finding close --disposition fixed names that commit by a short --resolution-sha
+    Then the staged transition records the full sha git resolved it to
+    And a short sha that names no commit is refused with exit 2

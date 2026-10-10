@@ -43,14 +43,43 @@ fn actor() -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-fn audit_path(repo: &Path) -> PathBuf {
-    repo.join(".canon/audit/access.jsonl")
+/// Where an access event is appended: beside the `canon.yaml` the
+/// command read, or nowhere when that file does not exist.
+///
+/// `canon.yaml` is the only marker that a directory is a canon repo. A
+/// read run where canon was never set up, or against another repository
+/// through `--repo`/`--canon-yaml`, used to create `.canon/audit/` in the
+/// current directory — an untracked write in a repository the operator
+/// had only read (0.15 D6, dogfood eval 2 G14). The event now goes to
+/// the repository whose `canon.yaml` was read, and to no directory at
+/// all when there is none.
+fn audit_path(repo: &Path, canon_yaml: Option<&Path>) -> Option<PathBuf> {
+    let yaml = resolve_canon_yaml(repo, canon_yaml);
+    if !yaml.is_file() {
+        return None;
+    }
+    let root = yaml.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    Some(root.join(".canon/audit/access.jsonl"))
 }
 
 /// Append one access event without recording query contents, credentials, or
-/// record bodies. New audit files are created mode 0600.
-pub fn append_access_audit(repo: &Path, operation: &str, kind: Option<RecordKind>, scope: &str, sensitive: bool, matched: usize, deleted: usize) -> Result<(), RetentionError> {
-    let path = audit_path(repo);
+/// record bodies. New audit files are created mode 0600. Silently writes
+/// nothing when there is no `canon.yaml` to scope the event to
+/// ([`audit_path`]).
+#[allow(clippy::too_many_arguments)]
+pub fn append_access_audit(
+    repo: &Path,
+    canon_yaml: Option<&Path>,
+    operation: &str,
+    kind: Option<RecordKind>,
+    scope: &str,
+    sensitive: bool,
+    matched: usize,
+    deleted: usize,
+) -> Result<(), RetentionError> {
+    let Some(path) = audit_path(repo, canon_yaml) else {
+        return Ok(());
+    };
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -201,7 +230,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, dry_run: 
         let value = purge_value(&outcome, learn_counts);
         let matched = registry_matched + learn_matched;
         let deleted = registry_deleted + learn_deleted;
-        append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
+        append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
         output_json_or_human(&value, json_output, &format!("canon purge --kind {}: {} matched, {} deleted", kind.as_str(), matched, deleted));
         Ok(())
     })();
@@ -213,7 +242,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, dry_run: 
                 RetentionError::PartialPurge { matched, deleted, .. } => (*matched, *deleted),
                 _ => (0, 0),
             };
-            let _ = append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted);
+            let _ = append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted);
             if json_output {
                 if let RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) = &err {
                     println!("{}", serde_json::to_string_pretty(&partial_purge_value(kind, before, *matched, *deleted, &err.to_string())).expect("partial purge manifest is serializable"));
@@ -272,14 +301,14 @@ pub fn run_export(repo: &Path, kind: RecordKind, before: Option<DateTime<Utc>>, 
         } else {
             println!("{}", String::from_utf8_lossy(&encoded));
         }
-        append_access_audit(repo, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
+        append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
         if out.is_some() && !json_output { eprintln!("canon export: wrote {} record(s)", rows.len()); }
         Ok(())
     })();
     match result {
         Ok(()) => 0,
         Err(err) => {
-            let _ = append_access_audit(repo, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, 0, 0);
+            let _ = append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, 0, 0);
             eprintln!("canon export: {err}");
             2
         }
@@ -347,13 +376,24 @@ mod tests {
     #[test]
     fn audit_file_is_created_restrictively() {
         let dir = tempfile::tempdir().unwrap();
-        append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
+        fs::write(dir.path().join("canon.yaml"), "").unwrap();
+        append_access_audit(dir.path(), None, "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
         use std::os::unix::fs::PermissionsExt;
-        let mode = fs::metadata(audit_path(dir.path())).unwrap().permissions().mode() & 0o777;
+        let mode = fs::metadata(audit_path(dir.path(), None).unwrap()).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
+    }
+
+    #[test]
+    fn no_canon_yaml_means_no_audit_write() {
+        let dir = tempfile::tempdir().unwrap();
+        append_access_audit(dir.path(), None, "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
+        assert!(fs::read_dir(dir.path()).unwrap().next().is_none(), "a directory without canon.yaml must be left untouched");
     }
 }
 
-pub fn audit_query(repo: &Path, kind: RecordKind, since: Option<DateTime<Utc>>, sensitive: bool, matched: usize) -> Result<(), RetentionError> {
-    append_access_audit(repo, "query", Some(kind), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
+/// The access event for one `canon query`, scoped like every other
+/// event ([`audit_path`]): `canon_yaml` is the query's own
+/// `--canon-yaml` override, when it has one.
+pub fn audit_query(repo: &Path, canon_yaml: Option<&Path>, kind: RecordKind, since: Option<DateTime<Utc>>, sensitive: bool, matched: usize) -> Result<(), RetentionError> {
+    append_access_audit(repo, canon_yaml, "query", Some(kind), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
 }

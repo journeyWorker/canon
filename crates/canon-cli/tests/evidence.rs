@@ -158,6 +158,42 @@ fn the_three_command_loop_flips_a_checkbox_on_authored_evidence() {
     assert_eq!(body["task_id"], "it-evidence-loop#1.1", "{body}");
 }
 
+/// 0.15 D6 (dogfood eval 2 G13): `canon gate task` warns, and still
+/// flips, when a task's evidence binds no file and its `--ref` is a canon
+/// command — canon's own output, cited as proof of the task. A bound
+/// artifact, or a ref that is not a canon command, draws no warning.
+#[test]
+fn gate_task_warns_on_a_canon_command_cited_as_proof_with_nothing_bound() {
+    let change_id = "it-evidence-circular";
+    let dir = repo_with_plan_corpus(change_id, "- [ ] 1.1 Circular proof\n- [ ] 1.2 Bound proof\n- [ ] 1.3 A test run\n");
+    let repo = dir.path();
+    std::fs::write(repo.join("proof.txt"), "the screenshot list\n").unwrap();
+
+    for (task, evidence_ref, extra) in [
+        ("it-evidence-circular#1.1", "canon gate check", &[][..]),
+        ("it-evidence-circular#1.2", "canon status", &["--artifact", "proof.txt"][..]),
+        ("it-evidence-circular#1.3", "cargo test -p demo", &[][..]),
+    ] {
+        let mut args = vec!["evidence", "add", "--task", task, "--kind", "test-run", "--ref", evidence_ref, "--role", "implementer"];
+        args.extend_from_slice(extra);
+        let added = run_canon(&args, repo);
+        assert!(added.status.success(), "{task}: {}", stderr(&added));
+    }
+    assert!(run_canon(&["gate", "promote"], repo).status.success());
+
+    let circular = run_canon(&["gate", "task", "it-evidence-circular#1.1"], repo);
+    assert_eq!(circular.status.code(), Some(0), "a warning never refuses: {}", stderr(&circular));
+    assert!(tasks_md(repo, change_id).contains("- [x] 1.1"), "the row still flips");
+    let warning = stderr(&circular);
+    assert!(warning.contains("warning") && warning.contains("`canon gate check`") && warning.contains("--artifact <path>"), "{warning}");
+
+    for task in ["it-evidence-circular#1.2", "it-evidence-circular#1.3"] {
+        let flipped = run_canon(&["gate", "task", task], repo);
+        assert_eq!(flipped.status.code(), Some(0), "{task}: {}", stderr(&flipped));
+        assert!(!stderr(&flipped).contains("warning"), "{task}: {}", stderr(&flipped));
+    }
+}
+
 /// Task 4.1's shared-admission requirement: an id the plan corpus does
 /// not carry is refused loudly (exit `2`) naming the id — the same
 /// decision `canon dispatch begin --task` makes, through the same
