@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:51:55.312612Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init init_refuses_a_duplicate_begin_marker_and_changes_nothing"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "authoring.init.10",
+  "schema": 1,
+  "staging_id": "b929555a0f2f",
+  "verdict": "faithful"
+}

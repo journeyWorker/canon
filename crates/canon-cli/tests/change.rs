@@ -95,11 +95,82 @@ fn change_new_refuses_an_existing_slug_and_leaves_it_untouched() {
     assert_eq!(std::fs::read(&proposal_path).unwrap(), before);
 
     // A change dir with no record yet (written by hand, not imported) is
-    // refused too.
-    std::fs::create_dir_all(dir.path().join("openspec/changes/by-hand")).unwrap();
+    // refused too, and its proposal is left byte for byte.
+    let by_hand = dir.path().join("openspec/changes/by-hand");
+    std::fs::create_dir_all(&by_hand).unwrap();
+    std::fs::write(by_hand.join("proposal.md"), "# By hand\n\n## Why\n\nWritten by a person.\n").unwrap();
     let out = run(dir.path(), &["change", "new", "by-hand", "--subject", "auth", "--title", "By hand"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains("openspec/changes/by-hand` already exists"), "{}", stderr(&out));
+    assert_eq!(std::fs::read_to_string(by_hand.join("proposal.md")).unwrap(), "# By hand\n\n## Why\n\nWritten by a person.\n");
+    assert!(!by_hand.join("tasks.md").exists(), "a refused change new writes no file into the existing dir");
+    assert!(!query(dir.path(), "change").iter().any(|c| c["change_id"] == "by-hand"), "a refused change new records nothing");
+}
+
+/// Entries `canon change new` leaves under `.canon/` (its staging dirs).
+fn staging_leftovers(repo: &Path) -> Vec<String> {
+    std::fs::read_dir(repo.join(".canon"))
+        .map(|entries| entries.filter_map(Result::ok).map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.starts_with("change-new-")).collect())
+        .unwrap_or_default()
+}
+
+/// Nothing of `add-login` survives a failed `change new`: no change dir,
+/// no staging dir, no change record, no link on the subject.
+fn assert_nothing_left(repo: &Path) {
+    assert!(!repo.join("openspec/changes/add-login").exists(), "the change dir must be removed");
+    assert!(staging_leftovers(repo).is_empty(), "staging dirs left: {:?}", staging_leftovers(repo));
+    assert!(query(repo, "change").is_empty(), "no change record may be written");
+    let subjects = query(repo, "subject");
+    assert!(subjects.iter().all(|s| s["change_ids"].as_array().is_none_or(|ids| ids.is_empty())), "{subjects:?}");
+}
+
+#[test]
+fn change_new_leaves_nothing_behind_when_publishing_the_change_dir_fails() {
+    let dir = TempDir::new().unwrap();
+    std::fs::write(
+        dir.path().join("canon.yaml"),
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  subject: local\n  change: local\nplans:\n  sources:\n    - { dialect: openspec, root: . }\n",
+    )
+    .unwrap();
+    // `openspec` is a file, so `openspec/changes/<slug>` cannot be created.
+    std::fs::write(dir.path().join("openspec"), "not a directory\n").unwrap();
+    assert!(run(dir.path(), &["subject", "new", "auth", "--domain", "dev", "--title", "Auth"]).status.success());
+
+    let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    assert!(stderr(&out).contains("failed to create `openspec/changes/add-login`"), "{}", stderr(&out));
+    assert!(stdout(&out).is_empty(), "nothing may be reported written: {}", stdout(&out));
+    assert_eq!(std::fs::read_to_string(dir.path().join("openspec")).unwrap(), "not a directory\n");
+    assert_nothing_left(dir.path());
+}
+
+/// The adopt write itself fails (the change ledger directory is read-only),
+/// after the change dir was published: the dir is taken back and no record
+/// or subject link remains.
+#[cfg(unix)]
+#[test]
+fn change_new_leaves_nothing_behind_when_the_adopt_write_fails() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = inited_repo_with_subject();
+    let ledger_change = dir.path().join(".canon/ledger/kind=change");
+    std::fs::create_dir_all(&ledger_change).unwrap();
+    std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o555)).unwrap();
+    // Root ignores directory permissions; there is no failure to force.
+    if std::fs::write(ledger_change.join("probe"), "").is_ok() {
+        std::fs::remove_file(ledger_change.join("probe")).unwrap();
+        std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o755)).unwrap();
+        eprintln!("skipped: running with permissions that ignore a read-only directory");
+        return;
+    }
+
+    let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
+    std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    assert!(stderr(&out).contains("failed to record the change, nothing was kept"), "{}", stderr(&out));
+    assert!(stdout(&out).is_empty(), "nothing may be reported written: {}", stdout(&out));
+    assert!(dir.path().join("openspec/changes").is_dir(), "the pre-existing changes dir is kept");
+    assert_nothing_left(dir.path());
 }
 
 #[test]

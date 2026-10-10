@@ -31,7 +31,8 @@ Feature: authoring change
     Given a change already created under a slug, or a change directory written by hand
     When canon change new is run with that slug again
     Then it exits 2 saying it already exists
-    And the existing proposal is byte-identical
+    And the existing proposal is byte-identical on both paths
+    And no file is added to the hand-written directory and no change record is written for it
 
   # canon: {"schema":1,"at":"2026-10-10T15:34:48Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -42,3 +43,13 @@ Feature: authoring change
     When canon change new is run
     Then it exits 2 naming the missing openspec source and what to add
     And no openspec directory is created
+
+  # canon: {"schema":1,"at":"2026-10-10T15:51:40Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.change.05
+  Scenario: A change whose later steps fail leaves nothing behind
+    Given a repo where the change dir cannot be created, or where the change record cannot be written
+    When canon change new is run
+    Then it exits 2 and reports nothing as written
+    And no change dir, no staging dir under .canon, no change record and no subject link remain

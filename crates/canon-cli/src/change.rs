@@ -1,11 +1,20 @@
 //! `canon change new <slug> --subject <id> --title <t>` (0.14 D2): the
 //! official path to a plan change. It scaffolds an openspec change dir
 //! (`proposal.md` + `tasks.md`) under the repo's configured `openspec`
-//! plans source, imports it through the same `canon ingest plans` pass
-//! ([`crate::plans::run`], one-shot over that one source), and adopts
-//! it into the subject through the same write `canon subject adopt`
-//! performs ([`crate::subject::adopt_change`]). Nothing in `canon.yaml`
-//! needs a hand edit: `canon init` configures the source.
+//! plans source, reads it with the same `openspec` plan adapter `canon
+//! ingest plans` uses, and records it adopted into the subject through
+//! the same write `canon subject adopt` performs
+//! ([`crate::subject::persist_adoption`]). Nothing in `canon.yaml` needs
+//! a hand edit: `canon init` configures the source.
+//!
+//! # All or nothing
+//! The files are staged in a private directory under `.canon/` and
+//! parsed there; only when that succeeds is the change dir moved into
+//! place, and only then are the records written. Any failure removes
+//! the staged files, the published change dir and any directory created
+//! for it. The one thing that cannot be taken back is a change record
+//! already written when the subject write after it fails (the ledger is
+//! append-only); the error names it.
 //!
 //! # Refusals (exit `2`, nothing written)
 //! - no `openspec` source in `canon.yaml`'s `plans.sources`;
@@ -16,7 +25,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use canon_model::{ChangeId, SubjectId};
+use canon_ingest::{find_plan_adapter, PlanSourceHandle};
+use canon_model::{paths, Change, ChangeId, SubjectId};
 
 use crate::context::{resolve_canon_yaml, resolve_repo_root};
 
@@ -65,8 +75,62 @@ fn display_rel(path: &Path, repo: &Path) -> String {
     path.strip_prefix(repo).unwrap_or(path).display().to_string()
 }
 
-/// `canon change new` (module doc). Exit `0` written + imported +
-/// adopted, `2` refused or failed.
+/// A directory this command created and removes again unless
+/// [`Created::keep`] is called — the staging dir always, the published
+/// change dir (or the first ancestor of it this command created) on
+/// every failure path.
+struct Created(Option<PathBuf>);
+
+impl Created {
+    fn keep(mut self) {
+        self.0 = None;
+    }
+}
+
+impl Drop for Created {
+    fn drop(&mut self) {
+        if let Some(dir) = self.0.take() {
+            let _ = fs::remove_dir_all(dir);
+        }
+    }
+}
+
+/// The outermost missing directory on the way to `dir` (`dir` itself
+/// when only it is missing) — what removing undoes a `create_dir_all`.
+fn first_missing_ancestor(dir: &Path) -> PathBuf {
+    let mut missing = dir.to_path_buf();
+    while let Some(parent) = missing.parent() {
+        if parent.as_os_str().is_empty() || parent.exists() {
+            break;
+        }
+        missing = parent.to_path_buf();
+    }
+    missing
+}
+
+/// Write the two files into `staging/<slug>/` and read them back with
+/// the `openspec` plan adapter: the one `Change` it yields is exactly
+/// what `canon ingest plans` would import from the published dir.
+fn stage_change(staging: &Path, slug: &ChangeId, title: &str) -> Result<Change, String> {
+    let dir = staging.join(slug.as_str());
+    fs::create_dir_all(&dir).map_err(|e| format!("failed to create the staging dir `{}`: {e}", dir.display()))?;
+    for (name, content) in [("proposal.md", proposal_md(title)), ("tasks.md", tasks_md(title))] {
+        fs::write(dir.join(name), content).map_err(|e| format!("failed to stage `{name}`: {e}"))?;
+    }
+    let entry = find_plan_adapter(DIALECT).ok_or_else(|| format!("the `{DIALECT}` plan dialect is not registered"))?;
+    let outcome = entry.adapter.parse(&PlanSourceHandle::Path(staging.to_path_buf()));
+    if !outcome.malformed.is_empty() {
+        return Err(format!("the scaffolded change did not parse as `{DIALECT}`: {:?}", outcome.malformed));
+    }
+    outcome
+        .changes
+        .into_iter()
+        .find(|change| &change.change_id == slug)
+        .ok_or_else(|| format!("the scaffolded change `{}` did not parse as `{DIALECT}`", slug.as_str()))
+}
+
+/// `canon change new` (module doc). Exit `0` written + adopted, `2`
+/// refused or failed with nothing left behind.
 pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, title: &str) -> i32 {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = resolve_canon_yaml(&repo, None);
@@ -84,21 +148,21 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, title: &str
         return EXIT_REFUSED;
     };
 
-    match crate::subject::subject_and_change_exist(&repo, subject_id, slug) {
-        Ok((false, _)) => {
+    let subject = match crate::subject::lookup_adoption(&repo, subject_id, slug) {
+        Ok((None, _)) => {
             eprintln!("canon change new: refused — subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str());
             return EXIT_REFUSED;
         }
-        Ok((true, true)) => {
+        Ok((Some(_), Some(_))) => {
             eprintln!("canon change new: refused — change `{}` already exists; pick another slug", slug.as_str());
             return EXIT_REFUSED;
         }
-        Ok((true, false)) => {}
+        Ok((Some(subject), None)) => subject,
         Err(e) => {
             eprintln!("canon change new: {e}");
             return EXIT_REFUSED;
         }
-    }
+    };
 
     let changes = changes_dir(source.root());
     let dir = changes.join(slug.as_str());
@@ -109,31 +173,40 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, title: &str
         return EXIT_REFUSED;
     }
 
-    if let Err(e) = fs::create_dir_all(&dir) {
+    let staging_path = repo.join(paths::CANON_DIR).join(format!("change-new-{}-{}", slug.as_str(), std::process::id()));
+    let staging = Created(Some(first_missing_ancestor(&staging_path)));
+    let change = match stage_change(&staging_path, slug, title) {
+        Ok(change) => change,
+        Err(e) => {
+            eprintln!("canon change new: {e}");
+            return EXIT_REFUSED;
+        }
+    };
+
+    let published = Created(Some(first_missing_ancestor(&dir)));
+    let publish = fs::create_dir_all(&changes).and_then(|()| fs::rename(staging_path.join(slug.as_str()), &dir));
+    if let Err(e) = publish {
         eprintln!("canon change new: failed to create `{}`: {e}", display_rel(&dir, &repo));
         return EXIT_REFUSED;
     }
-    for (name, content) in [("proposal.md", proposal_md(title)), ("tasks.md", tasks_md(title))] {
-        let path = dir.join(name);
-        if let Err(e) = fs::write(&path, content) {
-            eprintln!("canon change new: failed to write `{}`: {e}", display_rel(&path, &repo));
-            return EXIT_REFUSED;
-        }
-        println!("canon change new: wrote {}", display_rel(&path, &repo));
-    }
+    drop(staging);
 
-    if let Err(e) = crate::plans::run(&repo, Some(DIALECT), Some(source.root())) {
-        eprintln!("canon change new: wrote the change dir but `canon ingest plans` failed: {e}");
+    if let Err(e) = crate::subject::persist_adoption(&repo, change, subject) {
+        match e.change_written {
+            None => eprintln!("canon change new: failed to record the change, nothing was kept: {}", e.message),
+            Some(location) => eprintln!(
+                "canon change new: failed to update subject `{}`: {}; the change dir was removed, but change record `{location}` was already written and the ledger is append-only",
+                subject_id.as_str(),
+                e.message
+            ),
+        }
         return EXIT_REFUSED;
     }
-    match crate::subject::adopt_change(&repo, slug, subject_id) {
-        Ok(_) => {
-            println!("canon change new: imported change `{}` and adopted it into subject `{}`", slug.as_str(), subject_id.as_str());
-            0
-        }
-        Err(e) => {
-            eprintln!("canon change new: wrote the change dir but could not adopt it: {e}");
-            EXIT_REFUSED
-        }
+    published.keep();
+
+    for name in ["proposal.md", "tasks.md"] {
+        println!("canon change new: wrote {}", display_rel(&dir.join(name), &repo));
     }
+    println!("canon change new: recorded change `{}` adopted into subject `{}`", slug.as_str(), subject_id.as_str());
+    0
 }

@@ -206,34 +206,86 @@ The loop:
 `.canon/policy.yaml` is what the gate grades against; a human approves it.
 <!-- canon:end -->";
 
+/// A fence opener/closer line: up to three spaces, then three or more
+/// backticks or tildes (CommonMark). Returns the fence character, its
+/// run length, and whether only whitespace follows the run (a closing
+/// fence may carry nothing else).
+fn fence_of(line: &str) -> Option<(char, usize, bool)> {
+    let indent = line.len() - line.trim_start_matches(' ').len();
+    if indent > 3 {
+        return None;
+    }
+    let rest = &line[indent..];
+    let ch = rest.chars().next().filter(|c| *c == '`' || *c == '~')?;
+    let run = rest.len() - rest.trim_start_matches(ch).len();
+    (run >= 3).then(|| (ch, run, rest[run..].trim().is_empty()))
+}
+
+/// The byte span `[start, end)` of every standalone `marker` line (the
+/// line's trimmed text is exactly the marker) outside fenced code
+/// blocks, with `end` before the line's newline. `Err` when the text
+/// ends inside an unclosed fence: a block appended there would land in
+/// the fence and never be found again.
+fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usize, usize)>), String> {
+    let (mut begins, mut ends) = (Vec::new(), Vec::new());
+    let mut open_fence: Option<(char, usize)> = None;
+    let mut offset = 0;
+    for raw in text.split_inclusive('\n') {
+        let line = raw.trim_end_matches(['\n', '\r']);
+        let span = (offset, offset + line.len());
+        offset += raw.len();
+        match (open_fence, fence_of(line)) {
+            (None, Some((ch, run, _))) => open_fence = Some((ch, run)),
+            (Some((open_ch, open_run)), Some((ch, run, true))) if ch == open_ch && run >= open_run => open_fence = None,
+            (Some(_), _) => {}
+            (None, None) if line.trim() == AGENTS_BEGIN => begins.push(span),
+            (None, None) if line.trim() == AGENTS_END => ends.push(span),
+            (None, None) => {}
+        }
+    }
+    if open_fence.is_some() {
+        return Err("AGENTS.md ends inside an unclosed code fence; close it and rerun".to_string());
+    }
+    Ok((begins, ends))
+}
+
 /// `AGENTS.md`'s content with the canon block merged in. `existing` is
-/// the current file (`None` when absent). The first
-/// [`AGENTS_BEGIN`]..[`AGENTS_END`] span is replaced in place; with no
-/// begin marker the block is appended after a blank line. Bytes outside
-/// the markers are never changed, and merging the result again is a
-/// byte-identical no-op. A begin marker with no end marker after it is
-/// refused rather than guessed at.
+/// the current file (`None` when absent). Only standalone marker lines
+/// outside fenced code blocks count as markers, so a file that quotes
+/// them in a code sample is not mistaken for one canon owns. With no
+/// markers the block is appended after a blank line; with exactly one
+/// begin line followed by exactly one end line, that span is replaced
+/// in place. Any other arrangement (a duplicate or unmatched marker, an
+/// end before the begin, a trailing unclosed fence) is refused rather
+/// than guessed at, before anything is written. Bytes outside the
+/// markers are never changed, and merging the result again is a
+/// byte-identical no-op.
 fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
     let Some(text) = existing else {
         return Ok(format!("{AGENTS_BLOCK}\n"));
     };
-    if let Some(begin) = text.find(AGENTS_BEGIN) {
-        let Some(end_rel) = text[begin..].find(AGENTS_END) else {
-            return Err(format!("AGENTS.md has `{AGENTS_BEGIN}` without a matching `{AGENTS_END}` after it; fix the markers by hand and rerun"));
-        };
-        let end = begin + end_rel + AGENTS_END.len();
-        return Ok(format!("{}{AGENTS_BLOCK}{}", &text[..begin], &text[end..]));
-    }
-    let mut out = text.to_string();
-    if !out.is_empty() {
-        if !out.ends_with('\n') {
+    match marker_lines(text)? {
+        (begins, ends) if begins.is_empty() && ends.is_empty() => {
+            let mut out = text.to_string();
+            if !out.is_empty() {
+                if !out.ends_with('\n') {
+                    out.push('\n');
+                }
+                out.push('\n');
+            }
+            out.push_str(AGENTS_BLOCK);
             out.push('\n');
+            Ok(out)
         }
-        out.push('\n');
+        (begins, ends) if begins.len() == 1 && ends.len() == 1 && begins[0].1 <= ends[0].0 => {
+            Ok(format!("{}{AGENTS_BLOCK}{}", &text[..begins[0].0], &text[ends[0].1..]))
+        }
+        (begins, ends) => Err(format!(
+            "AGENTS.md must hold exactly one `{AGENTS_BEGIN}` line followed by one `{AGENTS_END}` line outside code fences (found {} begin, {} end); fix the markers by hand and rerun",
+            begins.len(),
+            ends.len()
+        )),
     }
-    out.push_str(AGENTS_BLOCK);
-    out.push('\n');
-    Ok(out)
 }
 
 /// What `canon init` writes besides `canon.yaml` (the opt-out flags).
@@ -562,7 +614,29 @@ mod tests {
     }
 
     #[test]
-    fn merge_agents_md_refuses_a_begin_marker_without_an_end() {
-        assert!(merge_agents_md(Some(&format!("{AGENTS_BEGIN}\nhalf a block\n"))).is_err());
+    fn merge_agents_md_refuses_any_marker_arrangement_but_one_ordered_pair() {
+        for text in [
+            format!("{AGENTS_BEGIN}\nhalf a block\n"),
+            format!("{AGENTS_END}\n"),
+            format!("{AGENTS_BEGIN}\n{AGENTS_BEGIN}\nx\n{AGENTS_END}\n"),
+            format!("{AGENTS_BEGIN}\nx\n{AGENTS_END}\n{AGENTS_END}\n"),
+            format!("{AGENTS_END}\nx\n{AGENTS_BEGIN}\n"),
+            format!("{AGENTS_BEGIN}\na\n{AGENTS_END}\n{AGENTS_BEGIN}\nb\n{AGENTS_END}\n"),
+        ] {
+            assert!(merge_agents_md(Some(&text)).is_err(), "must refuse: {text}");
+        }
+    }
+
+    #[test]
+    fn merge_agents_md_ignores_markers_inside_code_fences() {
+        let existing = format!("# Docs\n\n```md\n{AGENTS_BEGIN}\nquoted\n{AGENTS_END}\n```\n\n~~~~\n{AGENTS_BEGIN}\n~~~\nstill fenced\n~~~~\n");
+        let merged = merge_agents_md(Some(&existing)).unwrap();
+        assert_eq!(merged, format!("{existing}\n{AGENTS_BLOCK}\n"), "fenced markers are text, so the block is appended");
+        assert_eq!(merge_agents_md(Some(&merged)).unwrap(), merged);
+    }
+
+    #[test]
+    fn merge_agents_md_refuses_a_trailing_unclosed_fence() {
+        assert!(merge_agents_md(Some("# Docs\n\n```\nnever closed\n")).is_err());
     }
 }

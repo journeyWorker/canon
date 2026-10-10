@@ -378,48 +378,64 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
     }
 }
 
-/// The adopt write itself, shared by `canon subject adopt` and `canon
-/// change new`. Loads the latest of each record (fold-latest), refusing
-/// if either is absent, then writes BOTH re-stamped through the routed
-/// tiers: the change with `subject_id` set (design D3 — stamped at
-/// adoption time, never derived in canon-model), and the subject with
-/// `change_id` appended to `change_ids` (deduped). Both carry a fresh
-/// envelope `at` so the update deterministically supersedes the prior
-/// version in the query fold. Returns the updated subject, or the
-/// operator-facing message (without the command prefix).
+/// Look up, then write, an adoption: `canon subject adopt`'s whole
+/// effect. Refuses (`Err` with the operator-facing message, no command
+/// prefix) when either record is absent; see [`persist_adoption`] for
+/// the write.
 pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId) -> Result<Subject, String> {
+    let (subject, change) = lookup_adoption(repo, subject_id, change_id)?;
+    let Some(subject) = subject else {
+        return Err(format!("refused — subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str()));
+    };
+    let Some(change) = change else {
+        return Err(format!("refused — change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str()));
+    };
+    persist_adoption(repo, change, subject).map_err(|e| e.message)
+}
+
+/// The latest `subject_id` Subject and `change_id` Change (fold-latest),
+/// each `None` when absent — read through the routed tiers the adopt
+/// write uses.
+pub(crate) fn lookup_adoption(repo: &Path, subject_id: &SubjectId, change_id: &ChangeId) -> Result<(Option<Subject>, Option<Change>), String> {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = resolve_canon_yaml(&repo, None);
     let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject]).map_err(|e| e.to_string())?;
+    Ok((find_subject(&registry, subject_id)?, find_change(&registry, change_id)?))
+}
 
-    let Some(mut subject) = find_subject(&registry, subject_id)? else {
-        return Err(format!("refused — subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str()));
-    };
-    let Some(mut change) = find_change(&registry, change_id)? else {
-        return Err(format!("refused — change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str()));
-    };
+/// A failed [`persist_adoption`]: the store error, and whether the change
+/// record had already been written (its tier location) when the subject
+/// write failed. The ledger is append-only, so that record cannot be
+/// taken back.
+pub(crate) struct AdoptionWriteError {
+    pub(crate) change_written: Option<String>,
+    pub(crate) message: String,
+}
+
+/// The adopt write, shared by `canon subject adopt` and `canon change
+/// new`: the change with `subject_id` set (design D3 — stamped at
+/// adoption time, never derived in canon-model) and the subject with the
+/// change appended to `change_ids` (deduped), both re-stamped with a
+/// fresh envelope `at` so they deterministically supersede the prior
+/// versions in the query fold, persisted through the routed tiers —
+/// change first, then subject.
+pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Subject) -> Result<Subject, AdoptionWriteError> {
+    let repo = resolve_repo_root(repo);
+    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject])
+        .map_err(|e| AdoptionWriteError { change_written: None, message: e.to_string() })?;
 
     let now = Utc::now();
-    change.subject_id = Some(subject_id.clone());
+    change.subject_id = Some(subject.subject_id.clone());
     change.envelope.at = now;
-    if !subject.change_ids.contains(change_id) {
-        subject.change_ids.push(change_id.clone());
+    if !subject.change_ids.contains(&change.change_id) {
+        subject.change_ids.push(change.change_id.clone());
     }
     subject.envelope.at = now;
 
-    registry.persist(&change).map_err(|e| e.to_string())?;
-    registry.persist(&subject).map_err(|e| e.to_string())?;
+    let receipt = registry.persist(&change).map_err(|e| AdoptionWriteError { change_written: None, message: e.to_string() })?;
+    registry.persist(&subject).map_err(|e| AdoptionWriteError { change_written: Some(receipt.location), message: e.to_string() })?;
     Ok(subject)
-}
-
-/// Which of `subject_id` and `change_id` already have a record, read
-/// through the same routed tiers and fold [`adopt_change`] uses —
-/// `canon change new`'s pre-write refusal check.
-pub(crate) fn subject_and_change_exist(repo: &Path, subject_id: &SubjectId, change_id: &ChangeId) -> Result<(bool, bool), String> {
-    let repo = resolve_repo_root(repo);
-    let canon_yaml_path = resolve_canon_yaml(&repo, None);
-    let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject]).map_err(|e| e.to_string())?;
-    Ok((find_subject(&registry, subject_id)?.is_some(), find_change(&registry, change_id)?.is_some()))
 }
 
 /// `canon subject status <id> <state>` (module doc): apply a lifecycle

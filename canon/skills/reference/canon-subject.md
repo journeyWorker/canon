@@ -208,8 +208,8 @@ query --kind subject` agree on the link from both ends.
 
 ### Starting a new change: `canon change new`
 
-For a change that does not exist yet, one command scaffolds, imports and
-adopts it:
+For a change that does not exist yet, one command scaffolds it and
+records it adopted:
 
 ```bash
 canon change new add-login --subject auth --title "Add login"
@@ -220,8 +220,15 @@ canon change new add-login --subject auth --title "Add login"
   yet, so the change imports as `proposed`), under the repo's first
   `openspec` plans source. `canon init` configures that source
   (`{dialect: openspec, root: .}`), so `canon.yaml` needs no edit.
-- **Imports** that source exactly as `canon ingest plans` does, then
-  **adopts** the change through the same write as `canon subject adopt`.
+- **Reads** the files with the same `openspec` adapter `canon ingest
+  plans` uses, then **records** the change already adopted, through the
+  same write as `canon subject adopt`.
+- **All or nothing.** The files are staged under `.canon/` first and the
+  change dir is moved into place only once they parse. If anything after
+  that fails, the change dir, the staged files and any directory created
+  for them are removed. The one exception is a subject write that fails
+  after the change record was written: the ledger is append-only, so the
+  error names that record.
 - **Refuses** with exit `2`, writing nothing, when the subject does not
   exist, when the slug already has a change dir (active or archived) or a
   `change` record, or when `canon.yaml` has no `openspec` plans source.

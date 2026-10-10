@@ -146,6 +146,42 @@ fn init_refuses_an_agents_md_with_an_unclosed_canon_block_and_writes_nothing() {
 }
 
 #[test]
+fn init_refuses_a_duplicate_begin_marker_and_changes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let agents = "<!-- canon:begin -->\nfirst\n<!-- canon:begin -->\nsecond\n<!-- canon:end -->\n";
+    write(dir.path(), "AGENTS.md", agents);
+    let out = run_canon(&["init", "--repo", "."], dir.path());
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    assert!(stderr(&out).contains("found 2 begin, 1 end"), "{}", stderr(&out));
+    assert!(!dir.path().join("canon.yaml").exists(), "a refused init writes nothing");
+    assert!(!dir.path().join(".canon").exists(), "a refused init writes nothing");
+    assert_eq!(std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap(), agents);
+
+    // The same refusal on a rerun leaves the existing canon.yaml alone too.
+    write(dir.path(), "canon.yaml", "# hand-authored\n");
+    let rerun = run_canon(&["init", "--repo", "."], dir.path());
+    assert_eq!(rerun.status.code(), Some(2), "{}", stdout(&rerun));
+    assert_eq!(std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap(), agents);
+    assert_eq!(std::fs::read_to_string(dir.path().join("canon.yaml")).unwrap(), "# hand-authored\n");
+}
+
+#[test]
+fn init_treats_markers_inside_a_code_fence_as_text() {
+    let dir = tempfile::tempdir().unwrap();
+    let agents = "# Docs\n\nCanon owns this block:\n\n```md\n<!-- canon:begin -->\nexample\n<!-- canon:end -->\n```\n";
+    write(dir.path(), "AGENTS.md", agents);
+    let out = run_canon(&["init", "--repo", "."], dir.path());
+    assert!(out.status.success(), "{}", stderr(&out));
+    let merged = std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
+    assert!(merged.starts_with(&format!("{agents}\n<!-- canon:begin -->\n## Canon\n")), "the fenced sample must be kept and the block appended: {merged}");
+    assert!(merged.ends_with("<!-- canon:end -->\n"), "{merged}");
+
+    let rerun = run_canon(&["init", "--repo", "."], dir.path());
+    assert!(stdout(&rerun).contains("already current"), "{}", stdout(&rerun));
+    assert_eq!(std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap(), merged);
+}
+
+#[test]
 fn init_no_agents_md_and_no_policy_skip_those_files() {
     let dir = tempfile::tempdir().unwrap();
     let out = run_canon(&["init", "--repo", ".", "--no-agents-md", "--no-policy"], dir.path());

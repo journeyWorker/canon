@@ -94,3 +94,23 @@ Feature: authoring init
     Given a fresh canon init with other top-level directories present
     When canon ingest plans runs
     Then it exits 0 with the openspec source parsed and zero malformed entries
+
+  # canon: {"schema":1,"at":"2026-10-10T15:51:40Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.init.10
+  Scenario: A duplicate or unmatched AGENTS.md marker is refused and nothing changes
+    Given an AGENTS.md with two canon begin marker lines and one end marker line
+    When canon init runs, in a fresh repo or as a rerun
+    Then it exits 2 naming how many begin and end markers it found
+    And AGENTS.md, canon.yaml and .canon are exactly as they were
+
+  # canon: {"schema":1,"at":"2026-10-10T15:51:40Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.init.11
+  Scenario: Markers inside a code fence are text, not the canon block
+    Given an AGENTS.md whose only canon markers sit inside a fenced code block
+    When canon init runs
+    Then the fenced sample is kept byte for byte and the canon block is appended after it
+    And a rerun finds the block current and changes no byte
