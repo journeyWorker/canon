@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:36:20.353994Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test context context_outline_opens_with_a_status_pointer_and_leaves_json_unchanged"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 12,
+  "scenario_id": "context.capability.12",
+  "schema": 1,
+  "staging_id": "341292cb26d8",
+  "verdict": "faithful"
+}

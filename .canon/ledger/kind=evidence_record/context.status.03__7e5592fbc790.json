@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-10T15:36:20.071690Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status status_suggests_shipping_only_what_the_ship_gate_accepts"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "context.status.03",
+  "schema": 1,
+  "staging_id": "aa025daf0cf2",
+  "verdict": "faithful"
+}

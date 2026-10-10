@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-08T17:55:56.450545Z",
+  "change_ids": [
+    "c-cart"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "building",
+  "subject_id": "cart",
+  "summary": "",
+  "title": "Cart"
+}

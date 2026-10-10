@@ -1,0 +1,6 @@
+description: "`canon status` exits 0 on a repo with gaps and reports each subject's scenario, evidence, review and open-blocker counts, the policy in force, and the next commands, in both the human form and the stable `--json` shape"
+steps:
+  - args: [status]
+    exit: 0
+  - args: [status, --json]
+    exit: 0

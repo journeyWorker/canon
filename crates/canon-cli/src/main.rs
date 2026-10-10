@@ -100,6 +100,16 @@ enum Command {
         #[command(subcommand)]
         action: DemoCommand,
     },
+    /// Show where this repo stands: subjects by status, their gaps, and the next commands
+    #[command(after_help = "Examples:\n  canon status\n  canon status --json\n\nA read: exits 0 whatever it finds, and writes nothing. The counts come from the\nsame joins `canon gate check` and `canon subject status` use.")]
+    Status {
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
     /// Show what you can author here: record kinds, fields, enums, policies
     Context {
         /// Repo root (default: nearest ancestor with a canon.yaml)
@@ -1278,6 +1288,7 @@ fn main() -> ExitCode {
         Command::Purge { kind, before, repo, dry_run, json } => ExitCode::from(canon_cli::retention::run_purge(&repo, kind, before, dry_run, json)),
         Command::Format { check: _, root, repo } => run_fmt(&root, repo.as_deref()),
         Command::Context { repo, json } => run_context(&repo, json),
+        Command::Status { repo, json } => ExitCode::from(canon_cli::status::run(&repo, json) as u8),
         Command::ContextPack { action } => match action {
             ContextPackCommand::Create { manifest, repo, json } => run_context_pack_create(&repo, &manifest, json),
             ContextPackCommand::Show { id, repo, json } => run_context_pack_show(&repo, &id, json),
