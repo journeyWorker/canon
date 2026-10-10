@@ -244,6 +244,7 @@ mod tests {
                 diagnostics: Vec::new(),
             },
             evidence,
+            evidence_file_digests: Default::default(),
             audits,
             scenarios: vec![scenario],
             divergences: Vec::new(),

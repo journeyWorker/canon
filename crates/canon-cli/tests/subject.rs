@@ -951,7 +951,8 @@ fn a_pre_015_review_still_qualifies_and_every_surface_prints_the_advisory() {
 
     let gate = run(dir.path(), &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(0), "{}", stdout(&gate));
-    assert_eq!(stdout(&gate), format!("canon gate check: clean (0 violations)\n\nadvisory: {advisory}\n"));
+    let unapproved = "policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`";
+    assert_eq!(stdout(&gate), format!("canon gate check: clean (0 violations)\n\nadvisory: {unapproved}\n\nadvisory: {advisory}\n"));
 
     let status = run(dir.path(), &["status"]);
     assert_eq!(status.status.code(), Some(0));

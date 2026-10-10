@@ -278,7 +278,7 @@ fn status_counts_stale_and_unsigned_reviews() {
     let report = status_json(dir.path());
     let s = subject(&report, "demo-subject");
     assert_eq!((s["reviewed"].as_u64(), s["staleReviews"].as_u64(), s["unsignedReviews"].as_u64()), (Some(0), Some(1), Some(1)), "{s}");
-    assert!(report["warnings"].as_array().unwrap().is_empty(), "pinned reviews draw no legacy warning: {report}");
+    assert_eq!(report["warnings"], serde_json::json!([UNAPPROVED.strip_prefix("warning: ").unwrap()]), "pinned reviews draw no legacy warning: {report}");
     let why = report["next"].as_array().unwrap().iter().find(|n| n["command"].as_str().unwrap().starts_with("canon review add")).expect("a review step")["why"].as_str().unwrap().to_string();
     assert!(
         why.contains("2 of 2 scenario(s) lack a qualifying review (1 with a stale review (spec or evidence changed since it was reviewed); 1 with only indeterminate or unavailable reviews)"),
