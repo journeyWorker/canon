@@ -84,6 +84,7 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
         "canon policy approve --by <the human> --note",
         "Inside an approved scope, never stop for a human",
         "unless the brief says the human ships",
+        "a new change is a new scope",
     ] {
         assert!(agents.contains(needle), "the AGENTS.md block is missing `{needle}`: {agents}");
     }

@@ -118,6 +118,7 @@ Feature: skills install
     Then each says a new subject or a scope change needs one human answer approving the brief and the policy
     And each tells the agent to record that answer at once, as an "Approved: <who> <when>" line in the change's proposal.md and as canon policy approve --by <the human> --note, and never to approve without a human answer
     And each says that inside an approved scope the agent never stops for a human, that independent review happens on every change, and that when no human can answer it writes the assumption and proceeds
+    And each says a fix or follow-up stays in the approved change as tasks in its tasks.md, never a canon change new, because a new change is a new scope
     And each says the agent moves the subject to shipped itself once the guard passes, unless the brief says the human ships
 
   # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}

@@ -111,8 +111,11 @@ canon gate check: clean (0 violations)
 
    brief는 change의 `proposal.md`에 씁니다. 사람이 승인하면 에이전트가
    그 파일에 `Approved: <who> <when> — "<their words>"` 줄을 더합니다.
-   `canon status`는 이 줄을 읽어 서브젝트마다 brief 승인 여부를 보여
-   주고, 줄이 없을 때만 사람에게 요청하라고 안내합니다.
+   `canon status`는 서브젝트가 가장 최근에 adopt한 change에서 이 줄을
+   읽어 brief 승인 여부를 보여 주고, 줄이 없을 때만 사람에게 요청하라고
+   안내합니다. 수정과 후속 작업은 그 change의 `tasks.md`에 task로
+   넣습니다. 새 `canon change new`는 새 범위이므로 사람의 승인이
+   필요합니다.
 
 2. **저작 표면(authoring surface) 확인.** canon 아티팩트를 작성하기
    전에, 이 레포가 어떤 어휘와 스키마로 해석되는지 먼저 물어봅니다:

@@ -109,8 +109,11 @@ is attributed, and is fresh — never on a self-report. See
 
    The brief goes in the change's `proposal.md`. When the human approves
    it, the agent adds an `Approved: <who> <when> — "<their words>"` line
-   there; `canon status` reads that line to show whether each subject's
-   brief is approved, and asks for a human only when it is missing.
+   there; `canon status` reads that line in the subject's newest adopted
+   change to show whether its brief is approved, and asks for a human only
+   when it is missing. Fixes and follow-ups go in as tasks in that change's
+   `tasks.md`; a new `canon change new` is a new scope that needs the
+   human's approval.
 
 2. **See the authoring surface.** Before writing any canon artifact, ask
    the repo what vocabulary and schemas it resolves to:

@@ -290,16 +290,20 @@ uses, so status and the gate cannot disagree about a gap:
 - **Brief** (0.16) — for each `building`, `verifying` or `shipped`
   subject, a `brief:` line under it says whether the brief is approved:
   `brief: approved in <proposal.md> — <the recorded words>`, or
-  `brief: not approved (…)`. Approval is an `Approved:` line in one of
-  the subject's adopted changes' `proposal.md`: a line that starts with
-  `Approved:` (indent allowed) and says something after it, written by
-  the agent once the human answers, as
-  `Approved: <who> <when> — "<the human's words>"`. Status reads it from
-  the change dir under the repo's `openspec` plans sources, in config
-  order (the first source holding the change owns it, a live dir before
-  an archived one; with no `plans:` section, the `openspec` source rooted
-  at the repo that `canon gate task` also falls back to). There is no
-  record kind for it; the file is the record.
+  `brief: not approved (…)`. Approval is an `Approved:` line in the
+  `proposal.md` of the subject's newest adopted change (the last one
+  adopted): a line that starts with `Approved:` (indent allowed), says
+  something after it, and sits outside HTML comments (`<!-- … -->`,
+  multi-line included) and fenced code blocks (```` ``` ```` or `~~~`),
+  written by the agent once the human answers, as
+  `Approved: <who> <when> — "<the human's words>"`. Fixes and follow-ups
+  live as tasks in the approved change, so a newly adopted change is a
+  new scope: an older change's approval does not cover it. Status reads
+  the line from the change dir under the repo's `openspec` plans sources,
+  in config order (the first source holding the change owns it, a live
+  dir before an archived one; with no `plans:` section, the `openspec`
+  source rooted at the repo that `canon gate task` also falls back to).
+  There is no record kind for it; the file is the record.
 - **Unowned** — scenarios with no `@subject:` tag.
 - **Audits** — how many scenarios are sampled for
   `spec_coverage.require_audit`, confirmed, owed (no audit or
@@ -330,8 +334,9 @@ uses, so status and the gate cannot disagree about a gap:
 - **The one human step.** Every step is the agent's to run except one:
   a subject whose brief is not approved gets
   `human: get the brief approved (one human answer covers brief and policy)`,
-  whose reason names the `proposal.md` to write the `Approved:` line in
-  (or `canon change new` when the subject has no change) and
+  whose reason names the newest change's `proposal.md` to write the
+  `Approved:` line in (or `canon change new` when the subject has no
+  change) and
   `canon policy approve --by <the human> --note "<their words>"`. Until
   the line exists the subject is not suggested to move on. Once it does,
   a ship-ready verifying subject gets the agent's own
@@ -367,7 +372,7 @@ Status fails closed rather than suggest progress the gate would refuse:
   ],
   "unowned": ["cart.promo.01"],
   "next": [
-    { "command": "get the brief approved (one human answer covers brief and policy)", "why": "promo: no adopted change's proposal.md carries an `Approved:` line; …", "actor": "human" },
+    { "command": "get the brief approved (one human answer covers brief and policy)", "why": "promo: its newest adopted change's proposal.md carries no `Approved:` line …", "actor": "human" },
     { "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>", "why": "cart: 1 open blocker finding(s) (first: …); fix it, commit, then close it", "actor": "agent" },
     { "command": "canon review add --project-id root --scenario-id cart.add.02 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"", "why": "cart: 1 of 2 scenario(s) lack a qualifying review; …", "actor": "agent" },
     { "command": "canon inventory sync", "why": "1 scenario(s) carry no @subject tag (first: cart.promo.01); …", "actor": "agent" }
@@ -380,9 +385,9 @@ Each `missingCases` entry is `{ "projectId", "surface", "case" }`: the
 spec root, the `<area>.<surface>`, and the required case it lacks.
 
 `brief` is present for `building`, `verifying` and `shipped` subjects
-only. `change` and `proposal` name the approving change, or, when none
-approves, the first adopted change that has a `proposal.md` (both
-omitted when none has one); `approval` is the text after `Approved:`.
+only. `change` is the newest adopted change (omitted when the subject
+adopts none), `proposal` its `proposal.md` (omitted when no `openspec`
+source holds one), and `approval` the text after `Approved:`.
 
 Each `next` entry's `actor` is `agent` (its `command` is a canon command
 line) or `human` (its `command` says what to get from the human).

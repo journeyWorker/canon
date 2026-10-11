@@ -204,14 +204,15 @@ The loop:
 7. Independent review: a different session records `canon review add` and `canon finding add`, on every change.
 8. Transition: `canon subject status`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships.
 
-Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds go straight to scenario, implement, evidence and review. When no human can answer, write your assumption into the brief and proceed. `.canon/policy.yaml` is what the gate grades against.
+Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, as tasks in its `tasks.md`, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review. When no human can answer, write your assumption into the brief and proceed. `.canon/policy.yaml` is what the gate grades against.
 <!-- canon:end -->";
 
 /// A fence opener/closer line: up to three spaces, then three or more
 /// backticks or tildes (CommonMark). Returns the fence character, its
 /// run length, and whether only whitespace follows the run (a closing
-/// fence may carry nothing else).
-fn fence_of(line: &str) -> Option<(char, usize, bool)> {
+/// fence may carry nothing else). `canon status` uses it too, so an
+/// `Approved:` line quoted in a fence is not read as one.
+pub(crate) fn fence_of(line: &str) -> Option<(char, usize, bool)> {
     let indent = line.len() - line.trim_start_matches(' ').len();
     if indent > 3 {
         return None;

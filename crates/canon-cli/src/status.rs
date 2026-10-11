@@ -31,9 +31,12 @@
 //! One human answer approves a subject's scope: its brief and the
 //! policy. The agent records it as an `Approved:` line in the change's
 //! `proposal.md`, read here under the openspec plan sources (no record
-//! kind). A `building`, `verifying` or `shipped` subject none of whose
-//! adopted changes carries that line gets the one `human` step status
-//! ever emits, and no status advance; every other step is the agent's.
+//! kind), outside HTML comments and code fences. Fixes live as tasks in
+//! the approved change, so the subject's newest adopted change is its
+//! current scope: a `building`, `verifying` or `shipped` subject whose
+//! newest change does not carry that line gets the one `human` step
+//! status ever emits, and no status advance; every other step is the
+//! agent's.
 //!
 //! # Failing closed
 //! Status never suggests progress the gate would refuse. A corpus kind
@@ -194,19 +197,22 @@ pub struct SubjectSummary {
     pub brief: Option<BriefStatus>,
 }
 
-/// Whether one of a subject's adopted changes records the human's
-/// approval of its brief: an `Approved:` line in the change's
-/// `proposal.md`, read under the repo's `openspec` plan sources.
+/// Whether a subject's newest adopted change records the human's
+/// approval of its brief: an `Approved:` line in that change's
+/// `proposal.md`, read under the repo's `openspec` plan sources. A fix
+/// lives as tasks inside the approved change, so a newer adopted change
+/// is a new scope, and an older change's approval does not cover it.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BriefStatus {
     pub approved: bool,
-    /// The change whose `proposal.md` carries the approval; when none
-    /// does, the first adopted change that has a `proposal.md`. Omitted
-    /// when no adopted change has one.
+    /// The newest adopted change (the last in `change_ids`, adoption
+    /// order), whose `proposal.md` must carry the approval. Omitted when
+    /// the subject adopts no change.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub change: Option<String>,
-    /// That `proposal.md`, relative to the repo root.
+    /// That change's `proposal.md`, relative to the repo root. Omitted
+    /// when no `openspec` plan source holds one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proposal: Option<String>,
     /// The approval line's text after `Approved:`.
@@ -631,30 +637,69 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
 }
 
 /// The text after `Approved:` on the first line of `proposal` that
-/// starts with it (leading whitespace allowed) and says something.
+/// starts with it (leading whitespace allowed), says something, and sits
+/// outside fenced code blocks (the same fence rule `canon init` reads
+/// AGENTS.md with) and HTML comments, which may span lines: a quoted or
+/// commented-out approval is not one.
 fn approval_line(proposal: &str) -> Option<&str> {
-    proposal.lines().filter_map(|line| line.trim_start().strip_prefix("Approved:")).map(str::trim).find(|rest| !rest.is_empty())
+    let mut fence: Option<(char, usize)> = None;
+    let mut in_comment = false;
+    for line in proposal.lines() {
+        if !in_comment {
+            match (fence, crate::init::fence_of(line)) {
+                (None, Some((ch, run, _))) => {
+                    fence = Some((ch, run));
+                    continue;
+                }
+                (Some((open_ch, open_run)), Some((ch, run, true))) if ch == open_ch && run >= open_run => {
+                    fence = None;
+                    continue;
+                }
+                (Some(_), _) => continue,
+                (None, None) => {}
+            }
+            if let Some(approval) = line.trim_start().strip_prefix("Approved:").map(str::trim).filter(|rest| !rest.is_empty()) {
+                return Some(approval);
+            }
+        }
+        in_comment = comment_open_after(line, in_comment);
+    }
+    None
 }
 
-/// Whether one of `subject`'s adopted changes, in adoption order,
-/// carries an `Approved:` line in its `proposal.md` under the openspec
-/// `plan_roots` (the first root holding the change wins, as in `canon
-/// ingest plans`).
-fn brief_status(repo: &Path, plan_roots: &[PathBuf], subject: &Subject) -> BriefStatus {
-    let mut first = None;
-    for change in &subject.change_ids {
-        let Some(path) = plan_roots.iter().find_map(|root| canon_ingest::plan_adapters::openspec::proposal_path(root, change)) else {
-            continue;
+/// Whether an HTML comment is open at the end of `line`, given whether
+/// one was open at its start.
+fn comment_open_after(line: &str, mut open: bool) -> bool {
+    let mut rest = line;
+    loop {
+        let marker = if open { "-->" } else { "<!--" };
+        let Some(at) = rest.find(marker) else {
+            return open;
         };
-        let proposal = path.strip_prefix(repo).unwrap_or(&path).display().to_string();
-        let text = std::fs::read_to_string(&path).unwrap_or_default();
-        if let Some(approval) = approval_line(&text) {
-            return BriefStatus { approved: true, change: Some(change.as_str().to_string()), proposal: Some(proposal), approval: Some(approval.to_string()) };
-        }
-        first.get_or_insert((change.as_str().to_string(), proposal));
+        rest = &rest[at + marker.len()..];
+        open = !open;
     }
-    let (change, proposal) = first.unzip();
-    BriefStatus { approved: false, change, proposal, approval: None }
+}
+
+/// Whether `subject`'s newest adopted change (the last in `change_ids`,
+/// adoption order) carries an `Approved:` line in its `proposal.md` under
+/// the openspec `plan_roots` (the first root holding the change wins, as
+/// in `canon ingest plans`). A fix lives as tasks inside the approved
+/// change, so a newer adopted change is a new scope that an older
+/// change's approval does not cover.
+fn brief_status(repo: &Path, plan_roots: &[PathBuf], subject: &Subject) -> BriefStatus {
+    let Some(change) = subject.change_ids.last() else {
+        return BriefStatus { approved: false, change: None, proposal: None, approval: None };
+    };
+    let path = plan_roots.iter().find_map(|root| canon_ingest::plan_adapters::openspec::proposal_path(root, change));
+    let text = path.as_ref().and_then(|path| std::fs::read_to_string(path).ok()).unwrap_or_default();
+    let approval = approval_line(&text).map(str::to_string);
+    BriefStatus {
+        approved: approval.is_some(),
+        change: Some(change.as_str().to_string()),
+        proposal: path.map(|path| path.strip_prefix(repo).unwrap_or(&path).display().to_string()),
+        approval,
+    }
 }
 
 /// The next scenario number free on `surface` within spec root `project`.
@@ -705,10 +750,15 @@ fn subject_steps(
         next.push(NextStep {
             actor: StepActor::Human,
             command: "get the brief approved (one human answer covers brief and policy)".into(),
-            why: match &brief.proposal {
-                Some(proposal) => format!("{id}: no adopted change's proposal.md carries an `Approved:` line; once the human answers, {record} in {proposal} {approve}"),
-                None => format!(
-                    "{id}: no adopted change has a proposal.md to carry the approval; `canon change new <slug> --subject {id} --title \"<title>\"` writes one, and once the human answers, {record} in it {approve}"
+            why: match (&brief.proposal, &brief.change) {
+                (Some(proposal), _) => format!(
+                    "{id}: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope); once the human answers, {record} in {proposal} {approve}"
+                ),
+                (None, Some(change)) => format!(
+                    "{id}: its newest adopted change `{change}` has no proposal.md under the openspec plan sources; write its brief there, and once the human answers, {record} in it {approve}"
+                ),
+                (None, None) => format!(
+                    "{id}: it adopts no change to carry the brief; `canon change new <slug> --subject {id} --title \"<title>\"` writes one, and once the human answers, {record} in it {approve}"
                 ),
             },
         });
@@ -934,10 +984,11 @@ pub fn render(report: &StatusReport) -> String {
                 let _ = writeln!(out, "      missing @case:{} on {}", gap.case, gap.surface);
             }
             if let Some(brief) = &s.brief {
-                let _ = match (&brief.approval, &brief.proposal) {
-                    (Some(approval), Some(proposal)) => writeln!(out, "      brief: approved in {proposal} — {approval}"),
-                    (None, Some(proposal)) => writeln!(out, "      brief: not approved ({proposal} has no `Approved:` line)"),
-                    _ => writeln!(out, "      brief: not approved (no adopted change has a proposal.md)"),
+                let _ = match (&brief.approval, &brief.proposal, &brief.change) {
+                    (Some(approval), Some(proposal), _) => writeln!(out, "      brief: approved in {proposal} — {approval}"),
+                    (None, Some(proposal), _) => writeln!(out, "      brief: not approved ({proposal} has no `Approved:` line)"),
+                    (_, None, Some(change)) => writeln!(out, "      brief: not approved (change `{change}` has no proposal.md)"),
+                    _ => writeln!(out, "      brief: not approved (no adopted change)"),
                 };
             }
         }

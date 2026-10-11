@@ -42,7 +42,7 @@
   "next": [
     {
       "command": "get the brief approved (one human answer covers brief and policy)",
-      "why": "checkout: no adopted change's proposal.md carries an `Approved:` line; once the human answers, record their words as `Approved: <who> <when> — \"<their words>\"` in openspec/changes/c-checkout/proposal.md and run `canon policy approve --by <the human> --note \"<their words>\"`",
+      "why": "checkout: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope); once the human answers, record their words as `Approved: <who> <when> — \"<their words>\"` in openspec/changes/c-checkout/proposal.md and run `canon policy approve --by <the human> --note \"<their words>\"`",
       "actor": "human"
     }
   ],

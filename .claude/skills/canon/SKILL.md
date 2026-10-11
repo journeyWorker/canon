@@ -28,7 +28,10 @@ a feature, a one-line request included. A human is needed once per scope:
 - **Inside an approved scope, never stop for a human.** Fixes, follow-ups,
   review rounds and re-reviews go straight on: add or extend the scenario,
   implement, gather evidence, and get an independent review in another
-  session. Independent review happens on every change.
+  session. Independent review happens on every change. A fix or follow-up
+  stays in the approved change: add it as tasks in that change's
+  `tasks.md`, never with `canon change new`, because a new change is a new
+  scope and needs the human's approval.
 
 When no human can answer, write the question into the brief, proceed on the
 assumption you state there, and say so in your final report.
@@ -39,7 +42,7 @@ assumption you state there, and say so in your final report.
    `canon change new <slug> --subject <id> --title "…"` scaffolds once the
    subject exists (step 2). Ask the human once for the brief and the
    policy, and record the answer as above. Inside an approved scope there
-   is no new brief: go to step 3 under the existing subject.
+   is no new brief: go to step 3 under the existing subject and change.
 2. **Subject.** `canon subject new <id> --domain <domain> --title "…"`, then
    `canon change new <slug> --subject <id> --title "…"`, and put the brief in
    the change's `proposal.md`.

@@ -592,6 +592,9 @@ fn skills_install_20_skill_and_block_carry_one_approval_per_scope() {
             "on every change",
             "yourself once",
             "unless the brief says the human ships",
+            "in the approved change",
+            "tasks.md",
+            "a new change is a new scope",
         ] {
             assert!(text.to_lowercase().contains(&rule.to_lowercase()), "the {name} must say {rule:?}: {text}");
         }
