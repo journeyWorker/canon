@@ -124,3 +124,23 @@ Feature: authoring init
     When canon init writes the starter policy
     Then its output says a human approves the policy with `canon policy approve --by <who>`
     And the AGENTS.md block names the same command
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:54Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.init.70
+  Scenario: A fresh init followed by a query leaves git status clean
+    Given a git repository freshly initialized with canon init and committed
+    When a query reads the ledger and appends to the access audit log
+    Then the init gitignore covers .canon/audit/
+    And git status reports nothing untracked
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:54Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.init.71
+  Scenario: The scenario index a reader rebuilds stays out of git
+    Given a repository initialized with canon init whose feature file is committed
+    When a reader rebuilds the stale scenario index
+    Then the init gitignore covers .canon/ledger/kind=scenario/
+    And git status reports nothing untracked

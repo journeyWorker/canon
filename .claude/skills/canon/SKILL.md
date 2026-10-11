@@ -53,6 +53,7 @@ assumption you state there, and say so in your final report.
    with `--report junit:<path>` or `--artifact <path>` when files prove it.
    canon stores those bytes in `.canon/artifacts/sha256/` (commit it with the
    ledger) and `canon gate check` re-checks them. Then `canon gate promote`.
+   With `write: { promote: auto }` (what `canon init` writes), `canon evidence add` promotes itself, so there is no separate `canon gate promote` call.
    An external evaluator's audit is recorded with `canon evidence add --kind
    audit`; canon never generates one.
    Evidence for a plan task (`--task <id>`, before `canon gate task`) must

@@ -82,6 +82,12 @@ pub const ACCESS_AUDIT_FILE: &str = ".canon/audit/access.jsonl";
 /// The `.gitignore` line covering [`ACCESS_AUDIT_FILE`]'s directory.
 pub const AUDIT_GITIGNORE: &str = ".canon/audit/";
 
+/// The `.gitignore` line covering the default ledger's `Scenario` index
+/// (`kind=scenario/` under [`LEDGER_DIR`]): derived from the `.feature`
+/// files, and rebuilt by every reader of it when stale (0.16 D2), so
+/// `canon init` keeps it out of git.
+pub const SCENARIO_INDEX_GITIGNORE: &str = ".canon/ledger/kind=scenario/";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,6 +113,7 @@ mod tests {
             ARTIFACTS_SHA256_DIR,
             ACCESS_AUDIT_FILE,
             AUDIT_GITIGNORE,
+            SCENARIO_INDEX_GITIGNORE,
         ];
         for path in all {
             assert!(

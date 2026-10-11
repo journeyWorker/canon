@@ -306,3 +306,23 @@ fn a_fresh_init_then_a_query_leaves_git_status_clean() {
     assert!(repo.join(".canon/audit/access.jsonl").is_file(), "the query was audited");
     assert_eq!(git(repo, &["status", "--porcelain"]), "", "the audit log must not show up as untracked");
 }
+
+/// authoring.init.71: `canon init` also ignores the derived scenario
+/// index, so a reader's refresh after a committed `.feature` edit leaves
+/// `git status` clean too.
+#[test]
+fn the_scenario_index_a_reader_rebuilds_stays_out_of_git() {
+    let dir = init_repo();
+    let repo = dir.path();
+    let gitignore = std::fs::read_to_string(repo.join(".gitignore")).unwrap();
+    assert!(gitignore.lines().any(|l| l.trim() == ".canon/ledger/kind=scenario/"), "{gitignore}");
+    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
+    git(repo, &["add", "-A"]);
+    git(repo, &["commit", "-q", "-m", "spec"]);
+
+    let out = ok(repo, &["status"]);
+    assert!(stderr(&out).contains("refreshed the scenario index"), "{}", stderr(&out));
+    assert_eq!(scenario_records(repo).len(), 1);
+    ok(repo, &["query", "--kind", "subject"]);
+    assert_eq!(git(repo, &["status", "--porcelain"]), "", "neither the rebuilt index nor the audit log shows up as untracked");
+}

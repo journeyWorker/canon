@@ -57,6 +57,20 @@ approved: …` or `advisory: policy changed since approval: …` after its
 result, naming `canon policy approve --by <who>`; the exit code is
 unchanged (see `canon-policy`).
 
+Before it reads the scenario index, the gate rebuilds any stale part of
+it from the changed `.feature` files (the same code `canon inventory
+sync` runs) and says so in one stderr line, silent when the index is
+fresh:
+
+```
+canon gate check: refreshed the scenario index from 1 changed feature file(s) (specs/features/kind=feature/area=cart/add.feature): 1 record(s) written
+```
+
+A root that fails to sync (format violations, a duplicate id) is named
+instead, ending ``NOT refreshed: root `x` (N format violation(s), 0 sync
+error(s)) — `canon inventory sync` lists them``, and the gate still runs.
+See `canon-storage` (The scenario index).
+
 ### The spec-derived worklist (`spec_coverage`, opt-in)
 
 Coverage groups the EVIDENCE corpus, so it can only ever enumerate
@@ -431,13 +445,21 @@ canon gate promote --repo . --dry-run  # preview only
 ```
 
 Which writes need this step: `evidence add`, `finding add` and `finding
-close` stage, and their success line ends ``— run `canon gate promote`
-to commit it``. `divergence stage` stages for `canon divergence promote`
-and names it. Every other write — `review add`, `divergence
+close` stage, and under `write: { promote: manual }` (or an absent
+`write:` key) their success line ends ``— run `canon gate promote` to
+commit it``. Under `write: { promote: auto }` (what `canon init` writes)
+or with `--promote`, they run this same promotion themselves and end
+`— staged and promoted in this run; nothing to promote`, so no separate
+`canon gate promote` is needed; `--no-promote` keeps one write staged.
+`gate promote` stays safe to run anyway: with nothing staged it prints
+`nothing staged` and exits `0`. `divergence stage` stages for `canon
+divergence promote` and names it, under the same `write:` rule. Every
+other write — `review add`, `divergence
 resolve|defer`, `subject new|adopt|status`, `change new`, `scenario new`, `feature new`,
 `gate task` (it edits the plan document and re-ingests it)
 — is final when it returns, and its success line ends `— written
-directly; nothing to promote`.
+directly; nothing to promote`. Full promote-on-write contract:
+`canon-storage` (Staged writes and promotion).
 
 ## `canon gate install-hooks [--repo] [--event] [--matcher] [--command] [--timeout]`
 

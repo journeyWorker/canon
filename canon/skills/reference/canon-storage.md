@@ -149,7 +149,85 @@ Every query, export, and purge appends an actor-stamped record to
 `.canon/audit/access.jsonl` (mode `0600` on creation) in the repository
 whose `canon.yaml` it read (through `--repo` or `--canon-yaml`), never in
 the current directory; with no `canon.yaml` there is no audit and nothing
-is written. `CANON_ACTOR` takes
+is written. The log is local operator state: `canon init` keeps
+`.canon/audit/` out of git (below). `CANON_ACTOR` takes
 precedence over the OS username. Audit rows contain operation, kind, scope,
 sensitive flag, counts, and timestamp only—never query text, secrets, or
 record bodies.
+
+## Staged writes and promotion
+
+Four writes stage their record instead of committing it: `canon evidence
+add`, `canon finding add` and `canon finding close` (under
+`.canon/ledger/_staging/`, committed by `canon gate promote`) and `canon
+divergence stage` (committed by `canon divergence promote`). `canon.yaml`'s
+`write:` section decides whether they promote in the same run:
+
+```yaml
+write:
+  promote: auto   # or manual
+```
+
+- `auto` — the command stages, then runs the same promotion `canon gate
+  promote` (or `canon divergence promote`) runs. That promotion drains
+  everything staged, not only this record, and prints its report; the
+  success line ends `— staged and promoted in this run; nothing to
+  promote`. `canon init` writes `auto`.
+- `manual` — the record stays staged and the line ends ``— run `canon
+  gate promote` to commit it``. An absent `write:` key (or `promote:`
+  field) is `manual`, so a repo that never set it is unchanged.
+
+`--promote` / `--no-promote` decide for one write and win over the config
+without reading it; both at once is a usage error (exit `2`). If the
+promotion refuses the command's own record, the record stays staged, the
+line ends ``— run `canon gate promote` to commit it`` (`canon divergence
+promote` for a divergence), and the command exits `1`. With neither flag,
+a malformed `write:` section (anything but `promote: auto | manual`)
+refuses the write, exit `2`, before anything is staged. `canon init
+--check-config` reports `[PASS] write (promote: auto)`, `[not configured]
+write (promote: manual)`, or `[FAIL] write: …`. `canon gate promote` still
+works under `auto` and is idempotent: with nothing staged it prints
+`nothing staged` and exits `0`.
+
+## The scenario index
+
+`canon inventory sync` materializes one `Scenario` record per
+`(project_id, scenario_id)` under `.canon/ledger/kind=scenario/`. The
+index is derived — a pure function of the `.feature` files — so the
+commands that read it rebuild it first: `canon gate check`, `canon
+status`, `canon subject status`, `canon review add` and `canon evidence
+add`. The index is stale when a `.feature` file holds a scenario with no
+index record, or one whose recorded source digest differs from the file's
+current bytes. The reader then runs `canon inventory sync`'s code on the
+changed files only (validation still covers the whole root) and prints
+one stderr line:
+
+```
+canon status: refreshed the scenario index from 1 changed feature file(s) (specs/features/kind=feature/area=cart/add.feature): 1 record(s) written
+```
+
+A fresh index prints nothing. A root that fails to sync (format
+violations, a duplicate id) is named and left as it was, and the command
+still runs:
+
+```
+canon gate check: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them
+```
+
+Nothing is written in a directory without `canon.yaml`. `canon inventory
+sync` stays the explicit command, and the one that lists violations and
+tag diagnostics.
+
+## What `canon init` keeps out of git
+
+A fresh `canon init` writes these lines to `.gitignore` (each under a
+comment, only the missing ones):
+
+- `.canon/hot.db*` — the sqlite hot tier and its WAL/SHM sidecars.
+- `.canon/audit/` — the query/export/purge access log.
+- `.canon/ledger/kind=scenario/` — the scenario index; every reader
+  rebuilds it.
+
+A rerun on a repo that already has `canon.yaml` only refreshes
+`AGENTS.md`, so an existing repo's `.gitignore` is unchanged; add the
+lines by hand to adopt them.

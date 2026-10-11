@@ -136,3 +136,34 @@ Feature: inventory sync
     When the corpus is synced
     Then the scenario is indexed without a case and the sync reports a diagnostic naming the tag
     And a previously recorded case is not carried over to the new generation
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:happy
+  @inventory.sync.40
+  Scenario: A reader refreshes a stale scenario index once and names the files
+    Given a scenario written by scenario new and never synced
+    When canon status runs with --json
+    Then exactly one stderr line names the changed feature file and the records written
+    And stdout stays JSON that counts the scenario
+    And the next reader is silent
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:happy
+  @inventory.sync.41
+  Scenario: Review add and subject status read a scenario that was never synced
+    Given a scenario written by scenario new and never synced
+    When review add and subject status run
+    Then each refreshes the index first and succeeds without inventory sync
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:failure
+  @inventory.sync.42
+  Scenario: A root that cannot sync is named and a directory without canon.yaml is never written
+    Given a feature file whose provenance comments are missing
+    When canon status runs
+    Then one stderr line names the root that was not refreshed and points at inventory sync
+    And no scenario record is written
+    And a reader in a directory without canon.yaml writes nothing
