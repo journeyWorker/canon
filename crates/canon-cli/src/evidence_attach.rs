@@ -172,24 +172,30 @@ fn hash_artifact(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Bo
     Ok((relative, BoundFile { resolved, sha256 }))
 }
 
-/// Copy each bound file into the artifact store, returning how many
-/// were newly stored. Called once every refusal has passed, just before
-/// the record is written, so a record never names a blob the store
-/// lacks. A file that changed since it was hashed is refused rather
-/// than stored under a digest its bytes no longer have; the error names
-/// that file.
+/// Copy every bound file into the artifact store, all or nothing,
+/// returning how many were newly stored. Called once every refusal has
+/// passed, just before the record is written, so a record never names a
+/// blob the store lacks. Every file is first re-read, re-hashed and
+/// staged to a temp file in the store
+/// ([`canon_gate::artifact_store::stage`]); only when all of them have
+/// staged are they published. A file that changed since it was hashed
+/// is refused rather than stored under a digest its bytes no longer
+/// have, and then nothing is published. The error names that file.
 pub fn store_files<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<usize, (&'f BoundFile, canon_gate::artifact_store::StoreError)> {
-    let mut stored = 0usize;
+    let mut staged = Vec::new();
+    let mut sources = Vec::new();
     for file in files {
-        let outcome = std::fs::File::open(&file.resolved)
+        let blob = std::fs::File::open(&file.resolved)
             .map_err(canon_gate::artifact_store::StoreError::from)
-            .and_then(|reader| canon_gate::artifact_store::store(repo, &file.sha256, reader));
-        match outcome {
-            Ok(canon_gate::artifact_store::StoreOutcome::Stored) => stored += 1,
-            Ok(canon_gate::artifact_store::StoreOutcome::AlreadyStored) => {}
-            Err(e) => return Err((file, e)),
+            .and_then(|reader| canon_gate::artifact_store::stage(repo, &file.sha256, reader))
+            .map_err(|e| (file, e))?;
+        if let Some(blob) = blob {
+            staged.push(blob);
+            sources.push(file);
         }
     }
+    let stored = staged.len();
+    canon_gate::artifact_store::publish(staged).map_err(|(index, e)| (sources[index], e))?;
     Ok(stored)
 }
 
@@ -813,6 +819,30 @@ mod tests {
             matches!(bind(&oversized), Err(BindError::Usage(m)) if m.contains("--max-artifact-mib")),
             "a file over the size limit refuses, naming the override flag"
         );
+    }
+
+    /// A file that changed after it was bound refuses the whole store:
+    /// the files before it are staged but never published, and no temp
+    /// file is left behind.
+    #[test]
+    fn store_files_publishes_nothing_when_any_file_fails_to_stage() {
+        let repo = TempDir::new().unwrap();
+        std::fs::write(repo.path().join("a.png"), b"first").unwrap();
+        std::fs::write(repo.path().join("b.png"), b"second").unwrap();
+        let paths = vec![repo.path().join("a.png"), repo.path().join("b.png")];
+        let files: Vec<BoundFile> = bind_artifacts(repo.path(), &paths, 1024).unwrap().into_iter().map(|(_, f)| f).collect();
+        std::fs::write(repo.path().join("b.png"), b"rewritten").unwrap();
+
+        let (failed, error) = store_files(repo.path(), &files).unwrap_err();
+        assert_eq!(failed.sha256, files[1].sha256, "the error names the file that changed");
+        assert!(matches!(error, canon_gate::artifact_store::StoreError::Changed { .. }), "{error}");
+        let store = canon_gate::artifact_store::store_dir(repo.path());
+        assert_eq!(std::fs::read_dir(&store).unwrap().count(), 0, "nothing published and no temp file left");
+
+        std::fs::write(repo.path().join("b.png"), b"second").unwrap();
+        assert_eq!(store_files(repo.path(), &files).unwrap(), 2);
+        assert_eq!(store_files(repo.path(), &files).unwrap(), 0, "already stored intact");
+        assert_eq!(std::fs::read_dir(&store).unwrap().count(), 2);
     }
 
     #[test]

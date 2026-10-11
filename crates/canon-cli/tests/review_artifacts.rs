@@ -123,21 +123,22 @@ fn a_missing_or_altered_review_artifact_is_stale_evidence_naming_the_review() {
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "{}", text(&gate));
     let out = text(&gate);
+    let at = chrono::DateTime::parse_from_rfc3339(reviews(repo)[0]["at"].as_str().unwrap()).unwrap().to_utc().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let (title, hud) = (sha(TITLE), sha(HUD));
     let missing = format!(
-        "stale-evidence game.title.01 — review by `reviewer-2` (actor `reviewer-2`, {at}) bound file `reports/title.png` recorded sha256 {title}; stored blob .canon/artifacts/sha256/{title}: missing; working tree: {title} — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`",
-        at = chrono::DateTime::parse_from_rfc3339(reviews(repo)[0]["at"].as_str().unwrap()).unwrap().to_utc().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-        title = sha(TITLE)
+        "stale-evidence game.title.01 — review by `reviewer-2` (actor `reviewer-2`, {at}) bound file `reports/title.png` recorded sha256 {title}; stored blob .canon/artifacts/sha256/{title}: missing; working tree: {title} — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`"
     );
     assert!(out.contains(&missing), "a missing blob is stale even with the working-tree file intact:\n{out}\nexpected: {missing}");
-    assert!(
-        out.contains(&format!("bound file `reports/hud.webm` recorded sha256 {}; stored blob .canon/artifacts/sha256/{}: {}", sha(HUD), sha(HUD), sha(b"tampered")))
-            && out.contains("the stored blob does not match its name, so its bytes were altered"),
-        "{out}"
+    let altered = format!(
+        "stale-evidence game.title.01 — review by `reviewer-2` (actor `reviewer-2`, {at}) bound file `reports/hud.webm` recorded sha256 {hud}; stored blob .canon/artifacts/sha256/{hud}: {tampered}; working tree: {hud} — the stored blob does not match its name, so its bytes were altered, look again and re-record the review with `canon review add --artifact <path>`",
+        tampered = sha(b"tampered")
     );
+    assert!(out.contains(&altered), "an altered blob names the review, its actor and time, and what the store and the working tree hold:\n{out}\nexpected: {altered}");
 }
 
 /// review.add.42: a file outside the repository, a missing file, or one
-/// over the size limit is refused (exit 2); nothing is written or stored.
+/// over the size limit is refused (exit 2); nothing is written, and the
+/// artifact store is byte-for-byte what it was before each refusal.
 #[test]
 fn an_unbindable_review_artifact_is_refused_and_nothing_is_written() {
     let dir = setup();
@@ -146,6 +147,10 @@ fn an_unbindable_review_artifact_is_refused_and_nothing_is_written() {
     std::fs::write(outside.path(), b"elsewhere").unwrap();
     let big = vec![b'x'; 1024 * 1024 + 1];
     std::fs::write(repo.join("reports/big.webm"), &big).unwrap();
+    // The store already holds one blob, so "unchanged" is not just "absent".
+    ok(repo, &["evidence", "add", "--scenario-id", "game.title.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run e2e", "--role", "implementer", "--artifact", "reports/hud.webm"]);
+    let before = store_snapshot(repo);
+    assert_eq!(before.len(), 1, "{before:?}");
 
     for (args, expected) in [
         (vec!["--artifact", outside.path().to_str().unwrap()], "is outside the repository"),
@@ -156,9 +161,28 @@ fn an_unbindable_review_artifact_is_refused_and_nothing_is_written() {
         let out = review(repo, "reviewer-2", &args);
         assert_eq!(out.status.code(), Some(2), "{args:?}: {}", text(&out));
         assert!(text(&out).contains("canon review add: refused —") && text(&out).contains(expected), "{args:?}: {}", text(&out));
+        assert_eq!(store_snapshot(repo), before, "{args:?}: a refused review add stores no bytes at all");
     }
     assert!(reviews(repo).is_empty(), "a refused review add writes nothing");
-    assert!(!blob(repo, TITLE).exists(), "a refused review add stores nothing");
+}
+
+/// Every entry under `.canon/artifacts/` (temp files included), with its
+/// bytes, sorted by path.
+fn store_snapshot(repo: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+    fn walk(dir: &Path, out: &mut Vec<(PathBuf, Vec<u8>)>) {
+        for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else {
+                out.push((path.clone(), std::fs::read(&path).unwrap()));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(&repo.join(".canon/artifacts"), &mut out);
+    out.sort();
+    out
 }
 
 /// review.add.43: only in-effect reviews are checked. A reviewer's later
