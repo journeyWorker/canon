@@ -1,0 +1,5 @@
+error: the argument '--policy <LEVEL>' cannot be used with '--no-policy'
+
+Usage: canon init --policy <LEVEL>
+
+For more information, try '--help'.

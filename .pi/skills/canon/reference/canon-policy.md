@@ -26,21 +26,45 @@ diagnostic and reports `clean: false`.
 ## The starter policy `canon init` writes
 
 A fresh `canon init` writes `.canon/policy.yaml` (skip it with
-`--no-policy`; an existing file is never overwritten):
+`--no-policy`; an existing file is never overwritten). `--policy
+light|standard|strict` picks how much it asks for; the default is
+`strict`:
+
+| Level | `spec_coverage` |
+|---|---|
+| `light` | `require_evidence: true` — every scenario needs evidence |
+| `standard` | light, plus `require_cases: [failure]` — every feature surface needs a `@case:failure` scenario |
+| `strict` | standard, plus `require_review: {}` — verifying/shipped subjects need an independent review |
 
 ```yaml
+# canon policy level: strict
 spec_coverage:
   require_evidence: true    # every scenario needs evidence
   require_cases: [failure]  # every feature surface needs a @case:failure scenario
   require_review: {}        # verifying/shipped subjects need an independent review
 ```
 
-The file carries comments explaining each field. It loads with zero
-diagnostics. It is what `canon gate check` grades the work against, so a
-human should review and approve it, and every later change to it (next
-section). The agent doing the work should not write its own grading
-policy. Narrow it with `scope: [building, verifying]` to check evidence
-only for subjects in those statuses (see `canon-gate`).
+The first line names the level. The file carries comments explaining
+each field, and a `light` or `standard` starter carries the next levels'
+keys as commented lines: to raise the level, uncomment them and change
+the level line, and a human approves the edit (next section). An
+unknown `--policy` value exits 2, and so does `--policy` with `--no-policy`.
+
+`canon status` prints the level under the policy settings
+(`level: strict`, or `level: light — raise it by …` with how to raise
+it) and in `--json` as `policy.level`. It reads the level line when the
+file's leading comment block has one naming a known level; otherwise it
+infers the level from the `spec_coverage` section, which must match a
+level exactly (no `scope`, `exclude_lanes`, `require_audit`, or
+non-default `require_review` settings); anything else is `custom`.
+`policy.level` is `null` when there is no policy.
+
+Every level loads with zero diagnostics. The policy is what `canon gate
+check` grades the work against, so a human should review and approve
+it, and every later change to it (next section). The agent doing the
+work should not write its own grading policy. Narrow it with `scope:
+[building, verifying]` to check evidence only for subjects in those
+statuses (see `canon-gate`).
 
 ## Approving the policy
 

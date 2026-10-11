@@ -1,0 +1,3 @@
+providers: claude
+status: healthy
+competing-skill: ./.claude/skills/sites (description claims: build, sites, apps, games) — if an agent picks `site-builder` for build work, canon's loop will not run

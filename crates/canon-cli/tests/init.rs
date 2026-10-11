@@ -220,6 +220,111 @@ fn init_starter_policy_makes_the_gate_report_an_unevidenced_scenario() {
     assert!(!stdout(&red).contains("spec_coverage is off"), "{}", stdout(&red));
 }
 
+// ── starter policy levels (0.16 D3) ──
+
+fn status_level(dir: &Path) -> serde_json::Value {
+    let out = run_canon(&["status", "--json"], dir);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    report["policy"]["level"].clone()
+}
+
+/// The policy's keys, comments dropped.
+fn policy_keys(dir: &Path) -> Vec<String> {
+    std::fs::read_to_string(dir.join(".canon/policy.yaml"))
+        .unwrap()
+        .lines()
+        .filter(|line| !line.trim_start().starts_with('#') && !line.trim().is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// authoring.init.30: the default level is strict; its bytes are the
+/// 0.15 starter under one level line (pinned byte for byte by
+/// `init::tests::strict_starter_policy_is_the_pre_level_starter_under_one_level_line`).
+#[test]
+fn authoring_init_30_default_init_writes_the_strict_starter_under_a_level_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = run_canon(&["init"], dir.path());
+    assert!(out.status.success(), "{}", stderr(&out));
+    let policy = std::fs::read_to_string(dir.path().join(".canon/policy.yaml")).unwrap();
+    assert!(policy.starts_with("# canon policy level: strict\n# .canon/policy.yaml -- scaffolded by `canon init`.\n"), "{policy}");
+    assert_eq!(policy_keys(dir.path()), ["spec_coverage:", "  require_evidence: true", "  require_cases: [failure]", "  require_review: {}"]);
+    assert_eq!(status_level(dir.path()), "strict");
+    let human = stdout(&run_canon(&["status"], dir.path()));
+    assert!(human.contains("\n  level: strict\n"), "{human}");
+
+    let explicit = tempfile::tempdir().unwrap();
+    assert!(run_canon(&["init", "--policy", "strict"], explicit.path()).status.success());
+    assert_eq!(std::fs::read_to_string(explicit.path().join(".canon/policy.yaml")).unwrap(), policy, "--policy strict is the default");
+}
+
+/// authoring.init.31
+#[test]
+fn authoring_init_31_light_starter_requires_evidence_only_and_says_how_to_raise_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = run_canon(&["init", "--policy", "light"], dir.path());
+    assert!(out.status.success(), "{}", stderr(&out));
+    let policy = std::fs::read_to_string(dir.path().join(".canon/policy.yaml")).unwrap();
+    assert!(policy.starts_with("# canon policy level: light\n"), "{policy}");
+    assert_eq!(policy_keys(dir.path()), ["spec_coverage:", "  require_evidence: true"]);
+    for line in ["  # require_cases: [failure]", "  # require_review: {}", "To raise the level", "canon policy approve --by <who>"] {
+        assert!(policy.contains(line), "the light starter is missing `{line}`: {policy}");
+    }
+
+    let scenario = run_canon(&["scenario", "new", "cart.add.01", "--title", "An item is added", "--case", "happy"], dir.path());
+    assert!(scenario.status.success(), "{}", stderr(&scenario));
+    assert!(run_canon(&["inventory", "sync"], dir.path()).status.success());
+    let gate = stdout(&run_canon(&["gate", "check"], dir.path()));
+    assert!(gate.contains("cart.add.01 — spec scenario has no evidence record"), "{gate}");
+    assert!(!gate.contains("@case:failure"), "light asks no surface for a failure case: {gate}");
+
+    assert_eq!(status_level(dir.path()), "light");
+    let human = stdout(&run_canon(&["status"], dir.path()));
+    assert!(
+        human.contains("\n  level: light — raise it by uncommenting `require_cases: [failure]` (standard) and `require_review: {}` (strict) in .canon/policy.yaml"),
+        "{human}"
+    );
+}
+
+/// authoring.init.32
+#[test]
+fn authoring_init_32_standard_starter_adds_a_failure_case_and_says_how_to_reach_strict() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = run_canon(&["init", "--policy", "standard"], dir.path());
+    assert!(out.status.success(), "{}", stderr(&out));
+    let policy = std::fs::read_to_string(dir.path().join(".canon/policy.yaml")).unwrap();
+    assert!(policy.starts_with("# canon policy level: standard\n"), "{policy}");
+    assert_eq!(policy_keys(dir.path()), ["spec_coverage:", "  require_evidence: true", "  require_cases: [failure]"]);
+    assert!(policy.contains("  # require_review: {}") && policy.contains("strict"), "{policy}");
+
+    assert_eq!(status_level(dir.path()), "standard");
+    let human = stdout(&run_canon(&["status"], dir.path()));
+    assert!(human.contains("\n  level: standard — raise it by uncommenting `require_review: {}` (strict)"), "{human}");
+}
+
+/// authoring.init.33
+#[test]
+fn authoring_init_33_an_unknown_policy_level_is_refused_and_nothing_is_written() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = run_canon(&["init", "--policy", "extreme"], dir.path());
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert!(stderr(&out).contains("light, standard, strict"), "{}", stderr(&out));
+    assert!(!dir.path().join("canon.yaml").exists());
+    assert!(!dir.path().join(".canon").exists());
+}
+
+/// authoring.init.34
+#[test]
+fn authoring_init_34_a_policy_level_with_no_policy_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = run_canon(&["init", "--policy", "light", "--no-policy"], dir.path());
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert!(stderr(&out).contains("cannot be used with"), "{}", stderr(&out));
+    assert!(!dir.path().join("canon.yaml").exists());
+    assert!(!dir.path().join(".canon").exists());
+}
+
 // ── the scaffolded config resolves cleanly through every existing loader ──
 
 #[test]

@@ -170,3 +170,15 @@ Feature: context status
     Then it warns that the policy is not approved, or changed since approval, and names `canon policy approve`
     And the warning appears in the --json warnings too
     And status still exits 0
+
+  # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.80
+  Scenario: Status names the policy level from its level line, else from its sections, else custom
+    Given policies whose level line names a level, whose level line is missing or names no known level, and whose sections match no level
+    When status is run on each
+    Then the level is the level line's level when it names a known one, even if the sections differ
+    And without a usable level line it is the level the spec_coverage section matches exactly
+    And a section with any other setting, such as a scope, an audit or a non-default review, is custom
+    And --json carries the same level under policy.level, null when there is no policy

@@ -2,7 +2,8 @@
 //! what to do next.
 //!
 //! `canon context` answers what CAN be authored; this answers what HAS
-//! been: each subject's scenario, evidence and review counts, its open
+//! been: the policy's level (0.16 D3, [`crate::policy_level`]), each
+//! subject's scenario, evidence and review counts, its open
 //! blockers and missing required cases, the scenarios no subject owns,
 //! the bindings a re-attestation dropped on purpose (0.15 D2), the audit
 //! obligations `spec_coverage.require_audit` sampled and every refuted
@@ -147,6 +148,10 @@ pub struct PolicyStatus {
     /// The effective `spec_coverage` section, keyed like `policy.yaml`
     /// (the same shape `canon context --json` prints); `null` when absent.
     pub spec_coverage: Option<SpecCoverageSurface>,
+    /// The policy's level (0.16 D3, [`crate::policy_level::detect`]):
+    /// `light`, `standard`, `strict`, or `custom`; `null` when the
+    /// policy is absent.
+    pub level: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -252,7 +257,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
             warnings.extend(crate::policy_approval::advisory(repo));
             warnings.push(format!("cannot read this repo's ledger: {e}"));
             next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into() });
-            return finish(&policy, warnings, Vec::new(), Vec::new(), Vec::new(), None, next);
+            return finish(repo, &policy, warnings, Vec::new(), Vec::new(), Vec::new(), None, next);
         }
     };
 
@@ -305,7 +310,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
         });
         let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
         let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
-        return finish(&ctx.policy, warnings, summaries, unowned, drops, audits, next);
+        return finish(repo, &ctx.policy, warnings, summaries, unowned, drops, audits, next);
     }
 
     // ── next: global rules ──
@@ -374,10 +379,12 @@ pub fn resolve(repo: &Path) -> StatusReport {
 
     let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
     let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
-    finish(&ctx.policy, warnings, summaries, unowned, drops, audits, next)
+    finish(repo, &ctx.policy, warnings, summaries, unowned, drops, audits, next)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn finish(
+    repo: &Path,
     policy: &PolicyResolution,
     warnings: Vec<String>,
     subjects: Vec<SubjectSummary>,
@@ -394,6 +401,7 @@ fn finish(
         policy: PolicyStatus {
             present: !policy.diagnostics.iter().any(|d| matches!(d, PolicyDiagnostic::Missing { .. })),
             spec_coverage: spec_coverage_surface(policy),
+            level: crate::policy_level::detect(repo, policy),
         },
         warnings,
         subjects,
@@ -777,6 +785,16 @@ pub fn render(report: &StatusReport) -> String {
             };
             if let Some(ra) = require_audit {
                 let _ = writeln!(out, "  require_audit: {}", crate::context::require_audit_line(ra));
+            }
+        }
+    }
+    if let Some(level) = report.policy.level {
+        match crate::policy_level::raise_hint(level) {
+            Some(hint) => {
+                let _ = writeln!(out, "  level: {level} — {hint}");
+            }
+            None => {
+                let _ = writeln!(out, "  level: {level}");
             }
         }
     }

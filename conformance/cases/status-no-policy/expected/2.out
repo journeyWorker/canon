@@ -3,7 +3,8 @@
   "canonVersion": "0.15.0",
   "policy": {
     "present": false,
-    "spec_coverage": null
+    "spec_coverage": null,
+    "level": null
   },
   "warnings": [
     "no policy: .canon/policy.yaml not found, so `canon gate check` requires no evidence, failure cases or review here"

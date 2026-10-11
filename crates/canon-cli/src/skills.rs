@@ -12,6 +12,14 @@
 //! never reads. Install removes exactly the files of that legacy projection
 //! whose bytes still match the hash canon's own install lock recorded for
 //! them; `check` and `doctor` report whatever remains as a remnant.
+//!
+//! The install lock (`.canon/skills/.install-lock.json`) records the canon
+//! version that wrote it and, when the source is in a git checkout, that
+//! checkout's `HEAD` (0.16, #9). `check` and `doctor` name a lock written by
+//! another canon, or by a canon before 0.16 that recorded no version, and
+//! give the install command that rewrites it. `doctor` also lists other
+//! skills in the provider skill roots whose description claims build work
+//! (#10, [`BUILD_CLAIM_KEYWORDS`]); it only reports them.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -141,7 +149,34 @@ pub struct SkillsCheckReport {
     pub manifest_ok: bool,
     /// Paths of a legacy `.codex/skills` canon projection still on disk.
     pub remnants: Vec<PathBuf>,
+    /// Set when the install lock exists but was written by a canon other
+    /// than this one.
+    pub outdated: Option<OutdatedLock>,
 }
+
+/// An install lock another canon wrote (0.16, #9).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutdatedLock {
+    /// The lock's path.
+    pub path: PathBuf,
+    /// The canon version the lock records; `None` for a lock written
+    /// before 0.16, which records none.
+    pub installed_by: Option<String>,
+}
+
+impl OutdatedLock {
+    /// "installed by X, this canon is Y — run `canon skills install …`".
+    pub fn describe(&self, providers: &[Provider]) -> String {
+        let by = match &self.installed_by {
+            Some(version) => format!("canon {version}"),
+            None => "an unknown canon version (the lock predates 0.16)".to_string(),
+        };
+        format!("installed by {by}, this canon is {CANON_VERSION} — run `{}`", install_command(providers))
+    }
+}
+
+/// The version of this canon, recorded in every install lock it writes.
+pub const CANON_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, thiserror::Error)]
 pub enum SkillsError {
@@ -477,9 +512,40 @@ fn parse_providers(value: Option<&str>, target_dir: &Path) -> Result<Vec<Provide
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct CanonicalManifest {
     version: u64,
+    /// The canon that wrote the lock (0.16, #9). Absent in a lock written
+    /// before 0.16.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    canon_version: Option<String>,
+    /// `HEAD` of the git checkout the source was in when the projection
+    /// was last written; absent when the source is not in one.
+    /// Provenance only: never compared, so a new commit that leaves the
+    /// bundle unchanged does not rewrite the lock.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_commit: Option<String>,
     source_hash: String,
     providers: Vec<String>,
     files: BTreeMap<String, String>,
+}
+
+impl CanonicalManifest {
+    /// Whether both record the same projection: the same bundle, providers
+    /// and file hashes, whichever canon wrote them.
+    fn same_projection(&self, other: &Self) -> bool {
+        self.version == other.version && self.source_hash == other.source_hash && self.providers == other.providers && self.files == other.files
+    }
+}
+
+/// `HEAD` of the git checkout `source_dir` is in, if it is in one.
+fn source_commit(source_dir: &Path) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(source_dir)
+        .args(["rev-parse", "--verify", "--quiet", "HEAD^{commit}"])
+        .output()
+        .ok()?;
+    let commit = String::from_utf8(output.stdout).ok()?;
+    let commit = commit.trim();
+    (output.status.success() && !commit.is_empty()).then(|| commit.to_string())
 }
 
 fn manifest_path(target_dir: &Path) -> PathBuf {
@@ -522,6 +588,8 @@ fn manifest_for(files: &[BundleFile], providers: &[Provider]) -> CanonicalManife
     }
     CanonicalManifest {
         version: 1,
+        canon_version: Some(CANON_VERSION.to_string()),
+        source_commit: None,
         source_hash,
         providers: providers.iter().map(|p| p.as_str().into()).collect(),
         files: hashes,
@@ -755,8 +823,9 @@ fn legacy_codex_remnants(target_dir: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-/// The command that migrates a legacy Codex projection for `providers`.
-pub fn legacy_codex_fix(providers: &[Provider]) -> String {
+/// The install command for `providers`: what rewrites an outdated lock or
+/// migrates a legacy Codex projection.
+pub fn install_command(providers: &[Provider]) -> String {
     format!(
         "canon skills install --providers={}",
         providers
@@ -767,6 +836,110 @@ pub fn legacy_codex_fix(providers: &[Provider]) -> String {
     )
 }
 
+/// Words that make a co-installed skill's frontmatter `description` claim
+/// build work (#10), matched case-insensitively against its words (runs of
+/// letters and digits, so `web-app` holds `app`).
+pub const BUILD_CLAIM_KEYWORDS: [&str; 19] = [
+    "build",
+    "builds",
+    "building",
+    "builder",
+    "builders",
+    "implement",
+    "implements",
+    "implementing",
+    "implementation",
+    "site",
+    "sites",
+    "website",
+    "websites",
+    "app",
+    "apps",
+    "game",
+    "games",
+    "feature",
+    "features",
+];
+
+/// A skill beside canon's in a provider skill root whose description
+/// claims build work.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompetingSkill {
+    /// The skill's directory.
+    pub path: PathBuf,
+    /// Its frontmatter `name`, else its directory name.
+    pub name: String,
+    /// The [`BUILD_CLAIM_KEYWORDS`] its description holds, in that order.
+    pub claims: Vec<&'static str>,
+}
+
+/// The YAML frontmatter block `content` opens with, parsed.
+fn skill_frontmatter(content: &str) -> Option<serde_yaml::Mapping> {
+    let mut lines = content.split_inclusive('\n');
+    if lines.next()?.trim_end() != "---" {
+        return None;
+    }
+    let mut yaml = String::new();
+    for line in lines {
+        if line.trim_end() == "---" {
+            return serde_yaml::from_str(&yaml).ok();
+        }
+        yaml.push_str(line);
+    }
+    None
+}
+
+/// The [`BUILD_CLAIM_KEYWORDS`] `description` holds.
+fn build_claims(description: &str) -> Vec<&'static str> {
+    let words: Vec<String> = description
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    BUILD_CLAIM_KEYWORDS
+        .into_iter()
+        .filter(|keyword| words.iter().any(|word| word == keyword))
+        .collect()
+}
+
+/// Every skill (`<root>/<dir>/SKILL.md`) in the four provider skill roots
+/// other than canon's own (`canon`, and the `canon-*` legacy names `doctor`
+/// reports as remnants) whose frontmatter description claims build work.
+/// Read only; a skill without a parsable frontmatter description is
+/// skipped.
+pub fn competing_skills(target_dir: &Path) -> Vec<CompetingSkill> {
+    let mut found = Vec::new();
+    for provider in ALL_PROVIDERS {
+        let Ok(entries) = fs::read_dir(provider_skill_root(target_dir, provider)) else {
+            continue;
+        };
+        let mut dirs: Vec<(String, PathBuf)> = entries
+            .flatten()
+            .map(|entry| (entry.file_name().to_string_lossy().into_owned(), entry.path()))
+            .filter(|(name, _)| name != "canon" && !name.starts_with("canon-"))
+            .collect();
+        dirs.sort();
+        for (dir_name, path) in dirs {
+            let Ok(content) = fs::read_to_string(path.join("SKILL.md")) else {
+                continue;
+            };
+            let Some(frontmatter) = skill_frontmatter(&content) else {
+                continue;
+            };
+            let Some(description) = frontmatter.get("description").and_then(serde_yaml::Value::as_str) else {
+                continue;
+            };
+            let claims = build_claims(description);
+            if claims.is_empty() {
+                continue;
+            }
+            let name = frontmatter.get("name").and_then(serde_yaml::Value::as_str).map_or(dir_name, str::to_string);
+            found.push(CompetingSkill { path, name, claims });
+        }
+    }
+    found
+}
+
 pub fn install_canonical(
     source_dir: &Path,
     target_dir: &Path,
@@ -774,7 +947,7 @@ pub fn install_canonical(
 ) -> Result<CanonicalInstallReport, SkillsError> {
     let selected = parse_providers(providers, target_dir)?;
     let files = canonical_bundle(source_dir)?;
-    let manifest = manifest_for(&files, &selected);
+    let mut manifest = manifest_for(&files, &selected);
     let previous = load_manifest(target_dir)?;
     let mut writes: Vec<(PathBuf, Vec<u8>)> = Vec::new();
     for provider in &selected {
@@ -790,7 +963,7 @@ pub fn install_canonical(
     }
     reject_symlink_path_under(target_dir, &manifest_path(target_dir))?;
     let removals = legacy_codex_removals(target_dir, previous.as_ref());
-    let changed = previous.as_ref() != Some(&manifest)
+    let changed = !previous.as_ref().is_some_and(|previous| previous.same_projection(&manifest) && previous.canon_version == manifest.canon_version)
         || !removals.is_empty()
         || writes
             .iter()
@@ -800,6 +973,7 @@ pub fn install_canonical(
             write_bytes_under(target_dir, &path, &bytes)?;
         }
         remove_legacy_codex(target_dir, &removals)?;
+        manifest.source_commit = source_commit(source_dir);
         let mut json =
             serde_json::to_string_pretty(&manifest).expect("manifest serialization is infallible");
         json.push('\n');
@@ -863,13 +1037,17 @@ pub fn check(
             });
         }
     }
-    let manifest_ok = actual.as_ref() == Some(&expected);
+    let manifest_ok = actual.as_ref().is_some_and(|actual| actual.same_projection(&expected));
+    let outdated = actual
+        .filter(|actual| actual.canon_version != expected.canon_version)
+        .map(|actual| OutdatedLock { path: manifest_path(target_dir), installed_by: actual.canon_version });
     Ok(SkillsCheckReport {
         providers: selected,
         source_hash: expected.source_hash,
         statuses,
         manifest_ok,
         remnants: legacy_codex_remnants(target_dir),
+        outdated,
     })
 }
 
@@ -887,10 +1065,22 @@ pub fn doctor(
             .collect::<Vec<_>>()
             .join(",")
     )];
+    let advisories: Vec<String> = competing_skills(target_dir)
+        .into_iter()
+        .map(|skill| {
+            format!(
+                "competing-skill: {} (description claims: {}) — if an agent picks `{}` for build work, canon's loop will not run",
+                skill.path.display(),
+                skill.claims.join(", "),
+                skill.name
+            )
+        })
+        .collect();
     let report = match check(source_dir, target_dir, providers) {
         Ok(report) => report,
         Err(SkillsError::ManifestParse { path, source }) => {
             lines.push(format!("manifest-error: {} ({source})", path.display()));
+            lines.extend(advisories);
             return Ok(lines);
         }
         Err(err) => return Err(err),
@@ -908,11 +1098,14 @@ pub fn doctor(
     if !report.manifest_ok {
         lines.push(format!("stale: {}", manifest_path(target_dir).display()));
     }
+    if let Some(outdated) = &report.outdated {
+        lines.push(format!("outdated: {} {}", outdated.path.display(), outdated.describe(&report.providers)));
+    }
     for remnant in &report.remnants {
         lines.push(format!(
             "legacy-remnant: {} (codex reads .agents/skills, never .codex/skills; fix: `{}`, which removes what canon's install lock proves it wrote; remove anything it keeps by hand)",
             remnant.display(),
-            legacy_codex_fix(&report.providers)
+            install_command(&report.providers)
         ));
     }
     let roots = ALL_PROVIDERS
@@ -932,6 +1125,7 @@ pub fn doctor(
     if lines.len() == 1 {
         lines.push("status: healthy".into());
     }
+    lines.extend(advisories);
     Ok(lines)
 }
 
@@ -972,6 +1166,8 @@ mod tests {
             fs::write(target.join(key), "# topic\n").unwrap();
             let manifest = CanonicalManifest {
                 version: 1,
+                canon_version: None,
+                source_commit: None,
                 source_hash: "sha256:legacy".into(),
                 providers: vec!["codex".into()],
                 files: BTreeMap::from([(key.to_string(), content_hash(b"# topic\n"))]),
@@ -997,5 +1193,27 @@ mod tests {
             Provider::parse("gemini"),
             Err(SkillsError::InvalidProvider(_))
         ));
+    }
+
+    #[test]
+    fn build_claims_match_whole_words_case_insensitively() {
+        assert_eq!(build_claims("Builds Sites, web-apps and GAMES."), vec!["builds", "sites", "apps", "games"]);
+        assert_eq!(build_claims("Build sites and web-app games"), vec!["build", "sites", "app", "games"]);
+        assert_eq!(build_claims("Use to implement a feature"), vec!["implement", "feature"]);
+        assert!(build_claims("Rebuilds the index; reviews applications and suites").is_empty(), "substrings never match");
+    }
+
+    #[test]
+    fn skill_frontmatter_reads_plain_quoted_and_folded_descriptions() {
+        for (content, expected) in [
+            ("---\nname: sites\ndescription: Build sites\n---\n# Sites\n", "Build sites"),
+            ("---\r\nname: x\r\ndescription: \"Build: games\"\r\n---\r\n", "Build: games"),
+            ("---\ndescription: >\n  Build apps\n  and games\n---\n", "Build apps and games\n"),
+        ] {
+            let frontmatter = skill_frontmatter(content).unwrap_or_else(|| panic!("{content:?}"));
+            assert_eq!(frontmatter.get("description").and_then(serde_yaml::Value::as_str), Some(expected), "{content:?}");
+        }
+        assert!(skill_frontmatter("# no frontmatter\n").is_none());
+        assert!(skill_frontmatter("---\ndescription: never closed\n").is_none());
     }
 }
