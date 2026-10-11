@@ -584,13 +584,12 @@ fn context_status_60_status_reads_the_approval_from_the_changes_proposal() {
 
 /// context.status.63: only a line that starts with `Approved:`, says
 /// something, and sits outside HTML comments and fenced code blocks
-/// approves. Each case is its own subject, so one wrongly accepted case
-/// fails on its own; the controls prove a comment or fence that has
-/// closed does not hide a later approval.
+/// approves. Each case runs in its own repo with one subject, so its
+/// report stays under the `next` cap and its human step is checked
+/// exactly; the controls prove a comment or fence that has closed does
+/// not hide a later approval.
 #[test]
 fn context_status_63_a_line_that_only_mentions_approval_does_not_approve() {
-    let dir = repo();
-    write_policy(dir.path(), FULL_POLICY);
     let refused = [
         ("empty", "Approved:\n".to_string()),
         ("mid-line", "Status: Approved: by the agent\n".to_string()),
@@ -606,24 +605,31 @@ fn context_status_63_a_line_that_only_mentions_approval_does_not_approve() {
         ("after-comment", format!("<!-- a note -->\n<!--\nmore\n-->\n{APPROVED}\n")),
         ("after-fence", format!("```\nApproved: in code\n```\n{APPROVED}\n")),
     ];
-    for (case, body) in refused.iter().chain(&accepted) {
-        let id = format!("case-{case}");
-        seed_subject(dir.path(), &id, SubjectStatus::Building, &[&format!("c-{case}")]);
+    // One building subject adopting `c-<case>`, whose proposal.md is `body`.
+    let report_for = |case: &str, body: &str| {
+        let dir = repo();
+        write_policy(dir.path(), FULL_POLICY);
+        seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[&format!("c-{case}")]);
         write_proposal(dir.path(), &format!("c-{case}"), body);
-    }
+        let report = status_json(dir.path());
+        assert_eq!(report["nextOmitted"], 0, "{case}: the report stays under the next cap: {report}");
+        report
+    };
 
-    let report = status_json(dir.path());
     for (case, body) in &refused {
-        assert_eq!(subject(&report, &format!("case-{case}"))["brief"]["approved"], false, "{case} must not approve:\n{body}");
+        let report = report_for(case, body);
+        assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], false, "{case} must not approve:\n{body}");
+        let humans: Vec<&Value> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").collect();
+        assert_eq!(humans.len(), 1, "{case}: exactly one human step: {report}");
+        assert_eq!(humans[0]["command"], BRIEF_STEP, "{case}: {report}");
+        assert!(humans[0]["why"].as_str().unwrap().starts_with("demo-subject: "), "{case}: the step is the subject's: {report}");
+        assert!(humans[0]["why"].as_str().unwrap().contains(&format!("openspec/changes/c-{case}/proposal.md")), "{case}: {report}");
     }
     for (case, body) in &accepted {
-        assert_eq!(subject(&report, &format!("case-{case}"))["brief"]["approved"], true, "{case} must approve:\n{body}");
+        let report = report_for(case, body);
+        assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], true, "{case} must approve:\n{body}");
+        assert!(human_steps(&report).is_empty(), "{case}: an approved brief asks no human: {report}");
     }
-    // `next` caps at five, so only check that every human step shown is
-    // for a refused case.
-    let refused_ids: Vec<String> = refused.iter().map(|(case, _)| format!("case-{case}")).collect();
-    let humans = human_steps(&report);
-    assert!(!humans.is_empty() && humans.iter().all(|h| refused_ids.contains(h)), "only refused cases ask for a human: {humans:?}");
 }
 
 /// context.status.65: a fix lives as tasks inside the approved change, so

@@ -78,28 +78,41 @@ fn approve_refuses_an_empty_approver() {
     assert!(!dir.path().join(APPROVAL).exists());
 }
 
-/// The advisory follows the policy's bytes: present before approval,
-/// gone after it, back (naming both digests) once the policy changes.
-/// Neither command's exit code moves with it.
+/// context.status.40: the advisory follows the policy's bytes: present
+/// before approval, gone after it, back (naming both digests) once the
+/// policy changes. `gate check`, `status` and `status --json` all say so,
+/// both name the repair command, and no exit code moves with it.
 #[test]
 fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
     let dir = initialized_repo();
     let repo = dir.path();
+    const REPAIR: &str = "canon policy approve --by <who>";
 
     let check = |expect: Option<&str>| {
         let gate = run_canon(&["gate", "check"], repo);
         let status = run_canon(&["status"], repo);
+        let json = run_canon(&["status", "--json"], repo);
         assert_eq!(gate.status.code(), Some(0), "the advisory never changes the gate's exit: {}{}", stdout(&gate), stderr(&gate));
-        assert_eq!(status.status.code(), Some(0));
+        assert_eq!(status.status.code(), Some(0), "status: {}", stderr(&status));
+        assert_eq!(json.status.code(), Some(0), "status --json: {}", stderr(&json));
+        let report: serde_json::Value = serde_json::from_str(&stdout(&json)).expect("status --json prints one JSON object");
+        let warnings: Vec<&str> = report["warnings"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
+        let policy_warnings: Vec<&str> = warnings.iter().copied().filter(|w| w.starts_with("policy not approved") || w.starts_with("policy changed")).collect();
         match expect {
             Some(text) => {
                 assert!(stdout(&gate).contains(&format!("advisory: {text}")), "gate check: {}", stdout(&gate));
-                assert!(stdout(&status).contains(&format!("warning: {text}")), "status: {}", stdout(&status));
-                assert!(stdout(&gate).contains("canon policy approve --by <who>"), "the advisory names the command: {}", stdout(&gate));
+                assert!(stdout(&gate).contains(REPAIR), "the advisory names the command: {}", stdout(&gate));
+                let line = stdout(&status).lines().find(|line| line.starts_with(&format!("warning: {text}"))).map(str::to_string);
+                let line = line.unwrap_or_else(|| panic!("status: {}", stdout(&status)));
+                assert!(line.contains(REPAIR), "the status warning names the command: {line}");
+                assert_eq!(policy_warnings.len(), 1, "one policy warning in --json: {warnings:?}");
+                assert!(policy_warnings[0].starts_with(text) && policy_warnings[0].contains(REPAIR), "{warnings:?}");
+                assert_eq!(format!("warning: {}", policy_warnings[0]), line, "--json carries the same warning text");
             }
             None => {
                 assert!(!stdout(&gate).contains("policy not approved") && !stdout(&gate).contains("policy changed"), "gate check: {}", stdout(&gate));
                 assert!(!stdout(&status).contains("policy not approved") && !stdout(&status).contains("policy changed"), "status: {}", stdout(&status));
+                assert!(policy_warnings.is_empty(), "status --json: {warnings:?}");
             }
         }
     };
@@ -123,9 +136,7 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
     assert!(changed.contains(&format!("approved {approved_digest}")), "and the approved one: {changed}");
     assert_ne!(approved_digest, current_digest);
 
-    let json = run_canon(&["status", "--json"], repo);
-    let report: serde_json::Value = serde_json::from_str(&stdout(&json)).expect("status --json");
-    assert!(report["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().starts_with("policy changed since approval")), "{report}");
+    assert_eq!(approved_digest, approval(repo)["policy_digest"].as_str().unwrap(), "the record still names the approved bytes");
 }
 
 #[test]
