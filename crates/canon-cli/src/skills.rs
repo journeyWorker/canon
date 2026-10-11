@@ -19,7 +19,7 @@
 //! another canon, or by a canon before 0.16 that recorded no version, and
 //! give the install command that rewrites it. `doctor` also lists other
 //! skills in the provider skill roots whose description claims build work
-//! (#10, [`BUILD_CLAIM_KEYWORDS`]); it only reports them.
+//! (#10, [`build_claims`]); it only reports them.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -836,29 +836,29 @@ pub fn install_command(providers: &[Provider]) -> String {
     )
 }
 
-/// Words that make a co-installed skill's frontmatter `description` claim
-/// build work (#10), matched case-insensitively against its words (runs of
-/// letters and digits, so `web-app` holds `app`).
-pub const BUILD_CLAIM_KEYWORDS: [&str; 19] = [
-    "build",
-    "builds",
-    "building",
-    "builder",
-    "builders",
-    "implement",
-    "implements",
-    "implementing",
-    "implementation",
-    "site",
-    "sites",
-    "website",
-    "websites",
-    "app",
-    "apps",
-    "game",
-    "games",
-    "feature",
-    "features",
+/// Build verbs, in every form [`build_claims`] matches.
+pub const BUILD_VERBS: [&str; 28] = [
+    "build", "builds", "building", "built",
+    "implement", "implements", "implementing", "implemented",
+    "create", "creates", "creating", "created",
+    "make", "makes", "making", "made",
+    "scaffold", "scaffolds", "scaffolding", "scaffolded",
+    "develop", "develops", "developing", "developed",
+    "code", "codes", "coding", "coded",
+];
+
+/// Build objects, singular and plural, [`build_claims`] matches.
+pub const BUILD_OBJECTS: [&str; 20] = [
+    "site", "sites",
+    "website", "websites",
+    "app", "apps",
+    "application", "applications",
+    "game", "games",
+    "feature", "features",
+    "frontend", "frontends",
+    "ui", "uis",
+    "page", "pages",
+    "component", "components",
 ];
 
 /// A skill beside canon's in a provider skill root whose description
@@ -869,7 +869,8 @@ pub struct CompetingSkill {
     pub path: PathBuf,
     /// Its frontmatter `name`, else its directory name.
     pub name: String,
-    /// The [`BUILD_CLAIM_KEYWORDS`] its description holds, in that order.
+    /// The [`BUILD_VERBS`] and [`BUILD_OBJECTS`] its claiming sentences
+    /// hold, verbs first, each in table order.
     pub claims: Vec<&'static str>,
 }
 
@@ -889,17 +890,29 @@ fn skill_frontmatter(content: &str) -> Option<serde_yaml::Mapping> {
     None
 }
 
-/// The [`BUILD_CLAIM_KEYWORDS`] `description` holds.
+/// Whether a skill `description` claims build work (#10), and with which
+/// words. The rule: some sentence (text between `.`, `!`, `?`, `;` or a
+/// line break) holds both a [`BUILD_VERBS`] word and a [`BUILD_OBJECTS`]
+/// word. Words are runs of letters and digits, compared lowercase, so
+/// `web-app` holds `app` and `rebuild` holds nothing. A verb alone
+/// ("Build release notes") or an object alone ("Manage feature branches")
+/// is not a claim. Returns every verb and object of the claiming
+/// sentences, verbs first, each in table order; empty when none claims.
 fn build_claims(description: &str) -> Vec<&'static str> {
-    let words: Vec<String> = description
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|word| !word.is_empty())
-        .map(str::to_lowercase)
-        .collect();
-    BUILD_CLAIM_KEYWORDS
-        .into_iter()
-        .filter(|keyword| words.iter().any(|word| word == keyword))
-        .collect()
+    let mut verbs = Vec::new();
+    let mut objects = Vec::new();
+    for sentence in description.split(['.', '!', '?', ';', '\n']) {
+        let words: Vec<String> = sentence.split(|c: char| !c.is_alphanumeric()).filter(|word| !word.is_empty()).map(str::to_lowercase).collect();
+        let held = |table: &[&'static str]| -> Vec<&'static str> { table.iter().copied().filter(|keyword| words.iter().any(|word| word == keyword)).collect() };
+        let (sentence_verbs, sentence_objects) = (held(&BUILD_VERBS), held(&BUILD_OBJECTS));
+        if !sentence_verbs.is_empty() && !sentence_objects.is_empty() {
+            verbs.extend(sentence_verbs);
+            objects.extend(sentence_objects);
+        }
+    }
+    let mut claims: Vec<&'static str> = BUILD_VERBS.into_iter().filter(|verb| verbs.contains(verb)).collect();
+    claims.extend(BUILD_OBJECTS.into_iter().filter(|object| objects.contains(object)));
+    claims
 }
 
 /// Every skill (`<root>/<dir>/SKILL.md`) in the four provider skill roots
@@ -1196,11 +1209,16 @@ mod tests {
     }
 
     #[test]
-    fn build_claims_match_whole_words_case_insensitively() {
+    fn build_claims_need_a_build_verb_and_a_build_object_in_one_sentence() {
+        assert_eq!(build_claims("Build websites and apps"), vec!["build", "websites", "apps"]);
         assert_eq!(build_claims("Builds Sites, web-apps and GAMES."), vec!["builds", "sites", "apps", "games"]);
-        assert_eq!(build_claims("Build sites and web-app games"), vec!["build", "sites", "app", "games"]);
         assert_eq!(build_claims("Use to implement a feature"), vec!["implement", "feature"]);
-        assert!(build_claims("Rebuilds the index; reviews applications and suites").is_empty(), "substrings never match");
+        assert_eq!(build_claims("Notes.\nScaffold UI components"), vec!["scaffold", "ui", "components"]);
+        assert!(build_claims("Manage feature branches").is_empty(), "an object without a verb is no claim");
+        assert!(build_claims("Review pages, apps and game assets").is_empty(), "objects alone are no claim");
+        assert!(build_claims("Build release notes").is_empty(), "a verb alone is no claim");
+        assert!(build_claims("Build release notes. Track feature flags").is_empty(), "verb and object must share a sentence");
+        assert!(build_claims("Rebuilds the index; reviews websites").is_empty(), "substrings never match");
     }
 
     #[test]

@@ -296,7 +296,15 @@ fn authoring_init_32_standard_starter_adds_a_failure_case_and_says_how_to_reach_
     let policy = std::fs::read_to_string(dir.path().join(".canon/policy.yaml")).unwrap();
     assert!(policy.starts_with("# canon policy level: standard\n"), "{policy}");
     assert_eq!(policy_keys(dir.path()), ["spec_coverage:", "  require_evidence: true", "  require_cases: [failure]"]);
-    assert!(policy.contains("  # require_review: {}") && policy.contains("strict"), "{policy}");
+    for line in [
+        "  # To raise the level, uncomment what the next level adds below and\n  # change the level line at the top of this file; a human approves the\n  # edit with `canon policy approve --by <who>`.\n",
+        "  # strict:\n",
+        "  # require_review: {}\n",
+    ] {
+        assert!(policy.contains(line), "the standard starter must say how to raise it to strict and that a human approves the edit; missing {line:?}: {policy}");
+    }
+    let raise = policy.find("To raise the level").unwrap();
+    assert!(raise > policy.find("  require_cases: [failure]").unwrap() && raise < policy.find("  # require_review: {}").unwrap(), "the raise instructions sit between the active keys and the commented strict key: {policy}");
 
     assert_eq!(status_level(dir.path()), "standard");
     let human = stdout(&run_canon(&["status"], dir.path()));

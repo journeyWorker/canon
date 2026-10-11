@@ -698,7 +698,7 @@ fn skills_install_43_doctor_warns_about_skills_claiming_build_work_and_never_edi
     let sites = target.join(".claude/skills/sites/SKILL.md");
     let notes = target.join(".agents/skills/notes/SKILL.md");
     let sites_text = "---\nname: site-builder\ndescription: Build sites, web apps and games from a prompt\n---\n# Sites\n";
-    let notes_text = "---\nname: notes\ndescription: Take meeting notes\n---\n# Notes\n";
+    let notes_text = "---\nname: notes\ndescription: Manage feature branches and take meeting notes\n---\n# Notes\n";
     for (path, text) in [(&sites, sites_text), (&notes, notes_text)] {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, text).unwrap();

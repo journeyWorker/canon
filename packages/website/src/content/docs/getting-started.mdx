@@ -183,9 +183,10 @@ install lock records the canon version that wrote it, so after you upgrade
 canon both say "installed by canon X, this canon is Y — run
 `canon skills install`" (or "an unknown canon version" for a lock from
 before 0.16) until you reinstall. `doctor` also names other skills in the
-same provider roots whose description claims build, site, app, game or
-feature work: if an agent picks one of those for build work, canon's loop
-will not run. It only reports them.
+same provider roots whose description claims build work, meaning one
+sentence pairs a build verb (build, create, implement, …) with a build object
+(site, app, game, feature, …): if an agent picks one of those for build work,
+canon's loop will not run. It only reports them.
 
 Upgrading from canon 0.13.0 or earlier? Those releases wrote Codex's skill to
 `.codex/skills/canon.md`, which Codex never reads. Re-run `skills install`: it

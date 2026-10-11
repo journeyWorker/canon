@@ -1,6 +1,6 @@
 ---
 name: notes
-description: Take meeting notes.
+description: Manage feature branches and take meeting notes.
 ---
 
 # Notes

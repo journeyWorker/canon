@@ -81,12 +81,20 @@ rewrites the lock with this canon's version.
 competing-skill: <dir> (description claims: build, sites) — if an agent picks `<name>` for build work, canon's loop will not run
 ```
 
-The claim is a keyword match on the description's words, case-insensitive:
-`build`, `builds`, `building`, `builder`, `builders`, `implement`,
-`implements`, `implementing`, `implementation`, `site`, `sites`, `website`,
-`websites`, `app`, `apps`, `game`, `games`, `feature`, `features`. A word is
-a run of letters and digits, so `web-app` holds `app` and `rebuild` holds
-nothing. A skill without a readable frontmatter `description` is skipped.
+A description claims build work when one sentence (text between `.`, `!`,
+`?`, `;` or a line break) holds both a build verb and a build object, matched
+as whole words, case-insensitive:
+
+- verbs: `build`, `implement`, `create`, `make`, `scaffold`, `develop`,
+  `code`, each with its `-s`, `-ing` and past forms (`built`, `made`, …);
+- objects: `site`, `website`, `app`, `application`, `game`, `feature`,
+  `frontend`, `ui`, `page`, `component`, singular or plural.
+
+A word is a run of letters and digits, so `web-app` holds `app` and `rebuild`
+holds nothing. "Build websites and apps" claims build work; "Manage feature
+branches" (an object, no verb) and "Build release notes" (a verb, no object)
+do not. The line lists the verbs and objects of the claiming sentences. A
+skill without a readable frontmatter `description` is skipped.
 The line is advisory: it never makes the projections unhealthy, `doctor` still
 exits 0, and canon never edits another skill. User-level skill roots are not
 scanned.
