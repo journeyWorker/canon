@@ -1,2 +1,2 @@
 providers: claude
-outdated: ./.canon/skills/.install-lock.json installed by canon 0.13.1, this canon is 0.15.0 — run `canon skills install --providers=claude`
+outdated: ./.canon/skills/.install-lock.json installed by canon 0.13.1, this canon is 0.16.0 — run `canon skills install --providers=claude`
