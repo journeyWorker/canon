@@ -240,6 +240,19 @@ Nothing is written in a directory without `canon.yaml`. `canon inventory
 sync` stays the explicit command, and the one that lists violations and
 tag diagnostics.
 
+## The artifact store lock
+
+Every write to the evidence artifact store (`.canon/artifacts/sha256/`:
+`canon evidence add`, `canon review add`, `canon evidence vault`) holds an
+OS file lock on `.canon/artifact-store.lock` from its "already stored?"
+check through its last rename, so a write that fails and rolls back never
+removes a blob another writer published or counted as stored. A rollback
+removes only the blobs its own write renamed into place; a blob already
+stored intact counts as stored and is not written again. The lock is
+released when its holder exits, however it exits, so it never goes stale;
+a writer gives up after 30 s with a message naming the file and saying to
+retry (the command exits `2` and writes no record).
+
 ## What `canon init` keeps out of git
 
 A fresh `canon init` writes these lines to `.gitignore` (each under a
@@ -250,6 +263,8 @@ comment, only the missing ones):
 - `.canon/ledger/kind=scenario/` — the scenario index; every reader
   rebuilds it.
 - `.canon/scenario-index.lock` — the lock serializing index rebuilds.
+- `.canon/artifact-store.lock` — the lock serializing artifact store
+  writes.
 
 A rerun on a repo that already has `canon.yaml` only refreshes
 `AGENTS.md`, so an existing repo's `.gitignore` is unchanged; add the

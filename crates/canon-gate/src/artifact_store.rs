@@ -17,10 +17,24 @@
 //! in the same directory and a rename, so a reader never sees a partial
 //! blob, and a blob whose digest is already stored intact is not written
 //! again. A record binding several files stores them all or none: each
-//! is [`stage`]d (copied to a temp file and re-hashed) first, and only
-//! when every one has staged are they [`publish`]ed. A file larger than
-//! the size limit ([`DEFAULT_MAX_ARTIFACT_MIB`], raised with
-//! [`MAX_ARTIFACT_FLAG`]) is refused rather than stored.
+//! is staged ([`StoreLock::stage`]: copied to a temp file and re-hashed)
+//! first, and only when every one has staged are they published
+//! ([`StoreLock::publish`]); a rename that fails rolls back the ones
+//! before it. A file larger than the size limit
+//! ([`DEFAULT_MAX_ARTIFACT_MIB`], raised with [`MAX_ARTIFACT_FLAG`]) is
+//! refused rather than stored.
+//!
+//! Writes are serialized by a repo-level lock ([`StoreLock`],
+//! [`canon_model::paths::ARTIFACT_STORE_LOCK_FILE`]) held from the
+//! "already stored?" check through the last rename or rollback. Without
+//! it, a rollback could remove a blob another writer had just published,
+//! or had found intact and counted as stored — and that writer's record
+//! would then name bytes the store lacks. For the same reason a blob
+//! whose target already holds an intact copy when it is published (the
+//! same digest twice in one record, or a canon without the lock writing
+//! it meanwhile) counts as stored: it is not renamed over, and a
+//! rollback only ever removes what its own transaction renamed into
+//! place.
 //!
 //! # What the gate checks ([`ArtifactStoreCheck`])
 //! Every attachment on every LATEST evidence record: the latest record
@@ -44,7 +58,7 @@
 //!
 //! # Review artifacts (0.16 D5)
 //! `canon review add --artifact` stores what the reviewer looked at
-//! through the same [`store`] and records `{path, sha256}` on the
+//! through the same [`StoreLock`] and records `{path, sha256}` on the
 //! review. The check covers every IN-EFFECT review (the latest per
 //! `(project_id, scenario_id, reviewer)`,
 //! [`crate::review_gate::in_effect_reviews`]). A review artifact has no
@@ -63,9 +77,12 @@
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::marker::PhantomData;
 use std::path::{Component, Path, PathBuf};
+use std::time::Duration;
 
 use canon_model::{paths, EvidenceAttachment, EvidenceRecord};
+use canon_store::file_lock::{FileLock, FileLockError};
 use sha2::{Digest, Sha256};
 
 use crate::context::{GateCheck, GateContext};
@@ -204,14 +221,15 @@ impl Observed {
     }
 }
 
-/// Whether [`store`] wrote a blob or found it already stored intact.
+/// Whether [`StoreLock::store`] wrote a blob or found it already stored
+/// intact.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StoreOutcome {
     Stored,
     AlreadyStored,
 }
 
-/// Why [`store`] wrote nothing.
+/// Why a store write wrote nothing.
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
     /// The bytes read now hash differently from the digest being stored:
@@ -226,70 +244,153 @@ pub enum StoreError {
     /// the store.
     #[error("{} is not a real directory; refusing to write the artifact store through it", paths::ARTIFACTS_SHA256_DIR)]
     UnsafeStoreDir,
+    /// Another canon process held [`StoreLock`] for the whole wait.
+    #[error(
+        "another canon process has been writing the artifact store for {}s (it holds `{}`); retry once it finishes",
+        .0.as_secs(),
+        paths::ARTIFACT_STORE_LOCK_FILE
+    )]
+    Locked(Duration),
     #[error("{0}")]
     Io(#[from] std::io::Error),
 }
 
-/// Store the bytes `reader` yields as the blob for `expected`: [`stage`]
-/// then [`publish`]. Skips the write when an intact blob is already
-/// there. Refuses ([`StoreError::Changed`]), writing nothing, when the
-/// bytes do not hash to `expected` — the caller recorded that digest,
-/// and the store must hold exactly those bytes or nothing.
-pub fn store(repo: &Path, expected: &str, reader: impl Read) -> Result<StoreOutcome, StoreError> {
-    match stage(repo, expected, reader)? {
-        None => Ok(StoreOutcome::AlreadyStored),
-        Some(blob) => publish(vec![blob]).map(|()| StoreOutcome::Stored).map_err(|(_, e)| e),
+/// How long a writer of the artifact store waits for another one to
+/// finish before giving up.
+const STORE_LOCK_WAIT: Duration = Duration::from_secs(30);
+
+/// The repo's artifact-store lock ([`paths::ARTIFACT_STORE_LOCK_FILE`]),
+/// held until this value is dropped. Every write goes through it:
+/// [`StoreLock::stage`], [`StoreLock::publish`] and [`StoreLock::store`]
+/// are its methods, and a [`StagedBlob`] cannot outlive it, so the
+/// "already stored?" check, the renames and any rollback all happen
+/// under one hold (module doc).
+///
+/// An OS advisory lock on the file ([`canon_store::file_lock`]: `flock`
+/// on Unix, `LockFileEx` on Windows), not the file's existence: closing
+/// the file releases it, and so does the holder's death, however it
+/// died, so a killed writer never leaves a stale lock behind and the
+/// file itself is never deleted. Waiting is bounded ([`STORE_LOCK_WAIT`],
+/// polled), and running out is [`StoreError::Locked`], naming the file.
+#[derive(Debug)]
+pub struct StoreLock {
+    repo: PathBuf,
+    _lock: FileLock,
+}
+
+impl StoreLock {
+    /// Take the artifact-store lock of the repo rooted at `repo`.
+    pub fn acquire(repo: &Path) -> Result<StoreLock, StoreError> {
+        Self::acquire_within(repo, STORE_LOCK_WAIT)
+    }
+
+    fn acquire_within(repo: &Path, wait: Duration) -> Result<StoreLock, StoreError> {
+        match FileLock::acquire(&repo.join(paths::ARTIFACT_STORE_LOCK_FILE), wait) {
+            Ok(lock) => Ok(StoreLock { repo: repo.to_path_buf(), _lock: lock }),
+            Err(FileLockError::Busy(waited)) => Err(StoreError::Locked(waited)),
+            Err(FileLockError::Io(e)) => Err(e.into()),
+        }
+    }
+
+    /// Store the bytes `reader` yields as the blob for `expected`:
+    /// [`StoreLock::stage`] then [`StoreLock::publish`]. Skips the write
+    /// when an intact blob is already there. Refuses
+    /// ([`StoreError::Changed`]), writing nothing, when the bytes do not
+    /// hash to `expected` — the caller recorded that digest, and the
+    /// store must hold exactly those bytes or nothing.
+    pub fn store(&self, expected: &str, reader: impl Read) -> Result<StoreOutcome, StoreError> {
+        let Some(blob) = self.stage(expected, reader)? else {
+            return Ok(StoreOutcome::AlreadyStored);
+        };
+        match self.publish(vec![blob]).map_err(|(_, e)| e)? {
+            0 => Ok(StoreOutcome::AlreadyStored),
+            _ => Ok(StoreOutcome::Stored),
+        }
+    }
+
+    /// Copy the bytes `reader` yields into a temp file in the store
+    /// directory, hashing them on the way. `None` when an intact blob
+    /// for `expected` is already stored; [`StoreError::Changed`], with
+    /// the temp file removed, when the bytes do not hash to `expected` —
+    /// identical bytes are also the size that was checked when they were
+    /// bound.
+    ///
+    /// "Already stored" is decided by [`stored_blob`], which never
+    /// follows a link: a pre-existing symlink (or any non-file) at the
+    /// blob path is replaced by [`StoreLock::publish`]'s rename, which
+    /// swaps the link itself, never its target.
+    pub fn stage(&self, expected: &str, mut reader: impl Read) -> Result<Option<StagedBlob<'_>>, StoreError> {
+        if !is_sha256_hex(expected) {
+            return Err(StoreError::InvalidDigest(expected.to_string()));
+        }
+        if stored_blob(&self.repo, expected).matches(expected) {
+            return Ok(None);
+        }
+        let dir = create_store_dir(&self.repo)?;
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+        let temp = dir.join(format!(".tmp-{expected}-{}-{nanos}", std::process::id()));
+        let mut file = File::options().write(true).create_new(true).open(&temp)?;
+        // From here on, dropping `staged` removes the temp file.
+        let staged = StagedBlob { temp: Some(temp), sha256: expected.to_string(), _lock: PhantomData };
+        let written = copy_hashed(&mut reader, &mut file).and_then(|actual| file.sync_all().map(|()| actual));
+        drop(file);
+        let actual = written?;
+        if actual != expected {
+            return Err(StoreError::Changed { expected: expected.to_string(), actual });
+        }
+        Ok(Some(staged))
+    }
+
+    /// Rename every staged blob into place, in order, returning how many
+    /// this call wrote. Callers stage ALL their files first, so a file
+    /// that fails to read or hash never leaves a sibling published.
+    ///
+    /// A blob whose target already holds an intact copy (the same digest
+    /// staged twice in one call, or a canon without this lock writing
+    /// it meanwhile) counts as stored: its temp file is dropped and the
+    /// target is left alone. If a rename fails, only the targets this
+    /// call itself renamed into place are removed (best effort), the
+    /// rest are dropped unpublished, and the error carries the failing
+    /// blob's index.
+    pub fn publish(&self, staged: Vec<StagedBlob<'_>>) -> Result<usize, (usize, StoreError)> {
+        let mut renamed: Vec<PathBuf> = Vec::new();
+        for (index, mut blob) in staged.into_iter().enumerate() {
+            if stored_blob(&self.repo, &blob.sha256).matches(&blob.sha256) {
+                continue;
+            }
+            let target = blob_path(&self.repo, &blob.sha256);
+            let temp = blob.temp.take().expect("an unpublished StagedBlob always holds its temp file");
+            if let Err(e) = std::fs::rename(&temp, &target) {
+                blob.temp = Some(temp);
+                for target in &renamed {
+                    let _ = std::fs::remove_file(target);
+                }
+                return Err((index, e.into()));
+            }
+            renamed.push(target);
+        }
+        Ok(renamed.len())
     }
 }
 
 /// A blob written, hashed and synced to a temp file in the store
-/// directory, not yet visible under its name. [`publish`] renames it into
-/// place; dropped unpublished, its temp file is removed, so the store is
-/// left as it was.
+/// directory, not yet visible under its name; it borrows the
+/// [`StoreLock`] it was staged under. [`StoreLock::publish`] renames it
+/// into place; dropped unpublished, its temp file is removed, so the
+/// store is left as it was.
 #[derive(Debug)]
-pub struct StagedBlob {
+pub struct StagedBlob<'l> {
     temp: Option<PathBuf>,
-    target: PathBuf,
+    sha256: String,
+    _lock: PhantomData<&'l StoreLock>,
 }
 
-impl Drop for StagedBlob {
+impl Drop for StagedBlob<'_> {
     fn drop(&mut self) {
         if let Some(temp) = self.temp.take() {
             let _ = std::fs::remove_file(temp);
         }
     }
-}
-
-/// Copy the bytes `reader` yields into a temp file in the store
-/// directory, hashing them on the way. `None` when an intact blob for
-/// `expected` is already stored; [`StoreError::Changed`], with the temp
-/// file removed, when the bytes do not hash to `expected` — identical
-/// bytes are also the size that was checked when they were bound.
-///
-/// "Already stored" is decided by [`stored_blob`], which never follows a
-/// link: a pre-existing symlink (or any non-file) at the blob path is
-/// replaced by [`publish`]'s rename, which swaps the link itself, never
-/// its target.
-pub fn stage(repo: &Path, expected: &str, mut reader: impl Read) -> Result<Option<StagedBlob>, StoreError> {
-    if !is_sha256_hex(expected) {
-        return Err(StoreError::InvalidDigest(expected.to_string()));
-    }
-    if stored_blob(repo, expected).matches(expected) {
-        return Ok(None);
-    }
-    let dir = create_store_dir(repo)?;
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
-    let temp = dir.join(format!(".tmp-{expected}-{}-{nanos}", std::process::id()));
-    let mut file = File::options().write(true).create_new(true).open(&temp)?;
-    // From here on, dropping `staged` removes the temp file.
-    let staged = StagedBlob { temp: Some(temp), target: blob_path(repo, expected) };
-    let written = copy_hashed(&mut reader, &mut file).and_then(|actual| file.sync_all().map(|()| actual));
-    drop(file);
-    let actual = written?;
-    if actual != expected {
-        return Err(StoreError::Changed { expected: expected.to_string(), actual });
-    }
-    Ok(Some(staged))
 }
 
 /// Copy `reader` into `file`, returning the sha256 of the bytes copied.
@@ -305,27 +406,6 @@ fn copy_hashed(reader: &mut impl Read, file: &mut File) -> std::io::Result<Strin
         file.write_all(&buffer[..read])?;
     }
     Ok(format!("{:x}", hasher.finalize()))
-}
-
-/// Rename every staged blob into place, in order. Callers stage ALL
-/// their files first, so a file that fails to read or hash never leaves
-/// a sibling published. If a rename fails, the blobs this call already
-/// published are removed (best effort) and the rest are dropped
-/// unpublished; the error carries the failing blob's index.
-pub fn publish(staged: Vec<StagedBlob>) -> Result<(), (usize, StoreError)> {
-    let mut published: Vec<PathBuf> = Vec::new();
-    for (index, mut blob) in staged.into_iter().enumerate() {
-        let temp = blob.temp.take().expect("an unpublished StagedBlob always holds its temp file");
-        if let Err(e) = std::fs::rename(&temp, &blob.target) {
-            blob.temp = Some(temp);
-            for target in &published {
-                let _ = std::fs::remove_file(target);
-            }
-            return Err((index, e.into()));
-        }
-        published.push(blob.target.clone());
-    }
-    Ok(())
 }
 
 /// The working-tree file a repository-relative attachment path names,
@@ -499,6 +579,11 @@ mod tests {
     use super::*;
     use crate::policy::{PolicyField, PolicyResolution, StalenessPolicy};
 
+    /// One store transaction under the repo's lock.
+    fn store(repo: &Path, expected: &str, reader: impl Read) -> Result<StoreOutcome, StoreError> {
+        StoreLock::acquire(repo)?.store(expected, reader)
+    }
+
     fn sha(bytes: &[u8]) -> String {
         format!("{:x}", Sha256::digest(bytes))
     }
@@ -639,7 +724,7 @@ mod tests {
             assert!(matches!(store(dir.path(), bad, &b"x"[..]), Err(StoreError::InvalidDigest(_))), "{bad}");
             assert_eq!(stored_blob(dir.path(), bad), Observed::Missing);
         }
-        assert!(!dir.path().join(".canon").exists(), "nothing is created for an invalid digest");
+        assert!(!store_dir(dir.path()).exists(), "no store directory is created for an invalid digest");
     }
 
     /// A pre-existing `<digest>` symlink pointing outside the store (at
@@ -693,5 +778,57 @@ mod tests {
         let digest = sha(b"v1");
         assert!(matches!(store(dir.path(), &digest, &b"v1"[..]), Err(StoreError::UnsafeStoreDir)));
         assert!(std::fs::read_dir(outside.path()).unwrap().next().is_none(), "the outside directory stays empty");
+    }
+
+    /// evidence.add.66: a blob already intact at its target when the
+    /// transaction publishes (written by another writer) is not claimed
+    /// by this transaction, so its rollback leaves it in place.
+    #[test]
+    fn evidence_add_66_a_rollback_never_removes_a_blob_another_writer_published() {
+        let dir = TempDir::new().unwrap();
+        let (a, b) = (sha(b"first"), sha(b"second"));
+        let lock = StoreLock::acquire(dir.path()).unwrap();
+        let staged = vec![lock.stage(&a, &b"first"[..]).unwrap().unwrap(), lock.stage(&b, &b"second"[..]).unwrap().unwrap()];
+        // Another writer stores A meanwhile; B's rename will fail.
+        std::fs::write(blob_path(dir.path(), &a), b"first").unwrap();
+        std::fs::create_dir_all(blob_path(dir.path(), &b).join("occupied")).unwrap();
+
+        let (index, _) = lock.publish(staged).unwrap_err();
+        assert_eq!(index, 1, "the error names B");
+        assert!(stored_blob(dir.path(), &a).matches(&a), "the other writer's blob survives the rollback");
+        let mut left: Vec<String> = std::fs::read_dir(store_dir(dir.path())).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
+        left.sort();
+        let mut expected = vec![a.clone(), b.clone()];
+        expected.sort();
+        assert_eq!(left, expected, "A's blob and B's blocking directory only: no temp file is left");
+    }
+
+    /// evidence.add.66: an already-intact target counts as stored, so a
+    /// digest staged twice in one transaction is written once.
+    #[test]
+    fn evidence_add_66_publish_counts_only_the_blobs_it_wrote() {
+        let dir = TempDir::new().unwrap();
+        let digest = sha(b"same");
+        let lock = StoreLock::acquire(dir.path()).unwrap();
+        let staged = vec![lock.stage(&digest, &b"same"[..]).unwrap().unwrap(), lock.stage(&digest, &b"same"[..]).unwrap().unwrap()];
+        assert_eq!(lock.publish(staged).unwrap(), 1);
+        assert_eq!(std::fs::read_dir(store_dir(dir.path())).unwrap().count(), 1, "one blob, no temp file");
+        assert_eq!(lock.store(&digest, &b"same"[..]).unwrap(), StoreOutcome::AlreadyStored);
+    }
+
+    /// evidence.add.66: a second writer of the same repo waits for the
+    /// lock, is refused naming the lock file when the wait runs out, and
+    /// gets it once the first writer is done.
+    #[test]
+    fn evidence_add_66_a_second_store_writer_waits_for_the_lock() {
+        let dir = TempDir::new().unwrap();
+        let first = StoreLock::acquire(dir.path()).unwrap();
+        let busy = StoreLock::acquire_within(dir.path(), std::time::Duration::from_millis(120)).unwrap_err();
+        assert!(matches!(busy, StoreError::Locked(_)), "{busy}");
+        assert!(busy.to_string().contains(paths::ARTIFACT_STORE_LOCK_FILE) && busy.to_string().contains("retry"), "{busy}");
+        drop(first);
+        let second = StoreLock::acquire_within(dir.path(), std::time::Duration::ZERO).unwrap();
+        assert_eq!(second.store(&sha(b"v1"), &b"v1"[..]).unwrap(), StoreOutcome::Stored);
+        assert!(dir.path().join(paths::ARTIFACT_STORE_LOCK_FILE).is_file(), "the lock file is never deleted");
     }
 }

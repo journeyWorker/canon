@@ -71,6 +71,8 @@ packages/core-*/bin/*
 # The lock `canon inventory sync` and every reader's scenario-index
 # refresh hold while writing the index (0.16): local process state.
 .canon/scenario-index.lock
+# The lock every artifact-store write holds (0.16): local process state.
+.canon/artifact-store.lock
 .canon/REPORT.md
 .env
 .env.*

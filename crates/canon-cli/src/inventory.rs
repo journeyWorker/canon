@@ -38,6 +38,7 @@ use canon_gate::legacy_pins::SpecSources;
 use canon_gate::{GateContext, GateCtx};
 use canon_model::ids::SpecDigest;
 use canon_model::{paths, Actor, Envelope, ProjectId, RecordKind, Scenario, ScenarioId, SubjectId};
+use canon_store::file_lock::{FileLock, FileLockError};
 use canon_store::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{StoreError, Tier, TierQuery};
@@ -394,37 +395,27 @@ const INDEX_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 /// The repo's scenario-index lock ([`paths::SCENARIO_INDEX_LOCK_FILE`]),
 /// held until this value is dropped.
 ///
-/// An OS advisory lock on the file (`File::try_lock`: `flock` on Unix,
-/// `LockFileEx` on Windows), not the file's existence: closing the file
-/// releases it, and so does the holder's death, however it died, so a
-/// killed sync never leaves a stale lock behind and the file itself is
-/// never deleted. Waiting is bounded ([`INDEX_LOCK_WAIT`], polled), and
-/// running out is [`InventoryError::Locked`], naming the file.
+/// An OS advisory lock on the file ([`canon_store::file_lock`]: `flock`
+/// on Unix, `LockFileEx` on Windows), not the file's existence: closing
+/// the file releases it, and so does the holder's death, however it
+/// died, so a killed sync never leaves a stale lock behind and the file
+/// itself is never deleted. Waiting is bounded ([`INDEX_LOCK_WAIT`],
+/// polled), and running out is [`InventoryError::Locked`], naming the
+/// file.
 struct IndexLock {
-    _file: std::fs::File,
+    _lock: FileLock,
 }
 
 /// Take [`IndexLock`] for the repo rooted at `repo`.
 fn lock_index(repo: &Path) -> Result<IndexLock, InventoryError> {
-    let path = repo.join(paths::SCENARIO_INDEX_LOCK_FILE);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(StoreError::from)?;
-    }
-    let file = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(&path).map_err(StoreError::from)?;
-    let deadline = std::time::Instant::now() + INDEX_LOCK_WAIT;
-    loop {
-        match file.try_lock() {
-            Ok(()) => return Ok(IndexLock { _file: file }),
-            Err(std::fs::TryLockError::WouldBlock) if std::time::Instant::now() < deadline => std::thread::sleep(std::time::Duration::from_millis(50)),
-            Err(std::fs::TryLockError::WouldBlock) => {
-                return Err(InventoryError::Locked(format!(
-                    "another canon process has been writing the scenario index for {}s (it holds `{}`); retry once it finishes",
-                    INDEX_LOCK_WAIT.as_secs(),
-                    paths::SCENARIO_INDEX_LOCK_FILE
-                )))
-            }
-            Err(std::fs::TryLockError::Error(e)) => return Err(StoreError::from(e).into()),
-        }
+    match FileLock::acquire(&repo.join(paths::SCENARIO_INDEX_LOCK_FILE), INDEX_LOCK_WAIT) {
+        Ok(lock) => Ok(IndexLock { _lock: lock }),
+        Err(FileLockError::Busy(waited)) => Err(InventoryError::Locked(format!(
+            "another canon process has been writing the scenario index for {}s (it holds `{}`); retry once it finishes",
+            waited.as_secs(),
+            paths::SCENARIO_INDEX_LOCK_FILE
+        ))),
+        Err(FileLockError::Io(e)) => Err(StoreError::from(e).into()),
     }
 }
 

@@ -344,3 +344,15 @@ Feature: evidence add
     Then each run prints the promote line of its own record only
     And the other author's records are still staged
     And gate promote and divergence promote commit them afterwards
+
+  # canon: {"schema":1,"at":"2026-10-11T17:14:21Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.66
+  Scenario: A store rollback never removes a blob another writer published
+    Given two files staged into the artifact store under its lock
+    And another writer has already stored the first file's blob intact
+    When publishing the second file fails and the store rolls back
+    Then the first file's blob is still stored and hashes to its name
+    And no temp file is left in the store
+    And a second writer of the same repo waits for the lock and is refused naming the lock file

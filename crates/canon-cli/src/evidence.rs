@@ -1002,7 +1002,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
 /// matters is the gate's question, and a superseded record's lost file
 /// never does. `2` when the ledger cannot be read or a write fails.
 pub fn run_vault(repo: &Path, max_artifact_mib: u64) -> i32 {
-    use canon_gate::artifact_store::{blob_display, store, stored_blob, working_tree_path, StoreError, StoreOutcome, MIB};
+    use canon_gate::artifact_store::{blob_display, stored_blob, working_tree_path, StoreError, StoreLock, StoreOutcome, MIB};
 
     let repo = resolve_repo_root(repo);
     let ledger_root = match GateCtx::from_repo(&repo) {
@@ -1026,7 +1026,18 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64) -> i32 {
     let max_bytes = max_artifact_mib.saturating_mul(MIB);
     let (mut stored, mut already) = (Vec::new(), 0usize);
     let mut missing = Vec::new();
+    // One hold of the store lock for the whole pass, so "already
+    // stored" is never decided while another writer may still roll back.
+    // Nothing to store takes no lock.
+    let lock = match (!files.is_empty()).then(|| StoreLock::acquire(&repo)).transpose() {
+        Ok(lock) => lock,
+        Err(e) => {
+            eprintln!("canon evidence vault: {e}");
+            return 2;
+        }
+    };
     for (path, sha256) in &files {
+        let lock = lock.as_ref().expect("the lock is taken whenever there is a file");
         if stored_blob(&repo, sha256).as_str() == sha256 {
             already += 1;
             continue;
@@ -1050,11 +1061,11 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64) -> i32 {
             ));
             continue;
         }
-        match store(&repo, sha256, file) {
+        match lock.store(sha256, file) {
             Ok(StoreOutcome::Stored) => stored.push(format!("{} <- {path}", blob_display(sha256))),
             Ok(StoreOutcome::AlreadyStored) => already += 1,
             Err(StoreError::Changed { actual, .. }) => missing.push(format!("{path} (recorded sha256 {sha256}): working tree: {actual}")),
-            Err(e @ (StoreError::Io(_) | StoreError::InvalidDigest(_) | StoreError::UnsafeStoreDir)) => {
+            Err(e @ (StoreError::Io(_) | StoreError::InvalidDigest(_) | StoreError::UnsafeStoreDir | StoreError::Locked(_))) => {
                 eprintln!("canon evidence vault: could not write {}: {e}", blob_display(sha256));
                 return 2;
             }

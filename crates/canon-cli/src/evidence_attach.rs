@@ -173,30 +173,38 @@ fn hash_artifact(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Bo
 }
 
 /// Copy every bound file into the artifact store, all or nothing,
-/// returning how many were newly stored. Called once every refusal has
-/// passed, just before the record is written, so a record never names a
-/// blob the store lacks. Every file is first re-read, re-hashed and
-/// staged to a temp file in the store
-/// ([`canon_gate::artifact_store::stage`]); only when all of them have
-/// staged are they published. A file that changed since it was hashed
-/// is refused rather than stored under a digest its bytes no longer
-/// have, and then nothing is published. The error names that file.
+/// returning how many blobs this call wrote (a blob already stored
+/// intact, or the same bytes bound twice, is not newly stored). Called
+/// once every refusal has passed, just before the record is written, so
+/// a record never names a blob the store lacks. The whole transaction
+/// holds the repo's artifact-store lock
+/// ([`canon_gate::artifact_store::StoreLock`]); a lock that stays busy
+/// is reported against the first file. Every file is first re-read,
+/// re-hashed and staged to a temp file in the store; only when all of
+/// them have staged are they published. A file that changed since it
+/// was hashed is refused rather than stored under a digest its bytes no
+/// longer have, and then nothing is published. The error names that
+/// file.
 pub fn store_files<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<usize, (&'f BoundFile, canon_gate::artifact_store::StoreError)> {
+    use canon_gate::artifact_store::{StoreError, StoreLock};
+
+    let Some(first) = files.first() else {
+        return Ok(0);
+    };
+    let lock = StoreLock::acquire(repo).map_err(|e| (first, e))?;
     let mut staged = Vec::new();
     let mut sources = Vec::new();
     for file in files {
         let blob = std::fs::File::open(&file.resolved)
-            .map_err(canon_gate::artifact_store::StoreError::from)
-            .and_then(|reader| canon_gate::artifact_store::stage(repo, &file.sha256, reader))
+            .map_err(StoreError::from)
+            .and_then(|reader| lock.stage(&file.sha256, reader))
             .map_err(|e| (file, e))?;
         if let Some(blob) = blob {
             staged.push(blob);
             sources.push(file);
         }
     }
-    let stored = staged.len();
-    canon_gate::artifact_store::publish(staged).map_err(|(index, e)| (sources[index], e))?;
-    Ok(stored)
+    lock.publish(staged).map_err(|(index, e)| (sources[index], e))
 }
 
 /// The line a write command prints after [`store_files`].

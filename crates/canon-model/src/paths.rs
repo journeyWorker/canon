@@ -96,6 +96,15 @@ pub const SCENARIO_INDEX_GITIGNORE: &str = ".canon/ledger/kind=scenario/";
 /// state, so `canon init` ignores it.
 pub const SCENARIO_INDEX_LOCK_FILE: &str = ".canon/scenario-index.lock";
 
+/// The advisory lock every write to the evidence artifact store
+/// ([`ARTIFACTS_SHA256_DIR`]) holds from its "already stored?" check to
+/// its last rename or rollback, so a rollback never removes a blob
+/// another writer published or counted as stored. An OS file lock
+/// (`flock`/`LockFileEx`), released when the holder exits — even when it
+/// is killed — so the file never goes stale and is never deleted. Local
+/// state, so `canon init` ignores it.
+pub const ARTIFACT_STORE_LOCK_FILE: &str = ".canon/artifact-store.lock";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,6 +132,7 @@ mod tests {
             AUDIT_GITIGNORE,
             SCENARIO_INDEX_GITIGNORE,
             SCENARIO_INDEX_LOCK_FILE,
+            ARTIFACT_STORE_LOCK_FILE,
         ];
         for path in all {
             assert!(
