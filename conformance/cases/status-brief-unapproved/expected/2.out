@@ -11,7 +11,8 @@
         "failure"
       ],
       "require_review": null
-    }
+    },
+    "level": "custom"
   },
   "warnings": [
     "policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`"
