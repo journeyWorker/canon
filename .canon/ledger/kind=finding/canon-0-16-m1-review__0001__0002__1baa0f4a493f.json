@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-016-m1",
+    "role": "reviewer",
+    "session_id": "review-016-m1"
+  },
+  "at": "2026-10-11T16:13:41.449678Z",
+  "change_id": "canon-0-16-m1-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "abcfdbe216479c07f33bcafba42935209b278f7d",
+  "reviewer": "canon-reviewer-016-m1",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "status accepted an approval on an older adopted change for a later scope change"
+}

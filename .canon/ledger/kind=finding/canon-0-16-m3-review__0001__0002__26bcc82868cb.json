@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-016-m3",
+    "role": "reviewer",
+    "session_id": "review-016-m3"
+  },
+  "at": "2026-10-11T16:13:57.892650Z",
+  "change_id": "canon-0-16-m3-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "c7c2e70d8a82f02fa2186a8bceaf118453b35de7",
+  "reviewer": "canon-reviewer-016-m3",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "the verb+object rule missed common build targets such as tools, services and APIs"
+}

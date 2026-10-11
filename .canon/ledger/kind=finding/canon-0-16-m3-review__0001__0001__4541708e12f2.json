@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-016-m3",
+    "role": "reviewer",
+    "session_id": "review-016-m3"
+  },
+  "at": "2026-10-11T16:13:57.672726Z",
+  "change_id": "canon-0-16-m3-review",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "0f59708dcfa5dc573ffce6d45316b995e6a7512e",
+  "reviewer": "canon-reviewer-016-m3",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "skills doctor flagged any description containing a generic word such as feature as a build competitor"
+}

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-016-m4",
+    "role": "reviewer",
+    "session_id": "review-016-m4"
+  },
+  "at": "2026-10-11T16:14:03.701106Z",
+  "change_id": "canon-0-16-m4-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "8db278f30ad9a3711adfcc654fb70c8ae37545ba",
+  "reviewed_sha": "4c9d3ced4966ae0ffa706f272915dfff5bd75472",
+  "reviewer": "canon-reviewer-016-m4",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "artifact store_files published earlier blobs before a later file failed, so a refused review or evidence add could leave bytes in the store"
+}
