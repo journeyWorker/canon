@@ -16,9 +16,11 @@
 //! regenerates a report's earlier contents. Writes go through a temp file
 //! in the same directory and a rename, so a reader never sees a partial
 //! blob, and a blob whose digest is already stored intact is not written
-//! again. A file larger than the size limit
-//! ([`DEFAULT_MAX_ARTIFACT_MIB`], raised with [`MAX_ARTIFACT_FLAG`]) is
-//! refused rather than stored.
+//! again. A record binding several files stores them all or none: each
+//! is [`stage`]d (copied to a temp file and re-hashed) first, and only
+//! when every one has staged are they [`publish`]ed. A file larger than
+//! the size limit ([`DEFAULT_MAX_ARTIFACT_MIB`], raised with
+//! [`MAX_ARTIFACT_FLAG`]) is refused rather than stored.
 //!
 //! # What the gate checks ([`ArtifactStoreCheck`])
 //! Every attachment on every LATEST evidence record: the latest record
@@ -40,6 +42,17 @@
 //!   to its name "does not match its name, so its bytes were altered";
 //!   a missing one means "the bound bytes are gone".
 //!
+//! # Review artifacts (0.16 D5)
+//! `canon review add --artifact` stores what the reviewer looked at
+//! through the same [`store`] and records `{path, sha256}` on the
+//! review. The check covers every IN-EFFECT review (the latest per
+//! `(project_id, scenario_id, reviewer)`,
+//! [`crate::review_gate::in_effect_reviews`]). A review artifact has no
+//! pre-store generation, so only an intact blob is clean: a missing or
+//! altered one is `stale-evidence` on the review's scenario, and the
+//! detail names the reviewer, the review's actor and its time. The
+//! working-tree file is reported but never vouches for it.
+//!
 //! The check is NOT narrowed to `spec_coverage.scope`. A binding is a
 //! claim the record makes about bytes, whatever its subject's lifecycle
 //! status; scope belongs to the coverage policy, and a repo with no
@@ -58,6 +71,7 @@ use sha2::{Digest, Sha256};
 use crate::context::{GateCheck, GateContext};
 use crate::coverage::CellSubject;
 use crate::failure_class::{FailureClass, Violation};
+use crate::review_gate::in_effect_reviews;
 use crate::spec_coverage::latest_by_key;
 
 /// The documented default size limit for one stored file, in MiB.
@@ -216,52 +230,102 @@ pub enum StoreError {
     Io(#[from] std::io::Error),
 }
 
-/// Store the bytes `reader` yields as the blob for `expected`, through a
-/// temp file in the store directory and a rename. Skips the write when
-/// an intact blob is already there. Refuses ([`StoreError::Changed`]),
-/// writing nothing, when the bytes do not hash to `expected` — the
-/// caller recorded that digest, and the store must hold exactly those
-/// bytes or nothing.
+/// Store the bytes `reader` yields as the blob for `expected`: [`stage`]
+/// then [`publish`]. Skips the write when an intact blob is already
+/// there. Refuses ([`StoreError::Changed`]), writing nothing, when the
+/// bytes do not hash to `expected` — the caller recorded that digest,
+/// and the store must hold exactly those bytes or nothing.
+pub fn store(repo: &Path, expected: &str, reader: impl Read) -> Result<StoreOutcome, StoreError> {
+    match stage(repo, expected, reader)? {
+        None => Ok(StoreOutcome::AlreadyStored),
+        Some(blob) => publish(vec![blob]).map(|()| StoreOutcome::Stored).map_err(|(_, e)| e),
+    }
+}
+
+/// A blob written, hashed and synced to a temp file in the store
+/// directory, not yet visible under its name. [`publish`] renames it into
+/// place; dropped unpublished, its temp file is removed, so the store is
+/// left as it was.
+#[derive(Debug)]
+pub struct StagedBlob {
+    temp: Option<PathBuf>,
+    target: PathBuf,
+}
+
+impl Drop for StagedBlob {
+    fn drop(&mut self) {
+        if let Some(temp) = self.temp.take() {
+            let _ = std::fs::remove_file(temp);
+        }
+    }
+}
+
+/// Copy the bytes `reader` yields into a temp file in the store
+/// directory, hashing them on the way. `None` when an intact blob for
+/// `expected` is already stored; [`StoreError::Changed`], with the temp
+/// file removed, when the bytes do not hash to `expected` — identical
+/// bytes are also the size that was checked when they were bound.
 ///
 /// "Already stored" is decided by [`stored_blob`], which never follows a
 /// link: a pre-existing symlink (or any non-file) at the blob path is
-/// replaced by the rename, which swaps the link itself, never its target.
-pub fn store(repo: &Path, expected: &str, mut reader: impl Read) -> Result<StoreOutcome, StoreError> {
+/// replaced by [`publish`]'s rename, which swaps the link itself, never
+/// its target.
+pub fn stage(repo: &Path, expected: &str, mut reader: impl Read) -> Result<Option<StagedBlob>, StoreError> {
     if !is_sha256_hex(expected) {
         return Err(StoreError::InvalidDigest(expected.to_string()));
     }
-    let target = blob_path(repo, expected);
     if stored_blob(repo, expected).matches(expected) {
-        return Ok(StoreOutcome::AlreadyStored);
+        return Ok(None);
     }
     let dir = create_store_dir(repo)?;
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     let temp = dir.join(format!(".tmp-{expected}-{}-{nanos}", std::process::id()));
-    let result = (|| {
-        let mut file = File::options().write(true).create_new(true).open(&temp)?;
-        let mut hasher = Sha256::new();
-        let mut buffer = [0u8; 64 * 1024];
-        loop {
-            let read = reader.read(&mut buffer)?;
-            if read == 0 {
-                break;
-            }
-            hasher.update(&buffer[..read]);
-            file.write_all(&buffer[..read])?;
-        }
-        let actual = format!("{:x}", hasher.finalize());
-        if actual != expected {
-            return Err(StoreError::Changed { expected: expected.to_string(), actual });
-        }
-        file.sync_all()?;
-        drop(file);
-        std::fs::rename(&temp, &target)?;
-        Ok(StoreOutcome::Stored)
-    })();
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temp);
+    let mut file = File::options().write(true).create_new(true).open(&temp)?;
+    // From here on, dropping `staged` removes the temp file.
+    let staged = StagedBlob { temp: Some(temp), target: blob_path(repo, expected) };
+    let written = copy_hashed(&mut reader, &mut file).and_then(|actual| file.sync_all().map(|()| actual));
+    drop(file);
+    let actual = written?;
+    if actual != expected {
+        return Err(StoreError::Changed { expected: expected.to_string(), actual });
     }
-    result
+    Ok(Some(staged))
+}
+
+/// Copy `reader` into `file`, returning the sha256 of the bytes copied.
+fn copy_hashed(reader: &mut impl Read, file: &mut File) -> std::io::Result<String> {
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = reader.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+        file.write_all(&buffer[..read])?;
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Rename every staged blob into place, in order. Callers stage ALL
+/// their files first, so a file that fails to read or hash never leaves
+/// a sibling published. If a rename fails, the blobs this call already
+/// published are removed (best effort) and the rest are dropped
+/// unpublished; the error carries the failing blob's index.
+pub fn publish(staged: Vec<StagedBlob>) -> Result<(), (usize, StoreError)> {
+    let mut published: Vec<PathBuf> = Vec::new();
+    for (index, mut blob) in staged.into_iter().enumerate() {
+        let temp = blob.temp.take().expect("an unpublished StagedBlob always holds its temp file");
+        if let Err(e) = std::fs::rename(&temp, &blob.target) {
+            blob.temp = Some(temp);
+            for target in &published {
+                let _ = std::fs::remove_file(target);
+            }
+            return Err((index, e.into()));
+        }
+        published.push(blob.target.clone());
+    }
+    Ok(())
 }
 
 /// The working-tree file a repository-relative attachment path names,
@@ -366,26 +430,61 @@ impl GateCheck for ArtifactStoreCheck {
                 if blob == Observed::Missing && tree.matches(&attachment.sha256) {
                     continue;
                 }
-                // A blob that exists but no longer hashes to its own
-                // name was altered in place; one that is absent took the
-                // only proof with it (0.14 acceptance rerun G11).
-                let diagnosis = if blob == Observed::Missing { "the bound bytes are gone" } else { "the stored blob does not match its name, so its bytes were altered" };
                 violations.push(Violation::new(
                     FailureClass::StaleEvidence,
                     subject_of(record),
                     format!(
-                        "bound file `{}` recorded sha256 {}; stored blob {}: {}; working tree: {} — {diagnosis}, re-run and re-attest with `canon evidence add`",
+                        "bound file `{}` recorded sha256 {}; stored blob {}: {}; working tree: {} — {}, re-run and re-attest with `canon evidence add`",
                         attachment.path,
                         attachment.sha256,
                         blob_display(&attachment.sha256),
                         blob.as_str(),
-                        tree.as_str()
+                        tree.as_str(),
+                        diagnosis(&blob)
+                    ),
+                ));
+            }
+        }
+        // Review artifacts (0.16 D5) were stored when the review was
+        // written, so there is no working-tree-only generation to fall
+        // back on: the blob is the proof, and a missing one is stale.
+        for review in in_effect_reviews(ctx) {
+            for artifact in &review.artifacts {
+                let blob = stored_blob(repo, &artifact.sha256);
+                if blob.matches(&artifact.sha256) {
+                    continue;
+                }
+                violations.push(Violation::new(
+                    FailureClass::StaleEvidence,
+                    review.scenario_id.as_str().to_string(),
+                    format!(
+                        "review by `{}` (actor `{}`, {}) bound file `{}` recorded sha256 {}; stored blob {}: {}; working tree: {} — {}, look again and re-record the review with `canon review add --artifact <path>`",
+                        review.reviewer,
+                        review.envelope.actor.agent_id,
+                        review.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                        artifact.path,
+                        artifact.sha256,
+                        blob_display(&artifact.sha256),
+                        blob.as_str(),
+                        working_tree(repo, &artifact.path).as_str(),
+                        diagnosis(&blob)
                     ),
                 ));
             }
         }
         violations.sort_by(|a, b| (&a.subject, &a.detail).cmp(&(&b.subject, &b.detail)));
         violations
+    }
+}
+
+/// Why a bound file failed: a blob that exists but no longer hashes to
+/// its own name was altered in place; one that is absent took the only
+/// proof with it (0.14 acceptance rerun G11).
+fn diagnosis(blob: &Observed) -> &'static str {
+    if *blob == Observed::Missing {
+        "the bound bytes are gone"
+    } else {
+        "the stored blob does not match its name, so its bytes were altered"
     }
 }
 

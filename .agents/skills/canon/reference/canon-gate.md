@@ -24,7 +24,7 @@ Every violation carries one of these stable, grep-able strings:
 | `uncovered-cell` | Either a policy-required evidence cell (role × artifact) with no matching record, or — with `spec_coverage` enabled — a spec scenario that is unimplemented or mismatched, or a feature surface missing a `require_cases` case. The detail string distinguishes them. Coverage means "a test exists", not "a test passed": even a `Divergent` verdict satisfies the role-cell form. |
 | `unreviewed-promotion` | An artifact tagged `reviewed` has no matching ledger review record — or, with `spec_coverage.require_review` set, an in-scope scenario has no qualifying `Review`: none at all, only self-reviews, only stale reviews (the spec or evidence it pinned changed since), or only `indeterminate`/`unavailable` ones. See `canon-review`. |
 | `trust-below-required` | Achieved trust level is below `policy.yaml`'s `trust_required` for its class — RELEASE-scoped only (`canon gate check --release`); never fires on an ordinary run. |
-| `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. Also: a file bound to a latest evidence record whose bytes are gone — no intact blob in `.canon/artifacts/sha256/` and no working-tree copy with the recorded digest (see Bound evidence stays provable below). |
+| `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. Also: a file bound to a latest evidence record whose bytes are gone — no intact blob in `.canon/artifacts/sha256/` and no working-tree copy with the recorded digest — or a file bound to an in-effect review with no intact blob (see Bound evidence stays provable below). |
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of passing evidence. |
 | `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` evidence record. |
@@ -337,6 +337,15 @@ The check applies to every latest record, not only subjects in
 subject's status, and a repo with no `spec_coverage` would otherwise never
 have its bindings checked. A superseded record is not checked —
 re-attesting is the fix.
+
+Files bound to a review (`canon review add --artifact`, see
+`canon-review`) are checked the same way for every in-effect review (the
+latest per `(project_id, scenario_id, reviewer)`), with one difference:
+they were stored when the review was written, so only an intact blob is
+clean. A missing or altered blob is `stale-evidence` on the review's
+scenario, and the detail names the review: ``review by `<reviewer>`
+(actor `<id>`, <time>)``. The working-tree file is reported but never
+vouches for it.
 
 `canon evidence vault [--max-artifact-mib <N>]` stores the bytes for
 existing records: every attachment whose working-tree file still matches

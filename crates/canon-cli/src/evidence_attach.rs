@@ -152,27 +152,77 @@ impl Bound {
     }
 }
 
+/// Read and hash each opaque `--artifact` file — inside the repository,
+/// within the store's size limit — returning its repository-relative
+/// path and the file behind it. Writes nothing. `canon review add
+/// --artifact` (0.16 D5) binds through this, so a review's files meet
+/// exactly the checks an evidence record's do.
+pub fn bind_artifacts(repo: &Path, artifacts: &[PathBuf], max_bytes: u64) -> Result<Vec<(String, BoundFile)>, BindError> {
+    let repo = canonical_repo(repo)?;
+    artifacts.iter().map(|path| hash_artifact(&repo, path, max_bytes)).collect()
+}
+
+fn canonical_repo(repo: &Path) -> Result<PathBuf, BindError> {
+    repo.canonicalize().map_err(|e| BindError::Usage(format!("resolve repository root: {e}")))
+}
+
+fn hash_artifact(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, BoundFile), BindError> {
+    let (relative, resolved, file) = open_in_repo(repo, path, max_bytes)?;
+    let sha256 = canon_gate::artifact_store::sha256_reader(file).map_err(|e| BindError::Usage(format!("read {}: {e}", path.display())))?;
+    Ok((relative, BoundFile { resolved, sha256 }))
+}
+
+/// Copy every bound file into the artifact store, all or nothing,
+/// returning how many were newly stored. Called once every refusal has
+/// passed, just before the record is written, so a record never names a
+/// blob the store lacks. Every file is first re-read, re-hashed and
+/// staged to a temp file in the store
+/// ([`canon_gate::artifact_store::stage`]); only when all of them have
+/// staged are they published. A file that changed since it was hashed
+/// is refused rather than stored under a digest its bytes no longer
+/// have, and then nothing is published. The error names that file.
+pub fn store_files<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<usize, (&'f BoundFile, canon_gate::artifact_store::StoreError)> {
+    let mut staged = Vec::new();
+    let mut sources = Vec::new();
+    for file in files {
+        let blob = std::fs::File::open(&file.resolved)
+            .map_err(canon_gate::artifact_store::StoreError::from)
+            .and_then(|reader| canon_gate::artifact_store::stage(repo, &file.sha256, reader))
+            .map_err(|e| (file, e))?;
+        if let Some(blob) = blob {
+            staged.push(blob);
+            sources.push(file);
+        }
+    }
+    let stored = staged.len();
+    canon_gate::artifact_store::publish(staged).map_err(|(index, e)| (sources[index], e))?;
+    Ok(stored)
+}
+
+/// The line a write command prints after [`store_files`].
+pub fn stored_line(command: &str, bound: usize, stored: usize) -> String {
+    format!(
+        "{command}: artifact store holds {bound} bound file(s) under {}/ ({stored} newly stored) — commit them with the ledger",
+        canon_model::paths::ARTIFACTS_SHA256_DIR
+    )
+}
+
 /// Read, hash, and (for reports) match every requested file. Writes
 /// nothing (module doc).
 pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
-    let repo = request
-        .repo
-        .canonicalize()
-        .map_err(|e| BindError::Usage(format!("resolve repository root: {e}")))?;
+    let repo = canonical_repo(request.repo)?;
     let mut bound = Bound::default();
 
     for path in request.artifacts {
-        let (relative, resolved, file) = open_in_repo(&repo, path, request.max_bytes)?;
-        let sha256 = canon_gate::artifact_store::sha256_reader(file)
-            .map_err(|e| BindError::Usage(format!("read {}: {e}", path.display())))?;
-        bound.add_file(resolved, &sha256);
+        let (relative, file) = hash_artifact(&repo, path, request.max_bytes)?;
         bound.attachments.push(EvidenceAttachment {
             path: relative,
-            sha256,
+            sha256: file.sha256.clone(),
             format: None,
             case: None,
             outcome: None,
         });
+        bound.add_file(file.resolved, &file.sha256);
     }
 
     let mut named_unmatched: Vec<&str> = request.report_cases.iter().map(String::as_str).collect();
@@ -769,6 +819,30 @@ mod tests {
             matches!(bind(&oversized), Err(BindError::Usage(m)) if m.contains("--max-artifact-mib")),
             "a file over the size limit refuses, naming the override flag"
         );
+    }
+
+    /// A file that changed after it was bound refuses the whole store:
+    /// the files before it are staged but never published, and no temp
+    /// file is left behind.
+    #[test]
+    fn store_files_publishes_nothing_when_any_file_fails_to_stage() {
+        let repo = TempDir::new().unwrap();
+        std::fs::write(repo.path().join("a.png"), b"first").unwrap();
+        std::fs::write(repo.path().join("b.png"), b"second").unwrap();
+        let paths = vec![repo.path().join("a.png"), repo.path().join("b.png")];
+        let files: Vec<BoundFile> = bind_artifacts(repo.path(), &paths, 1024).unwrap().into_iter().map(|(_, f)| f).collect();
+        std::fs::write(repo.path().join("b.png"), b"rewritten").unwrap();
+
+        let (failed, error) = store_files(repo.path(), &files).unwrap_err();
+        assert_eq!(failed.sha256, files[1].sha256, "the error names the file that changed");
+        assert!(matches!(error, canon_gate::artifact_store::StoreError::Changed { .. }), "{error}");
+        let store = canon_gate::artifact_store::store_dir(repo.path());
+        assert_eq!(std::fs::read_dir(&store).unwrap().count(), 0, "nothing published and no temp file left");
+
+        std::fs::write(repo.path().join("b.png"), b"second").unwrap();
+        assert_eq!(store_files(repo.path(), &files).unwrap(), 2);
+        assert_eq!(store_files(repo.path(), &files).unwrap(), 0, "already stored intact");
+        assert_eq!(std::fs::read_dir(&store).unwrap().count(), 2);
     }
 
     #[test]

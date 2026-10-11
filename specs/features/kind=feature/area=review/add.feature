@@ -197,3 +197,45 @@ Feature: review add
     And editing the Background stales the review of every scenario that inherits it
     And a review pinned to the file's source digest keeps being compared with the file's source digest
     And re-aligning a table, reordering tags or moving a whole doc string never stales a review, while a changed cell, tag or doc string line does
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:56Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:happy
+  @review.add.40
+  Scenario: A review stores the files the reviewer looked at and records their path and digest
+    Given a screenshot and a recording inside the repository
+    When a review is added with --artifact for each, one of them given twice
+    Then each file's bytes are stored in .canon/artifacts/sha256/ under their digest and review add says so
+    And the review records each file once as its path and sha256, in the order given
+    And a review without --artifact carries no artifacts field
+    And `canon gate check` stays clean after the working-tree files change
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:56Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.41
+  Scenario: A missing or altered review artifact is stale evidence naming the review
+    Given a review bound to a screenshot and a recording
+    When one stored blob is deleted and the other is altered
+    Then `canon gate check` exits 1 with stale-evidence on the review's scenario for each file
+    And the detail names the reviewer, the review's actor and time, the path, the recorded digest and what the store and the working tree hold
+    And a missing blob is stale even while the working-tree file still matches
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:56Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.42
+  Scenario: A review artifact outside the repository, missing, or over the size limit is refused and nothing is written
+    Given a file outside the repository, a path that names no file, and a file over --max-artifact-mib
+    When a review is added with each as --artifact
+    Then review add exits 2 with a refusal naming the file and why
+    And no review is written and no bytes are stored
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:56Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:edge
+  @review.add.43
+  Scenario: Only the in-effect review's artifacts are checked
+    Given a review whose stored artifact blob was lost
+    When the same reviewer records a later review of the scenario
+    Then the earlier review's artifacts are no longer checked and `canon gate check` is clean

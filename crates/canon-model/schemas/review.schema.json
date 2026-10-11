@@ -1,11 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Review",
-  "description": "A review attestation (join-spine `scenario_id` row: spec ↔ test ↔\nledger ↔ divergence). Mirrors the donor parity harness's required\nreview fields (`scenario_id`, `reviewer`, `pin`) plus its\nprovenance-ref requirement.\n\n0.15 adds what the review saw and how the reviewer's run ended, all\noptional and absent when unset, so a review written before 0.15\nreserializes byte-identically:\n- `pins` (D1): the scenario's source digest and its latest evidence\n  records at review time. `canon review add` computes them; a pinned\n  review only counts while both still match the corpus.\n- `outcome` (D4): `signed` (the default, and what every pre-0.15\n  review is), `indeterminate` or `unavailable`. Only `signed` is an\n  approval; the other two are recorded gaps.\n- `reviewer_provider`/`reviewer_model`/`reviewer_harness` (D4): the\n  runtime that produced the review, as the caller reports it.",
+  "description": "A review attestation (join-spine `scenario_id` row: spec ↔ test ↔\nledger ↔ divergence). Mirrors the donor parity harness's required\nreview fields (`scenario_id`, `reviewer`, `pin`) plus its\nprovenance-ref requirement.\n\n0.15 adds what the review saw and how the reviewer's run ended, all\noptional and absent when unset, so a review written before 0.15\nreserializes byte-identically:\n- `pins` (D1): the scenario's source digest and its latest evidence\n  records at review time. `canon review add` computes them; a pinned\n  review only counts while both still match the corpus.\n- `outcome` (D4): `signed` (the default, and what every pre-0.15\n  review is), `indeterminate` or `unavailable`. Only `signed` is an\n  approval; the other two are recorded gaps.\n- `reviewer_provider`/`reviewer_model`/`reviewer_harness` (D4): the\n  runtime that produced the review, as the caller reports it.\n\n0.16 D5 adds `artifacts`: the files the reviewer looked at\n(screenshots, recordings), stored like evidence attachments and\nre-hashed by the gate. Absent when empty.",
   "type": "object",
   "properties": {
     "actor": {
       "$ref": "#/$defs/Actor"
+    },
+    "artifacts": {
+      "description": "What the reviewer looked at (0.16 D5), each file stored in the\nartifact store under its digest. Absent on the wire when empty.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ReviewArtifact"
+      }
     },
     "at": {
       "type": "string",
@@ -204,6 +211,24 @@
         "evidence_record",
         "subject",
         "finding"
+      ]
+    },
+    "ReviewArtifact": {
+      "description": "A file a [`Review`] binds (0.16 D5): what the reviewer looked at,\nby repository-relative path and the sha256 of its bytes.",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "Repository-relative path, `/`-separated, as read at review time.",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "64 lowercase hex characters: sha256 over the file's bytes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
       ]
     },
     "ReviewOutcome": {

@@ -1019,6 +1019,12 @@ enum ReviewCommand {
         /// The harness that ran the reviewer (e.g. omp, codex, claude)
         #[arg(long, value_parser = canon_cli::review::parse_runtime_label)]
         reviewer_harness: Option<String>,
+        /// A file the reviewer looked at (screenshot, recording); repeatable; must be inside the repo. Stored in .canon/artifacts/sha256/ and re-hashed by `canon gate check`
+        #[arg(long = "artifact", value_name = "PATH")]
+        artifacts: Vec<PathBuf>,
+        /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger file is refused
+        #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+        max_artifact_mib: u64,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1533,6 +1539,8 @@ fn main() -> ExitCode {
                 reviewer_provider,
                 reviewer_model,
                 reviewer_harness,
+                artifacts,
+                max_artifact_mib,
                 repo,
             } => ExitCode::from(canon_cli::review::run_add(
                 &repo,
@@ -1550,6 +1558,8 @@ fn main() -> ExitCode {
                     reviewer_provider,
                     reviewer_model,
                     reviewer_harness,
+                    artifacts,
+                    max_artifact_mib,
                 },
             ) as u8),
         },

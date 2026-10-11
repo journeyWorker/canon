@@ -760,6 +760,10 @@ pub enum ProvenanceRef {
 ///   approval; the other two are recorded gaps.
 /// - `reviewer_provider`/`reviewer_model`/`reviewer_harness` (D4): the
 ///   runtime that produced the review, as the caller reports it.
+///
+/// 0.16 D5 adds `artifacts`: the files the reviewer looked at
+/// (screenshots, recordings), stored like evidence attachments and
+/// re-hashed by the gate. Absent when empty.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Review {
     #[serde(flatten)]
@@ -786,6 +790,21 @@ pub struct Review {
     /// The harness that ran the reviewer (D4), e.g. `omp` or `codex`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reviewer_harness: Option<String>,
+    /// What the reviewer looked at (0.16 D5), each file stored in the
+    /// artifact store under its digest. Absent on the wire when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<ReviewArtifact>,
+}
+
+/// A file a [`Review`] binds (0.16 D5): what the reviewer looked at,
+/// by repository-relative path and the sha256 of its bytes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ReviewArtifact {
+    /// Repository-relative path, `/`-separated, as read at review time.
+    pub path: String,
+    /// 64 lowercase hex characters: sha256 over the file's bytes.
+    #[serde(deserialize_with = "deserialize_sha256_hex")]
+    pub sha256: String,
 }
 
 impl Review {
@@ -810,6 +829,7 @@ impl Review {
             reviewer_provider: None,
             reviewer_model: None,
             reviewer_harness: None,
+            artifacts: Vec::new(),
         }
     }
 }
@@ -2503,6 +2523,14 @@ mod tests {
         let json = serde_json::to_value(&review).unwrap();
         assert_eq!(json["outcome"], "indeterminate");
         assert_eq!(serde_json::from_value::<Review>(json.clone()).unwrap(), review);
+
+        review.artifacts.push(ReviewArtifact { path: "reports/title.png".into(), sha256: "a".repeat(64) });
+        let json = serde_json::to_value(&review).unwrap();
+        assert_eq!(json["artifacts"], serde_json::json!([{"path": "reports/title.png", "sha256": "a".repeat(64)}]));
+        assert_eq!(serde_json::from_value::<Review>(json.clone()).unwrap(), review);
+        let mut bad_digest = json.clone();
+        bad_digest["artifacts"][0]["sha256"] = serde_json::json!("not-a-digest");
+        assert!(serde_json::from_value::<Review>(bad_digest).is_err(), "a review artifact names a real sha256 or is refused");
 
         let mut bad = json;
         bad["outcome"] = serde_json::json!("approved");

@@ -52,7 +52,9 @@ assumption you state there, and say so in your final report.
    `canon evidence add --project-id <root-id> --scenario-id <id> --kind test-run --role implementer --ref "<command>" --actor-id <unit> --session-id <session>`,
    with `--report junit:<path>` or `--artifact <path>` when files prove it.
    canon stores those bytes in `.canon/artifacts/sha256/` (commit it with the
-   ledger) and `canon gate check` re-checks them. Then `canon gate promote`.
+   ledger) and `canon gate check` re-checks them. For a scenario about what
+   users see, bind the screenshot or recording that shows it
+   (`--artifact <path>`). Then `canon gate promote`.
    An external evaluator's audit is recorded with `canon evidence add --kind
    audit`; canon never generates one.
    Evidence for a plan task (`--task <id>`, before `canon gate task`) must
@@ -68,7 +70,10 @@ assumption you state there, and say so in your final report.
    and `canon gate promote`. Every bug fix adds or extends a scenario. The
    reviewer signs off each scenario:
    `canon review add --project-id <root-id> --scenario-id <id> --reviewer <who> --actor-id <who> --role reviewer --session-id <review-session> --pin <sha> --upstream-ref <ref>`
-   (written directly; nothing to promote).
+   (written directly; nothing to promote). A reviewer of user-visible
+   behavior attaches what it looked at with `--artifact <path>`
+   (repeatable); canon stores and re-checks those bytes and never compares
+   images.
 8. **Transition.** `canon subject status <id> <state>` along
    `proposed → specced → building → verifying → shipped`. It refuses a move
    the policy does not yet allow (missing evidence, missing reviews, open

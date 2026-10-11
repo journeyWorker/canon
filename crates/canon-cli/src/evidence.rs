@@ -939,28 +939,15 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
 
     // Store the bound bytes before staging (module doc): every refusal
     // is behind us, and a record must never name a blob the store lacks.
-    // A file that changed since `bind` hashed it is refused rather than
-    // stored under a digest its bytes no longer have.
-    let mut stored = 0usize;
-    for file in &bound.files {
-        let outcome = std::fs::File::open(&file.resolved)
-            .map_err(canon_gate::artifact_store::StoreError::from)
-            .and_then(|reader| canon_gate::artifact_store::store(&repo, &file.sha256, reader));
-        match outcome {
-            Ok(canon_gate::artifact_store::StoreOutcome::Stored) => stored += 1,
-            Ok(canon_gate::artifact_store::StoreOutcome::AlreadyStored) => {}
-            Err(e) => {
-                eprintln!("canon evidence add: refused — could not store {} in the artifact store: {e}", file.resolved.display());
-                return 2;
-            }
+    let stored = match crate::evidence_attach::store_files(&repo, &bound.files) {
+        Ok(stored) => stored,
+        Err((file, e)) => {
+            eprintln!("canon evidence add: refused — could not store {} in the artifact store: {e}", file.resolved.display());
+            return 2;
         }
-    }
+    };
     if !bound.files.is_empty() {
-        println!(
-            "canon evidence add: artifact store holds {} bound file(s) under {}/ ({stored} newly stored) — commit them with the ledger",
-            bound.files.len(),
-            canon_model::paths::ARTIFACTS_SHA256_DIR
-        );
+        println!("{}", crate::evidence_attach::stored_line("canon evidence add", bound.files.len(), stored));
     }
 
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
