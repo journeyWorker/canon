@@ -88,7 +88,9 @@ as whole words, case-insensitive:
 - verbs: `build`, `implement`, `create`, `make`, `scaffold`, `develop`,
   `code`, each with its `-s`, `-ing` and past forms (`built`, `made`, …);
 - objects: `site`, `website`, `app`, `application`, `game`, `feature`,
-  `frontend`, `ui`, `page`, `component`, singular or plural.
+  `frontend`, `ui`, `page`, `component`, `tool`, `library`, `service`, `api`,
+  `cli`, `server`, `backend`, `project`, `prototype`, `product`, `program`,
+  `script`, singular or plural.
 
 A word is a run of letters and digits, so `web-app` holds `app` and `rebuild`
 holds nothing. "Build websites and apps" claims build work; "Manage feature

@@ -848,7 +848,7 @@ pub const BUILD_VERBS: [&str; 28] = [
 ];
 
 /// Build objects, singular and plural, [`build_claims`] matches.
-pub const BUILD_OBJECTS: [&str; 20] = [
+pub const BUILD_OBJECTS: [&str; 44] = [
     "site", "sites",
     "website", "websites",
     "app", "apps",
@@ -859,6 +859,18 @@ pub const BUILD_OBJECTS: [&str; 20] = [
     "ui", "uis",
     "page", "pages",
     "component", "components",
+    "tool", "tools",
+    "library", "libraries",
+    "service", "services",
+    "api", "apis",
+    "cli", "clis",
+    "server", "servers",
+    "backend", "backends",
+    "project", "projects",
+    "prototype", "prototypes",
+    "product", "products",
+    "program", "programs",
+    "script", "scripts",
 ];
 
 /// A skill beside canon's in a provider skill root whose description
@@ -1219,6 +1231,9 @@ mod tests {
         assert!(build_claims("Build release notes").is_empty(), "a verb alone is no claim");
         assert!(build_claims("Build release notes. Track feature flags").is_empty(), "verb and object must share a sentence");
         assert!(build_claims("Rebuilds the index; reviews websites").is_empty(), "substrings never match");
+        assert_eq!(build_claims("Build tools for the team"), vec!["build", "tools"]);
+        assert_eq!(build_claims("Scaffold a CLI and a backend service"), vec!["scaffold", "service", "cli", "backend"]);
+        assert!(build_claims("Write release notes for the project").is_empty(), "an object without a build verb is no claim");
     }
 
     #[test]
