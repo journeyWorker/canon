@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m3-impl"
+  },
+  "at": "2026-10-11T14:58:47.172038Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test skills_install skills_install_42"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 17,
+  "scenario_id": "skills.install.42",
+  "schema": 1,
+  "staging_id": "8e16f6e16664",
+  "verdict": "faithful"
+}
