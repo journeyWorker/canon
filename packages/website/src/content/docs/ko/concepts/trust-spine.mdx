@@ -135,9 +135,10 @@ subject가 `require_review.scope`에 있는 모든 시나리오(`spec_coverage.s
 체크아웃, 히스토리 재작성) 판정 불가(undecidable)로 두고 계속 인정합니다. 커밋이
 없다는 이유로 위반이 되지는 않습니다. `gate check`는 `advisory: N review(s)
 predate review pinning (0.15) and were checked against the commit each one
-pinned: C current, S stale, U undecidable …` 한 줄에 낡은 시나리오를 함께
-출력합니다. CI에서는 게이트 job의 체크아웃을 전체 히스토리(`actions/checkout`의
-`fetch-depth: 0`)로 받으세요.
+pinned: C current, S stale, U undecidable …` 한 줄을 출력합니다. 시나리오에 다른
+유효한 리뷰가 이미 있으면 그 낡은 리뷰는 superseded로 세고, 리뷰가 아직 필요한
+시나리오만 다시 리뷰하라고 나열합니다. CI에서는 게이트 job의 체크아웃을 전체
+히스토리(`actions/checkout`의 `fetch-depth: 0`)로 받으세요.
 
 `block_on_findings`이면 리뷰 finding(`canon finding add --severity
 blocker|should-fix|note`)은 `(change_id, round, seq)`별 최신 버전으로

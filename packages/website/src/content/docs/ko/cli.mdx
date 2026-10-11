@@ -118,7 +118,8 @@ Gherkin `.feature` 스펙 코퍼스를 검증하고 확장합니다.
 증거가 없으면 **current**(인정), 그 뒤로 스펙이 바뀌었거나 증거가 더 새로우면
 **stale**(낡은 pinned 리뷰처럼 `unreviewed-promotion`), 커밋이나 그 커밋의
 시나리오가 클론에 없으면 **undecidable**(0.15처럼 계속 인정)입니다. advisory 한
-줄이 세 수를 세고 낡은 시나리오를 나열합니다. CI에서는 게이트 job을 전체
+줄이 세 수를 세고, 다른 유효한 리뷰가 이미 있는 낡은 리뷰는 superseded로 세며,
+리뷰가 아직 필요한 시나리오만 나열합니다. CI에서는 게이트 job을 전체
 히스토리(`fetch-depth: 0`)로 체크아웃해야 하며, 그렇지 않으면 이런 리뷰는 모두
 undecidable이 됩니다.
 

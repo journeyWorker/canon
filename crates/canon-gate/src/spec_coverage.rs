@@ -1247,6 +1247,50 @@ mod tests {
         }
     }
 
+    /// A stale legacy review whose scenario another reviewer has reviewed
+    /// since (current, signed, distinct) is counted stale but superseded,
+    /// and the advisory names no scenario to review again. A non-distinct
+    /// or unsigned later review supersedes nothing.
+    #[test]
+    fn a_stale_legacy_review_superseded_by_a_qualifying_review_is_not_named_for_re_review() {
+        use crate::legacy_pins::PinnedScenario;
+        use canon_model::ReviewOutcome::{Indeterminate, Signed};
+        let stale_legacy = || {
+            let mut ctx = pinned_corpus();
+            let digest = SpecDigest::of(b"own v1");
+            for s in &mut ctx.scenarios {
+                s.scenario_digest = Some(digest.clone());
+            }
+            let mut legacy = review("p.a.01", "reviewer-2", "reviewer-2");
+            legacy.envelope.at = ctx.evidence[0].envelope.at + chrono::Duration::seconds(10);
+            ctx.legacy_pins.insert(legacy.pin.clone(), project(), ScenarioId::parse("p.a.01").unwrap(), PinnedScenario::Digest(SpecDigest::of(b"own v0")));
+            ctx.reviews = vec![legacy];
+            ctx
+        };
+
+        let mut superseded = stale_legacy();
+        let current = pinned_review(&superseded, "reviewer-3", Signed, 20);
+        superseded.reviews.push(current);
+        assert!(SpecCoverageCheck.run(&superseded).is_empty(), "the other reviewer's current review qualifies");
+        let counts = crate::review_gate::legacy_review_advisory(&superseded).unwrap();
+        assert_eq!((counts.current, counts.stale, counts.superseded, counts.undecidable), (0, 1, 1, 0));
+        assert!(counts.needs_review.is_empty());
+        assert_eq!(
+            counts.note(),
+            "1 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 0 current, 1 stale, 0 undecidable; 1 stale one(s) superseded by a current review of the same scenario, so nothing is owed for them"
+        );
+
+        for (reviewer, actor, outcome) in [("agent-a", "agent-a", Signed), ("reviewer-3", "reviewer-3", Indeterminate)] {
+            let mut owed = stale_legacy();
+            let mut later = pinned_review(&owed, reviewer, outcome, 20);
+            later.envelope.actor.agent_id = actor.into();
+            owed.reviews.push(later);
+            let counts = crate::review_gate::legacy_review_advisory(&owed).unwrap();
+            assert_eq!((counts.stale, counts.superseded), (1, 0), "{reviewer} {outcome:?} supersedes nothing");
+            assert!(counts.note().ends_with("review its scenario again (`canon review add`): p.a.01"), "{}", counts.note());
+        }
+    }
+
     /// Findings fold latest-by-natural-key first: a blocker later closed
     /// as fixed no longer counts; a still-open one does; a should-fix or
     /// a finding on an unlisted change never does.

@@ -276,11 +276,14 @@ scenario) that carry no pins were written before 0.15. Each still names
   holds its id at that commit. It keeps counting, as in 0.15: a missing
   commit never becomes a violation.
 
-One advisory line after the violations counts the three and names the
-stale scenarios; the exit code is unchanged by the line itself:
+One advisory line after the violations counts the three. A stale one
+whose scenario already has another qualifying review (current, signed,
+distinct) is counted as superseded, since nothing is owed for it; only
+the scenarios a stale one leaves without a qualifying review are named
+for re-review. The exit code is unchanged by the line itself:
 
 ```
-advisory: 338 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 318 current, 12 stale, 8 undecidable; a stale one no longer counts — review its scenario again (`canon review add`): context.status.09, gate.check.03, …; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it
+advisory: 338 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 318 current, 12 stale, 8 undecidable; 7 stale one(s) superseded by a current review of the same scenario, so nothing is owed for them; a stale one with no current review in its place no longer counts — review its scenario again (`canon review add`): platformer.movement.01, platformer.movement.02, …; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it
 ```
 
 A review of a scenario no feature file declares any more is not counted.

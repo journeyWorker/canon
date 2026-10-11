@@ -306,18 +306,19 @@ spec root's files at that commit are searched for its id) and decides:
   counting, as in 0.15. A missing commit never becomes a violation.
 
 `canon gate check` prints one advisory line with the split (exit code
-unchanged by the line itself):
+unchanged by the line itself). A stale one whose scenario already has
+another qualifying review is counted as superseded and not named:
 
 ```
-advisory: 338 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 318 current, 12 stale, 8 undecidable; a stale one no longer counts — review its scenario again (`canon review add`): context.status.09, gate.check.03, …; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it
+advisory: 338 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 318 current, 12 stale, 8 undecidable; 7 stale one(s) superseded by a current review of the same scenario, so nothing is owed for them; a stale one with no current review in its place no longer counts — review its scenario again (`canon review add`): platformer.movement.01, platformer.movement.02, …; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it
 ```
 
 `canon status` prints the same line as a warning, and `canon subject
 status` prints it on stderr for the subject's own scenarios; all three
-make the same decision. Re-review exactly the stale scenarios the line
-names: the new review pins what it saw and replaces the reviewer's legacy
-one. In CI, check out full history (`fetch-depth: 0`) for the job that
-runs the gate, or every legacy review is undecidable.
+make the same decision. Re-review exactly the scenarios the line names:
+the new review pins what it saw and replaces the reviewer's legacy one.
+In CI, check out full history (`fetch-depth: 0`) for the job that runs
+the gate, or every legacy review is undecidable.
 
 ### `unreviewed-promotion`
 

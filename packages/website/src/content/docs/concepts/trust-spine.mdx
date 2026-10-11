@@ -143,7 +143,9 @@ otherwise. When the commit, or the scenario at it, is not in the clone
 still counts — a missing commit is never a violation. `gate check` prints
 one `advisory: N review(s) predate review pinning (0.15) and were checked
 against the commit each one pinned: C current, S stale, U undecidable …`
-line naming the stale scenarios. In CI, check out full history
+line. A stale one whose scenario already has another current review is
+counted as superseded; only the scenarios still owed a review are named
+for re-review. In CI, check out full history
 (`actions/checkout` with `fetch-depth: 0`) for the gate job.
 
 With `block_on_findings`, review findings (`canon finding add

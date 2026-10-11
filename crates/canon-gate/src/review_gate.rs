@@ -433,23 +433,33 @@ pub fn in_effect_reviews(ctx: &GateContext) -> Vec<&Review> {
 
 /// How the in-effect reviews without `pins` (written before 0.15) of
 /// live scenarios came out of the legacy check: one count per review,
-/// and the scenarios whose legacy review is stale.
+/// and the scenarios a stale one leaves without a qualifying review.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LegacyReviewCounts {
     pub current: usize,
+    /// Every stale legacy review, superseded or not.
     pub stale: usize,
+    /// The stale ones whose scenario already has another qualifying
+    /// review (current, signed, distinct when the policy asks): nothing
+    /// is owed for them.
+    pub superseded: usize,
     pub undecidable: usize,
-    /// The scenario ids with a stale legacy review, sorted.
-    pub stale_scenarios: BTreeSet<String>,
+    /// The scenario ids with a stale legacy review and no qualifying
+    /// review in its place, sorted: the ones to review again.
+    pub needs_review: BTreeSet<String>,
 }
 
 impl LegacyReviewCounts {
     /// Every in-effect legacy review of a live scenario `owned` accepts.
     /// A review of a scenario no feature file declares any more is not
-    /// counted: it reviews nothing the gate reads.
+    /// counted: it reviews nothing the gate reads. Whether a stale one is
+    /// superseded is [`review_gap`]'s answer for its scenario, under the
+    /// active `distinct_actor` (on when no rule is active, the stricter
+    /// reading).
     pub fn of(ctx: &GateContext, owned: impl Fn(&Scenario) -> bool) -> Self {
         let live: BTreeMap<(&canon_model::ProjectId, &canon_model::ScenarioId), &Scenario> =
             latest_scenarios(ctx).into_iter().map(|s| ((&s.project_id, &s.scenario_id), s)).collect();
+        let distinct_actor = active_require_review(ctx).is_none_or(|(rr, _)| rr.distinct_actor);
         let mut counts = Self::default();
         for review in in_effect_reviews(ctx).into_iter().filter(|r| r.pins.is_none()) {
             let Some(scenario) = live.get(&(&review.project_id, &review.scenario_id)).copied().filter(|s| owned(s)) else { continue };
@@ -457,7 +467,11 @@ impl LegacyReviewCounts {
                 LegacyCurrency::Current => counts.current += 1,
                 LegacyCurrency::Stale { .. } => {
                     counts.stale += 1;
-                    counts.stale_scenarios.insert(scenario.scenario_id.as_str().to_string());
+                    if review_gap(ctx, scenario, distinct_actor).is_none() {
+                        counts.superseded += 1;
+                    } else {
+                        counts.needs_review.insert(scenario.scenario_id.as_str().to_string());
+                    }
                 }
                 LegacyCurrency::Undecidable => counts.undecidable += 1,
             }
@@ -469,7 +483,8 @@ impl LegacyReviewCounts {
         self.current + self.stale + self.undecidable
     }
 
-    /// The one advisory line about these reviews, without a prefix.
+    /// The one advisory line about these reviews, without a prefix. Only
+    /// the scenarios still owed a review are named for re-review.
     pub fn note(&self) -> String {
         let mut line = format!(
             "{} review(s) predate review pinning (0.15) and were checked against the commit each one pinned: {} current, {} stale, {} undecidable",
@@ -478,9 +493,12 @@ impl LegacyReviewCounts {
             self.stale,
             self.undecidable
         );
-        if self.stale > 0 {
-            let ids = self.stale_scenarios.iter().map(String::as_str).collect::<Vec<_>>().join(", ");
-            line.push_str(&format!("; a stale one no longer counts — review its scenario again (`canon review add`): {ids}"));
+        if self.superseded > 0 {
+            line.push_str(&format!("; {} stale one(s) superseded by a current review of the same scenario, so nothing is owed for them", self.superseded));
+        }
+        if !self.needs_review.is_empty() {
+            let ids = self.needs_review.iter().map(String::as_str).collect::<Vec<_>>().join(", ");
+            line.push_str(&format!("; a stale one with no current review in its place no longer counts — review its scenario again (`canon review add`): {ids}"));
         }
         if self.undecidable > 0 {
             line.push_str(

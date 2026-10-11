@@ -159,7 +159,10 @@ fn a_legacy_review_whose_scenario_changed_after_its_pin_is_stale() {
     );
     assert!(out.contains(&line), "{out}");
     assert!(!out.contains("unreviewed-promotion cart.add.01"), "the sibling's review stays current: {out}");
-    assert!(out.contains(&format!("{}; a stale one no longer counts — review its scenario again (`canon review add`): cart.add.02\n", advisory(1, 1, 0))), "{out}");
+    assert!(
+        out.contains(&format!("{}; a stale one with no current review in its place no longer counts — review its scenario again (`canon review add`): cart.add.02\n", advisory(1, 1, 0))),
+        "{out}"
+    );
 
     let status = ok(repo, &["status"]);
     assert!(status.contains(&format!("warning: {}", advisory(1, 1, 0).trim_start_matches("advisory: "))), "{status}");
@@ -243,6 +246,44 @@ fn a_new_review_supersedes_a_stale_legacy_review() {
     );
     let out = gate(repo, 0);
     assert!(out.contains(&format!("{}\n", advisory(1, 0, 0))), "{out}");
+}
+
+/// review.add.60: a stale legacy review whose scenario another reviewer
+/// has since reviewed (current, pinned) is still counted as stale, but as
+/// superseded: the gate is clean and the advisory names no scenario to
+/// review again, so nobody redoes a review that is already current.
+#[test]
+fn a_stale_legacy_review_superseded_by_another_reviewer_is_not_named_for_re_review() {
+    let (dir, _) = legacy_repo();
+    let repo = dir.path();
+    commit_file(repo, FEATURE, &BASE.replace("Then the cart holds two of that item", "Then the cart holds one line with quantity two"), "edit cart.add.02");
+    ok(repo, &["inventory", "sync"]);
+    gate(repo, 1);
+    ok(
+        repo,
+        &[
+            "review", "add", "--project-id", "root", "--scenario-id", "cart.add.02", "--reviewer", "reviewer-3", "--pin", "r2", "--upstream-ref", "docs/plan.md#re-review",
+            "--actor-id", "reviewer-3", "--role", "reviewer", "--session-id", "sess-review-3",
+        ],
+    );
+    let out = gate(repo, 0);
+    assert!(
+        out.contains(&format!("{}; 1 stale one(s) superseded by a current review of the same scenario, so nothing is owed for them\n", advisory(1, 1, 0))),
+        "{out}"
+    );
+    assert!(!out.contains("review its scenario again"), "a superseded scenario is never named for re-review: {out}");
+
+    // The other legacy review goes stale too, with no review in its place:
+    // only that scenario is named.
+    attest(repo, "cart.add.01");
+    let out = gate(repo, 1);
+    assert!(
+        out.contains(&format!(
+            "{}; 1 stale one(s) superseded by a current review of the same scenario, so nothing is owed for them; a stale one with no current review in its place no longer counts — review its scenario again (`canon review add`): cart.add.01\n",
+            advisory(0, 2, 0)
+        )),
+        "{out}"
+    );
 }
 
 /// review.add.61: `canon subject status` decides a legacy review the way

@@ -116,9 +116,11 @@ per-scenario digest there equals today's and no declared evidence is newer
 than the review (it counts); **stale** when the spec changed since the pin
 or the evidence is newer (`unreviewed-promotion`, like a stale pinned review);
 **undecidable** when the commit or the scenario at it is not in this clone
-(it still counts, as in 0.15). One advisory line counts the three and names
-the stale scenarios. In CI, check out full history (`fetch-depth: 0`) for
-the gate job, or every such review is undecidable.
+(it still counts, as in 0.15). One advisory line counts the three, counts a
+stale one as superseded when its scenario already has another current
+review, and names only the scenarios still owed a review. In CI, check out
+full history (`fetch-depth: 0`) for the gate job, or every such review is
+undecidable.
 
 ## Memory
 
