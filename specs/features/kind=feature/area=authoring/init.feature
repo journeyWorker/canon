@@ -144,3 +144,13 @@ Feature: authoring init
     When a reader rebuilds the stale scenario index
     Then the init gitignore covers .canon/ledger/kind=scenario/
     And git status reports nothing untracked
+
+  # canon: {"schema":1,"at":"2026-10-11T15:45:13Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.init.72
+  Scenario: The scenario index lock stays out of git
+    Given a repository initialized with canon init whose feature file is committed
+    When a reader refreshes the stale scenario index and takes the index lock
+    Then the init gitignore covers .canon/scenario-index.lock
+    And git status reports nothing untracked

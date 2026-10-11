@@ -88,6 +88,14 @@ pub const AUDIT_GITIGNORE: &str = ".canon/audit/";
 /// `canon init` keeps it out of git.
 pub const SCENARIO_INDEX_GITIGNORE: &str = ".canon/ledger/kind=scenario/";
 
+/// The advisory lock `canon inventory sync` and every reader's
+/// stale-index refresh hold while they write the scenario index, so two
+/// of them never index the same change twice. An OS file lock
+/// (`flock`/`LockFileEx`), released when the holder exits — even when it
+/// is killed — so the file never goes stale and is never deleted. Local
+/// state, so `canon init` ignores it.
+pub const SCENARIO_INDEX_LOCK_FILE: &str = ".canon/scenario-index.lock";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -114,6 +122,7 @@ mod tests {
             ACCESS_AUDIT_FILE,
             AUDIT_GITIGNORE,
             SCENARIO_INDEX_GITIGNORE,
+            SCENARIO_INDEX_LOCK_FILE,
         ];
         for path in all {
             assert!(

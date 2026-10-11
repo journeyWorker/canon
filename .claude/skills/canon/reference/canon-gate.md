@@ -448,10 +448,13 @@ Which writes need this step: `evidence add`, `finding add` and `finding
 close` stage, and under `write: { promote: manual }` (or an absent
 `write:` key) their success line ends ``— run `canon gate promote` to
 commit it``. Under `write: { promote: auto }` (what `canon init` writes)
-or with `--promote`, they run this same promotion themselves and end
+or with `--promote`, they promote the one record they just staged —
+same validation and `run_seq` assignment as this command — and end
 `— staged and promoted in this run; nothing to promote`, so no separate
-`canon gate promote` is needed; `--no-promote` keeps one write staged.
-`gate promote` stays safe to run anyway: with nothing staged it prints
+`canon gate promote` is needed for it; `--no-promote` keeps one write
+staged. A record another run staged is not touched: only `gate promote`
+commits everything staged. It stays safe to run anyway: with nothing
+staged it prints
 `nothing staged` and exits `0`. `divergence stage` stages for `canon
 divergence promote` and names it, under the same `write:` rule. Every
 other write — `review add`, `divergence

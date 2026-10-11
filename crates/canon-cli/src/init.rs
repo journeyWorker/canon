@@ -55,13 +55,15 @@ const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, Recor
 /// `.canon/hot.db` prefix; the read-access audit directory `canon
 /// query`/`export`/`purge` append to (#8), which is local operator
 /// state and would otherwise show up as untracked after the first
-/// query; and the derived scenario index, which every reader rebuilds
+/// query; the derived scenario index, which every reader rebuilds
 /// from the `.feature` files when stale (0.16 D2), so committing it
-/// would only commit churn.
-const GITIGNORE_LINES: [(&str, &str); 3] = [
+/// would only commit churn; and the lock file that serializes those
+/// rebuilds, which is local process state.
+const GITIGNORE_LINES: [(&str, &str); 4] = [
     ("# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.", paths::HOT_DB_GITIGNORE),
     ("# canon's read-access audit log (canon query/export/purge) -- local, never committed.", paths::AUDIT_GITIGNORE),
     ("# canon's scenario index -- derived from the .feature files, rebuilt by every reader.", paths::SCENARIO_INDEX_GITIGNORE),
+    ("# the lock that serializes scenario index rebuilds -- local process state.", paths::SCENARIO_INDEX_LOCK_FILE),
 ];
 
 /// D8/D9's skeleton `canon.yaml` body: every one of `RecordKind::ALL`'s

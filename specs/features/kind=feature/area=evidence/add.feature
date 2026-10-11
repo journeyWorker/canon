@@ -333,3 +333,14 @@ Feature: evidence add
     Then the record is still staged
     And the success line names canon gate promote
     And the command exits 1
+
+  # canon: {"schema":1,"at":"2026-10-11T15:45:12Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.65
+  Scenario: A promote on write commits only the record its own run staged
+    Given another author staged an evidence record and a divergence candidate with --no-promote
+    When evidence add and divergence stage run under write promote auto
+    Then each run prints the promote line of its own record only
+    And the other author's records are still staged
+    And gate promote and divergence promote commit them afterwards

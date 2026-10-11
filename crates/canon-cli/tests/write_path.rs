@@ -4,7 +4,7 @@
 //! changed, and `.canon/audit/` stays out of git.
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
@@ -108,7 +108,8 @@ fn promote_flag_commits_in_the_same_run_and_a_later_gate_promote_is_a_no_op() {
     let out = ok(repo, &with(evidence("game.run.01"), &["--promote"]));
     let text = stdout(&out);
     assert!(text.lines().any(|l| l.contains(PROMOTED)), "the success line names the promotion:\n{text}");
-    assert!(text.contains("canon gate promote: promoted evidence_record=1"), "the promote report is printed:\n{text}");
+    assert!(text.contains("promoted evidence_record implementer/game-run run_seq=1 -> "), "the record's promote line is printed:\n{text}");
+    assert!(!text.contains("canon gate promote:"), "a promote on write reports its own record, not a batch tally:\n{text}");
     assert_eq!(staged(repo), 0);
     assert_eq!(committed(repo, "evidence_record"), 1);
 
@@ -184,6 +185,47 @@ fn a_malformed_write_section_or_both_flags_are_refused_before_anything_is_staged
     let out = canon(repo, &with(evidence("game.run.01"), &["--promote", "--no-promote"]));
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert_eq!(staged(repo), 0);
+}
+
+/// evidence.add.65: a promote on write commits only the record its own
+/// run staged. A record another author staged with `--no-promote` — an
+/// attestation or a divergence candidate — stays staged until a full
+/// `canon gate promote` / `canon divergence promote` commits it.
+#[test]
+fn a_promote_on_write_commits_only_its_own_record() {
+    let dir = init_repo();
+    let repo = dir.path();
+    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
+
+    ok(repo, &[
+        "evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "cargo test other", "--role", "reviewer",
+        "--actor-id", "other", "--no-promote",
+    ]);
+    assert_eq!(staged(repo), 1);
+    let out = ok(repo, &evidence("game.run.01"));
+    let text = stdout(&out);
+    assert!(text.lines().any(|l| l.contains(PROMOTED)), "{text}");
+    let promoted: Vec<&str> = text.lines().filter(|l| l.starts_with("promoted ")).collect();
+    assert_eq!(promoted.len(), 1, "one promote line, for this run's own record:\n{text}");
+    assert!(promoted[0].starts_with("promoted evidence_record implementer/game-run run_seq=1 -> "), "{text}");
+    assert_eq!((staged(repo), committed(repo, "evidence_record")), (1, 1), "the other author's record is still staged");
+
+    let sha = "a".repeat(40);
+    let stage = |actor: &str, extra: &[&str]| {
+        let mut args = vec!["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--actor-id", actor];
+        args.extend_from_slice(extra);
+        ok(repo, &args)
+    };
+    stage("other", &["--no-promote"]);
+    assert_eq!(staged(repo), 2);
+    let out = stage("mine", &[]);
+    assert!(stdout(&out).lines().any(|l| l.contains(PROMOTED)), "{}", stdout(&out));
+    assert_eq!((staged(repo), committed(repo, "divergence")), (2, 1), "the other reviewer's candidate is still staged");
+
+    let all = ok(repo, &["gate", "promote"]);
+    assert!(stdout(&all).contains("canon gate promote: promoted evidence_record=1"), "{}", stdout(&all));
+    ok(repo, &["divergence", "promote"]);
+    assert_eq!((staged(repo), committed(repo, "evidence_record"), committed(repo, "divergence")), (0, 2, 2));
 }
 
 // ── stale index refresh ──
@@ -289,6 +331,126 @@ fn a_root_that_cannot_sync_is_named_and_a_dir_without_canon_yaml_is_never_writte
     assert!(!bare.path().join(".canon").exists(), "no canon.yaml, no refresh");
 }
 
+/// Every scenario index record of `repo` without its `at` stamp, sorted:
+/// what two runs that wrote the same records at different instants
+/// share.
+fn scenario_records_without_at(repo: &Path) -> Vec<String> {
+    let mut records: Vec<String> = scenario_records(repo)
+        .into_iter()
+        .map(|mut record| {
+            record.as_object_mut().unwrap().remove("at");
+            record.to_string()
+        })
+        .collect();
+    records.sort();
+    records
+}
+
+/// A repo with two scenarios in two `.feature` files, indexed, whose
+/// `game.shop` file is then deleted; `spec_coverage` grades every
+/// scenario for evidence.
+fn repo_with_a_deleted_scenario() -> tempfile::TempDir {
+    let dir = init_repo();
+    let repo = dir.path();
+    std::fs::create_dir_all(repo.join(".canon")).unwrap();
+    std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_evidence: true\n").unwrap();
+    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
+    ok(repo, &["scenario", "new", "game.shop.01", "--title", "A shop opens", "--case", "failure"]);
+    ok(repo, &["inventory", "sync"]);
+    let shop = files_under(repo.join("specs/features")).into_iter().find(|p| p.to_string_lossy().contains("shop")).expect("the shop feature file");
+    std::fs::remove_file(shop).unwrap();
+    dir
+}
+
+/// inventory.sync.43: a scenario whose `.feature` file is deleted is a
+/// change to the index like any other. A reader's refresh and a full
+/// `canon inventory sync` both mark it removed with the same record; the
+/// gate stops grading it and `canon query` stops listing it; adding it
+/// back brings it back.
+#[test]
+fn a_deleted_scenario_is_removed_the_same_way_by_a_refresh_and_by_a_full_sync() {
+    let (refreshed, synced) = (repo_with_a_deleted_scenario(), repo_with_a_deleted_scenario());
+
+    let err = stderr(&canon(refreshed.path(), &["gate", "check"]));
+    assert!(
+        err.contains("canon gate check: refreshed the scenario index from 1 scenario(s) no longer in any feature file (game.shop.01): 1 record(s) written"),
+        "{err}"
+    );
+    let sync = ok(synced.path(), &["inventory", "sync"]);
+    assert!(stdout(&sync).contains("1 record(s) written (1 marking scenario(s) no longer in any feature file as removed)"), "{}", stdout(&sync));
+    assert_eq!(scenario_records_without_at(refreshed.path()), scenario_records_without_at(synced.path()), "the refresh writes exactly what a full sync writes");
+    assert!(scenario_records(synced.path()).iter().any(|r| r["scenario_id"] == "game.shop.01" && r["removed"] == true), "{:?}", scenario_records(synced.path()));
+
+    for repo in [refreshed.path(), synced.path()] {
+        assert!(stdout(&ok(repo, &["inventory", "sync"])).contains("0 record(s) written"), "nothing is left for a sync to do");
+        let graded = stdout(&canon(repo, &["gate", "check"]));
+        assert!(graded.contains("game.run.01") && !graded.contains("game.shop"), "the gate grades only the scenario still specified:\n{graded}");
+        let listed = stdout(&ok(repo, &["query", "--kind", "scenario", "--json"]));
+        assert!(listed.contains("game.run.01") && !listed.contains("game.shop.01"), "{listed}");
+    }
+
+    ok(refreshed.path(), &["scenario", "new", "game.shop.01", "--title", "A shop opens", "--case", "failure"]);
+    let graded = stdout(&canon(refreshed.path(), &["gate", "check"]));
+    assert!(graded.contains("game.shop.01"), "a re-added scenario is graded again:\n{graded}");
+}
+
+/// inventory.sync.44 (@case:failure): a root that refuses to sync marks
+/// nothing removed either. Neither a reader's refresh nor a full sync
+/// writes a tombstone for a root with format violations, so a half-edited
+/// corpus never empties the index.
+#[test]
+fn a_root_that_cannot_sync_marks_no_scenario_removed() {
+    let dir = repo_with_a_deleted_scenario();
+    let repo = dir.path();
+    let run = files_under(repo.join("specs/features")).pop().expect("the run feature file");
+    let text = std::fs::read_to_string(&run).unwrap();
+    std::fs::write(&run, text.lines().filter(|l| !l.trim_start().starts_with("# canon:")).map(|l| format!("{l}\n")).collect::<String>()).unwrap();
+
+    let err = stderr(&canon(repo, &["status"]));
+    assert!(err.contains("canon status: found the scenario index stale for 1 changed feature file(s)"), "{err}");
+    assert!(err.contains("and 1 scenario(s) no longer in any feature file (game.shop.01): 0 record(s) written; NOT refreshed: root `root`"), "{err}");
+    let sync = canon(repo, &["inventory", "sync"]);
+    assert_eq!(sync.status.code(), Some(1), "{}", stdout(&sync));
+    let records = scenario_records(repo);
+    assert_eq!(records.len(), 2, "no tombstone and no new generation: {records:?}");
+    assert!(records.iter().all(|r| r.get("removed").is_none()), "{records:?}");
+}
+
+/// inventory.sync.45: `canon inventory sync` and every reader's refresh
+/// take the repo's scenario-index lock, and a writer that waited checks
+/// staleness again before writing. Deterministic: the test holds the
+/// lock itself, starts two syncs and two refreshing readers against one
+/// stale index, sees that none of them writes while it holds the lock,
+/// releases it — and the index ends with one record per scenario,
+/// written by exactly one of the four.
+#[test]
+fn concurrent_syncs_and_refreshes_write_each_index_record_once() {
+    let dir = init_repo();
+    let repo = dir.path();
+    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
+    ok(repo, &["scenario", "new", "game.shop.01", "--title", "A shop opens", "--case", "failure"]);
+
+    std::fs::create_dir_all(repo.join(".canon")).unwrap();
+    let lock = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(repo.join(".canon/scenario-index.lock")).unwrap();
+    lock.lock().unwrap();
+    let spawn = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().expect("spawn canon")
+    };
+    let children = [spawn(&["inventory", "sync"]), spawn(&["inventory", "sync"]), spawn(&["status"]), spawn(&["gate", "check"])];
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    assert!(scenario_records(repo).is_empty(), "nothing writes the index while another process holds the lock");
+    lock.unlock().unwrap();
+    drop(lock);
+
+    let outputs: Vec<Output> = children.into_iter().map(|child| child.wait_with_output().unwrap()).collect();
+    for sync in &outputs[..2] {
+        assert!(sync.status.success(), "{}{}", stdout(sync), stderr(sync));
+    }
+    let writers = outputs.iter().filter(|out| stdout(out).contains("2 record(s) written") || stderr(out).contains("refreshed the scenario index")).count();
+    assert_eq!(writers, 1, "exactly one writer indexed the change: {:?}", outputs.iter().map(|o| (stdout(o), stderr(o))).collect::<Vec<_>>());
+    assert_eq!(scenario_records(repo).len(), 2, "one record per scenario: {:?}", scenario_records(repo));
+}
+
 // ── #8: the audit log stays out of git ──
 
 /// authoring.init.70: `canon init` ignores `.canon/audit/` (#8), so a
@@ -325,4 +487,22 @@ fn the_scenario_index_a_reader_rebuilds_stays_out_of_git() {
     assert_eq!(scenario_records(repo).len(), 1);
     ok(repo, &["query", "--kind", "subject"]);
     assert_eq!(git(repo, &["status", "--porcelain"]), "", "neither the rebuilt index nor the audit log shows up as untracked");
+}
+
+/// authoring.init.72: `canon init` ignores the scenario-index lock file,
+/// so the lock a reader's refresh leaves behind never shows up in `git
+/// status`.
+#[test]
+fn the_scenario_index_lock_stays_out_of_git() {
+    let dir = init_repo();
+    let repo = dir.path();
+    let gitignore = std::fs::read_to_string(repo.join(".gitignore")).unwrap();
+    assert!(gitignore.lines().any(|l| l.trim() == ".canon/scenario-index.lock"), "{gitignore}");
+    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
+    git(repo, &["add", "-A"]);
+    git(repo, &["commit", "-q", "-m", "spec"]);
+
+    ok(repo, &["status"]);
+    assert!(repo.join(".canon/scenario-index.lock").is_file(), "the refresh took the lock");
+    assert_eq!(git(repo, &["status", "--porcelain"]), "", "the lock file must not show up as untracked");
 }

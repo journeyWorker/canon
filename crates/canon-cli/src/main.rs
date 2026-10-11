@@ -774,7 +774,7 @@ enum GateCommand {
 /// (0.16 D2; `canon_cli::write_mode`).
 #[derive(clap::Args, Debug, Clone, Copy)]
 struct PromoteArgs {
-    /// Promote in the same run, so nothing is left to promote (the default under canon.yaml `write: { promote: auto }`)
+    /// Promote the record this run staged, in the same run; records others staged stay staged (the default under canon.yaml `write: { promote: auto }`)
     #[arg(long, conflicts_with = "no_promote")]
     promote: bool,
     /// Keep this write staged even under canon.yaml `write: { promote: auto }`

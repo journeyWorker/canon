@@ -13,10 +13,13 @@
 //! close`, `divergence stage`) promotes in the same run when asked:
 //! `--promote` on the command line, or `write: { promote: auto }` in
 //! `canon.yaml`. `--no-promote` keeps one write staged under `auto`. The
-//! promotion is the same code `canon gate promote` / `canon divergence
-//! promote` run, so it drains everything staged of that family, not only
-//! the record this command wrote. An absent `write:` key is `manual`:
-//! a repo that never set it keeps staging until someone promotes.
+//! run promotes ONLY the record it just staged, through the same
+//! validation and assignment `canon gate promote` / `canon divergence
+//! promote` apply (`canon_gate::promote_staged` /
+//! `promote_staged_divergence`); a record another author staged stays
+//! staged until they, or a full promote, commit it. An absent `write:`
+//! key is `manual`: a repo that never set it keeps staging until someone
+//! promotes.
 
 use std::path::Path;
 

@@ -68,6 +68,9 @@ packages/core-*/bin/*
 # The read-access audit log `canon query`/`export`/`purge` append to
 # (#8): local operator state, never committed.
 .canon/audit/
+# The lock `canon inventory sync` and every reader's scenario-index
+# refresh hold while writing the index (0.16): local process state.
+.canon/scenario-index.lock
 .canon/REPORT.md
 .env
 .env.*

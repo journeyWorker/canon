@@ -890,17 +890,26 @@ ORDER BY change_id, s.task_id;
 -- point — it is a specified scenario no plan is carrying.
 CREATE OR REPLACE VIEW mart_scope_status AS
 WITH scenario_latest AS (
-    SELECT
-        body ->> '$.project_id'  AS project_id,
-        body ->> '$.scenario_id' AS scenario_id,
-        body ->> '$.title'       AS title,
-        body ->> '$.subject_id'  AS subject_id
-    FROM stg_records
-    WHERE kind = 'scenario'
-    QUALIFY row_number() OVER (
-        PARTITION BY body ->> '$.project_id', body ->> '$.scenario_id'
-        ORDER BY version_rank DESC
-    ) = 1
+    SELECT project_id, scenario_id, title, subject_id
+    FROM (
+        SELECT
+            body ->> '$.project_id'                            AS project_id,
+            body ->> '$.scenario_id'                           AS scenario_id,
+            body ->> '$.title'                                 AS title,
+            body ->> '$.subject_id'                            AS subject_id,
+            coalesce((body ->> '$.removed')::BOOLEAN, false)   AS removed
+        FROM stg_records
+        WHERE kind = 'scenario'
+        QUALIFY row_number() OVER (
+            PARTITION BY body ->> '$.project_id', body ->> '$.scenario_id'
+            ORDER BY version_rank DESC
+        ) = 1
+    )
+    -- A scenario whose latest generation is a tombstone (`removed`,
+    -- written by `canon inventory sync` once no feature file declares
+    -- it) is gone from the spec corpus, as the gate reads it. Filtered
+    -- AFTER the fold, so the generation before it never stands in.
+    WHERE NOT removed
 ),
 -- One row per scenario at most. `int_task_scenario_refs` may declare
 -- the same scenario from SEVERAL tasks; multiplying the driver by that
@@ -1696,9 +1705,10 @@ subject_scenarios AS (
     SELECT subject_id, project_id, scenario_id
     FROM (
         SELECT
-            body ->> '$.project_id'  AS project_id,
-            body ->> '$.scenario_id' AS scenario_id,
-            body ->> '$.subject_id'  AS subject_id
+            body ->> '$.project_id'                            AS project_id,
+            body ->> '$.scenario_id'                           AS scenario_id,
+            body ->> '$.subject_id'                            AS subject_id,
+            coalesce((body ->> '$.removed')::BOOLEAN, false)   AS removed
         FROM stg_records
         WHERE kind = 'scenario'
         QUALIFY row_number() OVER (
@@ -1706,7 +1716,8 @@ subject_scenarios AS (
             ORDER BY version_rank DESC
         ) = 1
     )
-    WHERE subject_id IS NOT NULL
+    -- A tombstoned scenario (see `mart_scope_status`) links no subject.
+    WHERE subject_id IS NOT NULL AND NOT removed
 ),
 -- The CURRENT verdict about each scenario, as one WHOLE winner row
 -- ordered by `version_rank` — the `(at, schema, digest)` triple

@@ -89,8 +89,8 @@
 use std::path::{Path, PathBuf};
 
 use canon_gate::{
-    evidence_note_of, gate_task, install_hooks, promote as gate_promote, selftest, EvidenceNote, FailureClass, GateContext, GateCtx, GateReport, HookEntry, InstallOutcome,
-    Promoted, PromoteReport, TaskFlipDecision, FAILURE_CLASSES, PRE_COMMIT_SCRIPT, STAGED_KINDS,
+    evidence_note_of, gate_task, install_hooks, promote as gate_promote, promote_staged, selftest, EvidenceNote, FailureClass, GateContext, GateCtx, GateReport, HookEntry,
+    InstallOutcome, Promoted, PromoteReport, TaskFlipDecision, FAILURE_CLASSES, PRE_COMMIT_SCRIPT, STAGED_KINDS,
 };
 use canon_ingest::{find_plan_adapter, PlanWriteBack, WriteBackError};
 use canon_model::paths;
@@ -816,24 +816,24 @@ impl StagedOutcome {
 }
 
 /// A staged write's own promotion (`--promote` / `write: { promote:
-/// auto }`): `canon gate promote`'s code, run right after the write
-/// staged `location` (tier-relative under [`evidence_staging_dir`]).
-/// Prints the promote report exactly as `canon gate promote` would, so
-/// the run names what it committed, and reads the record's own outcome
-/// off staging: gone means promoted (or recovered), still there means
-/// promotion refused it.
+/// auto }`): `canon_gate::promote_staged` over exactly the record this
+/// command staged at `location` (tier-relative under
+/// [`evidence_staging_dir`]) — the same validation and assignment
+/// `canon gate promote` applies, but never another author's staged
+/// record. Prints that one record's promote line, and reads its outcome
+/// off the report, which carries only that record: committed (or
+/// recovered) means promoted, refused means it is still staged.
 pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &str, promote: bool) -> StagedOutcome {
     if !promote {
         return StagedOutcome::Staged;
     }
-    let staging_root = evidence_staging_dir(ledger_root);
-    match gate_promote(&GitTier::new(&staging_root), &GitTier::new(ledger_root), false) {
+    match promote_staged(&GitTier::new(evidence_staging_dir(ledger_root)), &GitTier::new(ledger_root), Path::new(location)) {
         Ok(report) => {
-            print!("{}", format_promote_report(&report, false));
-            if staging_root.join(location).exists() {
-                StagedOutcome::Refused
-            } else {
+            print!("{}", format_candidate_lines(&report, false));
+            if report.is_clean() {
                 StagedOutcome::Promoted
+            } else {
+                StagedOutcome::Refused
             }
         }
         Err(e) => {
@@ -857,20 +857,7 @@ pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &
 fn format_promote_report(report: &PromoteReport, dry_run: bool) -> String {
     let verb = if dry_run { "would promote" } else { "promoted" };
     let drain_verb = if dry_run { "would drain" } else { "drained" };
-    let mut out = String::new();
-    for p in &report.promoted {
-        out.push_str(&format!("{verb} {} -> {}\n", p.label(), p.target.display()));
-    }
-    // Reported distinctly from `promoted`, never folded into it: the
-    // record already existed, this call only finished the interrupted
-    // run's staging cleanup, and an operator comparing promote output
-    // against the ledger has to be able to tell which happened.
-    for p in &report.recovered {
-        out.push_str(&format!("{drain_verb} {} -> {} (already committed by an interrupted promote; not re-committed)\n", p.label(), p.target.display()));
-    }
-    for r in &report.refused {
-        out.push_str(&format!("refused: {}\n", r.violation.line()));
-    }
+    let mut out = format_candidate_lines(report, dry_run);
 
     if report.promoted.is_empty() && report.recovered.is_empty() && report.refused.is_empty() {
         // Named explicitly rather than left as silence: an author whose
@@ -889,6 +876,29 @@ fn format_promote_report(report: &PromoteReport, dry_run: bool) -> String {
         out.push_str(&format!("; refused {}", report.refused.len()));
     }
     out.push('\n');
+    out
+}
+
+/// One line per candidate in `report`: what was promoted, drained, or
+/// refused. [`format_promote_report`]'s body, and the whole of what a
+/// promote on write prints for its one record.
+fn format_candidate_lines(report: &PromoteReport, dry_run: bool) -> String {
+    let verb = if dry_run { "would promote" } else { "promoted" };
+    let drain_verb = if dry_run { "would drain" } else { "drained" };
+    let mut out = String::new();
+    for p in &report.promoted {
+        out.push_str(&format!("{verb} {} -> {}\n", p.label(), p.target.display()));
+    }
+    // Reported distinctly from `promoted`, never folded into it: the
+    // record already existed, this call only finished the interrupted
+    // run's staging cleanup, and an operator comparing promote output
+    // against the ledger has to be able to tell which happened.
+    for p in &report.recovered {
+        out.push_str(&format!("{drain_verb} {} -> {} (already committed by an interrupted promote; not re-committed)\n", p.label(), p.target.display()));
+    }
+    for r in &report.refused {
+        out.push_str(&format!("refused: {}\n", r.violation.line()));
+    }
     out
 }
 
@@ -1037,17 +1047,28 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let ledger_root = dir.path().join(".canon/ledger");
 
+        // Another author's well-formed record, staged and not promoted:
+        // no promote on write may commit it.
+        let bystander = stage(&ledger_root, Actor::new("other", RoleId::parse("reviewer").unwrap()));
+
         let kept = stage(&ledger_root, Actor::new("impl", RoleId::parse("implementer").unwrap()));
         assert_eq!(promote_after_stage("t", &ledger_root, &kept, false), StagedOutcome::Staged);
         assert!(evidence_staging_dir(&ledger_root).join(&kept).exists(), "not asked to promote: nothing moves");
 
         assert_eq!(promote_after_stage("t", &ledger_root, &kept, true), StagedOutcome::Promoted);
         assert!(!evidence_staging_dir(&ledger_root).join(&kept).exists());
+        assert!(evidence_staging_dir(&ledger_root).join(&bystander).exists(), "promoting this record leaves another author's staged");
 
-        // No `actor.role`: promotion cannot assign a run_seq and refuses it.
+        // The command's OWN record has no `actor.role`: promotion cannot
+        // assign a run_seq and refuses it — while the well-formed
+        // bystander beside it stays untouched rather than being promoted
+        // in its place.
         let refused = stage(&ledger_root, Actor::new_unattributed("legacy-writer"));
         let outcome = promote_after_stage("t", &ledger_root, &refused, true);
         assert_eq!((outcome, outcome.exit_code(), outcome.suffix()), (StagedOutcome::Refused, 1, crate::write_mode::STAGED_FOR_GATE_PROMOTE));
         assert!(evidence_staging_dir(&ledger_root).join(&refused).exists(), "a refused record stays staged");
+        assert!(evidence_staging_dir(&ledger_root).join(&bystander).exists(), "a refusal promotes nothing else either");
+        let committed = GitTier::new(&ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap();
+        assert_eq!(committed.records.len(), 1, "only the command's own promoted record is committed");
     }
 }

@@ -168,11 +168,13 @@ write:
   promote: auto   # or manual
 ```
 
-- `auto` — the command stages, then runs the same promotion `canon gate
-  promote` (or `canon divergence promote`) runs. That promotion drains
-  everything staged, not only this record, and prints its report; the
-  success line ends `— staged and promoted in this run; nothing to
-  promote`. `canon init` writes `auto`.
+- `auto` — the command stages, then promotes that one record through the
+  same validation and assignment `canon gate promote` (or `canon
+  divergence promote`) applies, and prints its promote line. Records
+  other runs staged stay staged; only `canon gate promote` / `canon
+  divergence promote` commit everything staged. The success line ends
+  `— staged and promoted in this run; nothing to promote`. `canon init`
+  writes `auto`.
 - `manual` — the record stays staged and the line ends ``— run `canon
   gate promote` to commit it``. An absent `write:` key (or `promote:`
   field) is `manual`, so a repo that never set it is unchanged.
@@ -197,14 +199,34 @@ index is derived — a pure function of the `.feature` files — so the
 commands that read it rebuild it first: `canon gate check`, `canon
 status`, `canon subject status`, `canon review add` and `canon evidence
 add`. The index is stale when a `.feature` file holds a scenario with no
-index record, or one whose recorded source digest differs from the file's
-current bytes. The reader then runs `canon inventory sync`'s code on the
-changed files only (validation still covers the whole root) and prints
-one stderr line:
+live index record, or one whose recorded source digest differs from the
+file's current bytes, or when the index holds a scenario of a spec root
+that no `.feature` file of it declares any more. The reader then runs
+`canon inventory sync`'s code on the changed files (validation still
+covers the whole root) and prints one stderr line:
 
 ```
 canon status: refreshed the scenario index from 1 changed feature file(s) (specs/features/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
+
+A deleted scenario is not erased: `canon inventory sync` — and a reader's
+refresh, identically — appends a tombstone, a new generation of its
+record with `removed: true`. The gate, `canon status`, `canon query` and
+the report panels then treat it as absent; re-adding the scenario writes
+a live generation that supersedes the tombstone. A root that fails to
+sync writes no tombstone either.
+
+```
+canon status: refreshed the scenario index from 1 scenario(s) no longer in any feature file (cart.pay.01): 1 record(s) written
+```
+
+`canon inventory sync` and every refresh hold an OS file lock on
+`.canon/scenario-index.lock` while they write, so concurrent runs never
+index one change twice; a refresh that waited checks staleness again and
+is silent if another run already did the work. The lock is released when
+its holder exits, however it exits, so it never goes stale; a writer
+gives up after 30 s with a message naming the file (`canon inventory
+sync` exits `2`; a reader skips the refresh and still runs).
 
 A fresh index prints nothing. A root that fails to sync (format
 violations, a duplicate id) is named and left as it was, and the command
@@ -227,6 +249,7 @@ comment, only the missing ones):
 - `.canon/audit/` — the query/export/purge access log.
 - `.canon/ledger/kind=scenario/` — the scenario index; every reader
   rebuilds it.
+- `.canon/scenario-index.lock` — the lock serializing index rebuilds.
 
 A rerun on a repo that already has `canon.yaml` only refreshes
 `AGENTS.md`, so an existing repo's `.gitignore` is unchanged; add the
