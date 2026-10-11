@@ -62,6 +62,17 @@ fn scenario(repo: &Path, id: &str, subject: Option<&str>) {
     ok(repo, &["inventory", "sync"]);
 }
 
+/// Record the human's approval of `subject`'s brief, which `verifying →
+/// shipped` requires (0.16 D1): a change adopted into it whose
+/// `proposal.md` carries an `Approved:` line.
+fn approve_brief(repo: &Path, subject: &str) {
+    let change = format!("c-{subject}");
+    ok(repo, &["change", "new", &change, "--subject", subject, "--title", "The brief"]);
+    let proposal = repo.join("openspec/changes").join(&change).join("proposal.md");
+    let text = std::fs::read_to_string(&proposal).unwrap();
+    std::fs::write(proposal, format!("{text}\nApproved: Journey 2026-10-12 — \"승인\"\n")).unwrap();
+}
+
 fn attest(repo: &Path, extra: &[&str]) -> Output {
     let mut args = vec!["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer"];
     args.extend_from_slice(extra);
@@ -308,6 +319,7 @@ fn a_task_and_scenario_keyed_record_ships_its_scenario_and_still_flips_its_task(
     ok(repo, &["evidence", "add", "--task", "cats#1", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
     ok(repo, &["gate", "promote"]);
 
+    approve_brief(repo, "cat-run");
     let shipped = canon(repo, &["subject", "status", "cat-run", "shipped"]);
     assert!(shipped.status.success(), "the scenario cell has the record's faithful verdict: {}", text(&shipped));
     ok(repo, &["gate", "task", "cats#1"]);

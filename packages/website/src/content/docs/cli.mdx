@@ -64,6 +64,17 @@ is the management record.
 | `canon subject adopt <change_id> --subject <id> [--repo <dir>] [--json]` | Link an imported plan `Change` (from `canon ingest plans`) to a `Subject`: stamps `Change.subject_id` and appends to the subject's `change_ids`. Writes only the side that lacks the link (a linked pair: nothing written, exit `0`). The subject is written first, since the gate reads adopted changes from its `change_ids`; if the change write then fails it exits `2` and prints `canon subject adopt <change_id> --subject <id>` to complete the link. |
 | `canon subject status <id> <state> [--override-reason <text>] [--actor-id <id>] [--repo <dir>] [--json]` | Policy-gated transition along `proposed → specced → building → verifying → shipped` (plus any → `retired`). `verifying → shipped` additionally requires the subject to own at least one scenario — one whose `@subject:<id>` tag `canon inventory sync` has indexed — and every owned scenario to carry a latest non-Divergent verdict; a violation prints by failure class, exits `1`, and leaves the record unchanged (fail closed). With `spec_coverage.require_review` set, it also prints on stderr which review checks it ran or skipped, and a move into a `require_review.scope` status with gaps (`unreviewed-promotion`, `open-blocker`) is refused the same way. `--override-reason "<one line>"` waives only those two classes — never ship-gate verdict or case gaps — and records `status_override` (`to`, `reason`, `waived`: the exact `{class, subject}` violations it let through, `actor` from `--actor-id`, default `canon`) on the new record. A gap it did not record, such as a blocker raised later, still fails the gate; a blank or multi-line reason exits `2`. The waiver clears on the subject's next status write. Without `require_review`, nothing changes. Moving to `shipped` also refuses `false-success` (a scenario whose latest audit is `refuted`) and, when `require_audit.scope` covers `shipped`, an owed sampled audit. |
 
+`verifying → shipped` also needs the subject's brief approved, by the same
+check `canon status` uses for its `brief:` line: the `proposal.md` of the
+subject's newest adopted change must carry an `Approved:` line outside HTML
+comments and code fences. It runs with or without a policy. Without the line
+the move is refused as `unreviewed-promotion <subject>`, naming that
+`proposal.md` and saying a human must answer the brief; the agent writes the
+line only from that answer. `--override-reason` waives it like a review gap
+and records `{class: unreviewed-promotion, subject: <subject>}` in the
+waiver. A brief that says the human ships changes who runs the move, not the
+check.
+
 ## Corpus
 
 Validate and grow a Gherkin `.feature` spec corpus.

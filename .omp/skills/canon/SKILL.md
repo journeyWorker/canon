@@ -93,10 +93,13 @@ assumption you state there, and say so in your final report.
    `proposed → specced → building → verifying → shipped`. It refuses a move
    the policy does not yet allow (missing evidence, missing reviews, open
    blocker findings); fix the gap rather than overriding, and finish with
-   `canon gate check` clean. Move the subject to `shipped` yourself once
-   `canon subject status <id> shipped` passes its guard, unless the brief
-   says the human ships. `canon status` shows whether each subject's brief
-   is approved and names the next step.
+   `canon gate check` clean. `shipped` also refuses while the brief has no
+   `Approved:` line in the change's `proposal.md`: that needs the human's
+   answer, and you record the line only from it. Move the subject to
+   `shipped` yourself once `canon subject status <id> shipped` passes its
+   guard, unless the brief says the human ships. `canon status` shows
+   whether each subject's brief is approved, by the same check, and names
+   the next step.
 
 Every write command says whether it staged the record (then
 `canon gate promote`) or wrote it directly.

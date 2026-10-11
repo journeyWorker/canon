@@ -207,8 +207,9 @@ Inside an approved scope, never stop for a human: fixes, follow-ups and review r
 /// A fence opener/closer line: up to three spaces, then three or more
 /// backticks or tildes (CommonMark). Returns the fence character, its
 /// run length, and whether only whitespace follows the run (a closing
-/// fence may carry nothing else). `canon status` uses it too, so an
-/// `Approved:` line quoted in a fence is not read as one.
+/// fence may carry nothing else). [`crate::brief`] uses it too (for
+/// `canon status` and the ship guard), so an `Approved:` line quoted in
+/// a fence is not read as one.
 pub(crate) fn fence_of(line: &str) -> Option<(char, usize, bool)> {
     let indent = line.len() - line.trim_start_matches(' ').len();
     if indent > 3 {

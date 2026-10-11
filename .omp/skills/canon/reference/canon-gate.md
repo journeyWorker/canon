@@ -249,6 +249,12 @@ review waivers: 1 advisory(ies) — not failing the gate:
 
 The waiver lasts only until the subject's next status write.
 
+`canon subject status <id> shipped` also refuses while the subject's
+brief has no `Approved:` line (see `canon-subject`), as an
+`unreviewed-promotion` naming the subject. `canon gate check` does not
+read briefs, so a waived brief prints no advisory here; `canon status`
+keeps showing the brief as not approved.
+
 ### Reviews that predate pinning (checked against their pin)
 
 With `require_review` on, the reviews in effect (latest per reviewer and

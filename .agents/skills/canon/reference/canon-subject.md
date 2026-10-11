@@ -145,6 +145,24 @@ empty set; so is one whose `scenario` records route away from the
 gate's rung. Each refusal prints by failure class (`uncovered-cell`),
 exits 1, and the status stays `verifying`. `retired` is not gated.
 
+**The brief (0.16):** `verifying → shipped` also refuses while the
+subject's brief is not approved, read exactly as `canon status` reads it
+(one shared check, so status says `ship` only when this passes): the
+`proposal.md` of the subject's newest adopted change must carry an
+`Approved:` line outside HTML comments and code fences. It runs with or
+without a policy. The refusal is an `unreviewed-promotion` naming the
+subject, and says what to do:
+
+```
+canon subject status: unreviewed-promotion demo-subject — verifying → shipped: brief not approved — openspec/changes/c-demo/proposal.md has no `Approved:` line; a human must answer the brief, and the agent records `Approved: <who> <when> — "<their words>"` there only from that answer
+canon subject status: refused — get the human's answer to the brief and record it as its `Approved:` line, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject
+```
+
+Never write the line without the human's answer. A subject with no
+adopted change, or whose change has no `proposal.md`, is refused the same
+way, naming what is missing. A brief that says the human ships changes who
+runs the transition, not the check.
+
 ### The review guard (`spec_coverage.require_review`, opt-in)
 
 When `.canon/policy.yaml` sets `spec_coverage.require_review` (see
@@ -172,9 +190,11 @@ canon subject status demo-subject verifying \
   --override-reason "reviewer out until Monday" --actor-id lead
 ```
 
-`--override-reason "<one line>"` waives ONLY `unreviewed-promotion` and
-`open-blocker` — never a ship-gate verdict or case gap, never unreadable
-routing. It prints the `waived ...` lines and `override recorded by
+`--override-reason "<one line>"` waives ONLY `unreviewed-promotion` (the
+review gaps and the brief check) and `open-blocker` — never a ship-gate
+verdict or case gap, never unreadable routing. A waived brief is recorded
+as `{ class: unreviewed-promotion, subject: <subject id> }`. It prints
+the `waived ...` lines and `override recorded by
 `lead` for the N violation(s) above: <reason>`, and records on the new
 Subject record exactly the violations it let through:
 
@@ -192,7 +212,8 @@ subject's next status write, so it never outlives the status it was
 granted for. While it stands, `canon gate check` lists the recorded gaps
 as advisories instead of failing; a gap it did not record (a blocker
 raised later, a scenario tagged later) still fails the gate. Without
-`require_review`, nothing is printed and nothing changes.
+`require_review`, nothing is printed and nothing changes, except that
+`shipped` still runs the brief check above.
 
 ## Adopt flow
 
@@ -339,8 +360,9 @@ uses, so status and the gate cannot disagree about a gap:
   `Approved:` line in (or `canon change new` when the subject has no
   change) and
   `canon policy approve --by <the human> --note "<their words>"`. Until
-  the line exists the subject is not suggested to move on. Once it does,
-  a ship-ready verifying subject gets the agent's own
+  the line exists the subject is not suggested to move on, and
+  `canon subject status <id> shipped` refuses on the same check. Once it
+  does, a ship-ready verifying subject gets the agent's own
   `canon subject status <id> shipped`; status never asks a human to ship.
 
 Status fails closed rather than suggest progress the gate would refuse:

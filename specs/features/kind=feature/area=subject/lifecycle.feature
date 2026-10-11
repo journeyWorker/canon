@@ -225,3 +225,37 @@ Feature: subject lifecycle
     Then the subject record, which the gate reads adopted changes from, is written first
     And the command exits 2 naming the subject that now lists the change and the exact command that completes the link
     And running that command completes the link, and running it again writes nothing
+
+  # canon: {"schema":1,"at":"2026-10-11T17:15:04Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.24
+  Scenario: Shipping is refused while the brief has no Approved line, even with every technical gate passing
+    Given a verifying subject whose every scenario is evidenced and reviewed, with no blocker or case gap
+    And its newest adopted change's proposal.md carries no Approved line
+    When the subject is moved to shipped
+    Then the command exits 1 with an unreviewed-promotion naming the subject and that proposal.md
+    And the refusal says a human must answer the brief and the agent records the Approved line only from that answer
+    And the subject stays verifying, and status reports the same brief as not approved
+    And once the line is recorded the same move ships the subject
+
+  # canon: {"schema":1,"at":"2026-10-11T17:15:05Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.25
+  Scenario: An Approved line inside an HTML comment or a code fence does not let the subject ship
+    Given a verifying subject that passes every technical gate
+    And its proposal.md carries an Approved line only inside an HTML comment or a fenced code block
+    When the subject is moved to shipped
+    Then the command exits 1 naming the proposal.md as having no Approved line
+    And status reports the brief as not approved, so status and the guard agree
+
+  # canon: {"schema":1,"at":"2026-10-11T17:15:05Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.26
+  Scenario: An override ships a subject with an unapproved brief and records the waiver
+    Given a verifying subject that passes every technical gate but whose brief has no Approved line
+    When the subject is moved to shipped with an override reason
+    Then the subject ships and the command names the waived brief check
+    And the subject record carries the reason, the actor and the waived unreviewed-promotion naming the subject
