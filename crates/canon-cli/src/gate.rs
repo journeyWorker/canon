@@ -124,13 +124,14 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     // every check this run engages reads `gate_context.now`, never its
     // own wall-clock read.
     let now = Utc::now();
-    let gate_context = match GateContext::load(ctx, &registry, now) {
+    let mut gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
             eprintln!("canon gate check: {e}");
             return 2;
         }
     };
+    crate::inventory::resolve_legacy_pins(&mut gate_context);
 
     let checks = canon_gate::check_set(release);
     let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).collect());
@@ -147,8 +148,8 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     if let Some(advisories) = canon_gate::review_advisories(&gate_context) {
         print!("{}", format_review_advisories(&advisories));
     }
-    if let Some(count) = canon_gate::review_gate::unpinned_review_advisory(&gate_context) {
-        print!("\nadvisory: {}\n", canon_gate::review_gate::unpinned_review_note(count));
+    if let Some(counts) = canon_gate::review_gate::legacy_review_advisory(&gate_context) {
+        print!("\nadvisory: {}\n", counts.note());
     }
     print!("{}", format_unstored_attachments(&canon_gate::unstored_attachments(&gate_context)));
     report.exit_code()

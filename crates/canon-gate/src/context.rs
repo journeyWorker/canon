@@ -31,6 +31,7 @@ use canon_store::git_tier::GitTier;
 use canon_store::tier::{StoreError, Tier, TierQuery};
 use chrono::{DateTime, Utc};
 
+use crate::legacy_pins::LegacyPins;
 use crate::policy::PolicyResolution;
 use crate::Violation;
 
@@ -183,6 +184,13 @@ pub struct GateContext {
     /// unfolded, with read problems in `corpus_violations`.
     pub reviews: Vec<Review>,
     pub findings: Vec<Finding>,
+    /// What each in-effect legacy review's pinned commit holds for its
+    /// scenario (0.16 D6, [`crate::legacy_pins`]). [`GateContext::load`]
+    /// leaves it empty: reading git is the caller's step
+    /// ([`crate::legacy_pins::resolve`]), taken by `canon gate check`,
+    /// `canon subject status` and `canon status`. Empty, every legacy
+    /// review is undecidable and counts, as in 0.15.
+    pub legacy_pins: LegacyPins,
     pub violations: Vec<EvidenceViolation>,
     /// Read problems from the corpus kinds above, each tagged with the
     /// kind it was read as, kept OUT of `violations` deliberately.
@@ -260,6 +268,7 @@ impl GateContext {
             subjects,
             reviews,
             findings,
+            legacy_pins: LegacyPins::default(),
             violations,
             corpus_violations,
             unreadable_kinds,

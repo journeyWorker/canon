@@ -109,6 +109,17 @@ producers it reads.
 | `canon divergence defer --project-id <id> --scenario-id <id> --sha <sha> --reviewer <name> --reason <r> --expiry <e> --role <role> [--round <n>] [--repo <dir>]` | Direct-commit a `Deferred { reason, expiry }` candidate — never touches the staging directory. |
 | `canon divergence status [--repo <dir>] [--as-of <date>]` | The current-state divergence burn-down view. `--as-of` governs `Deferred` expiry evaluation; defaults to now. |
 
+A review written before 0.15 carries no pins, only `--pin`, the commit it
+reviewed. `gate check`, `status` and `subject status` read the scenario at
+that commit through `git` and decide the same way: **current** when its
+per-scenario digest there equals today's and no declared evidence is newer
+than the review (it counts); **stale** when the spec changed since the pin
+or the evidence is newer (`unreviewed-promotion`, like a stale pinned review);
+**undecidable** when the commit or the scenario at it is not in this clone
+(it still counts, as in 0.15). One advisory line counts the three and names
+the stale scenarios. In CI, check out full history (`fetch-depth: 0`) for
+the gate job, or every such review is undecidable.
+
 ## Memory
 
 Distilled strategies, role+regime-scoped retrieval, and the dispatch-time

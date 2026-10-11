@@ -34,7 +34,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use canon_fmt::Violation;
-use canon_gate::GateCtx;
+use canon_gate::legacy_pins::SpecSources;
+use canon_gate::{GateContext, GateCtx};
 use canon_model::ids::SpecDigest;
 use canon_model::{paths, Actor, Envelope, ProjectId, RecordKind, Scenario, ScenarioId, SubjectId};
 use canon_store::fold_latest_by_key;
@@ -493,6 +494,36 @@ pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
         }
     }
     scanned
+}
+
+/// Read every legacy review's pinned commit into `ctx` (0.16 D6,
+/// [`canon_gate::legacy_pins`]): `canon gate check`, `canon status` and
+/// `canon subject status` call this right after loading, so the three
+/// decide a legacy review's currency from the same reads. The spec corpus
+/// is scanned for each scenario's current file only when there is a
+/// legacy review to check.
+pub fn resolve_legacy_pins(ctx: &mut GateContext) {
+    let repo = ctx.ctx.repo.clone();
+    ctx.legacy_pins = canon_gate::legacy_pins::resolve(ctx, || spec_sources(&repo));
+}
+
+/// Each scenario's current `.feature` file and each spec root, relative
+/// to `repo`. A root outside the repo has no history to read and is left
+/// out; an unusable `specs:` section leaves everything out, so every
+/// legacy review stays undecidable rather than misjudged.
+fn spec_sources(repo: &Path) -> SpecSources {
+    let mut sources = SpecSources::default();
+    let Ok(roots) = load_spec_roots(&repo.join("canon.yaml")) else { return sources };
+    for root in roots {
+        let Ok(relative) = root.root.strip_prefix(repo) else { continue };
+        sources.roots.insert(root.id.clone(), relative.to_path_buf());
+        for scanned in scan_feature_corpus_detailed(&root.root) {
+            if let Ok(file) = scanned.path.strip_prefix(repo) {
+                sources.files.insert((root.id.clone(), scanned.scenario_id), file.to_path_buf());
+            }
+        }
+    }
+    sources
 }
 
 /// Resolve a scanned scenario's `@subject:` tag(s) into the optional

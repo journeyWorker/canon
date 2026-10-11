@@ -64,7 +64,7 @@
 use std::path::Path;
 
 use canon_gate::review_gate::{
-    active_require_review, malformed_findings, subject_guard, unpinned_review_note, unpinned_reviews, unreadable_review_kinds, unreadable_violation,
+    active_require_review, malformed_findings, subject_guard, unreadable_review_kinds, unreadable_violation, LegacyReviewCounts,
 };
 use canon_gate::spec_coverage::{case_gaps, subject_scenarios};
 use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, PolicyResolution, RequireReview, SpecCoverage, Violation};
@@ -565,7 +565,12 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
     };
     let gate_context = if ships || reviews {
         match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &schemas, Utc::now()).map_err(|e| e.to_string())) {
-            Ok(ctx) => Some(ctx),
+            Ok(mut ctx) => {
+                if reviews {
+                    crate::inventory::resolve_legacy_pins(&mut ctx);
+                }
+                Some(ctx)
+            }
             Err(e) => {
                 eprintln!("canon subject status: {e}");
                 return EXIT_REFUSED;
@@ -594,9 +599,9 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
             }
             let owned: std::collections::BTreeSet<(&ProjectId, &ScenarioId)> =
                 subject_scenarios(ctx, subject_id).into_iter().map(|s| (&s.project_id, &s.scenario_id)).collect();
-            let unpinned = unpinned_reviews(ctx).into_iter().filter(|r| owned.contains(&(&r.project_id, &r.scenario_id))).count();
-            if unpinned > 0 {
-                eprintln!("canon subject status: advisory: {}", unpinned_review_note(unpinned));
+            let legacy = LegacyReviewCounts::of(ctx, |s| owned.contains(&(&s.project_id, &s.scenario_id)));
+            if legacy.total() > 0 {
+                eprintln!("canon subject status: advisory: {}", legacy.note());
             }
         } else {
             blocking.push(unreadable_violation(&unreadable));

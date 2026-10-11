@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m5-impl"
+  },
+  "at": "2026-10-11T16:35:35.230612Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test legacy_pins a_legacy_review_finds_its_scenario_in_the_file_it_lived_in_at_the_pin"
+  },
+  "evidence_note": {
+    "summary": "scenario moved to another file: found in its old file at the pin, current"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 41,
+  "scenario_id": "gate.check.94",
+  "schema": 1,
+  "staging_id": "f9c58a0df1c4",
+  "verdict": "faithful"
+}

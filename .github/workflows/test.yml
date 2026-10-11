@@ -57,7 +57,13 @@ jobs:
     name: cargo test --workspace (offline)
     runs-on: ubuntu-latest
     steps:
+      # Full history: `canon gate check` below reads each review written
+      # before review pinning at the commit it pinned (0.16 D6). In a
+      # shallow clone those commits are missing, so the gate can only count
+      # such reviews as undecidable instead of checking them.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable

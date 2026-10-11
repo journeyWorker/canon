@@ -327,6 +327,7 @@ mod tests {
             subjects,
             reviews: Vec::new(),
             findings: Vec::new(),
+            legacy_pins: Default::default(),
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
