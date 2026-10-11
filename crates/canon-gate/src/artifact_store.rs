@@ -40,6 +40,17 @@
 //!   to its name "does not match its name, so its bytes were altered";
 //!   a missing one means "the bound bytes are gone".
 //!
+//! # Review artifacts (0.16 D5)
+//! `canon review add --artifact` stores what the reviewer looked at
+//! through the same [`store`] and records `{path, sha256}` on the
+//! review. The check covers every IN-EFFECT review (the latest per
+//! `(project_id, scenario_id, reviewer)`,
+//! [`crate::review_gate::in_effect_reviews`]). A review artifact has no
+//! pre-store generation, so only an intact blob is clean: a missing or
+//! altered one is `stale-evidence` on the review's scenario, and the
+//! detail names the reviewer, the review's actor and its time. The
+//! working-tree file is reported but never vouches for it.
+//!
 //! The check is NOT narrowed to `spec_coverage.scope`. A binding is a
 //! claim the record makes about bytes, whatever its subject's lifecycle
 //! status; scope belongs to the coverage policy, and a repo with no
@@ -58,6 +69,7 @@ use sha2::{Digest, Sha256};
 use crate::context::{GateCheck, GateContext};
 use crate::coverage::CellSubject;
 use crate::failure_class::{FailureClass, Violation};
+use crate::review_gate::in_effect_reviews;
 use crate::spec_coverage::latest_by_key;
 
 /// The documented default size limit for one stored file, in MiB.
@@ -366,26 +378,61 @@ impl GateCheck for ArtifactStoreCheck {
                 if blob == Observed::Missing && tree.matches(&attachment.sha256) {
                     continue;
                 }
-                // A blob that exists but no longer hashes to its own
-                // name was altered in place; one that is absent took the
-                // only proof with it (0.14 acceptance rerun G11).
-                let diagnosis = if blob == Observed::Missing { "the bound bytes are gone" } else { "the stored blob does not match its name, so its bytes were altered" };
                 violations.push(Violation::new(
                     FailureClass::StaleEvidence,
                     subject_of(record),
                     format!(
-                        "bound file `{}` recorded sha256 {}; stored blob {}: {}; working tree: {} — {diagnosis}, re-run and re-attest with `canon evidence add`",
+                        "bound file `{}` recorded sha256 {}; stored blob {}: {}; working tree: {} — {}, re-run and re-attest with `canon evidence add`",
                         attachment.path,
                         attachment.sha256,
                         blob_display(&attachment.sha256),
                         blob.as_str(),
-                        tree.as_str()
+                        tree.as_str(),
+                        diagnosis(&blob)
+                    ),
+                ));
+            }
+        }
+        // Review artifacts (0.16 D5) were stored when the review was
+        // written, so there is no working-tree-only generation to fall
+        // back on: the blob is the proof, and a missing one is stale.
+        for review in in_effect_reviews(ctx) {
+            for artifact in &review.artifacts {
+                let blob = stored_blob(repo, &artifact.sha256);
+                if blob.matches(&artifact.sha256) {
+                    continue;
+                }
+                violations.push(Violation::new(
+                    FailureClass::StaleEvidence,
+                    review.scenario_id.as_str().to_string(),
+                    format!(
+                        "review by `{}` (actor `{}`, {}) bound file `{}` recorded sha256 {}; stored blob {}: {}; working tree: {} — {}, look again and re-record the review with `canon review add --artifact <path>`",
+                        review.reviewer,
+                        review.envelope.actor.agent_id,
+                        review.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                        artifact.path,
+                        artifact.sha256,
+                        blob_display(&artifact.sha256),
+                        blob.as_str(),
+                        working_tree(repo, &artifact.path).as_str(),
+                        diagnosis(&blob)
                     ),
                 ));
             }
         }
         violations.sort_by(|a, b| (&a.subject, &a.detail).cmp(&(&b.subject, &b.detail)));
         violations
+    }
+}
+
+/// Why a bound file failed: a blob that exists but no longer hashes to
+/// its own name was altered in place; one that is absent took the only
+/// proof with it (0.14 acceptance rerun G11).
+fn diagnosis(blob: &Observed) -> &'static str {
+    if *blob == Observed::Missing {
+        "the bound bytes are gone"
+    } else {
+        "the stored blob does not match its name, so its bytes were altered"
     }
 }
 

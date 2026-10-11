@@ -376,13 +376,18 @@ fn latest_reviews<'a>(ctx: &'a GateContext, scenario: &Scenario) -> Vec<&'a Revi
     latest_by_key(&reviews, |r| r.reviewer.clone()).into_iter().copied().collect()
 }
 
-/// The in-effect reviews (the latest per `(project_id, scenario_id,
-/// reviewer)`) that carry no pins: written before review pinning (0.15),
-/// they count without the freshness check. `canon gate check`, `canon
-/// subject status` and `canon status` print their count as one advisory
-/// ([`unpinned_review_note`]).
+/// The in-effect reviews: the latest per `(project_id, scenario_id,
+/// reviewer)`, the fold every review rule reads (module doc).
+pub fn in_effect_reviews(ctx: &GateContext) -> Vec<&Review> {
+    latest_by_key(&ctx.reviews, |r| (r.project_id.clone(), r.scenario_id.clone(), r.reviewer.clone()))
+}
+
+/// The [`in_effect_reviews`] that carry no pins: written before review
+/// pinning (0.15), they count without the freshness check. `canon gate
+/// check`, `canon subject status` and `canon status` print their count
+/// as one advisory ([`unpinned_review_note`]).
 pub fn unpinned_reviews(ctx: &GateContext) -> Vec<&Review> {
-    latest_by_key(&ctx.reviews, |r| (r.project_id.clone(), r.scenario_id.clone(), r.reviewer.clone())).into_iter().filter(|r| r.pins.is_none()).collect()
+    in_effect_reviews(ctx).into_iter().filter(|r| r.pins.is_none()).collect()
 }
 
 /// The one advisory line about [`unpinned_reviews`], without a prefix.

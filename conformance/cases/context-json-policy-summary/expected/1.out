@@ -141,6 +141,7 @@
       "schema_version": 1,
       "envelope_fields": {
         "actor": true,
+        "artifacts": false,
         "at": true,
         "kind": true,
         "outcome": false,
@@ -441,6 +442,7 @@
     ],
     "reviewFields": {
       "actor": true,
+      "artifacts": false,
       "at": true,
       "kind": true,
       "outcome": false,
@@ -585,6 +587,7 @@
     "review": {
       "fields": {
         "record.actor": "map",
+        "record.artifacts": "list<map>",
         "record.at": "timestamp",
         "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
         "record.outcome": "string (one of: signed, indeterminate, unavailable)",

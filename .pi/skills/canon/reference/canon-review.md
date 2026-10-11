@@ -48,7 +48,9 @@ The order an agent follows to claim a subject done:
    reviewer could not reach a verdict, record that instead of signing:
    `--outcome indeterminate` (or `unavailable` when it could not run).
    Changing the scenario or re-attesting it afterwards makes the review
-   stale; review it again.
+   stale; review it again. A reviewer of user-visible behavior attaches
+   the screenshots or recordings it looked at with `--artifact <path>`
+   (below).
 
 4. **Move the subject**: `canon subject status <id> verifying`, later
    `shipped`. See `canon-subject`.
@@ -130,7 +132,8 @@ canon review add --project-id <root-id> --scenario-id <id> \
   --reviewer <who> --pin <sha-or-ref> --role <role> \
   (--upstream-ref <ref> | --original-spec-ref <ref>) [--actor-id <id>] [--session-id <id>] \
   [--outcome signed|indeterminate|unavailable] \
-  [--reviewer-provider <p>] [--reviewer-model <m>] [--reviewer-harness <h>]
+  [--reviewer-provider <p>] [--reviewer-model <m>] [--reviewer-harness <h>] \
+  [--artifact <path>]... [--max-artifact-mib <MiB>]
 ```
 
 One attributed Review record for one scenario, joined on
@@ -142,6 +145,40 @@ ship gate still refuses missing or `Divergent` evidence verdicts on its
 own. It is written directly to the ledger, with no staging step, and says
 so: `canon review add: wrote <path> (new) — written directly; nothing to
 promote`.
+
+### What the reviewer looked at (artifacts)
+
+`--artifact <path>` (repeatable) binds a file the reviewer looked at — a
+screenshot, a recording, a trace — exactly as `canon evidence add
+--artifact` binds one: the path must resolve to a file inside the
+repository, a file over 25 MiB is refused unless `--max-artifact-mib <N>`
+raises the limit, and the bytes are copied into
+`.canon/artifacts/sha256/<hex>` (commit it with the ledger) before the
+review is written. Any refusal exits 2 and writes and stores nothing. The
+review records each distinct file once, in the order given:
+
+```json
+"artifacts": [{"path": "reports/title.png", "sha256": "<64 hex>"}]
+```
+
+The field is absent when no `--artifact` is given. `review add` prints
+`canon review add: artifact store holds <n> bound file(s) under
+.canon/artifacts/sha256/ (<k> newly stored) — commit them with the
+ledger`.
+
+`canon gate check` re-hashes the stored blob of every file bound to an
+in-effect review (the latest per `(project_id, scenario_id, reviewer)`).
+A missing or altered blob is `stale-evidence` on the review's scenario,
+naming the review, even when the working-tree file still matches (see
+`canon-gate`, "Bound evidence stays provable"):
+
+```
+stale-evidence world.demo.01 — review by `reviewer-2` (actor `reviewer-2`, 2026-10-11T09:00:00Z) bound file `reports/title.png` recorded sha256 <hex>; stored blob .canon/artifacts/sha256/<hex>: missing; working tree: <hex> — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`
+```
+
+The reviewer's later review replaces the earlier one, so its files are
+the ones checked. Canon binds and re-checks bytes only; it never compares
+images or judges what a screenshot shows.
 
 ### What the review saw (pins)
 
