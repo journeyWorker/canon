@@ -199,3 +199,13 @@ Feature: inventory sync
     When two inventory syncs and two refreshing readers start
     Then none of them writes while the lock is held
     And once it is released exactly one of them writes one record per scenario
+
+  # canon: {"schema":1,"at":"2026-10-11T16:04:57Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:edge
+  @inventory.sync.46
+  Scenario: Artifact ingest names no scenario whose latest record marks it removed
+    Given a titled scenario whose latest index record marks it removed
+    When artifact ingest joins an event keyed to that scenario
+    Then the event carries no scenario title in either record read order
+    And once a later record adds the scenario back the event carries its title again
