@@ -118,6 +118,14 @@ unless the brief says the human ships. The skill, the `AGENTS.md` block
   policy)` and withholds the move-on. With the brief approved and the
   guard passing, the ship step says to ship it yourself unless the brief
   says the human ships.
+- The ship guard checks the brief too, through the same check status
+  uses, so status never says `ship` for a subject the guard refuses.
+  `canon subject status <id> shipped` refuses a subject whose brief has
+  no `Approved:` line as `unreviewed-promotion <subject>`, naming the
+  change's `proposal.md` and saying a human must answer; the agent writes
+  the line only from that answer. `--override-reason` waives it like a
+  review gap and records it in the waiver. A brief that says the human
+  ships changes who runs the move, not the check.
 - `status --json` is `statusVersion: 2`: `next[].actor` (`agent` or
   `human`) and `subjects[].brief` (`approved`, `change`, `proposal`,
   `approval`) are new.
@@ -166,8 +174,9 @@ raise it.
 
 - *#8:* `canon init`'s `.gitignore` ignores `.canon/audit/` (the access
   audit `query`, `export` and `purge` append to), the scenario index
-  `.canon/ledger/kind=scenario/`, and `.canon/scenario-index.lock`.
-  canon's own `.gitignore` ignores the audit directory and the lock.
+  `.canon/ledger/kind=scenario/`, `.canon/scenario-index.lock` and
+  `.canon/artifact-store.lock`. canon's own `.gitignore` ignores the audit
+  directory and both locks.
 - *#9:* the skills install lock records `canon_version` and
   `source_commit` (provenance only; a new commit that leaves the bundle
   unchanged does not rewrite the lock). When the lock's `canon_version`
@@ -192,6 +201,12 @@ refused (exit 2) and no review is written. The skill tells reviewers of
 user-visible behavior to attach screenshots or recordings, and authors to
 bind them to visual scenarios.
 
+Writes to the artifact store hold a repo lock (`.canon/artifact-store.lock`)
+from the "already stored?" check to the last rename, so a rollback never
+removes a blob another writer published or counted as stored. A blob
+already present with the same bytes counts as stored and is never removed
+by a rollback.
+
 **D6: legacy reviews checked against their pin (#12).** A review written
 before 0.15 carries no pins, only `pin`, the commit it reviewed.
 `gate check`, `status` and `subject status` read the scenario at that
@@ -210,10 +225,14 @@ A scenario that lived in another feature file at the pin is found there.
 The advisory now counts current, stale and undecidable, counts a stale
 one as superseded when its scenario already has a qualifying review, names
 only the scenarios still owed a review, and suggests `fetch-depth: 0`.
-canon's own CI gate job checks out full history. On canon itself the gate
-is clean: of 338 legacy reviews, 318 are current, 12 stale and 8
-undecidable, and 7 of the stale ones are superseded by a new pinned review
-from an independent reviewer.
+canon's own CI gate job checks out full history. On canon's checked-in
+ledger, `canon gate check` prints 338 legacy reviews: 318 current, 12
+stale and 8 undecidable, with 7 of the stale ones superseded by a current
+review of the same scenario. The plan's 348 counted every legacy review
+record; canon counts only the latest review per scenario and reviewer on a
+scenario that still exists, which leaves out 8 replaced by the same
+reviewer's later review and 2 of scenarios no feature file declares any
+more (`skills.install.05` and `skills.install.06`).
 
 *Migration:*
 
@@ -229,7 +248,8 @@ from an independent reviewer.
   has no level line and `status` shows the level it matches, or `custom`.
 - Add `write: { promote: auto }` to `canon.yaml` to promote on write;
   without it, staged writes still wait for `canon gate promote`.
-- Add `.canon/audit/` and `.canon/scenario-index.lock` to `.gitignore`
+- Add `.canon/audit/`, `.canon/scenario-index.lock` and
+  `.canon/artifact-store.lock` to `.gitignore`
   (`init` does this only for new repos). New repos also ignore the
   scenario index `.canon/ledger/kind=scenario/`; an existing repo may keep
   it tracked, since every reader rebuilds a stale index.
@@ -239,7 +259,11 @@ from an independent reviewer.
   gate red until a new `canon review add` pins it.
 - Record each subject's brief approval as an `Approved:` line in its
   newest adopted change's `proposal.md`; until then `canon status` lists
-  getting the brief approved as the human step instead of the ship step.
+  getting the brief approved as the human step instead of the ship step,
+  and `canon subject status <id> shipped` refuses. A repo whose
+  `canon.yaml` has `plans: { sources: [] }` reads no brief at all: add the
+  `openspec` source `canon init` writes (`- dialect: openspec`,
+  `root: .`).
 - Scripts that parse `canon status --json` see `statusVersion: 2`, with
   `policy.level`, `subjects[].brief` and `next[].actor`.
 
@@ -279,6 +303,14 @@ prints the version re-blessed for `canon 0.16.0`: the `status-*` cases,
   in `case.yaml`), and `status` counts the review and asks for the brief
   approval. A spec edit after the review is pinned by
   `tests/review_pins.rs`.
+- `subject-ship-refused-missing-verdict`,
+  `subject-ship-refused-no-tagged-scenarios`,
+  `subject-ship-refused-require-cases-gap`, `review-pin-stale-evidence` —
+  the ship refusal also names the unapproved brief (`unreviewed-promotion
+  <subject>`), and when a review gap refuses too, the closing line asks
+  for both.
+- `subject-ship-allowed` — the fixture gains an adopted change whose
+  `proposal.md` carries an `Approved:` line; its output is unchanged.
 
 New cases: `evidence-add-promote-on-write`,
 `evidence-add-refused-malformed-write-config`,
@@ -287,7 +319,8 @@ New cases: `evidence-add-promote-on-write`,
 `init-policy-refused`, `review-add-artifact-stored`,
 `review-add-refused-artifact-outside-repo`, `skills-check-outdated-lock`,
 `skills-doctor-competing-skill`, `status-brief-unapproved`,
-`status-refreshes-stale-index`. Every other case is unchanged.
+`status-refreshes-stale-index`, `subject-ship-refused-unapproved-brief`.
+Every other case is unchanged.
 
 **Closed issues:** #8, #9, #10, #11, #12, #21, #22, #23. **Deferred:**
 #13 (Codex eval), as the maintainer asked.
