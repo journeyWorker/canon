@@ -80,17 +80,20 @@ struct Cli {
 enum Command {
     // ── Getting started ──
     /// Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)
-    #[command(after_help = "Examples:\n  canon init\n  canon init --no-agents-md --no-policy\n  canon init --check-config\n\nRerunning in a repo that has canon.yaml leaves canon.yaml and .canon/policy.yaml\nalone and only refreshes the canon block in AGENTS.md.")]
+    #[command(after_help = "Examples:\n  canon init\n  canon init --policy light\n  canon init --no-agents-md --no-policy\n  canon init --check-config\n\nPolicy levels (--policy, default strict): light requires evidence on every\nscenario; standard adds a `@case:failure` scenario per feature surface; strict\nadds independent review. The level is the first line of .canon/policy.yaml and\n`canon status` shows it.\n\nRerunning in a repo that has canon.yaml leaves canon.yaml and .canon/policy.yaml\nalone and only refreshes the canon block in AGENTS.md.")]
     Init {
         /// Directory to set up (used as-is)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
         /// Validate an existing canon.yaml instead of writing one
-        #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy"])]
+        #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy", "policy"])]
         check_config: bool,
         /// Do not write or refresh the canon block in AGENTS.md
         #[arg(long)]
         no_agents_md: bool,
+        /// Level of the starter .canon/policy.yaml [default: strict]
+        #[arg(long, value_enum, value_name = "LEVEL", conflicts_with = "no_policy")]
+        policy: Option<canon_cli::policy_level::PolicyLevel>,
         /// Do not write the starter .canon/policy.yaml
         #[arg(long)]
         no_policy: bool,
@@ -1315,7 +1318,7 @@ enum SkillsCommand {
         #[arg(long)]
         providers: Option<String>,
     },
-    /// Check canonical projections without writing.
+    /// Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote.
     Check {
         #[arg(long)]
         source: Option<PathBuf>,
@@ -1326,7 +1329,7 @@ enum SkillsCommand {
         #[arg(long)]
         providers: Option<String>,
     },
-    /// Print structured diagnostics for canonical projections and legacy remnants.
+    /// Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, and other skills whose description claims build work; reports only, never edits.
     Doctor {
         #[arg(long)]
         source: Option<PathBuf>,
@@ -1613,8 +1616,9 @@ fn main() -> ExitCode {
         Command::Change { action } => match action {
             ChangeCommand::New { slug, subject, title, repo } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject, &title) as u8),
         },
-        Command::Init { repo, check_config, no_agents_md, no_policy } => {
-            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy: !no_policy })
+        Command::Init { repo, check_config, no_agents_md, policy, no_policy } => {
+            let policy = (!no_policy).then(|| policy.unwrap_or(canon_cli::policy_level::PolicyLevel::Strict));
+            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy })
         }
         Command::Policy { action } => match action {
             PolicyCommand::Approve { by, note, repo } => ExitCode::from(canon_cli::policy_approval::run_approve(&repo, &by, note.as_deref()) as u8),
@@ -1685,8 +1689,9 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
     match canon_cli::skills::check(&source, target, providers) {
         Ok(report) => {
             for status in &report.statuses { println!("{} — {} ({})", status.path.display(), status.state, status.provider.as_str()); }
-            for remnant in &report.remnants { println!("{} — legacy-remnant (codex reads .agents/skills; fix: `{}`)", remnant.display(), canon_cli::skills::legacy_codex_fix(&report.providers)); }
-            if report.manifest_ok && report.remnants.is_empty() && report.statuses.iter().all(|status| status.state == "ok") { ExitCode::SUCCESS } else { ExitCode::from(1) }
+            for remnant in &report.remnants { println!("{} — legacy-remnant (codex reads .agents/skills; fix: `{}`)", remnant.display(), canon_cli::skills::install_command(&report.providers)); }
+            if let Some(outdated) = &report.outdated { println!("{} — outdated ({})", outdated.path.display(), outdated.describe(&report.providers)); }
+            if report.manifest_ok && report.remnants.is_empty() && report.outdated.is_none() && report.statuses.iter().all(|status| status.state == "ok") { ExitCode::SUCCESS } else { ExitCode::from(1) }
         }
         Err(err) => { eprintln!("canon skills check: {err}"); ExitCode::FAILURE }
     }
@@ -1910,7 +1915,7 @@ fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, p
     ExitCode::from(canon_cli::scaffold::run_feature_new(repo, surface, title, project, &actor, at) as u8)
 }
 
-/// `canon init [--repo <dir>] [--no-agents-md] [--no-policy]` / `canon
+/// `canon init [--repo <dir>] [--no-agents-md] [--policy <level> | --no-policy]` / `canon
 /// init --check-config` (s19 P4, `canon_cli::init`'s module doc):
 /// `check_config: false` scaffolds a fresh repo, or on an existing
 /// `canon.yaml` refreshes only the AGENTS.md block (see

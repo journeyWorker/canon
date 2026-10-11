@@ -90,7 +90,7 @@ Load only the reference the current step needs.
 ### Setup and provider projection
 
 ```bash
-canon init                                   # canon.yaml, starter policy, AGENTS.md block, plans home
+canon init                                   # canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, plans home
 canon skills install                         # detects .claude/.agents|.codex/.omp/.pi; if none exists, installs Claude+Codex
 canon skills install --providers=claude,codex,omp,pi
 canon skills check                           # read-only drift check

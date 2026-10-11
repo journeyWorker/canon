@@ -57,6 +57,50 @@ byte-identical no-op. Existing symlinks are never overwritten. `doctor`
 reports stale/missing projections and old `canon-*` remnants in all four
 managed roots and in `.codex/skills` without deleting user data.
 
+The lock also records `canon_version`, the canon that wrote it, and
+`source_commit`, the `HEAD` of the git checkout the source was in (omitted
+when the source is not in one). The commit is provenance only: a new commit
+that leaves the bundle unchanged does not rewrite the lock. When the lock's
+`canon_version` is not this canon's, `check` exits 1 and both `check` and
+`doctor` (as an `outdated:` line) say so:
+
+```
+<lock> — outdated (installed by canon 0.15.0, this canon is 0.16.0 — run `canon skills install --providers=claude,codex`)
+outdated: <lock> installed by an unknown canon version (the lock predates 0.16), this canon is 0.16.0 — run `canon skills install --providers=claude,codex`
+```
+
+A lock written before 0.16 has no `canon_version`, so it is reported as
+installed by an unknown canon version, with the same fix. Installing
+rewrites the lock with this canon's version.
+
+`doctor` also reads the other skills in `.claude/skills`, `.agents/skills`,
+`.omp/skills` and `.pi/skills` (each `<dir>/SKILL.md` other than `canon` and
+`canon-*`) and flags any whose frontmatter `description` claims build work:
+
+```
+competing-skill: <dir> (description claims: build, sites) — if an agent picks `<name>` for build work, canon's loop will not run
+```
+
+A description claims build work when one sentence (text between `.`, `!`,
+`?`, `;` or a line break) holds both a build verb and a build object, matched
+as whole words, case-insensitive:
+
+- verbs: `build`, `implement`, `create`, `make`, `scaffold`, `develop`,
+  `code`, each with its `-s`, `-ing` and past forms (`built`, `made`, …);
+- objects: `site`, `website`, `app`, `application`, `game`, `feature`,
+  `frontend`, `ui`, `page`, `component`, `tool`, `library`, `service`, `api`,
+  `cli`, `server`, `backend`, `project`, `prototype`, `product`, `program`,
+  `script`, singular or plural.
+
+A word is a run of letters and digits, so `web-app` holds `app` and `rebuild`
+holds nothing. "Build websites and apps" claims build work; "Manage feature
+branches" (an object, no verb) and "Build release notes" (a verb, no object)
+do not. The line lists the verbs and objects of the claiming sentences. A
+skill without a readable frontmatter `description` is skipped.
+The line is advisory: it never makes the projections unhealthy, `doctor` still
+exits 0, and canon never edits another skill. User-level skill roots are not
+scanned.
+
 Canon 0.13.0 and earlier projected Codex to a flattened
 `.codex/skills/canon.md` plus `.codex/skills/canon/**`. Install migrates that
 legacy projection: it removes each legacy file the manifest records whose

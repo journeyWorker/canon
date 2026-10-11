@@ -1,8 +1,10 @@
-//! `canon init [--repo <dir>] [--no-agents-md] [--no-policy]` + `canon
-//! init --check-config [--repo <dir>]` (s19 `canon-init-scaffold` spec,
-//! 0.14 D2): scaffolds a fresh, WORKING `canon.yaml` skeleton (design
-//! D8/D9) at `<repo>/canon.yaml`, plus what a repo needs to start the
-//! working loop: a starter `.canon/policy.yaml` a human approves, the
+//! `canon init [--repo <dir>] [--no-agents-md] [--policy <level> |
+//! --no-policy]` + `canon init --check-config [--repo <dir>]` (s19
+//! `canon-init-scaffold` spec, 0.14 D2): scaffolds a fresh, WORKING
+//! `canon.yaml` skeleton (design D8/D9) at `<repo>/canon.yaml`, plus what
+//! a repo needs to start the working loop: a starter `.canon/policy.yaml`
+//! a human approves, at the level `--policy` names
+//! ([`crate::policy_level`], 0.16 D3; `strict` by default), the
 //! `openspec/changes/` home the default plans source points at, and a
 //! canon block in `AGENTS.md` between `<!-- canon:begin -->`/`<!-- canon:end -->`.
 //! It never overwrites an existing `canon.yaml` or `policy.yaml`; a
@@ -36,6 +38,8 @@ use std::path::Path;
 use canon_model::envelope::RecordKind;
 use canon_model::paths;
 use canon_store::policy::{BackendConfig, TierPolicy};
+
+use crate::policy_level::{starter_policy, PolicyLevel};
 
 /// Kinds routed to `hot` by [`skeleton_yaml`] (s32 `sqlite-hot-backend`):
 /// the same hot-class set the tiered-storage docs/this repo's own
@@ -148,34 +152,6 @@ fn scaffold_gitignore(repo: &Path) -> std::io::Result<()> {
 /// would fall back to treating the repo root itself as the changes dir
 /// and report every top-level directory as a malformed change.
 pub(crate) const CHANGES_DIR: &str = "openspec/changes";
-
-/// The starter `.canon/policy.yaml` (0.14 D2). It turns `spec_coverage`
-/// on so the gate reports unevidenced scenarios, golden-path-only
-/// surfaces and unreviewed work from the first scenario on, instead of
-/// passing on zero evidence. It parses with zero diagnostics through
-/// `canon_gate::PolicyResolution::resolve` (pinned by a unit test
-/// below).
-const STARTER_POLICY_YAML: &str = "\
-# .canon/policy.yaml -- scaffolded by `canon init`.
-#
-# This file is what `canon gate check` grades the work against. A human
-# should review and approve it, and every later change to it, with
-# `canon policy approve --by <who>`: the agent doing the work should not
-# write the rules it is graded by.
-spec_coverage:
-  # Every scenario in the spec corpus needs evidence (`canon evidence
-  # add`). Add `scope: [building, verifying]` to check only scenarios
-  # whose subject is in one of those statuses.
-  require_evidence: true
-  # Every feature surface (`<area>.<surface>`) needs at least one
-  # `@case:failure` scenario, so no feature is specified by its golden
-  # path alone.
-  require_cases: [failure]
-  # Every scenario of a subject in `verifying` or `shipped` needs a
-  # review (`canon review add`) by an actor other than its evidence
-  # author, and an open blocker finding on an adopted change blocks.
-  require_review: {}
-";
 
 /// Opening marker of the canon block `init` owns in `AGENTS.md`.
 pub(crate) const AGENTS_BEGIN: &str = "<!-- canon:begin -->";
@@ -294,8 +270,9 @@ fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
 pub struct InitOptions {
     /// Write or refresh the canon block in `AGENTS.md`.
     pub agents_md: bool,
-    /// Write the starter `.canon/policy.yaml`.
-    pub policy: bool,
+    /// The level of the starter `.canon/policy.yaml` to write; `None`
+    /// writes none.
+    pub policy: Option<PolicyLevel>,
 }
 
 /// Write `merged` to `AGENTS.md` unless it already holds exactly those
@@ -311,14 +288,17 @@ fn write_agents_md(path: &Path, existing: Option<&str>, merged: &str) -> std::io
     Ok(())
 }
 
-/// Write the starter policy unless `.canon/policy.yaml` exists, which
-/// is left byte-for-byte alone.
-fn scaffold_policy(repo: &Path) -> std::io::Result<()> {
+/// Write the starter policy at `level` (0.14 D2, 0.16 D3) unless
+/// `.canon/policy.yaml` exists, which is left byte-for-byte alone. Every
+/// level parses with zero diagnostics through
+/// `canon_gate::PolicyResolution::resolve` (pinned by
+/// [`crate::policy_level`]'s tests).
+fn scaffold_policy(repo: &Path, level: PolicyLevel) -> std::io::Result<()> {
     let path = repo.join(paths::POLICY_FILE);
     fs::create_dir_all(repo.join(paths::CANON_DIR))?;
     match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
         Ok(mut file) => {
-            file.write_all(STARTER_POLICY_YAML.as_bytes())?;
+            file.write_all(starter_policy(level).as_bytes())?;
             println!(
                 "canon init: wrote {} — a human reviews it and approves it with `canon policy approve --by <who>`: the gate grades the work against it, and `canon status` and `canon gate check` say so until it is approved",
                 path.display()
@@ -343,12 +323,14 @@ fn scaffold_changes_dir(repo: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// `canon init [--repo <dir>] [--no-agents-md] [--no-policy]` (task 4.1,
-/// 0.14 D2). Returns the process exit code.
+/// `canon init [--repo <dir>] [--no-agents-md] [--policy <level> |
+/// --no-policy]` (task 4.1, 0.14 D2, 0.16 D3). Returns the process exit
+/// code.
 ///
 /// - A fresh repo gets `canon.yaml`, the `.gitignore` line, the
-///   `openspec/changes/` plans home, the starter policy (unless
-///   `--no-policy`) and the `AGENTS.md` block (unless `--no-agents-md`):
+///   `openspec/changes/` plans home, the starter policy at the requested
+///   level (unless `--no-policy`) and the `AGENTS.md` block (unless
+///   `--no-agents-md`):
 ///   exit `0`.
 /// - A repo whose `canon.yaml` exists keeps it byte-identical
 ///   (`create_new` is the atomic refusal) and only refreshes the
@@ -417,8 +399,8 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
         eprintln!("canon init: failed to create `{}`: {e}", repo.join(CHANGES_DIR).display());
         return 2;
     }
-    if options.policy {
-        if let Err(e) = scaffold_policy(repo) {
+    if let Some(level) = options.policy {
+        if let Err(e) = scaffold_policy(repo, level) {
             eprintln!("canon init: failed to write `{}`: {e}", repo.join(paths::POLICY_FILE).display());
             return 2;
         }
@@ -581,11 +563,39 @@ mod tests {
         assert_eq!(text.matches(GITIGNORE_LINE).count(), 1, "the line must never be duplicated across repeated scaffolds: {text}");
     }
 
+    /// The default (`strict`) starter is 0.15's starter byte for byte,
+    /// under one added level line.
+    #[test]
+    fn strict_starter_policy_is_the_pre_level_starter_under_one_level_line() {
+        const PRE_LEVEL_STARTER: &str = "\
+# .canon/policy.yaml -- scaffolded by `canon init`.
+#
+# This file is what `canon gate check` grades the work against. A human
+# should review and approve it, and every later change to it, with
+# `canon policy approve --by <who>`: the agent doing the work should not
+# write the rules it is graded by.
+spec_coverage:
+  # Every scenario in the spec corpus needs evidence (`canon evidence
+  # add`). Add `scope: [building, verifying]` to check only scenarios
+  # whose subject is in one of those statuses.
+  require_evidence: true
+  # Every feature surface (`<area>.<surface>`) needs at least one
+  # `@case:failure` scenario, so no feature is specified by its golden
+  # path alone.
+  require_cases: [failure]
+  # Every scenario of a subject in `verifying` or `shipped` needs a
+  # review (`canon review add`) by an actor other than its evidence
+  # author, and an open blocker finding on an adopted change blocks.
+  require_review: {}
+";
+        assert_eq!(starter_policy(PolicyLevel::Strict), format!("# canon policy level: strict\n{PRE_LEVEL_STARTER}"));
+    }
+
     #[test]
     fn starter_policy_resolves_with_zero_diagnostics_and_turns_spec_coverage_on() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
-        std::fs::write(dir.path().join(paths::POLICY_FILE), STARTER_POLICY_YAML).unwrap();
+        std::fs::write(dir.path().join(paths::POLICY_FILE), starter_policy(PolicyLevel::Strict)).unwrap();
         let policy = canon_gate::PolicyResolution::resolve(dir.path(), &canon_policy::SchemaRegistry::load());
         assert!(policy.diagnostics.is_empty(), "the starter policy must load clean, unknown-key check included: {:?}", policy.diagnostics);
         match policy.spec_coverage {

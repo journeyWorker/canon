@@ -561,3 +561,159 @@ fn skills_install_11_projected_skill_claims_build_work_and_opens_with_the_loop()
         .collect();
     assert_eq!(block_steps, LOOP_STEPS, "the AGENTS.md block's loop steps");
 }
+
+const LOCK: &str = ".canon/skills/.install-lock.json";
+
+fn git(dir: &Path, args: &[&str]) -> String {
+    let output = Command::new("git").args(["-c", "user.name=t", "-c", "user.email=t@example.com"]).args(args).current_dir(dir).output().unwrap();
+    assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
+}
+
+fn read_lock(target: &Path) -> serde_json::Value {
+    serde_json::from_str(&fs::read_to_string(target.join(LOCK)).unwrap()).unwrap()
+}
+
+/// Rewrite the lock's `canon_version` (`None` removes the key, as a lock
+/// written before 0.16 has none).
+fn set_lock_version(target: &Path, version: Option<&str>) {
+    let mut lock = read_lock(target);
+    let map = lock.as_object_mut().unwrap();
+    match version {
+        Some(version) => map.insert("canon_version".into(), version.into()),
+        None => map.remove("canon_version"),
+    };
+    fs::write(target.join(LOCK), serde_json::to_string_pretty(&lock).unwrap()).unwrap();
+}
+
+fn canon(args: &[&str], source: &Path, target: &Path) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--source").arg(source).arg("--target").arg(target).output().unwrap()
+}
+
+/// skills.install.40
+#[test]
+fn skills_install_40_the_lock_records_the_canon_version_and_the_source_commit() {
+    let tmp = tempfile::tempdir().unwrap();
+    let checkout = tmp.path().join("checkout");
+    let source = checkout.join("canon/skills");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    git(&checkout, &["init", "-q"]);
+    git(&checkout, &["add", "."]);
+    git(&checkout, &["commit", "-q", "-m", "skills"]);
+    let head = git(&checkout, &["rev-parse", "HEAD"]);
+
+    assert!(skills::install_canonical(&source, &target, Some("claude")).unwrap().changed);
+    let lock = read_lock(&target);
+    assert_eq!(lock["canon_version"], env!("CARGO_PKG_VERSION"), "{lock}");
+    assert_eq!(lock["source_commit"], head.as_str(), "{lock}");
+    let bytes = fs::read(target.join(LOCK)).unwrap();
+
+    fs::write(checkout.join("unrelated.txt"), "x\n").unwrap();
+    git(&checkout, &["add", "."]);
+    git(&checkout, &["commit", "-q", "-m", "unrelated"]);
+    assert!(!skills::install_canonical(&source, &target, Some("claude")).unwrap().changed, "a commit that leaves the bundle as it was changes nothing");
+    assert_eq!(fs::read(target.join(LOCK)).unwrap(), bytes, "the lock stays byte-identical");
+    let check = skills::check(&source, &target, Some("claude")).unwrap();
+    assert!(check.manifest_ok && check.outdated.is_none(), "{check:?}");
+
+    let plain = tmp.path().join("plain");
+    let plain_target = tmp.path().join("plain-target");
+    write_canonical_source(&plain);
+    skills::install_canonical(&plain, &plain_target, Some("claude")).unwrap();
+    let lock = read_lock(&plain_target);
+    assert_eq!(lock["canon_version"], env!("CARGO_PKG_VERSION"), "{lock}");
+    assert!(lock.get("source_commit").is_none(), "a source outside any git checkout records no commit: {lock}");
+}
+
+/// skills.install.41
+#[test]
+fn skills_install_41_a_lock_another_canon_wrote_is_reported_with_the_install_fix() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    skills::install_canonical(&source, &target, Some("claude,codex")).unwrap();
+    set_lock_version(&target, Some("0.13.1"));
+    let expected = format!(
+        "installed by canon 0.13.1, this canon is {} — run `canon skills install --providers=claude,codex`",
+        env!("CARGO_PKG_VERSION")
+    );
+
+    let check = canon(&["skills", "check", "--providers", "claude,codex"], &source, &target);
+    let out = String::from_utf8_lossy(&check.stdout);
+    assert_eq!(check.status.code(), Some(1), "{out}");
+    assert!(out.contains(&format!("{LOCK} — outdated ({expected})")), "{out}");
+    assert!(!out.contains("— stale") && !out.contains("— missing"), "only the lock's version differs: {out}");
+
+    let doctor = canon(&["skills", "doctor", "--providers", "claude,codex"], &source, &target);
+    let out = String::from_utf8_lossy(&doctor.stdout);
+    assert_eq!(doctor.status.code(), Some(0), "{out}");
+    assert!(out.lines().any(|line| line.starts_with("outdated: ") && line.ends_with(&expected)), "{out}");
+    assert!(!out.contains("status: healthy"), "{out}");
+
+    assert!(skills::install_canonical(&source, &target, Some("claude,codex")).unwrap().changed, "the install rewrites an outdated lock");
+    assert_eq!(read_lock(&target)["canon_version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(canon(&["skills", "check", "--providers", "claude,codex"], &source, &target).status.code(), Some(0));
+    let doctor = canon(&["skills", "doctor", "--providers", "claude,codex"], &source, &target);
+    assert_eq!(String::from_utf8_lossy(&doctor.stdout), "providers: claude,codex\nstatus: healthy\n");
+}
+
+/// skills.install.42
+#[test]
+fn skills_install_42_a_lock_from_before_0_16_is_reported_as_an_unknown_version() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    skills::install_canonical(&source, &target, Some("claude")).unwrap();
+    set_lock_version(&target, None);
+    let expected = format!(
+        "installed by an unknown canon version (the lock predates 0.16), this canon is {} — run `canon skills install --providers=claude`",
+        env!("CARGO_PKG_VERSION")
+    );
+
+    let report = skills::check(&source, &target, Some("claude")).unwrap();
+    assert!(report.manifest_ok, "the projection itself is current");
+    assert_eq!(report.outdated.as_ref().map(|o| o.installed_by.clone()), Some(None));
+    let check = canon(&["skills", "check", "--providers", "claude"], &source, &target);
+    let out = String::from_utf8_lossy(&check.stdout);
+    assert_eq!(check.status.code(), Some(1), "{out}");
+    assert!(out.contains(&expected), "{out}");
+    let doctor = skills::doctor(&source, &target, Some("claude")).unwrap();
+    assert!(doctor.iter().any(|line| line.starts_with("outdated: ") && line.ends_with(&expected)), "{doctor:?}");
+
+    skills::install_canonical(&source, &target, Some("claude")).unwrap();
+    assert_eq!(canon(&["skills", "check", "--providers", "claude"], &source, &target).status.code(), Some(0));
+}
+
+/// skills.install.43
+#[test]
+fn skills_install_43_doctor_warns_about_skills_claiming_build_work_and_never_edits_them() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    skills::install_canonical(&source, &target, Some("claude,codex")).unwrap();
+    let sites = target.join(".claude/skills/sites/SKILL.md");
+    let notes = target.join(".agents/skills/notes/SKILL.md");
+    let sites_text = "---\nname: site-builder\ndescription: Build sites, web apps and games from a prompt\n---\n# Sites\n";
+    let notes_text = "---\nname: notes\ndescription: Manage feature branches and take meeting notes\n---\n# Notes\n";
+    for (path, text) in [(&sites, sites_text), (&notes, notes_text)] {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+
+    let doctor = canon(&["skills", "doctor", "--providers", "claude,codex"], &source, &target);
+    let out = String::from_utf8_lossy(&doctor.stdout);
+    assert_eq!(doctor.status.code(), Some(0), "advisory only: {out}");
+    assert_eq!(
+        out,
+        format!(
+            "providers: claude,codex\nstatus: healthy\ncompeting-skill: {} (description claims: build, sites, apps, games) — if an agent picks `site-builder` for build work, canon's loop will not run\n",
+            target.join(".claude/skills/sites").display()
+        )
+    );
+    assert_eq!(fs::read_to_string(&sites).unwrap(), sites_text);
+    assert_eq!(fs::read_to_string(&notes).unwrap(), notes_text);
+}

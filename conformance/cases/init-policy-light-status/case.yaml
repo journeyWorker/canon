@@ -1,0 +1,6 @@
+description: "`canon init --policy light` writes the light starter policy (exit 0), and `canon status` names its level and how to raise it (exit 0)"
+steps:
+  - args: [init, --policy, light]
+    exit: 0
+  - args: [status]
+    exit: 0

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m3-impl"
+  },
+  "at": "2026-10-11T14:58:46.198186Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init authoring_init_30 && cargo test -p canon-cli --lib init::tests::strict_starter_policy_is_the_pre_level_starter_under_one_level_line"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 13,
+  "scenario_id": "authoring.init.30",
+  "schema": 1,
+  "staging_id": "ed97249660a3",
+  "verdict": "faithful"
+}

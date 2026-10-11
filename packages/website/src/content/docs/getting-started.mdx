@@ -74,9 +74,14 @@ is attributed, and is fresh — never on a self-report. See
    - **`.canon/policy.yaml`**, a starter policy that turns `spec_coverage`
      on: every scenario needs evidence, every feature surface needs a
      `@case:failure` scenario, and work on a subject claimed done needs an
-     independent review. The gate grades the work against it, so a human
-     reviews it and approves it with `canon policy approve --by <who>`;
-     until then `canon gate check` and `canon status` print an advisory.
+     independent review. That is the default `strict` level;
+     `--policy standard` leaves out the review and `--policy light` also
+     the failure case, keeping them as commented lines to uncomment when
+     you raise the level. The first line, `# canon policy level: <level>`,
+     names it, and `canon status` shows it. The gate grades the work
+     against the policy, so a human reviews it and approves it with
+     `canon policy approve --by <who>`; until then `canon gate check` and
+     `canon status` print an advisory.
    - **A canon block in `AGENTS.md`**, between `<!-- canon:begin -->` and
      `<!-- canon:end -->`. It tells any agent that features are managed
      with canon, lists the working loop, and points to `canon status` and
@@ -173,7 +178,15 @@ bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon re
 
 `skills check` and `skills doctor` are read-only: `check` reports missing or
 stale projections, while `doctor` reports provider, drift, and legacy-remnant
-diagnostics across all four managed roots without deleting user files.
+diagnostics across all four managed roots without deleting user files. The
+install lock records the canon version that wrote it, so after you upgrade
+canon both say "installed by canon X, this canon is Y — run
+`canon skills install`" (or "an unknown canon version" for a lock from
+before 0.16) until you reinstall. `doctor` also names other skills in the
+same provider roots whose description claims build work, meaning one
+sentence pairs a build verb (build, create, implement, …) with a build object
+(site, app, game, feature, tool, service, …): if an agent picks one of those
+for build work, canon's loop will not run. It only reports them.
 
 Upgrading from canon 0.13.0 or earlier? Those releases wrote Codex's skill to
 `.codex/skills/canon.md`, which Codex never reads. Re-run `skills install`: it

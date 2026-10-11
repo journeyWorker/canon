@@ -239,7 +239,7 @@ fn status_counts_each_subject_through_the_gates_joins() {
     // The header: the version, then the effective coverage, case and review
     // settings, then the warning that both seeded reviews predate pinning.
     let header = format!(
-        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=true scope=<every scenario>\n  require_cases: failure\n  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n{UNAPPROVED}\nwarning: 2 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw\n\n",
+        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=true scope=<every scenario>\n  require_cases: failure\n  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n  level: strict\n{UNAPPROVED}\nwarning: 2 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw\n\n",
         env!("CARGO_PKG_VERSION")
     );
     assert!(text.starts_with(&header), "expected the header\n{header}\ngot\n{text}");
@@ -297,7 +297,7 @@ fn status_header_prints_the_effective_settings() {
     write_policy(dir.path(), "spec_coverage:\n  require_evidence: false\n  scope: [building]\n  exclude_lanes: [process]\n");
     let text = stdout(&run(dir.path(), &["status"]));
     let header = format!(
-        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=false scope=building exclude_lanes=process\n  require_cases: <none>\n  require_review: <absent>\n{UNAPPROVED}\n",
+        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=false scope=building exclude_lanes=process\n  require_cases: <none>\n  require_review: <absent>\n  level: custom\n{UNAPPROVED}\n",
         env!("CARGO_PKG_VERSION")
     );
     assert!(text.starts_with(&header), "expected the header\n{header}\ngot\n{text}");
@@ -584,4 +584,35 @@ fn status_with_no_feature_scenarios_points_at_writing_them() {
     for command in &commands {
         assert_suggestion_parses_and_names_the_unit(command);
     }
+}
+
+/// context.status.80: the policy level is the level line's level when it
+/// names a known one, else the level `spec_coverage` matches exactly,
+/// else `custom`; `null` without a policy.
+#[test]
+fn context_status_80_status_names_the_policy_level_from_its_line_else_its_sections_else_custom() {
+    let light = "spec_coverage:\n  require_evidence: true\n";
+    let standard = "spec_coverage:\n  require_evidence: true\n  require_cases: [failure]\n";
+    for (policy, level) in [
+        (format!("# canon policy level: light\n{FULL_POLICY}"), "light"),
+        (format!("# a note\n#\n# canon policy level: standard\n{light}"), "standard"),
+        (format!("# canon policy level: extreme\n{FULL_POLICY}"), "strict"),
+        (FULL_POLICY.to_string(), "strict"),
+        (standard.to_string(), "standard"),
+        (light.to_string(), "light"),
+        (format!("{light}  scope: [building]\n"), "custom"),
+        (format!("{FULL_POLICY}  require_audit: {{rate: 0.5}}\n"), "custom"),
+        (format!("{standard}  require_review: {{distinct_actor: false}}\n"), "custom"),
+        ("spec_coverage:\n  require_evidence: false\n".to_string(), "custom"),
+        (format!("{light}# canon policy level: strict\n"), "light"),
+    ] {
+        let dir = repo();
+        write_policy(dir.path(), &policy);
+        assert_eq!(status_json(dir.path())["policy"]["level"], level, "{policy}");
+        let human = stdout(&run(dir.path(), &["status"]));
+        assert!(human.contains(&format!("\n  level: {level}")), "{policy}\n{human}");
+    }
+    let dir = repo();
+    assert_eq!(status_json(dir.path())["policy"]["level"], Value::Null);
+    assert!(!stdout(&run(dir.path(), &["status"])).contains("level:"));
 }

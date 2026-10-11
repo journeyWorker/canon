@@ -1,0 +1,12 @@
+description: "`canon skills check` on a current projection whose install lock canon 0.13.1 wrote reports the lock as installed by another canon with the install command (exit 1), `canon skills doctor` reports it as an `outdated:` line (exit 0), and after `canon skills install` rewrites the lock both are clean"
+steps:
+  - args: [skills, check, --providers, claude]
+    exit: 1
+  - args: [skills, doctor, --providers, claude]
+    exit: 0
+  - args: [skills, install, --providers, claude]
+    exit: 0
+  - args: [skills, check, --providers, claude]
+    exit: 0
+  - args: [skills, doctor, --providers, claude]
+    exit: 0

@@ -124,3 +124,57 @@ Feature: authoring init
     When canon init writes the starter policy
     Then its output says a human approves the policy with `canon policy approve --by <who>`
     And the AGENTS.md block names the same command
+
+  # canon: {"schema":1,"at":"2026-10-11T14:43:35Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @authoring.init.30
+  Scenario: Default init writes the strict starter policy under a level line
+    Given an empty repository
+    When canon init runs without a policy level
+    Then .canon/policy.yaml opens with the line "# canon policy level: strict"
+    And every byte after that line is the starter policy canon 0.15 wrote: evidence, a failure case per surface and independent review
+    And canon status reports the level as strict
+
+  # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @authoring.init.31
+  Scenario: A light starter policy requires evidence only and says how to raise it
+    Given an empty repository
+    When canon init runs with the light policy level
+    Then .canon/policy.yaml opens with the light level line and requires evidence on every scenario
+    And the failure-case and review requirements are present only as commented lines that say how to raise the level and that a human approves the edit
+    And the gate does not ask a golden-path-only surface for a failure case
+    And canon status reports the level as light with how to raise it
+
+  # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @authoring.init.32
+  Scenario: A standard starter policy adds a failure case per surface and says how to reach strict
+    Given an empty repository
+    When canon init runs with the standard policy level
+    Then .canon/policy.yaml opens with the standard level line and requires evidence and a failure case per feature surface
+    And the review requirement is present only as commented lines that say how to raise the level to strict
+    And canon status reports the level as standard with how to reach strict
+
+  # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.init.33
+  Scenario: An unknown policy level is refused and nothing is written
+    Given an empty repository
+    When canon init runs with a policy level that is not light, standard or strict
+    Then it exits 2 naming the accepted levels
+    And it writes no canon.yaml and no .canon directory
+
+  # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.init.34
+  Scenario: A policy level together with no-policy is refused
+    Given an empty repository
+    When canon init runs with a policy level and the no-policy flag together
+    Then it exits 2 saying the two cannot be used together
+    And it writes no canon.yaml and no .canon directory

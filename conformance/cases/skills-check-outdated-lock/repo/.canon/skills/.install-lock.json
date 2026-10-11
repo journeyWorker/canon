@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "canon_version": "0.13.1",
+  "source_hash": "sha256:07fd41e8048775e4b7a3f97ddc1799794e7e07a40d7f6cde130a5c0c17e01c90",
+  "providers": [
+    "claude"
+  ],
+  "files": {
+    ".claude/skills/canon/SKILL.md": "sha256:f45cf8335c826e555435a298302925044d8bb5104b5c7e5f5aa0ef49b7f9d502"
+  }
+}

@@ -24,6 +24,7 @@ pub mod learn;
 pub mod plans;
 pub mod plugin_sync;
 pub mod policy_approval;
+pub mod policy_level;
 pub mod query;
 pub mod retention;
 pub mod report;

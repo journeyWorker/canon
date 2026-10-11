@@ -67,7 +67,7 @@ pub fn run_demo_init(repo: &Path) -> i32 {
     // `.gitignore`. Refuses (non-zero) if a `canon.yaml` already exists:
     // with no AGENTS.md block to refresh, a rerun has nothing to do. The
     // demo writes its own policy below, so init's starter policy is off.
-    let code = crate::init::run_init(repo, crate::init::InitOptions { agents_md: false, policy: false });
+    let code = crate::init::run_init(repo, crate::init::InitOptions { agents_md: false, policy: None });
     if code != 0 {
         return code;
     }
