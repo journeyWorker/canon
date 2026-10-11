@@ -53,7 +53,7 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use canon_gate::policy::subject_status_name;
-use canon_gate::review_gate::{open_blockers, review_gap, unpinned_review_advisory, unpinned_review_note, ReviewGapKind};
+use canon_gate::review_gate::{legacy_review_advisory, open_blockers, review_gap, ReviewGapKind};
 use canon_gate::spec_coverage::{case_gaps, latest_scenarios, latest_subjects, subject_scenarios};
 use canon_gate::review_gate::active_require_review;
 use canon_gate::audit;
@@ -300,7 +300,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
     }
 
     let loaded = GateCtx::from_repo(repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &registry, Utc::now()).map_err(|e| e.to_string()));
-    let ctx = match loaded {
+    let mut ctx = match loaded {
         Ok(ctx) => ctx,
         Err(e) => {
             // The ledger cannot be read, so nothing below can be counted.
@@ -313,6 +313,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
         }
     };
 
+    crate::inventory::resolve_legacy_pins(&mut ctx);
     warnings.extend(policy_warning(&ctx.policy));
     warnings.extend(crate::policy_approval::advisory(repo));
     let routed_away: Vec<&str> = ctx
@@ -328,8 +329,8 @@ pub fn resolve(repo: &Path) -> StatusReport {
     if unreadable > 0 {
         warnings.push(format!("{unreadable} ledger record(s) could not be read and are not counted; `canon gate check` names them"));
     }
-    if let Some(count) = unpinned_review_advisory(&ctx) {
-        warnings.push(unpinned_review_note(count));
+    if let Some(counts) = legacy_review_advisory(&ctx) {
+        warnings.push(counts.note());
     }
 
     let joins = Joins { verdicts: latest_verdicts(&ctx), blockers: open_blockers(&ctx) };

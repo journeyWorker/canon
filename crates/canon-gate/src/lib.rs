@@ -54,6 +54,7 @@ pub mod evidence_binding;
 pub mod failure_class;
 pub mod hooks;
 pub mod ledger;
+pub mod legacy_pins;
 pub mod markers;
 pub mod policy;
 pub mod policy_keys;

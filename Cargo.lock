@@ -550,6 +550,7 @@ dependencies = [
 name = "canon-gate"
 version = "0.15.0"
 dependencies = [
+ "canon-fmt",
  "canon-model",
  "canon-policy",
  "canon-store",

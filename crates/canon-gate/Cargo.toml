@@ -13,6 +13,7 @@ path = "src/lib.rs"
 canon-model = { workspace = true }
 canon-store = { workspace = true }
 canon-policy = { workspace = true }
+canon-fmt = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

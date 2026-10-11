@@ -282,20 +282,42 @@ The scenario is reviewed when at least one of those latest reviews:
 1. is `signed`;
 2. still matches its pins — the scenario record's current
    `source_digest`, and its current latest evidence record per role —
-   when it has pins;
+   when it has pins; or, written before 0.15 without pins, still
+   describes its scenario at the commit it pinned (below);
 3. passes `distinct_actor`, when that is on.
 
-A review written before 0.15 has no pins. It keeps counting under rules
-1 and 3, without the freshness check, and `canon gate check` prints one
-advisory line counting such in-effect reviews (exit code unchanged):
+### Reviews written before pinning
+
+A review written before 0.15 has no pins, only `pin`: the commit it
+reviewed. The gate reads the scenario's `.feature` file at that commit
+(`git`, with the same per-scenario normalization `canon inventory sync`
+uses for `scenario_digest`; if the scenario was in another file then, the
+spec root's files at that commit are searched for its id) and decides:
+
+- **current** when that digest equals the scenario's current one and no
+  declared evidence record of the scenario is newer than the review: it
+  counts under rules 1 and 3;
+- **stale** when the scenario changed since the commit (`its spec changed
+  since <pin>`) or has evidence newer than the review (`it has declared
+  evidence newer than the review`): it no longer counts, exactly like a
+  stale pinned review;
+- **undecidable** when the pin is not a commit in this clone (shallow
+  clone, rewritten history) or the scenario id is absent at it: it keeps
+  counting, as in 0.15. A missing commit never becomes a violation.
+
+`canon gate check` prints one advisory line with the split (exit code
+unchanged by the line itself):
 
 ```
-advisory: 340 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw
+advisory: 338 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 318 current, 12 stale, 8 undecidable; a stale one no longer counts — review its scenario again (`canon review add`): context.status.09, gate.check.03, …; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it
 ```
 
 `canon status` prints the same line as a warning, and `canon subject
-status` prints it on stderr for the subject's own scenarios. Reviewing
-the scenario again pins it and drops it from the count.
+status` prints it on stderr for the subject's own scenarios; all three
+make the same decision. Re-review exactly the stale scenarios the line
+names: the new review pins what it saw and replaces the reviewer's legacy
+one. In CI, check out full history (`fetch-depth: 0`) for the job that
+runs the gate, or every legacy review is undecidable.
 
 ### `unreviewed-promotion`
 

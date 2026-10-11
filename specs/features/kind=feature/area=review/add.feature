@@ -239,3 +239,24 @@ Feature: review add
     Given a review whose stored artifact blob was lost
     When the same reviewer records a later review of the scenario
     Then the earlier review's artifacts are no longer checked and `canon gate check` is clean
+
+  # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:happy
+  @review.add.60
+  Scenario: A new review of a scenario whose review from before pinning went stale clears it
+    Given a review written before 0.15 that is stale because its scenario changed after the commit it pinned
+    When the same reviewer reviews the scenario again with `canon review add`
+    Then the new review pins what it saw and supersedes the old one
+    And `canon gate check` exits 0 and the advisory no longer counts the old review
+
+  # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.61
+  Scenario: The subject status guard and status judge a review written before pinning as the gate does
+    Given a building subject whose scenario's review from before 0.15 is stale against its pinned commit
+    When the subject is moved to verifying
+    Then the guard refuses with the gate's stale-review detail and prints the advisory for the subject's own scenarios
+    And `canon status` counts the scenario as a stale review
+    And once the scenario is reviewed again the move goes through

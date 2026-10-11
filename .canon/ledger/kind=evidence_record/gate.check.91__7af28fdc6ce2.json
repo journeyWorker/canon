@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m5-impl"
+  },
+  "at": "2026-10-11T16:35:33.838981Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test legacy_pins a_legacy_review_whose_scenario_changed_after_its_pin_is_stale; cargo test -p canon-gate a_legacy_review_is_current_stale_or_undecidable"
+  },
+  "evidence_note": {
+    "summary": "scenario edited after the pin: unreviewed-promotion naming the pin; sibling current; status prints the same split"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 38,
+  "scenario_id": "gate.check.91",
+  "schema": 1,
+  "staging_id": "4b29828739f6",
+  "verdict": "faithful"
+}

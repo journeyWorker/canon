@@ -913,11 +913,12 @@ fn an_unavailable_review_is_a_gap_at_the_gate_and_the_status_guard() {
 }
 
 /// gate.check.40: a review written before 0.15 (planted by hand, no
-/// `pins`/`outcome` keys) keeps qualifying even after its scenario's spec
-/// changes; `canon gate check`, `canon subject status` and `canon status`
-/// each print the one advisory line counting it, and all exit 0.
+/// `pins`/`outcome` keys) whose pin is no commit of this clone keeps
+/// qualifying even after its scenario's spec changes; `canon gate check`,
+/// `canon subject status` and `canon status` each print the one advisory
+/// line counting it as undecidable, and all exit 0.
 #[test]
-fn a_pre_015_review_still_qualifies_and_every_surface_prints_the_advisory() {
+fn an_undecidable_pre_015_review_still_qualifies_and_every_surface_prints_the_advisory() {
     let dir = repo();
     write_policy(dir.path(), REQUIRE_REVIEW);
     seed_attested_subject(dir.path());
@@ -943,7 +944,7 @@ fn a_pre_015_review_still_qualifies_and_every_surface_prints_the_advisory() {
     edited.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
     ledger(dir.path()).write(&edited).unwrap();
 
-    let advisory = "1 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw";
+    let advisory = "1 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 0 current, 0 stale, 1 undecidable; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it";
     let guard = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
     assert_eq!(guard.status.code(), Some(0), "the unpinned review still qualifies: {}", stderr(&guard));
     assert!(stderr(&guard).contains(&format!("canon subject status: advisory: {advisory}\n")), "{}", stderr(&guard));

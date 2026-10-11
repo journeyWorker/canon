@@ -274,9 +274,10 @@ fn status_counts_each_subject_through_the_gates_joins() {
 
     let text = stdout(&run(dir.path(), &["status"]));
     // The header: the version, then the effective coverage, case and review
-    // settings, then the warning that both seeded reviews predate pinning.
+    // settings, then the warning that both seeded reviews predate pinning
+    // and, their pins being no commit of this repo, went unchecked.
     let header = format!(
-        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=true scope=<every scenario>\n  require_cases: failure\n  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n  level: strict\n{UNAPPROVED}\nwarning: 2 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw\n\n",
+        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=true scope=<every scenario>\n  require_cases: failure\n  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n  level: strict\n{UNAPPROVED}\nwarning: 2 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 0 current, 0 stale, 2 undecidable; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it\n\n",
         env!("CARGO_PKG_VERSION")
     );
     assert!(text.starts_with(&header), "expected the header\n{header}\ngot\n{text}");

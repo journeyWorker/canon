@@ -286,7 +286,8 @@ uses, so status and the gate cannot disagree about a gap:
   stale or whose latest reviews are all `indeterminate`/`unavailable`
   (see `canon-review`), and the `canon review add` step names both. With
   `require_review` on, a `warning:` line counts the in-effect reviews that
-  predate review pinning (0.15).
+  predate review pinning (0.15), checked against the commit each pinned:
+  current, stale (named) and undecidable.
 - **Brief** (0.16) — for each `building`, `verifying` or `shipped`
   subject, a `brief:` line under it says whether the brief is approved:
   `brief: approved in <proposal.md> — <the recorded words>`, or
