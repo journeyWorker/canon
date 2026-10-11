@@ -27,6 +27,14 @@
 //! (the rest are counted, never listed). Subjects are visited closest to
 //! done first: verifying, building, specced, proposed, then shipped.
 //!
+//! # The brief (0.16 D1)
+//! One human answer approves a subject's scope: its brief and the
+//! policy. The agent records it as an `Approved:` line in the change's
+//! `proposal.md`, read here under the openspec plan sources (no record
+//! kind). A `building`, `verifying` or `shipped` subject none of whose
+//! adopted changes carries that line gets the one `human` step status
+//! ever emits, and no status advance; every other step is the agent's.
+//!
 //! # Failing closed
 //! Status never suggests progress the gate would refuse. A corpus kind
 //! routed away from the rung status reads (`scenario`, `subject`,
@@ -38,7 +46,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use canon_gate::policy::subject_status_name;
 use canon_gate::review_gate::{open_blockers, review_gap, unpinned_review_advisory, unpinned_review_note, ReviewGapKind};
@@ -55,8 +63,10 @@ use crate::context::{resolve_repo_root, spec_coverage_surface, SpecCoverageSurfa
 use crate::inventory::{load_spec_roots, scan_feature_corpus};
 
 /// `canon status --json`'s shape version. Bumped when a field changes
-/// meaning or is removed; an added field does not bump it.
-const STATUS_VERSION: u32 = 1;
+/// meaning or is removed; an added field does not bump it. `2` (0.16):
+/// a `next` entry's `command` is a canon command line only when its
+/// `actor` is `agent`.
+const STATUS_VERSION: u32 = 2;
 
 /// The most `next:` entries status prints.
 pub const NEXT_LIMIT: usize = 5;
@@ -178,6 +188,30 @@ pub struct SubjectSummary {
     /// Open blocker findings on the subject's adopted changes.
     pub open_blockers: usize,
     pub missing_cases: Vec<MissingCase>,
+    /// Whether the brief is approved (0.16 D1): present for `building`,
+    /// `verifying` and `shipped` subjects, omitted for the others.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub brief: Option<BriefStatus>,
+}
+
+/// Whether one of a subject's adopted changes records the human's
+/// approval of its brief: an `Approved:` line in the change's
+/// `proposal.md`, read under the repo's `openspec` plan sources.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BriefStatus {
+    pub approved: bool,
+    /// The change whose `proposal.md` carries the approval; when none
+    /// does, the first adopted change that has a `proposal.md`. Omitted
+    /// when no adopted change has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub change: Option<String>,
+    /// That `proposal.md`, relative to the repo root.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proposal: Option<String>,
+    /// The approval line's text after `Approved:`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub approval: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -192,8 +226,20 @@ pub struct MissingCase {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct NextStep {
+    /// A canon command line when `actor` is `agent`; what to get from
+    /// the human when it is `human`.
     pub command: String,
     pub why: String,
+    pub actor: StepActor,
+}
+
+/// Who carries out a `next` step (0.16 D1). The only `human` step is
+/// getting a brief approved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StepActor {
+    Agent,
+    Human,
 }
 
 /// The policy warning `canon status` and `canon context`'s header print:
@@ -239,7 +285,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
 
     if !repo.join("canon.yaml").is_file() {
         warnings.push(format!("no canon.yaml at {} — canon is not set up in this repo", repo.display()));
-        next.push(NextStep { command: "canon init".into(), why: "set canon up here".into() });
+        next.push(NextStep { command: "canon init".into(), why: "set canon up here".into(), actor: StepActor::Agent });
     }
 
     let loaded = GateCtx::from_repo(repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &registry, Utc::now()).map_err(|e| e.to_string()));
@@ -251,7 +297,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
             warnings.extend(policy_warning(&policy));
             warnings.extend(crate::policy_approval::advisory(repo));
             warnings.push(format!("cannot read this repo's ledger: {e}"));
-            next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into() });
+            next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into(), actor: StepActor::Agent });
             return finish(&policy, warnings, Vec::new(), Vec::new(), Vec::new(), None, next);
         }
     };
@@ -279,7 +325,16 @@ pub fn resolve(repo: &Path) -> StatusReport {
     let subjects = latest_subjects(&ctx);
     let spec_roots = load_spec_roots(&repo.join("canon.yaml")).unwrap_or_default();
     let roots: Vec<ProjectId> = spec_roots.iter().map(|r| r.id.clone()).collect();
-    let mut summaries: Vec<(&Subject, SubjectSummary)> = subjects.iter().map(|s| (*s, summarize(&ctx, &joins, s))).collect();
+    // Briefs are read from proposal.md under the openspec plan sources,
+    // resolved the way `canon gate task` resolves them.
+    let plan_roots: Vec<PathBuf> = match crate::plans::load_plan_sources_for_gate(repo) {
+        Ok(sources) => sources.iter().filter(|source| source.dialect() == "openspec").map(|source| source.root().to_path_buf()).collect(),
+        Err(e) => {
+            warnings.push(format!("canon.yaml's `plans:` section cannot be read ({e}), so no brief reads as approved; `canon init --check-config` names the problem"));
+            Vec::new()
+        }
+    };
+    let mut summaries: Vec<(&Subject, SubjectSummary)> = subjects.iter().map(|s| (*s, summarize(&ctx, &joins, repo, &plan_roots, s))).collect();
     summaries.sort_by_key(|(s, _)| (rank(&DISPLAY_ORDER, s.status), s.subject_id.as_str().to_string()));
 
     let scenarios = latest_scenarios(&ctx);
@@ -298,6 +353,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
     if !routed_away.is_empty() {
         let settings = routed_away.iter().map(|kind| format!("routing.{kind}: local")).collect::<Vec<_>>().join(", ");
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: "canon init --check-config".into(),
             why: format!(
                 "set `{settings}` in canon.yaml, then check it: status and the gate read only the local rung, so every count and step would rest on an empty corpus"
@@ -314,6 +370,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
     let policy_blocks = match &ctx.policy.spec_coverage {
         Some(SpecCoverage::Invalid { detail }) => {
             next.push(NextStep {
+                actor: StepActor::Agent,
                 command: "canon gate check".into(),
                 why: format!("fix `spec_coverage` in .canon/policy.yaml ({detail}); the gate refuses until it parses, so no subject is suggested to move on"),
             });
@@ -324,12 +381,14 @@ pub fn resolve(repo: &Path) -> StatusReport {
     for (id, tagged) in &dangling {
         warnings.push(format!("{} scenario(s) are tagged `@subject:{id}` but no subject `{id}` exists (first: {})", tagged.len(), tagged[0]));
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: format!("canon subject new {id} --domain <domain> --title \"<title>\" --actor-id <unit>"),
             why: format!("{} scenario(s) are tagged @subject:{id}, which no subject record carries", tagged.len()),
         });
     }
     if subjects.is_empty() && dangling.is_empty() {
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>".into(),
             why: "no subject exists yet; a subject is the unit status, review and shipping track".into(),
         });
@@ -346,10 +405,11 @@ pub fn resolve(repo: &Path) -> StatusReport {
     let corpus_has_scenarios = || spec_roots.iter().any(|root| !scan_feature_corpus(&root.root).is_empty());
     if scenarios.is_empty() && !subjects.is_empty() && corpus_has_scenarios() {
         warnings.push("the ledger holds no scenario records, so every subject reads as owning none".into());
-        next.push(NextStep { command: "canon inventory sync".into(), why: "index the .feature corpus into scenario records; status counts nothing until then".into() });
+        next.push(NextStep { command: "canon inventory sync".into(), why: "index the .feature corpus into scenario records; status counts nothing until then".into(), actor: StepActor::Agent });
     } else {
         if scenarios.is_empty() && !subjects.is_empty() {
             next.push(NextStep {
+                actor: StepActor::Agent,
                 command: format!("canon feature new <area>.<surface> --title \"<feature>\"{}", project_flag(&roots, None)),
                 why: "no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject <id>`".into(),
             });
@@ -363,6 +423,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
 
     if let Some(first) = unowned.first() {
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: "canon inventory sync".into(),
             why: format!(
                 "{} scenario(s) carry no @subject tag (first: {}); add `@subject:<id>` above each in its .feature file, then sync",
@@ -529,7 +590,7 @@ fn counted<'a>(ctx: &'a GateContext, subject: &Subject) -> (Vec<&'a Scenario>, u
     (counted, excluded)
 }
 
-fn summarize(ctx: &GateContext, joins: &Joins, subject: &Subject) -> SubjectSummary {
+fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBuf], subject: &Subject) -> SubjectSummary {
     let (counted, excluded) = counted(ctx, subject);
     let (_, require_cases) = coverage_settings(ctx);
     let rr = review_rule(ctx);
@@ -565,7 +626,35 @@ fn summarize(ctx: &GateContext, joins: &Joins, subject: &Subject) -> SubjectSumm
         review_due: rr.is_some_and(|rr| rr.covers(subject.status) || next_status(subject.status).is_some_and(|n| rr.covers(n))),
         open_blockers,
         missing_cases,
+        brief: matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying | SubjectStatus::Shipped).then(|| brief_status(repo, plan_roots, subject)),
     }
+}
+
+/// The text after `Approved:` on the first line of `proposal` that
+/// starts with it (leading whitespace allowed) and says something.
+fn approval_line(proposal: &str) -> Option<&str> {
+    proposal.lines().filter_map(|line| line.trim_start().strip_prefix("Approved:")).map(str::trim).find(|rest| !rest.is_empty())
+}
+
+/// Whether one of `subject`'s adopted changes, in adoption order,
+/// carries an `Approved:` line in its `proposal.md` under the openspec
+/// `plan_roots` (the first root holding the change wins, as in `canon
+/// ingest plans`).
+fn brief_status(repo: &Path, plan_roots: &[PathBuf], subject: &Subject) -> BriefStatus {
+    let mut first = None;
+    for change in &subject.change_ids {
+        let Some(path) = plan_roots.iter().find_map(|root| canon_ingest::plan_adapters::openspec::proposal_path(root, change)) else {
+            continue;
+        };
+        let proposal = path.strip_prefix(repo).unwrap_or(&path).display().to_string();
+        let text = std::fs::read_to_string(&path).unwrap_or_default();
+        if let Some(approval) = approval_line(&text) {
+            return BriefStatus { approved: true, change: Some(change.as_str().to_string()), proposal: Some(proposal), approval: Some(approval.to_string()) };
+        }
+        first.get_or_insert((change.as_str().to_string(), proposal));
+    }
+    let (change, proposal) = first.unzip();
+    BriefStatus { approved: false, change, proposal, approval: None }
 }
 
 /// The next scenario number free on `surface` within spec root `project`.
@@ -592,8 +681,9 @@ fn project_flag(roots: &[ProjectId], project: Option<&str>) -> String {
 }
 
 /// The per-subject `next:` rules (module doc), each producing at most one
-/// step. Gap rules come first; the status advance only when none fired
-/// and `may_advance` (no blocking policy gap).
+/// step. An unapproved brief comes first; then the gap rules; the status
+/// advance only when none fired and `may_advance` (no blocking policy
+/// gap).
 #[allow(clippy::too_many_arguments)]
 fn subject_steps(
     ctx: &GateContext,
@@ -609,9 +699,25 @@ fn subject_steps(
     let status = subject.status;
     let before = next.len();
 
+    if let Some(brief) = summary.brief.as_ref().filter(|brief| !brief.approved) {
+        let record = "record their words as `Approved: <who> <when> — \"<their words>\"`";
+        let approve = "and run `canon policy approve --by <the human> --note \"<their words>\"`";
+        next.push(NextStep {
+            actor: StepActor::Human,
+            command: "get the brief approved (one human answer covers brief and policy)".into(),
+            why: match &brief.proposal {
+                Some(proposal) => format!("{id}: no adopted change's proposal.md carries an `Approved:` line; once the human answers, {record} in {proposal} {approve}"),
+                None => format!(
+                    "{id}: no adopted change has a proposal.md to carry the approval; `canon change new <slug> --subject {id} --title \"<title>\"` writes one, and once the human answers, {record} in it {approve}"
+                ),
+            },
+        });
+    }
+
     if summary.scenarios + summary.excluded == 0 {
         let roots_note = if roots.len() > 1 { format!(" (spec roots: {})", roots.iter().map(ProjectId::as_str).collect::<Vec<_>>().join(", ")) } else { String::new() };
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject {id} --case happy{}", project_flag(roots, None)),
             why: format!("{id} owns no scenario; specify its behavior, then `canon inventory sync`{roots_note}"),
         });
@@ -620,6 +726,7 @@ fn subject_steps(
 
     if let Some(gap) = summary.missing_cases.first() {
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: format!(
                 "canon scenario new {} --title \"<what happens on this path>\" --subject {id} --case {}{}",
                 next_number(all, &gap.project_id, &gap.surface),
@@ -635,6 +742,7 @@ fn subject_steps(
     if attested {
         if let Some(first) = counted.iter().find(|s| !joins.verdict_state(s).0) {
             next.push(NextStep {
+                actor: StepActor::Agent,
                 command: format!(
                     "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
@@ -645,6 +753,7 @@ fn subject_steps(
         }
         if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1) {
             next.push(NextStep {
+                actor: StepActor::Agent,
                 command: format!(
                     "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
@@ -657,6 +766,7 @@ fn subject_steps(
 
     if let Some(blocker) = joins.blockers_of(subject).first() {
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: format!(
                 "canon finding close --change-id {} --round {} --seq {} --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
                 blocker.change_id.as_str(),
@@ -671,6 +781,7 @@ fn subject_steps(
         let distinct_actor = review_rule(ctx).is_some_and(|rr| rr.distinct_actor);
         if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).0 && review_gap(ctx, s, distinct_actor).is_some()) {
             next.push(NextStep {
+                actor: StepActor::Agent,
                 command: format!(
                     "canon review add --project-id {} --scenario-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
                     first.project_id.as_str(),
@@ -722,7 +833,7 @@ fn subject_steps(
             if class == canon_gate::FailureClass::FalseSuccess {
                 command.push_str(&counterexample_drops(&first.subject));
             }
-            next.push(NextStep { command, why: format!("{id}: {} {why} (first: {})", gaps.len(), first.subject) });
+            next.push(NextStep { command, why: format!("{id}: {} {why} (first: {})", gaps.len(), first.subject), actor: StepActor::Agent });
         }
     }
 
@@ -733,11 +844,16 @@ fn subject_steps(
     }
     if let Some(to) = next_status(status) {
         let to = subject_status_name(to);
+        let reviewed = if summary.review_due { " and reviewed" } else { "" };
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: format!("canon subject status {id} {to} --actor-id <unit>"),
             why: match status {
                 SubjectStatus::Proposed | SubjectStatus::Specced => format!("{id} has its scenarios and every required case; move it on"),
-                _ => format!("{id}: every scenario is evidenced{}, with no blocker or case gap", if summary.review_due { " and reviewed" } else { "" }),
+                SubjectStatus::Verifying => {
+                    format!("{id}: every scenario is evidenced{reviewed}, with no blocker or case gap, and the brief is approved; ship it yourself unless the brief says the human ships")
+                }
+                _ => format!("{id}: every scenario is evidenced{reviewed}, with no blocker or case gap"),
             },
         });
     }
@@ -817,6 +933,13 @@ pub fn render(report: &StatusReport) -> String {
             for gap in &s.missing_cases {
                 let _ = writeln!(out, "      missing @case:{} on {}", gap.case, gap.surface);
             }
+            if let Some(brief) = &s.brief {
+                let _ = match (&brief.approval, &brief.proposal) {
+                    (Some(approval), Some(proposal)) => writeln!(out, "      brief: approved in {proposal} — {approval}"),
+                    (None, Some(proposal)) => writeln!(out, "      brief: not approved ({proposal} has no `Approved:` line)"),
+                    _ => writeln!(out, "      brief: not approved (no adopted change has a proposal.md)"),
+                };
+            }
         }
     }
 
@@ -853,7 +976,10 @@ pub fn render(report: &StatusReport) -> String {
         let _ = writeln!(out, "next:");
         for step in &report.next {
             let _ = writeln!(out, "  # {}", step.why);
-            let _ = writeln!(out, "  {}", step.command);
+            let _ = match step.actor {
+                StepActor::Agent => writeln!(out, "  {}", step.command),
+                StepActor::Human => writeln!(out, "  human: {}", step.command),
+            };
         }
         if report.next_omitted > 0 {
             let _ = writeln!(out, "  … {} more once these are done", report.next_omitted);

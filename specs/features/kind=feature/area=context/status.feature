@@ -170,3 +170,61 @@ Feature: context status
     Then it warns that the policy is not approved, or changed since approval, and names `canon policy approve`
     And the warning appears in the --json warnings too
     And status still exits 0
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:45Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:context-capability
+  @case:happy
+  @context.status.60
+  Scenario: Status reads a subject's brief approval from its change's proposal.md
+    Given a building subject adopting two changes, the second of whose proposal.md has a line starting "Approved:" with the human's words
+    And a shipped subject with an approved brief and a specced subject
+    When canon status runs
+    Then the building and shipped subjects show their brief as approved, naming the change, its proposal.md and the recorded words
+    And the specced subject carries no brief field
+    And no step is addressed to a human
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.61
+  Scenario: An unapproved brief is the only human step and withholds the move-on
+    Given a verifying subject whose scenarios are all evidenced and reviewed, and whose change's proposal.md has no "Approved:" line
+    And a building subject that adopts no change
+    When canon status runs
+    Then each subject gets one step whose actor is human: get the brief approved, one human answer covering brief and policy
+    And its reason names where the "Approved:" line goes and the canon policy approve --by <the human> --note command
+    And neither subject is suggested to move on
+    And the human form prints the step as "human:" and each subject's brief as not approved
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.62
+  Scenario: With the brief approved and the guard passing, shipping is the agent's own step
+    Given a verifying subject whose scenarios are all evidenced and reviewed, and whose change's proposal.md carries an "Approved:" line
+    When canon status runs
+    Then the only step is the agent's canon subject status <id> shipped command
+    And its reason says to ship it yourself unless the brief says the human ships, and asks nobody
+    And following it succeeds, after which status lists nothing next
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.63
+  Scenario: A line that only mentions approval does not approve the brief
+    Given a building subject whose change's proposal.md holds an empty "Approved:" line, a line with "Approved:" mid-line, and one inside an HTML comment
+    When canon status runs
+    Then the brief reads as not approved
+    And the subject gets the human step to get the brief approved
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.64
+  Scenario: Status reads briefs under the configured openspec plan sources
+    Given canon.yaml configures a superpowers source, then an openspec source rooted at a changes dir, then a second openspec source
+    And a change exists in both openspec sources, approved only in the second, and an archived change is approved in the first
+    When canon status runs
+    Then the first openspec source holding a change owns its brief, so the change reads as not approved
+    And the archived change's approval is read
+    And with plans.sources empty no brief reads as approved

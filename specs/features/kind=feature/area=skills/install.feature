@@ -107,3 +107,24 @@ Feature: skills install
     And its first section is the working loop, naming brief, subject, scenarios, units, implement, evidence, independent review and transition in that order
     And the command reference comes after the loop
     And the AGENTS.md block canon init writes names the same steps in the same order
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:skills-install
+  @case:happy
+  @skills.install.20
+  Scenario: The skill and the AGENTS.md block carry one human approval per scope
+    Given canon's own skill source and the AGENTS.md block canon init writes
+    When each is read with its wrapped lines joined
+    Then each says a new subject or a scope change needs one human answer approving the brief and the policy
+    And each tells the agent to record that answer at once, as an "Approved: <who> <when>" line in the change's proposal.md and as canon policy approve --by <the human> --note, and never to approve without a human answer
+    And each says that inside an approved scope the agent never stops for a human, that independent review happens on every change, and that when no human can answer it writes the assumption and proceeds
+    And each says the agent moves the subject to shipped itself once the guard passes, unless the brief says the human ships
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.21
+  Scenario: The skill and the AGENTS.md block name no second human stop
+    Given canon's own skill source and the AGENTS.md block canon init writes
+    When each is read with its wrapped lines joined
+    Then neither keeps a fixed pair of human stops, a brief approval for every request, or a rule that the agent never runs the policy approval for the human

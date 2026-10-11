@@ -10,3 +10,8 @@ routing:
   scenario: local
   evidence_record: local
   subject: local
+  change: local
+plans:
+  sources:
+    - dialect: openspec
+      root: .

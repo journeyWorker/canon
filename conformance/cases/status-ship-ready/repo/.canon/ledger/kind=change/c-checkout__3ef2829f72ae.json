@@ -1,0 +1,13 @@
+{
+  "actor": {
+    "agent_id": "canon-plan-import-openspec"
+  },
+  "at": "2026-10-11T14:43:59.860002Z",
+  "change_id": "c-checkout",
+  "kind": "change",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "checkout",
+  "summary": "Checkout",
+  "title": "c-checkout"
+}

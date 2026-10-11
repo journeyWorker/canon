@@ -75,15 +75,21 @@ is attributed, and is fresh — never on a self-report. See
      on: every scenario needs evidence, every feature surface needs a
      `@case:failure` scenario, and work on a subject claimed done needs an
      independent review. The gate grades the work against it, so a human
-     reviews it and approves it with `canon policy approve --by <who>`;
+     approves it, in the same answer that approves a subject's brief, and
+     the agent records that answer with
+     `canon policy approve --by <the human> --note "<their words>"`;
      until then `canon gate check` and `canon status` print an advisory.
    - **A canon block in `AGENTS.md`**, between `<!-- canon:begin -->` and
      `<!-- canon:end -->`. It tells any agent that features are managed
      with canon, lists the working loop, and points to `canon status` and
-     the canon skill. The file is created if absent; otherwise only the text
-     between the markers is canon's. Markers count only as standalone lines
-     outside code fences; a duplicate or unmatched marker is refused and
-     nothing is written.
+     the canon skill. The loop stops for a human once per scope: a new
+     subject, or a change to an approved subject's scope, needs one answer
+     approving the brief and the policy. Inside an approved scope the
+     agent fixes, follows up, gets each change independently reviewed and
+     ships without stopping. The file is created if absent; otherwise only
+     the text between the markers is canon's. Markers count only as
+     standalone lines outside code fences; a duplicate or unmatched marker
+     is refused and nothing is written.
 
    `--no-agents-md` and `--no-policy` skip those two. `init` never
    overwrites an existing `canon.yaml` or `policy.yaml`; rerunning it only
@@ -100,6 +106,11 @@ is attributed, and is fresh — never on a self-report. See
    bunx @journeykit/canon subject new auth --domain dev --title "Auth"
    bunx @journeykit/canon change new add-login --subject auth --title "Add login"
    ```
+
+   The brief goes in the change's `proposal.md`. When the human approves
+   it, the agent adds an `Approved: <who> <when> — "<their words>"` line
+   there; `canon status` reads that line to show whether each subject's
+   brief is approved, and asks for a human only when it is missing.
 
 2. **See the authoring surface.** Before writing any canon artifact, ask
    the repo what vocabulary and schemas it resolves to:
