@@ -435,12 +435,23 @@ pub struct Scenario {
     /// `None` (fail-soft), never a hard parse error here.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject_id: Option<SubjectId>,
+    /// `true` on the generation `canon inventory sync` appends when this
+    /// scenario's id is no longer in any `.feature` file of its spec root
+    /// (0.16): a tombstone. Every reader folds to the latest generation
+    /// per `(project_id, scenario_id)` and treats a removed one as absent,
+    /// so a deleted scenario stops being graded, counted or reviewable;
+    /// re-adding the scenario appends a live generation that supersedes
+    /// it. Additive and skipped when `false`, so every live record is
+    /// byte-identical on the wire (its `at` is derivation time, so no
+    /// schema bump).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub removed: bool,
 }
 
 impl Scenario {
     pub fn new(envelope: Envelope, project_id: ProjectId, scenario_id: ScenarioId, title: impl Into<String>, description: impl Into<String>, source_digest: SpecDigest) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Scenario);
-        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, scenario_digest: None, lane: None, case: None, subject_id: None }
+        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, scenario_digest: None, lane: None, case: None, subject_id: None, removed: false }
     }
 }
 

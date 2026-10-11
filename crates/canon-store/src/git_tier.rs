@@ -113,6 +113,29 @@ fn at_file(violation: EvidenceViolation, relative: &Path) -> EvidenceViolation {
     EvidenceViolation::new(violation.class, relative.display().to_string(), detail)
 }
 
+/// One record file's layout + body validation, exactly as a scan applies
+/// it: parseable JSON, a body `kind` matching the directory, a
+/// content-derived path equal to the one it sits at, and the kind's own
+/// [`validate_body`]. Shared by [`GitTier::scan_kind_where`] and
+/// [`GitTier::read_at`], so reading one file can never accept what a
+/// scan would reject.
+fn validate_file(kind: RecordKind, relative: &Path, bytes: &[u8]) -> Result<RawRecord, EvidenceViolation> {
+    let json: serde_json::Value =
+        serde_json::from_slice(bytes).map_err(|e| EvidenceViolation::new(FailureClass::Malformed, relative.display().to_string(), e.to_string()))?;
+    validate_kind_matches_content(kind, &json).map_err(|violation| at_file(violation, relative))?;
+    let expected = expected_relative_path(kind, &json).map_err(|violation| at_file(violation, relative))?;
+    if expected != relative {
+        return Err(EvidenceViolation::new(
+            FailureClass::Malformed,
+            "layout",
+            format!("expected `{}` (template `{}`), found `{}`", expected.display(), kind.partition_template(), relative.display()),
+        ));
+    }
+    let raw = RawRecord(json);
+    validate_body(kind, &raw).map_err(|violation| at_file(violation, relative))?;
+    Ok(raw)
+}
+
 impl GitTier {
     /// `root` is `canon.yaml`'s `tiers.git.root` (design D3), an
     /// ordinary directory on local disk — no network, no credentials,
@@ -170,40 +193,13 @@ impl GitTier {
             let relative = absolute.strip_prefix(&self.root).expect("walked entries are under root").to_path_buf();
 
             let bytes = std::fs::read(absolute)?;
-            let json: serde_json::Value = match serde_json::from_slice(&bytes) {
-                Ok(v) => v,
-                Err(e) => {
-                    violations.push(EvidenceViolation::new(FailureClass::Malformed, relative.display().to_string(), e.to_string()));
-                    continue;
-                }
-            };
-
-            if let Err(violation) = validate_kind_matches_content(kind, &json) {
-                violations.push(at_file(violation, &relative));
-                continue;
-            }
-
-            let expected = match expected_relative_path(kind, &json) {
-                Ok(p) => p,
+            let raw = match validate_file(kind, &relative, &bytes) {
+                Ok(raw) => raw,
                 Err(violation) => {
-                    violations.push(at_file(violation, &relative));
+                    violations.push(violation);
                     continue;
                 }
             };
-            if expected != relative {
-                violations.push(EvidenceViolation::new(
-                    FailureClass::Malformed,
-                    "layout",
-                    format!("expected `{}` (template `{}`), found `{}`", expected.display(), kind.partition_template(), relative.display()),
-                ));
-                continue;
-            }
-
-            let raw = RawRecord(json);
-            if let Err(violation) = validate_body(kind, &raw) {
-                violations.push(at_file(violation, &relative));
-                continue;
-            }
 
             let at = crate::tier::raw_record_at(&raw);
             if keep(at) {
@@ -211,6 +207,25 @@ impl GitTier {
             }
         }
         Ok((records, violations))
+    }
+
+    /// The ONE `kind` record at tier-relative `relative`, validated
+    /// exactly as [`Tier::read`]'s scan validates each file it walks
+    /// (`validate_file`). `Ok(Err(violation))` is a file the scan
+    /// would have reported instead of returning; a missing file is
+    /// `StoreError::Io` with `NotFound`. A path that leaves the root
+    /// (`..`, absolute) or is a symlink is refused, as the scan refuses
+    /// to traverse one.
+    pub fn read_at(&self, kind: RecordKind, relative: &Path) -> Result<Result<RawRecord, EvidenceViolation>, StoreError> {
+        if !relative.components().all(|component| matches!(component, std::path::Component::Normal(_))) {
+            return Err(StoreError::Policy(format!("refusing to read `{}`: not a path inside the tier root", relative.display())));
+        }
+        let absolute = self.absolute(relative);
+        if std::fs::symlink_metadata(&absolute)?.file_type().is_symlink() {
+            return Err(StoreError::Policy(format!("refusing to traverse symlink `{}`", relative.display())));
+        }
+        let bytes = std::fs::read(&absolute)?;
+        Ok(validate_file(kind, relative, &bytes))
     }
 
     /// Corpus-wide scan across every `kind=<x>/` directory directly

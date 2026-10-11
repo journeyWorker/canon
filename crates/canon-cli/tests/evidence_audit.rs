@@ -150,7 +150,8 @@ fn a_reattest_that_drops_a_binding_is_refused_until_rebound_or_dropped_on_purpos
     assert!(human.contains("dropped bindings (1):") && human.contains("game.run.01: reports/shot.png — \"screenshots moved to the e2e lane\" (by impl-agent at "), "{human}");
 }
 
-/// evidence.add.42: the latest record includes one still in staging.
+/// evidence.add.42: the latest record includes one still in staging
+/// (`--no-promote`: `canon init` repos promote on write).
 #[test]
 fn an_unpromoted_record_is_the_latest_the_guard_compares_with() {
     let dir = setup();
@@ -158,7 +159,7 @@ fn an_unpromoted_record_is_the_latest_the_guard_compares_with() {
     scenario(repo, "game.run.01", None);
     write(repo, "reports/a.txt", b"a");
     write(repo, "reports/b.txt", b"b");
-    ok(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt", "--artifact", "reports/b.txt"]));
+    ok(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt", "--artifact", "reports/b.txt", "--no-promote"]));
     let out = refused(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt"]));
     assert!(out.contains("`reports/b.txt`"), "{out}");
     assert_eq!(staged(repo), 1);

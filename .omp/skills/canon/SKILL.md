@@ -69,6 +69,7 @@ assumption you state there, and say so in your final report.
    ledger) and `canon gate check` re-checks them. For a scenario about what
    users see, bind the screenshot or recording that shows it
    (`--artifact <path>`). Then `canon gate promote`.
+   With `write: { promote: auto }` (what `canon init` writes), `canon evidence add` promotes itself, so there is no separate `canon gate promote` call.
    An external evaluator's audit is recorded with `canon evidence add --kind
    audit`; canon never generates one.
    Evidence for a plan task (`--task <id>`, before `canon gate task`) must

@@ -254,7 +254,10 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 ///   judge one scenario twice and judge the STALE copy — but `canon
 ///   query --kind scenario` did not, and reported this repo's 24
 ///   scenarios as 38. That divergence between what the gate evaluates
-///   and what the operator can read is the bug, not the row count.
+///   and what the operator can read is the bug, not the row count. For
+///   the same reason a scenario whose CURRENT generation is a tombstone
+///   (`removed: true`, written by `canon inventory sync` once no feature
+///   file declares it) is dropped after the fold, as the gate drops it.
 ///
 /// KIND-gated for [`fold_pg_routed_kind`]'s stated reason, and by the
 /// same trade-off: a kind that gains a re-writing verb must be added
@@ -270,7 +273,11 @@ fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
     if !matches!(kind, RecordKind::Subject | RecordKind::Finding | RecordKind::Scenario) {
         return records;
     }
-    fold_latest_by_natural_key(kind, records)
+    let folded = fold_latest_by_natural_key(kind, records);
+    if kind != RecordKind::Scenario {
+        return folded;
+    }
+    folded.into_iter().filter(|record| record.0.get("removed").and_then(Value::as_bool) != Some(true)).collect()
 }
 
 /// The shared fold-to-latest-per-natural-key body (design D11/s21 D3,

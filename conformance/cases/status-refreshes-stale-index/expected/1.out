@@ -1,0 +1,3 @@
+canon init: wrote ./canon.yaml
+canon init: created ./openspec/changes
+canon init: next: `canon skills install` to install authoring guidance

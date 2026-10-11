@@ -1,4 +1,4 @@
-description: "0.15 D1: `canon review add` pins the scenario's source digest and its latest evidence, so a fresh pinned review lets `canon subject status <id> verifying` through (exit 0) and `canon gate check` is clean with no legacy-review advisory; after the scenario text changes and `canon inventory sync` records it, the same review is stale: `canon gate check` exits 1 with `unreviewed-promotion` naming the spec change, and `canon status` counts the stale review"
+description: "0.15 D1 + 0.16 D2: the fixture's scenario index predates the edited .feature text, so `canon review add` first refreshes the stale index from that file (one stderr line naming it) and then pins the scenario's CURRENT text by its scenario digest plus its latest evidence; the fresh review lets `canon subject status <id> verifying` through (exit 0), a later `canon inventory sync` has nothing left to write, `canon gate check` stays clean (exit 0), and `canon status` counts the review. A spec edit AFTER the review staling it is pinned by tests/review_pins.rs, since a conformance step cannot edit a file"
 steps:
   - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --reviewer, reviewer-2, --pin, r1, --original-spec-ref, specs/features/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review]
     exit: 0
@@ -9,6 +9,6 @@ steps:
   - args: [inventory, sync]
     exit: 0
   - args: [gate, check]
-    exit: 1
+    exit: 0
   - args: [status]
     exit: 0

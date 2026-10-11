@@ -280,3 +280,67 @@ Feature: evidence add
     Then the record carries the evaluator id, version, digest and result, and a divergent verdict
     And the counterexample report is bound and stored like any report
     And the scenario's declared verdict is still the faithful one
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.60
+  Scenario: Promote on the command line commits the record in the same run
+    Given a repository whose canon.yaml has no write section
+    When evidence add runs with --promote
+    Then the same run promotes the record and prints the promote report
+    And the success line ends "staged and promoted in this run; nothing to promote"
+    And a later gate promote finds nothing staged and exits 0
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.61
+  Scenario: Without a write key a staged record waits for gate promote
+    Given a repository whose canon.yaml has no write section
+    When evidence add runs without a promote flag
+    Then the record stays staged and the line names canon gate promote
+    And gate promote commits it
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.62
+  Scenario: Auto promotion commits every staged write and no-promote keeps one staged
+    Given a repository whose canon.yaml says write promote auto, as canon init writes it
+    When evidence add, finding add, finding close and divergence stage run
+    Then nothing is left staged
+    And an evidence add with --no-promote stays staged until gate promote
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.63
+  Scenario: A malformed write section or both promote flags are refused before anything is staged
+    Given a canon.yaml whose write section says promote always
+    When a staged write runs
+    Then it is refused with exit 2 naming the write section and nothing is staged
+    And init --check-config reports the write section as failed
+    And --promote together with --no-promote is a usage error with exit 2
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.64
+  Scenario: A promotion that refuses the record just staged leaves it staged and exits 1
+    Given a staged write whose own record promotion refuses
+    When the write runs with --promote
+    Then the record is still staged
+    And the success line names canon gate promote
+    And the command exits 1
+
+  # canon: {"schema":1,"at":"2026-10-11T15:45:12Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.65
+  Scenario: A promote on write commits only the record its own run staged
+    Given another author staged an evidence record and a divergence candidate with --no-promote
+    When evidence add and divergence stage run under write promote auto
+    Then each run prints the promote line of its own record only
+    And the other author's records are still staged
+    And gate promote and divergence promote commit them afterwards

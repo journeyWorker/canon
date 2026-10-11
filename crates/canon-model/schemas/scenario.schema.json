@@ -34,6 +34,10 @@
     "project_id": {
       "$ref": "#/$defs/ProjectId"
     },
+    "removed": {
+      "description": "`true` on the generation `canon inventory sync` appends when this\nscenario's id is no longer in any `.feature` file of its spec root\n(0.16): a tombstone. Every reader folds to the latest generation\nper `(project_id, scenario_id)` and treats a removed one as absent,\nso a deleted scenario stops being graded, counted or reviewable;\nre-adding the scenario appends a live generation that supersedes\nit. Additive and skipped when `false`, so every live record is\nbyte-identical on the wire (its `at` is derivation time, so no\nschema bump).",
+      "type": "boolean"
+    },
     "scenario_digest": {
       "description": "sha256-hex over this one scenario's meaning (0.15 D1): its own\nblock and tags plus the context it inherits — the Feature's tags,\nthe Feature Background, and an enclosing Rule with its tags and\nBackground — normalized so comments, blank lines and indentation\ndo not count, and other scenarios never do\n(`canon_fmt::gherkin::scenario_digests` defines it exactly). A\nreview pins this instead of the file-wide `source_digest`, so\nadding or editing a sibling scenario leaves the review current.\nAdditive: records written before 0.15 lack it.",
       "anyOf": [

@@ -326,3 +326,15 @@ Feature: gate check
     Then the false-success line and the re-audit next command name --drop-attachment with the counterexample path shell-quoted, and --drop-reason
     And the printed command, placeholders filled in, runs through a shell, is accepted and clears the gate
     And a refutation that binds no counterexample names no drop
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.80
+  Scenario: Gate check re-indexes only the edited feature file and is silent when the index is fresh
+    Given a synced scenario index and an edited feature file
+    When gate check runs
+    Then one stderr line says the index was refreshed from that one file
+    And only the edited scenario gets a new record
+    And a later inventory sync writes nothing
+    And the next reader prints no refresh line

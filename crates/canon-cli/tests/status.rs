@@ -443,7 +443,10 @@ fn status_names_the_spec_root_when_several_are_configured() {
     write_policy(dir.path(), FULL_POLICY);
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[]);
     seed_subject(dir.path(), "empty-subject", SubjectStatus::Building, &[]);
-    seed_scenario(dir.path(), "world.demo.01", Some("demo-subject"), Some("happy"));
+    // A real feature file under the configured `demo` root: an index
+    // record no feature file declares is marked removed by the refresh.
+    let authored = run(dir.path(), &["scenario", "new", "world.demo.01", "--title", "seeded", "--subject", "demo-subject", "--case", "happy", "--project", "demo"]);
+    assert!(authored.status.success(), "{}", String::from_utf8_lossy(&authored.stderr));
 
     let report = status_json(dir.path());
     let next = commands(&report);

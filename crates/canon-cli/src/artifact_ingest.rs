@@ -831,105 +831,103 @@ const SCENARIO_TITLE_MAX_CHARS: usize = 160;
 /// order the tier handed the records over.
 #[derive(Debug, Default)]
 struct ScenarioTitleIndex {
-    titles: BTreeMap<String, BTreeMap<String, IndexedScenarioTitle>>,
+    titles: BTreeMap<String, BTreeMap<String, String>>,
 }
 
-/// One indexed title plus the `(at, schema, digest)` triple that earned
-/// it its slot — see [`ScenarioTitleIndex::absorb_record`]'s
-/// supersession rule.
-#[derive(Debug)]
-struct IndexedScenarioTitle {
+/// One `Scenario` generation as [`ScenarioTitleIndex::from_records`]
+/// folds it: its `(scenario_id, project_id)` key, the `(at, schema,
+/// digest)` triple `canon_store::fold_latest_by_key` orders by, and its
+/// title — `None` for a tombstone (`removed: true`), the generation
+/// `canon inventory sync` appends once no `.feature` file declares the
+/// scenario.
+struct ScenarioGeneration<'a> {
+    scenario_id: &'a str,
+    project_id: &'a str,
     at: DateTime<Utc>,
     schema: u32,
     digest: String,
-    title: String,
+    title: Option<String>,
 }
 
-impl IndexedScenarioTitle {
-    /// The total supersession order — the SAME `(at, schema, digest)`
-    /// triple `canon_store::fold_latest_by_key` compares, spelled out
-    /// here because this index folds into a two-level `BTreeMap` slot
-    /// rather than that helper's flat one-winner-per-key map.
-    fn order(&self) -> (DateTime<Utc>, u32, &str) {
-        (self.at, self.schema, self.digest.as_str())
-    }
-}
-
-impl ScenarioTitleIndex {
-    /// Indexes every well-formed `Scenario` record, skipping the rest.
+impl<'a> ScenarioGeneration<'a> {
+    /// `None` for a record missing `scenario_id`/`project_id`, or a
+    /// LIVE record missing a non-blank `title`: a strategy title must
+    /// never be enriched with an empty sentence, and a partially-formed
+    /// record is not evidence (the same "malformed evidence is no
+    /// evidence" discipline `canon_ingest::ArtifactParseOutcome` applies
+    /// one layer out), so it takes no part in the fold. A tombstone needs
+    /// no title: it names nothing, it only supersedes.
     ///
-    /// A record missing `scenario_id`/`project_id`/`title`, or carrying
-    /// a blank one, contributes NO entry — a strategy title must never
-    /// be enriched with an empty sentence, and a partially-formed record
-    /// is not evidence (the same "malformed evidence is no evidence"
-    /// discipline `canon_ingest::ArtifactParseOutcome` applies one layer
-    /// out). Reads the fields off the bare `RawRecord` JSON rather than
-    /// deserializing `canon_model::records::Scenario`, so one
-    /// unparseable record — or a future schema generation this build
-    /// does not know — degrades to a missing title rather than aborting
-    /// the whole index.
-    fn from_records(records: &[RawRecord]) -> Self {
-        let mut index = Self::default();
-        for record in records {
-            index.absorb_record(record);
-        }
-        index
-    }
-
-    /// Folds one record in, the greatest `(at, schema, digest)` triple
-    /// winning its `(project_id, scenario_id)` slot.
-    ///
-    /// The ledger's own file naming (`<project>__<scenario>__<digest>`)
-    /// means a RETITLED scenario lands as a SECOND record beside its
-    /// predecessor rather than replacing it, and a `LiveDb`-class rung
-    /// retains historical versions outright (s21 P3) — so "which title
-    /// is current" is a real question, not a hypothetical. Determinism
-    /// is load-bearing: the title reaches `Trajectory::task`, and the
-    /// write-time idempotence skip only fires when a second pass derives
-    /// byte-identical text.
-    ///
-    /// `at` ALONE does not answer it. A ledger record's `at` is
-    /// deliberately byte-stable rather than wall-clock, so two versions
-    /// of one `(project_id, scenario_id)` routinely carry the IDENTICAL
-    /// timestamp — and a strictly-greater-`at` rule then leaves the slot
-    /// to whichever version the tier happened to return first, which for
-    /// a live database read is unordered. This is precisely the
-    /// supersession case `s38-evidence-bearing-memory` fixed for every
-    /// other multi-version reader, so it takes the same triple:
-    /// `Envelope.schema` (the per-kind FORMAT GENERATION, so the newer
-    /// parser's row wins a tie by stating so) between `at` and the
-    /// content `digest`, which remains the final tie-break. All three
-    /// rungs are the record's OWN data, so the resolved title is a pure
-    /// function of the input SET (ReviewCore).
-    ///
-    /// Reads that timestamp through [`raw_record_at_or_min`] rather than
-    /// `canon_store::tier::raw_record_at`, which `expect`s a
-    /// well-formed `at` and would PANIC on a hand-edited ledger file —
-    /// unacceptable for a join whose whole contract is that it can only
-    /// ever fail to enrich, never fail a run. `raw_record_schema`
-    /// already takes that posture for ITS field (a missing/invalid
-    /// `schema` floors to `0`, below every real generation).
-    fn absorb_record(&mut self, record: &RawRecord) {
-        let (Some(scenario_id), Some(project_id), Some(title)) =
-            (raw_field(record, "scenario_id"), raw_field(record, "project_id"), raw_field(record, "title").map(compact_scenario_title))
-        else {
-            return;
+    /// Reads `at` through [`raw_record_at_or_min`] rather than
+    /// `canon_store::tier::raw_record_at`, which `expect`s a well-formed
+    /// `at` and would PANIC on a hand-edited ledger file — unacceptable
+    /// for a join whose whole contract is that it can only ever fail to
+    /// enrich, never fail a run. `raw_record_schema` already takes that
+    /// posture for ITS field (a missing/invalid `schema` floors to `0`,
+    /// below every real generation).
+    fn of(record: &'a RawRecord) -> Option<Self> {
+        let scenario_id = raw_field(record, "scenario_id")?;
+        let project_id = raw_field(record, "project_id")?;
+        let title = match record.0.get("removed").and_then(serde_json::Value::as_bool) {
+            Some(true) => None,
+            _ => Some(compact_scenario_title(raw_field(record, "title")?)),
         };
-        let candidate = IndexedScenarioTitle {
+        Some(Self {
+            scenario_id,
+            project_id,
             at: raw_record_at_or_min(record),
             schema: canon_store::tier::raw_record_schema(record),
             digest: canon_store::partition::content_digest12(&record.0),
             title,
-        };
-        match self.titles.entry(scenario_id.to_string()).or_default().entry(project_id.to_string()) {
-            std::collections::btree_map::Entry::Vacant(slot) => {
-                slot.insert(candidate);
+        })
+    }
+}
+
+impl ScenarioTitleIndex {
+    /// Indexes the LATEST well-formed `Scenario` generation per
+    /// `(project_id, scenario_id)`, unless that generation is a
+    /// tombstone ([`ScenarioGeneration::of`] says which records count).
+    /// Reads the fields off the bare `RawRecord` JSON rather than
+    /// deserializing `canon_model::records::Scenario`, so one
+    /// unparseable record — or a future schema generation this build
+    /// does not know — degrades to a missing title rather than aborting
+    /// the whole index.
+    ///
+    /// "Which title is current" is a real question: the ledger's own
+    /// file naming (`<project>__<scenario>__<digest>`) means a RETITLED
+    /// scenario lands as a SECOND record beside its predecessor rather
+    /// than replacing it, and a `LiveDb`-class rung retains historical
+    /// versions outright (s21 P3). Determinism is load-bearing: the title
+    /// reaches `Trajectory::task`, and the write-time idempotence skip
+    /// only fires when a second pass derives byte-identical text. So the
+    /// generations fold through `canon_store::fold_latest_by_key` — the
+    /// `(at, schema, digest)` order every other multi-version reader
+    /// uses (`s38-evidence-bearing-memory`): a ledger `at` is byte-stable
+    /// rather than wall-clock, so ties are routine and `schema` (the
+    /// per-kind format generation) then `digest` break them on the
+    /// record's OWN data, making the resolved title a pure function of
+    /// the input SET (ReviewCore).
+    ///
+    /// The tombstone takes part in that fold rather than being filtered
+    /// first, so the gate's rule holds here too (`canon_gate::context`'s
+    /// `without_removed`): a deleted scenario's latest generation evicts
+    /// every earlier title, and a re-added scenario's later live
+    /// generation supersedes the tombstone and names it again.
+    fn from_records(records: &[RawRecord]) -> Self {
+        let latest = canon_store::fold_latest_by_key(
+            records.iter().filter_map(ScenarioGeneration::of),
+            |generation| (generation.scenario_id, generation.project_id),
+            |generation| generation.at,
+            |generation| generation.schema,
+            |generation| generation.digest.as_str(),
+        );
+        let mut index = Self::default();
+        for ((scenario_id, project_id), generation) in latest {
+            if let Some(title) = generation.title {
+                index.titles.entry(scenario_id.to_string()).or_default().insert(project_id.to_string(), title);
             }
-            std::collections::btree_map::Entry::Occupied(mut slot) if slot.get().order() < candidate.order() => {
-                slot.insert(candidate);
-            }
-            std::collections::btree_map::Entry::Occupied(_) => {}
         }
+        index
     }
 
     /// The title `join_key` names, or `None` — which is the ONLY
@@ -943,7 +941,7 @@ impl ScenarioTitleIndex {
     fn title_for(&self, join_key: &ArtifactJoinKey, project_id: Option<&str>) -> Option<&str> {
         let ArtifactJoinKey::Scenario(scenario_id) = join_key else { return None };
         let by_project = self.titles.get(scenario_id.as_str())?;
-        let indexed = match project_id {
+        let title = match project_id {
             Some(project) => by_project.get(project)?,
             // Exactly one project defines this scenario id, so naming it
             // is unambiguous even though the event never said which
@@ -953,21 +951,21 @@ impl ScenarioTitleIndex {
             None if by_project.len() == 1 => by_project.values().next()?,
             None => return None,
         };
-        Some(indexed.title.as_str())
+        Some(title.as_str())
     }
 }
 
 /// One trimmed, non-blank string field off a bare `RawRecord`'s JSON —
-/// the shape [`ScenarioTitleIndex::absorb_record`] needs for all three
-/// of its fields, where a present-but-blank value must read exactly like
-/// an absent one.
+/// the shape [`ScenarioGeneration::of`] needs for all three of its
+/// fields, where a present-but-blank value must read exactly like an
+/// absent one.
 fn raw_field<'a>(record: &'a RawRecord, field: &str) -> Option<&'a str> {
     record.0.get(field)?.as_str().map(str::trim).filter(|value| !value.is_empty())
 }
 
 /// A bare `RawRecord`'s `at`, or `DateTime::<Utc>::MIN_UTC` when it is
 /// absent or not RFC-3339 — the first rung of the `(at, schema,
-/// digest)` triple [`ScenarioTitleIndex::absorb_record`] compares.
+/// digest)` triple [`ScenarioTitleIndex::from_records`] folds by.
 ///
 /// `canon_store::tier::raw_record_at` is the shared accessor for this
 /// field, but it `expect`s the parse to succeed ("already passed
@@ -3526,6 +3524,43 @@ mod tests {
         let key = scenario_key("platformer.moving.01");
         assert_eq!(forward.title_for(&key, Some("platformer")), Some("A moving platform carries the standing player"));
         assert_eq!(forward.title_for(&key, Some("platformer")), reversed.title_for(&key, Some("platformer")));
+    }
+
+    #[test]
+    fn a_deleted_scenario_names_nothing_until_it_is_re_added() {
+        // `canon inventory sync` appends a `removed: true` generation
+        // (a copy of the latest one, title included) once no `.feature`
+        // file declares the scenario. The tombstone must win the fold and
+        // evict every earlier title in either read order, and a later
+        // live generation must supersede it and name the scenario again.
+        let title = "A moving platform carries the standing player";
+        let live = scenario_record("platformer", "platformer.moving.01", title, "2026-07-14T19:27:35Z");
+        let mut tombstone = scenario_record("platformer", "platformer.moving.01", title, "2026-07-20T08:00:00Z");
+        tombstone.0["removed"] = serde_json::json!(true);
+        let re_added = scenario_record("platformer", "platformer.moving.01", title, "2026-07-25T08:00:00Z");
+        let key = scenario_key("platformer.moving.01");
+
+        for records in [[live.clone(), tombstone.clone()], [tombstone.clone(), live.clone()]] {
+            let index = ScenarioTitleIndex::from_records(&records);
+            assert_eq!(index.title_for(&key, Some("platformer")), None, "a tombstoned latest generation names nothing");
+            assert_eq!(index.title_for(&key, None), None, "and the project-less fallback finds nothing either");
+        }
+        let regime_key = regime("platformer", "41fdd8c5");
+        let removed = ScenarioTitleIndex::from_records(&[live.clone(), tombstone.clone()]);
+        let joined = derived_joined(&removed, "review", &regime_key, key.clone(), Some("platformer"), Kind::NonVerdict, "2026-07-21T08:00:00Z");
+        assert_eq!(joined.scenario_title, None, "an ingest after the deletion attaches no title");
+
+        for records in [[live.clone(), tombstone.clone(), re_added.clone()], [re_added.clone(), tombstone.clone(), live.clone()]] {
+            let index = ScenarioTitleIndex::from_records(&records);
+            assert_eq!(index.title_for(&key, Some("platformer")), Some(title), "a re-added scenario's live generation supersedes its tombstone");
+        }
+
+        // A tombstone in one project neither hides nor ambiguates the
+        // same id another project still defines.
+        let other = scenario_record("world", "platformer.moving.01", "A wholly different sentence", "2026-07-14T19:27:35Z");
+        let index = ScenarioTitleIndex::from_records(&[live, tombstone, other]);
+        assert_eq!(index.title_for(&key, Some("platformer")), None);
+        assert_eq!(index.title_for(&key, None), Some("A wholly different sentence"));
     }
 
     #[test]

@@ -59,7 +59,7 @@ fn audit_path(repo: &Path, canon_yaml: Option<&Path>) -> Option<PathBuf> {
         return None;
     }
     let root = yaml.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(Path::new("."));
-    Some(root.join(".canon/audit/access.jsonl"))
+    Some(root.join(canon_model::paths::ACCESS_AUDIT_FILE))
 }
 
 /// Append one access event without recording query contents, credentials, or

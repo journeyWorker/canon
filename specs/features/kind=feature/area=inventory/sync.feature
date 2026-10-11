@@ -136,3 +136,76 @@ Feature: inventory sync
     When the corpus is synced
     Then the scenario is indexed without a case and the sync reports a diagnostic naming the tag
     And a previously recorded case is not carried over to the new generation
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:happy
+  @inventory.sync.40
+  Scenario: A reader refreshes a stale scenario index once and names the files
+    Given a scenario written by scenario new and never synced
+    When canon status runs with --json
+    Then exactly one stderr line names the changed feature file and the records written
+    And stdout stays JSON that counts the scenario
+    And the next reader is silent
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:happy
+  @inventory.sync.41
+  Scenario: Review add and subject status read a scenario that was never synced
+    Given a scenario written by scenario new and never synced
+    When review add and subject status run
+    Then each refreshes the index first and succeeds without inventory sync
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:failure
+  @inventory.sync.42
+  Scenario: A root that cannot sync is named and a directory without canon.yaml is never written
+    Given a feature file whose provenance comments are missing
+    When canon status runs
+    Then one stderr line names the root that was not refreshed and points at inventory sync
+    And no scenario record is written
+    And a reader in a directory without canon.yaml writes nothing
+
+  # canon: {"schema":1,"at":"2026-10-11T15:45:12Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:happy
+  @inventory.sync.43
+  Scenario: A deleted scenario is marked removed the same way by a reader's refresh and by a full sync
+    Given two indexed scenarios and the feature file of one of them deleted
+    When one repository runs gate check and an identical one runs inventory sync
+    Then both append the same record marking the deleted scenario removed
+    And the gate and query no longer report it
+    And adding the scenario back makes the gate grade it again
+
+  # canon: {"schema":1,"at":"2026-10-11T15:45:12Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:failure
+  @inventory.sync.44
+  Scenario: A root that cannot sync marks no scenario removed
+    Given an indexed scenario whose feature file is deleted
+    And a remaining feature file whose provenance comments are missing
+    When canon status and inventory sync run
+    Then the root is named as not refreshed and inventory sync exits 1
+    And no record marks the deleted scenario removed
+
+  # canon: {"schema":1,"at":"2026-10-11T15:45:12Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:edge
+  @inventory.sync.45
+  Scenario: Concurrent syncs and refreshes write each index record once
+    Given a stale scenario index and the index lock held by another process
+    When two inventory syncs and two refreshing readers start
+    Then none of them writes while the lock is held
+    And once it is released exactly one of them writes one record per scenario
+
+  # canon: {"schema":1,"at":"2026-10-11T16:04:57Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:edge
+  @inventory.sync.46
+  Scenario: Artifact ingest names no scenario whose latest record marks it removed
+    Given a titled scenario whose latest index record marks it removed
+    When artifact ingest joins an event keyed to that scenario
+    Then the event carries no scenario title in either record read order
+    And once a later record adds the scenario back the event carries its title again

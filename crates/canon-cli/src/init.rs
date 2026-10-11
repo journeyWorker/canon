@@ -51,12 +51,24 @@ use crate::policy_level::{starter_policy, PolicyLevel};
 /// OTHER kind (`RecordKind::ALL` minus this set) routes to `local`.
 const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, RecordKind::Session, RecordKind::Run, RecordKind::Event];
 
-/// The line [`scaffold_gitignore`] ensures is present in
-/// `<repo>/.gitignore`: one glob covering the sqlite hot tier's db
-/// file AND its WAL/SHM sidecars (`.canon/hot.db-wal`/`.canon/hot.db-shm`
-/// -- sqlite's own WAL-journal-mode naming convention), since all
-/// three share the `.canon/hot.db` prefix.
-const GITIGNORE_LINE: &str = paths::HOT_DB_GITIGNORE;
+/// The lines [`scaffold_gitignore`] ensures are present in
+/// `<repo>/.gitignore`, each under its own comment: one glob covering
+/// the sqlite hot tier's db file AND its WAL/SHM sidecars
+/// (`.canon/hot.db-wal`/`.canon/hot.db-shm` -- sqlite's own
+/// WAL-journal-mode naming convention), since all three share the
+/// `.canon/hot.db` prefix; the read-access audit directory `canon
+/// query`/`export`/`purge` append to (#8), which is local operator
+/// state and would otherwise show up as untracked after the first
+/// query; the derived scenario index, which every reader rebuilds
+/// from the `.feature` files when stale (0.16 D2), so committing it
+/// would only commit churn; and the lock file that serializes those
+/// rebuilds, which is local process state.
+const GITIGNORE_LINES: [(&str, &str); 4] = [
+    ("# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.", paths::HOT_DB_GITIGNORE),
+    ("# canon's read-access audit log (canon query/export/purge) -- local, never committed.", paths::AUDIT_GITIGNORE),
+    ("# canon's scenario index -- derived from the .feature files, rebuilt by every reader.", paths::SCENARIO_INDEX_GITIGNORE),
+    ("# the lock that serializes scenario index rebuilds -- local process state.", paths::SCENARIO_INDEX_LOCK_FILE),
+];
 
 /// D8/D9's skeleton `canon.yaml` body: every one of `RecordKind::ALL`'s
 /// fourteen wire strings (s36: `subject` is the reviewed 13th kind;
@@ -120,29 +132,37 @@ fn skeleton_yaml() -> String {
     out.push_str("  sources:\n");
     out.push_str("    - dialect: openspec\n");
     out.push_str("      root: .\n");
+    out.push_str("write:\n");
+    out.push_str("  # Staged writes (`canon evidence add`, `canon finding add|close`,\n");
+    out.push_str("  # `canon divergence stage`) promote in the same run. `manual` keeps\n");
+    out.push_str("  # them staged until `canon gate promote`; `--no-promote` keeps one.\n");
+    out.push_str("  promote: auto\n");
     out
 }
 
-/// Ensures [`GITIGNORE_LINE`] is present in `<repo>/.gitignore` --
-/// appends it (creating the file if absent) UNLESS it is already
-/// there, so a `.gitignore` a prior `canon init` (or the repo's own
-/// `git init`) already wrote is never duplicated. `canon init` itself
-/// stays a fresh-repo bootstrap (`run_init`'s `canon.yaml` refuses to
-/// overwrite), but `.gitignore` commonly PRE-EXISTS a `canon init`
-/// invocation (e.g. a `git init`-then-`canon init` sequence), so this
-/// appends rather than mirroring `canon.yaml`'s create-fails-if-exists
-/// refusal.
+/// Ensures every [`GITIGNORE_LINES`] entry is present in
+/// `<repo>/.gitignore` -- appends each missing one under its comment
+/// (creating the file if absent), so a `.gitignore` a prior `canon init`
+/// (or the repo's own `git init`) already wrote is never duplicated.
+/// `canon init` itself stays a fresh-repo bootstrap (`run_init`'s
+/// `canon.yaml` refuses to overwrite), but `.gitignore` commonly
+/// PRE-EXISTS a `canon init` invocation (e.g. a `git init`-then-`canon
+/// init` sequence), so this appends rather than mirroring `canon.yaml`'s
+/// create-fails-if-exists refusal.
 fn scaffold_gitignore(repo: &Path) -> std::io::Result<()> {
     let path = repo.join(".gitignore");
     let existing = fs::read_to_string(&path).unwrap_or_default();
-    if existing.lines().any(|line| line.trim() == GITIGNORE_LINE) {
+    let missing: Vec<&(&str, &str)> = GITIGNORE_LINES.iter().filter(|(_, line)| !existing.lines().any(|have| have.trim() == *line)).collect();
+    if missing.is_empty() {
         return Ok(());
     }
     let mut file = fs::OpenOptions::new().create(true).append(true).open(&path)?;
     if !existing.is_empty() && !existing.ends_with('\n') {
         file.write_all(b"\n")?;
     }
-    file.write_all(format!("# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.\n{GITIGNORE_LINE}\n").as_bytes())?;
+    for (comment, line) in missing {
+        file.write_all(format!("{comment}\n{line}\n").as_bytes())?;
+    }
     Ok(())
 }
 
@@ -489,6 +509,18 @@ pub fn run_check_config(repo: &Path) -> i32 {
         }
     }
 
+    // `write:` (0.16 D2): absent is the `manual` default, so it is
+    // reported as such rather than as a pass of nothing.
+    let write_present = serde_yaml::from_str::<serde_yaml::Value>(&text).ok().and_then(|doc| doc.get("write").cloned()).is_some();
+    match crate::write_mode::configured_promote_mode(&canon_yaml_path) {
+        Ok(mode) if write_present => report.push_str(&format!("[PASS] write (promote: {})\n", mode.as_str())),
+        Ok(_) => report.push_str("[not configured] write (promote: manual)\n"),
+        Err(e) => {
+            all_ok = false;
+            report.push_str(&format!("[FAIL] write: {e}\n"));
+        }
+    }
+
     print!("{report}");
     if all_ok { 0 } else { 1 }
 }
@@ -535,14 +567,20 @@ mod tests {
         assert!(TierPolicy::from_yaml_at(&text, dir.path()).is_ok());
         assert!(crate::inventory::load_spec_roots(&canon_yaml_path).is_ok());
         assert!(crate::plans::load_plan_sources_from_config(&canon_yaml_path, dir.path()).is_ok());
+        assert_eq!(crate::write_mode::configured_promote_mode(&canon_yaml_path), Ok(crate::write_mode::PromoteMode::Auto), "a new repo promotes on write");
+    }
+
+    fn has_every_gitignore_line(text: &str) -> bool {
+        GITIGNORE_LINES.iter().all(|(_, line)| text.lines().any(|have| have.trim() == *line))
     }
 
     #[test]
-    fn scaffold_gitignore_creates_a_fresh_file_with_the_hot_db_glob() {
+    fn scaffold_gitignore_creates_a_fresh_file_with_the_hot_db_glob_and_the_audit_dir() {
         let dir = tempfile::tempdir().unwrap();
         scaffold_gitignore(dir.path()).unwrap();
         let text = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
-        assert!(text.lines().any(|line| line.trim() == GITIGNORE_LINE), "{text}");
+        assert!(has_every_gitignore_line(&text), "{text}");
+        assert!(text.lines().any(|line| line.trim() == paths::AUDIT_GITIGNORE), "{text}");
     }
 
     #[test]
@@ -552,16 +590,20 @@ mod tests {
         scaffold_gitignore(dir.path()).unwrap();
         let text = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
         assert!(text.contains("target/\n"), "{text}");
-        assert!(text.lines().any(|line| line.trim() == GITIGNORE_LINE), "{text}");
+        assert!(has_every_gitignore_line(&text), "{text}");
     }
 
     #[test]
-    fn scaffold_gitignore_is_idempotent() {
+    fn scaffold_gitignore_is_idempotent_and_adds_only_the_missing_line() {
         let dir = tempfile::tempdir().unwrap();
+        // A repo initialized before #8 already carries the hot-db line.
+        std::fs::write(dir.path().join(".gitignore"), format!("{}\n", paths::HOT_DB_GITIGNORE)).unwrap();
         scaffold_gitignore(dir.path()).unwrap();
         scaffold_gitignore(dir.path()).unwrap();
         let text = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
-        assert_eq!(text.matches(GITIGNORE_LINE).count(), 1, "the line must never be duplicated across repeated scaffolds: {text}");
+        for (_, line) in GITIGNORE_LINES {
+            assert_eq!(text.lines().filter(|have| have.trim() == line).count(), 1, "`{line}` must appear exactly once across repeated scaffolds: {text}");
+        }
     }
 
     /// The default (`strict`) starter is 0.15's starter byte for byte,

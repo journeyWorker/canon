@@ -62,6 +62,7 @@ fn committed(repo: &Path, kind: &str) -> Vec<serde_json::Value> {
 
 const STAGED: &str = "— run `canon gate promote` to commit it";
 const DIRECT: &str = "— written directly; nothing to promote";
+const PROMOTED: &str = "— staged and promoted in this run; nothing to promote";
 
 /// `--session-id` on `evidence add` and `review add` fills each record's
 /// `actor.session_id`, and survives promotion.
@@ -124,7 +125,9 @@ fn a_session_id_outside_the_grammar_is_refused_and_nothing_is_written() {
 
 /// D6 (F16): every write command ends its success line with the same
 /// suffix for the same write mode, so an operator knows whether a
-/// promote is due.
+/// promote is due. `canon init` writes `write: { promote: auto }` (0.16
+/// D2), so a staged write says it promoted itself unless `--no-promote`
+/// keeps it staged.
 #[test]
 fn every_write_command_says_whether_it_staged_or_wrote_directly() {
     let dir = setup();
@@ -147,13 +150,14 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
     direct(&["change", "new", "runs-boss", "--subject", "runs", "--title", "A boss wave"]);
 
     staged(
-        &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer"],
+        &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer", "--no-promote"],
         STAGED,
     );
-    staged(&["finding", "add", "--change-id", "cats", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s"], STAGED);
+    staged(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer"], PROMOTED);
+    staged(&["finding", "add", "--change-id", "cats", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s", "--no-promote"], STAGED);
     ok(repo, &["gate", "promote"]);
-    staged(&["finding", "close", "--change-id", "cats", "--round", "1", "--seq", "1", "--disposition", "rejected"], STAGED);
-    ok(repo, &["gate", "promote"]);
+    staged(&["finding", "close", "--change-id", "cats", "--round", "1", "--seq", "1", "--disposition", "rejected"], PROMOTED);
+    assert!(records_under(repo, "_staging").is_empty(), "nothing is left to promote");
 
     direct(&[
         "review", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--reviewer", "r", "--pin", "p", "--original-spec-ref", "specs/x.feature",
@@ -162,9 +166,9 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
 
     let sha = "a".repeat(40);
     staged(
-        &["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"],
+        &["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"],
         "— run `canon divergence promote` to commit it",
     );
-    ok(repo, &["divergence", "promote"]);
-    direct(&["divergence", "resolve", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer"]);
+    staged(&["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
+    direct(&["divergence", "resolve", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "3", "--reviewer", "r", "--role", "reviewer"]);
 }

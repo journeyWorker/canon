@@ -319,6 +319,57 @@ fn subjects_counts_scenarios_once_across_a_status_lifecycle() {
     assert_eq!(row["covered_scenarios"], 1, "exactly one of them carries a non-divergent verdict");
 }
 
+/// 0.16: a scenario whose latest generation is a tombstone (`removed`,
+/// written by `canon inventory sync` once no feature file declares it)
+/// is gone from both scenario-driven panels, as it is from the gate —
+/// filtered AFTER the fold, so its earlier live generation never stands
+/// in for it.
+#[test]
+fn a_tombstoned_scenario_leaves_scope_status_and_subjects() {
+    if !support::duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let git_root = dir.path().join("ledger");
+    let tier = GitTier::new(&git_root);
+    let subject_id = SubjectId::parse("fold-subject").unwrap();
+    tier.write(&Subject::new(
+        Envelope::new(1, RecordKind::Subject, at(2026, 5, 4, 8), actor("planner")),
+        subject_id.clone(),
+        "folded subject",
+        "one subject, one scenario deleted",
+        "dev",
+        SubjectStatus::Building,
+        RoleId::parse("dev").unwrap(),
+    ))
+    .unwrap();
+
+    let scenario = |id: &str, hour: u32, removed: bool| {
+        let mut s = canon_model::Scenario::new(
+            Envelope::new(1, RecordKind::Scenario, at(2026, 5, 4, hour), actor("canon")),
+            canon_model::ProjectId::parse("fold-project").unwrap(),
+            ScenarioId::parse(id).unwrap(),
+            "fold scenario",
+            "",
+            canon_model::SpecDigest::of(id.as_bytes()),
+        );
+        s.subject_id = Some(subject_id.clone());
+        s.removed = removed;
+        s
+    };
+    for record in [scenario("fold.kept.01", 9, false), scenario("fold.gone.01", 9, false), scenario("fold.gone.01", 10, true)] {
+        tier.write(&record).unwrap();
+    }
+
+    let roots = Roots::new(git_root, dir.path().join("r2"), dir.path().join("learn"));
+    let scope = marts::fetch_scope_status(&roots).unwrap();
+    let ids: Vec<&serde_json::Value> = scope.rows.iter().map(|row| &row["scenario_id"]).collect();
+    assert_eq!(ids, vec![&json!("fold.kept.01")], "the removed scenario has no worklist row: {:?}", scope.rows);
+    let subjects = marts::fetch_subjects(&roots).unwrap();
+    assert_eq!(subjects.rows[0]["scenario_count"], 1, "the subject no longer counts the removed scenario: {:?}", subjects.rows);
+}
+
 #[test]
 fn trust_matrix_and_scope_status_yield_one_row_per_task_after_a_checkbox_flip() {
     if !support::duckdb_available() {

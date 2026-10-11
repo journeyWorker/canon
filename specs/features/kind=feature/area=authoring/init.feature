@@ -178,3 +178,33 @@ Feature: authoring init
     When canon init runs with a policy level and the no-policy flag together
     Then it exits 2 saying the two cannot be used together
     And it writes no canon.yaml and no .canon directory
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:54Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.init.70
+  Scenario: A fresh init followed by a query leaves git status clean
+    Given a git repository freshly initialized with canon init and committed
+    When a query reads the ledger and appends to the access audit log
+    Then the init gitignore covers .canon/audit/
+    And git status reports nothing untracked
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:54Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.init.71
+  Scenario: The scenario index a reader rebuilds stays out of git
+    Given a repository initialized with canon init whose feature file is committed
+    When a reader rebuilds the stale scenario index
+    Then the init gitignore covers .canon/ledger/kind=scenario/
+    And git status reports nothing untracked
+
+  # canon: {"schema":1,"at":"2026-10-11T15:45:13Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.init.72
+  Scenario: The scenario index lock stays out of git
+    Given a repository initialized with canon init whose feature file is committed
+    When a reader refreshes the stale scenario index and takes the index lock
+    Then the init gitignore covers .canon/scenario-index.lock
+    And git status reports nothing untracked
