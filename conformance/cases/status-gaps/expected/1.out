@@ -10,6 +10,7 @@ warning: 1 review(s) predate review pinning (0.15) and still count without a che
 subjects (1):
   building (1):
     cart: 1 scenarios, 1 evidenced, 1 reviewed, 1 open blockers
+      brief: approved in openspec/changes/c-cart/proposal.md — Journey 2026-10-08 — "approved, go ahead"
 
 unowned: none
 

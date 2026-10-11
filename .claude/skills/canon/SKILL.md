@@ -13,22 +13,36 @@ where each subject stands and lists the next commands.
 ## The working loop
 
 Follow these steps in order for every request that builds, changes or fixes
-a feature, a one-line request included. Two points stop for a human:
+a feature, a one-line request included. A human is needed once per scope:
 
-- **The brief** (step 1): the request, your assumptions, your open questions.
-- **The policy**: `.canon/policy.yaml` (written by `canon init`) is what the
-  gate grades the work against. A human approves it with
-  `canon policy approve --by <who>` (and again after every change to it);
-  never edit it to make the gate pass, and never approve it yourself.
+- **The approval** (step 1). A new subject, or a change to an approved
+  subject's scope, needs the human to approve its brief: the request, your
+  assumptions, your open questions. In the same answer the human approves
+  the policy, `.canon/policy.yaml` (written by `canon init`), which is what
+  the gate grades the work against. When the human answers, record both at
+  once: an `Approved: <who> <when> — "<the human's words>"` line in the
+  change's `proposal.md`, and
+  `canon policy approve --by <the human> --note "<their words>"`. Never
+  approve without a human answer, and never edit the policy to make the
+  gate pass.
+- **Inside an approved scope, never stop for a human.** Fixes, follow-ups,
+  review rounds and re-reviews go straight on: add or extend the scenario,
+  implement, gather evidence, and get an independent review in another
+  session. Independent review happens on every change. A fix or follow-up
+  stays in the approved change: add it as tasks in that change's
+  `tasks.md`, never with `canon change new`, because a new change is a new
+  scope and needs the human's approval.
 
 When no human can answer, write the question into the brief, proceed on the
 assumption you state there, and say so in your final report.
 
-1. **Brief.** Write down the request verbatim, your assumptions, and the
-   questions you could not ask. It becomes the change's
-   `openspec/changes/<slug>/proposal.md`, which
+1. **Brief.** For a new subject or a scope change, write down the request
+   verbatim, your assumptions, and the questions you could not ask. It
+   becomes the change's `openspec/changes/<slug>/proposal.md`, which
    `canon change new <slug> --subject <id> --title "…"` scaffolds once the
-   subject exists (step 2). A human approves the brief.
+   subject exists (step 2). Ask the human once for the brief and the
+   policy, and record the answer as above. Inside an approved scope there
+   is no new brief: go to step 3 under the existing subject and change.
 2. **Subject.** `canon subject new <id> --domain <domain> --title "…"`, then
    `canon change new <slug> --subject <id> --title "…"`, and put the brief in
    the change's `proposal.md`.
@@ -78,7 +92,10 @@ assumption you state there, and say so in your final report.
    `proposed → specced → building → verifying → shipped`. It refuses a move
    the policy does not yet allow (missing evidence, missing reviews, open
    blocker findings); fix the gap rather than overriding, and finish with
-   `canon gate check` clean.
+   `canon gate check` clean. Move the subject to `shipped` yourself once
+   `canon subject status <id> shipped` passes its guard, unless the brief
+   says the human ships. `canon status` shows whether each subject's brief
+   is approved and names the next step.
 
 Every write command says whether it staged the record (then
 `canon gate promote`) or wrote it directly.

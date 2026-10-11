@@ -72,8 +72,11 @@ statuses (see `canon-gate`).
 canon policy approve --by <who> [--note <text>] [--repo <dir>]
 ```
 
-A human runs this after reviewing `.canon/policy.yaml`. It writes
-`.canon/policy.approval.json` directly (nothing to promote):
+A human approves the policy after reviewing `.canon/policy.yaml`, in the
+same answer that approves a subject's brief (0.16; see the skill's working
+loop). The human runs this, or the agent runs it right after that answer
+as `canon policy approve --by <the human> --note "<their words>"`. It
+writes `.canon/policy.approval.json` directly (nothing to promote):
 
 ```json
 {
@@ -109,8 +112,8 @@ An approval file that does not parse reads
 `--json` `warnings`). The advisory never changes an exit code: canon
 cannot tell whether a human or an agent ran the command, so the record
 names who approved which bytes, and the advisory says when that no
-longer holds. An agent never runs `canon policy approve` on its own
-behalf.
+longer holds. An agent runs `canon policy approve` only to record a
+human's answer, never without one and never on its own behalf.
 
 ## The closed CEL profile
 

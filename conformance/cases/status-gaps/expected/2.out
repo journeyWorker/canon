@@ -1,5 +1,5 @@
 {
-  "statusVersion": 1,
+  "statusVersion": 2,
   "canonVersion": "0.15.0",
   "policy": {
     "present": true,
@@ -37,14 +37,21 @@
       "unsignedReviews": 0,
       "reviewDue": true,
       "openBlockers": 1,
-      "missingCases": []
+      "missingCases": [],
+      "brief": {
+        "approved": true,
+        "change": "c-cart",
+        "proposal": "openspec/changes/c-cart/proposal.md",
+        "approval": "Journey 2026-10-08 — \"approved, go ahead\""
+      }
     }
   ],
   "unowned": [],
   "next": [
     {
       "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
-      "why": "cart: 1 open blocker finding(s) (first: adding an item twice duplicates the line); fix it, commit, then close it"
+      "why": "cart: 1 open blocker finding(s) (first: adding an item twice duplicates the line); fix it, commit, then close it",
+      "actor": "agent"
     }
   ],
   "nextOmitted": 0

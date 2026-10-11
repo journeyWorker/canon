@@ -9,9 +9,10 @@ warning: policy not approved: .canon/policy.yaml has no approval record (.canon/
 subjects (1):
   verifying (1):
     checkout: 2 scenarios, 2 evidenced, 0 reviewed, 0 open blockers
+      brief: approved in openspec/changes/c-checkout/proposal.md — Journey 2026-10-11 — "승인. 네 가정대로 진행"
 
 unowned: none
 
 next:
-  # checkout: every scenario is evidenced, with no blocker or case gap
+  # checkout: every scenario is evidenced, with no blocker or case gap, and the brief is approved; ship it yourself unless the brief says the human ships
   canon subject status checkout shipped --actor-id <unit>

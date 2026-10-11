@@ -102,22 +102,59 @@ fn seed_blocker(repo: &Path, change: &str) {
     ledger(repo).write(&finding).unwrap();
 }
 
+/// The approval line the agent records once the human answers (0.16 D1).
+const APPROVED: &str = "Approved: Journey 2026-10-11 — \"승인. 네 가정대로 진행\"";
+
+/// The one `next` step status addresses to a human.
+const BRIEF_STEP: &str = "get the brief approved (one human answer covers brief and policy)";
+
+/// `proposal.md` for `change` at `<root>/openspec/changes/<change>/`,
+/// with `extra` after the `## Why` paragraph. `root` is the repo for the
+/// compat-default openspec source (`CANON_YAML` has no `plans:`).
+fn write_proposal(root: &Path, change: &str, extra: &str) {
+    let dir = root.join("openspec/changes").join(change);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("proposal.md"), format!("# {change}\n\n## Why\n\nSeeded.\n\n{extra}")).unwrap();
+}
+
+/// A subject adopting `c-<id>`, whose proposal.md carries an approval.
+fn seed_approved_subject(repo: &Path, id: &str, status: SubjectStatus) {
+    let change = format!("c-{id}");
+    seed_subject(repo, id, status, &[&change]);
+    write_proposal(repo, &change, &format!("{APPROVED}\n"));
+}
+
 fn status_json(repo: &Path) -> Value {
     let out = run(repo, &["status", "--json"]);
     assert_eq!(out.status.code(), Some(0), "status always exits 0; stderr: {}", stderr(&out));
-    serde_json::from_str(&stdout(&out)).expect("status --json prints one JSON object")
+    let report: Value = serde_json::from_str(&stdout(&out)).expect("status --json prints one JSON object");
+    for step in report["next"].as_array().unwrap() {
+        match step["actor"].as_str() {
+            Some("agent") => {}
+            Some("human") => assert_eq!(step["command"], BRIEF_STEP, "the brief is the only step status addresses to a human: {step}"),
+            _ => panic!("every step names its actor: {step}"),
+        }
+    }
+    report
 }
 
 fn subject<'a>(report: &'a Value, id: &str) -> &'a Value {
     report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == id).unwrap_or_else(|| panic!("no subject `{id}` in {report}"))
 }
 
+/// The agent's steps: each a canon command line that parses as printed.
 fn commands(report: &Value) -> Vec<String> {
-    let commands: Vec<String> = report["next"].as_array().unwrap().iter().map(|n| n["command"].as_str().unwrap().to_string()).collect();
+    let commands: Vec<String> =
+        report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "agent").map(|n| n["command"].as_str().unwrap().to_string()).collect();
     for command in &commands {
         assert_suggestion_parses_and_names_the_unit(command);
     }
     commands
+}
+
+/// The human steps' subjects, read off their reasons.
+fn human_steps(report: &Value) -> Vec<String> {
+    report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").map(|n| n["why"].as_str().unwrap().split(':').next().unwrap().to_string()).collect()
 }
 
 /// Splits a suggested command the way a POSIX shell would: whitespace
@@ -219,7 +256,7 @@ fn status_counts_each_subject_through_the_gates_joins() {
     seed_blocker(dir.path(), "c-demo");
 
     let report = status_json(dir.path());
-    assert_eq!(report["statusVersion"], 1);
+    assert_eq!(report["statusVersion"], 2);
     assert_eq!(report["canonVersion"], env!("CARGO_PKG_VERSION"));
     assert_eq!(report["policy"]["present"], true);
     assert_eq!(report["policy"]["spec_coverage"]["require_cases"], serde_json::json!(["failure"]));
@@ -311,12 +348,12 @@ const UNAPPROVED: &str = "warning: policy not approved: .canon/policy.yaml has n
 fn status_next_names_the_command_for_each_gap() {
     let dir = repo();
     write_policy(dir.path(), FULL_POLICY);
-    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["c-demo"]);
-    seed_subject(dir.path(), "empty-subject", SubjectStatus::Building, &[]);
+    seed_approved_subject(dir.path(), "demo-subject", SubjectStatus::Verifying);
+    seed_approved_subject(dir.path(), "empty-subject", SubjectStatus::Building);
     seed_scenario(dir.path(), "world.demo.01", Some("demo-subject"), Some("happy"));
     seed_scenario(dir.path(), "world.demo.02", Some("demo-subject"), Some("happy"));
     seed_evidence(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
-    seed_blocker(dir.path(), "c-demo");
+    seed_blocker(dir.path(), "c-demo-subject");
 
     let report = status_json(dir.path());
     assert_eq!(
@@ -324,7 +361,7 @@ fn status_next_names_the_command_for_each_gap() {
         [
             "canon scenario new world.demo.03 --title \"<what happens on this path>\" --subject demo-subject --case failure",
             "canon evidence add --scenario-id world.demo.02 --project-id demo --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
-            "canon finding close --change-id c-demo --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
+            "canon finding close --change-id c-demo-subject --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
             "canon review add --project-id demo --scenario-id world.demo.01 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
             "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject empty-subject --case happy",
         ]
@@ -444,28 +481,223 @@ fn status_on_a_repo_with_no_subject_points_at_subject_new() {
     assert_eq!(commands(&report), ["canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>"]);
 }
 
-/// The advance rule fires only for a subject the transition gates accept:
-/// following the suggested `shipped` command succeeds.
-#[test]
-fn status_suggests_shipping_only_what_the_ship_gate_accepts() {
-    let dir = repo();
-    write_policy(dir.path(), FULL_POLICY);
-    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &[]);
-    seed_scenario(dir.path(), "world.demo.01", Some("demo-subject"), Some("happy"));
-    seed_scenario(dir.path(), "world.demo.02", Some("demo-subject"), Some("failure"));
+/// A verifying subject whose scenarios are all evidenced and reviewed.
+fn ship_ready(dir: &Path) {
+    write_policy(dir, FULL_POLICY);
+    seed_subject(dir, "demo-subject", SubjectStatus::Verifying, &["c-demo-subject"]);
+    seed_scenario(dir, "world.demo.01", Some("demo-subject"), Some("happy"));
+    seed_scenario(dir, "world.demo.02", Some("demo-subject"), Some("failure"));
     for id in ["world.demo.01", "world.demo.02"] {
-        seed_evidence(dir.path(), id, EvidenceVerdict::Faithful);
-        seed_review(dir.path(), id, "reviewer-2");
+        seed_evidence(dir, id, EvidenceVerdict::Faithful);
+        seed_review(dir, id, "reviewer-2");
     }
+}
+
+/// context.status.62: the advance rule fires only for a subject the
+/// transition gates accept and whose brief is approved. The ship step is
+/// the agent's own command, with no ask of the human, and following it
+/// succeeds.
+#[test]
+fn context_status_62_ship_is_the_agents_step_once_the_brief_is_approved() {
+    let dir = repo();
+    ship_ready(dir.path());
+    write_proposal(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));
 
     let report = status_json(dir.path());
     assert_eq!(commands(&report), ["canon subject status demo-subject shipped --actor-id <unit>"]);
+    let step = &report["next"][0];
+    assert_eq!(step["actor"], "agent", "{step}");
+    let why = step["why"].as_str().unwrap();
+    assert!(why.contains("ship it yourself unless the brief says the human ships"), "{why}");
+    assert!(!why.contains("ask"), "shipping asks nobody: {why}");
     let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
     assert!(out.status.success(), "the suggested transition must pass its gates: {}", stderr(&out));
     let report = status_json(dir.path());
     assert_eq!(subject(&report, "demo-subject")["status"], "shipped");
+    assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], true, "a shipped subject still shows its brief");
     assert_eq!(report["next"], serde_json::json!([]));
     assert!(stdout(&run(dir.path(), &["status"])).contains("next: nothing"));
+}
+
+/// context.status.61: a ship-ready subject whose newest adopted change's
+/// proposal.md carries no `Approved:` line gets the one human step and no
+/// move-on; a subject with no change at all is told where the brief goes.
+#[test]
+fn context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_move_on() {
+    let dir = repo();
+    ship_ready(dir.path());
+    write_proposal(dir.path(), "c-demo-subject", "Status: draft, awaiting the human.\n");
+    seed_subject(dir.path(), "bare-subject", SubjectStatus::Building, &[]);
+    seed_scenario(dir.path(), "world.bare.01", Some("bare-subject"), Some("failure"));
+    seed_evidence(dir.path(), "world.bare.01", EvidenceVerdict::Faithful);
+
+    let report = status_json(dir.path());
+    assert_eq!(human_steps(&report), ["demo-subject", "bare-subject"], "{report}");
+    assert!(commands(&report).iter().all(|c| !c.starts_with("canon subject status")), "no move-on without an approved brief: {report}");
+    let whys: Vec<&str> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").map(|n| n["why"].as_str().unwrap()).collect();
+    assert!(whys[0].contains("openspec/changes/c-demo-subject/proposal.md"), "{}", whys[0]);
+    for why in &whys {
+        assert!(why.contains("Approved: <who> <when>") && why.contains("canon policy approve --by <the human> --note"), "{why}");
+    }
+    assert!(whys[1].contains("canon change new <slug> --subject bare-subject"), "{}", whys[1]);
+    let demo = subject(&report, "demo-subject");
+    assert_eq!(demo["brief"], serde_json::json!({"approved": false, "change": "c-demo-subject", "proposal": "openspec/changes/c-demo-subject/proposal.md"}));
+    assert_eq!(subject(&report, "bare-subject")["brief"], serde_json::json!({"approved": false}));
+
+    let text = stdout(&run(dir.path(), &["status"]));
+    assert!(text.contains("      brief: not approved (openspec/changes/c-demo-subject/proposal.md has no `Approved:` line)\n"), "{text}");
+    assert!(text.contains("      brief: not approved (no adopted change)\n"), "{text}");
+    assert!(text.contains(&format!("\n  human: {BRIEF_STEP}\n")), "{text}");
+}
+
+/// context.status.60: the brief is approved when the subject's newest
+/// adopted change's proposal.md has a line starting `Approved:` (indent
+/// allowed); status shows that change, its proposal.md and the recorded
+/// words, for building, verifying and shipped subjects only.
+#[test]
+fn context_status_60_status_reads_the_approval_from_the_changes_proposal() {
+    let dir = repo();
+    write_policy(dir.path(), FULL_POLICY);
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &["c-first", "c-second"]);
+    write_proposal(dir.path(), "c-first", "No approval here.\n");
+    write_proposal(dir.path(), "c-second", &format!("  {APPROVED}\n"));
+    seed_approved_subject(dir.path(), "done-subject", SubjectStatus::Shipped);
+    seed_subject(dir.path(), "early-subject", SubjectStatus::Specced, &[]);
+
+    let report = status_json(dir.path());
+    let words = APPROVED.strip_prefix("Approved: ").unwrap();
+    assert_eq!(
+        subject(&report, "demo-subject")["brief"],
+        serde_json::json!({"approved": true, "change": "c-second", "proposal": "openspec/changes/c-second/proposal.md", "approval": words})
+    );
+    assert_eq!(
+        subject(&report, "done-subject")["brief"],
+        serde_json::json!({"approved": true, "change": "c-done-subject", "proposal": "openspec/changes/c-done-subject/proposal.md", "approval": words}),
+        "a shipped subject shows its brief in full"
+    );
+    assert!(subject(&report, "early-subject").get("brief").is_none(), "a specced subject carries no brief field");
+    assert!(human_steps(&report).is_empty(), "{report}");
+    let text = stdout(&run(dir.path(), &["status"]));
+    assert!(text.contains(&format!("      brief: approved in openspec/changes/c-second/proposal.md — {words}\n")), "{text}");
+    assert!(text.contains(&format!("      brief: approved in openspec/changes/c-done-subject/proposal.md — {words}\n")), "{text}");
+}
+
+/// context.status.63: only a line that starts with `Approved:`, says
+/// something, and sits outside HTML comments and fenced code blocks
+/// approves. Each case runs in its own repo with one subject, so its
+/// report stays under the `next` cap and its human step is checked
+/// exactly; the controls prove a comment or fence that has closed does
+/// not hide a later approval.
+#[test]
+fn context_status_63_a_line_that_only_mentions_approval_does_not_approve() {
+    let refused = [
+        ("empty", "Approved:\n".to_string()),
+        ("mid-line", "Status: Approved: by the agent\n".to_string()),
+        ("comment-one-line", "<!-- Approved: Journey 2026-10-11 -->\n".to_string()),
+        ("comment-multi-line", format!("<!--\n{APPROVED}\n-->\n")),
+        ("comment-opened-mid-line", format!("Draft notes <!-- not yet:\n{APPROVED}\n-->\n")),
+        ("fence-backtick", format!("```\n{APPROVED}\n```\n")),
+        ("fence-tilde", format!("~~~md\n{APPROVED}\n~~~\n")),
+        ("fence-nested", format!("````\n```\n{APPROVED}\n```\n````\n")),
+        ("fence-unclosed", format!("```\n{APPROVED}\n")),
+    ];
+    let accepted = [
+        ("after-comment", format!("<!-- a note -->\n<!--\nmore\n-->\n{APPROVED}\n")),
+        ("after-fence", format!("```\nApproved: in code\n```\n{APPROVED}\n")),
+    ];
+    // One building subject adopting `c-<case>`, whose proposal.md is `body`.
+    let report_for = |case: &str, body: &str| {
+        let dir = repo();
+        write_policy(dir.path(), FULL_POLICY);
+        seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[&format!("c-{case}")]);
+        write_proposal(dir.path(), &format!("c-{case}"), body);
+        let report = status_json(dir.path());
+        assert_eq!(report["nextOmitted"], 0, "{case}: the report stays under the next cap: {report}");
+        report
+    };
+
+    for (case, body) in &refused {
+        let report = report_for(case, body);
+        assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], false, "{case} must not approve:\n{body}");
+        let humans: Vec<&Value> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").collect();
+        assert_eq!(humans.len(), 1, "{case}: exactly one human step: {report}");
+        assert_eq!(humans[0]["command"], BRIEF_STEP, "{case}: {report}");
+        assert!(humans[0]["why"].as_str().unwrap().starts_with("demo-subject: "), "{case}: the step is the subject's: {report}");
+        assert!(humans[0]["why"].as_str().unwrap().contains(&format!("openspec/changes/c-{case}/proposal.md")), "{case}: {report}");
+    }
+    for (case, body) in &accepted {
+        let report = report_for(case, body);
+        assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], true, "{case} must approve:\n{body}");
+        assert!(human_steps(&report).is_empty(), "{case}: an approved brief asks no human: {report}");
+    }
+}
+
+/// context.status.65: a fix lives as tasks inside the approved change, so
+/// a newer adopted change is a new scope. An approval on an older change
+/// does not cover it: status names the newest change, asks for the human,
+/// and withholds the ship step.
+#[test]
+fn context_status_65_an_older_changes_approval_does_not_cover_a_newer_change() {
+    let dir = repo();
+    ship_ready(dir.path());
+    write_proposal(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["c-demo-subject", "c-scope-two"]);
+    write_proposal(dir.path(), "c-scope-two", "A new scope, not yet approved.\n");
+    seed_subject(dir.path(), "other-subject", SubjectStatus::Building, &["c-other-old", "c-other-new"]);
+    write_proposal(dir.path(), "c-other-old", &format!("{APPROVED}\n"));
+
+    let report = status_json(dir.path());
+    assert_eq!(
+        subject(&report, "demo-subject")["brief"],
+        serde_json::json!({"approved": false, "change": "c-scope-two", "proposal": "openspec/changes/c-scope-two/proposal.md"})
+    );
+    assert_eq!(subject(&report, "other-subject")["brief"], serde_json::json!({"approved": false, "change": "c-other-new"}), "no proposal.md for the newest change");
+    let mut humans = human_steps(&report);
+    humans.sort();
+    assert_eq!(humans, ["demo-subject", "other-subject"], "{report}");
+    assert!(commands(&report).iter().all(|c| !c.starts_with("canon subject status")), "an older approval never unlocks the ship step: {report}");
+    let why = |id: &str| report["next"].as_array().unwrap().iter().find(|n| n["actor"] == "human" && n["why"].as_str().unwrap().starts_with(id)).unwrap()["why"].as_str().unwrap().to_string();
+    assert!(why("demo-subject").contains("openspec/changes/c-scope-two/proposal.md"), "{}", why("demo-subject"));
+    assert!(why("other-subject").contains("`c-other-new`"), "{}", why("other-subject"));
+    let text = stdout(&run(dir.path(), &["status"]));
+    assert!(text.contains("      brief: not approved (openspec/changes/c-scope-two/proposal.md has no `Approved:` line)\n"), "{text}");
+    assert!(text.contains("      brief: not approved (change `c-other-new` has no proposal.md)\n"), "{text}");
+}
+
+/// context.status.64: the brief is read under canon.yaml's openspec plan
+/// sources in config order, a changes dir passed directly and an archived
+/// change included; other dialects are not read, and with `sources: []`
+/// no proposal.md is found, so no brief reads as approved.
+#[test]
+fn context_status_64_status_reads_briefs_under_the_configured_openspec_sources() {
+    let dir = repo();
+    let plans = "plans:\n  sources:\n    - dialect: superpowers\n      root: docs/plans\n    - dialect: openspec\n      root: plans/changes\n    - dialect: openspec\n      root: later\n";
+    std::fs::write(dir.path().join("canon.yaml"), format!("{CANON_YAML}{plans}")).unwrap();
+    std::fs::create_dir_all(dir.path().join("docs/plans")).unwrap();
+    write_policy(dir.path(), FULL_POLICY);
+    seed_subject(dir.path(), "live-subject", SubjectStatus::Building, &["c-live"]);
+    seed_subject(dir.path(), "old-subject", SubjectStatus::Shipped, &["c-old"]);
+    // `plans/changes` is a changes dir passed directly; `c-old` is archived.
+    let direct = dir.path().join("plans/changes");
+    for (change, body) in [("c-live", "No approval in the first source.\n"), ("archive/c-old", "Approved: Journey 2026-10-01 — \"ok\"\n")] {
+        std::fs::create_dir_all(direct.join(change)).unwrap();
+        std::fs::write(direct.join(change).join("proposal.md"), format!("## Why\n\nSeeded.\n\n{body}")).unwrap();
+    }
+    // A later source's approval of the same change does not count: the
+    // first source holding the change owns it.
+    write_proposal(&dir.path().join("later"), "c-live", &format!("{APPROVED}\n"));
+    // The compat-default location is not a configured source here.
+    write_proposal(dir.path(), "c-live", &format!("{APPROVED}\n"));
+
+    let report = status_json(dir.path());
+    assert_eq!(subject(&report, "live-subject")["brief"]["proposal"], "plans/changes/c-live/proposal.md", "{report}");
+    assert_eq!(subject(&report, "live-subject")["brief"]["approved"], false, "{report}");
+    assert_eq!(subject(&report, "old-subject")["brief"]["proposal"], "plans/changes/archive/c-old/proposal.md", "{report}");
+    assert_eq!(subject(&report, "old-subject")["brief"]["approved"], true, "{report}");
+
+    std::fs::write(dir.path().join("canon.yaml"), format!("{CANON_YAML}plans:\n  sources: []\n")).unwrap();
+    let report = status_json(dir.path());
+    assert_eq!(subject(&report, "old-subject")["brief"], serde_json::json!({"approved": false, "change": "c-old"}), "{report}");
 }
 
 #[test]
@@ -538,7 +770,7 @@ fn status_caps_next_at_five() {
     let dir = repo();
     write_policy(dir.path(), FULL_POLICY);
     for n in 1..=7 {
-        seed_subject(dir.path(), &format!("subject-{n}"), SubjectStatus::Building, &[]);
+        seed_approved_subject(dir.path(), &format!("subject-{n}"), SubjectStatus::Building);
     }
     seed_scenario(dir.path(), "world.demo.01", None, None);
 

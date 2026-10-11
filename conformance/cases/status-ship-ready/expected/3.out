@@ -1,5 +1,5 @@
 {
-  "statusVersion": 1,
+  "statusVersion": 2,
   "canonVersion": "0.15.0",
   "policy": {
     "present": true,
@@ -31,7 +31,13 @@
       "unsignedReviews": 0,
       "reviewDue": false,
       "openBlockers": 0,
-      "missingCases": []
+      "missingCases": [],
+      "brief": {
+        "approved": true,
+        "change": "c-checkout",
+        "proposal": "openspec/changes/c-checkout/proposal.md",
+        "approval": "Journey 2026-10-11 — \"승인. 네 가정대로 진행\""
+      }
     }
   ],
   "unowned": [],

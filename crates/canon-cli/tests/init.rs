@@ -74,7 +74,18 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
 
     let agents = std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
     assert!(agents.starts_with("<!-- canon:begin -->\n") && agents.ends_with("<!-- canon:end -->\n"), "{agents}");
-    for needle in ["managed with canon", "canon status", "canon skill", "failure", "Independent review"] {
+    for needle in [
+        "managed with canon",
+        "canon status",
+        "canon skill",
+        "failure",
+        "Independent review",
+        "Approved: <who> <when>",
+        "canon policy approve --by <the human> --note",
+        "Inside an approved scope, never stop for a human",
+        "unless the brief says the human ships",
+        "a new change is a new scope",
+    ] {
         assert!(agents.contains(needle), "the AGENTS.md block is missing `{needle}`: {agents}");
     }
 

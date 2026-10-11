@@ -717,3 +717,55 @@ fn skills_install_43_doctor_warns_about_skills_claiming_build_work_and_never_edi
     assert_eq!(fs::read_to_string(&sites).unwrap(), sites_text);
     assert_eq!(fs::read_to_string(&notes).unwrap(), notes_text);
 }
+
+/// canon's own skill source and the `canon init` AGENTS.md block, each
+/// with its whitespace collapsed so wrapped lines read as one.
+fn skill_and_block() -> [(&'static str, String); 2] {
+    let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let skill = fs::read_to_string(repo.join("canon/skills/SKILL.src.md")).unwrap();
+    let tmp = tempfile::tempdir().unwrap();
+    let init = Command::new(env!("CARGO_BIN_EXE_canon")).arg("init").arg("--repo").arg(tmp.path()).output().unwrap();
+    assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
+    let block = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
+    [("skill", words(&skill)), ("AGENTS.md block", words(&block))]
+}
+
+/// skills.install.20 (0.16 D1): the skill and the AGENTS.md block both
+/// carry one human approval per scope, recorded by the agent at once in
+/// the brief and the policy approval, then no stop inside the scope,
+/// independent review on every change, and shipping by the agent.
+#[test]
+fn skills_install_20_skill_and_block_carry_one_approval_per_scope() {
+    for (name, text) in skill_and_block() {
+        for rule in [
+            "for a new subject or a scope change",
+            "Approved: <who> <when> — \"<",
+            "canon policy approve --by <the human> --note \"<their words>\"",
+            "Never approve without a human answer",
+            "Inside an approved scope, never stop for a human",
+            "When no human can answer",
+            "on every change",
+            "yourself once",
+            "unless the brief says the human ships",
+            "in the approved change",
+            "tasks.md",
+            "a new change is a new scope",
+        ] {
+            assert!(text.to_lowercase().contains(&rule.to_lowercase()), "the {name} must say {rule:?}: {text}");
+        }
+    }
+}
+
+/// skills.install.21 (0.16 D1): neither the skill nor the AGENTS.md
+/// block keeps a second human stop: no fixed pair of stops, no
+/// per-request brief approval, and no rule that the agent may never run
+/// the policy approval for the human.
+#[test]
+fn skills_install_21_skill_and_block_name_no_second_human_stop() {
+    for (name, text) in skill_and_block() {
+        for stale in ["Two points stop for a human", "a human approves it.", "never approve it yourself", "A human approves the brief"] {
+            assert!(!text.contains(stale), "the {name} still says {stale:?}: {text}");
+        }
+    }
+}

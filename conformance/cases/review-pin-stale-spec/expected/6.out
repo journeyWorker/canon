@@ -9,9 +9,12 @@ warning: policy not approved: .canon/policy.yaml has no approval record (.canon/
 subjects (1):
   verifying (1):
     cart: 1 scenarios, 1 evidenced, 0 reviewed (1 due), 1 stale review(s), 0 open blockers
+      brief: not approved (change `c-cart` has no proposal.md)
 
 unowned: none
 
 next:
+  # cart: its newest adopted change `c-cart` has no proposal.md under the openspec plan sources; write its brief there, and once the human answers, record their words as `Approved: <who> <when> — "<their words>"` in it and run `canon policy approve --by <the human> --note "<their words>"`
+  human: get the brief approved (one human answer covers brief and policy)
   # cart: 1 of 1 scenario(s) lack a qualifying review (1 with a stale review (spec or evidence changed since it was reviewed)); review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor
   canon review add --project-id root --scenario-id cart.add.01 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref "<feature file>"
