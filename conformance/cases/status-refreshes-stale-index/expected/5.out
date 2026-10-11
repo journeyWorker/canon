@@ -1,0 +1,13 @@
+canon 0.15.0
+policy: absent
+warning: no policy: .canon/policy.yaml not found, so `canon gate check` requires no evidence, failure cases or review here
+
+subjects (1):
+  proposed (1):
+    cart: 1 scenarios, 0 evidenced, 0 reviewed, 0 open blockers
+
+unowned: none
+
+next:
+  # cart has its scenarios and every required case; move it on
+  canon subject status cart specced --actor-id <unit>

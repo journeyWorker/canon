@@ -357,6 +357,9 @@ pub struct EvidenceArgs {
     /// `drop_reason` recorded for all of them.
     pub drop_attachments: Vec<String>,
     pub drop_reason: Option<String>,
+    /// `--promote`/`--no-promote` (0.16 D2): whether this run promotes
+    /// the record it stages ([`crate::write_mode`]).
+    pub promote: crate::write_mode::PromoteFlag,
 }
 
 /// The `--kind` value that marks an audited outcome (0.15 D3).
@@ -620,6 +623,13 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     // ancestor walk of its own — so the walk happens HERE, once, exactly
     // as `crate::gate`'s every subcommand does it.
     let repo = resolve_repo_root(repo);
+    let promote = match crate::write_mode::should_promote(&repo, args.promote) {
+        Ok(promote) => promote,
+        Err(error) => {
+            eprintln!("canon evidence add: refused — {error}");
+            return 2;
+        }
+    };
 
     if args.kind.trim().is_empty() || args.evidence_ref.trim().is_empty() {
         eprintln!("canon evidence add: refused — --kind and --ref must both be non-empty; an empty companion narrows the gate's typed evidence slice to nothing");
@@ -981,14 +991,9 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
                 Some(result) => format!("audit {}", result.as_str()),
                 None => format!("verdict {}", verdict_slug(verdict)),
             };
-            println!(
-                "canon evidence add: staged {} for {} ({outcome}) — {}, {}",
-                receipt.location,
-                subject,
-                crate::write_mode::STAGED_FOR_GATE_PROMOTE,
-                next
-            );
-            0
+            let settled = crate::gate::promote_after_stage("canon evidence add", &ledger_root, &receipt.location, promote);
+            println!("canon evidence add: staged {} for {} ({outcome}) — {}, {}", receipt.location, subject, settled.suffix(), next);
+            settled.exit_code()
         }
         Err(e) => {
             eprintln!("canon evidence add: {e}");
@@ -1162,6 +1167,7 @@ mod tests {
             audit_result: None,
             drop_attachments: Vec::new(),
             drop_reason: None,
+            promote: crate::write_mode::PromoteFlag::Config,
         }
     }
 

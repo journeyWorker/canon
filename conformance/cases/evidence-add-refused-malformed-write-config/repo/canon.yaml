@@ -1,0 +1,10 @@
+tiers:
+  local:
+    backend: git
+    root: .canon/ledger
+specs:
+  roots:
+    - id: root
+      root: specs
+write:
+  promote: always

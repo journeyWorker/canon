@@ -784,6 +784,65 @@ pub fn run_promote(repo: &Path, dry_run: bool) -> i32 {
     }
 }
 
+/// Where a staged write ended up once its command decided whether to
+/// promote ([`crate::write_mode::should_promote`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StagedOutcome {
+    /// Not asked to promote: the record waits in staging.
+    Staged,
+    /// Promoted in this run: the record left staging for the ledger.
+    Promoted,
+    /// Promotion ran and refused this record (or failed): it is still
+    /// staged, and the printed report says why.
+    Refused,
+}
+
+impl StagedOutcome {
+    /// The success-line suffix ([`crate::write_mode`]).
+    pub(crate) fn suffix(self) -> &'static str {
+        match self {
+            Self::Promoted => crate::write_mode::PROMOTED,
+            Self::Staged | Self::Refused => crate::write_mode::STAGED_FOR_GATE_PROMOTE,
+        }
+    }
+
+    /// The exit code: a refused promotion is refused-by-policy.
+    pub(crate) fn exit_code(self) -> i32 {
+        match self {
+            Self::Refused => 1,
+            Self::Staged | Self::Promoted => 0,
+        }
+    }
+}
+
+/// A staged write's own promotion (`--promote` / `write: { promote:
+/// auto }`): `canon gate promote`'s code, run right after the write
+/// staged `location` (tier-relative under [`evidence_staging_dir`]).
+/// Prints the promote report exactly as `canon gate promote` would, so
+/// the run names what it committed, and reads the record's own outcome
+/// off staging: gone means promoted (or recovered), still there means
+/// promotion refused it.
+pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &str, promote: bool) -> StagedOutcome {
+    if !promote {
+        return StagedOutcome::Staged;
+    }
+    let staging_root = evidence_staging_dir(ledger_root);
+    match gate_promote(&GitTier::new(&staging_root), &GitTier::new(ledger_root), false) {
+        Ok(report) => {
+            print!("{}", format_promote_report(&report, false));
+            if staging_root.join(location).exists() {
+                StagedOutcome::Refused
+            } else {
+                StagedOutcome::Promoted
+            }
+        }
+        Err(e) => {
+            eprintln!("{command}: staged, but promoting it failed: {e}");
+            StagedOutcome::Refused
+        }
+    }
+}
+
 /// One [`PromoteReport`] as an operator reads it: a line per candidate,
 /// then a PER-KIND tally.
 ///
@@ -950,4 +1009,45 @@ pub fn run_selftest() -> i32 {
     let report = selftest::run();
     print!("{}", report.format_human());
     report.exit_code()
+}
+
+#[cfg(test)]
+mod tests {
+    use canon_model::{EvidenceRecord, EvidenceVerdict, RoleId};
+    use canon_store::tier::RawWrite;
+
+    use super::*;
+
+    /// Stage one task-keyed evidence record by `actor`; returns its
+    /// staging-relative location.
+    fn stage(ledger_root: &Path, actor: Actor) -> String {
+        let record = EvidenceRecord::new(
+            Envelope::current(RecordKind::EvidenceRecord, Utc::now(), actor),
+            Some(TaskId::parse("demo-change#1.1").unwrap()),
+            None,
+            None,
+            EvidenceVerdict::Faithful,
+        );
+        let body = serde_json::to_value(&record).unwrap();
+        GitTier::new(evidence_staging_dir(ledger_root)).write(&RawWrite(RawRecord(body))).unwrap().location
+    }
+
+    #[test]
+    fn promote_after_stage_reads_the_records_own_outcome_off_staging() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger_root = dir.path().join(".canon/ledger");
+
+        let kept = stage(&ledger_root, Actor::new("impl", RoleId::parse("implementer").unwrap()));
+        assert_eq!(promote_after_stage("t", &ledger_root, &kept, false), StagedOutcome::Staged);
+        assert!(evidence_staging_dir(&ledger_root).join(&kept).exists(), "not asked to promote: nothing moves");
+
+        assert_eq!(promote_after_stage("t", &ledger_root, &kept, true), StagedOutcome::Promoted);
+        assert!(!evidence_staging_dir(&ledger_root).join(&kept).exists());
+
+        // No `actor.role`: promotion cannot assign a run_seq and refuses it.
+        let refused = stage(&ledger_root, Actor::new_unattributed("legacy-writer"));
+        let outcome = promote_after_stage("t", &ledger_root, &refused, true);
+        assert_eq!((outcome, outcome.exit_code(), outcome.suffix()), (StagedOutcome::Refused, 1, crate::write_mode::STAGED_FOR_GATE_PROMOTE));
+        assert!(evidence_staging_dir(&ledger_root).join(&refused).exists(), "a refused record stays staged");
+    }
 }

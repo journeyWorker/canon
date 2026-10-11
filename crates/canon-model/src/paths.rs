@@ -74,6 +74,14 @@ pub const PRE_COMMIT_SCRIPT: &str = ".canon/scripts/canon-gate-pre-commit.sh";
 /// it is git-tracked, never ignored.
 pub const ARTIFACTS_SHA256_DIR: &str = ".canon/artifacts/sha256";
 
+/// The read-access audit log `canon query`/`export`/`purge` append to.
+/// Local operator state, never committed: `canon init` ignores its
+/// directory ([`AUDIT_GITIGNORE`]).
+pub const ACCESS_AUDIT_FILE: &str = ".canon/audit/access.jsonl";
+
+/// The `.gitignore` line covering [`ACCESS_AUDIT_FILE`]'s directory.
+pub const AUDIT_GITIGNORE: &str = ".canon/audit/";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,6 +105,8 @@ mod tests {
             INGEST_CURSORS_DIR,
             PRE_COMMIT_SCRIPT,
             ARTIFACTS_SHA256_DIR,
+            ACCESS_AUDIT_FILE,
+            AUDIT_GITIGNORE,
         ];
         for path in all {
             assert!(

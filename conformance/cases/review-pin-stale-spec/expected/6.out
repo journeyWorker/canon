@@ -7,10 +7,10 @@ warning: policy not approved: .canon/policy.yaml has no approval record (.canon/
 
 subjects (1):
   verifying (1):
-    cart: 1 scenarios, 1 evidenced, 0 reviewed (1 due), 1 stale review(s), 0 open blockers
+    cart: 1 scenarios, 1 evidenced, 1 reviewed, 0 open blockers
 
 unowned: none
 
 next:
-  # cart: 1 of 1 scenario(s) lack a qualifying review (1 with a stale review (spec or evidence changed since it was reviewed)); review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor
-  canon review add --project-id root --scenario-id cart.add.01 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref "<feature file>"
+  # cart: every scenario is evidenced and reviewed, with no blocker or case gap
+  canon subject status cart shipped --actor-id <unit>
