@@ -482,7 +482,7 @@ canon evidence add: review by `reviewer-2` of cart.add.01 is now stale (it pinne
 
 The decision is the gate's own (the same stale-review rule `canon gate
 check` reports). The command repeats the review's reviewer, actor, role,
-provenance ref, runtime labels and artifacts, pinned at `HEAD` (`<sha>`
+session, provenance ref, runtime labels and artifacts, pinned at `HEAD` (`<sha>`
 when the repository has no commit). A record that is only staged says
 the review "goes stale once this evidence is promoted": promote first,
 then re-pin. The reviewer re-reviews before re-pinning; several

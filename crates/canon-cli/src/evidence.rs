@@ -1291,42 +1291,28 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         .collect();
     let stale_reviews = stale_review_notices(&mut gate_context, &records);
 
-    let stored = match crate::evidence_attach::store_files(repo, &batch.files) {
-        Ok(stored) => stored,
-        Err((file, e)) => {
-            eprintln!("canon evidence add: refused — could not store {} in the artifact store: {e}", file.resolved.display());
-            return 2;
+    let bodies: Vec<serde_json::Value> = records.iter().map(|record| record_body(record, args)).collect();
+    let landed = match land_batch(repo, &ledger_root, &batch.files, bodies, promote, &mut |tier, write| tier.write(write)) {
+        Ok(landed) => landed,
+        Err((error, code)) => {
+            eprintln!("canon evidence add: {error}");
+            eprintln!("canon evidence add: refused — no record of the batch is written: every record and blob this run staged, promoted or stored was removed");
+            return code;
         }
     };
-    println!("{}", crate::evidence_attach::stored_line("canon evidence add", batch.files.len(), stored));
-
-    let staging = GitTier::new(evidence_staging_dir(&ledger_root));
-    let mut staged = Vec::new();
-    for record in &records {
-        match staging.write(&RawWrite(RawRecord(record_body(record, args)))) {
-            Ok(receipt) => staged.push(receipt.location),
-            Err(e) => {
-                eprintln!("canon evidence add: {e}");
-                if !staged.is_empty() {
-                    eprintln!("canon evidence add: {} record(s) of the batch were staged before the failure: {}", staged.len(), staged.join(", "));
-                }
-                return 2;
-            }
-        }
-    }
-    let mut exit = 0;
-    let mut all_promoted = true;
-    for ((record, location), id) in records.iter().zip(&staged).zip(&scenario_ids) {
-        let settled = crate::gate::promote_after_stage("canon evidence add", &ledger_root, location, promote);
+    println!("{}", crate::evidence_attach::stored_line("canon evidence add", batch.files.len(), landed.stored));
+    for ((record, location), id) in records.iter().zip(&landed.locations).zip(&scenario_ids) {
+        let settled = match &location.promoted {
+            Some(target) => crate::gate::StagedOutcome::Promoted { target: target.clone() },
+            None => crate::gate::StagedOutcome::Staged,
+        };
         println!(
             "canon evidence add: {} for {} (verdict {}) — {}, then `canon gate check`",
-            settled.landed(location),
+            settled.landed(&location.staged),
             id.as_str(),
             verdict_slug(record.verdict),
             settled.suffix()
         );
-        all_promoted &= matches!(settled, crate::gate::StagedOutcome::Promoted { .. });
-        exit = exit.max(settled.exit_code());
     }
     for (id, case) in &batch.unindexed {
         println!("canon evidence add: skipped {id} — not an indexed scenario of spec root `{}` (case `{case}`); index it (`canon inventory sync`) or fix the test name", project_id.as_str());
@@ -1334,8 +1320,92 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     if batch.without_id > 0 {
         println!("canon evidence add: skipped {} case(s) that carry no scenario id", batch.without_id);
     }
-    print_stale_reviews(repo, &stale_reviews, all_promoted);
-    exit
+    print_stale_reviews(repo, &stale_reviews, promote);
+    0
+}
+
+/// Where one record of a batch landed: its staging location, and its
+/// committed path when it was promoted.
+struct BatchLocation {
+    staged: String,
+    promoted: Option<String>,
+}
+
+/// What [`land_batch`] wrote.
+struct LandedBatch {
+    /// Blobs newly stored.
+    stored: usize,
+    locations: Vec<BatchLocation>,
+}
+
+/// Write a batch all or nothing (0.18 D1): check that the staging (and,
+/// with `promote`, the committed) evidence directory can be written,
+/// store every bound file under the store lock, stage every body through
+/// `write`, then promote every staged record. A failure at any step
+/// removes every record this call staged or promoted and every blob it
+/// newly stored (the lock is held throughout, so no other writer's blob
+/// is touched), and is returned as the error. `write` is the staging
+/// write, `GitTier::write` outside tests.
+fn land_batch(
+    repo: &Path,
+    ledger_root: &Path,
+    files: &[crate::evidence_attach::BoundFile],
+    bodies: Vec<serde_json::Value>,
+    promote: bool,
+    write: &mut dyn FnMut(&GitTier, &RawWrite) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
+) -> Result<LandedBatch, (String, i32)> {
+    let staging_root = evidence_staging_dir(ledger_root);
+    let kind_dir = format!("kind={}", RecordKind::EvidenceRecord.as_str());
+    let mut destinations = vec![staging_root.join(&kind_dir)];
+    if promote {
+        destinations.push(ledger_root.join(&kind_dir));
+    }
+    for dir in &destinations {
+        let writable = std::fs::create_dir_all(dir).and_then(|()| std::fs::metadata(dir)).map(|m| !m.permissions().readonly());
+        match writable {
+            Ok(true) => {}
+            Ok(false) => return Err((format!("{} is read-only", dir.display()), 2)),
+            Err(e) => return Err((format!("cannot prepare {}: {e}", dir.display()), 2)),
+        }
+    }
+
+    let held = crate::evidence_attach::store_files_held(repo, files)
+        .map_err(|(file, e)| (format!("could not store {} in the artifact store: {e}", file.resolved.display()), 2))?;
+    let staging = GitTier::new(&staging_root);
+    let mut locations: Vec<BatchLocation> = Vec::new();
+    let rollback = |locations: &[BatchLocation], held: crate::evidence_attach::HeldStore| {
+        for location in locations {
+            let _ = std::fs::remove_file(staging_root.join(&location.staged));
+            if let Some(target) = &location.promoted {
+                let _ = std::fs::remove_file(ledger_root.join(target));
+            }
+        }
+        held.rollback();
+    };
+    for body in bodies {
+        match write(&staging, &RawWrite(RawRecord(body))) {
+            Ok(receipt) => locations.push(BatchLocation { staged: receipt.location, promoted: None }),
+            Err(e) => {
+                let error = format!("staging record {} of the batch failed: {e}", locations.len() + 1);
+                rollback(&locations, held);
+                return Err((error, 2));
+            }
+        }
+    }
+    if promote {
+        for index in 0..locations.len() {
+            match crate::gate::promote_after_stage("canon evidence add", ledger_root, &locations[index].staged, true) {
+                crate::gate::StagedOutcome::Promoted { target } => locations[index].promoted = Some(target),
+                _ => {
+                    let error = format!("promoting record {} of the batch ({}) was refused", index + 1, locations[index].staged);
+                    rollback(&locations, held);
+                    return Err((error, 1));
+                }
+            }
+        }
+    }
+    let stored = held.stored();
+    Ok(LandedBatch { stored, locations })
 }
 
 /// The in-effect pinned reviews that `written` makes stale (0.18 D2),
@@ -1382,7 +1452,8 @@ fn stale_review_notices(ctx: &mut GateContext, written: &[EvidenceRecord]) -> Ve
 
 /// One line per review `stale` names (0.18 D2): the reviewer, the
 /// scenario, and the `canon review add` that re-pins it — the same
-/// reviewer, actor, role, provenance ref and artifacts, pinned at
+/// reviewer, actor, role, session, provenance ref, runtime labels and
+/// artifacts, pinned at
 /// `HEAD` (`<sha>` when the repository has no commit). A record still
 /// staged makes the review stale once it is promoted.
 fn print_stale_reviews(repo: &Path, stale: &[Review], promoted: bool) {
@@ -1415,6 +1486,9 @@ fn repin_command(review: &Review, pin: &str) -> String {
         format!("--role {}", shell_quote(role)),
         format!("--pin {}", if pin == "<sha>" { pin.to_string() } else { shell_quote(pin) }),
     ];
+    if let Some(session) = &review.envelope.actor.session_id {
+        words.push(format!("--session-id {}", shell_quote(session.as_str())));
+    }
     words.push(match &review.provenance_ref {
         ProvenanceRef::UpstreamRef(r) => format!("--upstream-ref {}", shell_quote(r)),
         ProvenanceRef::OriginalSpecRef(r) => format!("--original-spec-ref {}", shell_quote(r)),
@@ -1878,5 +1952,66 @@ mod tests {
         assert!(!doc.contains("9.9"), "no forged row may reach the document: {doc}");
         assert!(!doc.contains("- [x]"), "nothing may flip on a multi-line note: {doc}");
         assert!(doc.contains("- [ ] 1.1"), "the real row stays open: {doc}");
+    }
+
+    /// A scenario-keyed evidence body by `actor`, as a batch stages it.
+    fn batch_body(scenario: &str, actor: Actor) -> serde_json::Value {
+        let record = EvidenceRecord::new(Envelope::current(RecordKind::EvidenceRecord, Utc::now(), actor), None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful)
+            .with_project_id(ProjectId::parse("root").unwrap());
+        serde_json::to_value(&record).unwrap()
+    }
+
+    /// evidence.add.83: a batch that fails partway — its second record's
+    /// staging write fails, or its promotion is refused — leaves no
+    /// committed record, no staged record and no new blob.
+    #[test]
+    fn evidence_add_83_a_batch_that_fails_partway_leaves_nothing_behind() {
+        let tmp = repo_with_plan_corpus();
+        let repo = tmp.path();
+        let ledger_root = GateCtx::from_repo(repo).unwrap().ledger_root;
+        std::fs::write(repo.join("junit.xml"), "<testsuite/>").unwrap();
+        let files: Vec<crate::evidence_attach::BoundFile> =
+            crate::evidence_attach::bind_artifacts(repo, &[repo.join("junit.xml")], 1024).unwrap().into_iter().map(|(_, file)| file).collect();
+        let store = canon_gate::artifact_store::store_dir(repo);
+        let blobs = || std::fs::read_dir(&store).map(|d| d.count()).unwrap_or(0);
+        let implementer = || Actor::new("impl", RoleId::parse("implementer").unwrap());
+        let bodies = || vec![batch_body("cart.add.01", implementer()), batch_body("cart.add.02", implementer())];
+
+        // The second staging write fails after the first one landed.
+        let mut calls = 0;
+        let mut failing_second = |tier: &GitTier, write: &RawWrite| {
+            calls += 1;
+            if calls == 2 {
+                return Err(canon_store::tier::StoreError::Io(std::io::Error::other("disk full")));
+            }
+            tier.write(write)
+        };
+        let Err((error, code)) = land_batch(repo, &ledger_root, &files, bodies(), true, &mut failing_second) else { panic!("the second write fails") };
+        assert_eq!(code, 2, "{error}");
+        assert!(error.contains("staging record 2 of the batch failed: ") && error.contains("disk full"), "{error}");
+        assert_eq!((staged_count(repo), committed(repo).len(), blobs()), (0, 0, 0), "nothing staged, committed or stored");
+
+        // Both stage; the second's promotion is refused (it has no role)
+        // after the first was committed.
+        let refused = vec![batch_body("cart.add.01", implementer()), batch_body("cart.add.02", Actor::new_unattributed("legacy-writer"))];
+        let Err((error, code)) = land_batch(repo, &ledger_root, &files, refused, true, &mut |tier, write| tier.write(write)) else { panic!("the second promotion is refused") };
+        assert_eq!(code, 1, "{error}");
+        assert!(error.contains("promoting record 2 of the batch"), "{error}");
+        assert_eq!((staged_count(repo), committed(repo).len(), blobs()), (0, 0, 0), "the first committed record is removed too");
+
+        // A read-only destination is refused before anything is written.
+        let staging_kind = evidence_staging_dir(&ledger_root).join("kind=evidence_record");
+        let mut readonly = std::fs::metadata(&staging_kind).unwrap().permissions();
+        readonly.set_readonly(true);
+        std::fs::set_permissions(&staging_kind, readonly.clone()).unwrap();
+        let outcome = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write));
+        readonly.set_readonly(false);
+        std::fs::set_permissions(&staging_kind, readonly).unwrap();
+        assert!(matches!(&outcome, Err((e, 2)) if e.contains("is read-only")), "{:?}", outcome.as_ref().err());
+        assert_eq!(blobs(), 0);
+
+        let landed = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write)).unwrap();
+        assert_eq!((landed.stored, landed.locations.len(), committed(repo).len(), blobs()), (1, 2, 2, 1), "the same batch lands whole");
+        assert!(landed.locations.iter().all(|l| l.promoted.is_some()));
     }
 }

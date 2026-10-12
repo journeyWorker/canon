@@ -205,10 +205,18 @@ fn hash_artifact(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Bo
 /// longer have, and then nothing is published. The error names that
 /// file.
 pub fn store_files<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<usize, (&'f BoundFile, canon_gate::artifact_store::StoreError)> {
+    store_files_held(repo, files).map(|held| held.stored())
+}
+
+/// [`store_files`], keeping the store lock for a caller that writes
+/// several records naming these blobs (0.18): if one of those writes
+/// fails, [`HeldStore::rollback`] removes exactly the blobs this call
+/// published, while no other writer could have published them meanwhile.
+pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldStore, (&'f BoundFile, canon_gate::artifact_store::StoreError)> {
     use canon_gate::artifact_store::{StoreError, StoreLock};
 
     let Some(first) = files.first() else {
-        return Ok(0);
+        return Ok(HeldStore { lock: None, published: Vec::new() });
     };
     let lock = StoreLock::acquire(repo).map_err(|e| (first, e))?;
     let mut staged = Vec::new();
@@ -223,7 +231,29 @@ pub fn store_files<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<usize, (&'
             sources.push(file);
         }
     }
-    lock.publish(staged).map_err(|(index, e)| (sources[index], e))
+    let published = lock.publish_paths(staged).map_err(|(index, e)| (sources[index], e))?;
+    Ok(HeldStore { lock: Some(lock), published })
+}
+
+/// The blobs one [`store_files_held`] call published, with the store
+/// lock still held. Dropping it keeps them and releases the lock.
+pub struct HeldStore {
+    lock: Option<canon_gate::artifact_store::StoreLock>,
+    published: Vec<PathBuf>,
+}
+
+impl HeldStore {
+    /// How many blobs this call newly stored.
+    pub fn stored(&self) -> usize {
+        self.published.len()
+    }
+
+    /// Remove the blobs this call published, then release the lock.
+    pub fn rollback(self) {
+        if let Some(lock) = &self.lock {
+            lock.unpublish(&self.published);
+        }
+    }
 }
 
 /// The line a write command prints after [`store_files`].
@@ -818,10 +848,14 @@ fn worse(a: ReportOutcome, b: ReportOutcome) -> ReportOutcome {
 /// its `name`; suites are not cases. A declared test with no event did
 /// not run and is not a case. Its outcome comes from its `event`
 /// records: an `issueRecorded` that is a failure (`isFailure`, or for a
-/// stream without it an issue neither known nor a warning) fails it,
-/// and one recorded against a suite fails every test inside it;
+/// stream without it an issue neither known nor a warning), or a
+/// `testEnded` whose messages carry the `fail` symbol, fails it;
 /// `testSkipped` skips it; `testStarted` then `testEnded` passes it;
-/// started and never ended fails it.
+/// started and never ended fails it. A suite's failing issue fails every
+/// test inside it. A suite whose `testEnded` reports a failure that no
+/// test or suite inside it recorded (setup or teardown failed) fails
+/// every test inside it too; when a test inside did fail, the suite's
+/// end only reports that, and its other tests keep their own outcome.
 pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
     use std::collections::HashMap;
 
@@ -830,7 +864,10 @@ pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
         started: bool,
         ended: bool,
         skipped: bool,
+        /// A failing issue recorded against it.
         failed: bool,
+        /// Its `testEnded` reported a failure.
+        ended_failed: bool,
     }
     let field = |value: &serde_json::Value, key: &str| value.get(key).and_then(|v| v.as_str()).map(str::to_string);
     let mut functions: Vec<(String, String)> = Vec::new();
@@ -862,7 +899,12 @@ pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
                 let entry = seen.entry(test_id).or_default();
                 match field(payload, "kind").as_deref() {
                     Some("testStarted") => entry.started = true,
-                    Some("testEnded") => entry.ended = true,
+                    Some("testEnded") => {
+                        entry.ended = true;
+                        entry.ended_failed |= payload.get("messages").and_then(|m| m.as_array()).is_some_and(|messages| {
+                            messages.iter().any(|m| m.get("symbol").and_then(|s| s.as_str()) == Some("fail"))
+                        });
+                    }
                     Some("testSkipped") => entry.skipped = true,
                     Some("issueRecorded") => entry.failed |= payload.get("issue").is_some_and(issue_is_failure),
                     _ => {}
@@ -874,13 +916,24 @@ pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
     if functions.is_empty() {
         return Err("no test record of kind `function`".to_string());
     }
-    let failed_suites: Vec<&String> = suites.iter().filter(|id| seen.get(*id).is_some_and(|s| s.failed)).collect();
+    let inside = |id: &str, suite: &str| id.strip_prefix(suite).is_some_and(|rest| rest.starts_with('/'));
+    let own_failure = |id: &str, function: bool| seen.get(id).is_some_and(|s| s.failed || (function && s.ended_failed));
+    let failed_suites: Vec<&String> = suites
+        .iter()
+        .filter(|suite| {
+            let Some(state) = seen.get(*suite) else { return false };
+            let explained = || {
+                functions.iter().any(|(id, _)| inside(id, suite) && own_failure(id, true)) || suites.iter().any(|other| inside(other, suite) && own_failure(other, false))
+            };
+            state.failed || (state.ended_failed && !explained())
+        })
+        .collect();
     let cases: Vec<ReportCase> = functions
-        .into_iter()
+        .iter()
         .filter_map(|(id, name)| {
-            let seen = seen.get(&id)?;
-            let in_failed_suite = failed_suites.iter().any(|suite| id.strip_prefix(suite.as_str()).is_some_and(|rest| rest.starts_with('/')));
-            let outcome = if seen.failed || in_failed_suite || (seen.started && !seen.ended && !seen.skipped) {
+            let seen = seen.get(id)?;
+            let in_failed_suite = failed_suites.iter().any(|suite| inside(id, suite));
+            let outcome = if seen.failed || seen.ended_failed || in_failed_suite || (seen.started && !seen.ended && !seen.skipped) {
                 ReportOutcome::Failed
             } else if seen.skipped {
                 ReportOutcome::Skipped
@@ -889,7 +942,7 @@ pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
             } else {
                 return None;
             };
-            Some(ReportCase { name, group: String::new(), tags: Vec::new(), outcome })
+            Some(ReportCase { name: name.clone(), group: String::new(), tags: Vec::new(), outcome })
         })
         .collect();
     if cases.is_empty() {
@@ -1228,6 +1281,28 @@ mod tests {
         );
         let suite_issue = format!("{stream}\n{}", r#"{"kind":"event","payload":{"kind":"issueRecorded","testID":"M.S","issue":{"isFailure":true}},"version":0}"#);
         assert!(parse_swift_testing(&suite_issue).unwrap().iter().all(|c| c.outcome == ReportOutcome::Failed), "a suite's failing issue fails every test in it");
+        let suite_end_fail = r#"{"kind":"event","payload":{"kind":"testEnded","testID":"M.S","messages":[{"symbol":"fail","text":"Suite \"S\" failed after 0.001 seconds with 1 issue."}]},"version":0}"#;
+        let unexplained = [
+            r#"{"kind":"test","payload":{"id":"M.S","kind":"suite","name":"S"},"version":0}"#.to_string(),
+            test("a_b_01"),
+            event("a_b_01", "testStarted", ""),
+            event("a_b_01", "testEnded", ""),
+            suite_end_fail.to_string(),
+        ]
+        .join("\n");
+        assert_eq!(
+            parse_swift_testing(&unexplained).unwrap()[0].outcome,
+            ReportOutcome::Failed,
+            "a suite whose end reports a failure no test inside it recorded fails its tests, with no issueRecorded for them"
+        );
+        let explained = format!("{stream}\n{suite_end_fail}");
+        assert_eq!(
+            parse_swift_testing(&explained).unwrap()[0],
+            ReportCase { name: "a_b_01()".to_string(), group: String::new(), tags: Vec::new(), outcome: ReportOutcome::Passed },
+            "a suite's end that reports a failing test inside it leaves that test's siblings as they ended"
+        );
+        let ended_failed = [test("a_b_01"), event("a_b_01", "testStarted", ""), event("a_b_01", "testEnded", r#","messages":[{"symbol":"fail","text":"failed"}]"#)].join("\n");
+        assert_eq!(parse_swift_testing(&ended_failed).unwrap()[0].outcome, ReportOutcome::Failed, "a test whose own end reports a failure failed");
 
         assert!(parse_swift_testing("<testsuite/>").unwrap_err().starts_with("line 1:"), "not JSON lines");
         assert!(parse_swift_testing(&test("a_b_01")).unwrap_err().contains("no test ran"));

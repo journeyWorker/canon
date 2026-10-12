@@ -466,6 +466,7 @@ Feature: evidence add
     And a summary carrying a fabrication marker refuses the batch the same way
     And a scenario whose latest record binds a file the batch does not refuses it with exit 2, nothing written
     And --all-scenarios with --scenario-id, --task, --report-case, a drop or an approval, or without --report or --project-id, is refused with exit 2
+    And a batch whose second record fails to stage, or whose second promotion is refused, leaves no record staged or committed and no new blob, and a read-only destination is refused before anything is written
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
   @subject:evidence-attestation
@@ -486,6 +487,7 @@ Feature: evidence add
     When it is bound with --report swift-testing:<path>
     Then each test's case is named by its display name, or its function name when it has none
     And a test with a failing issue is failed, a skipped test skipped, and a test that started and ended without one passed
+    And a suite whose end reports a failure no test inside it recorded fails every test inside it, while a suite whose end only reports a failed test leaves that test's siblings as they ended
     And a stream that is not JSON lines, or in which no test ran, is refused with exit 2
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
@@ -496,5 +498,6 @@ Feature: evidence add
     Given a scenario with a current signed review that pinned its latest evidence
     When new evidence for the scenario is added, alone or in a batch
     Then the add prints one line per review now stale naming the reviewer, the scenario and the `canon review add ... --pin <sha>` command that re-pins it
+    And that command keeps the review's session when it recorded one
     And running that command makes the review current again
     And evidence for a scenario with no current pinned review prints no such line

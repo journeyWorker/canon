@@ -141,9 +141,13 @@ fn evidence_add_80_one_report_writes_one_record_per_owned_scenario() {
     assert_eq!(records.len(), 3, "{records:?}");
     let digests: Vec<&str> = records.iter().flat_map(|r| r["attachments"].as_array().unwrap()).map(|a| a["sha256"].as_str().unwrap()).collect();
     assert!(digests.windows(2).all(|w| w[0] == w[1]), "every record pins the same report blob");
-    let two = records.iter().find(|r| r["scenario_id"] == "shop.cart.02").unwrap();
-    let cases: Vec<&str> = two["attachments"].as_array().unwrap().iter().map(|a| a["case"].as_str().unwrap()).collect();
-    assert_eq!(cases, ["shop.cart.02 refuses", "shop.cart.02 counts"], "only its own cases");
+    let cases = |id: &str| -> Vec<String> {
+        let record = records.iter().find(|r| r["scenario_id"] == id).unwrap();
+        record["attachments"].as_array().unwrap().iter().map(|a| a["case"].as_str().unwrap().to_string()).collect()
+    };
+    assert_eq!(cases("shop.cart.01"), ["shop.cart.01 adds"], "only its own cases");
+    assert_eq!(cases("shop.cart.02"), ["shop.cart.02 refuses", "shop.cart.02 counts"], "only its own cases");
+    assert_eq!(cases("shop.cart.03"), ["shop.cart.03 keeps both"], "only its own cases");
     assert_eq!(stored_blobs(repo), 1, "the report is stored once");
 }
 
@@ -233,6 +237,7 @@ fn evidence_add_83_any_refusal_refuses_the_whole_batch() {
         (vec!["--task", "c-demo#1.1"], "--task"),
         (vec!["--report-case", "x"], "--report-case"),
         (vec!["--drop-attachment", "trace.txt", "--drop-reason", "gone"], "--drop-attachment"),
+        (vec!["--approval-by", "alice", "--approval-role", "human"], "--approval-by, --approval-role"),
     ] {
         let out = attest_all(repo, "junit:reports/junit.xml", &extra);
         assert_eq!(out.status.code(), Some(2), "{flag}: {}", stderr(&out));
@@ -346,7 +351,7 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
     assert!(attest("shop.cart.01").status.success());
     ok(
         repo,
-        &["review", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--reviewer", "reviewer-2", "--actor-id", "reviewer-2", "--role", "reviewer", "--pin", "r1", "--upstream-ref", "tests/cart.rs#shop_cart_01"],
+        &["review", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--reviewer", "reviewer-2", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--pin", "r1", "--upstream-ref", "tests/cart.rs#shop_cart_01"],
     );
     let git = |args: &[&str]| {
         let out = Command::new("git").args(args).current_dir(repo).env("GIT_AUTHOR_NAME", "t").env("GIT_AUTHOR_EMAIL", "t@t").env("GIT_COMMITTER_NAME", "t").env("GIT_COMMITTER_EMAIL", "t@t").output().unwrap();
@@ -362,7 +367,7 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
     let out = attest("shop.cart.01");
     assert!(out.status.success(), "{}", stderr(&out));
     let expected = format!(
-        "canon evidence add: review by `reviewer-2` of shop.cart.01 is now stale (it pinned the evidence this record supersedes); re-pin it: canon review add --project-id root --scenario-id shop.cart.01 --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer --pin {head} --upstream-ref 'tests/cart.rs#shop_cart_01'"
+        "canon evidence add: review by `reviewer-2` of shop.cart.01 is now stale (it pinned the evidence this record supersedes); re-pin it: canon review add --project-id root --scenario-id shop.cart.01 --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer --pin {head} --session-id sess-review --upstream-ref 'tests/cart.rs#shop_cart_01'"
     );
     let text = stdout(&out);
     let line = text.lines().find(|l| l.contains("is now stale")).unwrap_or_else(|| panic!("no stale-review line: {text}"));

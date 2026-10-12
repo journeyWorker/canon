@@ -280,3 +280,4 @@ Feature: review add
     When a review is added for all three
     Then the add exits 2 naming the unindexed id, and no review is written for any of them
     And an ids file with a line that is not a scenario id is refused with exit 2, naming the line
+    And when writing the second review fails, the first review and every blob the call stored are removed, and a read-only review directory is refused before anything is written

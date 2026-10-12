@@ -353,6 +353,16 @@ impl StoreLock {
     /// rest are dropped unpublished, and the error carries the failing
     /// blob's index.
     pub fn publish(&self, staged: Vec<StagedBlob<'_>>) -> Result<usize, (usize, StoreError)> {
+        self.publish_paths(staged).map(|renamed| renamed.len())
+    }
+
+    /// [`StoreLock::publish`], returning the targets this call renamed
+    /// into place. A caller that writes more after publishing (a batch of
+    /// records naming these blobs, 0.18) keeps the lock and, if a later
+    /// write fails, removes exactly these with [`StoreLock::unpublish`]:
+    /// a blob already stored, or published by another writer, is never
+    /// among them.
+    pub fn publish_paths(&self, staged: Vec<StagedBlob<'_>>) -> Result<Vec<PathBuf>, (usize, StoreError)> {
         let mut renamed: Vec<PathBuf> = Vec::new();
         for (index, mut blob) in staged.into_iter().enumerate() {
             if stored_blob(&self.repo, &blob.sha256).matches(&blob.sha256) {
@@ -362,14 +372,20 @@ impl StoreLock {
             let temp = blob.temp.take().expect("an unpublished StagedBlob always holds its temp file");
             if let Err(e) = std::fs::rename(&temp, &target) {
                 blob.temp = Some(temp);
-                for target in &renamed {
-                    let _ = std::fs::remove_file(target);
-                }
+                self.unpublish(&renamed);
                 return Err((index, e.into()));
             }
             renamed.push(target);
         }
-        Ok(renamed.len())
+        Ok(renamed)
+    }
+
+    /// Remove `published` (what [`StoreLock::publish_paths`] returned
+    /// under this same lock), best effort.
+    pub fn unpublish(&self, published: &[PathBuf]) {
+        for target in published {
+            let _ = std::fs::remove_file(target);
+        }
     }
 }
 

@@ -222,8 +222,6 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
             files.push(file);
         }
     }
-    let committed = GitTier::new(&gate_context.ctx.ledger_root);
-
     let mut actor = Actor::new(&args.actor_id, args.role.clone());
     if let Some(session_id) = &args.session_id {
         actor = actor.with_session(session_id.clone());
@@ -264,31 +262,21 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
 
     // Store the bytes before any review is written (module doc): every
     // refusal is behind us, and a review must never name a blob the
-    // store lacks.
-    let stored = match crate::evidence_attach::store_files(&repo, &files) {
-        Ok(stored) => stored,
-        Err((file, e)) => {
-            eprintln!("canon review add: refused — could not store {} in the artifact store: {e}", file.resolved.display());
+    // store lacks. All or nothing (0.18 D1): a failed write removes what
+    // this call wrote and stored.
+    let only_reviews: Vec<Review> = reviews.iter().map(|(review, _)| review.clone()).collect();
+    let (stored, written) = match write_reviews(&repo, &gate_context.ctx.ledger_root, &files, &only_reviews, &mut |tier, review| tier.write(review)) {
+        Ok(landed) => landed,
+        Err(error) => {
+            eprintln!("canon review add: {error}");
+            if reviews.len() > 1 {
+                eprintln!("canon review add: refused — no review is written: every review and blob this run wrote or stored was removed");
+            }
             return 2;
         }
     };
-
-    let mut written = Vec::new();
-    for (review, pinned) in &reviews {
-        match committed.write(review) {
-            Ok(receipt) => {
-                println!("{pinned}");
-                written.push((receipt.location, receipt.deduped));
-            }
-            Err(e) => {
-                eprintln!("canon review add: {e}");
-                if !written.is_empty() {
-                    let paths = written.iter().map(|(location, _)| location.as_str()).collect::<Vec<_>>().join(", ");
-                    eprintln!("canon review add: {} review(s) were written before the failure: {paths}", written.len());
-                }
-                return 2;
-            }
-        }
+    for (_, pinned) in &reviews {
+        println!("{pinned}");
     }
     if !files.is_empty() {
         println!("{}", crate::evidence_attach::stored_line("canon review add", files.len(), stored));
@@ -300,6 +288,47 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         println!("canon review add: wrote {location} ({}) — {}", if *deduped { "deduped" } else { "new" }, crate::write_mode::DIRECT);
     }
     0
+}
+
+/// Write `reviews` all or nothing (0.18 D1): check the committed review
+/// directory can be written, store `files` under the store lock, then
+/// write each review through `write` (`GitTier::write` outside tests).
+/// A failed write removes every review this call wrote (a deduped one
+/// already existed and stays) and every blob it newly stored, and is
+/// returned as the error. `Ok` is the blobs newly stored and each
+/// review's `(location, deduped)`.
+fn write_reviews(
+    repo: &Path,
+    ledger_root: &Path,
+    files: &[crate::evidence_attach::BoundFile],
+    reviews: &[Review],
+    write: &mut dyn FnMut(&GitTier, &Review) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
+) -> Result<(usize, Vec<(String, bool)>), String> {
+    let dir = ledger_root.join(format!("kind={}", RecordKind::Review.as_str()));
+    match std::fs::create_dir_all(&dir).and_then(|()| std::fs::metadata(&dir)) {
+        Ok(meta) if meta.permissions().readonly() => return Err(format!("refused — {} is read-only", dir.display())),
+        Ok(_) => {}
+        Err(e) => return Err(format!("refused — cannot prepare {}: {e}", dir.display())),
+    }
+    let held = crate::evidence_attach::store_files_held(repo, files)
+        .map_err(|(file, e)| format!("refused — could not store {} in the artifact store: {e}", file.resolved.display()))?;
+    let committed = GitTier::new(ledger_root);
+    let mut written: Vec<(String, bool)> = Vec::new();
+    for review in reviews {
+        match write(&committed, review) {
+            Ok(receipt) => written.push((receipt.location, receipt.deduped)),
+            Err(e) => {
+                for (location, deduped) in &written {
+                    if !deduped {
+                        let _ = std::fs::remove_file(ledger_root.join(location));
+                    }
+                }
+                held.rollback();
+                return Err(format!("writing review {} of {} failed: {e}", written.len() + 1, reviews.len()));
+            }
+        }
+    }
+    Ok((held.stored(), written))
 }
 
 #[cfg(test)]
@@ -431,5 +460,57 @@ mod tests {
         let dir = repo_with_scenario();
         assert_eq!(run_add(dir.path(), &ReviewAddArgs { original_spec_ref: Some("spec/x.md".into()), ..args() }), 2);
         assert!(reviews(&dir).is_empty());
+    }
+
+    /// review.add.81: a write failure on the second review of a batch
+    /// removes the first and every blob the call stored; a read-only
+    /// review directory is refused before anything is written.
+    #[test]
+    fn review_add_81_a_batch_whose_second_write_fails_leaves_nothing() {
+        let dir = repo_with_scenario();
+        let ledger_root = GateCtx::from_repo(dir.path()).unwrap().ledger_root;
+        std::fs::write(dir.path().join("shot.png"), b"png").unwrap();
+        let files: Vec<crate::evidence_attach::BoundFile> =
+            crate::evidence_attach::bind_artifacts(dir.path(), &[dir.path().join("shot.png")], 1024).unwrap().into_iter().map(|(_, file)| file).collect();
+        let store = canon_gate::artifact_store::store_dir(dir.path());
+        let blobs = || std::fs::read_dir(&store).map(|d| d.count()).unwrap_or(0);
+        let review = |scenario: &str| {
+            let a = args();
+            Review::new(
+                Envelope::new(1, RecordKind::Review, Utc::now(), Actor::new("agent-x", RoleId::parse("reviewer").unwrap())),
+                a.project_id,
+                ScenarioId::parse(scenario).unwrap(),
+                "reviewer-1",
+                "pin",
+                ProvenanceRef::UpstreamRef("r".into()),
+            )
+        };
+        let batch = vec![review("cart.add.01"), review("cart.add.02")];
+
+        let mut calls = 0;
+        let mut failing_second = |tier: &GitTier, review: &Review| {
+            calls += 1;
+            if calls == 2 {
+                return Err(canon_store::tier::StoreError::Io(std::io::Error::other("disk full")));
+            }
+            tier.write(review)
+        };
+        let error = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut failing_second).unwrap_err();
+        assert!(error.contains("writing review 2 of 2 failed: ") && error.contains("disk full"), "{error}");
+        assert!(reviews(&dir).is_empty(), "the first review is removed");
+        assert_eq!(blobs(), 0, "the blob this call stored is removed");
+
+        let review_dir = ledger_root.join("kind=review");
+        let mut readonly = std::fs::metadata(&review_dir).unwrap().permissions();
+        readonly.set_readonly(true);
+        std::fs::set_permissions(&review_dir, readonly.clone()).unwrap();
+        let refused = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review));
+        readonly.set_readonly(false);
+        std::fs::set_permissions(&review_dir, readonly).unwrap();
+        assert!(refused.unwrap_err().contains("is read-only"));
+        assert_eq!(blobs(), 0);
+
+        let (stored, written) = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review)).unwrap();
+        assert_eq!((stored, written.len(), reviews(&dir).len(), blobs()), (1, 2, 2, 1));
     }
 }
