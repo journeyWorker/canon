@@ -92,10 +92,11 @@ lifecycle honest. Plan: `docs/superpowers/plans/2026-10-12-canon-0.18.0-fewer-ca
 **Paths canon owns (#25).** `canon skills install` and `canon skills
 doctor` now end with the globs of every path canon writes, for a
 formatter's or linter's ignore list: the projection of each selected
-provider first, then every canon-written path under `.canon/`, sorted.
+provider first, then every machine-written path under `.canon/`, sorted.
 The list comes from canon's own path constants, so a path a future
-release adds is listed the day it ships. `.canon/changes/` is left out,
-since its briefs and plans are prose people write. For a repo that
+release adds is listed the day it ships. `.canon/specs/`,
+`.canon/policy.yaml` and `.canon/changes/` are left out: people write
+them by hand, and linters should still see them. For a repo that
 selects Claude:
 
 ```
@@ -112,25 +113,19 @@ owned-paths: canon writes these; exclude them from formatters and linters:
   .canon/ledger/**
   .canon/plugins/**
   .canon/policy.approval.json
-  .canon/policy.yaml
   .canon/r2/**
   .canon/scenario-index.lock
   .canon/scripts/canon-gate-pre-commit.sh
   .canon/skills/**
-  .canon/specs/**
   .canon/strategies/**
   .canon/vocab/**
 ```
 
-`.canon/specs/**` and `.canon/policy.yaml` are listed although people
-edit them: `canon format` validates them, and a review or a policy
-approval pins their bytes, so another formatter's rewrite reads as a
-changed spec or an unapproved policy.
-
 **A formatter's rewrite is not drift (#25).** A projected skill file
 whose bytes differ from the bundle but whose content matches after
-whitespace and format normalization (line endings, wrapping, indentation,
-table padding, list and emphasis markers, escapes; a JSON file by value)
+normalization limited to what formatters do (CRLF, trailing whitespace,
+runs of blank lines, the final newline, and in markdown list markers,
+`_` emphasis and table-cell padding; a JSON file by value)
 is now `formatter-rewritten`, not `stale`. `canon skills check` still
 exits 1 on it. `canon skills doctor` names the ignore entry and the
 command that restores the file:
@@ -139,7 +134,9 @@ command that restores the file:
 formatter-rewritten: ./.claude/skills/canon/SKILL.md (claude) — the same content as canon's projection after whitespace and format normalization, so a formatter rewrote it; add `.claude/skills/canon/**` to that formatter's ignore list, then restore it with `canon skills install --providers=claude`
 ```
 
-A file whose content changed stays `stale`.
+Whitespace between tokens, backslashes and fenced code blocks are never
+normalized, so `rm -rf a b` against `rm -rfab`, a joined `\`
+continuation, or a changed fenced command stays `stale`.
 
 **`canon report` reads the sqlite hot tier (#29).** `canon init` routes
 `task`, `handoff`, `session`, `run` and `event` to a sqlite `hot` rung,
@@ -154,7 +151,10 @@ not exist yet is no rows and is never created. A file that is not a
 sqlite database fails the report (exit 1) and names the file, instead of
 rendering a report without its tasks. `Backend::Sqlite` now counts as
 read directly, so no sqlite-routed kind appears under `## Kinds not read
-directly`. Postgres and S3 rungs are unchanged.
+directly`. A hot row whose identical record (same kind and content
+digest) is also in the git ledger or `.canon/r2` is dropped from
+`stg_records`, so one record in two tiers counts once. Postgres and S3
+rungs are unchanged.
 
 **`canon finding list` (#34).** `canon finding list --change-id <id>
 [--open] [--json]` prints a change's committed findings at their latest

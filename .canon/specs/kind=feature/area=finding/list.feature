@@ -21,7 +21,7 @@ Feature: finding list
     Given the same findings
     When canon finding list runs with --open
     Then only the open should-fix is listed, never the finding that was raised open and closed
-    And a change with no open findings prints that it has none and exits 0
+    And a change whose only committed finding was raised open and later closed prints that it has no open findings and exits 0
 
   # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
   @subject:finding-lifecycle

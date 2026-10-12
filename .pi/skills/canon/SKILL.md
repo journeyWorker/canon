@@ -163,8 +163,9 @@ canon skills doctor                          # diagnostics, incl. a stray canon 
 
 `install` and `doctor` end with `owned-paths:`, the globs of every path
 canon writes. Add them to the repo's formatter and linter ignore lists; a
-formatter that rewrites a projection, a spec, the policy or a ledger record
-makes canon read drift. `doctor` reports a projection whose bytes changed
+formatter that rewrites a projection or a ledger record makes canon read
+drift. Specs, `policy.yaml` and the changes are written by hand and are not
+on the list. `doctor` reports a projection whose bytes changed
 but whose content did not as `formatter-rewritten` and names the ignore
 entry to add; a changed file stays `stale`.
 

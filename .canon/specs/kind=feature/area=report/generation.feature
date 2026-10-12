@@ -115,3 +115,13 @@ Feature: report generation
     When the report is generated
     Then it succeeds with no warning and does not create the file
     And once that file holds something that is not a sqlite database, the report exits 1 naming the file instead of rendering without its tasks
+
+  # canon: {"schema":1,"at":"2026-10-12T16:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:report-generation
+  @case:edge
+  @report.generation.12
+  Scenario: A record held by both the git ledger and the sqlite hot tier is counted once
+    Given a fresh canon init repo whose flipped task has one evidence record in the git ledger
+    And a byte-identical copy of that record written to the sqlite hot tier
+    When the report is generated
+    Then the task's evidence count is 1, not 2

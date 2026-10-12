@@ -34,7 +34,7 @@
 //! Formatters (0.18, #25): `install` and `doctor` print the globs of every
 //! path canon writes ([`owned_path_globs`]) for a formatter's or linter's
 //! ignore list. A projected file whose bytes differ but whose content
-//! matches after whitespace and format normalization is
+//! matches after normalizing only what formatters change is
 //! [`FORMATTER_REWRITTEN`], not `stale`, and `doctor` names the ignore
 //! entry that keeps the formatter off it.
 
@@ -825,21 +825,19 @@ pub fn projection_glob(provider: Provider) -> String {
 
 /// The paths canon writes in a repo, as globs for a formatter's or
 /// linter's ignore list (0.18, #25): the projection of each of
-/// `providers`, then every canon-written path under `.canon/`, sorted.
+/// `providers`, then every machine-written path under `.canon/`, sorted.
 /// A formatter that rewrites any of them makes canon read drift (a
-/// projection against its install lock, a spec or policy against the
-/// digest a review or approval pinned, a ledger record against its
+/// projection against its install lock, a ledger record against its
 /// digest-named file). Derived from `canon_model::paths` and this
-/// module's own constants, never typed out a second time.
-/// `.canon/changes/` is left out: its briefs and plans are prose people
-/// write.
+/// module's own constants, never typed out a second time. Paths people
+/// write by hand are left out so linters still see them:
+/// `.canon/specs/`, `.canon/policy.yaml` and `.canon/changes/`.
 pub fn owned_path_globs(providers: &[Provider]) -> Vec<String> {
     let artifacts_dir = Path::new(paths::ARTIFACTS_SHA256_DIR).parent().and_then(Path::to_str).unwrap_or(paths::ARTIFACTS_SHA256_DIR);
     let lock_dir = Path::new(INSTALL_LOCK_FILE).parent().and_then(Path::to_str).unwrap_or(INSTALL_LOCK_FILE);
     let dirs = [
         paths::LEDGER_DIR,
         artifacts_dir,
-        paths::SPECS_DIR,
         paths::R2_LOCAL_DIR,
         paths::LEARN_DIR,
         paths::STRATEGIES_DIR,
@@ -852,7 +850,6 @@ pub fn owned_path_globs(providers: &[Provider]) -> Vec<String> {
     ];
     let files = [
         paths::HOT_DB_GITIGNORE,
-        paths::POLICY_FILE,
         paths::POLICY_APPROVAL_FILE,
         paths::REPORT_FILE,
         paths::PRE_COMMIT_SCRIPT,
@@ -888,43 +885,96 @@ fn formatter_rewrote(relative: &Path, actual: &[u8], expected: &[u8]) -> bool {
             _ => false,
         };
     }
+    let markdown = relative.extension().is_some_and(|ext| ext == "md");
     match (std::str::from_utf8(actual), std::str::from_utf8(expected)) {
-        (Ok(a), Ok(e)) => format_insensitive(a) == format_insensitive(e),
+        (Ok(a), Ok(e)) => format_insensitive(a, markdown) == format_insensitive(e, markdown),
         _ => false,
     }
 }
 
-/// `text` with what a prettier-family formatter rewrites taken out:
-/// line endings, line wrapping, indentation and every other whitespace;
-/// `*`/`+` list markers (as `-`); `_` emphasis (as `*`); backslash
-/// escapes; and table-rule padding (a run of three or more `-` as
-/// `---`). Two texts equal here differ only in how they are laid out.
-fn format_insensitive(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for line in text.lines() {
-        let trimmed = line.trim_start();
-        let line = match trimmed.strip_prefix("* ").or_else(|| trimmed.strip_prefix("+ ")) {
-            Some(rest) => format!("-{rest}"),
-            None => trimmed.to_string(),
-        };
-        let mut dashes = 0usize;
-        for ch in line.chars().filter(|ch| !ch.is_whitespace() && *ch != '\\') {
-            if ch == '-' {
-                dashes += 1;
+/// `text` with only what a prettier-family formatter rewrites set aside,
+/// every token boundary kept: CRLF as LF, trailing whitespace per line,
+/// a run of blank lines as one, and blank lines at either end. In
+/// `markdown` also: a `*`/`+` list marker as `-`, `_` emphasis as `*`,
+/// and table-cell padding. Whitespace between tokens and backslashes are
+/// never dropped, and a fenced code block is kept verbatim, so a changed
+/// command never reads as a rewrite.
+fn format_insensitive(text: &str, markdown: bool) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    let mut fence: Option<&str> = None;
+    for raw in text.lines() {
+        let opener = ["```", "~~~"].into_iter().find(|mark| raw.trim_start().starts_with(mark));
+        if markdown {
+            if let Some(mark) = fence {
+                lines.push(raw.to_string());
+                if raw.trim().starts_with(mark) {
+                    fence = None;
+                }
                 continue;
             }
-            push_dashes(&mut out, dashes);
-            dashes = 0;
-            out.push(if ch == '_' { '*' } else { ch });
+            if opener.is_some() {
+                fence = opener;
+                lines.push(raw.trim_end().to_string());
+                continue;
+            }
         }
-        push_dashes(&mut out, dashes);
+        let line = raw.trim_end();
+        if line.is_empty() {
+            if lines.last().is_some_and(|last| !last.is_empty()) {
+                lines.push(String::new());
+            }
+            continue;
+        }
+        lines.push(if markdown { markdown_line(line) } else { line.to_string() });
     }
-    out
+    while lines.last().is_some_and(String::is_empty) {
+        lines.pop();
+    }
+    lines.join("\n")
 }
 
-fn push_dashes(out: &mut String, run: usize) {
-    let kept = if run >= 3 { 3 } else { run };
-    out.extend(std::iter::repeat_n('-', kept));
+/// One markdown line outside a code fence, with its list marker, `_`
+/// emphasis and table padding normalized (see [`format_insensitive`]).
+fn markdown_line(line: &str) -> String {
+    let indent = &line[..line.len() - line.trim_start().len()];
+    let body = line.trim_start();
+    if body.starts_with('|') {
+        let cells: Vec<String> = body
+            .split('|')
+            .map(|cell| {
+                let cell = cell.trim();
+                let rule = cell.trim_matches(':');
+                if !rule.is_empty() && rule.chars().all(|ch| ch == '-') {
+                    format!("{}---{}", if cell.starts_with(':') { ":" } else { "" }, if cell.ends_with(':') { ":" } else { "" })
+                } else {
+                    emphasis_as_asterisks(cell)
+                }
+            })
+            .collect();
+        return format!("{indent}{}", cells.join("|"));
+    }
+    let body = match body.strip_prefix("* ").or_else(|| body.strip_prefix("+ ")) {
+        Some(rest) => format!("- {rest}"),
+        None => body.to_string(),
+    };
+    format!("{indent}{}", emphasis_as_asterisks(&body))
+}
+
+/// `_` as `*` where it can delimit emphasis: outside inline code, and
+/// not between two word characters (`snake_case` stays).
+fn emphasis_as_asterisks(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len());
+    let mut in_code = false;
+    for (i, &ch) in chars.iter().enumerate() {
+        if ch == '`' {
+            in_code = !in_code;
+        }
+        let word = |c: Option<&char>| c.is_some_and(|c| c.is_alphanumeric());
+        let intraword = word(i.checked_sub(1).and_then(|j| chars.get(j))) && word(chars.get(i + 1));
+        out.push(if ch == '_' && !in_code && !intraword { '*' } else { ch });
+    }
+    out
 }
 
 fn load_manifest(target_dir: &Path) -> Result<Option<CanonicalManifest>, SkillsError> {
@@ -1690,13 +1740,22 @@ mod tests {
     #[test]
     fn formatter_rewrites_are_told_apart_from_content_changes() {
         let md = Path::new("reference/topic.md");
-        let source = "# Topic\n\nA *role* is a\nrung.\n\n* one\n* two\n\n| a | b |\n|---|---|\n| 1 | 2 |\n";
-        let formatted = "# Topic\r\n\r\nA _role_ is a rung.\r\n\r\n- one\r\n- two\r\n\r\n| a   | b   |\r\n| --- | --- |\r\n| 1   | 2   |\r\n\r\n";
+        let source = "# Topic\n\nA *role* is a rung of `snake_case`.\n\n* one\n* two\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```sh\nrm -rf a b\n```\n";
+        let formatted = "# Topic  \r\n\r\n\r\nA _role_ is a rung of `snake_case`.\r\n\r\n- one\r\n- two\r\n\r\n| a   | b   |\r\n| --- | --- |\r\n| 1   | 2   |\r\n\r\n```sh\r\nrm -rf a b\r\n```\r\n\r\n";
         assert!(formatter_rewrote(md, formatted.as_bytes(), source.as_bytes()));
         assert!(!formatter_rewrote(md, source.as_bytes(), source.as_bytes()), "identical bytes are no rewrite");
         assert!(!formatter_rewrote(md, source.replace("rung", "tier").as_bytes(), source.as_bytes()));
         assert!(!formatter_rewrote(md, source.replace("* two\n", "").as_bytes(), source.as_bytes()));
+        assert!(!formatter_rewrote(md, source.replace("a rung", "arung").as_bytes(), source.as_bytes()), "inner whitespace is a token boundary");
+        assert!(!formatter_rewrote(md, source.replace("snake_case", "snake*case").as_bytes(), source.as_bytes()), "an intraword _ is not emphasis");
+        assert!(!formatter_rewrote(md, source.replace("rm -rf a b", "rm -rf  a b").as_bytes(), source.as_bytes()), "a code fence is verbatim");
         assert!(!formatter_rewrote(md, &[0xff, 0xfe], source.as_bytes()), "non-UTF-8 is never a rewrite");
+
+        let sh = Path::new("scripts/hook.sh");
+        let script = "#!/bin/sh\nrm -rf a b\nexec canon \\\n  status\n";
+        assert!(formatter_rewrote(sh, b"#!/bin/sh  \r\nrm -rf a b\r\nexec canon \\\r\n  status\r\n\r\n", script.as_bytes()));
+        assert!(!formatter_rewrote(sh, script.replace("a b", "ab").as_bytes(), script.as_bytes()));
+        assert!(!formatter_rewrote(sh, script.replace("\\\n  status", "status").as_bytes(), script.as_bytes()), "a joined continuation is drift");
 
         let json = Path::new("reference/data.json");
         assert!(formatter_rewrote(json, b"{\n  \"b\": 1,\n  \"a\": [1, 2]\n}\n", br#"{"a":[1,2],"b":1}"#));

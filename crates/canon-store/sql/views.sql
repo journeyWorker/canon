@@ -586,13 +586,23 @@ FROM raw;
 -- view is where the fold semantics are added. Nothing may order by
 -- the column — `version_rank` is the only fold rung, and the thirteen
 -- fold sites all inherit it from here.
+--
+-- A hot row whose identical record (same `kind`, same content digest,
+-- hence the same natural key and body) is already in the git or r2
+-- root is dropped here (0.18 #29 review): one record in two tiers is
+-- one record, and every `count(*)` downstream would otherwise count
+-- it twice. The file-tier copy stays, with its own `source_tier`.
 CREATE OR REPLACE VIEW stg_records AS
 WITH unioned AS (
     SELECT kind, "at", scenario_id, 'git' AS source_tier, schema, digest, body FROM stg_git_records
     UNION ALL
     SELECT kind, "at", body ->> '$.scenario_id' AS scenario_id, 'r2' AS source_tier, schema, digest, body FROM stg_r2_records
     UNION ALL
-    SELECT kind, "at", scenario_id, 'hot' AS source_tier, schema, digest, body FROM stg_hot_records
+    SELECT h.kind, h."at", h.scenario_id, 'hot' AS source_tier, h.schema, h.digest, h.body
+    FROM stg_hot_records h
+    WHERE h.digest = ''
+       OR (NOT EXISTS (SELECT 1 FROM stg_git_records g WHERE g.kind = h.kind AND g.digest = h.digest)
+           AND NOT EXISTS (SELECT 1 FROM stg_r2_records r WHERE r.kind = h.kind AND r.digest = h.digest))
 ),
 -- `raw_record_at`'s RFC3339 grammar, read off chrono 0.4.45's
 -- `format::parse::parse_rfc3339` field by field (header's `at` rung

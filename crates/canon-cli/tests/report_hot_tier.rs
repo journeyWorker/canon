@@ -112,3 +112,33 @@ fn report_generation_11_a_missing_hot_db_is_no_rows_and_an_unreadable_one_fails_
     let err = stderr(&report);
     assert!(err.contains("reading the sqlite hot tier at") && err.contains(".canon/hot.db"), "{err}");
 }
+
+/// report.generation.12: one record held by both the git ledger and the
+/// sqlite hot tier is counted once — the task's evidence count stays 1.
+#[test]
+fn report_generation_12_a_record_in_both_tiers_counts_once() {
+    use canon_store::tier::{RawWrite, Tier as _};
+    if !duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = fresh_repo_with_tasks();
+    let repo = dir.path();
+    ok(
+        run_canon(&["evidence", "add", "--task", "add-login#1", "--kind", "test-run", "--ref", "cargo test login", "--role", "implementer", "--summary", "login scenarios written"], repo),
+        "evidence add",
+    );
+    ok(run_canon(&["gate", "task", "add-login#1"], repo), "gate task");
+    let evidence_dir = repo.join(".canon/ledger/kind=evidence_record");
+    let files: Vec<_> = fs::read_dir(&evidence_dir).unwrap().map(|e| e.unwrap().path()).collect();
+    assert_eq!(files.len(), 1, "{files:?}");
+    let body: serde_json::Value = serde_json::from_str(&fs::read_to_string(&files[0]).unwrap()).unwrap();
+    let hot = canon_store::sqlite_tier::SqliteTier::connect(&repo.join(".canon/hot.db")).unwrap();
+    let receipt = hot.write(&RawWrite(canon_model::RawRecord(body))).unwrap();
+    assert!(!receipt.deduped, "the copy landed in sqlite");
+    drop(hot);
+
+    ok(run_canon(&["report"], repo), "report");
+    let content = fs::read_to_string(repo.join(".canon/REPORT.md")).unwrap();
+    assert!(content.contains("| add-login | add-login#1 | Write the login scenarios | done | ✓ | ✓ | canon | 1 |"), "{content}");
+}

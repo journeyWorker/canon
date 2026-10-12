@@ -273,9 +273,9 @@ Feature: skills install
     Given a target whose canon.yaml selects Claude and Codex
     When canon skills install and canon skills doctor run
     Then each ends with an owned-paths block of one glob per line
-    And the block lists the selected providers' projections first, then every canon-written path under .canon sorted, including .canon/ledger/** and .canon/artifacts/**
+    And the block lists the selected providers' projections first, then every machine-written path under .canon sorted, including .canon/ledger/** and .canon/artifacts/**
     And an unchanged install prints the same block
-    And .canon/changes is never listed, since its briefs and plans are prose people write
+    And .canon/specs, .canon/policy.yaml and .canon/changes are never listed, since people write them by hand and linters should still see them
 
   # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
   @subject:skills-install
@@ -293,7 +293,7 @@ Feature: skills install
   @case:failure
   @skills.install.58
   Scenario: A projected file whose content changed stays drift
-    Given an installed Claude projection whose reference file gained a paragraph canon never wrote
+    Given an installed Claude projection where SKILL.md gained a paragraph, the hook script's `rm -rf a b` became `rm -rfab` and its `\` continuation was joined, and a command inside a reference file's code fence gained a space
     When canon skills check and canon skills doctor run
-    Then the check exits 1 and calls the file stale
-    And the doctor reports it stale and never as formatter-rewritten
+    Then the check exits 1 and calls each file stale
+    And the doctor reports each stale and never as formatter-rewritten, because whitespace between tokens, backslashes and code fences are never normalized away

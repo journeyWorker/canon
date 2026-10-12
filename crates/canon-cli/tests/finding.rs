@@ -1283,8 +1283,11 @@ fn listed_repo() -> tempfile::TempDir {
     raise("s43-findings-are-records", "blocker", "1", "1", "rev-a", "teardown races HMR");
     raise("s43-findings-are-records", "should-fix", "1", "2", "rev-b", "the count was typed by hand");
     raise("other-change", "note", "1", "1", "rev-c", "elsewhere");
+    raise("closed-only", "blocker", "1", "1", "rev-d", "fixed long ago");
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     let closed = run_canon(&["finding", "close", "--change-id", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "rejected"], repo);
+    assert!(closed.status.success(), "{}", stderr(&closed));
+    let closed = run_canon(&["finding", "close", "--change-id", "closed-only", "--round", "1", "--seq", "1", "--disposition", "deferred"], repo);
     assert!(closed.status.success(), "{}", stderr(&closed));
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     assert!(add(repo, &["--round", "2", "--seq", "1", "--reviewer", "rev-a", "--summary", "still staged"]).status.success());
@@ -1323,6 +1326,11 @@ fn finding_list_open_keeps_only_currently_open_findings() {
     let none = run_canon(&["finding", "list", "--change-id", "other-change", "--open"], dir.path());
     assert_eq!(none.status.code(), Some(0));
     assert_eq!(stdout(&none), "round  seq  severity  disposition  reviewer  summary\n1      1    note      open         rev-c     elsewhere\n");
+    let closed = run_canon(&["finding", "list", "--change-id", "closed-only", "--open"], dir.path());
+    assert_eq!(closed.status.code(), Some(0), "{}", stderr(&closed));
+    assert_eq!(stdout(&closed), "canon finding list: no committed open findings on change `closed-only`\n", "a change whose findings are all closed has none open");
+    let all = run_canon(&["finding", "list", "--change-id", "closed-only"], dir.path());
+    assert!(stdout(&all).contains("deferred") && stdout(&all).contains("fixed long ago"), "without --open the closed finding lists: {}", stdout(&all));
     let empty = run_canon(&["finding", "list", "--change-id", "no-findings-here", "--open"], dir.path());
     assert_eq!(empty.status.code(), Some(0));
     assert_eq!(stdout(&empty), "canon finding list: no committed open findings on change `no-findings-here`\n");

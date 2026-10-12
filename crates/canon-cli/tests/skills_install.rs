@@ -1030,12 +1030,10 @@ const CANON_OWNED_GLOBS: &str = "  .canon/REPORT.md
   .canon/ledger/**
   .canon/plugins/**
   .canon/policy.approval.json
-  .canon/policy.yaml
   .canon/r2/**
   .canon/scenario-index.lock
   .canon/scripts/canon-gate-pre-commit.sh
   .canon/skills/**
-  .canon/specs/**
   .canon/strategies/**
   .canon/vocab/**
 ";
@@ -1082,7 +1080,9 @@ fn skills_install_56_install_and_doctor_print_the_owned_path_globs() {
 
     let none = skills::owned_path_globs(&[]);
     assert!(!none.iter().any(|glob| glob.contains("/skills/canon/")), "no provider, no projection glob: {none:?}");
-    assert!(!none.iter().any(|glob| glob.starts_with(".canon/changes")), "briefs and plans are prose people write: {none:?}");
+    for authored in [".canon/changes", ".canon/specs", ".canon/policy.yaml"] {
+        assert!(!none.iter().any(|glob| glob.starts_with(authored)), "{authored} is written by hand and stays linted: {none:?}");
+    }
 }
 
 /// skills.install.57: a projected file a formatter rewrote — same
@@ -1098,7 +1098,7 @@ fn skills_install_57_a_formatter_rewrite_is_named_with_the_ignore_entry() {
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
     skills::install_canonical(&source, &target, Some("claude")).unwrap();
     let skill = target.join(".claude/skills/canon/SKILL.md");
-    fs::write(&skill, "---\r\nname:  canon\r\ndescription: umbrella\r\n---\r\n\r\n\r\n# Canon   \r\n\r\n").unwrap();
+    fs::write(&skill, "---\r\nname: canon  \r\ndescription: umbrella\r\n---\r\n\r\n\r\n# Canon   \r\n\r\n").unwrap();
 
     let check = canon(&["skills", "check"], &source, &target);
     let out = String::from_utf8_lossy(&check.stdout);
@@ -1130,17 +1130,30 @@ fn skills_install_58_changed_content_stays_drift() {
     write_canonical_source(&source);
     fs::create_dir_all(&target).unwrap();
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
+    fs::write(source.join("reference/topic.md"), "# topic\n\n```sh\nrm -rf a b\n```\n").unwrap();
+    fs::write(source.join("scripts/hook.sh"), "#!/bin/sh\nrm -rf a b\nexec canon \\\n  status\n").unwrap();
     skills::install_canonical(&source, &target, Some("claude")).unwrap();
     let topic = target.join(".claude/skills/canon/reference/topic.md");
-    fs::write(&topic, "# topic\n\nA paragraph canon never wrote.\n").unwrap();
+    let hook = target.join(".claude/skills/canon/scripts/hook.sh");
+    let skill = target.join(".claude/skills/canon/SKILL.md");
+    // Each would read as a rewrite if inner whitespace, backslashes or
+    // code fences were normalized away: a joined argument, a joined
+    // continuation, a changed fenced command, and a new paragraph.
+    fs::write(&hook, "#!/bin/sh\nrm -rfab\nexec canon status\n").unwrap();
+    fs::write(&topic, "# topic\n\n```sh\nrm -rf  a b\n```\n").unwrap();
+    fs::write(&skill, "---\nname: canon\ndescription: umbrella\n---\n\n# Canon\n\nA paragraph canon never wrote.\n").unwrap();
 
     let check = canon(&["skills", "check"], &source, &target);
     let out = String::from_utf8_lossy(&check.stdout);
     assert_eq!(check.status.code(), Some(1), "{out}");
-    assert!(out.contains(&format!("{} — stale (claude)", topic.display())), "{out}");
+    for path in [&topic, &hook, &skill] {
+        assert!(out.contains(&format!("{} — stale (claude)", path.display())), "{out}");
+    }
 
     let doctor = canon(&["skills", "doctor"], &source, &target);
     let out = String::from_utf8_lossy(&doctor.stdout);
-    assert!(out.contains(&format!("stale: {} (claude)\n", topic.display())), "{out}");
+    for path in [&topic, &hook, &skill] {
+        assert!(out.contains(&format!("stale: {} (claude)\n", path.display())), "{out}");
+    }
     assert!(!out.contains("formatter-rewritten"), "{out}");
 }
