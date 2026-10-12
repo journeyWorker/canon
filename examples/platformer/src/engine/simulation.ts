@@ -257,3 +257,10 @@ export class GameSimulation {
 
   private notify(): void { this.listeners.forEach((l) => l()); }
 }
+
+// One render frame, as PixiStage's ticker drives it: hand the simulation
+// this frame's input, then advance it by the frame's elapsed time.
+export function runFrame(sim: GameSimulation, input: { snapshot(): InputSnapshot }, deltaMS: number): void {
+  sim.setInput(input.snapshot());
+  sim.tick(deltaMS / 1000);
+}

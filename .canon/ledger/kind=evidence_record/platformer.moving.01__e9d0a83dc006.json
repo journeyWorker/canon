@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "018-n5-impl",
+    "role": "implementer",
+    "session_id": "018-n5-impl"
+  },
+  "at": "2026-10-12T15:17:01.345708Z",
+  "attachments": [
+    {
+      "case": "platformer.moving.01: A moving platform carries the standing player",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "3f886e89e2a5cb13336e4cd7ed8ed7039525507e232a8768dbd27b4c7d31caea"
+    }
+  ],
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cd examples/platformer && bun run test:junit"
+  },
+  "kind": "evidence_record",
+  "project_id": "platformer",
+  "run_seq": 4,
+  "scenario_id": "platformer.moving.01",
+  "schema": 1,
+  "staging_id": "6e539e62bbad",
+  "verdict": "faithful"
+}

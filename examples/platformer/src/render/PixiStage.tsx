@@ -8,7 +8,7 @@ import { createEnemyLayer } from './renderEnemies';
 import { createPlatformLayer } from './renderPlatforms';
 import { createPlayerSprite, updatePlayerSprite } from './renderPlayer';
 import { InputCapture } from '../engine/input';
-import type { GameSimulation } from '../engine/simulation';
+import { runFrame, type GameSimulation } from '../engine/simulation';
 import { SQUIRREL_DRAW } from '../engine/constants';
 import { LEVELS } from '../engine/level';
 
@@ -64,8 +64,7 @@ export function PixiStage({ sim }: { sim: GameSimulation }) {
       let seenLevelIndex = snap.levelIndex;
 
       const tickerCallback = (ticker: { deltaMS: number }) => {
-        sim.setInput(input.snapshot());
-        sim.tick(ticker.deltaMS / 1000);
+        runFrame(sim, input, ticker.deltaMS);
         snap = sim.getRenderSnapshot();
 
         if (snap.levelIndex !== seenLevelIndex) {
