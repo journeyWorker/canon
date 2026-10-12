@@ -74,7 +74,7 @@ canon gate check: clean (0 violations)
    `<root>/kind=feature/area=<area>/<surface>.feature`에 두며, 직접
    작성하고 git으로 추적합니다), 그리고 `plans:` 소스
    (레포 루트를 가리키는 `openspec` 소스와 빈 `openspec/changes/`)까지.
-   함께 쓰는 파일은 둘입니다:
+   함께 쓰는 것은 다음과 같습니다:
 
    - **`.canon/policy.yaml`**: `spec_coverage`를 켜는 시작 정책입니다.
      모든 시나리오에 evidence가, 모든 feature surface에 `@case:failure`
@@ -99,6 +99,14 @@ canon gate check: clean (0 violations)
      텍스트만 canon이 관리합니다. 마커는 코드 펜스 밖의 단독 줄일 때만
      인정되며, 중복되거나 짝이 맞지 않는 마커는 거부하고 아무것도 쓰지
      않습니다.
+   - **고른 하네스용 canon 스킬**: 터미널에서는 `init`이 어느 하네스에
+     설치할지 묻고, `.claude`·`.codex`·`.omp`·`.pi` 디렉터리가 있는
+     하네스를 미리 체크해 둡니다. `--providers claude,codex`(또는
+     `none`)를 주면 묻지 않습니다. 터미널도 플래그도 없으면 감지된
+     하네스에만 설치하고, 감지된 것이 없으면 아무것도 설치하지 않은 채
+     `canon skills install --providers=<list>`를 안내합니다. 답은
+     `canon.yaml`에 `skills: { providers: [...] }`로 기록됩니다.
+     `.agents`만으로는 Codex를 선택하지 않습니다.
 
    `--no-agents-md`와 `--no-policy`로 둘을 건너뜁니다. `init`은 기존
    `canon.yaml`과 `policy.yaml`을 절대 덮어쓰지 않으며, 다시 실행하면
@@ -179,17 +187,20 @@ canon gate check: clean (0 violations)
 (Codex는 `.codex/skills`가 아니라 `.agents/skills`를 탐색합니다), OMP에는
 `.omp/skills/canon/SKILL.md`, Pi에는 `.pi/skills/canon/SKILL.md`가 생성됩니다.
 OMP/Pi는 passive bundle이며 retrieve pre-dispatch 스크립트는 sidecar일 뿐
-native hook이 아닙니다. `--providers`를 생략하면 `.claude`, `.agents` 또는
-`.codex`(Codex), `.omp`, `.pi` root를 감지하고 아무 root도 없으면
-Claude+Codex를 기본 선택합니다. 투영 대상을 고정하려면 provider를 명시하세요:
+native hook이 아닙니다. `canon init`이 고른 하네스에 이미 설치해 둡니다.
+`skills install`, `check`, `doctor`는 `canon.yaml`의 `skills.providers`를
+따릅니다. 그 키가 없는 레포(0.17 이전에 설정한 레포)는 설치 lock에 기록된
+provider를, 그것도 없으면 감지된 `.claude`·`.codex`·`.omp`·`.pi` 디렉터리를
+씁니다. 감지되지 않은 하네스를 기본으로 더하는 일은 없습니다. 목록을 바꾸려면
+`--providers`를 주세요. install이 `canon.yaml`에 기록합니다:
 
 ```bash
-# 네 provider에 하나의 canonical canon 스킬 투영
-bunx @journeykit/canon skills install --source canon/skills --target . --providers=claude,codex,omp,pi
+# 네 provider에 canon 스킬을 투영하고 목록을 기록
+bunx @journeykit/canon skills install --providers=claude,codex,omp,pi
 
 # 쓰기 없이 투영 상태 확인
-bunx @journeykit/canon skills check --source canon/skills --target .
-bunx @journeykit/canon skills doctor --source canon/skills --target .
+bunx @journeykit/canon skills check
+bunx @journeykit/canon skills doctor
 
 # 태스크 시작 전에 역할별 전략 메모리를 노출
 bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon regime-key dev my-repo core abc123)"
@@ -201,8 +212,10 @@ bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon re
 canon 버전을 기록하므로, canon을 올린 뒤에는 다시 설치할 때까지 둘 다
 "installed by canon X, this canon is Y — run `canon skills install`"이라고
 알려 줍니다(0.16 이전 잠금 파일이면 "an unknown canon version"). `doctor`는
-같은 provider root에서 설명(description)의 한 문장에 빌드 동사(build·create 등)와
-빌드 대상(site·app·game·feature·tool·service 등)이 함께 있는 다른 스킬도 알려 줍니다. 에이전트가 빌드 작업에 그 스킬을 고르면
+더 이상 선택되지 않은 하네스에 남은 canon 투영도 `stray:` 줄로 알려 주며
+지우는 `rm -r` 명령을 함께 보여 줍니다. 또 같은 provider root에서 설명(description)의
+한 문장에 빌드 동사(build·create 등)와 빌드 대상(site·app·game·feature·tool·service 등)이
+함께 있는 다른 스킬도 알려 줍니다. 에이전트가 빌드 작업에 그 스킬을 고르면
 canon 루프가 돌지 않기 때문입니다. 알려 주기만 하고 고치지는 않습니다.
 
 canon 0.13.0 이하에서 업그레이드한다면: 이전 릴리스는 Codex 스킬을 Codex가

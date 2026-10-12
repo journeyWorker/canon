@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "017-p3-impl"
+  },
+  "at": "2026-10-12T10:41:25.362192Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test skills_install skills_install_52 && cargo test -p canon-cli --test conformance (skills-doctor-stray-projection steps 1-2)"
+  },
+  "evidence_note": {
+    "summary": "explicit providers flag rewrites skills.providers keeping other bytes; later runs follow canon.yaml"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 28,
+  "scenario_id": "skills.install.52",
+  "schema": 1,
+  "staging_id": "e3c4a5d97ab5",
+  "verdict": "faithful"
+}

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "017-p3-impl"
+  },
+  "at": "2026-10-12T10:41:17.735633Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init authoring_init_92 && cargo test -p canon-cli --test conformance (init-scaffold-and-rerun)"
+  },
+  "evidence_note": {
+    "summary": "bare repo: nothing installed, no lock, flag named, skills section only commented"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 20,
+  "scenario_id": "authoring.init.92",
+  "schema": 1,
+  "staging_id": "dd92f92fcd7e",
+  "verdict": "faithful"
+}

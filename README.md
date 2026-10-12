@@ -20,12 +20,14 @@ canon format spec                # validate a spec corpus
 canon gate check                 # run the evidence gate
 ```
 
-Run `canon <command> --help` for any explicit CLI command. Install the
-provider-neutral user-facing companion bundle with:
+Run `canon <command> --help` for any explicit CLI command. `canon init` asks
+which harnesses get the provider-neutral companion skill (on a terminal; the
+detected ones are checked), records the answer in `canon.yaml`, and installs
+it. Afterwards:
 
 ```bash
-canon skills install                         # detect .claude/.agents|.codex/.omp/.pi
-canon skills install --providers=claude,codex,omp,pi
+canon skills install                         # follows canon.yaml skills.providers
+canon skills install --providers=claude,codex,omp,pi   # any subset; rewrites skills.providers
 canon skills check                           # read-only drift check
 canon skills doctor                          # diagnostics, never deletes
 ```
@@ -35,9 +37,13 @@ provider: Claude uses `.claude/skills/canon/SKILL.md`, Codex uses
 `.agents/skills/canon/SKILL.md` (the directory Codex scans for skills), and
 OMP/Pi use `.omp/skills/canon/SKILL.md` and `.pi/skills/canon/SKILL.md`. Every
 selected provider receives lazy `reference/**` and `scripts/**` sidecars.
-Without `--providers`, an existing `.agents` or `.codex` directory selects
-Codex. OMP/Pi are project-local passive bundles; the retrieve pre-dispatch
-script is a sidecar, not a native hook.
+Without `--providers`, the commands serve `canon.yaml`'s
+`skills: { providers: [...] }`; a repo without that key (set up before 0.17)
+uses the providers its install lock records; with neither, the harnesses
+whose `.claude`, `.codex`, `.omp` or `.pi` directory exists. Nothing
+undetected is ever added: with nothing detected, nothing is installed and
+the command says how to choose. OMP/Pi are project-local passive bundles; the
+retrieve pre-dispatch script is a sidecar, not a native hook.
 
 Canon 0.13.0 and earlier wrote Codex to `.codex/skills/canon.md` and
 `.codex/skills/canon/**`, which Codex never reads. `canon skills install`
@@ -136,6 +142,42 @@ the plan, a root at the old repo-level `specs` default moves to
 
 canon's own corpus moved with it, to `specs/kind=feature/…` and
 `examples/platformer/specs/kind=feature/…`; both roots are unchanged.
+
+### Harness choice (D5)
+
+**Why.** `canon skills install` picked providers from directory markers and,
+when it found none, installed Claude and Codex. It never asked, and it read
+`.agents`, a directory other tools use too, as a Codex marker.
+
+- `canon.yaml` gains `skills: { providers: [claude, codex, omp, pi] }` (any
+  subset, `[]` for none). `canon init --check-config` validates it; a
+  malformed section or an unknown name fails `skills install|check|doctor`.
+- `canon init` asks, on a terminal, which harnesses get the canon skill, with
+  the detected ones checked (`.claude`, `.codex`, `.omp`, `.pi`
+  directories; `.agents` alone no longer selects Codex). `--providers a,b`
+  answers without a prompt; `--providers none` records `[]`. With no
+  terminal and no flag it takes the detected ones; with none detected it
+  installs nothing and names `canon skills install --providers=<list>`. It
+  writes the answer to `canon.yaml` and installs the skill from the default
+  source, as `canon skills install` does. If that source is missing, the
+  choice stays recorded and init exits 2 naming the install to run.
+- `canon skills install|check|doctor` follow `skills.providers`. An explicit
+  `--providers` on install rewrites the list in an existing `canon.yaml`
+  (every other byte kept) and never creates one. Without the key they use
+  the install lock's providers, then the detected ones. The Claude+Codex
+  fallback is gone.
+- `canon skills doctor` adds a `stray:` advisory for a canon projection
+  (`.claude/skills/canon`, `.agents/skills/canon`, `.omp/skills/canon`,
+  `.pi/skills/canon`) whose provider is not selected, with the `rm -r` that
+  removes it and the install command that selects it. `check` does not fail
+  on it. `check` and `doctor` name where the providers came from.
+
+*Migration:* nothing breaks: a repo with an install lock keeps its providers.
+Record them with `canon skills install --providers=<the lock's list>`. A repo
+with no lock and only an `.agents` directory no longer gets Codex by default;
+pass `--providers` to choose. Scripts that parse `canon init` output: its last
+line is now the skill install result (or the no-harness hint) instead of
+`next: canon skills install`.
 
 ## 0.16.0 release
 

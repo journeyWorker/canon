@@ -66,7 +66,7 @@ Feature: skills install
     And its frontmatter opens the file and carries the skill's name and a non-empty description
     And the reference and script sidecars sit beside it
     And nothing is written under the Codex config directory
-    And a target holding only the agents root or only the Codex config directory selects Codex when no provider is named
+    And a target holding the Codex config directory selects Codex when no provider is named
     And a second install reports unchanged and the read-only check is clean
 
   # canon: {"schema":1,"at":"2026-10-10T14:03:19Z","actor":{"agent_id":"canon"}}
@@ -197,3 +197,69 @@ Feature: skills install
     And each says the approval is never assumed, even when the human said they cannot answer until the agent reports, because the brief is that report
     And each limits proceeding on an assumption to the brief's questions and work inside an approved scope, never the approval
     And each calls the ship refusal and the evidence add refusal backstops, with the stop at the brief
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:edge
+  @skills.install.50
+  Scenario: Codex is detected from its config directory, never from the agents root alone
+    Given a canonical skill source and a target with no canon.yaml skills list and no install lock
+    When the skill is installed with no provider named, into a target holding the Codex config directory, or that and the agents root, or the agents root alone
+    Then the Codex config directory selects Codex and the skill lands under the agents skills root
+    And the agents root alone selects nothing, because other tools use it too, and nothing is projected
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.51
+  Scenario: A target with no harness directory gets nothing and is told how to choose
+    Given a canonical skill source and a target with no .claude, .codex, .omp or .pi directory, no canon.yaml skills list and no install lock
+    When canon skills install runs with no provider named
+    Then it selects no provider, writes no projection and no install lock, and adds no undetected default
+    And it says nothing was installed and names `canon skills install --providers=<list>`
+    And the read-only check exits 0 naming the same flag, and the doctor reports no-providers instead of healthy
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:happy
+  @skills.install.52
+  Scenario: An explicit provider list is written to canon.yaml and later runs follow it
+    Given a target with a canon.yaml that has comments and no skills section, and a .claude directory
+    When canon skills install runs with --providers codex,omp
+    Then it projects Codex and OMP only and appends `skills: { providers: [codex, omp] }` to canon.yaml, keeping every other byte
+    And install, check and doctor with no provider named follow that list and say it came from canon.yaml
+    And a later --providers replaces the section in place, a flow-style section in the middle of the file included, and --providers none records an empty list
+    And a target without canon.yaml gets no canon.yaml
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:edge
+  @skills.install.53
+  Scenario: A repo set up before 0.17 keeps working from its install lock
+    Given a target whose canon.yaml has no skills section and whose install lock records Claude and Codex, beside an .omp directory
+    When canon skills check, doctor and install run with no provider named
+    Then each serves Claude and Codex and says the list came from the install lock because canon.yaml has no skills key
+    And the check exits 0, the doctor reports healthy and the install reports unchanged
+    And the lock and canon.yaml are byte-identical afterwards, and nothing is projected for OMP
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.54
+  Scenario: Doctor names a canon projection left for a provider that is not selected
+    Given a target whose canon.yaml selects Claude and that still holds canon's Codex projection from an earlier install
+    When canon skills check and canon skills doctor run
+    Then the check exits 0 and does not mention the Codex projection
+    And the doctor still reports healthy and adds a stray line naming the directory, saying codex is not a selected provider and canon no longer updates it, with `rm -r <dir>` to remove it and the install command that selects it
+    And the projection is left on disk
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.55
+  Scenario: A malformed skills section in canon.yaml fails loud
+    Given a canon.yaml whose skills section is a bare list, has a misspelled key, or names a provider canon does not know
+    When canon skills install, check and doctor run with no provider named
+    Then each exits 1 naming the expected shape or the unknown provider
+    And nothing is projected and canon.yaml is byte-identical
+    And canon init --check-config reports the skills section as FAIL with the same reason

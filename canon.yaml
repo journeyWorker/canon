@@ -134,3 +134,9 @@ specs:
 # both BEFORE any read runs, rather than silently inflating the corpus.
 artifacts:
   native_records: true
+
+# Harnesses the canon skill is installed for: any of claude, codex, omp, pi
+# (`[]` for none). `canon skills install|check|doctor` follow this list;
+# `canon skills install --providers=<list>` rewrites it.
+skills:
+  providers: [claude, codex, omp, pi]

@@ -1,0 +1,4 @@
+description: "0.17 D5: `canon init --providers` naming a harness canon does not know is refused before anything is written (exit 2), naming the accepted names"
+steps:
+  - args: [init, --providers, "claude,gemini"]
+    exit: 2

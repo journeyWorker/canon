@@ -141,11 +141,16 @@ Load only the reference the current step needs.
 
 ```bash
 canon init                                   # canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, plans home
-canon skills install                         # detects .claude/.agents|.codex/.omp/.pi; if none exists, installs Claude+Codex
-canon skills install --providers=claude,codex,omp,pi
+canon init --providers=claude,codex          # harnesses for the canon skill; without it init asks on a terminal, else takes the detected .claude/.codex/.omp/.pi
+canon skills install                         # follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing)
+canon skills install --providers=claude,codex,omp,pi   # any subset or none; rewrites skills.providers
 canon skills check                           # read-only drift check
-canon skills doctor                          # diagnostics; never deletes user files
+canon skills doctor                          # diagnostics, incl. a stray canon projection for an unselected provider; never deletes user files
 ```
+
+The harness list lives in `canon.yaml` as `skills: { providers: [...] }`.
+`.agents` alone never selects Codex; `.codex` does. Change the list with
+`canon skills install --providers=<list>`, never by assuming a default.
 
 The canonical bundle is read-only. Claude receives
 `.claude/skills/canon/SKILL.md`; Codex receives
