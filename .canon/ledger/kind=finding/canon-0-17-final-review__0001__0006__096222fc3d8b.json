@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-017-final",
+    "role": "reviewer",
+    "session_id": "review-017-final"
+  },
+  "at": "2026-10-12T12:56:18.038917Z",
+  "change_id": "canon-0-17-final-review",
+  "disposition": "open",
+  "file_ref": "README.md:87-94",
+  "kind": "finding",
+  "reviewed_sha": "b7d64a76eadc518b0d31d50e424da3d1f3b7b3a8",
+  "reviewer": "canon-reviewer-017-final",
+  "round": 1,
+  "schema": 1,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "README overview claimed canon never writes into external plans, ignoring the gate task write-back"
+}
