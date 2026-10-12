@@ -397,7 +397,7 @@ No exit code changed.
 **Acceptance (plan D8).**
 
 - **(a) Eval 5 on omp.** The eval-1 one-line game request ran in a fresh repo initialized with this build, in three turns: the request, one human answer, then a follow-up fix after shipping. All four criteria pass:
-  - **One human stop.** The agent stopped once, at the brief (88 s), and shipped 28 scenarios after one answer.
+  - **One human stop.** The agent stopped once, at the brief (88 s). After one answer it shipped the first version with 28 scenarios; the turn-3 follow-up brought the total to 29.
   - **Follow-up without a human.** The follow-up reopened the shipped subject with `--reason`, went in as a task in the approved change, got a scenario, evidence and an independent review (which found and fixed one weak test), and shipped again with every guard re-run. No human was involved.
   - **Fewer calls than scenarios.** For 29 scenarios there were 4 `evidence add` calls (2 with `--all-scenarios`) and 3 `review add` calls (1 batch). That is 38 canon calls in all, 0 of them bookkeeping; eval 3c (0.16) took 49.
   - **Independent reviews.** Every scenario was reviewed by a separate omp session, and the gate is clean.
