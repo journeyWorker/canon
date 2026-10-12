@@ -40,6 +40,24 @@ not the index already holds its scenarios, `shipped` is refused, and
 fix it; run `canon migrate`, which moves `features/kind=feature/` to
 `<root>/kind=feature/`.
 
+`canon migrate --dry-run` prints the plan without writing anything, and
+`canon migrate` applies it. Commit first: it refuses while a path it
+moves has uncommitted changes, and when a destination already exists.
+A root at the repo-level `specs` moves to `.canon/specs`, and
+`canon.yaml` records `former_roots: [specs]`, so reviews pinned before
+the move still find their scenarios. Changes `canon change new` wrote
+under `openspec/changes/` move to `.canon/changes/<slug>/`
+(`proposal.md` becomes `brief.md`). An `Approved:` line in an external
+`proposal.md` is copied into a canon pointer `brief.md`. The command
+also writes `skills.providers` from the install lock, adds the missing
+canon `.gitignore` lines, and ends with a full index rebuild. It is
+idempotent.
+
+The reader's refresh treats a file as stale when its latest index
+generation has another `source_digest` or `scenario_digest`. A
+generation written before 0.15 has no `scenario_digest`, so a repo that
+kept an old index gets it rewritten on the first read.
+
 ## Where the index sits in the loop
 
 ```

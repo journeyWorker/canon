@@ -85,3 +85,7 @@ __pycache__/
 vendors/
 # Astro build cache (packages/website).
 .astro/
+# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.
+.canon/hot.db*
+# canon's scenario index -- derived from the .feature files, rebuilt by every reader.
+.canon/ledger/kind=scenario/

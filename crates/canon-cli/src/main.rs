@@ -101,6 +101,16 @@ enum Command {
         #[arg(long, value_name = "LIST")]
         providers: Option<String>,
     },
+    /// Move a repo set up by canon 0.16 or earlier onto the 0.17 layout (specs, changes, approvals, skills, .gitignore)
+    #[command(after_help = "Examples:\n  canon migrate --dry-run\n  canon migrate\n\nPrints the plan, then applies it; --dry-run stops after the plan. Idempotent:\na second run finds nothing to move.\n\n- A spec root's features/kind=feature/ moves to <root>/kind=feature/ (git mv in a\n  git work tree). A root at the repo-level `specs` moves to .canon/specs, and\n  canon.yaml records `former_roots: [specs]` so reviews pinned before the move\n  still find their scenarios.\n- Changes `canon change new` wrote under openspec/changes move to\n  .canon/changes/<slug>/ (proposal.md -> brief.md, tasks.md alongside); every\n  other change stays and is named. canon init's `{ dialect: openspec, root: . }`\n  source goes once no change is left under it.\n- An external proposal.md's Approved: line is copied into a canon pointer\n  brief, .canon/changes/<change>/brief.md, with a Source: line.\n- skills.providers is written from the install lock; missing canon .gitignore\n  lines are added; the scenario index is rebuilt (full sync).\n\nRefuses (exit 2, nothing written) on uncommitted changes under a path it\nmoves, on a destination that already exists, and on a canon.yaml edit it\ncannot make with every other byte kept.")]
+    Migrate {
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Print the plan and write nothing
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Record who approved the gate's policy (.canon/policy.yaml) and which bytes
     #[command(after_help = "Examples:\n  canon policy approve --by alice --note 'reviewed the starter policy'\n\nWrites .canon/policy.approval.json (commit it): the policy's sha256, who\napproved it, when, and the note. `canon gate check` and `canon status` print an\nadvisory while the policy is unapproved or has changed since its approval;\nthe advisory never changes an exit code.")]
     Policy {
@@ -1677,6 +1687,7 @@ fn main() -> ExitCode {
             };
             run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy, skills })
         }
+        Command::Migrate { repo, dry_run } => ExitCode::from(canon_cli::migrate::run(&repo, dry_run) as u8),
         Command::Policy { action } => match action {
             PolicyCommand::Approve { by, note, repo } => ExitCode::from(canon_cli::policy_approval::run_approve(&repo, &by, note.as_deref()) as u8),
         },

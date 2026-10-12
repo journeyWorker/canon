@@ -22,6 +22,7 @@ pub mod init;
 pub mod inventory;
 pub mod inventory_selftest;
 pub mod learn;
+pub mod migrate;
 pub mod plans;
 pub mod plugin_sync;
 pub mod policy_approval;

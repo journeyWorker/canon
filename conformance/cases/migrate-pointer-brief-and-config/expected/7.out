@@ -1,0 +1,4 @@
+canon migrate: plan:
+  rebuild the scenario index (full sync)
+  left: 1 openspec change(s) not written by `canon change new` stay where they are, read as an external plan: c-checkout
+canon migrate: rebuilt the scenario index: 0 record(s) written

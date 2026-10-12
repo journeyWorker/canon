@@ -141,7 +141,9 @@ the plan, a root at the old repo-level `specs` default moves to
 `.canon/specs`, and any other root only drops its `features/` level.
 
 canon's own corpus moved with it, to `specs/kind=feature/…` and
-`examples/platformer/specs/kind=feature/…`; both roots are unchanged.
+`examples/platformer/specs/kind=feature/…`. In P4 `canon migrate` then
+moved the first to `.canon/specs/kind=feature/…`, recording
+`former_roots: [specs]` (see below). `examples/platformer/specs` stays.
 
 ### Canon's own changes and approvals (P2)
 
@@ -247,6 +249,88 @@ with no lock and only an `.agents` directory no longer gets Codex by default;
 pass `--providers` to choose. Scripts that parse `canon init` output: its last
 line is now the skill install result (or the no-harness hint) instead of
 `next: canon skills install`.
+
+### `canon migrate` (P4, D6)
+
+`canon migrate [--dry-run] [--repo <dir>]` moves a repo that canon 0.16 or
+earlier set up onto the 0.17 layout in one idempotent command. It prints
+the plan and then applies it. `--dry-run` stops after the plan, and a
+second run finds nothing to move.
+
+- **Spec roots.** A root's `features/kind=feature/` moves to
+  `<root>/kind=feature/`, with `git mv` when the files are tracked. A root
+  at the repo-level `specs` moves to `.canon/specs` from either layout.
+  That covers 0.16's default, which is also what an absent `specs:` key or
+  an entry without `root:` meant then. Every other root stays put and only
+  drops its `features/` level. Emptied directories are removed, and any
+  other file left in them is named.
+- **`former_roots`.** A root that moved records where it was:
+  `specs.roots[].former_roots: [specs]`. Reviews written before 0.15 are
+  checked against the commit they pinned, and at a commit from before the
+  move `.canon/specs` holds nothing. The legacy lookup therefore searches
+  the root's directory now, then each former root. A former root belongs
+  to its project id, so the lookup never matches another root's scenario
+  with the same id. On canon's own repo, without the record, 329 of 337
+  legacy reviews would turn undecidable.
+- **Changes `canon change new` wrote under openspec** move to
+  `.canon/changes/<slug>/`, with `proposal.md` renamed `brief.md` and
+  `tasks.md` alongside. Then they are re-imported from canon's own source
+  under the same change id, so task ids (`<slug>#<n>`) and the adoption
+  keep joining. A change counts as canon's only when both signals hold:
+  its files still open with that command's 0.14–0.16 scaffold (through
+  the `## What Changes` and row-grammar comments), and its first stored
+  version is already adopted, because `change new` adopts before any
+  ingest. A change with one signal stays, named with the signal it lacks.
+  Every other change stays as an external plan. `canon init`'s
+  `{ dialect: openspec, root: . }` source, and its
+  `openspec/changes/.gitkeep`, go only once no change is left under it.
+- **Approvals.** An external `proposal.md` that holds the `Approved:` line
+  0.16 recorded gets a canon pointer brief,
+  `.canon/changes/<change>/brief.md`, holding `Source: <proposal>` and that
+  line. The proposal is not edited, and the output names the leftover line.
+- **Skills, .gitignore, index.** `skills.providers` is written from the
+  install lock when `canon.yaml` has no `skills:` key. The missing canon
+  `.gitignore` lines are added, and a scenario index still tracked in git
+  is named. The index is rebuilt last with a full `canon inventory sync`.
+- **canon.yaml.** Every edit is textual, as `canon skills install` edits
+  `skills:`: comments and CRLF are kept. A result that does not parse to
+  exactly the intended change is refused, with the edit to make by hand.
+- **Refusals** (exit 2, nothing written): uncommitted changes under a path
+  it moves (untracked files included), a destination that already exists,
+  or a `canon.yaml` edit it cannot make safely.
+
+**`canon init` on an existing repo (#35).** A rerun also adds the canon
+`.gitignore` lines the repo lacks: hot db, audit log, scenario index,
+index lock and artifact-store lock. It prints `canon init: added to
+.gitignore: …`, and its first line now reads `… left unchanged; the
+AGENTS.md block and the canon .gitignore lines are refreshed`. With
+`--no-agents-md` it adds only the lines. It still refuses (exit 2) when
+nothing is missing.
+
+**Fix: an old scenario index no longer turns legacy reviews
+undecidable.** The readers' stale-index check compared only each
+scenario's `source_digest`. A generation written before 0.15 carries no
+`scenario_digest`, so for a file unchanged since, the refresh kept it as
+the latest record. The legacy check then had no digest to compare and
+read the review as undecidable. Repos that tracked the index before 0.16
+keep such files. On canon's own repo the count was 225 current / 17 stale
+/ 95 undecidable instead of 307 / 22 / 8. The check now also compares
+`scenario_digest`, as `canon inventory sync` always did, so the first
+reader rewrites those generations. `canon review add` on such a scenario
+now pins at scenario scope, as it does on a fresh index.
+
+**Conformance.** New cases: `migrate-refused-uncommitted` and
+`migrate-pointer-brief-and-config`. 39 cases were re-blessed, every diff
+for one of three causes:
+- Their fixtures carry hand-made pre-0.15 index records, so their first
+  reader prints one `refreshed the scenario index from N changed feature
+  file(s) …` line.
+- `canon review add` prints `pinned … at scenario digest <x>` instead of
+  `source digest`, and the record's `pins` gain `scenario_digest_scope:
+  scenario`.
+- `init-scaffold-and-rerun` shows the new rerun line.
+
+No exit code changed.
 
 ## 0.16.0 release
 

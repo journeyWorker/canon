@@ -1,0 +1,16 @@
+canon 0.16.0
+policy: absent
+warning: no policy: .canon/policy.yaml not found, so `canon gate check` requires no evidence, failure cases or review here
+
+subjects (1):
+  proposed (1):
+    checkout: 0 scenarios, 0 evidenced, 0 reviewed, 0 open blockers
+      brief: approved in .canon/changes/c-checkout/brief.md — ana 2026-10-10 — "go"
+
+unowned (2, no @subject): cart.add.01, cart.add.02
+
+next:
+  # checkout owns no scenario; specify its behavior, one scenario per behavior
+  canon scenario new <area>.<surface>.01 --title "<behavior>" --subject checkout --case happy
+  # 2 scenario(s) carry no @subject tag (first: cart.add.01); add `@subject:<id>` above each in its .feature file, then check again: status re-indexes the edited files itself
+  canon status

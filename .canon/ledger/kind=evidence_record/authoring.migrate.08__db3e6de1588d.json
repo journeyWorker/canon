@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p4-impl",
+    "role": "implementer",
+    "session_id": "017-p4-impl"
+  },
+  "at": "2026-10-12T11:49:48.748520Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate authoring_migrate_08_a_canon_yaml_it_cannot_edit_safely_is_refused"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 8,
+  "scenario_id": "authoring.migrate.08",
+  "schema": 1,
+  "staging_id": "4fd3d15e7a07",
+  "verdict": "faithful"
+}

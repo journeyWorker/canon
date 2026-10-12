@@ -174,7 +174,7 @@ pub fn is_valid_transition(from: SubjectStatus, to: SubjectStatus) -> bool {
 /// ingest` share ([`tiers::build_lenient_tiers_for_kinds`]) — so a
 /// subject write honors `canon.yaml`'s `routing.subject` and lands
 /// where `canon query --kind subject` reads.
-fn registry_for(canon_yaml_path: &Path, kinds: &[RecordKind]) -> Result<TierRegistry, TierCliError> {
+pub(crate) fn registry_for(canon_yaml_path: &Path, kinds: &[RecordKind]) -> Result<TierRegistry, TierCliError> {
     let loaded = tiers::build_lenient_tiers_for_kinds(canon_yaml_path, kinds)?;
     Ok(TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite))
 }

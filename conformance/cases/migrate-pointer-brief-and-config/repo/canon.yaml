@@ -1,0 +1,22 @@
+tiers:
+  local:
+    backend: git
+    root: .canon/ledger
+routing:
+  change: local
+  subject: local
+  scenario: local
+  task: local
+  review: local
+  evidence_record: local
+  finding: local
+specs:
+  roots:
+    - id: root
+      root: .canon/specs
+plans:
+  # Where changes and their tasks live: `canon change new` scaffolds
+  # openspec/changes/<slug>/, `canon ingest plans` imports it.
+  sources:
+    - dialect: openspec
+      root: .
