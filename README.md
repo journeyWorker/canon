@@ -353,9 +353,15 @@ for one of three causes:
 
 No exit code changed.
 
-**Closed issues:** #35.
+**Closed issues:** #35, #13.
 
-ACCEPTANCE-PLACEHOLDER: main adds the acceptance paragraph (and #13 if eval 4 passes) here.
+**Acceptance (plan D7).**
+
+- **(a) canon migrates itself.** `canon migrate` moved canon's own corpus to `.canon/specs/kind=feature/` (31 files, `git mv`). It recorded `former_roots: [specs]` and left the 51 human-written openspec changes in place as an external plan. `canon gate check` and `canon status` printed byte-identical output before and after: clean, with 307 current, 22 stale and 8 undecidable legacy reviews. A second run is a no-op.
+- **(b) Throwaway copies of Kino and Lifeshot migrate the same way.** The originals were not touched. Gate output was byte-identical before and after: Kino moved 42 feature files, Lifeshot 25. Lifeshot's status differs in three lines, which are the 0.17 brief wording, not the move.
+- **(c) Eval 4 on Codex (#13).** The eval-1 one-line game request ran in a fresh repo initialized with `--providers codex`. The agent stopped once, at a brief in `.canon/changes/`. After one answer it recorded the approval there, shipped, and handled the follow-up with no human. Specs landed in `.canon/specs/kind=feature/`, no `openspec/` directory was created, and only `.agents/skills/canon` was projected. The gate was clean.
+- **What the run also showed.** Codex has no subagents, so its "independent" reviews were written by the implementing session under a new label (#39, tracked with #14), and its evidence was a `curl` check. Canon cannot tell either from a real review or a real test yet.
+- **A false start.** The first Codex run was void: Codex's login shell put the installed 0.16 binary ahead of the 0.17 build. The evidence is in `~/Workspace/canon-dogfood/PROTOCOL-4.md` and `FINDINGS-4.md`.
 
 ## 0.16.0 release
 
