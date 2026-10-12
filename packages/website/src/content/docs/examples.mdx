@@ -307,9 +307,13 @@ guidance, then drive it through its evidence-gated lifecycle.
    bunx @journeykit/canon subject adopt checkout-revamp-plan --subject checkout-revamp
    ```
 
-   This stamps `Change.subject_id` and appends the change to the
+   This appends the subject to `Change.subject_ids` and the change to the
    subject's `change_ids` — the plan unit now belongs to a managed
-   product unit.
+   product unit. A change may belong to several subjects: adopting it
+   under a second one adds that subject and prints ``linked change
+   `checkout-revamp-plan` to subject `<other>` as well; the change now
+   belongs to `checkout-revamp` and `<other>` ``; an open blocker on it
+   then gates both.
 
    Scenarios join the subject from the spec side: scaffold them with
    `--subject` (or add `@subject:checkout-revamp` by hand), then sync so
@@ -346,6 +350,17 @@ guidance, then drive it through its evidence-gated lifecycle.
    owned scenario carries a latest non-Divergent verdict. Otherwise it
    prints the offending scenarios, exits `1`, and the status stays
    `verifying`.
+
+   A follow-up on the shipped subject reopens it, with no human inside
+   its approved scope; add the follow-up as tasks in its approved change,
+   then scenario, evidence and review, and ship again through every
+   guard. `canon status` flags a shipped subject whose gate went red and
+   names this command:
+
+   ```bash
+   bunx @journeykit/canon subject status checkout-revamp verifying \
+     --reason "follow-up: totals round per line" --actor-id impl
+   ```
 
 5. **Read the per-domain management view.**
 
