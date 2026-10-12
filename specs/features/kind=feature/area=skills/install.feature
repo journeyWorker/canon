@@ -173,3 +173,15 @@ Feature: skills install
     And it says nothing about canon's own skill or the skill that claims no build work
     And it exits 0 and still reports the projections as healthy
     And every other skill's files are byte-identical afterwards
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:11Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.22
+  Scenario: The skill, the AGENTS.md block and the write help name no bookkeeping step the commands already do
+    Given canon's own skill source, the AGENTS.md block canon init writes, and the help of canon evidence, canon finding and canon finding add
+    When each is read with its wrapped lines joined
+    Then the working loop never tells the agent to run canon format specs or canon ingest plans
+    And it names canon inventory sync only for a command that printed "NOT refreshed"
+    And every mention of canon gate promote is conditioned on write.promote manual
+    And no help loop lists canon gate promote as a step of its own

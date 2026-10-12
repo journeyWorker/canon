@@ -1,16 +1,42 @@
 # canon-inventory
 
-`canon inventory sync` is the FIRST stage of canon's unified spec loop:
-it turns a hand-authored, `canon format`-validated `.feature` corpus into
-the scenario ledger-INDEX records every downstream stage joins against.
+`canon inventory sync` builds canon's scenario ledger-INDEX: it turns a
+hand-authored, `canon format`-validated `.feature` corpus into the scenario
+records every downstream stage joins against.
 
-## The unified loop
+## You rarely run it yourself
+
+Since 0.16 the commands that read the index refresh it first:
+`canon status`, `canon gate check`, `canon evidence add`,
+`canon review add` and `canon subject status` index added, edited and
+deleted `.feature` files themselves, with the same code this command runs,
+scoped to the changed files, and say so in one stderr line:
 
 ```
-author .feature corpus  →  canon format --check (validate)
+canon status: refreshed the scenario index from 1 changed feature file(s) (specs/features/…): 1 record(s) written
+```
+
+So the working loop has no sync step and no `canon format` step: write the
+scenario (`canon scenario new` writes it format-clean) and run the next
+command. Run `canon inventory sync` when:
+
+- a reader prints `NOT refreshed` — a root has a format violation (a
+  hand-written `Feature:`/`Scenario:` header with no `# canon:` provenance
+  comment, an emptied file, …) or a duplicate id, so its files were not
+  indexed and the command graded the index as it was. `canon inventory
+  sync` names each problem (`canon format specs` names the format ones);
+  fix them and the next command indexes the files;
+- `canon status` says the ledger holds no scenario records while the
+  `.feature` files hold some (the same refusal, on an index never built);
+- you want the whole index rebuilt from every root at once.
+
+## Where the index sits in the loop
+
+```
+author .feature corpus (canon scenario new)
         │
         ▼
-canon inventory sync            # THIS skill — materializes scenario index records
+scenario index                  # refreshed by every reader; `canon inventory sync` rebuilds it
         │
         ▼
 canon review add                # attests a review — see canon-inventory downstream / canon-gate
@@ -23,8 +49,8 @@ canon ingest artifacts          # with artifacts.native_records: true in canon.y
                                 # (see canon-artifact-ingest)
 ```
 
-Every stage after `sync` joins on the SAME `(project_id, scenario_id)`
-pair `sync` materializes — one identity scheme, no second one.
+Every stage after the index joins on the SAME `(project_id, scenario_id)`
+pair it materializes — one identity scheme, no second one.
 
 ## `canon inventory sync [--repo <dir>] [--spec-root <dir>]`
 

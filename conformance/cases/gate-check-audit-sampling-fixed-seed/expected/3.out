@@ -58,8 +58,8 @@
       "actor": "agent"
     },
     {
-      "command": "canon inventory sync",
-      "why": "6 scenario(s) carry no @subject tag (first: shop.cart.01); add `@subject:<id>` above each in its .feature file, then sync",
+      "command": "canon status",
+      "why": "6 scenario(s) carry no @subject tag (first: shop.cart.01); add `@subject:<id>` above each in its .feature file, then check again: status re-indexes the edited files itself",
       "actor": "agent"
     }
   ],

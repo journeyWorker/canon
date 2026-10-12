@@ -15,5 +15,5 @@ unowned: none
 next:
   # no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject <id>`
   canon feature new <area>.<surface> --title "<feature>"
-  # demo owns no scenario; specify its behavior, then `canon inventory sync`
+  # demo owns no scenario; specify its behavior, one scenario per behavior
   canon scenario new <area>.<surface>.01 --title "<behavior>" --subject demo --case happy

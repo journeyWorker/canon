@@ -1,0 +1,12 @@
+description: "`canon status` on a `proposed` subject whose newest adopted change has a proposal.md with no `Approved:` line shows the brief as not approved and lists only the `human` step, with no `canon feature new` or `canon scenario new` step, in both the human form and `--json`"
+steps:
+  - args: [init]
+    exit: 0
+  - args: [subject, new, cart, --domain, shop, --title, Cart, --actor-id, lead]
+    exit: 0
+  - args: [change, new, cart-v1, --subject, cart, --title, Cart v1]
+    exit: 0
+  - args: [status]
+    exit: 0
+  - args: [status, --json]
+    exit: 0

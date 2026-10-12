@@ -288,7 +288,7 @@ Feature: evidence add
   Scenario: Promote on the command line commits the record in the same run
     Given a repository whose canon.yaml has no write section
     When evidence add runs with --promote
-    Then the same run promotes the record and prints the promote report
+    Then the same run promotes the record and prints one success line naming the committed record
     And the success line ends "staged and promoted in this run; nothing to promote"
     And a later gate promote finds nothing staged and exits 0
 
@@ -341,7 +341,7 @@ Feature: evidence add
   Scenario: A promote on write commits only the record its own run staged
     Given another author staged an evidence record and a divergence candidate with --no-promote
     When evidence add and divergence stage run under write promote auto
-    Then each run prints the promote line of its own record only
+    Then each run promotes and names its own record only
     And the other author's records are still staged
     And gate promote and divergence promote commit them afterwards
 
@@ -356,3 +356,14 @@ Feature: evidence add
     Then the first file's blob is still stored and hashes to its name
     And no temp file is left in the store
     And a second writer of the same repo waits for the lock and is refused naming the lock file
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:11Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.67
+  Scenario: A promoted write prints one success line that names the committed record
+    Given a repository whose canon.yaml says write promote auto, as canon init writes it
+    When evidence add, finding add, finding close and divergence stage run
+    Then each prints one success line, naming the record's committed file under the ledger, which exists
+    And no line names the staged file promotion moved, and no separate promote line is printed
+    And with --no-promote the line names the staged file and canon gate promote instead

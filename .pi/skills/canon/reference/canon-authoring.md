@@ -85,7 +85,7 @@ enum, like `lane`.
 
 Every scenario belongs to a Subject (the durable product unit, see
 `canon-subject`). Write the Subject first, then pin with `--subject`;
-`canon inventory sync` carries the tag onto the index record and
+the scenario index carries the tag onto the index record and
 `spec_coverage.scope` filters on it. An unpinned scenario is invisible to
 a scoped gate.
 
@@ -97,9 +97,16 @@ canon scenario new checkout.cart.01 --title "Adding an item raises the count" \
   --subject checkout-core --lane behavior --case happy               # once per behavior
 canon scenario new checkout.cart.04 --title "Adding an out-of-stock item is refused" \
   --subject checkout-core --lane behavior --case failure             # and its failure path
-canon format specs                                                   # clean?
-canon inventory sync                                                 # index it
 ```
+
+There is no format or sync step after these: the scaffold writes a
+format-clean scenario, and `canon status`, `canon gate check`,
+`canon evidence add`, `canon review add` and `canon subject status`
+index added, edited and deleted `.feature` files before they read. When
+one of them prints `NOT refreshed`, the corpus has a format violation
+(for example a hand-written header with no `# canon:` line) or a
+duplicate id; `canon inventory sync` (or `canon format specs`) names it.
+Fix it and the next command indexes the files (see `canon-inventory`).
 
 - `--actor <id>` (or `CANON_ACTOR` in the environment) puts YOUR id on the
   provenance line. Default is `canon-scaffold`.

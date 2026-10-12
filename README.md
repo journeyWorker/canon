@@ -109,7 +109,8 @@ unless the brief says the human ships. The skill, the `AGENTS.md` block
 `canon init` writes, and `canon status` carry the rule:
 
 - `canon status` shows, for each building, verifying and shipped subject,
-  whether its brief is approved, read from the `proposal.md` of the
+  and each proposed subject whose newest adopted change has a
+  `proposal.md`, whether its brief is approved, read from the `proposal.md` of the
   subject's newest adopted change under the openspec plan sources. An
   older change's approval does not cover a newer scope, and an
   `Approved:` line counts only outside HTML comments and fenced code.
@@ -143,7 +144,9 @@ unless the brief says the human ships. The skill, the `AGENTS.md` block
   `divergence stage` take `--promote` and `--no-promote`. With
   `--promote`, or under `canon.yaml`'s `write: { promote: auto }`, they
   promote the one record they just staged in the same run (the same
-  validation and `run_seq` assignment as `gate promote`) and end
+  validation and `run_seq` assignment as `gate promote`) and print one
+  success line naming the committed record (`wrote kind=…/….json`, not
+  the staged file promotion renamed), ending
   `— staged and promoted in this run; nothing to promote`. A record
   another run staged stays staged, and a promotion that refuses the record
   leaves it staged and exits 1. `canon init` writes `promote: auto` for
@@ -241,6 +244,43 @@ scenario that still exists, which leaves out 8 replaced by the same
 reviewer's later review and 2 of scenarios no feature file declares any
 more (`skills.install.05` and `skills.install.06`).
 
+**M6: no bookkeeping steps in the guidance (dogfood eval 3).** The eval 3
+acceptance run measured bookkeeping at 11 of 130 canon call sites (8.5%,
+over the 5% bar): 5 `format` and 5 `inventory sync` calls, and one
+`gate promote` that found nothing staged. Promote on write and the
+stale-index refresh both worked; the skill and `canon status` still told
+the agent to run the commands, so it always synced first and the refresh
+never fired. The guidance now names a bookkeeping command only where it
+is needed:
+
+- The skill's loop has no format or sync step: the readers index edited
+  `.feature` files themselves, and `canon inventory sync` is named only
+  for a command that printed `NOT refreshed` (a format violation, such as
+  a hand-written header with no `# canon:` line, or a duplicate id; the
+  gate then graded the old index). `canon evidence add --task` and
+  `canon gate task` read `tasks.md` as it is, so a new task row needs no
+  `canon ingest plans`. `canon gate promote` is named only for
+  `write.promote: manual`, in the skill, the `AGENTS.md` block and the
+  loop in `canon evidence --help`, `canon finding --help` and
+  `canon finding add --help`.
+- `canon status`: a subject with no scenario says "specify its behavior,
+  one scenario per behavior" (was "…, then `canon inventory sync`"); the
+  unowned-scenario step is `canon status` after tagging (was
+  `canon inventory sync`); the remaining sync step, for `.feature`
+  scenarios with an empty index, says the automatic refresh could not
+  index them; and the evidence step adds "then `canon gate promote`" only
+  under `write.promote: manual`.
+- `canon status` shows the brief for a `proposed` subject once its newest
+  adopted change has a `proposal.md`. While that brief is unapproved the
+  human step is the subject's only step, with no `feature new` or
+  `scenario new`. A proposed subject with no adopted change or no
+  `proposal.md` is unchanged, and the ship guard still reads the brief on
+  `verifying → shipped` only.
+- A promote on write prints one success line naming the committed file
+  (`canon evidence add: wrote kind=evidence_record/… — staged and promoted
+  in this run; …`), where it printed the promote line and the staged
+  file's different name.
+
 *Migration:*
 
 - Re-run `canon skills install` (with your `--providers`). Until you do,
@@ -323,6 +363,16 @@ prints the version re-blessed for `canon 0.16.0`: the `status-*` cases,
 - `subject-ship-allowed` — the fixture gains an adopted change whose
   `proposal.md` carries an `Approved:` line; its output is unchanged.
 
+- `evidence-add-drop-attachment`, `gate-check-audit-false-success`,
+  `gate-check-audit-sampling-fixed-seed` (M6) — the unowned-scenario step
+  is `canon status`, "then check again: status re-indexes the edited
+  files itself", not `canon inventory sync`.
+- `status-no-scenarios` (M6) — the empty subject's reason is "specify its
+  behavior, one scenario per behavior", without the sync.
+- `evidence-add-promote-on-write`, `status-refreshes-stale-index` (M6) —
+  a promote on write prints one line, `wrote <committed file>`, instead of
+  the promote line and `staged <staged file>`.
+
 New cases: `evidence-add-promote-on-write`,
 `evidence-add-refused-malformed-write-config`,
 `gate-check-legacy-review-missing-pin`,
@@ -330,8 +380,8 @@ New cases: `evidence-add-promote-on-write`,
 `init-policy-refused`, `review-add-artifact-stored`,
 `review-add-refused-artifact-outside-repo`, `skills-check-outdated-lock`,
 `skills-doctor-competing-skill`, `status-brief-unapproved`,
-`status-refreshes-stale-index`, `subject-ship-refused-unapproved-brief`.
-Every other case is unchanged.
+`status-brief-proposed` (M6), `status-refreshes-stale-index`,
+`subject-ship-refused-unapproved-brief`. Every other case is unchanged.
 
 **Closed issues:** #8, #9, #10, #11, #12, #21, #22, #23. **Deferred:**
 #13 (Codex eval), as the maintainer asked.

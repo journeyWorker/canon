@@ -170,11 +170,12 @@ write:
 
 - `auto` — the command stages, then promotes that one record through the
   same validation and assignment `canon gate promote` (or `canon
-  divergence promote`) applies, and prints its promote line. Records
-  other runs staged stay staged; only `canon gate promote` / `canon
-  divergence promote` commit everything staged. The success line ends
-  `— staged and promoted in this run; nothing to promote`. `canon init`
-  writes `auto`.
+  divergence promote`) applies. Records other runs staged stay staged;
+  only `canon gate promote` / `canon divergence promote` commit
+  everything staged. The one success line names the committed record
+  (`wrote kind=…/….json`; promotion renames it, so the staged file is not
+  named) and ends `— staged and promoted in this run; nothing to
+  promote`. `canon init` writes `auto`.
 - `manual` — the record stays staged and the line ends ``— run `canon
   gate promote` to commit it``. An absent `write:` key (or `promote:`
   field) is `manual`, so a repo that never set it is unchanged.

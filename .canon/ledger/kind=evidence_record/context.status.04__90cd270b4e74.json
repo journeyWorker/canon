@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m6-impl"
+  },
+  "at": "2026-10-12T03:49:28.712411Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status context_status_04 && cargo test -p canon-cli --test conformance (evidence-add-drop-attachment, gate-check-audit-false-success, gate-check-audit-sampling-fixed-seed)"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 33,
+  "scenario_id": "context.status.04",
+  "schema": 1,
+  "staging_id": "ca7907653b95",
+  "verdict": "faithful"
+}

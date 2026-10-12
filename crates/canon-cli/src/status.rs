@@ -37,8 +37,22 @@
 //! change has a `proposal.md` without the `Approved:` line (the brief is
 //! enforced) gets the one `human` step status ever emits, and no status
 //! advance. With no `proposal.md` to answer, the `brief:` line still says
-//! not approved, as an advisory, and nothing is withheld. Every other
-//! step is the agent's.
+//! not approved, as an advisory, and nothing is withheld. A `proposed`
+//! subject shows its brief once its newest change has a `proposal.md`;
+//! while that brief is unapproved the human step is the subject's only
+//! step, so nothing suggests starting the work (no `feature new` or
+//! `scenario new`) before the human answers. Every other step is the
+//! agent's.
+//!
+//! # No bookkeeping steps (0.16 M6)
+//! Readers refresh a stale scenario index themselves
+//! ([`crate::inventory::refresh_stale_index`]), so no step says "then
+//! `canon inventory sync`": the sync step appears only when the `.feature`
+//! files hold scenarios and the index still holds none, which means the
+//! refresh refused (a format violation or a duplicate id) and
+//! `canon inventory sync` names why. The evidence step names
+//! `canon gate promote` only when `canon.yaml` keeps writes staged
+//! (`write.promote: manual`, the default without a `write:` key).
 //!
 //! # Failing closed
 //! Status never suggests progress the gate would refuse. A corpus kind
@@ -199,7 +213,9 @@ pub struct SubjectSummary {
     pub open_blockers: usize,
     pub missing_cases: Vec<MissingCase>,
     /// Whether the brief is approved (0.16 D1): present for `building`,
-    /// `verifying` and `shipped` subjects, omitted for the others.
+    /// `verifying` and `shipped` subjects, and for a `proposed` subject
+    /// whose newest adopted change has a `proposal.md`; omitted for the
+    /// others.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub brief: Option<BriefStatus>,
 }
@@ -384,19 +400,27 @@ pub fn resolve(repo: &Path) -> StatusReport {
     }
 
     // ── next: per-subject rules, closest to done first ──
-    // An empty scenario corpus under existing subjects is almost always an
-    // index never built (scenario records are derived and often
-    // gitignored), not a dozen subjects with no spec: say that once
+    // `canon status` refreshes a stale scenario index before this runs
+    // (module doc), so an empty index under a .feature corpus that holds
+    // scenarios means the refresh refused: a format violation or a
+    // duplicate id, which `canon inventory sync` names. Say that once
     // instead of one "owns no scenario" step per subject. But when the
-    // .feature corpus itself holds no scenario, a sync indexes nothing:
-    // the next step is writing features and scenarios, so each subject
-    // gets its `scenario new … --subject` step below.
+    // .feature corpus itself holds no scenario, there is nothing to
+    // index: the next step is writing features and scenarios, so each
+    // subject gets its `scenario new … --subject` step below.
     let corpus_has_scenarios = || spec_roots.iter().any(|root| !scan_feature_corpus(&root.root).is_empty());
+    let promote_manual = crate::write_mode::configured_promote_mode(&repo.join("canon.yaml")) != Ok(crate::write_mode::PromoteMode::Auto);
     if scenarios.is_empty() && !subjects.is_empty() && corpus_has_scenarios() {
         warnings.push("the ledger holds no scenario records, so every subject reads as owning none".into());
-        next.push(NextStep { command: "canon inventory sync".into(), why: "index the .feature corpus into scenario records; status counts nothing until then".into(), actor: StepActor::Agent });
+        next.push(NextStep {
+            command: "canon inventory sync".into(),
+            why: "the .feature files hold scenarios but the index holds none, so the automatic refresh could not index them; this names each format violation or duplicate id to fix".into(),
+            actor: StepActor::Agent,
+        });
     } else {
-        if scenarios.is_empty() && !subjects.is_empty() {
+        // A `proposed` subject waiting on its brief starts no work, so it
+        // asks for no feature either.
+        if scenarios.is_empty() && summaries.iter().any(|(subject, summary)| !awaits_brief(subject, summary)) {
             next.push(NextStep {
                 actor: StepActor::Agent,
                 command: format!("canon feature new <area>.<surface> --title \"<feature>\"{}", project_flag(&roots, None)),
@@ -406,16 +430,16 @@ pub fn resolve(repo: &Path) -> StatusReport {
         let mut by_priority: Vec<&(&Subject, SubjectSummary)> = summaries.iter().filter(|(s, _)| NEXT_ORDER.contains(&s.status)).collect();
         by_priority.sort_by_key(|(s, _)| (rank(&NEXT_ORDER, s.status), s.subject_id.as_str().to_string()));
         for (subject, summary) in by_priority {
-            subject_steps(&ctx, &joins, &scenarios, &roots, !policy_blocks, subject, summary, &mut next);
+            subject_steps(&ctx, &joins, &scenarios, &roots, !policy_blocks, promote_manual, subject, summary, &mut next);
         }
     }
 
     if let Some(first) = unowned.first() {
         next.push(NextStep {
             actor: StepActor::Agent,
-            command: "canon inventory sync".into(),
+            command: "canon status".into(),
             why: format!(
-                "{} scenario(s) carry no @subject tag (first: {}); add `@subject:<id>` above each in its .feature file, then sync",
+                "{} scenario(s) carry no @subject tag (first: {}); add `@subject:<id>` above each in its .feature file, then check again: status re-indexes the edited files itself",
                 unowned.len(),
                 first.scenario_id.as_str()
             ),
@@ -645,10 +669,18 @@ fn project_flag(roots: &[ProjectId], project: Option<&str>) -> String {
     format!(" --project {}", project.unwrap_or("<root-id>"))
 }
 
+/// Whether `subject` is `proposed` and its brief is enforced and not
+/// approved (module doc): the human answers before any work starts.
+fn awaits_brief(subject: &Subject, summary: &SubjectSummary) -> bool {
+    subject.status == SubjectStatus::Proposed && summary.brief.as_ref().is_some_and(|brief| brief.enforced)
+}
+
 /// The per-subject `next:` rules (module doc), each producing at most one
-/// step. An enforced unapproved brief comes first; then the gap rules; the status
-/// advance only when none fired and `may_advance` (no blocking policy
-/// gap).
+/// step. An enforced unapproved brief comes first, and for a `proposed`
+/// subject it is the only step; then the gap rules; the status advance
+/// only when none fired and `may_advance` (no blocking policy gap).
+/// `promote_manual` is whether `canon.yaml` keeps writes staged for
+/// `canon gate promote`.
 #[allow(clippy::too_many_arguments)]
 fn subject_steps(
     ctx: &GateContext,
@@ -656,6 +688,7 @@ fn subject_steps(
     all: &[&Scenario],
     roots: &[ProjectId],
     may_advance: bool,
+    promote_manual: bool,
     subject: &Subject,
     summary: &SubjectSummary,
     next: &mut Vec<NextStep>,
@@ -674,13 +707,16 @@ fn subject_steps(
             ),
         });
     }
+    if awaits_brief(subject, summary) {
+        return;
+    }
 
     if summary.scenarios + summary.excluded == 0 {
         let roots_note = if roots.len() > 1 { format!(" (spec roots: {})", roots.iter().map(ProjectId::as_str).collect::<Vec<_>>().join(", ")) } else { String::new() };
         next.push(NextStep {
             actor: StepActor::Agent,
             command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject {id} --case happy{}", project_flag(roots, None)),
-            why: format!("{id} owns no scenario; specify its behavior, then `canon inventory sync`{roots_note}"),
+            why: format!("{id} owns no scenario; specify its behavior, one scenario per behavior{roots_note}"),
         });
         return;
     }
@@ -709,7 +745,12 @@ fn subject_steps(
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
-                why: format!("{id}: {} of {} scenario(s) have no evidence; attest each, then `canon gate promote`", summary.scenarios - summary.evidenced, summary.scenarios),
+                why: format!(
+                    "{id}: {} of {} scenario(s) have no evidence; attest each{}",
+                    summary.scenarios - summary.evidenced,
+                    summary.scenarios,
+                    if promote_manual { ", then `canon gate promote` (`write.promote: manual`)" } else { "" }
+                ),
             });
         }
         if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1) {

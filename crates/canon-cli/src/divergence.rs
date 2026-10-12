@@ -149,24 +149,20 @@ pub fn run_stage(
         return 0;
     }
     // Only the file this run staged: another reviewer's staged candidate
-    // is theirs to promote.
-    let landed = match promote_staged_divergence(&path, &GitTier::new(&gate_ctx.ledger_root)) {
-        Ok(report) => {
-            print!("{}", format_candidate_lines(&report, false));
-            report.is_clean()
-        }
-        Err(e) => {
-            eprintln!("canon divergence stage: staged, but promoting it failed: {e}");
-            false
-        }
-    };
-    if landed {
-        println!("canon divergence stage: staged {} — {}", path.display(), crate::write_mode::PROMOTED);
-        0
-    } else {
-        println!("canon divergence stage: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
-        1
+    // is theirs to promote. Once it lands, the success line names the
+    // committed record alone, never the staged file promotion moved.
+    match promote_staged_divergence(&path, &GitTier::new(&gate_ctx.ledger_root)) {
+        Ok(report) => match report.promoted.iter().chain(&report.recovered).next().filter(|_| report.is_clean()) {
+            Some(landed) => {
+                println!("canon divergence stage: wrote {} — {}", landed.target.display(), crate::write_mode::PROMOTED);
+                return 0;
+            }
+            None => print!("{}", format_candidate_lines(&report, false)),
+        },
+        Err(e) => eprintln!("canon divergence stage: staged, but promoting it failed: {e}"),
     }
+    println!("canon divergence stage: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
+    1
 }
 
 /// `canon divergence promote [--dry-run]` (module doc): batch-promotes

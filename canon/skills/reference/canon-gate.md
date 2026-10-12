@@ -68,8 +68,10 @@ canon gate check: refreshed the scenario index from 1 changed feature file(s) (s
 
 A root that fails to sync (format violations, a duplicate id) is named
 instead, ending ``NOT refreshed: root `x` (N format violation(s), 0 sync
-error(s)) — `canon inventory sync` lists them``, and the gate still runs.
-See `canon-storage` (The scenario index).
+error(s)) — `canon inventory sync` lists them``, and the gate still runs,
+against the index as it was: a clean result then does not cover the
+edits that were not indexed. Fix what the sync lists and run the gate
+again. See `canon-storage` (The scenario index).
 
 ### The spec-derived worklist (`spec_coverage`, opt-in)
 
@@ -497,8 +499,10 @@ close` stage, and under `write: { promote: manual }` (or an absent
 `write:` key) their success line ends ``— run `canon gate promote` to
 commit it``. Under `write: { promote: auto }` (what `canon init` writes)
 or with `--promote`, they promote the one record they just staged —
-same validation and `run_seq` assignment as this command — and end
-`— staged and promoted in this run; nothing to promote`, so no separate
+same validation and `run_seq` assignment as this command — and print
+one success line naming the committed record (`wrote kind=…/….json`), not
+the staged file, ending `— staged and promoted in this run; nothing to
+promote`, so no separate
 `canon gate promote` is needed for it; `--no-promote` keeps one write
 staged. A record another run staged is not touched: only `gate promote`
 commits everything staged. It stays safe to run anyway: with nothing

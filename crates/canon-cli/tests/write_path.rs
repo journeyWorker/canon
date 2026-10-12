@@ -107,8 +107,8 @@ fn promote_flag_commits_in_the_same_run_and_a_later_gate_promote_is_a_no_op() {
 
     let out = ok(repo, &with(evidence("game.run.01"), &["--promote"]));
     let text = stdout(&out);
-    assert!(text.lines().any(|l| l.contains(PROMOTED)), "the success line names the promotion:\n{text}");
-    assert!(text.contains("promoted evidence_record implementer/game-run run_seq=1 -> "), "the record's promote line is printed:\n{text}");
+    assert_eq!(text.lines().count(), 1, "one success line:\n{text}");
+    assert!(text.starts_with("canon evidence add: wrote kind=evidence_record/game.run.01__") && text.contains(PROMOTED), "the success line names the committed record and the promotion:\n{text}");
     assert!(!text.contains("canon gate promote:"), "a promote on write reports its own record, not a batch tally:\n{text}");
     assert_eq!(staged(repo), 0);
     assert_eq!(committed(repo, "evidence_record"), 1);
@@ -204,10 +204,8 @@ fn a_promote_on_write_commits_only_its_own_record() {
     assert_eq!(staged(repo), 1);
     let out = ok(repo, &evidence("game.run.01"));
     let text = stdout(&out);
-    assert!(text.lines().any(|l| l.contains(PROMOTED)), "{text}");
-    let promoted: Vec<&str> = text.lines().filter(|l| l.starts_with("promoted ")).collect();
-    assert_eq!(promoted.len(), 1, "one promote line, for this run's own record:\n{text}");
-    assert!(promoted[0].starts_with("promoted evidence_record implementer/game-run run_seq=1 -> "), "{text}");
+    assert_eq!(text.lines().count(), 1, "one success line, for this run's own record:\n{text}");
+    assert!(text.starts_with("canon evidence add: wrote kind=evidence_record/") && text.contains(PROMOTED), "{text}");
     assert_eq!((staged(repo), committed(repo, "evidence_record")), (1, 1), "the other author's record is still staged");
 
     let sha = "a".repeat(40);
@@ -226,6 +224,40 @@ fn a_promote_on_write_commits_only_its_own_record() {
     assert!(stdout(&all).contains("canon gate promote: promoted evidence_record=1"), "{}", stdout(&all));
     ok(repo, &["divergence", "promote"]);
     assert_eq!((staged(repo), committed(repo, "evidence_record"), committed(repo, "divergence")), (0, 2, 2));
+}
+
+/// evidence.add.67: under `write: { promote: auto }` every staged write
+/// prints ONE success line naming the record's committed file, never the
+/// staged file promotion moved (dogfood eval 3 H2); `--no-promote` names
+/// the staged file and `canon gate promote` instead.
+#[test]
+fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
+    let dir = init_repo();
+    let repo = dir.path();
+    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
+    let sha = "a".repeat(40);
+    let writes: [(&str, Vec<&str>); 4] = [
+        ("canon evidence add", evidence("game.run.01")),
+        ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s"]),
+        ("canon finding close", vec!["finding", "close", "--change-id", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected"]),
+        ("canon divergence stage", vec!["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"]),
+    ];
+    for (command, args) in writes {
+        let text = stdout(&ok(repo, &args));
+        let lines: Vec<&str> = text.lines().filter(|l| !l.starts_with("canon finding add: note")).collect();
+        assert_eq!(lines.len(), 1, "{command}: one success line:\n{text}");
+        let path = lines[0].strip_prefix(&format!("{command}: wrote ")).unwrap_or_else(|| panic!("{command} names what it wrote: {text}"));
+        let path = path.split([' ']).next().unwrap();
+        assert!(repo.join(".canon/ledger").join(path).is_file(), "{command}: {path} is the committed file");
+        assert!(lines[0].contains(PROMOTED), "{text}");
+        assert!(!text.contains("_staging") && !text.lines().any(|l| l.starts_with("promoted ")), "{command}: no staged path, no separate promote line:\n{text}");
+    }
+    assert_eq!(staged(repo), 0);
+
+    let text = stdout(&ok(repo, &with(evidence("game.run.01"), &["--no-promote"])));
+    let path = text.strip_prefix("canon evidence add: staged ").and_then(|rest| rest.split(' ').next()).unwrap_or_else(|| panic!("{text}"));
+    assert!(repo.join(".canon/ledger/_staging").join(path).is_file(), "{path}");
+    assert!(text.contains(STAGED), "{text}");
 }
 
 // ── stale index refresh ──

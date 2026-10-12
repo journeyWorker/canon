@@ -652,8 +652,8 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         Ok(receipt) => {
             let settled = crate::gate::promote_after_stage("canon finding add", &ledger_root, &receipt.location, promote);
             println!(
-                "canon finding add: staged {} — {} round {} seq {} ({}, {}) — {}",
-                receipt.location,
+                "canon finding add: {} — {} round {} seq {} ({}, {}) — {}",
+                settled.landed(&receipt.location),
                 args.change_id,
                 args.round,
                 args.seq,
@@ -900,8 +900,8 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         Ok(receipt) => {
             let settled = crate::gate::promote_after_stage("canon finding close", &ledger_root, &receipt.location, promote);
             println!(
-                "canon finding close: staged {} — {} round {} seq {} ({} → {}) — {}",
-                receipt.location,
+                "canon finding close: {} — {} round {} seq {} ({} → {}) — {}",
+                settled.landed(&receipt.location),
                 args.change_id,
                 args.round,
                 args.seq,
