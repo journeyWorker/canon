@@ -733,23 +733,19 @@ pub fn run_status(
     report_review_guard(&policy, current, target, changes.len());
     if let (true, Some(ctx)) = (reviews, &gate_context) {
         let (rr, exclude_lanes) = active_require_review(ctx).expect("`reviews` implies an active require_review");
-        let unreadable = unreadable_review_kinds(ctx, rr);
-        if unreadable.is_empty() {
-            // An unreadable finding blocks, unwaivably: it might be an
-            // open blocker on this subject's changes.
-            blocking.extend(malformed_findings(ctx, rr));
-            waivable.extend(subject_guard(ctx, rr, exclude_lanes, &subject));
-            for violation in &mut waivable {
-                violation.detail = format!("{} → {}: {}", status_str(current), status_str(target), violation.detail);
-            }
+        let (unwaivable, gaps, readable) = review_checks(ctx, rr, exclude_lanes, &subject);
+        blocking.extend(unwaivable);
+        waivable.extend(gaps);
+        for violation in &mut waivable {
+            violation.detail = format!("{} → {}: {}", status_str(current), status_str(target), violation.detail);
+        }
+        if readable {
             let owned: std::collections::BTreeSet<(&ProjectId, &ScenarioId)> =
                 subject_scenarios(ctx, subject_id).into_iter().map(|s| (&s.project_id, &s.scenario_id)).collect();
             let legacy = LegacyReviewCounts::of(ctx, |s| owned.contains(&(&s.project_id, &s.scenario_id)));
             if legacy.total() > 0 {
                 eprintln!("canon subject status: advisory: {}", legacy.note());
             }
-        } else {
-            blocking.push(unreadable_violation(&unreadable));
         }
     }
     let brief_gap = if ships { brief_violation(&repo, &subject, &changes) } else { None };
@@ -869,6 +865,40 @@ fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: Subje
     } else {
         eprintln!("canon subject status:   skipped open-blocker — require_review.block_on_findings is false");
     }
+}
+
+/// The `require_review` checks a transition into its scope runs for
+/// `subject`: `(unwaivable, waivable, readable)`. When a review corpus
+/// kind is unreadable, the one unwaivable [`unreadable_violation`] and
+/// `readable == false`; otherwise every malformed finding (unwaivable:
+/// it might be an open blocker) and [`subject_guard`]'s review and
+/// open-blocker gaps (waivable).
+fn review_checks(ctx: &GateContext, rr: &RequireReview, exclude_lanes: &[String], subject: &Subject) -> (Vec<Violation>, Vec<Violation>, bool) {
+    let unreadable = unreadable_review_kinds(ctx, rr);
+    if !unreadable.is_empty() {
+        return (vec![unreadable_violation(&unreadable)], Vec::new(), false);
+    }
+    (malformed_findings(ctx, rr), subject_guard(ctx, rr, exclude_lanes, subject), true)
+}
+
+/// What the `verifying → shipped` guard would refuse `subject` on, from
+/// `ctx` alone: [`ship_gate_violations`] (ownership, verdicts, cases,
+/// audits, an unreadable scenario kind) and, when `require_review`
+/// covers `shipped`, [`review_checks`], less any review gap the
+/// subject's current waiver recorded (as `canon gate check` reports it
+/// as an advisory). The same functions [`run_status`] runs, so `canon
+/// status`'s red flag on a shipped subject (0.18 D3) and the ship guard
+/// cannot disagree. The brief and the unrefreshable-index check are not
+/// here: status reports both on their own.
+pub(crate) fn shipped_gate_gaps(ctx: &GateContext, subject: &Subject) -> Vec<Violation> {
+    let mut gaps = ship_gate_violations(ctx, &subject.subject_id);
+    if let Some((rr, exclude_lanes)) = active_require_review(ctx).filter(|(rr, _)| rr.covers(SubjectStatus::Shipped)) {
+        let (unwaivable, waivable, _) = review_checks(ctx, rr, exclude_lanes, subject);
+        let waiver = subject.status_override.as_ref().filter(|waiver| waiver.to == subject.status);
+        gaps.extend(unwaivable);
+        gaps.extend(waivable.into_iter().filter(|v| !waiver.is_some_and(|waiver| waiver.covers(v.class.as_str(), &v.subject))));
+    }
+    gaps
 }
 
 /// The `verifying → shipped` evidence gate (contract, fail-closed). The

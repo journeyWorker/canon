@@ -1,4 +1,4 @@
-description: "0.18 D3: once a shipped subject owns a new scenario nobody attested, `canon status` flags it `gate: red — 1 uncovered scenario(s) without evidence; reopen with …` and its only next step is the reopen command; following it reopens the subject (exit 0)"
+description: "0.18 D3: once a shipped subject owns a new scenario nobody attested, `canon status` flags it `gate: red — 1 uncovered-cell (first: checkout.pay.03); reopen with …` (the ship guard's own gaps, per failure class) and its only next step is the reopen command; following it reopens the subject (exit 0)"
 steps:
   - args: [subject, status, checkout, shipped]
     exit: 0

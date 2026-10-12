@@ -1584,4 +1584,7 @@ fn subject_lifecycle_34_a_pre_0_18_change_reads_as_a_one_element_list_and_a_seco
     let change = latest_change(dir.path(), "refactor-core");
     assert_eq!(change["subject_ids"], serde_json::json!(["perception", "editing"]), "appended, not re-pointed: {change}");
     assert_eq!(change["schema"], 2, "written at the current generation: {change}");
+    let changes: Value = serde_json::from_str(&stdout(&run(dir.path(), &["query", "--kind", "change", "--json"]))).unwrap();
+    assert_eq!(changes["count"], 1, "the old and the new version fold to one row: {changes}");
+    assert_eq!(changes["records"][0]["subject_ids"], serde_json::json!(["perception", "editing"]), "{changes}");
 }

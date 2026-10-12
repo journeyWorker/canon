@@ -272,9 +272,9 @@ canon subject status: demo-subject → verifying — written directly; nothing t
 - The review guard does not run on a reopen (it prints `skipped … — a
   reopen moves the subject back to fix its gaps; shipping again runs
   it`). `verifying → shipped` afterwards runs every guard above again.
-- `canon status` flags a shipped subject whose gate went red (an
-  uncovered scenario, a stale or missing review where `require_review`
-  covers `shipped`, an open blocker) and its only step is this reopen.
+- `canon status` flags a shipped subject whose gate went red (whatever
+  `verifying → shipped` would now refuse it on) and its only step is
+  this reopen.
 
 ## Adopt flow
 
@@ -441,10 +441,12 @@ uses, so status and the gate cannot disagree about a gap:
   canon brief and no line it reads
   ``brief: not approved (<brief> has no `Approved:` line)``.
   There is no record kind for it; the file is the record.
-- **Red shipped subject** (0.18) — a `shipped` subject whose gate went
-  red (uncovered scenarios, stale or missing reviews where
-  `require_review` covers `shipped`, open blockers) prints
-  ``gate: red — <what>; reopen with `canon subject status <id> verifying --reason "<why it reopens>" --actor-id <unit>` ``,
+- **Red shipped subject** (0.18) — a `shipped` subject that the
+  `verifying → shipped` guard would now refuse, by the guard's own checks
+  (owned scenarios, verdicts, required cases, audits, and, where
+  `require_review` covers `shipped`, reviews and open blockers under
+  `block_on_findings`; a gap its waiver recorded is not counted), prints
+  ``gate: red — <n> <class> (first: <subject>), …; reopen with `canon subject status <id> verifying --reason "<why it reopens>" --actor-id <unit>` ``,
   carries `red: [...]` in `--json`, and that reopen is its only `next:`
   step. Open blockers count against every subject a change belongs to.
 - **Unowned** — scenarios with no `@subject:` tag.

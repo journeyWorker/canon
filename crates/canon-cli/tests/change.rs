@@ -354,12 +354,9 @@ fn subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and
         let subject = subjects.iter().find(|s| s["subject_id"] == id).unwrap();
         assert_eq!(subject["change_ids"], serde_json::json!(["refactor-core"]), "{id} lists the change: {subject}");
     }
-    let latest = query(repo, "change")
-        .into_iter()
-        .filter(|c| c["change_id"] == "refactor-core")
-        .max_by_key(|c| chrono::DateTime::parse_from_rfc3339(c["at"].as_str().unwrap()).unwrap())
-        .unwrap();
-    assert_eq!(latest["subject_ids"], serde_json::json!(["perception", "editing"]), "the change lists both, never re-pointed: {latest}");
+    let rows: Vec<Value> = query(repo, "change").into_iter().filter(|c| c["change_id"] == "refactor-core").collect();
+    assert_eq!(rows.len(), 1, "`canon query --kind change` folds the versions to the current one: {rows:?}");
+    assert_eq!(rows[0]["subject_ids"], serde_json::json!(["perception", "editing"]), "the change lists both, never re-pointed: {rows:?}");
 
     // An open blocker on the shared change.
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_evidence: true\n  require_review: {}\n").unwrap();

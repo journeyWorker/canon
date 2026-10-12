@@ -258,6 +258,11 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 ///   the same reason a scenario whose CURRENT generation is a tombstone
 ///   (`removed: true`, written by `canon inventory sync` once no feature
 ///   file declares it) is dropped after the fold, as the gate drops it.
+/// - `change` (0.18 D4): `canon subject adopt` / `canon change new`
+///   append a version that adds a subject to `subject_ids`, and a plan
+///   re-import appends another, so a change adopted by two subjects
+///   would otherwise read as one row per version. Folded, it reads as
+///   its one current version listing every subject, as the gate reads it.
 ///
 /// KIND-gated for [`fold_pg_routed_kind`]'s stated reason, and by the
 /// same trade-off: a kind that gains a re-writing verb must be added
@@ -270,7 +275,7 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 /// one. Folding by key would collapse nothing today and would silently
 /// start dropping attestations the day two reviews share a pin.
 fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
-    if !matches!(kind, RecordKind::Subject | RecordKind::Finding | RecordKind::Scenario) {
+    if !matches!(kind, RecordKind::Subject | RecordKind::Finding | RecordKind::Scenario | RecordKind::Change) {
         return records;
     }
     let folded = fold_latest_by_natural_key(kind, records);

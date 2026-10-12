@@ -51,10 +51,11 @@
 //!
 //! # A shipped subject whose gate went red (0.18 D3)
 //! Evidence, specs and reviews keep moving after a subject ships. A
-//! `shipped` subject with an uncovered scenario (no evidence, a
-//! divergent verdict, a missing required case), a stale or missing
-//! review where `require_review` covers `shipped`, or an open blocker on
-//! one of its changes is flagged red ([`SubjectSummary::red`]), and its
+//! `shipped` subject that the `verifying → shipped` guard would now
+//! refuse ([`crate::subject::shipped_gate_gaps`], the guard's own checks:
+//! ownership, verdicts, required cases, audits, and the review guard,
+//! open blockers only under `block_on_findings`, where `require_review`
+//! covers `shipped`) is flagged red ([`SubjectSummary::red`]), and its
 //! only step is the reopen, `canon subject status <id> verifying
 //! --reason …`: the follow-up goes into its approved change as tasks,
 //! then scenario, evidence and review, and it ships again through every
@@ -241,10 +242,10 @@ pub struct SubjectSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub brief: Option<BriefStatus>,
     /// For a `shipped` subject, what makes its gate red now (0.18 D3):
-    /// uncovered scenarios (no evidence, a divergent verdict, a missing
-    /// required case), stale or missing reviews where `require_review`
-    /// covers `shipped`, and open blockers. Each is one phrase; status
-    /// then names the reopen command. Omitted when empty.
+    /// what the `verifying → shipped` guard would refuse it on
+    /// ([`crate::subject::shipped_gate_gaps`], the same checks), one
+    /// phrase per failure class: `<n> <class> (first: <subject>)`.
+    /// Status then names the reopen command. Omitted when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub red: Vec<String>,
 }
@@ -699,11 +700,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         .collect();
     let review_due = rr.is_some_and(|rr| rr.covers(subject.status) || next_status(subject.status).is_some_and(|n| rr.covers(n)));
     let stale_reviews = gap_count(ReviewGapKind::Stale);
-    let red = if subject.status == SubjectStatus::Shipped {
-        shipped_red(counted.len(), evidenced, divergent, &missing_cases, review_due.then_some((reviewed, stale_reviews)), open_blockers)
-    } else {
-        Vec::new()
-    };
+    let red = if subject.status == SubjectStatus::Shipped { shipped_red(ctx, subject) } else { Vec::new() };
 
     SubjectSummary {
         id: subject.subject_id.as_str().to_string(),
@@ -724,33 +721,18 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
     }
 }
 
-/// What makes a `shipped` subject's gate red ([`SubjectSummary::red`]).
-/// `reviews` is `(reviewed, stale)` when `require_review` covers
-/// `shipped`, else `None`.
-fn shipped_red(scenarios: usize, evidenced: usize, divergent: usize, missing_cases: &[MissingCase], reviews: Option<(usize, usize)>, open_blockers: usize) -> Vec<String> {
-    let mut red = Vec::new();
-    if evidenced < scenarios {
-        red.push(format!("{} uncovered scenario(s) without evidence", scenarios - evidenced));
-    }
-    if divergent > 0 {
-        red.push(format!("{divergent} uncovered scenario(s) with a divergent verdict"));
-    }
-    if !missing_cases.is_empty() {
-        red.push(format!("{} surface(s) missing a required case", missing_cases.len()));
-    }
-    if let Some((reviewed, stale)) = reviews {
-        if stale > 0 {
-            red.push(format!("{stale} stale review(s)"));
-        }
-        let unreviewed = scenarios - reviewed - stale;
-        if unreviewed > 0 {
-            red.push(format!("{unreviewed} unreviewed scenario(s)"));
+/// What makes a `shipped` subject's gate red ([`SubjectSummary::red`]):
+/// the ship guard's own gaps ([`crate::subject::shipped_gate_gaps`]),
+/// grouped by failure class in the order the guard reports them.
+fn shipped_red(ctx: &GateContext, subject: &Subject) -> Vec<String> {
+    let mut classes: Vec<(&'static str, usize, String)> = Vec::new();
+    for violation in crate::subject::shipped_gate_gaps(ctx, subject) {
+        match classes.iter_mut().find(|(class, _, _)| *class == violation.class.as_str()) {
+            Some((_, count, _)) => *count += 1,
+            None => classes.push((violation.class.as_str(), 1, violation.subject)),
         }
     }
-    if open_blockers > 0 {
-        red.push(format!("{open_blockers} open blocker(s)"));
-    }
-    red
+    classes.into_iter().map(|(class, count, first)| format!("{count} {class} (first: {first})")).collect()
 }
 
 /// `canon subject status <id> verifying --reason …`: the reopen command
