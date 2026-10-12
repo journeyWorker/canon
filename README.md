@@ -122,13 +122,19 @@ evidence artifacts: 1 bound file(s) not in the artifact store — not failing th
   unstored cart.add.01 reports/cart-badge.png (sha256 9848…, review by `reviewer-2`) is verified against the working tree only
 ```
 
-`canon evidence vault` stores review files as well as evidence files. A
-missing blob whose working-tree file changed or is gone, and an altered
+`canon evidence vault` stores the files of current reviews, the set the
+gate re-checks, as well as evidence files; a superseded review's file is
+neither checked nor vaulted. To read the same reviews as the gate, the
+vault first refreshes a stale scenario index, as `canon gate check` does.
+A missing blob whose working-tree file changed or is gone, and an altered
 blob, are still `stale-evidence` naming the review.
 
 Conformance: `gate-check-review-artifact-stale-evidence` now changes the
-working-tree file, since a matching one no longer makes that case red. New
-cases: `gate-check-review-artifact-vault-advisory`,
+working-tree file, since a matching one no longer makes that case red. In
+`evidence-vault-stores-unstored` and `evidence-vault-reports-unstorable`
+the index-refresh line moves from the later `gate check` step to the
+`evidence vault` step. New cases:
+`gate-check-review-artifact-vault-advisory`,
 `gate-check-review-artifact-superseded` and
 `evidence-add-fabrication-marker-whole-token`.
 

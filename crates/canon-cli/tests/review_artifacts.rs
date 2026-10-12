@@ -239,8 +239,9 @@ fn a_superseded_reviews_artifacts_are_no_longer_checked() {
 
 /// review.add.91 (0.18 D5, #36, FINDINGS-3 T5): a review that went stale
 /// when the scenario's evidence moved, and that another reviewer has
-/// reviewed again since, is superseded: its lost files are not checked.
-/// The newer, current review's files still are.
+/// reviewed again since, is superseded: its lost files are neither
+/// checked, nor listed as an advisory, nor vaulted. The newer, current
+/// review's files still are checked.
 #[test]
 fn a_stale_review_superseded_by_another_reviewers_newer_review_is_not_checked() {
     let dir = setup();
@@ -255,7 +256,15 @@ fn a_stale_review_superseded_by_another_reviewers_newer_review_is_not_checked() 
     );
     assert!(review(repo, "reviewer-4", &["--artifact", "reports/hud.webm"]).status.success());
 
+    // Lost while the working-tree file still matches: no advisory, and
+    // the vault stores only the current review's file (already stored).
     std::fs::remove_file(blob(repo, TITLE)).unwrap();
+    let gate = ok(repo, &["gate", "check"]);
+    assert!(!gate.contains("reports/title.png") && !gate.contains("canon evidence vault"), "{gate}");
+    let vault = ok(repo, &["evidence", "vault"]);
+    assert!(vault.contains("canon evidence vault: 1 bound file(s) — stored 0, already stored 1, could not store 0"), "{vault}");
+    assert!(!blob(repo, TITLE).exists(), "a superseded review's file is not vaulted");
+
     std::fs::write(repo.join("reports/title.png"), b"a later capture").unwrap();
     let gate = canon(repo, &["gate", "check"]);
     assert!(gate.status.success(), "the stale reviewer-2 review is superseded, so its lost file is not checked: {}", text(&gate));

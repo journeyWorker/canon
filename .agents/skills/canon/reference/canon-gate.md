@@ -486,7 +486,7 @@ detail names the review: ``review by `<reviewer>` (actor `<id>`,
 <time>)``.
 
 `canon evidence vault [--max-artifact-mib <N>]` stores the bytes for
-existing evidence records and reviews: every attachment whose
+existing evidence records and current reviews (a superseded review's files are not vaulted): every attachment whose
 working-tree file still matches its digest is copied in, and everything
 else is listed as not stored, with both digests. It exits `0` whenever it
 ran (the gate decides whether an unstored file matters), `2` when the

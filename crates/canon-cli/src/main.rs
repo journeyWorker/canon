@@ -923,8 +923,8 @@ enum EvidenceCommand {
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
-    /// Store the bound files of existing evidence records and reviews in the artifact store (.canon/artifacts/sha256/)
-    #[command(after_help = "For records written before canon stored bound bytes (0.11-0.13), and for any evidence or review file whose stored blob was lost. Each attachment whose working-tree file still hashes to the recorded digest is copied into .canon/artifacts/sha256/<hex>; everything else is listed as not stored, with why. Commit the store with the ledger.\n\nExit 0 when the pass ran (the gate decides whether an unstored file matters), 2 when the ledger cannot be read or a write fails.")]
+    /// Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)
+    #[command(after_help = "For records written before canon stored bound bytes (0.11-0.13), and for any evidence file, or file of a current review, whose stored blob was lost. Each attachment whose working-tree file still hashes to the recorded digest is copied into .canon/artifacts/sha256/<hex>; everything else is listed as not stored, with why. A superseded review's files are not vaulted, as the gate does not check them. Commit the store with the ledger.\n\nExit 0 when the pass ran (the gate decides whether an unstored file matters), 2 when the ledger cannot be read or a write fails.")]
     Vault {
         /// Per-file size limit for the artifact store, in MiB
         #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
@@ -1539,7 +1539,10 @@ fn main() -> ExitCode {
                     ) as u8,
                 )
             }
-            EvidenceCommand::Vault { max_artifact_mib, repo } => ExitCode::from(canon_cli::evidence::run_vault(&repo, max_artifact_mib) as u8),
+            EvidenceCommand::Vault { max_artifact_mib, repo } => {
+                canon_cli::inventory::refresh_stale_index(&repo, "canon evidence vault");
+                ExitCode::from(canon_cli::evidence::run_vault(&repo, max_artifact_mib) as u8)
+            }
         },
         Command::Finding { action } => match action {
             FindingCommand::Add {

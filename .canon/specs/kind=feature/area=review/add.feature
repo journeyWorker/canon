@@ -276,8 +276,9 @@ Feature: review add
   @subject:review-attestation
   @case:edge
   @review.add.91
-  Scenario: A review that went stale and was reviewed again by another reviewer is superseded, so its files are not checked
+  Scenario: A review that went stale and was reviewed again by another reviewer is superseded, so its files are neither checked nor vaulted
     Given a review bound to a screenshot, then new evidence for its scenario, then another reviewer's review bound to a recording
-    When the first review's stored blob is lost and its working-tree file changes
-    Then `canon gate check` exits 0 and names neither the file nor the first review
+    When the first review's stored blob is lost while its working-tree file still matches
+    Then `canon gate check` exits 0 with no advisory for the file, and `canon evidence vault` stores nothing for it, counting only the newer review's file
+    And once its working-tree file changes too, `canon gate check` still exits 0 and names neither the file nor the first review
     And when the newer review's blob is lost and its working-tree file changes, the gate exits 1 with stale-evidence naming the newer review only

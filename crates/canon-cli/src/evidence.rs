@@ -1092,51 +1092,42 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
 
 /// `canon evidence vault` (0.14 D4): store the bytes for committed
 /// evidence records written before the artifact store existed, and for
-/// review artifacts whose blob was lost (0.18 D5).
+/// the files of current reviews whose blob was lost (0.18 D5).
 ///
 /// Every distinct `(path, sha256)` attachment across the committed
-/// ledger's evidence records and reviews: already stored intact →
-/// counted; otherwise the working-tree file is stored when it still
-/// hashes to the recorded digest and fits the size limit. Everything else
-/// is listed as not stored, with why — those bytes are gone, and `canon
-/// gate check` reports a LATEST record, or a current review, bound to
-/// them as `stale-evidence` (re-attest to fix). Exit `0` when the pass
-/// ran, whatever it could store: whether an unstored file matters is the
+/// ledger's evidence records, and every artifact of a current in-effect
+/// review (`canon_gate::review_gate::current_reviews`, the set `canon
+/// gate check` re-checks; a superseded or stale review's files are
+/// neither checked nor vaulted): already stored intact → counted;
+/// otherwise the working-tree file is stored when it still hashes to the
+/// recorded digest and fits the size limit. Everything else is listed as
+/// not stored, with why — those bytes are gone, and `canon gate check`
+/// reports a LATEST record, or a current review, bound to them as
+/// `stale-evidence` (re-attest to fix). Exit `0` when the pass ran,
+/// whatever it could store: whether an unstored file matters is the
 /// gate's question, and a superseded record's lost file never does. `2`
 /// when the ledger cannot be read or a write fails.
 pub fn run_vault(repo: &Path, max_artifact_mib: u64) -> i32 {
     use canon_gate::artifact_store::{blob_display, stored_blob, working_tree_path, StoreError, StoreLock, StoreOutcome, MIB};
 
     let repo = resolve_repo_root(repo);
-    let ledger_root = match GateCtx::from_repo(&repo) {
-        Ok(ctx) => ctx.ledger_root,
+    // The gate's own context, so the reviews vaulted are exactly the ones
+    // it re-checks. Its evidence read is `validate_evidence_batch` over
+    // every committed record, split into declared records and audits.
+    let mut gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
+        Ok(gate_context) => gate_context,
         Err(e) => {
             eprintln!("canon evidence vault: {e}");
             return 2;
         }
     };
-    let tier = GitTier::new(ledger_root);
-    let raw = match tier.read(&TierQuery::kind(RecordKind::EvidenceRecord)) {
-        Ok(read) => read.records,
-        Err(e) => {
-            eprintln!("canon evidence vault: {e}");
-            return 2;
-        }
-    };
-    let (records, _malformed) = canon_model::validate_evidence_batch(&raw);
-    // A review row that does not read is the gate's to report; the vault
-    // stores what every readable review binds.
-    let reviews: Vec<canon_model::Review> = match tier.read(&TierQuery::kind(RecordKind::Review)) {
-        Ok(read) => read.records.into_iter().filter_map(|raw| serde_json::from_value(raw.0).ok()).collect(),
-        Err(e) => {
-            eprintln!("canon evidence vault: {e}");
-            return 2;
-        }
-    };
-    let files: std::collections::BTreeSet<(String, String)> = records
+    crate::inventory::resolve_legacy_pins(&mut gate_context);
+    let files: std::collections::BTreeSet<(String, String)> = gate_context
+        .evidence
         .iter()
+        .chain(&gate_context.audits)
         .flat_map(|r| r.attachments.iter().map(|a| (a.path.clone(), a.sha256.clone())))
-        .chain(reviews.iter().flat_map(|r| r.artifacts.iter().map(|a| (a.path.clone(), a.sha256.clone()))))
+        .chain(canon_gate::review_gate::current_reviews(&gate_context).into_iter().flat_map(|r| r.artifacts.iter().map(|a| (a.path.clone(), a.sha256.clone()))))
         .collect();
 
     let max_bytes = max_artifact_mib.saturating_mul(MIB);
