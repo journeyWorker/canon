@@ -297,6 +297,43 @@ checks it signs off. A reviewer that cannot run the tests says so and
 does not sign off. A report bound with `--report` is kept in
 `.canon/artifacts`, so its working-tree copy may be gitignored.
 
+### D7: the example's real evidence (#30)
+
+`examples/platformer`'s 16 scenarios were attested with
+`cargo test -p canon-gate spec_coverage`, which tests canon's gate and not
+the game. The example now has its own vitest suite in
+`examples/platformer/tests/`, one test per scenario, each named with its
+scenario id (`platformer.movement.03: No double jump; …`). Each test drives
+the game's own code and checks every Then:
+
+- The engine runs headless: `GameSimulation` with the game's levels, or a
+  small grid in the game's level format, stepped one fixed physics step at
+  a time.
+- The React screens (HUD, pause, game over, level complete, level select)
+  mount in jsdom. The keyboard goes through the game's `InputCapture`, and
+  frames go through `runFrame`, which is the two lines extracted from
+  `PixiStage`'s ticker, so the tests drive frames the same way the game
+  does. Only the Pixi WebGL stage is stubbed, because jsdom has no WebGL.
+
+`bun run test:junit` writes `reports/junit.xml`. That path is gitignored,
+because the bound copy is kept in `.canon/artifacts`. One call attests
+every scenario, the first real use of D1:
+
+```
+canon evidence add --project-id platformer --kind test-run \
+  --ref "cd examples/platformer && bun run test:junit" --role implementer \
+  --report junit:examples/platformer/reports/junit.xml --all-scenarios \
+  --session-id 018-n5-impl --actor-id 018-n5-impl --promote
+```
+
+It wrote 16 records, each `faithful` from its own passing case. All 16
+share one stored report blob. The four old `spec_coverage` records are
+superseded by the latest-fold, and their files stay in the ledger because
+the ledger is append-only. The new `platformer` job in the Test workflow
+runs the suite. The platformer's legacy reviews are now stale, and the
+gate's advisory names the platformer scenarios to review again. An
+independent re-review clears them.
+
 ## 0.17.0 release
 
 Version 0.17.0 gives canon its own home: the spec corpus, canon's own
