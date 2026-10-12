@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-018-n4",
+    "role": "reviewer",
+    "session_id": "review-018-n4"
+  },
+  "at": "2026-10-12T14:19:03.066149Z",
+  "change_id": "canon-0-18-n4-review",
+  "disposition": "open",
+  "file_ref": "crates/canon-store/sql/views.sql:591-598",
+  "kind": "finding",
+  "reviewed_sha": "99de5a85e2fbbebadae7ba15a14879d8fe4106ae",
+  "reviewer": "canon-reviewer-018-n4",
+  "round": 1,
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "a record in both the git and hot tiers was counted twice by report marts"
+}
