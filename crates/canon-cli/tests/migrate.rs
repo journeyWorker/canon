@@ -258,10 +258,15 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
     let subjects = query(repo, "subject");
     assert!(subjects.iter().any(|s| s["change_ids"].as_array().unwrap().iter().any(|c| c == "add-cart")));
 
-    let again = ok(repo, &["migrate"]);
+    let tree: Vec<String> = files(repo, "").into_iter().filter(|f| !f.starts_with(".git/") && !f.starts_with(".canon/ledger/kind=scenario/")).collect();
+    let again = canon(repo, &["migrate"]);
+    assert_eq!(again.status.code(), Some(0), "{}", text(&again));
+    let again = text(&again);
     assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"), "{again}");
     assert!(again.contains("canon migrate: rebuilt the scenario index: 0 record(s) written\n"), "{again}");
     assert_eq!(read(repo, "canon.yaml"), yaml, "a second run changes nothing");
+    let tree_again: Vec<String> = files(repo, "").into_iter().filter(|f| !f.starts_with(".git/") && !f.starts_with(".canon/ledger/kind=scenario/")).collect();
+    assert_eq!(tree_again, tree, "a second run moves and writes no file");
     let gate = canon(repo, &["gate", "check"]);
     assert!(!text(&gate).contains("canon migrate"), "nothing is left on the old layout: {}", text(&gate));
 }
@@ -279,13 +284,22 @@ fn authoring_migrate_02_another_root_only_drops_its_features_level() {
     write(repo, "game/specs/features/kind=feature/area=cart/add.feature", CART);
     write(repo, "game/specs/README.md", "the game's specs\n");
 
+    let moved = "game/specs/features/kind=feature/area=cart/add.feature";
+    let inode = |path: &str| std::os::unix::fs::MetadataExt::ino(&std::fs::metadata(repo.join(path)).unwrap());
+    let before = inode(moved);
     let out = ok(repo, &["migrate"]);
     assert!(out.contains("  move game/specs/features/kind=feature -> game/specs/kind=feature (spec root `game`)\n"), "{out}");
     assert_eq!(read(repo, "game/specs/kind=feature/area=cart/add.feature"), CART);
+    assert_eq!(inode("game/specs/kind=feature/area=cart/add.feature"), before, "a plain rename: the same file, not a copy");
     assert!(!repo.join("game/specs/features").exists(), "the emptied features/ directory is removed");
     assert_eq!(read(repo, "game/specs/README.md"), "the game's specs\n", "other files stay");
     assert_eq!(read(repo, "canon.yaml"), yaml, "the root did not move, so canon.yaml is unchanged");
     assert!(out.contains("canon migrate: rebuilt the scenario index: 1 record(s) written\n"), "{out}");
+
+    let again = ok(repo, &["migrate"]);
+    assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"), "a root already on the new layout is a no-op: {again}");
+    assert_eq!(inode("game/specs/kind=feature/area=cart/add.feature"), before);
+    assert_eq!(read(repo, "canon.yaml"), yaml);
 }
 
 /// authoring.migrate.03: uncommitted changes under a path it moves

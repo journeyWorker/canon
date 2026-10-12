@@ -285,6 +285,12 @@ fn plan_roots(repo: &Path, doc: &Value, plan: &mut Plan) -> Result<(), String> {
         let new_rel = if moves_home { paths::SPECS_DIR.to_string() } else { old_rel.clone() };
         let new_path = repo.join(&new_rel);
         let nested = old_path.join("features").join("kind=feature");
+        let to = new_path.join("kind=feature");
+        // Already on the 0.17 layout: the root holds `kind=feature/` and no
+        // legacy `features/` is left to move. A no-op, never a refusal.
+        if !nested.is_dir() && to.is_dir() {
+            continue;
+        }
         let from = if nested.is_dir() {
             nested
         } else if moves_home && old_path.join("kind=feature").is_dir() {
@@ -292,7 +298,9 @@ fn plan_roots(repo: &Path, doc: &Value, plan: &mut Plan) -> Result<(), String> {
         } else {
             continue;
         };
-        let to = new_path.join("kind=feature");
+        if fs::canonicalize(&from).ok().zip(fs::canonicalize(&to).ok()).is_some_and(|(from, to)| from == to) {
+            continue;
+        }
         if to.exists() {
             return Err(format!(
                 "spec root `{id}`: {} would move to {}, which already exists; move what is there out of the way first",
