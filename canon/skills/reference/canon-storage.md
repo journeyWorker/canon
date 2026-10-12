@@ -170,11 +170,12 @@ write:
 
 - `auto` — the command stages, then promotes that one record through the
   same validation and assignment `canon gate promote` (or `canon
-  divergence promote`) applies, and prints its promote line. Records
-  other runs staged stay staged; only `canon gate promote` / `canon
-  divergence promote` commit everything staged. The success line ends
-  `— staged and promoted in this run; nothing to promote`. `canon init`
-  writes `auto`.
+  divergence promote`) applies. Records other runs staged stay staged;
+  only `canon gate promote` / `canon divergence promote` commit
+  everything staged. The one success line names the committed record
+  (`wrote kind=…/….json`; promotion renames it, so the staged file is not
+  named) and ends `— staged and promoted in this run; nothing to
+  promote`. `canon init` writes `auto`.
 - `manual` — the record stays staged and the line ends ``— run `canon
   gate promote` to commit it``. An absent `write:` key (or `promote:`
   field) is `manual`, so a repo that never set it is unchanged.
@@ -230,7 +231,10 @@ sync` exits `2`; a reader skips the refresh and still runs).
 
 A fresh index prints nothing. A root that fails to sync (format
 violations, a duplicate id) is named and left as it was, and the command
-still runs:
+still runs; `canon gate check` then fails with `uncovered-cell <root>`,
+the `verifying → shipped` guard refuses, and `canon status` lists only
+`canon inventory sync`, while the reporting readers (`query`, `context`)
+keep only this line:
 
 ```
 canon gate check: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them

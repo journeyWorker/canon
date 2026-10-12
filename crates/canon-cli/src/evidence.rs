@@ -979,7 +979,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
                 None => format!("verdict {}", verdict_slug(verdict)),
             };
             let settled = crate::gate::promote_after_stage("canon evidence add", &ledger_root, &receipt.location, promote);
-            println!("canon evidence add: staged {} for {} ({outcome}) — {}, {}", receipt.location, subject, settled.suffix(), next);
+            println!("canon evidence add: {} for {} ({outcome}) — {}, {}", settled.landed(&receipt.location), subject, settled.suffix(), next);
             settled.exit_code()
         }
         Err(e) => {

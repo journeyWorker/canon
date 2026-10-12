@@ -197,7 +197,7 @@ The loop:
 3. Scenarios: `canon scenario new`, failure paths included (`--case failure`).
 4. Units: split the work; one actor id and session per unit.
 5. Implement: tests named by scenario id.
-6. Evidence: `canon evidence add`, then `canon gate promote`.
+6. Evidence: `canon evidence add` (it promotes itself under `write: { promote: auto }`; only under `write.promote: manual` run `canon gate promote` after it).
 7. Independent review: a different session records `canon review add` and `canon finding add`, on every change.
 8. Transition: `canon subject status`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships.
 

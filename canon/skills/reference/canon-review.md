@@ -17,8 +17,10 @@ state they are in.
 The order an agent follows to claim a subject done:
 
 1. **Test-run evidence** per owned scenario (`canon evidence add
-   --scenario-id <id> --project-id <root-id> ... --session-id <session>`,
-   then `canon gate promote`). See `canon-gate`.
+   --scenario-id <id> --project-id <root-id> ... --session-id <session>`;
+   final when it returns under `write: { promote: auto }`, which
+   `canon init` writes, and followed by `canon gate promote` only under
+   `write.promote: manual`). See `canon-gate`.
 2. **Independent review** of the change(s) the subject adopted. Record
    each issue the reviewer raises as a Finding, fix it, then close it:
 
@@ -26,12 +28,13 @@ The order an agent follows to claim a subject done:
    canon finding add --change-id c-demo --round 1 --seq 1 \
      --severity blocker --disposition open --reviewer reviewer-2 \
      --summary "unbounded subprocess wait" --session-id review-session-1
-   canon gate promote
    # ... fix, commit ...
    canon finding close --change-id c-demo --round 1 --seq 1 \
      --disposition fixed --resolution-sha "$(git rev-parse HEAD)"
-   canon gate promote
    ```
+
+   Under `write.promote: manual` (or no `write:` key), run
+   `canon gate promote` after each of the two.
 
 3. **One Review per scenario**, by someone other than the evidence actor,
    from a session other than the one that attested the evidence, after
@@ -72,8 +75,12 @@ canon finding close --change-id <c> --round <n> --seq <n> \
   --disposition fixed --resolution-sha <sha> [--session-id <id>]   # or rejected / deferred / open
 ```
 
-Both stage a candidate; `canon gate promote` commits it, and both say so
-(``… — run `canon gate promote` to commit it``). `finding close`
+Both stage a candidate. Under `write: { promote: auto }` (what
+`canon init` writes) the same run promotes it and the success line names
+the committed record (``wrote kind=finding/… — staged and promoted in this
+run; nothing to promote``); under `write.promote: manual`
+`canon gate promote` commits it, and the line says so (``staged … — run
+`canon gate promote` to commit it``). `finding close`
 changes only the disposition (and `resolution_sha` with it); severity,
 reviewer, summary, and refs are copied from the committed record. It
 appends a second version at the same natural key — the first stays. Its

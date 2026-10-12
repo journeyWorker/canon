@@ -21,6 +21,16 @@
 //! or no `proposal.md`, there is nothing to answer: status still shows
 //! the brief as not approved, the guard prints it as an advisory, and
 //! neither blocks.
+//!
+//! # A `proposed` subject
+//! A `proposed` subject's brief is read too, but only once there is one
+//! to read (dogfood eval 3 H3): its newest adopted change has a
+//! `proposal.md`. That is the moment the human is needed, so status
+//! shows the brief line and, when it is not approved, the human step
+//! instead of the steps that start the work. A `proposed` subject with
+//! no adopted change or no `proposal.md` has no brief yet, as before.
+//! The ship guard is unaffected: it reads the brief on `verifying →
+//! shipped` only.
 
 use std::path::{Path, PathBuf};
 
@@ -66,21 +76,26 @@ pub fn plan_roots(repo: &Path) -> Result<Vec<PathBuf>, String> {
 }
 
 /// The brief decision for `subject`: `None` for a subject that needs no
-/// brief yet (`proposed`, `specced`, `retired`), otherwise whether its
-/// newest adopted change (the last in `change_ids`, adoption order)
-/// carries an `Approved:` line in its `proposal.md` under `plan_roots`
-/// (the first root holding the change wins, as in `canon ingest
-/// plans`). A fix lives as tasks inside the approved change, so a newer
-/// adopted change is a new scope that an older change's approval does
-/// not cover.
+/// brief yet (`specced`, `retired`, and a `proposed` subject whose newest
+/// adopted change has no `proposal.md` under `plan_roots`), otherwise
+/// whether its newest adopted change (the last in `change_ids`, adoption
+/// order) carries an `Approved:` line in its `proposal.md` under
+/// `plan_roots` (the first root holding the change wins, as in `canon
+/// ingest plans`). A fix lives as tasks inside the approved change, so a
+/// newer adopted change is a new scope that an older change's approval
+/// does not cover.
 pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject) -> Option<BriefStatus> {
-    if !matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying | SubjectStatus::Shipped) {
+    let proposed = subject.status == SubjectStatus::Proposed;
+    if !proposed && !matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying | SubjectStatus::Shipped) {
         return None;
     }
     let Some(change) = subject.change_ids.last() else {
-        return Some(BriefStatus { approved: false, enforced: false, change: None, proposal: None, approval: None });
+        return (!proposed).then_some(BriefStatus { approved: false, enforced: false, change: None, proposal: None, approval: None });
     };
     let path = plan_roots.iter().find_map(|root| canon_ingest::plan_adapters::openspec::proposal_path(root, change));
+    if proposed && path.is_none() {
+        return None;
+    }
     let text = path.as_ref().and_then(|path| std::fs::read_to_string(path).ok()).unwrap_or_default();
     let approval = approval_line(&text).map(str::to_string);
     Some(BriefStatus {

@@ -42,7 +42,7 @@ Feature: context status
     Given scenarios that carry no subject tag beside one that does
     When status is run
     Then the untagged scenarios are listed as unowned
-    And the next list ends with tagging them and syncing the inventory
+    And the next list ends with tagging them in their .feature files and running canon status again, never an inventory sync
 
   # canon: {"schema":1,"at":"2026-10-10T15:35:47Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -90,10 +90,11 @@ Feature: context status
   @case:edge
   @context.status.09
   Scenario: Status on subjects with no scenario records points at the inventory sync
-    Given subjects and a .feature corpus with scenarios, but no scenario records in the ledger
+    Given subjects and a .feature corpus with scenarios that its own refresh cannot index, so the ledger holds no scenario records
     When status is run
     Then it warns that the ledger holds no scenario records
     And its only next command is the inventory sync, not one empty-subject step per subject
+    And its reason says the automatic refresh could not index the files and that the sync names each format violation or duplicate id
 
   # canon: {"schema":1,"at":"2026-10-10T15:59:34Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -254,3 +255,47 @@ Feature: context status
     And without a usable level line it is the level the spec_coverage section matches exactly
     And a section with any other setting, such as a scope, an audit or a non-default review, is custom
     And --json carries the same level under policy.level, null when there is no policy
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:10Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.66
+  Scenario: A proposed subject whose brief is unapproved shows the brief and asks only the human
+    Given a proposed subject owning no scenario, whose newest adopted change has a proposal.md with no "Approved:" line, in a repo whose .feature files hold no scenario
+    When canon status runs
+    Then the subject shows its brief as not approved, naming that proposal.md, in --json and the human form
+    And its only next step is the human's: get the brief approved, one human answer covering brief and policy
+    And no step starts the work: neither canon feature new nor canon scenario new is suggested
+    And once the proposal.md carries an "Approved:" line the brief reads as approved and the feature and scenario steps come back
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:10Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.67
+  Scenario: A proposed subject with no brief to answer keeps its steps, and showing a brief adds no transition check
+    Given a proposed subject that adopts no change, and a proposed subject whose newest adopted change has no proposal.md
+    When canon status runs
+    Then neither carries a brief field or a brief line, and neither gets a human step
+    And each still gets its canon scenario new step, after one canon feature new step
+    And a proposed subject whose brief is unapproved still moves to specced, with no brief line in its output: status reads that brief, the move to specced does not
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:10Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:happy
+  @context.status.68
+  Scenario: No status step names a sync while the readers refresh the index themselves
+    Given a building subject owning no scenario beside one that owns scenarios, and a scenario with no subject tag
+    When canon status runs
+    Then the empty subject's canon scenario new step gives its reason without naming canon inventory sync
+    And the untagged scenario's step is canon status, with a reason to add the @subject tag in its .feature file
+    And no step names canon inventory sync, canon format or canon ingest plans
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:11Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.69
+  Scenario: The evidence step names gate promote only when writes stay staged
+    Given a building subject with an unevidenced scenario
+    When canon status runs in a repo whose canon.yaml says write promote auto
+    Then the evidence step's reason says to attest each scenario and does not name canon gate promote
+    And in a repo with write promote manual, or with no write section, the same reason ends by naming canon gate promote

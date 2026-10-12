@@ -527,7 +527,9 @@ pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Sub
 /// `canon subject status <id> <state>` (module doc): apply a lifecycle
 /// transition. Refuses an off-chain step ([`is_valid_transition`], exit
 /// `2`); for `verifying → shipped` additionally runs
-/// [`ship_gate_violations`] and the brief check ([`brief_violation`]),
+/// [`ship_gate_violations`], the brief check ([`brief_violation`]) and
+/// the unrefreshable-index check ([`crate::inventory::unrefreshable_roots`],
+/// unwaivable),
 /// and for a target `require_review.scope` covers, the review guard
 /// (module doc). On any violation it prints each by failure class and
 /// exits `1` with the record UNCHANGED (fail closed), unless every
@@ -602,6 +604,11 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
         (true, Some(ctx)) => ship_gate_violations(ctx, subject_id),
         _ => Vec::new(),
     };
+    // The same decision `canon gate check` fails on (0.16 M6): shipping on
+    // an index the `.feature` edits are not in would ship ungraded specs.
+    if ships {
+        blocking.extend(crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation("verifying → shipped: ")));
+    }
     let mut waivable = Vec::new();
     report_review_guard(&policy, current, target, subject.change_ids.len());
     if let (true, Some(ctx)) = (reviews, &gate_context) {

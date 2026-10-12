@@ -209,3 +209,16 @@ Feature: inventory sync
     When artifact ingest joins an event keyed to that scenario
     Then the event carries no scenario title in either record read order
     And once a later record adds the scenario back the event carries its title again
+
+  # canon: {"schema":1,"at":"2026-10-12T04:08:25Z","actor":{"agent_id":"canon"}}
+  @subject:inventory-sync
+  @case:failure
+  @inventory.sync.47
+  Scenario: A root the refresh cannot index fails the gate, refuses shipping and holds status on the sync
+    Given a verifying subject whose only scenario is indexed and evidenced, so it could ship
+    And its feature file is then edited and loses a provenance comment, so the readers' refresh refuses the root
+    When canon gate check runs
+    Then it exits 1 with an uncovered-cell violation naming the root and saying canon inventory sync lists the problems
+    And canon subject status to shipped is refused with exit 1 by the same violation, and the subject stays verifying
+    And canon status's only next step is canon inventory sync, naming the root, with no step that moves a subject on
+    And once the provenance comment is restored the gate has no such violation and the subject ships

@@ -134,7 +134,10 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     crate::inventory::resolve_legacy_pins(&mut gate_context);
 
     let checks = canon_gate::check_set(release);
-    let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).collect());
+    // An index the `.feature` edits are not in grades specs that no longer
+    // exist (0.16 M6): fail closed, one violation per unrefreshable root.
+    let unrefreshable = crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation(""));
+    let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).collect());
     print!("{}", format_gate_report(&report));
     if let Some(count) = canon_gate::spec_coverage::coverage_off_scenarios(&gate_context) {
         print!("{}", format_coverage_off_advisory(count));
@@ -787,12 +790,13 @@ pub fn run_promote(repo: &Path, dry_run: bool) -> i32 {
 
 /// Where a staged write ended up once its command decided whether to
 /// promote ([`crate::write_mode::should_promote`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum StagedOutcome {
     /// Not asked to promote: the record waits in staging.
     Staged,
-    /// Promoted in this run: the record left staging for the ledger.
-    Promoted,
+    /// Promoted in this run: the record left staging for the ledger, at
+    /// `target` (relative to the ledger root, like the staged location).
+    Promoted { target: String },
     /// Promotion ran and refused this record (or failed): it is still
     /// staged, and the printed report says why.
     Refused,
@@ -800,18 +804,29 @@ pub(crate) enum StagedOutcome {
 
 impl StagedOutcome {
     /// The success-line suffix ([`crate::write_mode`]).
-    pub(crate) fn suffix(self) -> &'static str {
+    pub(crate) fn suffix(&self) -> &'static str {
         match self {
-            Self::Promoted => crate::write_mode::PROMOTED,
+            Self::Promoted { .. } => crate::write_mode::PROMOTED,
             Self::Staged | Self::Refused => crate::write_mode::STAGED_FOR_GATE_PROMOTE,
         }
     }
 
+    /// What the success line says landed where: the committed record
+    /// once promoted, otherwise the staged one at `staged`. One path
+    /// either way, so the line never names a staged file that promotion
+    /// already moved (dogfood eval 3 H2).
+    pub(crate) fn landed(&self, staged: &str) -> String {
+        match self {
+            Self::Promoted { target } => format!("wrote {target}"),
+            Self::Staged | Self::Refused => format!("staged {staged}"),
+        }
+    }
+
     /// The exit code: a refused promotion is refused-by-policy.
-    pub(crate) fn exit_code(self) -> i32 {
+    pub(crate) fn exit_code(&self) -> i32 {
         match self {
             Self::Refused => 1,
-            Self::Staged | Self::Promoted => 0,
+            Self::Staged | Self::Promoted { .. } => 0,
         }
     }
 }
@@ -821,22 +836,24 @@ impl StagedOutcome {
 /// command staged at `location` (tier-relative under
 /// [`evidence_staging_dir`]) — the same validation and assignment
 /// `canon gate promote` applies, but never another author's staged
-/// record. Prints that one record's promote line, and reads its outcome
-/// off the report, which carries only that record: committed (or
-/// recovered) means promoted, refused means it is still staged.
+/// record. Reads the outcome off the report, which carries only that
+/// record: committed (or recovered) means promoted, and the caller's
+/// one success line names the committed path; refused means it is
+/// still staged, and the refusal lines are printed here.
 pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &str, promote: bool) -> StagedOutcome {
     if !promote {
         return StagedOutcome::Staged;
     }
     match promote_staged(&GitTier::new(evidence_staging_dir(ledger_root)), &GitTier::new(ledger_root), Path::new(location)) {
-        Ok(report) => {
-            print!("{}", format_candidate_lines(&report, false));
-            if report.is_clean() {
-                StagedOutcome::Promoted
-            } else {
+        // The report carries exactly this one candidate: committed or
+        // recovered, or refused.
+        Ok(report) => match report.promoted.iter().chain(&report.recovered).next().filter(|_| report.is_clean()) {
+            Some(landed) => StagedOutcome::Promoted { target: landed.target.display().to_string() },
+            None => {
+                print!("{}", format_candidate_lines(&report, false));
                 StagedOutcome::Refused
             }
-        }
+        },
         Err(e) => {
             eprintln!("{command}: staged, but promoting it failed: {e}");
             StagedOutcome::Refused
@@ -881,7 +898,7 @@ fn format_promote_report(report: &PromoteReport, dry_run: bool) -> String {
 }
 
 /// One line per candidate in `report`: what was promoted, drained, or
-/// refused. [`format_promote_report`]'s body, and the whole of what a
+/// refused. [`format_promote_report`]'s body, and what a refused
 /// promote on write prints for its one record.
 fn format_candidate_lines(report: &PromoteReport, dry_run: bool) -> String {
     let verb = if dry_run { "would promote" } else { "promoted" };
@@ -1056,7 +1073,12 @@ mod tests {
         assert_eq!(promote_after_stage("t", &ledger_root, &kept, false), StagedOutcome::Staged);
         assert!(evidence_staging_dir(&ledger_root).join(&kept).exists(), "not asked to promote: nothing moves");
 
-        assert_eq!(promote_after_stage("t", &ledger_root, &kept, true), StagedOutcome::Promoted);
+        let promoted = promote_after_stage("t", &ledger_root, &kept, true);
+        let StagedOutcome::Promoted { target } = &promoted else { panic!("promoted: {promoted:?}") };
+        assert!(ledger_root.join(target).is_file(), "the outcome names the committed record: {target}");
+        assert_ne!(target, &kept, "promotion assigns the committed record its own name");
+        assert_eq!(promoted.landed(&kept), format!("wrote {target}"), "the success line names one path, the committed one");
+        assert_eq!(StagedOutcome::Staged.landed(&kept), format!("staged {kept}"));
         assert!(!evidence_staging_dir(&ledger_root).join(&kept).exists());
         assert!(evidence_staging_dir(&ledger_root).join(&bystander).exists(), "promoting this record leaves another author's staged");
 
@@ -1066,7 +1088,8 @@ mod tests {
         // in its place.
         let refused = stage(&ledger_root, Actor::new_unattributed("legacy-writer"));
         let outcome = promote_after_stage("t", &ledger_root, &refused, true);
-        assert_eq!((outcome, outcome.exit_code(), outcome.suffix()), (StagedOutcome::Refused, 1, crate::write_mode::STAGED_FOR_GATE_PROMOTE));
+        assert_eq!((outcome.exit_code(), outcome.suffix()), (1, crate::write_mode::STAGED_FOR_GATE_PROMOTE));
+        assert_eq!(outcome, StagedOutcome::Refused);
         assert!(evidence_staging_dir(&ledger_root).join(&refused).exists(), "a refused record stays staged");
         assert!(evidence_staging_dir(&ledger_root).join(&bystander).exists(), "a refusal promotes nothing else either");
         let committed = GitTier::new(&ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap();

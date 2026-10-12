@@ -769,3 +769,38 @@ fn skills_install_21_skill_and_block_name_no_second_human_stop() {
         }
     }
 }
+
+/// skills.install.22 (dogfood eval 3 H1, H2): the readers refresh the
+/// scenario index and `canon init` repos promote on write, so the
+/// working loop in the skill and the AGENTS.md block never sends the
+/// agent to `canon format specs` or `canon ingest plans`, names
+/// `canon inventory sync` only for a `NOT refreshed` line, and names
+/// `canon gate promote` only under `write.promote: manual`; the write
+/// help lists no promote step of its own.
+#[test]
+fn skills_install_22_skill_block_and_help_name_no_bookkeeping_step() {
+    let [(_, skill), (_, block)] = skill_and_block();
+    let loop_start = skill.find("## The working loop").expect("the skill has its loop");
+    let loop_end = skill.find("## Command reference").expect("the reference follows the loop");
+    for (name, text) in [("skill loop", &skill[loop_start..loop_end]), ("AGENTS.md block", block.as_str())] {
+        assert!(!text.contains("canon format specs"), "the {name} names a format step: {text}");
+        for sentence in text.split(". ") {
+            if sentence.contains("canon ingest plans") {
+                assert!(sentence.contains(" no "), "the {name} sends the agent to ingest plans: {sentence:?}");
+            }
+            if sentence.contains("canon inventory sync") {
+                assert!(sentence.contains("NOT refreshed"), "the {name} names a sync step: {sentence:?}");
+            }
+            if sentence.contains("canon gate promote") {
+                assert!(sentence.contains("write.promote: manual"), "the {name} names promote outside manual mode: {sentence:?}");
+            }
+        }
+    }
+    for args in [&["evidence", "--help"][..], &["finding", "--help"][..], &["finding", "add", "--help"][..]] {
+        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(args).output().unwrap();
+        let help = String::from_utf8_lossy(&out.stdout);
+        let listing = &help[help.find("The loop:").unwrap_or_else(|| panic!("{args:?} shows the loop: {help}"))..];
+        assert!(!listing.lines().any(|line| line.trim_start().starts_with("canon gate promote ")), "{args:?} lists promote as a step: {listing}");
+        assert!(listing.contains("Under `write.promote: manual`"), "{args:?} says when promote is needed: {listing}");
+    }
+}

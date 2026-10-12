@@ -712,8 +712,11 @@ fn context_status_64_status_reads_briefs_under_the_configured_openspec_sources()
     assert_eq!(subject(&report, "old-subject")["brief"], serde_json::json!({"approved": false, "enforced": false, "change": "c-old"}), "{report}");
 }
 
+/// context.status.04: untagged scenarios are listed as unowned, and the
+/// last step is tagging them and running `canon status` again (it
+/// re-indexes the edit), never `canon inventory sync`.
 #[test]
-fn status_lists_scenarios_no_subject_owns() {
+fn context_status_04_status_lists_scenarios_no_subject_owns() {
     let dir = repo();
     write_policy(dir.path(), FULL_POLICY);
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Proposed, &[]);
@@ -725,8 +728,10 @@ fn status_lists_scenarios_no_subject_owns() {
     assert_eq!(report["unowned"], serde_json::json!(["world.loose.01", "world.loose.02"]));
     let next = report["next"].as_array().unwrap();
     let last = next.last().unwrap();
-    assert_eq!(last["command"], "canon inventory sync");
-    assert!(last["why"].as_str().unwrap().contains("2 scenario(s) carry no @subject tag (first: world.loose.01)"), "{last}");
+    assert_eq!(last["command"], "canon status");
+    let why = last["why"].as_str().unwrap();
+    assert!(why.contains("2 scenario(s) carry no @subject tag (first: world.loose.01); add `@subject:<id>` above each in its .feature file"), "{last}");
+    assert!(!why.contains("sync"), "status re-indexes the edit itself: {last}");
     assert!(stdout(&run(dir.path(), &["status"])).contains("unowned (2, no @subject): world.loose.01, world.loose.02\n"));
 }
 
@@ -792,8 +797,11 @@ fn status_caps_next_at_five() {
     assert!(stdout(&run(dir.path(), &["status"])).contains("  … 3 more once these are done\n"));
 }
 
+/// context.status.09: a corpus the refresh cannot index (here, headers
+/// with no provenance comment) leaves the index empty; status says so
+/// once and names `canon inventory sync` for the reasons.
 #[test]
-fn status_on_an_unsynced_corpus_points_at_inventory_sync() {
+fn context_status_09_status_on_an_unindexable_corpus_points_at_inventory_sync() {
     let dir = repo();
     write_policy(dir.path(), FULL_POLICY);
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &[]);
@@ -802,8 +810,12 @@ fn status_on_an_unsynced_corpus_points_at_inventory_sync() {
     std::fs::create_dir_all(feature.parent().unwrap()).unwrap();
     std::fs::write(&feature, "Feature: demo\n\n  @subject:demo-subject\n  @world.demo.01\n  Scenario: A demo\n    Given a step\n").unwrap();
 
+    let out = run(dir.path(), &["status", "--json"]);
+    assert!(stderr(&out).contains("NOT refreshed"), "status's own refresh refused the corpus: {}", stderr(&out));
     let report = status_json(dir.path());
     assert_eq!(commands(&report), ["canon inventory sync"]);
+    let why = report["next"][0]["why"].as_str().unwrap();
+    assert!(why.contains("the automatic refresh could not index them") && why.contains("format violation or duplicate id"), "{why}");
     assert!(report["warnings"].as_array().unwrap().iter().any(|w| w == "the ledger holds no scenario records, so every subject reads as owning none"), "{report}");
 }
 
@@ -828,6 +840,128 @@ fn status_with_no_feature_scenarios_points_at_writing_them() {
     for command in &commands {
         assert_suggestion_parses_and_names_the_unit(command);
     }
+}
+
+/// context.status.66: a `proposed` subject whose newest adopted change
+/// has an unapproved proposal.md shows its brief, and the human step is
+/// its only step: nothing starts the work before the human answers.
+/// Approving the brief brings the feature and scenario steps back.
+#[test]
+fn context_status_66_a_proposed_subject_with_an_unapproved_brief_asks_only_the_human() {
+    let dir = repo();
+    write_policy(dir.path(), FULL_POLICY);
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Proposed, &["c-demo-subject"]);
+    write_proposal(dir.path(), "c-demo-subject", "Status: draft, awaiting the human.\n");
+
+    let report = status_json(dir.path());
+    assert_eq!(
+        subject(&report, "demo-subject")["brief"],
+        serde_json::json!({"approved": false, "enforced": true, "change": "c-demo-subject", "proposal": "openspec/changes/c-demo-subject/proposal.md"})
+    );
+    assert_eq!(human_steps(&report), ["demo-subject"], "{report}");
+    assert_eq!(report["next"].as_array().unwrap().len(), 1, "the human step is the only step: {report}");
+    let text = stdout(&run(dir.path(), &["status"]));
+    assert!(text.contains("      brief: not approved (openspec/changes/c-demo-subject/proposal.md has no `Approved:` line)\n"), "{text}");
+    assert!(text.contains(&format!("\n  human: {BRIEF_STEP}\n")), "{text}");
+    assert!(!text.contains("canon feature new") && !text.contains("canon scenario new"), "{text}");
+
+    write_proposal(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));
+    let report = status_json(dir.path());
+    assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], true, "{report}");
+    assert!(human_steps(&report).is_empty(), "{report}");
+    assert_eq!(
+        commands(&report),
+        ["canon feature new <area>.<surface> --title \"<feature>\"", "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject demo-subject --case happy"],
+        "{report}"
+    );
+}
+
+/// context.status.67: a `proposed` subject with no brief to answer (no
+/// adopted change, or a change with no proposal.md) keeps the steps it
+/// had, with no brief field; and showing a `proposed` subject's brief
+/// adds no transition check: its `proposed → specced` move succeeds
+/// with an unapproved brief and prints nothing about it.
+#[test]
+fn context_status_67_a_proposed_subject_with_no_brief_keeps_its_steps_and_its_brief_adds_no_transition_check() {
+    let dir = repo();
+    write_policy(dir.path(), FULL_POLICY);
+    seed_subject(dir.path(), "bare-subject", SubjectStatus::Proposed, &[]);
+    seed_subject(dir.path(), "draft-subject", SubjectStatus::Proposed, &["c-draft"]);
+
+    let report = status_json(dir.path());
+    for id in ["bare-subject", "draft-subject"] {
+        assert!(subject(&report, id).get("brief").is_none(), "{id} has no brief to show: {report}");
+    }
+    assert!(human_steps(&report).is_empty(), "{report}");
+    assert_eq!(
+        commands(&report),
+        [
+            "canon feature new <area>.<surface> --title \"<feature>\"",
+            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject bare-subject --case happy",
+            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject draft-subject --case happy",
+        ],
+        "{report}"
+    );
+    assert!(!stdout(&run(dir.path(), &["status"])).contains("brief:"));
+
+    seed_subject(dir.path(), "held-subject", SubjectStatus::Proposed, &["c-held"]);
+    write_proposal(dir.path(), "c-held", "Status: draft, awaiting the human.\n");
+    seed_scenario(dir.path(), "world.held.01", Some("held-subject"), Some("failure"));
+    let out = run(dir.path(), &["subject", "status", "held-subject", "specced", "--actor-id", "lead"]);
+    assert!(out.status.success(), "the move to specced does not read the brief: {}", stderr(&out));
+    assert!(!stderr(&out).contains("brief"), "{}", stderr(&out));
+}
+
+/// context.status.68: readers refresh the scenario index themselves, so
+/// no step names `canon inventory sync`, `canon format` or `canon ingest
+/// plans`: the empty subject's step just says to specify it, and the
+/// unowned step is `canon status`, after tagging.
+#[test]
+fn context_status_68_no_step_names_a_sync_while_readers_refresh() {
+    let dir = repo();
+    write_policy(dir.path(), FULL_POLICY);
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[]);
+    seed_subject(dir.path(), "empty-subject", SubjectStatus::Building, &[]);
+    seed_scenario(dir.path(), "world.demo.01", Some("demo-subject"), Some("failure"));
+    seed_scenario(dir.path(), "world.loose.01", None, None);
+
+    let report = status_json(dir.path());
+    assert_eq!(report["nextOmitted"], 0, "{report}");
+    let steps = report["next"].as_array().unwrap();
+    let empty = steps.iter().find(|n| n["command"].as_str().unwrap().contains("--subject empty-subject")).unwrap_or_else(|| panic!("{report}"));
+    assert_eq!(empty["why"], "empty-subject owns no scenario; specify its behavior, one scenario per behavior", "{report}");
+    let unowned = steps.last().unwrap();
+    assert_eq!(unowned["command"], "canon status", "{report}");
+    assert!(unowned["why"].as_str().unwrap().contains("add `@subject:<id>` above each in its .feature file"), "{unowned}");
+    for step in steps {
+        let line = format!("{} {}", step["command"].as_str().unwrap(), step["why"].as_str().unwrap());
+        for bookkeeping in ["inventory sync", "canon format", "ingest plans"] {
+            assert!(!line.contains(bookkeeping), "no step names `{bookkeeping}`: {step}");
+        }
+    }
+}
+
+/// context.status.69: the evidence step's reason names `canon gate
+/// promote` only when `canon.yaml` keeps writes staged (`manual`, or no
+/// `write:` key); under `auto` the attestation is final.
+#[test]
+fn context_status_69_the_evidence_step_names_gate_promote_only_when_writes_stay_staged() {
+    let dir = repo();
+    write_policy(dir.path(), FULL_POLICY);
+    seed_approved_subject(dir.path(), "demo-subject", SubjectStatus::Building);
+    seed_scenario(dir.path(), "world.demo.01", Some("demo-subject"), Some("failure"));
+    let evidence_why = |dir: &Path| {
+        let report = status_json(dir);
+        let step = report["next"].as_array().unwrap().iter().find(|n| n["command"].as_str().unwrap().starts_with("canon evidence add")).cloned();
+        step.unwrap_or_else(|| panic!("{report}"))["why"].as_str().unwrap().to_string()
+    };
+
+    let staged = "demo-subject: 1 of 1 scenario(s) have no evidence; attest each, then `canon gate promote` (`write.promote: manual`)";
+    assert_eq!(evidence_why(dir.path()), staged, "no write section is manual");
+    std::fs::write(dir.path().join("canon.yaml"), format!("{CANON_YAML}write:\n  promote: manual\n")).unwrap();
+    assert_eq!(evidence_why(dir.path()), staged);
+    std::fs::write(dir.path().join("canon.yaml"), format!("{CANON_YAML}write:\n  promote: auto\n")).unwrap();
+    assert_eq!(evidence_why(dir.path()), "demo-subject: 1 of 1 scenario(s) have no evidence; attest each");
 }
 
 /// context.status.80: the policy level is the level line's level when it
