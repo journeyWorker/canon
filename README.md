@@ -271,9 +271,10 @@ The advisory now counts current, stale and undecidable, counts a stale
 one as superseded when its scenario already has a qualifying review, names
 only the scenarios still owed a review, and suggests `fetch-depth: 0`.
 canon's own CI gate job checks out full history. On canon's checked-in
-ledger, `canon gate check` prints 338 legacy reviews: 318 current, 12
-stale and 8 undecidable, with 7 of the stale ones superseded by a current
-review of the same scenario. The plan's 348 counted every legacy review
+ledger, `canon gate check` prints 338 legacy reviews: 316 current, 14
+stale and 8 undecidable, with 9 of the stale ones superseded by a current
+review of the same scenario (M6's spec edits staled two more, both already
+re-reviewed). The plan's 348 counted every legacy review
 record; canon counts only the latest review per scenario and reviewer on a
 scenario that still exists, which leaves out 8 replaced by the same
 reviewer's later review and 2 of scenarios no feature file declares any
