@@ -1,3 +1,22 @@
 providers: claude
 status: healthy
 competing-skill: ./.claude/skills/sites (description claims: build, sites, apps, games) — if an agent picks `site-builder` for build work, canon's loop will not run
+owned-paths: canon writes these; exclude them from formatters and linters:
+  .claude/skills/canon/**
+  .canon/REPORT.md
+  .canon/artifact-store.lock
+  .canon/artifacts/**
+  .canon/audit/**
+  .canon/dashboard-snapshot/**
+  .canon/hot.db*
+  .canon/ingest/**
+  .canon/learn/**
+  .canon/ledger/**
+  .canon/plugins/**
+  .canon/policy.approval.json
+  .canon/r2/**
+  .canon/scenario-index.lock
+  .canon/scripts/canon-gate-pre-commit.sh
+  .canon/skills/**
+  .canon/strategies/**
+  .canon/vocab/**

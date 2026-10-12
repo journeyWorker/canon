@@ -63,6 +63,12 @@ pub const CANON_R2_ROOT_ENV: &str = "CANON_R2_ROOT";
 /// `trajectories/` subdirectories.
 pub const CANON_LEARN_ROOT_ENV: &str = "CANON_LEARN_ROOT";
 
+/// The rebindable-root env var [`VIEWS_SQL`] reads (0.18, #29): a
+/// directory holding the sqlite hot tier's rows materialized as
+/// git-shaped JSON files, which `canon-report` writes right before it
+/// opens the views. Unset or empty reads as no hot rows.
+pub const CANON_HOT_ROOT_ENV: &str = "CANON_HOT_ROOT";
+
 /// canon-store's own shared-contract selftest entry point (Wave-2
 /// `canon selftest` aggregator, per-crate registration): wraps
 /// `fixtures/git-tier/{well-formed,misfiled}/` — the SAME rebindable

@@ -58,7 +58,8 @@
 //! the report; it appears only if a local `.canon/r2` mirror is
 //! separately materialized, which canon has no automatic sync for
 //! today. Renamed to `Backend::read_directly_by_report()`
-//! (git → `true`; postgres/S3 → `false`) to say exactly this, no
+//! (git and, since 0.18 #29, the local sqlite file → `true`;
+//! postgres/S3 → `false`) to say exactly this, no
 //! more: see `crates/canon-report/src/tier_boundary.rs`'s module doc
 //! for the full report-side consequence (D3).
 //!
@@ -241,17 +242,21 @@ impl Backend {
     /// tier age` (`crates/canon-store/src/r2_tier.rs`), never to the
     /// local `.canon/r2` parquet directory the report's `stg_r2_records`
     /// view scans — that local directory is a SEPARATE, non-automatic
-    /// mirror an operator may or may not keep in sync. Distinct from
+    /// mirror an operator may or may not keep in sync. Sqlite (0.18,
+    /// #29) IS read directly: its db is a local file that needs no
+    /// credential, and `canon-report` materializes its rows under
+    /// `CANON_HOT_ROOT` before it opens the views, so `canon init`'s
+    /// default `hot` routing reaches the marts. Distinct from
     /// `Backend::class` (D1: a parse-time COMPATIBILITY classification)
-    /// even though both currently single out git — this is
+    /// — this is
     /// `canon-report`'s own report-INCLUSION signal, the ONE method
     /// every backend-conditioned report-visibility decision in the
     /// codebase reads; no second ad hoc "is this backend readable"
     /// check exists anywhere else.
     pub fn read_directly_by_report(self) -> bool {
         match self {
-            Backend::Git => true,
-            Backend::Postgres | Backend::S3 | Backend::Sqlite => false,
+            Backend::Git | Backend::Sqlite => true,
+            Backend::Postgres | Backend::S3 => false,
         }
     }
 
@@ -861,11 +866,13 @@ routing:
     }
 
     /// s28 design D2 counter-case: `Backend::read_directly_by_report()`
-    /// is `true` ONLY for git — S3 flips from s27's (wrong) `true` to
-    /// `false`, matching the corrected report-inclusion signal.
+    /// is `true` for git and (0.18, #29) the local sqlite file, never
+    /// for a live server or bucket — S3 flips from s27's (wrong) `true`
+    /// to `false`, matching the corrected report-inclusion signal.
     #[test]
-    fn read_directly_by_report_is_true_only_for_git() {
+    fn read_directly_by_report_is_true_only_for_local_files() {
         assert!(Backend::Git.read_directly_by_report());
+        assert!(Backend::Sqlite.read_directly_by_report());
         assert!(!Backend::Postgres.read_directly_by_report());
         assert!(!Backend::S3.read_directly_by_report());
     }

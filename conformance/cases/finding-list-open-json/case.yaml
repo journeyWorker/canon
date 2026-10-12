@@ -1,0 +1,20 @@
+description: "0.18 D6 (#34): `canon finding list --change-id <id>` prints a change's committed findings at their latest version (round, seq, severity, disposition, reviewer, summary), `--open` keeps only the currently open ones, `--json` prints the same rows as one document (all exit 0); a malformed change id is refused (exit 2)"
+steps:
+  - args: [finding, add, --change-id, c-cart, --round, "1", --seq, "1", --severity, blocker, --reviewer, rev-a, --summary, teardown races HMR]
+    exit: 0
+  - args: [finding, add, --change-id, c-cart, --round, "1", --seq, "2", --severity, should-fix, --reviewer, rev-b, --summary, the count was typed by hand]
+    exit: 0
+  - args: [gate, promote]
+    exit: 0
+  - args: [finding, close, --change-id, c-cart, --round, "1", --seq, "1", --disposition, rejected]
+    exit: 0
+  - args: [gate, promote]
+    exit: 0
+  - args: [finding, list, --change-id, c-cart]
+    exit: 0
+  - args: [finding, list, --change-id, c-cart, --open]
+    exit: 0
+  - args: [finding, list, --change-id, c-cart, --open, --json]
+    exit: 0
+  - args: [finding, list, --change-id, Not A Change]
+    exit: 2

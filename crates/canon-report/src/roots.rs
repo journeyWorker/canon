@@ -33,6 +33,19 @@
 //! precedent, `GateContext::load`'s "still resolves a full surface").
 //! Never touches `CANON_GIT_ROOT` (`read_text` already tolerates zero
 //! matches, confirmed by direct `duckdb` experimentation).
+//!
+//! # The sqlite hot tier (0.18, #29)
+//! `canon init` routes `task`/`handoff`/`session`/`run`/`event` to a
+//! sqlite `hot` rung. Its db is a local file that needs no credential,
+//! so the report reads it: [`Roots::hot_db`] names the file
+//! ([`hot_db_from_canon_yaml`]), and [`Roots::materialize_hot`] writes
+//! every `records_history` row as one git-shaped JSON file under a
+//! per-invocation scratch directory the query driver points
+//! `CANON_HOT_ROOT` at (`stg_hot_records`). DuckDB's own sqlite
+//! extension would be fetched over the network on first use, which a
+//! report must never do; this read goes through canon-store's
+//! `SqliteTier`, the same reader `canon query` uses. A db file that does
+//! not exist yet is no rows, never created.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -43,6 +56,12 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
 
+use canon_model::envelope::RecordKind;
+use canon_store::partition::content_digest12;
+use canon_store::policy::{BackendConfig, TierPolicy};
+use canon_store::sqlite_tier::SqliteTier;
+use canon_store::tier::{Tier as _, TierQuery};
+
 use crate::error::ReportError;
 
 /// The `kind`/`id` marker every seeded placeholder row set carries —
@@ -51,7 +70,7 @@ use crate::error::ReportError;
 /// `StrategyId`/`TrajectoryId`, neither of which starts with `_`).
 const SEED_MARKER: &str = "_canon_report_seed";
 
-/// The three physical-source roots [`canon_store::VIEWS_SQL`] reads.
+/// The physical-source roots [`canon_store::VIEWS_SQL`] reads.
 #[derive(Debug, Clone)]
 pub struct Roots {
     /// `canon.yaml`'s `tiers.git.root` — the git tier's Hive-laid-out
@@ -63,6 +82,30 @@ pub struct Roots {
     /// `canon-learn`'s `DEFAULT_LEARN_ROOT` (`<repo>/.canon/learn`) —
     /// the parent of its `strategies/`/`trajectories/` parquet stores.
     pub learn_root: PathBuf,
+    /// The sqlite hot tier's db file, when `canon.yaml` backs a rung
+    /// with sqlite (module doc, 0.18 #29). `None` reads no hot rows.
+    pub hot_db: Option<PathBuf>,
+}
+
+/// The sqlite db file `<repo_root>/canon.yaml` backs a rung with,
+/// resolved against the file's own directory
+/// ([`TierPolicy::from_yaml_at`]). `None` when the file is absent,
+/// does not parse, or backs no rung with sqlite — fail-soft like
+/// [`crate::tier_boundary::kinds_not_read_directly`], since a broken
+/// `canon.yaml` is `canon gate check`'s to report.
+pub fn hot_db_from_canon_yaml(repo_root: &Path) -> Option<PathBuf> {
+    let text = fs::read_to_string(repo_root.join("canon.yaml")).ok()?;
+    let policy = TierPolicy::from_yaml_at(&text, repo_root).ok()?;
+    let mut paths: Vec<PathBuf> = policy
+        .tiers
+        .values()
+        .filter_map(|cfg| match cfg {
+            BackendConfig::Sqlite(sqlite) => Some(sqlite.path.clone()),
+            _ => None,
+        })
+        .collect();
+    paths.sort();
+    paths.into_iter().next()
 }
 
 fn r2_schema() -> Arc<Schema> {
@@ -124,7 +167,41 @@ fn write_seed_parquet(path: &Path, schema: Arc<Schema>, columns: Vec<ArrayRef>) 
 
 impl Roots {
     pub fn new(git_root: impl Into<PathBuf>, r2_root: impl Into<PathBuf>, learn_root: impl Into<PathBuf>) -> Self {
-        Self { git_root: git_root.into(), r2_root: r2_root.into(), learn_root: learn_root.into() }
+        Self { git_root: git_root.into(), r2_root: r2_root.into(), learn_root: learn_root.into(), hot_db: None }
+    }
+
+    /// These roots, also reading the sqlite hot tier at `hot_db`.
+    pub fn with_hot_db(mut self, hot_db: Option<PathBuf>) -> Self {
+        self.hot_db = hot_db;
+        self
+    }
+
+    /// Writes every row of the sqlite hot tier ([`Self::hot_db`]) under
+    /// `dir` as `kind=<kind>/<n>__<digest12>.json`, the layout
+    /// `stg_hot_records` reads. The digest is
+    /// [`content_digest12`] of the body, the same value a git filename
+    /// carries, so the two tiers fold against each other. Nothing is
+    /// written when there is no hot db or its file does not exist yet:
+    /// opening a missing db would create it.
+    pub fn materialize_hot(&self, dir: &Path) -> Result<(), ReportError> {
+        let Some(db) = self.hot_db.as_deref().filter(|db| db.is_file()) else {
+            return Ok(());
+        };
+        let hot_error = |source| ReportError::HotTier { path: db.to_path_buf(), source };
+        let tier = SqliteTier::connect(db).map_err(hot_error)?;
+        for kind in RecordKind::ALL {
+            let rows = tier.read(&TierQuery::kind(kind)).map_err(hot_error)?.records;
+            if rows.is_empty() {
+                continue;
+            }
+            let kind_dir = dir.join(format!("kind={}", kind.as_str()));
+            fs::create_dir_all(&kind_dir)?;
+            for (n, raw) in rows.iter().enumerate() {
+                let body = serde_json::to_vec(&raw.0)?;
+                fs::write(kind_dir.join(format!("{n:06}__{}.json", content_digest12(&raw.0))), body)?;
+            }
+        }
+        Ok(())
     }
 
     /// Creates every root directory (idempotent — a real, already-

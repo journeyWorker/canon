@@ -1021,6 +1021,21 @@ enum FindingCommand {
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
+    /// List a change's committed findings at their latest version: round, seq, severity, disposition, reviewer and summary
+    List {
+        /// The change whose findings to list
+        #[arg(long, value_parser = canon_cli::finding::parse_change_id)]
+        change_id: ChangeId,
+        /// Only findings whose current disposition is open
+        #[arg(long)]
+        open: bool,
+        /// Print `{change_id, findings: [...]}` as JSON
+        #[arg(long)]
+        json: bool,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1588,6 +1603,9 @@ fn main() -> ExitCode {
                     &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, promote: promote.flag() },
                 ) as u8)
             }
+            FindingCommand::List { change_id, open, json, repo } => {
+                ExitCode::from(canon_cli::finding::run_list(&repo, &canon_cli::finding::FindingListArgs { change_id, open, json }) as u8)
+            }
         },
         Command::Review { action } => match action {
             ReviewCommand::Add {
@@ -1761,6 +1779,9 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
             }
             if let Some(path) = &report.config_written {
                 println!("canon skills install: wrote `skills: {{ providers: [{}] }}` to {}", report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "), path.display());
+            }
+            for line in canon_cli::skills::owned_paths_lines(&report.providers) {
+                println!("{line}");
             }
             ExitCode::SUCCESS
         }

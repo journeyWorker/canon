@@ -84,6 +84,9 @@ for the machine-readable source/projection/memory map.
 
 ## 0.18.0 release
 
+Version 0.18.0 cuts the calls an attestation costs and makes the
+lifecycle honest. Plan: `docs/superpowers/plans/2026-10-12-canon-0.18.0-fewer-calls.md`.
+
 ### D5: gate correctness (#32, #36)
 
 **Fabrication markers match whole words (#32).** `"would pass"`, `"TBD"`
@@ -137,6 +140,97 @@ the index-refresh line moves from the later `gate check` step to the
 `gate-check-review-artifact-vault-advisory`,
 `gate-check-review-artifact-superseded` and
 `evidence-add-fabrication-marker-whole-token`.
+
+### D6: consumer-repo hygiene and reads (#25, #29, #34, #37)
+
+**Paths canon owns (#25).** `canon skills install` and `canon skills
+doctor` now end with the globs of every path canon writes, for a
+formatter's or linter's ignore list: the projection of each selected
+provider first, then every machine-written path under `.canon/`, sorted.
+The list comes from canon's own path constants, so a path a future
+release adds is listed the day it ships. `.canon/specs/`,
+`.canon/policy.yaml` and `.canon/changes/` are left out: people write
+them by hand, and linters should still see them. For a repo that
+selects Claude:
+
+```
+owned-paths: canon writes these; exclude them from formatters and linters:
+  .claude/skills/canon/**
+  .canon/REPORT.md
+  .canon/artifact-store.lock
+  .canon/artifacts/**
+  .canon/audit/**
+  .canon/dashboard-snapshot/**
+  .canon/hot.db*
+  .canon/ingest/**
+  .canon/learn/**
+  .canon/ledger/**
+  .canon/plugins/**
+  .canon/policy.approval.json
+  .canon/r2/**
+  .canon/scenario-index.lock
+  .canon/scripts/canon-gate-pre-commit.sh
+  .canon/skills/**
+  .canon/strategies/**
+  .canon/vocab/**
+```
+
+**A formatter's rewrite is not drift (#25).** A projected skill file
+whose bytes differ from the bundle but whose content matches after
+normalization limited to what formatters do (CRLF, trailing whitespace,
+runs of blank lines, the final newline, and in markdown list markers,
+`_` emphasis and table-cell padding; a JSON file by value)
+is now `formatter-rewritten`, not `stale`. `canon skills check` still
+exits 1 on it. `canon skills doctor` names the ignore entry and the
+command that restores the file:
+
+```
+formatter-rewritten: ./.claude/skills/canon/SKILL.md (claude) — the same content as canon's projection after whitespace and format normalization, so a formatter rewrote it; add `.claude/skills/canon/**` to that formatter's ignore list, then restore it with `canon skills install --providers=claude`
+```
+
+Whitespace between tokens, backslashes and fenced code blocks are never
+normalized, so `rm -rf a b` against `rm -rfab`, a joined `\`
+continuation, or a changed fenced command stays `stale`.
+
+**`canon report` reads the sqlite hot tier (#29).** `canon init` routes
+`task`, `handoff`, `session`, `run` and `event` to a sqlite `hot` rung,
+and the report read only the git ledger and local parquet, so a fresh
+repo's trust matrix and scope status showed `—` for every task column
+and the report warned `Not read directly: event, handoff, run, session,
+task`. The report now reads the sqlite file: it is local and needs no
+credential. Before each DuckDB run it writes the hot tier's rows under a
+scratch directory (`CANON_HOT_ROOT`) that a new `stg_hot_records` view
+reads, beside `stg_git_records` and `stg_r2_records`. A db file that does
+not exist yet is no rows and is never created. A file that is not a
+sqlite database fails the report (exit 1) and names the file, instead of
+rendering a report without its tasks. `Backend::Sqlite` now counts as
+read directly, so no sqlite-routed kind appears under `## Kinds not read
+directly`. A hot row whose identical record (same kind and content
+digest) is also in the git ledger or `.canon/r2` is dropped from
+`stg_records`, so one record in two tiers counts once. Postgres and S3
+rungs are unchanged.
+
+**`canon finding list` (#34).** `canon finding list --change-id <id>
+[--open] [--json]` prints a change's committed findings at their latest
+version, ordered by round and seq. `--open` keeps the findings whose
+current disposition is `open`, so a finding closed after it was raised
+stays out:
+
+```
+round  seq  severity    disposition  reviewer  summary
+1      1    blocker     rejected     rev-a     teardown races HMR
+1      2    should-fix  open         rev-b     the count was typed by hand
+```
+
+`--json` prints `{"change_id", "findings": [{round, seq, severity,
+disposition, reviewer, summary, resolution_sha, file_ref}]}`. A staged
+finding is not a record yet; the command names how many are staged and
+points at `canon gate promote`.
+
+**Skill wording (#37).** A review runs in a session that can run the
+checks it signs off. A reviewer that cannot run the tests says so and
+does not sign off. A report bound with `--report` is kept in
+`.canon/artifacts`, so its working-tree copy may be gitignored.
 
 ## 0.17.0 release
 

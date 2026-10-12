@@ -62,7 +62,8 @@ fn parse_args() -> Args {
 
 fn main() -> ExitCode {
     let args = parse_args();
-    let inputs = ReportInputs::new(args.repo_root, Roots::new(args.git_root, args.r2_root, args.learn_root));
+    let hot_db = canon_report::roots::hot_db_from_canon_yaml(&args.repo_root);
+    let inputs = ReportInputs::new(args.repo_root, Roots::new(args.git_root, args.r2_root, args.learn_root).with_hot_db(hot_db));
 
     if args.check {
         match check_report(&inputs, &args.out) {
