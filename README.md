@@ -461,6 +461,29 @@ New cases: `evidence-add-promote-on-write`,
 **Closed issues:** #8, #9, #10, #11, #12, #21, #22, #23. **Deferred:**
 #13 (Codex eval), as the maintainer asked.
 
+**Acceptance (plan D7, dogfood eval 3c).** The release ran the eval-1
+one-line request ("make a cat-themed Vampire-Survivors-like game") with omp
+in a fresh repo initialized with this build. It used three turns: the
+request, one human answer, then a follow-up fix with no approval. All four
+criteria pass.
+
+- **(a) One human stop before `shipped`.** The agent stopped at the brief
+  after 91 seconds, before writing any code. It recorded the human's words
+  as `Approved:` and as `canon policy approve`, then shipped in 73 minutes
+  with no further stop.
+- **(b) The follow-up fix needed no human.** The agent added it as a task in
+  the approved change, wrote a new scenario and its evidence, and got an
+  independent review.
+- **(c) Bookkeeping was gone.** Across the four sessions, 0 of 49 canon call
+  sites were bookkeeping (`gate promote`, `inventory sync`, `format`).
+  Eval 2 had 21.6%; the first eval-3 run had 8.5%, which M6 fixed.
+- **(d) Everything was reviewed and the gate was clean.** All 30 scenarios
+  have a review from a different actor and session than their evidence, and
+  the gate is clean.
+
+An intermediate rerun (3b) failed (a), which is what M7 fixes. The evidence
+is in `~/Workspace/canon-dogfood/PROTOCOL-3.md` and `FINDINGS-3.md`.
+
 ## 0.15.0 release
 
 Version 0.15.0 makes the evidence chain hold over time: a review counts only
