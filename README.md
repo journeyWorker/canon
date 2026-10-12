@@ -82,6 +82,62 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.18.0 release
+
+### D5: gate correctness (#32, #36)
+
+**Fabrication markers match whole words (#32).** `"would pass"`, `"TBD"`
+and `"n/a"` in a `--summary` or `--command-result` are fabrication markers
+only where they stand as a whole word. The same letters inside a path, a
+file name, a URL or a longer word are not a marker, so dogfood eval 3's
+summary `… pack.json/atlas JSON …` is kept (it used to be refused for
+`n/a`). A `.` or `-` next to a marker joins it into a longer token only
+when a letter, digit, `_`, `/` or `\` follows (`n/a.json`, `x-tbd`);
+sentence punctuation does not (`result: n/a.`). Every standalone marker
+the earlier tests pinned is still caught.
+
+The refusal now reads like every other gate-red refusal of `evidence add`,
+one line per finding, still exit 1 and nothing written:
+
+```
+canon evidence add: refused — fabricated-evidence cart.add.01 — summary field contains fabrication marker "n/a": "atlas check: n/a"
+```
+
+**Review attachments follow the evidence rule (#36).** `canon gate check`
+re-checks the files bound by `canon review add --artifact` the way it
+re-checks evidence attachments, and only for current reviews. A current
+review is the latest per `(project_id, scenario_id, reviewer)` that has
+not gone stale against its scenario. A stale review is superseded (the
+gate reads the scenario's newer review, or reports the missing one as
+`unreviewed-promotion`), so its files are not checked. That is the review
+in FINDINGS-3 T5: `reviewer-2`'s review went stale when the evidence
+moved and `reviewer-4` reviewed again, yet a lost blob of `reviewer-2`'s
+still failed the gate.
+
+A missing blob whose working-tree file still matches is now an advisory,
+not a `stale-evidence` violation:
+
+```
+evidence artifacts: 1 bound file(s) not in the artifact store — not failing the gate; run `canon evidence vault` to store them before the working tree changes:
+  unstored cart.add.01 reports/cart-badge.png (sha256 9848…, review by `reviewer-2`) is verified against the working tree only
+```
+
+`canon evidence vault` stores the files of current reviews, the set the
+gate re-checks, as well as evidence files; a superseded review's file is
+neither checked nor vaulted. To read the same reviews as the gate, the
+vault first refreshes a stale scenario index, as `canon gate check` does.
+A missing blob whose working-tree file changed or is gone, and an altered
+blob, are still `stale-evidence` naming the review.
+
+Conformance: `gate-check-review-artifact-stale-evidence` now changes the
+working-tree file, since a matching one no longer makes that case red. In
+`evidence-vault-stores-unstored` and `evidence-vault-reports-unstorable`
+the index-refresh line moves from the later `gate check` step to the
+`evidence vault` step. New cases:
+`gate-check-review-artifact-vault-advisory`,
+`gate-check-review-artifact-superseded` and
+`evidence-add-fabrication-marker-whole-token`.
+
 ## 0.17.0 release
 
 Version 0.17.0 gives canon its own home: the spec corpus, canon's own

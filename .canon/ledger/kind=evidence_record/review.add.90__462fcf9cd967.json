@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "018-n3-impl",
+    "role": "implementer",
+    "session_id": "018-n3-impl"
+  },
+  "at": "2026-10-12T13:48:28.745201Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test review_artifacts a_lost_review_blob_with_a_matching_working_tree_is_a_vault_advisory"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 30,
+  "scenario_id": "review.add.90",
+  "schema": 1,
+  "staging_id": "d42d0e282932",
+  "verdict": "faithful"
+}

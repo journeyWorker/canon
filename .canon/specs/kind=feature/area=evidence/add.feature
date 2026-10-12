@@ -423,3 +423,23 @@ Feature: evidence add
     And nothing is staged or committed
     And once that canon brief.md holds the "Source:" line and the "Approved:" line, both adds succeed
     And the external proposal.md is never edited, and canon gate task flips the external task row
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.90
+  Scenario: A marker inside a path, a file name, a URL or a longer word is not a fabrication marker
+    Given a scenario and a summary naming "pack.json/atlas JSON", "tbd_notes.md" and "https://example.com/tbd"
+    When evidence is added for the scenario with that summary
+    Then the add succeeds and the committed record carries the summary as given
+    And a summary where "n/a" stands on its own is still refused with exit 1 and nothing is written
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.91
+  Scenario: A fabrication marker is refused the way every other gate-red refusal of evidence add is
+    Given a summary holding "TBD" and a command result reading "n/a"
+    When evidence is added with them
+    Then the command exits 1 with one "canon evidence add: refused —" line per finding, each naming fabricated-evidence, the scenario, the field and the marker
+    And nothing is staged or committed

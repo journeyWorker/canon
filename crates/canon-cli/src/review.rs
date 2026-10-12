@@ -42,9 +42,9 @@
 //! inside the repository, within `--max-artifact-mib`, its bytes copied
 //! into `.canon/artifacts/sha256/<hex>` after every refusal has passed
 //! and before the review is written. The review records each file's
-//! `{path, sha256}`; `canon gate check` re-hashes the stored blob of
-//! every in-effect review and reports a missing or altered one as
-//! `stale-evidence` naming the review. Canon never compares images.
+//! `{path, sha256}`; `canon gate check` re-checks the files of every
+//! current in-effect review by the evidence rule
+//! (`canon_gate::artifact_store`). Canon never compares images.
 
 use std::path::{Path, PathBuf};
 

@@ -431,6 +431,36 @@ pub fn in_effect_reviews(ctx: &GateContext) -> Vec<&Review> {
     latest_by_key(&ctx.reviews, |r| (r.project_id.clone(), r.scenario_id.clone(), r.reviewer.clone()))
 }
 
+/// The in-effect reviews that are still current (0.18 D5): every
+/// [`in_effect_reviews`] entry except one that no longer describes its
+/// live scenario — a pinned review whose spec or evidence pin moved, or a
+/// legacy review whose currency check says stale. A stale review is
+/// superseded: the gate reads the scenario's newer review in its place,
+/// or reports the gap itself (`unreviewed-promotion`), so nothing the
+/// stale one bound is still claimed. A legacy review that is undecidable
+/// keeps counting, and so is kept, as is a review whose scenario has no
+/// live record to compare it with: dropping either would only ever skip
+/// a check. Review artifacts are re-checked over exactly these
+/// ([`crate::artifact_store`]).
+pub fn current_reviews(ctx: &GateContext) -> Vec<&Review> {
+    let live: BTreeMap<(&canon_model::ProjectId, &canon_model::ScenarioId), &Scenario> =
+        latest_scenarios(ctx).into_iter().map(|s| ((&s.project_id, &s.scenario_id), s)).collect();
+    let mut pins: BTreeMap<(&canon_model::ProjectId, &canon_model::ScenarioId), ReviewPins> = BTreeMap::new();
+    let mut current = Vec::new();
+    for review in in_effect_reviews(ctx) {
+        let key = (&review.project_id, &review.scenario_id);
+        let Some(scenario) = live.get(&key).copied() else {
+            current.push(review);
+            continue;
+        };
+        let now = pins.entry(key).or_insert_with(|| current_pins(ctx, scenario));
+        if staleness(ctx, review, scenario, now).is_none() {
+            current.push(review);
+        }
+    }
+    current
+}
+
 /// How the in-effect reviews without `pins` (written before 0.15) of
 /// live scenarios came out of the legacy check: one count per review,
 /// and the scenarios a stale one leaves without a qualifying review.

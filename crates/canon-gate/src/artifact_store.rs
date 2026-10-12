@@ -56,16 +56,21 @@
 //!   to its name "does not match its name, so its bytes were altered";
 //!   a missing one means "the bound bytes are gone".
 //!
-//! # Review artifacts (0.16 D5)
+//! # Review artifacts (0.16 D5, 0.18 D5)
 //! `canon review add --artifact` stores what the reviewer looked at
 //! through the same [`StoreLock`] and records `{path, sha256}` on the
-//! review. The check covers every IN-EFFECT review (the latest per
-//! `(project_id, scenario_id, reviewer)`,
-//! [`crate::review_gate::in_effect_reviews`]). A review artifact has no
-//! pre-store generation, so only an intact blob is clean: a missing or
-//! altered one is `stale-evidence` on the review's scenario, and the
-//! detail names the reviewer, the review's actor and its time. The
-//! working-tree file is reported but never vouches for it.
+//! review. The check covers every CURRENT in-effect review
+//! ([`crate::review_gate::current_reviews`]): the latest per
+//! `(project_id, scenario_id, reviewer)`, less any that went stale
+//! against its scenario. A stale review is superseded (the gate reads
+//! the newer review, or reports the missing one), so what it bound is not
+//! re-checked, the way a superseded evidence record's is not. The rule is
+//! the evidence rule above: an intact blob is clean; a missing blob whose
+//! working-tree file still matches is an advisory
+//! ([`unstored_attachments`], naming `canon evidence vault`, which stores
+//! review artifacts too); anything else is `stale-evidence` on the
+//! review's scenario, and the detail names the reviewer, the review's
+//! actor and its time.
 //!
 //! The check is NOT narrowed to `spec_coverage.scope`. A binding is a
 //! claim the record makes about bytes, whatever its subject's lifecycle
@@ -81,14 +86,14 @@ use std::marker::PhantomData;
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
-use canon_model::{paths, EvidenceAttachment, EvidenceRecord};
+use canon_model::{paths, EvidenceAttachment, EvidenceRecord, Review, ReviewArtifact};
 use canon_store::file_lock::{FileLock, FileLockError};
 use sha2::{Digest, Sha256};
 
 use crate::context::{GateCheck, GateContext};
 use crate::coverage::CellSubject;
 use crate::failure_class::{FailureClass, Violation};
-use crate::review_gate::in_effect_reviews;
+use crate::review_gate::current_reviews;
 use crate::spec_coverage::latest_by_key;
 
 /// The documented default size limit for one stored file, in MiB.
@@ -453,40 +458,62 @@ fn subject_of(record: &EvidenceRecord) -> String {
     CellSubject::of(record).map(|s| s.as_str().to_string()).unwrap_or_default()
 }
 
-/// One attachment on a latest record whose bytes exist only in the
-/// working tree (module doc's back-compat path): not a violation, an
-/// advisory pointing at `canon evidence vault`.
+/// One attachment on a latest record, or a current review, whose bytes
+/// exist only in the working tree (module doc's back-compat path): not a
+/// violation, an advisory pointing at `canon evidence vault`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnstoredAttachment {
     pub subject: String,
     pub path: String,
     pub sha256: String,
+    /// The reviewer, when a review (not an evidence record) binds it.
+    pub reviewer: Option<String>,
 }
 
 impl UnstoredAttachment {
     pub fn line(&self) -> String {
-        format!("{} {} (sha256 {}) is verified against the working tree only", self.subject, self.path, self.sha256)
+        match &self.reviewer {
+            None => format!("{} {} (sha256 {}) is verified against the working tree only", self.subject, self.path, self.sha256),
+            Some(reviewer) => format!("{} {} (sha256 {}, review by `{reviewer}`) is verified against the working tree only", self.subject, self.path, self.sha256),
+        }
     }
 }
 
 /// The advisories `canon gate check` prints below its violations: every
-/// attachment on a latest record with no stored blob whose working-tree
-/// file still matches. Sorted by subject, then path.
+/// attachment on a latest record, and every artifact on a current
+/// review, with no stored blob whose working-tree file still matches.
+/// Sorted by subject, then path, evidence before reviews.
 pub fn unstored_attachments(ctx: &GateContext) -> Vec<UnstoredAttachment> {
     let repo = &ctx.ctx.repo;
+    let unstored = |path: &str, sha256: &str| stored_blob(repo, sha256) == Observed::Missing && working_tree(repo, path).matches(sha256);
     let mut out = Vec::new();
     for record in latest_records(ctx) {
         for attachment in distinct_files(record) {
-            if stored_blob(repo, &attachment.sha256) != Observed::Missing {
-                continue;
-            }
-            if working_tree(repo, &attachment.path).matches(&attachment.sha256) {
-                out.push(UnstoredAttachment { subject: subject_of(record), path: attachment.path.clone(), sha256: attachment.sha256.clone() });
+            if unstored(&attachment.path, &attachment.sha256) {
+                out.push(UnstoredAttachment { subject: subject_of(record), path: attachment.path.clone(), sha256: attachment.sha256.clone(), reviewer: None });
             }
         }
     }
-    out.sort_by(|a, b| (&a.subject, &a.path).cmp(&(&b.subject, &b.path)));
+    for review in current_reviews(ctx) {
+        for artifact in distinct_review_files(review) {
+            if unstored(&artifact.path, &artifact.sha256) {
+                out.push(UnstoredAttachment {
+                    subject: review.scenario_id.as_str().to_string(),
+                    path: artifact.path.clone(),
+                    sha256: artifact.sha256.clone(),
+                    reviewer: Some(review.reviewer.clone()),
+                });
+            }
+        }
+    }
+    out.sort_by(|a, b| (&a.subject, &a.path, &a.reviewer).cmp(&(&b.subject, &b.path, &b.reviewer)));
     out
+}
+
+/// Each distinct `(path, sha256)` a review binds.
+fn distinct_review_files(review: &Review) -> Vec<&ReviewArtifact> {
+    let mut seen = BTreeSet::new();
+    review.artifacts.iter().filter(|a| seen.insert((a.path.as_str(), a.sha256.as_str()))).collect()
 }
 
 /// The `canon gate check` arm (module doc).
@@ -525,13 +552,16 @@ impl GateCheck for ArtifactStoreCheck {
                 ));
             }
         }
-        // Review artifacts (0.16 D5) were stored when the review was
-        // written, so there is no working-tree-only generation to fall
-        // back on: the blob is the proof, and a missing one is stale.
-        for review in in_effect_reviews(ctx) {
-            for artifact in &review.artifacts {
+        // Review artifacts (0.18 D5): the evidence rule, over the current
+        // in-effect reviews only (module doc).
+        for review in current_reviews(ctx) {
+            for artifact in distinct_review_files(review) {
                 let blob = stored_blob(repo, &artifact.sha256);
                 if blob.matches(&artifact.sha256) {
+                    continue;
+                }
+                let tree = working_tree(repo, &artifact.path);
+                if blob == Observed::Missing && tree.matches(&artifact.sha256) {
                     continue;
                 }
                 violations.push(Violation::new(
@@ -546,7 +576,7 @@ impl GateCheck for ArtifactStoreCheck {
                         artifact.sha256,
                         blob_display(&artifact.sha256),
                         blob.as_str(),
-                        working_tree(repo, &artifact.path).as_str(),
+                        tree.as_str(),
                         diagnosis(&blob)
                     ),
                 ));
@@ -664,7 +694,7 @@ mod tests {
         std::fs::write(dir.path().join("smoke.json"), b"v1").unwrap();
         let ctx = ctx(dir.path(), vec![evidence("a.b.01", "smoke.json", &digest, 0)]);
         assert!(ArtifactStoreCheck.run(&ctx).is_empty());
-        assert_eq!(unstored_attachments(&ctx), vec![UnstoredAttachment { subject: "a.b.01".into(), path: "smoke.json".into(), sha256: digest }]);
+        assert_eq!(unstored_attachments(&ctx), vec![UnstoredAttachment { subject: "a.b.01".into(), path: "smoke.json".into(), sha256: digest, reviewer: None }]);
     }
 
     #[test]
