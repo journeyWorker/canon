@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-016-m6",
+    "role": "reviewer",
+    "session_id": "review-016-m6"
+  },
+  "at": "2026-10-12T04:23:31.595844Z",
+  "change_id": "canon-0-16-m6-review",
+  "disposition": "fixed",
+  "file_ref": ".agents/skills/canon/SKILL.md:57-60",
+  "kind": "finding",
+  "resolution_sha": "c6527f7d5b3b0b7f878dfec78938b6c201a23209",
+  "reviewed_sha": "8ea4d33ceffe4a88a7728a2789b12ee00c39193c",
+  "reviewer": "canon-reviewer-016-m6",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "A refused automatic index refresh left gate check grading the old index and status offering advance steps"
+}
