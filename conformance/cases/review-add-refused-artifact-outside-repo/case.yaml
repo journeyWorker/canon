@@ -2,7 +2,7 @@ description: "0.16 D5: `canon review add --artifact` exits 2 on a file that reso
 steps:
   - args: [inventory, sync]
     exit: 0
-  - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --reviewer, reviewer-2, --pin, r1, --original-spec-ref, specs/features/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --artifact, /etc/hosts]
+  - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --reviewer, reviewer-2, --pin, r1, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --artifact, /etc/hosts]
     exit: 2
   - args: [gate, check]
     exit: 0

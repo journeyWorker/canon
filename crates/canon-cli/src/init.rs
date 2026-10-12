@@ -79,8 +79,9 @@ const GITIGNORE_LINES: [(&str, &str); 5] = [
 /// `sqlite-hot-backend`: sqlite needs no operator-supplied credential,
 /// unlike postgres/s3) -- commented `tiers.hot` (postgres swap) /
 /// `tiers.cold` stanzas documenting the scale-up path, one working
-/// `specs.roots[]` entry (D9: a present `specs:` section requires at
-/// least one root, so this ships real rather than empty), and one
+/// `specs.roots[]` entry at [`paths::SPECS_DIR`] (D9: a present
+/// `specs:` section requires at least one root, so this ships real
+/// rather than empty; 0.17 D1 keeps it inside `.canon/`), and one
 /// `openspec` plans source rooted at the repo (0.14 D2), so the
 /// changes `canon change new` scaffolds under [`CHANGES_DIR`] are
 /// imported by `canon ingest plans` and flipped by `canon gate task`
@@ -124,9 +125,10 @@ fn skeleton_yaml() -> String {
     out.push_str("routing:\n");
     out.push_str(&routing);
     out.push_str("specs:\n");
+    out.push_str("  # The .feature corpus: <root>/kind=feature/area=<area>/<surface>.feature.\n");
     out.push_str("  roots:\n");
     out.push_str("    - id: root\n");
-    out.push_str("      root: specs\n");
+    out.push_str(&format!("      root: {}\n", paths::SPECS_DIR));
     out.push_str("plans:\n");
     out.push_str("  # Where changes and their tasks live: `canon change new` scaffolds\n");
     out.push_str("  # openspec/changes/<slug>/, `canon ingest plans` imports it.\n");

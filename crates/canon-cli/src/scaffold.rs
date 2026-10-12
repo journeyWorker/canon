@@ -53,6 +53,7 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use canon_model::family::feature::FeatureProvenance;
+use canon_model::family::FamilyKind;
 use canon_model::{Actor, ProjectId, ScenarioId};
 use chrono::{DateTime, Utc};
 
@@ -136,7 +137,7 @@ fn provenance_line(at: DateTime<Utc>, actor: &Actor) -> String {
 }
 
 /// Every `@<area>.<surface>.<nn>`-shaped tag anywhere under `root`'s
-/// `features/` corpus (`gherkin::scan`'s own `scenario_ids` — every
+/// `kind=feature/` corpus (`gherkin::scan`'s own `scenario_ids` — every
 /// tag found, whether or not it paired with a following `Scenario:`
 /// header, unlike `crate::inventory::scan_feature_corpus`'s paired-only
 /// `scenarios`) — used ONLY for duplicate-tag existence checking here
@@ -144,10 +145,7 @@ fn provenance_line(at: DateTime<Utc>, actor: &Actor) -> String {
 /// duplicate detection doesn't need).
 fn corpus_tags(root: &Path) -> BTreeSet<String> {
     let mut tags = BTreeSet::new();
-    for path in canon_fmt::util::walk_files(root, "features") {
-        if path.extension().and_then(|e| e.to_str()) != Some("feature") {
-            continue;
-        }
+    for path in canon_fmt::util::feature_files(root) {
         let Ok(text) = fs::read_to_string(&path) else { continue };
         tags.extend(canon_fmt::gherkin::scan(&text).scenario_ids);
     }
@@ -183,8 +181,22 @@ fn append_scenario_block(existing: &str, tag: &str, title: &str, prov_line: &str
     out.push_str(&block);
     out
 }
+/// Where `<area>.<surface>`'s `.feature` file lives under `root`:
+/// `<root>/kind=feature/area=<area>/<surface>.feature` (0.17 D1), the
+/// directory [`FamilyKind::Feature`]'s descriptor declares.
 pub fn resolve_feature_path(root: &SpecRoot, area: &str, surface: &str) -> PathBuf {
-    root.root.join("features").join("kind=feature").join(format!("area={area}")).join(format!("{surface}.feature"))
+    root.root.join(FamilyKind::Feature.layout_descriptor().corpus_dir()).join(format!("area={area}")).join(format!("{surface}.feature"))
+}
+
+/// Refuse a scaffold write under a root still on the pre-0.17 layout
+/// (0.17 D1): writing `kind=feature/` beside `features/kind=feature/`
+/// would leave a root no reader accepts. `Err` is the message without
+/// the command prefix, naming the root and `canon migrate`.
+fn refuse_pre_0_17(repo: &Path, root: &SpecRoot) -> Result<(), String> {
+    match crate::inventory::pre_0_17_detail(repo, root) {
+        Some(detail) => Err(format!("refused — {detail}; nothing written")),
+        None => Ok(()),
+    }
 }
 
 /// D3: whether `path` (already resolved to an absolute path) falls
@@ -280,7 +292,8 @@ fn resolve_spec_root<'a>(command: &str, roots: &'a [SpecRoot], project: Option<&
 /// invocation — a `specs.roots[]` config fault, a spec root
 /// [`resolve_spec_root`] cannot pin down when `--feature` is omitted
 /// (design D2), an explicit `--feature` path resolving outside every
-/// configured root (design D3), or `tag` already existing somewhere in
+/// configured root (design D3), a target root still on the pre-0.17
+/// layout (0.17 D1), or `tag` already existing somewhere in
 /// the target feature corpus — with ZERO bytes written either way,
 /// mirroring `canon review add`'s own
 /// refusal-exits-`2`/nothing-written convention
@@ -340,6 +353,12 @@ pub fn run_scenario_new(
             resolved
         }
     };
+    for root in roots.iter().filter(|root| path_under_root(&feature_path, &root.root)) {
+        if let Err(msg) = refuse_pre_0_17(&repo_root, root) {
+            eprintln!("canon scenario new: {msg}");
+            return 2;
+        }
+    }
 
     for root in &roots {
         if corpus_tags(&root.root).contains(tag.as_str()) {
@@ -405,12 +424,12 @@ pub fn run_scenario_new(
 /// file written, `2` on a refused invocation (a `specs.roots[]` config
 /// fault, a spec root [`resolve_spec_root`] cannot pin down — a
 /// multi-root config with no `--project <id>`, or a `--project` naming
-/// no configured entry — or the target file already
-/// existing). Uses `create_new` (atomic create-fails-if-exists), never
+/// no configured entry — a root still on the pre-0.17 layout (0.17
+/// D1), or the target file already existing). Uses `create_new` (atomic create-fails-if-exists), never
 /// a check-then-write race, so the existing file's bytes are UNTOUCHED
 /// in every refusal case. The path is derived via
 /// [`resolve_feature_path`] (s19 design D1) — the SAME
-/// `features/kind=feature/area=<area>/<surface>.feature` layout
+/// `kind=feature/area=<area>/<surface>.feature` layout
 /// `canon_model::family::FamilyKind::Feature::layout_descriptor`
 /// declares and `canon-fmt`/`canon inventory sync` already validate
 /// against.
@@ -459,6 +478,11 @@ pub fn run_feature_new(
             return 2;
         }
     };
+
+    if let Err(msg) = refuse_pre_0_17(&repo_root, root) {
+        eprintln!("canon feature new: {msg}");
+        return 2;
+    }
 
     let feature_path = resolve_feature_path(root, &area_surface.area, &area_surface.surface);
     // The next-step hint below must be an invocation that actually
@@ -648,7 +672,7 @@ mod tests {
         let dir = repo_with_spec_roots(1);
         let surface = AreaSurface::parse("world.hotdeal").unwrap();
         assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", None, &actor(), at()), 0);
-        assert!(dir.path().join("specs-p0/features/kind=feature/area=world/hotdeal.feature").is_file());
+        assert!(dir.path().join("specs-p0/kind=feature/area=world/hotdeal.feature").is_file());
     }
 
     #[test]
@@ -656,7 +680,7 @@ mod tests {
         let dir = repo_with_spec_roots(2);
         let surface = AreaSurface::parse("world.hotdeal").unwrap();
         assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", Some(&project("p1")), &actor(), at()), 0);
-        assert!(dir.path().join("specs-p1/features/kind=feature/area=world/hotdeal.feature").is_file());
+        assert!(dir.path().join("specs-p1/kind=feature/area=world/hotdeal.feature").is_file());
         assert!(!dir.path().join("specs-p0").exists(), "the unnamed root must be left entirely alone");
     }
 

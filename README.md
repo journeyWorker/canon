@@ -76,6 +76,67 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.17.0 release
+
+Version 0.17.0 changes where canon keeps its files. Each part of the
+release is described in its own subsection below.
+
+### Spec layout (P1, D1)
+
+A spec root now holds `kind=feature/area=<area>/<surface>.feature`
+directly. The `features/` directory between the root and `kind=feature/`
+is gone; `kind=` stays at the top so other kinds can sit beside it later.
+
+A new repo's default spec root is `.canon/specs` (`id: root`). `canon
+init` writes it into `canon.yaml`:
+
+```yaml
+specs:
+  # The .feature corpus: <root>/kind=feature/area=<area>/<surface>.feature.
+  roots:
+    - id: root
+      root: .canon/specs
+```
+
+An absent `specs:` key, or an entry with no `root:`, resolves to
+`.canon/specs` too; `specs.roots[]` still takes any path. `.canon/specs`
+is authored and git-tracked, and no canon gitignore line covers it. The
+walkers never consult `.gitignore` and never skip hidden directories, so
+a root inside `.canon/` is read like any other. A fresh repo's first
+scenario lands at `.canon/specs/kind=feature/area=cart/add.feature`:
+
+```
+canon status: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
+```
+
+canon does not read both layouts. A spec root that holds any `.feature`
+file under `<root>/features/` is refused, and every refusal names
+`canon migrate`:
+
+- `canon format` reports one `layout-grammar` violation at path
+  `features`: the root is on the pre-0.17 layout, canon reads
+  `kind=feature/area=<area>/<surface>.feature` directly under the root,
+  and `canon migrate` moves `features/kind=feature/` there.
+- `canon inventory sync` aborts the root: 0 writes, exit 1.
+- A reader's index refresh (`canon status`, `canon gate check`,
+  `canon evidence add`, `canon review add`, `canon subject status`)
+  names the root on stderr, does not refresh its scenario index, and
+  writes no tombstones.
+- `canon gate check` exits 1 with `uncovered-cell <root>` (the root's
+  scenarios are not graded until it moves), whether or not the index
+  already holds them. The ship guard of `canon subject status … shipped`
+  refuses with the same violation.
+- `canon status` warns, and its only next step is `canon migrate`.
+- `canon scenario new` and `canon feature new` exit 2 and write nothing.
+
+An empty leftover `features/` directory is not a refusal. `canon migrate`
+is the one idempotent command that moves the layout: `--dry-run` prints
+the plan, a root at the old repo-level `specs` default moves to
+`.canon/specs`, and any other root only drops its `features/` level.
+
+canon's own corpus moved with it, to `specs/kind=feature/…` and
+`examples/platformer/specs/kind=feature/…`; both roots are unchanged.
+
 ## 0.16.0 release
 
 Version 0.16.0 lets the agent drive after one approval: the human answers

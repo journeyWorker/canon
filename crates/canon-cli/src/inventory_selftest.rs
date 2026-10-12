@@ -56,7 +56,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use canon_model::ids::TotalOrder;
-use canon_model::{Actor, BindingSnapshot, Divergence, DivergenceStatus, Envelope, FoldedState, ProjectId, RecordKind, RoleId, ScenarioId, Sha, fold_to_current_state};
+use canon_model::{paths, Actor, BindingSnapshot, Divergence, DivergenceStatus, Envelope, FoldedState, ProjectId, RecordKind, RoleId, ScenarioId, Sha, fold_to_current_state};
 use chrono::{DateTime, Utc};
 
 use crate::inventory::{RootSyncOutcome, SyncCtx, run_sync_with_ctx};
@@ -97,7 +97,7 @@ fn provenance_comment() -> String {
     "  # canon: {\"schema\":1,\"at\":\"2026-07-10T00:00:00Z\",\"actor\":{\"agent_id\":\"canon-fmt\"}}".to_string()
 }
 
-/// A single well-formed `.feature` file under `<root>/features/`, Hive-
+/// A single well-formed `.feature` file under `<root>/kind=feature/`, Hive-
 /// laid-out (`kind=feature/area=<area>/<surface>.feature`) with a
 /// provenance comment on both headers, so `canon-fmt::check` reports
 /// zero violations for it (mirrors `crate::inventory`'s own
@@ -105,7 +105,7 @@ fn provenance_comment() -> String {
 fn write_clean_feature(spec_root: &Path, area: &str, surface: &str, nn: &str, title: &str) {
     let prov = provenance_comment();
     let text = format!("Feature: {area} {surface}\n{prov}\n\n  @{area}.{surface}.{nn}\n  Scenario: {title}\n{prov}\n    Given a precondition\n");
-    write(spec_root, &format!("features/kind=feature/area={area}/{surface}.feature"), &text);
+    write(spec_root, &format!("kind=feature/area={area}/{surface}.feature"), &text);
 }
 
 // ── the three sync fixture corpus builders (spec Req 1) ──
@@ -113,7 +113,7 @@ fn write_clean_feature(spec_root: &Path, area: &str, surface: &str, nn: &str, ti
 /// A clean root: one well-formed scenario, zero violations, exactly one
 /// `Scenario` record materialized.
 fn build_clean_root(dir: &Path) {
-    write_clean_feature(&dir.join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay");
+    write_clean_feature(&dir.join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay");
 }
 
 /// An S11-violation root: both headers lack a provenance comment —
@@ -122,8 +122,8 @@ fn build_clean_root(dir: &Path) {
 /// also fires), aborting the whole root (0 writes).
 fn build_missing_provenance(dir: &Path) {
     write(
-        &dir.join("specs"),
-        "features/kind=feature/area=world/hotdeal.feature",
+        &dir.join(paths::SPECS_DIR),
+        "kind=feature/area=world/hotdeal.feature",
         "Feature: world hotdeal\n\n  @world.hotdeal.01\n  Scenario: Opening the hotdeal overlay\n    Given a precondition\n",
     );
 }
@@ -137,15 +137,15 @@ fn build_missing_provenance(dir: &Path) {
 /// test corpus).
 fn build_duplicate_scenario(dir: &Path) {
     let prov = provenance_comment();
-    let root = dir.join("specs");
+    let root = dir.join(paths::SPECS_DIR);
     write(
         &root,
-        "features/kind=feature/area=world/hotdeal.feature",
+        "kind=feature/area=world/hotdeal.feature",
         &format!("Feature: world hotdeal\n{prov}\n\n  @world.hotdeal.01\n  Scenario: First\n{prov}\n    Given x\n"),
     );
     write(
         &root,
-        "features/kind=feature/area=world/hotdeal-again.feature",
+        "kind=feature/area=world/hotdeal-again.feature",
         &format!("Feature: world hotdeal again\n{prov}\n\n  @world.hotdeal.01\n  Scenario: Second\n{prov}\n    Given y\n"),
     );
 }

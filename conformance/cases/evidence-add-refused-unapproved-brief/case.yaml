@@ -6,7 +6,7 @@ steps:
     exit: 1
   - args: [gate, promote]
     exit: 0
-  - args: [review, add, --project-id, root, --scenario-id, checkout.pay.01, --reviewer, reviewer-2, --actor-id, reviewer-2, --role, reviewer, --pin, abc1234, --original-spec-ref, "specs/features/kind=feature/area=checkout/add.feature"]
+  - args: [review, add, --project-id, root, --scenario-id, checkout.pay.01, --reviewer, reviewer-2, --actor-id, reviewer-2, --role, reviewer, --pin, abc1234, --original-spec-ref, "specs/kind=feature/area=checkout/add.feature"]
     exit: 0
   - args: [status]
     exit: 0

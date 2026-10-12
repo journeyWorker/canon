@@ -23,7 +23,7 @@
       },
       "project_id": "root",
       "provenance_ref": {
-        "original_spec_ref": "specs/features/kind=feature/area=cart/add.feature"
+        "original_spec_ref": "specs/kind=feature/area=cart/add.feature"
       },
       "reviewer": "reviewer-2",
       "reviewer_harness": "codex",
@@ -52,7 +52,7 @@
       },
       "project_id": "root",
       "provenance_ref": {
-        "original_spec_ref": "specs/features/kind=feature/area=cart/add.feature"
+        "original_spec_ref": "specs/kind=feature/area=cart/add.feature"
       },
       "reviewer": "reviewer-2",
       "scenario_id": "cart.add.01",

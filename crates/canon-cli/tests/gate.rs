@@ -962,7 +962,7 @@ fn repo_with_spec_corpus() -> tempfile::TempDir {
         "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\n  subject: local\n  divergence: local\n  evidence_record: local\nspecs:\n  roots:\n    - id: core\n      root: specs\n",
     )
     .unwrap();
-    let features = dir.path().join("specs/features/kind=feature/area=core");
+    let features = dir.path().join("specs/kind=feature/area=core");
     std::fs::create_dir_all(&features).unwrap();
     const PROV: &str = r#"  # canon: {"schema":1,"at":"2026-07-14T19:26:44.332203Z","actor":{"agent_id":"canon-scaffold"}}"#;
     std::fs::write(

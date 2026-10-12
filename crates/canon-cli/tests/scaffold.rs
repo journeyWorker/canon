@@ -78,7 +78,7 @@ fn scenario_new_no_feature(dir: &Path, tag: &str, title: &str) -> Output {
     run_canon(&["scenario", "new", tag, "--title", title], dir)
 }
 
-const HOTDEAL_FEATURE_PATH: &str = "specs/features/kind=feature/area=world/hotdeal.feature";
+const HOTDEAL_FEATURE_PATH: &str = ".canon/specs/kind=feature/area=world/hotdeal.feature";
 
 // ── round-trip through `canon fmt --check` clean ──
 
@@ -93,7 +93,7 @@ fn a_scaffolded_feature_round_trips_through_canon_fmt_check_clean() {
     let out = scenario_new(dir.path(), "world.hotdeal.42", "Apply a hotdeal coupon", HOTDEAL_FEATURE_PATH);
     assert!(out.status.success(), "canon scenario new failed: {}", stderr(&out));
 
-    let out = run_canon(&["fmt", "--check", "specs"], dir.path());
+    let out = run_canon(&["fmt", "--check", ".canon/specs"], dir.path());
     assert!(out.status.success(), "canon fmt --check must be clean over the scaffolded corpus: {}\n{}", stdout(&out), stderr(&out));
     assert!(stdout(&out).contains(", 0 violation(s)"), "expected zero violations: {}", stdout(&out));
 }
@@ -106,7 +106,7 @@ fn a_bare_feature_new_file_has_the_provenance_comment_and_zero_scenarios() {
     let out = feature_new(dir.path(), "world.checkout", "Checkout flow");
     assert!(out.status.success(), "canon feature new failed: {}", stderr(&out));
 
-    let path = dir.path().join("specs/features/kind=feature/area=world/checkout.feature");
+    let path = dir.path().join(".canon/specs/kind=feature/area=world/checkout.feature");
     let content = std::fs::read_to_string(&path).unwrap();
     assert!(content.starts_with("Feature: Checkout flow\n"), "content: {content:?}");
     assert!(content.contains("# canon: {"), "content missing provenance comment: {content:?}");
@@ -134,7 +134,7 @@ fn scenario_new_emits_leading_provenance_subject_lane_and_actor() {
         dir.path(),
     );
     assert!(out.status.success(), "scenario new failed: {}", stderr(&out));
-    let path = dir.path().join("specs/features/kind=feature/area=world/checkout.feature");
+    let path = dir.path().join(".canon/specs/kind=feature/area=world/checkout.feature");
     let content = std::fs::read_to_string(path).unwrap();
     let normalized = normalize_provenance_timestamps(&content);
     assert_eq!(
@@ -154,7 +154,7 @@ fn scenario_new_uses_canon_actor_environment_when_flag_is_absent() {
         .output()
         .unwrap();
     assert!(out.status.success(), "scenario new failed: {}", stderr(&out));
-    let path = dir.path().join("specs/features/kind=feature/area=world/checkout.feature");
+    let path = dir.path().join(".canon/specs/kind=feature/area=world/checkout.feature");
     let content = std::fs::read_to_string(path).unwrap();
     assert!(content.contains("\"agent_id\":\"env-agent\""), "{content}");
 }
@@ -168,7 +168,7 @@ fn scenario_new_rejects_a_malformed_lane_before_writing() {
         dir.path(),
     );
     assert_eq!(out.status.code(), Some(2), "bad lane must exit 2: {}", stderr(&out));
-    assert!(!dir.path().join("specs").exists(), "bad lane must write zero bytes");
+    assert!(!dir.path().join(".canon/specs").exists(), "bad lane must write zero bytes");
 }
 
 #[test]
@@ -186,13 +186,13 @@ fn a_bare_feature_new_stub_is_fmt_dirty_until_scenario_new_adds_a_tagged_scenari
     assert!(out.status.success(), "canon feature new failed: {}", stderr(&out));
 
     // Bare stub: `fmt --check` flags the tagless feature (not yet valid corpus).
-    let out = run_canon(&["fmt", "--check", "specs"], dir.path());
+    let out = run_canon(&["fmt", "--check", ".canon/specs"], dir.path());
     assert!(!out.status.success(), "a bare zero-scenario feature stub must not be fmt-clean yet: {}", stdout(&out));
 
     // Adding the first tagged scenario makes the same file fmt-clean.
-    let out = scenario_new(dir.path(), "world.checkout.01", "Start checkout", "specs/features/kind=feature/area=world/checkout.feature");
+    let out = scenario_new(dir.path(), "world.checkout.01", "Start checkout", ".canon/specs/kind=feature/area=world/checkout.feature");
     assert!(out.status.success(), "canon scenario new failed: {}", stderr(&out));
-    let out = run_canon(&["fmt", "--check", "specs"], dir.path());
+    let out = run_canon(&["fmt", "--check", ".canon/specs"], dir.path());
     assert!(out.status.success(), "after `scenario new` the stub must be fmt-clean: {}\n{}", stdout(&out), stderr(&out));
     assert!(stdout(&out).contains(", 0 violation(s)"), "expected zero violations: {}", stdout(&out));
 }
@@ -297,7 +297,7 @@ fn feature_new_against_an_already_existing_file_is_rejected_loud_with_the_file_u
     let first = feature_new(dir.path(), "world.checkout", "Checkout flow");
     assert!(first.status.success(), "first canon feature new failed: {}", stderr(&first));
 
-    let path = dir.path().join("specs/features/kind=feature/area=world/checkout.feature");
+    let path = dir.path().join(".canon/specs/kind=feature/area=world/checkout.feature");
     let bytes_after_first = std::fs::read(&path).unwrap();
 
     let second = feature_new(dir.path(), "world.checkout", "A completely different title");
@@ -356,7 +356,7 @@ fn an_explicit_feature_path_outside_every_configured_root_is_refused() {
     assert!(err.contains("specs"), "stderr must name the configured root(s): {err}");
 
     assert!(!dir.path().join("wall.render").exists(), "the repo-root orphan must never be written");
-    assert!(!dir.path().join("specs").exists(), "zero bytes written anywhere on refusal");
+    assert!(!dir.path().join(".canon/specs").exists(), "zero bytes written anywhere on refusal");
 }
 
 #[test]
@@ -364,10 +364,10 @@ fn an_explicit_feature_path_under_a_configured_root_in_a_non_canonical_subpath_s
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(dir.path());
 
-    let out = scenario_new(dir.path(), "wall.render.04", "a hand-grouped surface", "specs/features/kind=feature/area=wall/misc.feature");
+    let out = scenario_new(dir.path(), "wall.render.04", "a hand-grouped surface", ".canon/specs/kind=feature/area=wall/misc.feature");
     assert!(out.status.success(), "a --feature path under a configured root must succeed even in a non-canonical subpath: {}", stderr(&out));
 
-    let path = dir.path().join("specs/features/kind=feature/area=wall/misc.feature");
+    let path = dir.path().join(".canon/specs/kind=feature/area=wall/misc.feature");
     assert!(path.exists(), "expected the explicit non-canonical path to be written");
     let content = std::fs::read_to_string(&path).unwrap();
     assert!(content.contains("@wall.render.04"), "content missing the tag: {content:?}");
@@ -407,7 +407,7 @@ fn feature_new_prints_a_next_step_hint_and_fmt_check_reports_the_wip_stub_wordin
         "expected a next-step hint naming the derived `canon scenario new` invocation: {hint}"
     );
 
-    let check_out = run_canon(&["fmt", "--check", "specs"], dir.path());
+    let check_out = run_canon(&["fmt", "--check", ".canon/specs"], dir.path());
     assert!(!check_out.status.success(), "a bare stub must still be fmt-dirty (unchanged exit-code contract)");
     let report = stdout(&check_out);
     assert!(
@@ -421,7 +421,7 @@ fn feature_new_prints_a_next_step_hint_and_fmt_check_reports_the_wip_stub_wordin
 /// Guards `path_under_root`'s component-wise `Path::starts_with` check
 /// (design D3's own doc comment: "a root named `specs` never falsely
 /// accepts a sibling `specs2`"): with a single configured root
-/// (`specs`, the implicit default), `--feature specs2/x.feature` names
+/// (`.canon/specs`, the implicit default), `--feature .canon/specs2/x.feature` names
 /// a SIBLING directory that merely shares `specs` as a string PREFIX —
 /// a naive `str::starts_with`/non-component-wise check would wrongly
 /// accept it as "under `specs`". It must be refused exactly like any
@@ -432,14 +432,14 @@ fn an_explicit_feature_path_under_a_sibling_directory_sharing_a_string_prefix_is
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(dir.path());
 
-    let out = scenario_new(dir.path(), "wall.render.06", "guess", "specs2/x.feature");
+    let out = scenario_new(dir.path(), "wall.render.06", "guess", ".canon/specs2/x.feature");
     assert!(!out.status.success(), "`specs2/` must never be falsely accepted as under the configured `specs` root");
     assert_eq!(out.status.code(), Some(2), "must exit 2: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("specs2"), "stderr must name the attempted path: {err}");
     assert!(err.contains("specs"), "stderr must name the configured root(s): {err}");
 
-    assert!(!dir.path().join("specs2").exists(), "zero bytes written under the sibling directory on refusal");
+    assert!(!dir.path().join(".canon/specs2").exists(), "zero bytes written under the sibling directory on refusal");
 }
 
 // ── s26 `repo-flag-uniformity` D3: `@`-prefixed tag == bare form ──
@@ -481,7 +481,7 @@ fn an_at_prefixed_tag_writes_the_same_header_a_bare_tag_would() {
     let out = scenario_new_no_feature_with_repo(dir_bare.path(), "story.x.01", "T");
     assert!(out.status.success(), "canon scenario new bare tag failed: {}", stderr(&out));
 
-    let feature_path = "specs/features/kind=feature/area=story/x.feature";
+    let feature_path = ".canon/specs/kind=feature/area=story/x.feature";
     let content_at = std::fs::read_to_string(dir_at.path().join(feature_path)).unwrap();
     let content_bare = std::fs::read_to_string(dir_bare.path().join(feature_path)).unwrap();
     assert_eq!(
@@ -499,7 +499,7 @@ fn the_bare_form_still_succeeds_unchanged_with_explicit_repo() {
     write_canon_yaml(dir.path());
     let out = scenario_new_no_feature_with_repo(dir.path(), "story.x.02", "T");
     assert!(out.status.success(), "canon scenario new (bare tag, --repo .) failed: {}", stderr(&out));
-    let content = std::fs::read_to_string(dir.path().join("specs/features/kind=feature/area=story/x.feature")).unwrap();
+    let content = std::fs::read_to_string(dir.path().join(".canon/specs/kind=feature/area=story/x.feature")).unwrap();
     assert!(content.contains("\n  @story.x.02\n"), "content missing the `@story.x.02` tag line: {content:?}");
     assert!(content.contains("Scenario: T"), "content missing the `Scenario: T` header: {content:?}");
 }

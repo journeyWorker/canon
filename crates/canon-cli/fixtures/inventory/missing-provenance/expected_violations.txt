@@ -4,4 +4,4 @@
 # `missing-provenance` violation (the corpus is Hive-laid-out, so no
 # incidental `layout-grammar` violation also fires); the whole root
 # aborts (0 writes) per D5.
-fmt:missing-provenance features/kind=feature/area=world/hotdeal.feature
+fmt:missing-provenance kind=feature/area=world/hotdeal.feature

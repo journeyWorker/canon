@@ -13,7 +13,7 @@ deleted `.feature` files themselves, with the same code this command runs,
 scoped to the changed files, and say so in one stderr line:
 
 ```
-canon status: refreshed the scenario index from 1 changed feature file(s) (specs/features/…): 1 record(s) written
+canon status: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
 So the working loop has no sync step and no `canon format` step: write the
@@ -25,11 +25,20 @@ command. Run `canon inventory sync` when:
   comment, an emptied file, …) or a duplicate id, so its files were not
   indexed. `canon gate check` then fails (`uncovered-cell <root>`),
   `shipped` is refused and `canon status` lists only the sync. `canon
-  inventory sync` names each problem (`canon format specs` names the format ones);
+  inventory sync` names each problem (`canon format <root>` names the format ones);
   fix them and the next command indexes the files;
 - `canon status` says the ledger holds no scenario records while the
   `.feature` files hold some (the same refusal, on an index never built);
 - you want the whole index rebuilt from every root at once.
+
+A spec root still on the pre-0.17 layout (a `.feature` file under
+`<root>/features/`) is not refreshed and fails closed the same way: the
+reader names the root and `canon migrate` on stderr and writes no
+tombstones, `canon gate check` fails (`uncovered-cell <root>`) whether or
+not the index already holds its scenarios, `shipped` is refused, and
+`canon status` lists only `canon migrate`. `canon inventory sync` does not
+fix it; run `canon migrate`, which moves `features/kind=feature/` to
+`<root>/kind=feature/`.
 
 ## Where the index sits in the loop
 
@@ -66,7 +75,7 @@ Per configured root, in order:
 1. **Validate** — runs `canon format --check` over the root. ANY violation
    (missing provenance, layout-grammar, …) ABORTS THE WHOLE ROOT: zero
    records written for it, the violation(s) reported. Never a partial sync.
-2. **Scan** — walks `<root>/features/**/*.feature`, pairing each
+2. **Scan** — walks `<root>/kind=feature/area=<area>/<surface>.feature`, pairing each
    `@<area>.<surface>.<nn>` tag with its header label as `title` and a
    `source_digest` (sha256 over the raw `.feature` bytes). `@subject:<id>`
    → `subject_id`, `@lane:<v>` → `lane`, `@case:<v>` → `case` (first tag
@@ -100,7 +109,10 @@ specs:
       root: apps/b/specs
 ```
 
-- **Absent `specs:` key** → the single default root `{id: root, root: specs}`.
+- **Absent `specs:` key** → the single default root
+  `{id: root, root: .canon/specs}`, the one `canon init` writes. An entry
+  with no `root:` also resolves to `.canon/specs`. The default root is
+  authored and git-tracked; no canon gitignore line covers it.
 - **Present `specs:` with an empty/missing `roots[]`** → fails LOUD; a
   present-but-incomplete config never silently resolves to zero roots.
 - **A malformed entry** (missing `id`, `roots` not a list, `id` not a
@@ -113,6 +125,10 @@ specs:
 
 - **A `canon format --check` validation violation** in the root's corpus →
   whole root aborts, 0 writes, violations reported.
+- **A root on the pre-0.17 layout** (a `.feature` file under
+  `<root>/features/`) → a `layout-grammar` violation at path `features`;
+  the root aborts, 0 writes, exit 1. Run `canon migrate`. An empty
+  leftover `features/` directory is not a refusal.
 - **A duplicate `scenario_id`** within one root → that root aborts, 0
   writes, reported as a sync error (a distinct lane from fmt violations).
 

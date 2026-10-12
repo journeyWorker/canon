@@ -105,7 +105,7 @@ format-clean scenario, and `canon status`, `canon gate check`,
 index added, edited and deleted `.feature` files before they read. When
 one of them prints `NOT refreshed`, the corpus has a format violation
 (for example a hand-written header with no `# canon:` line) or a
-duplicate id; `canon inventory sync` (or `canon format specs`) names it.
+duplicate id; `canon inventory sync` (or `canon format <root>`) names it.
 Fix it and the next command indexes the files (see `canon-inventory`).
 
 - `--actor <id>` (or `CANON_ACTOR` in the environment) puts YOUR id on the
@@ -158,7 +158,7 @@ Fix it and the next command indexes the files (see `canon-inventory`).
 ## Worked example
 
 ```
-specs/features/kind=feature/area=checkout/
+.canon/specs/kind=feature/area=checkout/
   cart.feature        # surface: the cart screen
   payment.feature     # surface: the payment step
 ```

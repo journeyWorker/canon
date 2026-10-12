@@ -1,0 +1,12 @@
+description: "0.17 D1: a spec root still on the pre-0.17 layout (`specs/features/kind=feature/`) is refused, never read: `canon format` and `canon inventory sync` exit 1 with one `layout-grammar` violation naming the root and `canon migrate`; `canon gate check` exits 1 with an `uncovered-cell` naming the root and `canon migrate` even though the index already holds its scenarios, and its refresh writes no tombstone; `canon status` exits 0 with `canon migrate` as its only step; `canon scenario new` refuses with exit 2"
+steps:
+  - args: [format, specs]
+    exit: 1
+  - args: [inventory, sync]
+    exit: 1
+  - args: [gate, check]
+    exit: 1
+  - args: [status]
+    exit: 0
+  - args: [scenario, new, cart.add.03, --title, "Another add", --case, failure]
+    exit: 2
