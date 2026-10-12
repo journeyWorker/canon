@@ -97,15 +97,17 @@ test('platformer.movement.03: No double jump; coyote and buffered jumps fire', (
   step(air, { right: true, jumpBuffered: true });
   expect(player(air).vy).toBeLessThan(0);
   // When jump is pressed repeatedly mid-air, over the gap: no second jump fires,
-  // so velocity only ever grows under gravity until the landing.
+  // so velocity only ever grows under gravity until touchdown on the lower
+  // floor (where a press still buffered may fire the landing jump below).
+  const lowerFloor = 8 * 48;
   let vy = player(air).vy;
-  for (let i = 0; i < 200 && !player(air).onGround; i++) {
+  for (let i = 0; i < 200; i++) {
     step(air, { right: true, jumpBuffered: i % 3 === 0 && player(air).x >= 5 * 48 });
-    if (player(air).onGround) break;
+    if (player(air).y + player(air).h >= lowerFloor) break;
     expect(player(air).vy).toBeCloseTo(Math.min(vy + GRAVITY * FIXED_DT, MAX_FALL), 9);
     vy = player(air).vy;
   }
-  expect(player(air).onGround).toBe(true);
+  expect(player(air).y + player(air).h).toBe(lowerFloor);
 
   // A jump pressed within coyote time after leaving a ledge still fires.
   const coyote = walkOffLedge();
@@ -123,13 +125,15 @@ test('platformer.movement.03: No double jump; coyote and buffered jumps fire', (
   expect(player(late).vy).toBeGreaterThan(before);
 
   // A jump buffered just before landing fires on the landing frame. A dry
-  // run finds the landing step L (and that, unpressed, the player stays
-  // grounded after it); the real run presses jump on step L-3 (0.05s
-  // early), stays airborne until L, lands on L, and is jumping on L+1 —
-  // the first step that begins on the ground — with no grounded step between.
+  // run finds the touchdown step L and its position (and that, unpressed,
+  // the player stays grounded after it); the real run presses jump on step
+  // L-3 (0.05s early), stays airborne until L, and on L itself reaches the
+  // same touchdown position with the jump already fired.
   const dry = walkOffLedge();
   let landing = 0;
   while (!player(dry).onGround) { step(dry); landing++; }
+  const touchdownY = player(dry).y;
+  expect(touchdownY + player(dry).h).toBe(lowerFloor);
   step(dry);
   expect(player(dry).onGround).toBe(true);
 
@@ -138,10 +142,13 @@ test('platformer.movement.03: No double jump; coyote and buffered jumps fire', (
   step(buffered, { jumpBuffered: true });
   steps(buffered, 2);
   expect(player(buffered).onGround).toBe(false);
+  expect(player(buffered).y).toBeLessThan(touchdownY);
   step(buffered);
-  expect(player(buffered).onGround).toBe(true);
-  step(buffered);
+  expect(player(buffered).y).toBe(touchdownY);
+  expect(player(buffered).vy).toBe(JUMP_VELOCITY);
   expect(player(buffered).onGround).toBe(false);
+  step(buffered);
+  expect(player(buffered).y).toBeLessThan(touchdownY);
   expect(player(buffered).vy).toBeCloseTo(JUMP_VELOCITY + GRAVITY * FIXED_DT, 9);
 });
 

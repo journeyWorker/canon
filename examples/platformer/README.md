@@ -61,9 +61,11 @@ bun run test:junit  # the same, plus reports/junit.xml (gitignored)
 `tests/` holds one test per scenario, named with its id
 (`platformer.hud.01: …`). Each test drives the game's own code: the
 engine headless, and the React screens in jsdom with real keyboard
-input. Only the Pixi WebGL stage is stubbed. Each test checks every
-Then of its scenario. One call binds the report to all 16 scenarios,
-each record getting the verdict of its own case:
+input. jsdom has no WebGL, so two things are stubbed: the `PixiStage`
+component wherever a test mounts `<App/>`, and pixi.js's `Sprite` class
+in `enemy.test.tsx`, which lets the blink rule in `renderPlayer` run.
+Each test checks every Then of its scenario. One call binds the report
+to all 16 scenarios, each record getting the verdict of its own case:
 
 ```bash
 canon evidence add --project-id platformer --kind test-run \

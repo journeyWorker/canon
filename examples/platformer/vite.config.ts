@@ -26,7 +26,8 @@ export default defineConfig({
   // One test per scenario in specs/, named with the scenario id, so
   // `canon evidence add --report junit:reports/junit.xml --all-scenarios`
   // binds each scenario to its own cases. jsdom hosts the React HUD and
-  // screens; Pixi's WebGL stage is stubbed where a test mounts <App/>.
+  // screens. It has no WebGL, so tests stub PixiStage where they mount
+  // <App/>, and enemy.test stubs pixi.js's Sprite class.
   test: {
     environment: 'jsdom',
     include: ['tests/**/*.test.{ts,tsx}'],

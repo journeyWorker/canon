@@ -313,7 +313,15 @@ the game's own code and checks every Then:
   mount in jsdom. The keyboard goes through the game's `InputCapture`, and
   frames go through `runFrame`, which is the two lines extracted from
   `PixiStage`'s ticker, so the tests drive frames the same way the game
-  does. Only the Pixi WebGL stage is stubbed, because jsdom has no WebGL.
+  does. jsdom has no WebGL, so two things are stubbed: the `PixiStage`
+  component wherever a test mounts `<App/>`, and, in `enemy.test.tsx`
+  only, pixi.js's `Sprite` class, so that `renderPlayer`'s blink rule
+  runs without the renderer.
+
+Writing the tests found one bug. A buffered jump fired one step after
+touchdown, but `platformer.movement.03` says it fires on the landing
+frame. The game now starts a buffered jump on the step that grounds the
+player.
 
 `bun run test:junit` writes `reports/junit.xml`. That path is gitignored,
 because the bound copy is kept in `.canon/artifacts`. One call attests
