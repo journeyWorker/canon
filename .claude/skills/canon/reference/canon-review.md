@@ -135,7 +135,8 @@ fixed finding reopened with `--disposition open` counts as open again.
 ## `canon review add`
 
 ```bash
-canon review add --project-id <root-id> --scenario-id <id> \
+canon review add --project-id <root-id> --scenario-id <id> [--scenario-id <id>]... \
+  [--scenario-ids-from <file|->] \
   --reviewer <who> --pin <sha-or-ref> --role <role> \
   (--upstream-ref <ref> | --original-spec-ref <ref>) [--actor-id <id>] [--session-id <id>] \
   [--outcome signed|indeterminate|unavailable] \
@@ -143,7 +144,7 @@ canon review add --project-id <root-id> --scenario-id <id> \
   [--artifact <path>]... [--max-artifact-mib <MiB>]
 ```
 
-One attributed Review record for one scenario, joined on
+One attributed Review record per scenario, joined on
 `(project_id, scenario_id)` — both are required because two spec roots
 may carry the same scenario id. Exactly one provenance ref is required.
 `--actor-id` defaults to `canon`; `--session-id` fills `actor.session_id`.
@@ -152,6 +153,18 @@ ship gate still refuses missing or `Divergent` evidence verdicts on its
 own. It is written directly to the ledger, with no staging step, and says
 so: `canon review add: wrote <path> (new) — written directly; nothing to
 promote`.
+
+### Several scenarios in one call (0.18)
+
+`--scenario-id` is repeatable, and `--scenario-ids-from <file>` (`-` reads
+stdin) adds one id per line; `#` starts a comment and blank lines are
+skipped. One reviewer, pin, provenance ref and set of artifacts cover
+every review; each review pins its own scenario and evidence, and each
+gets its own `pinned` and `wrote` line. The artifacts are stored once.
+It is all or nothing: a scenario with no record, or a line in the file
+that is not a scenario id, refuses the call (exit 2) and writes no review.
+This is also the batch re-pin after `canon evidence add` reports reviews
+it made stale (see `canon-gate`).
 
 ### What the reviewer looked at (artifacts)
 

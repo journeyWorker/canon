@@ -1,0 +1,8 @@
+description: "0.18 D1: `canon evidence add --report junit:<path> --all-scenarios` writes one record per indexed scenario owning a case (exit 0), each with its verdict from its own cases on its own line, stores the report once, and names the unindexed id and the id-less case it skipped"
+steps:
+  - args: [inventory, sync]
+    exit: 0
+  - args: [evidence, add, --project-id, root, --all-scenarios, --report, junit:reports/junit.xml, --kind, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
+    exit: 0
+  - args: [gate, promote]
+    exit: 0

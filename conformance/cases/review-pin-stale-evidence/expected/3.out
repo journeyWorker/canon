@@ -1,1 +1,2 @@
 canon evidence add: staged kind=evidence_record/cart.add.01__<digest12>.json for cart.add.01 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate check`
+canon evidence add: review by `reviewer-2` of cart.add.01 goes stale once this evidence is promoted (it pinned the evidence this record supersedes); re-pin it: canon review add --project-id root --scenario-id cart.add.01 --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer --pin <sha> --session-id sess-review --original-spec-ref specs/kind=feature/area=cart/add.feature
