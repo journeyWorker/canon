@@ -30,10 +30,19 @@
 //! say how to choose. `install --providers` also rewrites
 //! `skills.providers` in an existing `canon.yaml`. `doctor` names a canon
 //! projection directory left behind for a provider that is not selected.
+//!
+//! Formatters (0.18, #25): `install` and `doctor` print the globs of every
+//! path canon writes ([`owned_path_globs`]) for a formatter's or linter's
+//! ignore list. A projected file whose bytes differ but whose content
+//! matches after whitespace and format normalization is
+//! [`FORMATTER_REWRITTEN`], not `stale`, and `doctor` names the ignore
+//! entry that keeps the formatter off it.
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use canon_model::paths;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -222,8 +231,14 @@ pub struct CanonicalInstallReport {
 pub struct SkillStatus {
     pub provider: Provider,
     pub path: PathBuf,
+    /// `ok`, `missing`, `stale` (real drift) or [`FORMATTER_REWRITTEN`].
     pub state: &'static str,
 }
+
+/// A projected file whose bytes differ from the bundle but whose
+/// content does not: a formatter rewrote it (0.18, #25). It still
+/// fails `check`; `doctor` names the ignore entry to add.
+pub const FORMATTER_REWRITTEN: &str = "formatter-rewritten";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillsCheckReport {
@@ -791,8 +806,125 @@ fn source_commit(source_dir: &Path) -> Option<String> {
     (output.status.success() && !commit.is_empty()).then(|| commit.to_string())
 }
 
+/// The install lock, relative to the target.
+const INSTALL_LOCK_FILE: &str = ".canon/skills/.install-lock.json";
+
 fn manifest_path(target_dir: &Path) -> PathBuf {
-    target_dir.join(".canon/skills/.install-lock.json")
+    target_dir.join(INSTALL_LOCK_FILE)
+}
+
+/// `<dir>/**`, the glob for everything under a canon directory constant.
+fn dir_glob(dir: &str) -> String {
+    format!("{}/**", dir.trim_end_matches('/'))
+}
+
+/// The ignore entry for `provider`'s projection: `<root>/skills/canon/**`.
+pub fn projection_glob(provider: Provider) -> String {
+    dir_glob(&format!("{}/skills/canon", provider.descriptor().root))
+}
+
+/// The paths canon writes in a repo, as globs for a formatter's or
+/// linter's ignore list (0.18, #25): the projection of each of
+/// `providers`, then every canon-written path under `.canon/`, sorted.
+/// A formatter that rewrites any of them makes canon read drift (a
+/// projection against its install lock, a spec or policy against the
+/// digest a review or approval pinned, a ledger record against its
+/// digest-named file). Derived from `canon_model::paths` and this
+/// module's own constants, never typed out a second time.
+/// `.canon/changes/` is left out: its briefs and plans are prose people
+/// write.
+pub fn owned_path_globs(providers: &[Provider]) -> Vec<String> {
+    let artifacts_dir = Path::new(paths::ARTIFACTS_SHA256_DIR).parent().and_then(Path::to_str).unwrap_or(paths::ARTIFACTS_SHA256_DIR);
+    let lock_dir = Path::new(INSTALL_LOCK_FILE).parent().and_then(Path::to_str).unwrap_or(INSTALL_LOCK_FILE);
+    let dirs = [
+        paths::LEDGER_DIR,
+        artifacts_dir,
+        paths::SPECS_DIR,
+        paths::R2_LOCAL_DIR,
+        paths::LEARN_DIR,
+        paths::STRATEGIES_DIR,
+        paths::VOCAB_DIR,
+        paths::PLUGINS_DIR,
+        paths::INGEST_DIR,
+        paths::DASHBOARD_SNAPSHOT_DIR,
+        paths::AUDIT_GITIGNORE,
+        lock_dir,
+    ];
+    let files = [
+        paths::HOT_DB_GITIGNORE,
+        paths::POLICY_FILE,
+        paths::POLICY_APPROVAL_FILE,
+        paths::REPORT_FILE,
+        paths::PRE_COMMIT_SCRIPT,
+        paths::SCENARIO_INDEX_LOCK_FILE,
+        paths::ARTIFACT_STORE_LOCK_FILE,
+    ];
+    let mut canon: Vec<String> = dirs.into_iter().map(dir_glob).chain(files.into_iter().map(str::to_string)).collect();
+    canon.sort();
+    canon.dedup();
+    providers.iter().map(|provider| projection_glob(*provider)).chain(canon).collect()
+}
+
+/// The lines `canon skills install` and `canon skills doctor` print for
+/// [`owned_path_globs`]: one header, then one indented glob per line.
+pub fn owned_paths_lines(providers: &[Provider]) -> Vec<String> {
+    let mut lines = vec!["owned-paths: canon writes these; exclude them from formatters and linters:".to_string()];
+    lines.extend(owned_path_globs(providers).into_iter().map(|glob| format!("  {glob}")));
+    lines
+}
+
+/// Whether `actual` holds the same content as `expected` once what a
+/// formatter changes is set aside (0.18, #25): a JSON file parses to
+/// the same value; any other file matches after [`format_insensitive`].
+/// `false` when the bytes are identical (that is not a rewrite) or
+/// either side is not UTF-8.
+fn formatter_rewrote(relative: &Path, actual: &[u8], expected: &[u8]) -> bool {
+    if actual == expected {
+        return false;
+    }
+    if relative.extension().is_some_and(|ext| ext == "json") {
+        return match (serde_json::from_slice::<serde_json::Value>(actual), serde_json::from_slice::<serde_json::Value>(expected)) {
+            (Ok(a), Ok(e)) => a == e,
+            _ => false,
+        };
+    }
+    match (std::str::from_utf8(actual), std::str::from_utf8(expected)) {
+        (Ok(a), Ok(e)) => format_insensitive(a) == format_insensitive(e),
+        _ => false,
+    }
+}
+
+/// `text` with what a prettier-family formatter rewrites taken out:
+/// line endings, line wrapping, indentation and every other whitespace;
+/// `*`/`+` list markers (as `-`); `_` emphasis (as `*`); backslash
+/// escapes; and table-rule padding (a run of three or more `-` as
+/// `---`). Two texts equal here differ only in how they are laid out.
+fn format_insensitive(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        let line = match trimmed.strip_prefix("* ").or_else(|| trimmed.strip_prefix("+ ")) {
+            Some(rest) => format!("-{rest}"),
+            None => trimmed.to_string(),
+        };
+        let mut dashes = 0usize;
+        for ch in line.chars().filter(|ch| !ch.is_whitespace() && *ch != '\\') {
+            if ch == '-' {
+                dashes += 1;
+                continue;
+            }
+            push_dashes(&mut out, dashes);
+            dashes = 0;
+            out.push(if ch == '_' { '*' } else { ch });
+        }
+        push_dashes(&mut out, dashes);
+    }
+    out
+}
+
+fn push_dashes(out: &mut String, run: usize) {
+    let kept = if run >= 3 { 3 } else { run };
+    out.extend(std::iter::repeat_n('-', kept));
 }
 
 fn load_manifest(target_dir: &Path) -> Result<Option<CanonicalManifest>, SkillsError> {
@@ -1312,12 +1444,11 @@ pub fn check(
         for file in &files {
             let path = project_path(target_dir, *provider, &file.relative);
             let expected_bytes = file.bytes.as_slice();
-            let state = if !path.is_file() {
-                "missing"
-            } else if fs::read(&path).ok().as_deref() != Some(expected_bytes) {
-                "stale"
-            } else {
-                "ok"
+            let state = match fs::read(&path) {
+                _ if !path.is_file() => "missing",
+                Ok(actual) if actual == expected_bytes => "ok",
+                Ok(actual) if formatter_rewrote(&file.relative, &actual, expected_bytes) => FORMATTER_REWRITTEN,
+                _ => "stale",
             };
             statuses.push(SkillStatus {
                 provider: *provider,
@@ -1406,7 +1537,15 @@ pub fn doctor(
         Err(err) => return Err(err),
     };
     for status in report.statuses {
-        if status.state != "ok" {
+        if status.state == FORMATTER_REWRITTEN {
+            lines.push(format!(
+                "{FORMATTER_REWRITTEN}: {} ({}) — the same content as canon's projection after whitespace and format normalization, so a formatter rewrote it; add `{}` to that formatter's ignore list, then restore it with `{}`",
+                status.path.display(),
+                status.provider.as_str(),
+                projection_glob(status.provider),
+                install_command(&report.providers)
+            ));
+        } else if status.state != "ok" {
             lines.push(format!(
                 "{}: {} ({})",
                 status.state,
@@ -1446,6 +1585,7 @@ pub fn doctor(
         lines.push("status: healthy".into());
     }
     lines.extend(advisories);
+    lines.extend(owned_paths_lines(&report.providers));
     Ok(lines)
 }
 
@@ -1543,5 +1683,34 @@ mod tests {
         }
         assert!(skill_frontmatter("# no frontmatter\n").is_none());
         assert!(skill_frontmatter("---\ndescription: never closed\n").is_none());
+    }
+
+    /// skills.install.57/58: what a prettier-family formatter changes
+    /// reads as a rewrite; a changed word, line or JSON value is drift.
+    #[test]
+    fn formatter_rewrites_are_told_apart_from_content_changes() {
+        let md = Path::new("reference/topic.md");
+        let source = "# Topic\n\nA *role* is a\nrung.\n\n* one\n* two\n\n| a | b |\n|---|---|\n| 1 | 2 |\n";
+        let formatted = "# Topic\r\n\r\nA _role_ is a rung.\r\n\r\n- one\r\n- two\r\n\r\n| a   | b   |\r\n| --- | --- |\r\n| 1   | 2   |\r\n\r\n";
+        assert!(formatter_rewrote(md, formatted.as_bytes(), source.as_bytes()));
+        assert!(!formatter_rewrote(md, source.as_bytes(), source.as_bytes()), "identical bytes are no rewrite");
+        assert!(!formatter_rewrote(md, source.replace("rung", "tier").as_bytes(), source.as_bytes()));
+        assert!(!formatter_rewrote(md, source.replace("* two\n", "").as_bytes(), source.as_bytes()));
+        assert!(!formatter_rewrote(md, &[0xff, 0xfe], source.as_bytes()), "non-UTF-8 is never a rewrite");
+
+        let json = Path::new("reference/data.json");
+        assert!(formatter_rewrote(json, b"{\n  \"b\": 1,\n  \"a\": [1, 2]\n}\n", br#"{"a":[1,2],"b":1}"#));
+        assert!(!formatter_rewrote(json, br#"{"a":[2,1],"b":1}"#, br#"{"a":[1,2],"b":1}"#));
+    }
+
+    #[test]
+    fn owned_path_globs_lead_with_the_selected_projections() {
+        let globs = owned_path_globs(&[Provider::Claude, Provider::Pi]);
+        assert_eq!(&globs[..2], [".claude/skills/canon/**".to_string(), ".pi/skills/canon/**".to_string()]);
+        for expected in [".canon/ledger/**", ".canon/artifacts/**", ".canon/skills/**", ".canon/hot.db*"] {
+            assert!(globs.iter().any(|glob| glob == expected), "{expected} missing from {globs:?}");
+        }
+        let canon = &globs[2..];
+        assert!(canon.windows(2).all(|pair| pair[0] < pair[1]), "sorted, without duplicates: {canon:?}");
     }
 }

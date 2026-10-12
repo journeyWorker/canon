@@ -1,3 +1,24 @@
 providers: claude (from canon.yaml skills.providers)
 status: healthy
 stray: ./.agents/skills/canon — codex is not a selected provider (from canon.yaml skills.providers), so canon no longer updates it; remove it with `rm -r ./.agents/skills/canon`, or select it with `canon skills install --providers=claude,codex`
+owned-paths: canon writes these; exclude them from formatters and linters:
+  .claude/skills/canon/**
+  .canon/REPORT.md
+  .canon/artifact-store.lock
+  .canon/artifacts/**
+  .canon/audit/**
+  .canon/dashboard-snapshot/**
+  .canon/hot.db*
+  .canon/ingest/**
+  .canon/learn/**
+  .canon/ledger/**
+  .canon/plugins/**
+  .canon/policy.approval.json
+  .canon/policy.yaml
+  .canon/r2/**
+  .canon/scenario-index.lock
+  .canon/scripts/canon-gate-pre-commit.sh
+  .canon/skills/**
+  .canon/specs/**
+  .canon/strategies/**
+  .canon/vocab/**

@@ -104,11 +104,12 @@ canon query --kind trajectory --json
 
 canon exposes layered `stg_`/`int_`/`mart_` query views; `canon report`
 builds its numbers from the `mart_` views. Those read ONLY local roots
-— the git ledger and a LOCAL `.canon/r2` parquet mirror. `canon report`
+— the git ledger, the sqlite `hot` db file (local, no credential; read
+since 0.18) and a LOCAL `.canon/r2` parquet mirror. `canon report`
 never opens a live DB connection or the live bucket, so:
 
-- Kinds routed to `hot` (sqlite/postgres) do NOT appear in `canon
-  report`.
+- Kinds routed to a postgres `hot` rung do NOT appear in `canon
+  report`; kinds routed to `canon init`'s default sqlite `hot` rung do.
 - Kinds routed to `cold` (s3) appear only if a local `.canon/r2` mirror
   has been separately materialized — there is no automatic sync.
 

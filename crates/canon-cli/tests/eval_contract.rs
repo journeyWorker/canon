@@ -115,7 +115,7 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
         .output()
         .expect("spawn canon skills install");
     assert!(first.status.success(), "stderr: {}", String::from_utf8_lossy(&first.stderr));
-    assert_eq!(String::from_utf8_lossy(&first.stdout), "canon v1 — installed (omp,pi)\n");
+    assert_eq!(String::from_utf8_lossy(&first.stdout), format!("canon v1 — installed (omp,pi)\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Omp, canon_cli::skills::Provider::Pi]).join("\n")));
 
     let source_files = canonical_source_files();
     let expected_files: BTreeMap<String, &[u8]> = [
@@ -160,7 +160,7 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
         .output()
         .expect("spawn canon skills install");
     assert!(second.status.success(), "stderr: {}", String::from_utf8_lossy(&second.stderr));
-    assert_eq!(String::from_utf8_lossy(&second.stdout), "canon v1 — unchanged (omp,pi)\n");
+    assert_eq!(String::from_utf8_lossy(&second.stdout), format!("canon v1 — unchanged (omp,pi)\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Omp, canon_cli::skills::Provider::Pi]).join("\n")));
 }
 
 #[test]

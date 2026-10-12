@@ -194,6 +194,13 @@
 //! CURRENT committed version before admitting the append, so a
 //! hand-written body must clear the same bar as this command's output.
 //!
+//! # Reading them back: `canon finding list` (0.18, #34)
+//! [`run_list`] prints a change's committed findings at their latest
+//! version — round, seq, severity, disposition, reviewer, summary —
+//! optionally only the open ones, or as JSON. Before it, a reviewer
+//! looking for the next free seq or the open blockers grepped ledger
+//! JSON, and one such loop read the wrong file.
+//!
 //! # Line breaks are refused, not escaped
 //! `--summary`, `--reviewer`, `--file-ref` and `--actor-id` are the
 //! free-text fields of this record — the ones with no grammar
@@ -916,6 +923,144 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
             2
         }
     }
+}
+
+/// `canon finding list` (0.18, #34).
+#[derive(Debug, Clone)]
+pub struct FindingListArgs {
+    pub change_id: ChangeId,
+    /// Only findings whose CURRENT disposition is `open`.
+    pub open: bool,
+    pub json: bool,
+}
+
+/// The current version of every committed finding on `change_id`, one
+/// per `(round, seq)`, ordered by round then seq. The fold is
+/// [`fold_latest_by_key`], the rule [`find_finding`] and the report use,
+/// so a closed finding lists with its closing disposition, never the
+/// one it was raised with.
+fn current_findings(tier: &GitTier, change_id: &ChangeId) -> Result<Vec<Finding>, canon_store::tier::StoreError> {
+    let versions: Vec<(Finding, String)> = tier
+        .read(&TierQuery::kind(RecordKind::Finding))?
+        .records
+        .into_iter()
+        .filter_map(|raw| {
+            let finding = Finding::from_body(&raw.0).ok()?;
+            (&finding.change_id == change_id).then(|| (finding, content_digest12(&raw.0)))
+        })
+        .collect();
+    let mut current: Vec<Finding> =
+        fold_latest_by_key(versions, |(f, _)| (f.round, f.seq), |(f, _)| f.envelope.at, |(f, _)| f.envelope.schema, |(_, digest)| digest.as_str())
+            .into_values()
+            .map(|(finding, _)| finding)
+            .collect();
+    current.sort_by_key(|f| (f.round, f.seq));
+    Ok(current)
+}
+
+/// Print the findings recorded against one change (`canon finding
+/// list`, 0.18 #34): round, seq, severity, disposition, reviewer and
+/// summary per finding, each at its latest version
+/// ([`current_findings`]). `--open` keeps the findings whose current
+/// disposition is `open`; `--json` prints `{change_id, findings: [...]}`.
+///
+/// Committed findings only: a staged one is not yet a record, and its
+/// count is named on stderr with the command that commits it. Exit `0`
+/// whether or not anything matched; `2` when the ledger cannot be read.
+pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
+    let repo = resolve_repo_root(repo);
+    let ledger_root = match GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx.ledger_root,
+        Err(e) => {
+            eprintln!("canon finding list: {e}");
+            return 2;
+        }
+    };
+    let read = current_findings(&GitTier::new(&ledger_root), &args.change_id)
+        .and_then(|committed| Ok((committed, current_findings(&GitTier::new(evidence_staging_dir(&ledger_root)), &args.change_id)?.len())));
+    let (mut findings, staged) = match read {
+        Ok(read) => read,
+        Err(e) => {
+            eprintln!("canon finding list: {e}");
+            return 2;
+        }
+    };
+    if args.open {
+        findings.retain(|f| f.disposition() == FindingDisposition::Open);
+    }
+
+    if args.json {
+        let rows: Vec<serde_json::Value> = findings
+            .iter()
+            .map(|f| {
+                serde_json::json!({
+                    "round": f.round,
+                    "seq": f.seq,
+                    "severity": severity_slug(f.severity),
+                    "disposition": f.disposition().as_str(),
+                    "reviewer": f.reviewer,
+                    "summary": f.summary,
+                    "resolution_sha": f.resolution_sha().map(|sha| sha.as_str()),
+                    "file_ref": f.file_ref,
+                })
+            })
+            .collect();
+        let out = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows });
+        println!("{}", serde_json::to_string_pretty(&out).expect("a JSON value always serializes"));
+    } else if findings.is_empty() {
+        let which = if args.open { "open findings" } else { "findings" };
+        println!("canon finding list: no committed {which} on change `{}`", args.change_id);
+    } else {
+        print!("{}", render_finding_table(&findings));
+    }
+    if staged > 0 {
+        eprintln!("canon finding list: {staged} staged finding(s) on change `{}` are not listed until committed — run `canon gate promote`", args.change_id);
+    }
+    0
+}
+
+/// One header row and one row per finding, columns padded to their
+/// widest cell; the summary, last, is never padded.
+fn render_finding_table(findings: &[Finding]) -> String {
+    const LIST_COLUMNS: usize = 6;
+    let header: [&str; LIST_COLUMNS] = ["round", "seq", "severity", "disposition", "reviewer", "summary"];
+    let rows: Vec<[String; LIST_COLUMNS]> = findings
+        .iter()
+        .map(|f| {
+            [
+                f.round.to_string(),
+                f.seq.to_string(),
+                severity_slug(f.severity).to_string(),
+                f.disposition().as_str().to_string(),
+                f.reviewer.clone(),
+                f.summary.clone(),
+            ]
+        })
+        .collect();
+    let mut widths = header.map(str::len);
+    for row in &rows {
+        for (width, cell) in widths.iter_mut().zip(row) {
+            *width = (*width).max(cell.chars().count());
+        }
+    }
+    let line = |cells: [&str; LIST_COLUMNS]| {
+        let mut out = String::new();
+        for (i, cell) in cells.iter().enumerate() {
+            if i + 1 == cells.len() {
+                out.push_str(cell);
+            } else {
+                out.push_str(cell);
+                out.push_str(&" ".repeat(widths[i] - cell.chars().count() + 2));
+            }
+        }
+        out.push('\n');
+        out
+    };
+    let mut out = line(header);
+    for row in &rows {
+        out.push_str(&line([&row[0], &row[1], &row[2], &row[3], &row[4], &row[5]]));
+    }
+    out
 }
 
 /// The CURRENT [`Finding`] `tier` holds under `args`' natural key, if

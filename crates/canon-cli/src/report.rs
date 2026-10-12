@@ -36,6 +36,10 @@
 //!   (`canon_learn::LearnConfig`), `.canon/learn` when the file or the
 //!   section is absent; a present file whose `learn:` section does not
 //!   parse is a [`ReportConfigError`] too, for the same reason.
+//! - hot db — the sqlite file `canon.yaml` backs a rung with
+//!   ([`canon_report::roots::hot_db_from_canon_yaml`], 0.18 #29), so
+//!   kinds `canon init` routes to `hot` reach the report; none when no
+//!   rung is sqlite-backed.
 
 use std::path::{Path, PathBuf};
 
@@ -76,7 +80,7 @@ fn resolve_roots(repo: &Path) -> Result<Roots, ReportConfigError> {
 
     let r2_root = repo.join(DEFAULT_R2_LOCAL_ROOT);
 
-    Ok(Roots::new(git_root, r2_root, learn_root))
+    Ok(Roots::new(git_root, r2_root, learn_root).with_hot_db(canon_report::roots::hot_db_from_canon_yaml(repo)))
 }
 
 /// Resolves `--repo` (design D7 ancestor walk) and builds the

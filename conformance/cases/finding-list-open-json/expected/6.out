@@ -1,0 +1,3 @@
+round  seq  severity    disposition  reviewer  summary
+1      1    blocker     rejected     rev-a     teardown races HMR
+1      2    should-fix  open         rev-b     the count was typed by hand

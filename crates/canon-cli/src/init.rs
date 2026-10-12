@@ -223,7 +223,7 @@ The loop:
 4. Units: split the work; one actor id and session per unit.
 5. Implement: tests named by scenario id.
 6. Evidence: `canon evidence add` (it promotes itself under `write: { promote: auto }`; only under `write.promote: manual` run `canon gate promote` after it).
-7. Independent review: a different session records `canon review add` and `canon finding add`, on every change.
+7. Independent review: a different session, one that can run the checks it signs off, records `canon review add` and `canon finding add`, on every change; a reviewer that cannot run the tests says so and does not sign off.
 8. Transition: `canon subject status`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships. The ship guard and `canon evidence add` refuse while the brief is unapproved; they are backstops, the stop is at step 1.
 
 Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, as tasks in its `tasks.md`, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review. When no human can answer one of the brief's questions, write your assumption into the brief and proceed on it; that covers the brief's questions and work inside an approved scope, never the approval. `.canon/policy.yaml` is what the gate grades against.

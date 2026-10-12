@@ -88,7 +88,8 @@ work inside an approved scope, never to the approval itself.
    `canon evidence add --project-id <root-id> --scenario-id <id> --kind test-run --role implementer --ref "<command>" --actor-id <unit> --session-id <session>`,
    with `--report junit:<path>` or `--artifact <path>` when files prove it.
    canon stores those bytes in `.canon/artifacts/sha256/` (commit it with the
-   ledger) and `canon gate check` re-checks them. For a scenario about what
+   ledger) and `canon gate check` re-checks them; the bound copy is the one
+   kept, so the working-tree report itself may be gitignored. For a scenario about what
    users see, bind the screenshot or recording that shows it
    (`--artifact <path>`). Under `write: { promote: auto }` (what
    `canon init` writes) the record is final when the command returns; only
@@ -102,9 +103,15 @@ work inside an approved scope, never to the approval itself.
    change's `tasks.md` as it is now, so a task row you add needs no
    `canon ingest plans` first.
 7. **Independent review.** A different session from the one that wrote the
-   code and evidence reviews the change. The reviewer records every defect
+   code and evidence reviews the change. The review session must be able
+   to run the checks it signs off (the build, the tests, the app); a
+   reviewer that cannot run the tests says so and does not sign off. The
+   reviewer records every defect
    the review finds as a finding:
    `canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <me> --actor-id <me> --session-id <session> --summary "…"`;
+   `canon finding list --change-id <slug> [--open] [--json]` shows the
+   change's findings (round, seq, severity, disposition, reviewer, summary),
+   so the next seq and the open blockers are one command away;
    once fixed,
    `canon finding close --change-id <slug> --round <n> --seq <n> --disposition fixed --resolution-sha <sha>`
    (a short sha is fine; canon resolves it). With `write.promote: manual`,
@@ -151,8 +158,15 @@ canon init --providers=claude,codex          # harnesses for the canon skill; wi
 canon skills install                         # follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing)
 canon skills install --providers=claude,codex,omp,pi   # any subset or none; rewrites skills.providers
 canon skills check                           # read-only drift check
-canon skills doctor                          # diagnostics, incl. a stray canon projection for an unselected provider; never deletes user files
+canon skills doctor                          # diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote; never deletes user files
 ```
+
+`install` and `doctor` end with `owned-paths:`, the globs of every path
+canon writes. Add them to the repo's formatter and linter ignore lists; a
+formatter that rewrites a projection, a spec, the policy or a ledger record
+makes canon read drift. `doctor` reports a projection whose bytes changed
+but whose content did not as `formatter-rewritten` and names the ignore
+entry to add; a changed file stays `stale`.
 
 The harness list lives in `canon.yaml` as `skills: { providers: [...] }`.
 `.agents` alone never selects Codex; `.codex` does. Change the list with
