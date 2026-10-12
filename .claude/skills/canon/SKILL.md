@@ -25,7 +25,7 @@ a feature, a one-line request included. A human is needed once per scope:
   `.canon/policy.yaml` (written by `canon init`), which is what the gate
   grades the work against. When the human answers, record both at once:
   an `Approved: <who> <when> — "<the human's words>"` line in the change's
-  `proposal.md`, and
+  `.canon/changes/<slug>/brief.md`, and
   `canon policy approve --by <the human> --note "<their words>"`. Never
   approve without a human answer, and never edit the policy to make the
   gate pass.
@@ -44,17 +44,21 @@ work inside an approved scope, never to the approval itself.
 
 1. **Brief.** For a new subject or a scope change, write down the request
    verbatim, your assumptions, and the questions you could not ask. It
-   becomes the change's `openspec/changes/<slug>/proposal.md`, which
-   `canon change new <slug> --subject <id> --title "…"` scaffolds once the
-   subject exists (step 2). Once it is there, stop and report the brief,
+   becomes the change's `.canon/changes/<slug>/brief.md`, which
+   `canon change new <slug> --subject <id> --title "…"` writes once the
+   subject exists (step 2). A change that comes from an external plan the
+   human prepared (an openspec `proposal.md` read through
+   `plans.sources`) gets its brief there too: a `brief.md` whose
+   `Source: <path>` line points at the plan; canon never edits the plan.
+   Once the brief is there, stop and report it,
    asking the human once for the brief and the policy; go on to step 3
    only after the human answers, and record the answer as above. Inside an
    approved scope there is no new brief: go to step 3 under the existing
    subject and change.
 2. **Subject.** `canon subject new <id> --domain <domain> --title "…"`, then
    `canon change new <slug> --subject <id> --title "…"`, and put the brief in
-   the change's `proposal.md`. For a new subject or a scope change, this is
-   where you stop until the human answers (step 1).
+   the `.canon/changes/<slug>/brief.md` it writes. For a new subject or a
+   scope change, this is where you stop until the human answers (step 1).
 3. **Scenarios.** `canon feature new <area>.<surface> --title "…"`, then one
    `canon scenario new <area>.<surface>.<nn> --subject <id> --case <case> --title "…"`
    per behavior, with failure paths (`--case failure`) as well as `happy`
@@ -114,12 +118,14 @@ work inside an approved scope, never to the approval itself.
    blocker findings); fix the gap rather than overriding, and finish with
    `canon gate check` clean. A root whose `.feature` edits could not be
    indexed fails the gate and refuses `shipped` (`uncovered-cell <root>`;
-   see step 3). `shipped` also refuses while the change's `proposal.md`
-   has no `Approved:` line, and `canon evidence add` refuses the subject's
-   scenarios and tasks the same way. Both are backstops: the stop itself
-   is at step 1, so you never reach them for a brief the human has not
-   answered. You record the line only from the human's answer (with no
-   `proposal.md` there is no brief to answer: neither refuses, and the
+   see step 3). `shipped` also refuses while the change's
+   `.canon/changes/<slug>/brief.md` has no `Approved:` line (for a change
+   from an external plan with no canon brief yet, it names the `brief.md`
+   to create with its `Source:` line), and `canon evidence add` refuses the
+   subject's scenarios and tasks the same way. Both are backstops: the stop
+   itself is at step 1, so you never reach them for a brief the human has
+   not answered. You record the line only from the human's answer (with no
+   brief to answer there is nothing to refuse, and the
    ship guard only prints an advisory). Move the subject to
    `shipped` yourself once `canon subject status <id> shipped` passes its
    guard, unless the brief says the human ships. `canon status` shows
@@ -137,7 +143,7 @@ Load only the reference the current step needs.
 ### Setup and provider projection
 
 ```bash
-canon init                                   # canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, plans home
+canon init                                   # canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, commented plans examples
 canon skills install                         # detects .claude/.agents|.codex/.omp/.pi; if none exists, installs Claude+Codex
 canon skills install --providers=claude,codex,omp,pi
 canon skills check                           # read-only drift check

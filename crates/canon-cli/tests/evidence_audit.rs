@@ -63,13 +63,13 @@ fn subject_at(repo: &Path, id: &str, status: &str) {
 
 /// Record the human's approval of `subject`'s brief, which `verifying →
 /// shipped` requires (0.16 D1): a change adopted into it whose
-/// `proposal.md` carries an `Approved:` line.
+/// `.canon/changes/<change>/brief.md` carries an `Approved:` line.
 fn approve_brief(repo: &Path, subject: &str) {
     let change = format!("c-{subject}");
     ok(repo, &["change", "new", &change, "--subject", subject, "--title", "The brief"]);
-    let proposal = repo.join("openspec/changes").join(&change).join("proposal.md");
-    let text = std::fs::read_to_string(&proposal).unwrap();
-    std::fs::write(proposal, format!("{text}\nApproved: Journey 2026-10-12 — \"승인\"\n")).unwrap();
+    let brief = repo.join(".canon/changes").join(&change).join("brief.md");
+    let text = std::fs::read_to_string(&brief).unwrap();
+    std::fs::write(brief, format!("{text}\nApproved: Journey 2026-10-12 — \"승인\"\n")).unwrap();
 }
 
 fn write(repo: &Path, path: &str, bytes: &[u8]) {

@@ -1,5 +1,5 @@
 {
-  "statusVersion": 2,
+  "statusVersion": 3,
   "canonVersion": "0.16.0",
   "policy": {
     "present": true,

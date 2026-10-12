@@ -5,10 +5,11 @@ Feature: authoring init
   @subject:authoring-scaffold
   @case:happy
   @authoring.init.01
-  Scenario: A fresh init writes the config, a starter policy, the AGENTS.md block and a plans home
+  Scenario: A fresh init writes the config, a starter policy, the AGENTS.md block and commented plans examples
     Given an empty directory
     When canon init runs in it
-    Then canon.yaml configures an openspec plans source rooted at the repo and openspec/changes exists with a keep file
+    Then canon.yaml's plans section configures no source and shows commented openspec and superpowers examples naming .canon/changes as canon's own changes dir
+    And no openspec directory is created
     And .canon/policy.yaml turns spec_coverage on with require_evidence, require_cases [failure] and require_review
     And the policy says a human approves it, and so does the init output
     And AGENTS.md holds the canon block naming the loop, canon status and the canon skill
@@ -93,7 +94,7 @@ Feature: authoring init
   Scenario: Plan import is clean on a fresh init
     Given a fresh canon init with other top-level directories present
     When canon ingest plans runs
-    Then it exits 0 with the openspec source parsed and zero malformed entries
+    Then it exits 0 with no source read and nothing imported
 
   # canon: {"schema":1,"at":"2026-10-10T15:51:40Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold

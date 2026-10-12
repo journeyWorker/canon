@@ -148,27 +148,39 @@ empty set; so is one whose `scenario` records route away from the
 gate's rung. Each refusal prints by failure class (`uncovered-cell`),
 exits 1, and the status stays `verifying`. `retired` is not gated.
 
-**The brief (0.16):** `verifying → shipped` also refuses where a brief
+**The brief (0.16, 0.17):** `verifying → shipped` also refuses where a brief
 exists and is not approved, read exactly as `canon status` reads it (one
 shared check, so status says `ship` only when this passes): the subject's
-newest adopted change has a `proposal.md` under the openspec plan sources,
-and it carries no `Approved:` line outside HTML comments and code fences.
-It runs with or without a policy. The refusal is an `unreviewed-promotion`
-naming the subject, and says what to do:
+newest adopted change has a canon `.canon/changes/<change>/brief.md`
+with no `Approved:` line outside HTML comments and code fences, or has no
+canon `brief.md` yet but comes from an external openspec plan with a
+`proposal.md` under the plan sources. It runs with or without a policy.
+The refusal is an `unreviewed-promotion` naming the subject, and says
+what to do:
 
 ```
-canon subject status: unreviewed-promotion demo-subject — verifying → shipped: brief not approved — openspec/changes/c-demo/proposal.md has no `Approved:` line; a human must answer the brief, and the agent records `Approved: <who> <when> — "<their words>"` there only from that answer
+canon subject status: unreviewed-promotion demo-subject — verifying → shipped: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words as `Approved: <who> <when> — "<their words>"` in .canon/changes/c-demo/brief.md
 canon subject status: refused — get the human's answer to the brief and record it as its `Approved:` line, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject
 ```
 
+For an external change with no canon brief yet, the reason reads
+``.canon/changes/<c>/brief.md does not exist yet: change `<c>` comes from
+the external plan <proposal>, which canon reads and never edits, so its
+approval lives in that canon file`` and the agent will ``create
+.canon/changes/<c>/brief.md holding a `Source: <proposal>` line and
+record their words there as `Approved: <who> <when> — "<their words>"` ``.
+
 Never write the line without the human's answer. When there is no brief to
-answer (no openspec plan source, no adopted change, or a change with no
-`proposal.md`), the move is not refused: it prints
-`canon subject status: advisory: <id>'s brief is not approved — <why>, so
-there is no brief to answer and shipping is not refused`, and status shows
-the brief as not approved, as an advisory. `subjects[].brief.enforced` in
-`canon status --json` says which case applies. A brief that says the human
-ships changes who runs the transition, not the check.
+answer (no adopted change, or a newest change with neither a canon
+`brief.md` nor an external `proposal.md`), the move is not refused: it
+prints ``canon subject status: advisory: <id>'s brief is not approved —
+its newest adopted change `<c>` has no brief (no
+.canon/changes/<c>/brief.md, no openspec proposal.md), so there is no
+brief to answer and shipping is not refused`` (or `— <id> adopts no
+change, so …`), and status shows the brief as not approved, as an
+advisory. `subjects[].brief.enforced` in `canon status --json` says
+which case applies. A brief that says the human ships changes who runs
+the transition, not the check.
 
 This refusal is a backstop, and so is the evidence one: shipping is not
 the first thing an unapproved brief stops. The agent writes the brief,
@@ -265,21 +277,33 @@ it.
 
 ### Starting a new change: `canon change new`
 
-For a change that does not exist yet, one command scaffolds it and
-records it adopted:
+For a change that does not exist yet, one command writes it and records
+it adopted:
 
 ```bash
 canon change new add-login --subject auth --title "Add login"
 ```
 
-- **Writes** `openspec/changes/<slug>/proposal.md` (the title is its
-  `## Why`, which imports as the change summary) and `tasks.md` (no rows
-  yet, so the change imports as `proposed`), under the repo's first
-  `openspec` plans source. `canon init` configures that source
-  (`{dialect: openspec, root: .}`), so `canon.yaml` needs no edit.
-- **Reads** the files with the same `openspec` adapter `canon ingest
+```
+canon change new: wrote .canon/changes/add-login/brief.md
+canon change new: wrote .canon/changes/add-login/tasks.md
+canon change new: recorded change `add-login` adopted into subject `auth` — written directly; nothing to promote
+```
+
+- **Writes** canon's own change dir, `.canon/changes/<slug>/`:
+  `brief.md` (`# <title>`, `## Why` holding the title, which imports as
+  the change summary, `## What Changes` with a comment saying what goes
+  there, and a comment naming where the human's `Approved:` line goes,
+  so the file starts unapproved) and `tasks.md` (no rows yet, so the
+  change imports as `proposed`; the openspec checkbox row grammar).
+  `.canon/changes/` is canon's native plan source: every plan reader
+  reads it with no `plans:` entry, so `canon.yaml` needs no edit and no
+  external plans source is needed (see `canon-plan-import`).
+- **Reads** the files with the native `canon` plan adapter `canon ingest
   plans` uses, then **records** the change already adopted, through the
-  same write as `canon subject adopt`.
+  same write as `canon subject adopt`. Its records carry the actor
+  `canon-plan-import-canon` (canon-written); an external openspec
+  change's carry `canon-plan-import-openspec`.
 - **What a failure leaves behind.** The files are staged under `.canon/`
   and the change dir is moved into place only once they parse. A failure
   before any record is written (staging, publishing the dir, or the
@@ -291,13 +315,22 @@ canon change new add-login --subject auth --title "Add login"
   plans && canon subject adopt <slug> --subject <id>`, which completes
   the link and is safe to rerun.
 - **Refuses** with exit `2`, writing nothing, when the subject does not
-  exist, when the slug already has a change dir (active or archived) or a
-  `change` record, or when `canon.yaml` has no `openspec` plans source.
+  exist, or when the slug already has a `.canon/changes/<slug>` dir
+  (active or under `.canon/changes/archive/`) or a `change` record.
 
 Add task rows to `tasks.md` as `- [ ] <n> <title>`, and flip each with
 `canon gate task <slug>#<n>` once evidence exists. `canon evidence add
 --task` and the flip read `tasks.md` as it is, so a new row needs no
 `canon ingest plans` run.
+
+A change from an external plan (an openspec change listed under
+`plans.sources`, imported by `canon ingest plans` and adopted with
+`canon subject adopt`) gets its brief as a canon file too:
+`.canon/changes/<change>/brief.md` holding a `Source: <path>` line that
+points at the external document and, once the human answers, the
+`Approved:` line. Canon never edits the external document. Such a
+pointer `brief.md` is not a change of its own: the native reader skips
+it, so the external source keeps the change, its summary and its tasks.
 
 ## Where are we: `canon status`
 
@@ -332,23 +365,33 @@ uses, so status and the gate cannot disagree about a gap:
   `require_review` on, a `warning:` line counts the in-effect reviews that
   predate review pinning (0.15), checked against the commit each pinned:
   current, stale (named) and undecidable.
-- **Brief** (0.16) — for each `building`, `verifying` or `shipped`
+- **Brief** (0.16, 0.17) — for each `building`, `verifying` or `shipped`
   subject, and each `proposed` subject whose newest adopted change has a
-  `proposal.md`, a `brief:` line under it says whether the brief is approved:
-  `brief: approved in <proposal.md> — <the recorded words>`, or
-  `brief: not approved (…)`. Approval is an `Approved:` line in the
-  `proposal.md` of the subject's newest adopted change (the last one
-  adopted): a line that starts with `Approved:` (indent allowed), says
+  brief (a canon `brief.md`, or an external `proposal.md`), a `brief:`
+  line under it says whether the brief is approved:
+  `brief: approved in <brief> — <the recorded words>`, or
+  `brief: not approved (…)`. Approval is an `Approved:` line in
+  `.canon/changes/<change>/brief.md` for the subject's newest adopted
+  change (the last one adopted; a live dir before an archived one), and
+  only there: a line that starts with `Approved:` (indent allowed), says
   something after it, and sits outside HTML comments (`<!-- … -->`,
   multi-line included) and fenced code blocks (```` ``` ```` or `~~~`),
   written by the agent once the human answers, as
   `Approved: <who> <when> — "<the human's words>"`. Fixes and follow-ups
   live as tasks in the approved change, so a newly adopted change is a
-  new scope: an older change's approval does not cover it. Status reads
-  the line from the change dir under the repo's `openspec` plans sources,
-  in config order (the first source holding the change owns it, a live
-  dir before an archived one; with no `plans:` section, the `openspec`
-  source rooted at the repo that `canon gate task` also falls back to).
+  new scope: an older change's approval does not cover it. A change from
+  an external plan has its brief in the same canon file, with a
+  `Source: <path>` line pointing at the external document; an `Approved:`
+  line inside an external `proposal.md` is not read. Before that canon
+  file exists, an external openspec `proposal.md` under the plan sources
+  (the first source holding the change; with no `plans:` section, the
+  `openspec` source rooted at the repo that `canon gate task` also falls
+  back to) still makes the brief one to answer, and the line reads
+  ``brief: not approved (.canon/changes/<c>/brief.md does not exist yet:
+  change `<c>` comes from the external plan <proposal>, which canon reads
+  and never edits, so its approval lives in that canon file)``. With a
+  canon brief and no line it reads
+  ``brief: not approved (<brief> has no `Approved:` line)``.
   There is no record kind for it; the file is the record.
 - **Unowned** — scenarios with no `@subject:` tag.
 - **Audits** — how many scenarios are sampled for
@@ -372,7 +415,7 @@ uses, so status and the gate cannot disagree about a gap:
   itself first, so this means the refresh refused on a format violation
   or a duplicate id, which the sync names). Then per subject, verifying
   first, then building, specced, proposed, shipped: an unapproved brief
-  (building and later, and proposed once its change has a `proposal.md`)
+  (building and later, and proposed once its change has a brief)
   → the human step below, which is then the subject's
   only step; no scenario → `canon scenario new … --subject <id>` (and, when no
   `.feature` file holds a scenario yet, `canon feature new` first, unless
@@ -389,12 +432,20 @@ uses, so status and the gate cannot disagree about a gap:
   carries `--project`: the owning root for a missing case, `<root-id>`
   (the reason lists the roots) for a subject that owns no scenario yet.
 - **The one human step.** Every step is the agent's to run except one:
-  a subject whose brief is enforced (its newest change has a
-  `proposal.md` with no `Approved:` line) gets
-  `human: stop and report the brief in <proposal.md>; build and attest nothing for <id> until the human answers (one answer approves brief and policy)`,
-  whose reason names that `proposal.md`, says `canon evidence add`
-  refuses the subject's scenarios and tasks until the line is recorded,
-  and names `canon policy approve --by <the human> --note "<their words>"`.
+  a subject whose brief is enforced (its newest change's canon
+  `brief.md` has no `Approved:` line, or it has no canon `brief.md` yet
+  and comes from an external openspec `proposal.md`) gets
+  `human: stop and report the brief in <brief>; build and attest nothing for <id> until the human answers (one answer approves brief and policy)`,
+  where `<brief>` is the canon `brief.md`, or the external `proposal.md`
+  when no canon brief exists yet. Its reason reads ``<id>: <why
+  unanswered> (an older change's approval does not cover a new scope),
+  and the approval is never assumed: `canon evidence add` refuses <id>'s
+  scenarios and tasks until it is recorded; once the human answers,
+  <record> and run `canon policy approve --by <the human> --note "<their
+  words>"` ``, where `<record>` is ``record their words as `Approved: <who>
+  <when> — "<their words>"` in <brief>``, or, for an external change,
+  ``create <brief> holding a `Source: <proposal>` line and record their
+  words there as `Approved: <who> <when> — "<their words>"` ``.
   It is the subject's only step, whatever its status: nothing suggests
   `canon feature new`, `canon scenario new`, `canon evidence add`, a
   review or a move-on for it before the human answers, and
@@ -402,9 +453,9 @@ uses, so status and the gate cannot disagree about a gap:
   approval is never assumed. A subject with no brief to answer gets no human step;
   its `brief:` line says
   `not approved (no adopted change; advisory, nothing to approve yet)` or
-  ``not approved (change `<id>` has no proposal.md; advisory, nothing to
+  ``not approved (change `<id>` has no brief; advisory, nothing to
   approve yet)`` and nothing is withheld (a `proposed` subject with no
-  `proposal.md`, and a `specced` subject, show no `brief:` line at all). Once nothing blocks, a
+  brief, and a `specced` subject, show no `brief:` line at all). Once nothing blocks, a
   ship-ready verifying subject gets the agent's own
   `canon subject status <id> shipped`; status never asks a human to ship.
 
@@ -424,21 +475,21 @@ Status fails closed rather than suggest progress the gate would refuse:
 
 ```json
 {
-  "statusVersion": 2,
-  "canonVersion": "0.16.0",
+  "statusVersion": 3,
+  "canonVersion": "0.17.0",
   "policy": { "present": true, "spec_coverage": { "require_evidence": true, "scope": [], "exclude_lanes": [], "require_cases": ["failure"], "require_review": { "scope": ["verifying", "shipped"], "distinct_actor": true, "block_on_findings": true } } },
   "warnings": [],
   "subjects": [
     { "id": "cart", "title": "Cart", "status": "building", "scenarios": 2, "excluded": 0, "evidenced": 2, "divergent": 0,
       "reviewed": 1, "staleReviews": 0, "unsignedReviews": 0, "reviewDue": true, "openBlockers": 1, "missingCases": [],
-      "brief": { "approved": true, "enforced": false, "change": "c-cart", "proposal": "openspec/changes/c-cart/proposal.md", "approval": "Journey 2026-10-11 — \"approved\"" } },
+      "brief": { "approved": true, "enforced": false, "change": "c-cart", "brief": ".canon/changes/c-cart/brief.md", "briefExists": true, "approval": "Journey 2026-10-11 — \"approved\"" } },
     { "id": "promo", "title": "Promo", "status": "verifying", "scenarios": 1, "excluded": 0, "evidenced": 1, "divergent": 0,
       "reviewed": 1, "staleReviews": 0, "unsignedReviews": 0, "reviewDue": true, "openBlockers": 0, "missingCases": [],
-      "brief": { "approved": false, "enforced": true, "change": "c-promo", "proposal": "openspec/changes/c-promo/proposal.md" } }
+      "brief": { "approved": false, "enforced": true, "change": "c-promo", "brief": ".canon/changes/c-promo/brief.md", "briefExists": false, "source": "openspec/changes/c-promo/proposal.md" } }
   ],
   "unowned": ["cart.promo.01"],
   "next": [
-    { "command": "stop and report the brief in openspec/changes/c-promo/proposal.md; build and attest nothing for promo until the human answers (one answer approves brief and policy)", "why": "promo: its newest adopted change's proposal.md carries no `Approved:` line …", "actor": "human" },
+    { "command": "stop and report the brief in openspec/changes/c-promo/proposal.md; build and attest nothing for promo until the human answers (one answer approves brief and policy)", "why": "promo: .canon/changes/c-promo/brief.md does not exist yet: change `c-promo` comes from the external plan openspec/changes/c-promo/proposal.md, which canon reads and never edits, so its approval lives in that canon file (an older change's approval does not cover a new scope), and the approval is never assumed: … once the human answers, create .canon/changes/c-promo/brief.md holding a `Source: openspec/changes/c-promo/proposal.md` line and record their words there as `Approved: <who> <when> — \"<their words>\"` and run `canon policy approve --by <the human> --note \"<their words>\"`", "actor": "human" },
     { "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>", "why": "cart: 1 open blocker finding(s) (first: …); fix it, commit, then close it", "actor": "agent" },
     { "command": "canon review add --project-id root --scenario-id cart.add.02 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"", "why": "cart: 1 of 2 scenario(s) lack a qualifying review; …", "actor": "agent" },
     { "command": "canon status", "why": "1 scenario(s) carry no @subject tag (first: cart.promo.01); add `@subject:<id>` above each in its .feature file, then check again: …", "actor": "agent" }
@@ -451,21 +502,29 @@ Each `missingCases` entry is `{ "projectId", "surface", "case" }`: the
 spec root, the `<area>.<surface>`, and the required case it lacks.
 
 `brief` is present for `building`, `verifying` and `shipped` subjects,
-and for a `proposed` subject whose newest adopted change has a
-`proposal.md`. `change` is the newest adopted change (omitted when the
-subject adopts none), `proposal` its `proposal.md` (omitted when no
-`openspec` source holds one), `approval` the text after `Approved:`, and
-`enforced` whether the missing approval blocks (a `proposal.md` exists to
-carry it).
+and for a `proposed` subject whose newest adopted change has a brief (a
+canon `brief.md` or an external `proposal.md`). `change` is the newest
+adopted change (omitted when the subject adopts none); `brief` its canon
+`.canon/changes/<change>/brief.md`, the one file the approval is read
+from (omitted when the change has no brief to answer); `briefExists`
+(always present) whether that file exists (`false` for an external
+change whose canon brief is still to be created); `source` the external
+plan document the change comes from (the canon brief's `Source:` line,
+or, before that file exists, the external `proposal.md`; omitted for a
+canon-written change); `approval` the text after `Approved:`; and
+`enforced` whether the missing approval blocks (a brief exists to
+answer). The 0.16 `proposal` field is gone.
 
 Each `next` entry's `actor` is `agent` (its `command` is a canon command
 line) or `human` (its `command` says what to get from the human).
 
 `policy.spec_coverage` has the shape `canon context --json` prints
 (`null` when absent, `{"invalid": …}` when unusable). `statusVersion`
-changes only when a field changes meaning or is removed. It is `2`
-since 0.16, when `next[].command` stopped always being a command line
-(`actor` tells which); `brief` was added alongside.
+changes only when a field changes meaning or is removed. It became `2`
+in 0.16, when `next[].command` stopped always being a command line
+(`actor` tells which), and `brief` was added alongside. It is `3` since
+0.17, when `brief.proposal` was removed: the canon `brief.md` is
+`brief.brief`, with `briefExists` and `source`.
 
 `subject new`, `adopt` and `status` write their records directly; the
 human-readable success line ends `— written directly; nothing to

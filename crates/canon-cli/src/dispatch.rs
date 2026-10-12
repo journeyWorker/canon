@@ -103,7 +103,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use canon_ingest::{find_plan_adapter, PlanSourceConfig};
+use canon_ingest::PlanSourceConfig;
 use canon_learn::guidance::retrieve_guidance;
 use canon_learn::{LearnConfig, ParquetStrategyStore};
 use canon_model::envelope::{Actor, Envelope, RecordKind};
@@ -171,7 +171,7 @@ pub enum DispatchError {
     /// collapsing them would send the caller hunting for a typo in a
     /// repo that has no plan sources to typo against.
     #[error(
-        "--task `{task_id}` cannot be resolved: this repo configures no plan sources (canon.yaml has no `plans.sources` entries), so no plan corpus exists for a task id to live in — configure `plans:`, or dispatch without --task"
+        "--task `{task_id}` cannot be resolved: this repo configures no plan sources (no `.canon/changes` and no `plans.sources` entries in canon.yaml), so no plan corpus exists for a task id to live in — write the change with `canon change new`, list your external plans under `plans.sources`, or dispatch without --task"
     )]
     NoPlanSources { task_id: String },
 
@@ -630,7 +630,7 @@ pub(crate) fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(),
         // dialect before returning, so this lookup cannot miss — the
         // same reasoning (and the same `expect`) `crate::plans`' own
         // scan loop already states.
-        let entry = find_plan_adapter(src.dialect()).expect("dialect validated by load_plan_sources_from_config");
+        let entry = src.entry().expect("dialect validated by load_plan_sources_from_config");
         // An unresolvable source (only possible for an unconfigured
         // root, which `load_plan_sources_from_config` cannot produce)
         // contributes no candidates AND claims no `change_id`, exactly
@@ -2606,7 +2606,7 @@ mod begin_tests {
     /// `PlanAdapter::parse` set, so a test can tell "the row is not
     /// there" apart from "the row is there and D8 disowns it".
     fn parsed_task_ids(root: &Path) -> Vec<TaskId> {
-        let entry = find_plan_adapter("openspec").expect("the openspec dialect is registered");
+        let entry = canon_ingest::find_plan_adapter("openspec").expect("the openspec dialect is registered");
         let handle =
             entry.adapter.resolve_source(&PlanSourceConfig { root: Some(root.to_path_buf()) }).expect("a configured root resolves");
         entry.adapter.parse(&handle).tasks.into_iter().map(|task| task.task_id).collect()

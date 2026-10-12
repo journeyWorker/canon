@@ -69,9 +69,11 @@ canon gate check: clean (0 violations)
    ```
 
    바로 동작하는 `canon.yaml` 스켈레톤을 씁니다 — 스토리지
-   `tiers:`, 레코드 `routing:`, `specs:` root, 그리고 `plans:` 소스
-   (레포 루트를 가리키는 `openspec` 소스와 빈 `openspec/changes/`)까지.
-   함께 쓰는 파일은 둘입니다:
+   `tiers:`, 레코드 `routing:`, `specs:` root, 그리고 `sources: []`인
+   `plans:` 섹션까지. canon 자체의 change는 `.canon/changes/`에 있어 여기에
+   항목이 필요 없고, 주석은 직접 준비한 외부 plan을 나열하는 법을 보여
+   줍니다(주석 처리된 `openspec`, `superpowers` 예시). canon은 외부 plan을
+   읽기만 합니다. 함께 쓰는 파일은 둘입니다:
 
    - **`.canon/policy.yaml`**: `spec_coverage`를 켜는 시작 정책입니다.
      모든 시나리오에 evidence가, 모든 feature surface에 `@case:failure`
@@ -113,11 +115,15 @@ canon gate check: clean (0 violations)
    bunx @journeykit/canon change new add-login --subject auth --title "Add login"
    ```
 
-   brief는 change의 `proposal.md`에 씁니다. 사람이 승인하면 에이전트가
-   그 파일에 `Approved: <who> <when> — "<their words>"` 줄을 더합니다.
-   `canon status`는 서브젝트가 가장 최근에 adopt한 change에서 이 줄을
-   읽어 brief 승인 여부를 보여 주고, 줄이 없을 때만 사람에게 요청하라고
-   안내합니다. 수정과 후속 작업은 그 change의 `tasks.md`에 task로
+   `change new`는 `.canon/changes/add-login/brief.md`와 `tasks.md`를 쓰고
+   change를 subject에 adopt합니다. brief는 그 `brief.md`에 씁니다. 사람이
+   승인하면 에이전트가 그 파일에 `Approved: <who> <when> — "<their words>"`
+   줄을 더합니다. `canon status`는 서브젝트가 가장 최근에 adopt한 change에서
+   이 줄을 읽어 brief 승인 여부를 보여 주고, 줄이 없을 때만 사람에게
+   요청하라고 안내합니다. 외부 plan(`plans.sources`에 나열한 openspec
+   `proposal.md`)에서 온 change도 `.canon/changes/<change>/brief.md`에 brief를
+   두며, 그 파일의 `Source: <path>` 줄이 plan을 가리킵니다. canon은 plan을
+   고치지 않습니다. 수정과 후속 작업은 그 change의 `tasks.md`에 task로
    넣습니다. 새 `canon change new`는 새 범위이므로 사람의 승인이
    필요합니다.
 

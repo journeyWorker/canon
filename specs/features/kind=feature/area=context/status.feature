@@ -176,11 +176,11 @@ Feature: context status
   @subject:context-capability
   @case:happy
   @context.status.60
-  Scenario: Status reads a subject's brief approval from its newest change's proposal.md
-    Given a building subject adopting two changes, the newer of whose proposal.md has a line starting "Approved:" with the human's words
+  Scenario: Status reads a subject's brief approval from its newest change's canon brief.md
+    Given a building subject adopting two changes, the newer of whose brief.md has a line starting "Approved:" with the human's words
     And a shipped subject with an approved brief and a specced subject
     When canon status runs
-    Then the building and shipped subjects each show their brief as approved, naming the newest change, its proposal.md and the recorded words, in --json and the human form
+    Then the building and shipped subjects each show their brief as approved, naming the newest change, its brief.md and the recorded words, in --json and the human form
     And the specced subject carries no brief field
     And no step is addressed to a human
 
@@ -189,11 +189,11 @@ Feature: context status
   @case:failure
   @context.status.61
   Scenario: An unapproved brief is the only human step and withholds the move-on
-    Given a verifying subject whose scenarios are all evidenced and reviewed, and whose newest change's proposal.md has no "Approved:" line
+    Given a verifying subject whose scenarios are all evidenced and reviewed, and whose newest change's brief.md has no "Approved:" line
     And a building subject that adopts no change
     When canon status runs
     Then the verifying subject gets one step whose actor is human: stop and report the brief, building and attesting nothing for the subject until the human answers, one answer covering brief and policy
-    And its reason names the proposal.md the "Approved:" line goes in, says canon evidence add refuses the subject's scenarios and tasks until then, and names the canon policy approve --by <the human> --note command
+    And its reason names the brief.md the "Approved:" line goes in, says canon evidence add refuses the subject's scenarios and tasks until then, and names the canon policy approve --by <the human> --note command
     And the human step is the verifying subject's only step, so it is not suggested to move on
     And the subject with no change has no brief to answer, so it gets no human step and its next step is the agent's
     And the human form prints the step as "human:" and both briefs as not approved, the one with no change as an advisory
@@ -203,7 +203,7 @@ Feature: context status
   @case:edge
   @context.status.62
   Scenario: With the brief approved and the guard passing, shipping is the agent's own step
-    Given a verifying subject whose scenarios are all evidenced and reviewed, and whose change's proposal.md carries an "Approved:" line
+    Given a verifying subject whose scenarios are all evidenced and reviewed, and whose change's brief.md carries an "Approved:" line
     When canon status runs
     Then the only step is the agent's canon subject status <id> shipped command
     And its reason says to ship it yourself unless the brief says the human ships, and asks nobody
@@ -214,7 +214,7 @@ Feature: context status
   @case:failure
   @context.status.63
   Scenario: An approval that is only mentioned, commented out or quoted in code does not approve the brief
-    Given building subjects whose change's proposal.md holds an empty "Approved:" line, "Approved:" mid-line, an "Approved:" line in a one-line or multi-line HTML comment, or one inside a backtick, tilde, nested or unclosed code fence
+    Given building subjects whose change's brief.md holds an empty "Approved:" line, "Approved:" mid-line, an "Approved:" line in a one-line or multi-line HTML comment, or one inside a backtick, tilde, nested or unclosed code fence
     And control subjects whose "Approved:" line follows a comment or fence that has closed
     When canon status runs
     Then each of the first reads as not approved and gets the human step to get the brief approved
@@ -224,24 +224,27 @@ Feature: context status
   @subject:context-capability
   @case:edge
   @context.status.64
-  Scenario: Status reads briefs under the configured openspec plan sources
+  Scenario: An external change is answered in a canon brief that points at it
     Given canon.yaml configures a superpowers source, then an openspec source rooted at a changes dir, then a second openspec source
-    And a change exists in both openspec sources, approved only in the second, and an archived change is approved in the first
+    And a building subject's change exists in both openspec sources with an "Approved:" line in each proposal.md and no canon brief
+    And a shipped subject's archived external change has a canon brief.md holding a "Source:" line that points at it and the "Approved:" line
     When canon status runs
-    Then the first openspec source holding a change owns its brief, so the change reads as not approved
-    And the archived change's approval is read
-    And with plans.sources empty no proposal.md is found, so the brief reads as not approved
+    Then the building subject's brief is enforced and not approved: the proposal's own "Approved:" line is not read
+    And its human step reports the brief in the first openspec source's proposal.md and says to create .canon/changes/<change>/brief.md with a "Source:" line naming it and record the approval there
+    And the shipped subject's brief reads as approved from its canon brief.md, naming its source
+    And no external proposal.md is edited
+    And with plans.sources empty the building subject's change has no brief to answer, while the shipped subject's canon brief still approves
 
   # canon: {"schema":1,"at":"2026-10-11T15:16:45Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:context-capability
   @case:failure
   @context.status.65
   Scenario: An older change's approval does not cover a newer adopted change
-    Given a ship-ready verifying subject whose older change is approved and whose newer adopted change's proposal.md has no "Approved:" line
-    And a building subject whose older change is approved and whose newer change has no proposal.md
+    Given a ship-ready verifying subject whose older change is approved and whose newer adopted change's brief.md has no "Approved:" line
+    And a building subject whose older change is approved and whose newer change has no brief
     When canon status runs
     Then each brief reads as not approved and names the newest change
-    And the verifying subject gets the human step naming the newest change's proposal.md, and is not suggested to ship
+    And the verifying subject gets the human step naming the newest change's brief.md, and is not suggested to ship
     And the building subject's newest change has no brief to answer, so it gets no human step and its brief line is an advisory
 
   # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
@@ -261,19 +264,19 @@ Feature: context status
   @case:failure
   @context.status.66
   Scenario: A proposed subject whose brief is unapproved shows the brief and asks only the human
-    Given a proposed subject owning no scenario, whose newest adopted change has a proposal.md with no "Approved:" line, in a repo whose .feature files hold no scenario
+    Given a proposed subject owning no scenario, whose newest adopted change has a brief.md with no "Approved:" line, in a repo whose .feature files hold no scenario
     When canon status runs
-    Then the subject shows its brief as not approved, naming that proposal.md, in --json and the human form
+    Then the subject shows its brief as not approved, naming that brief.md, in --json and the human form
     And its only next step is the human's: get the brief approved, one human answer covering brief and policy
     And no step starts the work: neither canon feature new nor canon scenario new is suggested
-    And once the proposal.md carries an "Approved:" line the brief reads as approved and the feature and scenario steps come back
+    And once the brief.md carries an "Approved:" line the brief reads as approved and the feature and scenario steps come back
 
   # canon: {"schema":1,"at":"2026-10-12T03:41:10Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
   @case:edge
   @context.status.67
   Scenario: A proposed subject with no brief to answer keeps its steps, and showing a brief adds no transition check
-    Given a proposed subject that adopts no change, and a proposed subject whose newest adopted change has no proposal.md
+    Given a proposed subject that adopts no change, and a proposed subject whose newest adopted change has no brief
     When canon status runs
     Then neither carries a brief field or a brief line, and neither gets a human step
     And each still gets its canon scenario new step, after one canon feature new step

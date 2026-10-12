@@ -100,13 +100,13 @@ fn seed_scenario_verdict(repo: &Path, scenario: &str, verdict: EvidenceVerdict) 
 /// The approval line the agent records once the human answers (0.16 D1).
 const APPROVED: &str = "Approved: Journey 2026-10-12 — \"승인. 네 가정대로 진행\"";
 
-/// Write `change`'s brief as `openspec/changes/<change>/proposal.md`,
-/// under the openspec plan source an absent `plans:` section defaults
-/// to.
-fn write_proposal(repo: &Path, change: &str, body: &str) {
-    let dir = repo.join("openspec/changes").join(change);
+/// Write `change`'s brief as canon's own
+/// `.canon/changes/<change>/brief.md` (0.17 D3), the one file the
+/// approval is read from.
+fn write_brief(repo: &Path, change: &str, body: &str) {
+    let dir = repo.join(".canon/changes").join(change);
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("proposal.md"), format!("## Why\n\nSeeded brief.\n\n{body}")).unwrap();
+    std::fs::write(dir.join("brief.md"), format!("## Why\n\nSeeded brief.\n\n{body}")).unwrap();
 }
 
 fn query_subjects(repo: &Path, extra: &[&str]) -> Value {
@@ -329,7 +329,7 @@ fn shipped_is_allowed_with_a_faithful_verdict_for_every_linked_scenario() {
     let dir = repo();
     seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"], &["c-demo"]);
     seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
-    write_proposal(dir.path(), "c-demo", &format!("{APPROVED}\n"));
+    write_brief(dir.path(), "c-demo", &format!("{APPROVED}\n"));
 
     let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
@@ -347,7 +347,7 @@ fn shipped_is_blocked_until_each_owned_surface_specifies_a_required_case() {
     std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
     std::fs::write(dir.path().join(".canon/policy.yaml"), "spec_coverage:\n  require_evidence: true\n  require_cases: [failure]\n").unwrap();
     seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"], &["c-demo"]);
-    write_proposal(dir.path(), "c-demo", &format!("{APPROVED}\n"));
+    write_brief(dir.path(), "c-demo", &format!("{APPROVED}\n"));
     seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
 
     let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
@@ -980,14 +980,14 @@ fn an_undecidable_pre_015_review_still_qualifies_and_every_surface_prints_the_ad
 /// A `verifying` subject past every technical gate: `world.demo.01`
 /// evidenced by `impl-agent`, reviewed by `reviewer-2`, no blocker, the
 /// review guard satisfied, and adopted change `c-demo` holding `brief`
-/// as its proposal.md.
+/// as its brief.md.
 fn seed_technically_ship_ready(repo: &Path, brief: &str) {
     write_policy(repo, REQUIRE_REVIEW);
     seed_attested_subject(repo);
     seed_review(repo, "reviewer-2", "reviewer-2");
     let out = run(repo, &["subject", "status", "demo-subject", "verifying"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
-    write_proposal(repo, "c-demo", brief);
+    write_brief(repo, "c-demo", brief);
 }
 
 /// The brief as `canon status --json` reports it for `demo-subject`.
@@ -998,11 +998,11 @@ fn status_brief(repo: &Path) -> Value {
     report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo-subject").unwrap()["brief"].clone()
 }
 
-const BRIEF_REFUSAL: &str = "canon subject status: unreviewed-promotion demo-subject — verifying → shipped: brief not approved — openspec/changes/c-demo/proposal.md has no `Approved:` line; a human must answer the brief, and the agent records `Approved: <who> <when> — \"<their words>\"` there only from that answer\n";
+const BRIEF_REFUSAL: &str = "canon subject status: unreviewed-promotion demo-subject — verifying → shipped: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words as `Approved: <who> <when> — \"<their words>\"` in .canon/changes/c-demo/brief.md\n";
 
 /// subject.lifecycle.24: with every technical gate passing, a brief
 /// with no `Approved:` line refuses `verifying → shipped`, naming the
-/// proposal.md and saying a human must answer; status reads the same
+/// brief.md and saying a human must answer; status reads the same
 /// brief as not approved; recording the line lets the same move ship.
 #[test]
 fn subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line() {
@@ -1023,10 +1023,10 @@ fn subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line
     assert_eq!(current_subject(dir.path())["status"], "verifying", "a refusal leaves the record unchanged");
     assert_eq!(
         status_brief(dir.path()),
-        serde_json::json!({"approved": false, "enforced": true, "change": "c-demo", "proposal": "openspec/changes/c-demo/proposal.md"})
+        serde_json::json!({"approved": false, "enforced": true, "change": "c-demo", "brief": ".canon/changes/c-demo/brief.md", "briefExists": true})
     );
 
-    write_proposal(dir.path(), "c-demo", &format!("Status: approved.\n\n{APPROVED}\n"));
+    write_brief(dir.path(), "c-demo", &format!("Status: approved.\n\n{APPROVED}\n"));
     let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let subject = current_subject(dir.path());
@@ -1036,7 +1036,7 @@ fn subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line
 
 /// subject.lifecycle.25: an `Approved:` line that sits only inside an
 /// HTML comment or a fenced code block does not approve; the guard
-/// refuses naming the proposal.md, and status agrees.
+/// refuses naming the brief.md, and status agrees.
 #[test]
 fn subject_lifecycle_25_an_approved_line_in_a_comment_or_fence_does_not_ship() {
     for (case, body) in [
@@ -1092,7 +1092,7 @@ fn subject_lifecycle_27_a_subject_with_no_adopted_change_ships_with_an_advisory(
     let dir = repo();
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
     seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
-    assert_eq!(status_brief(dir.path()), serde_json::json!({"approved": false, "enforced": false}));
+    assert_eq!(status_brief(dir.path()), serde_json::json!({"approved": false, "enforced": false, "briefExists": false}));
     let status = run(dir.path(), &["status"]);
     assert!(!stdout(&status).contains("human:"), "nothing to answer, so no human step: {}", stdout(&status));
     assert!(stdout(&status).contains("      brief: not approved (no adopted change; advisory, nothing to approve yet)\n"), "{}", stdout(&status));
@@ -1130,13 +1130,12 @@ fn evidence_files(repo: &Path) -> Vec<std::path::PathBuf> {
 }
 
 /// A `building` subject owning `world.demo.01` and adopting `c-demo`,
-/// whose proposal.md is `brief` and whose tasks.md holds task `1.1`,
-/// under an explicit openspec plan source (task evidence needs one).
+/// whose brief.md is `brief` and whose tasks.md holds task `1.1`, both
+/// in canon's own `.canon/changes/c-demo/`, read with no `plans:` entry.
 fn seed_briefed_subject(repo: &Path, brief: &str) {
-    std::fs::write(repo.join("canon.yaml"), format!("{CANON_YAML}plans:\n  sources:\n    - dialect: openspec\n      root: .\n")).unwrap();
     seed_subject_with_changes(repo, "demo-subject", SubjectStatus::Building, &["world.demo.01"], &["c-demo"]);
-    write_proposal(repo, "c-demo", brief);
-    std::fs::write(repo.join("openspec/changes/c-demo/tasks.md"), "## 1. Build\n\n- [ ] 1.1 Build the demo\n").unwrap();
+    write_brief(repo, "c-demo", brief);
+    std::fs::write(repo.join(".canon/changes/c-demo/tasks.md"), "## 1. Build\n\n- [ ] 1.1 Build the demo\n").unwrap();
 }
 
 /// `canon evidence add` for `world.demo.01` (and `extra`), promoted.
@@ -1156,18 +1155,18 @@ fn attest_task(repo: &Path, extra: &[&str]) -> Output {
     run(repo, &args)
 }
 
-const EVIDENCE_REFUSAL: &str = "canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — \"<their words>\"` in that proposal.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record\n";
+const EVIDENCE_REFUSAL: &str = "canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — \"<their words>\"` in that brief.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record\n";
 
 /// The violation line `canon evidence add` prints for `demo-subject`'s
 /// unapproved brief, attesting `what`.
 fn evidence_brief_line(what: &str) -> String {
-    format!("canon evidence add: unreviewed-promotion demo-subject — evidence for {what}: brief not approved — openspec/changes/c-demo/proposal.md has no `Approved:` line, so the human has not answered it\n")
+    format!("canon evidence add: unreviewed-promotion demo-subject — evidence for {what}: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words as `Approved: <who> <when> — \"<their words>\"` in .canon/changes/c-demo/brief.md\n")
 }
 
 /// evidence.add.68: while the subject's brief is enforced and not
 /// approved, `canon evidence add` refuses with exit 1 and stages nothing,
 /// for the scenario (through its `@subject` owner) and for the task
-/// (through the subject adopting its change), naming the proposal.md and
+/// (through the subject adopting its change), naming the brief.md and
 /// saying to stop, report the brief and wait for the human's answer.
 /// `review add` and `finding add` are not refused.
 #[test]
@@ -1196,18 +1195,18 @@ fn evidence_add_68_an_unapproved_brief_refuses_the_attestation_and_stages_nothin
 }
 
 /// evidence.add.69: a subject with no brief to answer (no adopted change,
-/// or a newest change with no proposal.md) and a scenario no subject
+/// or a newest change with no brief) and a scenario no subject
 /// owns are attested as before: no refusal, no override, no warning.
 #[test]
 fn evidence_add_69_no_refusal_when_the_brief_is_not_enforced() {
-    for case in ["no-change", "no-proposal", "unowned"] {
+    for case in ["no-change", "no-brief", "unowned"] {
         let dir = repo();
         match case {
             "no-change" => seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &["world.demo.01"]),
-            "no-proposal" => seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Building, &["world.demo.01"], &["c-demo"]),
+            "no-brief" => seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Building, &["world.demo.01"], &["c-demo"]),
             _ => {
                 seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Building, &[], &["c-demo"]);
-                write_proposal(dir.path(), "c-demo", "Status: draft, awaiting the human.\n");
+                write_brief(dir.path(), "c-demo", "Status: draft, awaiting the human.\n");
                 let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
                 let scenario = Scenario::new(envelope, ProjectId::parse("demo").unwrap(), ScenarioId::parse("world.demo.01").unwrap(), "seeded", "", SpecDigest::of(b"x"));
                 ledger(dir.path()).write(&scenario).unwrap();
@@ -1260,7 +1259,7 @@ fn evidence_add_70_an_override_attests_anyway_and_records_the_waiver() {
     let gate = stdout(&run(dir.path(), &["gate", "check"]));
     assert!(gate.contains("brief overrides: 1 evidence record(s) attested before their brief was approved — not failing the gate:\n") && gate.contains(&format!("  {listed}")), "{gate}");
 
-    write_proposal(dir.path(), "c-demo", &format!("{APPROVED}\n"));
+    write_brief(dir.path(), "c-demo", &format!("{APPROVED}\n"));
     let out = attest_scenario(dir.path(), &["--override-reason", "habit"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation\n"), "{}", stderr(&out));
@@ -1278,7 +1277,7 @@ fn evidence_add_71_the_approval_lifts_the_refusal() {
     assert_eq!(attest_scenario(dir.path(), &[]).status.code(), Some(1));
     assert_eq!(attest_task(dir.path(), &[]).status.code(), Some(1));
 
-    write_proposal(dir.path(), "c-demo", &format!("Status: approved.\n\n{APPROVED}\n"));
+    write_brief(dir.path(), "c-demo", &format!("Status: approved.\n\n{APPROVED}\n"));
     for out in [attest_scenario(dir.path(), &[]), attest_task(dir.path(), &[])] {
         assert!(out.status.success(), "stderr: {}", stderr(&out));
         assert!(!stderr(&out).contains("brief"), "{}", stderr(&out));
@@ -1286,4 +1285,108 @@ fn evidence_add_71_the_approval_lifts_the_refusal() {
     let records: Vec<Value> = evidence_files(dir.path()).iter().map(|p| serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap()).collect();
     assert_eq!(records.len(), 2);
     assert!(records.iter().all(|r| r.get("brief_override").is_none()), "{records:?}");
+}
+
+// ── a change from an external plan is answered in a canon brief (0.17 D3) ──
+
+/// The external openspec proposal of `change`, holding a 0.16-style
+/// `Approved:` line that is never read, under an explicit openspec plan
+/// source at the repo root.
+fn write_external_proposal(repo: &Path, change: &str) -> std::path::PathBuf {
+    std::fs::write(repo.join("canon.yaml"), format!("{CANON_YAML}plans:\n  sources:\n    - dialect: openspec\n      root: .\n")).unwrap();
+    let dir = repo.join("openspec/changes").join(change);
+    std::fs::create_dir_all(&dir).unwrap();
+    let proposal = dir.join("proposal.md");
+    std::fs::write(&proposal, format!("## Why\n\nA human's plan.\n\n{APPROVED}\n")).unwrap();
+    proposal
+}
+
+/// The canon brief a change from an external plan is answered in: a
+/// `Source:` pointer to the plan and, from the human's answer, the
+/// approval.
+fn write_pointer_brief(repo: &Path, change: &str) {
+    write_brief(repo, change, &format!("Source: openspec/changes/{change}/proposal.md\n\n{APPROVED}\n"));
+}
+
+/// What the refusals ask for when `c-ext`'s canon brief does not exist.
+const EXTERNAL_UNANSWERED: &str = ".canon/changes/c-ext/brief.md does not exist yet: change `c-ext` comes from the external plan openspec/changes/c-ext/proposal.md, which canon reads and never edits, so its approval lives in that canon file";
+const EXTERNAL_RECORD: &str = "create .canon/changes/c-ext/brief.md holding a `Source: openspec/changes/c-ext/proposal.md` line and record their words there as `Approved: <who> <when> — \"<their words>\"`";
+
+/// evidence.add.72: a subject adopting a change from an external openspec
+/// plan with no canon brief has a brief to answer. `canon evidence add`
+/// refuses its scenario and its task, naming the canon `brief.md` to
+/// create with its `Source:` pointer; the `Approved:` line inside the
+/// external proposal is not read. Once the canon brief records the
+/// approval both attest, the external proposal is never edited, and
+/// `canon gate task` still flips the external task row (0.17 D4).
+#[test]
+fn evidence_add_72_an_external_change_is_answered_in_a_canon_brief_and_its_rows_still_flip() {
+    let dir = repo();
+    seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Building, &["world.demo.01"], &["c-ext"]);
+    let proposal = write_external_proposal(dir.path(), "c-ext");
+    let tasks = dir.path().join("openspec/changes/c-ext/tasks.md");
+    std::fs::write(&tasks, "## 1. Build\n\n- [ ] 1.1 Build the demo\n").unwrap();
+    let proposal_before = std::fs::read(&proposal).unwrap();
+    let attest_ext_task = |repo: &Path| {
+        run(repo, &["evidence", "add", "--task", "c-ext#1.1", "--kind", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl-agent", "--promote"])
+    };
+
+    for (what, out) in [("world.demo.01", attest_scenario(dir.path(), &[])), ("c-ext#1.1", attest_ext_task(dir.path()))] {
+        assert_eq!(out.status.code(), Some(1), "{what}: stderr: {}", stderr(&out));
+        assert_eq!(
+            stderr(&out),
+            format!(
+                "canon evidence add: unreviewed-promotion demo-subject — evidence for {what}: brief not approved — {EXTERNAL_UNANSWERED}, so the human has not answered it; once they do, {EXTERNAL_RECORD}\n{EVIDENCE_REFUSAL}"
+            )
+        );
+    }
+    assert!(evidence_files(dir.path()).is_empty(), "a refused add stages and commits nothing");
+
+    write_pointer_brief(dir.path(), "c-ext");
+    for out in [attest_scenario(dir.path(), &[]), attest_ext_task(dir.path())] {
+        assert!(out.status.success(), "stderr: {}", stderr(&out));
+        assert!(!stderr(&out).contains("brief"), "{}", stderr(&out));
+    }
+    assert_eq!(std::fs::read(&proposal).unwrap(), proposal_before, "canon never edits the external plan's proposal");
+
+    let flip = run(dir.path(), &["gate", "task", "c-ext#1.1"]);
+    assert!(flip.status.success(), "{}{}", stdout(&flip), stderr(&flip));
+    assert!(std::fs::read_to_string(&tasks).unwrap().contains("- [x] 1.1 Build the demo"), "the external task row flips");
+}
+
+/// subject.lifecycle.28: the ship guard refuses a subject whose newest
+/// change comes from an external openspec plan with no canon brief,
+/// naming the canon `brief.md` to create with its `Source:` pointer;
+/// status agrees. Once the canon brief records the approval the same
+/// move ships, and the external proposal is never edited.
+#[test]
+fn subject_lifecycle_28_shipping_an_external_change_needs_its_canon_brief() {
+    let dir = repo();
+    seed_technically_ship_ready(dir.path(), "unused\n");
+    std::fs::remove_dir_all(dir.path().join(".canon/changes")).unwrap();
+    // The subject's newest change is the external one.
+    seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Verifying, &[], &["c-demo", "c-ext"]);
+    let proposal = write_external_proposal(dir.path(), "c-ext");
+    let proposal_before = std::fs::read(&proposal).unwrap();
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(
+        stderr(&out).contains(&format!(
+            "canon subject status: unreviewed-promotion demo-subject — verifying → shipped: brief not approved — {EXTERNAL_UNANSWERED}; a human must answer the brief, and only from that answer the agent will {EXTERNAL_RECORD}\n"
+        )),
+        "{}",
+        stderr(&out)
+    );
+    assert_eq!(current_subject(dir.path())["status"], "verifying");
+    assert_eq!(
+        status_brief(dir.path()),
+        serde_json::json!({"approved": false, "enforced": true, "change": "c-ext", "brief": ".canon/changes/c-ext/brief.md", "briefExists": false, "source": "openspec/changes/c-ext/proposal.md"})
+    );
+
+    write_pointer_brief(dir.path(), "c-ext");
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(current_subject(dir.path())["status"], "shipped");
+    assert_eq!(std::fs::read(&proposal).unwrap(), proposal_before, "canon never edits the external plan's proposal");
 }

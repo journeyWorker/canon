@@ -5,7 +5,8 @@
 //!
 //! Covers every scenario spec.md names: a fresh repo's `init` writes a
 //! working skeleton plus the 0.14 starter policy, AGENTS.md block and
-//! plans home; a rerun keeps `canon.yaml`/`policy.yaml` and refreshes only
+//! commented plans examples (0.17 D2: no `openspec/` dir, no plans
+//! source); a rerun keeps `canon.yaml`/`policy.yaml` and refreshes only
 //! the AGENTS.md block (refusing when `--no-agents-md` leaves nothing to
 //! do);
 //! `init` immediately followed by `inventory sync` (with one added
@@ -61,9 +62,13 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
     }
     assert!(text.contains("specs:"), "{text}");
     assert!(text.contains("root: specs"), "{text}");
-    assert!(text.contains("plans:"), "{text}");
-    assert!(text.contains("- dialect: openspec\n      root: .\n"), "init must configure the default openspec plans source: {text}");
-    assert!(dir.path().join("openspec/changes/.gitkeep").is_file(), "the plans source's changes dir must exist and survive a clone");
+    assert!(text.contains("plans:\n"), "{text}");
+    assert!(text.contains("  sources: []\n"), "init configures no plans source: {text}");
+    assert!(
+        text.contains("  #   - dialect: openspec") && text.contains("  #   - dialect: superpowers") && text.contains(".canon/changes/<slug>/"),
+        "the plans block shows commented external examples and names canon's own changes dir: {text}"
+    );
+    assert!(!dir.path().join("openspec").exists(), "init creates no openspec directory");
 
     let policy = std::fs::read_to_string(dir.path().join(".canon/policy.yaml")).unwrap();
     for line in ["spec_coverage:", "require_evidence: true", "require_cases: [failure]", "require_review: {}"] {
@@ -363,16 +368,15 @@ fn init_then_inventory_sync_succeeds_with_zero_further_edits() {
 fn init_then_ingest_plans_exits_0_as_a_clean_no_op() {
     let dir = tempfile::tempdir().unwrap();
     assert!(run_canon(&["init", "--repo", "."], dir.path()).status.success());
-    // Top-level dirs the openspec source must NOT mistake for changes.
+    // Top-level dirs no plan source may mistake for changes.
     write(dir.path(), "specs/README.md", "specs\n");
     write(dir.path(), "src/main.rs", "fn main() {}\n");
 
     let out = run_canon(&["ingest", "plans", "--repo", ".", "--json"], dir.path());
-    assert!(out.status.success(), "canon ingest plans against the scaffolded openspec source must be a clean no-op: {}", stderr(&out));
+    assert!(out.status.success(), "canon ingest plans right after init must be a clean no-op: {}", stderr(&out));
     let payload: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
-    assert_eq!(payload["sources"][0]["dialect"], "openspec", "{payload}");
-    assert_eq!(payload["sources"][0]["changes_parsed"], 0, "{payload}");
-    assert_eq!(payload["sources"][0]["malformed"].as_array().map(Vec::len), Some(0), "{payload}");
+    assert_eq!(payload["sources"].as_array().map(Vec::len), Some(0), "no external source and no .canon/changes yet: {payload}");
+    assert_eq!(payload["changes_persisted"], 0, "{payload}");
 }
 
 // ── canon init --check-config ──

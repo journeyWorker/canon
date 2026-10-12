@@ -759,3 +759,55 @@ fn superpowers_dialect_resolves_through_the_canon_yaml_plans_config_path() {
     assert_eq!(task_records[0]["task_id"], "2026-07-14-config-path#1");
     assert_eq!(task_records[0]["status"], "done");
 }
+
+/// ingest.plans.11 (0.17 D2): canon's own `.canon/changes` is read with
+/// no `plans:` entry, ahead of the configured sources: it owns a change id
+/// an external source also carries, a pointer brief (a `brief.md` with a
+/// `Source:` line) is not a change, and its records carry canon's own
+/// provenance.
+#[test]
+fn ingest_plans_11_canon_changes_are_read_first_with_no_plans_entry() {
+    let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - { dialect: openspec, root: . }\n");
+    let own = dir.path().join(".canon/changes/shared");
+    std::fs::create_dir_all(&own).unwrap();
+    std::fs::write(own.join("brief.md"), "## Why\n\nCanon's own.\n").unwrap();
+    std::fs::write(own.join("tasks.md"), "- [ ] 1 Own task\n").unwrap();
+    let pointer = dir.path().join(".canon/changes/ext-only");
+    std::fs::create_dir_all(&pointer).unwrap();
+    std::fs::write(pointer.join("brief.md"), "Source: openspec/changes/ext-only/proposal.md\n\nApproved: ana 2026-10-12 — \"go\"\n").unwrap();
+    write_change_dir(dir.path(), "shared", "The external copy.", &["- [ ] 1 External task"]);
+    write_change_dir(dir.path(), "ext-only", "External only.", &["- [ ] 1 Ext task"]);
+
+    let payload = ingest_json(dir.path(), &[]);
+    let sources = payload["sources"].as_array().unwrap();
+    assert_eq!(sources[0]["dialect"], "canon", "{payload}");
+    assert_eq!(sources[0]["changes_parsed"], 1, "the pointer brief is not a change: {payload}");
+    assert_eq!(sources[1]["dialect"], "openspec");
+    assert_eq!(sources[1]["duplicate_change_id"], 1, "canon's own source owns `shared`: {payload}");
+
+    let out = run_canon(&["query", "--kind", "change", "--json"], dir.path());
+    let records: Value = serde_json::from_str(&stdout(&out)).unwrap();
+    let records = records["records"].as_array().unwrap();
+    let find = |id: &str| records.iter().find(|c| c["change_id"] == id).unwrap_or_else(|| panic!("{id} missing: {records:?}"));
+    assert_eq!(find("shared")["summary"], "Canon's own.");
+    assert_eq!(find("shared")["actor"]["agent_id"], "canon-plan-import-canon");
+    assert_eq!(find("ext-only")["actor"]["agent_id"], "canon-plan-import-openspec");
+}
+
+/// ingest.plans.12 (0.17 D2): `plans.sources` lists only external plans;
+/// an entry naming `canon`, canon's own source, fails loud naming
+/// `.canon/changes`, and nothing is imported.
+#[test]
+fn ingest_plans_12_a_plans_source_naming_canon_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path(), "plans:\n  sources:\n    - { dialect: canon, root: .canon/changes }\n");
+    let out = run_canon(&["ingest", "plans"], dir.path());
+    assert!(!out.status.success());
+    assert!(
+        stderr(&out).contains("names `canon`, canon's own plan source: `.canon/changes` is always read with no entry, and `plans.sources` lists only external plans; remove the entry"),
+        "{}",
+        stderr(&out)
+    );
+    assert!(!dir.path().join(".canon/ledger").exists(), "nothing is imported");
+}

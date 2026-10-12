@@ -5,13 +5,13 @@ Feature: authoring change
   @subject:authoring-scaffold
   @case:happy
   @authoring.change.01
-  Scenario: A new change is scaffolded, imported and adopted with no config edit
-    Given a repo set up by canon init alone and a subject
+  Scenario: A new change is written in canon's own changes dir, imported and adopted with no plans source
+    Given a repo set up by canon init alone, whose canon.yaml lists no plans source, and a subject
     When canon change new is run with a slug, the subject and a title
-    Then openspec/changes/<slug>/proposal.md and tasks.md are written, the title as the proposal's Why
-    And the change is imported and carries the subject, and the subject lists the change
-    And canon.yaml is byte-identical
-    And a task row added to tasks.md imports as <slug>#1
+    Then .canon/changes/<slug>/brief.md and tasks.md are written, the title as the brief's Why
+    And no openspec directory is created and canon.yaml is byte-identical
+    And the change is imported with canon's own provenance and carries the subject, and the subject lists the change
+    And a task row added to tasks.md imports as <slug>#1, and canon gate task flips it there
 
   # canon: {"schema":1,"at":"2026-10-10T15:34:48Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -28,28 +28,18 @@ Feature: authoring change
   @case:failure
   @authoring.change.03
   Scenario: A slug that already exists is refused and the existing change is untouched
-    Given a change already created under a slug, or a change directory written by hand
+    Given a change already created under a slug, or a directory under .canon/changes written by hand
     When canon change new is run with that slug again
     Then it exits 2 saying it already exists
-    And the existing proposal is byte-identical on both paths
+    And the existing brief is byte-identical on both paths
     And no file is added to the hand-written directory and no change record is written for it
-
-  # canon: {"schema":1,"at":"2026-10-10T15:34:48Z","actor":{"agent_id":"canon"}}
-  @subject:authoring-scaffold
-  @case:failure
-  @authoring.change.04
-  Scenario: A repo without an openspec plans source is refused
-    Given a canon.yaml whose plans sources hold no openspec source
-    When canon change new is run
-    Then it exits 2 naming the missing openspec source and what to add
-    And no openspec directory is created
 
   # canon: {"schema":1,"at":"2026-10-10T15:51:40Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
   @case:failure
   @authoring.change.05
   Scenario: A change that fails before any record is written leaves nothing behind
-    Given a repo where the change dir cannot be created, or where the first record, the subject, cannot be written
+    Given a repo where the change dir under .canon/changes cannot be created, or where the first record, the subject, cannot be written
     When canon change new is run
     Then it exits 2 and reports nothing as written
     And no change dir, no staging dir under .canon, no change record and no subject link remain
@@ -64,3 +54,14 @@ Feature: authoring change
     Then it exits 2, keeping the change dir and the subject record that now lists the change
     And it prints the command that completes the link: canon ingest plans, then canon subject adopt
     And running that command completes the link, and running the adopt again writes nothing
+
+  # canon: {"schema":1,"at":"2026-10-12T12:00:00Z","actor":{"agent_id":"017-p2-impl"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.change.07
+  Scenario: A configured external openspec source is never written into by change new
+    Given a canon.yaml whose plans sources hold an external openspec source with a human-written change
+    When canon change new is run
+    Then the change is written under .canon/changes and nothing is written under the external source
+    And the external change's proposal is byte-identical
+    And canon ingest plans imports both, the canon change with canon's provenance and the external one with the openspec dialect's

@@ -92,7 +92,7 @@ use canon_gate::{
     evidence_note_of, gate_task, install_hooks, promote as gate_promote, promote_staged, selftest, EvidenceNote, FailureClass, GateContext, GateCtx, GateReport, HookEntry,
     InstallOutcome, Promoted, PromoteReport, TaskFlipDecision, FAILURE_CLASSES, PRE_COMMIT_SCRIPT, STAGED_KINDS,
 };
-use canon_ingest::{find_plan_adapter, PlanWriteBack, WriteBackError};
+use canon_ingest::{PlanWriteBack, WriteBackError};
 use canon_model::paths;
 use canon_model::{validate_evidence_batch, Actor, ChangeId, Envelope, RawRecord, RecordKind, TaskId};
 use canon_policy::SchemaRegistry;
@@ -295,20 +295,21 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
     let sources = crate::plans::load_plan_sources_for_gate(repo).map_err(|e| e.to_string())?;
     if sources.is_empty() {
         // Distinct from "consulted N sources, none held it": this repo
-        // declared `plans.sources: []` (what `canon init` scaffolds),
-        // so there is no plan corpus for ANY task id to live in.
-        // Naming a synthesized openspec source here would blame a
-        // dialect the operator never configured — the same refusal
-        // `crate::dispatch::DispatchError::NoPlanSources` already makes
-        // for `--task`.
+        // has no `.canon/changes/` and declares `plans.sources: []`
+        // (what `canon init` scaffolds), so there is no plan corpus for
+        // ANY task id to live in. Naming a synthesized openspec source
+        // here would blame a dialect the operator never configured —
+        // the same refusal `crate::dispatch::DispatchError::NoPlanSources`
+        // already makes for `--task`.
         return Err(format!(
-            "this repo configures no plan sources (canon.yaml has no `plans.sources` entries), so no plan document exists for {task_id} to live in — configure `plans:` with the dialect holding your plan corpus"
+            "this repo configures no plan sources (no `{}` and no `plans.sources` entries in canon.yaml), so no plan document exists for {task_id} to live in — write the change with `canon change new`, or list your external plans under `plans.sources`",
+            canon_model::paths::CHANGES_DIR
         ));
     }
     let mut consulted: Vec<String> = Vec::new();
     for src in &sources {
         consulted.push(format!("{} @ {}", src.dialect(), src.root().display()));
-        let Some(entry) = find_plan_adapter(src.dialect()) else {
+        let Some(entry) = src.entry() else {
             return Err(format!("`{}` is not a registered plan dialect", src.dialect()));
         };
         // A dialect that registered no write-back capability at all

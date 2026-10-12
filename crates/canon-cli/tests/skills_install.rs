@@ -731,16 +731,20 @@ fn skill_and_block() -> [(&'static str, String); 2] {
     [("skill", words(&skill)), ("AGENTS.md block", words(&block))]
 }
 
-/// skills.install.20 (0.16 D1): the skill and the AGENTS.md block both
-/// carry one human approval per scope, recorded by the agent at once in
-/// the brief and the policy approval, then no stop inside the scope,
-/// independent review on every change, and shipping by the agent.
+/// skills.install.20 (0.16 D1, 0.17 D3): the skill and the AGENTS.md
+/// block both carry one human approval per scope, recorded by the agent
+/// at once in the change's `.canon/changes/<slug>/brief.md` (a `Source:`
+/// pointer for an external plan) and the policy approval, then no stop
+/// inside the scope, independent review on every change, and shipping
+/// by the agent.
 #[test]
 fn skills_install_20_skill_and_block_carry_one_approval_per_scope() {
     for (name, text) in skill_and_block() {
         for rule in [
             "for a new subject or a scope change",
             "Approved: <who> <when> — \"<",
+            ".canon/changes/<slug>/brief.md",
+            "Source: <path>",
             "canon policy approve --by <the human> --note \"<their words>\"",
             "Never approve without a human answer",
             "Inside an approved scope, never stop for a human",

@@ -232,9 +232,9 @@ Feature: subject lifecycle
   @subject.lifecycle.24
   Scenario: Shipping is refused while the brief has no Approved line, even with every technical gate passing
     Given a verifying subject whose every scenario is evidenced and reviewed, with no blocker or case gap
-    And its newest adopted change's proposal.md carries no Approved line
+    And its newest adopted change's .canon/changes brief.md carries no Approved line
     When the subject is moved to shipped
-    Then the command exits 1 with an unreviewed-promotion naming the subject and that proposal.md
+    Then the command exits 1 with an unreviewed-promotion naming the subject and that brief.md
     And the refusal says a human must answer the brief and the agent records the Approved line only from that answer
     And the subject stays verifying, and status reports the same brief as not approved
     And once the line is recorded the same move ships the subject
@@ -245,9 +245,9 @@ Feature: subject lifecycle
   @subject.lifecycle.25
   Scenario: An Approved line inside an HTML comment or a code fence does not let the subject ship
     Given a verifying subject that passes every technical gate
-    And its proposal.md carries an Approved line only inside an HTML comment or a fenced code block
+    And its brief.md carries an Approved line only inside an HTML comment or a fenced code block
     When the subject is moved to shipped
-    Then the command exits 1 naming the proposal.md as having no Approved line
+    Then the command exits 1 naming the brief.md as having no Approved line
     And status reports the brief as not approved, so status and the guard agree
 
   # canon: {"schema":1,"at":"2026-10-11T17:15:05Z","actor":{"agent_id":"canon-scaffold"}}
@@ -270,3 +270,14 @@ Feature: subject lifecycle
     Then it ships, and the command prints one advisory that the brief is not approved because there is no brief to answer
     And no waiver is recorded
     And status shows the brief as not approved and not enforced, with no human step
+
+  # canon: {"schema":1,"at":"2026-10-12T12:00:00Z","actor":{"agent_id":"017-p2-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.28
+  Scenario: Shipping a change from an external plan needs its canon brief
+    Given a verifying subject that passes every technical gate, whose newest adopted change comes from an external openspec plan with no canon brief
+    When the subject is moved to shipped
+    Then the command exits 1 with an unreviewed-promotion naming .canon/changes/<change>/brief.md to create, with a "Source:" line naming the external proposal.md, and the approval to record there
+    And the "Approved:" line inside the external proposal.md is not read, and status reports the same brief as enforced and not approved
+    And once the canon brief.md holds the "Source:" and "Approved:" lines the same move ships the subject, and the external proposal.md is never edited

@@ -36,11 +36,42 @@ use crate::plan_writeback::{FlipDocOutcome, PlanTaskLocation, PlanWriteBack, Wri
 use crate::plan_adapter::{PlanAdapter, PlanParseOutcome, PlanSourceConfig, PlanSourceHandle, resolve_path_source};
 use crate::scanner::scan_dir;
 
-/// The fixed, per-dialect unattributed actor every `Change`/`Task` this
-/// adapter emits carries (design D7: "provenance visible in every
-/// record, byte-stable across runs" — never a wall-clock- or
-/// run-derived value).
-const ACTOR_AGENT_ID: &str = "canon-plan-import-openspec";
+/// Where one dialect of the change-dir grammar keeps its files (0.17
+/// D2). openspec's `openspec/changes/<change>/proposal.md` and canon's
+/// own `.canon/changes/<change>/brief.md`
+/// ([`crate::plan_adapters::canon`]) share the change-dir shape, the
+/// `## Why` summary, the archive convention and the task-row grammar;
+/// they differ only in what this names.
+pub(crate) struct ChangeDirLayout {
+    /// The file that makes a directory a change; its `## Why` paragraph
+    /// is the change's summary.
+    pub(crate) brief: &'static str,
+    /// The malformed reason a change dir without [`Self::brief`] is
+    /// named by.
+    pub(crate) missing_brief: &'static str,
+    /// The fixed, per-dialect unattributed actor every `Change`/`Task`
+    /// the dialect emits carries (design D7: "provenance visible in
+    /// every record, byte-stable across runs" — never a wall-clock- or
+    /// run-derived value).
+    pub(crate) actor: &'static str,
+    /// Whether a source root may hold its changes under
+    /// `openspec/changes/` (openspec), rather than always being the
+    /// changes dir itself (canon).
+    pub(crate) nested: bool,
+    /// Whether a brief carrying a `Source:` line is a pointer to an
+    /// external plan's change rather than a change of its own (canon,
+    /// 0.17 D3): such a directory is not discovered at all.
+    pub(crate) pointer_briefs: bool,
+}
+
+/// The openspec dialect's layout.
+pub(crate) const OPENSPEC_LAYOUT: ChangeDirLayout = ChangeDirLayout {
+    brief: "proposal.md",
+    missing_brief: "missing-proposal-md",
+    actor: "canon-plan-import-openspec",
+    nested: true,
+    pointer_briefs: false,
+};
 
 /// Named diagnostic (design D3-style `unmapped` bookkeeping) for a
 /// change dir whose proposal.md has no `## Why` heading — the summary
@@ -107,11 +138,7 @@ impl PlanAdapter for OpenspecPlanAdapter {
 
     fn parse(&self, source: &PlanSourceHandle) -> PlanParseOutcome {
         let PlanSourceHandle::Path(root) = source;
-        let mut outcome = PlanParseOutcome::empty();
-        for dir in discover_change_dirs(root) {
-            parse_change_dir(&dir, root, &mut outcome);
-        }
-        outcome
+        parse_root(&OPENSPEC_LAYOUT, root)
     }
 
     /// Per discovered change dir, exactly the files [`parse_change_dir`]
@@ -122,25 +149,45 @@ impl PlanAdapter for OpenspecPlanAdapter {
     /// never `node_modules`, `target` or any other tree beside it.
     fn source_files(&self, source: &PlanSourceHandle) -> Vec<PathBuf> {
         let PlanSourceHandle::Path(root) = source;
-        let mut files = Vec::new();
-        for dir in discover_change_dirs(root) {
-            files.extend(["proposal.md", "tasks.md", "design.md"].into_iter().map(|name| dir.join(name)).filter(|path| path.is_file()));
-            files.extend(spec_delta_files(&dir));
-        }
-        files.sort_unstable();
-        files
+        layout_source_files(&OPENSPEC_LAYOUT, root)
     }
 
     /// Reads only the change dir whose basename is `change_id` (live or
     /// archived), never its siblings.
     fn parse_change(&self, source: &PlanSourceHandle, change_id: &ChangeId) -> PlanParseOutcome {
         let PlanSourceHandle::Path(root) = source;
-        let mut outcome = PlanParseOutcome::empty();
-        for dir in discover_change_dirs(root).into_iter().filter(|dir| dir.file_name() == Some(OsStr::new(change_id.as_str()))) {
-            parse_change_dir(&dir, root, &mut outcome);
-        }
-        outcome
+        parse_one(&OPENSPEC_LAYOUT, root, change_id)
     }
+}
+
+/// Every change dir under `root`, parsed ([`PlanAdapter::parse`]).
+pub(crate) fn parse_root(layout: &ChangeDirLayout, root: &Path) -> PlanParseOutcome {
+    let mut outcome = PlanParseOutcome::empty();
+    for dir in discover_change_dirs(layout, root) {
+        parse_change_dir(layout, &dir, root, &mut outcome);
+    }
+    outcome
+}
+
+/// The files [`parse_change_dir`] reads across `root`'s change dirs
+/// ([`PlanAdapter::source_files`]).
+pub(crate) fn layout_source_files(layout: &ChangeDirLayout, root: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for dir in discover_change_dirs(layout, root) {
+        files.extend([layout.brief, "tasks.md", "design.md"].into_iter().map(|name| dir.join(name)).filter(|path| path.is_file()));
+        files.extend(spec_delta_files(&dir));
+    }
+    files.sort_unstable();
+    files
+}
+
+/// Only the change dir named `change_id` ([`PlanAdapter::parse_change`]).
+pub(crate) fn parse_one(layout: &ChangeDirLayout, root: &Path, change_id: &ChangeId) -> PlanParseOutcome {
+    let mut outcome = PlanParseOutcome::empty();
+    for dir in discover_change_dirs(layout, root).into_iter().filter(|dir| dir.file_name() == Some(OsStr::new(change_id.as_str()))) {
+        parse_change_dir(layout, &dir, root, &mut outcome);
+    }
+    outcome
 }
 
 /// s35 `gate-plan-dialect-seam` (design D1): the openspec dialect owns
@@ -153,51 +200,67 @@ impl PlanAdapter for OpenspecPlanAdapter {
 /// [`format_line`].
 impl PlanWriteBack for OpenspecPlanAdapter {
     fn locate_task(&self, root: &Path, task_id: &TaskId) -> Option<PlanTaskLocation> {
-        let path = tasks_md_path(root, &task_id.change_id());
-        // FILE existence only (module doc): whether the specific `<n>`
-        // row lives IN this tasks.md is `flip_task`'s concern, so a
-        // located-but-rowless flip stays a gate-red "no matching row",
-        // never a "no source located it" usage error.
-        path.is_file().then_some(PlanTaskLocation { document_path: path })
+        locate(&OPENSPEC_LAYOUT, root, task_id)
     }
 
     fn flip_task(&self, document: &str, task_id: &TaskId, evidence_note: &str) -> Result<FlipDocOutcome, WriteBackError> {
-        // FIRST, before the document is even split (trait-method doc):
-        // `evidence_note` is untrusted caller-supplied text, and a line
-        // separator inside it would not lengthen this row — `lines.join`
-        // below would emit a SECOND document line carrying whatever the
-        // caller put after the separator, including a fully `- [x] ` row
-        // no evidence record backs. Refused here independently of
-        // `canon evidence add`'s own authoring-time refusal, so a
-        // different caller (or a record authored before that refusal
-        // existed) cannot reintroduce it.
-        reject_multi_line_note(task_id, evidence_note)?;
-        let want_id = row_number(task_id);
-        let mut lines: Vec<String> = document.split('\n').map(str::to_string).collect();
-        let row_idx = lines.iter().position(|line| parse_line(line).is_some_and(|row| row.id == want_id));
-        let Some(row_idx) = row_idx else {
-            return Err(WriteBackError::RowNotFound(task_id.clone()));
-        };
-        let row = parse_line(&lines[row_idx]).expect("row_idx was located via a successful parse_line above");
-        if row.checked {
-            // Already `[x]` — idempotent no-op, document byte-identical.
-            return Ok(FlipDocOutcome { document: document.to_string(), flipped: false });
-        }
-        let mut flipped = row;
-        flipped.checked = true;
-        flipped.evidence = Some(evidence_note.to_string());
-        lines[row_idx] = format_line(&flipped);
-        Ok(FlipDocOutcome { document: lines.join("\n"), flipped: true })
+        flip(document, task_id, evidence_note)
     }
 
     fn typed_atoms_path(&self, root: &Path, change_id: &ChangeId) -> Option<PathBuf> {
-        Some(change_dir(root, change_id).join("tasks.vocab.yaml"))
+        Some(change_dir(&OPENSPEC_LAYOUT, root, change_id).join("tasks.vocab.yaml"))
     }
+}
+
+/// [`PlanWriteBack::locate_task`] for `layout`: the change's `tasks.md`
+/// when that FILE exists. Whether the specific `<n>` row lives IN it is
+/// [`flip`]'s concern, so a located-but-rowless flip stays a gate-red
+/// "no matching row", never a "no source located it" usage error. A
+/// pointer brief's directory is no change ([`ChangeDirLayout::pointer_briefs`]),
+/// so it locates nothing.
+pub(crate) fn locate(layout: &ChangeDirLayout, root: &Path, task_id: &TaskId) -> Option<PlanTaskLocation> {
+    let dir = change_dir(layout, root, &task_id.change_id());
+    if layout.pointer_briefs && is_pointer_brief(layout, &dir) {
+        return None;
+    }
+    let path = dir.join("tasks.md");
+    path.is_file().then_some(PlanTaskLocation { document_path: path })
+}
+
+/// [`PlanWriteBack::flip_task`], the same for every change-dir layout.
+pub(crate) fn flip(document: &str, task_id: &TaskId, evidence_note: &str) -> Result<FlipDocOutcome, WriteBackError> {
+    // FIRST, before the document is even split (trait-method doc):
+    // `evidence_note` is untrusted caller-supplied text, and a line
+    // separator inside it would not lengthen this row — `lines.join`
+    // below would emit a SECOND document line carrying whatever the
+    // caller put after the separator, including a fully `- [x] ` row
+    // no evidence record backs. Refused here independently of
+    // `canon evidence add`'s own authoring-time refusal, so a
+    // different caller (or a record authored before that refusal
+    // existed) cannot reintroduce it.
+    reject_multi_line_note(task_id, evidence_note)?;
+    let want_id = row_number(task_id);
+    let mut lines: Vec<String> = document.split('\n').map(str::to_string).collect();
+    let row_idx = lines.iter().position(|line| parse_line(line).is_some_and(|row| row.id == want_id));
+    let Some(row_idx) = row_idx else {
+        return Err(WriteBackError::RowNotFound(task_id.clone()));
+    };
+    let row = parse_line(&lines[row_idx]).expect("row_idx was located via a successful parse_line above");
+    if row.checked {
+        // Already `[x]` — idempotent no-op, document byte-identical.
+        return Ok(FlipDocOutcome { document: document.to_string(), flipped: false });
+    }
+    let mut flipped = row;
+    flipped.checked = true;
+    flipped.evidence = Some(evidence_note.to_string());
+    lines[row_idx] = format_line(&flipped);
+    Ok(FlipDocOutcome { document: lines.join("\n"), flipped: true })
 }
 
 /// `<root>/openspec/changes/<change_id>` — the openspec dialect's
 /// change-dir layout (s35 D1), the SAME path `canon ingest plans` reads
-/// and `canon gate task` hardcoded before s35.
+/// and `canon gate task` hardcoded before s35; `<root>/<change_id>` for
+/// a layout that is never nested (canon's own `.canon/changes`).
 ///
 /// Resolves with the SAME preference order [`discover_change_dirs`]
 /// already uses (s37 `execution-graph-topology`): the canonical
@@ -218,32 +281,38 @@ impl PlanWriteBack for OpenspecPlanAdapter {
 /// answers with the canonical layout rather than inventing a sibling
 /// path (what [`PlanWriteBack::typed_atoms_path`]'s own contract needs:
 /// it returns a path for a file that may not exist yet).
-fn change_dir(root: &Path, change_id: &ChangeId) -> PathBuf {
+pub(crate) fn change_dir(layout: &ChangeDirLayout, root: &Path, change_id: &ChangeId) -> PathBuf {
+    let direct = root.join(change_id.as_str());
+    if !layout.nested {
+        return direct;
+    }
     let canonical = root.join("openspec").join("changes").join(change_id.as_str());
     if canonical.is_dir() {
         return canonical;
     }
-    let direct = root.join(change_id.as_str());
     if direct.is_dir() {
         return direct;
     }
     canonical
 }
 
-fn tasks_md_path(root: &Path, change_id: &ChangeId) -> PathBuf {
-    change_dir(root, change_id).join("tasks.md")
-}
-
 /// The `proposal.md` of the change dir named `change_id` under a source
 /// rooted at `root`, found the way [`discover_change_dirs`] finds change
 /// dirs, a live dir before an archived one; `None` when neither holds
-/// that file. `canon status` reads a brief's `Approved:` line from it
-/// (0.16 D1), so status and `canon ingest plans` agree on which
+/// that file. `canon status` reads it as an external change's brief to
+/// answer (0.17 D3), so status and `canon ingest plans` agree on which
 /// directory is the change.
 pub fn proposal_path(root: &Path, change_id: &ChangeId) -> Option<PathBuf> {
-    let mut dirs: Vec<PathBuf> = discover_change_dirs(root).into_iter().filter(|dir| dir.file_name() == Some(OsStr::new(change_id.as_str()))).collect();
+    brief_path(&OPENSPEC_LAYOUT, root, change_id)
+}
+
+/// `layout`'s brief of the change dir named `change_id` under `root`,
+/// a live dir before an archived one ([`proposal_path`]).
+pub(crate) fn brief_path(layout: &ChangeDirLayout, root: &Path, change_id: &ChangeId) -> Option<PathBuf> {
+    let mut dirs: Vec<PathBuf> =
+        discover_change_dirs(layout, root).into_iter().filter(|dir| dir.file_name() == Some(OsStr::new(change_id.as_str()))).collect();
     dirs.sort_by_key(|dir| is_archived(dir));
-    dirs.into_iter().map(|dir| dir.join("proposal.md")).find(|path| path.is_file())
+    dirs.into_iter().map(|dir| dir.join(layout.brief)).find(|path| path.is_file())
 }
 
 /// The `<n>` half of a `<change_id>#<n>` join-spine [`TaskId`] — the row
@@ -253,28 +322,41 @@ fn row_number(task_id: &TaskId) -> &str {
     task_id.as_str().rsplit_once('#').map(|(_, n)| n).unwrap_or_else(|| task_id.as_str())
 }
 
-fn actor() -> Actor {
-    Actor::new_unattributed(ACTOR_AGENT_ID)
+fn actor(layout: &ChangeDirLayout) -> Actor {
+    Actor::new_unattributed(layout.actor)
+}
+
+/// Whether `dir`'s brief carries a `Source:` line outside fences and
+/// comments: a pointer to an external plan's change (0.17 D3), not a
+/// change of its own.
+fn is_pointer_brief(layout: &ChangeDirLayout, dir: &Path) -> bool {
+    fs::read_to_string(dir.join(layout.brief)).is_ok_and(|text| crate::markdown::field(&text, "Source:").is_some())
 }
 
 /// Find every change directory this adapter should read from `root`:
-/// the immediate children of `<root>/openspec/changes/` when that
-/// substructure exists (the ordinary consumer-repo shape), otherwise
-/// the immediate children of `root` itself (a changes dir passed
-/// directly, or a fixture tree that only holds the changes
-/// substructure — mirrors `discover_task_files`'s identical fallback).
+/// for a nested layout (openspec), the immediate children of
+/// `<root>/openspec/changes/` when that substructure exists (the
+/// ordinary consumer-repo shape), otherwise the immediate children of
+/// `root` itself (a changes dir passed directly, or a fixture tree that
+/// only holds the changes substructure — mirrors `discover_task_files`'s
+/// identical fallback); for canon's own layout, always the children of
+/// `root`, less every pointer brief's directory
+/// ([`ChangeDirLayout::pointer_briefs`]).
 /// Immediate children of an `archive/` subdirectory are included too
 /// (each one a legitimate archived change dir, task 2.1) — `archive`
 /// itself is never treated as a change dir. Deterministic (byte-lexical
 /// path order, `list_subdirs`'s own sort) so two passes over the same
 /// tree enumerate identically.
-fn discover_change_dirs(root: &Path) -> Vec<PathBuf> {
+fn discover_change_dirs(layout: &ChangeDirLayout, root: &Path) -> Vec<PathBuf> {
     let changes_dir = root.join("openspec").join("changes");
-    let scan_root: PathBuf = if changes_dir.is_dir() { changes_dir } else { root.to_path_buf() };
+    let scan_root: PathBuf = if layout.nested && changes_dir.is_dir() { changes_dir } else { root.to_path_buf() };
 
     let mut dirs: Vec<PathBuf> =
         list_subdirs(&scan_root).into_iter().filter(|p| p.file_name() != Some(OsStr::new("archive"))).collect();
     dirs.extend(list_subdirs(&scan_root.join("archive")));
+    if layout.pointer_briefs {
+        dirs.retain(|dir| !is_pointer_brief(layout, dir));
+    }
     dirs.sort_unstable();
     dirs
 }
@@ -317,7 +399,7 @@ fn relative_to_root(path: &Path, root: &Path) -> String {
 /// candidate plus zero or more `Task` candidates, or a `malformed`
 /// increment when the directory itself is structurally broken (task
 /// 2.2). Never a crash — every failure mode here is skip-and-count.
-fn parse_change_dir(dir: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
+fn parse_change_dir(layout: &ChangeDirLayout, dir: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
     let Some(basename) = dir.file_name().and_then(|n| n.to_str()) else {
         outcome.record_malformed(relative_to_root(dir, root), "unreadable-directory");
         return;
@@ -328,9 +410,9 @@ fn parse_change_dir(dir: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
         outcome.record_malformed(relative_to_root(dir, root), "invalid-change-id-grammar");
         return;
     };
-    let proposal_path = dir.join("proposal.md");
+    let proposal_path = dir.join(layout.brief);
     let Ok(proposal_text) = fs::read_to_string(&proposal_path) else {
-        // Missing/unreadable proposal.md: not a valid openspec change.
+        // Missing/unreadable brief: not a valid change.
         // A `changes`-named directory that fails here is the EXACT
         // root-one-level-too-high near-miss signature (s18
         // `loud-plan-import-diagnostics` spec's "A malformed
@@ -339,16 +421,16 @@ fn parse_change_dir(dir: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
         // directory's own parent, rather than (or above)
         // `openspec/changes` itself.
         let dir_rel = relative_to_root(dir, root);
-        if basename == "changes" {
+        if layout.nested && basename == "changes" {
             let parent_rel = dir.parent().map(|p| relative_to_root(p, root)).unwrap_or_else(|| dir_rel.clone());
             let hint = format!(
                 "the configured `root:` may be pointing at `{}`, this directory's parent, rather than at (or above) `openspec/changes` itself — point it at `{}` (or a directory whose own `openspec/changes` resolves there) instead",
                 parent_rel,
                 dir_rel,
             );
-            outcome.record_malformed_with_hint(dir_rel, "missing-proposal-md", hint);
+            outcome.record_malformed_with_hint(dir_rel, layout.missing_brief, hint);
         } else {
-            outcome.record_malformed(dir_rel, "missing-proposal-md");
+            outcome.record_malformed(dir_rel, layout.missing_brief);
         }
         return;
     };
@@ -360,10 +442,10 @@ fn parse_change_dir(dir: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
     }
 
     let archived = is_archived(dir);
-    let (tasks, done_count, open_count, change_at) = parse_tasks_file(dir, root, &change_id, proposal_mtime, outcome);
+    let (tasks, done_count, open_count, change_at) = parse_tasks_file(layout, dir, root, &change_id, proposal_mtime, outcome);
 
     let status = derive_status(archived, done_count, open_count);
-    let envelope = Envelope::current(RecordKind::Change, change_at, actor());
+    let envelope = Envelope::current(RecordKind::Change, change_at, actor(layout));
     outcome.changes.push(Change::new(envelope, change_id, basename, summary, status));
     outcome.tasks.extend(tasks);
 
@@ -386,6 +468,7 @@ fn parse_change_dir(dir: &Path, root: &Path, outcome: &mut PlanParseOutcome) {
 /// pointing FORWARD), so no row can be finalized until every row has
 /// been read. Pass 1 collects rows + tallies; pass 2 emits `Task`s.
 fn parse_tasks_file(
+    layout: &ChangeDirLayout,
     dir: &Path,
     root: &Path,
     change_id: &ChangeId,
@@ -449,7 +532,7 @@ fn parse_tasks_file(
             // candidate must fail soft and stay visible).
             outcome.record_unmapped(&format!("{DIAG_UNRESOLVABLE_TASK_DEP}:{}", task_id.as_str()));
         }
-        let envelope = Envelope::current(RecordKind::Task, tasks_mtime, actor());
+        let envelope = Envelope::current(RecordKind::Task, tasks_mtime, actor(layout));
         tasks.push(Task::new(envelope, task_id, title, status, evidence_note).with_scenario_refs(row.scenario_refs).with_depends_on(depends_on));
     }
 
