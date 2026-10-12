@@ -37,16 +37,46 @@ use crate::{FailureClass, Violation};
 
 /// The closed fabrication-marker blocklist — spec.md's own three named
 /// examples ("A fabricated evidence field blocks the flip", quoting `"would
-/// pass"`, `"TBD"`, `"n/a"`), matched case-insensitively as a substring
-/// of a structured evidence field's text. A hit is a violation
-/// regardless of surrounding text — these are markers of an evidence
-/// claim that was never actually checked, not words that happen to
-/// co-occur with a legitimate one.
+/// pass"`, `"TBD"`, `"n/a"`), matched ASCII-case-insensitively as a WHOLE
+/// TOKEN of a structured evidence field's text ([`contains_marker`]). A
+/// hit is a violation regardless of the surrounding sentence — these are
+/// markers of an evidence claim that was never actually checked, not
+/// words that happen to co-occur with a legitimate one. A marker inside a
+/// longer word, a path segment, a file name or a URL is not a hit (0.18
+/// D5, #32: `pack.json/atlas` holds the bytes `n/a` and is no dismissal).
 pub const FABRICATION_BLOCKLIST: [&str; 3] = [
     "would pass", // an unexecuted, hypothetical claim standing in for a real result
     "tbd",        // a placeholder left where a real evidence value belongs
     "n/a",        // a dismissal masquerading as a completed check
 ];
+
+/// Whether `marker` (lowercase ASCII) occurs in `text` as a whole token:
+/// some occurrence that neither side continues into a longer token
+/// ([`continues_token`]). Case-insensitive over ASCII only, so byte
+/// offsets in the lowered text are the original's.
+pub fn contains_marker(text: &str, marker: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    let bytes = lower.as_bytes();
+    lower.match_indices(marker).any(|(start, hit)| {
+        let end = start + hit.len();
+        !continues_token(bytes[..start].iter().rev().copied()) && !continues_token(bytes[end..].iter().copied())
+    })
+}
+
+/// Whether the bytes on one side of a match, read outward from it, join
+/// it into a longer token: a word byte right next to it (an ASCII letter
+/// or digit, `_`, or a path separator `/` `\`), or a `.` or `-` with a
+/// word byte past it (`n/a.json`, `x-tbd`). A `.` or `-` with nothing
+/// word-like past it is punctuation (`n/a.`, `TBD - later`). Non-ASCII
+/// bytes are boundaries, so `TBD입니다` and `TBD — later` still hit.
+fn continues_token(mut outward: impl Iterator<Item = u8>) -> bool {
+    let is_word = |b: u8| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'/' | b'\\');
+    match outward.next() {
+        Some(b) if is_word(b) => true,
+        Some(b'.' | b'-') => outward.next().is_some_and(is_word),
+        _ => false,
+    }
+}
 
 /// Canon-gate's own companion type for the structured evidence text a
 /// `- [x] ` flip's evidence note is built from and scanned against
@@ -125,9 +155,8 @@ pub fn scan_note_text(subject: &str, summary: &str, command_result: Option<&str>
     }
 
     for (field_name, text) in &fields {
-        let lower = text.to_lowercase();
         for marker in FABRICATION_BLOCKLIST {
-            if lower.contains(marker) {
+            if contains_marker(text, marker) {
                 violations.push(Violation::new(
                     FailureClass::FabricatedEvidence,
                     subject,
@@ -215,5 +244,70 @@ mod tests {
         let note = EvidenceNote::new(task_id(), "cargo test -p canon-gate: 40 passed", Some("test result: ok".to_string()));
         assert!(!ambient_chat_reply.is_empty(), "the ambient text exists but is never passed to the scanner");
         assert!(scan_fake_markers(&note).is_empty());
+    }
+
+    /// gate.markers.01 (0.18 D5, #32): markers match as whole tokens only.
+    /// Every row is `(summary, hits)`: the markers the scan must find, in
+    /// blocklist order.
+    #[test]
+    fn markers_match_whole_tokens_never_inside_a_path_a_file_name_a_url_or_a_longer_word() {
+        let table: &[(&str, &[&str])] = &[
+            // true positives
+            ("this would pass once the CLI is wired", &["would pass"]),
+            ("Tbd — will fill in after review", &["tbd"]),
+            ("n/a, this task has no test surface", &["n/a"]),
+            ("TBD: forgot to capture the real output", &["tbd"]),
+            ("TBD", &["tbd"]),
+            ("N/A", &["n/a"]),
+            ("result: n/a.", &["n/a"]),
+            ("(tbd)", &["tbd"]),
+            ("\"n/a\"", &["n/a"]),
+            ("status tbd - later", &["tbd"]),
+            ("it Would Pass", &["would pass"]),
+            ("TBD입니다", &["tbd"]),
+            ("smoke: TBD, n/a for the rest; it would pass", &["would pass", "tbd", "n/a"]),
+            ("ran it; n/a\nfor the GPU path", &["n/a"]),
+            // negatives: paths, file names, URLs, longer words
+            ("loader reads pack.json/atlas JSON and names the bad file", &[]),
+            ("cat assets/n/a/sprite.png", &[]),
+            ("wrote n/a.json", &[]),
+            ("see https://example.com/tbd for the plan", &[]),
+            ("tbd_notes.md checked", &[]),
+            ("x-tbd flag parsed", &[]),
+            ("tbd-notes reviewed", &[]),
+            ("C:\\tbd\\log.txt", &[]),
+            ("the tbdx parser", &[]),
+            ("1tbd", &[]),
+            ("it would passthrough the header", &[]),
+            ("cargo test -p canon-gate: 40 passed, 0 failed", &[]),
+        ];
+        for (summary, hits) in table {
+            let found: Vec<&str> = FABRICATION_BLOCKLIST.into_iter().filter(|marker| contains_marker(summary, marker)).collect();
+            assert_eq!(&found, hits, "summary {summary:?}");
+            assert_eq!(scan_note_text("a.b.01", summary, Some("ok")).len(), hits.len(), "summary {summary:?}");
+        }
+    }
+
+    /// gate.markers.02 (0.18 D5, #32): a path holding a marker's letters
+    /// does not hide a standalone marker elsewhere in the same field. The
+    /// note is still fabricated, and the flip it was meant to justify is
+    /// blocked.
+    #[test]
+    fn a_standalone_marker_beside_a_path_holding_its_letters_is_still_a_finding_and_blocks_the_flip() {
+        let note = EvidenceNote::new(task_id(), "loaded pack.json/atlas; GPU path: n/a", None);
+        let violations = scan_fake_markers(&note);
+        assert_eq!(violations.len(), 1, "{violations:?}");
+        assert_eq!(violations[0].class, FailureClass::FabricatedEvidence);
+        assert!(violations[0].detail.contains("fabrication marker \"n/a\""), "{}", violations[0].detail);
+
+        let record = canon_model::EvidenceRecord::new(
+            canon_model::Envelope::new(1, canon_model::RecordKind::EvidenceRecord, chrono::Utc::now(), canon_model::Actor::new("impl", canon_model::RoleId::parse("implementer").unwrap())),
+            Some(task_id()),
+            None,
+            None,
+            canon_model::EvidenceVerdict::Faithful,
+        );
+        let decision = crate::gate_task(&task_id(), &[record], &[note]);
+        assert!(matches!(decision, crate::TaskFlipDecision::Blocked { ref violations } if violations.iter().all(|v| v.class == FailureClass::FabricatedEvidence)), "{decision:?}");
     }
 }

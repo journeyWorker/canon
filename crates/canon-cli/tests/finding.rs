@@ -1265,3 +1265,107 @@ fn an_empty_help_invocation_is_refused_rather_than_passing_vacuously() {
     // refusal: the marker is present in real help.
     assert!(checked_help(&run_canon(&["finding", "--help"], dir.path()), PARENT_HELP_MARKER).is_ok());
 }
+
+/// Three findings on one change, two committed and one still staged:
+/// (1,1) blocker raised open then closed `rejected`, (1,2) should-fix
+/// left open, and a staged (2,1). Plus one committed finding on another
+/// change, which no list of this change may show.
+fn listed_repo() -> tempfile::TempDir {
+    let dir = repo();
+    let repo = dir.path();
+    let raise = |change: &str, severity: &str, round: &str, seq: &str, reviewer: &str, summary: &str| {
+        let out = run_canon(
+            &["finding", "add", "--change-id", change, "--severity", severity, "--round", round, "--seq", seq, "--reviewer", reviewer, "--summary", summary],
+            repo,
+        );
+        assert!(out.status.success(), "{}", stderr(&out));
+    };
+    raise("s43-findings-are-records", "blocker", "1", "1", "rev-a", "teardown races HMR");
+    raise("s43-findings-are-records", "should-fix", "1", "2", "rev-b", "the count was typed by hand");
+    raise("other-change", "note", "1", "1", "rev-c", "elsewhere");
+    raise("closed-only", "blocker", "1", "1", "rev-d", "fixed long ago");
+    assert!(run_canon(&["gate", "promote"], repo).status.success());
+    let closed = run_canon(&["finding", "close", "--change-id", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "rejected"], repo);
+    assert!(closed.status.success(), "{}", stderr(&closed));
+    let closed = run_canon(&["finding", "close", "--change-id", "closed-only", "--round", "1", "--seq", "1", "--disposition", "deferred"], repo);
+    assert!(closed.status.success(), "{}", stderr(&closed));
+    assert!(run_canon(&["gate", "promote"], repo).status.success());
+    assert!(add(repo, &["--round", "2", "--seq", "1", "--reviewer", "rev-a", "--summary", "still staged"]).status.success());
+    dir
+}
+
+/// finding.list.01: every committed finding of the change, one row each
+/// at its latest version, ordered by round and seq; a staged one is
+/// named on stderr, not listed.
+#[test]
+fn finding_list_prints_each_committed_finding_at_its_latest_version() {
+    let dir = listed_repo();
+    let out = run_canon(&["finding", "list", "--change-id", "s43-findings-are-records"], dir.path());
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert_eq!(
+        stdout(&out),
+        "round  seq  severity    disposition  reviewer  summary\n\
+         1      1    blocker     rejected     rev-a     teardown races HMR\n\
+         1      2    should-fix  open         rev-b     the count was typed by hand\n"
+    );
+    assert_eq!(
+        stderr(&out),
+        "canon finding list: 1 staged finding(s) on change `s43-findings-are-records` are not listed until committed — run `canon gate promote`\n"
+    );
+}
+
+/// finding.list.02: `--open` keeps only the findings whose CURRENT
+/// disposition is open — a closed one stays out though it was raised open.
+#[test]
+fn finding_list_open_keeps_only_currently_open_findings() {
+    let dir = listed_repo();
+    let out = run_canon(&["finding", "list", "--change-id", "s43-findings-are-records", "--open"], dir.path());
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert_eq!(stdout(&out), "round  seq  severity    disposition  reviewer  summary\n1      2    should-fix  open         rev-b     the count was typed by hand\n");
+
+    let none = run_canon(&["finding", "list", "--change-id", "other-change", "--open"], dir.path());
+    assert_eq!(none.status.code(), Some(0));
+    assert_eq!(stdout(&none), "round  seq  severity  disposition  reviewer  summary\n1      1    note      open         rev-c     elsewhere\n");
+    let closed = run_canon(&["finding", "list", "--change-id", "closed-only", "--open"], dir.path());
+    assert_eq!(closed.status.code(), Some(0), "{}", stderr(&closed));
+    assert_eq!(stdout(&closed), "canon finding list: no committed open findings on change `closed-only`\n", "a change whose findings are all closed has none open");
+    let all = run_canon(&["finding", "list", "--change-id", "closed-only"], dir.path());
+    assert!(stdout(&all).contains("deferred") && stdout(&all).contains("fixed long ago"), "without --open the closed finding lists: {}", stdout(&all));
+    let empty = run_canon(&["finding", "list", "--change-id", "no-findings-here", "--open"], dir.path());
+    assert_eq!(empty.status.code(), Some(0));
+    assert_eq!(stdout(&empty), "canon finding list: no committed open findings on change `no-findings-here`\n");
+}
+
+/// finding.list.03: `--json` carries the same rows, every field typed.
+#[test]
+fn finding_list_json_carries_the_same_rows() {
+    let dir = listed_repo();
+    let out = run_canon(&["finding", "list", "--change-id", "s43-findings-are-records", "--json"], dir.path());
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let json: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("stdout is one JSON document");
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "change_id": "s43-findings-are-records",
+            "findings": [
+                {"round": 1, "seq": 1, "severity": "blocker", "disposition": "rejected", "reviewer": "rev-a", "summary": "teardown races HMR", "resolution_sha": null, "file_ref": null},
+                {"round": 1, "seq": 2, "severity": "should-fix", "disposition": "open", "reviewer": "rev-b", "summary": "the count was typed by hand", "resolution_sha": null, "file_ref": null},
+            ]
+        })
+    );
+    let open = run_canon(&["finding", "list", "--change-id", "s43-findings-are-records", "--open", "--json"], dir.path());
+    let json: serde_json::Value = serde_json::from_str(&stdout(&open)).unwrap();
+    assert_eq!(json["findings"].as_array().unwrap().len(), 1, "{json}");
+    assert_eq!(json["findings"][0]["seq"], 2, "{json}");
+}
+
+/// finding.list.04: a change id outside the grammar is refused by clap,
+/// exit 2, and nothing is printed to stdout.
+#[test]
+fn finding_list_refuses_a_malformed_change_id() {
+    let dir = repo();
+    let out = run_canon(&["finding", "list", "--change-id", "Not A Change"], dir.path());
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert!(stdout(&out).is_empty(), "{}", stdout(&out));
+    assert!(stderr(&out).contains("--change-id"), "{}", stderr(&out));
+}

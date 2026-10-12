@@ -103,7 +103,7 @@ this subject and domain — the exact memory step 2 retrieves next time.
 
 ## Status lifecycle + the shipped evidence gate
 
-`canon subject status <id> <state> [--override-reason <text>] [--actor-id <id>]`
+`canon subject status <id> <state> [--override-reason <text>] [--reason <text>] [--actor-id <id>]`
 performs a policy-gated transition.
 The legal chain:
 
@@ -111,9 +111,10 @@ The legal chain:
 proposed → specced → building → verifying → shipped
 ```
 
-plus **any state → retired** (a subject can be retired from anywhere).
-Any other transition is rejected by failure class, exits 1, and leaves
-the record UNCHANGED (fail closed).
+plus **shipped → verifying** to reopen a shipped subject (with
+`--reason`, below) and **any state → retired** (a subject can be retired
+from anywhere). Any other transition is rejected by failure class, exits
+1, and leaves the record UNCHANGED (fail closed).
 
 ```bash
 canon subject status subject-domain-loop specced
@@ -242,6 +243,39 @@ raised later, a scenario tagged later) still fails the gate. Without
 `require_review`, nothing is printed and nothing changes, except that
 `shipped` still runs the brief check above.
 
+### Reopening a shipped subject (0.18)
+
+A follow-up on a shipped subject (a fix, a review round, a scenario its
+gate now misses) reopens it: reopen, add tasks to the approved change,
+scenario, evidence, review, ship.
+
+```bash
+canon subject status demo-subject verifying \
+  --reason "follow-up: the retry path leaks a file handle" --actor-id impl
+```
+
+```
+canon subject status: reopened `demo-subject` from shipped, recorded by `impl`: follow-up: the retry path leaks a file handle; add the follow-up as tasks in its approved change `c-demo`, then scenario, evidence and review; shipping again runs every guard
+canon subject status: demo-subject → verifying — written directly; nothing to promote
+```
+
+- `--reason "<one line>"` is required for `shipped → verifying` and
+  refused on any other transition (exit 2, as is a blank one). The new
+  record carries it with the actor and the change the work goes into:
+  `reopen: { reason: …, change: c-demo, actor: { agent_id: impl } }`. The
+  next status write clears it, as it clears a waiver.
+- Inside the approved scope it needs no human: the subject's newest
+  adopted change's brief is approved, or there is no brief to answer.
+  Otherwise it refuses, exit 1, naming the brief to approve, and
+  `--override-reason` does not waive it:
+  ``unreviewed-promotion demo-subject — shipped → verifying: reopening needs the approved scope, and the brief is not approved — .canon/changes/c-next/brief.md has no `Approved:` line; …``.
+- The review guard does not run on a reopen (it prints `skipped … — a
+  reopen moves the subject back to fix its gaps; shipping again runs
+  it`). `verifying → shipped` afterwards runs every guard above again.
+- `canon status` flags a shipped subject whose gate went red (whatever
+  `verifying → shipped` would now refuse it on) and its only step is
+  this reopen.
+
 ## Adopt flow
 
 Planning docs written outside canon become change/task records via
@@ -261,19 +295,33 @@ and a flip re-imports that change itself. Run `canon ingest plans` for a
 plan written outside canon, or when `canon query --kind task` must list
 rows nobody has flipped yet.
 
-`adopt` stamps the change's `subject_id` and adds it to the Subject's
-`change_ids`, so `canon query --kind change --change-id …` and `canon
-query --kind subject` agree on the link from both ends. It writes only
-the side that lacks the link, so rerunning it on a linked pair writes
-nothing and exits `0`.
+`adopt` adds the subject to the change's `subject_ids` and the change to
+the Subject's `change_ids`, so `canon query --kind change --change-id …`
+and `canon query --kind subject` agree on the link from both ends. It
+writes only the side that lacks the link, so rerunning it on a linked
+pair writes nothing and exits `0`.
+
+A change may belong to several subjects (0.18). Adopting it under a
+second subject adds that subject, never re-points the change, and says
+so:
+
+```
+canon subject adopt: linked change `refactor-core` to subject `editing` as well; the change now belongs to `perception` and `editing` — written directly; nothing to promote
+```
+
+Every reader joins a subject to its changes from both sides (the
+subject's `change_ids`, and every change whose `subject_ids` names it):
+the open-blocker rule, the status guard, `canon status`, the brief and
+the evidence refusal. An open blocker on a shared change gates each
+subject it belongs to. A change written before 0.18 names one subject as
+`subject_id`; it reads, and `canon query --kind change --json` shows it,
+as a one-element `subject_ids`.
 
 The two records cannot be written atomically, so the subject is written
-first: its `change_ids` is what the gate reads a subject's adopted
-changes from (`open-blocker`, the status guard), so a half-done adoption
-still has that change's open blockers counted. If the change write then
-fails, `adopt` exits `2`, names the subject that now lists the change,
-and prints `canon subject adopt <change_id> --subject <id>` to complete
-it.
+first: a half-done adoption still has that change's open blockers
+counted. If the change write then fails, `adopt` exits `2`, names the
+subject that now lists the change, and prints `canon subject adopt
+<change_id> --subject <id>` to complete it.
 
 ### Starting a new change: `canon change new`
 
@@ -393,6 +441,14 @@ uses, so status and the gate cannot disagree about a gap:
   canon brief and no line it reads
   ``brief: not approved (<brief> has no `Approved:` line)``.
   There is no record kind for it; the file is the record.
+- **Red shipped subject** (0.18) — a `shipped` subject that the
+  `verifying → shipped` guard would now refuse, by the guard's own checks
+  (owned scenarios, verdicts, required cases, audits, and, where
+  `require_review` covers `shipped`, reviews and open blockers under
+  `block_on_findings`; a gap its waiver recorded is not counted), prints
+  ``gate: red — <n> <class> (first: <subject>), …; reopen with `canon subject status <id> verifying --reason "<why it reopens>" --actor-id <unit>` ``,
+  carries `red: [...]` in `--json`, and that reopen is its only `next:`
+  step. Open blockers count against every subject a change belongs to.
 - **Unowned** — scenarios with no `@subject:` tag.
 - **Audits** — how many scenarios are sampled for
   `spec_coverage.require_audit`, confirmed, owed (no audit or

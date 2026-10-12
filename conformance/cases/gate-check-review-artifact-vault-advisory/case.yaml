@@ -1,0 +1,8 @@
+description: "0.18 D5: a file bound to a current review whose stored blob is gone but whose working-tree copy still hashes to the recorded digest keeps `canon gate check` clean (exit 0) and is listed as an evidence-artifacts advisory naming the reviewer and `canon evidence vault`; `canon evidence vault` stores it back (exit 0) and the advisory goes away"
+steps:
+  - args: [gate, check]
+    exit: 0
+  - args: [evidence, vault]
+    exit: 0
+  - args: [gate, check]
+    exit: 0

@@ -38,16 +38,19 @@ fn duckdb_available() -> bool {
 /// [`run_pinned_command`]) appends to the `-init` file, after
 /// `canon_store::VIEWS_SQL`'s own definitions.
 ///
-/// `views.sql` reads the filesystem in exactly FOUR places — the
+/// `views.sql` reads the filesystem in exactly FIVE places — the
 /// `read_text`/`read_parquet` calls in `stg_git_records`,
-/// `stg_r2_records`, `stg_strategy_items` and `stg_trajectories`
-/// (verified by grepping every `read_*(`/`glob(` in that file, and the
-/// only reason this list can be short enough to be trustworthy). Every
-/// `int_*`/`mart_*` view is a pure derivation over those four. So
-/// materializing the four into temp tables and repointing the four
-/// staging views at them PINS the whole corpus: every mart the batch
-/// goes on to compute reads the same rows, and a record written to the
-/// ledger after this DDL runs reaches NONE of them.
+/// `stg_r2_records`, `stg_hot_records`, `stg_strategy_items` and
+/// `stg_trajectories` (verified by grepping every `read_*(`/`glob(` in
+/// that file, and the only reason this list can be short enough to be
+/// trustworthy). Every `int_*`/`mart_*` view is a pure derivation over
+/// those five. So materializing the five into temp tables and
+/// repointing the five staging views at them PINS the whole corpus:
+/// every mart the batch goes on to compute reads the same rows, and a
+/// record written to the ledger after this DDL runs reaches NONE of
+/// them. (The hot tier is already a per-invocation snapshot,
+/// [`Roots::materialize_hot`]; it is pinned anyway so the five staging
+/// views stay one rule.)
 ///
 /// Why this is needed at all: a DuckDB glob is re-expanded and the
 /// files re-read for every statement that touches a staging view, so
@@ -66,28 +69,38 @@ fn duckdb_available() -> bool {
 const PIN_CORPUS_SQL: &str = "
 CREATE TEMP TABLE _canon_pinned_git_records   AS SELECT * FROM stg_git_records;
 CREATE TEMP TABLE _canon_pinned_r2_records    AS SELECT * FROM stg_r2_records;
+CREATE TEMP TABLE _canon_pinned_hot_records   AS SELECT * FROM stg_hot_records;
 CREATE TEMP TABLE _canon_pinned_strategies    AS SELECT * FROM stg_strategy_items;
 CREATE TEMP TABLE _canon_pinned_trajectories  AS SELECT * FROM stg_trajectories;
 CREATE OR REPLACE VIEW stg_git_records   AS SELECT * FROM _canon_pinned_git_records;
 CREATE OR REPLACE VIEW stg_r2_records    AS SELECT * FROM _canon_pinned_r2_records;
+CREATE OR REPLACE VIEW stg_hot_records   AS SELECT * FROM _canon_pinned_hot_records;
 CREATE OR REPLACE VIEW stg_strategy_items AS SELECT * FROM _canon_pinned_strategies;
 CREATE OR REPLACE VIEW stg_trajectories  AS SELECT * FROM _canon_pinned_trajectories;
 ";
 
+/// The scratch files one `duckdb` invocation needs alive until it
+/// exits: the `-init` file and the directory the sqlite hot tier is
+/// materialized into (`CANON_HOT_ROOT`, [`Roots::materialize_hot`]).
+struct Scratch {
+    _init_file: tempfile::NamedTempFile,
+    _hot_root: tempfile::TempDir,
+}
+
 /// Builds the base `duckdb -init <views.sql> [-json]` `Command` every
 /// caller needs — env vars set, `roots` seeded first
 /// ([`Roots::ensure_seeded`]) so an empty r2/learn source never aborts
-/// an unrelated query (module doc of [`crate::roots`]). Returns the
-/// backing [`tempfile::NamedTempFile`] alongside the `Command` — it
-/// must outlive the `duckdb` invocation, since `-init` takes a
-/// filename, never inline SQL.
+/// an unrelated query (module doc of [`crate::roots`]), and the sqlite
+/// hot tier materialized under `CANON_HOT_ROOT`. Returns the backing
+/// [`Scratch`] alongside the `Command` — it must outlive the `duckdb`
+/// invocation, since `-init` takes a filename, never inline SQL.
 ///
 /// `pin_corpus` appends [`PIN_CORPUS_SQL`] to that same init file. A
 /// failing statement in an init file is fatal to `duckdb` (non-zero
 /// exit + stderr, verified directly), so a pin that could not be taken
 /// surfaces as a [`ReportError::QueryFailed`] rather than as a silent
 /// fall-back to unpinned reads.
-fn base_command(roots: &Roots, json: bool, pin_corpus: bool) -> Result<(Command, tempfile::NamedTempFile), ReportError> {
+fn base_command(roots: &Roots, json: bool, pin_corpus: bool) -> Result<(Command, Scratch), ReportError> {
     if !duckdb_available() {
         return Err(ReportError::DuckDbMissing);
     }
@@ -100,6 +113,9 @@ fn base_command(roots: &Roots, json: bool, pin_corpus: bool) -> Result<(Command,
     }
     init_file.flush()?;
 
+    let hot_root = tempfile::Builder::new().prefix("canon-report-hot-").tempdir()?;
+    roots.materialize_hot(hot_root.path())?;
+
     let mut cmd = Command::new("duckdb");
     cmd.arg("-init").arg(init_file.path());
     if json {
@@ -108,7 +124,8 @@ fn base_command(roots: &Roots, json: bool, pin_corpus: bool) -> Result<(Command,
     for (key, value) in roots.env_pairs() {
         cmd.env(key, value);
     }
-    Ok((cmd, init_file))
+    cmd.env(canon_store::CANON_HOT_ROOT_ENV, hot_root.path());
+    Ok((cmd, Scratch { _init_file: init_file, _hot_root: hot_root }))
 }
 
 fn parse_rows(stdout: &str) -> Result<Vec<Row>, ReportError> {
@@ -129,7 +146,7 @@ fn parse_rows(stdout: &str) -> Result<Vec<Row>, ReportError> {
 /// to serve one read. Two numbers that a reader will compare must come
 /// from [`run_pinned_queries`] instead.
 pub fn run_query(roots: &Roots, sql: &str) -> Result<Vec<Row>, ReportError> {
-    let (mut cmd, _init_file) = base_command(roots, true, false)?;
+    let (mut cmd, _scratch) = base_command(roots, true, false)?;
     // `-init` takes a FILENAME, never inline SQL — the embedded view
     // layer is written to a temp file per call rather than assuming a
     // caller-relative `sql/views.sql` path exists on disk (this crate
@@ -158,7 +175,7 @@ pub fn run_query(roots: &Roots, sql: &str) -> Result<Vec<Row>, ReportError> {
 /// EXACTLY one result set: a `COPY`/DDL statement prints nothing and
 /// would shift the whole batch.
 pub fn run_pinned_queries<S: AsRef<str>>(roots: &Roots, statements: &[S]) -> Result<Vec<Vec<Row>>, ReportError> {
-    let (mut cmd, _init_file) = base_command(roots, true, true)?;
+    let (mut cmd, _scratch) = base_command(roots, true, true)?;
     let script = statements.iter().map(AsRef::as_ref).collect::<Vec<_>>().join("\n");
     cmd.arg("-c").arg(script);
     let output = cmd.output()?;
@@ -201,7 +218,7 @@ pub fn run_pinned_command(roots: &Roots, sql: &str) -> Result<(), ReportError> {
 }
 
 fn run(roots: &Roots, sql: &str, pin_corpus: bool) -> Result<(), ReportError> {
-    let (mut cmd, _init_file) = base_command(roots, false, pin_corpus)?;
+    let (mut cmd, _scratch) = base_command(roots, false, pin_corpus)?;
     cmd.arg("-c").arg(sql);
     let output = cmd.output()?;
     if !output.status.success() {

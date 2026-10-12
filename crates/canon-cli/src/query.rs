@@ -258,6 +258,11 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 ///   the same reason a scenario whose CURRENT generation is a tombstone
 ///   (`removed: true`, written by `canon inventory sync` once no feature
 ///   file declares it) is dropped after the fold, as the gate drops it.
+/// - `change` (0.18 D4): `canon subject adopt` / `canon change new`
+///   append a version that adds a subject to `subject_ids`, and a plan
+///   re-import appends another, so a change adopted by two subjects
+///   would otherwise read as one row per version. Folded, it reads as
+///   its one current version listing every subject, as the gate reads it.
 ///
 /// KIND-gated for [`fold_pg_routed_kind`]'s stated reason, and by the
 /// same trade-off: a kind that gains a re-writing verb must be added
@@ -270,7 +275,7 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 /// one. Folding by key would collapse nothing today and would silently
 /// start dropping attestations the day two reviews share a pin.
 fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
-    if !matches!(kind, RecordKind::Subject | RecordKind::Finding | RecordKind::Scenario) {
+    if !matches!(kind, RecordKind::Subject | RecordKind::Finding | RecordKind::Scenario | RecordKind::Change) {
         return records;
     }
     let folded = fold_latest_by_natural_key(kind, records);
@@ -478,11 +483,28 @@ fn sensitive_detail_key(key: &str) -> bool {
 }
 
 fn query_record(kind: RecordKind, raw: &RawRecord, include_sensitive: bool) -> Value {
-    if kind == RecordKind::Event && !include_sensitive {
-        redacted_event_record(raw)
-    } else {
-        raw.0.clone()
+    match kind {
+        RecordKind::Event if !include_sensitive => redacted_event_record(raw),
+        RecordKind::Change => change_record(raw),
+        _ => raw.0.clone(),
     }
+}
+
+/// A change as `--json` shows it (0.18 D4): a version written before
+/// 0.18 carries one `subject_id`, shown as the one-element `subject_ids`
+/// the model reads it as, so every version names its subjects the same
+/// way. Presentation only, like event redaction: the stored record is
+/// never modified.
+fn change_record(raw: &RawRecord) -> Value {
+    let mut record = raw.0.clone();
+    if let Some(object) = record.as_object_mut() {
+        if let Some(old) = object.remove("subject_id") {
+            if !old.is_null() && !object.contains_key("subject_ids") {
+                object.insert("subject_ids".to_string(), Value::Array(vec![old]));
+            }
+        }
+    }
+    record
 }
 
 /// `--json`: machine-readable output — event bodies are redacted by default.

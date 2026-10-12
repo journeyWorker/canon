@@ -93,3 +93,35 @@ Feature: report generation
     When the report is generated
     Then the boundary section is absent entirely
     And the warning is a statement about this repo's routing, not boilerplate
+
+  # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:report-generation
+  @case:happy
+  @report.generation.10
+  Scenario: A fresh canon init repo's report fills its task columns from the sqlite hot tier
+    Given a fresh canon init repo, whose canon.yaml routes task to a sqlite hot rung, with a change carrying two tasks and its brief approved
+    When one task is attested and flipped with canon gate task, and the report is generated
+    Then the trust matrix carries each task's title and status, the flipped one done
+    And no task record reached the git ledger, so those rows were read from sqlite
+    And no kind is named as not read directly and no warning is printed
+    And canon report --check reads the same report back
+
+  # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:report-generation
+  @case:failure
+  @report.generation.11
+  Scenario: A missing hot db is no rows and an unreadable one fails the report loud
+    Given a canon.yaml backing hot with a sqlite file that does not exist yet
+    When the report is generated
+    Then it succeeds with no warning and does not create the file
+    And once that file holds something that is not a sqlite database, the report exits 1 naming the file instead of rendering without its tasks
+
+  # canon: {"schema":1,"at":"2026-10-12T16:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:report-generation
+  @case:edge
+  @report.generation.12
+  Scenario: A record held by both the git ledger and the sqlite hot tier is counted once
+    Given a fresh canon init repo whose flipped task has one evidence record in the git ledger
+    And a byte-identical copy of that record written to the sqlite hot tier
+    When the report is generated
+    Then the task's evidence count is 1, not 2

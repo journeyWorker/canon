@@ -349,7 +349,7 @@ pub struct Handoff {
     /// idempotence that `canon report --check`'s drift gate and ingest
     /// watermarks both rest on. An unset endpoint is an ABSENT key,
     /// byte-identical to a pre-s37 row — the same discipline
-    /// [`crate::records::Change::subject_id`] and `Actor::role` already
+    /// [`crate::records::Change::subject_ids`] and `Actor::role` already
     /// follow.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from_role: Option<RoleId>,

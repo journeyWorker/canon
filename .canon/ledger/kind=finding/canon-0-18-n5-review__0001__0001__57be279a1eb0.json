@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-018-n5",
+    "role": "reviewer",
+    "session_id": "review-018-n5"
+  },
+  "at": "2026-10-12T15:22:30.828934Z",
+  "change_id": "canon-0-18-n5-review",
+  "disposition": "open",
+  "file_ref": "examples/platformer/tests/movement.test.ts:125-145",
+  "kind": "finding",
+  "reviewed_sha": "27e029ada53f44b272f305ae66a96cb85080771b",
+  "reviewer": "canon-reviewer-018-n5",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "movement.03 test pinned the buffered jump on L+1 while the scenario says the landing frame"
+}

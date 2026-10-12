@@ -125,6 +125,10 @@ impl RecordKind {
     ///   post-change record for one `task_id` tie on `at` exactly, and
     ///   without this bump the fold resolved that tie by lexicographic
     ///   digest — arbitrarily, per row.
+    /// - **`Change` is `2`** (0.18 D4) — its single `subject_id` became
+    ///   the list `subject_ids`, and a plan-imported change's `at` is the
+    ///   same byte-stable source mtime, so a pre-0.18 and a 0.18 record
+    ///   of one `change_id` can tie on `at` the same way.
     /// - **`Run` and `Handoff` stay `1`** even though they ALSO gained
     ///   fields on the same branch (`Run.parent_run_id`,
     ///   `Run.injected_guidance`, the handoff role fields). Their `at`
@@ -139,9 +143,8 @@ impl RecordKind {
     /// generation MARKER for the fold, not a migration trigger.
     pub const fn schema_version(self) -> u32 {
         match self {
-            RecordKind::Task => 2,
-            RecordKind::Change
-            | RecordKind::Scenario
+            RecordKind::Task | RecordKind::Change => 2,
+            RecordKind::Scenario
             | RecordKind::Session
             | RecordKind::Run
             | RecordKind::Event
@@ -315,12 +318,13 @@ mod tests {
     /// are named explicitly because both DID gain fields on the same
     /// branch that bumped `Task` and both deliberately stayed at `1`.
     #[test]
-    fn only_task_carries_the_bumped_schema_generation() {
+    fn only_task_and_change_carry_a_bumped_schema_generation() {
         assert_eq!(RecordKind::Task.schema_version(), 2, "Task gained `depends_on` and its byte-stable `at` can tie");
+        assert_eq!(RecordKind::Change.schema_version(), 2, "Change's `subject_id` became `subject_ids` and its plan-import `at` can tie");
         assert_eq!(RecordKind::Run.schema_version(), 1, "Run's `at` is derivation-time, so its generations can never tie on `at`");
         assert_eq!(RecordKind::Handoff.schema_version(), 1, "Handoff's `at` is derivation-time, so its generations can never tie on `at`");
         for kind in RecordKind::ALL {
-            if kind == RecordKind::Task {
+            if matches!(kind, RecordKind::Task | RecordKind::Change) {
                 continue;
             }
             assert_eq!(kind.schema_version(), 1, "{kind:?} must stay at generation 1 until its records can tie on `at`");

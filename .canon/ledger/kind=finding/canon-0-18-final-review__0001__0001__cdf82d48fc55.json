@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-018-final",
+    "role": "reviewer",
+    "session_id": "review-018-final"
+  },
+  "at": "2026-10-12T15:41:42.562513Z",
+  "change_id": "canon-0-18-final-review",
+  "disposition": "rejected",
+  "file_ref": "README.md:394-395",
+  "kind": "finding",
+  "reviewed_sha": "34b6ea7a48b035ac7694df90bb157baf746b90d0",
+  "reviewer": "canon-reviewer-018-final",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "README listed issues as closed before the release merged (rejected: the PR closes each on merge, one Closes line per issue)"
+}

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "018-n2-impl",
+    "role": "implementer",
+    "session_id": "018-n2-impl"
+  },
+  "at": "2026-10-12T14:21:41.541722Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status context_status_70"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 49,
+  "scenario_id": "context.status.70",
+  "schema": 1,
+  "staging_id": "2e3c49615eaa",
+  "verdict": "faithful"
+}

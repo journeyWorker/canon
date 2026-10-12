@@ -828,7 +828,7 @@ enum EvidenceCommand {
         repo: PathBuf,
     },
     /// Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)
-    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).\n\nRE-ATTESTING NEVER DROPS A BINDING SILENTLY (--drop-attachment).\nFor a scenario, a record that leaves out a file the scenario's latest record binds is refused (exit 2) until it re-binds the file (new bytes at the same path are fine) or names it with --drop-attachment <path> (repeatable) --drop-reason <text>. The drop is recorded on the record and listed by canon status. Task-only evidence has no drop guard.\n\nNOTHING IS ATTESTED BEFORE THE BRIEF IS APPROVED (--override-reason).\nWhile a subject this record attests for (the scenario's @subject owner, or any subject adopting the task's change) has a newest change whose proposal.md has no `Approved:` line, the add is refused (exit 1, nothing staged): stop, report the brief and wait for the human's answer. --override-reason <text> attests anyway; the reason, the waived subjects and --actor-id are recorded on the record and listed by canon status and canon gate check. A subject with no proposal.md to answer is unaffected; review add and finding add are never refused.\n\nAUDITS (--kind audit).\nRecords an external evaluator's re-audit of one scenario: --evaluator-id, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
+    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path>, cucumber:<path> or swift-testing:<path> (the JSON-lines event stream of `swift test --experimental-event-stream-output`) also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, a Swift Testing display name, then function name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. With --task and no --scenario-id, every case in the report is bound. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).\n\nONE REPORT, MANY SCENARIOS (--all-scenarios).\nWith --report and --project-id, writes one record per indexed scenario that owns a case in the report, each with its own cases and its own verdict: --verdict when given, else derived (faithful when every case passed, divergent when one failed, not-applicable when one was skipped). A case whose id is not indexed is named and skipped. All or nothing: any refusal (a claimed faithful verdict over a failed case, a fabrication marker, an unapproved brief, a dropped binding) writes no record. The records share the stored report and --artifact files.\n\nA WRITE THAT BREAKS A REVIEW PIN SAYS SO.\nWhen the new record supersedes evidence a current pinned review saw, one line per review now stale names the reviewer, the scenario and the `canon review add ... --pin <sha>` that re-pins it.\n\nRE-ATTESTING NEVER DROPS A BINDING SILENTLY (--drop-attachment).\nFor a scenario, a record that leaves out a file the scenario's latest record binds is refused (exit 2) until it re-binds the file (new bytes at the same path are fine) or names it with --drop-attachment <path> (repeatable) --drop-reason <text>. The drop is recorded on the record and listed by canon status. Task-only evidence has no drop guard.\n\nNOTHING IS ATTESTED BEFORE THE BRIEF IS APPROVED (--override-reason).\nWhile a subject this record attests for (the scenario's @subject owner, or any subject adopting the task's change) has a newest change whose proposal.md has no `Approved:` line, the add is refused (exit 1, nothing staged): stop, report the brief and wait for the human's answer. --override-reason <text> attests anyway; the reason, the waived subjects and --actor-id are recorded on the record and listed by canon status and canon gate check. A subject with no proposal.md to answer is unaffected; review add and finding add are never refused.\n\nAUDITS (--kind audit).\nRecords an external evaluator's re-audit of one scenario: --evaluator-id, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
     Add {
         /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
@@ -842,7 +842,7 @@ enum EvidenceCommand {
         /// The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon
         #[arg(long = "ref", value_name = "REF")]
         evidence_ref: String,
-        /// faithful (default) / not-applicable / divergent; refused with --kind audit, whose verdict follows --audit-result
+        /// faithful / not-applicable / divergent; refused with --kind audit, whose verdict follows --audit-result. Default faithful; with --all-scenarios, each record's verdict is derived from its own cases unless this is given
         #[arg(long, value_parser = canon_cli::evidence::parse_verdict)]
         verdict: Option<EvidenceVerdict>,
         /// One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)
@@ -887,12 +887,15 @@ enum EvidenceCommand {
         /// EXPERIMENTAL: bind any file (trace, screenshots, agent QA log, report) by sha256; repeatable; must be inside the repo
         #[arg(long = "artifact", value_name = "PATH")]
         artifacts: Vec<PathBuf>,
-        /// EXPERIMENTAL: bind and parse a test report, `junit:<path>` or `cucumber:<path>`; repeatable
+        /// EXPERIMENTAL: bind and parse a test report, `junit:<path>`, `cucumber:<path>` or `swift-testing:<path>`; repeatable
         #[arg(long = "report", value_name = "FORMAT:PATH", value_parser = canon_cli::evidence_attach::parse_report_spec)]
         reports: Vec<(canon_model::ReportFormat, PathBuf)>,
         /// EXPERIMENTAL: also bind this report case (a Rust test: its function name); repeatable. Cases whose own scenario id is this one are always bound
         #[arg(long = "report-case", value_name = "NAME")]
         report_cases: Vec<String>,
+        /// One record per indexed scenario of --project-id that owns a case in the --report(s), all or nothing (see below)
+        #[arg(long)]
+        all_scenarios: bool,
         /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
         #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
         max_artifact_mib: u64,
@@ -923,8 +926,8 @@ enum EvidenceCommand {
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
-    /// Store the bound files of existing evidence records in the artifact store (.canon/artifacts/sha256/)
-    #[command(after_help = "For records written before canon stored bound bytes (0.11-0.13). Each attachment whose working-tree file still hashes to the recorded digest is copied into .canon/artifacts/sha256/<hex>; everything else is listed as not stored, with why. Commit the store with the ledger.\n\nExit 0 when the pass ran (the gate decides whether an unstored file matters), 2 when the ledger cannot be read or a write fails.")]
+    /// Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)
+    #[command(after_help = "For records written before canon stored bound bytes (0.11-0.13), and for any evidence file, or file of a current review, whose stored blob was lost. Each attachment whose working-tree file still hashes to the recorded digest is copied into .canon/artifacts/sha256/<hex>; everything else is listed as not stored, with why. A superseded review's files are not vaulted, as the gate does not check them. Commit the store with the ledger.\n\nExit 0 when the pass ran (the gate decides whether an unstored file matters), 2 when the ledger cannot be read or a write fails.")]
     Vault {
         /// Per-file size limit for the artifact store, in MiB
         #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
@@ -1021,17 +1024,35 @@ enum FindingCommand {
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
+    /// List a change's committed findings at their latest version: round, seq, severity, disposition, reviewer and summary
+    List {
+        /// The change whose findings to list
+        #[arg(long, value_parser = canon_cli::finding::parse_change_id)]
+        change_id: ChangeId,
+        /// Only findings whose current disposition is open
+        #[arg(long)]
+        open: bool,
+        /// Print `{change_id, findings: [...]}` as JSON
+        #[arg(long)]
+        json: bool,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
 enum ReviewCommand {
-    /// Write one attributed Review record directly to the ledger, nothing to promote (exactly one provenance ref required). The review pins the scenario's source digest and its latest evidence; it counts only while both are unchanged
+    /// Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required). Each review pins its scenario's source digest and latest evidence; it counts only while both are unchanged
     Add {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
-        /// The reviewed scenario; it must have a record (`canon inventory sync`), or the review is refused (exit 2)
-        #[arg(long, value_parser = canon_cli::review::parse_scenario_id)]
-        scenario_id: ScenarioId,
+        /// The reviewed scenario; repeatable, one review per scenario, all or nothing. Each must have a record (`canon inventory sync`), or nothing is written (exit 2)
+        #[arg(long = "scenario-id", value_parser = canon_cli::review::parse_scenario_id)]
+        scenario_ids: Vec<ScenarioId>,
+        /// Read more scenario ids from a file (`-` for stdin): one per line, `#` starts a comment
+        #[arg(long, value_name = "FILE|-")]
+        scenario_ids_from: Option<String>,
         #[arg(long)]
         reviewer: String,
         #[arg(long)]
@@ -1306,7 +1327,7 @@ enum SubjectCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Link an imported plan change to a subject
+    /// Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several)
     Adopt {
         /// The imported Change's id
         #[arg(value_parser = canon_cli::subject::parse_change_id)]
@@ -1321,7 +1342,7 @@ enum SubjectCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Transition a subject's lifecycle status (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated)
+    /// Transition a subject's lifecycle status (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)
     Status {
         /// The subject to transition
         #[arg(value_parser = canon_cli::subject::parse_subject_id)]
@@ -1332,7 +1353,10 @@ enum SubjectCommand {
         /// Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories
         #[arg(long)]
         override_reason: Option<String>,
-        /// The invoking actor's id, recorded with an --override-reason waiver
+        /// Why a shipped subject reopens (required for shipped → verifying, refused on any other transition); recorded on the subject with the actor
+        #[arg(long)]
+        reason: Option<String>,
+        /// The invoking actor's id, recorded with an --override-reason waiver or a --reason reopen
         #[arg(long, default_value = "canon")]
         actor_id: String,
         /// Repo root (default: nearest ancestor with a canon.yaml)
@@ -1489,6 +1513,7 @@ fn main() -> ExitCode {
                 artifacts,
                 reports,
                 report_cases,
+                all_scenarios,
                 max_artifact_mib,
                 evaluator_id,
                 evaluator_version,
@@ -1526,6 +1551,7 @@ fn main() -> ExitCode {
                             artifacts,
                             reports,
                             report_cases,
+                            all_scenarios,
                             max_artifact_mib,
                             evaluator_id,
                             evaluator_version,
@@ -1539,7 +1565,10 @@ fn main() -> ExitCode {
                     ) as u8,
                 )
             }
-            EvidenceCommand::Vault { max_artifact_mib, repo } => ExitCode::from(canon_cli::evidence::run_vault(&repo, max_artifact_mib) as u8),
+            EvidenceCommand::Vault { max_artifact_mib, repo } => {
+                canon_cli::inventory::refresh_stale_index(&repo, "canon evidence vault");
+                ExitCode::from(canon_cli::evidence::run_vault(&repo, max_artifact_mib) as u8)
+            }
         },
         Command::Finding { action } => match action {
             FindingCommand::Add {
@@ -1585,11 +1614,15 @@ fn main() -> ExitCode {
                     &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, promote: promote.flag() },
                 ) as u8)
             }
+            FindingCommand::List { change_id, open, json, repo } => {
+                ExitCode::from(canon_cli::finding::run_list(&repo, &canon_cli::finding::FindingListArgs { change_id, open, json }) as u8)
+            }
         },
         Command::Review { action } => match action {
             ReviewCommand::Add {
                 project_id,
-                scenario_id,
+                scenario_ids,
+                scenario_ids_from,
                 reviewer,
                 pin,
                 upstream_ref,
@@ -1610,7 +1643,8 @@ fn main() -> ExitCode {
                     &repo,
                     &canon_cli::review::ReviewAddArgs {
                         project_id,
-                        scenario_id,
+                        scenario_ids,
+                        scenario_ids_from,
                         reviewer,
                         pin,
                         upstream_ref,
@@ -1671,9 +1705,9 @@ fn main() -> ExitCode {
                 ExitCode::from(canon_cli::subject::run_new(&repo, &id, &domain, &title, &summary, &owner_role, &actor_id, json) as u8)
             }
             SubjectCommand::Adopt { change_id, subject, repo, json } => ExitCode::from(canon_cli::subject::run_adopt(&repo, &change_id, &subject, json) as u8),
-            SubjectCommand::Status { id, state, override_reason, actor_id, repo, json } => {
+            SubjectCommand::Status { id, state, override_reason, reason, actor_id, repo, json } => {
                 canon_cli::inventory::refresh_stale_index(&repo, "canon subject status");
-                ExitCode::from(canon_cli::subject::run_status(&repo, &id, state, override_reason.as_deref(), &actor_id, json) as u8)
+                ExitCode::from(canon_cli::subject::run_status(&repo, &id, state, override_reason.as_deref(), reason.as_deref(), &actor_id, json) as u8)
             }
         },
         Command::Change { action } => match action {
@@ -1758,6 +1792,9 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
             }
             if let Some(path) = &report.config_written {
                 println!("canon skills install: wrote `skills: {{ providers: [{}] }}` to {}", report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "), path.display());
+            }
+            for line in canon_cli::skills::owned_paths_lines(&report.providers) {
+                println!("{line}");
             }
             ExitCode::SUCCESS
         }

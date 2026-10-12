@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-018-final",
+    "role": "reviewer",
+    "session_id": "review-018-final"
+  },
+  "at": "2026-10-12T15:41:42.813606Z",
+  "change_id": "canon-0-18-final-review",
+  "disposition": "fixed",
+  "file_ref": "README.md:400",
+  "kind": "finding",
+  "resolution_sha": "2d680c3bc458fc97b196ffc6ce4af455f96ec041",
+  "reviewed_sha": "34b6ea7a48b035ac7694df90bb157baf746b90d0",
+  "reviewer": "canon-reviewer-018-final",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "acceptance paragraph gave 28 scenarios where the evidence says 29"
+}

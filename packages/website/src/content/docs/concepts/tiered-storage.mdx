@@ -162,8 +162,11 @@ CANON_R2_ROOT=/path/to/local/r2/root/canon \
 
 These views never write back to a rung — `canon fmt`, `canon migrate`,
 and tier writes are the only sanctioned mutators. A kind routed to a
-rung that isn't directly report-readable (Postgres/sqlite always;
-S3/cold unless a local mirror happens to exist) isn't lost — it stays reachable
+rung that isn't directly report-readable (Postgres always;
+S3/cold unless a local mirror happens to exist) isn't lost. Since 0.18
+`canon report` reads the sqlite `hot` file directly — it is local and
+needs no credential — so `canon init`'s default routing fills the task
+columns. A kind that is not read directly stays reachable
 through `canon query --kind <kind>`, and `canon report` names the gap
 explicitly rather than under-counting it.
 

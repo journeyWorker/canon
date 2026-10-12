@@ -1,0 +1,44 @@
+{
+  "count": 2,
+  "kind": "subject",
+  "records": [
+    {
+      "actor": {
+        "agent_id": "canon",
+        "role": "implementer"
+      },
+      "at": "<ts>",
+      "change_ids": [
+        "refactor-core"
+      ],
+      "domain": "dev",
+      "kind": "subject",
+      "owner_role": "implementer",
+      "schema": 1,
+      "status": "proposed",
+      "subject_id": "editing",
+      "summary": "",
+      "title": "Editing"
+    },
+    {
+      "actor": {
+        "agent_id": "canon",
+        "role": "implementer"
+      },
+      "at": "<ts>",
+      "change_ids": [
+        "refactor-core"
+      ],
+      "domain": "dev",
+      "kind": "subject",
+      "owner_role": "implementer",
+      "schema": 1,
+      "status": "proposed",
+      "subject_id": "perception",
+      "summary": "",
+      "title": "Perception"
+    }
+  ],
+  "since": null,
+  "violations": 0
+}

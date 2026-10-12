@@ -264,3 +264,36 @@ Feature: skills install
     Then each exits 1 naming the expected shape or the unknown provider
     And nothing is projected and canon.yaml is byte-identical
     And canon init --check-config reports the skills section as FAIL with the same reason
+
+  # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:happy
+  @skills.install.56
+  Scenario: Install and doctor print the paths canon owns for formatter and linter ignore lists
+    Given a target whose canon.yaml selects Claude and Codex
+    When canon skills install and canon skills doctor run
+    Then each ends with an owned-paths block of one glob per line
+    And the block lists the selected providers' projections first, then every machine-written path under .canon sorted, including .canon/ledger/** and .canon/artifacts/**
+    And an unchanged install prints the same block
+    And .canon/specs, .canon/policy.yaml and .canon/changes are never listed, since people write them by hand and linters should still see them
+
+  # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:edge
+  @skills.install.57
+  Scenario: A projected file a formatter rewrote is named as a rewrite with the ignore entry to add
+    Given an installed Claude projection whose SKILL.md a formatter rewrote with other line endings, spacing and blank lines
+    When canon skills check and canon skills doctor run
+    Then the check still exits 1 and calls the file formatter-rewritten
+    And the doctor reports formatter-rewritten for the file, names `.claude/skills/canon/**` as the ignore entry and the install command that restores it
+    And the doctor does not report the file as stale and does not report healthy
+
+  # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.58
+  Scenario: A projected file whose content changed stays drift
+    Given an installed Claude projection where SKILL.md gained a paragraph, the hook script's `rm -rf a b` became `rm -rfab` and its `\` continuation was joined, and a command inside a reference file's code fence gained a space
+    When canon skills check and canon skills doctor run
+    Then the check exits 1 and calls each file stale
+    And the doctor reports each stale and never as formatter-rewritten, because whitespace between tokens, backslashes and code fences are never normalized away

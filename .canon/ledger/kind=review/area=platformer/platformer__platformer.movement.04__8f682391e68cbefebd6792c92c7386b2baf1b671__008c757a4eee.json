@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-018-n5",
+    "role": "reviewer",
+    "session_id": "review-018-n5"
+  },
+  "at": "2026-10-12T15:22:32.136705Z",
+  "kind": "review",
+  "pin": "8f682391e68cbefebd6792c92c7386b2baf1b671",
+  "pins": {
+    "evidence": [
+      {
+        "digest": "b1b4b8458a27",
+        "key": "platformer.movement.04"
+      }
+    ],
+    "scenario_digest": "c70e6f0035d7890be5252d8cc75e683bf0b277a61e66616c134bd61b3ef907cc",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "platformer",
+  "provenance_ref": {
+    "upstream_ref": "docs/superpowers/plans/2026-10-12-canon-0.18.0-fewer-calls.md#D7"
+  },
+  "reviewer": "canon-reviewer-018-n5",
+  "scenario_id": "platformer.movement.04",
+  "schema": 1
+}

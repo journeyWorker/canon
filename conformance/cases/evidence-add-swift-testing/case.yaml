@@ -1,0 +1,6 @@
+description: "0.18 D1: `--report swift-testing:<path>` reads the JSON-lines event stream of a real `swift test --experimental-event-stream-output` run; with `--all-scenarios` each indexed scenario's record binds its test by display name and records its outcome (a failing issue is divergent), exit 0"
+steps:
+  - args: [inventory, sync]
+    exit: 0
+  - args: [evidence, add, --project-id, root, --all-scenarios, --report, swift-testing:reports/events.jsonl, --kind, test-run, --ref, "swift test --experimental-event-stream-output reports/events.jsonl", --role, implementer, --actor-id, impl-agent]
+    exit: 0

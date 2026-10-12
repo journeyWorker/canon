@@ -1,0 +1,39 @@
+{
+  "count": 1,
+  "kind": "subject",
+  "records": [
+    {
+      "actor": {
+        "agent_id": "canon",
+        "role": "implementer"
+      },
+      "at": "<ts>",
+      "change_ids": [
+        "c-checkout"
+      ],
+      "domain": "commerce",
+      "kind": "subject",
+      "owner_role": "implementer",
+      "schema": 1,
+      "status": "shipped",
+      "status_override": {
+        "actor": {
+          "agent_id": "lead"
+        },
+        "reason": "the human approved in chat; line to follow",
+        "to": "shipped",
+        "waived": [
+          {
+            "class": "unreviewed-promotion",
+            "subject": "checkout"
+          }
+        ]
+      },
+      "subject_id": "checkout",
+      "summary": "",
+      "title": "Checkout"
+    }
+  ],
+  "since": null,
+  "violations": 0
+}

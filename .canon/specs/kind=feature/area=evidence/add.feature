@@ -423,3 +423,101 @@ Feature: evidence add
     And nothing is staged or committed
     And once that canon brief.md holds the "Source:" line and the "Approved:" line, both adds succeed
     And the external proposal.md is never edited, and canon gate task flips the external task row
+
+  # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.80
+  Scenario: One report attests every indexed scenario that owns a case in it, one record each
+    Given three indexed scenarios and a JUnit report whose cases lead with their ids, one of them failing
+    When evidence is added with --report and --all-scenarios and no --verdict
+    Then three records are written, each binding only its own cases, with the failing scenario's verdict divergent and the others faithful
+    And every record pins the same stored report blob, which is stored once
+    And the output lists each scenario with its verdict on its own line
+
+  # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.81
+  Scenario: A faithful claim over a batch with any failed case refuses the whole batch
+    Given indexed scenarios and a report where one scenario's case failed and the others passed
+    When evidence is added with --all-scenarios --verdict faithful
+    Then the add exits 1 naming the failed case and its scenario
+    And no record is staged or committed and no blob is stored
+
+  # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.82
+  Scenario: A case whose scenario id is not indexed is named and skipped
+    Given a report with a case leading with an id no indexed scenario carries, and a case with no id at all
+    When evidence is added with --all-scenarios
+    Then the indexed scenarios get their records and the output names the unindexed id and counts the case with no id as skipped
+    And a report in which no case belongs to an indexed scenario is refused with exit 2 and nothing is written
+
+  # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.83
+  Scenario: Any refusal one record of a batch would meet refuses all of them
+    Given a batch of scenarios where one belongs to a subject whose brief is not approved
+    When evidence is added with --all-scenarios
+    Then the add exits 1 with the brief refusal and nothing is staged for any scenario
+    And a summary carrying a fabrication marker refuses the batch the same way
+    And a scenario whose latest record binds a file the batch does not refuses it with exit 2, nothing written
+    And --all-scenarios with --scenario-id, --task, --report-case, a drop or an approval, or without --report or --project-id, is refused with exit 2
+    And a batch whose second record fails to stage, or whose second promotion is refused, leaves no record staged or committed and no new blob, and a read-only destination is refused before anything is written
+
+  # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.84
+  Scenario: A task's report with no scenario id binds every case in it
+    Given a task row and a report whose cases carry no scenario id
+    When evidence is added with --task and --report and no --scenario-id
+    Then the record binds every case in the report
+    And when any case failed, a faithful verdict is refused with exit 1 and nothing is staged
+
+  # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.85
+  Scenario: A Swift Testing event stream binds by display name, then function name
+    Given the event stream a real `swift test --experimental-event-stream-output` run wrote, with passing, failing, skipped and parameterized tests
+    When it is bound with --report swift-testing:<path>
+    Then each test's case is named by its display name, or its function name when it has none
+    And a test with a failing issue is failed, a skipped test skipped, and a test that started and ended without one passed
+    And a suite whose end reports a failure no test inside it recorded fails every test inside it, while a suite whose end only reports a failed test leaves that test's siblings as they ended
+    And a stream that is not JSON lines, or in which no test ran, is refused with exit 2
+
+  # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.86
+  Scenario: A write that makes a pinned review stale names the review and its re-pin command
+    Given a scenario with a current signed review that pinned its latest evidence
+    When new evidence for the scenario is added, alone or in a batch
+    Then the add prints one line per review now stale naming the reviewer, the scenario and the `canon review add ... --pin <sha>` command that re-pins it
+    And that command keeps the review's session when it recorded one
+    And running that command makes the review current again
+    And evidence for a scenario with no current pinned review prints no such line
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.90
+  Scenario: A marker inside a path, a file name, a URL or a longer word is not a fabrication marker
+    Given a scenario and a summary naming "pack.json/atlas JSON", "tbd_notes.md" and "https://example.com/tbd"
+    When evidence is added for the scenario with that summary
+    Then the add succeeds and the committed record carries the summary as given
+    And a summary where "n/a" stands on its own is still refused with exit 1 and nothing is written
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.91
+  Scenario: A fabrication marker is refused the way every other gate-red refusal of evidence add is
+    Given a summary holding "TBD" and a command result reading "n/a"
+    When evidence is added with them
+    Then the command exits 1 with one "canon evidence add: refused —" line per finding, each naming fabricated-evidence, the scenario, the field and the marker
+    And nothing is staged or committed

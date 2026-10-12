@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "018-n2-impl",
+    "role": "implementer",
+    "session_id": "018-n2-impl"
+  },
+  "at": "2026-10-12T14:21:39.245891Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test change subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and_its_blocker_gates_both"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 36,
+  "scenario_id": "subject.lifecycle.33",
+  "schema": 1,
+  "staging_id": "f093db8d4f55",
+  "verdict": "faithful"
+}

@@ -353,8 +353,8 @@ fn change_id_scopes_a_change_query_to_at_most_one_record() {
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
     let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
     let records = payload["records"].as_array().unwrap();
-    assert_eq!(records.len(), 2, "both add-widget envelope versions, add-other excluded: {records:?}");
-    assert!(records.iter().all(|r| r["change_id"] == "add-widget"));
+    assert_eq!(records.len(), 1, "the two add-widget versions fold to the current one (0.18 D4), add-other excluded: {records:?}");
+    assert_eq!(records[0]["title"], "Add widget, refined", "the newer version wins: {records:?}");
 }
 
 #[test]

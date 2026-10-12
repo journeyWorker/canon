@@ -76,16 +76,17 @@ pub enum FailureClass {
     /// (`gated-task-completion` capability, design decision 6). S5
     /// wave-2's checkbox-grammar surface (task 3.2/3.4) emits this.
     UnevidencedFlip,
-    /// Fabrication-marker scanning found a blocklisted substring or a
+    /// Fabrication-marker scanning found a blocklisted marker token or a
     /// bare `verified` claim with no attached structured result
     /// (`gated-task-completion` capability, design decision 6,
     /// `scanFakeMarkers` shape). S5 wave-2's fabrication scanner (task
     /// 3.3/3.4) emits this.
     FabricatedEvidence,
     /// An open `blocker` [`canon_model::Finding`] (latest version per
-    /// `(change_id, round, seq)`) sits on a change listed in the
-    /// `change_ids` of a subject `spec_coverage.require_review` puts in
-    /// scope (issue #2). Silent unless that policy is present with
+    /// `(change_id, round, seq)`) sits on a change adopted by a subject
+    /// `spec_coverage.require_review` puts in scope (issue #2), joined
+    /// from both sides: the subject's `change_ids` or the change's
+    /// `subject_ids` (0.18 D4). Silent unless that policy is present with
     /// `block_on_findings`.
     OpenBlocker,
     /// A scenario's latest AUDIT record (`canon evidence add --kind

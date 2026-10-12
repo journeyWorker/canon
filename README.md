@@ -82,6 +82,330 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.18.0 release
+
+Version 0.18.0 cuts the calls an attestation costs and makes the
+lifecycle honest: one `evidence add` attests every scenario a test report
+covers, one `review add` reviews a batch, a shipped subject can be
+reopened inside its approved scope, a change can belong to several
+subjects, and the gate stops failing on what is not wrong. Plan:
+`docs/superpowers/plans/2026-10-12-canon-0.18.0-fewer-calls.md`.
+
+**Why.** Dogfood runs (FINDINGS-3, FINDINGS-4) spent most of their calls
+on bookkeeping: one `evidence add` and one `review add` per scenario, a
+refused `faithful` for a task report, a silent pin break the agent found
+only at the gate. Follow-up work on a shipped subject had no lawful path
+back, a change shared by two subjects could name only one, the gate
+refused a summary for `n/a` inside a file name and failed on a lost blob
+of a superseded review, a formatter's rewrite read as skill drift, a
+fresh repo's report showed no tasks, and the example attested its
+scenarios with canon's own tests instead of the game's.
+
+### D1, D2: one report, many scenarios; the write that breaks a pin says so (#27, #33, #26, #24)
+
+- **One report, many scenarios.** `canon evidence add --project-id <root>
+  --all-scenarios --report <fmt>:<path> …` writes one record per indexed
+  scenario that owns a case in the report (the existing own-leading-id
+  rule). Each record binds only its own cases and gets the verdict they
+  show (`faithful` all passed, `divergent` one failed, `not-applicable`
+  one skipped and none failed), unless `--verdict` claims one for all. An
+  unindexed id is named and skipped. All or nothing: a claimed `faithful`
+  over a failed case, a fabrication marker, an unapproved brief, or a
+  dropped binding writes no record. The records share the one stored
+  report blob, and the output lists each scenario with its verdict.
+- **Batch review.** `canon review add` takes `--scenario-id` repeated and
+  `--scenario-ids-from <file|->` (one id per line, `#` comments): one
+  reviewer, pin and set of artifacts, one review per scenario, all or
+  nothing. Single-scenario output is unchanged.
+- **`--task --report` with no scenario id** binds every case in the
+  report; `faithful` needs all of them to pass (it was refused before).
+- **`--report swift-testing:<path>`** reads the JSON-lines event stream of
+  `swift test --experimental-event-stream-output`: the display name, else
+  the function name, carries the scenario id; issues and `testSkipped`
+  decide the outcome. `ReportFormat` gains `swift-testing` (schema
+  regenerated). A stream captured from a real Swift 6.4 run is checked in
+  at `crates/canon-cli/tests/fixtures/swift-testing/`.
+- **A write that breaks a pin says so.** When `evidence add` (single or
+  batch) supersedes the evidence a current pinned review saw, it prints
+  one line per review now stale with the reviewer, the scenario and the
+  `canon review add … --pin <sha>` that re-pins it (`HEAD`, or `<sha>`
+  with no commit). The decision is the gate's own `review_gap`.
+
+### D3, D4: reopening a shipped subject, and a change in several subjects (#31, #28)
+
+- **Reopen (D3, #31).** `canon subject status <id> verifying --reason
+  "<why>"` reopens a `shipped` subject for follow-up work. Inside the
+  approved scope it needs no human: either the brief of the subject's newest
+  adopted change is approved, or there is no brief to answer. Otherwise it
+  exits 1 and names the brief to approve, and `--override-reason` does not
+  waive that.
+  - The new Subject record carries `reopen: { reason, change, actor }`. The
+    next status write clears it.
+  - `--reason` is required for the reopen and refused on any other
+    transition (exit 2).
+  - The review guard does not run on a reopen. Shipping again runs every
+    guard.
+  - `canon status` flags a shipped subject whose ship guard would now fail
+    (`gate: red — <n> <class> (first: <subject>)`, `red` in `--json`). It
+    uses the same check as the guard, and the subject's only step is the
+    reopen command.
+- **A change in several subjects (D4, #28).** `Change.subject_id` is now
+  `subject_ids`, a list (`Change` schema generation `2`).
+  - A record written before 0.18 reads as a one-element list.
+  - A second `canon subject adopt <change> --subject <other>` adds the
+    subject and prints that the change now belongs to both. It never
+    re-points.
+  - Every reader joins a subject to its changes from both sides: the gate's
+    open-blocker rule, the status guard, `canon status`, the brief and the
+    evidence refusal. An open blocker on a shared change therefore gates
+    every subject it belongs to.
+  - `canon query --kind change` now returns each change's current version
+    only. It used to return every version.
+
+### D5: gate correctness (#32, #36)
+
+**Fabrication markers match whole words (#32).** `"would pass"`, `"TBD"`
+and `"n/a"` in a `--summary` or `--command-result` are fabrication markers
+only where they stand as a whole word. The same letters inside a path, a
+file name, a URL or a longer word are not a marker, so dogfood eval 3's
+summary `… pack.json/atlas JSON …` is kept (it used to be refused for
+`n/a`). A `.` or `-` next to a marker joins it into a longer token only
+when a letter, digit, `_`, `/` or `\` follows (`n/a.json`, `x-tbd`);
+sentence punctuation does not (`result: n/a.`). Every standalone marker
+the earlier tests pinned is still caught.
+
+The refusal now reads like every other gate-red refusal of `evidence add`,
+one line per finding, still exit 1 and nothing written:
+
+```
+canon evidence add: refused — fabricated-evidence cart.add.01 — summary field contains fabrication marker "n/a": "atlas check: n/a"
+```
+
+**Review attachments follow the evidence rule (#36).** `canon gate check`
+re-checks the files bound by `canon review add --artifact` the way it
+re-checks evidence attachments, and only for current reviews. A current
+review is the latest per `(project_id, scenario_id, reviewer)` that has
+not gone stale against its scenario. A stale review is superseded (the
+gate reads the scenario's newer review, or reports the missing one as
+`unreviewed-promotion`), so its files are not checked. That is the review
+in FINDINGS-3 T5: `reviewer-2`'s review went stale when the evidence
+moved and `reviewer-4` reviewed again, yet a lost blob of `reviewer-2`'s
+still failed the gate.
+
+A missing blob whose working-tree file still matches is now an advisory,
+not a `stale-evidence` violation:
+
+```
+evidence artifacts: 1 bound file(s) not in the artifact store — not failing the gate; run `canon evidence vault` to store them before the working tree changes:
+  unstored cart.add.01 reports/cart-badge.png (sha256 9848…, review by `reviewer-2`) is verified against the working tree only
+```
+
+`canon evidence vault` stores the files of current reviews, the set the
+gate re-checks, as well as evidence files; a superseded review's file is
+neither checked nor vaulted. To read the same reviews as the gate, the
+vault first refreshes a stale scenario index, as `canon gate check` does.
+A missing blob whose working-tree file changed or is gone, and an altered
+blob, are still `stale-evidence` naming the review.
+
+### D6: consumer-repo hygiene and reads (#25, #29, #34, #37)
+
+**Paths canon owns (#25).** `canon skills install` and `canon skills
+doctor` now end with the globs of every path canon writes, for a
+formatter's or linter's ignore list: the projection of each selected
+provider first, then every machine-written path under `.canon/`, sorted.
+The list comes from canon's own path constants, so a path a future
+release adds is listed the day it ships. `.canon/specs/`,
+`.canon/policy.yaml` and `.canon/changes/` are left out: people write
+them by hand, and linters should still see them. For a repo that
+selects Claude:
+
+```
+owned-paths: canon writes these; exclude them from formatters and linters:
+  .claude/skills/canon/**
+  .canon/REPORT.md
+  .canon/artifact-store.lock
+  .canon/artifacts/**
+  .canon/audit/**
+  .canon/dashboard-snapshot/**
+  .canon/hot.db*
+  .canon/ingest/**
+  .canon/learn/**
+  .canon/ledger/**
+  .canon/plugins/**
+  .canon/policy.approval.json
+  .canon/r2/**
+  .canon/scenario-index.lock
+  .canon/scripts/canon-gate-pre-commit.sh
+  .canon/skills/**
+  .canon/strategies/**
+  .canon/vocab/**
+```
+
+**A formatter's rewrite is not drift (#25).** A projected skill file
+whose bytes differ from the bundle but whose content matches after
+normalization limited to what formatters do (CRLF, trailing whitespace,
+runs of blank lines, the final newline, and in markdown list markers,
+`_` emphasis and table-cell padding; a JSON file by value)
+is now `formatter-rewritten`, not `stale`. `canon skills check` still
+exits 1 on it. `canon skills doctor` names the ignore entry and the
+command that restores the file:
+
+```
+formatter-rewritten: ./.claude/skills/canon/SKILL.md (claude) — the same content as canon's projection after whitespace and format normalization, so a formatter rewrote it; add `.claude/skills/canon/**` to that formatter's ignore list, then restore it with `canon skills install --providers=claude`
+```
+
+Whitespace between tokens, backslashes and fenced code blocks are never
+normalized, so `rm -rf a b` against `rm -rfab`, a joined `\`
+continuation, or a changed fenced command stays `stale`.
+
+**`canon report` reads the sqlite hot tier (#29).** `canon init` routes
+`task`, `handoff`, `session`, `run` and `event` to a sqlite `hot` rung,
+and the report read only the git ledger and local parquet, so a fresh
+repo's trust matrix and scope status showed `—` for every task column
+and the report warned `Not read directly: event, handoff, run, session,
+task`. The report now reads the sqlite file: it is local and needs no
+credential. Before each DuckDB run it writes the hot tier's rows under a
+scratch directory (`CANON_HOT_ROOT`) that a new `stg_hot_records` view
+reads, beside `stg_git_records` and `stg_r2_records`. A db file that does
+not exist yet is no rows and is never created. A file that is not a
+sqlite database fails the report (exit 1) and names the file, instead of
+rendering a report without its tasks. `Backend::Sqlite` now counts as
+read directly, so no sqlite-routed kind appears under `## Kinds not read
+directly`. A hot row whose identical record (same kind and content
+digest) is also in the git ledger or `.canon/r2` is dropped from
+`stg_records`, so one record in two tiers counts once. Postgres and S3
+rungs are unchanged.
+
+**`canon finding list` (#34).** `canon finding list --change-id <id>
+[--open] [--json]` prints a change's committed findings at their latest
+version, ordered by round and seq. `--open` keeps the findings whose
+current disposition is `open`, so a finding closed after it was raised
+stays out:
+
+```
+round  seq  severity    disposition  reviewer  summary
+1      1    blocker     rejected     rev-a     teardown races HMR
+1      2    should-fix  open         rev-b     the count was typed by hand
+```
+
+`--json` prints `{"change_id", "findings": [{round, seq, severity,
+disposition, reviewer, summary, resolution_sha, file_ref}]}`. A staged
+finding is not a record yet; the command names how many are staged and
+points at `canon gate promote`.
+
+**Skill wording (#37).** A review runs in a session that can run the
+checks it signs off. A reviewer that cannot run the tests says so and
+does not sign off. A report bound with `--report` is kept in
+`.canon/artifacts`, so its working-tree copy may be gitignored.
+
+### D7: the example's real evidence (#30)
+
+`examples/platformer`'s 16 scenarios were attested with
+`cargo test -p canon-gate spec_coverage`, which tests canon's gate and not
+the game. The example now has its own vitest suite in
+`examples/platformer/tests/`, one test per scenario, each named with its
+scenario id (`platformer.movement.03: No double jump; …`). Each test drives
+the game's own code and checks every Then:
+
+- The engine runs headless: `GameSimulation` with the game's levels, or a
+  small grid in the game's level format, stepped one fixed physics step at
+  a time.
+- The React screens (HUD, pause, game over, level complete, level select)
+  mount in jsdom. The keyboard goes through the game's `InputCapture`, and
+  frames go through `runFrame`, which is the two lines extracted from
+  `PixiStage`'s ticker, so the tests drive frames the same way the game
+  does. jsdom has no WebGL, so two things are stubbed: the `PixiStage`
+  component wherever a test mounts `<App/>`, and, in `enemy.test.tsx`
+  only, pixi.js's `Sprite` class, so that `renderPlayer`'s blink rule
+  runs without the renderer.
+
+Writing the tests found one bug. A buffered jump fired one step after
+touchdown, but `platformer.movement.03` says it fires on the landing
+frame. The game now starts a buffered jump on the step that grounds the
+player.
+
+`bun run test:junit` writes `reports/junit.xml`. That path is gitignored,
+because the bound copy is kept in `.canon/artifacts`. One call attests
+every scenario, the first real use of D1:
+
+```
+canon evidence add --project-id platformer --kind test-run \
+  --ref "cd examples/platformer && bun run test:junit" --role implementer \
+  --report junit:examples/platformer/reports/junit.xml --all-scenarios \
+  --session-id 018-n5-impl --actor-id 018-n5-impl --promote
+```
+
+It wrote 16 records, each `faithful` from its own passing case. All 16
+share one stored report blob. The four old `spec_coverage` records are
+superseded by the latest-fold, and their files stay in the ledger because
+the ledger is append-only. The new `platformer` job in the Test workflow
+runs the suite. The platformer's legacy reviews are now stale, and the
+gate's advisory names the platformer scenarios to review again. An
+independent re-review clears them.
+
+**Migration.** For a 0.17 consumer:
+
+- Run `canon skills install` to refresh the projected skill (#37's
+  wording) and to see the `owned-paths:` list for formatter and linter
+  ignores.
+- `canon query --kind change` now returns one row per change, its current
+  version; it used to return every version.
+- `Change` records of schema generation 1 (`subject_id`) are read as a
+  one-element `subject_ids`; nothing needs rewriting. New records are
+  written at generation `2`.
+- `canon status --json` has a `red` field for shipped subjects whose ship
+  guard would now fail (`statusVersion` stays `3`).
+- `canon report` now reads the sqlite hot tier: a fresh repo's task
+  columns fill in, and a `hot` db file that is not sqlite fails the report
+  (exit 1).
+- `canon skills check` reports a formatter-only rewrite of a projected
+  file as `formatter-rewritten` instead of `stale`; it still exits 1.
+  Scripts that match `stale` should match both.
+
+**Changed conformance expectations.**
+
+- `version` and every case that prints the version now print 0.18.0.
+- `review-pin-stale-evidence` step 3 carries the stale-review line (D2).
+- `gate-check-review-artifact-stale-evidence` now changes the
+  working-tree file, since a matching one no longer makes the case red
+  (D5).
+- `evidence-vault-stores-unstored` and `evidence-vault-reports-unstorable`:
+  the index-refresh line moves from the later `gate check` step to the
+  `evidence vault` step (D5).
+- `skills-check-outdated-lock`, `skills-doctor-competing-skill`,
+  `skills-doctor-stray-projection` and `init-providers-detected` end with
+  the `owned-paths:` list (D6).
+- `context-json-policy-summary` shows `Change` schema `2` with
+  `subject_ids` and `reopen` (D3, D4).
+- `subject-status-off-chain-transition` names `shipped → verifying` as an
+  allowed reopen (D3).
+
+No exit code changed.
+
+**New conformance cases:** `evidence-add-all-scenarios`,
+`evidence-add-all-scenarios-refused-contradiction`,
+`evidence-add-swift-testing`, `review-add-batch`,
+`subject-reopen-allowed`, `subject-reopen-refused-unapproved-brief`,
+`status-shipped-red-reopen`, `subject-adopt-second-subject`,
+`evidence-add-fabrication-marker-whole-token`,
+`gate-check-review-artifact-vault-advisory`,
+`gate-check-review-artifact-superseded`, `finding-list-open-json`.
+
+**Closed issues:** #24, #25, #26, #27, #28, #29, #30, #31, #32, #33, #34,
+#36, #37.
+
+**Acceptance (plan D8).**
+
+- **(a) Eval 5 on omp.** The eval-1 one-line game request ran in a fresh repo initialized with this build, in three turns: the request, one human answer, then a follow-up fix after shipping. All four criteria pass:
+  - **One human stop.** The agent stopped once, at the brief (88 s). After one answer it shipped the first version with 28 scenarios; the turn-3 follow-up brought the total to 29.
+  - **Follow-up without a human.** The follow-up reopened the shipped subject with `--reason`, went in as a task in the approved change, got a scenario, evidence and an independent review (which found and fixed one weak test), and shipped again with every guard re-run. No human was involved.
+  - **Fewer calls than scenarios.** For 29 scenarios there were 4 `evidence add` calls (2 with `--all-scenarios`) and 3 `review add` calls (1 batch). That is 38 canon calls in all, 0 of them bookkeeping; eval 3c (0.16) took 49.
+  - **Independent reviews.** Every scenario was reviewed by a separate omp session, and the gate is clean.
+- **(b) A Swift Testing event stream binds with `--all-scenarios`.** The fixture is a stream captured from a real `swift test --experimental-event-stream-output` run (Swift 6.4), checked in with its package source.
+- **(c) The platformer example attests with its own tests.** One `--all-scenarios` call attested all 16 scenarios, and one batch `review add` re-reviewed them. All 25 stale legacy reviews are now superseded by current ones. The 8 undecidable legacy reviews are pinned to commits that predate their scenarios, so their count cannot change; every one of those scenarios now also has a current review.
+
+Evidence: `~/Workspace/canon-dogfood/PROTOCOL-5.md` and `FINDINGS-5.md`.
+
 ## 0.17.0 release
 
 Version 0.17.0 gives canon its own home: the spec corpus, canon's own

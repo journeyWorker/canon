@@ -601,7 +601,7 @@ fn authoring_init_90_non_tty_init_installs_only_the_detected_harness_and_records
     let check = run_canon(&["init", "--check-config"], &repo);
     assert!(stdout(&check).contains("[PASS] skills (providers: omp)\n"), "{}", stdout(&check));
     let doctor = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "doctor"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
-    assert_eq!(stdout(&doctor), "providers: omp (from canon.yaml skills.providers)\nstatus: healthy\n");
+    assert_eq!(stdout(&doctor), format!("providers: omp (from canon.yaml skills.providers)\nstatus: healthy\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Omp]).join("\n")));
 }
 
 /// authoring.init.91: `--providers codex` answers without a prompt and
@@ -710,6 +710,6 @@ fn authoring_init_95_a_missing_skill_source_is_reported_with_the_retry() {
 
     let source = skill_source(tmp.path());
     let retry = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "install", "--source"]).arg(&source).current_dir(&repo).output().unwrap();
-    assert_eq!(stdout(&retry), "canon v1 — installed (pi; from canon.yaml skills.providers)\n", "{}", stderr(&retry));
+    assert_eq!(stdout(&retry), format!("canon v1 — installed (pi; from canon.yaml skills.providers)\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Pi]).join("\n")), "{}", stderr(&retry));
     assert_eq!(projected(&repo), vec![".pi/skills/canon"]);
 }

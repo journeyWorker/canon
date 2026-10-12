@@ -135,7 +135,8 @@ fixed finding reopened with `--disposition open` counts as open again.
 ## `canon review add`
 
 ```bash
-canon review add --project-id <root-id> --scenario-id <id> \
+canon review add --project-id <root-id> --scenario-id <id> [--scenario-id <id>]... \
+  [--scenario-ids-from <file|->] \
   --reviewer <who> --pin <sha-or-ref> --role <role> \
   (--upstream-ref <ref> | --original-spec-ref <ref>) [--actor-id <id>] [--session-id <id>] \
   [--outcome signed|indeterminate|unavailable] \
@@ -143,7 +144,7 @@ canon review add --project-id <root-id> --scenario-id <id> \
   [--artifact <path>]... [--max-artifact-mib <MiB>]
 ```
 
-One attributed Review record for one scenario, joined on
+One attributed Review record per scenario, joined on
 `(project_id, scenario_id)` — both are required because two spec roots
 may carry the same scenario id. Exactly one provenance ref is required.
 `--actor-id` defaults to `canon`; `--session-id` fills `actor.session_id`.
@@ -152,6 +153,18 @@ ship gate still refuses missing or `Divergent` evidence verdicts on its
 own. It is written directly to the ledger, with no staging step, and says
 so: `canon review add: wrote <path> (new) — written directly; nothing to
 promote`.
+
+### Several scenarios in one call (0.18)
+
+`--scenario-id` is repeatable, and `--scenario-ids-from <file>` (`-` reads
+stdin) adds one id per line; `#` starts a comment and blank lines are
+skipped. One reviewer, pin, provenance ref and set of artifacts cover
+every review; each review pins its own scenario and evidence, and each
+gets its own `pinned` and `wrote` line. The artifacts are stored once.
+It is all or nothing: a scenario with no record, or a line in the file
+that is not a scenario id, refuses the call (exit 2) and writes no review.
+This is also the batch re-pin after `canon evidence add` reports reviews
+it made stale (see `canon-gate`).
 
 ### What the reviewer looked at (artifacts)
 
@@ -173,19 +186,25 @@ The field is absent when no `--artifact` is given. `review add` prints
 .canon/artifacts/sha256/ (<k> newly stored) — commit them with the
 ledger`.
 
-`canon gate check` re-hashes the stored blob of every file bound to an
-in-effect review (the latest per `(project_id, scenario_id, reviewer)`).
-A missing or altered blob is `stale-evidence` on the review's scenario,
-naming the review, even when the working-tree file still matches (see
-`canon-gate`, "Bound evidence stays provable"):
+`canon gate check` re-checks every file bound to a current in-effect
+review (the latest per `(project_id, scenario_id, reviewer)`, unless it
+went stale against its scenario) by the evidence rule (see `canon-gate`,
+"Bound evidence stays provable"). A missing blob whose working-tree file
+still matches is an advisory naming `canon evidence vault`, which stores
+it back. A missing blob with a changed or missing working-tree file, or
+an altered blob, is `stale-evidence` on the review's scenario, naming
+the review:
 
 ```
-stale-evidence world.demo.01 — review by `reviewer-2` (actor `reviewer-2`, 2026-10-11T09:00:00Z) bound file `reports/title.png` recorded sha256 <hex>; stored blob .canon/artifacts/sha256/<hex>: missing; working tree: <hex> — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`
+stale-evidence world.demo.01 — review by `reviewer-2` (actor `reviewer-2`, 2026-10-11T09:00:00Z) bound file `reports/title.png` recorded sha256 <hex>; stored blob .canon/artifacts/sha256/<hex>: missing; working tree: <other hex> — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`
 ```
 
 The reviewer's later review replaces the earlier one, so its files are
-the ones checked. Canon binds and re-checks bytes only; it never compares
-images or judges what a screenshot shows.
+the ones checked. A review that went stale (its scenario's spec or
+evidence moved since) is not checked either: it no longer counts, and the
+scenario's newer review is the one whose files are checked. Canon binds
+and re-checks bytes only; it never compares images or judges what a
+screenshot shows.
 
 ### What the review saw (pins)
 

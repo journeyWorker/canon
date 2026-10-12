@@ -216,10 +216,10 @@ Feature: review add
   @review.add.41
   Scenario: A missing or altered review artifact is stale evidence naming the review
     Given a review bound to a screenshot and a recording
-    When one stored blob is deleted and the other is altered
+    When one stored blob is deleted and its working-tree file changed, and the other stored blob is altered
     Then `canon gate check` exits 1 with stale-evidence on the review's scenario for each file
     And the detail names the reviewer, the review's actor and time, the path, the recorded digest and what the store and the working tree hold
-    And a missing blob is stale even while the working-tree file still matches
+    And an altered blob is stale even while the working-tree file still matches
 
   # canon: {"schema":1,"at":"2026-10-11T14:44:56Z","actor":{"agent_id":"canon"}}
   @subject:review-attestation
@@ -260,3 +260,46 @@ Feature: review add
     Then the guard refuses with the gate's stale-review detail and prints the advisory for the subject's own scenarios
     And `canon status` counts the scenario as a stale review
     And once the scenario is reviewed again the move goes through
+
+  # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
+  @subject:review-attestation
+  @case:happy
+  @review.add.80
+  Scenario: One review add signs off several scenarios with one reviewer, pin and set of artifacts
+    Given three indexed scenarios
+    When a review is added with --scenario-id repeated and --scenario-ids-from a file of ids with comments
+    Then one review is written per scenario, each pinning its own scenario and evidence, with the same reviewer, pin and artifacts
+    And the artifacts are stored once
+
+  # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.81
+  Scenario: A batch review with any scenario that has no record writes nothing
+    Given two indexed scenarios and one id with no scenario record
+    When a review is added for all three
+    Then the add exits 2 naming the unindexed id, and no review is written for any of them
+    And an ids file with a line that is not a scenario id is refused with exit 2, naming the line
+    And when writing the second review fails, the first review and every blob the call stored are removed, and a read-only review directory is refused before anything is written
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}
+  @subject:review-attestation
+  @case:edge
+  @review.add.90
+  Scenario: A lost review blob whose working-tree file still matches is a vault advisory, as for evidence
+    Given a review bound to a screenshot whose stored blob was deleted while the working-tree file is unchanged
+    When `canon gate check` runs
+    Then it exits 0 with no stale-evidence, and the evidence-artifacts advisory names the scenario, the path, the digest and the reviewer and says to run `canon evidence vault`
+    And `canon evidence vault` stores the blob back from the working tree, and the advisory goes away
+    And once the blob is lost again and the working-tree file changes, the gate exits 1 with stale-evidence naming the review
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}
+  @subject:review-attestation
+  @case:edge
+  @review.add.91
+  Scenario: A review that went stale and was reviewed again by another reviewer is superseded, so its files are neither checked nor vaulted
+    Given a review bound to a screenshot, then new evidence for its scenario, then another reviewer's review bound to a recording
+    When the first review's stored blob is lost while its working-tree file still matches
+    Then `canon gate check` exits 0 with no advisory for the file, and `canon evidence vault` stores nothing for it, counting only the newer review's file
+    And once its working-tree file changes too, `canon gate check` still exits 0 and names neither the file nor the first review
+    And when the newer review's blob is lost and its working-tree file changes, the gate exits 1 with stale-evidence naming the newer review only

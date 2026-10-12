@@ -25,7 +25,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use canon_model::{validate_evidence_batch, Divergence, EvidenceRecord, EvidenceViolation, Finding, RawRecord, RecordKind, Review, Scenario, Subject};
+use canon_model::{validate_evidence_batch, Change, Divergence, EvidenceRecord, EvidenceViolation, Finding, RawRecord, RecordKind, Review, Scenario, Subject};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{StoreError, Tier, TierQuery};
@@ -178,6 +178,15 @@ pub struct GateContext {
     /// documented "loaded once per gate run" seam and a check that
     /// opened its own tier would fork that contract.
     pub subjects: Vec<Subject>,
+    /// Changes, unfolded, for the change side of the subject ↔ change
+    /// join (0.18 D4, [`crate::spec_coverage::subject_change_ids`]): a
+    /// change lists every subject it belongs to in `subject_ids`, and
+    /// each subject lists it in `change_ids`; readers take both. Read
+    /// problems land in `corpus_violations`. A repo that routes `change`
+    /// off the local rung reads none here, and the subject side alone
+    /// still carries every link `canon subject adopt` wrote (it writes
+    /// the subject first).
+    pub changes: Vec<Change>,
     /// Review attestations and code-review findings, read for
     /// `spec_coverage.require_review` (issue #2) the same way and for the
     /// same reason as the three corpus kinds above: loaded once here,
@@ -253,6 +262,7 @@ impl GateContext {
         let scenarios = without_removed(read_corpus_kind(&tier, RecordKind::Scenario, &mut corpus_violations)?);
         let divergences = read_corpus_kind(&tier, RecordKind::Divergence, &mut corpus_violations)?;
         let subjects = read_corpus_kind(&tier, RecordKind::Subject, &mut corpus_violations)?;
+        let changes = read_corpus_kind(&tier, RecordKind::Change, &mut corpus_violations)?;
         let reviews = read_corpus_kind(&tier, RecordKind::Review, &mut corpus_violations)?;
         let findings = read_corpus_kind(&tier, RecordKind::Finding, &mut corpus_violations)?;
         let unreadable_kinds = unreadable_corpus_kinds(&ctx.repo)?;
@@ -266,6 +276,7 @@ impl GateContext {
             scenarios,
             divergences,
             subjects,
+            changes,
             reviews,
             findings,
             legacy_pins: LegacyPins::default(),

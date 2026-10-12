@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::{Command, Output};
 
 use canon_model::{
-    Actor, ChangeId, Envelope, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, ProjectId, ProvenanceRef, RecordKind, Review, RoleId, Scenario,
+    Actor, AuditResult, ChangeId, Envelope, EvidenceAudit, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, ProjectId, ProvenanceRef, RecordKind, Review, RoleId, Scenario,
     ScenarioId, SpecDigest, Subject, SubjectId, SubjectStatus,
 };
 use canon_store::git_tier::GitTier;
@@ -539,6 +539,74 @@ fn context_status_62_ship_is_the_agents_step_once_the_brief_is_approved() {
     assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], true, "a shipped subject still shows its brief");
     assert_eq!(report["next"], serde_json::json!([]));
     assert!(stdout(&run(dir.path(), &["status"])).contains("next: nothing"));
+}
+
+/// context.status.70 (0.18 D3): a shipped subject whose gate went red
+/// after it shipped (an unattested, unreviewed new scenario and an open
+/// blocker) is flagged with what the ship guard would refuse, per
+/// failure class, and its one step is the reopen command, which parses
+/// and, followed, reopens it; the flag and the reopen step are then gone.
+#[test]
+fn context_status_70_a_shipped_subject_whose_gate_is_red_is_flagged_and_its_step_is_the_reopen() {
+    let dir = repo();
+    ship_ready(dir.path());
+    write_brief(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));
+    assert!(run(dir.path(), &["subject", "status", "demo-subject", "shipped"]).status.success());
+    assert!(subject(&status_json(dir.path()), "demo-subject").get("red").is_none(), "a green shipped subject is not flagged");
+
+    seed_blocker(dir.path(), "c-demo-subject");
+    seed_scenario(dir.path(), "world.demo.03", Some("demo-subject"), Some("failure"));
+    let report = status_json(dir.path());
+    let red = "1 uncovered-cell (first: world.demo.03), 1 unreviewed-promotion (first: world.demo.03), 1 open-blocker (first: c-demo-subject#1.1)";
+    assert_eq!(subject(&report, "demo-subject")["red"], serde_json::json!(red.split(", ").collect::<Vec<_>>()));
+    let reopen = "canon subject status demo-subject verifying --reason \"<why it reopens>\" --actor-id <unit>";
+    assert_eq!(commands(&report), [reopen]);
+    assert_eq!(
+        report["next"][0]["why"],
+        format!("demo-subject is shipped but its gate is red ({red}); reopen it, add the follow-up as tasks in its approved change `c-demo-subject` (never `canon change new`), then scenario, evidence and review, and ship it again")
+    );
+    let human = stdout(&run(dir.path(), &["status"]));
+    assert!(human.contains(&format!("      gate: red — {red}; reopen with `{reopen}`\n")), "{human}");
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying", "--reason", "follow-up: a blocker and a new failure path", "--actor-id", "impl-agent"]);
+    assert!(out.status.success(), "the suggested reopen goes through: {}", stderr(&out));
+    let report = status_json(dir.path());
+    assert_eq!(subject(&report, "demo-subject")["status"], "verifying");
+    assert!(subject(&report, "demo-subject").get("red").is_none());
+    assert!(!commands(&report).iter().any(|c| c.contains("--reason")), "{report}");
+}
+
+/// context.status.70: the red flag reads the ship guard's own inputs. A
+/// refuted audit (`false-success`) makes a shipped subject red; an open
+/// blocker under a `require_review` without `block_on_findings` does
+/// not, as it does not refuse shipping.
+#[test]
+fn context_status_70_the_red_flag_follows_the_ship_guard_audits_in_blockers_only_when_they_block() {
+    let dir = repo();
+    ship_ready(dir.path());
+    write_policy(dir.path(), "spec_coverage:\n  require_evidence: true\n  require_cases: [failure]\n  require_review:\n    block_on_findings: false\n");
+    write_brief(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+
+    seed_blocker(dir.path(), "c-demo-subject");
+    let report = status_json(dir.path());
+    assert!(subject(&report, "demo-subject").get("red").is_none(), "a blocker that does not refuse shipping does not make the gate red: {report}");
+    assert_eq!(subject(&report, "demo-subject")["openBlockers"], 1, "status still counts it");
+
+    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor("auditor-1", "auditor"));
+    let audit = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("world.demo.01").unwrap()), None, EvidenceVerdict::Divergent)
+        .with_project_id(ProjectId::parse("demo").unwrap())
+        .with_audit(EvidenceAudit { evaluator_id: "auditor-1".into(), evaluator_version: "1.0.0".into(), evaluator_digest: "a".repeat(64), result: AuditResult::Refuted });
+    ledger(dir.path()).write(&audit).unwrap();
+    let report = status_json(dir.path());
+    assert_eq!(subject(&report, "demo-subject")["red"], serde_json::json!(["1 false-success (first: world.demo.01)"]), "{report}");
+    assert_eq!(commands(&report)[0], "canon subject status demo-subject verifying --reason \"<why it reopens>\" --actor-id <unit>");
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying", "--reason", "follow-up: the audit refuted run.01", "--actor-id", "impl-agent"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert_eq!(out.status.code(), Some(1), "the ship guard refuses on the same gap: {}", stderr(&out));
+    assert!(stderr(&out).contains("false-success world.demo.01"), "{}", stderr(&out));
 }
 
 /// context.status.61: a ship-ready subject whose newest adopted change's

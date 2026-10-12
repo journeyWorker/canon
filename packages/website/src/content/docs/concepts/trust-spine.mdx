@@ -34,7 +34,7 @@ migration:
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of any passing evidence. |
 | `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` `EvidenceRecord`. |
-| `fabricated-evidence` | The evidence note attached to a flip contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) or a bare `verified` claim with no attached command result. |
+| `fabricated-evidence` | The evidence note attached to a flip contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) as a whole word — never inside a path, a file name, a URL or a longer word — or a bare `verified` claim with no attached command result. |
 | `open-blocker` | With `spec_coverage.require_review` on, a review finding whose latest version is severity `blocker` and disposition `open`, on a change adopted by an in-scope subject. The subject string is `<change_id>#<round>.<seq>`. |
 | `false-success` | A scenario's latest audit record (`canon evidence add --kind audit`) is `refuted`: an external evaluator found a counterexample. Always on, whatever the policy or sampling, and it overrides any declared faithful verdict until a newer audit (`confirmed` or `indeterminate`) clears it. The detail names the evaluator, its version, its sha256 and the counterexample paths. |
 
@@ -291,6 +291,12 @@ file bound to a latest evidence record, whatever its subject's status:
   and what the store and working tree hold now, and whether the stored
   blob was altered (it no longer matches its name) or is gone. Re-run and
   re-attest.
+
+Files a reviewer bound with `canon review add --artifact` follow the same
+rule for every current review: the latest per reviewer and scenario,
+unless it went stale against its scenario. A stale review is superseded,
+so its files are neither re-checked nor vaulted; `canon evidence vault`
+stores a current review's files too.
 
 ## The trust ladder
 

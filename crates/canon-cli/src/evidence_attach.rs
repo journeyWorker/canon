@@ -7,9 +7,15 @@
 //!
 //! - `--artifact <path>` (repeatable): any file — a trace, a screenshot
 //!   archive, an agent QA log, a review document — bound by sha256.
-//! - `--report <junit|cucumber>:<path>` (repeatable): a machine-readable
-//!   test report. Canon parses it, finds the case for this evidence's
-//!   scenario, and records the case and its outcome alongside the digest.
+//! - `--report <junit|cucumber|swift-testing>:<path>` (repeatable): a
+//!   machine-readable test report. Canon parses it, finds the case for
+//!   this evidence's scenario, and records the case and its outcome
+//!   alongside the digest. `swift-testing` is Swift Testing's JSON-lines
+//!   event stream (`swift test --experimental-event-stream-output`,
+//!   0.18 D1): a test's display name is its case name, else its
+//!   function name, and its outcome comes from its events (a failing
+//!   issue fails it, `testSkipped` skips it, a test that started and
+//!   ended without one passed, one that never ended failed).
 //!
 //! # Finding the cases
 //! A case is bound when it is the scenario's OWN case: its leading
@@ -31,6 +37,15 @@
 //! not `--report-case` is given. No match at all refuses, and so does a
 //! `--report-case` that names no case: a binding that names nothing is
 //! not a binding.
+//!
+//! # One report, many records (0.18 D1)
+//! With no `--scenario-id`, a task's evidence binds EVERY case in the
+//! report ([`BindRequest::all_cases`]), so a faithful verdict needs all
+//! of them to pass. `--all-scenarios` ([`bind_all_scenarios`]) binds the
+//! report once and splits it by owner: each indexed scenario that owns
+//! a case (the rule above) gets its own record, with its own cases and
+//! a verdict from them. A case whose id is not indexed is named and
+//! skipped. Every record pins the same report blob.
 //!
 //! # Storing the bytes (0.14 D4)
 //! [`bind`] only reads. It returns each bound file's resolved path and
@@ -97,13 +112,14 @@ pub struct ReportCase {
 pub fn parse_report_spec(value: &str) -> Result<(ReportFormat, PathBuf), String> {
     let (format, path) = value
         .split_once(':')
-        .ok_or_else(|| format!("`{value}` is not <junit|cucumber>:<path>"))?;
+        .ok_or_else(|| format!("`{value}` is not <junit|cucumber|swift-testing>:<path>"))?;
     let format = match format {
         "junit" => ReportFormat::Junit,
         "cucumber" => ReportFormat::Cucumber,
+        "swift-testing" => ReportFormat::SwiftTesting,
         other => {
             return Err(format!(
-                "`{other}` is not a supported report format (expected junit or cucumber)"
+                "`{other}` is not a supported report format (expected junit, cucumber or swift-testing)"
             ))
         }
     };
@@ -123,6 +139,9 @@ pub struct BindRequest<'a> {
     pub report_cases: &'a [String],
     /// The scenario id the default case match looks for.
     pub scenario_id: Option<&'a str>,
+    /// Bind every case of every report (0.18 D1): a task's evidence with
+    /// no `--scenario-id` and no `--report-case`.
+    pub all_cases: bool,
     pub verdict: EvidenceVerdict,
     /// The store's size limit for one file, in bytes.
     pub max_bytes: u64,
@@ -186,10 +205,18 @@ fn hash_artifact(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Bo
 /// longer have, and then nothing is published. The error names that
 /// file.
 pub fn store_files<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<usize, (&'f BoundFile, canon_gate::artifact_store::StoreError)> {
+    store_files_held(repo, files).map(|held| held.stored())
+}
+
+/// [`store_files`], keeping the store lock for a caller that writes
+/// several records naming these blobs (0.18): if one of those writes
+/// fails, [`HeldStore::rollback`] removes exactly the blobs this call
+/// published, while no other writer could have published them meanwhile.
+pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldStore, (&'f BoundFile, canon_gate::artifact_store::StoreError)> {
     use canon_gate::artifact_store::{StoreError, StoreLock};
 
     let Some(first) = files.first() else {
-        return Ok(0);
+        return Ok(HeldStore { lock: None, published: Vec::new() });
     };
     let lock = StoreLock::acquire(repo).map_err(|e| (first, e))?;
     let mut staged = Vec::new();
@@ -204,7 +231,29 @@ pub fn store_files<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<usize, (&'
             sources.push(file);
         }
     }
-    lock.publish(staged).map_err(|(index, e)| (sources[index], e))
+    let published = lock.publish_paths(staged).map_err(|(index, e)| (sources[index], e))?;
+    Ok(HeldStore { lock: Some(lock), published })
+}
+
+/// The blobs one [`store_files_held`] call published, with the store
+/// lock still held. Dropping it keeps them and releases the lock.
+pub struct HeldStore {
+    lock: Option<canon_gate::artifact_store::StoreLock>,
+    published: Vec<PathBuf>,
+}
+
+impl HeldStore {
+    /// How many blobs this call newly stored.
+    pub fn stored(&self) -> usize {
+        self.published.len()
+    }
+
+    /// Remove the blobs this call published, then release the lock.
+    pub fn rollback(self) {
+        if let Some(lock) = &self.lock {
+            lock.unpublish(&self.published);
+        }
+    }
 }
 
 /// The line a write command prints after [`store_files`].
@@ -213,6 +262,73 @@ pub fn stored_line(command: &str, bound: usize, stored: usize) -> String {
         "{command}: artifact store holds {bound} bound file(s) under {}/ ({stored} newly stored) — commit them with the ledger",
         canon_model::paths::ARTIFACTS_SHA256_DIR
     )
+}
+
+/// One `--report` read and parsed: where it lives, its digest, and its
+/// cases in report order.
+struct ParsedReport {
+    format: ReportFormat,
+    /// The path as given, for messages.
+    given: PathBuf,
+    relative: String,
+    resolved: PathBuf,
+    sha256: String,
+    cases: Vec<ReportCase>,
+}
+
+impl ParsedReport {
+    fn attachment(&self, case: &ReportCase) -> EvidenceAttachment {
+        EvidenceAttachment {
+            path: self.relative.clone(),
+            sha256: self.sha256.clone(),
+            format: Some(self.format),
+            case: Some(case.name.clone()),
+            outcome: Some(case.outcome),
+        }
+    }
+
+    /// The refusal of a faithful verdict over `matched`, when any of
+    /// them did not pass.
+    fn contradiction(&self, matched: &[&ReportCase]) -> Option<String> {
+        let contradicting: Vec<String> = matched
+            .iter()
+            .filter(|c| c.outcome != ReportOutcome::Passed)
+            .map(|c| format!("`{}` as {}", c.name, outcome_name(c.outcome)))
+            .collect();
+        (!contradicting.is_empty()).then(|| format!("{} records case {}", self.given.display(), contradicting.join(", ")))
+    }
+}
+
+const FAITHFUL_NEEDS_PASSES: &str = "a faithful verdict needs every bound case to pass (attest the verdict the report shows, or fix the test)";
+
+fn read_report(repo: &Path, format: ReportFormat, path: &Path, max_bytes: u64) -> Result<ParsedReport, BindError> {
+    let (relative, resolved, file) = open_in_repo(repo, path, max_bytes)?;
+    let mut bytes = Vec::new();
+    file.take(MAX_REPORT_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| BindError::Usage(format!("read {}: {e}", path.display())))?;
+    if bytes.len() as u64 > MAX_REPORT_BYTES {
+        return Err(BindError::Usage(format!(
+            "{} is larger than {MAX_REPORT_BYTES} bytes; bind it with --artifact instead",
+            path.display()
+        )));
+    }
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|_| BindError::Usage(format!("{} is not UTF-8", path.display())))?;
+    let cases = match format {
+        ReportFormat::Junit => parse_junit(text),
+        ReportFormat::Cucumber => parse_cucumber(text),
+        ReportFormat::SwiftTesting => parse_swift_testing(text),
+    }
+    .map_err(|e| {
+        BindError::Usage(format!(
+            "{} is not a readable {} report: {e}",
+            path.display(),
+            format_name(format)
+        ))
+    })?;
+    let sha256 = format!("{:x}", Sha256::digest(&bytes));
+    Ok(ParsedReport { format, given: path.to_path_buf(), relative, resolved, sha256, cases })
 }
 
 /// Read, hash, and (for reports) match every requested file. Writes
@@ -235,58 +351,21 @@ pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
 
     let mut named_unmatched: Vec<&str> = request.report_cases.iter().map(String::as_str).collect();
     for (format, path) in request.reports {
-        let (relative, resolved, file) = open_in_repo(&repo, path, request.max_bytes)?;
-        let mut bytes = Vec::new();
-        file.take(MAX_REPORT_BYTES + 1)
-            .read_to_end(&mut bytes)
-            .map_err(|e| BindError::Usage(format!("read {}: {e}", path.display())))?;
-        if bytes.len() as u64 > MAX_REPORT_BYTES {
-            return Err(BindError::Usage(format!(
-                "{} is larger than {MAX_REPORT_BYTES} bytes; bind it with --artifact instead",
-                path.display()
-            )));
-        }
-        let text = std::str::from_utf8(&bytes)
-            .map_err(|_| BindError::Usage(format!("{} is not UTF-8", path.display())))?;
-        let cases = match format {
-            ReportFormat::Junit => parse_junit(text),
-            ReportFormat::Cucumber => parse_cucumber(text),
-        }
-        .map_err(|e| {
-            BindError::Usage(format!(
-                "{} is not a readable {} report: {e}",
-                path.display(),
-                format_name(*format)
-            ))
-        })?;
-        let matched = match_cases(&cases, request.report_cases, request.scenario_id)
-            .map_err(|e| BindError::Usage(format!("{}: {e}", path.display())))?;
+        let report = read_report(&repo, *format, path, request.max_bytes)?;
+        let matched: Vec<&ReportCase> = if request.all_cases {
+            report.cases.iter().collect()
+        } else {
+            match_cases(&report.cases, request.report_cases, request.scenario_id)
+                .map_err(|e| BindError::Usage(format!("{}: {e}", path.display())))?
+        };
         named_unmatched.retain(|name| !matched.iter().any(|c| names_case(c, name)));
         if request.verdict == EvidenceVerdict::Faithful {
-            let contradicting: Vec<String> = matched
-                .iter()
-                .filter(|c| c.outcome != ReportOutcome::Passed)
-                .map(|c| format!("`{}` as {}", c.name, outcome_name(c.outcome)))
-                .collect();
-            if !contradicting.is_empty() {
-                return Err(BindError::Contradiction(format!(
-                    "{} records case {}; a faithful verdict needs every bound case to pass (attest the verdict the report shows, or fix the test)",
-                    path.display(),
-                    contradicting.join(", ")
-                )));
+            if let Some(contradiction) = report.contradiction(&matched) {
+                return Err(BindError::Contradiction(format!("{contradiction}; {FAITHFUL_NEEDS_PASSES}")));
             }
         }
-        let sha256 = format!("{:x}", Sha256::digest(&bytes));
-        bound.add_file(resolved, &sha256);
-        for case in matched {
-            bound.attachments.push(EvidenceAttachment {
-                path: relative.clone(),
-                sha256: sha256.clone(),
-                format: Some(*format),
-                case: Some(case.name.clone()),
-                outcome: Some(case.outcome),
-            });
-        }
+        bound.add_file(report.resolved.clone(), &report.sha256);
+        bound.attachments.extend(matched.iter().map(|case| report.attachment(case)));
     }
     if let Some(name) = named_unmatched.first() {
         return Err(BindError::Usage(format!(
@@ -296,10 +375,168 @@ pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
     Ok(bound)
 }
 
+/// Inputs for [`bind_all_scenarios`].
+pub struct BatchRequest<'a> {
+    pub repo: &'a Path,
+    /// Bound to every record.
+    pub artifacts: &'a [PathBuf],
+    pub reports: &'a [(ReportFormat, PathBuf)],
+    /// The indexed scenario ids of the spec root, the ones a record may
+    /// be written for.
+    pub indexed: &'a [&'a str],
+    /// `--verdict` as given: every record claims it. `None`: each
+    /// record's verdict comes from its own cases ([`derived_verdict`]).
+    pub verdict: Option<EvidenceVerdict>,
+    pub max_bytes: u64,
+}
+
+/// One record of a batch: the scenario, its verdict, and what it binds
+/// (the shared artifacts, then its own cases).
+#[derive(Debug)]
+pub struct ScenarioBinding {
+    pub scenario_id: String,
+    pub verdict: EvidenceVerdict,
+    pub attachments: Vec<EvidenceAttachment>,
+}
+
+/// What [`bind_all_scenarios`] produced.
+#[derive(Debug, Default)]
+pub struct BatchBound {
+    /// In the order of [`BatchRequest::indexed`].
+    pub scenarios: Vec<ScenarioBinding>,
+    /// Every bound file, once per digest: shared by every record.
+    pub files: Vec<BoundFile>,
+    /// The scenario ids cases lead with that are not indexed, each with
+    /// its first case, sorted. These cases bind nothing.
+    pub unindexed: Vec<(String, String)>,
+    /// How many cases carry no scenario id at all.
+    pub without_id: usize,
+}
+
+/// A record's verdict from its own cases when none was claimed: any
+/// failed case makes it `divergent`; all passed, `faithful`; otherwise
+/// (a skipped case, none failed) `not-applicable`, since the report
+/// shows neither.
+pub fn derived_verdict(outcomes: impl IntoIterator<Item = ReportOutcome>) -> EvidenceVerdict {
+    let mut verdict = EvidenceVerdict::Faithful;
+    for outcome in outcomes {
+        match outcome {
+            ReportOutcome::Failed => return EvidenceVerdict::Divergent,
+            ReportOutcome::Skipped => verdict = EvidenceVerdict::NotApplicable,
+            ReportOutcome::Passed => {}
+        }
+    }
+    verdict
+}
+
+/// `--all-scenarios` (module doc): read every file once, and split the
+/// reports' cases by the indexed scenario that owns them. Refuses (and
+/// so writes nothing) when no indexed scenario owns a case, and when a
+/// claimed `faithful` verdict meets any record's failed or skipped case,
+/// naming every such case.
+pub fn bind_all_scenarios(request: &BatchRequest<'_>) -> Result<BatchBound, BindError> {
+    use std::collections::BTreeMap;
+
+    let repo = canonical_repo(request.repo)?;
+    let mut batch = BatchBound::default();
+    let mut shared = Vec::new();
+    for path in request.artifacts {
+        let (relative, file) = hash_artifact(&repo, path, request.max_bytes)?;
+        shared.push(EvidenceAttachment { path: relative, sha256: file.sha256.clone(), format: None, case: None, outcome: None });
+        if !batch.files.iter().any(|f| f.sha256 == file.sha256) {
+            batch.files.push(file);
+        }
+    }
+    let reports = request
+        .reports
+        .iter()
+        .map(|(format, path)| read_report(&repo, *format, path, request.max_bytes))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut unindexed: BTreeMap<String, String> = BTreeMap::new();
+    for report in &reports {
+        for case in report.cases.iter().filter(|c| !request.indexed.iter().any(|id| owns_scenario(c, id))) {
+            match case_scenario_token(case) {
+                Some(id) => {
+                    unindexed.entry(id).or_insert_with(|| case.name.clone());
+                }
+                None => batch.without_id += 1,
+            }
+        }
+    }
+    batch.unindexed = unindexed.into_iter().collect();
+
+    let mut contradictions = Vec::new();
+    for id in request.indexed {
+        let mut attachments = shared.clone();
+        let mut outcomes = Vec::new();
+        for report in &reports {
+            let matched: Vec<&ReportCase> = report.cases.iter().filter(|c| owns_scenario(c, id)).collect();
+            if request.verdict == Some(EvidenceVerdict::Faithful) {
+                if let Some(contradiction) = report.contradiction(&matched) {
+                    contradictions.push(format!("{id}: {contradiction}"));
+                }
+            }
+            outcomes.extend(matched.iter().map(|c| c.outcome));
+            attachments.extend(matched.iter().map(|case| report.attachment(case)));
+        }
+        if outcomes.is_empty() {
+            continue;
+        }
+        let verdict = request.verdict.unwrap_or_else(|| derived_verdict(outcomes));
+        batch.scenarios.push(ScenarioBinding { scenario_id: id.to_string(), verdict, attachments });
+    }
+    if !contradictions.is_empty() {
+        return Err(BindError::Contradiction(format!(
+            "{}; {FAITHFUL_NEEDS_PASSES}, so no record of the batch is written (drop --verdict to record each scenario's own verdict)",
+            contradictions.join("; ")
+        )));
+    }
+    if batch.scenarios.is_empty() {
+        let cases: usize = reports.iter().map(|r| r.cases.len()).sum();
+        let named = if batch.unindexed.is_empty() {
+            String::new()
+        } else {
+            format!(" (not indexed: {})", batch.unindexed.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>().join(", "))
+        };
+        return Err(BindError::Usage(format!(
+            "no case among the report's {cases} case(s) belongs to an indexed scenario{named}; start each test name with its scenario id or tag it, and index the scenarios (`canon inventory sync`)"
+        )));
+    }
+    for report in &reports {
+        if !batch.files.iter().any(|f| f.sha256 == report.sha256) {
+            batch.files.push(BoundFile { resolved: report.resolved.clone(), sha256: report.sha256.clone() });
+        }
+    }
+    Ok(batch)
+}
+
+/// The scenario id `case` leads with, as written (module doc): a tag
+/// shaped like one, else the leading id of its classname, then its name.
+/// `None` when it carries none.
+fn case_scenario_token(case: &ReportCase) -> Option<String> {
+    if let Some(tag) = case.tags.iter().find(|t| leading_id_end(t) == Some(t.len()) && t.split('.').count() == 3) {
+        return Some(tag.clone());
+    }
+    let text = if leading_id_end(&case.group).is_some() { &case.group } else { &case.name };
+    let end = leading_id_end(text)?;
+    let bytes = text.as_bytes();
+    // `leading_id_end` guarantees `<area><sep><surface><sep><digits>`.
+    let digits = bytes[..end].iter().rev().take_while(|b| b.is_ascii_digit()).count();
+    let separator_at = end - digits - 1;
+    let separator = bytes[separator_at];
+    let segment = |b: &&u8| b.is_ascii_lowercase() || b.is_ascii_digit() || (separator == b'.' && **b == b'-');
+    let surface_start = separator_at - bytes[..separator_at].iter().rev().take_while(segment).count();
+    let area_end = surface_start - 1;
+    let start = area_end - bytes[..area_end].iter().rev().take_while(segment).count();
+    Some(text[start..end].to_string())
+}
+
 fn format_name(format: ReportFormat) -> &'static str {
     match format {
         ReportFormat::Junit => "JUnit XML",
         ReportFormat::Cucumber => "Cucumber JSON",
+        ReportFormat::SwiftTesting => "Swift Testing event stream",
     }
 }
 
@@ -605,6 +842,127 @@ fn worse(a: ReportOutcome, b: ReportOutcome) -> ReportOutcome {
     }
 }
 
+/// Parse Swift Testing's JSON-lines event stream (`swift test
+/// --experimental-event-stream-output`, module doc). A `test` record of
+/// kind `function` declares a case, named by its `displayName`, else
+/// its `name`; suites are not cases. A declared test with no event did
+/// not run and is not a case. Its outcome comes from its `event`
+/// records: an `issueRecorded` that is a failure (`isFailure`, or for a
+/// stream without it an issue neither known nor a warning), or a
+/// `testEnded` whose messages carry the `fail` symbol, fails it;
+/// `testSkipped` skips it; `testStarted` then `testEnded` passes it;
+/// started and never ended fails it. A suite's failing issue fails every
+/// test inside it. A suite whose `testEnded` reports a failure that no
+/// test or suite inside it recorded (setup or teardown failed) fails
+/// every test inside it too; when a test inside did fail, the suite's
+/// end only reports that, and its other tests keep their own outcome.
+pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
+    use std::collections::HashMap;
+
+    #[derive(Default)]
+    struct Seen {
+        started: bool,
+        ended: bool,
+        skipped: bool,
+        /// A failing issue recorded against it.
+        failed: bool,
+        /// Its `testEnded` reported a failure.
+        ended_failed: bool,
+    }
+    let field = |value: &serde_json::Value, key: &str| value.get(key).and_then(|v| v.as_str()).map(str::to_string);
+    let mut functions: Vec<(String, String)> = Vec::new();
+    let mut suites: Vec<String> = Vec::new();
+    let mut seen: HashMap<String, Seen> = HashMap::new();
+    for (index, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let at = index + 1;
+        let record: serde_json::Value = serde_json::from_str(line).map_err(|e| format!("line {at}: {e}"))?;
+        let payload = record.get("payload").ok_or_else(|| format!("line {at}: a record without a payload"))?;
+        match record.get("kind").and_then(|v| v.as_str()) {
+            Some("test") => {
+                let id = field(payload, "id").ok_or_else(|| format!("line {at}: a test without an id"))?;
+                if field(payload, "kind").as_deref() == Some("suite") {
+                    suites.push(id);
+                    continue;
+                }
+                let name = field(payload, "displayName")
+                    .or_else(|| field(payload, "name"))
+                    .filter(|n| !n.is_empty())
+                    .ok_or_else(|| format!("line {at}: test `{id}` has no name"))?;
+                functions.push((id, name));
+            }
+            Some("event") => {
+                let Some(test_id) = field(payload, "testID") else { continue };
+                let entry = seen.entry(test_id).or_default();
+                match field(payload, "kind").as_deref() {
+                    Some("testStarted") => entry.started = true,
+                    Some("testEnded") => {
+                        entry.ended = true;
+                        entry.ended_failed |= payload.get("messages").and_then(|m| m.as_array()).is_some_and(|messages| {
+                            messages.iter().any(|m| m.get("symbol").and_then(|s| s.as_str()) == Some("fail"))
+                        });
+                    }
+                    Some("testSkipped") => entry.skipped = true,
+                    Some("issueRecorded") => entry.failed |= payload.get("issue").is_some_and(issue_is_failure),
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+    if functions.is_empty() {
+        return Err("no test record of kind `function`".to_string());
+    }
+    let inside = |id: &str, suite: &str| id.strip_prefix(suite).is_some_and(|rest| rest.starts_with('/'));
+    let own_failure = |id: &str, function: bool| seen.get(id).is_some_and(|s| s.failed || (function && s.ended_failed));
+    let failed_suites: Vec<&String> = suites
+        .iter()
+        .filter(|suite| {
+            let Some(state) = seen.get(*suite) else { return false };
+            let explained = || {
+                functions.iter().any(|(id, _)| inside(id, suite) && own_failure(id, true)) || suites.iter().any(|other| inside(other, suite) && own_failure(other, false))
+            };
+            state.failed || (state.ended_failed && !explained())
+        })
+        .collect();
+    let cases: Vec<ReportCase> = functions
+        .iter()
+        .filter_map(|(id, name)| {
+            let seen = seen.get(id)?;
+            let in_failed_suite = failed_suites.iter().any(|suite| inside(id, suite));
+            let outcome = if seen.failed || seen.ended_failed || in_failed_suite || (seen.started && !seen.ended && !seen.skipped) {
+                ReportOutcome::Failed
+            } else if seen.skipped {
+                ReportOutcome::Skipped
+            } else if seen.started {
+                ReportOutcome::Passed
+            } else {
+                return None;
+            };
+            Some(ReportCase { name: name.clone(), group: String::new(), tags: Vec::new(), outcome })
+        })
+        .collect();
+    if cases.is_empty() {
+        return Err("no test ran (no testStarted or testSkipped event names a declared test)".to_string());
+    }
+    Ok(cases)
+}
+
+/// Whether a Swift Testing `issue` fails its test: its `isFailure` when
+/// the stream carries it, else an issue that is neither a known issue nor
+/// a warning.
+fn issue_is_failure(issue: &serde_json::Value) -> bool {
+    if let Some(failure) = issue.get("isFailure").and_then(|v| v.as_bool()) {
+        return failure;
+    }
+    let known = issue.get("isKnown").and_then(|v| v.as_bool()).unwrap_or(false);
+    let warning = issue.get("severity").and_then(|v| v.as_str()) == Some("warning");
+    !known && !warning
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -772,6 +1130,7 @@ mod tests {
             reports,
             report_cases: &[],
             scenario_id: Some("cart.add.01"),
+            all_cases: false,
             verdict,
             max_bytes: 25 * 1024 * 1024,
         }
@@ -862,5 +1221,159 @@ mod tests {
         assert!(parse_report_spec("tap:out.tap").is_err());
         assert!(parse_report_spec("junit:").is_err());
         assert!(parse_report_spec("junit.xml").is_err());
+        assert_eq!(
+            parse_report_spec("swift-testing:.build/events.jsonl").unwrap(),
+            (ReportFormat::SwiftTesting, PathBuf::from(".build/events.jsonl"))
+        );
+    }
+
+    /// The event stream a real `swift test --experimental-event-stream-output`
+    /// run wrote (Swift 6.4, `tests/fixtures/swift-testing`).
+    const SWIFT_EVENTS: &str = include_str!("../tests/fixtures/swift-testing/events.jsonl");
+
+    /// evidence.add.85: display name first, then the function name; a
+    /// failing issue fails, `testSkipped` skips, started-and-ended passes,
+    /// a parameterized test is one case; suites are not cases.
+    #[test]
+    fn evidence_add_85_swift_testing_stream_parses_names_and_outcomes() {
+        let mut cases: Vec<(String, ReportOutcome)> = parse_swift_testing(SWIFT_EVENTS).unwrap().into_iter().map(|c| (c.name, c.outcome)).collect();
+        cases.sort_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(
+            cases,
+            vec![
+                ("shop.cart.01 adding an item counts it".to_string(), ReportOutcome::Passed),
+                ("shop.cart.02 an empty cart counts zero".to_string(), ReportOutcome::Passed),
+                ("shop.cart.03 adding twice keeps both".to_string(), ReportOutcome::Passed),
+                ("shop.cart.05 a deliberately failing expectation".to_string(), ReportOutcome::Failed),
+                ("shop.cart.06 not run yet".to_string(), ReportOutcome::Skipped),
+                ("shop_cart_04_count_never_negative()".to_string(), ReportOutcome::Passed),
+            ]
+        );
+        let parsed = parse_swift_testing(SWIFT_EVENTS).unwrap();
+        assert_eq!(names(&match_cases(&parsed, &[], Some("shop.cart.04")).unwrap())[0].0, "shop_cart_04_count_never_negative()", "the function name carries the id");
+
+        let test = |id: &str| format!(r#"{{"kind":"test","payload":{{"id":"M.S/{id}()","kind":"function","name":"{id}()"}},"version":0}}"#);
+        let event = |id: &str, kind: &str, extra: &str| format!(r#"{{"kind":"event","payload":{{"kind":"{kind}","testID":"M.S/{id}()"{extra}}},"version":0}}"#);
+        let stream = [
+            r#"{"kind":"test","payload":{"id":"M.S","kind":"suite","name":"S"},"version":0}"#.to_string(),
+            test("a_b_01"),
+            test("a_b_02"),
+            test("a_b_03"),
+            test("a_b_04"),
+            event("a_b_01", "testStarted", ""),
+            event("a_b_01", "issueRecorded", r#","issue":{"isKnown":true}"#),
+            event("a_b_01", "testEnded", ""),
+            event("a_b_02", "testStarted", ""),
+            event("a_b_02", "issueRecorded", r#","issue":{"isKnown":false}"#),
+            event("a_b_02", "testEnded", ""),
+            event("a_b_03", "testStarted", ""),
+        ]
+        .join("\n");
+        let outcomes: Vec<(String, ReportOutcome)> = parse_swift_testing(&stream).unwrap().into_iter().map(|c| (c.name, c.outcome)).collect();
+        assert_eq!(
+            outcomes,
+            vec![
+                ("a_b_01()".to_string(), ReportOutcome::Passed),
+                ("a_b_02()".to_string(), ReportOutcome::Failed),
+                ("a_b_03()".to_string(), ReportOutcome::Failed),
+            ],
+            "a known issue passes (a stream without isFailure), an unknown one fails, a test that never ended fails, a test that never ran is no case"
+        );
+        let suite_issue = format!("{stream}\n{}", r#"{"kind":"event","payload":{"kind":"issueRecorded","testID":"M.S","issue":{"isFailure":true}},"version":0}"#);
+        assert!(parse_swift_testing(&suite_issue).unwrap().iter().all(|c| c.outcome == ReportOutcome::Failed), "a suite's failing issue fails every test in it");
+        let suite_end_fail = r#"{"kind":"event","payload":{"kind":"testEnded","testID":"M.S","messages":[{"symbol":"fail","text":"Suite \"S\" failed after 0.001 seconds with 1 issue."}]},"version":0}"#;
+        let unexplained = [
+            r#"{"kind":"test","payload":{"id":"M.S","kind":"suite","name":"S"},"version":0}"#.to_string(),
+            test("a_b_01"),
+            event("a_b_01", "testStarted", ""),
+            event("a_b_01", "testEnded", ""),
+            suite_end_fail.to_string(),
+        ]
+        .join("\n");
+        assert_eq!(
+            parse_swift_testing(&unexplained).unwrap()[0].outcome,
+            ReportOutcome::Failed,
+            "a suite whose end reports a failure no test inside it recorded fails its tests, with no issueRecorded for them"
+        );
+        let explained = format!("{stream}\n{suite_end_fail}");
+        assert_eq!(
+            parse_swift_testing(&explained).unwrap()[0],
+            ReportCase { name: "a_b_01()".to_string(), group: String::new(), tags: Vec::new(), outcome: ReportOutcome::Passed },
+            "a suite's end that reports a failing test inside it leaves that test's siblings as they ended"
+        );
+        let ended_failed = [test("a_b_01"), event("a_b_01", "testStarted", ""), event("a_b_01", "testEnded", r#","messages":[{"symbol":"fail","text":"failed"}]"#)].join("\n");
+        assert_eq!(parse_swift_testing(&ended_failed).unwrap()[0].outcome, ReportOutcome::Failed, "a test whose own end reports a failure failed");
+
+        assert!(parse_swift_testing("<testsuite/>").unwrap_err().starts_with("line 1:"), "not JSON lines");
+        assert!(parse_swift_testing(&test("a_b_01")).unwrap_err().contains("no test ran"));
+        assert!(parse_swift_testing("").unwrap_err().contains("no test record"));
+    }
+
+    /// evidence.add.80: each indexed scenario's record carries its own
+    /// cases and a verdict derived from them, after the shared artifact;
+    /// the report is one file.
+    #[test]
+    fn evidence_add_80_a_batch_splits_the_report_by_owner() {
+        let repo = TempDir::new().unwrap();
+        let report = r#"<testsuite>
+            <testcase classname="cart" name="shop.cart.01 adds"/>
+            <testcase classname="cart" name="shop.cart.02 refuses"><failure/></testcase>
+            <testcase classname="cart" name="shop.cart.02 counts"/>
+            <testcase classname="cart" name="tests::shop_cart_03_skips"><skipped/></testcase>
+            <testcase classname="cart" name="shop.cart.09 is not indexed"/>
+            <testcase classname="cart" name="helper works"/>
+        </testsuite>"#;
+        std::fs::write(repo.path().join("junit.xml"), report).unwrap();
+        std::fs::write(repo.path().join("trace.zip"), b"trace").unwrap();
+        let reports = vec![(ReportFormat::Junit, repo.path().join("junit.xml"))];
+        let artifacts = vec![repo.path().join("trace.zip")];
+        let request = BatchRequest {
+            repo: repo.path(),
+            artifacts: &artifacts,
+            reports: &reports,
+            indexed: &["shop.cart.01", "shop.cart.02", "shop.cart.03", "shop.cart.04"],
+            verdict: None,
+            max_bytes: 1024 * 1024,
+        };
+        let batch = bind_all_scenarios(&request).unwrap();
+        let summary: Vec<(&str, EvidenceVerdict, Vec<Option<&str>>)> = batch
+            .scenarios
+            .iter()
+            .map(|s| (s.scenario_id.as_str(), s.verdict, s.attachments.iter().map(|a| a.case.as_deref()).collect()))
+            .collect();
+        assert_eq!(
+            summary,
+            vec![
+                ("shop.cart.01", EvidenceVerdict::Faithful, vec![None, Some("shop.cart.01 adds")]),
+                ("shop.cart.02", EvidenceVerdict::Divergent, vec![None, Some("shop.cart.02 refuses"), Some("shop.cart.02 counts")]),
+                ("shop.cart.03", EvidenceVerdict::NotApplicable, vec![None, Some("tests::shop_cart_03_skips")]),
+            ],
+            "shop.cart.04 owns no case and gets no record"
+        );
+        assert_eq!(batch.files.len(), 2, "the artifact and the report, once each");
+        assert_eq!(batch.unindexed, vec![("shop.cart.09".to_string(), "shop.cart.09 is not indexed".to_string())]);
+        assert_eq!(batch.without_id, 1);
+
+        let faithful = bind_all_scenarios(&BatchRequest { verdict: Some(EvidenceVerdict::Faithful), ..request }).unwrap_err();
+        assert!(
+            matches!(&faithful, BindError::Contradiction(m) if m.contains("shop.cart.02: ") && m.contains("`shop.cart.02 refuses` as failed") && m.contains("shop.cart.03: ") && m.contains("no record of the batch is written")),
+            "{faithful:?}"
+        );
+        let nobody = bind_all_scenarios(&BatchRequest { indexed: &["shop.cart.05"], ..request }).unwrap_err();
+        assert!(matches!(&nobody, BindError::Usage(m) if m.contains("not indexed: shop.cart.01, shop.cart.02, shop.cart.09, shop_cart_03")), "{nobody:?}");
+        assert_eq!(derived_verdict([ReportOutcome::Passed, ReportOutcome::Skipped, ReportOutcome::Failed]), EvidenceVerdict::Divergent);
+    }
+
+    /// evidence.add.84: with `all_cases` every case is bound, so one
+    /// failed case refuses a faithful verdict.
+    #[test]
+    fn evidence_add_84_all_cases_binds_every_case() {
+        let repo = TempDir::new().unwrap();
+        std::fs::write(repo.path().join("junit.xml"), JUNIT).unwrap();
+        let reports = vec![(ReportFormat::Junit, repo.path().join("junit.xml"))];
+        let all = BindRequest { scenario_id: None, all_cases: true, ..request(repo.path(), &[], &reports, EvidenceVerdict::Divergent) };
+        assert_eq!(bind(&all).unwrap().attachments.len(), 5);
+        let faithful = BindRequest { scenario_id: None, all_cases: true, ..request(repo.path(), &[], &reports, EvidenceVerdict::Faithful) };
+        assert!(matches!(bind(&faithful), Err(BindError::Contradiction(m)) if m.contains("cart.add.010 later")));
     }
 }

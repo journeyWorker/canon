@@ -1,0 +1,15 @@
+{
+  "change_id": "c-cart",
+  "findings": [
+    {
+      "disposition": "open",
+      "file_ref": null,
+      "resolution_sha": null,
+      "reviewer": "rev-b",
+      "round": 1,
+      "seq": 2,
+      "severity": "should-fix",
+      "summary": "the count was typed by hand"
+    }
+  ]
+}

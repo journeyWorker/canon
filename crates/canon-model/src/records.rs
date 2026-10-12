@@ -42,14 +42,20 @@ pub enum ChangeStatus {
 }
 
 /// A change: the top of the join spine's `change_id` row (change ↔
-/// tasks ↔ specs). `subject_id` (s36, additive — `#[serde(default,
-/// skip_serializing_if = "Option::is_none")]`, so a pre-s36 `Change`
-/// is byte-identical on the wire) links an imported plan change to the
-/// durable [`Subject`] it was adopted under; it is a plain `pub` field
-/// left `None` by [`Change::new`] and stamped on by `canon-cli`'s
-/// `subject adopt` at adoption time (mirroring how
+/// tasks ↔ specs). `subject_ids` links an imported plan change to every
+/// durable [`Subject`] it was adopted under (0.18 D4: a change may belong
+/// to several subjects; per-task subjects are out of scope). It is a
+/// plain `pub` field left empty by [`Change::new`] and appended to by
+/// `canon-cli`'s `subject adopt` at adoption time (mirroring how
 /// [`Session::project_key`] is set outside this crate), never derived
-/// here.
+/// here. Skipped when empty, so an unadopted change carries no key.
+///
+/// # Old records
+/// The ledger is append-only. A change written before 0.18 carries a
+/// single `subject_id` string; it reads as a one-element `subject_ids`
+/// ([`one_or_many_subjects`]) and is never rewritten. Renaming the field
+/// is a format generation change on a kind whose `at` can be byte-stable
+/// (plan import), so [`RecordKind::Change`] is at schema `2`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Change {
     #[serde(flatten)]
@@ -58,15 +64,36 @@ pub struct Change {
     pub title: String,
     pub summary: String,
     pub status: ChangeStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub subject_id: Option<SubjectId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty", alias = "subject_id", deserialize_with = "one_or_many_subjects")]
+    pub subject_ids: Vec<SubjectId>,
 }
 
 impl Change {
     pub fn new(envelope: Envelope, change_id: ChangeId, title: impl Into<String>, summary: impl Into<String>, status: ChangeStatus) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Change);
-        Self { envelope, change_id, title: title.into(), summary: summary.into(), status, subject_id: None }
+        Self { envelope, change_id, title: title.into(), summary: summary.into(), status, subject_ids: Vec::new() }
     }
+}
+
+/// [`Change::subject_ids`] from either wire form: the 0.18 list, or the
+/// single `subject_id` string (or `null`) a pre-0.18 record carries
+/// under the old key (the field's serde alias), read as a one-element
+/// (or empty) list.
+fn one_or_many_subjects<'de, D>(deserializer: D) -> Result<Vec<SubjectId>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(SubjectId),
+        Many(Vec<SubjectId>),
+    }
+    Ok(match Option::<OneOrMany>::deserialize(deserializer)? {
+        None => Vec::new(),
+        Some(OneOrMany::One(id)) => vec![id],
+        Some(OneOrMany::Many(ids)) => ids,
+    })
 }
 
 impl CanonRecord for Change {
@@ -144,7 +171,10 @@ where
 /// `canon/vocab`, not here); `owner_role` names the accountable role;
 /// `change_ids` accumulates as plan changes are adopted
 /// (additive-empty by default, so a freshly-authored subject with no
-/// links yet is still a valid, minimal record).
+/// links yet is still a valid, minimal record). One change may be listed
+/// by several subjects (0.18 D4); the change's own
+/// [`Change::subject_ids`] lists each of them, and readers join a
+/// subject to its changes from both sides.
 ///
 /// The scenario side of the join lives on [`Scenario::subject_id`], set
 /// by `canon inventory sync` from each scenario's `@subject:<id>` tag —
@@ -175,6 +205,27 @@ pub struct Subject {
     /// waiver never outlives the status it was granted for.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub status_override: Option<StatusOverride>,
+    /// Who reopened this subject from `shipped` to `verifying`, and why
+    /// (0.18 D3, `canon subject status <id> verifying --reason`). Set
+    /// only on the record that reopens; every other `canon subject
+    /// status` write clears it, like [`Self::status_override`]. Skipped
+    /// when absent, so every other subject stays byte-identical.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub reopen: Option<Reopen>,
+}
+
+/// A recorded reopen of a shipped subject (see [`Subject::reopen`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Reopen {
+    /// The operator's reason, verbatim (one line).
+    pub reason: String,
+    /// The approved change the follow-up work goes into: the subject's
+    /// newest adopted change when it reopened. Absent when it adopted
+    /// none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change: Option<ChangeId>,
+    /// Who reopened it.
+    pub actor: Actor,
 }
 
 /// A recorded waiver of the `spec_coverage.require_review` status guard
@@ -236,6 +287,7 @@ impl Subject {
             owner_role,
             change_ids: Vec::new(),
             status_override: None,
+            reopen: None,
         }
     }
 
@@ -429,7 +481,7 @@ pub struct Scenario {
     /// "Option::is_none")]`, so a pre-s36 `Scenario` is byte-identical
     /// on the wire), mapped from a `.feature` scenario's
     /// `@subject:<subject-id>` Gherkin tag by `canon inventory sync`
-    /// (mirrors `Change.subject_id`, which `subject adopt` stamps). A
+    /// (mirrors `Change.subject_ids`, which `subject adopt` appends to). A
     /// plain `pub` field left `None` by [`Scenario::new`] and populated
     /// outside this crate; a malformed or absent tag simply leaves it
     /// `None` (fail-soft), never a hard parse error here.
@@ -1153,6 +1205,10 @@ pub enum ReportFormat {
     Junit,
     /// Cucumber JSON — Gherkin runners; scenario tags travel in it.
     Cucumber,
+    /// Swift Testing's JSON-lines event stream (`swift test
+    /// --experimental-event-stream-output <path>`): the scenario id is
+    /// read from a test's display name, else its function name.
+    SwiftTesting,
 }
 
 /// The outcome a parsed report records for the case an attachment names.
@@ -1965,7 +2021,7 @@ mod tests {
     );
 
     round_trip_test!(
-        change_with_subject_id_round_trips,
+        change_with_subject_ids_round_trips,
         {
             let mut c = Change::new(
                 envelope(RecordKind::Change),
@@ -1974,10 +2030,72 @@ mod tests {
                 "subject loop",
                 ChangeStatus::InProgress,
             );
-            c.subject_id = Some(SubjectId::parse("subject-domain-loop").unwrap());
+            c.subject_ids = vec![SubjectId::parse("subject-domain-loop").unwrap(), SubjectId::parse("editing").unwrap()];
             c
         }
     );
+
+    round_trip_test!(subject_with_reopen_round_trips, {
+        let mut s = Subject::new(
+            envelope(RecordKind::Subject),
+            SubjectId::parse("payments").unwrap(),
+            "payments",
+            "billing subject",
+            "planning",
+            SubjectStatus::Verifying,
+            RoleId::parse("planner").unwrap(),
+        );
+        s.reopen = Some(Reopen {
+            reason: "follow-up: refunds round to cents".to_string(),
+            change: Some(ChangeId::parse("add-refunds").unwrap()),
+            actor: Actor::new_unattributed("lead"),
+        });
+        s
+    });
+
+    /// A change written before 0.18 carries one `subject_id` string. The
+    /// ledger is append-only, so it must still read: as a one-element
+    /// `subject_ids`, written back under the new key.
+    #[test]
+    fn a_pre_0_18_change_with_one_subject_id_reads_as_a_one_element_list() {
+        let json = serde_json::json!({
+            "schema": 1,
+            "kind": "change",
+            "at": "2026-07-20T12:00:00Z",
+            "actor": {"agent_id": "codex-cli", "role": "implementer"},
+            "change_id": "refactor-core",
+            "title": "Refactor core",
+            "summary": "",
+            "status": "in_progress",
+            "subject_id": "perception"
+        });
+        let change: Change = serde_json::from_value(json).expect("a pre-0.18 change must deserialize");
+        assert_eq!(change.subject_ids, vec![SubjectId::parse("perception").unwrap()]);
+        let written = serde_json::to_value(&change).unwrap();
+        assert_eq!(written["subject_ids"], serde_json::json!(["perception"]));
+        assert!(written.get("subject_id").is_none(), "the old key is not written back");
+    }
+
+    /// A malformed old `subject_id` fails the record, as a malformed list
+    /// entry does: never read as "no subject".
+    #[test]
+    fn a_malformed_subject_id_in_either_form_fails_the_change() {
+        let base = serde_json::json!({
+            "schema": 1,
+            "kind": "change",
+            "at": "2026-07-20T12:00:00Z",
+            "actor": {"agent_id": "codex-cli", "role": "implementer"},
+            "change_id": "refactor-core",
+            "title": "Refactor core",
+            "summary": "",
+            "status": "in_progress"
+        });
+        for (key, value) in [("subject_id", serde_json::json!("Not A Slug")), ("subject_ids", serde_json::json!(["ok", "Not A Slug"]))] {
+            let mut json = base.clone();
+            json[key] = value;
+            assert!(serde_json::from_value::<Change>(json).is_err(), "{key}");
+        }
+    }
 
     round_trip_test!(
         subject_round_trips,
@@ -2122,12 +2240,12 @@ mod tests {
         assert!(serde_json::from_value::<EvidenceRecord>(bad).is_err());
     }
 
-    /// A pre-s36 `Change` (no `subject_id` key at all) still
-    /// deserializes to `subject_id: None` and never reserializes a
-    /// spurious `"subject_id": null` — the additive-field bar this
-    /// change is held to.
+    /// A pre-s36 `Change` (no subject key at all) still deserializes to
+    /// an empty `subject_ids` and never reserializes a spurious
+    /// `"subject_ids": []` — the additive-field bar this change is held
+    /// to.
     #[test]
-    fn change_without_subject_id_key_deserializes_none_and_reserializes_without_the_key() {
+    fn change_without_subject_key_deserializes_empty_and_reserializes_without_the_key() {
         let json = serde_json::json!({
             "schema": 1,
             "kind": "change",
@@ -2139,7 +2257,7 @@ mod tests {
             "status": "in_progress"
         });
         let change: Change = serde_json::from_value(json.clone()).unwrap();
-        assert_eq!(change.subject_id, None);
+        assert!(change.subject_ids.is_empty());
         assert_eq!(serde_json::to_value(&change).unwrap(), json);
     }
 
@@ -2296,7 +2414,7 @@ mod tests {
     /// A pre-s36 `Scenario` (no `subject_id` key at all) still
     /// deserializes to `subject_id: None` and never reserializes a
     /// spurious `"subject_id": null` — the additive-field bar, mirroring
-    /// `Change.subject_id`.
+    /// `Change.subject_ids`.
     #[test]
     fn scenario_without_subject_id_key_deserializes_none_and_reserializes_without_the_key() {
         let at = serde_json::to_value(Utc::now()).unwrap();

@@ -281,3 +281,67 @@ Feature: subject lifecycle
     Then the command exits 1 with an unreviewed-promotion naming .canon/changes/<change>/brief.md to create, with a "Source:" line naming the external proposal.md, and the approval to record there
     And the "Approved:" line inside the external proposal.md is not read, and status reports the same brief as enforced and not approved
     And once the canon brief.md holds the "Source:" and "Approved:" lines the same move ships the subject, and the external proposal.md is never edited
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n2-impl"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @subject.lifecycle.29
+  Scenario: A shipped subject reopens inside its approved scope and records why
+    Given a shipped subject whose newest adopted change's brief.md carries an Approved line
+    When it is moved to verifying with a reason and an actor
+    Then it moves with no human, and the review guard says it skipped its checks because a reopen moves the subject back to fix its gaps
+    And the new record carries the reason, the actor and the approved change the follow-up goes into as tasks
+    And the next status write clears that note, so it belongs to the reopen that wrote it
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:01Z","actor":{"agent_id":"018-n2-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.30
+  Scenario: Reopening outside an approved scope is refused naming the brief to approve
+    Given a shipped subject that adopted a newer change whose brief.md has no Approved line
+    When it is moved to verifying with a reason
+    Then the command exits 1 with an unreviewed-promotion naming that brief.md and saying a human must answer it
+    And an override reason does not waive it, and the subject stays shipped
+    And once the brief records the human's approval the same reopen goes through
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:02Z","actor":{"agent_id":"018-n2-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.31
+  Scenario: A reopen needs a reason and a reason needs a reopen
+    Given a shipped subject
+    When it is moved to verifying with no reason, or with a blank one
+    Then the command refuses as a usage error saying the reopen needs one line of reason
+    And a reason given to any other transition is refused the same way
+    And the subject stays shipped
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:03Z","actor":{"agent_id":"018-n2-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.32
+  Scenario: Shipping a reopened subject runs every guard again
+    Given a reopened subject whose follow-up added an owned scenario with no evidence and found an open blocker on its change
+    When it is moved to shipped
+    Then the command exits 1 naming the uncovered scenario, the unreviewed scenario and the open blocker, and the subject stays verifying
+    And once the blocker is fixed and the scenario evidenced and reviewed, the same move ships it
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:04Z","actor":{"agent_id":"018-n2-impl"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @subject.lifecycle.33
+  Scenario: A change adopted by a second subject belongs to both and its open blocker gates both
+    Given a change written by canon change new under one subject
+    When it is adopted under a second subject
+    Then the command says the change now belongs to both subjects, naming each
+    And both subjects list the change, and the change lists both, never re-pointed
+    And status counts an open blocker on the change against both, and it refuses each subject's move into review scope
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:05Z","actor":{"agent_id":"018-n2-impl"}}
+  @subject:subject-lifecycle
+  @case:edge
+  @subject.lifecycle.34
+  Scenario: A change written before 0.18 with one subject reads as a one-element list
+    Given a stored change written before 0.18 that names its one subject in subject_id
+    When the changes are queried
+    Then the change shows that subject as a one-element subject_ids
+    And adopting it under a second subject appends that subject and writes the change as the list at the current schema generation

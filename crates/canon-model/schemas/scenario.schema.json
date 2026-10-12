@@ -63,7 +63,7 @@
       "$ref": "#/$defs/SpecDigest"
     },
     "subject_id": {
-      "description": "The durable [`Subject`] this scenario is specced against (s36,\nadditive — `#[serde(default, skip_serializing_if =\n\"Option::is_none\")]`, so a pre-s36 `Scenario` is byte-identical\non the wire), mapped from a `.feature` scenario's\n`@subject:<subject-id>` Gherkin tag by `canon inventory sync`\n(mirrors `Change.subject_id`, which `subject adopt` stamps). A\nplain `pub` field left `None` by [`Scenario::new`] and populated\noutside this crate; a malformed or absent tag simply leaves it\n`None` (fail-soft), never a hard parse error here.",
+      "description": "The durable [`Subject`] this scenario is specced against (s36,\nadditive — `#[serde(default, skip_serializing_if =\n\"Option::is_none\")]`, so a pre-s36 `Scenario` is byte-identical\non the wire), mapped from a `.feature` scenario's\n`@subject:<subject-id>` Gherkin tag by `canon inventory sync`\n(mirrors `Change.subject_ids`, which `subject adopt` appends to). A\nplain `pub` field left `None` by [`Scenario::new`] and populated\noutside this crate; a malformed or absent tag simply leaves it\n`None` (fail-soft), never a hard parse error here.",
       "anyOf": [
         {
           "$ref": "#/$defs/SubjectId"

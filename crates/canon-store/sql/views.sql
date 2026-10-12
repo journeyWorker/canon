@@ -35,6 +35,15 @@
 -- tiers above; see `stg_strategy_items`/`stg_trajectories` below for
 -- why it needs its own root instead of reusing `CANON_R2_ROOT`.
 --
+-- 0.18 (#29) addition: a FOURTH rebindable root, `CANON_HOT_ROOT`,
+-- holds the sqlite hot tier's rows materialized as git-shaped JSON
+-- files (`kind=<kind>/<n>__<digest12>.json`) by `canon-report` right
+-- before it opens this file — the sqlite db is local and needs no
+-- credential, so `canon init`'s default routing (`task`/`handoff`/
+-- `session`/`run`/`event` to a sqlite `hot` rung) reaches the marts.
+-- `read_text` tolerates zero matches, so an unset or empty root reads
+-- as no hot rows at all, never an error.
+--
 -- ── Multi-version records: which views FOLD and which read the raw
 --    version stream ─────────────────────────────────────────────────
 --
@@ -53,8 +62,8 @@
 -- `crate::query`'s Rust readers fold those versions to one winner per
 -- natural key (`canon_store::fold_latest_by_key`, greatest
 -- `(at, schema, digest)`). The views in this file DO NOT inherit that
--- fold and never have: `stg_records` is a plain `UNION ALL` over both
--- physical roots and every mart reads it directly, so a mart is
+-- fold and never have: `stg_records` is a plain `UNION ALL` over every
+-- physical root and every mart reads it directly, so a mart is
 -- exposed to raw versions even though `canon query` for the same kind
 -- is not. Each view therefore states its own posture below — the s42
 -- re-review found `mart_session_costs` silently multiplying
@@ -486,15 +495,40 @@ SELECT
     CAST(body AS JSON)                                   AS body
 FROM read_parquet(getenv('CANON_R2_ROOT') || '/kind=*/**/*.parquet');
 
--- One normalized, source-tagged view over BOTH physical local roots —
+-- Thin extraction over the sqlite hot tier, read the git way: the
+-- caller materializes every `records_history` row as one JSON file
+-- under `CANON_HOT_ROOT` (`canon_report::roots`, 0.18 #29), named
+-- `__{digest12}.json` with the SAME `partition::content_digest12` the
+-- git filename carries, so this view's columns line up with
+-- `stg_git_records` one for one and the fold compares them directly.
+CREATE OR REPLACE VIEW stg_hot_records AS
+WITH raw AS (
+    SELECT
+        filename                AS record_path,
+        CAST(content AS JSON)   AS j
+    FROM read_text(getenv('CANON_HOT_ROOT') || '/kind=*/**/*.json')
+)
+SELECT
+    record_path,
+    try_cast(j ->> '$.schema' AS BIGINT)                      AS schema,
+    j ->> '$.kind'                                            AS kind,
+    try_cast(j ->> '$.at' AS TIMESTAMP)                       AS "at",
+    j ->> '$.scenario_id'                                     AS scenario_id,
+    regexp_extract(record_path, '__([0-9a-f]{12})\.json$', 1) AS digest,
+    j                                                         AS body
+FROM raw;
+
+-- One normalized, source-tagged view over EVERY physical local root —
 -- the shape `canon query`'s own Rust fan-out/merge (D4) also
 -- produces, so a dashboard reading this view and a CLI caller reading
 -- `canon query` never disagree about what a merged read looks like.
 --
 -- This view is exhaustively `stg_git_records UNION ALL
--- stg_r2_records`, no third source: Postgres has ZERO SQL view here
--- (canon-report never opens a live DB connection, s25/s27/s28
--- design). `stg_r2_records` scans whatever parquet sits at
+-- stg_r2_records UNION ALL stg_hot_records`: Postgres has ZERO SQL
+-- view here (canon-report never opens a live DB connection, s25/s27/
+-- s28 design); the sqlite hot tier is a local file, read through the
+-- rows `canon-report` materializes under `CANON_HOT_ROOT` (0.18 #29).
+-- `stg_r2_records` scans whatever parquet sits at
 -- `CANON_R2_ROOT` (a LOCAL directory) — for an S3-backed rung this is
 -- only a local MIRROR, never the live bucket itself, and canon has no
 -- automatic sync keeping it current (s28 `rung-backend-capability`
@@ -552,11 +586,23 @@ FROM read_parquet(getenv('CANON_R2_ROOT') || '/kind=*/**/*.parquet');
 -- view is where the fold semantics are added. Nothing may order by
 -- the column — `version_rank` is the only fold rung, and the thirteen
 -- fold sites all inherit it from here.
+--
+-- A hot row whose identical record (same `kind`, same content digest,
+-- hence the same natural key and body) is already in the git or r2
+-- root is dropped here (0.18 #29 review): one record in two tiers is
+-- one record, and every `count(*)` downstream would otherwise count
+-- it twice. The file-tier copy stays, with its own `source_tier`.
 CREATE OR REPLACE VIEW stg_records AS
 WITH unioned AS (
     SELECT kind, "at", scenario_id, 'git' AS source_tier, schema, digest, body FROM stg_git_records
     UNION ALL
     SELECT kind, "at", body ->> '$.scenario_id' AS scenario_id, 'r2' AS source_tier, schema, digest, body FROM stg_r2_records
+    UNION ALL
+    SELECT h.kind, h."at", h.scenario_id, 'hot' AS source_tier, h.schema, h.digest, h.body
+    FROM stg_hot_records h
+    WHERE h.digest = ''
+       OR (NOT EXISTS (SELECT 1 FROM stg_git_records g WHERE g.kind = h.kind AND g.digest = h.digest)
+           AND NOT EXISTS (SELECT 1 FROM stg_r2_records r WHERE r.kind = h.kind AND r.digest = h.digest))
 ),
 -- `raw_record_at`'s RFC3339 grammar, read off chrono 0.4.45's
 -- `format::parse::parse_rfc3339` field by field (header's `at` rung
@@ -865,8 +911,9 @@ ORDER BY change_id, s.task_id;
 -- entirely from `Task.scenario_refs`. That made the panel structurally
 -- unable to report a scenario no plan task declares — and worse,
 -- invisible whenever `Task` is routed off a rung this corpus reads.
--- `canon.yaml` routing `task: hot` is exactly that case: the report
--- corpus is `stg_git_records UNION ALL stg_r2_records` and nothing
+-- `canon.yaml` routing `task: hot` was exactly that case before 0.18
+-- read the sqlite hot tier (#29): the report corpus was
+-- `stg_git_records UNION ALL stg_r2_records` and nothing
 -- else, so canon's own panel rendered `_No rows._` while sixteen
 -- Scenario records sat in the git tier. A worklist whose row set
 -- depends on where an UNRELATED kind is routed is not a worklist.

@@ -36,6 +36,14 @@ a feature, a one-line request included. A human is needed once per scope:
   stays in the approved change: add it as tasks in that change's
   `tasks.md`, never with `canon change new`, because a new change is a new
   scope and needs the human's approval.
+- **A follow-up on a shipped subject reopens it.** Reopen it with
+  `canon subject status <id> verifying --reason "<why>" --actor-id <unit>`
+  (no human inside the approved scope; the reason and your id are
+  recorded), add the follow-up as tasks in the approved change's
+  `tasks.md`, then its scenario, evidence and an independent review, and
+  ship again with `canon subject status <id> shipped`, which runs every
+  guard again. `canon status` flags a shipped subject whose gate went red
+  and names the reopen.
 
 When no human can answer one of the brief's questions, write the question
 into the brief, state the assumption you will build on, and say so in your
@@ -59,6 +67,9 @@ work inside an approved scope, never to the approval itself.
    `canon change new <slug> --subject <id> --title "…"`, and put the brief in
    the `.canon/changes/<slug>/brief.md` it writes. For a new subject or a
    scope change, this is where you stop until the human answers (step 1).
+   A change that also serves another subject is adopted there too,
+   `canon subject adopt <slug> --subject <other>`: it then belongs to both,
+   and its open blockers gate both.
 3. **Scenarios.** `canon feature new <area>.<surface> --title "…"`, then one
    `canon scenario new <area>.<surface>.<nn> --subject <id> --case <case> --title "…"`
    per behavior, with failure paths (`--case failure`) as well as `happy`
@@ -88,12 +99,20 @@ work inside an approved scope, never to the approval itself.
    `canon evidence add --project-id <root-id> --scenario-id <id> --kind test-run --role implementer --ref "<command>" --actor-id <unit> --session-id <session>`,
    with `--report junit:<path>` or `--artifact <path>` when files prove it.
    canon stores those bytes in `.canon/artifacts/sha256/` (commit it with the
-   ledger) and `canon gate check` re-checks them. For a scenario about what
+   ledger) and `canon gate check` re-checks them; the bound copy is the one
+   kept, so the working-tree report itself may be gitignored. For a scenario about what
    users see, bind the screenshot or recording that shows it
    (`--artifact <path>`). Under `write: { promote: auto }` (what
    `canon init` writes) the record is final when the command returns; only
    in a repo with `write.promote: manual` (or no `write:` key) follow it
    with `canon gate promote`.
+   One test run that proves several scenarios is bound once:
+   `canon evidence add --project-id <root-id> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref "<command>" --actor-id <unit> --session-id <session>`
+   writes one record per indexed scenario owning a case, each with the
+   verdict its own cases show; any refusal writes none. When a new record
+   makes a signed review stale, the add prints the reviewer and the
+   `canon review add … --pin <sha>` that re-pins it; the reviewer looks
+   again before running it.
    An external evaluator's audit is recorded with `canon evidence add --kind
    audit`; canon never generates one.
    Evidence for a plan task (`--task <id>`, before `canon gate task`) must
@@ -102,16 +121,24 @@ work inside an approved scope, never to the approval itself.
    change's `tasks.md` as it is now, so a task row you add needs no
    `canon ingest plans` first.
 7. **Independent review.** A different session from the one that wrote the
-   code and evidence reviews the change. The reviewer records every defect
+   code and evidence reviews the change. The review session must be able
+   to run the checks it signs off (the build, the tests, the app); a
+   reviewer that cannot run the tests says so and does not sign off. The
+   reviewer records every defect
    the review finds as a finding:
    `canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <me> --actor-id <me> --session-id <session> --summary "…"`;
+   `canon finding list --change-id <slug> [--open] [--json]` shows the
+   change's findings (round, seq, severity, disposition, reviewer, summary),
+   so the next seq and the open blockers are one command away;
    once fixed,
    `canon finding close --change-id <slug> --round <n> --seq <n> --disposition fixed --resolution-sha <sha>`
    (a short sha is fine; canon resolves it). With `write.promote: manual`,
    follow each with `canon gate promote`. Every bug fix adds or extends a scenario. The
    reviewer signs off each scenario:
    `canon review add --project-id <root-id> --scenario-id <id> --reviewer <who> --actor-id <who> --role reviewer --session-id <review-session> --pin <sha> --upstream-ref <ref>`
-   (written directly; nothing to promote). A reviewer of user-visible
+   (written directly; nothing to promote). Repeat `--scenario-id`, or pass
+   `--scenario-ids-from <file>`, to sign off several scenarios in one
+   call, all or nothing. A reviewer of user-visible
    behavior attaches what it looked at with `--artifact <path>`
    (repeatable); canon stores and re-checks those bytes and never compares
    images.
@@ -133,7 +160,10 @@ work inside an approved scope, never to the approval itself.
    `shipped` yourself once `canon subject status <id> shipped` passes its
    guard, unless the brief says the human ships. `canon status` shows
    whether each subject's brief is approved, by the same check, and names
-   the next step.
+   the next step. `shipped → verifying` reopens a shipped subject for a
+   follow-up (see the working loop above): it needs `--reason`, and it is
+   refused, naming the brief, when the subject's newest change is not
+   approved.
 
 Every write command says whether the record is final (`written directly`,
 or `staged and promoted in this run`) or staged; only a staged record
@@ -151,8 +181,16 @@ canon init --providers=claude,codex          # harnesses for the canon skill; wi
 canon skills install                         # follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing)
 canon skills install --providers=claude,codex,omp,pi   # any subset or none; rewrites skills.providers
 canon skills check                           # read-only drift check
-canon skills doctor                          # diagnostics, incl. a stray canon projection for an unselected provider; never deletes user files
+canon skills doctor                          # diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote; never deletes user files
 ```
+
+`install` and `doctor` end with `owned-paths:`, the globs of every path
+canon writes. Add them to the repo's formatter and linter ignore lists; a
+formatter that rewrites a projection or a ledger record makes canon read
+drift. Specs, `policy.yaml` and the changes are written by hand and are not
+on the list. `doctor` reports a projection whose bytes changed
+but whose content did not as `formatter-rewritten` and names the ignore
+entry to add; a changed file stays `stale`.
 
 The harness list lives in `canon.yaml` as `skills: { providers: [...] }`.
 `.agents` alone never selects Codex; `.codex` does. Change the list with

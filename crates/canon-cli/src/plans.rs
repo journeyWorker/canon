@@ -59,11 +59,12 @@
 //! flipped ([`refresh_change`]) and leaves the cursor alone.
 //!
 //! # Adoption survives a re-import (0.14 acceptance rerun G9)
-//! A plan document never names its subject; `canon change new` and
-//! `canon subject adopt` stamp `subject_id` on a newer change version.
-//! Every imported `Change` with no `subject_id` of its own carries the
-//! one its latest stored version has ([`Adoptions`]), so a re-import
-//! never unlinks an adopted change.
+//! A plan document never names its subjects; `canon change new` and
+//! `canon subject adopt` stamp `subject_ids` on a newer change version.
+//! Every imported `Change` with no `subject_ids` of its own carries the
+//! ones its latest stored version has ([`Adoptions`]; a pre-0.18 version's
+//! single `subject_id` reads as one), so a re-import never unlinks an
+//! adopted change.
 //!
 //! # Cross-source `change_id` collision (design D8, task 3.7)
 //! Sources are processed in strict config/one-shot order. A
@@ -533,23 +534,25 @@ fn persist_candidates(store: &TierRegistry, adoptions: &mut Adoptions, changes: 
     Ok(persisted)
 }
 
-/// The subject each change was adopted into (`canon change new`,
+/// The subjects each change was adopted into (`canon change new`,
 /// `canon subject adopt`), read from the latest change records the
 /// first time an import has a change to persist (0.14 acceptance rerun
-/// G9). A plan document never names its subject, so without this every
+/// G9). A plan document never names its subjects, so without this every
 /// re-import (a `canon gate task` flip, a ticked checkbox) appended a
-/// newer change version with `subject_id: null` that superseded the
-/// adoption in every folded read.
+/// newer change version with no subject that superseded the adoption in
+/// every folded read.
 #[derive(Default)]
-struct Adoptions(Option<BTreeMap<ChangeId, SubjectId>>);
+struct Adoptions(Option<BTreeMap<ChangeId, Vec<SubjectId>>>);
 
 impl Adoptions {
-    /// Give `change` the subject its latest stored version carries, when
-    /// the plan source named none. A change tier this run cannot reach
-    /// reads as no adoptions: the change itself then degrades to the
-    /// `unwritten` seam at persist time, so nothing is lost.
+    /// Give `change` the subjects its latest stored version carries, when
+    /// the plan source named none. A latest version written before 0.18
+    /// carries one `subject_id`, read as a one-element list by the model.
+    /// A change tier this run cannot reach reads as no adoptions: the
+    /// change itself then degrades to the `unwritten` seam at persist
+    /// time, so nothing is lost.
     fn carry(&mut self, store: &TierRegistry, change: &mut Change) -> Result<(), PlansError> {
-        if change.subject_id.is_some() {
+        if !change.subject_ids.is_empty() {
             return Ok(());
         }
         if self.0.is_none() {
@@ -559,16 +562,14 @@ impl Adoptions {
                 Err(err) => return Err(PlansError::Store(err)),
             };
             let adopted = latest
-                .iter()
-                .filter_map(|raw| {
-                    let change_id = ChangeId::parse(raw.0.get("change_id")?.as_str()?).ok()?;
-                    let subject_id = SubjectId::parse(raw.0.get("subject_id")?.as_str()?).ok()?;
-                    Some((change_id, subject_id))
-                })
+                .into_iter()
+                .filter_map(|raw| serde_json::from_value::<Change>(raw.0).ok())
+                .filter(|stored| !stored.subject_ids.is_empty())
+                .map(|stored| (stored.change_id, stored.subject_ids))
                 .collect();
             self.0 = Some(adopted);
         }
-        change.subject_id = self.0.as_ref().and_then(|adopted| adopted.get(&change.change_id)).cloned();
+        change.subject_ids = self.0.as_ref().and_then(|adopted| adopted.get(&change.change_id)).cloned().unwrap_or_default();
         Ok(())
     }
 }

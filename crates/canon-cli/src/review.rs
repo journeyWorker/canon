@@ -42,9 +42,9 @@
 //! inside the repository, within `--max-artifact-mib`, its bytes copied
 //! into `.canon/artifacts/sha256/<hex>` after every refusal has passed
 //! and before the review is written. The review records each file's
-//! `{path, sha256}`; `canon gate check` re-hashes the stored blob of
-//! every in-effect review and reports a missing or altered one as
-//! `stale-evidence` naming the review. Canon never compares images.
+//! `{path, sha256}`; `canon gate check` re-checks the files of every
+//! current in-effect review by the evidence rule
+//! (`canon_gate::artifact_store`). Canon never compares images.
 
 use std::path::{Path, PathBuf};
 
@@ -96,7 +96,11 @@ pub fn parse_runtime_label(s: &str) -> Result<String, String> {
 /// one MUST be `Some`.
 pub struct ReviewAddArgs {
     pub project_id: ProjectId,
-    pub scenario_id: ScenarioId,
+    /// `--scenario-id`, repeatable (0.18 D1): one review per scenario.
+    pub scenario_ids: Vec<ScenarioId>,
+    /// `--scenario-ids-from <file|->`: more ids, one per line, `#`
+    /// starting a comment ([`parse_scenario_ids`]).
+    pub scenario_ids_from: Option<String>,
     pub reviewer: String,
     pub pin: String,
     pub upstream_ref: Option<String>,
@@ -114,10 +118,52 @@ pub struct ReviewAddArgs {
     pub max_artifact_mib: u64,
 }
 
+/// The scenario ids of a `--scenario-ids-from` file: one per line, `#`
+/// starting a comment that runs to the end of the line, blank lines
+/// skipped. A line that is not a scenario id is an error naming it.
+pub fn parse_scenario_ids(text: &str) -> Result<Vec<ScenarioId>, String> {
+    text.lines()
+        .enumerate()
+        .filter_map(|(index, line)| {
+            let id = line.split('#').next().unwrap_or_default().trim();
+            (!id.is_empty()).then(|| ScenarioId::parse(id).map_err(|e| format!("line {}: `{id}` is not a scenario id: {e}", index + 1)))
+        })
+        .collect()
+}
+
+/// Every scenario id the invocation names, in order and each once:
+/// `--scenario-id` first, then `--scenario-ids-from` (`-` reads stdin).
+fn requested_scenarios(args: &ReviewAddArgs) -> Result<Vec<ScenarioId>, String> {
+    let mut ids = args.scenario_ids.clone();
+    if let Some(source) = &args.scenario_ids_from {
+        let text = if source == "-" {
+            let mut text = String::new();
+            std::io::Read::read_to_string(&mut std::io::stdin(), &mut text).map_err(|e| format!("--scenario-ids-from -: {e}"))?;
+            text
+        } else {
+            std::fs::read_to_string(source).map_err(|e| format!("--scenario-ids-from {source}: {e}"))?
+        };
+        ids.extend(parse_scenario_ids(&text).map_err(|e| format!("--scenario-ids-from {source}: {e}"))?);
+    }
+    let mut unique: Vec<ScenarioId> = Vec::new();
+    for id in ids {
+        if !unique.contains(&id) {
+            unique.push(id);
+        }
+    }
+    if unique.is_empty() {
+        return Err("no scenario to review: give --scenario-id <id> (repeatable) or --scenario-ids-from <file|->".to_string());
+    }
+    Ok(unique)
+}
+
 /// `canon review add` (module doc). Both provenance refs `None` or both
-/// `Some`, and a scenario without a record, are refused before any write
-/// is attempted. Returns the process exit code: `0` on a successful
-/// write, `2` on a refused/malformed invocation.
+/// `Some`, no scenario, and any scenario without a record are refused
+/// before any write is attempted. With several scenarios (0.18 D1) it
+/// writes one review per scenario with the same reviewer, pin and
+/// artifacts, each pinning its own scenario, all or nothing. Returns the
+/// process exit code: `0` on a successful write, `2` on a
+/// refused/malformed invocation.
 pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let provenance_ref = match (&args.upstream_ref, &args.original_spec_ref) {
         (Some(r), None) => ProvenanceRef::UpstreamRef(r.clone()),
@@ -131,6 +177,13 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
             return 2;
         }
     };
+    let scenario_ids = match requested_scenarios(args) {
+        Ok(ids) => ids,
+        Err(e) => {
+            eprintln!("canon review add: refused — {e}");
+            return 2;
+        }
+    };
 
     let repo = resolve_repo_root(repo);
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
@@ -140,15 +193,18 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
             return 2;
         }
     };
-    let Some(scenario) = latest_scenarios(&gate_context).into_iter().find(|s| s.project_id == args.project_id && s.scenario_id == args.scenario_id) else {
+    let indexed = latest_scenarios(&gate_context);
+    let (found, missing): (Vec<_>, Vec<_>) =
+        scenario_ids.iter().map(|id| (id, indexed.iter().find(|s| s.project_id == args.project_id && &s.scenario_id == id))).partition(|(_, s)| s.is_some());
+    if !missing.is_empty() {
+        let ids = missing.iter().map(|(id, _)| format!("`{}`", id.as_str())).collect::<Vec<_>>().join(", ");
+        let nothing = if scenario_ids.len() > 1 { " (nothing is written for any of the scenarios)" } else { "" };
         eprintln!(
-            "canon review add: refused — no scenario record for `{}` in spec root `{}`; a review pins the scenario it saw, so index it first (`canon inventory sync`)",
-            args.scenario_id.as_str(),
+            "canon review add: refused — no scenario record for {ids} in spec root `{}`; a review pins the scenario it saw, so index it first (`canon inventory sync`){nothing}",
             args.project_id.as_str()
         );
         return 2;
-    };
-    let pins = current_pins(&gate_context, scenario);
+    }
     let bound = match crate::evidence_attach::bind_artifacts(&repo, &args.artifacts, args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB)) {
         Ok(bound) => bound,
         Err(e) => {
@@ -166,70 +222,116 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
             files.push(file);
         }
     }
-    let committed = GitTier::new(&gate_context.ctx.ledger_root);
-
     let mut actor = Actor::new(&args.actor_id, args.role.clone());
     if let Some(session_id) = &args.session_id {
         actor = actor.with_session(session_id.clone());
     }
-    let mut review = Review::new(
-        Envelope::new(1, RecordKind::Review, Utc::now(), actor),
-        args.project_id.clone(),
-        args.scenario_id.clone(),
-        &args.reviewer,
-        &args.pin,
-        provenance_ref,
-    );
-    review.outcome = args.outcome;
-    review.reviewer_provider = args.reviewer_provider.clone();
-    review.reviewer_model = args.reviewer_model.clone();
-    review.reviewer_harness = args.reviewer_harness.clone();
-    review.artifacts = artifacts;
-    let pinned = format!(
-        "canon review add: pinned {} at {} {} and {} latest evidence record(s); the review counts only while both are unchanged",
-        args.scenario_id.as_str(),
-        match pins.scenario_digest_scope {
-            PinnedSpec::Scenario => "scenario digest",
-            PinnedSpec::File => "source digest",
-        },
-        &pins.scenario_digest.as_str()[..12],
-        pins.evidence.len()
-    );
-    review.pins = Some(pins);
+    let at = Utc::now();
+    let reviews: Vec<(Review, String)> = found
+        .into_iter()
+        .filter_map(|(_, scenario)| scenario.copied())
+        .map(|scenario| {
+            let pins = current_pins(&gate_context, scenario);
+            let mut review = Review::new(
+                Envelope::new(1, RecordKind::Review, at, actor.clone()),
+                args.project_id.clone(),
+                scenario.scenario_id.clone(),
+                &args.reviewer,
+                &args.pin,
+                provenance_ref.clone(),
+            );
+            review.outcome = args.outcome;
+            review.reviewer_provider = args.reviewer_provider.clone();
+            review.reviewer_model = args.reviewer_model.clone();
+            review.reviewer_harness = args.reviewer_harness.clone();
+            review.artifacts = artifacts.clone();
+            let pinned = format!(
+                "canon review add: pinned {} at {} {} and {} latest evidence record(s); the review counts only while both are unchanged",
+                scenario.scenario_id.as_str(),
+                match pins.scenario_digest_scope {
+                    PinnedSpec::Scenario => "scenario digest",
+                    PinnedSpec::File => "source digest",
+                },
+                &pins.scenario_digest.as_str()[..12],
+                pins.evidence.len()
+            );
+            review.pins = Some(pins);
+            (review, pinned)
+        })
+        .collect();
 
-    // Store the bytes before the review is written (module doc): every
+    // Store the bytes before any review is written (module doc): every
     // refusal is behind us, and a review must never name a blob the
-    // store lacks.
-    let stored = match crate::evidence_attach::store_files(&repo, &files) {
-        Ok(stored) => stored,
-        Err((file, e)) => {
-            eprintln!("canon review add: refused — could not store {} in the artifact store: {e}", file.resolved.display());
+    // store lacks. All or nothing (0.18 D1): a failed write removes what
+    // this call wrote and stored.
+    let only_reviews: Vec<Review> = reviews.iter().map(|(review, _)| review.clone()).collect();
+    let (stored, written) = match write_reviews(&repo, &gate_context.ctx.ledger_root, &files, &only_reviews, &mut |tier, review| tier.write(review)) {
+        Ok(landed) => landed,
+        Err(error) => {
+            eprintln!("canon review add: {error}");
+            if reviews.len() > 1 {
+                eprintln!("canon review add: refused — no review is written: every review and blob this run wrote or stored was removed");
+            }
             return 2;
         }
     };
+    for (_, pinned) in &reviews {
+        println!("{pinned}");
+    }
+    if !files.is_empty() {
+        println!("{}", crate::evidence_attach::stored_line("canon review add", files.len(), stored));
+    }
+    if !args.outcome.is_signed() {
+        println!("canon review add: outcome `{}` is recorded as a review gap, never as an approval", args.outcome.as_str());
+    }
+    for (location, deduped) in &written {
+        println!("canon review add: wrote {location} ({}) — {}", if *deduped { "deduped" } else { "new" }, crate::write_mode::DIRECT);
+    }
+    0
+}
 
-    match committed.write(&review) {
-        Ok(receipt) => {
-            println!("{pinned}");
-            if !files.is_empty() {
-                println!("{}", crate::evidence_attach::stored_line("canon review add", files.len(), stored));
+/// Write `reviews` all or nothing (0.18 D1): check the committed review
+/// directory can be written, store `files` under the store lock, then
+/// write each review through `write` (`GitTier::write` outside tests).
+/// A failed write removes every review this call wrote (a deduped one
+/// already existed and stays) and every blob it newly stored, and is
+/// returned as the error. `Ok` is the blobs newly stored and each
+/// review's `(location, deduped)`.
+fn write_reviews(
+    repo: &Path,
+    ledger_root: &Path,
+    files: &[crate::evidence_attach::BoundFile],
+    reviews: &[Review],
+    write: &mut dyn FnMut(&GitTier, &Review) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
+) -> Result<(usize, Vec<(String, bool)>), String> {
+    let dir = ledger_root.join(format!("kind={}", RecordKind::Review.as_str()));
+    match std::fs::create_dir_all(&dir).and_then(|()| std::fs::metadata(&dir)) {
+        Ok(meta) if meta.permissions().readonly() => return Err(format!("refused — {} is read-only", dir.display())),
+        Ok(_) => {}
+        Err(e) => return Err(format!("refused — cannot prepare {}: {e}", dir.display())),
+    }
+    let held = crate::evidence_attach::store_files_held(repo, files)
+        .map_err(|(file, e)| format!("refused — could not store {} in the artifact store: {e}", file.resolved.display()))?;
+    let committed = GitTier::new(ledger_root);
+    let mut written: Vec<(String, bool)> = Vec::new();
+    for review in reviews {
+        match write(&committed, review) {
+            Ok(receipt) => written.push((receipt.location, receipt.deduped)),
+            Err(e) => {
+                for (location, deduped) in &written {
+                    if !deduped {
+                        let _ = std::fs::remove_file(ledger_root.join(location));
+                    }
+                }
+                held.rollback();
+                if reviews.len() == 1 {
+                    return Err(e.to_string());
+                }
+                return Err(format!("writing review {} of {} failed: {e}", written.len() + 1, reviews.len()));
             }
-            if !args.outcome.is_signed() {
-                println!("canon review add: outcome `{}` is recorded as a review gap, never as an approval", args.outcome.as_str());
-            }
-            println!(
-                "canon review add: wrote {} ({}) — {}",
-                receipt.location,
-                if receipt.deduped { "deduped" } else { "new" },
-                crate::write_mode::DIRECT
-            );
-            0
-        }
-        Err(e) => {
-            eprintln!("canon review add: {e}");
-            2
         }
     }
+    Ok((held.stored(), written))
 }
 
 #[cfg(test)]
@@ -243,7 +345,8 @@ mod tests {
     fn args() -> ReviewAddArgs {
         ReviewAddArgs {
             project_id: ProjectId::parse("app-a").unwrap(),
-            scenario_id: ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap(),
+            scenario_ids: vec![ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap()],
+            scenario_ids_from: None,
             reviewer: "reviewer-1".into(),
             pin: "abc123pin".into(),
             upstream_ref: Some("routes/world.firstbuy-hotdeal.26#onReview".into()),
@@ -269,7 +372,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
         let a = args();
-        ledger(&dir).write(&Scenario::new(envelope, a.project_id, a.scenario_id, "t", "", SpecDigest::of(b"feature bytes"))).unwrap();
+        ledger(&dir).write(&Scenario::new(envelope, a.project_id, a.scenario_ids[0].clone(), "t", "", SpecDigest::of(b"feature bytes"))).unwrap();
         dir
     }
 
@@ -307,7 +410,7 @@ mod tests {
 
         let a = args();
         let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("impl", RoleId::parse("implementer").unwrap()));
-        let record = EvidenceRecord::new(envelope, None, Some(a.scenario_id.clone()), None, EvidenceVerdict::Faithful).with_project_id(a.project_id.clone());
+        let record = EvidenceRecord::new(envelope, None, Some(a.scenario_ids[0].clone()), None, EvidenceVerdict::Faithful).with_project_id(a.project_id.clone());
         let receipt = ledger(&dir).write(&record).unwrap();
         assert_eq!(run_add(dir.path(), &ReviewAddArgs { reviewer: "reviewer-2".into(), ..args() }), 0);
         let second = reviews(&dir).into_iter().find(|r| r.reviewer == "reviewer-2").unwrap();
@@ -360,5 +463,64 @@ mod tests {
         let dir = repo_with_scenario();
         assert_eq!(run_add(dir.path(), &ReviewAddArgs { original_spec_ref: Some("spec/x.md".into()), ..args() }), 2);
         assert!(reviews(&dir).is_empty());
+    }
+
+    /// review.add.81: a write failure on the second review of a batch
+    /// removes the first and every blob the call stored; a read-only
+    /// review directory is refused before anything is written.
+    #[test]
+    fn review_add_81_a_batch_whose_second_write_fails_leaves_nothing() {
+        let dir = repo_with_scenario();
+        let ledger_root = GateCtx::from_repo(dir.path()).unwrap().ledger_root;
+        std::fs::write(dir.path().join("shot.png"), b"png").unwrap();
+        let files: Vec<crate::evidence_attach::BoundFile> =
+            crate::evidence_attach::bind_artifacts(dir.path(), &[dir.path().join("shot.png")], 1024).unwrap().into_iter().map(|(_, file)| file).collect();
+        let store = canon_gate::artifact_store::store_dir(dir.path());
+        let blobs = || std::fs::read_dir(&store).map(|d| d.count()).unwrap_or(0);
+        let review = |scenario: &str| {
+            let a = args();
+            Review::new(
+                Envelope::new(1, RecordKind::Review, Utc::now(), Actor::new("agent-x", RoleId::parse("reviewer").unwrap())),
+                a.project_id,
+                ScenarioId::parse(scenario).unwrap(),
+                "reviewer-1",
+                "pin",
+                ProvenanceRef::UpstreamRef("r".into()),
+            )
+        };
+        let batch = vec![review("cart.add.01"), review("cart.add.02")];
+
+        let mut calls = 0;
+        let mut failing_second = |tier: &GitTier, review: &Review| {
+            calls += 1;
+            if calls == 2 {
+                return Err(canon_store::tier::StoreError::Io(std::io::Error::other("disk full")));
+            }
+            tier.write(review)
+        };
+        let error = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut failing_second).unwrap_err();
+        assert!(error.contains("writing review 2 of 2 failed: ") && error.contains("disk full"), "{error}");
+        assert!(reviews(&dir).is_empty(), "the first review is removed");
+        assert_eq!(blobs(), 0, "the blob this call stored is removed");
+
+        // One scenario: the error is the write's own, as before 0.18,
+        // so `run_add` prints `canon review add: <error>` unchanged.
+        let disk_full = || canon_store::tier::StoreError::Io(std::io::Error::other("disk full"));
+        let single = write_reviews(dir.path(), &ledger_root, &files, &batch[..1], &mut |_, _| Err(disk_full())).unwrap_err();
+        assert_eq!(single, disk_full().to_string(), "a single review's failure keeps its pre-0.18 wording");
+        assert_eq!((reviews(&dir).len(), blobs()), (0, 0));
+
+        let review_dir = ledger_root.join("kind=review");
+        let mut readonly = std::fs::metadata(&review_dir).unwrap().permissions();
+        readonly.set_readonly(true);
+        std::fs::set_permissions(&review_dir, readonly.clone()).unwrap();
+        let refused = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review));
+        readonly.set_readonly(false);
+        std::fs::set_permissions(&review_dir, readonly).unwrap();
+        assert!(refused.unwrap_err().contains("is read-only"));
+        assert_eq!(blobs(), 0);
+
+        let (stored, written) = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review)).unwrap();
+        assert_eq!((stored, written.len(), reviews(&dir).len(), blobs()), (1, 2, 2, 1));
     }
 }

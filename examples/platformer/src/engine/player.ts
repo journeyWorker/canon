@@ -31,12 +31,7 @@ export function updatePlayer(
   if (input.jumpBuffered) state.jumpBufferTimer = JUMP_BUFFER;
   state.jumpBufferTimer = Math.max(0, state.jumpBufferTimer - dt);
 
-  if (state.jumpBufferTimer > 0 && state.coyoteTimer > 0) {
-    state.vy = JUMP_VELOCITY;
-    state.onGround = false;
-    state.jumpBufferTimer = 0;
-    state.coyoteTimer = 0;
-  }
+  if (state.jumpBufferTimer > 0 && state.coyoteTimer > 0) startJump(state);
 
   state.vy = Math.min(state.vy + GRAVITY * dt, MAX_FALL);
 
@@ -47,18 +42,32 @@ export function updatePlayer(
   resolveAxis(state, 'x', level);
   const prevBottom = state.y + state.h;
   state.y += fallSpeed * dt;
-  const landedOnId = resolveAxis(state, 'y', level, extraSolids, { prevBottom, vy: fallSpeed });
+  let landedOnId = resolveAxis(state, 'y', level, extraSolids, { prevBottom, vy: fallSpeed });
 
   if (!wasGrounded && state.onGround && fallSpeed > SQUASH_FALL_THRESHOLD) {
     state.squashTimer = SQUASH_DURATION;
   }
   state.squashTimer = Math.max(0, state.squashTimer - dt);
 
+  // A jump buffered before touchdown fires on the landing step itself,
+  // from the ground just reached.
+  if (!wasGrounded && state.onGround && state.jumpBufferTimer > 0) {
+    startJump(state);
+    landedOnId = null;
+  }
+
   const worldH = level.grid.length * TILE;
   if (state.y > worldH + 200) {
     return 'RESPAWN'; // simulation.ts interprets this sentinel and repositions the player
   }
   return landedOnId;
+}
+
+function startJump(state: PlayerState): void {
+  state.vy = JUMP_VELOCITY;
+  state.onGround = false;
+  state.jumpBufferTimer = 0;
+  state.coyoteTimer = 0;
 }
 
 export function spawnPlayer(spawn: { x: number; y: number }): PlayerState {

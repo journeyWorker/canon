@@ -52,9 +52,17 @@
 //! performed by the time this module ever sees a `TierPolicy` — this
 //! module reads only `read_directly_by_report`, never `class`.
 //!
+//! # 0.18 (#29): the sqlite hot tier is read directly
+//! A sqlite-backed rung's store is a local file that needs no
+//! credential. `canon-report` materializes its rows under
+//! `CANON_HOT_ROOT` (`crate::roots::Roots::materialize_hot`) before
+//! opening the views, so `Backend::Sqlite.read_directly_by_report()`
+//! is `true` and a kind routed there is never named here.
+//!
 //! # Why this set is a CONSERVATIVE lower bound on "invisible to the marts", not an exact list
 //! `crates/canon-store/sql/views.sql`'s `stg_records` is exhaustively
-//! `stg_git_records UNION ALL stg_r2_records` — no third source, and
+//! `stg_git_records UNION ALL stg_r2_records UNION ALL
+//! stg_hot_records` — no fourth source, and
 //! `stg_r2_records` scans whatever parquet happens to sit at
 //! `CANON_R2_ROOT` (default `<repo>/.canon/r2`), REGARDLESS of whether
 //! that directory is a live-synced mirror of an S3-backed cold rung, a
@@ -133,7 +141,7 @@ pub fn kinds_not_read_directly(repo_root: &Path) -> Vec<RecordKind> {
 /// wording could drift apart independently). s28 design D3: truthful
 /// WITH OR WITHOUT a local `.canon/r2` mirror — never an absolute "not
 /// reflected" claim.
-const ESCAPE_HATCH_SENTENCE: &str = "canon report reads its local roots directly (the git ledger + local `.canon/r2` + `.canon/learn` parquet); the kinds below route to a backend whose own store it does not read (a live database or object-store bucket), so their data appears only if materialized into the local report roots — it may be incomplete or stale. Read them live with `canon query --kind <kind>`.";
+const ESCAPE_HATCH_SENTENCE: &str = "canon report reads its local roots directly (the git ledger, the sqlite hot db, and local `.canon/r2` + `.canon/learn` parquet); the kinds below route to a backend whose own store it does not read (a live database or object-store bucket), so their data appears only if materialized into the local report roots — it may be incomplete or stale. Read them live with `canon query --kind <kind>`.";
 
 /// `## Kinds not read directly` — `None` when `kinds` is empty (design
 /// D2: an empty set renders NOTHING at all, not an empty section, so
@@ -236,6 +244,18 @@ mod tests {
         write_canon_yaml(dir.path(), "routing:\n  task: hot\n");
         let kinds = kinds_not_read_directly(dir.path());
         assert_eq!(kinds, vec![RecordKind::Task], "an unconfigured rung must never be assumed read-directly");
+    }
+
+    /// 0.18 #29: `canon init`'s own default — `hot` backed by a local
+    /// sqlite file — is read directly, so no kind routed there is named.
+    #[test]
+    fn a_hot_rung_backed_by_sqlite_is_read_directly() {
+        let dir = tempfile::tempdir().unwrap();
+        write_canon_yaml(
+            dir.path(),
+            "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  task: hot\n  session: hot\n  change: local\n",
+        );
+        assert!(kinds_not_read_directly(dir.path()).is_empty(), "the sqlite hot db is a local file the report reads");
     }
 
     #[test]

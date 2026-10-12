@@ -194,6 +194,47 @@ fn a_summary_is_kept_on_scenario_only_evidence_and_still_scanned_for_fabrication
     assert!(text(&fabricated).contains("fabricated-evidence game.run.01"), "{}", text(&fabricated));
 }
 
+/// evidence.add.90 (0.18 D5, #32, FINDINGS-3 H6): a marker inside a path,
+/// a file name, a URL or a longer word is no fabrication marker, so the
+/// eval's `pack.json/atlas` summary is kept; the same marker standing on
+/// its own is still refused.
+#[test]
+fn a_marker_inside_a_path_a_file_name_a_url_or_a_longer_word_is_not_a_fabrication_marker() {
+    let dir = setup(false);
+    let repo = dir.path();
+    scenario(repo, "game.run.01", None);
+    let summary = "error screen names pack.json/atlas JSON as unreadable; notes in tbd_notes.md and https://example.com/tbd";
+    let added = attest(repo, &["--summary", summary]);
+    assert!(added.status.success(), "{}", text(&added));
+    assert_eq!(committed_records(repo)[0]["evidence_note"]["summary"], summary);
+
+    let standalone = attest(repo, &["--summary", "atlas check: n/a"]);
+    assert_eq!(standalone.status.code(), Some(1), "{}", text(&standalone));
+    assert!(text(&standalone).contains("fabrication marker \"n/a\""), "{}", text(&standalone));
+    assert_eq!(committed_records(repo).len(), 1, "a refused add writes nothing");
+}
+
+/// evidence.add.91 (0.18 D5, #32): a fabrication marker is refused the
+/// way every other gate-red refusal of `evidence add` is — one
+/// `canon evidence add: refused —` line per finding, exit 1, nothing
+/// staged or committed.
+#[test]
+fn a_fabrication_marker_refusal_reads_refused_and_exits_1() {
+    let dir = setup(false);
+    let repo = dir.path();
+    scenario(repo, "game.run.01", None);
+    let refused = attest(repo, &["--summary", "TBD after the review", "--command-result", "n/a"]);
+    assert_eq!(refused.status.code(), Some(1), "{}", text(&refused));
+    let stderr = String::from_utf8_lossy(&refused.stderr).into_owned();
+    let lines: Vec<&str> = stderr.lines().collect();
+    assert_eq!(lines.len(), 2, "one refusal line per finding: {stderr}");
+    assert!(lines.iter().all(|l| l.starts_with("canon evidence add: refused — fabricated-evidence game.run.01 — ")), "{stderr}");
+    assert!(lines[0].contains("summary field contains fabrication marker \"tbd\"") && lines[1].contains("command_result field contains fabrication marker \"n/a\""), "{stderr}");
+    assert!(committed_records(repo).is_empty(), "a refused add writes nothing");
+    let staged = repo.join(".canon/ledger/_staging/kind=evidence_record");
+    assert!(std::fs::read_dir(&staged).map(|mut entries| entries.next().is_none()).unwrap_or(true), "a refused add stages nothing");
+}
+
 /// Dogfood F15: one `--report-case` hid the other cases for the same
 /// scenario. Every case carrying the id is bound, named cases are added,
 /// and a failed one refuses `faithful`.

@@ -1,0 +1,16 @@
+tiers:
+  local:
+    backend: git
+    root: .canon/ledger
+specs:
+  roots:
+    - id: root
+      root: specs
+routing:
+  scenario: local
+  evidence_record: local
+  subject: local
+  review: local
+  finding: local
+  change: local
+  task: local

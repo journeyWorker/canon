@@ -219,7 +219,7 @@ fn skills_install_51_a_bare_target_installs_nothing_and_names_the_flag() {
     assert_eq!(install.status.code(), Some(0), "{out}");
     assert_eq!(
         out,
-        "canon v1 — nothing installed: no provider selected (no .claude, .codex, .omp or .pi directory found); choose with `canon skills install --providers=<list>` (any of claude, codex, omp, pi)\n"
+        format!("canon v1 — nothing installed: no provider selected (no .claude, .codex, .omp or .pi directory found); choose with `canon skills install --providers=<list>` (any of claude, codex, omp, pi)\n{}", owned(&[]))
     );
     assert_eq!(fs::read_dir(&target).unwrap().count(), 0, "the CLI writes nothing either");
 
@@ -657,7 +657,7 @@ fn skills_install_41_a_lock_another_canon_wrote_is_reported_with_the_install_fix
     assert_eq!(read_lock(&target)["canon_version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(canon(&["skills", "check", "--providers", "claude,codex"], &source, &target).status.code(), Some(0));
     let doctor = canon(&["skills", "doctor", "--providers", "claude,codex"], &source, &target);
-    assert_eq!(String::from_utf8_lossy(&doctor.stdout), "providers: claude,codex\nstatus: healthy\n");
+    assert_eq!(String::from_utf8_lossy(&doctor.stdout), format!("providers: claude,codex\nstatus: healthy\n{}", owned(&[".claude", ".agents"])));
 }
 
 /// skills.install.42
@@ -711,8 +711,9 @@ fn skills_install_43_doctor_warns_about_skills_claiming_build_work_and_never_edi
     assert_eq!(
         out,
         format!(
-            "providers: claude,codex\nstatus: healthy\ncompeting-skill: {} (description claims: build, sites, apps, games) — if an agent picks `site-builder` for build work, canon's loop will not run\n",
-            target.join(".claude/skills/sites").display()
+            "providers: claude,codex\nstatus: healthy\ncompeting-skill: {} (description claims: build, sites, apps, games) — if an agent picks `site-builder` for build work, canon's loop will not run\n{}",
+            target.join(".claude/skills/sites").display(),
+            owned(&[".claude", ".agents"])
         )
     );
     assert_eq!(fs::read_to_string(&sites).unwrap(), sites_text);
@@ -935,12 +936,12 @@ fn skills_install_53_a_pre_0_17_repo_with_a_lock_keeps_working() {
     let doctor = canon(&["skills", "doctor"], &source, &target);
     assert_eq!(
         String::from_utf8_lossy(&doctor.stdout),
-        "providers: claude,codex (from the install lock; canon.yaml has no skills: key)\nstatus: healthy\n"
+        format!("providers: claude,codex (from the install lock; canon.yaml has no skills: key)\nstatus: healthy\n{}", owned(&[".claude", ".agents"]))
     );
     let install = canon(&["skills", "install"], &source, &target);
     assert_eq!(
         String::from_utf8_lossy(&install.stdout),
-        "canon v1 — unchanged (claude,codex; from the install lock; canon.yaml has no skills: key)\n"
+        format!("canon v1 — unchanged (claude,codex; from the install lock; canon.yaml has no skills: key)\n{}", owned(&[".claude", ".agents"]))
     );
     assert_eq!(fs::read(target.join(LOCK)).unwrap(), lock, "the lock is untouched");
     assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), CONFIG_WITHOUT_SKILLS, "only an explicit --providers writes the list");
@@ -974,7 +975,7 @@ fn skills_install_54_doctor_names_a_stray_projection_and_check_does_not_fail_on_
     assert_eq!(
         out,
         format!(
-            "providers: claude (from canon.yaml skills.providers)\nstatus: healthy\nstray: {path} — codex is not a selected provider (from canon.yaml skills.providers), so canon no longer updates it; remove it with `rm -r {path}`, or select it with `canon skills install --providers=claude,codex`\n"
+            "providers: claude (from canon.yaml skills.providers)\nstatus: healthy\nstray: {path} — codex is not a selected provider (from canon.yaml skills.providers), so canon no longer updates it; remove it with `rm -r {path}`, or select it with `canon skills install --providers=claude,codex`\nowned-paths: canon writes these; exclude them from formatters and linters:\n  .claude/skills/canon/**\n{CANON_OWNED_GLOBS}"
         )
     );
     assert!(stray.join("SKILL.md").is_file(), "doctor never deletes");
@@ -1014,4 +1015,145 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
         assert_eq!(check.status.code(), Some(1), "{out}");
         assert!(out.lines().any(|line| line.starts_with("[FAIL] skills: ") && line.contains(needle)), "{out}");
     }
+}
+
+/// The `.canon/` part of the owned-paths block, after the projection
+/// globs: every canon-written path, sorted.
+const CANON_OWNED_GLOBS: &str = "  .canon/REPORT.md
+  .canon/artifact-store.lock
+  .canon/artifacts/**
+  .canon/audit/**
+  .canon/dashboard-snapshot/**
+  .canon/hot.db*
+  .canon/ingest/**
+  .canon/learn/**
+  .canon/ledger/**
+  .canon/plugins/**
+  .canon/policy.approval.json
+  .canon/r2/**
+  .canon/scenario-index.lock
+  .canon/scripts/canon-gate-pre-commit.sh
+  .canon/skills/**
+  .canon/strategies/**
+  .canon/vocab/**
+";
+
+/// The owned-paths block install and doctor end with, for providers
+/// whose roots are `projections`.
+fn owned(projections: &[&str]) -> String {
+    let mut block = "owned-paths: canon writes these; exclude them from formatters and linters:\n".to_string();
+    for root in projections {
+        block.push_str(&format!("  {root}/skills/canon/**\n"));
+    }
+    block.push_str(CANON_OWNED_GLOBS);
+    block
+}
+
+/// skills.install.56: install and doctor print the globs of every path
+/// canon writes, the selected providers' projections first.
+#[test]
+fn skills_install_56_install_and_doctor_print_the_owned_path_globs() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    fs::create_dir_all(&target).unwrap();
+    fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
+    let block = format!(
+        "owned-paths: canon writes these; exclude them from formatters and linters:\n  .claude/skills/canon/**\n  .agents/skills/canon/**\n{CANON_OWNED_GLOBS}"
+    );
+
+    let install = canon(&["skills", "install", "--providers", "codex,claude"], &source, &target);
+    let out = String::from_utf8_lossy(&install.stdout);
+    assert_eq!(install.status.code(), Some(0), "{out}");
+    assert!(out.ends_with(&block), "{out}");
+    assert!(out.starts_with("canon v1 — installed (claude,codex)\n"), "{out}");
+
+    let rerun = canon(&["skills", "install"], &source, &target);
+    let out = String::from_utf8_lossy(&rerun.stdout);
+    assert!(out.ends_with(&block), "an unchanged install still prints the list: {out}");
+
+    let doctor = canon(&["skills", "doctor"], &source, &target);
+    let out = String::from_utf8_lossy(&doctor.stdout);
+    assert_eq!(doctor.status.code(), Some(0), "{out}");
+    assert_eq!(out, format!("providers: claude,codex (from canon.yaml skills.providers)\nstatus: healthy\n{block}"));
+
+    let none = skills::owned_path_globs(&[]);
+    assert!(!none.iter().any(|glob| glob.contains("/skills/canon/")), "no provider, no projection glob: {none:?}");
+    for authored in [".canon/changes", ".canon/specs", ".canon/policy.yaml"] {
+        assert!(!none.iter().any(|glob| glob.starts_with(authored)), "{authored} is written by hand and stays linted: {none:?}");
+    }
+}
+
+/// skills.install.57: a projected file a formatter rewrote — same
+/// content, different layout — is reported as formatter-rewritten with
+/// the ignore entry to add, not as drift.
+#[test]
+fn skills_install_57_a_formatter_rewrite_is_named_with_the_ignore_entry() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    fs::create_dir_all(&target).unwrap();
+    fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
+    skills::install_canonical(&source, &target, Some("claude")).unwrap();
+    let skill = target.join(".claude/skills/canon/SKILL.md");
+    fs::write(&skill, "---\r\nname: canon  \r\ndescription: umbrella\r\n---\r\n\r\n\r\n# Canon   \r\n\r\n").unwrap();
+
+    let check = canon(&["skills", "check"], &source, &target);
+    let out = String::from_utf8_lossy(&check.stdout);
+    assert_eq!(check.status.code(), Some(1), "a rewritten projection still fails check: {out}");
+    assert!(out.contains(&format!("{} — formatter-rewritten (claude)", skill.display())), "{out}");
+
+    let doctor = canon(&["skills", "doctor"], &source, &target);
+    let out = String::from_utf8_lossy(&doctor.stdout);
+    assert_eq!(doctor.status.code(), Some(0), "{out}");
+    assert!(
+        out.contains(&format!(
+            "formatter-rewritten: {} (claude) — the same content as canon's projection after whitespace and format normalization, so a formatter rewrote it; add `.claude/skills/canon/**` to that formatter's ignore list, then restore it with `canon skills install --providers=claude`\n",
+            skill.display()
+        )),
+        "{out}"
+    );
+    assert!(!out.contains("stale: "), "a rewrite is not drift: {out}");
+    assert!(!out.contains("status: healthy"), "{out}");
+    assert!(out.contains("owned-paths: "), "{out}");
+}
+
+/// skills.install.58: a projected file whose content changed is still
+/// drift, never called a formatter rewrite.
+#[test]
+fn skills_install_58_changed_content_stays_drift() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    fs::create_dir_all(&target).unwrap();
+    fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
+    fs::write(source.join("reference/topic.md"), "# topic\n\n```sh\nrm -rf a b\n```\n").unwrap();
+    fs::write(source.join("scripts/hook.sh"), "#!/bin/sh\nrm -rf a b\nexec canon \\\n  status\n").unwrap();
+    skills::install_canonical(&source, &target, Some("claude")).unwrap();
+    let topic = target.join(".claude/skills/canon/reference/topic.md");
+    let hook = target.join(".claude/skills/canon/scripts/hook.sh");
+    let skill = target.join(".claude/skills/canon/SKILL.md");
+    // Each would read as a rewrite if inner whitespace, backslashes or
+    // code fences were normalized away: a joined argument, a joined
+    // continuation, a changed fenced command, and a new paragraph.
+    fs::write(&hook, "#!/bin/sh\nrm -rfab\nexec canon status\n").unwrap();
+    fs::write(&topic, "# topic\n\n```sh\nrm -rf  a b\n```\n").unwrap();
+    fs::write(&skill, "---\nname: canon\ndescription: umbrella\n---\n\n# Canon\n\nA paragraph canon never wrote.\n").unwrap();
+
+    let check = canon(&["skills", "check"], &source, &target);
+    let out = String::from_utf8_lossy(&check.stdout);
+    assert_eq!(check.status.code(), Some(1), "{out}");
+    for path in [&topic, &hook, &skill] {
+        assert!(out.contains(&format!("{} — stale (claude)", path.display())), "{out}");
+    }
+
+    let doctor = canon(&["skills", "doctor"], &source, &target);
+    let out = String::from_utf8_lossy(&doctor.stdout);
+    for path in [&topic, &hook, &skill] {
+        assert!(out.contains(&format!("stale: {} (claude)\n", path.display())), "{out}");
+    }
+    assert!(!out.contains("formatter-rewritten"), "{out}");
 }

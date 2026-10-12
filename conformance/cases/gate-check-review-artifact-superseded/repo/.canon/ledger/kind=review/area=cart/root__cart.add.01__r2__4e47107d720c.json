@@ -1,0 +1,32 @@
+{
+  "actor": {
+    "agent_id": "reviewer-4",
+    "role": "reviewer"
+  },
+  "artifacts": [
+    {
+      "path": "reports/cart-add.webm",
+      "sha256": "330b1760857998f05a061b53c733286cbdc3693087ab38c111330c96555ab151"
+    }
+  ],
+  "at": "2026-10-12T13:45:10.689742Z",
+  "kind": "review",
+  "pin": "r2",
+  "pins": {
+    "evidence": [
+      {
+        "digest": "4df545cd55bd",
+        "key": "cart.add.01"
+      }
+    ],
+    "scenario_digest": "4f40e229159d1ea9df3bd6331bfd77549bedf54a7a121a89b9017fcfd1957ba8",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "root",
+  "provenance_ref": {
+    "original_spec_ref": "specs/kind=feature/area=cart/add.feature"
+  },
+  "reviewer": "reviewer-4",
+  "scenario_id": "cart.add.01",
+  "schema": 1
+}

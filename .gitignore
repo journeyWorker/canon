@@ -89,3 +89,7 @@ vendors/
 .canon/hot.db*
 # canon's scenario index -- derived from the .feature files, rebuilt by every reader.
 .canon/ledger/kind=scenario/
+# The platformer's junit report (`bun run test:junit`). `canon evidence add
+# --report` stores the bytes it binds in .canon/artifacts, so the
+# working-tree copy is a regenerable output.
+examples/platformer/reports/

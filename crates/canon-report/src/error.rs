@@ -30,4 +30,7 @@ pub enum ReportError {
 
     #[error("failed to serialize `manifest.json`: {0}")]
     ManifestJson(String),
+
+    #[error("reading the sqlite hot tier at {path:?}: {source}")]
+    HotTier { path: PathBuf, source: canon_store::tier::StoreError },
 }

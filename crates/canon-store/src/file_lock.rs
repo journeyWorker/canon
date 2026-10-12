@@ -68,7 +68,10 @@ mod tests {
         assert!(path.is_file(), "the lock file and its parents are created");
         assert!(matches!(FileLock::acquire(&path, Duration::from_millis(120)), Err(FileLockError::Busy(_))));
         drop(first);
-        let _second = FileLock::acquire(&path, Duration::ZERO).unwrap();
+        // A test that forks a child in parallel briefly holds a copy of the
+        // fd until the child execs, so the release is not instant: retry
+        // within a bound, as every caller does.
+        let _second = FileLock::acquire(&path, Duration::from_secs(5)).unwrap();
         assert!(path.is_file(), "the lock file is never deleted");
     }
 }
