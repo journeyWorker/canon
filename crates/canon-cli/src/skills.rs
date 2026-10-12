@@ -651,12 +651,15 @@ pub fn skills_config_block(providers: &[Provider]) -> String {
 
 /// `text` with its top-level `skills:` section replaced by
 /// [`skills_config_block`] (appended under [`SKILLS_CONFIG_COMMENT`] when
-/// absent). Every other byte is kept. The section is the `skills:` line
-/// and the indented lines after it; a blank line belongs to it only when
-/// an indented line follows. The result is refused unless it parses to
-/// exactly `providers` with every other key unchanged.
+/// absent). Every other byte is kept, and the inserted lines end with the
+/// file's own newline (`\r\n` when the file uses it, else `\n`). The
+/// section is the `skills:` line and the indented lines after it; a blank
+/// line belongs to it only when an indented line follows. The result is
+/// refused unless it parses to exactly `providers` with every other key
+/// unchanged.
 fn rewrite_skills_section(text: &str, providers: &[Provider]) -> Result<String, String> {
-    let block = skills_config_block(providers);
+    let newline = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    let block = skills_config_block(providers).replace('\n', newline);
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let rewritten = match lines.iter().position(|line| line.starts_with("skills:")) {
         Some(start) => {
@@ -678,11 +681,11 @@ fn rewrite_skills_section(text: &str, providers: &[Provider]) -> Result<String, 
             let mut out = text.to_string();
             if !out.is_empty() {
                 if !out.ends_with('\n') {
-                    out.push('\n');
+                    out.push_str(newline);
                 }
-                out.push('\n');
+                out.push_str(newline);
             }
-            out.push_str(SKILLS_CONFIG_COMMENT);
+            out.push_str(&SKILLS_CONFIG_COMMENT.replace('\n', newline));
             out.push_str(&block);
             out
         }

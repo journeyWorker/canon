@@ -882,6 +882,25 @@ fn skills_install_52_explicit_providers_rewrite_the_config_list_that_later_runs_
     assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), "a: 1\nskills:\n  providers: []\nb: 2\n");
     assert_eq!(skills::check(&source, &target, None).unwrap().providers, vec![]);
 
+    // A CRLF canon.yaml stays CRLF: appended, then replaced in place.
+    let crlf = CONFIG_WITHOUT_SKILLS.replace('\n', "\r\n");
+    fs::write(target.join("canon.yaml"), &crlf).unwrap();
+    let rest = |text: &str| {
+        let mut doc: serde_yaml::Value = serde_yaml::from_str(text).unwrap();
+        doc.as_mapping_mut().unwrap().remove("skills");
+        doc
+    };
+    for (list, expected) in [("codex,pi", vec![skills::Provider::Codex, skills::Provider::Pi]), ("omp", vec![skills::Provider::Omp])] {
+        skills::install_canonical(&source, &target, Some(list)).unwrap();
+        let config = fs::read_to_string(target.join("canon.yaml")).unwrap();
+        assert!(config.starts_with(&crlf), "{list}: every byte before the section is kept: {config:?}");
+        assert_eq!(config.matches('\n').count(), config.matches("\r\n").count(), "{list}: every line ends CRLF: {config:?}");
+        assert_eq!(config.matches("skills:").count(), 1, "{list}: {config:?}");
+        assert_eq!(rest(&config), rest(&crlf), "{list}: every other key is unchanged");
+        assert_eq!(skills::check(&source, &target, None).unwrap().providers, expected, "{list}: the providers parse back");
+    }
+    assert!(fs::read_to_string(target.join("canon.yaml")).unwrap().ends_with("skills:\r\n  providers: [omp]\r\n"));
+
     // No canon.yaml: install never creates one.
     let bare = tmp.path().join("bare");
     skills::install_canonical(&source, &bare, Some("claude")).unwrap();
