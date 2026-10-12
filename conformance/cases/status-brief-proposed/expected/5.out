@@ -1,5 +1,5 @@
 {
-  "statusVersion": 2,
+  "statusVersion": 3,
   "canonVersion": "0.16.0",
   "policy": {
     "present": true,
@@ -43,15 +43,16 @@
         "approved": false,
         "enforced": true,
         "change": "cart-v1",
-        "proposal": "openspec/changes/cart-v1/proposal.md"
+        "brief": ".canon/changes/cart-v1/brief.md",
+        "briefExists": true
       }
     }
   ],
   "unowned": [],
   "next": [
     {
-      "command": "stop and report the brief in openspec/changes/cart-v1/proposal.md; build and attest nothing for cart until the human answers (one answer approves brief and policy)",
-      "why": "cart: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses cart's scenarios and tasks until it is recorded; once the human answers, record their words as `Approved: <who> <when> — \"<their words>\"` in openspec/changes/cart-v1/proposal.md and run `canon policy approve --by <the human> --note \"<their words>\"`",
+      "command": "stop and report the brief in .canon/changes/cart-v1/brief.md; build and attest nothing for cart until the human answers (one answer approves brief and policy)",
+      "why": "cart: .canon/changes/cart-v1/brief.md has no `Approved:` line (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses cart's scenarios and tasks until it is recorded; once the human answers, record their words as `Approved: <who> <when> — \"<their words>\"` in .canon/changes/cart-v1/brief.md and run `canon policy approve --by <the human> --note \"<their words>\"`",
       "actor": "human"
     }
   ],

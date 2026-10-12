@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p2-impl",
+    "role": "implementer",
+    "session_id": "017-p2-impl"
+  },
+  "at": "2026-10-12T10:41:18.357848Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject subject_lifecycle_25_an_approved_line_in_a_comment_or_fence_does_not_ship"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 28,
+  "scenario_id": "subject.lifecycle.25",
+  "schema": 1,
+  "staging_id": "66dcce0aa65f",
+  "verdict": "faithful"
+}

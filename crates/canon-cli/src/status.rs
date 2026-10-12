@@ -28,21 +28,24 @@
 //! (the rest are counted, never listed). Subjects are visited closest to
 //! done first: verifying, building, specced, proposed, then shipped.
 //!
-//! # The brief (0.16 D1, M7)
+//! # The brief (0.16 D1, M7; 0.17 D3)
 //! One human answer approves a subject's scope: its brief and the
 //! policy. [`crate::brief::brief_of`] decides whether a subject's brief
 //! is approved, and the `verifying → shipped` guard of `canon subject
 //! status` and `canon evidence add` refuse on the same call, so status
 //! and the guards cannot disagree. A subject whose newest change has a
-//! `proposal.md` without the `Approved:` line (the brief is enforced)
-//! gets the one `human` step status ever emits, and it is the subject's
-//! only step, whatever its status: the agent stops and reports the
-//! brief, and nothing is built or attested for the subject (no `feature
-//! new`, `scenario new`, `evidence add`, review or status advance)
-//! before the human answers. With no `proposal.md` to answer, the
-//! `brief:` line still says not approved, as an advisory, and nothing is
-//! withheld. A `proposed` subject shows its brief once its newest change
-//! has a `proposal.md`. Evidence attested under a brief
+//! brief to answer (its `.canon/changes/<change>/brief.md`, or an
+//! external openspec `proposal.md` while that canon file does not exist)
+//! and no `Approved:` line in the canon `brief.md` (the brief is
+//! enforced) gets the one `human` step status ever emits, and it is the
+//! subject's only step, whatever its status: the agent stops and reports
+//! the brief, and nothing is built or attested for the subject (no
+//! `feature new`, `scenario new`, `evidence add`, review or status
+//! advance) before the human answers. The step names the canon file to
+//! write, with its `Source:` pointer for an external plan. With no brief
+//! to answer, the `brief:` line still says not approved, as an advisory,
+//! and nothing is withheld. A `proposed` subject shows its brief once its
+//! newest change has one. Evidence attested under a brief
 //! override is listed as a warning ([`crate::brief::override_lines`]).
 //! Every other step is the agent's.
 //!
@@ -90,8 +93,9 @@ use crate::inventory::{load_spec_roots, scan_feature_corpus};
 /// `canon status --json`'s shape version. Bumped when a field changes
 /// meaning or is removed; an added field does not bump it. `2` (0.16):
 /// a `next` entry's `command` is a canon command line only when its
-/// `actor` is `agent`.
-const STATUS_VERSION: u32 = 2;
+/// `actor` is `agent`. `3` (0.17): `brief.proposal` is removed; the canon
+/// `brief.md` is `brief.brief`, with `briefExists` and `source`.
+const STATUS_VERSION: u32 = 3;
 
 /// The most `next:` entries status prints.
 pub const NEXT_LIMIT: usize = 5;
@@ -219,8 +223,8 @@ pub struct SubjectSummary {
     pub missing_cases: Vec<MissingCase>,
     /// Whether the brief is approved (0.16 D1): present for `building`,
     /// `verifying` and `shipped` subjects, and for a `proposed` subject
-    /// whose newest adopted change has a `proposal.md`; omitted for the
-    /// others.
+    /// whose newest adopted change has a brief to answer; omitted for
+    /// the others.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub brief: Option<BriefStatus>,
 }
@@ -741,12 +745,16 @@ fn subject_steps(
     let before = next.len();
 
     if let Some(brief) = summary.brief.as_ref().filter(|brief| brief.enforced) {
-        let proposal = brief.proposal.as_deref().unwrap_or_default();
         next.push(NextStep {
             actor: StepActor::Human,
-            command: format!("stop and report the brief in {proposal}; build and attest nothing for {id} until the human answers (one answer approves brief and policy)"),
+            command: format!(
+                "stop and report the brief in {}; build and attest nothing for {id} until the human answers (one answer approves brief and policy)",
+                brief.report_in()
+            ),
             why: format!(
-                "{id}: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses {id}'s scenarios and tasks until it is recorded; once the human answers, record their words as `Approved: <who> <when> — \"<their words>\"` in {proposal} and run `canon policy approve --by <the human> --note \"<their words>\"`"
+                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses {id}'s scenarios and tasks until it is recorded; once the human answers, {} and run `canon policy approve --by <the human> --note \"<their words>\"`",
+                brief.unanswered(),
+                brief.record()
             ),
         });
         return;
@@ -988,10 +996,10 @@ pub fn render(report: &StatusReport) -> String {
                 let _ = writeln!(out, "      missing @case:{} on {}", gap.case, gap.surface);
             }
             if let Some(brief) = &s.brief {
-                let _ = match (&brief.approval, &brief.proposal, &brief.change) {
-                    (Some(approval), Some(proposal), _) => writeln!(out, "      brief: approved in {proposal} — {approval}"),
-                    (None, Some(proposal), _) => writeln!(out, "      brief: not approved ({proposal} has no `Approved:` line)"),
-                    (_, None, Some(change)) => writeln!(out, "      brief: not approved (change `{change}` has no proposal.md; advisory, nothing to approve yet)"),
+                let _ = match (&brief.approval, &brief.brief, &brief.change) {
+                    (Some(approval), Some(path), _) => writeln!(out, "      brief: approved in {path} — {approval}"),
+                    (None, Some(_), _) => writeln!(out, "      brief: not approved ({})", brief.unanswered()),
+                    (_, None, Some(change)) => writeln!(out, "      brief: not approved (change `{change}` has no brief; advisory, nothing to approve yet)"),
                     _ => writeln!(out, "      brief: not approved (no adopted change; advisory, nothing to approve yet)"),
                 };
             }

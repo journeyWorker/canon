@@ -9,7 +9,7 @@ warning: policy not approved: .canon/policy.yaml has no approval record (.canon/
 subjects (1):
   verifying (1):
     checkout: 2 scenarios, 2 evidenced, 0 reviewed, 0 open blockers
-      brief: approved in openspec/changes/c-checkout/proposal.md — Journey 2026-10-11 — "승인. 네 가정대로 진행"
+      brief: approved in .canon/changes/c-checkout/brief.md — Journey 2026-10-11 — "승인. 네 가정대로 진행"
 
 unowned: none
 

@@ -143,6 +143,75 @@ the plan, a root at the old repo-level `specs` default moves to
 canon's own corpus moved with it, to `specs/kind=feature/…` and
 `examples/platformer/specs/kind=feature/…`; both roots are unchanged.
 
+### Canon's own changes and approvals (P2)
+
+**D2: `.canon/changes/` is canon's own plan home.** `canon change new
+<slug> --subject <id> --title "…"` writes `.canon/changes/<slug>/brief.md`
+(`# <title>`, `## Why` holding the title, `## What Changes`, and a comment
+naming where the approval line goes) and `tasks.md` (the same checkbox
+row grammar), imports the change and adopts it into the subject. It needs
+no plans source and no longer scaffolds `openspec/changes/<slug>/`, so the
+old refusal for a repo with no `openspec` source is gone; it still
+refuses an unknown subject, or a slug that already has a
+`.canon/changes/<slug>` dir (active or archived) or a change record. It
+prints `canon change new: wrote .canon/changes/<slug>/brief.md`, the same
+for `tasks.md`, and ``canon change new: recorded change `<slug>` adopted
+into subject `<id>` — …``. `.canon/changes/` is a native plan source
+(dialect id `canon`) that is never listed in `canon.yaml`; a
+`plans.sources` entry naming `canon` is refused. Every plan reader
+(`canon ingest plans`, `canon gate task`, `canon evidence add --task`,
+`canon dispatch --task`, `canon status` and the brief check) reads it
+first, with no `plans:` entry, whenever the directory exists, so it owns
+a change id an external source also carries. Its records carry the actor
+`canon-plan-import-canon`; an external openspec change's carry
+`canon-plan-import-openspec`. `canon init` no longer creates
+`openspec/changes/`: its `plans:` section is `sources: []`, preceded by
+comments explaining `.canon/changes/` and commented `openspec`
+(`root: .`) and `superpowers` (`root: docs/superpowers/plans`) examples.
+`plans.sources` lists only external plans, which canon reads. With no
+`.canon/changes/` and no sources, `canon gate task` and
+`canon dispatch --task` say the repo configures no plan sources and
+point at `canon change new` or `plans.sources`.
+
+**D3: approvals live only in canon's file.** The `Approved:` line is read
+only from `.canon/changes/<change>/brief.md` (outside HTML comments and
+fenced code, as before). A change from an external plan gets its brief
+there too: a `brief.md` holding a `Source: <path>` line that points at
+the external document and, once the human answers, the `Approved:` line.
+Such a pointer `brief.md` is not a change of its own (the native reader
+skips it), and an `Approved:` line inside an external `proposal.md` is
+not read. The brief is enforced when the subject's newest adopted change
+has a canon `brief.md` without `Approved:`, or has no canon `brief.md`
+but an external openspec `proposal.md` under the plan sources; then the
+human step, the `canon evidence add` refusal and the ship guard name the
+canon file to write, with its `Source:` line for an external plan
+(``create .canon/changes/<c>/brief.md holding a `Source: <proposal>` line
+and record their words there as `Approved: <who> <when> — "<their
+words>"` ``). `canon status` prints `brief: approved in <brief> — <words>`
+or `brief: not approved (…)`, and `--json` `brief` is `{approved,
+enforced, change?, brief?, briefExists, source?, approval?}`; the old
+`proposal` field is gone, so `statusVersion` is now `3`. `--override-reason` is unchanged.
+
+**D4: `canon gate task` still flips external task rows.** Canon only reads
+external plans, with one exception: `canon gate task` flips the task's
+checkbox in an external plan's `tasks.md`, the one place it writes into
+one. Open for the maintainer: record external flips only in the ledger
+instead.
+
+**Upgrading.**
+
+- An approval recorded as an `Approved:` line in an openspec
+  `proposal.md` is no longer read. Move it into
+  `.canon/changes/<change>/brief.md`, with a `Source: <path to the
+  proposal.md>` line; until then `canon status` lists the human step for
+  that subject.
+- Repos that configured `{ dialect: openspec, root: . }` keep it as an
+  external source; new changes go to `.canon/changes/`.
+- Scripts that parse `canon status --json` read `brief.brief`,
+  `brief.briefExists` and `brief.source` instead of `brief.proposal`.
+- Scripts that match `canon change new` output see the
+  `.canon/changes/<slug>/brief.md` and `tasks.md` paths.
+
 ### Harness choice (D5)
 
 **Why.** `canon skills install` picked providers from directory markers and,
@@ -184,7 +253,9 @@ line is now the skill install result (or the no-harness hint) instead of
 Version 0.16.0 lets the agent drive after one approval: the human answers
 once per scope, canon does its own bookkeeping, `canon init` offers policy
 levels, a reviewer can attach what it looked at, and reviews written before
-0.15 are checked against the commit they pinned.
+0.15 are checked against the commit they pinned. (0.17.0 moved the brief
+and its `Approved:` line from the change's `proposal.md` to
+`.canon/changes/<change>/brief.md`; see the 0.17.0 release above.)
 
 **Why.** The maintainer's rule (2026-10-11): an agent reviewing another
 agent is cheap; a human blocking the work is expensive. After one
@@ -788,6 +859,8 @@ plans source rooted at `.` with `openspec/changes/` created. `--no-agents-md`
 and `--no-policy` opt out. Rerunning `init` on an existing repo leaves
 `canon.yaml` alone, refreshes only the AGENTS.md block and exits 0 (it used
 to exit 2); a rerun with nothing to do (`--no-agents-md`) still refuses.
+(Since 0.17.0 `init` writes `plans: { sources: [] }` and no
+`openspec/changes/`.)
 
 **`canon change new`.** `canon change new <slug> --subject <id> --title <t>`
 scaffolds `openspec/changes/<slug>/{proposal,tasks}.md`, imports the change
@@ -799,6 +872,8 @@ half-done adoption still has its open blockers counted), writes only the
 side lacking the link, and writes nothing for a linked pair. That makes
 `canon subject adopt <change> --subject <id>` an idempotent repair: a
 failure between the two writes exits 2 and prints that exact command.
+(Since 0.17.0 it writes `.canon/changes/<slug>/{brief,tasks}.md` and needs
+no plans source.)
 
 **`canon gate check` says when it is not enforcing.** When the corpus has
 scenarios and `.canon/policy.yaml` has no `spec_coverage`, the gate prints

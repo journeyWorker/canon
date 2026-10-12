@@ -70,8 +70,11 @@ is attributed, and is fresh — never on a self-report. See
    This writes a working `canon.yaml` skeleton — storage `tiers:`, record
    `routing:`, `specs:` with its default root `.canon/specs` (`.feature`
    files at `<root>/kind=feature/area=<area>/<surface>.feature`, authored
-   and git-tracked), and a `plans:` source (`openspec`, rooted at
-   the repo, with an empty `openspec/changes/`). It also writes:
+   and git-tracked), and a `plans:` section with `sources: []`.
+   Canon's own changes live in `.canon/changes/` and need no entry there;
+   its comments show how to list external plans you prepare (commented
+   `openspec` and `superpowers` examples), which canon only reads. It also
+   writes:
 
    - **`.canon/policy.yaml`**, a starter policy that turns `spec_coverage`
      on: every scenario needs evidence, every feature surface needs a
@@ -121,11 +124,16 @@ is attributed, and is fresh — never on a self-report. See
    bunx @journeykit/canon change new add-login --subject auth --title "Add login"
    ```
 
-   The brief goes in the change's `proposal.md`. When the human approves
-   it, the agent adds an `Approved: <who> <when> — "<their words>"` line
-   there; `canon status` reads that line in the subject's newest adopted
-   change to show whether its brief is approved, and asks for a human only
-   when it is missing. Fixes and follow-ups go in as tasks in that change's
+   `change new` writes `.canon/changes/add-login/brief.md` and `tasks.md`
+   and adopts the change into the subject. The brief goes in that
+   `brief.md`. When the human approves it, the agent adds an
+   `Approved: <who> <when> — "<their words>"` line there; `canon status`
+   reads that line in the subject's newest adopted change to show whether
+   its brief is approved, and asks for a human only when it is missing. A
+   change from an external plan (an openspec `proposal.md` listed under
+   `plans.sources`) gets its brief in `.canon/changes/<change>/brief.md`
+   too, with a `Source: <path>` line pointing at the plan; canon never
+   edits the plan. Fixes and follow-ups go in as tasks in the change's
    `tasks.md`; a new `canon change new` is a new scope that needs the
    human's approval.
 

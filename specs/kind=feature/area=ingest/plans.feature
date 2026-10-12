@@ -102,3 +102,24 @@ Feature: ingest plans
     When plans are imported, a file under node_modules is edited, added or made unreadable, and plans are imported again
     Then the cursor records only files under openspec/changes and the second import reports the source skipped unchanged
     And an edit under openspec/changes still re-imports the source
+
+  # canon: {"schema":1,"at":"2026-10-12T12:00:00Z","actor":{"agent_id":"017-p2-impl"}}
+  @subject:ingest-pipelines
+  @case:happy
+  @ingest.plans.11
+  Scenario: Canon's own changes are read first with no plans entry
+    Given a .canon/changes dir holding a change and a pointer brief whose brief.md carries a "Source:" line, beside a configured openspec source holding the same change id and the pointed-at change
+    When plans are imported
+    Then canon's own source is read first and owns the shared change id, which is counted as a duplicate against the openspec source
+    And the pointer brief is not a change, so the pointed-at change is imported from the openspec source
+    And canon's records carry the canon-plan-import-canon actor and the external ones the openspec dialect's
+
+  # canon: {"schema":1,"at":"2026-10-12T12:00:00Z","actor":{"agent_id":"017-p2-impl"}}
+  @subject:ingest-pipelines
+  @case:failure
+  @ingest.plans.12
+  Scenario: A plans source naming canon's own source is refused
+    Given a canon.yaml whose plans sources name the canon dialect
+    When plans are imported
+    Then the command fails naming .canon/changes as always read with no entry and plans.sources as listing only external plans
+    And nothing is imported

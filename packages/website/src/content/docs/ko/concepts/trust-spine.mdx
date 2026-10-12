@@ -308,11 +308,14 @@ canon gate task s5-trust-spine-gate#5.2 --repo .
 ```
 
 `canon gate task <task_id>`는 change의 plan 문서에서 체크박스 행 하나를
-증거 기반으로 플립합니다. `<task_id>`(`<change_id>#<n>`)는 `canon.yaml`의
-`plans:` 소스를 통해 해석됩니다 — 설정된 dialect 중 해당 태스크를 먼저
-찾아낸 쪽이 이기므로 플립은 plan-dialect에 중립적입니다(`openspec` change
-디렉터리, `superpowers` plan 문서). `plans:` 섹션이 없는 레포는 호환
-기본값 `[{ dialect: openspec, root: <repo> }]`로 폴백합니다.
+증거 기반으로 플립합니다. `<task_id>`(`<change_id>#<n>`)는 canon 자체의
+`.canon/changes/`(`plans:` 항목 없이 먼저 읽습니다)와 이어서 `canon.yaml`의
+`plans.sources`를 통해 해석됩니다 — 해당 태스크를 먼저 찾아낸 dialect가
+이기므로 플립은 plan-dialect에 중립적입니다(canon 자체의 `tasks.md`, 외부
+`openspec` change 디렉터리, `superpowers` plan 문서). `plans:` 섹션이 없는
+레포는 호환 기본값 `[{ dialect: openspec, root: <repo> }]`로 폴백합니다.
+canon은 외부 plan을 읽기만 하지만 예외가 하나 있습니다: 외부 plan의
+태스크라면 플립이 그 plan의 `tasks.md` 체크박스를 직접 고칩니다.
 레저에서 대응하는 non-`Divergent` `EvidenceRecord`를 요구하며, 검사가
 깨끗할 때에만 `- [ ]` → `- [x]`로 플립하면서 증거 노트를 덧붙입니다.
 노트는 그 태스크에 묶인 모든 레코드를 한 줄로 요약합니다 —

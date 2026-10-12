@@ -192,8 +192,9 @@
 //! a brief [`crate::brief::brief_of`] reads as enforced and not approved:
 //! the scenario's `@subject` owner, and every subject adopting the
 //! task's change ([`crate::brief::attested_briefs`]). Each refusal is an
-//! `unreviewed-promotion` naming the subject and its `proposal.md`, as
-//! the ship guard prints it. `--override-reason` attests anyway and
+//! `unreviewed-promotion` naming the subject and its canon `brief.md`
+//! (with the `Source:` pointer to write, for a change from an external
+//! plan), as the ship guard prints it. `--override-reason` attests anyway and
 //! records a [`BriefOverride`] (reason, waived refusals, actor) on the
 //! record, which `canon status` and `canon gate check` list. A subject
 //! with no brief to answer is unaffected. `canon review add` and `canon
@@ -227,7 +228,7 @@ use crate::gate::{evidence_staging_dir, typed_evidence_contract_for_task};
 
 /// What `canon evidence add` tells the agent when a brief refuses the
 /// attestation (0.16 M7): the stop belongs at the brief.
-const BRIEF_STOP: &str = "stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — \"<their words>\"` in that proposal.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record";
+const BRIEF_STOP: &str = "stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — \"<their words>\"` in that brief.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record";
 
 /// The brief refusals for this attestation (module doc, 0.16 M7): one
 /// `unreviewed-promotion` per subject it attests for whose brief
@@ -240,8 +241,8 @@ fn brief_refusals(repo: &Path, args: &EvidenceArgs) -> Result<Vec<Violation>, St
     let ctx = GateCtx::from_repo(repo)
         .map_err(|e| e.to_string())
         .and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string()))?;
-    // An unreadable `plans:` section finds no proposal.md, so no brief is
-    // enforced; `canon status` warns about it.
+    // An unreadable `plans:` section finds no external proposal.md;
+    // `canon status` warns about it.
     let plan_roots = crate::brief::plan_roots(repo).unwrap_or_default();
     let scenario = args.project_id.as_ref().zip(args.scenario_id.as_ref());
     let what = [args.scenario_id.as_ref().map(|s| s.as_str().to_string()), args.task_id.as_ref().map(ToString::to_string)]
@@ -253,11 +254,10 @@ fn brief_refusals(repo: &Path, args: &EvidenceArgs) -> Result<Vec<Violation>, St
         .into_iter()
         .filter(|(_, brief)| brief.enforced)
         .map(|(subject, brief)| {
-            let proposal = brief.proposal.as_deref().unwrap_or_default();
             Violation::new(
                 FailureClass::UnreviewedPromotion,
                 subject.subject_id.as_str(),
-                format!("evidence for {what}: brief not approved — {proposal} has no `Approved:` line, so the human has not answered it"),
+                format!("evidence for {what}: brief not approved — {}, so the human has not answered it; once they do, {}", brief.unanswered(), brief.record()),
             )
         })
         .collect())

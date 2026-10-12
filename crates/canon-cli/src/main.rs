@@ -182,7 +182,7 @@ enum Command {
         #[command(subcommand)]
         action: SubjectCommand,
     },
-    /// Scaffold a plan change (openspec proposal + tasks) adopted into a subject
+    /// Write a plan change (.canon/changes/<slug>: brief + tasks) adopted into a subject
     #[command(after_help = "Examples:\n  canon change new add-login --subject auth --title 'Add login'")]
     Change {
         #[command(subcommand)]
@@ -709,7 +709,7 @@ enum IngestCommand {
         #[arg(long, value_name = "RUN_ID", value_parser = canon_cli::dispatch::parse_run_id)]
         run: Option<RunId>,
     },
-    /// Import a plan corpus (openspec, superpowers) as Change/Task records
+    /// Import plans as Change/Task records: canon's own .canon/changes, then the configured external sources (openspec, superpowers)
     Plans {
         /// One-shot override: import this dialect's --source root (requires --source)
         #[arg(long)]
@@ -739,7 +739,7 @@ enum GateCommand {
     },
     /// Flip one task checkbox, gated on real evidence (fails closed)
     Task {
-        /// The openspec task id (<change_id>#<n>)
+        /// The task id (<change_id>#<n>)
         task_id: String,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
@@ -1250,7 +1250,7 @@ enum FeatureCommand {
 
 #[derive(Subcommand)]
 enum ChangeCommand {
-    /// Scaffold openspec/changes/<slug>/{proposal,tasks}.md, import it, and adopt it into a subject
+    /// Write .canon/changes/<slug>/{brief,tasks}.md, import it, and adopt it into a subject
     New {
         /// The change's slug (its change_id)
         #[arg(value_parser = canon_cli::subject::parse_change_id)]
@@ -1258,7 +1258,7 @@ enum ChangeCommand {
         /// The existing subject to adopt the change under
         #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
         subject: SubjectId,
-        /// The change's title (also its proposal summary)
+        /// The change's title (also its brief's summary)
         #[arg(long)]
         title: String,
         /// Repo root (default: nearest ancestor with a canon.yaml)

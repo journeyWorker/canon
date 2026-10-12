@@ -1,4 +1,4 @@
-description: "`canon subject status <id> shipped` from `verifying` exits 0 and reports the transition once every owned scenario is evidenced and `require_cases` is satisfied and its newest adopted change's proposal.md carries an `Approved:` line"
+description: "`canon subject status <id> shipped` from `verifying` exits 0 and reports the transition once every owned scenario is evidenced and `require_cases` is satisfied and its newest adopted change's .canon/changes brief.md carries an `Approved:` line"
 steps:
   - args: [subject, status, checkout, shipped]
     exit: 0

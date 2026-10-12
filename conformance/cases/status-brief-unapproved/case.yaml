@@ -1,4 +1,4 @@
-description: "`canon status` on a ship-ready verifying subject whose adopted change's proposal.md has no `Approved:` line shows the brief as not approved and lists one `human` step, getting the brief approved, instead of the ship command, in both the human form and `--json`"
+description: "`canon status` on a ship-ready verifying subject whose adopted change comes from an external openspec plan with no canon brief (0.17 D3: the external proposal.md is not where the approval goes) shows the brief as not approved and lists one `human` step, getting the brief approved, instead of the ship command, in both the human form and `--json`"
 steps:
   - args: [status]
     exit: 0

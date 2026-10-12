@@ -1,4 +1,4 @@
-description: "`canon status` on a `proposed` subject whose newest adopted change has a proposal.md with no `Approved:` line shows the brief as not approved and lists only the `human` step, with no `canon feature new` or `canon scenario new` step, in both the human form and `--json`"
+description: "`canon status` on a `proposed` subject whose newest adopted change has a .canon/changes brief.md with no `Approved:` line shows the brief as not approved and lists only the `human` step, with no `canon feature new` or `canon scenario new` step, in both the human form and `--json`"
 steps:
   - args: [init]
     exit: 0

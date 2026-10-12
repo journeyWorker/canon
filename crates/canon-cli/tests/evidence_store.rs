@@ -35,19 +35,17 @@ fn blob(repo: &Path, bytes: &[u8]) -> std::path::PathBuf {
 /// tests pin the artifact store and cell keying, so they opt out of the
 /// starter policy (0.14 D2) whose require_review would gate their
 /// status moves; a test that needs a policy writes its own. With `plan`,
-/// the repo also gets change `cats` with one open task under the openspec
-/// plan source `canon init` configures (`root: .`).
+/// the repo also gets change `cats` with one open task in canon's own
+/// `.canon/changes/`, read with no `plans:` entry.
 fn setup(plan: bool) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
     if plan {
-        let yaml = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
-        assert!(yaml.contains("- dialect: openspec\n      root: ."), "init must configure the openspec plan source:\n{yaml}");
-        let change = repo.join("openspec/changes/cats");
+        let change = repo.join(".canon/changes/cats");
         std::fs::create_dir_all(&change).unwrap();
-        std::fs::write(change.join("proposal.md"), "# cats\n\n## Why\n\nA cat-themed run.\n").unwrap();
+        std::fs::write(change.join("brief.md"), "# cats\n\n## Why\n\nA cat-themed run.\n").unwrap();
         std::fs::write(change.join("tasks.md"), "## 1. Run\n\n- [ ] 1 Ship the run\n").unwrap();
     }
     dir
@@ -64,13 +62,13 @@ fn scenario(repo: &Path, id: &str, subject: Option<&str>) {
 
 /// Record the human's approval of `subject`'s brief, which `verifying →
 /// shipped` requires (0.16 D1): a change adopted into it whose
-/// `proposal.md` carries an `Approved:` line.
+/// `.canon/changes/<change>/brief.md` carries an `Approved:` line.
 fn approve_brief(repo: &Path, subject: &str) {
     let change = format!("c-{subject}");
     ok(repo, &["change", "new", &change, "--subject", subject, "--title", "The brief"]);
-    let proposal = repo.join("openspec/changes").join(&change).join("proposal.md");
-    let text = std::fs::read_to_string(&proposal).unwrap();
-    std::fs::write(proposal, format!("{text}\nApproved: Journey 2026-10-12 — \"승인\"\n")).unwrap();
+    let brief = repo.join(".canon/changes").join(&change).join("brief.md");
+    let text = std::fs::read_to_string(&brief).unwrap();
+    std::fs::write(brief, format!("{text}\nApproved: Journey 2026-10-12 — \"승인\"\n")).unwrap();
 }
 
 fn attest(repo: &Path, extra: &[&str]) -> Output {
@@ -296,7 +294,7 @@ fn a_flipped_row_aggregates_every_record_and_the_task_store_agrees() {
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
     ok(repo, &["gate", "task", "cats#1"]);
-    let tasks = std::fs::read_to_string(repo.join("openspec/changes/cats/tasks.md")).unwrap();
+    let tasks = std::fs::read_to_string(repo.join(".canon/changes/cats/tasks.md")).unwrap();
     assert!(
         tasks.contains("- [x] 1 Ship the run — ✅ 2 evidence records (1 faithful, 1 not-applicable); latest: 9 vitest cases and 2 smoke checks"),
         "{tasks}"
@@ -323,7 +321,7 @@ fn a_task_and_scenario_keyed_record_ships_its_scenario_and_still_flips_its_task(
     let shipped = canon(repo, &["subject", "status", "cat-run", "shipped"]);
     assert!(shipped.status.success(), "the scenario cell has the record's faithful verdict: {}", text(&shipped));
     ok(repo, &["gate", "task", "cats#1"]);
-    assert!(std::fs::read_to_string(repo.join("openspec/changes/cats/tasks.md")).unwrap().contains("- [x] 1 Ship the run"));
+    assert!(std::fs::read_to_string(repo.join(".canon/changes/cats/tasks.md")).unwrap().contains("- [x] 1 Ship the run"));
 }
 
 /// 0.14 review: the gate judges the same cells the ship gate credits. A

@@ -1,13 +1,34 @@
 # canon-plan-import
 
-`canon ingest plans` imports a FOREIGN plan dialect's on-disk state into
-canon's `change`/`task` records, through the same validated path every
-other ingest family uses. Imported rows carry no special marker — once
+`canon ingest plans` imports plan state into canon's `change`/`task`
+records, through the same validated path every other ingest family uses:
+canon's own changes under `.canon/changes/`, and any FOREIGN plan dialect
+listed in `canon.yaml`. Imported rows carry no special marker — once
 imported, `canon query` cannot tell an imported row from a hand-authored
 one, and neither can `canon gate`.
 
-## 1. Configure a `plans:` source
+## 1. Canon's own changes and external `plans:` sources
 
+`.canon/changes/` is canon's native plan source (dialect id `canon`):
+one `<slug>/` directory per change holding `brief.md` and `tasks.md`,
+written by `canon change new` (see `canon-subject`). Every plan reader —
+`canon ingest plans`, `canon gate task`, `canon evidence add --task`,
+`canon dispatch --task`, `canon status` and the brief check — reads it
+first whenever the directory exists, with no `plans:` entry. Being first,
+it owns a change id an external source also carries (the external copy
+is the later duplicate, skipped and counted under `duplicate_change_id`).
+Its records carry the actor `canon-plan-import-canon`; an external
+openspec change's carry `canon-plan-import-openspec`. A `brief.md` with a
+`Source: <path>` line is not a change of its own: it is the canon brief
+of a change imported from an external plan (it points at the external
+document and holds the human's `Approved:` line), so the native reader
+skips that directory and the external source keeps the change id.
+
+`plans.sources` lists only EXTERNAL plans — documents you prepare outside
+canon, which canon only reads. The one exception: `canon gate task`
+flips the task's checkbox in an external plan's `tasks.md` (see
+`canon-gate`). Their briefs and approvals live in
+`.canon/changes/<change>/brief.md`, never in the external document.
 `canon.yaml`:
 
 ```yaml
@@ -17,17 +38,22 @@ plans:
       root: .              # resolved relative to canon.yaml's directory
 ```
 
-- `canon init` writes exactly this source, plus an empty
-  `openspec/changes/` (so the adapter never scans the repo root itself).
-- An absent `plans:` section = zero sources (a clean no-op).
+- `canon init` writes `sources: []`, preceded by comments explaining
+  `.canon/changes/` and commented examples for `openspec` (`root: .`) and
+  `superpowers` (`root: docs/superpowers/plans`). It creates no
+  `openspec/changes/` directory.
+- An absent `plans:` section = zero external sources (a clean no-op;
+  `.canon/changes/` is still read).
 - A present section parses STRICTLY: a typo'd key, an unregistered
   `dialect`, or a nonexistent `root` fails the command loud, naming the
-  offender.
+  offender. `canon` is not a registered dialect: a source naming it is
+  refused, since `.canon/changes/` needs no entry.
 - `root` is whatever the dialect's adapter scans — for `openspec`, a
   repo root containing `openspec/changes/`, or that changes dir directly.
 
-One-shot override (bypasses `canon.yaml` for a single ad hoc import;
-either flag alone fails loud):
+One-shot override (bypasses `canon.yaml` and `.canon/changes/` for a
+single ad hoc import, reading only the source it names; either flag alone
+fails loud):
 
 ```bash
 canon ingest plans --dialect openspec --source ../other-repo
@@ -36,7 +62,7 @@ canon ingest plans --dialect openspec --source ../other-repo
 ## 2. Run the import
 
 ```bash
-canon ingest plans                 # canon.yaml-driven, every configured source
+canon ingest plans                 # .canon/changes/ + every configured source
 canon ingest plans --json          # machine-readable outcome
 canon ingest plans --repo ../svc   # a specific repo root
 ```
@@ -60,9 +86,19 @@ canon query --kind task [--json]
 No dialect/plugin filter exists or is needed — an imported `change`/
 `task` is an ordinary core record.
 
+## The `canon` dialect (`.canon/changes/`)
+
+Uses the `openspec` change-dir grammar below, with three differences:
+the brief is `brief.md` (its `## Why` first paragraph is the summary; a
+missing one is a `missing-brief-md` malformed dir), the source root is
+always `.canon/changes/` itself (archived changes under
+`.canon/changes/archive/`), and a `brief.md` carrying a `Source:` line is
+skipped (a pointer brief, above). `tasks.md` uses the same checkbox row
+grammar.
+
 ## The `openspec` dialect
 
-Maps `openspec/changes/**` onto core kinds:
+Maps an external `openspec/changes/**` onto core kinds:
 
 | openspec construct | Core mapping |
 | --- | --- |
@@ -76,7 +112,9 @@ Maps `openspec/changes/**` onto core kinds:
 A missing/unreadable `proposal.md`, or a basename that isn't a valid
 `change_id`, skips the WHOLE dir (counted `malformed`); siblings
 unaffected. A proposal-only dir imports as `Change { status: proposed }`
-with zero tasks and zero diagnostics.
+with zero tasks and zero diagnostics. An `Approved:` line in an external
+`proposal.md` is not read: the change's approval lives in
+`.canon/changes/<change>/brief.md` (see `canon-subject`).
 
 ## The `superpowers` dialect
 
@@ -136,9 +174,10 @@ downstream reader's job.
 
 ## What this skill does NOT cover
 
-- **Authoring an openspec change dir** (`proposal.md`/`tasks.md`
-  conventions) — `canon change new` scaffolds one and adopts it into a
-  subject (see `canon-subject`); this skill covers IMPORTING that shape.
+- **Authoring a change** — `canon change new` writes
+  `.canon/changes/<slug>/brief.md` and `tasks.md` and adopts the change
+  into a subject (see `canon-subject`); it never scaffolds an openspec
+  change dir. This skill covers IMPORTING plans.
 - **`canon gate check`/`canon gate task`** (the hand-authored one-task-at-
   a-time path this complements at bulk) — see `canon-gate`.
 - **Wiring an imported `Task`/`Change` into a `canon gate` decision** —

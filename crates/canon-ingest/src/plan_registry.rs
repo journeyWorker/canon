@@ -22,11 +22,21 @@
 //! panics or prints would make this module impossible to probe from a
 //! caller that wants to build its OWN error message (e.g. one naming
 //! every registered id, not just the one that missed).
+//!
+//! # The native `canon` dialect is not registered (0.17 D2)
+//! [`native`] is canon's own plan source, `.canon/changes/`, which every
+//! plan reader reads with no `plans:` entry. It is deliberately kept out
+//! of [`registry`]: `plans.sources` lists only external plans, so
+//! `canon.yaml` cannot name it and [`find`] never returns it.
 
 use crate::plan_adapter::PlanAdapter;
 use crate::plan_writeback::PlanWriteBack;
+use crate::plan_adapters::canon::CanonPlanAdapter;
 use crate::plan_adapters::openspec::OpenspecPlanAdapter;
 use crate::plan_adapters::superpowers::SuperpowersPlanAdapter;
+
+/// The dialect id of canon's own plan source ([`native`]).
+pub const NATIVE_DIALECT: &str = "canon";
 
 /// One registered plan-dialect adapter — its [`PlanAdapter`] plus its
 /// OPTIONAL [`PlanWriteBack`] capability (s35 `gate-plan-dialect-seam`,
@@ -73,6 +83,15 @@ pub fn find(dialect_id: &str) -> Option<&'static PlanAdapterEntry> {
     registry().iter().find(|entry| entry.dialect_id() == dialect_id)
 }
 
+/// Canon's own plan source's adapter, `.canon/changes/<slug>/`
+/// ([`crate::plan_adapters::canon`]): never in [`registry`] (module
+/// doc); the plan readers read it ahead of the configured sources.
+pub fn native() -> &'static PlanAdapterEntry {
+    static CANON: CanonPlanAdapter = CanonPlanAdapter;
+    static NATIVE: PlanAdapterEntry = PlanAdapterEntry { adapter: &CANON, write_back: Some(&CANON) };
+    &NATIVE
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -104,6 +123,13 @@ mod tests {
         // the lookup (task 1.4).
         assert!(find("no-such-dialect").is_none());
         assert!(find("").is_none());
+    }
+
+    #[test]
+    fn the_native_canon_dialect_is_never_found_through_the_registry() {
+        assert_eq!(native().dialect_id(), NATIVE_DIALECT);
+        assert!(native().write_back.is_some(), "canon gate task flips canon's own tasks.md rows");
+        assert!(find(NATIVE_DIALECT).is_none(), "plans.sources cannot name canon's own source");
     }
 
     #[test]

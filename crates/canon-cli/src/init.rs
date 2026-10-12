@@ -5,7 +5,9 @@
 //! a repo needs to start the working loop: a starter `.canon/policy.yaml`
 //! a human approves, at the level `--policy` names
 //! ([`crate::policy_level`], 0.16 D3; `strict` by default), the
-//! `openspec/changes/` home the default plans source points at, and a
+//! commented `plans:` examples (canon's own changes live in
+//! `.canon/changes/`, read with no entry; `plans.sources` lists only
+//! external plans canon reads, 0.17 D2), and a
 //! canon block in `AGENTS.md` between `<!-- canon:begin -->`/`<!-- canon:end -->`.
 //! It never overwrites an existing `canon.yaml` or `policy.yaml`; a
 //! second `init` on a repo that already has `canon.yaml` only refreshes
@@ -92,13 +94,14 @@ const GITIGNORE_LINES: [(&str, &str); 5] = [
 /// `sqlite-hot-backend`: sqlite needs no operator-supplied credential,
 /// unlike postgres/s3) -- commented `tiers.hot` (postgres swap) /
 /// `tiers.cold` stanzas documenting the scale-up path, one working
-/// `specs.roots[]` entry at [`paths::SPECS_DIR`] (D9: a present
-/// `specs:` section requires at least one root, so this ships real
-/// rather than empty; 0.17 D1 keeps it inside `.canon/`), and one
-/// `openspec` plans source rooted at the repo (0.14 D2), so the
-/// changes `canon change new` scaffolds under [`CHANGES_DIR`] are
-/// imported by `canon ingest plans` and flipped by `canon gate task`
-/// with no hand edit.
+/// `specs.roots[]` entry at [`paths::SPECS_DIR`] (D9: a present `specs:` section
+/// requires at least one root, so this ships real rather than empty;
+/// 0.17 D1 keeps it inside `.canon/`), and one
+/// `plans:` section that configures no source (0.17 D2): `canon change
+/// new` writes canon's own changes under
+/// [`canon_model::paths::CHANGES_DIR`], which every plan reader reads
+/// with no entry, so `plans.sources` lists only external plans canon
+/// reads, shown as commented openspec and superpowers examples.
 fn skeleton_yaml() -> String {
     let mut routing = String::new();
     for kind in RecordKind::ALL {
@@ -143,11 +146,17 @@ fn skeleton_yaml() -> String {
     out.push_str("    - id: root\n");
     out.push_str(&format!("      root: {}\n", paths::SPECS_DIR));
     out.push_str("plans:\n");
-    out.push_str("  # Where changes and their tasks live: `canon change new` scaffolds\n");
-    out.push_str("  # openspec/changes/<slug>/, `canon ingest plans` imports it.\n");
-    out.push_str("  sources:\n");
-    out.push_str("    - dialect: openspec\n");
-    out.push_str("      root: .\n");
+    out.push_str("  # canon's own changes live in .canon/changes/<slug>/ (`canon change\n");
+    out.push_str("  # new` writes brief.md + tasks.md there); every reader reads them\n");
+    out.push_str("  # with no entry here. `sources` lists external plans you prepare,\n");
+    out.push_str("  # which canon only reads: it never writes into them, except that\n");
+    out.push_str("  # `canon gate task` flips a task's checkbox in their tasks.md.\n");
+    out.push_str("  # Their briefs and approvals live in .canon/changes/<change>/brief.md.\n");
+    out.push_str("  #   - dialect: openspec      # openspec/changes/<change>/proposal.md + tasks.md\n");
+    out.push_str("  #     root: .\n");
+    out.push_str("  #   - dialect: superpowers   # writing-plans documents\n");
+    out.push_str("  #     root: docs/superpowers/plans\n");
+    out.push_str("  sources: []\n");
     out.push_str("write:\n");
     out.push_str("  # Staged writes (`canon evidence add`, `canon finding add|close`,\n");
     out.push_str("  # `canon divergence stage`) promote in the same run. `manual` keeps\n");
@@ -182,13 +191,6 @@ fn scaffold_gitignore(repo: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// The repo-relative directory the default `openspec` plans source
-/// ([`skeleton_yaml`]) reads changes from. `init` creates it (with a
-/// `.gitkeep`, so a clone keeps it): without it the openspec adapter
-/// would fall back to treating the repo root itself as the changes dir
-/// and report every top-level directory as a malformed change.
-pub(crate) const CHANGES_DIR: &str = "openspec/changes";
-
 /// Opening marker of the canon block `init` owns in `AGENTS.md`.
 pub(crate) const AGENTS_BEGIN: &str = "<!-- canon:begin -->";
 /// Closing marker of the canon block `init` owns in `AGENTS.md`.
@@ -207,8 +209,8 @@ feature.
 
 The loop:
 
-1. Brief: for a new subject or a scope change, record the request and your assumptions in the change's `proposal.md`, then stop and report the brief: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy. Record it at once: an `Approved: <who> <when> — \"<their words>\"` line in the change's `proposal.md`, and `canon policy approve --by <the human> --note \"<their words>\"`. Never approve without a human answer.
-2. Subject: `canon subject new`, then `canon change new` for the change; its `proposal.md` holds the brief.
+1. Brief: for a new subject or a scope change, record the request and your assumptions in the change's `.canon/changes/<slug>/brief.md`, then stop and report the brief: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy. Record it at once: an `Approved: <who> <when> — \"<their words>\"` line in that `brief.md`, and `canon policy approve --by <the human> --note \"<their words>\"`. Never approve without a human answer.
+2. Subject: `canon subject new`, then `canon change new` for the change; it writes `.canon/changes/<slug>/brief.md`, which holds the brief. A change from an external plan (an openspec `proposal.md`) gets its brief there too: a `brief.md` whose `Source: <path>` line points at the plan; canon never edits the plan.
 3. Scenarios: `canon scenario new`, failure paths included (`--case failure`).
 4. Units: split the work; one actor id and session per unit.
 5. Implement: tests named by scenario id.
@@ -218,23 +220,6 @@ The loop:
 
 Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, as tasks in its `tasks.md`, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review. When no human can answer one of the brief's questions, write your assumption into the brief and proceed on it; that covers the brief's questions and work inside an approved scope, never the approval. `.canon/policy.yaml` is what the gate grades against.
 <!-- canon:end -->";
-
-/// A fence opener/closer line: up to three spaces, then three or more
-/// backticks or tildes (CommonMark). Returns the fence character, its
-/// run length, and whether only whitespace follows the run (a closing
-/// fence may carry nothing else). [`crate::brief`] uses it too (for
-/// `canon status` and the ship guard), so an `Approved:` line quoted in
-/// a fence is not read as one.
-pub(crate) fn fence_of(line: &str) -> Option<(char, usize, bool)> {
-    let indent = line.len() - line.trim_start_matches(' ').len();
-    if indent > 3 {
-        return None;
-    }
-    let rest = &line[indent..];
-    let ch = rest.chars().next().filter(|c| *c == '`' || *c == '~')?;
-    let run = rest.len() - rest.trim_start_matches(ch).len();
-    (run >= 3).then(|| (ch, run, rest[run..].trim().is_empty()))
-}
 
 /// The byte span `[start, end)` of every standalone `marker` line (the
 /// line's trimmed text is exactly the marker) outside fenced code
@@ -249,7 +234,7 @@ fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usize, usize)>)
         let line = raw.trim_end_matches(['\n', '\r']);
         let span = (offset, offset + line.len());
         offset += raw.len();
-        match (open_fence, fence_of(line)) {
+        match (open_fence, canon_ingest::markdown::fence_of(line)) {
             (None, Some((ch, run, _))) => open_fence = Some((ch, run)),
             (Some((open_ch, open_run)), Some((ch, run, true))) if ch == open_ch && run >= open_run => open_fence = None,
             (Some(_), _) => {}
@@ -474,23 +459,12 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Create [`CHANGES_DIR`] with a `.gitkeep` when it is absent or empty.
-fn scaffold_changes_dir(repo: &Path) -> std::io::Result<()> {
-    let dir = repo.join(CHANGES_DIR);
-    fs::create_dir_all(&dir)?;
-    if fs::read_dir(&dir)?.next().is_none() {
-        fs::write(dir.join(".gitkeep"), "")?;
-        println!("canon init: created {}", dir.display());
-    }
-    Ok(())
-}
-
 /// `canon init [--repo <dir>] [--no-agents-md] [--policy <level> |
 /// --no-policy]` (task 4.1, 0.14 D2, 0.16 D3). Returns the process exit
 /// code.
 ///
 /// - A fresh repo gets `canon.yaml`, the `.gitignore` line, the
-///   `openspec/changes/` plans home, the starter policy at the requested
+///   commented plans examples, the starter policy at the requested
 ///   level (unless `--no-policy`) and the `AGENTS.md` block (unless
 ///   `--no-agents-md`):
 ///   exit `0`.
@@ -573,10 +547,6 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
 
     if let Err(e) = scaffold_gitignore(repo) {
         eprintln!("canon init: wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display());
-        return 2;
-    }
-    if let Err(e) = scaffold_changes_dir(repo) {
-        eprintln!("canon init: failed to create `{}`: {e}", repo.join(CHANGES_DIR).display());
         return 2;
     }
     if let Some(level) = options.policy {

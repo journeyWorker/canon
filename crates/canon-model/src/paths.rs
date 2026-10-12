@@ -56,6 +56,14 @@ pub const POLICY_FILE: &str = ".canon/policy.yaml";
 /// authored, git-tracked).
 pub const POLICY_APPROVAL_FILE: &str = ".canon/policy.approval.json";
 
+/// Canon's own plan source (authored, git-tracked): one
+/// `<CHANGES_DIR>/<slug>/` per change, holding its `brief.md` (the
+/// human's `Approved:` line lives there) and `tasks.md`. `canon change
+/// new` writes it; every plan reader reads it with no `plans:` entry. A
+/// change imported from an external plan gets only a `brief.md` here,
+/// whose `Source:` line points at the external document.
+pub const CHANGES_DIR: &str = ".canon/changes";
+
 /// `canon report`'s generated-never-edited markdown output.
 pub const REPORT_FILE: &str = ".canon/REPORT.md";
 

@@ -1,0 +1,67 @@
+//! The two markdown line rules canon reads a document's own lines by:
+//! a CommonMark fence ([`fence_of`]) and a `Key:` line that counts only
+//! outside fences and HTML comments ([`field`]). `canon init` finds its
+//! `AGENTS.md` markers with the first; a change's `brief.md` carries its
+//! `Approved:` and `Source:` lines under the second (0.16 D1, 0.17 D3),
+//! read by `canon status`, the ship guard, `canon evidence add` and the
+//! native `canon` plan dialect alike, so a quoted or commented-out line
+//! is never one.
+
+/// A fence opener/closer line: up to three spaces, then three or more
+/// backticks or tildes (CommonMark). Returns the fence character, its
+/// run length, and whether only whitespace follows the run (a closing
+/// fence may carry nothing else).
+pub fn fence_of(line: &str) -> Option<(char, usize, bool)> {
+    let indent = line.len() - line.trim_start_matches(' ').len();
+    if indent > 3 {
+        return None;
+    }
+    let rest = &line[indent..];
+    let ch = rest.chars().next().filter(|c| *c == '`' || *c == '~')?;
+    let run = rest.len() - rest.trim_start_matches(ch).len();
+    (run >= 3).then(|| (ch, run, rest[run..].trim().is_empty()))
+}
+
+/// The text after `key` (for example `Approved:`) on the first line of
+/// `text` that starts with it (leading whitespace allowed), says
+/// something, and sits outside fenced code blocks and HTML comments,
+/// which may span lines.
+pub fn field<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+    let mut fence: Option<(char, usize)> = None;
+    let mut in_comment = false;
+    for line in text.lines() {
+        if !in_comment {
+            match (fence, fence_of(line)) {
+                (None, Some((ch, run, _))) => {
+                    fence = Some((ch, run));
+                    continue;
+                }
+                (Some((open_ch, open_run)), Some((ch, run, true))) if ch == open_ch && run >= open_run => {
+                    fence = None;
+                    continue;
+                }
+                (Some(_), _) => continue,
+                (None, None) => {}
+            }
+            if let Some(value) = line.trim_start().strip_prefix(key).map(str::trim).filter(|rest| !rest.is_empty()) {
+                return Some(value);
+            }
+        }
+        in_comment = comment_open_after(line, in_comment);
+    }
+    None
+}
+
+/// Whether an HTML comment is open at the end of `line`, given whether
+/// one was open at its start.
+fn comment_open_after(line: &str, mut open: bool) -> bool {
+    let mut rest = line;
+    loop {
+        let marker = if open { "-->" } else { "<!--" };
+        let Some(at) = rest.find(marker) else {
+            return open;
+        };
+        rest = &rest[at + marker.len()..];
+        open = !open;
+    }
+}

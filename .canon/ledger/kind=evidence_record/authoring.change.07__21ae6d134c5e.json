@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p2-impl",
+    "role": "implementer",
+    "session_id": "017-p2-impl"
+  },
+  "at": "2026-10-12T10:41:10.558787Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test change change_new_writes_canon_changes_beside_an_external_openspec_source_it_never_touches"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 14,
+  "scenario_id": "authoring.change.07",
+  "schema": 1,
+  "staging_id": "bfc1c6011e1c",
+  "verdict": "faithful"
+}

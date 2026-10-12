@@ -1,3 +1,2 @@
 canon init: wrote ./canon.yaml
-canon init: created ./openspec/changes
 canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; choose with `canon skills install --providers=<list>` (any of claude, codex, omp, pi)

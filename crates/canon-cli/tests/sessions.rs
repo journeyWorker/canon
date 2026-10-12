@@ -19,8 +19,8 @@ fn ok(repo: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
-/// `git init` + `canon init --no-policy` + change `cats` under the
-/// openspec plan source `canon init` configures (`root: .`), imported.
+/// `git init` + `canon init --no-policy` + change `cats` in canon's own
+/// `.canon/changes/`, read with no `plans:` entry, imported.
 /// The write-mode test moves a subject, so it opts out of the starter
 /// policy (0.14 D2) whose require_review would gate that move.
 fn setup() -> tempfile::TempDir {
@@ -28,11 +28,9 @@ fn setup() -> tempfile::TempDir {
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
-    let yaml = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
-    assert!(yaml.contains("- dialect: openspec\n      root: ."), "init must configure the openspec plan source:\n{yaml}");
-    let change = repo.join("openspec/changes/cats");
+    let change = repo.join(".canon/changes/cats");
     std::fs::create_dir_all(&change).unwrap();
-    std::fs::write(change.join("proposal.md"), "# cats\n\n## Why\n\nA cat-themed run.\n").unwrap();
+    std::fs::write(change.join("brief.md"), "# cats\n\n## Why\n\nA cat-themed run.\n").unwrap();
     std::fs::write(change.join("tasks.md"), "## 1. Run\n\n- [ ] 1 Ship the run\n").unwrap();
     ok(repo, &["ingest", "plans"]);
     dir

@@ -14,11 +14,22 @@
 //! # Config: `canon.yaml` `plans:` (design D2, task 3.2)
 //! `plans: { sources: [{dialect, root}] }`, roots resolved relative to
 //! the `canon.yaml` directory. An ABSENT `plans:` section resolves to
-//! ZERO sources — a clean, explicit no-op, never a hardcoded default
-//! root ([`load_plan_sources_from_config`]). A PRESENT section parses
-//! STRICTLY (`deny_unknown_fields`): a typo'd key, an unregistered
-//! dialect id, or (checked separately, before any scan) a nonexistent
-//! source root all fail the command loud, naming the offender.
+//! ZERO configured sources — a clean, explicit no-op, never a hardcoded
+//! default root ([`load_plan_sources_from_config`]). A PRESENT section
+//! parses STRICTLY (`deny_unknown_fields`): a typo'd key, an
+//! unregistered dialect id, or (checked separately, before any scan) a
+//! nonexistent source root all fail the command loud, naming the
+//! offender.
+//!
+//! # Canon's own plan source (0.17 D2)
+//! `.canon/changes/` ([`canon_model::paths::CHANGES_DIR`], the native
+//! `canon` dialect, [`canon_ingest::native_plan_adapter`]) is read ahead
+//! of every configured source, with no `plans:` entry, whenever the
+//! directory exists: `canon change new` writes it, so `plans.sources`
+//! lists only external plans canon reads. Being first, it owns a change
+//! id an external source also carries (design D8 below). `canon.yaml`
+//! cannot name it, and the `--dialect`/`--source` one-shot reads only
+//! the source it names.
 //!
 //! # One-shot override (design D2, task 3.3)
 //! `--dialect <id> --source <path>` bypasses `canon.yaml` entirely for
@@ -181,12 +192,30 @@ pub(crate) struct PlanSource {
 }
 
 impl PlanSource {
+    /// Canon's own `.canon/changes/` source (module doc), when that
+    /// directory exists.
+    fn native(repo: &Path) -> Option<Self> {
+        let root = repo.join(canon_model::paths::CHANGES_DIR);
+        root.is_dir().then(|| PlanSource { dialect: canon_ingest::NATIVE_DIALECT.to_string(), root })
+    }
+
     pub(crate) fn dialect(&self) -> &str {
         &self.dialect
     }
 
     pub(crate) fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// This source's adapter: the native `canon` dialect's, or a
+    /// registered one. `None` only for an unregistered dialect id, which
+    /// [`load_plan_sources_from_config`] and [`resolve_sources`] refuse
+    /// before any source is built.
+    pub(crate) fn entry(&self) -> Option<&'static plan_registry::PlanAdapterEntry> {
+        if self.dialect == canon_ingest::NATIVE_DIALECT {
+            return Some(canon_ingest::native_plan_adapter());
+        }
+        plan_registry::find(&self.dialect)
     }
 }
 
@@ -323,7 +352,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
     for src in &sources {
         // Validated at `resolve_sources`/`load_plan_sources_from_config`
         // time — every `src.dialect` is a registered id by construction.
-        let entry = plan_registry::find(&src.dialect).expect("dialect validated before the scan loop");
+        let entry = src.entry().expect("dialect validated before the scan loop");
         let cursor_id = plan_source_cursor_id(&src.dialect, entry.adapter.parse_version(), &src.root);
         let handle = entry.adapter.resolve_source(&PlanSourceConfig { root: Some(src.root.clone()) });
 
@@ -572,7 +601,7 @@ pub(crate) fn refresh_change(repo: &Path, change_id: &ChangeId) -> Result<Change
     let mut unwritten = PlansOutcome::default();
     let mut refresh = ChangeRefresh { changes_parsed: 0, malformed: 0 };
     for src in &sources {
-        let entry = plan_registry::find(&src.dialect).ok_or_else(|| PlansError::Config(format!("`{}` is not a registered plan dialect", src.dialect)))?;
+        let entry = src.entry().ok_or_else(|| PlansError::Config(format!("`{}` is not a registered plan dialect", src.dialect)))?;
         let Some(handle) = entry.adapter.resolve_source(&PlanSourceConfig { root: Some(src.root.clone()) }) else {
             continue;
         };
@@ -685,10 +714,18 @@ fn registered_dialect_ids() -> Vec<&'static str> {
     ids
 }
 
+/// Every plan source the config-driven readers read: canon's own
+/// `.canon/changes/` first when it exists (module doc), then
+/// `canon.yaml`'s `plans.sources` ([`configured_plan_sources`]).
+pub(crate) fn load_plan_sources_from_config(canon_yaml_path: &Path, repo: &Path) -> Result<Vec<PlanSource>, PlansError> {
+    let configured = configured_plan_sources(canon_yaml_path, repo)?;
+    Ok(PlanSource::native(repo).into_iter().chain(configured).collect())
+}
+
 /// Parse `canon.yaml`'s `plans:` section (task 3.2; see module doc for
 /// the fail-soft-on-absent vs fail-loud-on-present split, mirroring
 /// `crate::ingest::IngestSourceConfig::load`'s established pattern).
-pub(crate) fn load_plan_sources_from_config(canon_yaml_path: &Path, repo: &Path) -> Result<Vec<PlanSource>, PlansError> {
+fn configured_plan_sources(canon_yaml_path: &Path, repo: &Path) -> Result<Vec<PlanSource>, PlansError> {
     // Missing/unreadable canon.yaml: fail-soft (no config at all is a
     // legitimate first-run state) -- zero sources, same as an absent
     // `plans:` section.
@@ -711,6 +748,13 @@ pub(crate) fn load_plan_sources_from_config(canon_yaml_path: &Path, repo: &Path)
 
     let mut sources = Vec::with_capacity(raw.sources.len());
     for (i, s) in raw.sources.into_iter().enumerate() {
+        if s.dialect == canon_ingest::NATIVE_DIALECT {
+            return Err(PlansError::Config(format!(
+                "canon.yaml `plans.sources[{i}]` names `{}`, canon's own plan source: `{}` is always read with no entry, and `plans.sources` lists only external plans; remove the entry",
+                s.dialect,
+                canon_model::paths::CHANGES_DIR
+            )));
+        }
         if plan_registry::find(&s.dialect).is_none() {
             return Err(PlansError::Config(format!(
                 "canon.yaml `plans.sources[{i}]` names unregistered dialect `{}` (registered: {}); fix the dialect id or remove the entry",
@@ -727,11 +771,11 @@ pub(crate) fn load_plan_sources_from_config(canon_yaml_path: &Path, repo: &Path)
 /// Whether `canon.yaml` carries a `plans:` key AT ALL — the signal
 /// [`load_plan_sources_for_gate`] needs to tell "a pre-s35 repo that
 /// never knew about `plans:`" apart from "a repo that configured
-/// `plans.sources: []` on purpose". Both resolve to zero sources
-/// through [`load_plan_sources_from_config`], but only the former
+/// `plans.sources: []` on purpose". Both resolve to zero configured
+/// sources through [`configured_plan_sources`], but only the former
 /// earns the openspec compat default. Unreadable/non-YAML both answer
 /// `false`; the loud parse error is
-/// [`load_plan_sources_from_config`]'s job, and this is only ever
+/// [`configured_plan_sources`]'s job, and this is only ever
 /// consulted after that call already returned `Ok`.
 fn plans_section_present(canon_yaml_path: &Path) -> bool {
     let Ok(text) = std::fs::read_to_string(canon_yaml_path) else {
@@ -741,11 +785,12 @@ fn plans_section_present(canon_yaml_path: &Path) -> bool {
 }
 
 /// The plan sources `canon gate task` resolves a flip through (s35
-/// `gate-plan-dialect-seam`, design "Compat default"). Loads
-/// `canon.yaml`'s `plans:` sources exactly like `canon ingest plans`
+/// `gate-plan-dialect-seam`, design "Compat default"): canon's own
+/// `.canon/changes/` first when it exists, then `canon.yaml`'s `plans:`
+/// sources exactly like `canon ingest plans`
 /// ([`load_plan_sources_from_config`]) — but where that command treats
-/// an ABSENT `plans:` section as zero sources (a clean no-op scan),
-/// `canon gate task` instead falls back to the documented compat
+/// an ABSENT `plans:` section as zero configured sources (a clean no-op
+/// scan), `canon gate task` instead falls back to the documented compat
 /// default `[{ dialect: openspec, root: <repo> }]` so every consumer
 /// that worked before s35 (a repo with no `plans:` section, whose
 /// `tasks.md` lives at `<repo>/openspec/changes/<change_id>/`) keeps
@@ -756,19 +801,19 @@ fn plans_section_present(canon_yaml_path: &Path) -> bool {
 /// The fallback is keyed on the section's ABSENCE
 /// ([`plans_section_present`]), never on "zero sources resolved". A
 /// repo that writes `plans:\n  sources: []` — which is exactly what
-/// `canon init` scaffolds — has configured a plan corpus and declared
-/// it empty, so synthesizing an openspec source under it would make
-/// `canon gate task` report `consulted: openspec @ <repo>` against a
-/// dialect the operator never named. That is the same misleading shape
-/// `crate::dispatch`'s `--task` validation already refuses via
-/// `DispatchError::NoPlanSources`; the two commands now agree.
+/// `canon init` scaffolds — has configured its external plans and
+/// declared there are none, so synthesizing an openspec source under it
+/// would make `canon gate task` report `consulted: openspec @ <repo>`
+/// against a dialect the operator never named. That is the same
+/// misleading shape `crate::dispatch`'s `--task` validation already
+/// refuses via `DispatchError::NoPlanSources`; the two commands agree.
 pub(crate) fn load_plan_sources_for_gate(repo: &Path) -> Result<Vec<PlanSource>, PlansError> {
     let canon_yaml_path = repo.join("canon.yaml");
-    let mut sources = load_plan_sources_from_config(&canon_yaml_path, repo)?;
-    if sources.is_empty() && !plans_section_present(&canon_yaml_path) {
-        sources.push(PlanSource { dialect: "openspec".to_string(), root: repo.to_path_buf() });
+    let mut configured = configured_plan_sources(&canon_yaml_path, repo)?;
+    if configured.is_empty() && !plans_section_present(&canon_yaml_path) {
+        configured.push(PlanSource { dialect: "openspec".to_string(), root: repo.to_path_buf() });
     }
-    Ok(sources)
+    Ok(PlanSource::native(repo).into_iter().chain(configured).collect())
 }
 
 /// A malformed CONFIGURATION fails loud BEFORE any scan (spec

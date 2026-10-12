@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p2-impl",
+    "role": "implementer",
+    "session_id": "017-p2-impl"
+  },
+  "at": "2026-10-12T10:41:15.699316Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject evidence_add_68_an_unapproved_brief_refuses_the_attestation_and_stages_nothing"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 49,
+  "scenario_id": "evidence.add.68",
+  "schema": 1,
+  "staging_id": "f3746df59e4c",
+  "verdict": "faithful"
+}
