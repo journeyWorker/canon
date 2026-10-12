@@ -140,13 +140,21 @@ fn authoring_init_82_the_canon_specs_corpus_is_never_ignored() {
 
 /// format.corpus.10: `canon format` refuses a root still on the pre-0.17
 /// layout with one `layout-grammar` violation naming the root and
-/// `canon migrate`, and reads none of its files.
+/// `canon migrate`, and reads none of its files: a malformed one under
+/// `features/` raises no violation of its own.
 #[test]
 fn format_corpus_10_format_refuses_the_pre_0_17_layout() {
     let dir = pre_0_17_repo(false);
+    // A second old-layout file that, if it were read, would raise its own
+    // layout-grammar (no tag to resolve an area from) and missing-provenance
+    // violations. It sorts after hotdeal, so the named first file is unchanged.
+    let broken = "specs/features/kind=feature/area=world/zzz-broken.feature";
+    std::fs::write(dir.path().join(broken), "Feature: broken\n\n  Scenario: no tag, no provenance\n    Given a step\n").unwrap();
     let out = canon(dir.path(), &["format", "specs"]);
     assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
     let text = stdout(&out);
+    assert!(text.starts_with("canon format: 0 file(s) checked, 1 violation(s)\n"), "no old-layout file is read: {text}");
+    assert!(!text.contains("zzz-broken") && !text.contains("missing-provenance"), "the unread file raises nothing of its own: {text}");
     assert!(text.contains("features"), "{text}");
     assert!(
         text.contains("spec root `specs` is on the pre-0.17 layout (`features/kind=feature/area=world/hotdeal.feature` sits under `features/`)"),
@@ -215,6 +223,9 @@ fn authoring_scaffold_13_the_scaffold_refuses_a_pre_0_17_root() {
 
     let out = canon(repo, &["scenario", "new", "world.cart.01", "--title", "A cart", "--feature", "specs/kind=feature/area=world/cart.feature"]);
     assert_eq!(out.status.code(), Some(2), "an explicit --feature under the root is refused too: {}", stderr(&out));
+    assert!(stderr(&out).contains(&format!("canon scenario new: refused — {MIGRATE}; nothing written")), "{}", stderr(&out));
+    assert!(!repo.join("specs/kind=feature/area=world/cart.feature").exists(), "the explicit --feature target is not written");
+    assert_eq!(files_under(repo.join("specs")), before, "nothing written by the explicit --feature refusal");
 
     let out = canon(repo, &["feature", "new", "world.cart", "--title", "Cart"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
