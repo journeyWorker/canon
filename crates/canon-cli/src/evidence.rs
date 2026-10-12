@@ -824,10 +824,12 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             (None, Some(scenario_id)) => scenario_id.as_str().to_string(),
             (None, None) => unreachable!("one of --task/--scenario-id is required, checked above"),
         };
+        // Worded and exited like every other gate-red refusal of this
+        // command (0.18 D5, #32): `refused —`, exit 1.
         let violations = scan_note_text(&subject, summary, args.command_result.as_deref());
         if !violations.is_empty() {
             for violation in &violations {
-                eprintln!("{}", violation.line());
+                eprintln!("canon evidence add: refused — {}", violation.line());
             }
             return 1;
         }
@@ -1089,17 +1091,19 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
 }
 
 /// `canon evidence vault` (0.14 D4): store the bytes for committed
-/// evidence records written before the artifact store existed.
+/// evidence records written before the artifact store existed, and for
+/// review artifacts whose blob was lost (0.18 D5).
 ///
 /// Every distinct `(path, sha256)` attachment across the committed
-/// ledger: already stored intact → counted; otherwise the working-tree
-/// file is stored when it still hashes to the recorded digest and fits
-/// the size limit. Everything else is listed as not stored, with why —
-/// those bytes are gone, and `canon gate check` reports a LATEST record
-/// bound to them as `stale-evidence` (re-attest to fix). Exit `0` when
-/// the pass ran, whatever it could store: whether an unstored file
-/// matters is the gate's question, and a superseded record's lost file
-/// never does. `2` when the ledger cannot be read or a write fails.
+/// ledger's evidence records and reviews: already stored intact →
+/// counted; otherwise the working-tree file is stored when it still
+/// hashes to the recorded digest and fits the size limit. Everything else
+/// is listed as not stored, with why — those bytes are gone, and `canon
+/// gate check` reports a LATEST record, or a current review, bound to
+/// them as `stale-evidence` (re-attest to fix). Exit `0` when the pass
+/// ran, whatever it could store: whether an unstored file matters is the
+/// gate's question, and a superseded record's lost file never does. `2`
+/// when the ledger cannot be read or a write fails.
 pub fn run_vault(repo: &Path, max_artifact_mib: u64) -> i32 {
     use canon_gate::artifact_store::{blob_display, stored_blob, working_tree_path, StoreError, StoreLock, StoreOutcome, MIB};
 
@@ -1111,7 +1115,8 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64) -> i32 {
             return 2;
         }
     };
-    let raw = match GitTier::new(ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)) {
+    let tier = GitTier::new(ledger_root);
+    let raw = match tier.read(&TierQuery::kind(RecordKind::EvidenceRecord)) {
         Ok(read) => read.records,
         Err(e) => {
             eprintln!("canon evidence vault: {e}");
@@ -1119,8 +1124,20 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64) -> i32 {
         }
     };
     let (records, _malformed) = canon_model::validate_evidence_batch(&raw);
-    let files: std::collections::BTreeSet<(String, String)> =
-        records.iter().flat_map(|r| r.attachments.iter().map(|a| (a.path.clone(), a.sha256.clone()))).collect();
+    // A review row that does not read is the gate's to report; the vault
+    // stores what every readable review binds.
+    let reviews: Vec<canon_model::Review> = match tier.read(&TierQuery::kind(RecordKind::Review)) {
+        Ok(read) => read.records.into_iter().filter_map(|raw| serde_json::from_value(raw.0).ok()).collect(),
+        Err(e) => {
+            eprintln!("canon evidence vault: {e}");
+            return 2;
+        }
+    };
+    let files: std::collections::BTreeSet<(String, String)> = records
+        .iter()
+        .flat_map(|r| r.attachments.iter().map(|a| (a.path.clone(), a.sha256.clone())))
+        .chain(reviews.iter().flat_map(|r| r.artifacts.iter().map(|a| (a.path.clone(), a.sha256.clone()))))
+        .collect();
 
     let max_bytes = max_artifact_mib.saturating_mul(MIB);
     let (mut stored, mut already) = (Vec::new(), 0usize);

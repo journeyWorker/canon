@@ -1,4 +1,4 @@
-description: "0.16 D5: a file bound to an in-effect review whose stored blob is gone is `stale-evidence` on the review's scenario (exit 1), naming the reviewer, the review's actor and time, even though the working-tree file still matches"
+description: "0.16 D5, 0.18 D5: a file bound to a current review whose stored blob is gone and whose working-tree file changed is `stale-evidence` on the review's scenario (exit 1), naming the reviewer, the review's actor and time, and what the store and the working tree hold"
 steps:
   - args: [gate, check]
     exit: 1

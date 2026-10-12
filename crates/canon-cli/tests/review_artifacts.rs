@@ -1,8 +1,9 @@
-//! review.add.40–43 (0.16 D5) through the real binary: `canon review add
-//! --artifact` binds what the reviewer looked at exactly as `canon
-//! evidence add --artifact` binds a file — stored under its digest,
-//! recorded as `{path, sha256}` on the review — and `canon gate check`
-//! re-hashes the stored blobs of every in-effect review.
+//! review.add.40–43 (0.16 D5) and review.add.90–91 (0.18 D5) through the
+//! real binary: `canon review add --artifact` binds what the reviewer
+//! looked at exactly as `canon evidence add --artifact` binds a file —
+//! stored under its digest, recorded as `{path, sha256}` on the review —
+//! and `canon gate check` re-checks the files of every current in-effect
+//! review by the evidence rule.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -109,9 +110,9 @@ fn review_add_stores_each_artifact_and_records_its_path_and_digest() {
     assert!(!text(&gate).contains("stale-evidence"), "{}", text(&gate));
 }
 
-/// review.add.41: a missing or altered stored blob is `stale-evidence` on
-/// the review's scenario, naming the review; an intact working-tree file
-/// does not vouch for a review artifact.
+/// review.add.41: an altered stored blob, or a missing one whose
+/// working-tree file changed, is `stale-evidence` on the review's
+/// scenario, naming the review.
 #[test]
 fn a_missing_or_altered_review_artifact_is_stale_evidence_naming_the_review() {
     let dir = setup();
@@ -119,21 +120,55 @@ fn a_missing_or_altered_review_artifact_is_stale_evidence_naming_the_review() {
     assert!(review(repo, "reviewer-2", &["--artifact", "reports/title.png", "--artifact", "reports/hud.webm"]).status.success());
 
     std::fs::remove_file(blob(repo, TITLE)).unwrap();
+    std::fs::write(repo.join("reports/title.png"), b"a later capture").unwrap();
     std::fs::write(blob(repo, HUD), b"tampered").unwrap();
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "{}", text(&gate));
     let out = text(&gate);
     let at = chrono::DateTime::parse_from_rfc3339(reviews(repo)[0]["at"].as_str().unwrap()).unwrap().to_utc().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let (title, hud) = (sha(TITLE), sha(HUD));
+    let (title, hud, later) = (sha(TITLE), sha(HUD), sha(b"a later capture"));
     let missing = format!(
-        "stale-evidence game.title.01 — review by `reviewer-2` (actor `reviewer-2`, {at}) bound file `reports/title.png` recorded sha256 {title}; stored blob .canon/artifacts/sha256/{title}: missing; working tree: {title} — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`"
+        "stale-evidence game.title.01 — review by `reviewer-2` (actor `reviewer-2`, {at}) bound file `reports/title.png` recorded sha256 {title}; stored blob .canon/artifacts/sha256/{title}: missing; working tree: {later} — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`"
     );
-    assert!(out.contains(&missing), "a missing blob is stale even with the working-tree file intact:\n{out}\nexpected: {missing}");
+    assert!(out.contains(&missing), "a missing blob with a changed working-tree file is stale:\n{out}\nexpected: {missing}");
     let altered = format!(
         "stale-evidence game.title.01 — review by `reviewer-2` (actor `reviewer-2`, {at}) bound file `reports/hud.webm` recorded sha256 {hud}; stored blob .canon/artifacts/sha256/{hud}: {tampered}; working tree: {hud} — the stored blob does not match its name, so its bytes were altered, look again and re-record the review with `canon review add --artifact <path>`",
         tampered = sha(b"tampered")
     );
     assert!(out.contains(&altered), "an altered blob names the review, its actor and time, and what the store and the working tree hold:\n{out}\nexpected: {altered}");
+    assert!(!out.contains("canon evidence vault"), "neither file is vouched for by the working tree:\n{out}");
+}
+
+/// review.add.90 (0.18 D5, #36): a lost review blob whose working-tree
+/// file still matches is a vault advisory, as for evidence; `canon
+/// evidence vault` stores it back. Once the working-tree file changes too,
+/// it is `stale-evidence`.
+#[test]
+fn a_lost_review_blob_with_a_matching_working_tree_is_a_vault_advisory() {
+    let dir = setup();
+    let repo = dir.path();
+    assert!(review(repo, "reviewer-2", &["--artifact", "reports/title.png"]).status.success());
+    std::fs::remove_file(blob(repo, TITLE)).unwrap();
+
+    let gate = canon(repo, &["gate", "check"]);
+    assert!(gate.status.success(), "a matching working tree vouches for a lost review blob: {}", text(&gate));
+    let out = text(&gate);
+    assert!(!out.contains("stale-evidence"), "{out}");
+    assert!(out.contains("not failing the gate; run `canon evidence vault`"), "{out}");
+    let advisory = format!("  unstored game.title.01 reports/title.png (sha256 {}, review by `reviewer-2`) is verified against the working tree only", sha(TITLE));
+    assert!(out.contains(&advisory), "{out}\nexpected: {advisory}");
+
+    let vault = ok(repo, &["evidence", "vault"]);
+    assert!(vault.contains("stored 1, already stored 0, could not store 0"), "{vault}");
+    assert_eq!(std::fs::read(blob(repo, TITLE)).unwrap(), TITLE);
+    let gate = ok(repo, &["gate", "check"]);
+    assert!(!gate.contains("canon evidence vault"), "the stored blob clears the advisory: {gate}");
+
+    std::fs::remove_file(blob(repo, TITLE)).unwrap();
+    std::fs::write(repo.join("reports/title.png"), b"a later capture").unwrap();
+    let gate = canon(repo, &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(1), "{}", text(&gate));
+    assert!(text(&gate).contains("stale-evidence game.title.01 — review by `reviewer-2`") && text(&gate).contains("the bound bytes are gone"), "{}", text(&gate));
 }
 
 /// review.add.42: a file outside the repository, a missing file, or one
@@ -194,9 +229,43 @@ fn a_superseded_reviews_artifacts_are_no_longer_checked() {
     let repo = dir.path();
     assert!(review(repo, "reviewer-2", &["--artifact", "reports/title.png"]).status.success());
     std::fs::remove_file(blob(repo, TITLE)).unwrap();
+    std::fs::write(repo.join("reports/title.png"), b"a later capture").unwrap();
     assert_eq!(canon(repo, &["gate", "check"]).status.code(), Some(1));
 
     assert!(review(repo, "reviewer-2", &["--artifact", "reports/hud.webm"]).status.success());
     let gate = canon(repo, &["gate", "check"]);
     assert!(gate.status.success(), "{}", text(&gate));
+}
+
+/// review.add.91 (0.18 D5, #36, FINDINGS-3 T5): a review that went stale
+/// when the scenario's evidence moved, and that another reviewer has
+/// reviewed again since, is superseded: its lost files are not checked.
+/// The newer, current review's files still are.
+#[test]
+fn a_stale_review_superseded_by_another_reviewers_newer_review_is_not_checked() {
+    let dir = setup();
+    let repo = dir.path();
+    assert!(review(repo, "reviewer-2", &["--artifact", "reports/title.png"]).status.success());
+    ok(
+        repo,
+        &[
+            "evidence", "add", "--scenario-id", "game.title.01", "--project-id", "root", "--kind", "test-run", "--ref", "vitest", "--role", "implementer", "--actor-id", "impl",
+            "--promote",
+        ],
+    );
+    assert!(review(repo, "reviewer-4", &["--artifact", "reports/hud.webm"]).status.success());
+
+    std::fs::remove_file(blob(repo, TITLE)).unwrap();
+    std::fs::write(repo.join("reports/title.png"), b"a later capture").unwrap();
+    let gate = canon(repo, &["gate", "check"]);
+    assert!(gate.status.success(), "the stale reviewer-2 review is superseded, so its lost file is not checked: {}", text(&gate));
+    assert!(!text(&gate).contains("reports/title.png"), "{}", text(&gate));
+
+    std::fs::remove_file(blob(repo, HUD)).unwrap();
+    std::fs::write(repo.join("reports/hud.webm"), b"a later recording").unwrap();
+    let gate = canon(repo, &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(1), "the current review's lost file is still checked: {}", text(&gate));
+    let out = text(&gate);
+    assert!(out.contains("stale-evidence game.title.01 — review by `reviewer-4`") && out.contains("`reports/hud.webm`"), "{out}");
+    assert!(!out.contains("review by `reviewer-2`"), "{out}");
 }

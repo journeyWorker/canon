@@ -173,19 +173,25 @@ The field is absent when no `--artifact` is given. `review add` prints
 .canon/artifacts/sha256/ (<k> newly stored) — commit them with the
 ledger`.
 
-`canon gate check` re-hashes the stored blob of every file bound to an
-in-effect review (the latest per `(project_id, scenario_id, reviewer)`).
-A missing or altered blob is `stale-evidence` on the review's scenario,
-naming the review, even when the working-tree file still matches (see
-`canon-gate`, "Bound evidence stays provable"):
+`canon gate check` re-checks every file bound to a current in-effect
+review (the latest per `(project_id, scenario_id, reviewer)`, unless it
+went stale against its scenario) by the evidence rule (see `canon-gate`,
+"Bound evidence stays provable"). A missing blob whose working-tree file
+still matches is an advisory naming `canon evidence vault`, which stores
+it back. A missing blob with a changed or missing working-tree file, or
+an altered blob, is `stale-evidence` on the review's scenario, naming
+the review:
 
 ```
-stale-evidence world.demo.01 — review by `reviewer-2` (actor `reviewer-2`, 2026-10-11T09:00:00Z) bound file `reports/title.png` recorded sha256 <hex>; stored blob .canon/artifacts/sha256/<hex>: missing; working tree: <hex> — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`
+stale-evidence world.demo.01 — review by `reviewer-2` (actor `reviewer-2`, 2026-10-11T09:00:00Z) bound file `reports/title.png` recorded sha256 <hex>; stored blob .canon/artifacts/sha256/<hex>: missing; working tree: <other hex> — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`
 ```
 
 The reviewer's later review replaces the earlier one, so its files are
-the ones checked. Canon binds and re-checks bytes only; it never compares
-images or judges what a screenshot shows.
+the ones checked. A review that went stale (its scenario's spec or
+evidence moved since) is not checked either: it no longer counts, and the
+scenario's newer review is the one whose files are checked. Canon binds
+and re-checks bytes only; it never compares images or judges what a
+screenshot shows.
 
 ### What the review saw (pins)
 

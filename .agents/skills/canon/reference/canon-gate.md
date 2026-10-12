@@ -28,7 +28,7 @@ Every violation carries one of these stable, grep-able strings:
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of passing evidence. |
 | `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` evidence record. |
-| `fabricated-evidence` | An evidence note contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) or a bare `verified` claim with no attached command result. |
+| `fabricated-evidence` | An evidence note contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) standing as a whole word — never inside a path, a file name, a URL or a longer word, so `pack.json/atlas` is not `n/a` — or a bare `verified` claim with no attached command result. `canon evidence add` refuses such a note before writing (`canon evidence add: refused — fabricated-evidence …`, exit 1). |
 | `open-blocker` | With `spec_coverage.require_review` set (and `block_on_findings`, the default), a Finding whose latest version is severity `blocker`, disposition `open`, on a change an in-scope subject adopted. Subject string `<change_id>#<round>.<seq>`. See `canon-review`. |
 | `false-success` | The latest audit record (`canon evidence add --kind audit`) of a scenario says `refuted`: an external evaluator found a counterexample to the claimed success. Always on, regardless of policy or sampling, and takes precedence over any declared faithful verdict; only a newer audit (`confirmed` or `indeterminate`) clears it. The detail names the evaluator, its version, its sha256 and the counterexample paths. |
 
@@ -468,20 +468,29 @@ have its bindings checked. A superseded record is not checked —
 re-attesting is the fix.
 
 Files bound to a review (`canon review add --artifact`, see
-`canon-review`) are checked the same way for every in-effect review (the
-latest per `(project_id, scenario_id, reviewer)`), with one difference:
-they were stored when the review was written, so only an intact blob is
-clean. A missing or altered blob is `stale-evidence` on the review's
-scenario, and the detail names the review: ``review by `<reviewer>`
-(actor `<id>`, <time>)``. The working-tree file is reported but never
-vouches for it.
+`canon-review`) are checked by the same rule for every CURRENT in-effect
+review: the latest per `(project_id, scenario_id, reviewer)`, less any
+that went stale against its scenario (its spec or evidence pin moved, or
+a review from before pinning is stale at its commit). A stale review is
+superseded — the gate reads the newer review, or reports the missing
+one as `unreviewed-promotion` — so its files are not re-checked, as a
+superseded evidence record's are not. A missing blob whose working-tree
+file still matches is an advisory, listed with the reviewer:
+
+```
+  unstored cart.add.01 reports/cart-badge.png (sha256 9848…, review by `reviewer-2`) is verified against the working tree only
+```
+
+Anything else is `stale-evidence` on the review's scenario, and the
+detail names the review: ``review by `<reviewer>` (actor `<id>`,
+<time>)``.
 
 `canon evidence vault [--max-artifact-mib <N>]` stores the bytes for
-existing records: every attachment whose working-tree file still matches
-its digest is copied in, and everything else is listed as not stored,
-with both digests. It exits `0` whenever it ran (the gate decides whether
-an unstored file matters), `2` when the ledger cannot be read or a write
-fails.
+existing evidence records and reviews: every attachment whose
+working-tree file still matches its digest is copied in, and everything
+else is listed as not stored, with both digests. It exits `0` whenever it
+ran (the gate decides whether an unstored file matters), `2` when the
+ledger cannot be read or a write fails.
 
 ## Effect-aware risk approvals (`risk_tiers`)
 

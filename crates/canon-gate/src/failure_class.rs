@@ -76,7 +76,7 @@ pub enum FailureClass {
     /// (`gated-task-completion` capability, design decision 6). S5
     /// wave-2's checkbox-grammar surface (task 3.2/3.4) emits this.
     UnevidencedFlip,
-    /// Fabrication-marker scanning found a blocklisted substring or a
+    /// Fabrication-marker scanning found a blocklisted marker token or a
     /// bare `verified` claim with no attached structured result
     /// (`gated-task-completion` capability, design decision 6,
     /// `scanFakeMarkers` shape). S5 wave-2's fabrication scanner (task

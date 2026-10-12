@@ -32,7 +32,7 @@ description: canon gate가 태스크 완료를 자가 보고에서 증거 기반
 | `malformed-evidence` | 후보 레코드가 파싱되지 않거나, 잘못된 위치에 있거나, 파싱 불가능한 임시 태그를 가짐. 잘못된 형식의 증거는 증거가 아님. |
 | `flagged` | 사람만 설정 가능한 `flagged` 오버레이가 켜짐 — 어떤 통과 증거가 있어도 절대 green이 되지 않음. |
 | `unevidenced-flip` | `canon gate task <task_id>`가 대응하는 non-`Divergent` `EvidenceRecord` 없이 체크박스 플립을 요청받음. |
-| `fabricated-evidence` | 플립에 첨부된 증거 노트에 차단 대상 마커(`"would pass"`, `"TBD"`, `"n/a"`)가 있거나, 첨부된 커맨드 결과 없이 `verified`만 주장함. |
+| `fabricated-evidence` | 플립에 첨부된 증거 노트에 차단 대상 마커(`"would pass"`, `"TBD"`, `"n/a"`)가 독립된 단어로 있거나(경로, 파일 이름, URL, 더 긴 단어 안에 든 것은 해당하지 않음), 첨부된 커맨드 결과 없이 `verified`만 주장함. |
 | `open-blocker` | `spec_coverage.require_review`가 켜진 경우, 범위 안 subject가 adopt한 change에 최신 버전 기준 severity `blocker`, disposition `open`인 리뷰 finding이 있음. subject 문자열은 `<change_id>#<round>.<seq>`입니다. |
 | `false-success` | 시나리오의 최신 audit 레코드(`canon evidence add --kind audit`)가 `refuted`: 외부 평가자가 반례를 찾음. 정책이나 샘플링과 무관하게 항상 켜져 있으며, 더 새로운 audit(`confirmed` 또는 `indeterminate`)이 해소할 때까지 선언된 faithful 판정보다 우선합니다. 상세에는 평가자, 버전, sha256, 반례 경로가 나옵니다. |
 
@@ -278,6 +278,12 @@ experimental:
   트리에 지금 있는 것을 함께 보여주고, 저장된 blob이 바뀌었는지(이름과
   내용이 맞지 않음) 사라졌는지 구분해 알려줍니다. 다시 실행하고 다시
   신고하세요.
+
+리뷰어가 `canon review add --artifact`로 묶은 파일도 현재 리뷰에 대해서는
+같은 규칙을 따릅니다. 현재 리뷰는 리뷰어와 시나리오마다 가장 최근 리뷰 가운데
+시나리오에 비해 stale해지지 않은 것입니다. stale해진 리뷰는 대체된 것으로
+보고 그 파일은 다시 검사하지 않습니다. `canon evidence vault`는 리뷰 파일도
+저장합니다.
 
 ## 트러스트 래더
 

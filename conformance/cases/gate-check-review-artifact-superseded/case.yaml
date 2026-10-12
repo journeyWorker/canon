@@ -1,0 +1,4 @@
+description: "0.18 D5 (FINDINGS-3 T5): a review that went stale when its scenario's evidence moved, and that another reviewer has reviewed again since, is superseded; its lost blob (with a changed working-tree file) is not checked, and `canon gate check` stays clean (exit 0) while the newer review's blob is intact"
+steps:
+  - args: [gate, check]
+    exit: 0

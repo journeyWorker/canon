@@ -264,7 +264,7 @@ fn evidence_add_refuses_a_fabricated_summary_before_staging_anything() {
         repo,
     );
     assert_eq!(output.status.code(), Some(1), "a fabrication marker is a gate-red refusal; stdout: {}", stdout(&output));
-    assert!(stderr(&output).contains("fabricated-evidence"), "{}", stderr(&output));
+    assert!(stderr(&output).contains("canon evidence add: refused — fabricated-evidence"), "{}", stderr(&output));
     assert!(staging_is_empty(repo), "a refused add must stage nothing");
 }
 
