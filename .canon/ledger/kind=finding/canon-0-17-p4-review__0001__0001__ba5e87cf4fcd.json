@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-017-p4",
+    "role": "reviewer",
+    "session_id": "review-017-p4"
+  },
+  "at": "2026-10-12T12:08:47.518638Z",
+  "change_id": "canon-0-17-p4-review",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/migrate.rs:279-295",
+  "kind": "finding",
+  "reviewed_sha": "fbead7eb8e8e25f5046a3fd7001c0be22a2cd8ef",
+  "reviewer": "canon-reviewer-017-p4",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "canon migrate refused a root already on the 0.17 layout instead of a no-op"
+}
