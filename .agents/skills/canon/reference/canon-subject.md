@@ -170,6 +170,14 @@ the brief as not approved, as an advisory. `subjects[].brief.enforced` in
 `canon status --json` says which case applies. A brief that says the human
 ships changes who runs the transition, not the check.
 
+This refusal is a backstop, and so is the evidence one: shipping is not
+the first thing an unapproved brief stops. The agent writes the brief,
+then stops and reports it, and nothing is built or attested for the
+subject until the human answers. `canon evidence add` refuses (exit 1,
+nothing staged) a scenario whose `@subject` owner, or a task whose change
+an adopting subject, has an enforced, unapproved brief, through the same
+check; see `canon-gate`.
+
 ### The review guard (`spec_coverage.require_review`, opt-in)
 
 When `.canon/policy.yaml` sets `spec_coverage.require_review` (see
@@ -351,6 +359,10 @@ uses, so status and the gate cannot disagree about a gap:
   one).
 - **Dropped bindings** — `dropped bindings (N):` lists every recorded
   `--drop-attachment` (scenario, paths, reason); `drops[]` in `--json`.
+- **Brief overrides** — a `warning:` line per evidence record attested
+  with `canon evidence add --override-reason` while its subject's brief
+  was not approved: what it attests, who, when, the subject and the
+  reason (see `canon-gate`).
 - **`next:`** — at most five steps, each with a one-line reason; the
   rest are counted. Rules, in order: no `canon.yaml` → `canon init`; an
   unreadable one → `canon init --check-config`; a scenario tagged with a
@@ -361,8 +373,8 @@ uses, so status and the gate cannot disagree about a gap:
   or a duplicate id, which the sync names). Then per subject, verifying
   first, then building, specced, proposed, shipped: an unapproved brief
   (building and later, and proposed once its change has a `proposal.md`)
-  → the human step below, which for a `proposed` subject is its only
-  step; no scenario → `canon scenario new … --subject <id>` (and, when no
+  → the human step below, which is then the subject's
+  only step; no scenario → `canon scenario new … --subject <id>` (and, when no
   `.feature` file holds a scenario yet, `canon feature new` first, unless
   every subject waits on its brief); a missing case → `canon scenario new
   <surface>.<next nn> … --case <case>`; (building and later) an
@@ -379,19 +391,20 @@ uses, so status and the gate cannot disagree about a gap:
 - **The one human step.** Every step is the agent's to run except one:
   a subject whose brief is enforced (its newest change has a
   `proposal.md` with no `Approved:` line) gets
-  `human: get the brief approved (one human answer covers brief and policy)`,
-  whose reason names that `proposal.md` and
-  `canon policy approve --by <the human> --note "<their words>"`. Until
-  the line exists the subject is not suggested to move on, and
-  `canon subject status <id> shipped` refuses on the same check. A
-  `proposed` subject waiting on its brief gets no other step: nothing
-  suggests `canon feature new` or `canon scenario new` for it before the
-  human answers. A subject with no brief to answer gets no human step;
+  `human: stop and report the brief in <proposal.md>; build and attest nothing for <id> until the human answers (one answer approves brief and policy)`,
+  whose reason names that `proposal.md`, says `canon evidence add`
+  refuses the subject's scenarios and tasks until the line is recorded,
+  and names `canon policy approve --by <the human> --note "<their words>"`.
+  It is the subject's only step, whatever its status: nothing suggests
+  `canon feature new`, `canon scenario new`, `canon evidence add`, a
+  review or a move-on for it before the human answers, and
+  `canon subject status <id> shipped` refuses on the same check. The
+  approval is never assumed. A subject with no brief to answer gets no human step;
   its `brief:` line says
   `not approved (no adopted change; advisory, nothing to approve yet)` or
   ``not approved (change `<id>` has no proposal.md; advisory, nothing to
   approve yet)`` and nothing is withheld (a `proposed` subject with no
-  `proposal.md` shows no `brief:` line at all). Once nothing blocks, a
+  `proposal.md`, and a `specced` subject, show no `brief:` line at all). Once nothing blocks, a
   ship-ready verifying subject gets the agent's own
   `canon subject status <id> shipped`; status never asks a human to ship.
 
@@ -425,7 +438,7 @@ Status fails closed rather than suggest progress the gate would refuse:
   ],
   "unowned": ["cart.promo.01"],
   "next": [
-    { "command": "get the brief approved (one human answer covers brief and policy)", "why": "promo: its newest adopted change's proposal.md carries no `Approved:` line …", "actor": "human" },
+    { "command": "stop and report the brief in openspec/changes/c-promo/proposal.md; build and attest nothing for promo until the human answers (one answer approves brief and policy)", "why": "promo: its newest adopted change's proposal.md carries no `Approved:` line …", "actor": "human" },
     { "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>", "why": "cart: 1 open blocker finding(s) (first: …); fix it, commit, then close it", "actor": "agent" },
     { "command": "canon review add --project-id root --scenario-id cart.add.02 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"", "why": "cart: 1 of 2 scenario(s) lack a qualifying review; …", "actor": "agent" },
     { "command": "canon status", "why": "1 scenario(s) carry no @subject tag (first: cart.promo.01); add `@subject:<id>` above each in its .feature file, then check again: …", "actor": "agent" }

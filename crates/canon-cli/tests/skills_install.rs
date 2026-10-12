@@ -770,6 +770,34 @@ fn skills_install_21_skill_and_block_name_no_second_human_stop() {
     }
 }
 
+/// skills.install.44 (0.16 M7, eval 3b): the skill and the AGENTS.md
+/// block stop at the brief: write it, stop and report it, build and
+/// attest nothing until the human answers; the approval is never assumed,
+/// even when the human cannot answer before the report, since the brief
+/// is that report; assumptions cover the brief's questions and work
+/// inside an approved scope only; the ship and evidence refusals are
+/// backstops. The pre-M7 unscoped assumption rule is gone.
+#[test]
+fn skills_install_44_skill_and_block_stop_at_the_brief_and_never_assume_the_approval() {
+    for (name, text) in skill_and_block() {
+        let lower = text.to_lowercase();
+        for rule in [
+            "then stop and report",
+            "nothing for that scope",
+            "never assume",
+            "even when the human said they cannot answer until you report",
+            "the brief is that report",
+            "the brief's questions",
+            "inside an approved scope, never",
+            "canon evidence add",
+            "backstops",
+        ] {
+            assert!(lower.contains(rule), "the {name} must say {rule:?}: {text}");
+        }
+        assert!(!text.contains("When no human can answer, write"), "the {name} still scopes the assumption rule to nothing: {text}");
+    }
+}
+
 /// skills.install.22 (dogfood eval 3 H1, H2): the readers refresh the
 /// scenario index and `canon init` repos promote on write, so the
 /// working loop in the skill and the AGENTS.md block never sends the

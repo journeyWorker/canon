@@ -17,11 +17,15 @@ a feature, a one-line request included. A human is needed once per scope:
 
 - **The approval** (step 1). A new subject, or a change to an approved
   subject's scope, needs the human to approve its brief: the request, your
-  assumptions, your open questions. In the same answer the human approves
-  the policy, `.canon/policy.yaml` (written by `canon init`), which is what
-  the gate grades the work against. When the human answers, record both at
-  once: an `Approved: <who> <when> — "<the human's words>"` line in the
-  change's `proposal.md`, and
+  assumptions, your open questions. Write the brief, then stop and report
+  it: build nothing for that scope (no scenarios, code or evidence) before
+  the human answers. The approval is the one thing you never assume, even
+  when the human said they cannot answer until you report: the brief is
+  that report. In the same answer the human approves the policy,
+  `.canon/policy.yaml` (written by `canon init`), which is what the gate
+  grades the work against. When the human answers, record both at once:
+  an `Approved: <who> <when> — "<the human's words>"` line in the change's
+  `proposal.md`, and
   `canon policy approve --by <the human> --note "<their words>"`. Never
   approve without a human answer, and never edit the policy to make the
   gate pass.
@@ -33,19 +37,24 @@ a feature, a one-line request included. A human is needed once per scope:
   `tasks.md`, never with `canon change new`, because a new change is a new
   scope and needs the human's approval.
 
-When no human can answer, write the question into the brief, proceed on the
-assumption you state there, and say so in your final report.
+When no human can answer one of the brief's questions, write the question
+into the brief, state the assumption you will build on, and say so in your
+report. Proceeding on an assumption applies to the brief's questions and to
+work inside an approved scope, never to the approval itself.
 
 1. **Brief.** For a new subject or a scope change, write down the request
    verbatim, your assumptions, and the questions you could not ask. It
    becomes the change's `openspec/changes/<slug>/proposal.md`, which
    `canon change new <slug> --subject <id> --title "…"` scaffolds once the
-   subject exists (step 2). Ask the human once for the brief and the
-   policy, and record the answer as above. Inside an approved scope there
-   is no new brief: go to step 3 under the existing subject and change.
+   subject exists (step 2). Once it is there, stop and report the brief,
+   asking the human once for the brief and the policy; go on to step 3
+   only after the human answers, and record the answer as above. Inside an
+   approved scope there is no new brief: go to step 3 under the existing
+   subject and change.
 2. **Subject.** `canon subject new <id> --domain <domain> --title "…"`, then
    `canon change new <slug> --subject <id> --title "…"`, and put the brief in
-   the change's `proposal.md`.
+   the change's `proposal.md`. For a new subject or a scope change, this is
+   where you stop until the human answers (step 1).
 3. **Scenarios.** `canon feature new <area>.<surface> --title "…"`, then one
    `canon scenario new <area>.<surface>.<nn> --subject <id> --case <case> --title "…"`
    per behavior, with failure paths (`--case failure`) as well as `happy`
@@ -105,10 +114,13 @@ assumption you state there, and say so in your final report.
    blocker findings); fix the gap rather than overriding, and finish with
    `canon gate check` clean. A root whose `.feature` edits could not be
    indexed fails the gate and refuses `shipped` (`uncovered-cell <root>`;
-   see step 3). `shipped` also refuses while the change's
-   `proposal.md` has no `Approved:` line: that needs the human's answer,
-   and you record the line only from it (with no `proposal.md` there is no
-   brief to answer, and the guard only prints an advisory). Move the subject to
+   see step 3). `shipped` also refuses while the change's `proposal.md`
+   has no `Approved:` line, and `canon evidence add` refuses the subject's
+   scenarios and tasks the same way. Both are backstops: the stop itself
+   is at step 1, so you never reach them for a brief the human has not
+   answered. You record the line only from the human's answer (with no
+   `proposal.md` there is no brief to answer: neither refuses, and the
+   ship guard only prints an advisory). Move the subject to
    `shipped` yourself once `canon subject status <id> shipped` passes its
    guard, unless the brief says the human ships. `canon status` shows
    whether each subject's brief is approved, by the same check, and names

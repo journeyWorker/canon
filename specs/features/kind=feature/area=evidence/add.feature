@@ -367,3 +367,47 @@ Feature: evidence add
     Then each prints one success line, naming the record's committed file under the ledger, which exists
     And no line names the staged file promotion moved, and no separate promote line is printed
     And with --no-promote, evidence add and finding add print the staged file and canon gate promote, and divergence stage prints the staged file and canon divergence promote
+
+  # canon: {"schema":1,"at":"2026-10-12T07:30:40Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.68
+  Scenario: Evidence for a subject whose brief is not approved is refused, and nothing is staged
+    Given a building subject owning a scenario and adopting a change whose proposal.md has no "Approved:" line, with a task row in its tasks.md
+    When evidence is added for the scenario, and then for the task
+    Then each add exits 1 with an unreviewed-promotion line naming the subject and that proposal.md
+    And the refusal tells the agent to stop, report the brief and wait for the human's answer, and names --override-reason
+    And nothing is staged or committed
+    And canon review add and canon finding add for the same scenario and change are not refused
+
+  # canon: {"schema":1,"at":"2026-10-12T07:30:41Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.69
+  Scenario: A subject with no brief to answer is attested as before
+    Given a building subject that adopts no change, one whose newest change has no proposal.md, and a scenario no subject owns
+    When evidence is added for each scenario
+    Then each add succeeds with no brief refusal
+    And the record carries no brief override and canon status lists none
+
+  # canon: {"schema":1,"at":"2026-10-12T07:30:41Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.70
+  Scenario: An override attests anyway and records its reason and actor where a reader sees it
+    Given a building subject owning a scenario whose newest change's proposal.md has no "Approved:" line
+    When evidence is added for the scenario with a blank --override-reason, then with a one-line reason and an actor id
+    Then the blank reason exits 2 and nothing is written
+    And the reasoned add succeeds, printing the waived unreviewed-promotion line and who recorded the override
+    And the record carries brief_override with the reason, the waived unreviewed-promotion naming the subject, and the actor
+    And canon status lists it as a warning and canon gate check as an advisory, without failing
+    And once the brief is approved, an override nothing needed is not recorded
+
+  # canon: {"schema":1,"at":"2026-10-12T07:30:41Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.71
+  Scenario: Recording the human's approval lifts the refusal
+    Given a building subject whose scenario and task attestations are refused because its brief has no "Approved:" line
+    When the human's answer is recorded as the "Approved:" line in its proposal.md
+    Then the same scenario and task attestations succeed with no override

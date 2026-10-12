@@ -192,9 +192,9 @@ Feature: context status
     Given a verifying subject whose scenarios are all evidenced and reviewed, and whose newest change's proposal.md has no "Approved:" line
     And a building subject that adopts no change
     When canon status runs
-    Then the verifying subject gets one step whose actor is human: get the brief approved, one human answer covering brief and policy
-    And its reason names the proposal.md the "Approved:" line goes in and the canon policy approve --by <the human> --note command
-    And the verifying subject is not suggested to move on
+    Then the verifying subject gets one step whose actor is human: stop and report the brief, building and attesting nothing for the subject until the human answers, one answer covering brief and policy
+    And its reason names the proposal.md the "Approved:" line goes in, says canon evidence add refuses the subject's scenarios and tasks until then, and names the canon policy approve --by <the human> --note command
+    And the human step is the verifying subject's only step, so it is not suggested to move on
     And the subject with no change has no brief to answer, so it gets no human step and its next step is the agent's
     And the human form prints the step as "human:" and both briefs as not approved, the one with no change as an advisory
 

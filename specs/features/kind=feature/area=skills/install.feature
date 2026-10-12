@@ -185,3 +185,15 @@ Feature: skills install
     And it names canon inventory sync only for a command that printed "NOT refreshed"
     And every mention of canon gate promote is conditioned on write.promote manual
     And no help loop lists canon gate promote as a step of its own
+
+  # canon: {"schema":1,"at":"2026-10-12T07:31:04Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.44
+  Scenario: The skill and the AGENTS.md block stop at the brief and never assume the approval
+    Given canon's own skill source and the AGENTS.md block canon init writes
+    When each is read with its wrapped lines joined
+    Then each tells the agent to write the brief, then stop and report it, and to build and attest nothing for that scope until the human answers
+    And each says the approval is never assumed, even when the human said they cannot answer until the agent reports, because the brief is that report
+    And each limits proceeding on an assumption to the brief's questions and work inside an approved scope, never the approval
+    And each calls the ship refusal and the evidence add refusal backstops, with the stop at the brief

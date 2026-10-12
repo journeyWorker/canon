@@ -192,16 +192,16 @@ feature.
 
 The loop:
 
-1. Brief: for a new subject or a scope change, record the request and your assumptions; one human answer approves the brief and the policy. Record it at once: an `Approved: <who> <when> — \"<their words>\"` line in the change's `proposal.md`, and `canon policy approve --by <the human> --note \"<their words>\"`. Never approve without a human answer.
-2. Subject: `canon subject new`, then `canon change new` for the change.
+1. Brief: for a new subject or a scope change, record the request and your assumptions in the change's `proposal.md`, then stop and report the brief: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy. Record it at once: an `Approved: <who> <when> — \"<their words>\"` line in the change's `proposal.md`, and `canon policy approve --by <the human> --note \"<their words>\"`. Never approve without a human answer.
+2. Subject: `canon subject new`, then `canon change new` for the change; its `proposal.md` holds the brief.
 3. Scenarios: `canon scenario new`, failure paths included (`--case failure`).
 4. Units: split the work; one actor id and session per unit.
 5. Implement: tests named by scenario id.
 6. Evidence: `canon evidence add` (it promotes itself under `write: { promote: auto }`; only under `write.promote: manual` run `canon gate promote` after it).
 7. Independent review: a different session records `canon review add` and `canon finding add`, on every change.
-8. Transition: `canon subject status`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships.
+8. Transition: `canon subject status`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships. The ship guard and `canon evidence add` refuse while the brief is unapproved; they are backstops, the stop is at step 1.
 
-Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, as tasks in its `tasks.md`, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review. When no human can answer, write your assumption into the brief and proceed. `.canon/policy.yaml` is what the gate grades against.
+Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, as tasks in its `tasks.md`, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review. When no human can answer one of the brief's questions, write your assumption into the brief and proceed on it; that covers the brief's questions and work inside an approved scope, never the approval. `.canon/policy.yaml` is what the gate grades against.
 <!-- canon:end -->";
 
 /// A fence opener/closer line: up to three spaces, then three or more
