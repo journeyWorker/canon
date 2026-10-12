@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-018-n1",
+    "role": "reviewer",
+    "session_id": "review-018-n1"
+  },
+  "at": "2026-10-12T14:38:06.851256Z",
+  "change_id": "canon-0-18-n1-review",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/evidence.rs:1303-1330",
+  "kind": "finding",
+  "resolution_sha": "7c453c30120b3bf12508c2b2510e8632e09d3217",
+  "reviewed_sha": "148d8ba40177854f1bf08c92d65dc56e506766af",
+  "reviewer": "canon-reviewer-018-n1",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "a batch evidence add that failed partway left partial records"
+}

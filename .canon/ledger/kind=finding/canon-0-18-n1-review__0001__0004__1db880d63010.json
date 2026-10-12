@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-018-n1",
+    "role": "reviewer",
+    "session_id": "review-018-n1"
+  },
+  "at": "2026-10-12T14:38:07.337546Z",
+  "change_id": "canon-0-18-n1-review",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/evidence.rs:1405-1435",
+  "kind": "finding",
+  "reviewed_sha": "148d8ba40177854f1bf08c92d65dc56e506766af",
+  "reviewer": "canon-reviewer-018-n1",
+  "round": 1,
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "the stale-review re-pin command dropped the review's session id"
+}
