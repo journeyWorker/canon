@@ -36,6 +36,14 @@ a feature, a one-line request included. A human is needed once per scope:
   stays in the approved change: add it as tasks in that change's
   `tasks.md`, never with `canon change new`, because a new change is a new
   scope and needs the human's approval.
+- **A follow-up on a shipped subject reopens it.** Reopen it with
+  `canon subject status <id> verifying --reason "<why>" --actor-id <unit>`
+  (no human inside the approved scope; the reason and your id are
+  recorded), add the follow-up as tasks in the approved change's
+  `tasks.md`, then its scenario, evidence and an independent review, and
+  ship again with `canon subject status <id> shipped`, which runs every
+  guard again. `canon status` flags a shipped subject whose gate went red
+  and names the reopen.
 
 When no human can answer one of the brief's questions, write the question
 into the brief, state the assumption you will build on, and say so in your
@@ -59,6 +67,9 @@ work inside an approved scope, never to the approval itself.
    `canon change new <slug> --subject <id> --title "…"`, and put the brief in
    the `.canon/changes/<slug>/brief.md` it writes. For a new subject or a
    scope change, this is where you stop until the human answers (step 1).
+   A change that also serves another subject is adopted there too,
+   `canon subject adopt <slug> --subject <other>`: it then belongs to both,
+   and its open blockers gate both.
 3. **Scenarios.** `canon feature new <area>.<surface> --title "…"`, then one
    `canon scenario new <area>.<surface>.<nn> --subject <id> --case <case> --title "…"`
    per behavior, with failure paths (`--case failure`) as well as `happy`
@@ -140,7 +151,10 @@ work inside an approved scope, never to the approval itself.
    `shipped` yourself once `canon subject status <id> shipped` passes its
    guard, unless the brief says the human ships. `canon status` shows
    whether each subject's brief is approved, by the same check, and names
-   the next step.
+   the next step. `shipped → verifying` reopens a shipped subject for a
+   follow-up (see the working loop above): it needs `--reason`, and it is
+   refused, naming the brief, when the subject's newest change is not
+   approved.
 
 Every write command says whether the record is final (`written directly`,
 or `staged and promoted in this run`) or staged; only a staged record

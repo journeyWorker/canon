@@ -87,6 +87,37 @@ for the machine-readable source/projection/memory map.
 Version 0.18.0 cuts the calls an attestation costs and makes the
 lifecycle honest. Plan: `docs/superpowers/plans/2026-10-12-canon-0.18.0-fewer-calls.md`.
 
+### D3, D4: reopening a shipped subject, and a change in several subjects (#31, #28)
+
+- **Reopen (D3, #31).** `canon subject status <id> verifying --reason
+  "<why>"` reopens a `shipped` subject for follow-up work. Inside the
+  approved scope it needs no human: either the brief of the subject's newest
+  adopted change is approved, or there is no brief to answer. Otherwise it
+  exits 1 and names the brief to approve, and `--override-reason` does not
+  waive that.
+  - The new Subject record carries `reopen: { reason, change, actor }`. The
+    next status write clears it.
+  - `--reason` is required for the reopen and refused on any other
+    transition (exit 2).
+  - The review guard does not run on a reopen. Shipping again runs every
+    guard.
+  - `canon status` flags a shipped subject whose ship guard would now fail
+    (`gate: red — <n> <class> (first: <subject>)`, `red` in `--json`). It
+    uses the same check as the guard, and the subject's only step is the
+    reopen command.
+- **A change in several subjects (D4, #28).** `Change.subject_id` is now
+  `subject_ids`, a list (`Change` schema generation `2`).
+  - A record written before 0.18 reads as a one-element list.
+  - A second `canon subject adopt <change> --subject <other>` adds the
+    subject and prints that the change now belongs to both. It never
+    re-points.
+  - Every reader joins a subject to its changes from both sides: the gate's
+    open-blocker rule, the status guard, `canon status`, the brief and the
+    evidence refusal. An open blocker on a shared change therefore gates
+    every subject it belongs to.
+  - `canon query --kind change` now returns each change's current version
+    only. It used to return every version.
+
 ### D5: gate correctness (#32, #36)
 
 **Fabrication markers match whole words (#32).** `"would pass"`, `"TBD"`

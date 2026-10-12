@@ -325,6 +325,7 @@ mod tests {
             scenarios,
             divergences: Vec::new(),
             subjects,
+            changes: Vec::new(),
             reviews: Vec::new(),
             findings: Vec::new(),
             legacy_pins: Default::default(),

@@ -2,7 +2,7 @@
   "capabilityVersion": 5,
   "kinds": {
     "change": {
-      "schema_version": 1,
+      "schema_version": 2,
       "envelope_fields": {
         "actor": true,
         "at": true,
@@ -10,7 +10,7 @@
         "kind": true,
         "schema": true,
         "status": true,
-        "subject_id": false,
+        "subject_ids": false,
         "summary": true,
         "title": true
       },
@@ -253,6 +253,7 @@
         "domain": true,
         "kind": true,
         "owner_role": true,
+        "reopen": false,
         "schema": true,
         "status": true,
         "status_override": false,
@@ -470,7 +471,7 @@
         "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
         "record.schema": "uint",
         "record.status": "string (one of: proposed, in_progress, completed, archived)",
-        "record.subject_id": "string",
+        "record.subject_ids": "list<string>",
         "record.summary": "string",
         "record.title": "string"
       },
@@ -691,6 +692,7 @@
         "record.domain": "string",
         "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
         "record.owner_role": "string",
+        "record.reopen": "map",
         "record.schema": "uint",
         "record.status": "string (one of: proposed, specced, building, verifying, shipped, retired)",
         "record.status_override": "map",

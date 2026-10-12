@@ -41,7 +41,7 @@ pub use records::{
     AttachmentDrop, AuditResult, BriefOverride, Change, ChangeStatus, Divergence, DivergenceStatus, Event, EvidenceApproval, EvidenceAttachment, EvidenceAudit, EvidenceRecord,
     EvidenceVerdict, Finding, FindingDisposition, ReportFormat, ReportOutcome,
     FindingSeverity, ProvenanceRef, Review, ReviewArtifact, ReviewOutcome, ReviewPins, PinnedSpec, EvidencePin, Run, RunLineage, RunStatus, SkillSnapshot, ContextSnapshot, PolicySnapshot, Scenario,
-    Session, StatusOverride, StrategyItem, StrategyRef, Subject, WaivedViolation,
+    Reopen, Session, StatusOverride, StrategyItem, StrategyRef, Subject, WaivedViolation,
     SubjectStatus, Task, TaskStatus, Trajectory,
 };
 pub use trust::{FlaggedOverlay, TrustLifecycle};

@@ -70,7 +70,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use canon_model::fold::{fold_to_current_state, FoldedState};
-use canon_model::{EvidenceRecord, EvidenceVerdict, ProjectId, Scenario, ScenarioId, Subject, SubjectId, SubjectStatus};
+use canon_model::{Change, ChangeId, EvidenceRecord, EvidenceVerdict, ProjectId, Scenario, ScenarioId, Subject, SubjectId, SubjectStatus};
 
 use crate::context::{GateCheck, GateContext, SPEC_CORPUS_KINDS};
 use crate::review_gate;
@@ -358,6 +358,34 @@ pub fn latest_subjects(ctx: &GateContext) -> Vec<&Subject> {
     latest_by_key(&ctx.subjects, |s| s.subject_id.as_str().to_string())
 }
 
+/// The LATEST record of every Change, ordered by `change_id`.
+pub fn latest_changes(ctx: &GateContext) -> Vec<&Change> {
+    latest_by_key(&ctx.changes, |c| c.change_id.as_str().to_string())
+}
+
+/// The changes `subject` adopted, joined from both sides (0.18 D4): its
+/// own `change_ids` in adoption order, then every latest change whose
+/// `subject_ids` names it and which the subject does not list, ordered
+/// by when that change was written. This is the ONE subject → change
+/// join: the open-blocker rule, the subject status guard, `canon
+/// status` and the brief read it, so a change shared by two subjects
+/// gates both whichever record carries the link.
+pub fn subject_change_ids(ctx: &GateContext, subject: &Subject) -> Vec<ChangeId> {
+    let mut ids = subject.change_ids.clone();
+    let mut named: Vec<&Change> =
+        latest_changes(ctx).into_iter().filter(|c| c.subject_ids.contains(&subject.subject_id) && !ids.contains(&c.change_id)).collect();
+    named.sort_by(|a, b| (a.envelope.at, a.change_id.as_str()).cmp(&(b.envelope.at, b.change_id.as_str())));
+    ids.extend(named.into_iter().map(|c| c.change_id.clone()));
+    ids
+}
+
+/// The latest subjects `change` belongs to, ordered by `subject_id`:
+/// each one whose [`subject_change_ids`] holds it. The change → subject
+/// side of the same join.
+pub fn change_subjects<'a>(ctx: &'a GateContext, change: &ChangeId) -> Vec<&'a Subject> {
+    latest_subjects(ctx).into_iter().filter(|s| subject_change_ids(ctx, s).contains(change)).collect()
+}
+
 /// Every `(project_id, scenario_id)` an `EvidenceRecord` attests to.
 ///
 /// A record carrying a `scenario_id` but no `project_id` is EXCLUDED,
@@ -502,6 +530,7 @@ mod tests {
         audits: Vec<EvidenceRecord>,
         divergences: Vec<Divergence>,
         subjects: Vec<Subject>,
+        changes: Vec<canon_model::Change>,
         reviews: Vec<canon_model::Review>,
         findings: Vec<canon_model::Finding>,
         unreadable: Vec<RecordKind>,
@@ -515,6 +544,7 @@ mod tests {
                 audits: Vec::new(),
                 divergences: Vec::new(),
                 subjects: Vec::new(),
+                changes: Vec::new(),
                 reviews: Vec::new(),
                 findings: Vec::new(),
                 unreadable: Vec::new(),
@@ -532,6 +562,7 @@ mod tests {
             scenarios: corpus.scenarios,
             divergences: corpus.divergences,
             subjects: corpus.subjects,
+            changes: corpus.changes,
             reviews: corpus.reviews,
             findings: corpus.findings,
             legacy_pins: Default::default(),
@@ -1309,6 +1340,38 @@ mod tests {
         let out = run(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
         assert_eq!(out.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(FailureClass::OpenBlocker, "c-live#1.1")]);
         assert!(out[0].detail.contains("`live`"), "{}", out[0].detail);
+    }
+
+    /// 0.18 D4: one change adopted by two subjects. An open blocker on it
+    /// gates both, whether the link is on the subject (`change_ids`) or
+    /// only on the change (`subject_ids`), and the guard each subject's
+    /// status transition runs agrees with the corpus-wide rule.
+    #[test]
+    fn a_blocker_on_a_shared_change_gates_every_subject_it_belongs_to() {
+        let change_envelope = Envelope::new(2, RecordKind::Change, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
+        let mut shared = canon_model::Change::new(change_envelope, ChangeId::parse("refactor-core").unwrap(), "t", "s", canon_model::ChangeStatus::InProgress);
+        shared.subject_ids = vec![SubjectId::parse("perception").unwrap(), SubjectId::parse("editing").unwrap()];
+        let mut corpus = Corpus::new();
+        // `editing` lists the change itself; `perception` is linked only
+        // from the change side.
+        corpus.subjects = vec![verifying_subject("editing", &["refactor-core"]), verifying_subject("perception", &[])];
+        corpus.changes = vec![shared];
+        corpus.findings = vec![finding("refactor-core", 1, FindingSeverity::Blocker, FindingDisposition::Open, 0)];
+        let ctx = context(corpus, reviewing(RequireReview::DEFAULT_SCOPE.to_vec(), true));
+
+        let out = SpecCoverageCheck.run(&ctx);
+        assert_eq!(out.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(FailureClass::OpenBlocker, "refactor-core#1.1")]);
+        assert!(out[0].detail.contains("`editing`") && out[0].detail.contains("`perception`"), "{}", out[0].detail);
+
+        let (rr, lanes) = crate::review_gate::active_require_review(&ctx).unwrap();
+        for id in ["editing", "perception"] {
+            let subject = latest_subjects(&ctx).into_iter().find(|s| s.subject_id.as_str() == id).unwrap();
+            assert_eq!(subject_change_ids(&ctx, subject), vec![ChangeId::parse("refactor-core").unwrap()], "{id}");
+            let guard = crate::review_gate::subject_guard(&ctx, rr, lanes, subject);
+            assert_eq!(guard.iter().map(|v| (v.class, v.subject.as_str())).collect::<Vec<_>>(), vec![(FailureClass::OpenBlocker, "refactor-core#1.1")], "{id}");
+        }
+        let holders: Vec<&str> = change_subjects(&ctx, &ChangeId::parse("refactor-core").unwrap()).into_iter().map(|s| s.subject_id.as_str()).collect();
+        assert_eq!(holders, vec!["editing", "perception"]);
     }
 
     fn waiver(waived: &[(&str, &str)]) -> StatusOverride {

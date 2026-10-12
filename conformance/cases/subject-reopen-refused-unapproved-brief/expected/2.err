@@ -1,0 +1,1 @@
+canon subject status: unreviewed-promotion checkout — shipped → verifying: reopening needs the approved scope, and the brief is not approved — .canon/changes/c-checkout/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words as `Approved: <who> <when> — "<their words>"` in .canon/changes/c-checkout/brief.md

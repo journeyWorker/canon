@@ -49,6 +49,20 @@
 //! override is listed as a warning ([`crate::brief::override_lines`]).
 //! Every other step is the agent's.
 //!
+//! # A shipped subject whose gate went red (0.18 D3)
+//! Evidence, specs and reviews keep moving after a subject ships. A
+//! `shipped` subject that the `verifying → shipped` guard would now
+//! refuse ([`crate::subject::shipped_gate_gaps`], the guard's own checks:
+//! ownership, verdicts, required cases, audits, and the review guard,
+//! open blockers only under `block_on_findings`, where `require_review`
+//! covers `shipped`) is flagged red ([`SubjectSummary::red`]), and its
+//! only step is the reopen, `canon subject status <id> verifying
+//! --reason …`: the follow-up goes into its approved change as tasks,
+//! then scenario, evidence and review, and it ships again through every
+//! guard. A subject's changes are joined from both sides
+//! ([`subject_change_ids`]), so a change shared by two subjects counts
+//! its blockers against both.
+//!
 //! # No bookkeeping steps (0.16 M6)
 //! Readers refresh a stale scenario index themselves
 //! ([`crate::inventory::refresh_stale_index`]), so no step says "then
@@ -77,11 +91,11 @@ use std::path::{Path, PathBuf};
 
 use canon_gate::policy::subject_status_name;
 use canon_gate::review_gate::{legacy_review_advisory, open_blockers, review_gap, ReviewGapKind};
-use canon_gate::spec_coverage::{case_gaps, latest_scenarios, latest_subjects, subject_scenarios};
+use canon_gate::spec_coverage::{case_gaps, latest_scenarios, latest_subjects, subject_change_ids, subject_scenarios};
 use canon_gate::review_gate::active_require_review;
 use canon_gate::audit;
 use canon_gate::{latest_verdicts, CellKey, GateContext, GateCtx, LedgerEntry, PolicyDiagnostic, PolicyResolution, RequireReview, SpecCoverage};
-use canon_model::{AuditResult, EvidenceVerdict, Finding, ProjectId, RecordKind, Scenario, Subject, SubjectStatus};
+use canon_model::{AuditResult, ChangeId, EvidenceVerdict, Finding, ProjectId, RecordKind, Scenario, Subject, SubjectStatus};
 use canon_policy::SchemaRegistry;
 use chrono::Utc;
 use serde::Serialize;
@@ -227,6 +241,13 @@ pub struct SubjectSummary {
     /// the others.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub brief: Option<BriefStatus>,
+    /// For a `shipped` subject, what makes its gate red now (0.18 D3):
+    /// what the `verifying → shipped` guard would refuse it on
+    /// ([`crate::subject::shipped_gate_gaps`], the same checks), one
+    /// phrase per failure class: `<n> <class> (first: <subject>)`.
+    /// Status then names the reopen command. Omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub red: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -633,9 +654,10 @@ impl Joins<'_> {
         (evidenced, entries.any(|e| e.verdict == EvidenceVerdict::Divergent))
     }
 
-    /// Open blocker findings on `subject`'s adopted changes.
-    fn blockers_of(&self, subject: &Subject) -> Vec<&Finding> {
-        self.blockers.iter().copied().filter(|f| subject.change_ids.contains(&f.change_id)).collect()
+    /// Open blocker findings on `changes`, a subject's adopted changes
+    /// ([`subject_change_ids`]).
+    fn blockers_of(&self, changes: &[ChangeId]) -> Vec<&Finding> {
+        self.blockers.iter().copied().filter(|f| changes.contains(&f.change_id)).collect()
     }
 }
 
@@ -670,11 +692,15 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
     let gaps: Vec<ReviewGapKind> = counted.iter().filter_map(|s| review_gap(ctx, s, distinct_actor)).map(|gap| gap.kind).collect();
     let reviewed = counted.len() - gaps.len();
     let gap_count = |kind| gaps.iter().filter(|k| **k == kind).count();
-    let open_blockers = joins.blockers_of(subject).len();
-    let missing_cases = case_gaps(counted.iter().copied(), require_cases)
+    let changes = subject_change_ids(ctx, subject);
+    let open_blockers = joins.blockers_of(&changes).len();
+    let missing_cases: Vec<MissingCase> = case_gaps(counted.iter().copied(), require_cases)
         .into_iter()
         .map(|gap| MissingCase { project_id: gap.project_id.as_str().to_string(), surface: gap.surface, case: gap.case })
         .collect();
+    let review_due = rr.is_some_and(|rr| rr.covers(subject.status) || next_status(subject.status).is_some_and(|n| rr.covers(n)));
+    let stale_reviews = gap_count(ReviewGapKind::Stale);
+    let red = if subject.status == SubjectStatus::Shipped { shipped_red(ctx, subject) } else { Vec::new() };
 
     SubjectSummary {
         id: subject.subject_id.as_str().to_string(),
@@ -685,13 +711,34 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         evidenced,
         divergent,
         reviewed,
-        stale_reviews: gap_count(ReviewGapKind::Stale),
+        stale_reviews,
         unsigned_reviews: gap_count(ReviewGapKind::Unsigned),
-        review_due: rr.is_some_and(|rr| rr.covers(subject.status) || next_status(subject.status).is_some_and(|n| rr.covers(n))),
+        review_due,
         open_blockers,
         missing_cases,
-        brief: crate::brief::brief_of(repo, plan_roots, subject),
+        brief: crate::brief::brief_of(repo, plan_roots, subject, &changes),
+        red,
     }
+}
+
+/// What makes a `shipped` subject's gate red ([`SubjectSummary::red`]):
+/// the ship guard's own gaps ([`crate::subject::shipped_gate_gaps`]),
+/// grouped by failure class in the order the guard reports them.
+fn shipped_red(ctx: &GateContext, subject: &Subject) -> Vec<String> {
+    let mut classes: Vec<(&'static str, usize, String)> = Vec::new();
+    for violation in crate::subject::shipped_gate_gaps(ctx, subject) {
+        match classes.iter_mut().find(|(class, _, _)| *class == violation.class.as_str()) {
+            Some((_, count, _)) => *count += 1,
+            None => classes.push((violation.class.as_str(), 1, violation.subject)),
+        }
+    }
+    classes.into_iter().map(|(class, count, first)| format!("{count} {class} (first: {first})")).collect()
+}
+
+/// `canon subject status <id> verifying --reason …`: the reopen command
+/// status names for a red shipped subject (0.18 D3).
+fn reopen_command(id: &str) -> String {
+    format!("canon subject status {id} verifying --reason \"<why it reopens>\" --actor-id <unit>")
 }
 
 /// The next scenario number free on `surface` within spec root `project`.
@@ -760,6 +807,24 @@ fn subject_steps(
         return;
     }
 
+    // A shipped subject whose gate went red (0.18 D3) is reopened first:
+    // every gap below is follow-up work inside its approved change.
+    if status == SubjectStatus::Shipped && !summary.red.is_empty() {
+        let tasks = match summary.brief.as_ref().and_then(|brief| brief.change.as_deref()) {
+            Some(change) => format!("as tasks in its approved change `{change}` (never `canon change new`)"),
+            None => "as tasks in its change".to_string(),
+        };
+        next.push(NextStep {
+            actor: StepActor::Agent,
+            command: reopen_command(id),
+            why: format!(
+                "{id} is shipped but its gate is red ({}); reopen it, add the follow-up {tasks}, then scenario, evidence and review, and ship it again",
+                summary.red.join(", ")
+            ),
+        });
+        return;
+    }
+
     if summary.scenarios + summary.excluded == 0 {
         let roots_note = if roots.len() > 1 { format!(" (spec roots: {})", roots.iter().map(ProjectId::as_str).collect::<Vec<_>>().join(", ")) } else { String::new() };
         next.push(NextStep {
@@ -815,7 +880,7 @@ fn subject_steps(
         }
     }
 
-    if let Some(blocker) = joins.blockers_of(subject).first() {
+    if let Some(blocker) = joins.blockers_of(&subject_change_ids(ctx, subject)).first() {
         next.push(NextStep {
             actor: StepActor::Agent,
             command: format!(
@@ -1002,6 +1067,9 @@ pub fn render(report: &StatusReport) -> String {
                     (_, None, Some(change)) => writeln!(out, "      brief: not approved (change `{change}` has no brief; advisory, nothing to approve yet)"),
                     _ => writeln!(out, "      brief: not approved (no adopted change; advisory, nothing to approve yet)"),
                 };
+            }
+            if !s.red.is_empty() {
+                let _ = writeln!(out, "      gate: red — {}; reopen with `{}`", s.red.join(", "), reopen_command(&s.id));
             }
         }
     }

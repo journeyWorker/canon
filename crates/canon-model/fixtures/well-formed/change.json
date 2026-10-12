@@ -6,8 +6,12 @@
   "at": "2026-07-10T12:00:00Z",
   "change_id": "s1-state-model-join-spine",
   "kind": "change",
-  "schema": 1,
+  "schema": 2,
   "status": "in_progress",
+  "subject_ids": [
+    "perception",
+    "editing"
+  ],
   "summary": "join spine",
   "title": "S1"
 }

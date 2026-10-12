@@ -320,8 +320,13 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
    bunx @journeykit/canon subject adopt checkout-revamp-plan --subject checkout-revamp
    ```
 
-   `Change.subject_id`를 찍고 change를 서브젝트의 `change_ids`에
-   추가합니다 — plan 단위가 이제 관리되는 product unit에 속합니다.
+   subject를 `Change.subject_ids`에, change를 서브젝트의 `change_ids`에
+   추가합니다 — plan 단위가 이제 관리되는 product unit에 속합니다. 한
+   change는 여러 서브젝트에 속할 수 있습니다: 두 번째 서브젝트로 adopt하면
+   그 서브젝트를 더하고 ``linked change `checkout-revamp-plan` to subject
+   `<other>` as well; the change now belongs to `checkout-revamp` and
+   `<other>` ``를 출력하며, 그 change의 열린 blocker는 두 서브젝트를 모두
+   막습니다.
 
    시나리오는 스펙 쪽에서 서브젝트에 연결됩니다: `--subject`로
    스캐폴딩하거나(또는 `@subject:checkout-revamp`를 직접 추가) sync해서
@@ -357,6 +362,17 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
    sync`로 인덱싱됨), 소유한 모든 scenario가 최신 non-Divergent 판정을
    가질 때에만 성공합니다. 그렇지 않으면 문제되는 scenario를 출력하고
    `1`로 종료하며 상태는 `verifying`으로 유지됩니다.
+
+   출하된 서브젝트에 후속 작업이 생기면 다시 엽니다. 승인된 범위 안에서는
+   사람이 필요 없습니다. 후속 작업을 승인된 change의 task로 추가하고,
+   시나리오, 증거, 리뷰를 거쳐 모든 가드를 다시 통과해 출하합니다.
+   `canon status`는 게이트가 빨갛게 된 출하 서브젝트를 표시하고 이 명령을
+   제시합니다:
+
+   ```bash
+   bunx @journeykit/canon subject status checkout-revamp verifying \
+     --reason "follow-up: totals round per line" --actor-id impl
+   ```
 
 5. **도메인별 관리 뷰 읽기.**
 

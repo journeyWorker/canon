@@ -57,7 +57,7 @@
 
 use std::path::{Path, PathBuf};
 
-use canon_gate::spec_coverage::{latest_scenarios, latest_subjects};
+use canon_gate::spec_coverage::{latest_scenarios, latest_subjects, subject_change_ids};
 use canon_gate::GateContext;
 use canon_ingest::markdown::field;
 use canon_model::{paths, ChangeId, ProjectId, ScenarioId, Subject, SubjectStatus, TaskId};
@@ -77,9 +77,9 @@ pub struct BriefStatus {
     /// asks the human and the ship guard refuses; otherwise both only
     /// report it.
     pub enforced: bool,
-    /// The newest adopted change (the last in `change_ids`, adoption
-    /// order), whose canon `brief.md` must carry the approval. Omitted
-    /// when the subject adopts no change.
+    /// The newest adopted change (the last of the subject's adopted
+    /// changes, adoption order), whose canon `brief.md` must carry the
+    /// approval. Omitted when the subject adopts no change.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub change: Option<String>,
     /// That change's canon `brief.md`, relative to the repo root: the one
@@ -163,17 +163,20 @@ fn rel(repo: &Path, path: &Path) -> String {
 /// The brief decision for `subject`: `None` for a subject that needs no
 /// brief yet (`specced`, `retired`, and a `proposed` subject whose newest
 /// adopted change has no brief to answer), otherwise whether its newest
-/// adopted change (the last in `change_ids`, adoption order) carries an
-/// `Approved:` line in its canon `brief.md` (module doc). An external
-/// openspec `proposal.md` under `plan_roots` (the first root holding the
-/// change wins, as in `canon ingest plans`) is a brief to answer only
-/// while no canon `brief.md` exists; its own lines are never read.
-pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject) -> Option<BriefStatus> {
+/// adopted change (the last of `changes`, the subject's adopted changes
+/// joined from both sides by
+/// [`canon_gate::spec_coverage::subject_change_ids`], adoption order)
+/// carries an `Approved:` line in its canon `brief.md` (module doc). An
+/// external openspec `proposal.md` under `plan_roots` (the first root
+/// holding the change wins, as in `canon ingest plans`) is a brief to
+/// answer only while no canon `brief.md` exists; its own lines are never
+/// read.
+pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes: &[ChangeId]) -> Option<BriefStatus> {
     let proposed = subject.status == SubjectStatus::Proposed;
     if !proposed && !matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying | SubjectStatus::Shipped) {
         return None;
     }
-    let Some(change) = subject.change_ids.last() else {
+    let Some(change) = changes.last() else {
         return (!proposed).then_some(BriefStatus {
             approved: false,
             enforced: false,
@@ -228,10 +231,12 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject) -> Optio
 /// Every subject an attestation for `task` and/or `scenario` builds
 /// under, with its brief (module doc, 0.16 M7), sorted by subject id:
 /// the subject the scenario's latest index row names through its
-/// `@subject` tag, and every subject whose `change_ids` holds the task's
-/// change. Read through the gate's own folds over `ctx`. A scenario the
-/// index does not hold, or one with no `@subject` tag, names no subject;
-/// a subject that needs no brief yet is left out.
+/// `@subject` tag, and every subject that adopted the task's change
+/// (joined from both sides, [`subject_change_ids`]: a change shared by
+/// several subjects builds under each). Read through the gate's own
+/// folds over `ctx`. A scenario the index does not hold, or one with no
+/// `@subject` tag, names no subject; a subject that needs no brief yet
+/// is left out.
 pub fn attested_briefs<'a>(
     repo: &Path,
     plan_roots: &[PathBuf],
@@ -243,12 +248,13 @@ pub fn attested_briefs<'a>(
         latest_scenarios(ctx).into_iter().find(|s| &s.project_id == project && &s.scenario_id == id).and_then(|s| s.subject_id.as_ref())
     });
     let change = task.map(TaskId::change_id);
-    let mut subjects: Vec<&Subject> = latest_subjects(ctx)
+    let mut subjects: Vec<(&Subject, Vec<ChangeId>)> = latest_subjects(ctx)
         .into_iter()
-        .filter(|s| owner == Some(&s.subject_id) || change.as_ref().is_some_and(|change| s.change_ids.contains(change)))
+        .map(|s| (s, subject_change_ids(ctx, s)))
+        .filter(|(s, changes)| owner == Some(&s.subject_id) || change.as_ref().is_some_and(|change| changes.contains(change)))
         .collect();
-    subjects.sort_by(|a, b| a.subject_id.as_str().cmp(b.subject_id.as_str()));
-    subjects.into_iter().filter_map(|s| brief_of(repo, plan_roots, s).map(|brief| (s, brief))).collect()
+    subjects.sort_by(|a, b| a.0.subject_id.as_str().cmp(b.0.subject_id.as_str()));
+    subjects.into_iter().filter_map(|(s, changes)| brief_of(repo, plan_roots, s, &changes).map(|brief| (s, brief))).collect()
 }
 
 /// One line per evidence record attested under a brief override (0.16

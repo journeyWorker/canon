@@ -83,9 +83,10 @@ pub enum FailureClass {
     /// 3.3/3.4) emits this.
     FabricatedEvidence,
     /// An open `blocker` [`canon_model::Finding`] (latest version per
-    /// `(change_id, round, seq)`) sits on a change listed in the
-    /// `change_ids` of a subject `spec_coverage.require_review` puts in
-    /// scope (issue #2). Silent unless that policy is present with
+    /// `(change_id, round, seq)`) sits on a change adopted by a subject
+    /// `spec_coverage.require_review` puts in scope (issue #2), joined
+    /// from both sides: the subject's `change_ids` or the change's
+    /// `subject_ids` (0.18 D4). Silent unless that policy is present with
     /// `block_on_findings`.
     OpenBlocker,
     /// A scenario's latest AUDIT record (`canon evidence add --kind
