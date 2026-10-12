@@ -141,7 +141,9 @@ the plan, a root at the old repo-level `specs` default moves to
 `.canon/specs`, and any other root only drops its `features/` level.
 
 canon's own corpus moved with it, to `specs/kind=feature/…` and
-`examples/platformer/specs/kind=feature/…`; both roots are unchanged.
+`examples/platformer/specs/kind=feature/…`. In P4 `canon migrate` then
+moved the first to `.canon/specs/kind=feature/…`, recording
+`former_roots: [specs]` (see below). `examples/platformer/specs` stays.
 
 ### Canon's own changes and approvals (P2)
 

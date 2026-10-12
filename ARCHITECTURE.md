@@ -124,7 +124,7 @@ through typed join IDs. A task's declared scenario/dependency references are
 intent declarations; they are not an implicit scheduler. Imported plans remain
 plan state until a canonical lifecycle adopts them. Evidence:
 [`canon-model/src/records.rs`](crates/canon-model/src/records.rs),
-[`specs/`](specs), and the `subject`/plan commands in `canon-cli`.
+[`.canon/specs/`](.canon/specs), and the `subject`/plan commands in `canon-cli`.
 
 **Invariant:** a new execution or completion MUST name the work it serves, or
 be represented as an explicitly unscoped/root run rather than acquiring an
