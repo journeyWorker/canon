@@ -85,3 +85,48 @@ Feature: canon migrate
     When canon migrate runs
     Then it exits 2 saying it cannot rewrite specs.roots safely and naming the edit to make by hand
     And nothing moves and canon.yaml is unchanged
+
+  # canon: {"schema":1,"at":"2026-10-12T12:49:07Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.migrate.09
+  Scenario: A migrate run that stopped before writing canon.yaml is finished by the next run
+    Given a repo canon 0.16 set up, and a canon migrate run whose canon.yaml write fails after the corpus and the change moved
+    Then that run exits 2 and canon.yaml is byte-identical, never half-written
+    When canon migrate runs again
+    Then it sees the root already at .canon/specs while canon.yaml names specs and writes root .canon/specs with former_roots [specs]
+    And it re-imports the moved change under the same change id with its adoption, removes the init openspec source, and a third run finds nothing to migrate
+
+  # canon: {"schema":1,"at":"2026-10-12T12:49:07Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.migrate.10
+  Scenario: A pointer brief that cannot be written keeps the openspec source that holds the approval
+    Given an external openspec change whose proposal.md holds an Approved: line, the init openspec source, and a .canon/changes directory canon cannot write into
+    When canon migrate runs
+    Then it exits 2 naming the brief it could not write, and canon.yaml still lists the init openspec source and its .gitkeep stays
+    When the directory is writable again and canon migrate runs
+    Then it writes the pointer brief with Source: and that Approved: line, and only then removes the init openspec source
+
+  # canon: {"schema":1,"at":"2026-10-12T12:49:07Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.migrate.11
+  Scenario: A change move that could stop halfway is refused, and a half-moved change is finished by the next run
+    Given a repo canon 0.16 set up whose canon-written change directory is not writable
+    When canon migrate runs
+    Then it exits 2 naming the directory before anything moves, and canon.yaml is unchanged
+    Given an earlier run moved that change to .canon/changes/<slug>/ and stopped before renaming proposal.md
+    When canon migrate runs
+    Then it renames proposal.md to brief.md, re-imports the change from canon's own source, and finishes the rest of the migration
+
+  # canon: {"schema":1,"at":"2026-10-12T12:49:07Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.migrate.12
+  Scenario: Change material the openspec reader cannot read keeps the openspec source
+    Given a repo canon 0.16 set up with a canon-written change, a change directory with no proposal.md and a loose file under openspec/changes/
+    When canon migrate --dry-run runs
+    Then the directory is named as staying with the openspec reader's diagnostic, the canon-written change still moves, and the init openspec source is kept
+    When only the loose file is left and canon migrate runs
+    Then the plan names the source as staying because canon has not read that file, and the file and the source stay

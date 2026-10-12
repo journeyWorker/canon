@@ -44,7 +44,19 @@
 //! # Refusals (exit `2`, nothing written)
 //! A `canon.yaml` canon cannot read; uncommitted changes (untracked files
 //! included) under a path it moves; a destination that already exists; a
-//! `canon.yaml` edit it cannot make safely.
+//! change directory whose move could stop halfway ([`preflight_change`]);
+//! a `canon.yaml` edit it cannot make safely.
+//!
+//! # A stopped run is finished by the next
+//! `canon.yaml` is written atomically, after the moves, and the openspec
+//! source's placeholder and directories go only after that write. The next
+//! run finishes what a stopped one left: a root already at `.canon/specs`
+//! while `canon.yaml` names `specs` gets its config edit, a
+//! `.canon/changes/<id>/proposal.md` its rename, a moved change its
+//! re-import ([`plan_unfinished`]). A failed `proposal.md` rename moves the
+//! change directory back. The source is dropped only after every pointer
+//! brief is written, and never while change material it has not read
+//! remains under `openspec/changes/` ([`unread_material`]).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -86,8 +98,10 @@ fn scaffold_tasks(title: &str) -> String {
 struct RootMove {
     id: String,
     /// The directory moved: `<root>/features/kind=feature` or, for a root
-    /// at `specs` already on the new layout, `specs/kind=feature`.
-    from: PathBuf,
+    /// at `specs` already on the new layout, `specs/kind=feature`. `None`
+    /// when an interrupted run already moved it and only the `canon.yaml`
+    /// edit is left.
+    from: Option<PathBuf>,
     /// `<new root>/kind=feature`.
     to: PathBuf,
     /// The `canon.yaml` edit it needs, if any.
@@ -129,6 +143,14 @@ struct Plan {
     roots: Vec<RootMove>,
     changes: Vec<ChangeMove>,
     briefs: Vec<PointerBrief>,
+    /// Changes an interrupted run left half-moved: `from` is
+    /// `.canon/changes/<id>/proposal.md`, still to be renamed `to`,
+    /// `brief.md`.
+    renames: Vec<ChangeMove>,
+    /// Changes already in `.canon/changes/` whose latest stored version
+    /// still comes from the openspec import (an interrupted run moved them
+    /// but did not re-import them), with their directory.
+    reimport: Vec<(ChangeId, PathBuf)>,
     /// The `{ dialect: openspec, root: . }` source entry to remove, by
     /// its index in `plans.sources`.
     drop_source: Option<usize>,
@@ -144,7 +166,14 @@ struct Plan {
 
 impl Plan {
     fn changes_files(&self) -> bool {
-        !self.roots.is_empty() || !self.changes.is_empty() || !self.briefs.is_empty() || self.drop_source.is_some() || self.providers.is_some() || !self.gitignore.is_empty()
+        !self.roots.is_empty()
+            || !self.changes.is_empty()
+            || !self.briefs.is_empty()
+            || !self.renames.is_empty()
+            || !self.reimport.is_empty()
+            || self.drop_source.is_some()
+            || self.providers.is_some()
+            || !self.gitignore.is_empty()
     }
 }
 
@@ -187,11 +216,14 @@ pub fn run(repo: &Path, dry_run: bool) -> i32 {
     }
 
     let applied = apply(&repo, &plan, git);
-    let written = render_config(&text, &plan, applied.roots, applied.changes_done)
+    // The openspec source goes only once every change moved and every
+    // pointer brief is written: a rerun reads the approvals still there.
+    let drop_source = applied.error.is_none() && applied.briefs_done;
+    let written = render_config(&text, &plan, applied.roots, drop_source)
         .map_err(|e| format!("could not rewrite canon.yaml: {e}"))
-        .and_then(|config| if config == text { Ok(()) } else { fs::write(&canon_yaml, config).map_err(|e| format!("failed to write canon.yaml: {e}")) });
+        .and_then(|config| if config == text { Ok(()) } else { write_atomic(&canon_yaml, &config) });
     if let Err(e) = written {
-        eprintln!("canon migrate: {e}");
+        eprintln!("canon migrate: stopped — {e}; canon.yaml is unchanged, and running `canon migrate` again finishes what this run started");
         return EXIT_REFUSED;
     }
     if config != text && applied.error.is_none() {
@@ -201,12 +233,23 @@ pub fn run(repo: &Path, dry_run: bool) -> i32 {
         eprintln!("canon migrate: stopped — {e}; what moved is recorded in canon.yaml, so running `canon migrate` again finishes the rest");
         return EXIT_REFUSED;
     }
+    // Only now that canon.yaml no longer lists the openspec source do its
+    // placeholder and emptied directories go: removed earlier, a stopped
+    // run would leave a configured source whose `openspec/changes/` is
+    // gone, which the openspec reader then reads as the repo root.
+    if drop_source && plan.drop_source.is_some() {
+        if let Err(e) = remove_dropped_source(&repo, &plan, git) {
+            eprintln!("canon migrate: stopped — {e}; canon.yaml no longer lists the source, so remove it by hand");
+            return EXIT_REFUSED;
+        }
+    }
 
-    for change in &plan.changes {
-        match crate::plans::refresh_change(&repo, &change.change) {
-            Ok(_) => println!("canon migrate: re-imported change `{}` from {} (same change id; its tasks and adoption keep joining)", change.change.as_str(), rel(&repo, &change.to)),
+    let moved = plan.changes.iter().chain(&plan.renames).map(|c| (&c.change, if c.to.ends_with("brief.md") { c.to.parent().unwrap_or(&c.to) } else { c.to.as_path() }));
+    for (change, dir) in moved.chain(plan.reimport.iter().map(|(change, dir)| (change, dir.as_path()))) {
+        match crate::plans::refresh_change(&repo, change) {
+            Ok(_) => println!("canon migrate: re-imported change `{}` from {} (same change id; its tasks and adoption keep joining)", change.as_str(), rel(&repo, dir)),
             Err(e) => {
-                eprintln!("canon migrate: moved change `{}` but could not re-import it: {e}; run `canon ingest plans`", change.change.as_str());
+                eprintln!("canon migrate: moved change `{}` but could not re-import it: {e}; run `canon migrate` again", change.as_str());
                 return EXIT_REFUSED;
             }
         }
@@ -286,16 +329,20 @@ fn plan_roots(repo: &Path, doc: &Value, plan: &mut Plan) -> Result<(), String> {
         let new_path = repo.join(&new_rel);
         let nested = old_path.join("features").join("kind=feature");
         let to = new_path.join("kind=feature");
-        // Already on the 0.17 layout: the root holds `kind=feature/` and no
-        // legacy `features/` is left to move. A no-op, never a refusal.
-        if !nested.is_dir() && to.is_dir() {
-            continue;
-        }
+        let flat = old_path.join("kind=feature");
         let from = if nested.is_dir() {
             nested
-        } else if moves_home && old_path.join("kind=feature").is_dir() {
-            old_path.join("kind=feature")
+        } else if moves_home && flat.is_dir() {
+            flat
         } else {
+            // Nothing left to move. The files are at `to` and the entry
+            // still names `specs` explicitly: an earlier run moved them and
+            // stopped before writing canon.yaml, so only that edit is left.
+            // (An entry without `root:` already resolves to `.canon/specs`.)
+            if let (true, true, Some(index)) = (moves_home && written.is_some(), to.is_dir(), index) {
+                let config = Some(RootConfigEdit::Entry { index, new_root: new_rel.clone(), former: old_rel.clone(), explicit_root: true });
+                plan.roots.push(RootMove { id, from: None, to, config, emptied: vec![old_path.join("features"), old_path.clone()] });
+            }
             continue;
         };
         if fs::canonicalize(&from).ok().zip(fs::canonicalize(&to).ok()).is_some_and(|(from, to)| from == to) {
@@ -324,7 +371,7 @@ fn plan_roots(repo: &Path, doc: &Value, plan: &mut Plan) -> Result<(), String> {
             emptied.push(old_path.clone());
         }
         plan.moved_paths.push(from.clone());
-        plan.roots.push(RootMove { id, from, to, config, emptied });
+        plan.roots.push(RootMove { id, from: Some(from), to, config, emptied });
     }
     Ok(())
 }
@@ -346,31 +393,49 @@ fn plan_sources(doc: &Value) -> Vec<(String, String)> {
         .unwrap_or_default()
 }
 
-/// [`ChangeMove`]s, [`PointerBrief`]s and the openspec source to drop
-/// (module doc).
+/// The openspec reader's diagnostics that mean a whole change directory
+/// went unread (as opposed to one task row of a change that was read).
+const UNREAD_DIR_REASONS: [&str; 3] = ["missing-proposal-md", "invalid-change-id-grammar", "unreadable-directory"];
+
+/// [`ChangeMove`]s, [`PointerBrief`]s, what an interrupted run left
+/// unfinished, and the openspec source to drop (module doc).
 fn plan_changes(repo: &Path, doc: &Value, plan: &mut Plan) -> Result<(), String> {
     let sources = crate::plans::load_plan_sources_for_gate(repo).map_err(|e| e.to_string())?;
     let Some(entry) = find_plan_adapter("openspec") else { return Ok(()) };
-    let first_versions = first_change_versions(repo);
+    let versions = change_versions(repo);
     let canon_changes = repo.join(paths::CHANGES_DIR);
-    // Per openspec source root, repo-relative: how many changes stay under it.
+    plan_unfinished(repo, &canon_changes, &versions, plan)?;
+    // Per openspec source root, repo-relative: how much change material
+    // stays under it, read or not.
     let mut staying: BTreeMap<String, usize> = BTreeMap::new();
     let mut external = Vec::new();
     for source in sources.iter().filter(|source| source.dialect() == "openspec") {
         let root = source.root().to_path_buf();
-        let staying = staying.entry(normalized(repo, &root).unwrap_or_default()).or_default();
+        let root_rel = normalized(repo, &root).unwrap_or_default();
+        let staying = staying.entry(root_rel.clone()).or_default();
         let outcome = entry.adapter.parse(&PlanSourceHandle::Path(root.clone()));
+        for malformed in outcome.malformed.iter().filter(|m| UNREAD_DIR_REASONS.contains(&m.reason.as_str())) {
+            *staying += 1;
+            let path = if root_rel.is_empty() { malformed.path.clone() } else { format!("{root_rel}/{}", malformed.path) };
+            let hint = malformed.hint.as_deref().map(|hint| format!("; {hint}")).unwrap_or_default();
+            plan.left.push(format!("{path} stays where it is: the openspec reader cannot read it ({}{hint})", malformed.reason));
+        }
         for change in outcome.changes {
-            let Some(proposal) = proposal_path(&root, &change.change_id) else { continue };
+            let id = change.change_id.as_str().to_string();
+            let Some(proposal) = proposal_path(&root, &change.change_id) else {
+                *staying += 1;
+                plan.left.push(format!("change `{id}` stays where it is: its proposal.md was not found under {}", if root_rel.is_empty() { "." } else { &root_rel }));
+                continue;
+            };
             let Some(dir) = proposal.parent().map(Path::to_path_buf) else { continue };
             let archived = dir.parent().and_then(Path::file_name).is_some_and(|name| name == "archive");
-            let id = change.change_id.as_str().to_string();
-            match canon_written(&dir, first_versions.get(&id).copied()) {
+            match canon_written(&dir, versions.get(&id).map(|v| v.first_adopted)) {
                 Ok(()) => {
                     let to = if archived { canon_changes.join("archive").join(&id) } else { canon_changes.join(&id) };
                     if to.exists() {
                         return Err(format!("change `{id}`: {} would move to {}, which already exists", rel(repo, &dir), rel(repo, &to)));
                     }
+                    preflight_change(repo, &dir)?;
                     plan.moved_paths.push(dir.clone());
                     plan.changes.push(ChangeMove { change: change.change_id.clone(), from: dir, to });
                 }
@@ -405,43 +470,129 @@ fn plan_changes(repo: &Path, doc: &Value, plan: &mut Plan) -> Result<(), String>
     if !external.is_empty() {
         plan.left.push(format!("{} openspec change(s) not written by `canon change new` stay where they are, read as an external plan: {}", external.len(), external.join(", ")));
     }
-    // The 0.16 init's `{ dialect: openspec, root: . }`, once empty.
+    // The 0.16 init's `{ dialect: openspec, root: . }`, once nothing is
+    // left under it: no change that stays, and no file or directory in
+    // `openspec/changes/` this run does not move.
     for (index, (dialect, root)) in plan_sources(doc).into_iter().enumerate() {
         if dialect != "openspec" || normalized(repo, Path::new(&root)).as_deref() != Some("") {
             continue;
         }
-        if staying.get("").copied().unwrap_or_default() == 0 {
-            plan.drop_source = Some(index);
-            let gitkeep = repo.join("openspec/changes/.gitkeep");
-            let only_gitkeep = fs::read_dir(repo.join("openspec/changes"))
-                .map(|entries| entries.filter_map(Result::ok).all(|entry| entry.file_name() == ".gitkeep" || plan.changes.iter().any(|c| c.from == entry.path())))
-                .unwrap_or(false);
-            if gitkeep.is_file() && only_gitkeep {
-                plan.gitkeep = Some(gitkeep);
-            }
+        if staying.get("").copied().unwrap_or_default() > 0 {
+            break;
+        }
+        let unread = unread_material(repo, plan);
+        if !unread.is_empty() {
+            plan.left.push(format!("the plans source `{{ dialect: openspec, root: . }}` stays: canon has not read {}", unread.join(", ")));
+            break;
+        }
+        plan.drop_source = Some(index);
+        let gitkeep = repo.join("openspec/changes/.gitkeep");
+        if gitkeep.is_file() {
+            plan.gitkeep = Some(gitkeep);
         }
         break;
     }
     Ok(())
 }
 
-/// The `at` and `subject_id` presence of the first stored version of
-/// every change, by change id. A change tier this run cannot read gives
-/// no versions, so no change counts as canon-written.
-fn first_change_versions(repo: &Path) -> BTreeMap<String, bool> {
-    let Ok(registry) = crate::subject::registry_for(&repo.join("canon.yaml"), &[RecordKind::Change]) else { return BTreeMap::new() };
-    let Ok(result) = registry.query(&TierQuery::kind(RecordKind::Change)) else { return BTreeMap::new() };
-    let mut first: BTreeMap<String, (chrono::DateTime<chrono::Utc>, bool)> = BTreeMap::new();
-    for raw in result.records {
-        let Some(id) = raw.0.get("change_id").and_then(serde_json::Value::as_str) else { continue };
-        let Some(at) = raw.0.get("at").and_then(serde_json::Value::as_str).and_then(|at| at.parse().ok()) else { continue };
-        let adopted = raw.0.get("subject_id").and_then(serde_json::Value::as_str).is_some();
-        let slot = first.entry(id.to_string()).or_insert((at, adopted));
-        if at < slot.0 {
-            *slot = (at, adopted);
+/// Every entry of `openspec/changes/` (and of its `archive/`) that is
+/// neither init's `.gitkeep` nor a change this run moves, repo-relative.
+fn unread_material(repo: &Path, plan: &Plan) -> Vec<String> {
+    let moved = |path: &Path| plan.changes.iter().any(|change| change.from == path);
+    let mut unread = Vec::new();
+    let changes = repo.join("openspec/changes");
+    for entry in fs::read_dir(&changes).into_iter().flatten().filter_map(Result::ok) {
+        let path = entry.path();
+        if entry.file_name() == ".gitkeep" || moved(&path) {
+            continue;
+        }
+        if entry.file_name() == "archive" && path.is_dir() {
+            unread.extend(fs::read_dir(&path).into_iter().flatten().filter_map(Result::ok).map(|e| e.path()).filter(|p| !moved(p)).map(|p| rel(repo, &p)));
+            continue;
+        }
+        unread.push(rel(repo, &path));
+    }
+    unread.sort();
+    unread
+}
+
+/// Refuse a change move that could stop halfway: both files must be there,
+/// no `brief.md` may be in the way, and the directory and its parent must
+/// be writable (the directory is moved, then `proposal.md` renamed in it).
+fn preflight_change(repo: &Path, dir: &Path) -> Result<(), String> {
+    let shown = rel(repo, dir);
+    for name in ["proposal.md", "tasks.md"] {
+        if !dir.join(name).is_file() {
+            return Err(format!("change dir {shown} has no {name}"));
         }
     }
-    first.into_iter().map(|(id, (_, adopted))| (id, adopted)).collect()
+    if dir.join("brief.md").exists() {
+        return Err(format!("change dir {shown} already holds a brief.md, so its proposal.md cannot be renamed to it"));
+    }
+    for path in [dir, dir.parent().unwrap_or(repo)] {
+        if fs::metadata(path).map(|meta| meta.permissions().readonly()).unwrap_or(true) {
+            return Err(format!("{} is not writable, so change dir {shown} cannot be moved", rel(repo, path)));
+        }
+    }
+    Ok(())
+}
+
+/// What an interrupted run left in `.canon/changes/` ([`Plan::renames`],
+/// [`Plan::reimport`]). A pointer brief (`Source:`) is not a change.
+fn plan_unfinished(repo: &Path, canon_changes: &Path, versions: &BTreeMap<String, ChangeVersions>, plan: &mut Plan) -> Result<(), String> {
+    let subdirs = |dir: &Path| -> Vec<PathBuf> {
+        let mut dirs: Vec<PathBuf> = fs::read_dir(dir).into_iter().flatten().filter_map(Result::ok).map(|e| e.path()).filter(|p| p.is_dir()).collect();
+        dirs.sort();
+        dirs
+    };
+    let dirs = subdirs(canon_changes).into_iter().filter(|dir| !dir.ends_with("archive")).chain(subdirs(&canon_changes.join("archive")));
+    for dir in dirs {
+        let Some(change) = dir.file_name().and_then(|name| name.to_str()).and_then(|name| ChangeId::parse(name).ok()) else { continue };
+        let (proposal, brief) = (dir.join("proposal.md"), dir.join("brief.md"));
+        if proposal.is_file() {
+            if brief.exists() {
+                return Err(format!("{} holds both proposal.md and brief.md; keep one as brief.md (the file canon reads), then run it again", rel(repo, &dir)));
+            }
+            plan.renames.push(ChangeMove { change, from: proposal, to: brief });
+            continue;
+        }
+        let pointer = fs::read_to_string(&brief).ok().is_some_and(|text| field(&text, "Source:").is_some());
+        if brief.is_file() && !pointer && versions.get(change.as_str()).is_some_and(|v| v.latest_actor == "canon-plan-import-openspec") {
+            plan.reimport.push((change, dir));
+        }
+    }
+    Ok(())
+}
+
+/// What the ledger says about one change id ([`change_versions`]).
+struct ChangeVersions {
+    /// Whether its first stored version already has `subject_id`.
+    first_adopted: bool,
+    /// The actor of its latest stored version.
+    latest_actor: String,
+}
+
+/// [`ChangeVersions`] of every stored change, by change id. A change tier
+/// this run cannot read gives none, so no change counts as canon-written.
+fn change_versions(repo: &Path) -> BTreeMap<String, ChangeVersions> {
+    let Ok(registry) = crate::subject::registry_for(&repo.join("canon.yaml"), &[RecordKind::Change]) else { return BTreeMap::new() };
+    let Ok(result) = registry.query(&TierQuery::kind(RecordKind::Change)) else { return BTreeMap::new() };
+    type At = chrono::DateTime<chrono::Utc>;
+    let mut seen: BTreeMap<String, ((At, bool), (At, String))> = BTreeMap::new();
+    for raw in result.records {
+        let Some(id) = raw.0.get("change_id").and_then(serde_json::Value::as_str) else { continue };
+        let Some(at) = raw.0.get("at").and_then(serde_json::Value::as_str).and_then(|at| at.parse::<At>().ok()) else { continue };
+        let adopted = raw.0.get("subject_id").and_then(serde_json::Value::as_str).is_some();
+        let actor = raw.0.get("actor").and_then(|a| a.get("agent_id")).and_then(serde_json::Value::as_str).unwrap_or_default().to_string();
+        let slot = seen.entry(id.to_string()).or_insert(((at, adopted), (at, actor.clone())));
+        if at < slot.0 .0 {
+            slot.0 = (at, adopted);
+        }
+        if at >= slot.1 .0 {
+            slot.1 = (at, actor);
+        }
+    }
+    seen.into_iter().map(|(id, ((_, first_adopted), (_, latest_actor)))| (id, ChangeVersions { first_adopted, latest_actor })).collect()
 }
 
 /// `Ok` when the change dir `dir` was written by `canon change new`
@@ -710,10 +861,19 @@ fn print_plan(repo: &Path, plan: &Plan, config_changes: bool) {
             Some(RootConfigEdit::Section { new_root, former }) => format!("; canon.yaml gains specs.roots: id root, root: {new_root}, former_roots: [{former}]"),
             None => String::new(),
         };
-        println!("  move {} -> {} (spec root `{}`{config})", rel(repo, &root.from), rel(repo, &root.to), root.id);
+        match &root.from {
+            Some(from) => println!("  move {} -> {} (spec root `{}`{config})", rel(repo, from), rel(repo, &root.to), root.id),
+            None => println!("  spec root `{}` is already at {} (an earlier run stopped before writing canon.yaml){config}", root.id, rel(repo, &root.to)),
+        }
     }
     for change in &plan.changes {
         println!("  move {} -> {} (proposal.md -> brief.md; written by `canon change new`)", rel(repo, &change.from), rel(repo, &change.to));
+    }
+    for rename in &plan.renames {
+        println!("  rename {} -> {} (an earlier run moved change `{}` and stopped before this rename)", rel(repo, &rename.from), rel(repo, &rename.to), rename.change.as_str());
+    }
+    for (change, dir) in &plan.reimport {
+        println!("  re-import change `{}` from {} (an earlier run moved it and stopped before re-importing it)", change.as_str(), rel(repo, dir));
     }
     for brief in &plan.briefs {
         println!(
@@ -748,36 +908,53 @@ fn print_plan(repo: &Path, plan: &Plan, config_changes: bool) {
 /// What [`apply`] got through.
 struct Applied {
     roots: usize,
-    changes_done: bool,
+    /// Every pointer brief was written (so the openspec source may go).
+    briefs_done: bool,
     error: Option<String>,
 }
 
 /// Perform the plan's file moves and writes, stopping at the first
 /// failure ([`Applied`]).
 fn apply(repo: &Path, plan: &Plan, git: bool) -> Applied {
-    let mut applied = Applied { roots: 0, changes_done: false, error: None };
+    let mut applied = Applied { roots: 0, briefs_done: false, error: None };
     for root in &plan.roots {
-        if let Err(e) = move_dir(repo, &root.from, &root.to, git) {
-            applied.error = Some(e);
-            return applied;
+        if let Some(from) = &root.from {
+            if let Err(e) = move_dir(repo, from, &root.to, git) {
+                applied.error = Some(e);
+                return applied;
+            }
+            println!("canon migrate: moved {} -> {}", rel(repo, from), rel(repo, &root.to));
         }
         applied.roots += 1;
-        println!("canon migrate: moved {} -> {}", rel(repo, &root.from), rel(repo, &root.to));
         for dir in &root.emptied {
             if fs::remove_dir(dir).is_err() && dir.is_dir() {
                 println!("canon migrate: left {} in place; it still holds files canon does not move", rel(repo, dir));
             }
         }
     }
-    for change in &plan.changes {
-        let renamed = move_dir(repo, &change.from, &change.to, git).and_then(|()| move_file(repo, &change.to.join("proposal.md"), &change.to.join("brief.md"), git));
-        if let Err(e) = renamed {
+    for rename in &plan.renames {
+        if let Err(e) = move_file(repo, &rename.from, &rename.to, git) {
             applied.error = Some(e);
+            return applied;
+        }
+        println!("canon migrate: renamed {} -> {}", rel(repo, &rename.from), rel(repo, &rename.to));
+    }
+    for change in &plan.changes {
+        if let Err(e) = move_dir(repo, &change.from, &change.to, git) {
+            applied.error = Some(e);
+            return applied;
+        }
+        if let Err(e) = move_file(repo, &change.to.join("proposal.md"), &change.to.join("brief.md"), git) {
+            // Put the directory back, so nothing is left half-moved.
+            let rolled_back = move_dir(repo, &change.to, &change.from, git);
+            applied.error = Some(match rolled_back {
+                Ok(()) => format!("{e}; moved {} back", rel(repo, &change.from)),
+                Err(back) => format!("{e}; and moving it back failed ({back}), so a rerun finishes the rename in {}", rel(repo, &change.to)),
+            });
             return applied;
         }
         println!("canon migrate: moved {} -> {} (proposal.md -> brief.md)", rel(repo, &change.from), rel(repo, &change.to));
     }
-    applied.changes_done = true;
     for brief in &plan.briefs {
         let written = fs::create_dir_all(brief.path.parent().unwrap_or(repo))
             .and_then(|()| fs::write(&brief.path, format!("Source: {}\n\nApproved: {}\n", brief.source, brief.approval)));
@@ -787,21 +964,23 @@ fn apply(repo: &Path, plan: &Plan, git: bool) -> Applied {
         }
         println!("canon migrate: wrote {} (Source: {}); the Approved: line left in {} is no longer read", rel(repo, &brief.path), brief.source, brief.source);
     }
+    applied.briefs_done = true;
+    applied
+}
+
+/// Remove `openspec/changes/.gitkeep` and the emptied `openspec/`
+/// directories of the source this run dropped. Only empty directories go:
+/// whatever else the repo keeps there stays.
+fn remove_dropped_source(repo: &Path, plan: &Plan, git: bool) -> Result<(), String> {
     if let Some(gitkeep) = &plan.gitkeep {
         let removed = if git && is_tracked(repo, gitkeep) { git_run(repo, &["rm", "-q", "--", &rel(repo, gitkeep)]) } else { fs::remove_file(gitkeep).map_err(|e| e.to_string()) };
-        if let Err(e) = removed {
-            applied.error = Some(format!("failed to remove {}: {e}", rel(repo, gitkeep)));
-            return applied;
-        }
+        removed.map_err(|e| format!("failed to remove {}: {e}", rel(repo, gitkeep)))?;
         println!("canon migrate: removed {}", rel(repo, gitkeep));
     }
-    if plan.drop_source.is_some() {
-        // Only empty directories go: whatever else the repo keeps there stays.
-        for dir in ["openspec/changes/archive", "openspec/changes", "openspec"] {
-            let _ = fs::remove_dir(repo.join(dir));
-        }
+    for dir in ["openspec/changes/archive", "openspec/changes", "openspec"] {
+        let _ = fs::remove_dir(repo.join(dir));
     }
-    applied
+    Ok(())
 }
 
 fn move_dir(repo: &Path, from: &Path, to: &Path, git: bool) -> Result<(), String> {
@@ -820,6 +999,18 @@ fn move_file(repo: &Path, from: &Path, to: &Path, git: bool) -> Result<(), Strin
         return Err(format!("{} already exists", rel(repo, to)));
     }
     move_dir(repo, from, to, git)
+}
+
+/// Write `path` whole or not at all: a temp file beside it, then a rename.
+fn write_atomic(path: &Path, text: &str) -> Result<(), String> {
+    let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("canon.yaml");
+    let temp = path.with_file_name(format!(".{name}.canon-migrate.tmp"));
+    let written = fs::write(&temp, text).and_then(|()| fs::rename(&temp, path));
+    if let Err(e) = written {
+        let _ = fs::remove_file(&temp);
+        return Err(format!("failed to write {}: {e}", path.display()));
+    }
+    Ok(())
 }
 
 fn git_run(repo: &Path, args: &[&str]) -> Result<(), String> {

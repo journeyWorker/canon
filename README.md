@@ -86,11 +86,14 @@ for the machine-readable source/projection/memory map.
 
 Version 0.17.0 gives canon its own home: the spec corpus, canon's own
 changes and every approval live under `.canon/`, external plans are read
-and not written, `canon init` asks which harnesses get the canon skill,
-and `canon migrate` moves a 0.16 repo over in one command.
+and not written (one exception: the evidence-gated `canon gate task`
+still flips a task's checkbox in an external `tasks.md`, D4), `canon init`
+asks which harnesses get the canon skill, and `canon migrate` moves a 0.16
+repo over in one command.
 
 **Why.** The maintainer's rules (2026-10-12): canon keeps what it writes
-in `.canon/`; canon reads external plans and never writes into them; canon
+in `.canon/`; canon reads external plans and never writes into them,
+except for that evidence-gated checkbox write-back; canon
 asks which harnesses to install for. 0.16 kept the corpus at
 `specs/features/kind=feature/…` (where `features` and `kind=feature` say
 the same thing), had `canon init` create `openspec/changes/` and
@@ -264,9 +267,15 @@ second run finds nothing to move.
   the `## What Changes` and row-grammar comments), and its first stored
   version is already adopted, because `change new` adopts before any
   ingest. A change with one signal stays, named with the signal it lacks.
-  Every other change stays as an external plan. `canon init`'s
+  0.16 recorded no durable provenance, so this is the strongest evidence
+  there is. A false positive keeps its content and ids, is printed in the
+  plan, and is undone with one `git mv`; `--dry-run` shows exactly which
+  changes move. Every other change stays as an external plan. `canon init`'s
   `{ dialect: openspec, root: . }` source, and its
-  `openspec/changes/.gitkeep`, go only once no change is left under it.
+  `openspec/changes/.gitkeep`, go only once nothing is left under it: no
+  change that stays, no directory the openspec reader cannot read (each is
+  named with the reader's diagnostic), and no other file in
+  `openspec/changes/`.
 - **Approvals.** An external `proposal.md` that holds the `Approved:` line
   0.16 recorded gets a canon pointer brief,
   `.canon/changes/<change>/brief.md`, holding `Source: <proposal>` and that
@@ -280,7 +289,18 @@ second run finds nothing to move.
   exactly the intended change is refused, with the edit to make by hand.
 - **Refusals** (exit 2, nothing written): uncommitted changes under a path
   it moves (untracked files included), a destination that already exists,
-  or a `canon.yaml` edit it cannot make safely.
+  a change directory that could stop halfway (a missing `proposal.md` or
+  `tasks.md`, a `brief.md` in the way, or a directory that is not
+  writable), or a `canon.yaml` edit it cannot make safely.
+- **Resumable.** `canon.yaml` is written whole or not at all (a temp file,
+  then a rename). A run that stops partway is finished by the next one: a
+  spec root already at `.canon/specs` while `canon.yaml` still names
+  `specs` gets its `root:` and `former_roots` edit, a change left at
+  `.canon/changes/<id>/proposal.md` gets its rename to `brief.md`, a moved
+  change that was not re-imported is re-imported, and a change whose
+  `proposal.md` → `brief.md` rename fails is moved back. The openspec
+  source is removed only after every pointer brief is written, so a failed
+  brief write leaves the approval readable for the rerun.
 
 **`canon init` on an existing repo (#35).** A rerun also adds the canon
 `.gitignore` lines the repo lacks: hot db, audit log, scenario index,
