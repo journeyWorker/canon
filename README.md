@@ -394,7 +394,17 @@ No exit code changed.
 **Closed issues:** #24, #25, #26, #27, #28, #29, #30, #31, #32, #33, #34,
 #36, #37.
 
-ACCEPTANCE-PLACEHOLDER: …
+**Acceptance (plan D8).**
+
+- **(a) Eval 5 on omp.** The eval-1 one-line game request ran in a fresh repo initialized with this build, in three turns: the request, one human answer, then a follow-up fix after shipping. All four criteria pass:
+  - **One human stop.** The agent stopped once, at the brief (88 s), and shipped 28 scenarios after one answer.
+  - **Follow-up without a human.** The follow-up reopened the shipped subject with `--reason`, went in as a task in the approved change, got a scenario, evidence and an independent review (which found and fixed one weak test), and shipped again with every guard re-run. No human was involved.
+  - **Fewer calls than scenarios.** For 29 scenarios there were 4 `evidence add` calls (2 with `--all-scenarios`) and 3 `review add` calls (1 batch). That is 38 canon calls in all, 0 of them bookkeeping; eval 3c (0.16) took 49.
+  - **Independent reviews.** Every scenario was reviewed by a separate omp session, and the gate is clean.
+- **(b) A Swift Testing event stream binds with `--all-scenarios`.** The fixture is a stream captured from a real `swift test --experimental-event-stream-output` run (Swift 6.4), checked in with its package source.
+- **(c) The platformer example attests with its own tests.** One `--all-scenarios` call attested all 16 scenarios, and one batch `review add` re-reviewed them. All 25 stale legacy reviews are now superseded by current ones. The 8 undecidable legacy reviews are pinned to commits that predate their scenarios, so their count cannot change; every one of those scenarios now also has a current review.
+
+Evidence: `~/Workspace/canon-dogfood/PROTOCOL-5.md` and `FINDINGS-5.md`.
 
 ## 0.17.0 release
 
