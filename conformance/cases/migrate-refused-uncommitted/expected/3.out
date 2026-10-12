@@ -1,0 +1,4 @@
+canon gate check: 1 violation(s)
+
+uncovered-cell (1):
+  uncovered-cell root — spec root `root` (`specs`) is on the pre-0.17 layout (`features/kind=feature/area=cart/add.feature` sits under `features/`); canon reads `kind=feature/area=<area>/<surface>.feature` directly under the root, and `canon migrate` moves `features/kind=feature/` there; until then its scenarios are not graded

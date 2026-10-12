@@ -1,1 +1,2 @@
+canon review add: refreshed the scenario index from 1 changed feature file(s) (specs/kind=feature/area=cart/add.feature): 1 record(s) written
 canon review add: refused — no scenario record for `cart.add.99` in spec root `root`; a review pins the scenario it saw, so index it first (`canon inventory sync`)

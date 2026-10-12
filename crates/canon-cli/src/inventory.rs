@@ -108,6 +108,12 @@ struct RawSpecRoot {
     id: String,
     #[serde(default)]
     root: Option<String>,
+    /// Where this root lived before `canon migrate` moved it (0.17 D6),
+    /// newest last. Read only by the legacy-pin lookup
+    /// ([`resolve_legacy_pins`]): a review pinned to a commit from before
+    /// the move finds its scenario under these paths at that commit.
+    #[serde(default)]
+    former_roots: Vec<String>,
 }
 
 fn default_root(repo_root: &Path) -> SpecRoot {
@@ -122,13 +128,24 @@ fn default_root(repo_root: &Path) -> SpecRoot {
 /// itself is new here, not a copy of ingest's per-source `roots`
 /// override.
 pub fn load_spec_roots(canon_yaml: &Path) -> Result<Vec<SpecRoot>, InventoryError> {
+    Ok(load_spec_roots_with_former(canon_yaml)?.into_iter().map(|(root, _)| root).collect())
+}
+
+/// [`load_spec_roots`], each root with its `former_roots` resolved the
+/// same way as `root` (relative entries joined against `canon.yaml`'s
+/// directory).
+fn load_spec_roots_with_former(canon_yaml: &Path) -> Result<Vec<(SpecRoot, Vec<PathBuf>)>, InventoryError> {
     let repo_root = canon_yaml.parent().unwrap_or_else(|| Path::new("."));
+    let resolve = |dir: &str| {
+        let path = Path::new(dir);
+        if path.is_absolute() { path.to_path_buf() } else { repo_root.join(path) }
+    };
 
     // Missing / unreadable canon.yaml: fail-soft (no config at all is
     // a legitimate first-run / minimal state) — same as
     // `IngestSourceConfig::load`.
     let Ok(text) = std::fs::read_to_string(canon_yaml) else {
-        return Ok(vec![default_root(repo_root)]);
+        return Ok(vec![(default_root(repo_root), Vec::new())]);
     };
     // A PRESENT but non-YAML canon.yaml fails LOUD: a syntax typo in a
     // canon.yaml meant to set `specs.roots[]` must never silently
@@ -139,7 +156,7 @@ pub fn load_spec_roots(canon_yaml: &Path) -> Result<Vec<SpecRoot>, InventoryErro
         ))
     })?;
     let Some(specs_val) = doc.get("specs") else {
-        return Ok(vec![default_root(repo_root)]);
+        return Ok(vec![(default_root(repo_root), Vec::new())]);
     };
     // PRESENT `specs:` — strict from here on.
     let specs: RawSpecs = serde_yaml::from_value(specs_val.clone())
@@ -161,10 +178,9 @@ pub fn load_spec_roots(canon_yaml: &Path) -> Result<Vec<SpecRoot>, InventoryErro
     for raw in specs.roots {
         let id = ProjectId::parse(&raw.id)
             .map_err(|e| InventoryError::Config(format!("canon.yaml `specs.roots[]` entry `id: {}` is not a valid ProjectId: {e}", raw.id)))?;
-        let root_dir = raw.root.as_deref().unwrap_or(DEFAULT_SPEC_ROOT_DIR);
-        let root_path = Path::new(root_dir);
-        let root = if root_path.is_absolute() { root_path.to_path_buf() } else { repo_root.join(root_path) };
-        roots.push(SpecRoot { id, root });
+        let root = resolve(raw.root.as_deref().unwrap_or(DEFAULT_SPEC_ROOT_DIR));
+        let former = raw.former_roots.iter().map(|dir| resolve(dir)).collect();
+        roots.push((SpecRoot { id, root }, former));
     }
     Ok(roots)
 }
@@ -496,16 +512,19 @@ pub fn resolve_legacy_pins(ctx: &mut GateContext) {
     ctx.legacy_pins = canon_gate::legacy_pins::resolve(ctx, || spec_sources(&repo));
 }
 
-/// Each scenario's current `.feature` file and each spec root, relative
-/// to `repo`. A root outside the repo has no history to read and is left
-/// out; an unusable `specs:` section leaves everything out, so every
-/// legacy review stays undecidable rather than misjudged.
+/// Each scenario's current `.feature` file and the directories each spec
+/// root's history lives under, relative to `repo`: the root now, then its
+/// `former_roots` (where `canon migrate` moved it from). A root outside
+/// the repo has no history to read and is left out, and so is a former
+/// root outside it; an unusable `specs:` section leaves everything out,
+/// so every legacy review stays undecidable rather than misjudged.
 fn spec_sources(repo: &Path) -> SpecSources {
     let mut sources = SpecSources::default();
-    let Ok(roots) = load_spec_roots(&repo.join("canon.yaml")) else { return sources };
-    for root in roots {
+    let Ok(roots) = load_spec_roots_with_former(&repo.join("canon.yaml")) else { return sources };
+    for (root, former) in roots {
         let Ok(relative) = root.root.strip_prefix(repo) else { continue };
-        sources.roots.insert(root.id.clone(), relative.to_path_buf());
+        let dirs = std::iter::once(relative.to_path_buf()).chain(former.iter().filter_map(|dir| dir.strip_prefix(repo).ok().map(Path::to_path_buf)));
+        sources.roots.insert(root.id.clone(), dirs.collect());
         for scanned in scan_feature_corpus_detailed(&root.root) {
             if let Ok(file) = scanned.path.strip_prefix(repo) {
                 sources.files.insert((root.id.clone(), scanned.scenario_id), file.to_path_buf());
@@ -787,8 +806,11 @@ struct StaleRoot {
     scanned: Vec<ScannedScenario>,
     /// Every `.feature` file holding a scenario whose latest `Scenario`
     /// generation is missing, removed, or carries another
-    /// `source_digest` than the file's bytes have now. A file with no
-    /// scenario has nothing to index and is never stale.
+    /// `source_digest` or `scenario_digest` than the file has now. A
+    /// generation written before 0.15 has no `scenario_digest`, so its
+    /// file is stale even though its bytes are unchanged: the sync
+    /// rewrites it, as [`sync_one_root`] would. A file with no scenario
+    /// has nothing to index and is never stale.
     files: BTreeSet<PathBuf>,
     /// Scenarios the index still holds live for this root's project
     /// that no `.feature` file declares any more — what a full sync
@@ -799,9 +821,9 @@ struct StaleRoot {
 /// Every root whose index differs from what `canon inventory sync` would
 /// leave, with the per-project corpus ids ([`corpus_ids`]) that was
 /// judged against. Two differences count: a scanned scenario the index
-/// lacks or holds at another `source_digest`, and an indexed scenario
-/// the corpus no longer declares — the indexed id set and the corpus id
-/// set of a project must be equal.
+/// lacks or holds at another `source_digest` or `scenario_digest`, and
+/// an indexed scenario the corpus no longer declares — the indexed id
+/// set and the corpus id set of a project must be equal.
 fn stale_roots(tier: &GitTier, roots: &[SpecRoot]) -> Result<(Vec<StaleRoot>, BTreeMap<ProjectId, BTreeSet<ScenarioId>>), InventoryError> {
     let latest = latest_index(tier)?;
     let scans: Vec<Vec<ScannedScenario>> = roots.iter().map(|root| scan_feature_corpus_detailed(&root.root)).collect();
@@ -814,7 +836,7 @@ fn stale_roots(tier: &GitTier, roots: &[SpecRoot]) -> Result<(Vec<StaleRoot>, BT
             .filter(|candidate| {
                 !latest
                     .get(&(root.id.clone(), candidate.scenario_id.clone()))
-                    .is_some_and(|record| !record.removed && record.source_digest == candidate.source_digest)
+                    .is_some_and(|record| !record.removed && record.source_digest == candidate.source_digest && record.scenario_digest == candidate.scenario_digest)
             })
             .map(|candidate| candidate.path.clone())
             .collect();

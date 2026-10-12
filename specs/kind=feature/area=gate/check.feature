@@ -391,3 +391,25 @@ Feature: gate check
     When the scenarios have since moved, unchanged, to a new file and `canon gate check` runs
     Then the scenarios are found in the old file at the pinned commit
     And both reviews count as current and the gate exits 0
+
+  # canon: {"schema":1,"at":"2026-10-12T11:44:52Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.95
+  Scenario: A scenario index generation from before 0.15 cannot leave a legacy review undecidable
+    Given require_review and reviews written before 0.15 pinned to the commit they reviewed
+    And a scenario index holding only generations written before 0.15, with no scenario digest, for a feature file whose bytes are unchanged
+    When canon gate check runs
+    Then its refresh rewrites those generations as canon inventory sync would
+    And the reviews are checked against their pin and counted current, never undecidable
+
+  # canon: {"schema":1,"at":"2026-10-12T11:44:52Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.96
+  Scenario: A moved spec root is searched at its former path and only for its own project
+    Given a spec root moved from specs to .canon/specs with former_roots [specs], and a second root declaring the same scenario ids with the same text
+    And reviews written before 0.15 for both projects, pinned to a commit from before the move, when only the first project existed
+    When canon gate check runs
+    Then the first project's review is found at its former root and counted current
+    And the second project's review is undecidable, never matched against the first project's scenario

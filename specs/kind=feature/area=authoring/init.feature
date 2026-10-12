@@ -305,3 +305,13 @@ Feature: authoring init
     Then it lists claude, codex, omp and pi with claude and omp checked
     And Enter or the end of input keeps the checked ones, a comma- or space-separated list or none replaces them
     And an unknown name is reported and asked again
+
+  # canon: {"schema":1,"at":"2026-10-12T11:44:52Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.init.97
+  Scenario: Init re-run on an existing repo adds the canon gitignore lines it lacks
+    Given a repo whose canon.yaml exists and whose gitignore lacks canon lines added since it was set up
+    When canon init runs again
+    Then it adds each missing canon gitignore line once under its comment, names them, and keeps the rest of the gitignore and canon.yaml byte-identical
+    And with --no-agents-md it only adds the lines, and with none missing that run is the overwrite refusal

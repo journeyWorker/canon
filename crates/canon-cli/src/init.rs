@@ -165,30 +165,38 @@ fn skeleton_yaml() -> String {
     out
 }
 
+/// The [`GITIGNORE_LINES`] entries `<repo>/.gitignore` lacks, as
+/// `(comment, line)`, in order. A missing or unreadable file lacks all.
+pub(crate) fn missing_gitignore_lines(repo: &Path) -> Vec<(&'static str, &'static str)> {
+    let existing = fs::read_to_string(repo.join(".gitignore")).unwrap_or_default();
+    GITIGNORE_LINES.iter().copied().filter(|(_, line)| !existing.lines().any(|have| have.trim() == *line)).collect()
+}
+
 /// Ensures every [`GITIGNORE_LINES`] entry is present in
 /// `<repo>/.gitignore` -- appends each missing one under its comment
 /// (creating the file if absent), so a `.gitignore` a prior `canon init`
 /// (or the repo's own `git init`) already wrote is never duplicated.
-/// `canon init` itself stays a fresh-repo bootstrap (`run_init`'s
-/// `canon.yaml` refuses to overwrite), but `.gitignore` commonly
-/// PRE-EXISTS a `canon init` invocation (e.g. a `git init`-then-`canon
-/// init` sequence), so this appends rather than mirroring `canon.yaml`'s
-/// create-fails-if-exists refusal.
-fn scaffold_gitignore(repo: &Path) -> std::io::Result<()> {
+/// `.gitignore` commonly PRE-EXISTS a `canon init` invocation (e.g. a
+/// `git init`-then-`canon init` sequence), and a repo initialized by an
+/// older canon lacks the lines added since (#35), so this appends rather
+/// than mirroring `canon.yaml`'s create-fails-if-exists refusal: a fresh
+/// `canon init`, a re-run on an existing repo and `canon migrate` all
+/// call it. Returns the lines it added.
+pub(crate) fn scaffold_gitignore(repo: &Path) -> std::io::Result<Vec<&'static str>> {
     let path = repo.join(".gitignore");
     let existing = fs::read_to_string(&path).unwrap_or_default();
-    let missing: Vec<&(&str, &str)> = GITIGNORE_LINES.iter().filter(|(_, line)| !existing.lines().any(|have| have.trim() == *line)).collect();
+    let missing = missing_gitignore_lines(repo);
     if missing.is_empty() {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let mut file = fs::OpenOptions::new().create(true).append(true).open(&path)?;
     if !existing.is_empty() && !existing.ends_with('\n') {
         file.write_all(b"\n")?;
     }
-    for (comment, line) in missing {
+    for (comment, line) in &missing {
         file.write_all(format!("{comment}\n{line}\n").as_bytes())?;
     }
-    Ok(())
+    Ok(missing.into_iter().map(|(_, line)| line).collect())
 }
 
 /// Opening marker of the canon block `init` owns in `AGENTS.md`.
@@ -470,8 +478,10 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel) -> std::io::Result<()> {
 ///   exit `0`.
 /// - A repo whose `canon.yaml` exists keeps it byte-identical
 ///   (`create_new` is the atomic refusal) and only refreshes the
-///   `AGENTS.md` block: exit `0`. With `--no-agents-md` there is nothing
-///   left to do, so that is the pre-0.14 refusal, exit `2`.
+///   `AGENTS.md` block and adds the canon `.gitignore` lines it lacks
+///   (#35, a repo initialized by an older canon): exit `0`. With
+///   `--no-agents-md` and no line missing there is nothing left to do,
+///   so that is the pre-0.14 refusal, exit `2`.
 /// - Unbalanced `AGENTS.md` markers, or an unknown `--providers` name,
 ///   refuse (exit `2`) before anything is written.
 /// - A fresh repo also records and installs the harness choice
@@ -525,17 +535,29 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
             println!("canon init: wrote {}", canon_yaml_path.display());
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            let Some((existing, merged)) = agents else {
+            let missing = missing_gitignore_lines(repo);
+            if agents.is_none() && missing.is_empty() {
                 eprintln!("canon init: refused — `{}` already exists; never overwriting an existing config", canon_yaml_path.display());
                 return 2;
-            };
-            println!("canon init: {} already exists — left unchanged; only the AGENTS.md block is refreshed", canon_yaml_path.display());
+            }
+            let refreshed = if agents.is_some() { "the AGENTS.md block and the canon .gitignore lines are refreshed" } else { "the canon .gitignore lines are refreshed" };
+            println!("canon init: {} already exists — left unchanged; {refreshed}", canon_yaml_path.display());
             if matches!(options.skills, SkillsChoice::Providers(_)) {
                 println!("canon init: --providers is not applied to an existing canon.yaml; run `canon skills install --providers=<list>`, which records the list in skills.providers");
             }
-            if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged) {
-                eprintln!("canon init: failed to write `{}`: {e}", agents_path.display());
-                return 2;
+            match scaffold_gitignore(repo) {
+                Ok(added) if !added.is_empty() => println!("canon init: added to .gitignore: {}", added.join(", ")),
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("canon init: failed to update `.gitignore`: {e}");
+                    return 2;
+                }
+            }
+            if let Some((existing, merged)) = agents {
+                if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged) {
+                    eprintln!("canon init: failed to write `{}`: {e}", agents_path.display());
+                    return 2;
+                }
             }
             return 0;
         }

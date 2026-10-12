@@ -657,7 +657,7 @@ pub fn skills_config_block(providers: &[Provider]) -> String {
 /// line belongs to it only when an indented line follows. The result is
 /// refused unless it parses to exactly `providers` with every other key
 /// unchanged.
-fn rewrite_skills_section(text: &str, providers: &[Provider]) -> Result<String, String> {
+pub(crate) fn rewrite_skills_section(text: &str, providers: &[Provider]) -> Result<String, String> {
     let newline = if text.contains("\r\n") { "\r\n" } else { "\n" };
     let block = skills_config_block(providers).replace('\n', newline);
     let lines: Vec<&str> = text.split_inclusive('\n').collect();

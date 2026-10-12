@@ -340,7 +340,10 @@ scenario) that carry no pins were written before 0.15. Each still names
   `scenario_digest`) equals its current digest, and no declared evidence
   record of the scenario is newer than the review. It counts. When the
   scenario lived in another `.feature` file at that commit, the spec
-  root's files at that commit are searched for its id.
+  root's files at that commit are searched for its id, then the files
+  under each of the root's `former_roots` (where `canon migrate` moved
+  it from, e.g. `specs` for a root now at `.canon/specs`). Only the
+  root's own directories are searched, never another root's.
 - **stale** — the scenario changed since the commit, or it has newer
   evidence. It no longer counts, and an in-scope scenario left with no
   other qualifying review is `unreviewed-promotion`:

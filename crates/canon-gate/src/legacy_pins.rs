@@ -25,9 +25,12 @@
 //! # How git is read
 //! One `git cat-file --batch` process serves every read of a run. Each
 //! pin is checked once (`<pin>^{commit}`), each `(pin, file)` is read and
-//! digested once, and each `(pin, spec root)` is listed once (`git
-//! ls-tree`) when a scenario is not in its current file at the pin and its
-//! old file has to be found. `GIT_NO_LAZY_FETCH=1` keeps a partial clone
+//! digested once, and each `(pin, spec root directory)` is listed once
+//! (`git ls-tree`) when a scenario is not in its current file at the pin
+//! and its old file has to be found: the root's directory now, then each
+//! directory `canon migrate` moved the root from (0.17 D6), so a review
+//! pinned before the move still finds its scenario.
+//! `GIT_NO_LAZY_FETCH=1` keeps a partial clone
 //! from fetching a missing object: a read never touches the network.
 //!
 //! # Undecidable
@@ -82,12 +85,16 @@ impl LegacyPins {
 }
 
 /// Where the spec corpus lives now, repo-relative: the `.feature` file
-/// holding each scenario, and each spec root's directory (searched at a
-/// pinned commit when the scenario was in another file then).
+/// holding each scenario, and the directories each spec root's history
+/// lives under, searched at a pinned commit when the scenario was in
+/// another file then: the root's directory now, then every directory
+/// `canon migrate` moved it from (`specs.roots[].former_roots`, 0.17 D6).
+/// A former directory is the same project's corpus at the commits before
+/// the move, so the search never reaches another root's scenarios.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SpecSources {
     pub files: BTreeMap<(ProjectId, ScenarioId), PathBuf>,
-    pub roots: BTreeMap<ProjectId, PathBuf>,
+    pub roots: BTreeMap<ProjectId, Vec<PathBuf>>,
 }
 
 /// Read the pinned commit of every in-effect review without `pins` whose
@@ -138,15 +145,18 @@ impl PinReader {
                 return PinnedScenario::Digest(digest);
             }
         }
-        let Some(root) = sources.roots.get(project_id).and_then(|root| git_path(root).or_else(|| is_repo_root(root).then(|| ".".to_string()))) else {
+        let Some(dirs) = sources.roots.get(project_id) else {
             return PinnedScenario::ScenarioMissing;
         };
-        for file in self.feature_files(pin, &root) {
-            if Some(&file) == current.as_ref() {
-                continue;
-            }
-            if let Some(digest) = self.digests(pin, &file).and_then(|d| d.get(id)).cloned() {
-                return PinnedScenario::Digest(digest);
+        let dirs: Vec<String> = dirs.iter().filter_map(|dir| git_path(dir).or_else(|| is_repo_root(dir).then(|| ".".to_string()))).collect();
+        for dir in dirs {
+            for file in self.feature_files(pin, &dir) {
+                if Some(&file) == current.as_ref() {
+                    continue;
+                }
+                if let Some(digest) = self.digests(pin, &file).and_then(|d| d.get(id)).cloned() {
+                    return PinnedScenario::Digest(digest);
+                }
             }
         }
         PinnedScenario::ScenarioMissing

@@ -130,6 +130,7 @@ fn init_rerun_keeps_canon_yaml_and_policy_and_refreshes_only_the_agents_md_block
 fn init_rerun_with_no_agents_md_refuses_to_overwrite_an_existing_canon_yaml() {
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), "canon.yaml", "# a hand-authored config\ntiers:\n  git:\n    root: .canon/ledger\n");
+    write(dir.path(), ".gitignore", CANON_GITIGNORE);
     let before = std::fs::read(dir.path().join("canon.yaml")).unwrap();
 
     let out = run_canon(&["init", "--repo", ".", "--no-agents-md"], dir.path());
@@ -137,6 +138,48 @@ fn init_rerun_with_no_agents_md_refuses_to_overwrite_an_existing_canon_yaml() {
     assert!(stderr(&out).contains("canon.yaml"), "{}", stderr(&out));
     assert_eq!(std::fs::read(dir.path().join("canon.yaml")).unwrap(), before, "the existing file's bytes must be byte-identical before and after the refused init");
     assert!(!dir.path().join("AGENTS.md").exists());
+    assert_eq!(std::fs::read_to_string(dir.path().join(".gitignore")).unwrap(), CANON_GITIGNORE);
+}
+
+/// Every canon `.gitignore` line, as a repo set up by `canon init` 0.17 has them.
+const CANON_GITIGNORE: &str = ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n";
+
+/// authoring.init.97 (#35): `canon init` re-run on a repo an older canon
+/// set up adds the canon `.gitignore` lines it lacks, each once, and keeps
+/// the rest of the file and `canon.yaml` byte-identical; with
+/// `--no-agents-md` that is all it does, and a second run with nothing
+/// missing is the old overwrite refusal.
+#[test]
+fn authoring_init_97_a_rerun_adds_the_missing_canon_gitignore_lines() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "canon.yaml", "# a 0.15 config\ntiers:\n  git:\n    root: .canon/ledger\n");
+    write(dir.path(), ".gitignore", "target/\n.canon/hot.db*");
+    let canon_yaml = std::fs::read(dir.path().join("canon.yaml")).unwrap();
+
+    let out = run_canon(&["init", "--repo", "."], dir.path());
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(stdout(&out).contains("canon.yaml already exists — left unchanged; the AGENTS.md block and the canon .gitignore lines are refreshed\n"), "{}", stdout(&out));
+    assert!(
+        stdout(&out).contains("canon init: added to .gitignore: .canon/audit/, .canon/ledger/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock\n"),
+        "{}",
+        stdout(&out)
+    );
+    let gitignore = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
+    assert!(gitignore.starts_with("target/\n.canon/hot.db*\n# canon's read-access audit log"), "the existing lines are kept: {gitignore}");
+    for line in CANON_GITIGNORE.lines() {
+        assert_eq!(gitignore.lines().filter(|have| have.trim() == line).count(), 1, "{line} once: {gitignore}");
+    }
+    assert_eq!(std::fs::read(dir.path().join("canon.yaml")).unwrap(), canon_yaml);
+
+    let other = tempfile::tempdir().unwrap();
+    write(other.path(), "canon.yaml", "# a 0.15 config\ntiers:\n  git:\n    root: .canon/ledger\n");
+    let out = run_canon(&["init", "--repo", ".", "--no-agents-md"], other.path());
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(stdout(&out).contains("left unchanged; the canon .gitignore lines are refreshed\n"), "{}", stdout(&out));
+    assert!(!other.path().join("AGENTS.md").exists());
+    assert_eq!(std::fs::read_to_string(other.path().join(".gitignore")).unwrap().lines().filter(|line| !line.starts_with('#')).collect::<Vec<_>>(), CANON_GITIGNORE.lines().collect::<Vec<_>>());
+    let again = run_canon(&["init", "--repo", ".", "--no-agents-md"], other.path());
+    assert_eq!(again.status.code(), Some(2), "nothing left to refresh: {}", stdout(&again));
 }
 
 #[test]
