@@ -1,6 +1,6 @@
 //! S11 task 8: the fixture corpus under `fixtures/consumer-corpus/pre/`
 //! reproduces a donor project's real, audited drift shapes (abbreviated
-//! `app_sha`, flat-not-Hive `features/`/`inventory/`, `;`- AND
+//! `app_sha`, flat-not-Hive `kind=feature/`/`inventory/`, `;`- AND
 //! `,`-joined `port_ref`, free-text `upstream_ref`, the fourth ad-hoc
 //! `assets.lock` format, envelope-less `policy.yaml`, a one-way
 //! divergence back-ref) — every sample grounded in a real corresponding
@@ -28,13 +28,13 @@ fn fmt_check_detects_every_audited_gap_category_on_fixtures() {
 }
 
 #[test]
-fn fmt_check_flags_the_pre_migration_features_dir_as_layout_violation() {
+fn fmt_check_flags_the_flat_feature_partition_as_layout_violation() {
     let report = check(&fixture_root());
     let hit = report
         .violations
         .iter()
-        .find(|v| v.class == FmtFailureClass::LayoutGrammar && v.path.to_string_lossy().contains("features/idolive"));
-    assert!(hit.is_some(), "expected a features/ layout violation, got: {report:#?}");
+        .find(|v| v.class == FmtFailureClass::LayoutGrammar && v.path.to_string_lossy().contains("kind=feature/idolive"));
+    assert!(hit.is_some(), "expected a kind=feature/ layout violation, got: {report:#?}");
 }
 
 #[test]

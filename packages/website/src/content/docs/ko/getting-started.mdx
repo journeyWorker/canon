@@ -69,7 +69,10 @@ canon gate check: clean (0 violations)
    ```
 
    바로 동작하는 `canon.yaml` 스켈레톤을 씁니다 — 스토리지
-   `tiers:`, 레코드 `routing:`, `specs:` root, 그리고 `plans:` 소스
+   `tiers:`, 레코드 `routing:`, 기본 root `.canon/specs`를 가진
+   `specs:`(`.feature` 파일은
+   `<root>/kind=feature/area=<area>/<surface>.feature`에 두며, 직접
+   작성하고 git으로 추적합니다), 그리고 `plans:` 소스
    (레포 루트를 가리키는 `openspec` 소스와 빈 `openspec/changes/`)까지.
    함께 쓰는 파일은 둘입니다:
 

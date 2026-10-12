@@ -12,8 +12,8 @@ use std::process::{Command, Output};
 
 use canon_model::RecordKind;
 
-const FEATURE: &str = "specs/features/kind=feature/area=cart/add.feature";
-const MOVED: &str = "specs/features/kind=feature/area=cart/basket.feature";
+const FEATURE: &str = ".canon/specs/kind=feature/area=cart/add.feature";
+const MOVED: &str = ".canon/specs/kind=feature/area=cart/basket.feature";
 
 const BASE: &str = r#"Feature: cart add
   # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
@@ -66,7 +66,7 @@ fn commit_file(repo: &Path, path: &str, body: &str, message: &str) -> String {
     let file = repo.join(path);
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
     std::fs::write(file, body).unwrap();
-    git(repo, &["add", "-A", "specs"]);
+    git(repo, &["add", "-A", ".canon/specs"]);
     git(repo, &["commit", "-q", "-m", message]);
     git(repo, &["rev-parse", "HEAD"])
 }
@@ -195,7 +195,7 @@ fn a_legacy_review_whose_pin_cannot_be_read_counts_with_an_advisory() {
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
     std::fs::create_dir_all(repo.join(".canon")).unwrap();
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
-    let before = commit_file(repo, "specs/README.md", "specs land here\n", "before the scenarios");
+    let before = commit_file(repo, ".canon/specs/README.md", "specs land here\n", "before the scenarios");
     commit_file(repo, FEATURE, BASE, "cart add");
     ok(repo, &["inventory", "sync"]);
     attest(repo, "cart.add.01");

@@ -62,11 +62,11 @@ fn write_repo(dir: &Path) {
     let feature_text = format!(
         "Feature: idolive hub\n{prov}\n\n  @idolive.hub.01\n  Scenario: Opening the hub\n{prov}\n    Given a step\n\n  @idolive.hub.02\n  Scenario: Never covered\n{prov}\n    Given a step\n"
     );
-    write(dir, "specs/features/kind=feature/area=idolive/hub.feature", &feature_text);
+    write(dir, ".canon/specs/kind=feature/area=idolive/hub.feature", &feature_text);
 
     write(
         dir,
-        "specs/inventory/kind=inventory/area=idolive/surface=hub/hub.yaml",
+        ".canon/specs/inventory/kind=inventory/area=idolive/surface=hub/hub.yaml",
         "schema: 1\nkind: inventory\nat: \"2026-07-10T00:00:00Z\"\nactor:\n  agent_id: test\nidolive.hub.hub-header:\n  upstream:\n    pin: a\n    file: f.tsx\n    symbol: S\n    lines: \"1-2\"\n  covered_by: [idolive.hub.01]\n",
     );
 }
@@ -256,7 +256,7 @@ fn canon_gate_source_carries_no_porting_plugin_reference() {
 fn write_inventory_at(dir: &Path, at: &str, covered_by: &str) {
     write(
         dir,
-        "specs/inventory/kind=inventory/area=idolive/surface=hub/hub.yaml",
+        ".canon/specs/inventory/kind=inventory/area=idolive/surface=hub/hub.yaml",
         &format!("schema: 1\nkind: inventory\nat: \"{at}\"\nactor:\n  agent_id: test\nidolive.hub.hub-header:\n  upstream:\n    pin: a\n    file: f.tsx\n    symbol: S\n    lines: \"1-2\"\n  covered_by: {covered_by}\n"),
     );
 }
@@ -321,7 +321,7 @@ fn plugin_sync_from_a_subdirectory_resolves_the_repo_root_tier() {
     write_repo(dir.path());
     sync_inventory(dir.path());
 
-    let sub = dir.path().join("specs/features"); // a nested subdir, no canon.yaml of its own
+    let sub = dir.path().join(".canon/specs/kind=feature"); // a nested subdir, no canon.yaml of its own
     let out = run_canon(&["plugin", "sync", "porting", "--repo", "."], &sub);
     assert!(out.status.success(), "plugin sync --repo . from a subdir must resolve the repo root: {}", stderr(&out));
     assert!(stdout(&out).contains("2 written"), "must write into the repo-root tier: {}", stdout(&out));

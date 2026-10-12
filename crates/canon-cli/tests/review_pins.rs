@@ -7,7 +7,7 @@
 use std::path::Path;
 use std::process::{Command, Output};
 
-const FEATURE: &str = "specs/features/kind=feature/area=cart/add.feature";
+const FEATURE: &str = ".canon/specs/kind=feature/area=cart/add.feature";
 
 const BASE: &str = r#"Feature: cart add
   # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}

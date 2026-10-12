@@ -60,7 +60,7 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
         assert!(text.contains(&format!("{kind}: local")), "missing local-routing line for `{kind}`: {text}");
     }
     assert!(text.contains("specs:"), "{text}");
-    assert!(text.contains("root: specs"), "{text}");
+    assert!(text.contains("root: .canon/specs"), "{text}");
     assert!(text.contains("plans:"), "{text}");
     assert!(text.contains("- dialect: openspec\n      root: .\n"), "init must configure the default openspec plans source: {text}");
     assert!(dir.path().join("openspec/changes/.gitkeep").is_file(), "the plans source's changes dir must exist and survive a clone");
@@ -353,7 +353,7 @@ fn init_then_inventory_sync_succeeds_with_zero_further_edits() {
 
     let prov = "  # canon: {\"schema\":1,\"at\":\"2026-07-10T00:00:00Z\",\"actor\":{\"agent_id\":\"a-human\"}}";
     let feature_text = format!("Feature: world hotdeal\n{prov}\n\n  @world.hotdeal.01\n  Scenario: Apply a hotdeal coupon\n{prov}\n    Given a step\n");
-    write(dir.path(), "specs/features/kind=feature/area=world/hotdeal.feature", &feature_text);
+    write(dir.path(), ".canon/specs/kind=feature/area=world/hotdeal.feature", &feature_text);
 
     let out = run_canon(&["inventory", "sync", "--repo", "."], dir.path());
     assert!(out.status.success(), "canon inventory sync must succeed against a freshly-init'd repo with zero further config edits: {}", stderr(&out));

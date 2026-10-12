@@ -286,7 +286,7 @@ fn a_reader_refreshes_a_stale_index_once_and_names_the_files() {
     let out = ok(repo, &["status", "--json"]);
     let lines: Vec<String> = stderr(&out).lines().map(str::to_string).collect();
     assert_eq!(lines.len(), 1, "one line says what was refreshed: {lines:?}");
-    assert!(lines[0].starts_with("canon status: refreshed the scenario index from 1 changed feature file(s) (specs/features/"), "{lines:?}");
+    assert!(lines[0].starts_with("canon status: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/"), "{lines:?}");
     assert!(lines[0].ends_with(": 1 record(s) written"), "{lines:?}");
     let report: serde_json::Value = serde_json::from_slice(&out.stdout).expect("stdout stays JSON");
     let runs = report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "runs").unwrap();
@@ -309,7 +309,7 @@ fn an_edited_feature_file_is_reindexed_by_the_next_reader_and_only_that_file() {
     ok(repo, &["inventory", "sync"]);
     assert_eq!(scenario_records(repo).len(), 2);
 
-    let feature = files_under(repo.join("specs/features")).into_iter().find(|p| p.to_string_lossy().contains("run")).expect("the run feature file");
+    let feature = files_under(repo.join(".canon/specs/kind=feature")).into_iter().find(|p| p.to_string_lossy().contains("run")).expect("the run feature file");
     let text = std::fs::read_to_string(&feature).unwrap();
     std::fs::write(&feature, text.replace("A run ends", "A run ends at zero health")).unwrap();
 
@@ -338,7 +338,7 @@ fn review_add_and_subject_status_need_no_sync_step() {
     ]);
     assert!(stderr(&review).contains("canon review add: refreshed the scenario index"), "{}", stderr(&review));
 
-    let feature = files_under(repo.join("specs/features")).pop().unwrap();
+    let feature = files_under(repo.join(".canon/specs/kind=feature")).pop().unwrap();
     let text = std::fs::read_to_string(&feature).unwrap();
     std::fs::write(&feature, text.replace("A run ends", "A run ends cleanly")).unwrap();
     let out = ok(repo, &["subject", "status", "runs", "specced", "--actor-id", "lead"]);
@@ -353,7 +353,7 @@ fn a_root_that_cannot_sync_is_named_and_a_dir_without_canon_yaml_is_never_writte
     let dir = init_repo();
     let repo = dir.path();
     ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
-    let feature = files_under(repo.join("specs/features")).pop().unwrap();
+    let feature = files_under(repo.join(".canon/specs/kind=feature")).pop().unwrap();
     let text = std::fs::read_to_string(&feature).unwrap();
     // Drop the provenance comment `canon format` requires on the header.
     let broken: String = text.lines().filter(|l| !l.trim_start().starts_with("# canon:")).map(|l| format!("{l}\n")).collect();
@@ -367,11 +367,11 @@ fn a_root_that_cannot_sync_is_named_and_a_dir_without_canon_yaml_is_never_writte
     assert!(scenario_records(repo).is_empty(), "an aborted root writes nothing");
 
     let bare = tempfile::tempdir().unwrap();
-    std::fs::create_dir_all(bare.path().join("specs/features")).unwrap();
-    std::fs::copy(&feature, bare.path().join("specs/features/run.feature")).unwrap();
+    std::fs::create_dir_all(bare.path().join(".canon/specs/kind=feature")).unwrap();
+    std::fs::copy(&feature, bare.path().join(".canon/specs/kind=feature/run.feature")).unwrap();
     let _ = canon(bare.path(), &["gate", "check", "--repo", "."]);
     let _ = canon(bare.path(), &["status", "--repo", "."]);
-    assert!(!bare.path().join(".canon").exists(), "no canon.yaml, no refresh");
+    assert!(!bare.path().join(".canon/ledger").exists(), "no canon.yaml, no refresh");
 }
 
 /// Every scenario index record of `repo` without its `at` stamp, sorted:
@@ -400,7 +400,7 @@ fn repo_with_a_deleted_scenario() -> tempfile::TempDir {
     ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
     ok(repo, &["scenario", "new", "game.shop.01", "--title", "A shop opens", "--case", "failure"]);
     ok(repo, &["inventory", "sync"]);
-    let shop = files_under(repo.join("specs/features")).into_iter().find(|p| p.to_string_lossy().contains("shop")).expect("the shop feature file");
+    let shop = files_under(repo.join(".canon/specs/kind=feature")).into_iter().find(|p| p.to_string_lossy().contains("shop")).expect("the shop feature file");
     std::fs::remove_file(shop).unwrap();
     dir
 }
@@ -451,7 +451,7 @@ fn a_deleted_scenario_is_removed_the_same_way_by_a_refresh_and_by_a_full_sync() 
 fn a_root_that_cannot_sync_marks_no_scenario_removed() {
     let dir = repo_with_a_deleted_scenario();
     let repo = dir.path();
-    let run = files_under(repo.join("specs/features")).pop().expect("the run feature file");
+    let run = files_under(repo.join(".canon/specs/kind=feature")).pop().expect("the run feature file");
     let text = std::fs::read_to_string(&run).unwrap();
     std::fs::write(&run, text.lines().filter(|l| !l.trim_start().starts_with("# canon:")).map(|l| format!("{l}\n")).collect::<String>()).unwrap();
 
@@ -483,7 +483,7 @@ fn inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_sta
     for state in ["specced", "building", "verifying"] {
         ok(repo, &["subject", "status", "demo", state, "--actor-id", "lead"]);
     }
-    let feature = files_under(repo.join("specs/features")).pop().unwrap();
+    let feature = files_under(repo.join(".canon/specs/kind=feature")).pop().unwrap();
     let clean = std::fs::read_to_string(&feature).unwrap();
     let mut lines: Vec<&str> = clean.lines().collect();
     let provenance = lines.iter().rposition(|l| l.contains("# canon:")).unwrap();

@@ -12,14 +12,15 @@ use std::path::PathBuf;
 /// discipline as `canon_model::evidence::FailureClass`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FmtFailureClass {
-    /// features/ third partition grammar; inventory/ partition-key
+    /// the `.feature` corpus's `kind=feature/area=` grammar (and a
+    /// root still on the pre-0.17 `features/` dir); inventory/ partition-key
     /// smeared into filenames; any leaf/segment mismatch against a
     /// kind's [`canon_model::family::LayoutDescriptor`].
     LayoutGrammar,
-    /// inventory/ (and, pre-migration, features/) missing the
+    /// inventory/ (and, pre-migration, `.feature` files) missing the
     /// `{schema, kind, at, actor}` envelope entirely.
     MissingEnvelope,
-    /// features/ scenario/feature header missing its `# canon: {...}`
+    /// `.feature` scenario/feature header missing its `# canon: {...}`
     /// authoring-provenance comment (design D2).
     MissingProvenance,
     /// A record's actor is absent or still a bare `by` string (ledger

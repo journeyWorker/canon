@@ -378,22 +378,36 @@ pub fn resolve(repo: &Path) -> StatusReport {
     // ── fail closed: .feature edits the index refresh could not take ──
     // The same decision `canon gate check` and the ship guard fail on:
     // every count below would describe specs the files no longer say, so
-    // the sync that names the problems is the only step.
+    // the step that unblocks it is the only step. A root still on the
+    // pre-0.17 layout is never read: `canon migrate` moves it (0.17 D1).
     let unrefreshable = crate::inventory::unrefreshable_roots(repo);
     if !unrefreshable.is_empty() {
-        let ids = unrefreshable.iter().map(|root| format!("`{}`", root.id.as_str())).collect::<Vec<_>>().join(", ");
-        let (violations, errors) = unrefreshable.iter().fold((0, 0), |(v, e), root| (v + root.violations, e + root.sync_errors));
+        let quote = |roots: &[&crate::inventory::UnrefreshableRoot]| roots.iter().map(|root| format!("`{}`", root.id.as_str())).collect::<Vec<_>>().join(", ");
+        let (old, stale): (Vec<_>, Vec<_>) = unrefreshable.iter().partition(|root| root.pre_0_17.is_some());
         if scenarios.is_empty() {
             warnings.push("the ledger holds no scenario records, so every subject reads as owning none".into());
         }
-        warnings.push(format!("the scenario index for spec root(s) {ids} is stale and could not be refreshed, so `canon gate check` fails and no subject is suggested to move on"));
-        next.push(NextStep {
-            actor: StepActor::Agent,
-            command: "canon inventory sync".into(),
-            why: format!(
-                "the .feature files under spec root(s) {ids} changed, but the automatic refresh could not index them ({violations} format violation(s), {errors} sync error(s)); this names each format violation or duplicate id to fix"
-            ),
-        });
+        if !old.is_empty() {
+            let ids = quote(&old);
+            warnings.push(format!("spec root(s) {ids} are on the pre-0.17 layout (`features/kind=feature/`), which canon no longer reads, so `canon gate check` fails and no subject is suggested to move on"));
+            next.push(NextStep {
+                actor: StepActor::Agent,
+                command: "canon migrate".into(),
+                why: format!("spec root(s) {ids} hold their .feature files under `features/kind=feature/`; `canon migrate` moves them to `kind=feature/` directly under the root"),
+            });
+        }
+        if !stale.is_empty() {
+            let ids = quote(&stale);
+            let (violations, errors) = stale.iter().fold((0, 0), |(v, e), root| (v + root.violations, e + root.sync_errors));
+            warnings.push(format!("the scenario index for spec root(s) {ids} is stale and could not be refreshed, so `canon gate check` fails and no subject is suggested to move on"));
+            next.push(NextStep {
+                actor: StepActor::Agent,
+                command: "canon inventory sync".into(),
+                why: format!(
+                    "the .feature files under spec root(s) {ids} changed, but the automatic refresh could not index them ({violations} format violation(s), {errors} sync error(s)); this names each format violation or duplicate id to fix"
+                ),
+            });
+        }
         let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
         let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
         return finish(repo, &ctx.policy, warnings, summaries, unowned, drops, audits, next);

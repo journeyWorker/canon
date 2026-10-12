@@ -207,7 +207,7 @@ that no `.feature` file of it declares any more. The reader then runs
 covers the whole root) and prints one stderr line:
 
 ```
-canon status: refreshed the scenario index from 1 changed feature file(s) (specs/features/kind=feature/area=cart/add.feature): 1 record(s) written
+canon status: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
 A deleted scenario is not erased: `canon inventory sync` — and a reader's

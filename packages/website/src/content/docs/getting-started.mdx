@@ -68,7 +68,9 @@ is attributed, and is fresh — never on a self-report. See
    ```
 
    This writes a working `canon.yaml` skeleton — storage `tiers:`, record
-   `routing:`, `specs:` roots, and a `plans:` source (`openspec`, rooted at
+   `routing:`, `specs:` with its default root `.canon/specs` (`.feature`
+   files at `<root>/kind=feature/area=<area>/<surface>.feature`, authored
+   and git-tracked), and a `plans:` source (`openspec`, rooted at
    the repo, with an empty `openspec/changes/`). It also writes:
 
    - **`.canon/policy.yaml`**, a starter policy that turns `spec_coverage`

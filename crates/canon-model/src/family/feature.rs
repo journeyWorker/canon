@@ -1,4 +1,4 @@
-//! `spec/features/kind=feature/area=<area>/<surface>.feature` (S11
+//! `<spec root>/kind=feature/area=<area>/<surface>.feature` (S11
 //! design D2): authoring provenance for a Gherkin `Feature:`/
 //! `Scenario:` header, carried as a structured `# canon: {...}` comment
 //! line — valid Gherkin (a `#`-prefixed line is a comment to every

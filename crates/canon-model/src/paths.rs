@@ -21,6 +21,13 @@ pub const CANON_DIR: &str = ".canon";
 /// staging dir). Overridable via `canon.yaml` `tiers.local.root`.
 pub const LEDGER_DIR: &str = ".canon/ledger";
 
+/// The default spec root (`specs.roots[]` entry `id: root`, 0.17 D1):
+/// the authored `.feature` corpus, at
+/// `kind=feature/area=<area>/<surface>.feature` beneath it. Used when
+/// `canon.yaml` has no `specs:` section, and written by `canon init`.
+/// Authored and git-tracked: no canon `.gitignore` line may cover it.
+pub const SPECS_DIR: &str = ".canon/specs";
+
 /// Hot-tier sqlite database file. Overridable via `tiers.hot.path`.
 pub const HOT_DB_FILE: &str = ".canon/hot.db";
 
@@ -113,6 +120,7 @@ mod tests {
     fn every_product_path_lives_under_the_canon_dir() {
         let all = [
             LEDGER_DIR,
+            SPECS_DIR,
             HOT_DB_FILE,
             HOT_DB_GITIGNORE,
             LEARN_DIR,

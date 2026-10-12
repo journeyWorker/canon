@@ -1,7 +1,7 @@
 //! `canon-fmt`: the artifact-family format authority (S11
 //! `s11-format-authority-migration`) — `canon fmt --check` validates
 //! an EXTERNAL consumer-repo corpus shape (ledger/divergences/
-//! features/inventory/policy.yaml) against `canon-model`'s family
+//! kind=feature/inventory/policy.yaml) against `canon-model`'s family
 //! schemas + layout descriptors (`canon_model::family`). This crate
 //! never touches canon's OWN storage tiers (`canon-store`'s job, S2),
 //! and never reads a live consumer-repo checkout on its own — every

@@ -3,7 +3,7 @@
 `canon format --check` is canon's read-only format validator over a
 consumer-repo artifact corpus: ledger records (run/drill/review/clear/
 code-review/design-review), divergence events (manifest/review/
-remediation), `features/`, `inventory/`, and `policy.yaml`. It never
+remediation), `kind=feature/` spec files, `inventory/`, and `policy.yaml`. It never
 rewrites or mutates the corpus — it only validates and reports.
 
 ## Running
@@ -17,7 +17,7 @@ a report grouped by failure class in this fixed order:
 
 | Failure class | Meaning | Fix |
 |---|---|---|
-| `layout-grammar` | Wrong Hive path shape — a `features/`/`inventory/` file not under a `kind=<kind>/area=<area>/` prefix, a wrong leaf filename, or `assets.lock`'s ad-hoc format. | Move the file under the correct `kind=…/area=…/` prefix with the expected leaf name. |
+| `layout-grammar` | Wrong Hive path shape — a spec or `inventory/` file not under a `kind=<kind>/area=<area>/` prefix, a wrong leaf filename, or `assets.lock`'s ad-hoc format. A spec root still on the pre-0.17 layout (any `.feature` file under `<root>/features/`) is refused with one violation at path `features`. | Move the file under the correct `kind=…/area=…/` prefix with the expected leaf name. For a pre-0.17 root, run `canon migrate`, which moves `features/kind=feature/` to `<root>/kind=feature/`. |
 | `missing-envelope` | A YAML file (`inventory/`, `policy.yaml`) has no top-level `schema`/`kind`/`at`/`actor` keys. | Add the four envelope keys at the top level. |
 | `missing-provenance` | A `.feature` file's `Feature:`/`Scenario:` header has no `# canon: {...}` comment either directly above it (with its tags, no blank line) or directly below it. | Use `canon scenario new` / `canon feature new`, which stamp it; never hand-type the line. See `canon-authoring`. |
 | `missing-actor` | No structured `actor` object — a bare `by` string, or absent. | Replace `by: <name>` with a structured `actor` object. |

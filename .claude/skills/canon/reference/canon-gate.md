@@ -63,7 +63,7 @@ sync` runs) and says so in one stderr line, silent when the index is
 fresh:
 
 ```
-canon gate check: refreshed the scenario index from 1 changed feature file(s) (specs/features/kind=feature/area=cart/add.feature): 1 record(s) written
+canon gate check: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
 A root that fails to sync (format violations, a duplicate id) is named
@@ -76,6 +76,15 @@ does not hold the edits. The `verifying → shipped` guard refuses with
 the same violation, and `canon status` lists the sync as its only step.
 Fix what the sync lists and run the gate again. See `canon-storage`
 (The scenario index).
+
+A spec root still on the pre-0.17 layout (a `.feature` file under
+`<root>/features/`) fails closed the same way, whether or not the index
+already holds its scenarios: the gate adds `uncovered-cell <root> — spec
+root `<root>` (`<path>`) is on the pre-0.17 layout (…)…; until then its
+scenarios are not graded` and exits 1, the ship guard refuses with the
+same violation, and `canon status` names `canon migrate` as its only
+step. `canon migrate` moves `features/kind=feature/` to
+`<root>/kind=feature/`; run it, then the gate again.
 
 ### The spec-derived worklist (`spec_coverage`, opt-in)
 

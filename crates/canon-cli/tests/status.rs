@@ -820,7 +820,7 @@ fn context_status_09_status_on_an_unindexable_corpus_points_at_inventory_sync() 
     write_policy(dir.path(), FULL_POLICY);
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &[]);
     seed_subject(dir.path(), "other-subject", SubjectStatus::Building, &[]);
-    let feature = dir.path().join("specs/features/kind=feature/area=world/demo.feature");
+    let feature = dir.path().join(".canon/specs/kind=feature/area=world/demo.feature");
     std::fs::create_dir_all(feature.parent().unwrap()).unwrap();
     std::fs::write(&feature, "Feature: demo\n\n  @subject:demo-subject\n  @world.demo.01\n  Scenario: A demo\n    Given a step\n").unwrap();
 

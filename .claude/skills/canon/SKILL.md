@@ -66,7 +66,10 @@ work inside an approved scope, never to the approval itself.
    one of them prints `NOT refreshed` (a format violation, such as a
    hand-written header with no `# canon:` provenance comment, or a
    duplicate id) run `canon inventory sync`: it names each problem; fix
-   them, and the next command indexes the files.
+   them, and the next command indexes the files. Specs live at
+   `<root>/kind=feature/area=<area>/<surface>.feature` under a
+   `specs.roots[]` root (default `.canon/specs`); a root still on
+   `features/kind=feature/` is refused until you run `canon migrate`.
 4. **Units.** Split the work into units (for example specs, domain code,
    assets, review). Give each unit its own actor id and session id, and pass
    them on everything the unit records (`--actor-id <unit> --session-id <session>`),

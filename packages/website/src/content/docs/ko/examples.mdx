@@ -63,9 +63,10 @@ import { Steps } from "@astrojs/starlight/components";
      evidence_record: local
      subject: local
    specs:
+     # The .feature corpus: <root>/kind=feature/area=<area>/<surface>.feature.
      roots:
        - id: root
-         root: specs
+         root: .canon/specs
    plans:
      sources: []
    ```
@@ -80,16 +81,20 @@ import { Steps } from "@astrojs/starlight/components";
    ```
 
 2. **스펙 코퍼스 검증.** `.feature` 파일은 `specs.roots[]`가
-   가리키는 경로(기본값 `specs/`) 아래에 있습니다:
+   가리키는 경로(기본값 `.canon/specs`, git으로 추적) 아래
+   `<root>/kind=feature/area=<area>/<surface>.feature`에 있습니다:
 
    ```bash
-   bunx @journeykit/canon fmt --check specs
+   bunx @journeykit/canon fmt --check .canon/specs
    ```
 
    코퍼스를 canon의 아티팩트-패밀리 스키마와 레이아웃 디스크립터에
    대해 검사합니다. provenance 누락, 레이아웃 문법 위반 등 어떤
    위반이든 보고되며 — 여기가 깨끗해지기 전에는 다음 단계가
-   실행되지 않습니다.
+   실행되지 않습니다. 아직 0.17 이전 레이아웃인 root(`<root>/features/`
+   아래의 `.feature` 파일)는 `layout-grammar` 위반 하나로 보고되며,
+   `canon migrate`가 `features/kind=feature/`를 `<root>/kind=feature/`로
+   옮깁니다.
 
 3. **레저 인덱스 구체화.**
 
@@ -98,7 +103,7 @@ import { Steps } from "@astrojs/starlight/components";
    ```
 
    설정된 각 root에 대해 동일한 `fmt --check` 검사를 다시 수행한
-   뒤, `<root>/features/**/*.feature`를 순회하며 `(project_id,
+   뒤, `<root>/kind=feature/area=<area>/<surface>.feature`를 순회하며 `(project_id,
    scenario_id)`쌍마다 하나의 `Scenario` 레저 레코드를 upsert
    합니다. 위반이 발생하면 해당 root 전체가 중단됩니다 — 부분
    sync는 절대 없으며, 그 root에 대해 레코드가 하나도 쓰이지
@@ -124,7 +129,8 @@ import { Steps } from "@astrojs/starlight/components";
    ```
 
    `.feature` 스텁을 추가합니다 — 파일이 없으면 새로 만듭니다 — 대상
-   경로는 태그 자체의 `<area>.<surface>`에서 유도되거나(또는 설정된
+   경로 `<root>/kind=feature/area=auth/login.feature`는 태그 자체의
+   `<area>.<surface>`에서 유도되거나(또는 설정된
    `specs.roots[]` 항목 아래의 명시적 `--feature <path>`) 결정됩니다.
    스텁은 태그 바로 위에 `# canon:` provenance 줄을 두며 `--actor`(또는
    `CANON_ACTOR`)를 기록하고, 이어서 `@subject:auth-core`,
@@ -145,7 +151,7 @@ import { Steps } from "@astrojs/starlight/components";
      --scenario-id auth.login.01 \
      --reviewer alice \
      --pin "$(git rev-parse HEAD)" \
-     --original-spec-ref specs/auth.feature \
+     --original-spec-ref .canon/specs/kind=feature/area=auth/login.feature \
      --role dev
    ```
 
