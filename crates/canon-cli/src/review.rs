@@ -324,6 +324,9 @@ fn write_reviews(
                     }
                 }
                 held.rollback();
+                if reviews.len() == 1 {
+                    return Err(e.to_string());
+                }
                 return Err(format!("writing review {} of {} failed: {e}", written.len() + 1, reviews.len()));
             }
         }
@@ -499,6 +502,13 @@ mod tests {
         assert!(error.contains("writing review 2 of 2 failed: ") && error.contains("disk full"), "{error}");
         assert!(reviews(&dir).is_empty(), "the first review is removed");
         assert_eq!(blobs(), 0, "the blob this call stored is removed");
+
+        // One scenario: the error is the write's own, as before 0.18,
+        // so `run_add` prints `canon review add: <error>` unchanged.
+        let disk_full = || canon_store::tier::StoreError::Io(std::io::Error::other("disk full"));
+        let single = write_reviews(dir.path(), &ledger_root, &files, &batch[..1], &mut |_, _| Err(disk_full())).unwrap_err();
+        assert_eq!(single, disk_full().to_string(), "a single review's failure keeps its pre-0.18 wording");
+        assert_eq!((reviews(&dir).len(), blobs()), (0, 0));
 
         let review_dir = ledger_root.join("kind=review");
         let mut readonly = std::fs::metadata(&review_dir).unwrap().permissions();
