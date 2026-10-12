@@ -462,3 +462,145 @@ fn authoring_migrate_08_a_canon_yaml_it_cannot_edit_safely_is_refused() {
     assert!(repo.join(OLD_FEATURE).is_file());
     assert_eq!(read(repo, "canon.yaml"), yaml);
 }
+
+/// `canon.yaml` once the `old_repo()` migration is complete.
+fn migrated_yaml() -> String {
+    OLD_YAML
+        .replace("      root: specs\n", "      root: .canon/specs\n      former_roots: [specs]\n")
+        .replace("  sources:\n    - dialect: openspec\n      root: .\n", "  sources: []\n")
+        + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --providers=<list>` rewrites it.\nskills:\n  providers: [claude, codex]\n"
+}
+
+fn set_mode(path: &Path, mode: u32) {
+    std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(mode)).unwrap();
+}
+
+/// The latest stored version of change `id`.
+fn latest_change(repo: &Path, id: &str) -> serde_json::Value {
+    query(repo, "change").into_iter().filter(|c| c["change_id"] == id).max_by_key(|c| c["at"].as_str().unwrap().to_string()).unwrap()
+}
+
+/// authoring.migrate.09: canon.yaml is written whole or not at all. A run
+/// whose canon.yaml write fails after the corpus and the change moved
+/// leaves canon.yaml byte-identical and exits 2; the rerun sees the root
+/// already at `.canon/specs` while canon.yaml still names `specs`, writes
+/// the `root:`/`former_roots` edit and the source removal, and re-imports
+/// the change that was moved but not re-imported.
+#[test]
+fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by_the_next() {
+    let dir = old_repo();
+    let repo = dir.path();
+    // The temp file canon.yaml is written through cannot be created.
+    std::fs::create_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
+    let out = canon(repo, &["migrate"]);
+    assert_eq!(out.status.code(), Some(2), "{}", text(&out));
+    assert!(text(&out).contains("canon migrate: stopped — failed to write"), "{}", text(&out));
+    assert!(text(&out).contains("canon.yaml is unchanged, and running `canon migrate` again finishes what this run started"), "{}", text(&out));
+    assert_eq!(read(repo, "canon.yaml"), OLD_YAML, "never half-written");
+    assert!(repo.join(NEW_FEATURE).is_file() && repo.join(".canon/changes/add-cart/brief.md").is_file(), "the moves happened before the write failed");
+
+    std::fs::remove_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
+    let out = ok(repo, &["migrate"]);
+    assert!(
+        out.contains("  spec root `root` is already at .canon/specs/kind=feature (an earlier run stopped before writing canon.yaml); canon.yaml root: .canon/specs, former_roots: [specs]\n"),
+        "{out}"
+    );
+    assert!(out.contains("  re-import change `add-cart` from .canon/changes/add-cart (an earlier run moved it and stopped before re-importing it)\n"), "{out}");
+    assert!(out.contains("  canon.yaml: remove the plans source `{ dialect: openspec, root: . }` canon init wrote"), "{out}");
+    assert_eq!(read(repo, "canon.yaml"), migrated_yaml());
+    let latest = latest_change(repo, "add-cart");
+    assert_eq!(latest["actor"]["agent_id"], "canon-plan-import-canon", "{latest}");
+    assert_eq!(latest["subject_id"], "cart", "{latest}");
+    assert!(ok(repo, &["migrate"]).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"));
+}
+
+/// authoring.migrate.10: when a pointer brief cannot be written, the
+/// openspec source that still holds the approval stays configured and the
+/// run exits 2; the rerun writes the brief and only then removes the
+/// source canon init wrote.
+#[test]
+fn authoring_migrate_10_a_failed_pointer_brief_keeps_the_source_that_holds_the_approval() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q"]);
+    let yaml = OLD_YAML.replace("      root: .\n", "      root: .\n    - dialect: openspec\n      root: ext\n");
+    write(repo, "canon.yaml", &yaml);
+    write(repo, ".gitignore", ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n");
+    write(repo, "openspec/changes/.gitkeep", "");
+    write(repo, "ext/openspec/changes/checkout/proposal.md", "## Why\n\nShip checkout.\n\nApproved: ana 2026-10-10 — \"go\"\n");
+    write(repo, "ext/openspec/changes/checkout/tasks.md", "- [ ] 1 Pay\n");
+    std::fs::create_dir_all(repo.join(".canon/changes")).unwrap();
+    commit_all(repo, "an external approval and the init source");
+    set_mode(&repo.join(".canon/changes"), 0o555);
+
+    let out = canon(repo, &["migrate"]);
+    set_mode(&repo.join(".canon/changes"), 0o755);
+    assert_eq!(out.status.code(), Some(2), "{}", text(&out));
+    assert!(text(&out).contains("canon migrate: stopped — failed to write .canon/changes/checkout/brief.md"), "{}", text(&out));
+    assert_eq!(read(repo, "canon.yaml"), yaml, "the source canon init wrote stays while the approval is not copied");
+    assert!(repo.join("openspec/changes/.gitkeep").is_file());
+
+    let out = ok(repo, &["migrate"]);
+    assert!(out.contains("canon migrate: wrote .canon/changes/checkout/brief.md (Source: ext/openspec/changes/checkout/proposal.md)"), "{out}");
+    assert_eq!(read(repo, ".canon/changes/checkout/brief.md"), "Source: ext/openspec/changes/checkout/proposal.md\n\nApproved: ana 2026-10-10 — \"go\"\n");
+    assert!(read(repo, "canon.yaml").contains("  sources:\n    - dialect: openspec\n      root: ext\n"), "{}", read(repo, "canon.yaml"));
+    assert!(!read(repo, "canon.yaml").contains("      root: .\n"), "now the init source goes");
+}
+
+/// authoring.migrate.11: a change move that could stop halfway is refused
+/// before anything moves (here its directory is not writable); and a
+/// change an earlier run left at `.canon/changes/<id>/proposal.md` gets
+/// its rename to `brief.md` and its re-import on the next run.
+#[test]
+fn authoring_migrate_11_a_change_move_is_preflighted_and_a_half_moved_change_is_finished() {
+    let dir = old_repo();
+    let repo = dir.path();
+    set_mode(&repo.join("openspec/changes/add-cart"), 0o555);
+    let out = canon(repo, &["migrate"]);
+    set_mode(&repo.join("openspec/changes/add-cart"), 0o755);
+    assert_eq!(out.status.code(), Some(2), "{}", text(&out));
+    assert!(
+        text(&out).contains("canon migrate: refused — openspec/changes/add-cart is not writable, so change dir openspec/changes/add-cart cannot be moved"),
+        "{}",
+        text(&out)
+    );
+    assert!(repo.join(OLD_FEATURE).is_file() && repo.join("openspec/changes/add-cart/proposal.md").is_file(), "nothing moved");
+    assert_eq!(read(repo, "canon.yaml"), OLD_YAML);
+
+    // An earlier run moved the change dir and stopped before the rename.
+    std::fs::create_dir_all(repo.join(".canon/changes")).unwrap();
+    git(repo, &["mv", "openspec/changes/add-cart", ".canon/changes/add-cart"]);
+    let out = ok(repo, &["migrate"]);
+    assert!(out.contains("  rename .canon/changes/add-cart/proposal.md -> .canon/changes/add-cart/brief.md (an earlier run moved change `add-cart` and stopped before this rename)\n"), "{out}");
+    assert!(out.contains("canon migrate: re-imported change `add-cart` from .canon/changes/add-cart"), "{out}");
+    assert!(repo.join(".canon/changes/add-cart/brief.md").is_file() && !repo.join(".canon/changes/add-cart/proposal.md").exists());
+    assert_eq!(latest_change(repo, "add-cart")["actor"]["agent_id"], "canon-plan-import-canon");
+    assert_eq!(read(repo, "canon.yaml"), migrated_yaml());
+    assert!(ok(repo, &["migrate"]).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"));
+}
+
+/// authoring.migrate.12: change material the openspec reader cannot read
+/// (a directory with no `proposal.md`) and any other file under
+/// `openspec/changes/` keep the source canon init wrote; each is named,
+/// with the reader's diagnostic, and the canon-written change still moves.
+#[test]
+fn authoring_migrate_12_unread_openspec_material_keeps_the_source() {
+    let dir = old_repo();
+    let repo = dir.path();
+    write(repo, "openspec/changes/broken/tasks.md", "- [ ] 1 Orphan task\n");
+    write(repo, "openspec/changes/notes.txt", "loose notes\n");
+    commit_all(repo, "unread material");
+
+    let out = ok(repo, &["migrate", "--dry-run"]);
+    assert!(out.contains("  left: openspec/changes/broken stays where it is: the openspec reader cannot read it (missing-proposal-md)\n"), "{out}");
+    assert!(out.contains("  move openspec/changes/add-cart -> .canon/changes/add-cart"), "{out}");
+    assert!(!out.contains("remove the plans source"), "{out}");
+
+    std::fs::remove_dir_all(repo.join("openspec/changes/broken")).unwrap();
+    commit_all(repo, "only the notes are left");
+    let out = ok(repo, &["migrate"]);
+    assert!(out.contains("  left: the plans source `{ dialect: openspec, root: . }` stays: canon has not read openspec/changes/notes.txt\n"), "{out}");
+    assert!(read(repo, "canon.yaml").contains("    - dialect: openspec\n      root: .\n"), "the source stays");
+    assert_eq!(read(repo, "openspec/changes/notes.txt"), "loose notes\n");
+    assert!(repo.join(".canon/changes/add-cart/brief.md").is_file());
+}

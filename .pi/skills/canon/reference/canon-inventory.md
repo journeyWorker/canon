@@ -51,7 +51,11 @@ under `openspec/changes/` move to `.canon/changes/<slug>/`
 `proposal.md` is copied into a canon pointer `brief.md`. The command
 also writes `skills.providers` from the install lock, adds the missing
 canon `.gitignore` lines, and ends with a full index rebuild. It is
-idempotent.
+idempotent, and a run that stopped partway is finished by the next run:
+`canon.yaml` is written atomically, a half-moved change is completed,
+and the openspec source `canon init` wrote is removed only after every
+pointer brief is written and nothing unread is left under
+`openspec/changes/` (each unread directory is named).
 
 The reader's refresh treats a file as stale when its latest index
 generation has another `source_digest` or `scenario_digest`. A
