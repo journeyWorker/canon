@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "017-p3-impl"
+  },
+  "at": "2026-10-12T10:41:18.307021Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init authoring_init_94 && cargo test -p canon-cli --test conformance (init-providers-refused-unknown)"
+  },
+  "evidence_note": {
+    "summary": "unknown provider refused exit 2 before anything is written"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 21,
+  "scenario_id": "authoring.init.94",
+  "schema": 1,
+  "staging_id": "6bbbdc38f42e",
+  "verdict": "faithful"
+}

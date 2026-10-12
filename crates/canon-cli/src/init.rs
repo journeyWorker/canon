@@ -20,6 +20,18 @@
 //! section, never stopping at the first failure (mirroring `canon fmt
 //! --check`'s own "report everything" convention).
 //!
+//! # Harness choice (0.17 D5)
+//! A fresh `init` also picks the harnesses the canon skill is installed
+//! for ([`SkillsChoice`]): `--providers` answers; otherwise, on a
+//! terminal, it asks with the detected harnesses (`.claude`, `.codex`,
+//! `.omp`, `.pi` directories) checked; otherwise it takes the detected
+//! ones. The answer is written as `canon.yaml` `skills.providers` and the
+//! skill is installed from the default skill source, as `canon skills
+//! install` does. With no terminal, no flag and nothing detected, it
+//! records nothing, installs nothing and says how to choose.
+//! `--check-config` validates `skills:` through
+//! [`crate::skills::configured_providers`].
+//!
 //! # `<repo>` is used literally, never an ancestor walk
 //! Every other subcommand's `--repo` resolves through
 //! `crate::context::resolve_repo_root`'s nearest-ancestor-`canon.yaml`
@@ -32,7 +44,7 @@
 //! own literal join) is used exactly as given, default `.` meaning cwd.
 
 use std::fs;
-use std::io::Write as _;
+use std::io::{BufRead, IsTerminal as _, Write as _};
 use std::path::Path;
 
 use canon_model::envelope::RecordKind;
@@ -40,6 +52,7 @@ use canon_model::paths;
 use canon_store::policy::{BackendConfig, TierPolicy};
 
 use crate::policy_level::{starter_policy, PolicyLevel};
+use crate::skills::{self, Provider};
 
 /// Kinds routed to `hot` by [`skeleton_yaml`] (s32 `sqlite-hot-backend`):
 /// the same hot-class set the tiered-storage docs/this repo's own
@@ -289,13 +302,137 @@ fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
 }
 
 /// What `canon init` writes besides `canon.yaml` (the opt-out flags).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct InitOptions {
     /// Write or refresh the canon block in `AGENTS.md`.
     pub agents_md: bool,
     /// The level of the starter `.canon/policy.yaml` to write; `None`
     /// writes none.
     pub policy: Option<PolicyLevel>,
+    /// How a fresh `init` picks the harnesses to install the canon skill
+    /// for (0.17 D5).
+    pub skills: SkillsChoice,
+}
+
+/// How a fresh `canon init` picks the harnesses (0.17 D5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SkillsChoice {
+    /// Ask on a terminal, the detected harnesses checked; without a
+    /// terminal, the detected harnesses.
+    Ask,
+    /// `--providers <list>`: this list (`none` or empty for none), no prompt.
+    Providers(String),
+    /// Record and install nothing (`canon demo init`).
+    Skip,
+}
+
+/// The harnesses a fresh `init` installs for, and whether the choice is
+/// recorded as `skills.providers` (an answer, or a detection that found
+/// something; nothing detected without an answer records nothing).
+struct InitSkills {
+    providers: Vec<Provider>,
+    recorded: bool,
+}
+
+/// Asks which harnesses get the canon skill: the four providers with the
+/// `detected` ones checked, then a comma- or space-separated list, `none`,
+/// or an empty line (or end of input) for the checked ones. An unknown
+/// name is reported and asked again.
+fn prompt_providers(detected: &[Provider], input: &mut impl BufRead, out: &mut impl std::io::Write) -> std::io::Result<Vec<Provider>> {
+    writeln!(out, "canon init: which harnesses should get the canon skill?")?;
+    for provider in skills::ALL_PROVIDERS {
+        if detected.contains(&provider) {
+            writeln!(out, "  [x] {:<7} ({} found)", provider.as_str(), provider.marker())?;
+        } else {
+            writeln!(out, "  [ ] {}", provider.as_str())?;
+        }
+    }
+    loop {
+        write!(out, "Comma-separated list, `none`, or Enter for the checked ones [{}]: ", skills::provider_names(detected))?;
+        out.flush()?;
+        let mut line = String::new();
+        if input.read_line(&mut line)? == 0 {
+            writeln!(out)?;
+            return Ok(detected.to_vec());
+        }
+        let answer = line.trim();
+        if answer.is_empty() {
+            return Ok(detected.to_vec());
+        }
+        match skills::parse_provider_list(&answer.replace(char::is_whitespace, ",")) {
+            Ok(providers) => return Ok(providers),
+            Err(e) => writeln!(out, "canon init: {e}")?,
+        }
+    }
+}
+
+/// Resolves [`InitOptions::skills`] for a fresh `init` in `repo`. `Err`
+/// for an unknown `--providers` name, before anything is written.
+fn choose_skills(repo: &Path, choice: &SkillsChoice) -> Result<Option<InitSkills>, String> {
+    match choice {
+        SkillsChoice::Skip => Ok(None),
+        SkillsChoice::Providers(list) => skills::parse_provider_list(list)
+            .map(|providers| Some(InitSkills { providers, recorded: true }))
+            .map_err(|e| e.to_string()),
+        SkillsChoice::Ask => {
+            let detected = skills::detected_providers(repo);
+            if std::io::stdin().is_terminal() && std::io::stderr().is_terminal() {
+                let providers = prompt_providers(&detected, &mut std::io::stdin().lock(), &mut std::io::stderr())
+                    .map_err(|e| format!("failed to read the harness choice: {e}"))?;
+                Ok(Some(InitSkills { providers, recorded: true }))
+            } else {
+                let recorded = !detected.is_empty();
+                Ok(Some(InitSkills { providers: detected, recorded }))
+            }
+        }
+    }
+}
+
+/// The `skills:` section appended to the skeleton: the recorded choice,
+/// or a commented example when nothing is recorded.
+fn skills_section(skills: Option<&InitSkills>) -> String {
+    let mut out = String::from(skills::SKILLS_CONFIG_COMMENT);
+    match skills {
+        Some(chosen) if chosen.recorded => out.push_str(&skills::skills_config_block(&chosen.providers)),
+        _ => out.push_str("# skills:\n#   providers: [claude, codex]\n"),
+    }
+    out
+}
+
+/// Installs the canon skill for the chosen harnesses through
+/// [`skills::install_canonical`] (which follows the `skills.providers`
+/// just written), and prints what happened. `Err` carries the exit code.
+fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkills) -> Result<(), i32> {
+    if chosen.providers.is_empty() {
+        if chosen.recorded {
+            println!("canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`");
+        } else {
+            println!("canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; {}", skills::CHOOSE_PROVIDERS);
+        }
+        return Ok(());
+    }
+    let source = skills::resolve_source(None);
+    match skills::install_canonical(&source, repo, None) {
+        Ok(report) => {
+            let dirs = report
+                .providers
+                .iter()
+                .map(|provider| skills::provider_bundle_root(repo, *provider).display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            println!("canon init: installed the canon skill for {} ({dirs})", skills::provider_names(&report.providers));
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!(
+                "canon init: wrote `skills: {{ providers: [{}] }}` to {} but did not install the canon skill: {e}; once the skill source is available, run `canon skills install` (set {} or pass --source <dir>; it follows skills.providers)",
+                chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "),
+                canon_yaml_path.display(),
+                skills::CANONICAL_SOURCE_ENV
+            );
+            Err(2)
+        }
+    }
 }
 
 /// Write `merged` to `AGENTS.md` unless it already holds exactly those
@@ -359,8 +496,11 @@ fn scaffold_changes_dir(repo: &Path) -> std::io::Result<()> {
 ///   (`create_new` is the atomic refusal) and only refreshes the
 ///   `AGENTS.md` block: exit `0`. With `--no-agents-md` there is nothing
 ///   left to do, so that is the pre-0.14 refusal, exit `2`.
-/// - Unbalanced `AGENTS.md` markers refuse (exit `2`) before anything is
-///   written.
+/// - Unbalanced `AGENTS.md` markers, or an unknown `--providers` name,
+///   refuse (exit `2`) before anything is written.
+/// - A fresh repo also records and installs the harness choice
+///   ([`SkillsChoice`], 0.17 D5); an install that fails after the writes
+///   exits `2` naming the retry. A rerun never asks and never installs.
 pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
     if let Err(e) = fs::create_dir_all(repo) {
         eprintln!("canon init: failed to create `{}`: {e}", repo.display());
@@ -388,9 +528,21 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
     };
 
     let canon_yaml_path = repo.join("canon.yaml");
+    let skills = if canon_yaml_path.exists() {
+        None
+    } else {
+        match choose_skills(repo, &options.skills) {
+            Ok(skills) => skills,
+            Err(e) => {
+                eprintln!("canon init: refused — {e}");
+                return 2;
+            }
+        }
+    };
     match fs::OpenOptions::new().write(true).create_new(true).open(&canon_yaml_path) {
         Ok(mut file) => {
-            if let Err(e) = file.write_all(skeleton_yaml().as_bytes()) {
+            let config = skeleton_yaml() + &skills_section(skills.as_ref());
+            if let Err(e) = file.write_all(config.as_bytes()) {
                 eprintln!("canon init: failed to write `{}`: {e}", canon_yaml_path.display());
                 return 2;
             }
@@ -402,6 +554,9 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
                 return 2;
             };
             println!("canon init: {} already exists — left unchanged; only the AGENTS.md block is refreshed", canon_yaml_path.display());
+            if matches!(options.skills, SkillsChoice::Providers(_)) {
+                println!("canon init: --providers is not applied to an existing canon.yaml; run `canon skills install --providers=<list>`, which records the list in skills.providers");
+            }
             if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged) {
                 eprintln!("canon init: failed to write `{}`: {e}", agents_path.display());
                 return 2;
@@ -434,7 +589,11 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
             return 2;
         }
     }
-    println!("canon init: next: `canon skills install` to install authoring guidance");
+    if let Some(chosen) = &skills {
+        if let Err(code) = install_chosen_skills(repo, &canon_yaml_path, chosen) {
+            return code;
+        }
+    }
     0
 }
 
@@ -523,6 +682,17 @@ pub fn run_check_config(repo: &Path) -> i32 {
         }
     }
 
+    // `skills:` (0.17 D5): absent falls back to the install lock's
+    // providers, then the detected harnesses, so it is not a failure.
+    match skills::configured_providers(&canon_yaml_path) {
+        Ok(Some(providers)) => report.push_str(&format!("[PASS] skills (providers: {})\n", skills::provider_names(&providers))),
+        Ok(None) => report.push_str("[not configured] skills (providers: the install lock's, else the detected harnesses)\n"),
+        Err(e) => {
+            all_ok = false;
+            report.push_str(&format!("[FAIL] skills: {e}\n"));
+        }
+    }
+
     print!("{report}");
     if all_ok { 0 } else { 1 }
 }
@@ -530,6 +700,49 @@ pub fn run_check_config(repo: &Path) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// authoring.init.96: on a terminal init lists the four harnesses with
+    /// the detected ones checked; Enter (or end of input) keeps the checked
+    /// ones, a list or `none` replaces them, and an unknown name is asked
+    /// again.
+    #[test]
+    fn authoring_init_96_the_prompt_prechecks_the_detected_harnesses() {
+        let detected = [Provider::Claude, Provider::Omp];
+        let ask = |answers: &str| {
+            let mut out = Vec::new();
+            let chosen = prompt_providers(&detected, &mut answers.as_bytes(), &mut out).unwrap();
+            (chosen, String::from_utf8(out).unwrap())
+        };
+
+        let (chosen, shown) = ask("\n");
+        assert_eq!(chosen, detected);
+        assert_eq!(
+            shown,
+            "canon init: which harnesses should get the canon skill?\n  [x] claude  (.claude found)\n  [ ] codex\n  [x] omp     (.omp found)\n  [ ] pi\nComma-separated list, `none`, or Enter for the checked ones [claude,omp]: "
+        );
+        assert_eq!(ask("").0, detected, "end of input keeps the checked ones");
+        assert_eq!(ask("pi, codex\n").0, vec![Provider::Codex, Provider::Pi]);
+        assert_eq!(ask("codex omp\n").0, vec![Provider::Codex, Provider::Omp], "spaces separate too");
+        assert_eq!(ask("none\n").0, vec![]);
+        let (chosen, shown) = ask("gemini\nclaude\n");
+        assert_eq!(chosen, vec![Provider::Claude]);
+        assert!(shown.contains("canon init: invalid provider `gemini`"), "{shown}");
+        assert_eq!(shown.matches("Enter for the checked ones").count(), 2, "asked again: {shown}");
+    }
+
+    /// The `skills:` section init appends parses back to the choice, and
+    /// the skeleton with it still loads under every section loader.
+    #[test]
+    fn skills_section_round_trips_through_the_config_loader() {
+        let dir = tempfile::tempdir().unwrap();
+        let canon_yaml = dir.path().join("canon.yaml");
+        let chosen = InitSkills { providers: vec![Provider::Codex, Provider::Pi], recorded: true };
+        std::fs::write(&canon_yaml, skeleton_yaml() + &skills_section(Some(&chosen))).unwrap();
+        assert_eq!(skills::configured_providers(&canon_yaml).unwrap(), Some(vec![Provider::Codex, Provider::Pi]));
+        assert!(TierPolicy::from_yaml_at(&std::fs::read_to_string(&canon_yaml).unwrap(), dir.path()).is_ok());
+        std::fs::write(&canon_yaml, skeleton_yaml() + &skills_section(None)).unwrap();
+        assert_eq!(skills::configured_providers(&canon_yaml).unwrap(), None);
+    }
 
     #[test]
     fn skeleton_yaml_routes_hot_class_kinds_to_hot_and_the_rest_to_local() {

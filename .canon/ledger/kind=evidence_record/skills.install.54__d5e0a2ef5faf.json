@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "017-p3-impl"
+  },
+  "at": "2026-10-12T10:41:16.103693Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test skills_install skills_install_54 && cargo test -p canon-cli --test conformance (skills-doctor-stray-projection)"
+  },
+  "evidence_note": {
+    "summary": "doctor names stray .agents/skills/canon with rm -r and select command; check exit 0"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 26,
+  "scenario_id": "skills.install.54",
+  "schema": 1,
+  "staging_id": "ea722da03939",
+  "verdict": "faithful"
+}

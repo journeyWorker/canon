@@ -80,13 +80,13 @@ struct Cli {
 enum Command {
     // ── Getting started ──
     /// Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)
-    #[command(after_help = "Examples:\n  canon init\n  canon init --policy light\n  canon init --no-agents-md --no-policy\n  canon init --check-config\n\nPolicy levels (--policy, default strict): light requires evidence on every\nscenario; standard adds a `@case:failure` scenario per feature surface; strict\nadds independent review. The level is the first line of .canon/policy.yaml and\n`canon status` shows it.\n\nRerunning in a repo that has canon.yaml leaves canon.yaml and .canon/policy.yaml\nalone and only refreshes the canon block in AGENTS.md.")]
+    #[command(after_help = "Examples:\n  canon init\n  canon init --policy light\n  canon init --providers claude,codex\n  canon init --no-agents-md --no-policy\n  canon init --check-config\n\nPolicy levels (--policy, default strict): light requires evidence on every\nscenario; standard adds a `@case:failure` scenario per feature surface; strict\nadds independent review. The level is the first line of .canon/policy.yaml and\n`canon status` shows it.\n\nHarnesses (--providers): on a terminal, init asks which harnesses get the canon\nskill, with the detected ones (.claude, .codex, .omp, .pi directories) checked.\nWithout a terminal or --providers it takes the detected ones; with none detected\nit installs nothing and says how to choose. The answer is recorded as\n`skills: { providers: [...] }` in canon.yaml (`--providers none` records `[]`).\n\nRerunning in a repo that has canon.yaml leaves canon.yaml and .canon/policy.yaml\nalone and only refreshes the canon block in AGENTS.md.")]
     Init {
         /// Directory to set up (used as-is)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
         /// Validate an existing canon.yaml instead of writing one
-        #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy", "policy"])]
+        #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy", "policy", "providers"])]
         check_config: bool,
         /// Do not write or refresh the canon block in AGENTS.md
         #[arg(long)]
@@ -97,6 +97,9 @@ enum Command {
         /// Do not write the starter .canon/policy.yaml
         #[arg(long)]
         no_policy: bool,
+        /// Harnesses to install the canon skill for, without asking (`claude`, `codex`, `omp`, `pi`, comma-separated; `none` for none)
+        #[arg(long, value_name = "LIST")]
+        providers: Option<String>,
     },
     /// Record who approved the gate's policy (.canon/policy.yaml) and which bytes
     #[command(after_help = "Examples:\n  canon policy approve --by alice --note 'reviewed the starter policy'\n\nWrites .canon/policy.approval.json (commit it): the policy's sha256, who\napproved it, when, and the note. `canon gate check` and `canon status` print an\nadvisory while the policy is unapproved or has changed since its approval;\nthe advisory never changes an exit code.")]
@@ -1341,9 +1344,11 @@ enum SkillsCommand {
         /// Consumer repo root to materialize into.
         #[arg(long, default_value = ".")]
         target: PathBuf,
-        /// Providers to project (`claude`, `codex`, `omp`, `pi`, or a comma-separated list).
-        /// Omitted: detected from `.claude`, `.agents` or `.codex` (codex), `.omp`, `.pi`;
-        /// none present selects claude,codex. Codex is projected to `.agents/skills/canon/`.
+        /// Providers to project (`claude`, `codex`, `omp`, `pi`, a comma-separated list, or `none`);
+        /// also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml
+        /// `skills.providers`, else the install lock's providers, else the detected `.claude`,
+        /// `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is
+        /// projected to `.agents/skills/canon/`.
         #[arg(long)]
         providers: Option<String>,
     },
@@ -1354,18 +1359,18 @@ enum SkillsCommand {
         /// Consumer repo root to inspect.
         #[arg(long, default_value = ".")]
         target: PathBuf,
-        /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list).
+        /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install.
         #[arg(long)]
         providers: Option<String>,
     },
-    /// Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, and other skills whose description claims build work; reports only, never edits.
+    /// Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits.
     Doctor {
         #[arg(long)]
         source: Option<PathBuf>,
         /// Consumer repo root to inspect.
         #[arg(long, default_value = ".")]
         target: PathBuf,
-        /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list).
+        /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install.
         #[arg(long)]
         providers: Option<String>,
     },
@@ -1664,9 +1669,13 @@ fn main() -> ExitCode {
         Command::Change { action } => match action {
             ChangeCommand::New { slug, subject, title, repo } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject, &title) as u8),
         },
-        Command::Init { repo, check_config, no_agents_md, policy, no_policy } => {
+        Command::Init { repo, check_config, no_agents_md, policy, no_policy, providers } => {
             let policy = (!no_policy).then(|| policy.unwrap_or(canon_cli::policy_level::PolicyLevel::Strict));
-            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy })
+            let skills = match providers {
+                Some(list) => canon_cli::init::SkillsChoice::Providers(list),
+                None => canon_cli::init::SkillsChoice::Ask,
+            };
+            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy, skills })
         }
         Command::Policy { action } => match action {
             PolicyCommand::Approve { by, note, repo } => ExitCode::from(canon_cli::policy_approval::run_approve(&repo, &by, note.as_deref()) as u8),
@@ -1725,7 +1734,20 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
     }
     match canon_cli::skills::install_canonical(&source, target, providers) {
         Ok(report) => {
-            println!("canon v1 — {} ({})", if report.changed { "installed" } else { "unchanged" }, report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(","));
+            let selection = canon_cli::skills::ProviderSelection { providers: report.providers.clone(), origin: report.origin };
+            let status = if report.changed { "installed" } else { "unchanged" };
+            if report.providers.is_empty() {
+                let hint = if report.origin == canon_cli::skills::ProviderOrigin::Detected { format!("; {}", canon_cli::skills::CHOOSE_PROVIDERS) } else { String::new() };
+                let lock = if report.changed { "; install lock rewritten" } else { "" };
+                println!("canon v1 — nothing installed: no provider selected ({}){lock}{hint}", selection.describe());
+            } else if report.origin == canon_cli::skills::ProviderOrigin::Flag {
+                println!("canon v1 — {status} ({})", selection.names());
+            } else {
+                println!("canon v1 — {status} ({}; {})", selection.names(), selection.describe());
+            }
+            if let Some(path) = &report.config_written {
+                println!("canon skills install: wrote `skills: {{ providers: [{}] }}` to {}", report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "), path.display());
+            }
             ExitCode::SUCCESS
         }
         Err(err) => { eprintln!("canon skills install: {err}"); ExitCode::FAILURE }
@@ -1736,6 +1758,11 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
     let source = canon_cli::skills::resolve_source(source);
     match canon_cli::skills::check(&source, target, providers) {
         Ok(report) => {
+            if report.origin != canon_cli::skills::ProviderOrigin::Flag {
+                let selection = canon_cli::skills::ProviderSelection { providers: report.providers.clone(), origin: report.origin };
+                let hint = if report.providers.is_empty() && report.origin == canon_cli::skills::ProviderOrigin::Detected { format!("; {}", canon_cli::skills::CHOOSE_PROVIDERS) } else { String::new() };
+                println!("providers: {} ({}){hint}", selection.names(), selection.describe());
+            }
             for status in &report.statuses { println!("{} — {} ({})", status.path.display(), status.state, status.provider.as_str()); }
             for remnant in &report.remnants { println!("{} — legacy-remnant (codex reads .agents/skills; fix: `{}`)", remnant.display(), canon_cli::skills::install_command(&report.providers)); }
             if let Some(outdated) = &report.outdated { println!("{} — outdated ({})", outdated.path.display(), outdated.describe(&report.providers)); }

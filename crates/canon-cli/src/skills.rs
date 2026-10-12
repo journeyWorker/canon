@@ -20,6 +20,16 @@
 //! give the install command that rewrites it. `doctor` also lists other
 //! skills in the provider skill roots whose description claims build work
 //! (#10, [`build_claims`]); it only reports them.
+//!
+//! Which providers `install`, `check` and `doctor` serve (0.17 D5,
+//! [`select_providers`]): an explicit `--providers`, else `canon.yaml`'s
+//! `skills: { providers: [...] }`, else the providers the install lock
+//! records (a repo from before 0.17), else the harnesses whose marker
+//! directory (`.claude`, `.codex`, `.omp`, `.pi`) exists. Nothing is ever
+//! added by default: with no marker, nothing is selected and the commands
+//! say how to choose. `install --providers` also rewrites
+//! `skills.providers` in an existing `canon.yaml`. `doctor` names a canon
+//! projection directory left behind for a provider that is not selected.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -76,8 +86,9 @@ struct ProviderDescriptor {
     /// The provider's project skill root: canon projects to
     /// `<root>/skills/canon/`.
     root: &'static str,
-    /// Directories whose presence selects the provider when `--providers`
-    /// is omitted.
+    /// Directories whose presence selects the provider when neither
+    /// `--providers`, `canon.yaml` `skills.providers` nor an install lock
+    /// names the providers.
     markers: &'static [&'static str],
 }
 
@@ -91,13 +102,14 @@ impl Provider {
             },
             // Codex discovers skills in `.agents/skills` from the working
             // directory up to the repository root (and `$HOME/.agents/skills`),
-            // never in `.codex/skills`. `.agents` is therefore both the
-            // projection root and a detection marker; `.codex` (Codex's own
-            // config directory) still marks a repository as a Codex user.
+            // never in `.codex/skills`, so `.agents` is the projection root.
+            // Only `.codex` (Codex's own config directory) marks a
+            // repository as a Codex user: other tools use `.agents` too
+            // (0.17 D5).
             Self::Codex => ProviderDescriptor {
                 name: "codex",
                 root: ".agents",
-                markers: &[".agents", ".codex"],
+                markers: &[".codex"],
             },
             Self::Omp => ProviderDescriptor {
                 name: "omp",
@@ -118,6 +130,11 @@ impl Provider {
         self.descriptor().name
     }
 
+    /// The directory whose presence detects this provider.
+    pub fn marker(self) -> &'static str {
+        self.descriptor().markers[0]
+    }
+
     pub fn parse(value: &str) -> Result<Self, SkillsError> {
         let normalized = value.trim().to_ascii_lowercase();
         ALL_PROVIDERS
@@ -127,11 +144,78 @@ impl Provider {
     }
 }
 
+/// Where [`select_providers`] took the providers from (0.17 D5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderOrigin {
+    /// An explicit `--providers`.
+    Flag,
+    /// `canon.yaml`'s `skills.providers`.
+    Config,
+    /// The install lock's providers: a repo whose `canon.yaml` has no
+    /// `skills:` key (written before 0.17).
+    Lock,
+    /// The provider marker directories present in the target.
+    Detected,
+}
+
+/// The providers a skills command serves, and where they came from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderSelection {
+    pub providers: Vec<Provider>,
+    pub origin: ProviderOrigin,
+}
+
+impl ProviderSelection {
+    /// "from canon.yaml skills.providers", "detected: .claude, .omp", ….
+    pub fn describe(&self) -> String {
+        match self.origin {
+            ProviderOrigin::Flag => "from --providers".into(),
+            ProviderOrigin::Config => "from canon.yaml skills.providers".into(),
+            ProviderOrigin::Lock => "from the install lock; canon.yaml has no skills: key".into(),
+            ProviderOrigin::Detected if self.providers.is_empty() => {
+                format!("no {} directory found", MARKER_LIST)
+            }
+            ProviderOrigin::Detected => format!(
+                "detected: {}",
+                self.providers
+                    .iter()
+                    .flat_map(|p| p.descriptor().markers.iter().copied())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        }
+    }
+
+    /// The provider names, comma-separated, or `none`.
+    pub fn names(&self) -> String {
+        provider_names(&self.providers)
+    }
+}
+
+/// The marker directories, in prose.
+const MARKER_LIST: &str = ".claude, .codex, .omp or .pi";
+
+/// How to choose providers when none is selected.
+pub const CHOOSE_PROVIDERS: &str =
+    "choose with `canon skills install --providers=<list>` (any of claude, codex, omp, pi)";
+
+/// `claude,omp`, or `none` for an empty list.
+pub fn provider_names(providers: &[Provider]) -> String {
+    if providers.is_empty() {
+        return "none".into();
+    }
+    providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(",")
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanonicalInstallReport {
     pub providers: Vec<Provider>,
+    pub origin: ProviderOrigin,
     pub source_hash: String,
     pub changed: bool,
+    /// The `canon.yaml` whose `skills.providers` an explicit `--providers`
+    /// rewrote; `None` when it already held that list or does not exist.
+    pub config_written: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,6 +228,7 @@ pub struct SkillStatus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillsCheckReport {
     pub providers: Vec<Provider>,
+    pub origin: ProviderOrigin,
     pub source_hash: String,
     pub statuses: Vec<SkillStatus>,
     pub manifest_ok: bool,
@@ -184,8 +269,10 @@ pub enum SkillsError {
     SourceNotFound(PathBuf),
     #[error("canonical skill source is missing SKILL.src.md under {0}")]
     CanonicalSourceMissing(PathBuf),
-    #[error("invalid provider `{0}`; expected one of: claude, codex, omp, pi")]
+    #[error("invalid provider `{0}`; expected one of: claude, codex, omp, pi, or none")]
     InvalidProvider(String),
+    #[error("{0}")]
+    Config(String),
     #[error("canonical bundle has an unsupported or unsafe symlink at {0}")]
     UnsafeSymlink(PathBuf),
     #[error("refusing to overwrite a symlink at {0}")]
@@ -459,7 +546,8 @@ fn bundle_hash(files: &[BundleFile]) -> String {
     format!("sha256:{:x}", hasher.finalize())
 }
 
-const ALL_PROVIDERS: [Provider; 4] = [
+/// Every provider, in stable order.
+pub const ALL_PROVIDERS: [Provider; 4] = [
     Provider::Claude,
     Provider::Codex,
     Provider::Omp,
@@ -470,43 +558,195 @@ fn provider_skill_root(target_dir: &Path, provider: Provider) -> PathBuf {
     target_dir.join(provider.descriptor().root).join("skills")
 }
 
-fn provider_bundle_root(target_dir: &Path, provider: Provider) -> PathBuf {
+/// `<target_dir>/<root>/skills/canon`: where `provider`'s projection lives.
+pub fn provider_bundle_root(target_dir: &Path, provider: Provider) -> PathBuf {
     provider_skill_root(target_dir, provider).join("canon")
 }
 
-fn parse_providers(value: Option<&str>, target_dir: &Path) -> Result<Vec<Provider>, SkillsError> {
-    let mut providers = if let Some(value) = value {
-        let mut parsed = Vec::new();
-        for part in value.split(',').filter(|part| !part.trim().is_empty()) {
-            parsed.push(Provider::parse(part)?);
-        }
-        if parsed.is_empty() {
-            return Err(SkillsError::InvalidProvider(value.to_string()));
-        }
-        parsed
-    } else {
-        let detected = ALL_PROVIDERS
-            .into_iter()
-            .map(|provider| {
-                let markers = provider.descriptor().markers;
-                (
-                    markers.iter().any(|marker| target_dir.join(marker).exists()),
-                    provider,
-                )
-            })
-            .collect::<Vec<_>>();
-        if detected.iter().all(|(exists, _)| !exists) {
-            vec![Provider::Claude, Provider::Codex]
-        } else {
-            detected
-                .into_iter()
-                .filter_map(|(exists, provider)| exists.then_some(provider))
-                .collect()
-        }
-    };
+/// A `--providers` value: a comma-separated list of provider names, or
+/// `none` (or an empty value) for none. Sorted, without duplicates.
+pub fn parse_provider_list(value: &str) -> Result<Vec<Provider>, SkillsError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("none") {
+        return Ok(Vec::new());
+    }
+    let mut providers = Vec::new();
+    for part in trimmed.split(',').filter(|part| !part.trim().is_empty()) {
+        providers.push(Provider::parse(part)?);
+    }
+    if providers.is_empty() {
+        return Err(SkillsError::InvalidProvider(value.to_string()));
+    }
     providers.sort();
     providers.dedup();
     Ok(providers)
+}
+
+/// The providers whose marker directory (`.claude`, `.codex`, `.omp`,
+/// `.pi`) exists in `target_dir`, in stable order. `.agents` is not a
+/// marker: other tools use it too (0.17 D5).
+pub fn detected_providers(target_dir: &Path) -> Vec<Provider> {
+    ALL_PROVIDERS
+        .into_iter()
+        .filter(|provider| provider.descriptor().markers.iter().any(|marker| target_dir.join(marker).is_dir()))
+        .collect()
+}
+
+/// `canon.yaml`'s `skills:` section, strict once present (0.17 D5).
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawSkillsSection {
+    providers: Vec<String>,
+}
+
+/// The shape a `skills:` section must have, for diagnostics.
+const SKILLS_SECTION_SHAPE: &str = "`skills: { providers: [claude, codex, omp, pi] }`, any subset, `[]` for none";
+
+fn configured_providers_in(text: &str) -> Result<Option<Vec<Provider>>, String> {
+    let doc: serde_yaml::Value =
+        serde_yaml::from_str(text).map_err(|e| format!("canon.yaml is not valid YAML: {e}"))?;
+    let Some(section) = doc.get("skills") else {
+        return Ok(None);
+    };
+    let raw: RawSkillsSection = serde_yaml::from_value(section.clone())
+        .map_err(|e| format!("canon.yaml `skills:` section is malformed (expected {SKILLS_SECTION_SHAPE}): {e}"))?;
+    let mut providers = Vec::new();
+    for name in &raw.providers {
+        let provider = ALL_PROVIDERS
+            .into_iter()
+            .find(|provider| provider.as_str() == name)
+            .ok_or_else(|| format!("canon.yaml `skills.providers` names `{name}`; expected any of claude, codex, omp, pi"))?;
+        providers.push(provider);
+    }
+    providers.sort();
+    providers.dedup();
+    Ok(Some(providers))
+}
+
+/// `skills.providers` from the `canon.yaml` at `canon_yaml`: `None` when
+/// the file or its `skills:` key is absent. A present section that is not
+/// [`SKILLS_SECTION_SHAPE`], or names an unknown provider, fails loud.
+pub fn configured_providers(canon_yaml: &Path) -> Result<Option<Vec<Provider>>, String> {
+    let Ok(text) = fs::read_to_string(canon_yaml) else {
+        return Ok(None);
+    };
+    configured_providers_in(&text)
+}
+
+/// The comment `canon init` and [`rewrite_skills_section`] put above a
+/// `skills:` section.
+pub const SKILLS_CONFIG_COMMENT: &str = "\
+# Harnesses the canon skill is installed for: any of claude, codex, omp, pi
+# (`[]` for none). `canon skills install|check|doctor` follow this list;
+# `canon skills install --providers=<list>` rewrites it.
+";
+
+/// `skills:\n  providers: [claude, omp]\n`.
+pub fn skills_config_block(providers: &[Provider]) -> String {
+    format!(
+        "skills:\n  providers: [{}]\n",
+        providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", ")
+    )
+}
+
+/// `text` with its top-level `skills:` section replaced by
+/// [`skills_config_block`] (appended under [`SKILLS_CONFIG_COMMENT`] when
+/// absent). Every other byte is kept. The section is the `skills:` line
+/// and the indented lines after it; a blank line belongs to it only when
+/// an indented line follows. The result is refused unless it parses to
+/// exactly `providers` with every other key unchanged.
+fn rewrite_skills_section(text: &str, providers: &[Provider]) -> Result<String, String> {
+    let block = skills_config_block(providers);
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    let rewritten = match lines.iter().position(|line| line.starts_with("skills:")) {
+        Some(start) => {
+            let mut end = start + 1;
+            let mut cursor = start + 1;
+            while let Some(line) = lines.get(cursor) {
+                if line.trim().is_empty() {
+                    cursor += 1;
+                } else if line.starts_with(' ') || line.starts_with('\t') {
+                    cursor += 1;
+                    end = cursor;
+                } else {
+                    break;
+                }
+            }
+            format!("{}{block}{}", lines[..start].concat(), lines[end..].concat())
+        }
+        None => {
+            let mut out = text.to_string();
+            if !out.is_empty() {
+                if !out.ends_with('\n') {
+                    out.push('\n');
+                }
+                out.push('\n');
+            }
+            out.push_str(SKILLS_CONFIG_COMMENT);
+            out.push_str(&block);
+            out
+        }
+    };
+    let refuse = || {
+        format!(
+            "could not rewrite the `skills:` section of canon.yaml safely; set it by hand to `skills: {{ providers: [{}] }}`",
+            providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", ")
+        )
+    };
+    let without_skills = |text: &str| -> Option<serde_yaml::Value> {
+        let mut doc: serde_yaml::Value = serde_yaml::from_str(text).ok()?;
+        if let Some(map) = doc.as_mapping_mut() {
+            map.remove("skills");
+        }
+        Some(doc)
+    };
+    let rest_kept = matches!((without_skills(text), without_skills(&rewritten)), (Some(before), Some(after)) if before == after);
+    if !rest_kept || configured_providers_in(&rewritten).ok().flatten().as_deref() != Some(providers) {
+        return Err(refuse());
+    }
+    Ok(rewritten)
+}
+
+/// The `canon.yaml` in `target_dir` and its text with `skills.providers`
+/// set to `providers`; `None` when there is no `canon.yaml` or it already
+/// holds exactly that list.
+fn planned_config(target_dir: &Path, providers: &[Provider]) -> Result<Option<(PathBuf, String)>, SkillsError> {
+    let path = target_dir.join("canon.yaml");
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let text = read_to_string(&path)?;
+    if configured_providers_in(&text).ok().flatten().as_deref() == Some(providers) {
+        return Ok(None);
+    }
+    let rewritten = rewrite_skills_section(&text, providers).map_err(SkillsError::Config)?;
+    Ok(Some((path, rewritten)))
+}
+
+/// The providers a skills command serves (0.17 D5), first match wins:
+/// an explicit `--providers`; `canon.yaml`'s `skills.providers`; the
+/// providers the install lock records (a repo set up before 0.17); the
+/// marker directories present. Nothing undetected is ever added, so the
+/// result may be empty.
+pub fn select_providers(target_dir: &Path, flag: Option<&str>) -> Result<ProviderSelection, SkillsError> {
+    if let Some(value) = flag {
+        return Ok(ProviderSelection { providers: parse_provider_list(value)?, origin: ProviderOrigin::Flag });
+    }
+    if let Some(providers) = configured_providers(&target_dir.join("canon.yaml")).map_err(SkillsError::Config)? {
+        return Ok(ProviderSelection { providers, origin: ProviderOrigin::Config });
+    }
+    // A lock canon cannot parse leaves the choice to detection; `check`
+    // and `doctor` still report the lock itself.
+    if let Some(manifest) = load_manifest(target_dir).ok().flatten() {
+        let mut providers = Vec::new();
+        for name in &manifest.providers {
+            providers.push(Provider::parse(name)?);
+        }
+        providers.sort();
+        providers.dedup();
+        return Ok(ProviderSelection { providers, origin: ProviderOrigin::Lock });
+    }
+    Ok(ProviderSelection { providers: detected_providers(target_dir), origin: ProviderOrigin::Detected })
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -826,14 +1066,7 @@ fn legacy_codex_remnants(target_dir: &Path) -> Vec<PathBuf> {
 /// The install command for `providers`: what rewrites an outdated lock or
 /// migrates a legacy Codex projection.
 pub fn install_command(providers: &[Provider]) -> String {
-    format!(
-        "canon skills install --providers={}",
-        providers
-            .iter()
-            .map(|p| p.as_str())
-            .collect::<Vec<_>>()
-            .join(",")
-    )
+    format!("canon skills install --providers={}", provider_names(providers))
 }
 
 /// Build verbs, in every form [`build_claims`] matches.
@@ -965,13 +1198,26 @@ pub fn competing_skills(target_dir: &Path) -> Vec<CompetingSkill> {
     found
 }
 
+/// Projects the canonical bundle for the [`select_providers`] selection
+/// and records it in the install lock. An explicit `providers` also
+/// rewrites `skills.providers` in `<target_dir>/canon.yaml` when that file
+/// exists, after the projection is written. With nothing selected and no
+/// install lock, nothing at all is written.
 pub fn install_canonical(
     source_dir: &Path,
     target_dir: &Path,
     providers: Option<&str>,
 ) -> Result<CanonicalInstallReport, SkillsError> {
-    let selected = parse_providers(providers, target_dir)?;
+    let selection = select_providers(target_dir, providers)?;
+    let selected = selection.providers;
     let files = canonical_bundle(source_dir)?;
+    let config = match selection.origin {
+        ProviderOrigin::Flag => planned_config(target_dir, &selected)?,
+        _ => None,
+    };
+    if let Some((path, _)) = &config {
+        reject_symlink_path(path)?;
+    }
     let mut manifest = manifest_for(&files, &selected);
     let previous = load_manifest(target_dir)?;
     let mut writes: Vec<(PathBuf, Vec<u8>)> = Vec::new();
@@ -988,7 +1234,12 @@ pub fn install_canonical(
     }
     reject_symlink_path_under(target_dir, &manifest_path(target_dir))?;
     let removals = legacy_codex_removals(target_dir, previous.as_ref());
-    let changed = !previous.as_ref().is_some_and(|previous| previous.same_projection(&manifest) && previous.canon_version == manifest.canon_version)
+    let lock_current = match &previous {
+        Some(previous) => previous.same_projection(&manifest) && previous.canon_version == manifest.canon_version,
+        // Nothing selected and nothing recorded: there is nothing to lock.
+        None => selected.is_empty(),
+    };
+    let changed = !lock_current
         || !removals.is_empty()
         || writes
             .iter()
@@ -1004,10 +1255,19 @@ pub fn install_canonical(
         json.push('\n');
         write_file_under(target_dir, &manifest_path(target_dir), &json)?;
     }
+    let config_written = match config {
+        Some((path, text)) => {
+            write_file(&path, &text)?;
+            Some(path)
+        }
+        None => None,
+    };
     Ok(CanonicalInstallReport {
         providers: selected,
+        origin: selection.origin,
         source_hash: manifest.source_hash,
         changed,
+        config_written,
     })
 }
 
@@ -1039,7 +1299,8 @@ pub fn check(
     target_dir: &Path,
     providers: Option<&str>,
 ) -> Result<SkillsCheckReport, SkillsError> {
-    let selected = parse_providers(providers, target_dir)?;
+    let selection = select_providers(target_dir, providers)?;
+    let selected = selection.providers;
     let files = canonical_bundle(source_dir)?;
     let expected = manifest_for(&files, &selected);
     let actual = load_manifest(target_dir)?;
@@ -1062,12 +1323,17 @@ pub fn check(
             });
         }
     }
-    let manifest_ok = actual.as_ref().is_some_and(|actual| actual.same_projection(&expected));
+    let manifest_ok = match &actual {
+        Some(actual) => actual.same_projection(&expected),
+        // Nothing selected needs no lock.
+        None => selected.is_empty(),
+    };
     let outdated = actual
         .filter(|actual| actual.canon_version != expected.canon_version)
         .map(|actual| OutdatedLock { path: manifest_path(target_dir), installed_by: actual.canon_version });
     Ok(SkillsCheckReport {
         providers: selected,
+        origin: selection.origin,
         source_hash: expected.source_hash,
         statuses,
         manifest_ok,
@@ -1076,31 +1342,57 @@ pub fn check(
     })
 }
 
+/// The canon projection directories (`<root>/skills/canon`) present for a
+/// provider outside `selected`, with that provider. Canon no longer
+/// updates them; `doctor` names them, `check` ignores them.
+pub fn stray_projections(target_dir: &Path, selected: &[Provider]) -> Vec<(Provider, PathBuf)> {
+    ALL_PROVIDERS
+        .into_iter()
+        .filter(|provider| !selected.contains(provider))
+        .map(|provider| (provider, provider_bundle_root(target_dir, provider)))
+        .filter(|(_, dir)| fs::symlink_metadata(dir).is_ok())
+        .collect()
+}
+
 pub fn doctor(
     source_dir: &Path,
     target_dir: &Path,
     providers: Option<&str>,
 ) -> Result<Vec<String>, SkillsError> {
-    let selected = parse_providers(providers, target_dir)?;
-    let mut lines = vec![format!(
-        "providers: {}",
-        selected
-            .iter()
-            .map(|p| p.as_str())
-            .collect::<Vec<_>>()
-            .join(",")
-    )];
-    let advisories: Vec<String> = competing_skills(target_dir)
+    let selection = select_providers(target_dir, providers)?;
+    let mut lines = vec![match selection.origin {
+        ProviderOrigin::Flag => format!("providers: {}", selection.names()),
+        _ => format!("providers: {} ({})", selection.names(), selection.describe()),
+    }];
+    if selection.providers.is_empty() && selection.origin == ProviderOrigin::Detected {
+        lines.push(format!("no-providers: no canon skill is installed; {CHOOSE_PROVIDERS}"));
+    }
+    let selected = selection.providers.clone();
+    let mut advisories: Vec<String> = stray_projections(target_dir, &selected)
         .into_iter()
-        .map(|skill| {
+        .map(|(provider, dir)| {
+            let mut with = selected.clone();
+            with.push(provider);
+            with.sort();
             format!(
-                "competing-skill: {} (description claims: {}) — if an agent picks `{}` for build work, canon's loop will not run",
-                skill.path.display(),
-                skill.claims.join(", "),
-                skill.name
+                "stray: {} — {} is not a selected provider ({}), so canon no longer updates it; remove it with `rm -r {}`, or select it with `{}`",
+                dir.display(),
+                provider.as_str(),
+                selection.describe(),
+                dir.display(),
+                install_command(&with)
             )
         })
         .collect();
+    advisories.extend(competing_skills(target_dir).into_iter().map(|skill| {
+        format!(
+            "competing-skill: {} (description claims: {}) — if an agent picks `{}` for build work, canon's loop will not run",
+            skill.path.display(),
+            skill.claims.join(", "),
+            skill.name
+        )
+    }));
+    let lines_before_report = lines.len();
     let report = match check(source_dir, target_dir, providers) {
         Ok(report) => report,
         Err(SkillsError::ManifestParse { path, source }) => {
@@ -1147,7 +1439,7 @@ pub fn doctor(
             }
         }
     }
-    if lines.len() == 1 {
+    if lines.len() == lines_before_report && !lines.iter().any(|line| line.starts_with("no-providers:")) {
         lines.push("status: healthy".into());
     }
     lines.extend(advisories);

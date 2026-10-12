@@ -1,0 +1,10 @@
+description: "0.17 D5: `canon skills install --providers` records the list in canon.yaml `skills.providers` (exit 0); after the list drops codex, `canon skills check` follows canon.yaml and passes without mentioning the leftover `.agents/skills/canon` (exit 0), and `canon skills doctor` reports healthy plus a `stray:` line naming it with how to remove or select it (exit 0)"
+steps:
+  - args: [skills, install, --providers, "claude,codex"]
+    exit: 0
+  - args: [skills, install, --providers, claude]
+    exit: 0
+  - args: [skills, check]
+    exit: 0
+  - args: [skills, doctor]
+    exit: 0

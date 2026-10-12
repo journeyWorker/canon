@@ -94,6 +94,14 @@ is attributed, and is fresh — never on a self-report. See
      the text between the markers is canon's. Markers count only as
      standalone lines outside code fences; a duplicate or unmatched marker
      is refused and nothing is written.
+   - **The canon skill, for the harnesses you pick.** On a terminal,
+     `init` asks which harnesses get it, with the ones whose `.claude`,
+     `.codex`, `.omp` or `.pi` directory exists checked; `--providers
+     claude,codex` (or `none`) answers without asking. Without a terminal
+     or the flag it takes the detected ones, and with none detected it
+     installs nothing and names `canon skills install --providers=<list>`.
+     The answer is recorded as `skills: { providers: [...] }` in
+     `canon.yaml`. `.agents` alone does not select Codex.
 
    `--no-agents-md` and `--no-policy` skip those two. `init` never
    overwrites an existing `canon.yaml` or `policy.yaml`; rerunning it only
@@ -172,18 +180,20 @@ projected into each selected provider's project-local location: Claude gets
 (Codex scans `.agents/skills`, never `.codex/skills`), OMP gets
 `.omp/skills/canon/SKILL.md`, and Pi gets `.pi/skills/canon/SKILL.md`. OMP/Pi
 are passive bundles; their retrieve pre-dispatch script is a sidecar only, not
-a native hook. When `--providers` is omitted, canon detects existing
-`.claude`, `.agents` or `.codex` (Codex), `.omp`, and `.pi` roots and defaults
-to Claude+Codex when none exist. Select providers explicitly when you want to
-pin the projection:
+a native hook. `canon init` already installed it for the harnesses you
+picked. `skills install`, `check` and `doctor` follow `canon.yaml`'s
+`skills.providers`; a repo without that key (set up before 0.17) uses the
+providers its install lock records, then the detected `.claude`, `.codex`,
+`.omp` and `.pi` directories. Nothing undetected is ever added. Pass
+`--providers` to change the list; install records it in `canon.yaml`:
 
 ```bash
-# project one canonical canon skill for all four providers
-bunx @journeykit/canon skills install --source canon/skills --target . --providers=claude,codex,omp,pi
+# project the canon skill for all four providers and record the list
+bunx @journeykit/canon skills install --providers=claude,codex,omp,pi
 
 # inspect projections without writing
-bunx @journeykit/canon skills check --source canon/skills --target .
-bunx @journeykit/canon skills doctor --source canon/skills --target .
+bunx @journeykit/canon skills check
+bunx @journeykit/canon skills doctor
 
 # surface role-scoped strategy memory before a task starts
 bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon regime-key dev my-repo core abc123)"
@@ -195,11 +205,13 @@ diagnostics across all four managed roots without deleting user files. The
 install lock records the canon version that wrote it, so after you upgrade
 canon both say "installed by canon X, this canon is Y — run
 `canon skills install`" (or "an unknown canon version" for a lock from
-before 0.16) until you reinstall. `doctor` also names other skills in the
-same provider roots whose description claims build work, meaning one
-sentence pairs a build verb (build, create, implement, …) with a build object
-(site, app, game, feature, tool, service, …): if an agent picks one of those
-for build work, canon's loop will not run. It only reports them.
+before 0.16) until you reinstall. `doctor` also names a canon projection
+left for a harness that is no longer selected (`stray:`, with the `rm -r`
+that removes it), and other skills in the same provider roots whose
+description claims build work, meaning one sentence pairs a build verb
+(build, create, implement, …) with a build object (site, app, game, feature,
+tool, service, …): if an agent picks one of those for build work, canon's
+loop will not run. It only reports them.
 
 Upgrading from canon 0.13.0 or earlier? Those releases wrote Codex's skill to
 `.codex/skills/canon.md`, which Codex never reads. Re-run `skills install`: it

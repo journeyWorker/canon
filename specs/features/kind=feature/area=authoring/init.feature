@@ -208,3 +208,78 @@ Feature: authoring init
     When a reader refreshes the stale scenario index and takes the index lock
     Then the init gitignore covers .canon/scenario-index.lock
     And git status reports nothing untracked
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @authoring.init.90
+  Scenario: Without a terminal init installs the skill for the detected harnesses only
+    Given an empty repository holding an .omp directory and an .agents directory, and a skill source
+    When canon init runs with no terminal and no --providers
+    Then it installs the canon skill for omp only and says where
+    And canon.yaml ends with `skills: { providers: [omp] }` and the install lock records omp only
+    And canon init --check-config passes the skills section and canon skills doctor reports healthy from canon.yaml
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @authoring.init.91
+  Scenario: --providers codex answers without a prompt and installs only the agents projection
+    Given an empty repository holding a .claude directory, and a skill source
+    When canon init runs with --providers codex
+    Then only .agents/skills/canon is projected and nothing is written under .claude or .codex
+    And canon.yaml records `providers: [codex]`, and the policy and AGENTS.md are written as before
+    And a rerun with --providers leaves canon.yaml alone and says to use canon skills install --providers instead
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.init.92
+  Scenario: A repository with no harness directory gets no skill and is told how to choose
+    Given an empty repository with no .claude, .codex, .omp or .pi directory
+    When canon init runs with no terminal and no --providers
+    Then it exits 0, installs nothing and writes no install lock
+    And its output says no harness was detected and names `canon skills install --providers=<list>`
+    And canon.yaml carries the skills section only as a commented example, which check-config reports as not configured
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.init.93
+  Scenario: An explicit empty harness choice is recorded
+    Given an empty repository holding a .claude directory
+    When canon init runs with --providers none, or with an empty --providers
+    Then canon.yaml records `providers: []` and nothing is installed
+    And canon skills check exits 0 reporting no providers from canon.yaml
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.init.94
+  Scenario: An unknown harness in --providers is refused before anything is written
+    Given an empty repository
+    When canon init runs with --providers naming a harness canon does not know
+    Then it exits 2 naming the harness and the accepted names
+    And the repository is still empty
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.init.95
+  Scenario: A missing skill source keeps the recorded choice and names the install to run
+    Given an empty repository holding a .pi directory, and no skill source
+    When canon init runs with no terminal and no --providers
+    Then it records `providers: [pi]` in canon.yaml, installs nothing and exits 2
+    And it names the missing source and `canon skills install` with CANON_SKILLS_SOURCE or --source
+    And that install, once the source exists, projects pi from canon.yaml
+
+  # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @authoring.init.96
+  Scenario: On a terminal init asks with the detected harnesses checked
+    Given detected .claude and .omp directories
+    When init asks which harnesses get the canon skill
+    Then it lists claude, codex, omp and pi with claude and omp checked
+    And Enter or the end of input keeps the checked ones, a comma- or space-separated list or none replaces them
+    And an unknown name is reported and asked again

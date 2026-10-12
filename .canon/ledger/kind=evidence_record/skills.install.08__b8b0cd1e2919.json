@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "017-p3-impl"
+  },
+  "at": "2026-10-12T10:41:14.463529Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test skills_install canonical_codex_projects_agents_skill_with_frontmatter_and_sidecars && cargo test -p canon-cli --test skills_install skills_install_50"
+  },
+  "evidence_note": {
+    "summary": "codex projection under .agents with frontmatter and sidecars; .codex selects codex"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 22,
+  "scenario_id": "skills.install.08",
+  "schema": 1,
+  "staging_id": "8b1cd39c1444",
+  "verdict": "faithful"
+}

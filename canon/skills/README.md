@@ -19,8 +19,9 @@ commands or internal Rust modules.
 ## Materialization
 
 ```bash
-canon skills install                              # detect .claude/.agents|.codex/.omp/.pi
-canon skills install --providers=claude,codex,omp,pi
+canon init --providers=claude,codex               # or answer init's prompt; records skills.providers
+canon skills install                              # follows canon.yaml skills.providers
+canon skills install --providers=claude,codex,omp,pi   # any subset or none; rewrites skills.providers
 canon skills check                                # read-only drift check
 canon skills doctor                               # diagnostics, no deletion
 ```
@@ -45,10 +46,16 @@ projections too:
 OMP/Pi projections are project-local passive bundles. The
 `canon-retrieve-pre-dispatch.sh` script is provided only as a sidecar; no OMP
 or Pi native hook is installed. Provider selection is `claude`, `codex`, `omp`,
-and/or `pi`; invalid names fail before any write. Without `--providers`, each
-provider whose root exists is selected; an existing `.agents` or `.codex`
-directory selects Codex. If no provider root exists, Claude and Codex are
-selected for backwards compatibility.
+and/or `pi` (or `none`); invalid names fail before any write. Without
+`--providers`, the commands serve `canon.yaml`'s `skills: { providers: [...] }`
+(0.17); a repo without that key uses the providers its install lock records;
+with neither, each provider whose marker directory (`.claude`, `.codex`,
+`.omp`, `.pi`) exists. `.agents` alone does not select Codex: other tools use
+it too. With nothing detected, nothing is installed and the command names
+`canon skills install --providers=<list>`. An explicit `--providers` on
+install rewrites `skills.providers` in an existing `canon.yaml`, keeping
+every other byte. `canon init` asks for the list on a terminal (the detected
+ones checked), or takes `--providers`, records it and installs.
 
 The source checkout is never modified by a canonical install. The target owns
 a timestamp-free content-addressed manifest at
@@ -56,6 +63,15 @@ a timestamp-free content-addressed manifest at
 byte-identical no-op. Existing symlinks are never overwritten. `doctor`
 reports stale/missing projections and old `canon-*` remnants in all four
 managed roots and in `.codex/skills` without deleting user data.
+
+`doctor` also names a canon projection directory (`.claude/skills/canon`,
+`.agents/skills/canon`, `.omp/skills/canon`, `.pi/skills/canon`) whose
+provider is not selected. Canon no longer updates it; the line is advisory,
+`check` ignores it, and `doctor` still reports healthy:
+
+```
+stray: ./.agents/skills/canon — codex is not a selected provider (from canon.yaml skills.providers), so canon no longer updates it; remove it with `rm -r ./.agents/skills/canon`, or select it with `canon skills install --providers=claude,codex`
+```
 
 The lock also records `canon_version`, the canon that wrote it, and
 `source_commit`, the `HEAD` of the git checkout the source was in (omitted

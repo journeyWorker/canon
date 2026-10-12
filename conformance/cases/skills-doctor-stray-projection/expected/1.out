@@ -1,0 +1,2 @@
+canon v1 — installed (claude,codex)
+canon skills install: wrote `skills: { providers: [claude, codex] }` to ./canon.yaml
