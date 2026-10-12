@@ -878,10 +878,11 @@ fn context_status_66_a_proposed_subject_with_an_unapproved_brief_asks_only_the_h
 
 /// context.status.67: a `proposed` subject with no brief to answer (no
 /// adopted change, or a change with no proposal.md) keeps the steps it
-/// had, with no brief field; and the `proposed → specced` move never
-/// reads the brief, even when it is unapproved.
+/// had, with no brief field; and showing a `proposed` subject's brief
+/// adds no transition check: its `proposed → specced` move succeeds
+/// with an unapproved brief and prints nothing about it.
 #[test]
-fn context_status_67_a_proposed_subject_with_no_brief_keeps_its_steps_and_the_guard_is_unchanged() {
+fn context_status_67_a_proposed_subject_with_no_brief_keeps_its_steps_and_its_brief_adds_no_transition_check() {
     let dir = repo();
     write_policy(dir.path(), FULL_POLICY);
     seed_subject(dir.path(), "bare-subject", SubjectStatus::Proposed, &[]);
@@ -907,7 +908,7 @@ fn context_status_67_a_proposed_subject_with_no_brief_keeps_its_steps_and_the_gu
     write_proposal(dir.path(), "c-held", "Status: draft, awaiting the human.\n");
     seed_scenario(dir.path(), "world.held.01", Some("held-subject"), Some("failure"));
     let out = run(dir.path(), &["subject", "status", "held-subject", "specced", "--actor-id", "lead"]);
-    assert!(out.status.success(), "only verifying → shipped reads the brief: {}", stderr(&out));
+    assert!(out.status.success(), "the move to specced does not read the brief: {}", stderr(&out));
     assert!(!stderr(&out).contains("brief"), "{}", stderr(&out));
 }
 

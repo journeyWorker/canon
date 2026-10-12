@@ -47,15 +47,18 @@
 //! # No bookkeeping steps (0.16 M6)
 //! Readers refresh a stale scenario index themselves
 //! ([`crate::inventory::refresh_stale_index`]), so no step says "then
-//! `canon inventory sync`": the sync step appears only when the `.feature`
-//! files hold scenarios and the index still holds none, which means the
-//! refresh refused (a format violation or a duplicate id) and
-//! `canon inventory sync` names why. The evidence step names
+//! `canon inventory sync`": the sync step appears only when the refresh
+//! refused (a format violation or a duplicate id), and
+//! `canon inventory sync` names why (see Failing closed). The evidence step names
 //! `canon gate promote` only when `canon.yaml` keeps writes staged
 //! (`write.promote: manual`, the default without a `write:` key).
 //!
 //! # Failing closed
-//! Status never suggests progress the gate would refuse. A corpus kind
+//! Status never suggests progress the gate would refuse. A spec root
+//! whose changed `.feature` files the index refresh could not take
+//! ([`crate::inventory::unrefreshable_roots`], the decision `canon gate
+//! check` and the ship guard also fail on) makes `canon inventory sync`
+//! the only step, since every count would describe the old specs. A corpus kind
 //! routed away from the rung status reads (`scenario`, `subject`,
 //! `review`, `finding`) would read as empty, so status then lists only
 //! the routing repair, like the ship gate and `spec_coverage` refuse
@@ -362,6 +365,30 @@ pub fn resolve(repo: &Path) -> StatusReport {
             command: "canon init --check-config".into(),
             why: format!(
                 "set `{settings}` in canon.yaml, then check it: status and the gate read only the local rung, so every count and step would rest on an empty corpus"
+            ),
+        });
+        let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
+        let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
+        return finish(repo, &ctx.policy, warnings, summaries, unowned, drops, audits, next);
+    }
+
+    // ── fail closed: .feature edits the index refresh could not take ──
+    // The same decision `canon gate check` and the ship guard fail on:
+    // every count below would describe specs the files no longer say, so
+    // the sync that names the problems is the only step.
+    let unrefreshable = crate::inventory::unrefreshable_roots(repo);
+    if !unrefreshable.is_empty() {
+        let ids = unrefreshable.iter().map(|root| format!("`{}`", root.id.as_str())).collect::<Vec<_>>().join(", ");
+        let (violations, errors) = unrefreshable.iter().fold((0, 0), |(v, e), root| (v + root.violations, e + root.sync_errors));
+        if scenarios.is_empty() {
+            warnings.push("the ledger holds no scenario records, so every subject reads as owning none".into());
+        }
+        warnings.push(format!("the scenario index for spec root(s) {ids} is stale and could not be refreshed, so `canon gate check` fails and no subject is suggested to move on"));
+        next.push(NextStep {
+            actor: StepActor::Agent,
+            command: "canon inventory sync".into(),
+            why: format!(
+                "the .feature files under spec root(s) {ids} changed, but the automatic refresh could not index them ({violations} format violation(s), {errors} sync error(s)); this names each format violation or duplicate id to fix"
             ),
         });
         let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();

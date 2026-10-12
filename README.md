@@ -256,8 +256,15 @@ is needed:
 - The skill's loop has no format or sync step: the readers index edited
   `.feature` files themselves, and `canon inventory sync` is named only
   for a command that printed `NOT refreshed` (a format violation, such as
-  a hand-written header with no `# canon:` line, or a duplicate id; the
-  gate then graded the old index). `canon evidence add --task` and
+  a hand-written header with no `# canon:` line, or a duplicate id).
+- *Fail closed on a refused refresh.* When a root's `.feature` files
+  changed but its refresh is refused, `canon gate check` exits 1 with
+  `uncovered-cell <root>` (the class the ship gate already uses when a
+  subject's scenarios cannot be counted) saying `canon inventory sync`
+  lists the problems; `canon subject status <id> shipped` refuses with
+  the same violation; and `canon status` lists the sync as its only step.
+  All three read one decision (`unrefreshable_roots`). Before, the gate
+  graded the old index and could pass. `canon evidence add --task` and
   `canon gate task` read `tasks.md` as it is, so a new task row needs no
   `canon ingest plans`. `canon gate promote` is named only for
   `write.promote: manual`, in the skill, the `AGENTS.md` block and the

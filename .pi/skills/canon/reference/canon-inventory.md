@@ -23,8 +23,9 @@ command. Run `canon inventory sync` when:
 - a reader prints `NOT refreshed` — a root has a format violation (a
   hand-written `Feature:`/`Scenario:` header with no `# canon:` provenance
   comment, an emptied file, …) or a duplicate id, so its files were not
-  indexed and the command graded the index as it was. `canon inventory
-  sync` names each problem (`canon format specs` names the format ones);
+  indexed. `canon gate check` then fails (`uncovered-cell <root>`),
+  `shipped` is refused and `canon status` lists only the sync. `canon
+  inventory sync` names each problem (`canon format specs` names the format ones);
   fix them and the next command indexes the files;
 - `canon status` says the ledger holds no scenario records while the
   `.feature` files hold some (the same refusal, on an index never built);

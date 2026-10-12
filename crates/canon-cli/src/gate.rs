@@ -134,7 +134,10 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     crate::inventory::resolve_legacy_pins(&mut gate_context);
 
     let checks = canon_gate::check_set(release);
-    let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).collect());
+    // An index the `.feature` edits are not in grades specs that no longer
+    // exist (0.16 M6): fail closed, one violation per unrefreshable root.
+    let unrefreshable = crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation(""));
+    let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).collect());
     print!("{}", format_gate_report(&report));
     if let Some(count) = canon_gate::spec_coverage::coverage_off_scenarios(&gate_context) {
         print!("{}", format_coverage_off_advisory(count));

@@ -272,12 +272,12 @@ Feature: context status
   @subject:context-capability
   @case:edge
   @context.status.67
-  Scenario: A proposed subject with no brief to answer keeps its steps, and the ship guard is unchanged
+  Scenario: A proposed subject with no brief to answer keeps its steps, and showing a brief adds no transition check
     Given a proposed subject that adopts no change, and a proposed subject whose newest adopted change has no proposal.md
     When canon status runs
     Then neither carries a brief field or a brief line, and neither gets a human step
     And each still gets its canon scenario new step, after one canon feature new step
-    And a proposed subject whose brief is unapproved still moves to specced, since only verifying to shipped checks the brief
+    And a proposed subject whose brief is unapproved still moves to specced, with no brief line in its output: status reads that brief, the move to specced does not
 
   # canon: {"schema":1,"at":"2026-10-12T03:41:10Z","actor":{"agent_id":"canon"}}
   @subject:context-capability

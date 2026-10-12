@@ -231,7 +231,10 @@ sync` exits `2`; a reader skips the refresh and still runs).
 
 A fresh index prints nothing. A root that fails to sync (format
 violations, a duplicate id) is named and left as it was, and the command
-still runs:
+still runs; `canon gate check` then fails with `uncovered-cell <root>`,
+the `verifying → shipped` guard refuses, and `canon status` lists only
+`canon inventory sync`, while the reporting readers (`query`, `context`)
+keep only this line:
 
 ```
 canon gate check: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them

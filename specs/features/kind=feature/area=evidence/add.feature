@@ -366,4 +366,4 @@ Feature: evidence add
     When evidence add, finding add, finding close and divergence stage run
     Then each prints one success line, naming the record's committed file under the ledger, which exists
     And no line names the staged file promotion moved, and no separate promote line is printed
-    And with --no-promote the line names the staged file and canon gate promote instead
+    And with --no-promote, evidence add and finding add print the staged file and canon gate promote, and divergence stage prints the staged file and canon divergence promote

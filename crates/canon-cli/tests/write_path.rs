@@ -228,8 +228,9 @@ fn a_promote_on_write_commits_only_its_own_record() {
 
 /// evidence.add.67: under `write: { promote: auto }` every staged write
 /// prints ONE success line naming the record's committed file, never the
-/// staged file promotion moved (dogfood eval 3 H2); `--no-promote` names
-/// the staged file and `canon gate promote` instead.
+/// staged file promotion moved (dogfood eval 3 H2); with `--no-promote`
+/// the line names the staged file and the promote that commits it:
+/// `canon gate promote`, or `canon divergence promote` for a divergence.
 #[test]
 fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     let dir = init_repo();
@@ -254,10 +255,20 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     }
     assert_eq!(staged(repo), 0);
 
-    let text = stdout(&ok(repo, &with(evidence("game.run.01"), &["--no-promote"])));
-    let path = text.strip_prefix("canon evidence add: staged ").and_then(|rest| rest.split(' ').next()).unwrap_or_else(|| panic!("{text}"));
-    assert!(repo.join(".canon/ledger/_staging").join(path).is_file(), "{path}");
-    assert!(text.contains(STAGED), "{text}");
+    let kept: [(&str, Vec<&str>, &str); 3] = [
+        ("canon evidence add", with(evidence("game.run.01"), &["--no-promote"]), STAGED),
+        ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "2", "--severity", "note", "--reviewer", "r", "--summary", "s", "--no-promote"], STAGED),
+        ("canon divergence stage", vec!["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"], "— run `canon divergence promote` to commit it"),
+    ];
+    for (command, args, suffix) in kept {
+        let text = stdout(&ok(repo, &args));
+        let line = text.lines().next().unwrap_or_default();
+        let path = line.strip_prefix(&format!("{command}: staged ")).and_then(|rest| rest.split(' ').next()).unwrap_or_else(|| panic!("{command} names the staged file: {text}"));
+        let staged_file = if Path::new(path).is_absolute() { PathBuf::from(path) } else { repo.join(".canon/ledger/_staging").join(path) };
+        assert!(staged_file.is_file(), "{command}: {path} is the staged file");
+        assert!(line.contains(suffix), "{command} directs to its promote: {text}");
+    }
+    assert_eq!(staged(repo), 3);
 }
 
 // ── stale index refresh ──
@@ -401,7 +412,13 @@ fn repo_with_a_deleted_scenario() -> tempfile::TempDir {
 /// back brings it back.
 #[test]
 fn a_deleted_scenario_is_removed_the_same_way_by_a_refresh_and_by_a_full_sync() {
-    let (refreshed, synced) = (repo_with_a_deleted_scenario(), repo_with_a_deleted_scenario());
+    // One fixture, copied: two separately scaffolded repos carry
+    // provenance timestamps that differ across a second boundary, and so
+    // different source digests, which made the comparison below flaky.
+    let refreshed = repo_with_a_deleted_scenario();
+    let synced = tempfile::tempdir().unwrap();
+    let copied = Command::new("cp").arg("-R").arg(refreshed.path().join(".")).arg(synced.path()).status().unwrap();
+    assert!(copied.success());
 
     let err = stderr(&canon(refreshed.path(), &["gate", "check"]));
     assert!(
@@ -446,6 +463,52 @@ fn a_root_that_cannot_sync_marks_no_scenario_removed() {
     let records = scenario_records(repo);
     assert_eq!(records.len(), 2, "no tombstone and no new generation: {records:?}");
     assert!(records.iter().all(|r| r.get("removed").is_none()), "{records:?}");
+}
+
+/// inventory.sync.47 (@case:failure): a root the readers' refresh cannot
+/// index fails closed through one decision
+/// (`canon_cli::inventory::unrefreshable_roots`): `canon gate check`
+/// exits 1 with an `uncovered-cell` naming the root, the `verifying →
+/// shipped` guard refuses with the same violation, and `canon status`'s
+/// only step is the sync. Restoring the file lifts all three.
+#[test]
+fn inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_status() {
+    let dir = init_repo();
+    let repo = dir.path();
+    std::fs::create_dir_all(repo.join(".canon")).unwrap();
+    std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_evidence: true\n").unwrap();
+    ok(repo, &["subject", "new", "demo", "--domain", "game", "--title", "Demo", "--actor-id", "lead"]);
+    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--subject", "demo", "--case", "failure"]);
+    ok(repo, &evidence("game.run.01"));
+    for state in ["specced", "building", "verifying"] {
+        ok(repo, &["subject", "status", "demo", state, "--actor-id", "lead"]);
+    }
+    let feature = files_under(repo.join("specs/features")).pop().unwrap();
+    let clean = std::fs::read_to_string(&feature).unwrap();
+    let mut lines: Vec<&str> = clean.lines().collect();
+    let provenance = lines.iter().rposition(|l| l.contains("# canon:")).unwrap();
+    lines.remove(provenance);
+    std::fs::write(&feature, lines.join("\n").replace("A run ends", "A run ends at zero health") + "\n").unwrap();
+
+    let violation = "uncovered-cell root — the scenario index for spec root `root` is stale and could not be refreshed (1 format violation(s), 0 sync error(s)), so its changed .feature files are not graded; `canon inventory sync` lists the problems to fix";
+    let gate = canon(repo, &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(1), "{}{}", stdout(&gate), stderr(&gate));
+    assert!(stdout(&gate).contains(violation), "{}", stdout(&gate));
+
+    let ship = canon(repo, &["subject", "status", "demo", "shipped", "--actor-id", "lead"]);
+    assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
+    assert!(stderr(&ship).contains("uncovered-cell root — verifying → shipped: the scenario index for spec root `root` is stale"), "{}", stderr(&ship));
+    let report: serde_json::Value = serde_json::from_slice(&ok(repo, &["status", "--json"]).stdout).unwrap();
+    assert_eq!(report["subjects"][0]["status"], "verifying", "a refused ship leaves the subject: {report}");
+    let next = report["next"].as_array().unwrap();
+    assert_eq!(next.len(), 1, "the sync is the only step: {report}");
+    assert_eq!(next[0]["command"], "canon inventory sync");
+    assert!(next[0]["why"].as_str().unwrap().contains("spec root(s) `root`"), "{report}");
+
+    std::fs::write(&feature, &clean).unwrap();
+    let gate = canon(repo, &["gate", "check"]);
+    assert!(!stdout(&gate).contains("could not be refreshed"), "{}", stdout(&gate));
+    ok(repo, &["subject", "status", "demo", "shipped", "--actor-id", "lead"]);
 }
 
 /// inventory.sync.45: `canon inventory sync` and every reader's refresh

@@ -103,9 +103,9 @@ assumption you state there, and say so in your final report.
    `proposed → specced → building → verifying → shipped`. It refuses a move
    the policy does not yet allow (missing evidence, missing reviews, open
    blocker findings); fix the gap rather than overriding, and finish with
-   `canon gate check` clean and printing no `NOT refreshed` line (that
-   line means it graded an index your `.feature` edits are not in; see
-   step 3). `shipped` also refuses while the change's
+   `canon gate check` clean. A root whose `.feature` edits could not be
+   indexed fails the gate and refuses `shipped` (`uncovered-cell <root>`;
+   see step 3). `shipped` also refuses while the change's
    `proposal.md` has no `Approved:` line: that needs the human's answer,
    and you record the line only from it (with no `proposal.md` there is no
    brief to answer, and the guard only prints an advisory). Move the subject to

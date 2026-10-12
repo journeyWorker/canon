@@ -68,10 +68,14 @@ canon gate check: refreshed the scenario index from 1 changed feature file(s) (s
 
 A root that fails to sync (format violations, a duplicate id) is named
 instead, ending ``NOT refreshed: root `x` (N format violation(s), 0 sync
-error(s)) — `canon inventory sync` lists them``, and the gate still runs,
-against the index as it was: a clean result then does not cover the
-edits that were not indexed. Fix what the sync lists and run the gate
-again. See `canon-storage` (The scenario index).
+error(s)) — `canon inventory sync` lists them``, and the gate fails
+closed: it adds `uncovered-cell <root> — the scenario index for spec root
+`<root>` is stale and could not be refreshed (…); `canon inventory sync`
+lists the problems to fix` and exits 1, since the index it would grade
+does not hold the edits. The `verifying → shipped` guard refuses with
+the same violation, and `canon status` lists the sync as its only step.
+Fix what the sync lists and run the gate again. See `canon-storage`
+(The scenario index).
 
 ### The spec-derived worklist (`spec_coverage`, opt-in)
 
