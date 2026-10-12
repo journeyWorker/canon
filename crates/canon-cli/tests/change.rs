@@ -56,8 +56,8 @@ fn change_new_scaffolds_imports_and_adopts_with_no_config_edit() {
 
     let changes = query(dir.path(), "change");
     assert!(
-        changes.iter().any(|c| c["change_id"] == "add-login" && c["subject_id"] == "auth" && c["summary"] == "Add login"),
-        "the change must be imported and carry subject_id=auth: {changes:?}"
+        changes.iter().any(|c| c["change_id"] == "add-login" && c["subject_ids"] == serde_json::json!(["auth"]) && c["summary"] == "Add login"),
+        "the change must be imported and carry subject_ids=[auth]: {changes:?}"
     );
     assert!(
         changes.iter().all(|c| c["actor"]["agent_id"] == "canon-plan-import-canon"),
@@ -80,10 +80,10 @@ fn change_new_scaffolds_imports_and_adopts_with_no_config_edit() {
 }
 
 /// 0.14 acceptance rerun G9: `canon gate task` re-imports the flipped
-/// change, and the re-imported change version used to carry
-/// `subject_id: null`, superseding the adoption `change new` wrote. The
-/// latest change still names its subject after the flip, and after a
-/// full `canon ingest plans`.
+/// change, and the re-imported change version used to carry no subject,
+/// superseding the adoption `change new` wrote. The latest change still
+/// names its subject after the flip, and after a full `canon ingest
+/// plans`.
 #[test]
 fn a_task_flip_keeps_the_changes_adopted_subject() {
     let dir = inited_repo_with_subject();
@@ -118,11 +118,11 @@ fn a_task_flip_keeps_the_changes_adopted_subject() {
             .expect("the change is in the store")
     };
     let change = latest(repo);
-    assert_eq!(change["subject_id"], "auth", "the flip's re-import keeps the adoption: {change}");
+    assert_eq!(change["subject_ids"], serde_json::json!(["auth"]), "the flip's re-import keeps the adoption: {change}");
     assert_eq!(change["status"], "completed", "the re-import did land: {change}");
 
     assert!(run(repo, &["ingest", "plans"]).status.success());
-    assert_eq!(latest(repo)["subject_id"], "auth", "a full import keeps it too");
+    assert_eq!(latest(repo)["subject_ids"], serde_json::json!(["auth"]), "a full import keeps it too");
 }
 
 #[test]
@@ -280,7 +280,7 @@ fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_l
     assert!(adopt.status.success(), "{}", stderr(&adopt));
     assert!(stdout(&adopt).contains("linked change `add-login` to subject `auth`"), "{}", stdout(&adopt));
     let changes = query(dir.path(), "change");
-    assert!(changes.iter().any(|c| c["change_id"] == "add-login" && c["subject_id"] == "auth"), "{changes:?}");
+    assert!(changes.iter().any(|c| c["change_id"] == "add-login" && c["subject_ids"] == serde_json::json!(["auth"])), "{changes:?}");
 
     // Idempotent: a second run writes nothing.
     let before = ledger_file_count(dir.path());
@@ -319,4 +319,70 @@ fn change_new_writes_canon_changes_beside_an_external_openspec_source_it_never_t
     let actor = |id: &str| changes.iter().find(|c| c["change_id"] == id).map(|c| c["actor"]["agent_id"].clone());
     assert_eq!(actor("add-login"), Some(Value::from("canon-plan-import-canon")), "{changes:?}");
     assert_eq!(actor("ext-plan"), Some(Value::from("canon-plan-import-openspec")), "{changes:?}");
+}
+
+/// subject.lifecycle.33 (0.18 D4, issue #28's repro): `change new
+/// refactor-core --subject perception`, then `subject adopt refactor-core
+/// --subject editing`. The second adopt adds the subject and says the
+/// change now belongs to both; both subjects list the change, the change
+/// lists both, status counts its open blocker against both, and that
+/// blocker refuses each subject's move into review scope.
+#[test]
+fn subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and_its_blocker_gates_both() {
+    use canon_model::{Actor, ChangeId, Envelope, Finding, FindingSeverity, RecordKind, RoleId};
+    use canon_store::tier::Tier;
+
+    let dir = TempDir::new().unwrap();
+    let repo = dir.path();
+    assert!(run(repo, &["init"]).status.success());
+    for id in ["perception", "editing"] {
+        let out = run(repo, &["subject", "new", id, "--domain", "dev", "--title", id]);
+        assert!(out.status.success(), "{}", stderr(&out));
+    }
+    let created = run(repo, &["change", "new", "refactor-core", "--subject", "perception", "--title", "Refactor core"]);
+    assert!(created.status.success(), "{}", stderr(&created));
+
+    let adopt = run(repo, &["subject", "adopt", "refactor-core", "--subject", "editing"]);
+    assert!(adopt.status.success(), "{}", stderr(&adopt));
+    assert_eq!(
+        stdout(&adopt),
+        "canon subject adopt: linked change `refactor-core` to subject `editing` as well; the change now belongs to `perception` and `editing` — written directly; nothing to promote\n"
+    );
+
+    let subjects = query(repo, "subject");
+    for id in ["perception", "editing"] {
+        let subject = subjects.iter().find(|s| s["subject_id"] == id).unwrap();
+        assert_eq!(subject["change_ids"], serde_json::json!(["refactor-core"]), "{id} lists the change: {subject}");
+    }
+    let latest = query(repo, "change")
+        .into_iter()
+        .filter(|c| c["change_id"] == "refactor-core")
+        .max_by_key(|c| chrono::DateTime::parse_from_rfc3339(c["at"].as_str().unwrap()).unwrap())
+        .unwrap();
+    assert_eq!(latest["subject_ids"], serde_json::json!(["perception", "editing"]), "the change lists both, never re-pointed: {latest}");
+
+    // An open blocker on the shared change.
+    std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_evidence: true\n  require_review: {}\n").unwrap();
+    let envelope = Envelope::new(1, RecordKind::Finding, chrono::Utc::now(), Actor::new("reviewer-2", RoleId::parse("reviewer").unwrap()));
+    let finding = Finding::new(envelope, ChangeId::parse("refactor-core").unwrap(), 1, 1, FindingSeverity::Blocker, "reviewer-2", "core leaks a handle");
+    canon_store::git_tier::GitTier::new(repo.join(".canon/ledger")).write(&finding).unwrap();
+
+    let status: Value = serde_json::from_str(&stdout(&run(repo, &["status", "--json"]))).unwrap();
+    for id in ["perception", "editing"] {
+        let summary = status["subjects"].as_array().unwrap().iter().find(|s| s["id"] == id).unwrap();
+        assert_eq!(summary["openBlockers"], 1, "{id}: {summary}");
+    }
+    for id in ["perception", "editing"] {
+        for state in ["specced", "building"] {
+            assert!(run(repo, &["subject", "status", id, state]).status.success());
+        }
+        let out = run(repo, &["subject", "status", id, "verifying"]);
+        assert_eq!(out.status.code(), Some(1), "{id}: {}", stderr(&out));
+        assert!(
+            stderr(&out).contains("open-blocker refactor-core#1.1 — building → verifying: open blocker finding by `reviewer-2`"),
+            "{id}: {}",
+            stderr(&out)
+        );
+        assert!(stderr(&out).contains("ran open-blocker — 1 adopted change(s) checked"), "{id}: {}", stderr(&out));
+    }
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Change",
-  "description": "A change: the top of the join spine's `change_id` row (change ↔\ntasks ↔ specs). `subject_id` (s36, additive — `#[serde(default,\nskip_serializing_if = \"Option::is_none\")]`, so a pre-s36 `Change`\nis byte-identical on the wire) links an imported plan change to the\ndurable [`Subject`] it was adopted under; it is a plain `pub` field\nleft `None` by [`Change::new`] and stamped on by `canon-cli`'s\n`subject adopt` at adoption time (mirroring how\n[`Session::project_key`] is set outside this crate), never derived\nhere.",
+  "description": "A change: the top of the join spine's `change_id` row (change ↔\ntasks ↔ specs). `subject_ids` links an imported plan change to every\ndurable [`Subject`] it was adopted under (0.18 D4: a change may belong\nto several subjects; per-task subjects are out of scope). It is a\nplain `pub` field left empty by [`Change::new`] and appended to by\n`canon-cli`'s `subject adopt` at adoption time (mirroring how\n[`Session::project_key`] is set outside this crate), never derived\nhere. Skipped when empty, so an unadopted change carries no key.\n\n# Old records\nThe ledger is append-only. A change written before 0.18 carries a\nsingle `subject_id` string; it reads as a one-element `subject_ids`\n([`one_or_many_subjects`]) and is never rewritten. Renaming the field\nis a format generation change on a kind whose `at` can be byte-stable\n(plan import), so [`RecordKind::Change`] is at schema `2`.",
   "type": "object",
   "properties": {
     "actor": {
@@ -26,15 +26,11 @@
     "status": {
       "$ref": "#/$defs/ChangeStatus"
     },
-    "subject_id": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/SubjectId"
-        },
-        {
-          "type": "null"
-        }
-      ]
+    "subject_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SubjectId"
+      }
     },
     "summary": {
       "type": "string"

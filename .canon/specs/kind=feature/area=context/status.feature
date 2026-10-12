@@ -302,3 +302,15 @@ Feature: context status
     When canon status runs in a repo whose canon.yaml says write promote auto
     Then the evidence step's reason says to attest each scenario and does not name canon gate promote
     And in a repo with write promote manual, or with no write section, the same reason ends by naming canon gate promote
+
+  # canon: {"schema":1,"at":"2026-10-12T18:00:06Z","actor":{"agent_id":"018-n2-impl"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.70
+  Scenario: A shipped subject whose gate went red is flagged and its step is the reopen
+    Given a shipped subject that gained an unattested, unreviewed scenario and an open blocker on its change after it shipped
+    When canon status runs
+    Then the subject is flagged red, naming the uncovered scenario, the unreviewed scenario and the open blocker
+    And its only step is canon subject status with verifying and a reason, which parses as printed
+    And the reason says to add the follow-up as tasks in its approved change, then scenario, evidence and review, and ship it again
+    And once the reopen is followed the flag and the reopen step are gone

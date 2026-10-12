@@ -56,8 +56,10 @@
 //! [`canon_store::fold::fold_latest_by_key`]'s ordering). A finding that
 //! was raised `open` and later closed as `fixed`/`rejected`/`deferred`
 //! therefore no longer counts. One whose latest version is still `open`
-//! with severity `blocker`, on a change listed in an in-scope subject's
-//! `change_ids`, is an `open-blocker` violation.
+//! with severity `blocker`, on a change an in-scope subject adopted
+//! ([`subject_change_ids`]: its `change_ids` and every change whose
+//! `subject_ids` names it), is an `open-blocker` violation. A change
+//! shared by several subjects gates each of them.
 //!
 //! A Finding row the ledger read refused (unparseable, schema-invalid,
 //! misfiled) is a `malformed-evidence` violation naming its file, for
@@ -88,7 +90,7 @@ use crate::context::GateContext;
 use crate::legacy_pins::PinnedScenario;
 use crate::failure_class::{FailureClass, Violation};
 use crate::policy::{subject_status_name, RequireReview, SpecCoverage};
-use crate::spec_coverage::{latest_by_key, latest_scenarios, latest_subjects, scope_decision, subject_scenarios, ScopeDecision};
+use crate::spec_coverage::{latest_by_key, latest_scenarios, latest_subjects, scope_decision, subject_change_ids, subject_scenarios, ScopeDecision};
 
 /// One review gap a recorded waiver let through: reported by `canon gate
 /// check` as an advisory, never as a violation.
@@ -198,14 +200,14 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
         // A change can belong to several subjects. Its blocker is waived
         // only when EVERY in-scope subject holding it recorded that exact
         // blocker in its waiver.
-        let mut holders: BTreeMap<&str, Vec<&Subject>> = BTreeMap::new();
+        let mut holders: BTreeMap<ChangeId, Vec<&Subject>> = BTreeMap::new();
         for subject in subjects.values().filter(|s| require_review.covers(s.status)) {
-            for change_id in &subject.change_ids {
-                holders.entry(change_id.as_str()).or_default().push(subject);
+            for change_id in subject_change_ids(ctx, subject) {
+                holders.entry(change_id).or_default().push(subject);
             }
         }
         for finding in open_blockers(ctx) {
-            let Some(holding) = holders.get(finding.change_id.as_str()) else { continue };
+            let Some(holding) = holders.get(&finding.change_id) else { continue };
             let names: Vec<&str> = holding.iter().map(|s| s.subject_id.as_str()).collect();
             let violation = open_blocker_violation(finding, &names);
             let waived: Option<(&Subject, &StatusOverride)> = holding
@@ -225,27 +227,23 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
 }
 
 /// The per-subject rule `canon subject status` applies before moving
-/// `subject_id` into a status `require_review.scope` covers: every
+/// `subject` into a status `require_review.scope` covers: every
 /// scenario the subject owns needs a qualifying review, and (with
-/// `block_on_findings`) none of `change_ids` may carry an open blocker.
-/// The same [`review_gap`] and [`open_blockers`] the corpus-wide rule
-/// uses, so the guard and `canon gate check` cannot disagree.
-pub fn subject_guard(
-    ctx: &GateContext,
-    require_review: &RequireReview,
-    exclude_lanes: &[String],
-    subject_id: &SubjectId,
-    change_ids: &[ChangeId],
-) -> Vec<Violation> {
+/// `block_on_findings`) none of its adopted changes
+/// ([`subject_change_ids`]) may carry an open blocker. The same
+/// [`review_gap`] and [`open_blockers`] the corpus-wide rule uses, so
+/// the guard and `canon gate check` cannot disagree.
+pub fn subject_guard(ctx: &GateContext, require_review: &RequireReview, exclude_lanes: &[String], subject: &Subject) -> Vec<Violation> {
+    let subject_id = &subject.subject_id;
     let mut violations: Vec<Violation> = subject_scenarios(ctx, subject_id)
         .into_iter()
         .filter(|s| !is_excluded(s, exclude_lanes))
         .filter_map(|s| review_gap(ctx, s, require_review.distinct_actor).map(|gap| gap.violation))
         .collect();
     if require_review.block_on_findings {
-        let changes: BTreeSet<&str> = change_ids.iter().map(ChangeId::as_str).collect();
+        let changes: BTreeSet<ChangeId> = subject_change_ids(ctx, subject).into_iter().collect();
         violations.extend(
-            open_blockers(ctx).into_iter().filter(|f| changes.contains(f.change_id.as_str())).map(|f| open_blocker_violation(f, &[subject_id.as_str()])),
+            open_blockers(ctx).into_iter().filter(|f| changes.contains(&f.change_id)).map(|f| open_blocker_violation(f, &[subject_id.as_str()])),
         );
     }
     violations

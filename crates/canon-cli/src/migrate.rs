@@ -566,7 +566,7 @@ fn plan_unfinished(repo: &Path, canon_changes: &Path, versions: &BTreeMap<String
 
 /// What the ledger says about one change id ([`change_versions`]).
 struct ChangeVersions {
-    /// Whether its first stored version already has `subject_id`.
+    /// Whether its first stored version already names a subject.
     first_adopted: bool,
     /// The actor of its latest stored version.
     latest_actor: String,
@@ -582,7 +582,7 @@ fn change_versions(repo: &Path) -> BTreeMap<String, ChangeVersions> {
     for raw in result.records {
         let Some(id) = raw.0.get("change_id").and_then(serde_json::Value::as_str) else { continue };
         let Some(at) = raw.0.get("at").and_then(serde_json::Value::as_str).and_then(|at| at.parse::<At>().ok()) else { continue };
-        let adopted = raw.0.get("subject_id").and_then(serde_json::Value::as_str).is_some();
+        let adopted = serde_json::from_value::<canon_model::Change>(raw.0.clone()).is_ok_and(|change| !change.subject_ids.is_empty());
         let actor = raw.0.get("actor").and_then(|a| a.get("agent_id")).and_then(serde_json::Value::as_str).unwrap_or_default().to_string();
         let slot = seen.entry(id.to_string()).or_insert(((at, adopted), (at, actor.clone())));
         if at < slot.0 .0 {

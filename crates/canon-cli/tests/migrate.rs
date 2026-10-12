@@ -253,7 +253,7 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
     let changes = query(repo, "change");
     let latest = changes.iter().filter(|c| c["change_id"] == "add-cart").max_by_key(|c| c["at"].as_str().unwrap().to_string()).unwrap();
     assert_eq!(latest["actor"]["agent_id"], "canon-plan-import-canon", "re-imported from canon's own source: {changes:?}");
-    assert_eq!(latest["subject_id"], "cart", "the adoption carried over: {changes:?}");
+    assert_eq!(latest["subject_ids"], serde_json::json!(["cart"]), "the adoption carried over from the 0.16 record's `subject_id`: {changes:?}");
     assert!(query(repo, "task").iter().any(|t| t["task_id"] == "add-cart#1"), "the task id is unchanged");
     let subjects = query(repo, "subject");
     assert!(subjects.iter().any(|s| s["change_ids"].as_array().unwrap().iter().any(|c| c == "add-cart")));
@@ -510,7 +510,7 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
     assert_eq!(read(repo, "canon.yaml"), migrated_yaml());
     let latest = latest_change(repo, "add-cart");
     assert_eq!(latest["actor"]["agent_id"], "canon-plan-import-canon", "{latest}");
-    assert_eq!(latest["subject_id"], "cart", "{latest}");
+    assert_eq!(latest["subject_ids"], serde_json::json!(["cart"]), "{latest}");
     assert!(ok(repo, &["migrate"]).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"));
 }
 

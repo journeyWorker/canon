@@ -163,14 +163,14 @@ fn adopt_links_the_change_and_the_subject_on_both_sides() {
     let change_ids = subjects["records"][0]["change_ids"].as_array().unwrap();
     assert!(change_ids.iter().any(|c| c == "s36-demo"), "subject.change_ids must include the adopted change: {change_ids:?}");
 
-    // Change side: some version carries the stamped `subject_id`.
+    // Change side: some version carries the stamped `subject_ids`.
     let cq = run(dir.path(), &["query", "--kind", "change", "--json"]);
     assert!(cq.status.success(), "stderr: {}", stderr(&cq));
     let change_payload: Value = serde_json::from_str(&stdout(&cq)).unwrap();
     let changes = change_payload["records"].as_array().unwrap();
     assert!(
-        changes.iter().any(|c| c["subject_id"] == "demo-subject"),
-        "an adopted change must carry subject_id=demo-subject: {changes:?}"
+        changes.iter().any(|c| c["subject_ids"] == serde_json::json!(["demo-subject"]) && c["schema"] == 2),
+        "an adopted change must carry subject_ids=[demo-subject], written at the current generation: {changes:?}"
     );
 }
 
@@ -241,7 +241,7 @@ fn adopt_failing_between_its_two_writes_prints_a_repair_that_completes_the_link(
     let repair = run(dir.path(), &["subject", "adopt", "s36-demo", "--subject", "demo-subject"]);
     assert_eq!(repair.status.code(), Some(0), "{}", stderr(&repair));
     let changes: Value = serde_json::from_str(&stdout(&run(dir.path(), &["query", "--kind", "change", "--json"]))).unwrap();
-    assert!(changes["records"].as_array().unwrap().iter().any(|c| c["subject_id"] == "demo-subject"), "{changes}");
+    assert!(changes["records"].as_array().unwrap().iter().any(|c| c["subject_ids"] == serde_json::json!(["demo-subject"])), "{changes}");
     let again = run(dir.path(), &["subject", "adopt", "s36-demo", "--subject", "demo-subject"]);
     assert!(stdout(&again).contains("nothing written"), "{}", stdout(&again));
 }
@@ -1389,4 +1389,199 @@ fn subject_lifecycle_28_shipping_an_external_change_needs_its_canon_brief() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(current_subject(dir.path())["status"], "shipped");
     assert_eq!(std::fs::read(&proposal).unwrap(), proposal_before, "canon never edits the external plan's proposal");
+}
+
+// ── reopening a shipped subject (0.18 D3) ──
+
+/// [`seed_technically_ship_ready`] with an approved brief, shipped.
+fn seed_shipped(repo: &Path) {
+    seed_technically_ship_ready(repo, &format!("Status: approved.\n\n{APPROVED}\n"));
+    let out = run(repo, &["subject", "status", "demo-subject", "shipped"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+}
+
+const REOPEN_REASON: &str = "follow-up: the retry path leaks a file handle";
+
+fn reopen(repo: &Path, extra: &[&str]) -> Output {
+    let mut args = vec!["subject", "status", "demo-subject", "verifying", "--reason", REOPEN_REASON, "--actor-id", "impl-agent"];
+    args.extend_from_slice(extra);
+    run(repo, &args)
+}
+
+/// subject.lifecycle.29: inside its approved scope a shipped subject
+/// reopens with no human, the review guard skipped and said so; the new
+/// record carries the reason, the actor and the change the follow-up goes
+/// into, and the next status write clears it.
+#[test]
+fn subject_lifecycle_29_a_shipped_subject_reopens_inside_its_approved_scope_and_records_why() {
+    let dir = repo();
+    seed_shipped(dir.path());
+
+    let out = reopen(dir.path(), &[]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert!(stdout(&out).starts_with("canon subject status: demo-subject → verifying — "), "{}", stdout(&out));
+    let err = stderr(&out);
+    assert!(
+        err.contains(&format!(
+            "canon subject status: reopened `demo-subject` from shipped, recorded by `impl-agent`: {REOPEN_REASON}; add the follow-up as tasks in its approved change `c-demo`, then scenario, evidence and review; shipping again runs every guard\n"
+        )),
+        "{err}"
+    );
+    assert!(err.contains("skipped unreviewed-promotion — a reopen moves the subject back to fix its gaps; shipping again runs it"), "{err}");
+    let subject = current_subject(dir.path());
+    assert_eq!(subject["status"], "verifying");
+    assert_eq!(subject["reopen"], serde_json::json!({"reason": REOPEN_REASON, "change": "c-demo", "actor": {"agent_id": "impl-agent"}}));
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let subject = current_subject(dir.path());
+    assert_eq!(subject["status"], "shipped");
+    assert!(subject.get("reopen").is_none(), "the note belongs to the reopen that wrote it: {subject}");
+}
+
+/// subject.lifecycle.30: a newer adopted change is a new scope. While
+/// its brief has no `Approved:` line the reopen is refused naming that
+/// brief, `--override-reason` does not waive it, and the subject stays
+/// shipped; once the human answers, the same reopen goes through.
+#[test]
+fn subject_lifecycle_30_reopening_outside_an_approved_scope_is_refused_naming_the_brief() {
+    let dir = repo();
+    seed_shipped(dir.path());
+    seed_change(dir.path(), "c-next");
+    assert!(run(dir.path(), &["subject", "adopt", "c-next", "--subject", "demo-subject"]).status.success());
+    write_brief(dir.path(), "c-next", "Status: draft, awaiting the human.\n");
+
+    let refusal = "canon subject status: unreviewed-promotion demo-subject — shipped → verifying: reopening needs the approved scope, and the brief is not approved — .canon/changes/c-next/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words as `Approved: <who> <when> — \"<their words>\"` in .canon/changes/c-next/brief.md\n";
+    let out = reopen(dir.path(), &[]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains(refusal), "{}", stderr(&out));
+    assert_eq!(current_subject(dir.path())["status"], "shipped", "a refusal leaves the record unchanged");
+
+    let out = reopen(dir.path(), &["--override-reason", "the human said go"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains(refusal) && stderr(&out).contains("waives only the review checks"), "{}", stderr(&out));
+    assert_eq!(current_subject(dir.path())["status"], "shipped");
+
+    write_brief(dir.path(), "c-next", &format!("{APPROVED}\n"));
+    let out = reopen(dir.path(), &[]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(current_subject(dir.path())["reopen"]["change"], "c-next");
+}
+
+/// subject.lifecycle.31: a reopen without `--reason`, with a blank one,
+/// or a `--reason` on any other transition is a usage refusal that
+/// leaves the subject unchanged.
+#[test]
+fn subject_lifecycle_31_a_reopen_needs_a_reason_and_a_reason_needs_a_reopen() {
+    let dir = repo();
+    seed_shipped(dir.path());
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
+    assert!(
+        stderr(&out).contains("refused — reopening demo-subject (shipped → verifying) needs --reason <text>: why it reopens, recorded on the subject with the actor"),
+        "{}",
+        stderr(&out)
+    );
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying", "--reason", "  "]);
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("--reason must be one non-empty line"), "{}", stderr(&out));
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "retired", "--reason", "done"]);
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("--reason records why a shipped subject reopens and applies only to shipped → verifying, not shipped → retired"), "{}", stderr(&out));
+    assert_eq!(current_subject(dir.path())["status"], "shipped");
+}
+
+/// subject.lifecycle.32: a reopened subject ships through every guard
+/// again: an open blocker found in the follow-up and a new owned
+/// scenario with no evidence each refuse, and once they are fixed,
+/// evidenced and reviewed it ships.
+#[test]
+fn subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again() {
+    let dir = repo();
+    seed_shipped(dir.path());
+    assert!(reopen(dir.path(), &[]).status.success());
+
+    seed_blocker(dir.path(), None);
+    let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
+    let mut follow_up = Scenario::new(envelope, ProjectId::parse("demo").unwrap(), ScenarioId::parse("world.demo.02").unwrap(), "follow-up", "", SpecDigest::of(b"02"));
+    follow_up.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
+    ledger(dir.path()).write(&follow_up).unwrap();
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("uncovered-cell world.demo.02 — verifying → shipped: no ledger verdict"), "the evidence gate ran: {err}");
+    assert!(err.contains("open-blocker c-demo#1.1 — verifying → shipped"), "the review guard ran: {err}");
+    assert!(err.contains("unreviewed-promotion world.demo.02 — verifying → shipped"), "the review guard ran: {err}");
+    assert_eq!(current_subject(dir.path())["status"], "verifying");
+
+    seed_blocker(dir.path(), Some(5));
+    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
+    let evidence = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("world.demo.02").unwrap()), None, EvidenceVerdict::Faithful)
+        .with_project_id(ProjectId::parse("demo").unwrap());
+    ledger(dir.path()).write(&evidence).unwrap();
+    let envelope = Envelope::new(1, RecordKind::Review, Utc::now(), Actor::new("reviewer-2", RoleId::parse("reviewer").unwrap()));
+    let review = Review::new(
+        envelope,
+        ProjectId::parse("demo").unwrap(),
+        ScenarioId::parse("world.demo.02").unwrap(),
+        "reviewer-2",
+        "pin-reviewer-2-02",
+        ProvenanceRef::OriginalSpecRef("specs/demo.feature".into()),
+    );
+    ledger(dir.path()).write(&review).unwrap();
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(current_subject(dir.path())["status"], "shipped");
+}
+
+// ── a change belongs to several subjects (0.18 D4) ──
+
+/// The latest stored version of change `id`, as `canon query` shows it.
+fn latest_change(repo: &Path, id: &str) -> Value {
+    let changes: Value = serde_json::from_str(&stdout(&run(repo, &["query", "--kind", "change", "--json"]))).unwrap();
+    changes["records"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["change_id"] == id)
+        .max_by_key(|c| chrono::DateTime::parse_from_rfc3339(c["at"].as_str().unwrap()).unwrap())
+        .cloned()
+        .expect("the change is in the store")
+}
+
+/// subject.lifecycle.34: a change written before 0.18 names its one
+/// subject as `subject_id`. It reads, and `canon query` shows it, as a
+/// one-element `subject_ids`; adopting it under a second subject appends
+/// rather than re-points, and the new version is written as the list.
+#[test]
+fn subject_lifecycle_34_a_pre_0_18_change_reads_as_a_one_element_list_and_a_second_adopt_appends() {
+    let dir = repo();
+    for id in ["perception", "editing"] {
+        assert!(run(dir.path(), &["subject", "new", id, "--domain", "dev", "--title", id]).status.success());
+    }
+    let old = serde_json::json!({
+        "schema": 1,
+        "kind": "change",
+        "at": "2026-10-01T00:00:00.000000Z",
+        "actor": {"agent_id": "canon-plan-import-canon"},
+        "change_id": "refactor-core",
+        "title": "refactor-core",
+        "summary": "Refactor core",
+        "status": "in_progress",
+        "subject_id": "perception"
+    });
+    let path = dir.path().join(".canon/ledger").join(canon_store::partition::expected_relative_path(RecordKind::Change, &old).unwrap());
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, serde_json::to_vec_pretty(&old).unwrap()).unwrap();
+
+    assert_eq!(latest_change(dir.path(), "refactor-core")["subject_ids"], serde_json::json!(["perception"]), "the old key reads as a list");
+
+    let out = run(dir.path(), &["subject", "adopt", "refactor-core", "--subject", "editing"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("the change now belongs to `perception` and `editing`"), "{}", stdout(&out));
+    let change = latest_change(dir.path(), "refactor-core");
+    assert_eq!(change["subject_ids"], serde_json::json!(["perception", "editing"]), "appended, not re-pointed: {change}");
+    assert_eq!(change["schema"], 2, "written at the current generation: {change}");
 }

@@ -541,6 +541,41 @@ fn context_status_62_ship_is_the_agents_step_once_the_brief_is_approved() {
     assert!(stdout(&run(dir.path(), &["status"])).contains("next: nothing"));
 }
 
+/// context.status.70 (0.18 D3): a shipped subject whose gate went red
+/// after it shipped (an unattested, unreviewed new scenario and an open
+/// blocker) is flagged with what is red, and its one step is the reopen
+/// command, which parses and, followed, reopens it; the flag and the
+/// reopen step are then gone.
+#[test]
+fn context_status_70_a_shipped_subject_whose_gate_is_red_is_flagged_and_its_step_is_the_reopen() {
+    let dir = repo();
+    ship_ready(dir.path());
+    write_brief(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));
+    assert!(run(dir.path(), &["subject", "status", "demo-subject", "shipped"]).status.success());
+    assert!(subject(&status_json(dir.path()), "demo-subject").get("red").is_none(), "a green shipped subject is not flagged");
+
+    seed_blocker(dir.path(), "c-demo-subject");
+    seed_scenario(dir.path(), "world.demo.03", Some("demo-subject"), Some("failure"));
+    let report = status_json(dir.path());
+    let red = "1 uncovered scenario(s) without evidence, 1 unreviewed scenario(s), 1 open blocker(s)";
+    assert_eq!(subject(&report, "demo-subject")["red"], serde_json::json!(red.split(", ").collect::<Vec<_>>()));
+    let reopen = "canon subject status demo-subject verifying --reason \"<why it reopens>\" --actor-id <unit>";
+    assert_eq!(commands(&report), [reopen]);
+    assert_eq!(
+        report["next"][0]["why"],
+        format!("demo-subject is shipped but its gate is red ({red}); reopen it, add the follow-up as tasks in its approved change `c-demo-subject` (never `canon change new`), then scenario, evidence and review, and ship it again")
+    );
+    let human = stdout(&run(dir.path(), &["status"]));
+    assert!(human.contains(&format!("      gate: red — {red}; reopen with `{reopen}`\n")), "{human}");
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying", "--reason", "follow-up: a blocker and a new failure path", "--actor-id", "impl-agent"]);
+    assert!(out.status.success(), "the suggested reopen goes through: {}", stderr(&out));
+    let report = status_json(dir.path());
+    assert_eq!(subject(&report, "demo-subject")["status"], "verifying");
+    assert!(subject(&report, "demo-subject").get("red").is_none());
+    assert!(!commands(&report).iter().any(|c| c.contains("--reason")), "{report}");
+}
+
 /// context.status.61: a ship-ready subject whose newest adopted change's
 /// brief.md carries no `Approved:` line gets the one human step and no
 /// move-on; a subject with no change at all has no brief to answer, so it

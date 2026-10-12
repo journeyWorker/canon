@@ -1306,7 +1306,7 @@ enum SubjectCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Link an imported plan change to a subject
+    /// Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several)
     Adopt {
         /// The imported Change's id
         #[arg(value_parser = canon_cli::subject::parse_change_id)]
@@ -1321,7 +1321,7 @@ enum SubjectCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Transition a subject's lifecycle status (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated)
+    /// Transition a subject's lifecycle status (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)
     Status {
         /// The subject to transition
         #[arg(value_parser = canon_cli::subject::parse_subject_id)]
@@ -1332,7 +1332,10 @@ enum SubjectCommand {
         /// Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories
         #[arg(long)]
         override_reason: Option<String>,
-        /// The invoking actor's id, recorded with an --override-reason waiver
+        /// Why a shipped subject reopens (required for shipped → verifying, refused on any other transition); recorded on the subject with the actor
+        #[arg(long)]
+        reason: Option<String>,
+        /// The invoking actor's id, recorded with an --override-reason waiver or a --reason reopen
         #[arg(long, default_value = "canon")]
         actor_id: String,
         /// Repo root (default: nearest ancestor with a canon.yaml)
@@ -1671,9 +1674,9 @@ fn main() -> ExitCode {
                 ExitCode::from(canon_cli::subject::run_new(&repo, &id, &domain, &title, &summary, &owner_role, &actor_id, json) as u8)
             }
             SubjectCommand::Adopt { change_id, subject, repo, json } => ExitCode::from(canon_cli::subject::run_adopt(&repo, &change_id, &subject, json) as u8),
-            SubjectCommand::Status { id, state, override_reason, actor_id, repo, json } => {
+            SubjectCommand::Status { id, state, override_reason, reason, actor_id, repo, json } => {
                 canon_cli::inventory::refresh_stale_index(&repo, "canon subject status");
-                ExitCode::from(canon_cli::subject::run_status(&repo, &id, state, override_reason.as_deref(), &actor_id, json) as u8)
+                ExitCode::from(canon_cli::subject::run_status(&repo, &id, state, override_reason.as_deref(), reason.as_deref(), &actor_id, json) as u8)
             }
         },
         Command::Change { action } => match action {

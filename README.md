@@ -82,6 +82,31 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.18.0 release
+
+### Reopening a shipped subject, and a change in several subjects (N2: D3, D4)
+
+- **Reopen (D3, #31).** `canon subject status <id> verifying --reason
+  "<why>"` reopens a `shipped` subject for follow-up work. It needs no
+  human inside the approved scope (the subject's newest adopted change's
+  brief is approved, or there is no brief to answer); otherwise it exits
+  1 naming the brief to approve, and `--override-reason` does not waive
+  it. The new Subject record carries `reopen: { reason, change, actor }`;
+  the next status write clears it. `--reason` is required for the reopen
+  and refused on any other transition (exit 2). The review guard does not
+  run on a reopen; shipping again runs every guard. `canon status` flags
+  a shipped subject whose gate went red (`gate: red — …`, `red` in
+  `--json`) and its only step is the reopen command.
+- **A change in several subjects (D4, #28).** `Change.subject_id` is now
+  `subject_ids` (a list; `Change` schema generation `2`). A record written
+  before 0.18 reads, and `canon query --kind change --json` shows it, as a
+  one-element list. A second `canon subject adopt <change> --subject
+  <other>` adds the subject and prints that the change now belongs to
+  both; it never re-points. The gate's open-blocker rule, the status
+  guard, `canon status`, the brief and the evidence refusal join a
+  subject to its changes from both sides, so an open blocker on a shared
+  change gates every subject it belongs to.
+
 ## 0.17.0 release
 
 Version 0.17.0 gives canon its own home: the spec corpus, canon's own

@@ -478,11 +478,28 @@ fn sensitive_detail_key(key: &str) -> bool {
 }
 
 fn query_record(kind: RecordKind, raw: &RawRecord, include_sensitive: bool) -> Value {
-    if kind == RecordKind::Event && !include_sensitive {
-        redacted_event_record(raw)
-    } else {
-        raw.0.clone()
+    match kind {
+        RecordKind::Event if !include_sensitive => redacted_event_record(raw),
+        RecordKind::Change => change_record(raw),
+        _ => raw.0.clone(),
     }
+}
+
+/// A change as `--json` shows it (0.18 D4): a version written before
+/// 0.18 carries one `subject_id`, shown as the one-element `subject_ids`
+/// the model reads it as, so every version names its subjects the same
+/// way. Presentation only, like event redaction: the stored record is
+/// never modified.
+fn change_record(raw: &RawRecord) -> Value {
+    let mut record = raw.0.clone();
+    if let Some(object) = record.as_object_mut() {
+        if let Some(old) = object.remove("subject_id") {
+            if !old.is_null() && !object.contains_key("subject_ids") {
+                object.insert("subject_ids".to_string(), Value::Array(vec![old]));
+            }
+        }
+    }
+    record
 }
 
 /// `--json`: machine-readable output — event bodies are redacted by default.

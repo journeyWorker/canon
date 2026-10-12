@@ -80,17 +80,37 @@
 //! check` keeps reporting the gaps as advisories. The guard prints, on
 //! stderr, which checks it ran and which it skipped. Without the policy
 //! none of this runs and the output is unchanged.
+//!
+//! # Reopening a shipped subject (0.18 D3)
+//! `shipped → verifying` is the one backward step: follow-up work on a
+//! shipped subject (a fix, a review round, a scenario its gate now
+//! misses) reopens it. It needs `--reason`, recorded with the actor on
+//! the new record ([`canon_model::Reopen`], with the change the work goes
+//! into). Inside the approved scope it needs no human: the subject's
+//! newest adopted change has an approved brief, or there is no brief to
+//! answer. Otherwise it refuses, unwaivably, naming the brief to approve.
+//! The review guard does not run on it (it moves the subject back to fix
+//! its gaps); shipping again runs every guard above, as the first ship
+//! did.
+//!
+//! # A change may belong to several subjects (0.18 D4)
+//! `canon subject adopt` appends: adopting a change under a second
+//! subject adds that subject to the change's `subject_ids` and the
+//! change to the subject's `change_ids`, and says the change now belongs
+//! to both. Every guard reads a subject's changes joined from both sides
+//! ([`canon_gate::spec_coverage::subject_change_ids`]), so an open
+//! blocker on a shared change gates each subject it belongs to.
 
 use std::path::Path;
 
 use canon_gate::review_gate::{
     active_require_review, malformed_findings, subject_guard, unreadable_review_kinds, unreadable_violation, LegacyReviewCounts,
 };
-use canon_gate::spec_coverage::{case_gaps, subject_scenarios};
+use canon_gate::spec_coverage::{case_gaps, subject_change_ids, subject_scenarios};
 use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, PolicyResolution, RequireReview, SpecCoverage, Violation};
 use canon_model::{
-    Actor, Change, ChangeId, Envelope, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, ScenarioId, StatusOverride, Subject, SubjectId, SubjectStatus,
-    WaivedViolation,
+    Actor, Change, ChangeId, Envelope, EvidenceVerdict, ProjectId, RawRecord, RecordKind, Reopen, RoleId, ScenarioId, StatusOverride, Subject, SubjectId,
+    SubjectStatus, WaivedViolation,
 };
 use canon_policy::SchemaRegistry;
 use canon_store::registry::TierRegistry;
@@ -155,18 +175,20 @@ fn status_str(status: SubjectStatus) -> &'static str {
 }
 
 /// The subject lifecycle transition rule (s36 design D1): the forward
-/// chain `proposed → specced → building → verifying → shipped`, plus
-/// any non-retired state → `retired`. Every other transition (a skip,
-/// a backward step, a self-loop, or anything out of `retired`) is
-/// invalid. The `verifying → shipped` EVIDENCE gate is a SEPARATE,
-/// additional requirement layered on top of this pure step check (see
-/// [`ship_gate_violations`]).
+/// chain `proposed → specced → building → verifying → shipped`, the one
+/// backward step `shipped → verifying` that reopens a shipped subject
+/// for follow-up work (0.18 D3, which [`run_status`] also requires a
+/// `--reason` and the approved scope for), plus any non-retired state →
+/// `retired`. Every other transition (a skip, another backward step, a
+/// self-loop, or anything out of `retired`) is invalid. The `verifying →
+/// shipped` EVIDENCE gate is a SEPARATE, additional requirement layered
+/// on top of this pure step check (see [`ship_gate_violations`]).
 pub fn is_valid_transition(from: SubjectStatus, to: SubjectStatus) -> bool {
     use SubjectStatus::*;
     if to == Retired {
         return from != Retired;
     }
-    matches!((from, to), (Proposed, Specced) | (Specced, Building) | (Building, Verifying) | (Verifying, Shipped))
+    matches!((from, to), (Proposed, Specced) | (Specced, Building) | (Building, Verifying) | (Verifying, Shipped) | (Shipped, Verifying))
 }
 
 /// Build a [`TierRegistry`] over exactly `kinds`' routed rungs, via the
@@ -392,12 +414,23 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 /// `canon subject adopt <change_id> --subject <id>` (module doc): link
 /// an imported plan [`Change`] to a [`Subject`] via [`adopt_change`],
 /// printing the result. Exit `2` on any refusal or store failure.
-/// Rerunning it on a linked pair writes nothing and exits `0`.
+/// Rerunning it on a linked pair writes nothing and exits `0`. A change
+/// may belong to several subjects (0.18 D4): adopting it under a second
+/// one adds that subject and says the change now belongs to each, never
+/// re-points it.
 pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json: bool) -> i32 {
     match adopt_change(repo, change_id, subject_id) {
-        Ok((subject, wrote)) => {
+        Ok((subject, owners, wrote)) => {
             if json {
                 report_subject(&subject, "adopt", true);
+            } else if wrote && owners.len() > 1 {
+                println!(
+                    "canon subject adopt: linked change `{}` to subject `{}` as well; the change now belongs to {} — {}",
+                    change_id.as_str(),
+                    subject_id.as_str(),
+                    quoted_list(&owners),
+                    crate::write_mode::DIRECT
+                );
             } else if wrote {
                 println!(
                     "canon subject adopt: linked change `{}` to subject `{}` — {}",
@@ -417,12 +450,22 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
     }
 }
 
+/// `` `a` ``, `` `a` and `b` ``, `` `a`, `b` and `c` ``.
+fn quoted_list(ids: &[SubjectId]) -> String {
+    let quoted: Vec<String> = ids.iter().map(|id| format!("`{}`", id.as_str())).collect();
+    match quoted.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
+        _ => quoted.join(""),
+    }
+}
+
 /// Look up, then write, an adoption: `canon subject adopt`'s whole
 /// effect. Refuses (`Err` with the operator-facing message, no command
 /// prefix) when either record is absent; see [`persist_adoption`] for
-/// the write. `Ok` carries the subject and whether anything was written
+/// the write. `Ok` carries the subject, every subject the change now
+/// belongs to ([`change_owners`]), and whether anything was written
 /// (`false`: both sides already carried the link).
-pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId) -> Result<(Subject, bool), String> {
+pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId) -> Result<(Subject, Vec<SubjectId>, bool), String> {
     let (subject, change) = lookup_adoption(repo, subject_id, change_id)?;
     let Some(subject) = subject else {
         return Err(format!("refused — subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str()));
@@ -430,7 +473,34 @@ pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &Subje
     let Some(change) = change else {
         return Err(format!("refused — change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str()));
     };
-    persist_adoption(repo, change, subject).map_err(|e| e.describe(change_id, subject_id, &adopt_command(change_id, subject_id)))
+    let (subject, change, wrote) =
+        persist_adoption(repo, change, subject).map_err(|e| e.describe(change_id, subject_id, &adopt_command(change_id, subject_id)))?;
+    // The write is done; an owner list that cannot be read falls back to
+    // the change's own side rather than reporting a written adoption as
+    // refused.
+    let owners = change_owners(repo, &change).unwrap_or_else(|_| change.subject_ids.clone());
+    Ok((subject, owners, wrote))
+}
+
+/// Every subject `change` belongs to, joined from both sides (0.18 D4):
+/// its own `subject_ids` in adoption order, then each latest subject
+/// whose `change_ids` lists it, by subject id. The same join
+/// [`canon_gate::spec_coverage::subject_change_ids`] reads from the
+/// subject side.
+pub(crate) fn change_owners(repo: &Path, change: &Change) -> Result<Vec<SubjectId>, String> {
+    let repo = resolve_repo_root(repo);
+    let registry = registry_for(&resolve_canon_yaml(&repo, None), &[RecordKind::Subject]).map_err(|e| e.to_string())?;
+    let mut owners = change.subject_ids.clone();
+    let mut listing: Vec<SubjectId> = latest_records(&registry, RecordKind::Subject)
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .filter_map(|raw| serde_json::from_value::<Subject>(raw.0).ok())
+        .filter(|s| s.change_ids.contains(&change.change_id) && !owners.contains(&s.subject_id))
+        .map(|s| s.subject_id)
+        .collect();
+    listing.sort_by(|a, b| a.as_str().cmp(b.as_str()));
+    owners.extend(listing);
+    Ok(owners)
 }
 
 /// The latest `subject_id` Subject and `change_id` Change (fold-latest),
@@ -479,33 +549,36 @@ impl AdoptionWriteError {
 
 /// The adopt write, shared by `canon subject adopt` and `canon change
 /// new`: the subject with the change appended to `change_ids`, and the
-/// change with `subject_id` set (design D3 — stamped at adoption time,
-/// never derived in canon-model), each re-stamped with a fresh envelope
-/// `at` so it deterministically supersedes the prior version in the
-/// query fold, persisted through the routed tiers. Returns the subject
-/// and whether anything was written.
+/// change with the subject appended to `subject_ids` (design D3 —
+/// stamped at adoption time, never derived in canon-model; 0.18 D4 —
+/// appended, never re-pointed, so a change adopted by a second subject
+/// belongs to both), each re-stamped with a fresh envelope `at` so it
+/// deterministically supersedes the prior version in the query fold,
+/// persisted through the routed tiers. The change is written at its
+/// kind's current schema generation, since it is written in the current
+/// format. Returns the subject, the change, and whether anything was
+/// written.
 ///
 /// # Two records, no transaction
 /// The ledger is append-only and the two kinds may route to different
 /// tiers, so the pair cannot be written atomically. Two rules make a
 /// failure between the writes recoverable:
 ///
-/// - **Subject first.** `subject.change_ids` is the side the gate joins
-///   on: `spec_coverage.require_review`'s `open-blocker` check and the
-///   subject status guard read a subject's adopted changes from it. A
-///   subject that lists the change while the change record lacks the
-///   link still has that change's open blockers counted, so a half-done
-///   adoption errs toward enforcing. The other order would leave a
-///   change claiming a subject whose gate never looks at it.
+/// - **Subject first.** Readers join a subject's changes from both
+///   sides ([`canon_gate::spec_coverage::subject_change_ids`]), and the
+///   subject side is the one every tier layout keeps readable to the
+///   gate. A subject that lists the change while the change record lacks
+///   the link still has that change's open blockers counted, so a
+///   half-done adoption errs toward enforcing.
 /// - **Only what is missing.** A side that already carries the link is
 ///   not rewritten, and nothing is written once both do, so
 ///   [`adopt_command`] completes a half-written adoption and is a no-op
 ///   on a whole one.
-pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Subject) -> Result<(Subject, bool), AdoptionWriteError> {
+pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Subject) -> Result<(Subject, Change, bool), AdoptionWriteError> {
     let needs_subject = !subject.change_ids.contains(&change.change_id);
-    let needs_change = change.subject_id.as_ref() != Some(&subject.subject_id);
+    let needs_change = !change.subject_ids.contains(&subject.subject_id);
     if !needs_subject && !needs_change {
-        return Ok((subject, false));
+        return Ok((subject, change, false));
     }
 
     let repo = resolve_repo_root(repo);
@@ -520,11 +593,12 @@ pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Sub
         registry.persist(&subject).map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
     }
     if needs_change {
-        change.subject_id = Some(subject.subject_id.clone());
+        change.subject_ids.push(subject.subject_id.clone());
         change.envelope.at = now;
+        change.envelope.schema = RecordKind::Change.schema_version();
         registry.persist(&change).map_err(|e| AdoptionWriteError { subject_written: needs_subject, message: e.to_string() })?;
     }
-    Ok((subject, true))
+    Ok((subject, change, true))
 }
 
 /// `canon subject status <id> <state>` (module doc): apply a lifecycle
@@ -537,12 +611,27 @@ pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Sub
 /// (module doc). On any violation it prints each by failure class and
 /// exits `1` with the record UNCHANGED (fail closed), unless every
 /// violation is a review check or the brief check and `override_reason`
-/// waives them. A successful transition re-stamps the
-/// subject (fresh `at`) and persists it through the routed tier.
-pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, override_reason: Option<&str>, actor_id: &str, json: bool) -> i32 {
-    if let Some(reason) = override_reason {
-        if reason.trim().is_empty() || reason.contains(['\n', '\r']) {
-            eprintln!("canon subject status: refused — --override-reason must be one non-empty line; it is recorded on the subject as the accountable reason");
+/// waives them. The reopen `shipped → verifying` (0.18 D3) needs
+/// `reason` and the approved scope ([`reopen_violation`], unwaivable),
+/// runs no review guard, and records [`Reopen`]. A successful transition
+/// re-stamps the subject (fresh `at`) and persists it through the routed
+/// tier.
+#[allow(clippy::too_many_arguments)]
+pub fn run_status(
+    repo: &Path,
+    subject_id: &SubjectId,
+    target: SubjectStatus,
+    override_reason: Option<&str>,
+    reason: Option<&str>,
+    actor_id: &str,
+    json: bool,
+) -> i32 {
+    for (flag, text, recorded) in [
+        ("--override-reason", override_reason, "the accountable reason"),
+        ("--reason", reason, "why it reopens, with the actor"),
+    ] {
+        if text.is_some_and(|text| text.trim().is_empty() || text.contains(['\n', '\r'])) {
+            eprintln!("canon subject status: refused — {flag} must be one non-empty line; it is recorded on the subject as {recorded}");
             return EXIT_REFUSED;
         }
     }
@@ -572,21 +661,44 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
     let current = subject.status;
     if !is_valid_transition(current, target) {
         eprintln!(
-            "canon subject status: refused — invalid transition {} → {} (allowed: the chain proposed → specced → building → verifying → shipped, or any non-retired state → retired)",
+            "canon subject status: refused — invalid transition {} → {} (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)",
             status_str(current),
             status_str(target)
         );
         return EXIT_REFUSED;
     }
+    let reopens = current == SubjectStatus::Shipped && target == SubjectStatus::Verifying;
+    match (reopens, reason) {
+        (true, None) => {
+            eprintln!(
+                "canon subject status: refused — reopening {} (shipped → verifying) needs --reason <text>: why it reopens, recorded on the subject with the actor",
+                subject_id.as_str()
+            );
+            return EXIT_REFUSED;
+        }
+        (false, Some(_)) => {
+            eprintln!(
+                "canon subject status: refused — --reason records why a shipped subject reopens and applies only to shipped → verifying, not {} → {}",
+                status_str(current),
+                status_str(target)
+            );
+            return EXIT_REFUSED;
+        }
+        _ => {}
+    }
 
     let schemas = SchemaRegistry::load();
     let policy = PolicyResolution::resolve(&repo, &schemas);
     let ships = current == SubjectStatus::Verifying && target == SubjectStatus::Shipped;
-    let reviews = match &policy.spec_coverage {
-        Some(SpecCoverage::Active { require_review: Some(rr), .. }) => rr.covers(target),
-        _ => false,
-    };
-    let gate_context = if ships || reviews {
+    // A reopen moves a subject back to fix its gaps, so the review guard
+    // that gates moving forward into its scope does not run on it;
+    // shipping again runs it.
+    let reviews = !reopens
+        && match &policy.spec_coverage {
+            Some(SpecCoverage::Active { require_review: Some(rr), .. }) => rr.covers(target),
+            _ => false,
+        };
+    let gate_context = if ships || reviews || reopens {
         match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &schemas, Utc::now()).map_err(|e| e.to_string())) {
             Ok(mut ctx) => {
                 if reviews {
@@ -602,6 +714,8 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
     } else {
         None
     };
+    // The subject's adopted changes, joined from both sides (0.18 D4).
+    let changes = gate_context.as_ref().map_or_else(|| subject.change_ids.clone(), |ctx| subject_change_ids(ctx, &subject));
 
     let mut blocking = match (ships, &gate_context) {
         (true, Some(ctx)) => ship_gate_violations(ctx, subject_id),
@@ -612,8 +726,11 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
     if ships {
         blocking.extend(crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation("verifying → shipped: ")));
     }
+    if reopens {
+        blocking.extend(reopen_violation(&repo, &subject, &changes));
+    }
     let mut waivable = Vec::new();
-    report_review_guard(&policy, current, target, subject.change_ids.len());
+    report_review_guard(&policy, current, target, changes.len());
     if let (true, Some(ctx)) = (reviews, &gate_context) {
         let (rr, exclude_lanes) = active_require_review(ctx).expect("`reviews` implies an active require_review");
         let unreadable = unreadable_review_kinds(ctx, rr);
@@ -621,7 +738,7 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
             // An unreadable finding blocks, unwaivably: it might be an
             // open blocker on this subject's changes.
             blocking.extend(malformed_findings(ctx, rr));
-            waivable.extend(subject_guard(ctx, rr, exclude_lanes, subject_id, &subject.change_ids));
+            waivable.extend(subject_guard(ctx, rr, exclude_lanes, &subject));
             for violation in &mut waivable {
                 violation.detail = format!("{} → {}: {}", status_str(current), status_str(target), violation.detail);
             }
@@ -635,7 +752,7 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
             blocking.push(unreadable_violation(&unreadable));
         }
     }
-    let brief_gap = if ships { brief_violation(&repo, &subject) } else { None };
+    let brief_gap = if ships { brief_violation(&repo, &subject, &changes) } else { None };
     let review_gaps = !waivable.is_empty();
     waivable.extend(brief_gap.iter().cloned());
 
@@ -649,9 +766,10 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
         return EXIT_GATED;
     }
 
-    // A waiver belongs to the transition that needed it: every write
-    // starts without one, so an old waiver never carries forward.
+    // A waiver, and a reopen note, belong to the transition that needed
+    // them: every write starts without either, so neither carries forward.
     subject.status_override = None;
+    subject.reopen = None;
     if !waivable.is_empty() {
         let Some(reason) = override_reason else {
             for v in &waivable {
@@ -683,6 +801,18 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
         );
     } else if override_reason.is_some() {
         eprintln!("canon subject status: --override-reason not recorded — no review check refused this transition");
+    }
+    if let (true, Some(reason)) = (reopens, reason) {
+        let change = changes.last().cloned();
+        let into = match &change {
+            Some(change) => format!("add the follow-up as tasks in its approved change `{}`", change.as_str()),
+            None => "add the follow-up as tasks in its change".to_string(),
+        };
+        eprintln!(
+            "canon subject status: reopened `{}` from shipped, recorded by `{actor_id}`: {reason}; {into}, then scenario, evidence and review; shipping again runs every guard",
+            subject_id.as_str()
+        );
+        subject.reopen = Some(Reopen { reason: reason.to_string(), change, actor: Actor::new_unattributed(actor_id) });
     }
 
     subject.status = target;
@@ -718,6 +848,11 @@ fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: Subje
     };
     let scope = if rr.scope.is_empty() { "every status".to_string() } else { rr.scope.iter().map(|s| status_str(*s)).collect::<Vec<_>>().join(", ") };
     eprintln!("canon subject status: review guard for {} → {} (spec_coverage.require_review, scope: {scope})", status_str(from), status_str(to));
+    if from == SubjectStatus::Shipped && to == SubjectStatus::Verifying {
+        eprintln!("canon subject status:   skipped unreviewed-promotion — a reopen moves the subject back to fix its gaps; shipping again runs it");
+        eprintln!("canon subject status:   skipped open-blocker — a reopen moves the subject back to fix its gaps; shipping again runs it");
+        return;
+    }
     if !rr.covers(to) {
         eprintln!("canon subject status:   skipped unreviewed-promotion — `{}` is not in require_review.scope", status_str(to));
         eprintln!("canon subject status:   skipped open-blocker — `{}` is not in require_review.scope", status_str(to));
@@ -818,13 +953,32 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
 /// the decision `canon status` reports, reads its brief as enforced and
 /// not approved. An unapproved brief that is not enforced (nothing to
 /// answer) prints an advisory instead. `None` when the brief is
-/// approved, not enforced, or the subject needs none.
-fn brief_violation(repo: &Path, subject: &Subject) -> Option<Violation> {
+/// approved, not enforced, or the subject needs none. `changes` is the
+/// subject's adopted changes, joined from both sides.
+fn brief_violation(repo: &Path, subject: &Subject, changes: &[ChangeId]) -> Option<Violation> {
+    brief_gap(repo, subject, changes, "verifying → shipped", "shipping")
+}
+
+/// The reopen check (0.18 D3): `shipped → verifying` needs no human
+/// inside the approved scope, the subject's newest adopted change whose
+/// brief is approved, or when there is no brief to answer. Otherwise it
+/// refuses with the same `unreviewed-promotion` the ship guard prints,
+/// naming the brief to approve; `--override-reason` does not waive it.
+fn reopen_violation(repo: &Path, subject: &Subject, changes: &[ChangeId]) -> Option<Violation> {
+    brief_gap(repo, subject, changes, "shipped → verifying", "reopening").map(|mut violation| {
+        violation.detail = violation.detail.replacen("brief not approved", "reopening needs the approved scope, and the brief is not approved", 1);
+        violation
+    })
+}
+
+/// The brief check of `transition` (`verb` is how its advisory names
+/// it): [`brief_violation`] and [`reopen_violation`].
+fn brief_gap(repo: &Path, subject: &Subject, changes: &[ChangeId], transition: &str, verb: &str) -> Option<Violation> {
     let (roots, unreadable) = match crate::brief::plan_roots(repo) {
         Ok(roots) => (roots, None),
         Err(e) => (Vec::new(), Some(e)),
     };
-    let brief = crate::brief::brief_of(repo, &roots, subject).filter(|brief| !brief.approved)?;
+    let brief = crate::brief::brief_of(repo, &roots, subject, changes).filter(|brief| !brief.approved)?;
     let id = subject.subject_id.as_str();
     if !brief.enforced {
         let why = match (unreadable, &brief.change) {
@@ -833,14 +987,14 @@ fn brief_violation(repo: &Path, subject: &Subject) -> Option<Violation> {
             (None, Some(change)) => format!("its newest adopted change `{change}` has no brief (no {}/{change}/brief.md, no openspec proposal.md)", canon_model::paths::CHANGES_DIR),
             (None, None) => format!("{id} adopts no change"),
         };
-        eprintln!("canon subject status: advisory: {id}'s brief is not approved — {why}, so there is no brief to answer and shipping is not refused");
+        eprintln!("canon subject status: advisory: {id}'s brief is not approved — {why}, so there is no brief to answer and {verb} is not refused");
         return None;
     }
     Some(Violation::new(
         FailureClass::UnreviewedPromotion,
         id,
         format!(
-            "verifying → shipped: brief not approved — {}; a human must answer the brief, and only from that answer the agent will {}",
+            "{transition}: brief not approved — {}; a human must answer the brief, and only from that answer the agent will {}",
             brief.unanswered(),
             brief.record()
         ),
@@ -852,17 +1006,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_forward_chain_is_the_only_forward_path() {
+    fn the_forward_chain_and_the_reopen_are_the_only_paths() {
         use SubjectStatus::*;
         assert!(is_valid_transition(Proposed, Specced));
         assert!(is_valid_transition(Specced, Building));
         assert!(is_valid_transition(Building, Verifying));
         assert!(is_valid_transition(Verifying, Shipped));
-        // Skips, backward steps, and self-loops are all invalid.
+        // The one backward step: reopening a shipped subject (0.18 D3).
+        assert!(is_valid_transition(Shipped, Verifying));
+        // Skips, other backward steps, and self-loops are all invalid.
         assert!(!is_valid_transition(Proposed, Building));
         assert!(!is_valid_transition(Building, Proposed));
         assert!(!is_valid_transition(Building, Building));
-        assert!(!is_valid_transition(Shipped, Verifying));
+        assert!(!is_valid_transition(Shipped, Building));
+        assert!(!is_valid_transition(Verifying, Building));
     }
 
     #[test]
