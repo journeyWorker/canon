@@ -45,7 +45,7 @@ Final state: 16/16 scenarios attested, divergence burndown
 
 ## Spec corpus
 
-`specs/features/kind=feature/area=platformer/*.feature` — 16 tagged
+`specs/kind=feature/area=platformer/*.feature` — 16 tagged
 Gherkin scenarios (movement ×4, session ×4, enemy ×2, levels ×2,
 moving ×2, hud ×2). `canon inventory sync` materializes them into the
 ledger index; they are the acceptance authority the personas worked

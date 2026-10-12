@@ -2,3 +2,4 @@
 [PASS] specs
 [not configured] plans
 [FAIL] write: canon.yaml `write:` section is malformed (expected `write: { promote: auto | manual }`): unknown variant `always`, expected `auto` or `manual`
+[not configured] skills (providers: the install lock's, else the detected harnesses)

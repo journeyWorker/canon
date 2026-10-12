@@ -16,7 +16,7 @@ use crate::report::{FmtFailureClass, FmtReport, Violation};
 use crate::resolve::{self, ResolveError};
 use crate::schema_registry::{self, SchemaCheck};
 use crate::sha::is_full_sha;
-use crate::util::{relative, walk_files};
+use crate::util::{feature_files, pre_0_17_feature_file, pre_0_17_layout_detail, relative, walk_files, PRE_0_17_FEATURES_DIR};
 
 pub fn check(root: &Path) -> FmtReport {
     let mut report = FmtReport::default();
@@ -257,11 +257,16 @@ fn check_divergences(root: &Path, report: &mut FmtReport, ledger_backrefs: &BTre
     }
 }
 
+/// The `.feature` corpus pass: every file under `kind=feature/`
+/// ([`feature_files`]) against [`FamilyKind::Feature`]'s descriptor. A
+/// root still holding a `.feature` file under the pre-0.17 `features/`
+/// directory is one `layout-grammar` violation naming the root and
+/// `canon migrate` (0.17 D1): the old layout is refused, never read.
 fn check_features(root: &Path, report: &mut FmtReport) {
-    for path in walk_files(root, "features") {
-        if path.extension().and_then(|e| e.to_str()) != Some("feature") {
-            continue;
-        }
+    if let Some(first) = pre_0_17_feature_file(root) {
+        report.violations.push(Violation::new(FmtFailureClass::LayoutGrammar, PRE_0_17_FEATURES_DIR, pre_0_17_layout_detail(&format!("`{}`", root.display()), &first)));
+    }
+    for path in feature_files(root) {
         let rel = relative(root, &path);
         report.files_checked += 1;
         let Ok(text) = std::fs::read_to_string(&path) else { continue };

@@ -1,0 +1,3 @@
+providers: claude (from canon.yaml skills.providers)
+status: healthy
+stray: ./.agents/skills/canon — codex is not a selected provider (from canon.yaml skills.providers), so canon no longer updates it; remove it with `rm -r ./.agents/skills/canon`, or select it with `canon skills install --providers=claude,codex`

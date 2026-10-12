@@ -5,7 +5,7 @@
   "freshness_days": 180,
   "description": "Canonical repository knowledge map. Source entries are authoritative; provider projections are generated views; empirical memory is learned evidence and never a source of product policy.",
   "invariants": [
-    {"id": "work-intent", "statement": "Every work has intent.", "evidence": ["crates/canon-model/src/records.rs", "specs"]},
+    {"id": "work-intent", "statement": "Every work has intent.", "evidence": ["crates/canon-model/src/records.rs", ".canon/specs"]},
     {"id": "run-context", "statement": "Every run has reproducible context.", "evidence": ["crates/canon-model/src/records.rs", "crates/canon-ingest/src/lib.rs"]},
     {"id": "completion-evidence", "statement": "Every completion has evidence.", "evidence": ["crates/canon-model/src/records.rs", "crates/canon-gate/src/lib.rs"]},
     {"id": "risky-approval", "statement": "Every risky action has accountable approval.", "evidence": ["crates/canon-model/src/records.rs", "crates/canon-gate/src/risk.rs"]},
@@ -25,7 +25,7 @@
     {"id": "report-reference", "path": "canon/skills/reference/canon-report-dashboard.md", "kind": "source", "status": "active", "primary": true, "owner": "canon-maintainers", "review_date": "2026-10-01", "review_criteria": ["report and snapshot commands match canon-report"]},
     {"id": "storage-reference", "path": "canon/skills/reference/canon-storage.md", "kind": "source", "status": "active", "primary": true, "owner": "canon-maintainers", "review_date": "2026-10-01", "review_criteria": ["tier and backend distinction remains accurate"]},
     {"id": "artifact-reference", "path": "canon/skills/reference/canon-artifact-ingest.md", "kind": "source", "status": "active", "primary": true, "owner": "canon-maintainers", "review_date": "2026-10-01", "review_criteria": ["artifact adapter boundaries remain accurate"]},
-    {"id": "feature-corpus", "path": "specs", "kind": "source", "status": "active", "primary": true, "owner": "canon-maintainers", "review_date": "2026-10-01", "review_criteria": ["active scenarios remain the acceptance source for canon behavior"]},
+    {"id": "feature-corpus", "path": ".canon/specs", "kind": "source", "status": "active", "primary": true, "owner": "canon-maintainers", "review_date": "2026-10-01", "review_criteria": ["active scenarios remain the acceptance source for canon behavior"]},
     {"id": "model-contract", "path": "crates/canon-model/src/lib.rs", "kind": "source", "status": "active", "primary": true, "owner": "canon-maintainers", "review_date": "2026-10-01", "review_criteria": ["Envelope, typed IDs, records, and generated schema contracts remain aligned"]},
     {"id": "store-contract", "path": "crates/canon-store/src/lib.rs", "kind": "source", "status": "active", "primary": true, "owner": "canon-maintainers", "review_date": "2026-10-01", "review_criteria": ["Tier, policy, registry, and single embedded view layer remain the storage boundary"]},
     {"id": "ingest-contract", "path": "crates/canon-ingest/src/lib.rs", "kind": "source", "status": "active", "primary": true, "owner": "canon-maintainers", "review_date": "2026-10-01", "review_criteria": ["session, artifact, and plan adapters remain storage-independent"]},

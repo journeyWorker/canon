@@ -45,18 +45,21 @@
 //! [`is_valid_transition`] chain; an off-chain transition is refused
 //! (exit `2`), the record likewise unchanged.
 //!
-//! # `verifying → shipped` needs the approved brief where one exists (0.16 D1)
+//! # `verifying → shipped` needs the approved brief where one exists (0.16 D1, 0.17 D3)
 //! The same transition also refuses when the subject's brief is
 //! enforced and not approved, through [`crate::brief::brief_of`], the
 //! one call `canon status` reports the brief with: its newest adopted
-//! change has a `proposal.md` under the plan sources, and it carries no
-//! `Approved:` line outside HTML comments and code fences. The refusal
-//! names that `proposal.md` and says a human must answer the brief; the
-//! agent records the line only from that answer. It is an
+//! change has a brief to answer (its `.canon/changes/<change>/brief.md`,
+//! or an external openspec `proposal.md` while that canon file does not
+//! exist), and the canon `brief.md` carries no `Approved:` line outside
+//! HTML comments and code fences. The refusal names that `brief.md`
+//! (with the `Source:` pointer to write, for an external plan) and says
+//! a human must answer the brief; the agent records the line only from
+//! that answer. It is an
 //! `unreviewed-promotion` naming the subject, a review check like those
 //! below, so `--override-reason` lets it through and records it in the
-//! waiver. With no plan source, no adopted change or no `proposal.md`
-//! there is no brief to answer: the guard prints an advisory saying the
+//! waiver. With no adopted change or no brief to answer, the guard
+//! prints an advisory saying the
 //! brief is not approved and does not refuse. A brief that says the
 //! human ships changes who runs the transition, not the guard. It runs
 //! whatever the policy says, as status reports the brief whatever the
@@ -171,7 +174,7 @@ pub fn is_valid_transition(from: SubjectStatus, to: SubjectStatus) -> bool {
 /// ingest` share ([`tiers::build_lenient_tiers_for_kinds`]) — so a
 /// subject write honors `canon.yaml`'s `routing.subject` and lands
 /// where `canon query --kind subject` reads.
-fn registry_for(canon_yaml_path: &Path, kinds: &[RecordKind]) -> Result<TierRegistry, TierCliError> {
+pub(crate) fn registry_for(canon_yaml_path: &Path, kinds: &[RecordKind]) -> Result<TierRegistry, TierCliError> {
     let loaded = tiers::build_lenient_tiers_for_kinds(canon_yaml_path, kinds)?;
     Ok(TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite))
 }
@@ -825,18 +828,22 @@ fn brief_violation(repo: &Path, subject: &Subject) -> Option<Violation> {
     let id = subject.subject_id.as_str();
     if !brief.enforced {
         let why = match (unreadable, &brief.change) {
-            (Some(e), _) => format!("canon.yaml's `plans:` section cannot be read ({e}), so no proposal.md is found"),
-            (None, Some(change)) => format!("its newest adopted change `{change}` has no proposal.md under the openspec plan sources"),
+            (Some(e), Some(change)) => format!("its newest adopted change `{change}` has no brief, and canon.yaml's `plans:` section cannot be read ({e}), so no external proposal.md is found"),
+            (Some(e), None) => format!("canon.yaml's `plans:` section cannot be read ({e}), and {id} adopts no change"),
+            (None, Some(change)) => format!("its newest adopted change `{change}` has no brief (no {}/{change}/brief.md, no openspec proposal.md)", canon_model::paths::CHANGES_DIR),
             (None, None) => format!("{id} adopts no change"),
         };
         eprintln!("canon subject status: advisory: {id}'s brief is not approved — {why}, so there is no brief to answer and shipping is not refused");
         return None;
     }
-    let proposal = brief.proposal.as_deref().unwrap_or_default();
     Some(Violation::new(
         FailureClass::UnreviewedPromotion,
         id,
-        format!("verifying → shipped: brief not approved — {proposal} has no `Approved:` line; a human must answer the brief, and the agent records `Approved: <who> <when> — \"<their words>\"` there only from that answer"),
+        format!(
+            "verifying → shipped: brief not approved — {}; a human must answer the brief, and only from that answer the agent will {}",
+            brief.unanswered(),
+            brief.record()
+        ),
     ))
 }
 

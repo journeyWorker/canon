@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-017-p2",
+    "role": "reviewer",
+    "session_id": "review-017-p2"
+  },
+  "at": "2026-10-12T11:19:43.547173Z",
+  "change_id": "canon-0-17-p2-review",
+  "disposition": "fixed",
+  "file_ref": "packages/website/src/content/docs/cli.mdx:37",
+  "kind": "finding",
+  "resolution_sha": "1d81f1ef6531f252927895fd0cda6cef10b5d44e",
+  "reviewed_sha": "21f1d5dc504b83470fcb4c5b7231dfbc7f6a2944",
+  "reviewer": "canon-reviewer-017-p2",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Website still documented status JSON statusVersion 2"
+}

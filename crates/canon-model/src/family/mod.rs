@@ -27,7 +27,7 @@ pub mod ledger;
 pub mod policy;
 pub mod refs;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
@@ -51,7 +51,8 @@ pub enum FamilyKind {
     /// individually one of [`divergence::DivergenceEvent`]'s three
     /// event shapes (`manifest`/`review`/`remediation`).
     Divergence,
-    /// `spec/features/kind=feature/area=<area>/<surface>.feature`.
+    /// `<spec root>/kind=feature/area=<area>/<surface>.feature` (0.17 D1:
+    /// no `features/` level; `kind=` sits directly under the root).
     Feature,
     /// `spec/inventory/kind=inventory/area=<area>/[surface=<surface>/]<key>.yaml`.
     Inventory,
@@ -207,7 +208,10 @@ pub struct LayoutDescriptor {
     pub kind: FamilyKind,
     /// The top-level directory this kind's files live under, relative
     /// to the corpus root (`spec/`) — e.g. `"ledger"`, `"divergences"`,
-    /// `"features"`, `"inventory"`. Divergences' root itself is the
+    /// `"inventory"`; empty for a kind that sits directly under the
+    /// root (the policy file, and since 0.17 D1 the `.feature` corpus,
+    /// whose `kind=feature/` segment already says what a `features/`
+    /// dir would). Divergences' root itself is the
     /// kind-discriminator (no `kind=divergence/` segment is added,
     /// design Non-Goal: layout unchanged); every other family gains an
     /// explicit `kind=<value>/` segment directly under its root.
@@ -230,6 +234,21 @@ pub struct LayoutDescriptor {
     /// except [`FamilyKind::Inventory`].
     pub optional_segment_key: Option<&'static str>,
     pub leaf: LeafGrammar,
+}
+
+impl LayoutDescriptor {
+    /// The fixed directory every file of this kind sits under, relative
+    /// to the corpus root: `root_dir` then the `kind=<value>` segment
+    /// (e.g. `kind=feature` for [`FamilyKind::Feature`]). Walkers start
+    /// here, so they never disagree with [`layout_problem`] about where
+    /// a kind's files live.
+    pub fn corpus_dir(&self) -> PathBuf {
+        let mut dir = PathBuf::from(self.root_dir);
+        if let Some(seg) = self.kind_segment {
+            dir.push(format!("kind={seg}"));
+        }
+        dir
+    }
 }
 
 impl FamilyKind {
@@ -293,7 +312,7 @@ impl FamilyKind {
             },
             FamilyKind::Feature => LayoutDescriptor {
                 kind: self,
-                root_dir: "features",
+                root_dir: "",
                 kind_segment: Some("feature"),
                 partition_keys: &["area"],
                 optional_segment_key: None,
@@ -541,13 +560,16 @@ mod tests {
     }
 
     #[test]
-    fn feature_flat_pre_migration_path_is_a_violation() {
+    fn feature_lives_directly_under_the_spec_root() {
         let descriptor = FamilyKind::Feature.layout_descriptor();
+        assert_eq!(descriptor.corpus_dir(), Path::new("kind=feature"));
         let resolved = ResolvedPartition { values: vec![("area", "idolive".to_string())], leaf_name: None, optional_segment: None };
         let flat = Path::new("features/idolive/idolive-hub.feature");
         assert!(layout_problem(&descriptor, flat, &resolved).is_some());
-        let migrated = Path::new("features/kind=feature/area=idolive/idolive-hub.feature");
-        assert_eq!(layout_problem(&descriptor, migrated, &resolved), None);
+        let pre_0_17 = Path::new("features/kind=feature/area=idolive/idolive-hub.feature");
+        assert!(layout_problem(&descriptor, pre_0_17, &resolved).is_some());
+        let current = Path::new("kind=feature/area=idolive/idolive-hub.feature");
+        assert_eq!(layout_problem(&descriptor, current, &resolved), None);
     }
 
     #[test]

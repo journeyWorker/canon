@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-017-final",
+    "role": "reviewer",
+    "session_id": "review-017-final"
+  },
+  "at": "2026-10-12T12:56:17.057583Z",
+  "change_id": "canon-0-17-final-review",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/migrate.rs:289-309",
+  "kind": "finding",
+  "resolution_sha": "984619f9833fc7ce0078804005cada9e549cfe76",
+  "reviewed_sha": "b7d64a76eadc518b0d31d50e424da3d1f3b7b3a8",
+  "reviewer": "canon-reviewer-017-final",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "migrate could strand the corpus if interrupted after the move, before the canon.yaml write"
+}

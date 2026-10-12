@@ -97,7 +97,9 @@ plans:
 # now `platformer` was the only one, so `spec_coverage` — the check that
 # starts from the Scenario corpus and reports a spec nobody attested to
 # — could only ever measure a demo browser game. canon shipped a gate it
-# had no corpus to point at itself. `specs/` is that corpus; it grows one
+# had no corpus to point at itself. `.canon/specs/` is that corpus (at
+# `specs/` until `canon migrate` moved it in 0.17; `former_roots` below
+# keeps reviews pinned before the move checkable); it grows one
 # area at a time, and `scope:` in `.canon/policy.yaml` is what keeps a
 # half-written area from blocking (see that file).
 #
@@ -108,7 +110,8 @@ specs:
     - id: platformer
       root: examples/platformer/specs
     - id: canon
-      root: specs
+      root: .canon/specs
+      former_roots: [specs]
 
 # s37 (`execution-graph-topology`): this repo's own `canon ingest
 # artifacts` source. Absent until now — which is why every
@@ -134,3 +137,9 @@ specs:
 # both BEFORE any read runs, rather than silently inflating the corpus.
 artifacts:
   native_records: true
+
+# Harnesses the canon skill is installed for: any of claude, codex, omp, pi
+# (`[]` for none). `canon skills install|check|doctor` follow this list;
+# `canon skills install --providers=<list>` rewrites it.
+skills:
+  providers: [claude, codex, omp, pi]

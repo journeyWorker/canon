@@ -12,8 +12,8 @@ use std::process::{Command, Output};
 
 use canon_model::RecordKind;
 
-const FEATURE: &str = "specs/features/kind=feature/area=cart/add.feature";
-const MOVED: &str = "specs/features/kind=feature/area=cart/basket.feature";
+const FEATURE: &str = ".canon/specs/kind=feature/area=cart/add.feature";
+const MOVED: &str = ".canon/specs/kind=feature/area=cart/basket.feature";
 
 const BASE: &str = r#"Feature: cart add
   # canon: {"schema":1,"at":"2026-10-09T00:00:00Z","actor":{"agent_id":"canon"}}
@@ -66,7 +66,7 @@ fn commit_file(repo: &Path, path: &str, body: &str, message: &str) -> String {
     let file = repo.join(path);
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
     std::fs::write(file, body).unwrap();
-    git(repo, &["add", "-A", "specs"]);
+    git(repo, &["add", "-A", ".canon/specs"]);
     git(repo, &["commit", "-q", "-m", message]);
     git(repo, &["rev-parse", "HEAD"])
 }
@@ -195,7 +195,7 @@ fn a_legacy_review_whose_pin_cannot_be_read_counts_with_an_advisory() {
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
     std::fs::create_dir_all(repo.join(".canon")).unwrap();
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
-    let before = commit_file(repo, "specs/README.md", "specs land here\n", "before the scenarios");
+    let before = commit_file(repo, ".canon/specs/README.md", "specs land here\n", "before the scenarios");
     commit_file(repo, FEATURE, BASE, "cart add");
     ok(repo, &["inventory", "sync"]);
     attest(repo, "cart.add.01");
@@ -225,6 +225,109 @@ fn a_legacy_review_finds_its_scenario_in_the_file_it_lived_in_at_the_pin() {
     ok(repo, &["inventory", "sync"]);
     let out = gate(repo, 0);
     assert!(out.contains(&advisory(2, 0, 0)), "both reviews are checked at their old file: {out}");
+}
+
+/// gate.check.95: a scenario index left over from before 0.15 (its
+/// generations carry no `scenario_digest`; repos that tracked the index
+/// keep such files) cannot turn a legacy review undecidable. The reader's
+/// refresh finds those generations stale although the feature file's
+/// bytes are unchanged, rewrites them as `canon inventory sync` would, and
+/// the review is checked against its pin.
+#[test]
+fn an_index_generation_from_before_0_15_cannot_leave_a_legacy_review_undecidable() {
+    let (dir, _) = legacy_repo();
+    let repo = dir.path();
+    let index = repo.join(".canon/ledger/kind=scenario");
+    let mut generations = Vec::new();
+    for entry in walk(&index) {
+        let mut record: serde_json::Value = serde_json::from_slice(&std::fs::read(&entry).unwrap()).unwrap();
+        record.as_object_mut().unwrap().remove("scenario_digest");
+        generations.push(record);
+    }
+    assert_eq!(generations.len(), 2, "one generation per scenario");
+    std::fs::remove_dir_all(&index).unwrap();
+    for record in generations {
+        let path = repo.join(".canon/ledger").join(canon_store::partition::expected_relative_path(RecordKind::Scenario, &record).unwrap());
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, serde_json::to_vec_pretty(&record).unwrap()).unwrap();
+    }
+
+    let out = gate(repo, 0);
+    assert!(out.contains(&format!("canon gate check: refreshed the scenario index from 1 changed feature file(s) ({FEATURE}): 2 record(s) written")), "{out}");
+    assert!(out.contains(&format!("{}\n", advisory(2, 0, 0))), "both reviews are checked against their pin: {out}");
+    assert!(!gate(repo, 0).contains("refreshed the scenario index"), "the rewritten index is fresh");
+}
+
+/// Every file under `dir`, recursively.
+fn walk(dir: &Path) -> Vec<std::path::PathBuf> {
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            files.extend(walk(&path));
+        } else {
+            files.push(path);
+        }
+    }
+    files
+}
+
+/// gate.check.96: a spec root `canon migrate` moved (`specs` →
+/// `.canon/specs`, `former_roots: [specs]`) is searched at its old path
+/// at a pin from before the move, and only for its own project: another
+/// root declaring the same scenario id, with the same text, never answers
+/// for it. Project `a`'s review is checked current at its former root;
+/// project `b`'s, pinned to a commit before `b` existed, stays
+/// undecidable although `a`'s identical scenario sat in the repo then.
+#[test]
+fn a_moved_root_is_searched_at_its_former_path_and_only_for_its_own_project() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q"]);
+    ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    std::fs::create_dir_all(repo.join(".canon")).unwrap();
+    std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
+    let yaml = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
+    let roots = "    - id: root\n      root: .canon/specs\n";
+    assert!(yaml.contains(roots), "{yaml}");
+    std::fs::write(repo.join("canon.yaml"), yaml.replace(roots, "    - id: a\n      root: specs\n")).unwrap();
+    let old = "specs/kind=feature/area=cart/add.feature";
+    std::fs::create_dir_all(repo.join(old).parent().unwrap()).unwrap();
+    std::fs::write(repo.join(old), BASE).unwrap();
+    git(repo, &["add", "-A"]);
+    git(repo, &["commit", "-q", "-m", "project a at specs"]);
+    let pin = git(repo, &["rev-parse", "HEAD"]);
+
+    // What `canon migrate` leaves, plus a second project declaring the same ids.
+    std::fs::create_dir_all(repo.join(".canon/specs")).unwrap();
+    git(repo, &["mv", "specs/kind=feature", ".canon/specs/kind=feature"]);
+    std::fs::write(
+        repo.join("canon.yaml"),
+        yaml.replace(roots, "    - id: a\n      root: .canon/specs\n      former_roots: [specs]\n    - id: b\n      root: b/specs\n"),
+    )
+    .unwrap();
+    commit_file(repo, &format!("b/{old}"), BASE, "project b");
+    for project in ["a", "b"] {
+        ok(repo, &["evidence", "add", "--scenario-id", "cart.add.01", "--project-id", project, "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+    }
+    for project in ["a", "b"] {
+        let legacy = serde_json::json!({
+            "schema": 1,
+            "kind": "review",
+            "at": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
+            "actor": {"agent_id": "reviewer-2", "role": "reviewer"},
+            "project_id": project,
+            "scenario_id": "cart.add.01",
+            "reviewer": "reviewer-2",
+            "pin": pin,
+            "provenance_ref": {"upstream_ref": "docs/plan.md#review"},
+        });
+        let path = repo.join(".canon/ledger").join(canon_store::partition::expected_relative_path(RecordKind::Review, &legacy).unwrap());
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
+    }
+    let out = canon(repo, &["gate", "check"]);
+    assert!(text(&out).contains(&advisory(1, 0, 1)), "a is current at its former root, b is undecidable: {}", text(&out));
 }
 
 /// review.add.60: `canon review add` on a scenario whose legacy review is

@@ -1,4 +1,3 @@
 canon init: wrote ./canon.yaml
-canon init: created ./openspec/changes
 canon init: wrote ./.canon/policy.yaml — a human reviews it and approves it with `canon policy approve --by <who>`: the gate grades the work against it, and `canon status` and `canon gate check` say so until it is approved
-canon init: next: `canon skills install` to install authoring guidance
+canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; choose with `canon skills install --providers=<list>` (any of claude, codex, omp, pi)

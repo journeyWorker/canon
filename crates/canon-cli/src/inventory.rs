@@ -6,7 +6,7 @@
 //! 1. Validate with `canon-fmt::check` (S11) — ANY violation ABORTS
 //!    THE WHOLE ROOT, writing zero `Scenario` records for it and
 //!    reporting the violation(s); never a partial sync.
-//! 2. Scan `features/` via the extended `canon_fmt::gherkin::scan`
+//! 2. Scan `kind=feature/` via the extended `canon_fmt::gherkin::scan`
 //!    (task 3.2) — each tag paired with its header's label as `title`,
 //!    `source_digest` a sha256 over the `.feature` file's raw bytes, and
 //!    `scenario_digest` a sha256 over that one scenario's meaning
@@ -51,7 +51,8 @@ use crate::subject::enum_membership_violation;
 /// `--spec-root`'s ad hoc override resolve to (design D3) — NEVER the
 /// checkout directory name.
 const DEFAULT_SPEC_ROOT_ID: &str = "root";
-const DEFAULT_SPEC_ROOT_DIR: &str = "specs";
+/// Where the default root, and an entry without `root:`, lives (0.17 D1).
+const DEFAULT_SPEC_ROOT_DIR: &str = paths::SPECS_DIR;
 
 fn default_root_id() -> ProjectId {
     ProjectId::parse(DEFAULT_SPEC_ROOT_ID).expect("literal default spec-root id is a valid ProjectId")
@@ -107,6 +108,12 @@ struct RawSpecRoot {
     id: String,
     #[serde(default)]
     root: Option<String>,
+    /// Where this root lived before `canon migrate` moved it (0.17 D6),
+    /// newest last. Read only by the legacy-pin lookup
+    /// ([`resolve_legacy_pins`]): a review pinned to a commit from before
+    /// the move finds its scenario under these paths at that commit.
+    #[serde(default)]
+    former_roots: Vec<String>,
 }
 
 fn default_root(repo_root: &Path) -> SpecRoot {
@@ -121,13 +128,24 @@ fn default_root(repo_root: &Path) -> SpecRoot {
 /// itself is new here, not a copy of ingest's per-source `roots`
 /// override.
 pub fn load_spec_roots(canon_yaml: &Path) -> Result<Vec<SpecRoot>, InventoryError> {
+    Ok(load_spec_roots_with_former(canon_yaml)?.into_iter().map(|(root, _)| root).collect())
+}
+
+/// [`load_spec_roots`], each root with its `former_roots` resolved the
+/// same way as `root` (relative entries joined against `canon.yaml`'s
+/// directory).
+fn load_spec_roots_with_former(canon_yaml: &Path) -> Result<Vec<(SpecRoot, Vec<PathBuf>)>, InventoryError> {
     let repo_root = canon_yaml.parent().unwrap_or_else(|| Path::new("."));
+    let resolve = |dir: &str| {
+        let path = Path::new(dir);
+        if path.is_absolute() { path.to_path_buf() } else { repo_root.join(path) }
+    };
 
     // Missing / unreadable canon.yaml: fail-soft (no config at all is
     // a legitimate first-run / minimal state) — same as
     // `IngestSourceConfig::load`.
     let Ok(text) = std::fs::read_to_string(canon_yaml) else {
-        return Ok(vec![default_root(repo_root)]);
+        return Ok(vec![(default_root(repo_root), Vec::new())]);
     };
     // A PRESENT but non-YAML canon.yaml fails LOUD: a syntax typo in a
     // canon.yaml meant to set `specs.roots[]` must never silently
@@ -138,7 +156,7 @@ pub fn load_spec_roots(canon_yaml: &Path) -> Result<Vec<SpecRoot>, InventoryErro
         ))
     })?;
     let Some(specs_val) = doc.get("specs") else {
-        return Ok(vec![default_root(repo_root)]);
+        return Ok(vec![(default_root(repo_root), Vec::new())]);
     };
     // PRESENT `specs:` — strict from here on.
     let specs: RawSpecs = serde_yaml::from_value(specs_val.clone())
@@ -160,10 +178,9 @@ pub fn load_spec_roots(canon_yaml: &Path) -> Result<Vec<SpecRoot>, InventoryErro
     for raw in specs.roots {
         let id = ProjectId::parse(&raw.id)
             .map_err(|e| InventoryError::Config(format!("canon.yaml `specs.roots[]` entry `id: {}` is not a valid ProjectId: {e}", raw.id)))?;
-        let root_dir = raw.root.as_deref().unwrap_or(DEFAULT_SPEC_ROOT_DIR);
-        let root_path = Path::new(root_dir);
-        let root = if root_path.is_absolute() { root_path.to_path_buf() } else { repo_root.join(root_path) };
-        roots.push(SpecRoot { id, root });
+        let root = resolve(raw.root.as_deref().unwrap_or(DEFAULT_SPEC_ROOT_DIR));
+        let former = raw.former_roots.iter().map(|dir| resolve(dir)).collect();
+        roots.push((SpecRoot { id, root }, former));
     }
     Ok(roots)
 }
@@ -419,7 +436,7 @@ fn lock_index(repo: &Path) -> Result<IndexLock, InventoryError> {
     }
 }
 
-/// Scan `root`'s `features/` corpus for every well-formed
+/// Scan `root`'s `kind=feature/` corpus for every well-formed
 /// `(scenario_id, title, source_digest)` triple the `.feature` files
 /// there declare — the SAME walk [`sync_one_root`] performs to decide
 /// what to materialize, factored out so a plugin overlay source (s16
@@ -459,10 +476,7 @@ pub struct ScannedScenario {
 /// scenario universe and the subject-tag pairing can never drift apart.
 pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
     let mut scanned = Vec::new();
-    for path in canon_fmt::util::walk_files(root, "features") {
-        if path.extension().and_then(|e| e.to_str()) != Some("feature") {
-            continue;
-        }
+    for path in canon_fmt::util::feature_files(root) {
         let Ok(bytes) = std::fs::read(&path) else { continue };
         let Ok(text) = std::str::from_utf8(&bytes) else { continue };
         let scan = canon_fmt::gherkin::scan(text);
@@ -498,16 +512,19 @@ pub fn resolve_legacy_pins(ctx: &mut GateContext) {
     ctx.legacy_pins = canon_gate::legacy_pins::resolve(ctx, || spec_sources(&repo));
 }
 
-/// Each scenario's current `.feature` file and each spec root, relative
-/// to `repo`. A root outside the repo has no history to read and is left
-/// out; an unusable `specs:` section leaves everything out, so every
-/// legacy review stays undecidable rather than misjudged.
+/// Each scenario's current `.feature` file and the directories each spec
+/// root's history lives under, relative to `repo`: the root now, then its
+/// `former_roots` (where `canon migrate` moved it from). A root outside
+/// the repo has no history to read and is left out, and so is a former
+/// root outside it; an unusable `specs:` section leaves everything out,
+/// so every legacy review stays undecidable rather than misjudged.
 fn spec_sources(repo: &Path) -> SpecSources {
     let mut sources = SpecSources::default();
-    let Ok(roots) = load_spec_roots(&repo.join("canon.yaml")) else { return sources };
-    for root in roots {
+    let Ok(roots) = load_spec_roots_with_former(&repo.join("canon.yaml")) else { return sources };
+    for (root, former) in roots {
         let Ok(relative) = root.root.strip_prefix(repo) else { continue };
-        sources.roots.insert(root.id.clone(), relative.to_path_buf());
+        let dirs = std::iter::once(relative.to_path_buf()).chain(former.iter().filter_map(|dir| dir.strip_prefix(repo).ok().map(Path::to_path_buf)));
+        sources.roots.insert(root.id.clone(), dirs.collect());
         for scanned in scan_feature_corpus_detailed(&root.root) {
             if let Ok(file) = scanned.path.strip_prefix(repo) {
                 sources.files.insert((root.id.clone(), scanned.scenario_id), file.to_path_buf());
@@ -789,8 +806,11 @@ struct StaleRoot {
     scanned: Vec<ScannedScenario>,
     /// Every `.feature` file holding a scenario whose latest `Scenario`
     /// generation is missing, removed, or carries another
-    /// `source_digest` than the file's bytes have now. A file with no
-    /// scenario has nothing to index and is never stale.
+    /// `source_digest` or `scenario_digest` than the file has now. A
+    /// generation written before 0.15 has no `scenario_digest`, so its
+    /// file is stale even though its bytes are unchanged: the sync
+    /// rewrites it, as [`sync_one_root`] would. A file with no scenario
+    /// has nothing to index and is never stale.
     files: BTreeSet<PathBuf>,
     /// Scenarios the index still holds live for this root's project
     /// that no `.feature` file declares any more — what a full sync
@@ -801,9 +821,9 @@ struct StaleRoot {
 /// Every root whose index differs from what `canon inventory sync` would
 /// leave, with the per-project corpus ids ([`corpus_ids`]) that was
 /// judged against. Two differences count: a scanned scenario the index
-/// lacks or holds at another `source_digest`, and an indexed scenario
-/// the corpus no longer declares — the indexed id set and the corpus id
-/// set of a project must be equal.
+/// lacks or holds at another `source_digest` or `scenario_digest`, and
+/// an indexed scenario the corpus no longer declares — the indexed id
+/// set and the corpus id set of a project must be equal.
 fn stale_roots(tier: &GitTier, roots: &[SpecRoot]) -> Result<(Vec<StaleRoot>, BTreeMap<ProjectId, BTreeSet<ScenarioId>>), InventoryError> {
     let latest = latest_index(tier)?;
     let scans: Vec<Vec<ScannedScenario>> = roots.iter().map(|root| scan_feature_corpus_detailed(&root.root)).collect();
@@ -816,7 +836,7 @@ fn stale_roots(tier: &GitTier, roots: &[SpecRoot]) -> Result<(Vec<StaleRoot>, BT
             .filter(|candidate| {
                 !latest
                     .get(&(root.id.clone(), candidate.scenario_id.clone()))
-                    .is_some_and(|record| !record.removed && record.source_digest == candidate.source_digest)
+                    .is_some_and(|record| !record.removed && record.source_digest == candidate.source_digest && record.scenario_digest == candidate.scenario_digest)
             })
             .map(|candidate| candidate.path.clone())
             .collect();
@@ -861,6 +881,10 @@ fn first_three(items: &[String]) -> String {
 /// waited for another writer finds its work done and stays silent
 /// instead of indexing the same change twice.
 ///
+/// A root still on the pre-0.17 layout is not refreshed at all: one
+/// stderr line names it and `canon migrate` ([`pre_0_17_detail`]), and
+/// the readers that grade fail closed on it ([`unrefreshable_roots`]).
+///
 /// The index is derived from the `.feature` files, so rebuilding it is
 /// not the kind of write a read-only command must avoid: it changes no
 /// authored record, and grading a stale index would answer about specs
@@ -872,6 +896,10 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
     }
     let Ok(ctx) = SyncCtx::from_repo(&repo) else { return };
     let Ok(roots) = ctx.spec_roots(None) else { return };
+    let (old, roots) = split_pre_0_17(&ctx.repo, roots);
+    for (_, detail) in &old {
+        eprintln!("{command}: {detail}; its scenario index is NOT refreshed");
+    }
     let tier = GitTier::new(&ctx.ledger_root);
     let checked = |tier: &GitTier| match stale_roots(tier, &roots) {
         Ok(stale) => Some(stale),
@@ -938,48 +966,80 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
     eprintln!("{line}");
 }
 
-/// A configured spec root whose scenario index is stale and cannot be
-/// refreshed (the `NOT refreshed` case of [`refresh_stale_index`]): its
-/// `.feature` files changed, but the root has format violations or a
-/// duplicate id, so every reader is reading an index those changes are
-/// not in.
+/// A configured spec root every grading reader must refuse: its scenario
+/// index is stale and cannot be refreshed (the `NOT refreshed` case of
+/// [`refresh_stale_index`]), because its `.feature` files changed but
+/// the root has format violations or a duplicate id, or because the
+/// root is still on the pre-0.17 layout (`pre_0_17`), which is never
+/// read. Either way every reader would be reading an index the corpus
+/// is not in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnrefreshableRoot {
     pub id: ProjectId,
     pub violations: usize,
     pub sync_errors: usize,
+    /// Why the root is refused for its layout ([`pre_0_17_detail`]):
+    /// `Some` for a root still holding `.feature` files under the
+    /// pre-0.17 `features/` directory, whatever the index holds.
+    pub pre_0_17: Option<String>,
 }
 
 impl UnrefreshableRoot {
     /// The gate's violation for this root (0.16 M6, fail closed): an
     /// `uncovered-cell` naming the root, the class the ship gate already
     /// uses for "this subject's scenarios cannot be counted" (`scenario`
-    /// routed away), because the root's changed scenarios cannot be
-    /// graded at all. `prefix` is prepended to the detail (the
-    /// transition, for the ship guard).
+    /// routed away), because the root's scenarios cannot be graded at
+    /// all. `prefix` is prepended to the detail (the transition, for the
+    /// ship guard).
     pub fn violation(&self, prefix: &str) -> canon_gate::Violation {
-        canon_gate::Violation::new(
-            canon_gate::FailureClass::UncoveredCell,
-            self.id.as_str(),
-            format!(
+        let detail = match &self.pre_0_17 {
+            Some(detail) => format!("{prefix}{detail}; until then its scenarios are not graded"),
+            None => format!(
                 "{prefix}the scenario index for spec root `{}` is stale and could not be refreshed ({} format violation(s), {} sync error(s)), so its changed .feature files are not graded; `canon inventory sync` lists the problems to fix",
                 self.id.as_str(),
                 self.violations,
                 self.sync_errors
             ),
-        )
+        };
+        canon_gate::Violation::new(canon_gate::FailureClass::UncoveredCell, self.id.as_str(), detail)
     }
 }
 
-/// Every configured spec root whose stale index cannot be refreshed: the
-/// ONE decision `canon gate check`, the `verifying → shipped` guard of
-/// `canon subject status`, and `canon status` fail closed on (0.16 M6),
-/// so none of them grades or advances on an index the `.feature` edits
-/// are not in. Readers that only report (`query`, `context`) keep the
-/// stderr line of [`refresh_stale_index`] instead. It reads the same
-/// staleness and the same refusal ([`root_refusal`]) the refresh acts
-/// on, and writes nothing. Empty without `canon.yaml`, or when the
-/// config or the index cannot be read: the caller reports those itself.
+/// Why `root` is refused for its layout, or `None` when it holds no
+/// `.feature` file under the pre-0.17 `features/` directory (0.17 D1,
+/// [`canon_fmt::util::pre_0_17_feature_file`]). Names the root by id and
+/// repo-relative path, and `canon migrate`.
+pub fn pre_0_17_detail(repo: &Path, root: &SpecRoot) -> Option<String> {
+    let first = canon_fmt::util::pre_0_17_feature_file(&root.root)?;
+    let shown = root.root.strip_prefix(repo).unwrap_or(&root.root);
+    Some(canon_fmt::util::pre_0_17_layout_detail(&format!("`{}` (`{}`)", root.id.as_str(), shown.display()), &first))
+}
+
+/// `roots` split into those on the pre-0.17 layout (with
+/// [`pre_0_17_detail`]) and the rest, each in configured order.
+fn split_pre_0_17(repo: &Path, roots: Vec<SpecRoot>) -> (Vec<(SpecRoot, String)>, Vec<SpecRoot>) {
+    let mut old = Vec::new();
+    let mut current = Vec::new();
+    for root in roots {
+        match pre_0_17_detail(repo, &root) {
+            Some(detail) => old.push((root, detail)),
+            None => current.push(root),
+        }
+    }
+    (old, current)
+}
+
+/// Every configured spec root a grading reader must refuse
+/// ([`UnrefreshableRoot`]): the ONE decision `canon gate check`, the
+/// `verifying → shipped` guard of `canon subject status`, and `canon
+/// status` fail closed on (0.16 M6, 0.17 D1), so none of them grades or
+/// advances on an index the `.feature` corpus is not in. Readers that
+/// only report (`query`, `context`) keep the stderr line of
+/// [`refresh_stale_index`] instead. It reads the same layout check, the
+/// same staleness and the same refusal ([`root_refusal`]) the refresh
+/// acts on, and writes nothing. A pre-0.17 root is listed whatever the
+/// index holds. Otherwise empty without `canon.yaml`, or when the config
+/// or the index cannot be read: the caller reports those itself.
 pub fn unrefreshable_roots(repo: &Path) -> Vec<UnrefreshableRoot> {
     let repo = resolve_repo_root(repo);
     if !repo.join("canon.yaml").is_file() {
@@ -987,14 +1047,16 @@ pub fn unrefreshable_roots(repo: &Path) -> Vec<UnrefreshableRoot> {
     }
     let Ok(ctx) = SyncCtx::from_repo(&repo) else { return Vec::new() };
     let Ok(roots) = ctx.spec_roots(None) else { return Vec::new() };
-    let Ok((stale, _)) = stale_roots(&GitTier::new(&ctx.ledger_root), &roots) else { return Vec::new() };
-    stale
-        .iter()
-        .filter_map(|stale| {
-            let (violations, sync_errors) = root_refusal(&stale.root, &stale.scanned);
-            (!violations.is_empty() || !sync_errors.is_empty()).then(|| UnrefreshableRoot { id: stale.root.id.clone(), violations: violations.len(), sync_errors: sync_errors.len() })
-        })
-        .collect()
+    let (old, roots) = split_pre_0_17(&ctx.repo, roots);
+    let mut refused: Vec<UnrefreshableRoot> =
+        old.into_iter().map(|(root, detail)| UnrefreshableRoot { id: root.id, violations: 0, sync_errors: 0, pre_0_17: Some(detail) }).collect();
+    let Ok((stale, _)) = stale_roots(&GitTier::new(&ctx.ledger_root), &roots) else { return refused };
+    refused.extend(stale.iter().filter_map(|stale| {
+        let (violations, sync_errors) = root_refusal(&stale.root, &stale.scanned);
+        (!violations.is_empty() || !sync_errors.is_empty())
+            .then(|| UnrefreshableRoot { id: stale.root.id.clone(), violations: violations.len(), sync_errors: sync_errors.len(), pre_0_17: None })
+    }));
+    refused
 }
 
 #[cfg(test)]
@@ -1013,7 +1075,7 @@ mod tests {
         "  # canon: {\"schema\":1,\"at\":\"2026-07-10T00:00:00Z\",\"actor\":{\"agent_id\":\"canon-fmt\"}}".to_string()
     }
 
-    /// A single well-formed `.feature` file under `<root>/features/`,
+    /// A single well-formed `.feature` file under `<root>/kind=feature/`,
     /// with a provenance comment on both headers (so `canon-fmt::check`
     /// reports zero violations) and one scenario tag/header pair.
     fn write_clean_feature(root: &Path, area: &str, surface: &str, nn: &str, title: &str) {
@@ -1021,7 +1083,7 @@ mod tests {
             "Feature: {area} {surface}\n{prov}\n\n  @{area}.{surface}.{nn}\n  Scenario: {title}\n{prov}\n    Given a precondition\n",
             prov = provenance_comment()
         );
-        write(root, &format!("features/kind=feature/area={area}/{surface}.feature"), &text);
+        write(root, &format!("kind=feature/area={area}/{surface}.feature"), &text);
     }
 
     /// Like [`write_clean_feature`] but appends `extra_tags` (e.g.
@@ -1032,7 +1094,7 @@ mod tests {
             "Feature: {area} {surface}\n{prov}\n\n  @{area}.{surface}.{nn} {extra_tags}\n  Scenario: {title}\n{prov}\n    Given a precondition\n",
             prov = provenance_comment()
         );
-        write(root, &format!("features/kind=feature/area={area}/{surface}.feature"), &text);
+        write(root, &format!("kind=feature/area={area}/{surface}.feature"), &text);
     }
 
     fn only_scenario(repo: &Path) -> Scenario {
@@ -1058,14 +1120,14 @@ mod tests {
         let dir = TempDir::new().unwrap();
         write(dir.path(), "canon.yaml", "tiers:\n  local:\n    backend: git\n    root: .canon/ledger\n");
         let roots = load_spec_roots(&dir.path().join("canon.yaml")).unwrap();
-        assert_eq!(roots, vec![SpecRoot { id: ProjectId::parse("root").unwrap(), root: dir.path().join("specs") }]);
+        assert_eq!(roots, vec![SpecRoot { id: ProjectId::parse("root").unwrap(), root: dir.path().join(paths::SPECS_DIR) }]);
     }
 
     #[test]
     fn missing_canon_yaml_also_resolves_the_default_single_root() {
         let dir = TempDir::new().unwrap();
         let roots = load_spec_roots(&dir.path().join("canon.yaml")).unwrap();
-        assert_eq!(roots, vec![SpecRoot { id: ProjectId::parse("root").unwrap(), root: dir.path().join("specs") }]);
+        assert_eq!(roots, vec![SpecRoot { id: ProjectId::parse("root").unwrap(), root: dir.path().join(paths::SPECS_DIR) }]);
     }
 
     #[test]
@@ -1117,7 +1179,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         write(dir.path(), "canon.yaml", "specs:\n  roots:\n    - id: app-a\n");
         let roots = load_spec_roots(&dir.path().join("canon.yaml")).unwrap();
-        assert_eq!(roots, vec![SpecRoot { id: ProjectId::parse("app-a").unwrap(), root: dir.path().join("specs") }]);
+        assert_eq!(roots, vec![SpecRoot { id: ProjectId::parse("app-a").unwrap(), root: dir.path().join(paths::SPECS_DIR) }]);
     }
 
     #[test]
@@ -1139,7 +1201,7 @@ mod tests {
     #[test]
     fn a_clean_root_materializes_one_scenario_per_scenario_id_with_correct_digest_and_title() {
         let repo = TempDir::new().unwrap();
-        write_clean_feature(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay");
+        write_clean_feature(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay");
 
         let outcome = run_sync(repo.path(), None).unwrap();
         assert!(outcome.is_clean());
@@ -1153,7 +1215,7 @@ mod tests {
         assert_eq!(record.project_id, ProjectId::parse("root").unwrap());
         assert_eq!(record.scenario_id, ScenarioId::parse("world.hotdeal.01").unwrap());
         assert_eq!(record.title, "Opening the hotdeal overlay");
-        let bytes = std::fs::read(repo.path().join("specs/features/kind=feature/area=world/hotdeal.feature")).unwrap();
+        let bytes = std::fs::read(repo.path().join(".canon/specs/kind=feature/area=world/hotdeal.feature")).unwrap();
         assert_eq!(record.source_digest, SpecDigest::of(&bytes));
     }
 
@@ -1162,7 +1224,7 @@ mod tests {
         let repo = TempDir::new().unwrap();
         // No provenance comment on either header -> MissingProvenance
         // violation (S11 `canon-fmt::check`).
-        write(&repo.path().join("specs"), "features/world/hotdeal.feature", "Feature: world hotdeal\n\n  @world.hotdeal.01\n  Scenario: Opening the hotdeal overlay\n    Given a precondition\n");
+        write(&repo.path().join(paths::SPECS_DIR), "kind=feature/world/hotdeal.feature", "Feature: world hotdeal\n\n  @world.hotdeal.01\n  Scenario: Opening the hotdeal overlay\n    Given a precondition\n");
 
         let outcome = run_sync(repo.path(), None).unwrap();
         assert!(!outcome.is_clean());
@@ -1175,10 +1237,59 @@ mod tests {
         assert!(result.records.is_empty(), "an aborted root must write zero Scenario records");
     }
 
+    /// Write `<repo>/canon.yaml` naming one root `root: specs`, with a
+    /// clean feature under its pre-0.17 `features/kind=feature/` dir.
+    fn pre_0_17_repo() -> TempDir {
+        let repo = TempDir::new().unwrap();
+        write(repo.path(), "canon.yaml", "specs:\n  roots:\n    - id: app\n      root: specs\n");
+        write_clean_feature(&repo.path().join("specs/features"), "world", "hotdeal", "01", "Opening the hotdeal overlay");
+        repo
+    }
+
+    #[test]
+    fn a_pre_0_17_root_aborts_sync_naming_the_root_and_canon_migrate() {
+        let repo = pre_0_17_repo();
+        let outcome = run_sync(repo.path(), None).unwrap();
+        assert!(!outcome.is_clean());
+        assert_eq!(outcome.total_written(), 0);
+        let violations = &outcome.roots[0].violations;
+        assert_eq!(violations.len(), 1, "{violations:?}");
+        assert_eq!(violations[0].class, canon_fmt::FmtFailureClass::LayoutGrammar);
+        assert!(violations[0].detail.contains("specs`") && violations[0].detail.contains("`canon migrate`"), "{}", violations[0].detail);
+    }
+
+    #[test]
+    fn a_pre_0_17_root_is_unrefreshable_even_with_an_empty_index() {
+        let repo = pre_0_17_repo();
+        let refused = unrefreshable_roots(repo.path());
+        assert_eq!(refused.len(), 1, "{refused:?}");
+        let detail = refused[0].pre_0_17.as_deref().expect("refused for its layout");
+        assert!(detail.starts_with("spec root `app` (`specs`) is on the pre-0.17 layout"), "{detail}");
+        let violation = refused[0].violation("");
+        assert_eq!(violation.class, canon_gate::FailureClass::UncoveredCell);
+        assert!(violation.detail.contains("`canon migrate`"), "{}", violation.detail);
+    }
+
+    #[test]
+    fn a_root_moved_back_to_the_pre_0_17_layout_is_never_tombstoned_by_a_refresh() {
+        let repo = TempDir::new().unwrap();
+        write(repo.path(), "canon.yaml", "specs:\n  roots:\n    - id: app\n      root: specs\n");
+        write_clean_feature(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay");
+        assert_eq!(run_sync(repo.path(), None).unwrap().total_written(), 1);
+        std::fs::create_dir_all(repo.path().join("specs/features")).unwrap();
+        std::fs::rename(repo.path().join("specs/kind=feature"), repo.path().join("specs/features/kind=feature")).unwrap();
+
+        refresh_stale_index(repo.path(), "canon test");
+        let tier = GitTier::new(&GateCtx::from_repo(repo.path()).unwrap().ledger_root);
+        let latest = latest_index(&tier).unwrap();
+        assert_eq!(latest.len(), 1);
+        assert!(latest.values().all(|scenario| !scenario.removed), "a refused root writes no tombstone");
+    }
+
     #[test]
     fn resync_of_an_unchanged_corpus_writes_zero_new_records() {
         let repo = TempDir::new().unwrap();
-        write_clean_feature(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay");
+        write_clean_feature(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay");
 
         let first = run_sync(repo.path(), None).unwrap();
         assert_eq!(first.total_written(), 1);
@@ -1194,10 +1305,10 @@ mod tests {
     #[test]
     fn a_changed_feature_file_produces_exactly_one_new_record() {
         let repo = TempDir::new().unwrap();
-        write_clean_feature(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay");
+        write_clean_feature(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay");
         run_sync(repo.path(), None).unwrap();
 
-        write_clean_feature(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay v2");
+        write_clean_feature(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay v2");
         let second = run_sync(repo.path(), None).unwrap();
         assert_eq!(second.total_written(), 1, "a changed .feature file must append exactly one new record");
 
@@ -1210,12 +1321,12 @@ mod tests {
     #[test]
     fn sync_derives_the_index_from_features_alone_ignoring_any_inventory_dir() {
         let repo = TempDir::new().unwrap();
-        write_clean_feature(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay");
+        write_clean_feature(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay");
         // A present, WELL-FORMED `inventory/` dir carrying real
         // `covered_by` data -- sync must never read this to populate
         // the index.
         write(
-            &repo.path().join("specs"),
+            &repo.path().join(paths::SPECS_DIR),
             "inventory/kind=inventory/area=world/surface=hub/hub.yaml",
             "schema: 1\nkind: inventory\nat: \"2026-07-10T00:00:00Z\"\nactor:\n  agent_id: canon-fmt-test\nworld.hub.hub-header:\n  upstream:\n    pin: 9c93d024b\n    file: routes/world/hub/index.tsx\n    symbol: RouteComponent\n    lines: \"1-10\"\n  covered_by: [world.hotdeal.01]\n",
         );
@@ -1261,7 +1372,7 @@ mod tests {
         let repo = TempDir::new().unwrap();
         // A configured (but unused, since --spec-root overrides it)
         // root that would fail validation if it were ever read.
-        write(&repo.path().join("configured"), "features/world/broken.feature", "Feature: broken\n\n  @world.broken.01\n  Scenario: no provenance\n    Given x\n");
+        write(&repo.path().join("configured"), "kind=feature/world/broken.feature", "Feature: broken\n\n  @world.broken.01\n  Scenario: no provenance\n    Given x\n");
         write(repo.path(), "canon.yaml", "specs:\n  roots:\n    - id: configured\n      root: configured\n");
         write_clean_feature(&repo.path().join("ad-hoc"), "world", "hotdeal", "01", "Opening the hotdeal overlay");
 
@@ -1282,8 +1393,8 @@ mod tests {
         // one-record-per-key contract, so this root aborts (0 writes)
         // via `sync_errors`, NOT a frozen `FmtFailureClass` violation.
         let dup_root = repo.path().join("apps/dup/specs");
-        write(&dup_root, "features/kind=feature/area=world/hotdeal.feature", &format!("Feature: world hotdeal\n{prov}\n\n  @world.hotdeal.01\n  Scenario: First\n{prov}\n    Given x\n"));
-        write(&dup_root, "features/kind=feature/area=world/hotdeal-again.feature", &format!("Feature: world hotdeal again\n{prov}\n\n  @world.hotdeal.01\n  Scenario: Second\n{prov}\n    Given y\n"));
+        write(&dup_root, "kind=feature/area=world/hotdeal.feature", &format!("Feature: world hotdeal\n{prov}\n\n  @world.hotdeal.01\n  Scenario: First\n{prov}\n    Given x\n"));
+        write(&dup_root, "kind=feature/area=world/hotdeal-again.feature", &format!("Feature: world hotdeal again\n{prov}\n\n  @world.hotdeal.01\n  Scenario: Second\n{prov}\n    Given y\n"));
         // Root `app-ok`: a clean, distinct root that must still materialize.
         write_clean_feature(&repo.path().join("apps/ok/specs"), "world", "coupon", "02", "Applying the coupon");
         write(repo.path(), "canon.yaml", "specs:\n  roots:\n    - id: app-dup\n      root: apps/dup/specs\n    - id: app-ok\n      root: apps/ok/specs\n");
@@ -1317,7 +1428,7 @@ mod tests {
     #[test]
     fn a_tagged_scenario_round_trips_the_subject_join() {
         let repo = TempDir::new().unwrap();
-        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@subject:payments-core");
+        write_feature_with_tags(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@subject:payments-core");
 
         let outcome = run_sync(repo.path(), None).unwrap();
         assert!(outcome.is_clean(), "a well-formed subject tag is never a violation");
@@ -1331,7 +1442,7 @@ mod tests {
     #[test]
     fn an_untagged_scenario_leaves_the_subject_join_unset() {
         let repo = TempDir::new().unwrap();
-        write_clean_feature(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay");
+        write_clean_feature(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay");
 
         let outcome = run_sync(repo.path(), None).unwrap();
         assert!(outcome.is_clean());
@@ -1349,7 +1460,7 @@ mod tests {
         let repo = TempDir::new().unwrap();
         // `Bad_Slug` is a single whitespace token (so the scan pairs it)
         // but not a kebab-case subject slug (underscore + uppercase).
-        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@subject:Bad_Slug");
+        write_feature_with_tags(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@subject:Bad_Slug");
 
         let outcome = run_sync(repo.path(), None).unwrap();
         assert!(outcome.is_clean(), "a malformed tag is fail-soft, never a whole-root abort");
@@ -1364,7 +1475,7 @@ mod tests {
     #[test]
     fn two_subject_tags_on_one_scenario_first_wins_with_a_counted_diagnostic() {
         let repo = TempDir::new().unwrap();
-        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@subject:first-subject @subject:second-subject");
+        write_feature_with_tags(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@subject:first-subject @subject:second-subject");
 
         let outcome = run_sync(repo.path(), None).unwrap();
         assert!(outcome.is_clean(), "multiple tags are fail-soft, never a whole-root abort");
@@ -1379,7 +1490,7 @@ mod tests {
     #[test]
     fn a_lane_tag_round_trips_the_lane_join() {
         let repo = TempDir::new().unwrap();
-        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@lane:process");
+        write_feature_with_tags(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@lane:process");
 
         let outcome = run_sync(repo.path(), None).unwrap();
         assert!(outcome.is_clean());
@@ -1391,7 +1502,7 @@ mod tests {
     #[test]
     fn two_lane_tags_first_wins_with_a_counted_diagnostic() {
         let repo = TempDir::new().unwrap();
-        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@lane:behavior @lane:design");
+        write_feature_with_tags(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@lane:behavior @lane:design");
 
         let outcome = run_sync(repo.path(), None).unwrap();
         assert_eq!(outcome.roots[0].tag_diagnostics.len(), 1);
@@ -1402,7 +1513,7 @@ mod tests {
     #[test]
     fn malformed_lane_is_dropped_with_a_counted_diagnostic() {
         let repo = TempDir::new().unwrap();
-        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@lane:Bad_Lane");
+        write_feature_with_tags(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@lane:Bad_Lane");
 
         let outcome = run_sync(repo.path(), None).unwrap();
         assert_eq!(outcome.roots[0].tag_diagnostics.len(), 1);
@@ -1421,7 +1532,7 @@ mod tests {
         .unwrap();
         std::fs::write(repo.path().join(".canon/vocab/canon.core/enums.yaml"), "enums:\n  case: [happy, failure, edge]\n").unwrap();
 
-        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@case:failure");
+        write_feature_with_tags(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@case:failure");
         let outcome = run_sync(repo.path(), None).unwrap();
         assert!(outcome.roots[0].tag_diagnostics.is_empty(), "{:?}", outcome.roots[0].tag_diagnostics);
         assert_eq!(only_scenario(repo.path()).case.as_deref(), Some("failure"));
@@ -1429,7 +1540,7 @@ mod tests {
         // A case the repo never declared must not count toward
         // `require_cases`: dropped, with a named diagnostic, and the
         // re-synced record no longer carries the old case.
-        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@case:sad");
+        write_feature_with_tags(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@case:sad");
         let outcome = run_sync(repo.path(), None).unwrap();
         assert_eq!(outcome.roots[0].tag_diagnostics.len(), 1);
         assert!(outcome.roots[0].tag_diagnostics[0].contains("@case:sad"), "{}", outcome.roots[0].tag_diagnostics[0]);
@@ -1449,7 +1560,7 @@ mod tests {
     #[test]
     fn unknown_namespace_is_counted_once_per_scenario_and_namespace() {
         let repo = TempDir::new().unwrap();
-        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@foo:bar @foo:baz @p2");
+        write_feature_with_tags(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@foo:bar @foo:baz @p2");
 
         let outcome = run_sync(repo.path(), None).unwrap();
         assert_eq!(outcome.roots[0].tag_diagnostics.len(), 1);
@@ -1459,10 +1570,10 @@ mod tests {
     #[test]
     fn a_resync_after_adding_a_subject_tag_rewrites_the_record_to_carry_the_join() {
         let repo = TempDir::new().unwrap();
-        write_clean_feature(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay");
+        write_clean_feature(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay");
         run_sync(repo.path(), None).unwrap();
 
-        write_feature_with_tags(&repo.path().join("specs"), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@subject:payments-core");
+        write_feature_with_tags(&repo.path().join(paths::SPECS_DIR), "world", "hotdeal", "01", "Opening the hotdeal overlay", "@subject:payments-core");
         let second = run_sync(repo.path(), None).unwrap();
         assert_eq!(second.total_written(), 1, "adding a subject tag changes the file bytes, so a new record is appended");
 

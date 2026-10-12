@@ -5,7 +5,9 @@
 //! a repo needs to start the working loop: a starter `.canon/policy.yaml`
 //! a human approves, at the level `--policy` names
 //! ([`crate::policy_level`], 0.16 D3; `strict` by default), the
-//! `openspec/changes/` home the default plans source points at, and a
+//! commented `plans:` examples (canon's own changes live in
+//! `.canon/changes/`, read with no entry; `plans.sources` lists only
+//! external plans canon reads, 0.17 D2), and a
 //! canon block in `AGENTS.md` between `<!-- canon:begin -->`/`<!-- canon:end -->`.
 //! It never overwrites an existing `canon.yaml` or `policy.yaml`; a
 //! second `init` on a repo that already has `canon.yaml` only refreshes
@@ -20,6 +22,18 @@
 //! section, never stopping at the first failure (mirroring `canon fmt
 //! --check`'s own "report everything" convention).
 //!
+//! # Harness choice (0.17 D5)
+//! A fresh `init` also picks the harnesses the canon skill is installed
+//! for ([`SkillsChoice`]): `--providers` answers; otherwise, on a
+//! terminal, it asks with the detected harnesses (`.claude`, `.codex`,
+//! `.omp`, `.pi` directories) checked; otherwise it takes the detected
+//! ones. The answer is written as `canon.yaml` `skills.providers` and the
+//! skill is installed from the default skill source, as `canon skills
+//! install` does. With no terminal, no flag and nothing detected, it
+//! records nothing, installs nothing and says how to choose.
+//! `--check-config` validates `skills:` through
+//! [`crate::skills::configured_providers`].
+//!
 //! # `<repo>` is used literally, never an ancestor walk
 //! Every other subcommand's `--repo` resolves through
 //! `crate::context::resolve_repo_root`'s nearest-ancestor-`canon.yaml`
@@ -32,7 +46,7 @@
 //! own literal join) is used exactly as given, default `.` meaning cwd.
 
 use std::fs;
-use std::io::Write as _;
+use std::io::{BufRead, IsTerminal as _, Write as _};
 use std::path::Path;
 
 use canon_model::envelope::RecordKind;
@@ -40,6 +54,7 @@ use canon_model::paths;
 use canon_store::policy::{BackendConfig, TierPolicy};
 
 use crate::policy_level::{starter_policy, PolicyLevel};
+use crate::skills::{self, Provider};
 
 /// Kinds routed to `hot` by [`skeleton_yaml`] (s32 `sqlite-hot-backend`):
 /// the same hot-class set the tiered-storage docs/this repo's own
@@ -79,12 +94,14 @@ const GITIGNORE_LINES: [(&str, &str); 5] = [
 /// `sqlite-hot-backend`: sqlite needs no operator-supplied credential,
 /// unlike postgres/s3) -- commented `tiers.hot` (postgres swap) /
 /// `tiers.cold` stanzas documenting the scale-up path, one working
-/// `specs.roots[]` entry (D9: a present `specs:` section requires at
-/// least one root, so this ships real rather than empty), and one
-/// `openspec` plans source rooted at the repo (0.14 D2), so the
-/// changes `canon change new` scaffolds under [`CHANGES_DIR`] are
-/// imported by `canon ingest plans` and flipped by `canon gate task`
-/// with no hand edit.
+/// `specs.roots[]` entry at [`paths::SPECS_DIR`] (D9: a present `specs:` section
+/// requires at least one root, so this ships real rather than empty;
+/// 0.17 D1 keeps it inside `.canon/`), and one
+/// `plans:` section that configures no source (0.17 D2): `canon change
+/// new` writes canon's own changes under
+/// [`canon_model::paths::CHANGES_DIR`], which every plan reader reads
+/// with no entry, so `plans.sources` lists only external plans canon
+/// reads, shown as commented openspec and superpowers examples.
 fn skeleton_yaml() -> String {
     let mut routing = String::new();
     for kind in RecordKind::ALL {
@@ -124,15 +141,22 @@ fn skeleton_yaml() -> String {
     out.push_str("routing:\n");
     out.push_str(&routing);
     out.push_str("specs:\n");
+    out.push_str("  # The .feature corpus: <root>/kind=feature/area=<area>/<surface>.feature.\n");
     out.push_str("  roots:\n");
     out.push_str("    - id: root\n");
-    out.push_str("      root: specs\n");
+    out.push_str(&format!("      root: {}\n", paths::SPECS_DIR));
     out.push_str("plans:\n");
-    out.push_str("  # Where changes and their tasks live: `canon change new` scaffolds\n");
-    out.push_str("  # openspec/changes/<slug>/, `canon ingest plans` imports it.\n");
-    out.push_str("  sources:\n");
-    out.push_str("    - dialect: openspec\n");
-    out.push_str("      root: .\n");
+    out.push_str("  # canon's own changes live in .canon/changes/<slug>/ (`canon change\n");
+    out.push_str("  # new` writes brief.md + tasks.md there); every reader reads them\n");
+    out.push_str("  # with no entry here. `sources` lists external plans you prepare,\n");
+    out.push_str("  # which canon only reads: it never writes into them, except that\n");
+    out.push_str("  # `canon gate task` flips a task's checkbox in their tasks.md.\n");
+    out.push_str("  # Their briefs and approvals live in .canon/changes/<change>/brief.md.\n");
+    out.push_str("  #   - dialect: openspec      # openspec/changes/<change>/proposal.md + tasks.md\n");
+    out.push_str("  #     root: .\n");
+    out.push_str("  #   - dialect: superpowers   # writing-plans documents\n");
+    out.push_str("  #     root: docs/superpowers/plans\n");
+    out.push_str("  sources: []\n");
     out.push_str("write:\n");
     out.push_str("  # Staged writes (`canon evidence add`, `canon finding add|close`,\n");
     out.push_str("  # `canon divergence stage`) promote in the same run. `manual` keeps\n");
@@ -141,38 +165,39 @@ fn skeleton_yaml() -> String {
     out
 }
 
+/// The [`GITIGNORE_LINES`] entries `<repo>/.gitignore` lacks, as
+/// `(comment, line)`, in order. A missing or unreadable file lacks all.
+pub(crate) fn missing_gitignore_lines(repo: &Path) -> Vec<(&'static str, &'static str)> {
+    let existing = fs::read_to_string(repo.join(".gitignore")).unwrap_or_default();
+    GITIGNORE_LINES.iter().copied().filter(|(_, line)| !existing.lines().any(|have| have.trim() == *line)).collect()
+}
+
 /// Ensures every [`GITIGNORE_LINES`] entry is present in
 /// `<repo>/.gitignore` -- appends each missing one under its comment
 /// (creating the file if absent), so a `.gitignore` a prior `canon init`
 /// (or the repo's own `git init`) already wrote is never duplicated.
-/// `canon init` itself stays a fresh-repo bootstrap (`run_init`'s
-/// `canon.yaml` refuses to overwrite), but `.gitignore` commonly
-/// PRE-EXISTS a `canon init` invocation (e.g. a `git init`-then-`canon
-/// init` sequence), so this appends rather than mirroring `canon.yaml`'s
-/// create-fails-if-exists refusal.
-fn scaffold_gitignore(repo: &Path) -> std::io::Result<()> {
+/// `.gitignore` commonly PRE-EXISTS a `canon init` invocation (e.g. a
+/// `git init`-then-`canon init` sequence), and a repo initialized by an
+/// older canon lacks the lines added since (#35), so this appends rather
+/// than mirroring `canon.yaml`'s create-fails-if-exists refusal: a fresh
+/// `canon init`, a re-run on an existing repo and `canon migrate` all
+/// call it. Returns the lines it added.
+pub(crate) fn scaffold_gitignore(repo: &Path) -> std::io::Result<Vec<&'static str>> {
     let path = repo.join(".gitignore");
     let existing = fs::read_to_string(&path).unwrap_or_default();
-    let missing: Vec<&(&str, &str)> = GITIGNORE_LINES.iter().filter(|(_, line)| !existing.lines().any(|have| have.trim() == *line)).collect();
+    let missing = missing_gitignore_lines(repo);
     if missing.is_empty() {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let mut file = fs::OpenOptions::new().create(true).append(true).open(&path)?;
     if !existing.is_empty() && !existing.ends_with('\n') {
         file.write_all(b"\n")?;
     }
-    for (comment, line) in missing {
+    for (comment, line) in &missing {
         file.write_all(format!("{comment}\n{line}\n").as_bytes())?;
     }
-    Ok(())
+    Ok(missing.into_iter().map(|(_, line)| line).collect())
 }
-
-/// The repo-relative directory the default `openspec` plans source
-/// ([`skeleton_yaml`]) reads changes from. `init` creates it (with a
-/// `.gitkeep`, so a clone keeps it): without it the openspec adapter
-/// would fall back to treating the repo root itself as the changes dir
-/// and report every top-level directory as a malformed change.
-pub(crate) const CHANGES_DIR: &str = "openspec/changes";
 
 /// Opening marker of the canon block `init` owns in `AGENTS.md`.
 pub(crate) const AGENTS_BEGIN: &str = "<!-- canon:begin -->";
@@ -192,8 +217,8 @@ feature.
 
 The loop:
 
-1. Brief: for a new subject or a scope change, record the request and your assumptions in the change's `proposal.md`, then stop and report the brief: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy. Record it at once: an `Approved: <who> <when> — \"<their words>\"` line in the change's `proposal.md`, and `canon policy approve --by <the human> --note \"<their words>\"`. Never approve without a human answer.
-2. Subject: `canon subject new`, then `canon change new` for the change; its `proposal.md` holds the brief.
+1. Brief: for a new subject or a scope change, record the request and your assumptions in the change's `.canon/changes/<slug>/brief.md`, then stop and report the brief: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy. Record it at once: an `Approved: <who> <when> — \"<their words>\"` line in that `brief.md`, and `canon policy approve --by <the human> --note \"<their words>\"`. Never approve without a human answer.
+2. Subject: `canon subject new`, then `canon change new` for the change; it writes `.canon/changes/<slug>/brief.md`, which holds the brief. A change from an external plan (an openspec `proposal.md`) gets its brief there too: a `brief.md` whose `Source: <path>` line points at the plan; canon never edits the plan.
 3. Scenarios: `canon scenario new`, failure paths included (`--case failure`).
 4. Units: split the work; one actor id and session per unit.
 5. Implement: tests named by scenario id.
@@ -203,23 +228,6 @@ The loop:
 
 Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, as tasks in its `tasks.md`, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review. When no human can answer one of the brief's questions, write your assumption into the brief and proceed on it; that covers the brief's questions and work inside an approved scope, never the approval. `.canon/policy.yaml` is what the gate grades against.
 <!-- canon:end -->";
-
-/// A fence opener/closer line: up to three spaces, then three or more
-/// backticks or tildes (CommonMark). Returns the fence character, its
-/// run length, and whether only whitespace follows the run (a closing
-/// fence may carry nothing else). [`crate::brief`] uses it too (for
-/// `canon status` and the ship guard), so an `Approved:` line quoted in
-/// a fence is not read as one.
-pub(crate) fn fence_of(line: &str) -> Option<(char, usize, bool)> {
-    let indent = line.len() - line.trim_start_matches(' ').len();
-    if indent > 3 {
-        return None;
-    }
-    let rest = &line[indent..];
-    let ch = rest.chars().next().filter(|c| *c == '`' || *c == '~')?;
-    let run = rest.len() - rest.trim_start_matches(ch).len();
-    (run >= 3).then(|| (ch, run, rest[run..].trim().is_empty()))
-}
 
 /// The byte span `[start, end)` of every standalone `marker` line (the
 /// line's trimmed text is exactly the marker) outside fenced code
@@ -234,7 +242,7 @@ fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usize, usize)>)
         let line = raw.trim_end_matches(['\n', '\r']);
         let span = (offset, offset + line.len());
         offset += raw.len();
-        match (open_fence, fence_of(line)) {
+        match (open_fence, canon_ingest::markdown::fence_of(line)) {
             (None, Some((ch, run, _))) => open_fence = Some((ch, run)),
             (Some((open_ch, open_run)), Some((ch, run, true))) if ch == open_ch && run >= open_run => open_fence = None,
             (Some(_), _) => {}
@@ -289,13 +297,137 @@ fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
 }
 
 /// What `canon init` writes besides `canon.yaml` (the opt-out flags).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct InitOptions {
     /// Write or refresh the canon block in `AGENTS.md`.
     pub agents_md: bool,
     /// The level of the starter `.canon/policy.yaml` to write; `None`
     /// writes none.
     pub policy: Option<PolicyLevel>,
+    /// How a fresh `init` picks the harnesses to install the canon skill
+    /// for (0.17 D5).
+    pub skills: SkillsChoice,
+}
+
+/// How a fresh `canon init` picks the harnesses (0.17 D5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SkillsChoice {
+    /// Ask on a terminal, the detected harnesses checked; without a
+    /// terminal, the detected harnesses.
+    Ask,
+    /// `--providers <list>`: this list (`none` or empty for none), no prompt.
+    Providers(String),
+    /// Record and install nothing (`canon demo init`).
+    Skip,
+}
+
+/// The harnesses a fresh `init` installs for, and whether the choice is
+/// recorded as `skills.providers` (an answer, or a detection that found
+/// something; nothing detected without an answer records nothing).
+struct InitSkills {
+    providers: Vec<Provider>,
+    recorded: bool,
+}
+
+/// Asks which harnesses get the canon skill: the four providers with the
+/// `detected` ones checked, then a comma- or space-separated list, `none`,
+/// or an empty line (or end of input) for the checked ones. An unknown
+/// name is reported and asked again.
+fn prompt_providers(detected: &[Provider], input: &mut impl BufRead, out: &mut impl std::io::Write) -> std::io::Result<Vec<Provider>> {
+    writeln!(out, "canon init: which harnesses should get the canon skill?")?;
+    for provider in skills::ALL_PROVIDERS {
+        if detected.contains(&provider) {
+            writeln!(out, "  [x] {:<7} ({} found)", provider.as_str(), provider.marker())?;
+        } else {
+            writeln!(out, "  [ ] {}", provider.as_str())?;
+        }
+    }
+    loop {
+        write!(out, "Comma-separated list, `none`, or Enter for the checked ones [{}]: ", skills::provider_names(detected))?;
+        out.flush()?;
+        let mut line = String::new();
+        if input.read_line(&mut line)? == 0 {
+            writeln!(out)?;
+            return Ok(detected.to_vec());
+        }
+        let answer = line.trim();
+        if answer.is_empty() {
+            return Ok(detected.to_vec());
+        }
+        match skills::parse_provider_list(&answer.replace(char::is_whitespace, ",")) {
+            Ok(providers) => return Ok(providers),
+            Err(e) => writeln!(out, "canon init: {e}")?,
+        }
+    }
+}
+
+/// Resolves [`InitOptions::skills`] for a fresh `init` in `repo`. `Err`
+/// for an unknown `--providers` name, before anything is written.
+fn choose_skills(repo: &Path, choice: &SkillsChoice) -> Result<Option<InitSkills>, String> {
+    match choice {
+        SkillsChoice::Skip => Ok(None),
+        SkillsChoice::Providers(list) => skills::parse_provider_list(list)
+            .map(|providers| Some(InitSkills { providers, recorded: true }))
+            .map_err(|e| e.to_string()),
+        SkillsChoice::Ask => {
+            let detected = skills::detected_providers(repo);
+            if std::io::stdin().is_terminal() && std::io::stderr().is_terminal() {
+                let providers = prompt_providers(&detected, &mut std::io::stdin().lock(), &mut std::io::stderr())
+                    .map_err(|e| format!("failed to read the harness choice: {e}"))?;
+                Ok(Some(InitSkills { providers, recorded: true }))
+            } else {
+                let recorded = !detected.is_empty();
+                Ok(Some(InitSkills { providers: detected, recorded }))
+            }
+        }
+    }
+}
+
+/// The `skills:` section appended to the skeleton: the recorded choice,
+/// or a commented example when nothing is recorded.
+fn skills_section(skills: Option<&InitSkills>) -> String {
+    let mut out = String::from(skills::SKILLS_CONFIG_COMMENT);
+    match skills {
+        Some(chosen) if chosen.recorded => out.push_str(&skills::skills_config_block(&chosen.providers)),
+        _ => out.push_str("# skills:\n#   providers: [claude, codex]\n"),
+    }
+    out
+}
+
+/// Installs the canon skill for the chosen harnesses through
+/// [`skills::install_canonical`] (which follows the `skills.providers`
+/// just written), and prints what happened. `Err` carries the exit code.
+fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkills) -> Result<(), i32> {
+    if chosen.providers.is_empty() {
+        if chosen.recorded {
+            println!("canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`");
+        } else {
+            println!("canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; {}", skills::CHOOSE_PROVIDERS);
+        }
+        return Ok(());
+    }
+    let source = skills::resolve_source(None);
+    match skills::install_canonical(&source, repo, None) {
+        Ok(report) => {
+            let dirs = report
+                .providers
+                .iter()
+                .map(|provider| skills::provider_bundle_root(repo, *provider).display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            println!("canon init: installed the canon skill for {} ({dirs})", skills::provider_names(&report.providers));
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!(
+                "canon init: wrote `skills: {{ providers: [{}] }}` to {} but did not install the canon skill: {e}; once the skill source is available, run `canon skills install` (set {} or pass --source <dir>; it follows skills.providers)",
+                chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "),
+                canon_yaml_path.display(),
+                skills::CANONICAL_SOURCE_ENV
+            );
+            Err(2)
+        }
+    }
 }
 
 /// Write `merged` to `AGENTS.md` unless it already holds exactly those
@@ -335,32 +467,26 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Create [`CHANGES_DIR`] with a `.gitkeep` when it is absent or empty.
-fn scaffold_changes_dir(repo: &Path) -> std::io::Result<()> {
-    let dir = repo.join(CHANGES_DIR);
-    fs::create_dir_all(&dir)?;
-    if fs::read_dir(&dir)?.next().is_none() {
-        fs::write(dir.join(".gitkeep"), "")?;
-        println!("canon init: created {}", dir.display());
-    }
-    Ok(())
-}
-
 /// `canon init [--repo <dir>] [--no-agents-md] [--policy <level> |
 /// --no-policy]` (task 4.1, 0.14 D2, 0.16 D3). Returns the process exit
 /// code.
 ///
 /// - A fresh repo gets `canon.yaml`, the `.gitignore` line, the
-///   `openspec/changes/` plans home, the starter policy at the requested
+///   commented plans examples, the starter policy at the requested
 ///   level (unless `--no-policy`) and the `AGENTS.md` block (unless
 ///   `--no-agents-md`):
 ///   exit `0`.
 /// - A repo whose `canon.yaml` exists keeps it byte-identical
 ///   (`create_new` is the atomic refusal) and only refreshes the
-///   `AGENTS.md` block: exit `0`. With `--no-agents-md` there is nothing
-///   left to do, so that is the pre-0.14 refusal, exit `2`.
-/// - Unbalanced `AGENTS.md` markers refuse (exit `2`) before anything is
-///   written.
+///   `AGENTS.md` block and adds the canon `.gitignore` lines it lacks
+///   (#35, a repo initialized by an older canon): exit `0`. With
+///   `--no-agents-md` and no line missing there is nothing left to do,
+///   so that is the pre-0.14 refusal, exit `2`.
+/// - Unbalanced `AGENTS.md` markers, or an unknown `--providers` name,
+///   refuse (exit `2`) before anything is written.
+/// - A fresh repo also records and installs the harness choice
+///   ([`SkillsChoice`], 0.17 D5); an install that fails after the writes
+///   exits `2` naming the retry. A rerun never asks and never installs.
 pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
     if let Err(e) = fs::create_dir_all(repo) {
         eprintln!("canon init: failed to create `{}`: {e}", repo.display());
@@ -388,23 +514,50 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
     };
 
     let canon_yaml_path = repo.join("canon.yaml");
+    let skills = if canon_yaml_path.exists() {
+        None
+    } else {
+        match choose_skills(repo, &options.skills) {
+            Ok(skills) => skills,
+            Err(e) => {
+                eprintln!("canon init: refused — {e}");
+                return 2;
+            }
+        }
+    };
     match fs::OpenOptions::new().write(true).create_new(true).open(&canon_yaml_path) {
         Ok(mut file) => {
-            if let Err(e) = file.write_all(skeleton_yaml().as_bytes()) {
+            let config = skeleton_yaml() + &skills_section(skills.as_ref());
+            if let Err(e) = file.write_all(config.as_bytes()) {
                 eprintln!("canon init: failed to write `{}`: {e}", canon_yaml_path.display());
                 return 2;
             }
             println!("canon init: wrote {}", canon_yaml_path.display());
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            let Some((existing, merged)) = agents else {
+            let missing = missing_gitignore_lines(repo);
+            if agents.is_none() && missing.is_empty() {
                 eprintln!("canon init: refused — `{}` already exists; never overwriting an existing config", canon_yaml_path.display());
                 return 2;
-            };
-            println!("canon init: {} already exists — left unchanged; only the AGENTS.md block is refreshed", canon_yaml_path.display());
-            if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged) {
-                eprintln!("canon init: failed to write `{}`: {e}", agents_path.display());
-                return 2;
+            }
+            let refreshed = if agents.is_some() { "the AGENTS.md block and the canon .gitignore lines are refreshed" } else { "the canon .gitignore lines are refreshed" };
+            println!("canon init: {} already exists — left unchanged; {refreshed}", canon_yaml_path.display());
+            if matches!(options.skills, SkillsChoice::Providers(_)) {
+                println!("canon init: --providers is not applied to an existing canon.yaml; run `canon skills install --providers=<list>`, which records the list in skills.providers");
+            }
+            match scaffold_gitignore(repo) {
+                Ok(added) if !added.is_empty() => println!("canon init: added to .gitignore: {}", added.join(", ")),
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("canon init: failed to update `.gitignore`: {e}");
+                    return 2;
+                }
+            }
+            if let Some((existing, merged)) = agents {
+                if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged) {
+                    eprintln!("canon init: failed to write `{}`: {e}", agents_path.display());
+                    return 2;
+                }
             }
             return 0;
         }
@@ -416,10 +569,6 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
 
     if let Err(e) = scaffold_gitignore(repo) {
         eprintln!("canon init: wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display());
-        return 2;
-    }
-    if let Err(e) = scaffold_changes_dir(repo) {
-        eprintln!("canon init: failed to create `{}`: {e}", repo.join(CHANGES_DIR).display());
         return 2;
     }
     if let Some(level) = options.policy {
@@ -434,7 +583,11 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
             return 2;
         }
     }
-    println!("canon init: next: `canon skills install` to install authoring guidance");
+    if let Some(chosen) = &skills {
+        if let Err(code) = install_chosen_skills(repo, &canon_yaml_path, chosen) {
+            return code;
+        }
+    }
     0
 }
 
@@ -523,6 +676,17 @@ pub fn run_check_config(repo: &Path) -> i32 {
         }
     }
 
+    // `skills:` (0.17 D5): absent falls back to the install lock's
+    // providers, then the detected harnesses, so it is not a failure.
+    match skills::configured_providers(&canon_yaml_path) {
+        Ok(Some(providers)) => report.push_str(&format!("[PASS] skills (providers: {})\n", skills::provider_names(&providers))),
+        Ok(None) => report.push_str("[not configured] skills (providers: the install lock's, else the detected harnesses)\n"),
+        Err(e) => {
+            all_ok = false;
+            report.push_str(&format!("[FAIL] skills: {e}\n"));
+        }
+    }
+
     print!("{report}");
     if all_ok { 0 } else { 1 }
 }
@@ -530,6 +694,49 @@ pub fn run_check_config(repo: &Path) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// authoring.init.96: on a terminal init lists the four harnesses with
+    /// the detected ones checked; Enter (or end of input) keeps the checked
+    /// ones, a list or `none` replaces them, and an unknown name is asked
+    /// again.
+    #[test]
+    fn authoring_init_96_the_prompt_prechecks_the_detected_harnesses() {
+        let detected = [Provider::Claude, Provider::Omp];
+        let ask = |answers: &str| {
+            let mut out = Vec::new();
+            let chosen = prompt_providers(&detected, &mut answers.as_bytes(), &mut out).unwrap();
+            (chosen, String::from_utf8(out).unwrap())
+        };
+
+        let (chosen, shown) = ask("\n");
+        assert_eq!(chosen, detected);
+        assert_eq!(
+            shown,
+            "canon init: which harnesses should get the canon skill?\n  [x] claude  (.claude found)\n  [ ] codex\n  [x] omp     (.omp found)\n  [ ] pi\nComma-separated list, `none`, or Enter for the checked ones [claude,omp]: "
+        );
+        assert_eq!(ask("").0, detected, "end of input keeps the checked ones");
+        assert_eq!(ask("pi, codex\n").0, vec![Provider::Codex, Provider::Pi]);
+        assert_eq!(ask("codex omp\n").0, vec![Provider::Codex, Provider::Omp], "spaces separate too");
+        assert_eq!(ask("none\n").0, vec![]);
+        let (chosen, shown) = ask("gemini\nclaude\n");
+        assert_eq!(chosen, vec![Provider::Claude]);
+        assert!(shown.contains("canon init: invalid provider `gemini`"), "{shown}");
+        assert_eq!(shown.matches("Enter for the checked ones").count(), 2, "asked again: {shown}");
+    }
+
+    /// The `skills:` section init appends parses back to the choice, and
+    /// the skeleton with it still loads under every section loader.
+    #[test]
+    fn skills_section_round_trips_through_the_config_loader() {
+        let dir = tempfile::tempdir().unwrap();
+        let canon_yaml = dir.path().join("canon.yaml");
+        let chosen = InitSkills { providers: vec![Provider::Codex, Provider::Pi], recorded: true };
+        std::fs::write(&canon_yaml, skeleton_yaml() + &skills_section(Some(&chosen))).unwrap();
+        assert_eq!(skills::configured_providers(&canon_yaml).unwrap(), Some(vec![Provider::Codex, Provider::Pi]));
+        assert!(TierPolicy::from_yaml_at(&std::fs::read_to_string(&canon_yaml).unwrap(), dir.path()).is_ok());
+        std::fs::write(&canon_yaml, skeleton_yaml() + &skills_section(None)).unwrap();
+        assert_eq!(skills::configured_providers(&canon_yaml).unwrap(), None);
+    }
 
     #[test]
     fn skeleton_yaml_routes_hot_class_kinds_to_hot_and_the_rest_to_local() {

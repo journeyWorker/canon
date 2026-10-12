@@ -20,12 +20,14 @@ canon format spec                # validate a spec corpus
 canon gate check                 # run the evidence gate
 ```
 
-Run `canon <command> --help` for any explicit CLI command. Install the
-provider-neutral user-facing companion bundle with:
+Run `canon <command> --help` for any explicit CLI command. `canon init` asks
+which harnesses get the provider-neutral companion skill (on a terminal; the
+detected ones are checked), records the answer in `canon.yaml`, and installs
+it. Afterwards:
 
 ```bash
-canon skills install                         # detect .claude/.agents|.codex/.omp/.pi
-canon skills install --providers=claude,codex,omp,pi
+canon skills install                         # follows canon.yaml skills.providers
+canon skills install --providers=claude,codex,omp,pi   # any subset; rewrites skills.providers
 canon skills check                           # read-only drift check
 canon skills doctor                          # diagnostics, never deletes
 ```
@@ -35,9 +37,13 @@ provider: Claude uses `.claude/skills/canon/SKILL.md`, Codex uses
 `.agents/skills/canon/SKILL.md` (the directory Codex scans for skills), and
 OMP/Pi use `.omp/skills/canon/SKILL.md` and `.pi/skills/canon/SKILL.md`. Every
 selected provider receives lazy `reference/**` and `scripts/**` sidecars.
-Without `--providers`, an existing `.agents` or `.codex` directory selects
-Codex. OMP/Pi are project-local passive bundles; the retrieve pre-dispatch
-script is a sidecar, not a native hook.
+Without `--providers`, the commands serve `canon.yaml`'s
+`skills: { providers: [...] }`; a repo without that key (set up before 0.17)
+uses the providers its install lock records; with neither, the harnesses
+whose `.claude`, `.codex`, `.omp` or `.pi` directory exists. Nothing
+undetected is ever added: with nothing detected, nothing is installed and
+the command says how to choose. OMP/Pi are project-local passive bundles; the
+retrieve pre-dispatch script is a sidecar, not a native hook.
 
 Canon 0.13.0 and earlier wrote Codex to `.codex/skills/canon.md` and
 `.codex/skills/canon/**`, which Codex never reads. `canon skills install`
@@ -76,12 +82,315 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.17.0 release
+
+Version 0.17.0 gives canon its own home: the spec corpus, canon's own
+changes and every approval live under `.canon/`, external plans are read
+and not written (one exception: the evidence-gated `canon gate task`
+still flips a task's checkbox in an external `tasks.md`, D4), `canon init`
+asks which harnesses get the canon skill, and `canon migrate` moves a 0.16
+repo over in one command.
+
+**Why.** The maintainer's rules (2026-10-12): canon keeps what it writes
+in `.canon/`; canon reads external plans and never writes into them,
+except for that evidence-gated checkbox write-back; canon
+asks which harnesses to install for. 0.16 kept the corpus at
+`specs/features/kind=feature/…` (where `features` and `kind=feature` say
+the same thing), had `canon init` create `openspec/changes/` and
+`canon change new` scaffold there, wrote the human's `Approved:` line into
+that external `proposal.md`, and picked skill providers from directory
+markers, falling back to Claude and Codex without asking. Consumers on
+0.16 must move with one command, and ledger joins (scenario ids, change
+ids, review pins) must survive the move.
+
+**D1: spec layout.** A spec root now holds `kind=feature/area=<area>/<surface>.feature`
+directly. The `features/` directory between the root and `kind=feature/`
+is gone; `kind=` stays at the top so other kinds can sit beside it later.
+
+A new repo's default spec root is `.canon/specs` (`id: root`). `canon
+init` writes it into `canon.yaml`:
+
+```yaml
+specs:
+  # The .feature corpus: <root>/kind=feature/area=<area>/<surface>.feature.
+  roots:
+    - id: root
+      root: .canon/specs
+```
+
+An absent `specs:` key, or an entry with no `root:`, resolves to
+`.canon/specs` too; `specs.roots[]` still takes any path. `.canon/specs`
+is authored and git-tracked, and no canon gitignore line covers it. The
+walkers never consult `.gitignore` and never skip hidden directories, so
+a root inside `.canon/` is read like any other. A fresh repo's first
+scenario lands at `.canon/specs/kind=feature/area=cart/add.feature`:
+
+```
+canon status: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
+```
+
+canon does not read both layouts. A spec root that holds any `.feature`
+file under `<root>/features/` is refused, and every refusal names
+`canon migrate`:
+
+- `canon format` reports one `layout-grammar` violation at path
+  `features`: the root is on the pre-0.17 layout, canon reads
+  `kind=feature/area=<area>/<surface>.feature` directly under the root,
+  and `canon migrate` moves `features/kind=feature/` there.
+- `canon inventory sync` aborts the root: 0 writes, exit 1.
+- A reader's index refresh (`canon status`, `canon gate check`,
+  `canon evidence add`, `canon review add`, `canon subject status`)
+  names the root on stderr, does not refresh its scenario index, and
+  writes no tombstones.
+- `canon gate check` exits 1 with `uncovered-cell <root>` (the root's
+  scenarios are not graded until it moves), whether or not the index
+  already holds them. The ship guard of `canon subject status … shipped`
+  refuses with the same violation.
+- `canon status` warns, and its only next step is `canon migrate`.
+- `canon scenario new` and `canon feature new` exit 2 and write nothing.
+
+An empty leftover `features/` directory is not a refusal. `canon migrate`
+is the one idempotent command that moves the layout: `--dry-run` prints
+the plan, a root at the old repo-level `specs` default moves to
+`.canon/specs`, and any other root only drops its `features/` level.
+
+
+canon's own corpus moved to `.canon/specs/kind=feature/…` through
+`canon migrate` (recording `former_roots: [specs]`, see D6);
+`examples/platformer/specs/kind=feature/…` only dropped its `features/`
+level.
+
+**D2: `.canon/changes/` is canon's own plan home.** `canon change new
+<slug> --subject <id> --title "…"` writes `.canon/changes/<slug>/brief.md`
+(`# <title>`, `## Why` holding the title, `## What Changes`, and a comment
+naming where the approval line goes) and `tasks.md` (the same checkbox
+row grammar), imports the change and adopts it into the subject. It needs
+no plans source and no longer scaffolds `openspec/changes/<slug>/`, so the
+old refusal for a repo with no `openspec` source is gone; it still
+refuses an unknown subject, or a slug that already has a
+`.canon/changes/<slug>` dir (active or archived) or a change record. It
+prints `canon change new: wrote .canon/changes/<slug>/brief.md`, the same
+for `tasks.md`, and ``canon change new: recorded change `<slug>` adopted
+into subject `<id>` — …``. `.canon/changes/` is a native plan source
+(dialect id `canon`) that is never listed in `canon.yaml`; a
+`plans.sources` entry naming `canon` is refused. Every plan reader
+(`canon ingest plans`, `canon gate task`, `canon evidence add --task`,
+`canon dispatch --task`, `canon status` and the brief check) reads it
+first, with no `plans:` entry, whenever the directory exists, so it owns
+a change id an external source also carries. Its records carry the actor
+`canon-plan-import-canon`; an external openspec change's carry
+`canon-plan-import-openspec`. `canon init` no longer creates
+`openspec/changes/`: its `plans:` section is `sources: []`, preceded by
+comments explaining `.canon/changes/` and commented `openspec`
+(`root: .`) and `superpowers` (`root: docs/superpowers/plans`) examples.
+`plans.sources` lists only external plans, which canon reads. With no
+`.canon/changes/` and no sources, `canon gate task` and
+`canon dispatch --task` say the repo configures no plan sources and
+point at `canon change new` or `plans.sources`.
+
+**D3: approvals live only in canon's file.** The `Approved:` line is read
+only from `.canon/changes/<change>/brief.md` (outside HTML comments and
+fenced code, as before). A change from an external plan gets its brief
+there too: a `brief.md` holding a `Source: <path>` line that points at
+the external document and, once the human answers, the `Approved:` line.
+Such a pointer `brief.md` is not a change of its own (the native reader
+skips it), and an `Approved:` line inside an external `proposal.md` is
+not read. The brief is enforced when the subject's newest adopted change
+has a canon `brief.md` without `Approved:`, or has no canon `brief.md`
+but an external openspec `proposal.md` under the plan sources; then the
+human step, the `canon evidence add` refusal and the ship guard name the
+canon file to write, with its `Source:` line for an external plan
+(``create .canon/changes/<c>/brief.md holding a `Source: <proposal>` line
+and record their words there as `Approved: <who> <when> — "<their
+words>"` ``). `canon status` prints `brief: approved in <brief> — <words>`
+or `brief: not approved (…)`, and `--json` `brief` is `{approved,
+enforced, change?, brief?, briefExists, source?, approval?}`; the old
+`proposal` field is gone, so `statusVersion` is now `3`. `--override-reason` is unchanged.
+
+**D4: `canon gate task` still flips external task rows.** Canon only reads
+external plans, with one exception: `canon gate task` flips the task's
+checkbox in an external plan's `tasks.md`, the one place it writes into
+one. Open for the maintainer: record external flips only in the ledger
+instead.
+
+**D5: harness choice.**
+
+- `canon.yaml` gains `skills: { providers: [claude, codex, omp, pi] }` (any
+  subset, `[]` for none). `canon init --check-config` validates it; a
+  malformed section or an unknown name fails `skills install|check|doctor`.
+- `canon init` asks, on a terminal, which harnesses get the canon skill, with
+  the detected ones checked (`.claude`, `.codex`, `.omp`, `.pi`
+  directories; `.agents` alone no longer selects Codex). `--providers a,b`
+  answers without a prompt; `--providers none` records `[]`. With no
+  terminal and no flag it takes the detected ones; with none detected it
+  installs nothing and names `canon skills install --providers=<list>`. It
+  writes the answer to `canon.yaml` and installs the skill from the default
+  source, as `canon skills install` does. If that source is missing, the
+  choice stays recorded and init exits 2 naming the install to run.
+- `canon skills install|check|doctor` follow `skills.providers`. An explicit
+  `--providers` on install rewrites the list in an existing `canon.yaml`
+  (every other byte kept) and never creates one. Without the key they use
+  the install lock's providers, then the detected ones. The Claude+Codex
+  fallback is gone.
+- `canon skills doctor` adds a `stray:` advisory for a canon projection
+  (`.claude/skills/canon`, `.agents/skills/canon`, `.omp/skills/canon`,
+  `.pi/skills/canon`) whose provider is not selected, with the `rm -r` that
+  removes it and the install command that selects it. `check` does not fail
+  on it. `check` and `doctor` name where the providers came from.
+
+**D6: `canon migrate`.** `canon migrate [--dry-run] [--repo <dir>]` moves a repo that canon 0.16 or
+earlier set up onto the 0.17 layout in one idempotent command. It prints
+the plan and then applies it. `--dry-run` stops after the plan, and a
+second run finds nothing to move.
+
+- **Spec roots.** A root's `features/kind=feature/` moves to
+  `<root>/kind=feature/`, with `git mv` when the files are tracked. A root
+  at the repo-level `specs` moves to `.canon/specs` from either layout.
+  That covers 0.16's default, which is also what an absent `specs:` key or
+  an entry without `root:` meant then. Every other root stays put and only
+  drops its `features/` level. Emptied directories are removed, and any
+  other file left in them is named.
+- **`former_roots`.** A root that moved records where it was:
+  `specs.roots[].former_roots: [specs]`. Reviews written before 0.15 are
+  checked against the commit they pinned, and at a commit from before the
+  move `.canon/specs` holds nothing. The legacy lookup therefore searches
+  the root's directory now, then each former root. A former root belongs
+  to its project id, so the lookup never matches another root's scenario
+  with the same id. On canon's own repo, without the record, 329 of 337
+  legacy reviews would turn undecidable.
+- **Changes `canon change new` wrote under openspec** move to
+  `.canon/changes/<slug>/`, with `proposal.md` renamed `brief.md` and
+  `tasks.md` alongside. Then they are re-imported from canon's own source
+  under the same change id, so task ids (`<slug>#<n>`) and the adoption
+  keep joining. A change counts as canon's only when both signals hold:
+  its files still open with that command's 0.14–0.16 scaffold (through
+  the `## What Changes` and row-grammar comments), and its first stored
+  version is already adopted, because `change new` adopts before any
+  ingest. A change with one signal stays, named with the signal it lacks.
+  0.16 recorded no durable provenance, so this is the strongest evidence
+  there is. A false positive keeps its content and ids, is printed in the
+  plan, and is undone with one `git mv`; `--dry-run` shows exactly which
+  changes move. Every other change stays as an external plan. `canon init`'s
+  `{ dialect: openspec, root: . }` source, and its
+  `openspec/changes/.gitkeep`, go only once nothing is left under it: no
+  change that stays, no directory the openspec reader cannot read (each is
+  named with the reader's diagnostic), and no other file in
+  `openspec/changes/`.
+- **Approvals.** An external `proposal.md` that holds the `Approved:` line
+  0.16 recorded gets a canon pointer brief,
+  `.canon/changes/<change>/brief.md`, holding `Source: <proposal>` and that
+  line. The proposal is not edited, and the output names the leftover line.
+- **Skills, .gitignore, index.** `skills.providers` is written from the
+  install lock when `canon.yaml` has no `skills:` key. The missing canon
+  `.gitignore` lines are added, and a scenario index still tracked in git
+  is named. The index is rebuilt last with a full `canon inventory sync`.
+- **canon.yaml.** Every edit is textual, as `canon skills install` edits
+  `skills:`: comments and CRLF are kept. A result that does not parse to
+  exactly the intended change is refused, with the edit to make by hand.
+- **Refusals** (exit 2, nothing written): uncommitted changes under a path
+  it moves (untracked files included), a destination that already exists,
+  a change directory that could stop halfway (a missing `proposal.md` or
+  `tasks.md`, a `brief.md` in the way, or a directory that is not
+  writable), or a `canon.yaml` edit it cannot make safely.
+- **Resumable.** `canon.yaml` is written whole or not at all (a temp file,
+  then a rename). A run that stops partway is finished by the next one: a
+  spec root already at `.canon/specs` while `canon.yaml` still names
+  `specs` gets its `root:` and `former_roots` edit, a change left at
+  `.canon/changes/<id>/proposal.md` gets its rename to `brief.md`, a moved
+  change that was not re-imported is re-imported, and a change whose
+  `proposal.md` → `brief.md` rename fails is moved back. The openspec
+  source is removed only after every pointer brief is written, so a failed
+  brief write leaves the approval readable for the rerun.
+
+**`canon init` on an existing repo (#35).** A rerun also adds the canon
+`.gitignore` lines the repo lacks: hot db, audit log, scenario index,
+index lock and artifact-store lock. It prints `canon init: added to
+.gitignore: …`, and its first line now reads `… left unchanged; the
+AGENTS.md block and the canon .gitignore lines are refreshed`. With
+`--no-agents-md` it adds only the lines. It still refuses (exit 2) when
+nothing is missing.
+
+**Fix: an old scenario index no longer turns legacy reviews
+undecidable.** The readers' stale-index check compared only each
+scenario's `source_digest`. A generation written before 0.15 carries no
+`scenario_digest`, so for a file unchanged since, the refresh kept it as
+the latest record. The legacy check then had no digest to compare and
+read the review as undecidable. Repos that tracked the index before 0.16
+keep such files. On canon's own repo the count was 225 current / 17 stale
+/ 95 undecidable instead of 307 / 22 / 8. The check now also compares
+`scenario_digest`, as `canon inventory sync` always did, so the first
+reader rewrites those generations. `canon review add` on such a scenario
+now pins at scenario scope, as it does on a fresh index.
+
+**Migration.** For a repo on canon 0.16:
+
+1. Install canon 0.17.0.
+2. Run `canon migrate --dry-run` and read the plan: the spec moves, the
+   changes it re-homes, the pointer briefs, the `canon.yaml` and
+   `.gitignore` edits. Commit anything uncommitted under a path it moves
+   first; it refuses otherwise.
+3. Run `canon migrate`. A second run finds nothing to move.
+4. Commit the result.
+5. Run `canon skills check` (and `canon skills doctor` for `stray:`
+   projections of unselected providers).
+
+What `canon migrate` leaves alone, and names in its output: external plan
+changes (they stay as external sources, and an external `proposal.md`
+keeps its now-unread `Approved:` line), a change carrying only one of the
+two canon signals, other files left in an emptied spec directory, and a
+scenario index still tracked in git. Other upgrade notes:
+
+- An `Approved:` line in an openspec `proposal.md` is no longer read; it
+  counts only in `.canon/changes/<change>/brief.md` (migrate writes that
+  pointer brief for each approved proposal it finds). Until then
+  `canon status` lists the human step for that subject.
+- Repos that configured `{ dialect: openspec, root: . }` keep it as an
+  external source; new changes go to `.canon/changes/`.
+- `canon status --json` has `statusVersion` 3: scripts read
+  `brief.brief`, `brief.briefExists` and `brief.source` instead of
+  `brief.proposal`.
+- Scripts that match `canon change new` output see the
+  `.canon/changes/<slug>/brief.md` and `tasks.md` paths; scripts that
+  parse `canon init` output see the skill install result (or the
+  no-harness hint) as its last line instead of `next: canon skills install`.
+- A repo with an install lock keeps its providers (migrate records them as
+  `skills.providers`). A repo with no lock and only an `.agents` directory
+  no longer gets Codex by default; pass `--providers`.
+- Rerunning `canon init` on an existing repo now adds the canon
+  `.gitignore` lines it lacks (#35, above).
+
+**Changed conformance expectations.** `version` and every case that
+prints the version now print 0.17.0. **Conformance.** New cases: `migrate-refused-uncommitted` and
+`migrate-pointer-brief-and-config`. 39 cases were re-blessed, every diff
+for one of three causes:
+- Their fixtures carry hand-made pre-0.15 index records, so their first
+  reader prints one `refreshed the scenario index from N changed feature
+  file(s) …` line.
+- `canon review add` prints `pinned … at scenario digest <x>` instead of
+  `source digest`, and the record's `pins` gain `scenario_digest_scope:
+  scenario`.
+- `init-scaffold-and-rerun` shows the new rerun line.
+
+No exit code changed.
+
+**Closed issues:** #35, #13.
+
+**Acceptance (plan D7).**
+
+- **(a) canon migrates itself.** `canon migrate` moved canon's own corpus to `.canon/specs/kind=feature/` (31 files, `git mv`). It recorded `former_roots: [specs]` and left the 51 human-written openspec changes in place as an external plan. `canon gate check` and `canon status` printed byte-identical output before and after: clean, with 307 current, 22 stale and 8 undecidable legacy reviews. A second run is a no-op.
+- **(b) Throwaway copies of Kino and Lifeshot migrate the same way.** The originals were not touched. Gate output was byte-identical before and after: Kino moved 42 feature files, Lifeshot 25. Lifeshot's status differs in three lines, which are the 0.17 brief wording, not the move.
+- **(c) Eval 4 on Codex (#13).** The eval-1 one-line game request ran in a fresh repo initialized with `--providers codex`. The agent stopped once, at a brief in `.canon/changes/`. After one answer it recorded the approval there, shipped, and handled the follow-up with no human. Specs landed in `.canon/specs/kind=feature/`, no `openspec/` directory was created, and only `.agents/skills/canon` was projected. The gate was clean.
+- **What the run also showed.** Codex has no subagents, so its "independent" reviews were written by the implementing session under a new label (#39, tracked with #14), and its evidence was a `curl` check. Canon cannot tell either from a real review or a real test yet.
+- **A false start.** The first Codex run was void: Codex's login shell put the installed 0.16 binary ahead of the 0.17 build. The evidence is in `~/Workspace/canon-dogfood/PROTOCOL-4.md` and `FINDINGS-4.md`.
+
 ## 0.16.0 release
 
 Version 0.16.0 lets the agent drive after one approval: the human answers
 once per scope, canon does its own bookkeeping, `canon init` offers policy
 levels, a reviewer can attach what it looked at, and reviews written before
-0.15 are checked against the commit they pinned.
+0.15 are checked against the commit they pinned. (0.17.0 moved the brief
+and its `Approved:` line from the change's `proposal.md` to
+`.canon/changes/<change>/brief.md`; see the 0.17.0 release above.)
 
 **Why.** The maintainer's rule (2026-10-11): an agent reviewing another
 agent is cheap; a human blocking the work is expensive. After one
@@ -685,6 +994,8 @@ plans source rooted at `.` with `openspec/changes/` created. `--no-agents-md`
 and `--no-policy` opt out. Rerunning `init` on an existing repo leaves
 `canon.yaml` alone, refreshes only the AGENTS.md block and exits 0 (it used
 to exit 2); a rerun with nothing to do (`--no-agents-md`) still refuses.
+(Since 0.17.0 `init` writes `plans: { sources: [] }` and no
+`openspec/changes/`.)
 
 **`canon change new`.** `canon change new <slug> --subject <id> --title <t>`
 scaffolds `openspec/changes/<slug>/{proposal,tasks}.md`, imports the change
@@ -696,6 +1007,8 @@ half-done adoption still has its open blockers counted), writes only the
 side lacking the link, and writes nothing for a linked pair. That makes
 `canon subject adopt <change> --subject <id>` an idempotent repair: a
 failure between the two writes exits 2 and prints that exact command.
+(Since 0.17.0 it writes `.canon/changes/<slug>/{brief,tasks}.md` and needs
+no plans source.)
 
 **`canon gate check` says when it is not enforcing.** When the corpus has
 scenarios and `.canon/policy.yaml` has no `spec_coverage`, the gate prints

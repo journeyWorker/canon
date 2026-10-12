@@ -5,7 +5,8 @@
 //!
 //! Covers every scenario spec.md names: a fresh repo's `init` writes a
 //! working skeleton plus the 0.14 starter policy, AGENTS.md block and
-//! plans home; a rerun keeps `canon.yaml`/`policy.yaml` and refreshes only
+//! commented plans examples (0.17 D2: no `openspec/` dir, no plans
+//! source); a rerun keeps `canon.yaml`/`policy.yaml` and refreshes only
 //! the AGENTS.md block (refusing when `--no-agents-md` leaves nothing to
 //! do);
 //! `init` immediately followed by `inventory sync` (with one added
@@ -60,10 +61,14 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
         assert!(text.contains(&format!("{kind}: local")), "missing local-routing line for `{kind}`: {text}");
     }
     assert!(text.contains("specs:"), "{text}");
-    assert!(text.contains("root: specs"), "{text}");
-    assert!(text.contains("plans:"), "{text}");
-    assert!(text.contains("- dialect: openspec\n      root: .\n"), "init must configure the default openspec plans source: {text}");
-    assert!(dir.path().join("openspec/changes/.gitkeep").is_file(), "the plans source's changes dir must exist and survive a clone");
+    assert!(text.contains("root: .canon/specs"), "{text}");
+    assert!(text.contains("plans:\n"), "{text}");
+    assert!(text.contains("  sources: []\n"), "init configures no plans source: {text}");
+    assert!(
+        text.contains("  #   - dialect: openspec") && text.contains("  #   - dialect: superpowers") && text.contains(".canon/changes/<slug>/"),
+        "the plans block shows commented external examples and names canon's own changes dir: {text}"
+    );
+    assert!(!dir.path().join("openspec").exists(), "init creates no openspec directory");
 
     let policy = std::fs::read_to_string(dir.path().join(".canon/policy.yaml")).unwrap();
     for line in ["spec_coverage:", "require_evidence: true", "require_cases: [failure]", "require_review: {}"] {
@@ -125,6 +130,7 @@ fn init_rerun_keeps_canon_yaml_and_policy_and_refreshes_only_the_agents_md_block
 fn init_rerun_with_no_agents_md_refuses_to_overwrite_an_existing_canon_yaml() {
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), "canon.yaml", "# a hand-authored config\ntiers:\n  git:\n    root: .canon/ledger\n");
+    write(dir.path(), ".gitignore", CANON_GITIGNORE);
     let before = std::fs::read(dir.path().join("canon.yaml")).unwrap();
 
     let out = run_canon(&["init", "--repo", ".", "--no-agents-md"], dir.path());
@@ -132,6 +138,48 @@ fn init_rerun_with_no_agents_md_refuses_to_overwrite_an_existing_canon_yaml() {
     assert!(stderr(&out).contains("canon.yaml"), "{}", stderr(&out));
     assert_eq!(std::fs::read(dir.path().join("canon.yaml")).unwrap(), before, "the existing file's bytes must be byte-identical before and after the refused init");
     assert!(!dir.path().join("AGENTS.md").exists());
+    assert_eq!(std::fs::read_to_string(dir.path().join(".gitignore")).unwrap(), CANON_GITIGNORE);
+}
+
+/// Every canon `.gitignore` line, as a repo set up by `canon init` 0.17 has them.
+const CANON_GITIGNORE: &str = ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n";
+
+/// authoring.init.97 (#35): `canon init` re-run on a repo an older canon
+/// set up adds the canon `.gitignore` lines it lacks, each once, and keeps
+/// the rest of the file and `canon.yaml` byte-identical; with
+/// `--no-agents-md` that is all it does, and a second run with nothing
+/// missing is the old overwrite refusal.
+#[test]
+fn authoring_init_97_a_rerun_adds_the_missing_canon_gitignore_lines() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "canon.yaml", "# a 0.15 config\ntiers:\n  git:\n    root: .canon/ledger\n");
+    write(dir.path(), ".gitignore", "target/\n.canon/hot.db*");
+    let canon_yaml = std::fs::read(dir.path().join("canon.yaml")).unwrap();
+
+    let out = run_canon(&["init", "--repo", "."], dir.path());
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(stdout(&out).contains("canon.yaml already exists — left unchanged; the AGENTS.md block and the canon .gitignore lines are refreshed\n"), "{}", stdout(&out));
+    assert!(
+        stdout(&out).contains("canon init: added to .gitignore: .canon/audit/, .canon/ledger/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock\n"),
+        "{}",
+        stdout(&out)
+    );
+    let gitignore = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
+    assert!(gitignore.starts_with("target/\n.canon/hot.db*\n# canon's read-access audit log"), "the existing lines are kept: {gitignore}");
+    for line in CANON_GITIGNORE.lines() {
+        assert_eq!(gitignore.lines().filter(|have| have.trim() == line).count(), 1, "{line} once: {gitignore}");
+    }
+    assert_eq!(std::fs::read(dir.path().join("canon.yaml")).unwrap(), canon_yaml);
+
+    let other = tempfile::tempdir().unwrap();
+    write(other.path(), "canon.yaml", "# a 0.15 config\ntiers:\n  git:\n    root: .canon/ledger\n");
+    let out = run_canon(&["init", "--repo", ".", "--no-agents-md"], other.path());
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(stdout(&out).contains("left unchanged; the canon .gitignore lines are refreshed\n"), "{}", stdout(&out));
+    assert!(!other.path().join("AGENTS.md").exists());
+    assert_eq!(std::fs::read_to_string(other.path().join(".gitignore")).unwrap().lines().filter(|line| !line.starts_with('#')).collect::<Vec<_>>(), CANON_GITIGNORE.lines().collect::<Vec<_>>());
+    let again = run_canon(&["init", "--repo", ".", "--no-agents-md"], other.path());
+    assert_eq!(again.status.code(), Some(2), "nothing left to refresh: {}", stdout(&again));
 }
 
 #[test]
@@ -353,7 +401,7 @@ fn init_then_inventory_sync_succeeds_with_zero_further_edits() {
 
     let prov = "  # canon: {\"schema\":1,\"at\":\"2026-07-10T00:00:00Z\",\"actor\":{\"agent_id\":\"a-human\"}}";
     let feature_text = format!("Feature: world hotdeal\n{prov}\n\n  @world.hotdeal.01\n  Scenario: Apply a hotdeal coupon\n{prov}\n    Given a step\n");
-    write(dir.path(), "specs/features/kind=feature/area=world/hotdeal.feature", &feature_text);
+    write(dir.path(), ".canon/specs/kind=feature/area=world/hotdeal.feature", &feature_text);
 
     let out = run_canon(&["inventory", "sync", "--repo", "."], dir.path());
     assert!(out.status.success(), "canon inventory sync must succeed against a freshly-init'd repo with zero further config edits: {}", stderr(&out));
@@ -363,16 +411,15 @@ fn init_then_inventory_sync_succeeds_with_zero_further_edits() {
 fn init_then_ingest_plans_exits_0_as_a_clean_no_op() {
     let dir = tempfile::tempdir().unwrap();
     assert!(run_canon(&["init", "--repo", "."], dir.path()).status.success());
-    // Top-level dirs the openspec source must NOT mistake for changes.
+    // Top-level dirs no plan source may mistake for changes.
     write(dir.path(), "specs/README.md", "specs\n");
     write(dir.path(), "src/main.rs", "fn main() {}\n");
 
     let out = run_canon(&["ingest", "plans", "--repo", ".", "--json"], dir.path());
-    assert!(out.status.success(), "canon ingest plans against the scaffolded openspec source must be a clean no-op: {}", stderr(&out));
+    assert!(out.status.success(), "canon ingest plans right after init must be a clean no-op: {}", stderr(&out));
     let payload: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
-    assert_eq!(payload["sources"][0]["dialect"], "openspec", "{payload}");
-    assert_eq!(payload["sources"][0]["changes_parsed"], 0, "{payload}");
-    assert_eq!(payload["sources"][0]["malformed"].as_array().map(Vec::len), Some(0), "{payload}");
+    assert_eq!(payload["sources"].as_array().map(Vec::len), Some(0), "no external source and no .canon/changes yet: {payload}");
+    assert_eq!(payload["changes_persisted"], 0, "{payload}");
 }
 
 // ── canon init --check-config ──
@@ -508,4 +555,161 @@ fn init_then_ingest_sessions_writes_the_sqlite_hot_tier_with_zero_env_or_service
 
     assert!(out.status.success(), "canon ingest sessions against a fresh sqlite-hot init must exit 0 with zero services: {}", stderr(&out));
     assert!(dir.path().join(".canon/hot.db").exists(), "expected the sqlite hot tier's db file to be written by the ingest pass");
+}
+
+// ── harness choice (0.17 D5) ──
+
+/// A canonical skill source under `dir/source`.
+fn skill_source(dir: &Path) -> std::path::PathBuf {
+    let source = dir.join("source");
+    write(&source, "SKILL.src.md", "---\nname: canon\ndescription: umbrella\n---\n\n# Canon\n");
+    write(&source, "reference/topic.md", "# topic\n");
+    source
+}
+
+/// `canon init` in `repo` (piped stdin, so never a terminal) with the
+/// default skill source at `source`.
+fn init_with_source(args: &[&str], repo: &Path, source: &Path) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_canon")).arg("init").args(args).current_dir(repo).env("CANON_SKILLS_SOURCE", source).output().expect("spawn canon binary")
+}
+
+const PROJECTIONS: [&str; 4] = [".claude/skills/canon", ".agents/skills/canon", ".omp/skills/canon", ".pi/skills/canon"];
+
+fn projected(repo: &Path) -> Vec<&'static str> {
+    PROJECTIONS.into_iter().filter(|dir| repo.join(dir).join("SKILL.md").is_file()).collect()
+}
+
+/// authoring.init.90: without a terminal or `--providers`, init installs
+/// for the detected harnesses only and records them.
+#[test]
+fn authoring_init_90_non_tty_init_installs_only_the_detected_harness_and_records_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = skill_source(tmp.path());
+    let repo = tmp.path().join("repo");
+    std::fs::create_dir_all(repo.join(".omp")).unwrap();
+    std::fs::create_dir_all(repo.join(".agents")).unwrap();
+
+    let out = init_with_source(&[], &repo, &source);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(stdout(&out).ends_with("canon init: installed the canon skill for omp (./.omp/skills/canon)\n"), "{}", stdout(&out));
+    assert_eq!(projected(&repo), vec![".omp/skills/canon"], ".agents alone selects nothing");
+    let config = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
+    assert!(config.ends_with("skills:\n  providers: [omp]\n"), "{config}");
+    let lock = std::fs::read_to_string(repo.join(".canon/skills/.install-lock.json")).unwrap();
+    assert!(lock.contains("\"omp\"") && !lock.contains("\"codex\""), "{lock}");
+
+    let check = run_canon(&["init", "--check-config"], &repo);
+    assert!(stdout(&check).contains("[PASS] skills (providers: omp)\n"), "{}", stdout(&check));
+    let doctor = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "doctor"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
+    assert_eq!(stdout(&doctor), "providers: omp (from canon.yaml skills.providers)\nstatus: healthy\n");
+}
+
+/// authoring.init.91: `--providers codex` answers without a prompt and
+/// installs only `.agents/skills/canon`, whatever markers exist.
+#[test]
+fn authoring_init_91_providers_codex_installs_only_the_agents_projection() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = skill_source(tmp.path());
+    let repo = tmp.path().join("repo");
+    std::fs::create_dir_all(repo.join(".claude")).unwrap();
+
+    let out = init_with_source(&["--providers", "codex"], &repo, &source);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert_eq!(projected(&repo), vec![".agents/skills/canon"]);
+    assert!(!repo.join(".codex").exists() && !repo.join(".claude/skills").exists());
+    assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: [codex]\n"));
+    assert!(repo.join("AGENTS.md").is_file() && repo.join(".canon/policy.yaml").is_file(), "the other writes still happen");
+
+    // A rerun keeps canon.yaml and says --providers is not applied there.
+    let rerun = init_with_source(&["--providers", "claude"], &repo, &source);
+    assert_eq!(rerun.status.code(), Some(0), "{}", stderr(&rerun));
+    assert!(stdout(&rerun).contains("--providers is not applied to an existing canon.yaml; run `canon skills install --providers=<list>`"), "{}", stdout(&rerun));
+    assert_eq!(projected(&repo), vec![".agents/skills/canon"]);
+}
+
+/// authoring.init.92: a bare repo with no harness marker gets no skill
+/// and no `skills:` key, and init names the flag that chooses.
+#[test]
+fn authoring_init_92_a_bare_repo_installs_nothing_and_names_the_flag() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = skill_source(tmp.path());
+    let repo = tmp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+
+    let out = init_with_source(&[], &repo, &source);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(
+        stdout(&out).ends_with("canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; choose with `canon skills install --providers=<list>` (any of claude, codex, omp, pi)\n"),
+        "{}",
+        stdout(&out)
+    );
+    assert!(projected(&repo).is_empty());
+    assert!(!repo.join(".canon/skills").exists(), "no install lock");
+    let config = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
+    assert!(config.ends_with("# skills:\n#   providers: [claude, codex]\n"), "only a commented example: {config}");
+    let check = run_canon(&["init", "--check-config"], &repo);
+    assert!(stdout(&check).contains("[not configured] skills"), "{}", stdout(&check));
+}
+
+/// authoring.init.93: `--providers none` is an explicit empty choice,
+/// recorded as `providers: []`, with nothing installed.
+#[test]
+fn authoring_init_93_an_explicit_empty_choice_is_recorded() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = skill_source(tmp.path());
+    let repo = tmp.path().join("repo");
+    std::fs::create_dir_all(repo.join(".claude")).unwrap();
+
+    let out = init_with_source(&["--providers", "none"], &repo, &source);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(stdout(&out).ends_with("canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`\n"), "{}", stdout(&out));
+    assert!(projected(&repo).is_empty());
+    assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: []\n"));
+    let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "check"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
+    assert_eq!(check.status.code(), Some(0), "{}", stdout(&check));
+    assert_eq!(stdout(&check), "providers: none (from canon.yaml skills.providers)\n");
+
+    let empty = tmp.path().join("empty-flag");
+    std::fs::create_dir_all(empty.join(".omp")).unwrap();
+    let out = init_with_source(&["--providers="], &empty, &source);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert!(std::fs::read_to_string(empty.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: []\n"));
+    assert!(projected(&empty).is_empty());
+}
+
+/// authoring.init.94: an unknown `--providers` name is refused before
+/// anything is written.
+#[test]
+fn authoring_init_94_an_unknown_provider_is_refused_and_nothing_is_written() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = skill_source(tmp.path());
+    let repo = tmp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+
+    let out = init_with_source(&["--providers", "claude,gemini"], &repo, &source);
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    assert_eq!(stderr(&out), "canon init: refused — invalid provider `gemini`; expected one of: claude, codex, omp, pi, or none\n");
+    assert_eq!(std::fs::read_dir(&repo).unwrap().count(), 0, "nothing is written");
+}
+
+/// authoring.init.95: when the skill source is missing, init still
+/// records the choice, then exits 2 naming the install to run.
+#[test]
+fn authoring_init_95_a_missing_skill_source_is_reported_with_the_retry() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo = tmp.path().join("repo");
+    std::fs::create_dir_all(repo.join(".pi")).unwrap();
+
+    let out = init_with_source(&[], &repo, &tmp.path().join("missing"));
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    let err = stderr(&out);
+    assert!(err.contains("wrote `skills: { providers: [pi] }` to ./canon.yaml but did not install the canon skill: canonical skill source is missing SKILL.src.md"), "{err}");
+    assert!(err.contains("run `canon skills install` (set CANON_SKILLS_SOURCE or pass --source <dir>; it follows skills.providers)"), "{err}");
+    assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: [pi]\n"));
+    assert!(projected(&repo).is_empty());
+
+    let source = skill_source(tmp.path());
+    let retry = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "install", "--source"]).arg(&source).current_dir(&repo).output().unwrap();
+    assert_eq!(stdout(&retry), "canon v1 — installed (pi; from canon.yaml skills.providers)\n", "{}", stderr(&retry));
+    assert_eq!(projected(&repo), vec![".pi/skills/canon"]);
 }

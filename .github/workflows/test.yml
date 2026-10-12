@@ -25,7 +25,6 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "docker-compose.yml"
-      - "specs/**"
       - ".canon/**"
       - "canon.yaml"
       - "packages/cli/**"
@@ -37,7 +36,6 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "docker-compose.yml"
-      - "specs/**"
       - ".canon/**"
       - "canon.yaml"
       - "packages/cli/**"
@@ -116,7 +114,8 @@ jobs:
         run: cargo test --workspace --locked --offline
 
       # Canon gates its own spec corpus. Scenario records are regenerable
-      # (gitignored) so they are synced from `specs/` first; evidence,
+      # (gitignored) so they are synced from `.canon/specs/` and
+      # `examples/platformer/specs/` first; evidence,
       # findings, and subjects are tracked. This is the step that would
       # have caught nine specced-but-unattested scenarios sitting red for
       # two weeks while every test passed.

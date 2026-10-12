@@ -63,7 +63,7 @@ sync` runs) and says so in one stderr line, silent when the index is
 fresh:
 
 ```
-canon gate check: refreshed the scenario index from 1 changed feature file(s) (specs/features/kind=feature/area=cart/add.feature): 1 record(s) written
+canon gate check: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
 A root that fails to sync (format violations, a duplicate id) is named
@@ -76,6 +76,15 @@ does not hold the edits. The `verifying → shipped` guard refuses with
 the same violation, and `canon status` lists the sync as its only step.
 Fix what the sync lists and run the gate again. See `canon-storage`
 (The scenario index).
+
+A spec root still on the pre-0.17 layout (a `.feature` file under
+`<root>/features/`) fails closed the same way, whether or not the index
+already holds its scenarios: the gate adds `uncovered-cell <root> — spec
+root `<root>` (`<path>`) is on the pre-0.17 layout (…)…; until then its
+scenarios are not graded` and exits 1, the ship guard refuses with the
+same violation, and `canon status` names `canon migrate` as its only
+step. `canon migrate` moves `features/kind=feature/` to
+`<root>/kind=feature/`; run it, then the gate again.
 
 ### The spec-derived worklist (`spec_coverage`, opt-in)
 
@@ -246,19 +255,32 @@ reports it, and builds nothing for that scope until the human answers.
 `canon evidence add` is the backstop for that stop (0.16 M7). It
 refuses (exit `1`, nothing staged or stored) while a subject the record
 attests for has an enforced, unapproved brief: the newest adopted
-change has a `proposal.md` under the openspec plan sources with no
-`Approved:` line (the check `canon status` and the ship guard use; see
+change's canon `.canon/changes/<change>/brief.md` has no `Approved:`
+line, or there is no canon `brief.md` yet but the change comes from an
+external openspec plan with a `proposal.md` under the plan sources (the
+check `canon status` and the ship guard use; see
 `canon-subject`). The subjects are the scenario's `@subject` owner for
 `--scenario-id`, and every subject adopting the task's change for
 `--task`:
 
 ```
-canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — openspec/changes/c-demo/proposal.md has no `Approved:` line, so the human has not answered it
-canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — "<their words>"` in that proposal.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
+canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words as `Approved: <who> <when> — "<their words>"` in .canon/changes/c-demo/brief.md
+canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — "<their words>"` in that brief.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
 ```
 
-A subject with no brief to answer (no openspec source, no adopted change,
-no `proposal.md`) and a scenario no subject owns are unaffected.
+For a change from an external plan with no canon brief yet, the first
+line says instead ``.canon/changes/c-ext/brief.md does not exist yet:
+change `c-ext` comes from the external plan
+openspec/changes/c-ext/proposal.md, which canon reads and never edits, so
+its approval lives in that canon file, so the human has not answered it;
+once they do, create .canon/changes/c-ext/brief.md holding a `Source:
+openspec/changes/c-ext/proposal.md` line and record their words there as
+`Approved: <who> <when> — "<their words>"` ``. An `Approved:` line in the
+external `proposal.md` itself is never read.
+
+A subject with no brief to answer (no adopted change, or a newest change
+with neither a canon `brief.md` nor an external `proposal.md`) and a
+scenario no subject owns are unaffected.
 `canon review add` and `canon finding add` are never refused.
 `--override-reason "<one line>"` attests anyway, prints the `waived …`
 lines and `override recorded by `<actor>` for the N brief refusal(s)
@@ -298,8 +320,9 @@ review waivers: 1 advisory(ies) — not failing the gate:
 The waiver lasts only until the subject's next status write.
 
 `canon subject status <id> shipped` also refuses where a brief exists and
-has no `Approved:` line (the subject's newest adopted change has a
-`proposal.md`; see `canon-subject`), as an `unreviewed-promotion` naming
+has no `Approved:` line (the subject's newest adopted change has a canon
+`brief.md`, or an external `proposal.md` and no canon `brief.md` yet;
+see `canon-subject`), as an `unreviewed-promotion` naming
 the subject. With no brief to answer it prints an advisory and does not
 refuse. Like the evidence refusal above, it is a backstop: the stop is at
 the brief. `canon gate check` does not grade briefs, so a waived ship
@@ -317,7 +340,10 @@ scenario) that carry no pins were written before 0.15. Each still names
   `scenario_digest`) equals its current digest, and no declared evidence
   record of the scenario is newer than the review. It counts. When the
   scenario lived in another `.feature` file at that commit, the spec
-  root's files at that commit are searched for its id.
+  root's files at that commit are searched for its id, then the files
+  under each of the root's `former_roots` (where `canon migrate` moved
+  it from, e.g. `specs` for a root now at `.canon/specs`). Only the
+  root's own directories are searched, never another root's.
 - **stale** — the scenario changed since the commit, or it has newer
   evidence. It no longer counts, and an in-scope scenario left with no
   other qualifying review is `unreviewed-promotion`:
@@ -489,12 +515,19 @@ empty clean map.
 ## `canon gate task <task_id> [--repo <dir>]`
 
 The evidence-gated task checkbox flip. Resolves `<task_id>`
-(`<change_id>#<n>`) through `canon.yaml`'s `plans:` sources — the first
-configured dialect whose `PlanWriteBack` locates the task's document
-wins, so the flip is plan-dialect agnostic (`openspec` change dirs,
-`superpowers` plan docs). A repo with no `plans:` section falls back to
-the compat default `[{ dialect: openspec, root: <repo> }]`; no source
-locating the task at all is a loud failure naming every source consulted.
+(`<change_id>#<n>`) through `.canon/changes/` (canon's own changes, read
+first whenever the directory exists, with no `plans:` entry) and then
+`canon.yaml`'s `plans.sources` — the first dialect whose `PlanWriteBack`
+locates the task's document wins, so the flip is plan-dialect agnostic
+(canon's own `tasks.md`, external `openspec` change dirs, `superpowers`
+plan docs). A repo with no `plans:` section falls back to the compat
+default `[{ dialect: openspec, root: <repo> }]`; no source locating the
+task at all is a loud failure naming every source consulted. A repo with
+no `.canon/changes/` and `sources: []` is refused: "this repo configures
+no plan sources (no `.canon/changes` and no `plans.sources` entries in
+canon.yaml) … write the change with `canon change new`, or list your
+external plans under `plans.sources`" (`canon dispatch --task` says the
+same).
 It requires
 a matching non-`Divergent` evidence record, and flips `- [ ]` → `- [x]`
 with an appended evidence note ONLY on a clean check. The note
@@ -525,6 +558,13 @@ canon gate task my-change#5.2 --repo .
 
 This is canon's own authority for the checkbox grammar — always flip
 through `canon gate task`, never by hand.
+
+Canon only reads external plans, with this one exception: for a task
+from an external plan source, `canon gate task` flips the checkbox in
+that plan's own `tasks.md` (or plan document). It is the one place canon
+writes into an external plan; their briefs and approvals still live in
+`.canon/changes/<change>/brief.md`. (Open for the maintainer: record
+external flips only in the ledger instead.)
 
 ## `canon gate promote [--repo <dir>] [--dry-run]`
 

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "017-p3-impl"
+  },
+  "at": "2026-10-12T10:41:26.398943Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init authoring_init_93"
+  },
+  "evidence_note": {
+    "summary": "providers none and an empty providers value record providers: []; check exit 0"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 25,
+  "scenario_id": "authoring.init.93",
+  "schema": 1,
+  "staging_id": "2d0e1a2bbd84",
+  "verdict": "faithful"
+}

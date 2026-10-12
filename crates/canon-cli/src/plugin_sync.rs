@@ -359,7 +359,7 @@ mod tests {
     #[test]
     fn a_covered_scenario_projects_covered_true_with_its_surface_ref() {
         let dir = tempfile::tempdir().unwrap();
-        write(dir.path(), "features/f.feature", &feature("idolive.hub.01", "Opening the hub"));
+        write(dir.path(), "kind=feature/f.feature", &feature("idolive.hub.01", "Opening the hub"));
         write(
             dir.path(),
             "inventory/kind=inventory/area=idolive/surface=hub/hub.yaml",
@@ -379,7 +379,7 @@ mod tests {
     #[test]
     fn an_uncovered_scenario_projects_covered_false_with_an_empty_surface_ref() {
         let dir = tempfile::tempdir().unwrap();
-        write(dir.path(), "features/f.feature", &feature("world.hotdeal.99", "Never covered"));
+        write(dir.path(), "kind=feature/f.feature", &feature("world.hotdeal.99", "Never covered"));
 
         let spec_root = SpecRoot { id: ProjectId::parse("root").unwrap(), root: dir.path().to_path_buf() };
         let source = PortingOverlaySource::new();
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn a_scenario_covered_by_multiple_entries_collects_every_surface_ref() {
         let dir = tempfile::tempdir().unwrap();
-        write(dir.path(), "features/f.feature", &feature("world.map.01", "Loading the map"));
+        write(dir.path(), "kind=feature/f.feature", &feature("world.map.01", "Loading the map"));
         write(
             dir.path(),
             "inventory/kind=inventory/area=world/surface=map/a.yaml",
@@ -419,7 +419,7 @@ mod tests {
     #[test]
     fn two_calls_over_an_unchanged_root_produce_byte_identical_candidates() {
         let dir = tempfile::tempdir().unwrap();
-        write(dir.path(), "features/f.feature", &feature("idolive.hub.01", "Opening the hub"));
+        write(dir.path(), "kind=feature/f.feature", &feature("idolive.hub.01", "Opening the hub"));
         write(
             dir.path(),
             "inventory/kind=inventory/area=idolive/surface=hub/hub.yaml",
@@ -437,7 +437,7 @@ mod tests {
     fn scan_feature_corpus_reuse_matches_inventory_syncs_own_universe() {
         let dir = tempfile::tempdir().unwrap();
         let combined = feature("a.b.01", "One") + &feature("a.b.02", "Two");
-        write(dir.path(), "features/f.feature", &combined);
+        write(dir.path(), "kind=feature/f.feature", &combined);
         let scanned = scan_feature_corpus(dir.path());
         let ids: Vec<String> = scanned.iter().map(|(id, _, _): &(ScenarioId, String, SpecDigest)| id.as_str().to_string()).collect();
         assert_eq!(ids, vec!["a.b.01".to_string(), "a.b.02".to_string()]);

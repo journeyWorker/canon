@@ -1,0 +1,8 @@
+description: "0.17 D5: `canon init` with no terminal and no `--providers`, in a repo holding `.omp` and `.agents`, installs the canon skill for omp only (`.agents` alone selects nothing) and records `skills: { providers: [omp] }` (exit 0); `canon skills doctor` follows canon.yaml and reports healthy (exit 0); `canon init --check-config` passes the skills section (exit 0)"
+steps:
+  - args: [init]
+    exit: 0
+  - args: [skills, doctor]
+    exit: 0
+  - args: [init, --check-config]
+    exit: 0

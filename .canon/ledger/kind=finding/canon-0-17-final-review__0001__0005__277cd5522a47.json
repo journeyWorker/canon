@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-017-final",
+    "role": "reviewer",
+    "session_id": "review-017-final"
+  },
+  "at": "2026-10-12T12:56:17.944409Z",
+  "change_id": "canon-0-17-final-review",
+  "disposition": "rejected",
+  "file_ref": "crates/canon-cli/src/migrate.rs:455-469",
+  "kind": "finding",
+  "reviewed_sha": "b7d64a76eadc518b0d31d50e424da3d1f3b7b3a8",
+  "reviewer": "canon-reviewer-017-final",
+  "round": 1,
+  "schema": 1,
+  "seq": 5,
+  "severity": "blocker",
+  "summary": "canon-written change detection relies on scaffold text, not durable provenance (rejected: 0.16 has none; double signal kept, false positive is visible and reversible)"
+}

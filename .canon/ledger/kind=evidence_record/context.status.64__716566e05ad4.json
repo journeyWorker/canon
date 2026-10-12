@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p2-impl",
+    "role": "implementer",
+    "session_id": "017-p2-impl"
+  },
+  "at": "2026-10-12T10:41:13.618556Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points_at_it"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 44,
+  "scenario_id": "context.status.64",
+  "schema": 1,
+  "staging_id": "3c4c294542b9",
+  "verdict": "faithful"
+}

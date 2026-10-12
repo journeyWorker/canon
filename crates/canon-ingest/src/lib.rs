@@ -50,6 +50,7 @@ pub mod adapters;
 pub mod artifact_adapter;
 pub mod artifact_adapters;
 pub mod artifact_registry;
+pub mod markdown;
 pub mod normalize;
 pub mod plan_writeback;
 pub mod task_rows;
@@ -72,7 +73,7 @@ pub use artifact_adapter::{
 pub use artifact_registry::{ArtifactAdapterEntry, registry as artifact_adapter_registry};
 pub use normalize::{DirectivePrivacyPolicy, NormalizeOutcome, NormalizedSession, normalize_rows, normalize_with_privacy};
 pub use plan_adapter::{PlanAdapter, PlanParseOutcome, PlanSourceConfig, PlanSourceHandle};
-pub use plan_registry::{PlanAdapterEntry, find as find_plan_adapter, registry as plan_adapter_registry};
+pub use plan_registry::{NATIVE_DIALECT, PlanAdapterEntry, find as find_plan_adapter, native as native_plan_adapter, registry as plan_adapter_registry};
 pub use plan_writeback::{FlipDocOutcome, PlanTaskLocation, PlanWriteBack, WriteBackError, reject_multi_line_note};
 pub use registry::{AdapterEntry, AdapterScanResult, enumerate, parse_files, registry, scan_and_parse};
 pub use selftest::selftest;

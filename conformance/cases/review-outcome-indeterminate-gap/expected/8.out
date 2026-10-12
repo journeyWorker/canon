@@ -19,11 +19,12 @@
             "key": "cart.add.01"
           }
         ],
-        "scenario_digest": "b2520759011c45d9f4face51d3af0ce2f0d11ef676d7c822b9d4bfe0e578e4bc"
+        "scenario_digest": "6bb1bf1434056901ffd5b6536d525c726f106806f724be808733ec1d02a15c6a",
+        "scenario_digest_scope": "scenario"
       },
       "project_id": "root",
       "provenance_ref": {
-        "original_spec_ref": "specs/features/kind=feature/area=cart/add.feature"
+        "original_spec_ref": "specs/kind=feature/area=cart/add.feature"
       },
       "reviewer": "reviewer-2",
       "reviewer_harness": "codex",
@@ -48,11 +49,12 @@
             "key": "cart.add.01"
           }
         ],
-        "scenario_digest": "b2520759011c45d9f4face51d3af0ce2f0d11ef676d7c822b9d4bfe0e578e4bc"
+        "scenario_digest": "6bb1bf1434056901ffd5b6536d525c726f106806f724be808733ec1d02a15c6a",
+        "scenario_digest_scope": "scenario"
       },
       "project_id": "root",
       "provenance_ref": {
-        "original_spec_ref": "specs/features/kind=feature/area=cart/add.feature"
+        "original_spec_ref": "specs/kind=feature/area=cart/add.feature"
       },
       "reviewer": "reviewer-2",
       "scenario_id": "cart.add.01",

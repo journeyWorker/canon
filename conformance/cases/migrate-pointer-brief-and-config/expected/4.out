@@ -1,0 +1,3 @@
+canon (<repo>/.canon/changes): 0 change(s) parsed / 0 persisted / 0 unwritten; 0 task(s) parsed / 0 persisted / 0 unwritten; 0 duplicate-change-id; 0 malformed
+openspec (<repo>/.): 1 change(s) parsed / 1 persisted / 0 unwritten; 1 task(s) parsed / 1 persisted / 0 unwritten; 0 duplicate-change-id; 0 malformed
+total: 1 change(s) persisted, 1 task(s) persisted, 0 duplicate-change-id skipped

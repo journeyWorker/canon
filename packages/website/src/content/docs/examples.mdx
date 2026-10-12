@@ -62,9 +62,10 @@ Scaffold `canon.yaml`, then validate and index a spec corpus.
      evidence_record: local
      subject: local
    specs:
+     # The .feature corpus: <root>/kind=feature/area=<area>/<surface>.feature.
      roots:
        - id: root
-         root: specs
+         root: .canon/specs
    plans:
      sources: []
    ```
@@ -77,16 +78,20 @@ Scaffold `canon.yaml`, then validate and index a spec corpus.
    bunx @journeykit/canon init --check-config
    ```
 
-2. **Validate the spec corpus.** `.feature` files live under whatever
-   `specs.roots[]` names (`specs/` by default):
+2. **Validate the spec corpus.** `.feature` files live at
+   `<root>/kind=feature/area=<area>/<surface>.feature` under whatever
+   `specs.roots[]` names (`.canon/specs` by default; it is git-tracked):
 
    ```bash
-   bunx @journeykit/canon fmt --check specs
+   bunx @journeykit/canon fmt --check .canon/specs
    ```
 
    Checks the corpus against canon's artifact-family schemas and layout
    descriptors. Any violation — missing provenance, a layout-grammar
-   miss — is reported; nothing downstream runs until this is clean.
+   miss — is reported; nothing downstream runs until this is clean. A
+   root still on the pre-0.17 layout (`.feature` files under
+   `<root>/features/`) is one `layout-grammar` violation; `canon migrate`
+   moves `features/kind=feature/` to `<root>/kind=feature/`.
 
 3. **Materialize the ledger index.**
 
@@ -95,7 +100,7 @@ Scaffold `canon.yaml`, then validate and index a spec corpus.
    ```
 
    Re-validates each configured root with the same `fmt --check` pass,
-   then walks `<root>/features/**/*.feature` and upserts one `Scenario`
+   then walks `<root>/kind=feature/area=<area>/<surface>.feature` and upserts one `Scenario`
    ledger record per `(project_id, scenario_id)`. A violation aborts
    the WHOLE root — zero records written for it, never a partial sync.
    An unchanged `.feature` file (same `source_digest`) is a no-op; a
@@ -119,8 +124,9 @@ the status report.
    ```
 
    Appends a `.feature` stub — creating the file if it doesn't exist —
-   under the target derived from the tag's own `<area>.<surface>` (or
-   an explicit `--feature <path>` under a configured `specs.roots[]`
+   at `<root>/kind=feature/area=auth/login.feature`, the target derived
+   from the tag's own `<area>.<surface>` (or an explicit
+   `--feature <path>` under a configured `specs.roots[]`
    entry). The stub carries its `# canon:` provenance line directly
    above the tags, naming `--actor` (or `CANON_ACTOR`), then
    `@subject:auth-core`, `@lane:behavior`, and the id tag. Never
@@ -140,7 +146,7 @@ the status report.
      --scenario-id auth.login.01 \
      --reviewer alice \
      --pin "$(git rev-parse HEAD)" \
-     --original-spec-ref specs/auth.feature \
+     --original-spec-ref .canon/specs/kind=feature/area=auth/login.feature \
      --role dev
    ```
 

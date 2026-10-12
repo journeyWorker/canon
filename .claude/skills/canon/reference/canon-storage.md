@@ -192,6 +192,29 @@ write (promote: manual)`, or `[FAIL] write: …`. `canon gate promote` still
 works under `auto` and is idempotent: with nothing staged it prints
 `nothing staged` and exits `0`.
 
+## Harnesses: the `skills:` section
+
+`canon.yaml`'s `skills:` section names the harnesses the canon skill is
+installed for (0.17):
+
+```yaml
+skills:
+  providers: [claude, codex]   # any of claude, codex, omp, pi; [] for none
+```
+
+`canon init` writes it: on a terminal it asks, with the harnesses whose
+`.claude`, `.codex`, `.omp` or `.pi` directory exists checked;
+`--providers a,b` (or `none`) answers without asking; with neither it takes
+the detected ones, and with none detected it writes only a commented example
+and installs nothing. `.agents` alone never selects Codex. `canon skills
+install|check|doctor` follow the section; `canon skills install
+--providers=<list>` rewrites it in place. Without the section they use the
+install lock's providers, then the detected ones; nothing undetected is ever
+added. A present section that is not this shape, or names another harness,
+fails those commands (exit `1`), and `canon init --check-config` reports
+`[PASS] skills (providers: …)`, `[not configured] skills (…)`, or
+`[FAIL] skills: …`.
+
 ## The scenario index
 
 `canon inventory sync` materializes one `Scenario` record per
@@ -207,7 +230,7 @@ that no `.feature` file of it declares any more. The reader then runs
 covers the whole root) and prints one stderr line:
 
 ```
-canon status: refreshed the scenario index from 1 changed feature file(s) (specs/features/kind=feature/area=cart/add.feature): 1 record(s) written
+canon status: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
 A deleted scenario is not erased: `canon inventory sync` — and a reader's

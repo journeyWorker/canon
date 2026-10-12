@@ -1,6 +1,6 @@
 {
-  "statusVersion": 2,
-  "canonVersion": "0.16.0",
+  "statusVersion": 3,
+  "canonVersion": "0.17.0",
   "policy": {
     "present": true,
     "spec_coverage": {
@@ -42,7 +42,8 @@
         "approved": true,
         "enforced": false,
         "change": "c-cart",
-        "proposal": "openspec/changes/c-cart/proposal.md",
+        "brief": ".canon/changes/c-cart/brief.md",
+        "briefExists": true,
         "approval": "Journey 2026-10-08 — \"approved, go ahead\""
       }
     }
