@@ -212,11 +212,12 @@
 
 use std::path::{Path, PathBuf};
 
+use canon_gate::review_gate::{in_effect_reviews, review_gap, ReviewGapKind};
 use canon_gate::{scan_note_text, verify_risk_approval, FailureClass, GateContext, GateCtx, Violation};
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{
     approval_payload_bytes, Actor, AttachmentDrop, AuditResult, BriefOverride, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId,
-    RawRecord, RecordKind, ReportFormat, RoleId, RunId, ScenarioId, SessionId, Sha, TaskId, WaivedViolation, APPROVAL_NAMESPACE,
+    ProvenanceRef, RawRecord, RecordKind, ReportFormat, Review, RoleId, RunId, Scenario, ScenarioId, SessionId, Sha, TaskId, WaivedViolation, APPROVAL_NAMESPACE,
 };
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
@@ -230,27 +231,29 @@ use crate::gate::{evidence_staging_dir, typed_evidence_contract_for_task};
 /// attestation (0.16 M7): the stop belongs at the brief.
 const BRIEF_STOP: &str = "stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — \"<their words>\"` in that brief.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record";
 
+/// The gate's view of the repository, as every check here reads it.
+fn load_gate_context(repo: &Path) -> Result<GateContext, String> {
+    GateCtx::from_repo(repo)
+        .map_err(|e| e.to_string())
+        .and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string()))
+}
+
 /// The brief refusals for this attestation (module doc, 0.16 M7): one
 /// `unreviewed-promotion` per subject it attests for whose brief
 /// [`crate::brief::brief_of`] reads as enforced and not approved, the
 /// class and subject the ship guard's brief check prints. The subjects
 /// come from [`crate::brief::attested_briefs`]: the scenario's
-/// `@subject` owner and every subject adopting the task's change. `Err`
-/// when the ledger cannot be read.
-fn brief_refusals(repo: &Path, args: &EvidenceArgs) -> Result<Vec<Violation>, String> {
-    let ctx = GateCtx::from_repo(repo)
-        .map_err(|e| e.to_string())
-        .and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string()))?;
+/// `@subject` owner and every subject adopting the task's change.
+fn brief_refusals(repo: &Path, ctx: &GateContext, task_id: Option<&TaskId>, scenario: Option<(&ProjectId, &ScenarioId)>) -> Vec<Violation> {
     // An unreadable `plans:` section finds no external proposal.md;
     // `canon status` warns about it.
     let plan_roots = crate::brief::plan_roots(repo).unwrap_or_default();
-    let scenario = args.project_id.as_ref().zip(args.scenario_id.as_ref());
-    let what = [args.scenario_id.as_ref().map(|s| s.as_str().to_string()), args.task_id.as_ref().map(ToString::to_string)]
+    let what = [scenario.map(|(_, s)| s.as_str().to_string()), task_id.map(ToString::to_string)]
         .into_iter()
         .flatten()
         .collect::<Vec<_>>()
         .join(" and ");
-    Ok(crate::brief::attested_briefs(repo, &plan_roots, &ctx, args.task_id.as_ref(), scenario)
+    crate::brief::attested_briefs(repo, &plan_roots, ctx, task_id, scenario)
         .into_iter()
         .filter(|(_, brief)| brief.enforced)
         .map(|(subject, brief)| {
@@ -260,7 +263,7 @@ fn brief_refusals(repo: &Path, args: &EvidenceArgs) -> Result<Vec<Violation>, St
                 format!("evidence for {what}: brief not approved — {}, so the human has not answered it; once they do, {}", brief.unanswered(), brief.record()),
             )
         })
-        .collect())
+        .collect()
 }
 
 /// `--verdict`'s clap `value_parser`. Kebab-cased on the CLI, matching
@@ -395,6 +398,10 @@ pub struct EvidenceArgs {
     /// Report cases to bind IN ADDITION to every case carrying the
     /// scenario id (repeatable; 0.14 D5).
     pub report_cases: Vec<String>,
+    /// `--all-scenarios` (0.18 D1): one record per indexed scenario of
+    /// `--project-id` that owns a case in the `--report`s
+    /// ([`run_add_all`]).
+    pub all_scenarios: bool,
     /// The artifact store's per-file size limit, in MiB.
     pub max_artifact_mib: u64,
     /// `--kind audit` only (0.15 D3): the external evaluator's id,
@@ -539,21 +546,11 @@ fn check_drop_flags(args: &EvidenceArgs) -> Result<(), String> {
     Ok(())
 }
 
-/// The drop guard (0.15 D2). The scenario's current latest record of the
-/// SAME fold — declared, or audit for an audit — is read from the
-/// committed ledger and the staging area together, so an unpromoted
-/// record counts too. Every path it binds that the new record does not
-/// must be named by `--drop-attachment`, and every `--drop-attachment`
-/// must name such a path. Re-binding a path to new bytes is not a drop.
-/// `Ok(Some)` is the drop to record on the new record; `Ok(None)` when
-/// nothing is dropped or the record is not scenario-keyed.
-fn drop_guard(ledger_root: &Path, args: &EvidenceArgs, is_audit: bool, attachments: &[canon_model::EvidenceAttachment]) -> Result<Option<AttachmentDrop>, String> {
-    use std::collections::BTreeSet;
-
-    let (Some(project_id), Some(scenario_id)) = (&args.project_id, &args.scenario_id) else {
-        return Ok(None);
-    };
-    let mut same_fold = Vec::new();
+/// Every well-formed evidence record in the committed ledger and the
+/// staging area together, which the drop guard compares against, so an
+/// unpromoted record counts too.
+fn ledger_and_staged_evidence(ledger_root: &Path) -> Result<Vec<EvidenceRecord>, String> {
+    let mut all = Vec::new();
     for root in [ledger_root.to_path_buf(), evidence_staging_dir(ledger_root)] {
         if !root.is_dir() {
             continue;
@@ -562,10 +559,33 @@ fn drop_guard(ledger_root: &Path, args: &EvidenceArgs, is_audit: bool, attachmen
             .read(&TierQuery::kind(RecordKind::EvidenceRecord))
             .map_err(|e| format!("cannot read {} to compare this record's bindings with the latest one: {e}", root.display()))?;
         let (records, _malformed) = canon_model::validate_evidence_batch(&read.records);
-        same_fold.extend(
-            records.into_iter().filter(|r| r.is_audit() == is_audit && r.project_id.as_ref() == Some(project_id) && r.scenario_id.as_ref() == Some(scenario_id)),
-        );
+        all.extend(records);
     }
+    Ok(all)
+}
+
+/// The drop guard (0.15 D2). The scenario's current latest record of the
+/// SAME fold — declared, or audit for an audit — is read from the
+/// committed ledger and the staging area together, so an unpromoted
+/// record counts too. Every path it binds that the new record does not
+/// must be named by `--drop-attachment`, and every `--drop-attachment`
+/// must name such a path. Re-binding a path to new bytes is not a drop.
+/// `Ok(Some)` is the drop to record on the new record; `Ok(None)` when
+/// nothing is dropped. `records` is [`ledger_and_staged_evidence`].
+fn drop_guard(
+    records: &[EvidenceRecord],
+    args: &EvidenceArgs,
+    (project_id, scenario_id): (&ProjectId, &ScenarioId),
+    is_audit: bool,
+    attachments: &[canon_model::EvidenceAttachment],
+) -> Result<Option<AttachmentDrop>, String> {
+    use std::collections::BTreeSet;
+
+    let same_fold: Vec<EvidenceRecord> = records
+        .iter()
+        .filter(|r| r.is_audit() == is_audit && r.project_id.as_ref() == Some(project_id) && r.scenario_id.as_ref() == Some(scenario_id))
+        .cloned()
+        .collect();
     let latest = canon_gate::spec_coverage::latest_by_scenario(&same_fold);
     let previous = latest.get(&(project_id.clone(), scenario_id.clone())).copied();
     let bound: BTreeSet<&str> = attachments.iter().map(|a| a.path.as_str()).collect();
@@ -693,6 +713,10 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         eprintln!("canon evidence add: refused — --kind and --ref must both be non-empty; an empty companion narrows the gate's typed evidence slice to nothing");
         return 2;
     }
+    if let Err(error) = check_all_scenarios_flags(args) {
+        eprintln!("canon evidence add: refused — {error}");
+        return 2;
+    }
     let audit = match audit_of(args) {
         Ok(audit) => audit,
         Err(error) => {
@@ -775,6 +799,9 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         );
         return 2;
     }
+    if args.all_scenarios {
+        return run_add_all(&repo, args, promote);
+    }
 
     // At least one coverage subject, checked before anything else
     // touches the corpus. A record with neither key is invisible to
@@ -856,36 +883,18 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     }
     // 0.16 M7: nothing is attested for a subject whose brief awaits the
     // human's answer (module doc). Before anything is bound or staged.
-    let brief_override = match brief_refusals(&repo, args) {
-        Ok(refusals) if refusals.is_empty() => {
-            if args.override_reason.is_some() {
-                eprintln!("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation");
-            }
-            None
-        }
-        Ok(refusals) => {
-            let Some(reason) = &args.override_reason else {
-                for refusal in &refusals {
-                    eprintln!("canon evidence add: {}", refusal.line());
-                }
-                eprintln!("canon evidence add: refused — {BRIEF_STOP}");
-                return 1;
-            };
-            for refusal in &refusals {
-                eprintln!("canon evidence add: waived {}", refusal.line());
-            }
-            eprintln!("canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
-            Some(BriefOverride {
-                reason: reason.clone(),
-                waived: refusals.iter().map(|v| WaivedViolation { class: v.class.as_str().to_string(), subject: v.subject.clone() }).collect(),
-                actor: Actor::new_unattributed(args.actor_id.as_str()),
-            })
-        }
+    let mut gate_context = match load_gate_context(&repo) {
+        Ok(ctx) => ctx,
         Err(e) => {
             eprintln!("canon evidence add: {e}");
             return 2;
         }
     };
+    let refusals = brief_refusals(&repo, &gate_context, args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref()));
+    if let Err(code) = report_brief_refusals(args, &refusals) {
+        return code;
+    }
+    let brief_override = brief_override_of(args, &refusals);
     // Experimental binding: read (never run) the files the caller names,
     // before anything is staged, so a refused binding leaves no record.
     if !args.report_cases.is_empty() && args.reports.is_empty() {
@@ -898,6 +907,9 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         reports: &args.reports,
         report_cases: &args.report_cases,
         scenario_id: args.scenario_id.as_ref().map(ScenarioId::as_str),
+        // 0.18 D1: a task's report with no scenario to match binds all
+        // of it, so a faithful verdict needs every case to pass.
+        all_cases: args.task_id.is_some() && args.scenario_id.is_none() && args.report_cases.is_empty(),
         verdict,
         max_bytes: args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB),
     }) {
@@ -908,22 +920,19 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         }
     };
 
-    let ledger_root = match GateCtx::from_repo(&repo) {
-        Ok(ctx) => ctx.ledger_root,
-        Err(e) => {
-            eprintln!("canon evidence add: {e}");
-            return 2;
-        }
-    };
+    let ledger_root = gate_context.ctx.ledger_root.clone();
     // 0.15 D2: a new latest record never silently drops what the
     // previous one bound. Checked after binding (the new paths are known)
     // and before anything is stored or staged.
-    let attachment_drop = match drop_guard(&ledger_root, args, audit.is_some(), &bound.attachments) {
-        Ok(attachment_drop) => attachment_drop,
-        Err(error) => {
-            eprintln!("canon evidence add: refused — {error}");
-            return 2;
-        }
+    let attachment_drop = match args.project_id.as_ref().zip(args.scenario_id.as_ref()) {
+        None => None,
+        Some(scenario) => match ledger_and_staged_evidence(&ledger_root).and_then(|records| drop_guard(&records, args, scenario, audit.is_some(), &bound.attachments)) {
+            Ok(attachment_drop) => attachment_drop,
+            Err(error) => {
+                eprintln!("canon evidence add: refused — {error}");
+                return 2;
+            }
+        },
     };
 
     let at = Utc::now();
@@ -1026,25 +1035,8 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         });
     }
 
-    // `serde_json::to_value` on a record canon just constructed, and
-    // `as_object_mut` on the object that produced — the identical pair
-    // of canon-originated-data `expect`s `canon_gate::promote` states
-    // when it stamps `run_seq` onto a body it just read.
-    let mut body = serde_json::to_value(&record).expect("an EvidenceRecord always serializes");
-    let object = body.as_object_mut().expect("an EvidenceRecord's serialized body is always a JSON object");
-    object.insert("evidence".to_string(), serde_json::json!({ "kind": args.kind, "ref": args.evidence_ref }));
-    if let Some(summary) = &args.summary {
-        // The SAME values that were scanned, so the bytes on disk are the
-        // bytes the scan cleared. `task_id` is already the record's own
-        // typed field; the companion carries only what
-        // `evidence_note_of` reads back.
-        let mut companion = serde_json::Map::new();
-        companion.insert("summary".to_string(), serde_json::Value::String(summary.clone()));
-        if let Some(command_result) = &args.command_result {
-            companion.insert("command_result".to_string(), serde_json::Value::String(command_result.clone()));
-        }
-        object.insert("evidence_note".to_string(), serde_json::Value::Object(companion));
-    }
+    let body = record_body(&record, args);
+    let stale_reviews = stale_review_notices(&mut gate_context, std::slice::from_ref(&record));
 
     // Store the bound bytes before staging (module doc): every refusal
     // is behind us, and a record must never name a blob the store lacks.
@@ -1079,6 +1071,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             };
             let settled = crate::gate::promote_after_stage("canon evidence add", &ledger_root, &receipt.location, promote);
             println!("canon evidence add: {} for {} ({outcome}) — {}, {}", settled.landed(&receipt.location), subject, settled.suffix(), next);
+            print_stale_reviews(&repo, &stale_reviews, matches!(settled, crate::gate::StagedOutcome::Promoted { .. }));
             settled.exit_code()
         }
         Err(e) => {
@@ -1086,6 +1079,364 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             2
         }
     }
+}
+
+/// The staged body of `record`: the record, plus the `evidence: {kind,
+/// ref}` companion and, with `--summary`, the `evidence_note` companion
+/// (module doc).
+fn record_body(record: &EvidenceRecord, args: &EvidenceArgs) -> serde_json::Value {
+    // `serde_json::to_value` on a record canon just constructed, and
+    // `as_object_mut` on the object that produced — the identical pair
+    // of canon-originated-data `expect`s `canon_gate::promote` states
+    // when it stamps `run_seq` onto a body it just read.
+    let mut body = serde_json::to_value(record).expect("an EvidenceRecord always serializes");
+    let object = body.as_object_mut().expect("an EvidenceRecord's serialized body is always a JSON object");
+    object.insert("evidence".to_string(), serde_json::json!({ "kind": args.kind, "ref": args.evidence_ref }));
+    if let Some(summary) = &args.summary {
+        // The SAME values that were scanned, so the bytes on disk are the
+        // bytes the scan cleared. `task_id` is already the record's own
+        // typed field; the companion carries only what
+        // `evidence_note_of` reads back.
+        let mut companion = serde_json::Map::new();
+        companion.insert("summary".to_string(), serde_json::Value::String(summary.clone()));
+        if let Some(command_result) = &args.command_result {
+            companion.insert("command_result".to_string(), serde_json::Value::String(command_result.clone()));
+        }
+        object.insert("evidence_note".to_string(), serde_json::Value::Object(companion));
+    }
+    body
+}
+
+/// Prints `refusals` (0.16 M7, module doc). `Err(1)` when they refuse
+/// the attestation; with `--override-reason` they are printed as waived.
+fn report_brief_refusals(args: &EvidenceArgs, refusals: &[Violation]) -> Result<(), i32> {
+    if refusals.is_empty() {
+        if args.override_reason.is_some() {
+            eprintln!("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation");
+        }
+        return Ok(());
+    }
+    let Some(reason) = &args.override_reason else {
+        for refusal in refusals {
+            eprintln!("canon evidence add: {}", refusal.line());
+        }
+        eprintln!("canon evidence add: refused — {BRIEF_STOP}");
+        return Err(1);
+    };
+    for refusal in refusals {
+        eprintln!("canon evidence add: waived {}", refusal.line());
+    }
+    eprintln!("canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
+    Ok(())
+}
+
+/// The [`BriefOverride`] a record carries for the brief `refusals` it
+/// waived, or `None` when nothing was waived.
+fn brief_override_of(args: &EvidenceArgs, refusals: &[Violation]) -> Option<BriefOverride> {
+    let reason = args.override_reason.as_ref().filter(|_| !refusals.is_empty())?;
+    Some(BriefOverride {
+        reason: reason.clone(),
+        waived: refusals.iter().map(|v| WaivedViolation { class: v.class.as_str().to_string(), subject: v.subject.clone() }).collect(),
+        actor: Actor::new_unattributed(args.actor_id.as_str()),
+    })
+}
+
+/// `--all-scenarios` (0.18 D1) checks its flag combination before
+/// anything else: it needs a `--report` to split and the `--project-id`
+/// whose indexed scenarios own the cases, and refuses every flag that
+/// names one subject (`--scenario-id`, `--task`, `--report-case`, an
+/// audit, a drop, an approval).
+fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), String> {
+    if !args.all_scenarios {
+        return Ok(());
+    }
+    let one_subject = [
+        ("--scenario-id", args.scenario_id.is_some()),
+        ("--task", args.task_id.is_some()),
+        ("--report-case", !args.report_cases.is_empty()),
+        ("--kind audit", args.kind == AUDIT_KIND),
+        ("--drop-attachment", !args.drop_attachments.is_empty()),
+        ("--drop-reason", args.drop_reason.is_some()),
+        ("--approval-by", args.approval_by.is_some()),
+        ("--approval-role", args.approval_role.is_some()),
+        ("--approval-signature-file", args.approval_signature_file.is_some()),
+        ("--approval-at", args.approval_at.is_some()),
+    ];
+    let refused: Vec<&str> = one_subject.iter().filter(|(_, set)| *set).map(|(flag, _)| *flag).collect();
+    if !refused.is_empty() {
+        return Err(format!(
+            "{} name(s) one subject and do(es) not combine with --all-scenarios, which writes one record per scenario the --report owns; attest one scenario on its own with --scenario-id and without --all-scenarios",
+            refused.join(", ")
+        ));
+    }
+    if args.reports.is_empty() {
+        return Err("--all-scenarios splits a --report <format>:<path> by the scenario each case belongs to; none was given".to_string());
+    }
+    if args.project_id.is_none() {
+        return Err("--all-scenarios needs --project-id: the cases are matched against that spec root's indexed scenarios".to_string());
+    }
+    Ok(())
+}
+
+/// `canon evidence add --all-scenarios` (0.18 D1): one record per indexed
+/// scenario of `--project-id` that owns a case in the reports
+/// ([`crate::evidence_attach::bind_all_scenarios`]), each with its own
+/// cases and its own verdict (`--verdict` when given, else derived from
+/// its cases). All or nothing: the fabrication scan, every record's brief
+/// refusals and drop guard, and a claimed `faithful` verdict over any
+/// failed case run first, and any refusal writes nothing. The records
+/// share the stored report blob and `--artifact` files. Prints one line
+/// per record, then each unindexed scenario id it skipped, then any
+/// review the batch makes stale.
+fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
+    let project_id = args.project_id.as_ref().expect("--all-scenarios requires --project-id, checked by check_all_scenarios_flags");
+    let mut gate_context = match load_gate_context(repo) {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            eprintln!("canon evidence add: {e}");
+            return 2;
+        }
+    };
+    let mut indexed: Vec<&ScenarioId> =
+        canon_gate::spec_coverage::latest_scenarios(&gate_context).into_iter().filter(|s| &s.project_id == project_id).map(|s| &s.scenario_id).collect();
+    indexed.sort();
+    let indexed: Vec<&str> = indexed.into_iter().map(ScenarioId::as_str).collect();
+    let batch = match crate::evidence_attach::bind_all_scenarios(&crate::evidence_attach::BatchRequest {
+        repo,
+        artifacts: &args.artifacts,
+        reports: &args.reports,
+        indexed: &indexed,
+        verdict: args.verdict,
+        max_bytes: args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB),
+    }) {
+        Ok(batch) => batch,
+        Err(error) => {
+            eprintln!("canon evidence add: refused — {}", error.message());
+            return error.exit_code();
+        }
+    };
+    let scenario_ids: Vec<ScenarioId> = match batch.scenarios.iter().map(|b| ScenarioId::parse(&b.scenario_id)).collect() {
+        Ok(ids) => ids,
+        Err(e) => {
+            eprintln!("canon evidence add: {e}");
+            return 2;
+        }
+    };
+
+    if let Some(summary) = &args.summary {
+        let subject = scenario_ids.iter().map(ScenarioId::as_str).collect::<Vec<_>>().join(", ");
+        let violations = scan_note_text(&subject, summary, args.command_result.as_deref());
+        if !violations.is_empty() {
+            for violation in &violations {
+                eprintln!("canon evidence add: refused — {}", violation.line());
+            }
+            eprintln!("canon evidence add: refused — no record of the batch is written");
+            return 1;
+        }
+    }
+
+    let refusals: Vec<Vec<Violation>> = scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, None, Some((project_id, id)))).collect();
+    if let Err(code) = report_brief_refusals(args, &refusals.concat()) {
+        eprintln!("canon evidence add: refused — no record of the batch is written");
+        return code;
+    }
+
+    let ledger_root = gate_context.ctx.ledger_root.clone();
+    let existing = match ledger_and_staged_evidence(&ledger_root) {
+        Ok(records) => records,
+        Err(error) => {
+            eprintln!("canon evidence add: refused — {error}");
+            return 2;
+        }
+    };
+    let drops: Vec<String> = batch
+        .scenarios
+        .iter()
+        .zip(&scenario_ids)
+        .filter_map(|(binding, id)| drop_guard(&existing, args, (project_id, id), false, &binding.attachments).err())
+        .collect();
+    if !drops.is_empty() {
+        for error in &drops {
+            eprintln!("canon evidence add: refused — {error}");
+        }
+        eprintln!("canon evidence add: refused — no record of the batch is written; attest a scenario whose files changed on its own with --scenario-id (and --drop-attachment if it drops one)");
+        return 2;
+    }
+
+    let at = Utc::now();
+    let mut actor = Actor::new(args.actor_id.as_str(), args.role.clone());
+    if let Some(session_id) = &args.session_id {
+        actor = actor.with_session(session_id.clone());
+    }
+    let records: Vec<EvidenceRecord> = batch
+        .scenarios
+        .iter()
+        .zip(&scenario_ids)
+        .zip(&refusals)
+        .map(|((binding, id), refusals)| {
+            let mut record = EvidenceRecord::new(Envelope::current(RecordKind::EvidenceRecord, at, actor.clone()), None, Some(id.clone()), args.run_id.clone(), binding.verdict)
+                .with_attachments(binding.attachments.clone())
+                .with_project_id(project_id.clone());
+            if let Some(brief_override) = brief_override_of(args, refusals) {
+                record = record.with_brief_override(brief_override);
+            }
+            if !args.surface_ref.is_empty() {
+                record = record.with_surface_ref(normalized_strings(&args.surface_ref));
+            }
+            if let Some(artifact_sha) = &args.artifact_sha {
+                record = record.with_evidence_sha(artifact_sha.clone());
+            }
+            record
+        })
+        .collect();
+    let stale_reviews = stale_review_notices(&mut gate_context, &records);
+
+    let stored = match crate::evidence_attach::store_files(repo, &batch.files) {
+        Ok(stored) => stored,
+        Err((file, e)) => {
+            eprintln!("canon evidence add: refused — could not store {} in the artifact store: {e}", file.resolved.display());
+            return 2;
+        }
+    };
+    println!("{}", crate::evidence_attach::stored_line("canon evidence add", batch.files.len(), stored));
+
+    let staging = GitTier::new(evidence_staging_dir(&ledger_root));
+    let mut staged = Vec::new();
+    for record in &records {
+        match staging.write(&RawWrite(RawRecord(record_body(record, args)))) {
+            Ok(receipt) => staged.push(receipt.location),
+            Err(e) => {
+                eprintln!("canon evidence add: {e}");
+                if !staged.is_empty() {
+                    eprintln!("canon evidence add: {} record(s) of the batch were staged before the failure: {}", staged.len(), staged.join(", "));
+                }
+                return 2;
+            }
+        }
+    }
+    let mut exit = 0;
+    let mut all_promoted = true;
+    for ((record, location), id) in records.iter().zip(&staged).zip(&scenario_ids) {
+        let settled = crate::gate::promote_after_stage("canon evidence add", &ledger_root, location, promote);
+        println!(
+            "canon evidence add: {} for {} (verdict {}) — {}, then `canon gate check`",
+            settled.landed(location),
+            id.as_str(),
+            verdict_slug(record.verdict),
+            settled.suffix()
+        );
+        all_promoted &= matches!(settled, crate::gate::StagedOutcome::Promoted { .. });
+        exit = exit.max(settled.exit_code());
+    }
+    for (id, case) in &batch.unindexed {
+        println!("canon evidence add: skipped {id} — not an indexed scenario of spec root `{}` (case `{case}`); index it (`canon inventory sync`) or fix the test name", project_id.as_str());
+    }
+    if batch.without_id > 0 {
+        println!("canon evidence add: skipped {} case(s) that carry no scenario id", batch.without_id);
+    }
+    print_stale_reviews(repo, &stale_reviews, all_promoted);
+    exit
+}
+
+/// The in-effect pinned reviews that `written` makes stale (0.18 D2),
+/// decided by the gate's own [`review_gap`]: a review is listed when,
+/// judged alone, it qualifies before the write (signed, its pins
+/// current) and is a [`ReviewGapKind::Stale`] gap once `written` is the
+/// scenario's latest evidence. `ctx` is restored before returning.
+fn stale_review_notices(ctx: &mut GateContext, written: &[EvidenceRecord]) -> Vec<Review> {
+    let declared: Vec<EvidenceRecord> = written.iter().filter(|r| !r.is_audit() && r.scenario_id.is_some()).cloned().collect();
+    let touched = |s: &Scenario| declared.iter().any(|r| r.scenario_id.as_ref() == Some(&s.scenario_id) && r.project_id.as_ref().is_none_or(|p| *p == s.project_id));
+    let scenarios: Vec<Scenario> = canon_gate::spec_coverage::latest_scenarios(ctx).into_iter().filter(|s| touched(s)).cloned().collect();
+    let candidates: Vec<(Scenario, Review)> = scenarios
+        .iter()
+        .flat_map(|s| {
+            in_effect_reviews(ctx)
+                .into_iter()
+                .filter(|r| r.pins.is_some() && r.project_id == s.project_id && r.scenario_id == s.scenario_id)
+                .map(|r| (s.clone(), r.clone()))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    if candidates.is_empty() {
+        return Vec::new();
+    }
+    let reviews = std::mem::take(&mut ctx.reviews);
+    let mut current_before = Vec::new();
+    for (scenario, review) in &candidates {
+        ctx.reviews = vec![review.clone()];
+        current_before.push(review_gap(ctx, scenario, false).is_none());
+    }
+    let evidence = ctx.evidence.len();
+    ctx.evidence.extend(declared);
+    let mut stale = Vec::new();
+    for ((scenario, review), was_current) in candidates.into_iter().zip(current_before) {
+        ctx.reviews = vec![review.clone()];
+        if was_current && review_gap(ctx, &scenario, false).is_some_and(|gap| gap.kind == ReviewGapKind::Stale) {
+            stale.push(review);
+        }
+    }
+    ctx.evidence.truncate(evidence);
+    ctx.reviews = reviews;
+    stale
+}
+
+/// One line per review `stale` names (0.18 D2): the reviewer, the
+/// scenario, and the `canon review add` that re-pins it — the same
+/// reviewer, actor, role, provenance ref and artifacts, pinned at
+/// `HEAD` (`<sha>` when the repository has no commit). A record still
+/// staged makes the review stale once it is promoted.
+fn print_stale_reviews(repo: &Path, stale: &[Review], promoted: bool) {
+    if stale.is_empty() {
+        return;
+    }
+    let pin = head_sha(repo).unwrap_or_else(|| "<sha>".to_string());
+    let when = if promoted { "is now stale" } else { "goes stale once this evidence is promoted" };
+    for review in stale {
+        println!(
+            "canon evidence add: review by `{}` of {} {when} (it pinned the evidence this record supersedes); re-pin it: {}",
+            review.reviewer,
+            review.scenario_id.as_str(),
+            repin_command(review, &pin)
+        );
+    }
+}
+
+/// `canon review add` re-pinning `review` at `pin`, as one shell line.
+fn repin_command(review: &Review, pin: &str) -> String {
+    use canon_gate::audit::shell_quote;
+
+    let role = review.envelope.actor.role.as_ref().map_or("reviewer", |r| r.as_str());
+    let mut words = vec![
+        "canon review add".to_string(),
+        format!("--project-id {}", shell_quote(review.project_id.as_str())),
+        format!("--scenario-id {}", shell_quote(review.scenario_id.as_str())),
+        format!("--reviewer {}", shell_quote(&review.reviewer)),
+        format!("--actor-id {}", shell_quote(&review.envelope.actor.agent_id)),
+        format!("--role {}", shell_quote(role)),
+        format!("--pin {}", if pin == "<sha>" { pin.to_string() } else { shell_quote(pin) }),
+    ];
+    words.push(match &review.provenance_ref {
+        ProvenanceRef::UpstreamRef(r) => format!("--upstream-ref {}", shell_quote(r)),
+        ProvenanceRef::OriginalSpecRef(r) => format!("--original-spec-ref {}", shell_quote(r)),
+    });
+    for (flag, value) in [
+        ("--reviewer-provider", &review.reviewer_provider),
+        ("--reviewer-model", &review.reviewer_model),
+        ("--reviewer-harness", &review.reviewer_harness),
+    ] {
+        if let Some(value) = value {
+            words.push(format!("{flag} {}", shell_quote(value)));
+        }
+    }
+    words.extend(review.artifacts.iter().map(|a| format!("--artifact {}", shell_quote(&a.path))));
+    words.join(" ")
+}
+
+/// The full sha of `HEAD`, or `None` when the repository has no commit.
+fn head_sha(repo: &Path) -> Option<String> {
+    let out = std::process::Command::new("git").arg("-C").arg(repo).args(["rev-parse", "--verify", "--quiet", "HEAD"]).output().ok()?;
+    let sha = String::from_utf8(out.stdout).ok()?.trim().to_string();
+    (out.status.success() && !sha.is_empty()).then_some(sha)
 }
 
 /// `canon evidence vault` (0.14 D4): store the bytes for committed
@@ -1257,6 +1608,7 @@ mod tests {
             artifacts: Vec::new(),
             reports: Vec::new(),
             report_cases: Vec::new(),
+            all_scenarios: false,
             max_artifact_mib: canon_gate::DEFAULT_MAX_ARTIFACT_MIB,
             evaluator_id: None,
             evaluator_version: None,

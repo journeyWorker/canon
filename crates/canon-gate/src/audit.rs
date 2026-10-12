@@ -104,7 +104,7 @@ pub fn counterexample_drop_flags(record: &EvidenceRecord) -> Option<String> {
 /// `value` as one POSIX shell word: bare when it is made only of
 /// characters no shell treats specially, else single-quoted with each
 /// `'` written as `'\''`.
-fn shell_quote(value: &str) -> String {
+pub fn shell_quote(value: &str) -> String {
     if !value.is_empty() && value.bytes().all(|b| b.is_ascii_alphanumeric() || b"_-./:=@%+,".contains(&b)) {
         value.to_string()
     } else {

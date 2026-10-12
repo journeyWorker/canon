@@ -94,6 +94,13 @@ work inside an approved scope, never to the approval itself.
    `canon init` writes) the record is final when the command returns; only
    in a repo with `write.promote: manual` (or no `write:` key) follow it
    with `canon gate promote`.
+   One test run that proves several scenarios is bound once:
+   `canon evidence add --project-id <root-id> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref "<command>" --actor-id <unit> --session-id <session>`
+   writes one record per indexed scenario owning a case, each with the
+   verdict its own cases show; any refusal writes none. When a new record
+   makes a signed review stale, the add prints the reviewer and the
+   `canon review add … --pin <sha>` that re-pins it; the reviewer looks
+   again before running it.
    An external evaluator's audit is recorded with `canon evidence add --kind
    audit`; canon never generates one.
    Evidence for a plan task (`--task <id>`, before `canon gate task`) must
@@ -111,7 +118,9 @@ work inside an approved scope, never to the approval itself.
    follow each with `canon gate promote`. Every bug fix adds or extends a scenario. The
    reviewer signs off each scenario:
    `canon review add --project-id <root-id> --scenario-id <id> --reviewer <who> --actor-id <who> --role reviewer --session-id <review-session> --pin <sha> --upstream-ref <ref>`
-   (written directly; nothing to promote). A reviewer of user-visible
+   (written directly; nothing to promote). Repeat `--scenario-id`, or pass
+   `--scenario-ids-from <file>`, to sign off several scenarios in one
+   call, all or nothing. A reviewer of user-visible
    behavior attaches what it looked at with `--artifact <path>`
    (repeatable); canon stores and re-checks those bytes and never compares
    images.

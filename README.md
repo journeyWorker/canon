@@ -82,6 +82,42 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.18.0 release
+
+### N1: fewer calls per attestation (D1, D2)
+
+- **One report, many scenarios.** `canon evidence add --project-id <root>
+  --all-scenarios --report <fmt>:<path> …` writes one record per indexed
+  scenario that owns a case in the report (the existing own-leading-id
+  rule). Each record binds only its own cases and gets the verdict they
+  show (`faithful` all passed, `divergent` one failed, `not-applicable`
+  one skipped and none failed), unless `--verdict` claims one for all. An
+  unindexed id is named and skipped. All or nothing: a claimed `faithful`
+  over a failed case, a fabrication marker, an unapproved brief, or a
+  dropped binding writes no record. The records share the one stored
+  report blob, and the output lists each scenario with its verdict.
+- **Batch review.** `canon review add` takes `--scenario-id` repeated and
+  `--scenario-ids-from <file|->` (one id per line, `#` comments): one
+  reviewer, pin and set of artifacts, one review per scenario, all or
+  nothing. Single-scenario output is unchanged.
+- **`--task --report` with no scenario id** binds every case in the
+  report; `faithful` needs all of them to pass (it was refused before).
+- **`--report swift-testing:<path>`** reads the JSON-lines event stream of
+  `swift test --experimental-event-stream-output`: the display name, else
+  the function name, carries the scenario id; issues and `testSkipped`
+  decide the outcome. `ReportFormat` gains `swift-testing` (schema
+  regenerated). A stream captured from a real Swift 6.4 run is checked in
+  at `crates/canon-cli/tests/fixtures/swift-testing/`.
+- **A write that breaks a pin says so.** When `evidence add` (single or
+  batch) supersedes the evidence a current pinned review saw, it prints
+  one line per review now stale with the reviewer, the scenario and the
+  `canon review add … --pin <sha>` that re-pins it (`HEAD`, or `<sha>`
+  with no commit). The decision is the gate's own `review_gap`.
+- Conformance: `review-pin-stale-evidence` step 3 now carries the
+  stale-review line (re-blessed); new cases `evidence-add-all-scenarios`,
+  `evidence-add-all-scenarios-refused-contradiction`,
+  `evidence-add-swift-testing`, `review-add-batch`.
+
 ## 0.17.0 release
 
 Version 0.17.0 gives canon its own home: the spec corpus, canon's own

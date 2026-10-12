@@ -391,6 +391,8 @@ canon evidence add --scenario-id cart.add.04 --project-id root \
 # a JUnit XML or Cucumber JSON report: also records the matched case + outcome
 canon evidence add ... --report junit:target/nextest/default/junit.xml
 canon evidence add ... --report cucumber:reports/cucumber.json
+# a Swift Testing event stream (swift test --experimental-event-stream-output <path>)
+canon evidence add ... --report swift-testing:.build/events.jsonl
 ```
 
 A case is bound when the scenario id is its OWN: the first
@@ -407,6 +409,12 @@ or a `--report-case` naming no case, refuses (exit 2); a `faithful`
 verdict when ANY bound case failed or was skipped refuses (exit 1). Files
 must be inside the repository, are recorded by relative path, and are
 stored (see Bound evidence stays provable).
+
+A Swift Testing case is named by its display name (`@Test("cart.add.04
+refuses an out-of-stock item")`), else its function name
+(`cart_add_04_refuses()`). A test with a failing issue failed, a skipped
+test was skipped, a test that started and ended without one passed, and
+a test that started and never ended failed.
 
 Strength, weakest first: `attested` (no attachment) < `artifact` (any
 bound file) < `report` (a parsed report whose case passed). The policy
@@ -430,6 +438,55 @@ evidence record per scenario decides; scenarios with no evidence are
 violation in every mode. Canon still cannot know whether the bound test
 actually exercises the scenario — binding narrows the trust gap, it does
 not close it.
+
+### One report, many scenarios (0.18)
+
+One test run proves many scenarios. Bind it once:
+
+```bash
+canon evidence add --project-id root --all-scenarios \
+  --report junit:target/nextest/default/junit.xml \
+  --kind test-run --ref "cargo nextest run" --role implementer
+```
+
+Each indexed scenario of `--project-id` that owns a case (the rule above)
+gets its own record, with only its own cases. Its verdict comes from
+them: `faithful` when every case passed, `divergent` when one failed,
+`not-applicable` when one was skipped and none failed. `--verdict <v>`
+claims the same verdict for every record instead. A case whose id is not
+indexed is named and skipped (`skipped <id> — not an indexed scenario`);
+a report no indexed scenario owns is refused (exit 2). The records share
+the stored report and every `--artifact`, and the output lists each
+scenario with its verdict on its own line.
+
+It is all or nothing: a claimed `faithful` verdict over a failed case,
+a fabrication marker in `--summary`, an unapproved brief for any
+scenario's subject, or a scenario whose latest record binds a file the
+batch does not refuses the whole batch, and nothing is written.
+`--scenario-id`, `--task`, `--report-case`, `--kind audit`,
+`--drop-attachment` and the approval flags name one subject and are
+refused with `--all-scenarios`.
+
+A task's evidence with `--report` and no `--scenario-id` binds EVERY case
+in the report, so a `faithful` verdict needs all of them to pass.
+
+### A write that makes a review stale says so (0.18)
+
+When new evidence (one record or a batch) supersedes the evidence a
+current pinned review saw, `canon evidence add` prints one line per
+review it makes stale, with the command that re-pins it:
+
+```
+canon evidence add: review by `reviewer-2` of cart.add.01 is now stale (it pinned the evidence this record supersedes); re-pin it: canon review add --project-id root --scenario-id cart.add.01 --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer --pin <HEAD sha> --original-spec-ref specs/kind=feature/area=cart/add.feature
+```
+
+The decision is the gate's own (the same stale-review rule `canon gate
+check` reports). The command repeats the review's reviewer, actor, role,
+provenance ref, runtime labels and artifacts, pinned at `HEAD` (`<sha>`
+when the repository has no commit). A record that is only staged says
+the review "goes stale once this evidence is promoted": promote first,
+then re-pin. The reviewer re-reviews before re-pinning; several
+scenarios re-pin in one `canon review add` (see `canon-review`).
 
 ## Bound evidence stays provable (the artifact store)
 

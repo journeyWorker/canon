@@ -1153,6 +1153,10 @@ pub enum ReportFormat {
     Junit,
     /// Cucumber JSON — Gherkin runners; scenario tags travel in it.
     Cucumber,
+    /// Swift Testing's JSON-lines event stream (`swift test
+    /// --experimental-event-stream-output <path>`): the scenario id is
+    /// read from a test's display name, else its function name.
+    SwiftTesting,
 }
 
 /// The outcome a parsed report records for the case an attachment names.

@@ -1,0 +1,7 @@
+canon review add: pinned cart.add.01 at scenario digest a9ae86ece48f and 0 latest evidence record(s); the review counts only while both are unchanged
+canon review add: pinned cart.add.02 at scenario digest af9a434f41ba and 0 latest evidence record(s); the review counts only while both are unchanged
+canon review add: pinned cart.add.03 at scenario digest 33fd58bf82fc and 0 latest evidence record(s); the review counts only while both are unchanged
+canon review add: artifact store holds 1 bound file(s) under .canon/artifacts/sha256/ (1 newly stored) — commit them with the ledger
+canon review add: wrote kind=review/area=cart/root__cart.add.01__r1__<digest12>.json (new) — written directly; nothing to promote
+canon review add: wrote kind=review/area=cart/root__cart.add.02__r1__<digest12>.json (new) — written directly; nothing to promote
+canon review add: wrote kind=review/area=cart/root__cart.add.03__r1__<digest12>.json (new) — written directly; nothing to promote

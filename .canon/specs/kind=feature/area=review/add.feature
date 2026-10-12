@@ -260,3 +260,23 @@ Feature: review add
     Then the guard refuses with the gate's stale-review detail and prints the advisory for the subject's own scenarios
     And `canon status` counts the scenario as a stale review
     And once the scenario is reviewed again the move goes through
+
+  # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
+  @subject:review-attestation
+  @case:happy
+  @review.add.80
+  Scenario: One review add signs off several scenarios with one reviewer, pin and set of artifacts
+    Given three indexed scenarios
+    When a review is added with --scenario-id repeated and --scenario-ids-from a file of ids with comments
+    Then one review is written per scenario, each pinning its own scenario and evidence, with the same reviewer, pin and artifacts
+    And the artifacts are stored once
+
+  # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.81
+  Scenario: A batch review with any scenario that has no record writes nothing
+    Given two indexed scenarios and one id with no scenario record
+    When a review is added for all three
+    Then the add exits 2 naming the unindexed id, and no review is written for any of them
+    And an ids file with a line that is not a scenario id is refused with exit 2, naming the line
