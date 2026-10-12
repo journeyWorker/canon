@@ -85,7 +85,21 @@ for the machine-readable source/projection/memory map.
 ## 0.18.0 release
 
 Version 0.18.0 cuts the calls an attestation costs and makes the
-lifecycle honest. Plan: `docs/superpowers/plans/2026-10-12-canon-0.18.0-fewer-calls.md`.
+lifecycle honest: one `evidence add` attests every scenario a test report
+covers, one `review add` reviews a batch, a shipped subject can be
+reopened inside its approved scope, a change can belong to several
+subjects, and the gate stops failing on what is not wrong. Plan:
+`docs/superpowers/plans/2026-10-12-canon-0.18.0-fewer-calls.md`.
+
+**Why.** Dogfood runs (FINDINGS-3, FINDINGS-4) spent most of their calls
+on bookkeeping: one `evidence add` and one `review add` per scenario, a
+refused `faithful` for a task report, a silent pin break the agent found
+only at the gate. Follow-up work on a shipped subject had no lawful path
+back, a change shared by two subjects could name only one, the gate
+refused a summary for `n/a` inside a file name and failed on a lost blob
+of a superseded review, a formatter's rewrite read as skill drift, a
+fresh repo's report showed no tasks, and the example attested its
+scenarios with canon's own tests instead of the game's.
 
 ### D1, D2: one report, many scenarios; the write that breaks a pin says so (#27, #33, #26, #24)
 
@@ -116,10 +130,6 @@ lifecycle honest. Plan: `docs/superpowers/plans/2026-10-12-canon-0.18.0-fewer-ca
   one line per review now stale with the reviewer, the scenario and the
   `canon review add … --pin <sha>` that re-pins it (`HEAD`, or `<sha>`
   with no commit). The decision is the gate's own `review_gap`.
-- Conformance: `review-pin-stale-evidence` step 3 now carries the
-  stale-review line (re-blessed); new cases `evidence-add-all-scenarios`,
-  `evidence-add-all-scenarios-refused-contradiction`,
-  `evidence-add-swift-testing`, `review-add-batch`.
 
 ### D3, D4: reopening a shipped subject, and a change in several subjects (#31, #28)
 
@@ -196,15 +206,6 @@ neither checked nor vaulted. To read the same reviews as the gate, the
 vault first refreshes a stale scenario index, as `canon gate check` does.
 A missing blob whose working-tree file changed or is gone, and an altered
 blob, are still `stale-evidence` naming the review.
-
-Conformance: `gate-check-review-artifact-stale-evidence` now changes the
-working-tree file, since a matching one no longer makes that case red. In
-`evidence-vault-stores-unstored` and `evidence-vault-reports-unstorable`
-the index-refresh line moves from the later `gate check` step to the
-`evidence vault` step. New cases:
-`gate-check-review-artifact-vault-advisory`,
-`gate-check-review-artifact-superseded` and
-`evidence-add-fabrication-marker-whole-token`.
 
 ### D6: consumer-repo hygiene and reads (#25, #29, #34, #37)
 
@@ -341,6 +342,59 @@ the ledger is append-only. The new `platformer` job in the Test workflow
 runs the suite. The platformer's legacy reviews are now stale, and the
 gate's advisory names the platformer scenarios to review again. An
 independent re-review clears them.
+
+**Migration.** For a 0.17 consumer:
+
+- Run `canon skills install` to refresh the projected skill (#37's
+  wording) and to see the `owned-paths:` list for formatter and linter
+  ignores.
+- `canon query --kind change` now returns one row per change, its current
+  version; it used to return every version.
+- `Change` records of schema generation 1 (`subject_id`) are read as a
+  one-element `subject_ids`; nothing needs rewriting. New records are
+  written at generation `2`.
+- `canon status --json` has a `red` field for shipped subjects whose ship
+  guard would now fail (`statusVersion` stays `3`).
+- `canon report` now reads the sqlite hot tier: a fresh repo's task
+  columns fill in, and a `hot` db file that is not sqlite fails the report
+  (exit 1).
+- `canon skills check` reports a formatter-only rewrite of a projected
+  file as `formatter-rewritten` instead of `stale`; it still exits 1.
+  Scripts that match `stale` should match both.
+
+**Changed conformance expectations.**
+
+- `version` and every case that prints the version now print 0.18.0.
+- `review-pin-stale-evidence` step 3 carries the stale-review line (D2).
+- `gate-check-review-artifact-stale-evidence` now changes the
+  working-tree file, since a matching one no longer makes the case red
+  (D5).
+- `evidence-vault-stores-unstored` and `evidence-vault-reports-unstorable`:
+  the index-refresh line moves from the later `gate check` step to the
+  `evidence vault` step (D5).
+- `skills-check-outdated-lock`, `skills-doctor-competing-skill`,
+  `skills-doctor-stray-projection` and `init-providers-detected` end with
+  the `owned-paths:` list (D6).
+- `context-json-policy-summary` shows `Change` schema `2` with
+  `subject_ids` and `reopen` (D3, D4).
+- `subject-status-off-chain-transition` names `shipped → verifying` as an
+  allowed reopen (D3).
+
+No exit code changed.
+
+**New conformance cases:** `evidence-add-all-scenarios`,
+`evidence-add-all-scenarios-refused-contradiction`,
+`evidence-add-swift-testing`, `review-add-batch`,
+`subject-reopen-allowed`, `subject-reopen-refused-unapproved-brief`,
+`status-shipped-red-reopen`, `subject-adopt-second-subject`,
+`evidence-add-fabrication-marker-whole-token`,
+`gate-check-review-artifact-vault-advisory`,
+`gate-check-review-artifact-superseded`, `finding-list-open-json`.
+
+**Closed issues:** #24, #25, #26, #27, #28, #29, #30, #31, #32, #33, #34,
+#36, #37.
+
+ACCEPTANCE-PLACEHOLDER: …
 
 ## 0.17.0 release
 
