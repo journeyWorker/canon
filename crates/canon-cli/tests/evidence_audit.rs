@@ -61,6 +61,17 @@ fn subject_at(repo: &Path, id: &str, status: &str) {
     }
 }
 
+/// Record the human's approval of `subject`'s brief, which `verifying →
+/// shipped` requires (0.16 D1): a change adopted into it whose
+/// `proposal.md` carries an `Approved:` line.
+fn approve_brief(repo: &Path, subject: &str) {
+    let change = format!("c-{subject}");
+    ok(repo, &["change", "new", &change, "--subject", subject, "--title", "The brief"]);
+    let proposal = repo.join("openspec/changes").join(&change).join("proposal.md");
+    let text = std::fs::read_to_string(&proposal).unwrap();
+    std::fs::write(proposal, format!("{text}\nApproved: Journey 2026-10-12 — \"승인\"\n")).unwrap();
+}
+
 fn write(repo: &Path, path: &str, bytes: &[u8]) {
     let path = repo.join(path);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -150,7 +161,8 @@ fn a_reattest_that_drops_a_binding_is_refused_until_rebound_or_dropped_on_purpos
     assert!(human.contains("dropped bindings (1):") && human.contains("game.run.01: reports/shot.png — \"screenshots moved to the e2e lane\" (by impl-agent at "), "{human}");
 }
 
-/// evidence.add.42: the latest record includes one still in staging.
+/// evidence.add.42: the latest record includes one still in staging
+/// (`--no-promote`: `canon init` repos promote on write).
 #[test]
 fn an_unpromoted_record_is_the_latest_the_guard_compares_with() {
     let dir = setup();
@@ -158,7 +170,7 @@ fn an_unpromoted_record_is_the_latest_the_guard_compares_with() {
     scenario(repo, "game.run.01", None);
     write(repo, "reports/a.txt", b"a");
     write(repo, "reports/b.txt", b"b");
-    ok(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt", "--artifact", "reports/b.txt"]));
+    ok(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt", "--artifact", "reports/b.txt", "--no-promote"]));
     let out = refused(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt"]));
     assert!(out.contains("`reports/b.txt`"), "{out}");
     assert_eq!(staged(repo), 1);
@@ -265,6 +277,7 @@ fn a_refuted_audit_is_false_success_until_a_newer_audit_confirms() {
     assert!(out.contains("the latest audit record for game.run.01") && out.contains("`reports/counter.xml`"), "{out}");
     record(repo, &audit_args("game.run.01", "confirmed", &["--drop-attachment", "reports/counter.xml", "--drop-reason", "the counterexample is fixed"]));
     ok(repo, &["gate", "check"]);
+    approve_brief(repo, "run");
     ok(repo, &["subject", "status", "run", "shipped", "--actor-id", "lead"]);
 }
 

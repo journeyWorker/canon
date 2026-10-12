@@ -1,0 +1,6 @@
+description: "A review written before review pinning whose pin is a commit this clone does not have (a shallow clone or rewritten history, simulated with a fake sha) is undecidable (0.16 D6): it still satisfies `require_review`, `canon subject status <id> verifying` exits 0, and `canon gate check` is clean (exit 0) with an advisory counting it as undecidable and suggesting a full-history checkout (`fetch-depth: 0`)"
+steps:
+  - args: [subject, status, cart, verifying]
+    exit: 0
+  - args: [gate, check]
+    exit: 0

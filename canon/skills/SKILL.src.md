@@ -13,31 +13,60 @@ where each subject stands and lists the next commands.
 ## The working loop
 
 Follow these steps in order for every request that builds, changes or fixes
-a feature, a one-line request included. Two points stop for a human:
+a feature, a one-line request included. A human is needed once per scope:
 
-- **The brief** (step 1): the request, your assumptions, your open questions.
-- **The policy**: `.canon/policy.yaml` (written by `canon init`) is what the
-  gate grades the work against. A human approves it with
-  `canon policy approve --by <who>` (and again after every change to it);
-  never edit it to make the gate pass, and never approve it yourself.
+- **The approval** (step 1). A new subject, or a change to an approved
+  subject's scope, needs the human to approve its brief: the request, your
+  assumptions, your open questions. Write the brief, then stop and report
+  it: build nothing for that scope (no scenarios, code or evidence) before
+  the human answers. The approval is the one thing you never assume, even
+  when the human said they cannot answer until you report: the brief is
+  that report. In the same answer the human approves the policy,
+  `.canon/policy.yaml` (written by `canon init`), which is what the gate
+  grades the work against. When the human answers, record both at once:
+  an `Approved: <who> <when> — "<the human's words>"` line in the change's
+  `proposal.md`, and
+  `canon policy approve --by <the human> --note "<their words>"`. Never
+  approve without a human answer, and never edit the policy to make the
+  gate pass.
+- **Inside an approved scope, never stop for a human.** Fixes, follow-ups,
+  review rounds and re-reviews go straight on: add or extend the scenario,
+  implement, gather evidence, and get an independent review in another
+  session. Independent review happens on every change. A fix or follow-up
+  stays in the approved change: add it as tasks in that change's
+  `tasks.md`, never with `canon change new`, because a new change is a new
+  scope and needs the human's approval.
 
-When no human can answer, write the question into the brief, proceed on the
-assumption you state there, and say so in your final report.
+When no human can answer one of the brief's questions, write the question
+into the brief, state the assumption you will build on, and say so in your
+report. Proceeding on an assumption applies to the brief's questions and to
+work inside an approved scope, never to the approval itself.
 
-1. **Brief.** Write down the request verbatim, your assumptions, and the
-   questions you could not ask. It becomes the change's
-   `openspec/changes/<slug>/proposal.md`, which
+1. **Brief.** For a new subject or a scope change, write down the request
+   verbatim, your assumptions, and the questions you could not ask. It
+   becomes the change's `openspec/changes/<slug>/proposal.md`, which
    `canon change new <slug> --subject <id> --title "…"` scaffolds once the
-   subject exists (step 2). A human approves the brief.
+   subject exists (step 2). Once it is there, stop and report the brief,
+   asking the human once for the brief and the policy; go on to step 3
+   only after the human answers, and record the answer as above. Inside an
+   approved scope there is no new brief: go to step 3 under the existing
+   subject and change.
 2. **Subject.** `canon subject new <id> --domain <domain> --title "…"`, then
    `canon change new <slug> --subject <id> --title "…"`, and put the brief in
-   the change's `proposal.md`.
+   the change's `proposal.md`. For a new subject or a scope change, this is
+   where you stop until the human answers (step 1).
 3. **Scenarios.** `canon feature new <area>.<surface> --title "…"`, then one
    `canon scenario new <area>.<surface>.<nn> --subject <id> --case <case> --title "…"`
    per behavior, with failure paths (`--case failure`) as well as `happy`
    and `edge`. When the gate asks for a missing case (`require_cases`), add
-   a new scenario; never retag an existing one to satisfy it. Check the
-   corpus with `canon format specs` and index it with `canon inventory sync`.
+   a new scenario; never retag an existing one to satisfy it. There is no
+   sync or format step: `canon status`, `canon gate check`,
+   `canon evidence add`, `canon review add` and `canon subject status`
+   index added, edited or deleted `.feature` files themselves. Only when
+   one of them prints `NOT refreshed` (a format violation, such as a
+   hand-written header with no `# canon:` provenance comment, or a
+   duplicate id) run `canon inventory sync`: it names each problem; fix
+   them, and the next command indexes the files.
 4. **Units.** Split the work into units (for example specs, domain code,
    assets, review). Give each unit its own actor id and session id, and pass
    them on everything the unit records (`--actor-id <unit> --session-id <session>`),
@@ -52,31 +81,54 @@ assumption you state there, and say so in your final report.
    `canon evidence add --project-id <root-id> --scenario-id <id> --kind test-run --role implementer --ref "<command>" --actor-id <unit> --session-id <session>`,
    with `--report junit:<path>` or `--artifact <path>` when files prove it.
    canon stores those bytes in `.canon/artifacts/sha256/` (commit it with the
-   ledger) and `canon gate check` re-checks them. Then `canon gate promote`.
+   ledger) and `canon gate check` re-checks them. For a scenario about what
+   users see, bind the screenshot or recording that shows it
+   (`--artifact <path>`). Under `write: { promote: auto }` (what
+   `canon init` writes) the record is final when the command returns; only
+   in a repo with `write.promote: manual` (or no `write:` key) follow it
+   with `canon gate promote`.
    An external evaluator's audit is recorded with `canon evidence add --kind
    audit`; canon never generates one.
    Evidence for a plan task (`--task <id>`, before `canon gate task`) must
    bind the artifact or report that proves the task; a canon command
-   (`canon status`, `canon gate check`) is never that proof.
+   (`canon status`, `canon gate check`) is never that proof. Both read the
+   change's `tasks.md` as it is now, so a task row you add needs no
+   `canon ingest plans` first.
 7. **Independent review.** A different session from the one that wrote the
    code and evidence reviews the change. The reviewer records every defect
    the review finds as a finding:
-   `canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <me> --actor-id <me> --session-id <session> --summary "…"`,
-   then `canon gate promote`; once fixed,
+   `canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <me> --actor-id <me> --session-id <session> --summary "…"`;
+   once fixed,
    `canon finding close --change-id <slug> --round <n> --seq <n> --disposition fixed --resolution-sha <sha>`
-   (a short sha is fine; canon resolves it)
-   and `canon gate promote`. Every bug fix adds or extends a scenario. The
+   (a short sha is fine; canon resolves it). With `write.promote: manual`,
+   follow each with `canon gate promote`. Every bug fix adds or extends a scenario. The
    reviewer signs off each scenario:
    `canon review add --project-id <root-id> --scenario-id <id> --reviewer <who> --actor-id <who> --role reviewer --session-id <review-session> --pin <sha> --upstream-ref <ref>`
-   (written directly; nothing to promote).
+   (written directly; nothing to promote). A reviewer of user-visible
+   behavior attaches what it looked at with `--artifact <path>`
+   (repeatable); canon stores and re-checks those bytes and never compares
+   images.
 8. **Transition.** `canon subject status <id> <state>` along
    `proposed → specced → building → verifying → shipped`. It refuses a move
    the policy does not yet allow (missing evidence, missing reviews, open
    blocker findings); fix the gap rather than overriding, and finish with
-   `canon gate check` clean.
+   `canon gate check` clean. A root whose `.feature` edits could not be
+   indexed fails the gate and refuses `shipped` (`uncovered-cell <root>`;
+   see step 3). `shipped` also refuses while the change's `proposal.md`
+   has no `Approved:` line, and `canon evidence add` refuses the subject's
+   scenarios and tasks the same way. Both are backstops: the stop itself
+   is at step 1, so you never reach them for a brief the human has not
+   answered. You record the line only from the human's answer (with no
+   `proposal.md` there is no brief to answer: neither refuses, and the
+   ship guard only prints an advisory). Move the subject to
+   `shipped` yourself once `canon subject status <id> shipped` passes its
+   guard, unless the brief says the human ships. `canon status` shows
+   whether each subject's brief is approved, by the same check, and names
+   the next step.
 
-Every write command says whether it staged the record (then
-`canon gate promote`) or wrote it directly.
+Every write command says whether the record is final (`written directly`,
+or `staged and promoted in this run`) or staged; only a staged record
+needs `canon gate promote`, and only `write.promote: manual` leaves one.
 
 ## Command reference
 
@@ -85,7 +137,7 @@ Load only the reference the current step needs.
 ### Setup and provider projection
 
 ```bash
-canon init                                   # canon.yaml, starter policy, AGENTS.md block, plans home
+canon init                                   # canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, plans home
 canon skills install                         # detects .claude/.agents|.codex/.omp/.pi; if none exists, installs Claude+Codex
 canon skills install --providers=claude,codex,omp,pi
 canon skills check                           # read-only drift check

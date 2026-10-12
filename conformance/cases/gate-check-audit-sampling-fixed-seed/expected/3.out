@@ -1,6 +1,6 @@
 {
-  "statusVersion": 1,
-  "canonVersion": "0.15.0",
+  "statusVersion": 2,
+  "canonVersion": "0.16.0",
   "policy": {
     "present": true,
     "spec_coverage": {
@@ -14,7 +14,8 @@
         "seed": "canon-0.15",
         "scope": []
       }
-    }
+    },
+    "level": "custom"
   },
   "warnings": [
     "policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`"
@@ -53,11 +54,13 @@
   "next": [
     {
       "command": "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>",
-      "why": "no subject exists yet; a subject is the unit status, review and shipping track"
+      "why": "no subject exists yet; a subject is the unit status, review and shipping track",
+      "actor": "agent"
     },
     {
-      "command": "canon inventory sync",
-      "why": "6 scenario(s) carry no @subject tag (first: shop.cart.01); add `@subject:<id>` above each in its .feature file, then sync"
+      "command": "canon status",
+      "why": "6 scenario(s) carry no @subject tag (first: shop.cart.01); add `@subject:<id>` above each in its .feature file, then check again: status re-indexes the edited files itself",
+      "actor": "agent"
     }
   ],
   "nextOmitted": 0

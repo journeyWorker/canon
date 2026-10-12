@@ -66,6 +66,7 @@
         "attachment_drop": false,
         "attachments": false,
         "audit": false,
+        "brief_override": false,
         "evidence_sha": false,
         "flagged": false,
         "kind": true,
@@ -141,6 +142,7 @@
       "schema_version": 1,
       "envelope_fields": {
         "actor": true,
+        "artifacts": false,
         "at": true,
         "kind": true,
         "outcome": false,
@@ -192,6 +194,7 @@
         "kind": true,
         "lane": false,
         "project_id": true,
+        "removed": false,
         "scenario_digest": false,
         "scenario_id": true,
         "schema": true,
@@ -441,6 +444,7 @@
     ],
     "reviewFields": {
       "actor": true,
+      "artifacts": false,
       "at": true,
       "kind": true,
       "outcome": false,
@@ -516,6 +520,7 @@
         "record.attachment_drop": "map",
         "record.attachments": "list<map>",
         "record.audit": "map",
+        "record.brief_override": "map",
         "record.evidence_sha": "string",
         "record.flagged": "map",
         "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
@@ -585,6 +590,7 @@
     "review": {
       "fields": {
         "record.actor": "map",
+        "record.artifacts": "list<map>",
         "record.at": "timestamp",
         "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
         "record.outcome": "string (one of: signed, indeterminate, unavailable)",
@@ -632,6 +638,7 @@
         "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
         "record.lane": "string",
         "record.project_id": "string",
+        "record.removed": "bool",
         "record.scenario_digest": "string",
         "record.scenario_id": "string",
         "record.schema": "uint",

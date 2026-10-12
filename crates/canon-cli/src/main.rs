@@ -80,17 +80,20 @@ struct Cli {
 enum Command {
     // ── Getting started ──
     /// Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)
-    #[command(after_help = "Examples:\n  canon init\n  canon init --no-agents-md --no-policy\n  canon init --check-config\n\nRerunning in a repo that has canon.yaml leaves canon.yaml and .canon/policy.yaml\nalone and only refreshes the canon block in AGENTS.md.")]
+    #[command(after_help = "Examples:\n  canon init\n  canon init --policy light\n  canon init --no-agents-md --no-policy\n  canon init --check-config\n\nPolicy levels (--policy, default strict): light requires evidence on every\nscenario; standard adds a `@case:failure` scenario per feature surface; strict\nadds independent review. The level is the first line of .canon/policy.yaml and\n`canon status` shows it.\n\nRerunning in a repo that has canon.yaml leaves canon.yaml and .canon/policy.yaml\nalone and only refreshes the canon block in AGENTS.md.")]
     Init {
         /// Directory to set up (used as-is)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
         /// Validate an existing canon.yaml instead of writing one
-        #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy"])]
+        #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy", "policy"])]
         check_config: bool,
         /// Do not write or refresh the canon block in AGENTS.md
         #[arg(long)]
         no_agents_md: bool,
+        /// Level of the starter .canon/policy.yaml [default: strict]
+        #[arg(long, value_enum, value_name = "LEVEL", conflicts_with = "no_policy")]
+        policy: Option<canon_cli::policy_level::PolicyLevel>,
         /// Do not write the starter .canon/policy.yaml
         #[arg(long)]
         no_policy: bool,
@@ -196,13 +199,13 @@ enum Command {
         action: GateCommand,
     },
     /// Author a staged, attributed evidence attestation for a plan task
-    #[command(after_help = "Examples:\n  canon evidence add --task my-change#3.1 --kind test-run --ref 'cargo test -p canon-cli' --role implementer\n\nThe loop:\n  canon evidence add ...    Stage an EvidenceRecord\n  canon gate promote        Commit it (assigns run_seq)\n  canon gate task <id>      Flip the checkbox on it\n\nSee `canon evidence add --help` for exactly what the gate does and does not check.")]
+    #[command(after_help = "Examples:\n  canon evidence add --task my-change#3.1 --kind test-run --ref 'cargo test -p canon-cli' --role implementer\n\nThe loop:\n  canon evidence add ...    Record an EvidenceRecord (promoted in the same run under\n                            `write: { promote: auto }`, which `canon init` writes)\n  canon gate task <id>      Flip the checkbox on it\nUnder `write.promote: manual` (no `write:` key), run `canon gate promote` after\neach add to commit it (assigns run_seq).\n\nSee `canon evidence add --help` for exactly what the gate does and does not check.")]
     Evidence {
         #[command(subcommand)]
         action: EvidenceCommand,
     },
     /// Record one code-review finding as a durable record
-    #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --reviewer review-voice \\\n      --summary 'a release metric is asserted, never computed'\n  canon finding close --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n\nThe loop:\n  canon finding add ...     Stage a Finding\n  canon gate promote        Commit it\n  canon finding close ...   Stage its disposition TRANSITION, once fixed\n  canon gate promote        Commit that too\n\nThe committed finding STAYS when it is closed: the ledger is append-only and\nthe pair IS the history. Every reader folds by natural key to the latest\nversion, so the finding is still counted once.\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-by is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
+    #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --reviewer review-voice \\\n      --summary 'a release metric is asserted, never computed'\n  canon finding close --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n\nThe loop:\n  canon finding add ...     Record a Finding\n  canon finding close ...   Record its disposition TRANSITION, once fixed\nEach is promoted in the same run under `write: { promote: auto }`, which\n`canon init` writes. Under `write.promote: manual` (no `write:` key), run\n`canon gate promote` after each to commit it.\n\nThe committed finding STAYS when it is closed: the ledger is append-only and\nthe pair IS the history. Every reader folds by natural key to the latest\nversion, so the finding is still counted once.\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-by is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
     Finding {
         #[command(subcommand)]
         action: FindingCommand,
@@ -770,6 +773,24 @@ enum GateCommand {
     Selftest,
 }
 
+/// `--promote`/`--no-promote`, flattened into every staged write
+/// (0.16 D2; `canon_cli::write_mode`).
+#[derive(clap::Args, Debug, Clone, Copy)]
+struct PromoteArgs {
+    /// Promote the record this run staged, in the same run; records others staged stay staged (the default under canon.yaml `write: { promote: auto }`)
+    #[arg(long, conflicts_with = "no_promote")]
+    promote: bool,
+    /// Keep this write staged even under canon.yaml `write: { promote: auto }`
+    #[arg(long)]
+    no_promote: bool,
+}
+
+impl PromoteArgs {
+    fn flag(self) -> canon_cli::write_mode::PromoteFlag {
+        canon_cli::write_mode::PromoteFlag::from_flags(self.promote, self.no_promote)
+    }
+}
+
 #[derive(Subcommand)]
 enum EvidenceCommand {
     /// Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`
@@ -793,8 +814,8 @@ enum EvidenceCommand {
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
-    /// Stage one attributed EvidenceRecord for a task or scenario (commit it with `canon gate promote`)
-    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).\n\nRE-ATTESTING NEVER DROPS A BINDING SILENTLY (--drop-attachment).\nFor a scenario, a record that leaves out a file the scenario's latest record binds is refused (exit 2) until it re-binds the file (new bytes at the same path are fine) or names it with --drop-attachment <path> (repeatable) --drop-reason <text>. The drop is recorded on the record and listed by canon status. Task-only evidence has no drop guard.\n\nAUDITS (--kind audit).\nRecords an external evaluator's re-audit of one scenario: --evaluator-id, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
+    /// Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)
+    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).\n\nRE-ATTESTING NEVER DROPS A BINDING SILENTLY (--drop-attachment).\nFor a scenario, a record that leaves out a file the scenario's latest record binds is refused (exit 2) until it re-binds the file (new bytes at the same path are fine) or names it with --drop-attachment <path> (repeatable) --drop-reason <text>. The drop is recorded on the record and listed by canon status. Task-only evidence has no drop guard.\n\nNOTHING IS ATTESTED BEFORE THE BRIEF IS APPROVED (--override-reason).\nWhile a subject this record attests for (the scenario's @subject owner, or any subject adopting the task's change) has a newest change whose proposal.md has no `Approved:` line, the add is refused (exit 1, nothing staged): stop, report the brief and wait for the human's answer. --override-reason <text> attests anyway; the reason, the waived subjects and --actor-id are recorded on the record and listed by canon status and canon gate check. A subject with no proposal.md to answer is unaffected; review add and finding add are never refused.\n\nAUDITS (--kind audit).\nRecords an external evaluator's re-audit of one scenario: --evaluator-id, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
     Add {
         /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
@@ -880,6 +901,11 @@ enum EvidenceCommand {
         /// Why the --drop-attachment files are no longer bound (one line, recorded on the record)
         #[arg(long)]
         drop_reason: Option<String>,
+        /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)
+        #[arg(long)]
+        override_reason: Option<String>,
+        #[command(flatten)]
+        promote: PromoteArgs,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -898,8 +924,8 @@ enum EvidenceCommand {
 
 #[derive(Subcommand)]
 enum FindingCommand {
-    /// Stage one code-review finding (commit it with `canon gate promote`)
-    #[command(after_help = "RECORDED OBSERVATION, NOT PROOF. canon does not verify that the defect\nexisted, that it was real, that it was fixed, or that --introduced-by names\nthe commit that actually caused it. This records that a named reviewer, at a\nstamped time, RAISED this finding against this change.\n\nAn agent that can run this command can record its own review round, with its\nown severities: the author of a finding and its beneficiary are the same\nparty, with no signature and no second party — the same gap `canon evidence\nadd` states about attestations.\n\nWhat canon does NOT check:\n  - --summary, against the diff, the code, or the review transcript. The\n    record is identical whether the defect was real, misdiagnosed, or invented\n  - --resolution-sha: never resolved, never read. `--disposition fixed`\n    records that someone SAID this commit closed it, not that it did\n  - --introduced-by: never verified, and never guessed (below)\n  - --reviewed-sha: optional, because most rounds review an uncommitted\n    working tree. When absent, canon does not infer one\n  - nothing here is gated. No `canon gate check` check consumes findings, and\n    no checkbox flips on one\n\nWhat the record IS good for:\n  - attribution: an append-only row naming who raised what, in which round,\n    against which change, at which severity and disposition. Before this\n    command, a review round left nothing at all once its transcript was gone\n  - a DERIVED count that stops being typed from memory. v0.4.0's release note\n    hand-typed its issue counts into a published tag and got them wrong; that\n    is why this command exists. No count is quoted here and none is asserted\n    in its place -- read them off the 'Review rounds' panel in\n    .canon/REPORT.md or the dashboard, which derive them from these records\n\n--introduced-by must be SOURCED:\n  Set it only when the introducing commit was actually established — someone\n  read the diff, or the fixing commit names it. Never from timing, commit\n  adjacency, or `git blame`. Leaving it UNSET is the correct record when it is\n  not known, not an incomplete one. Unset means UNSOURCED, never 'no cause'; a\n  guessed value would inflate the exact number this command exists to make\n  trustworthy.\n\nWhat a derived fix-of-fix count MEANS, stated here word for word as every\nother surface states it (canon_report::render::FIX_OF_FIX_MEANING) rather\nthan paraphrased, because paraphrase is how the previous wording went wrong\non seven surfaces at once:\n\n  `fix_of_fix` bounds NOTHING — not from below, not from above: it\n  UNDER-counts, because an unsourced finding is never counted and a fix in\n  one change that breaks something first found while reviewing a DIFFERENT\n  change is not counted at all; it OVER-counts, because a `resolution_sha`\n  commit may carry work BEYOND the fix and every finding recording that\n  commit is counted regardless; and for any individual match the data cannot\n  say whether the fix or the other work in that commit introduced the\n  defect.\n\nFix-of-fix is DERIVED, never recorded: a finding is one when its\nintroduced_by equals an EARLIER finding's resolution_sha (lower round/seq in\nthe same change). There is no flag for it and there will not be one — a flag\nwould relocate the hand-typing from the release notes into the record.\n\n--seq is REQUIRED, never auto-assigned: two concurrent adds would read the\nsame highest seq and both pick the next one, landing two records under one\nfinding's identity and inflating the count. An already-occupied\n(--change-id, --round, --seq) is refused, naming it.\n\nRefused before anything is staged:\n  - --disposition fixed with no --resolution-sha, and --resolution-sha with\n    any other disposition\n  - a line separator in --summary, --reviewer, --file-ref or --actor-id: a\n    finding is rendered as ONE row, so a separator appends a second row that\n    no record backs\n\nThe loop:\n  canon finding add ...     Stage a Finding\n  canon gate promote        Commit it")]
+    /// Record one code-review finding (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)
+    #[command(after_help = "RECORDED OBSERVATION, NOT PROOF. canon does not verify that the defect\nexisted, that it was real, that it was fixed, or that --introduced-by names\nthe commit that actually caused it. This records that a named reviewer, at a\nstamped time, RAISED this finding against this change.\n\nAn agent that can run this command can record its own review round, with its\nown severities: the author of a finding and its beneficiary are the same\nparty, with no signature and no second party — the same gap `canon evidence\nadd` states about attestations.\n\nWhat canon does NOT check:\n  - --summary, against the diff, the code, or the review transcript. The\n    record is identical whether the defect was real, misdiagnosed, or invented\n  - --resolution-sha: never resolved, never read. `--disposition fixed`\n    records that someone SAID this commit closed it, not that it did\n  - --introduced-by: never verified, and never guessed (below)\n  - --reviewed-sha: optional, because most rounds review an uncommitted\n    working tree. When absent, canon does not infer one\n  - nothing here is gated. No `canon gate check` check consumes findings, and\n    no checkbox flips on one\n\nWhat the record IS good for:\n  - attribution: an append-only row naming who raised what, in which round,\n    against which change, at which severity and disposition. Before this\n    command, a review round left nothing at all once its transcript was gone\n  - a DERIVED count that stops being typed from memory. v0.4.0's release note\n    hand-typed its issue counts into a published tag and got them wrong; that\n    is why this command exists. No count is quoted here and none is asserted\n    in its place -- read them off the 'Review rounds' panel in\n    .canon/REPORT.md or the dashboard, which derive them from these records\n\n--introduced-by must be SOURCED:\n  Set it only when the introducing commit was actually established — someone\n  read the diff, or the fixing commit names it. Never from timing, commit\n  adjacency, or `git blame`. Leaving it UNSET is the correct record when it is\n  not known, not an incomplete one. Unset means UNSOURCED, never 'no cause'; a\n  guessed value would inflate the exact number this command exists to make\n  trustworthy.\n\nWhat a derived fix-of-fix count MEANS, stated here word for word as every\nother surface states it (canon_report::render::FIX_OF_FIX_MEANING) rather\nthan paraphrased, because paraphrase is how the previous wording went wrong\non seven surfaces at once:\n\n  `fix_of_fix` bounds NOTHING — not from below, not from above: it\n  UNDER-counts, because an unsourced finding is never counted and a fix in\n  one change that breaks something first found while reviewing a DIFFERENT\n  change is not counted at all; it OVER-counts, because a `resolution_sha`\n  commit may carry work BEYOND the fix and every finding recording that\n  commit is counted regardless; and for any individual match the data cannot\n  say whether the fix or the other work in that commit introduced the\n  defect.\n\nFix-of-fix is DERIVED, never recorded: a finding is one when its\nintroduced_by equals an EARLIER finding's resolution_sha (lower round/seq in\nthe same change). There is no flag for it and there will not be one — a flag\nwould relocate the hand-typing from the release notes into the record.\n\n--seq is REQUIRED, never auto-assigned: two concurrent adds would read the\nsame highest seq and both pick the next one, landing two records under one\nfinding's identity and inflating the count. An already-occupied\n(--change-id, --round, --seq) is refused, naming it.\n\nRefused before anything is staged:\n  - --disposition fixed with no --resolution-sha, and --resolution-sha with\n    any other disposition\n  - a line separator in --summary, --reviewer, --file-ref or --actor-id: a\n    finding is rendered as ONE row, so a separator appends a second row that\n    no record backs\n\nThe loop:\n  canon finding add ...     Record a Finding (promoted in the same run under\n                            `write: { promote: auto }`, which `canon init` writes)\nUnder `write.promote: manual` (no `write:` key), run `canon gate promote` to\ncommit it.")]
     Add {
         /// The change under review (e.g. s43-findings-are-records) — first component of the natural key
         #[arg(long, value_parser = canon_cli::finding::parse_change_id)]
@@ -943,11 +969,13 @@ enum FindingCommand {
         /// The authoring session (recorded as actor.session_id)
         #[arg(long, value_parser = canon_cli::review::parse_session_id)]
         session_id: Option<canon_model::SessionId>,
+        #[command(flatten)]
+        promote: PromoteArgs,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
     },
-    /// Move an already-committed finding's disposition (commit it with `canon gate promote`)
+    /// Move an already-committed finding's disposition (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)
     #[command(after_help = "A finding is raised `open` and later closed. This is the ONLY way to record\nthat second state: `canon finding add` refuses an occupied natural key,\nbecause two DIFFERENT findings under one (change, round, seq) are two\nreviewers' work collapsed into one identity.\n\nWhat it changes: the disposition, and `resolution_sha` with it. NOTHING else.\nSeverity, reviewer, summary, --reviewed-sha, --introduced-by and --file-ref\nare READ from the committed record and copied byte-identically — this command\ncannot edit them, and no command can. A finding recorded wrongly stays\nwrongly recorded; that is the append-only ledger working, not a gap.\n\nThe committed record STAYS. This appends a second version at the same\nnatural key, and the pair IS the history: `open` at one instant, `fixed` at\nanother, each with its own author and timestamp. Every reader folds by\nnatural key to the latest version, so the finding is still counted once.\n\n`canon gate promote` re-derives the transition rule itself before committing\nthe second version, so a hand-written body must clear the same bar.\n\nExamples:\n  canon finding close --change-id s44-spec-derived-worklist --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n  canon finding close --change-id s44-spec-derived-worklist --round 1 --seq 9 \\\n      --disposition rejected")]
     Close {
         /// The change under review — first component of the natural key
@@ -974,6 +1002,8 @@ enum FindingCommand {
         /// The session that authored the TRANSITION (recorded as actor.session_id)
         #[arg(long, value_parser = canon_cli::review::parse_session_id)]
         session_id: Option<canon_model::SessionId>,
+        #[command(flatten)]
+        promote: PromoteArgs,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1019,6 +1049,12 @@ enum ReviewCommand {
         /// The harness that ran the reviewer (e.g. omp, codex, claude)
         #[arg(long, value_parser = canon_cli::review::parse_runtime_label)]
         reviewer_harness: Option<String>,
+        /// A file the reviewer looked at (screenshot, recording); repeatable; must be inside the repo. Stored in .canon/artifacts/sha256/ and re-hashed by `canon gate check`
+        #[arg(long = "artifact", value_name = "PATH")]
+        artifacts: Vec<PathBuf>,
+        /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger file is refused
+        #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+        max_artifact_mib: u64,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1027,7 +1063,7 @@ enum ReviewCommand {
 
 #[derive(Subcommand)]
 enum DivergenceCliCommand {
-    /// Stage a divergence candidate, no run_seq yet (commit it with `canon divergence promote`)
+    /// Stage a divergence candidate, no run_seq yet (commit it with `canon divergence promote`, or in the same run with --promote / `write: { promote: auto }`)
     Stage {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
@@ -1052,6 +1088,8 @@ enum DivergenceCliCommand {
         actor_id: String,
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
+        #[command(flatten)]
+        promote: PromoteArgs,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1309,7 +1347,7 @@ enum SkillsCommand {
         #[arg(long)]
         providers: Option<String>,
     },
-    /// Check canonical projections without writing.
+    /// Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote.
     Check {
         #[arg(long)]
         source: Option<PathBuf>,
@@ -1320,7 +1358,7 @@ enum SkillsCommand {
         #[arg(long)]
         providers: Option<String>,
     },
-    /// Print structured diagnostics for canonical projections and legacy remnants.
+    /// Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, and other skills whose description claims build work; reports only, never edits.
     Doctor {
         #[arg(long)]
         source: Option<PathBuf>,
@@ -1367,7 +1405,10 @@ fn main() -> ExitCode {
         Command::Purge { kind, before, repo, dry_run, json } => ExitCode::from(canon_cli::retention::run_purge(&repo, kind, before, dry_run, json)),
         Command::Format { check: _, root, repo } => run_fmt(&root, repo.as_deref()),
         Command::Context { repo, json } => run_context(&repo, json),
-        Command::Status { repo, json } => ExitCode::from(canon_cli::status::run(&repo, json) as u8),
+        Command::Status { repo, json } => {
+            canon_cli::inventory::refresh_stale_index(&repo, "canon status");
+            ExitCode::from(canon_cli::status::run(&repo, json) as u8)
+        }
         Command::ContextPack { action } => match action {
             ContextPackCommand::Create { manifest, repo, json } => run_context_pack_create(&repo, &manifest, json),
             ContextPackCommand::Show { id, repo, json } => run_context_pack_show(&repo, &id, json),
@@ -1389,7 +1430,10 @@ fn main() -> ExitCode {
             IngestCommand::Plans { dialect, source, repo, json } => run_ingest_plans(&repo, dialect.as_deref(), source.as_deref(), json),
         },
         Command::Gate { action } => match action {
-            GateCommand::Check { repo, release } => ExitCode::from(canon_cli::gate::run_check(&repo, release) as u8),
+            GateCommand::Check { repo, release } => {
+                canon_cli::inventory::refresh_stale_index(&repo, "canon gate check");
+                ExitCode::from(canon_cli::gate::run_check(&repo, release) as u8)
+            }
             GateCommand::Task { task_id, repo } => ExitCode::from(canon_cli::gate::run_task(&repo, &task_id) as u8),
             GateCommand::Promote { repo, dry_run } => ExitCode::from(canon_cli::gate::run_promote(&repo, dry_run) as u8),
             GateCommand::InstallHooks { repo, event, matcher, command, timeout } => {
@@ -1437,42 +1481,49 @@ fn main() -> ExitCode {
                 audit_result,
                 drop_attachments,
                 drop_reason,
+                override_reason,
+                promote,
                 repo,
-            } => ExitCode::from(
-                canon_cli::evidence::run_add(
-                    &repo,
-                    &canon_cli::evidence::EvidenceArgs {
-                        task_id: task,
-                        project_id,
-                        kind,
-                        evidence_ref,
-                        verdict,
-                        summary,
-                        command_result,
-                        scenario_id,
-                        run_id,
-                        surface_ref,
-                        actor_id,
-                        role,
-                        session_id,
-                        approval_by,
-                        approval_role,
-                        approval_signature_file,
-                        approval_at,
-                        artifact_sha,
-                        artifacts,
-                        reports,
-                        report_cases,
-                        max_artifact_mib,
-                        evaluator_id,
-                        evaluator_version,
-                        evaluator_digest,
-                        audit_result,
-                        drop_attachments,
-                        drop_reason,
-                    },
-                ) as u8,
-            ),
+            } => {
+                canon_cli::inventory::refresh_stale_index(&repo, "canon evidence add");
+                ExitCode::from(
+                    canon_cli::evidence::run_add(
+                        &repo,
+                        &canon_cli::evidence::EvidenceArgs {
+                            task_id: task,
+                            project_id,
+                            kind,
+                            evidence_ref,
+                            verdict,
+                            summary,
+                            command_result,
+                            scenario_id,
+                            run_id,
+                            surface_ref,
+                            actor_id,
+                            role,
+                            session_id,
+                            approval_by,
+                            approval_role,
+                            approval_signature_file,
+                            approval_at,
+                            artifact_sha,
+                            artifacts,
+                            reports,
+                            report_cases,
+                            max_artifact_mib,
+                            evaluator_id,
+                            evaluator_version,
+                            evaluator_digest,
+                            audit_result,
+                            drop_attachments,
+                            drop_reason,
+                            override_reason,
+                            promote: promote.flag(),
+                        },
+                    ) as u8,
+                )
+            }
             EvidenceCommand::Vault { max_artifact_mib, repo } => ExitCode::from(canon_cli::evidence::run_vault(&repo, max_artifact_mib) as u8),
         },
         Command::Finding { action } => match action {
@@ -1491,6 +1542,7 @@ fn main() -> ExitCode {
                 actor_id,
                 role,
                 session_id,
+                promote,
                 repo,
             } => ExitCode::from(canon_cli::finding::run_add(
                 &repo,
@@ -1509,12 +1561,13 @@ fn main() -> ExitCode {
                     actor_id,
                     role,
                     session_id,
+                    promote: promote.flag(),
                 },
             ) as u8),
-            FindingCommand::Close { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, repo } => {
+            FindingCommand::Close { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, promote, repo } => {
                 ExitCode::from(canon_cli::finding::run_close(
                     &repo,
-                    &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id },
+                    &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, promote: promote.flag() },
                 ) as u8)
             }
         },
@@ -1533,30 +1586,37 @@ fn main() -> ExitCode {
                 reviewer_provider,
                 reviewer_model,
                 reviewer_harness,
+                artifacts,
+                max_artifact_mib,
                 repo,
-            } => ExitCode::from(canon_cli::review::run_add(
-                &repo,
-                &canon_cli::review::ReviewAddArgs {
-                    project_id,
-                    scenario_id,
-                    reviewer,
-                    pin,
-                    upstream_ref,
-                    original_spec_ref,
-                    actor_id,
-                    role,
-                    session_id,
-                    outcome,
-                    reviewer_provider,
-                    reviewer_model,
-                    reviewer_harness,
-                },
-            ) as u8),
+            } => {
+                canon_cli::inventory::refresh_stale_index(&repo, "canon review add");
+                ExitCode::from(canon_cli::review::run_add(
+                    &repo,
+                    &canon_cli::review::ReviewAddArgs {
+                        project_id,
+                        scenario_id,
+                        reviewer,
+                        pin,
+                        upstream_ref,
+                        original_spec_ref,
+                        actor_id,
+                        role,
+                        session_id,
+                        outcome,
+                        reviewer_provider,
+                        reviewer_model,
+                        reviewer_harness,
+                        artifacts,
+                        max_artifact_mib,
+                    },
+                ) as u8)
+            }
         },
         Command::Divergence { action } => match action {
-            DivergenceCliCommand::Stage { project_id, scenario_id, sha, status, reason, expiry, round, reviewer, detail, actor_id, role, repo } => {
+            DivergenceCliCommand::Stage { project_id, scenario_id, sha, status, reason, expiry, round, reviewer, detail, actor_id, role, promote, repo } => {
                 match canon_cli::divergence::parse_status(&status, reason.as_deref(), expiry) {
-                    Ok(status) => ExitCode::from(canon_cli::divergence::run_stage(&repo, &project_id, &scenario_id, &sha, status, round, &reviewer, &detail, &actor_id, &role) as u8),
+                    Ok(status) => ExitCode::from(canon_cli::divergence::run_stage(&repo, &project_id, &scenario_id, &sha, status, round, &reviewer, &detail, &actor_id, &role, promote.flag()) as u8),
                     Err(e) => {
                         eprintln!("canon divergence stage: {e}");
                         ExitCode::from(2)
@@ -1597,14 +1657,16 @@ fn main() -> ExitCode {
             }
             SubjectCommand::Adopt { change_id, subject, repo, json } => ExitCode::from(canon_cli::subject::run_adopt(&repo, &change_id, &subject, json) as u8),
             SubjectCommand::Status { id, state, override_reason, actor_id, repo, json } => {
+                canon_cli::inventory::refresh_stale_index(&repo, "canon subject status");
                 ExitCode::from(canon_cli::subject::run_status(&repo, &id, state, override_reason.as_deref(), &actor_id, json) as u8)
             }
         },
         Command::Change { action } => match action {
             ChangeCommand::New { slug, subject, title, repo } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject, &title) as u8),
         },
-        Command::Init { repo, check_config, no_agents_md, no_policy } => {
-            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy: !no_policy })
+        Command::Init { repo, check_config, no_agents_md, policy, no_policy } => {
+            let policy = (!no_policy).then(|| policy.unwrap_or(canon_cli::policy_level::PolicyLevel::Strict));
+            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy })
         }
         Command::Policy { action } => match action {
             PolicyCommand::Approve { by, note, repo } => ExitCode::from(canon_cli::policy_approval::run_approve(&repo, &by, note.as_deref()) as u8),
@@ -1675,8 +1737,9 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
     match canon_cli::skills::check(&source, target, providers) {
         Ok(report) => {
             for status in &report.statuses { println!("{} — {} ({})", status.path.display(), status.state, status.provider.as_str()); }
-            for remnant in &report.remnants { println!("{} — legacy-remnant (codex reads .agents/skills; fix: `{}`)", remnant.display(), canon_cli::skills::legacy_codex_fix(&report.providers)); }
-            if report.manifest_ok && report.remnants.is_empty() && report.statuses.iter().all(|status| status.state == "ok") { ExitCode::SUCCESS } else { ExitCode::from(1) }
+            for remnant in &report.remnants { println!("{} — legacy-remnant (codex reads .agents/skills; fix: `{}`)", remnant.display(), canon_cli::skills::install_command(&report.providers)); }
+            if let Some(outdated) = &report.outdated { println!("{} — outdated ({})", outdated.path.display(), outdated.describe(&report.providers)); }
+            if report.manifest_ok && report.remnants.is_empty() && report.outdated.is_none() && report.statuses.iter().all(|status| status.state == "ok") { ExitCode::SUCCESS } else { ExitCode::from(1) }
         }
         Err(err) => { eprintln!("canon skills check: {err}"); ExitCode::FAILURE }
     }
@@ -1900,7 +1963,7 @@ fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, p
     ExitCode::from(canon_cli::scaffold::run_feature_new(repo, surface, title, project, &actor, at) as u8)
 }
 
-/// `canon init [--repo <dir>] [--no-agents-md] [--no-policy]` / `canon
+/// `canon init [--repo <dir>] [--no-agents-md] [--policy <level> | --no-policy]` / `canon
 /// init --check-config` (s19 P4, `canon_cli::init`'s module doc):
 /// `check_config: false` scaffolds a fresh repo, or on an existing
 /// `canon.yaml` refreshes only the AGENTS.md block (see

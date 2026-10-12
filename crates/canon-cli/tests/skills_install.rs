@@ -561,3 +561,274 @@ fn skills_install_11_projected_skill_claims_build_work_and_opens_with_the_loop()
         .collect();
     assert_eq!(block_steps, LOOP_STEPS, "the AGENTS.md block's loop steps");
 }
+
+const LOCK: &str = ".canon/skills/.install-lock.json";
+
+fn git(dir: &Path, args: &[&str]) -> String {
+    let output = Command::new("git").args(["-c", "user.name=t", "-c", "user.email=t@example.com"]).args(args).current_dir(dir).output().unwrap();
+    assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
+}
+
+fn read_lock(target: &Path) -> serde_json::Value {
+    serde_json::from_str(&fs::read_to_string(target.join(LOCK)).unwrap()).unwrap()
+}
+
+/// Rewrite the lock's `canon_version` (`None` removes the key, as a lock
+/// written before 0.16 has none).
+fn set_lock_version(target: &Path, version: Option<&str>) {
+    let mut lock = read_lock(target);
+    let map = lock.as_object_mut().unwrap();
+    match version {
+        Some(version) => map.insert("canon_version".into(), version.into()),
+        None => map.remove("canon_version"),
+    };
+    fs::write(target.join(LOCK), serde_json::to_string_pretty(&lock).unwrap()).unwrap();
+}
+
+fn canon(args: &[&str], source: &Path, target: &Path) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--source").arg(source).arg("--target").arg(target).output().unwrap()
+}
+
+/// skills.install.40
+#[test]
+fn skills_install_40_the_lock_records_the_canon_version_and_the_source_commit() {
+    let tmp = tempfile::tempdir().unwrap();
+    let checkout = tmp.path().join("checkout");
+    let source = checkout.join("canon/skills");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    git(&checkout, &["init", "-q"]);
+    git(&checkout, &["add", "."]);
+    git(&checkout, &["commit", "-q", "-m", "skills"]);
+    let head = git(&checkout, &["rev-parse", "HEAD"]);
+
+    assert!(skills::install_canonical(&source, &target, Some("claude")).unwrap().changed);
+    let lock = read_lock(&target);
+    assert_eq!(lock["canon_version"], env!("CARGO_PKG_VERSION"), "{lock}");
+    assert_eq!(lock["source_commit"], head.as_str(), "{lock}");
+    let bytes = fs::read(target.join(LOCK)).unwrap();
+
+    fs::write(checkout.join("unrelated.txt"), "x\n").unwrap();
+    git(&checkout, &["add", "."]);
+    git(&checkout, &["commit", "-q", "-m", "unrelated"]);
+    assert!(!skills::install_canonical(&source, &target, Some("claude")).unwrap().changed, "a commit that leaves the bundle as it was changes nothing");
+    assert_eq!(fs::read(target.join(LOCK)).unwrap(), bytes, "the lock stays byte-identical");
+    let check = skills::check(&source, &target, Some("claude")).unwrap();
+    assert!(check.manifest_ok && check.outdated.is_none(), "{check:?}");
+
+    let plain = tmp.path().join("plain");
+    let plain_target = tmp.path().join("plain-target");
+    write_canonical_source(&plain);
+    skills::install_canonical(&plain, &plain_target, Some("claude")).unwrap();
+    let lock = read_lock(&plain_target);
+    assert_eq!(lock["canon_version"], env!("CARGO_PKG_VERSION"), "{lock}");
+    assert!(lock.get("source_commit").is_none(), "a source outside any git checkout records no commit: {lock}");
+}
+
+/// skills.install.41
+#[test]
+fn skills_install_41_a_lock_another_canon_wrote_is_reported_with_the_install_fix() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    skills::install_canonical(&source, &target, Some("claude,codex")).unwrap();
+    set_lock_version(&target, Some("0.13.1"));
+    let expected = format!(
+        "installed by canon 0.13.1, this canon is {} — run `canon skills install --providers=claude,codex`",
+        env!("CARGO_PKG_VERSION")
+    );
+
+    let check = canon(&["skills", "check", "--providers", "claude,codex"], &source, &target);
+    let out = String::from_utf8_lossy(&check.stdout);
+    assert_eq!(check.status.code(), Some(1), "{out}");
+    assert!(out.contains(&format!("{LOCK} — outdated ({expected})")), "{out}");
+    assert!(!out.contains("— stale") && !out.contains("— missing"), "only the lock's version differs: {out}");
+
+    let doctor = canon(&["skills", "doctor", "--providers", "claude,codex"], &source, &target);
+    let out = String::from_utf8_lossy(&doctor.stdout);
+    assert_eq!(doctor.status.code(), Some(0), "{out}");
+    assert!(out.lines().any(|line| line.starts_with("outdated: ") && line.ends_with(&expected)), "{out}");
+    assert!(!out.contains("status: healthy"), "{out}");
+
+    assert!(skills::install_canonical(&source, &target, Some("claude,codex")).unwrap().changed, "the install rewrites an outdated lock");
+    assert_eq!(read_lock(&target)["canon_version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(canon(&["skills", "check", "--providers", "claude,codex"], &source, &target).status.code(), Some(0));
+    let doctor = canon(&["skills", "doctor", "--providers", "claude,codex"], &source, &target);
+    assert_eq!(String::from_utf8_lossy(&doctor.stdout), "providers: claude,codex\nstatus: healthy\n");
+}
+
+/// skills.install.42
+#[test]
+fn skills_install_42_a_lock_from_before_0_16_is_reported_as_an_unknown_version() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    skills::install_canonical(&source, &target, Some("claude")).unwrap();
+    set_lock_version(&target, None);
+    let expected = format!(
+        "installed by an unknown canon version (the lock predates 0.16), this canon is {} — run `canon skills install --providers=claude`",
+        env!("CARGO_PKG_VERSION")
+    );
+
+    let report = skills::check(&source, &target, Some("claude")).unwrap();
+    assert!(report.manifest_ok, "the projection itself is current");
+    assert_eq!(report.outdated.as_ref().map(|o| o.installed_by.clone()), Some(None));
+    let check = canon(&["skills", "check", "--providers", "claude"], &source, &target);
+    let out = String::from_utf8_lossy(&check.stdout);
+    assert_eq!(check.status.code(), Some(1), "{out}");
+    assert!(out.contains(&expected), "{out}");
+    let doctor = skills::doctor(&source, &target, Some("claude")).unwrap();
+    assert!(doctor.iter().any(|line| line.starts_with("outdated: ") && line.ends_with(&expected)), "{doctor:?}");
+
+    skills::install_canonical(&source, &target, Some("claude")).unwrap();
+    assert_eq!(canon(&["skills", "check", "--providers", "claude"], &source, &target).status.code(), Some(0));
+}
+
+/// skills.install.43
+#[test]
+fn skills_install_43_doctor_warns_about_skills_claiming_build_work_and_never_edits_them() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    skills::install_canonical(&source, &target, Some("claude,codex")).unwrap();
+    let sites = target.join(".claude/skills/sites/SKILL.md");
+    let notes = target.join(".agents/skills/notes/SKILL.md");
+    let sites_text = "---\nname: site-builder\ndescription: Build sites, web apps and games from a prompt\n---\n# Sites\n";
+    let notes_text = "---\nname: notes\ndescription: Manage feature branches and take meeting notes\n---\n# Notes\n";
+    for (path, text) in [(&sites, sites_text), (&notes, notes_text)] {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+
+    let doctor = canon(&["skills", "doctor", "--providers", "claude,codex"], &source, &target);
+    let out = String::from_utf8_lossy(&doctor.stdout);
+    assert_eq!(doctor.status.code(), Some(0), "advisory only: {out}");
+    assert_eq!(
+        out,
+        format!(
+            "providers: claude,codex\nstatus: healthy\ncompeting-skill: {} (description claims: build, sites, apps, games) — if an agent picks `site-builder` for build work, canon's loop will not run\n",
+            target.join(".claude/skills/sites").display()
+        )
+    );
+    assert_eq!(fs::read_to_string(&sites).unwrap(), sites_text);
+    assert_eq!(fs::read_to_string(&notes).unwrap(), notes_text);
+}
+
+/// canon's own skill source and the `canon init` AGENTS.md block, each
+/// with its whitespace collapsed so wrapped lines read as one.
+fn skill_and_block() -> [(&'static str, String); 2] {
+    let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let skill = fs::read_to_string(repo.join("canon/skills/SKILL.src.md")).unwrap();
+    let tmp = tempfile::tempdir().unwrap();
+    let init = Command::new(env!("CARGO_BIN_EXE_canon")).arg("init").arg("--repo").arg(tmp.path()).output().unwrap();
+    assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
+    let block = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
+    [("skill", words(&skill)), ("AGENTS.md block", words(&block))]
+}
+
+/// skills.install.20 (0.16 D1): the skill and the AGENTS.md block both
+/// carry one human approval per scope, recorded by the agent at once in
+/// the brief and the policy approval, then no stop inside the scope,
+/// independent review on every change, and shipping by the agent.
+#[test]
+fn skills_install_20_skill_and_block_carry_one_approval_per_scope() {
+    for (name, text) in skill_and_block() {
+        for rule in [
+            "for a new subject or a scope change",
+            "Approved: <who> <when> — \"<",
+            "canon policy approve --by <the human> --note \"<their words>\"",
+            "Never approve without a human answer",
+            "Inside an approved scope, never stop for a human",
+            "When no human can answer",
+            "on every change",
+            "yourself once",
+            "unless the brief says the human ships",
+            "in the approved change",
+            "tasks.md",
+            "a new change is a new scope",
+        ] {
+            assert!(text.to_lowercase().contains(&rule.to_lowercase()), "the {name} must say {rule:?}: {text}");
+        }
+    }
+}
+
+/// skills.install.21 (0.16 D1): neither the skill nor the AGENTS.md
+/// block keeps a second human stop: no fixed pair of stops, no
+/// per-request brief approval, and no rule that the agent may never run
+/// the policy approval for the human.
+#[test]
+fn skills_install_21_skill_and_block_name_no_second_human_stop() {
+    for (name, text) in skill_and_block() {
+        for stale in ["Two points stop for a human", "a human approves it.", "never approve it yourself", "A human approves the brief"] {
+            assert!(!text.contains(stale), "the {name} still says {stale:?}: {text}");
+        }
+    }
+}
+
+/// skills.install.44 (0.16 M7, eval 3b): the skill and the AGENTS.md
+/// block stop at the brief: write it, stop and report it, build and
+/// attest nothing until the human answers; the approval is never assumed,
+/// even when the human cannot answer before the report, since the brief
+/// is that report; assumptions cover the brief's questions and work
+/// inside an approved scope only; the ship and evidence refusals are
+/// backstops. The pre-M7 unscoped assumption rule is gone.
+#[test]
+fn skills_install_44_skill_and_block_stop_at_the_brief_and_never_assume_the_approval() {
+    for (name, text) in skill_and_block() {
+        let lower = text.to_lowercase();
+        for rule in [
+            "then stop and report",
+            "nothing for that scope",
+            "never assume",
+            "even when the human said they cannot answer until you report",
+            "the brief is that report",
+            "the brief's questions",
+            "inside an approved scope, never",
+            "canon evidence add",
+            "backstops",
+        ] {
+            assert!(lower.contains(rule), "the {name} must say {rule:?}: {text}");
+        }
+        assert!(!text.contains("When no human can answer, write"), "the {name} still scopes the assumption rule to nothing: {text}");
+    }
+}
+
+/// skills.install.22 (dogfood eval 3 H1, H2): the readers refresh the
+/// scenario index and `canon init` repos promote on write, so the
+/// working loop in the skill and the AGENTS.md block never sends the
+/// agent to `canon format specs` or `canon ingest plans`, names
+/// `canon inventory sync` only for a `NOT refreshed` line, and names
+/// `canon gate promote` only under `write.promote: manual`; the write
+/// help lists no promote step of its own.
+#[test]
+fn skills_install_22_skill_block_and_help_name_no_bookkeeping_step() {
+    let [(_, skill), (_, block)] = skill_and_block();
+    let loop_start = skill.find("## The working loop").expect("the skill has its loop");
+    let loop_end = skill.find("## Command reference").expect("the reference follows the loop");
+    for (name, text) in [("skill loop", &skill[loop_start..loop_end]), ("AGENTS.md block", block.as_str())] {
+        assert!(!text.contains("canon format specs"), "the {name} names a format step: {text}");
+        for sentence in text.split(". ") {
+            if sentence.contains("canon ingest plans") {
+                assert!(sentence.contains(" no "), "the {name} sends the agent to ingest plans: {sentence:?}");
+            }
+            if sentence.contains("canon inventory sync") {
+                assert!(sentence.contains("NOT refreshed"), "the {name} names a sync step: {sentence:?}");
+            }
+            if sentence.contains("canon gate promote") {
+                assert!(sentence.contains("write.promote: manual"), "the {name} names promote outside manual mode: {sentence:?}");
+            }
+        }
+    }
+    for args in [&["evidence", "--help"][..], &["finding", "--help"][..], &["finding", "add", "--help"][..]] {
+        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(args).output().unwrap();
+        let help = String::from_utf8_lossy(&out.stdout);
+        let listing = &help[help.find("The loop:").unwrap_or_else(|| panic!("{args:?} shows the loop: {help}"))..];
+        assert!(!listing.lines().any(|line| line.trim_start().starts_with("canon gate promote ")), "{args:?} lists promote as a step: {listing}");
+        assert!(listing.contains("Under `write.promote: manual`"), "{args:?} says when promote is needed: {listing}");
+    }
+}

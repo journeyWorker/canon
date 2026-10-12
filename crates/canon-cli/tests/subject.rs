@@ -97,6 +97,18 @@ fn seed_scenario_verdict(repo: &Path, scenario: &str, verdict: EvidenceVerdict) 
     ledger(repo).write(&record).unwrap();
 }
 
+/// The approval line the agent records once the human answers (0.16 D1).
+const APPROVED: &str = "Approved: Journey 2026-10-12 — \"승인. 네 가정대로 진행\"";
+
+/// Write `change`'s brief as `openspec/changes/<change>/proposal.md`,
+/// under the openspec plan source an absent `plans:` section defaults
+/// to.
+fn write_proposal(repo: &Path, change: &str, body: &str) {
+    let dir = repo.join("openspec/changes").join(change);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("proposal.md"), format!("## Why\n\nSeeded brief.\n\n{body}")).unwrap();
+}
+
 fn query_subjects(repo: &Path, extra: &[&str]) -> Value {
     let mut args = vec!["query", "--kind", "subject", "--json"];
     args.extend_from_slice(extra);
@@ -315,8 +327,9 @@ fn shipped_is_blocked_when_a_linked_scenario_is_divergent() {
 #[test]
 fn shipped_is_allowed_with_a_faithful_verdict_for_every_linked_scenario() {
     let dir = repo();
-    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
+    seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"], &["c-demo"]);
     seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
+    write_proposal(dir.path(), "c-demo", &format!("{APPROVED}\n"));
 
     let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
@@ -333,7 +346,8 @@ fn shipped_is_blocked_until_each_owned_surface_specifies_a_required_case() {
     let dir = repo();
     std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
     std::fs::write(dir.path().join(".canon/policy.yaml"), "spec_coverage:\n  require_evidence: true\n  require_cases: [failure]\n").unwrap();
-    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
+    seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"], &["c-demo"]);
+    write_proposal(dir.path(), "c-demo", &format!("{APPROVED}\n"));
     seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
 
     let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
@@ -913,11 +927,12 @@ fn an_unavailable_review_is_a_gap_at_the_gate_and_the_status_guard() {
 }
 
 /// gate.check.40: a review written before 0.15 (planted by hand, no
-/// `pins`/`outcome` keys) keeps qualifying even after its scenario's spec
-/// changes; `canon gate check`, `canon subject status` and `canon status`
-/// each print the one advisory line counting it, and all exit 0.
+/// `pins`/`outcome` keys) whose pin is no commit of this clone keeps
+/// qualifying even after its scenario's spec changes; `canon gate check`,
+/// `canon subject status` and `canon status` each print the one advisory
+/// line counting it as undecidable, and all exit 0.
 #[test]
-fn a_pre_015_review_still_qualifies_and_every_surface_prints_the_advisory() {
+fn an_undecidable_pre_015_review_still_qualifies_and_every_surface_prints_the_advisory() {
     let dir = repo();
     write_policy(dir.path(), REQUIRE_REVIEW);
     seed_attested_subject(dir.path());
@@ -943,7 +958,7 @@ fn a_pre_015_review_still_qualifies_and_every_surface_prints_the_advisory() {
     edited.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
     ledger(dir.path()).write(&edited).unwrap();
 
-    let advisory = "1 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw";
+    let advisory = "1 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 0 current, 0 stale, 1 undecidable; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it";
     let guard = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
     assert_eq!(guard.status.code(), Some(0), "the unpinned review still qualifies: {}", stderr(&guard));
     assert!(stderr(&guard).contains(&format!("canon subject status: advisory: {advisory}\n")), "{}", stderr(&guard));
@@ -958,4 +973,317 @@ fn a_pre_015_review_still_qualifies_and_every_surface_prints_the_advisory() {
     assert_eq!(status.status.code(), Some(0));
     assert!(stdout(&status).contains(&format!("warning: {advisory}\n")), "{}", stdout(&status));
     assert!(stdout(&status).contains("demo-subject: 1 scenarios, 1 evidenced, 1 reviewed"), "{}", stdout(&status));
+}
+
+// ── the ship guard needs the approved brief (0.16 D1) ──
+
+/// A `verifying` subject past every technical gate: `world.demo.01`
+/// evidenced by `impl-agent`, reviewed by `reviewer-2`, no blocker, the
+/// review guard satisfied, and adopted change `c-demo` holding `brief`
+/// as its proposal.md.
+fn seed_technically_ship_ready(repo: &Path, brief: &str) {
+    write_policy(repo, REQUIRE_REVIEW);
+    seed_attested_subject(repo);
+    seed_review(repo, "reviewer-2", "reviewer-2");
+    let out = run(repo, &["subject", "status", "demo-subject", "verifying"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    write_proposal(repo, "c-demo", brief);
+}
+
+/// The brief as `canon status --json` reports it for `demo-subject`.
+fn status_brief(repo: &Path) -> Value {
+    let out = run(repo, &["status", "--json"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let report: Value = serde_json::from_str(&stdout(&out)).unwrap();
+    report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo-subject").unwrap()["brief"].clone()
+}
+
+const BRIEF_REFUSAL: &str = "canon subject status: unreviewed-promotion demo-subject — verifying → shipped: brief not approved — openspec/changes/c-demo/proposal.md has no `Approved:` line; a human must answer the brief, and the agent records `Approved: <who> <when> — \"<their words>\"` there only from that answer\n";
+
+/// subject.lifecycle.24: with every technical gate passing, a brief
+/// with no `Approved:` line refuses `verifying → shipped`, naming the
+/// proposal.md and saying a human must answer; status reads the same
+/// brief as not approved; recording the line lets the same move ship.
+#[test]
+fn subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line() {
+    let dir = repo();
+    seed_technically_ship_ready(dir.path(), "Status: draft, awaiting the human.\n");
+    let gate = run(dir.path(), &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(0), "every technical gate passes: {}", stdout(&gate));
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains(BRIEF_REFUSAL), "{err}");
+    assert!(
+        err.contains("canon subject status: refused — get the human's answer to the brief and record it as its `Approved:` line, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject\n"),
+        "{err}"
+    );
+    assert!(!err.contains("uncovered-cell") && !err.contains("world.demo.01"), "only the brief refuses: {err}");
+    assert_eq!(current_subject(dir.path())["status"], "verifying", "a refusal leaves the record unchanged");
+    assert_eq!(
+        status_brief(dir.path()),
+        serde_json::json!({"approved": false, "enforced": true, "change": "c-demo", "proposal": "openspec/changes/c-demo/proposal.md"})
+    );
+
+    write_proposal(dir.path(), "c-demo", &format!("Status: approved.\n\n{APPROVED}\n"));
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let subject = current_subject(dir.path());
+    assert_eq!(subject["status"], "shipped");
+    assert!(subject.get("status_override").is_none(), "nothing was waived: {subject}");
+}
+
+/// subject.lifecycle.25: an `Approved:` line that sits only inside an
+/// HTML comment or a fenced code block does not approve; the guard
+/// refuses naming the proposal.md, and status agrees.
+#[test]
+fn subject_lifecycle_25_an_approved_line_in_a_comment_or_fence_does_not_ship() {
+    for (case, body) in [
+        ("comment", format!("<!-- draft:\n{APPROVED}\n-->\n")),
+        ("comment-one-line", format!("<!-- {APPROVED} -->\n")),
+        ("fence-backtick", format!("```\n{APPROVED}\n```\n")),
+        ("fence-tilde", format!("~~~md\n{APPROVED}\n~~~\n")),
+    ] {
+        let dir = repo();
+        seed_technically_ship_ready(dir.path(), &body);
+        let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+        assert_eq!(out.status.code(), Some(1), "{case}: stderr: {}", stderr(&out));
+        assert!(stderr(&out).contains(BRIEF_REFUSAL), "{case}: {}", stderr(&out));
+        assert_eq!(current_subject(dir.path())["status"], "verifying", "{case}");
+        assert_eq!(status_brief(dir.path())["approved"], false, "{case}: status and the guard agree");
+    }
+}
+
+/// subject.lifecycle.26: `--override-reason` ships a subject whose brief
+/// is not approved, names the waived brief check, and records the
+/// reason, the actor and the waived `unreviewed-promotion` naming the
+/// subject on the new subject record.
+#[test]
+fn subject_lifecycle_26_an_override_ships_an_unapproved_brief_and_records_the_waiver() {
+    let dir = repo();
+    seed_technically_ship_ready(dir.path(), "Status: draft, awaiting the human.\n");
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped", "--override-reason", "the human approved in chat; line to follow", "--actor-id", "lead"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains(&BRIEF_REFUSAL.replace("canon subject status: unreviewed-promotion", "canon subject status: waived unreviewed-promotion")), "{err}");
+    assert!(err.contains("override recorded by `lead` for the 1 violation(s) above: the human approved in chat; line to follow"), "{err}");
+
+    let subject = current_subject(dir.path());
+    assert_eq!(subject["status"], "shipped");
+    assert_eq!(
+        subject["status_override"],
+        serde_json::json!({
+            "to": "shipped",
+            "reason": "the human approved in chat; line to follow",
+            "waived": [{"class": "unreviewed-promotion", "subject": "demo-subject"}],
+            "actor": {"agent_id": "lead"}
+        })
+    );
+}
+
+/// subject.lifecycle.27: a subject that adopts no change has no brief a
+/// human could answer, so `verifying → shipped` passes its gates with an
+/// advisory that the brief is not approved and no refusal; status reads
+/// the same brief as not approved and not enforced, with no human step.
+#[test]
+fn subject_lifecycle_27_a_subject_with_no_adopted_change_ships_with_an_advisory() {
+    let dir = repo();
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
+    seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
+    assert_eq!(status_brief(dir.path()), serde_json::json!({"approved": false, "enforced": false}));
+    let status = run(dir.path(), &["status"]);
+    assert!(!stdout(&status).contains("human:"), "nothing to answer, so no human step: {}", stdout(&status));
+    assert!(stdout(&status).contains("      brief: not approved (no adopted change; advisory, nothing to approve yet)\n"), "{}", stdout(&status));
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(
+        stderr(&out),
+        "canon subject status: advisory: demo-subject's brief is not approved — demo-subject adopts no change, so there is no brief to answer and shipping is not refused\n"
+    );
+    let subject = current_subject(dir.path());
+    assert_eq!(subject["status"], "shipped");
+    assert!(subject.get("status_override").is_none(), "nothing was waived: {subject}");
+}
+
+// ── nothing is attested under an unapproved brief (0.16 M7) ──
+
+/// Every evidence record file under `.canon/`, staged or committed.
+fn evidence_files(repo: &Path) -> Vec<std::path::PathBuf> {
+    fn walk(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.to_string_lossy().contains("evidence_record") {
+                out.push(path);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(&repo.join(".canon"), &mut out);
+    out.sort();
+    out
+}
+
+/// A `building` subject owning `world.demo.01` and adopting `c-demo`,
+/// whose proposal.md is `brief` and whose tasks.md holds task `1.1`,
+/// under an explicit openspec plan source (task evidence needs one).
+fn seed_briefed_subject(repo: &Path, brief: &str) {
+    std::fs::write(repo.join("canon.yaml"), format!("{CANON_YAML}plans:\n  sources:\n    - dialect: openspec\n      root: .\n")).unwrap();
+    seed_subject_with_changes(repo, "demo-subject", SubjectStatus::Building, &["world.demo.01"], &["c-demo"]);
+    write_proposal(repo, "c-demo", brief);
+    std::fs::write(repo.join("openspec/changes/c-demo/tasks.md"), "## 1. Build\n\n- [ ] 1.1 Build the demo\n").unwrap();
+}
+
+/// `canon evidence add` for `world.demo.01` (and `extra`), promoted.
+fn attest_scenario(repo: &Path, extra: &[&str]) -> Output {
+    let mut args = vec![
+        "evidence", "add", "--project-id", "demo", "--scenario-id", "world.demo.01", "--kind", "test-run", "--ref", "cargo test", "--role", "implementer",
+        "--actor-id", "impl-agent", "--promote",
+    ];
+    args.extend_from_slice(extra);
+    run(repo, &args)
+}
+
+/// `canon evidence add` for task `c-demo#1.1` (and `extra`), promoted.
+fn attest_task(repo: &Path, extra: &[&str]) -> Output {
+    let mut args = vec!["evidence", "add", "--task", "c-demo#1.1", "--kind", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl-agent", "--promote"];
+    args.extend_from_slice(extra);
+    run(repo, &args)
+}
+
+const EVIDENCE_REFUSAL: &str = "canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — \"<their words>\"` in that proposal.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record\n";
+
+/// The violation line `canon evidence add` prints for `demo-subject`'s
+/// unapproved brief, attesting `what`.
+fn evidence_brief_line(what: &str) -> String {
+    format!("canon evidence add: unreviewed-promotion demo-subject — evidence for {what}: brief not approved — openspec/changes/c-demo/proposal.md has no `Approved:` line, so the human has not answered it\n")
+}
+
+/// evidence.add.68: while the subject's brief is enforced and not
+/// approved, `canon evidence add` refuses with exit 1 and stages nothing,
+/// for the scenario (through its `@subject` owner) and for the task
+/// (through the subject adopting its change), naming the proposal.md and
+/// saying to stop, report the brief and wait for the human's answer.
+/// `review add` and `finding add` are not refused.
+#[test]
+fn evidence_add_68_an_unapproved_brief_refuses_the_attestation_and_stages_nothing() {
+    let dir = repo();
+    seed_briefed_subject(dir.path(), "Status: draft, awaiting the human.\n");
+    let before = evidence_files(dir.path());
+
+    let out = attest_scenario(dir.path(), &[]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(stderr(&out), format!("{}{EVIDENCE_REFUSAL}", evidence_brief_line("world.demo.01")));
+    assert_eq!(evidence_files(dir.path()), before, "a refused add stages and commits nothing");
+
+    let out = attest_task(dir.path(), &[]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(stderr(&out), format!("{}{EVIDENCE_REFUSAL}", evidence_brief_line("c-demo#1.1")));
+    assert_eq!(evidence_files(dir.path()), before, "a refused add stages and commits nothing");
+
+    let review = review_via_cli(dir.path(), "reviewer-2", None);
+    assert!(review.status.success(), "review add is not refused: {}", stderr(&review));
+    let finding = run(
+        dir.path(),
+        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "reviewer-2", "--summary", "brief pending", "--promote"],
+    );
+    assert!(finding.status.success(), "finding add is not refused: {}", stderr(&finding));
+}
+
+/// evidence.add.69: a subject with no brief to answer (no adopted change,
+/// or a newest change with no proposal.md) and a scenario no subject
+/// owns are attested as before: no refusal, no override, no warning.
+#[test]
+fn evidence_add_69_no_refusal_when_the_brief_is_not_enforced() {
+    for case in ["no-change", "no-proposal", "unowned"] {
+        let dir = repo();
+        match case {
+            "no-change" => seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &["world.demo.01"]),
+            "no-proposal" => seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Building, &["world.demo.01"], &["c-demo"]),
+            _ => {
+                seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Building, &[], &["c-demo"]);
+                write_proposal(dir.path(), "c-demo", "Status: draft, awaiting the human.\n");
+                let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
+                let scenario = Scenario::new(envelope, ProjectId::parse("demo").unwrap(), ScenarioId::parse("world.demo.01").unwrap(), "seeded", "", SpecDigest::of(b"x"));
+                ledger(dir.path()).write(&scenario).unwrap();
+            }
+        }
+        let out = attest_scenario(dir.path(), &[]);
+        assert!(out.status.success(), "{case}: stderr: {}", stderr(&out));
+        assert!(!stderr(&out).contains("brief"), "{case}: {}", stderr(&out));
+        let records: Vec<Value> = evidence_files(dir.path()).iter().map(|p| serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap()).collect();
+        assert_eq!(records.len(), 1, "{case}");
+        assert!(records[0].get("brief_override").is_none(), "{case}: {}", records[0]);
+        assert!(!stdout(&run(dir.path(), &["status"])).contains("was attested by"), "{case}");
+    }
+}
+
+/// evidence.add.70: `--override-reason` attests anyway, prints the waived
+/// refusal and who recorded the override, records the reason, the waived
+/// `unreviewed-promotion` naming the subject and the actor on the record,
+/// and `canon status` and `canon gate check` list it. A blank reason is
+/// refused (exit 2) and an override nothing needed is not recorded.
+#[test]
+fn evidence_add_70_an_override_attests_anyway_and_records_the_waiver() {
+    let dir = repo();
+    seed_briefed_subject(dir.path(), "Status: draft, awaiting the human.\n");
+
+    let out = attest_scenario(dir.path(), &["--override-reason", " "]);
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
+    assert!(evidence_files(dir.path()).is_empty());
+
+    let out = attest_scenario(dir.path(), &["--override-reason", "the human approved in chat; line to follow"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains(&evidence_brief_line("world.demo.01").replace("canon evidence add: unreviewed-promotion", "canon evidence add: waived unreviewed-promotion")), "{err}");
+    assert!(err.contains("canon evidence add: override recorded by `impl-agent` for the 1 brief refusal(s) above: the human approved in chat; line to follow\n"), "{err}");
+    let files = evidence_files(dir.path());
+    assert_eq!(files.len(), 1);
+    let record: Value = serde_json::from_slice(&std::fs::read(&files[0]).unwrap()).unwrap();
+    assert_eq!(
+        record["brief_override"],
+        serde_json::json!({
+            "reason": "the human approved in chat; line to follow",
+            "waived": [{"class": "unreviewed-promotion", "subject": "demo-subject"}],
+            "actor": {"agent_id": "impl-agent"}
+        })
+    );
+
+    let listed = "evidence for world.demo.01 was attested by `impl-agent` at ";
+    let status = stdout(&run(dir.path(), &["status"]));
+    assert!(status.contains(&format!("warning: {listed}")) && status.contains("while the brief of demo-subject was not approved (override: the human approved in chat; line to follow)"), "{status}");
+    let gate = stdout(&run(dir.path(), &["gate", "check"]));
+    assert!(gate.contains("brief overrides: 1 evidence record(s) attested before their brief was approved — not failing the gate:\n") && gate.contains(&format!("  {listed}")), "{gate}");
+
+    write_proposal(dir.path(), "c-demo", &format!("{APPROVED}\n"));
+    let out = attest_scenario(dir.path(), &["--override-reason", "habit"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation\n"), "{}", stderr(&out));
+    let latest = evidence_files(dir.path()).into_iter().map(|p| serde_json::from_slice::<Value>(&std::fs::read(p).unwrap()).unwrap()).find(|r| r.get("brief_override").is_none());
+    assert!(latest.is_some(), "the unneeded override is not recorded");
+}
+
+/// evidence.add.71: once the human's answer is recorded as the brief's
+/// `Approved:` line, the same scenario and task attestations that were
+/// refused go through, with no override.
+#[test]
+fn evidence_add_71_the_approval_lifts_the_refusal() {
+    let dir = repo();
+    seed_briefed_subject(dir.path(), "Status: draft, awaiting the human.\n");
+    assert_eq!(attest_scenario(dir.path(), &[]).status.code(), Some(1));
+    assert_eq!(attest_task(dir.path(), &[]).status.code(), Some(1));
+
+    write_proposal(dir.path(), "c-demo", &format!("Status: approved.\n\n{APPROVED}\n"));
+    for out in [attest_scenario(dir.path(), &[]), attest_task(dir.path(), &[])] {
+        assert!(out.status.success(), "stderr: {}", stderr(&out));
+        assert!(!stderr(&out).contains("brief"), "{}", stderr(&out));
+    }
+    let records: Vec<Value> = evidence_files(dir.path()).iter().map(|p| serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap()).collect();
+    assert_eq!(records.len(), 2);
+    assert!(records.iter().all(|r| r.get("brief_override").is_none()), "{records:?}");
 }

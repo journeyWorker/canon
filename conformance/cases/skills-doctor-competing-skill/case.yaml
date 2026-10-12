@@ -1,0 +1,6 @@
+description: "`canon skills doctor` beside a co-installed skill whose description claims site, app and game work reports the projections healthy and adds an advisory `competing-skill:` line naming it and warning that canon's loop will not run if an agent picks it for build work (exit 0); a skill that claims no build work is not named"
+steps:
+  - args: [skills, install, --providers, claude]
+    exit: 0
+  - args: [skills, doctor, --providers, claude]
+    exit: 0

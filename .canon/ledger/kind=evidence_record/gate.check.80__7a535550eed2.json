@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m2-impl"
+  },
+  "at": "2026-10-11T15:02:30.674588Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test write_path an_edited_feature_file_is_reindexed_by_the_next_reader_and_only_that_file"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 35,
+  "scenario_id": "gate.check.80",
+  "schema": 1,
+  "staging_id": "6aa47c5d8721",
+  "verdict": "faithful"
+}

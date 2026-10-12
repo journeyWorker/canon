@@ -472,6 +472,8 @@ pub struct FindingArgs {
     pub role: RoleId,
     /// The authoring session, recorded as `actor.session_id`.
     pub session_id: Option<SessionId>,
+    /// `--promote`/`--no-promote` (0.16 D2; [`crate::write_mode`]).
+    pub promote: crate::write_mode::PromoteFlag,
 }
 
 /// The envelope actor for a record this module stages: the id, the role,
@@ -499,6 +501,13 @@ fn authoring_actor(actor_id: &str, role: &RoleId, session_id: Option<&SessionId>
 /// the same numbered finding are a corrupted count.
 pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let repo = resolve_repo_root(repo);
+    let promote = match crate::write_mode::should_promote(&repo, args.promote) {
+        Ok(promote) => promote,
+        Err(error) => {
+            eprintln!("canon finding add: refused — {error}");
+            return 2;
+        }
+    };
 
     if args.round == 0 || args.seq == 0 {
         eprintln!(
@@ -641,15 +650,16 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
 
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
+            let settled = crate::gate::promote_after_stage("canon finding add", &ledger_root, &receipt.location, promote);
             println!(
-                "canon finding add: staged {} — {} round {} seq {} ({}, {}) — {}",
-                receipt.location,
+                "canon finding add: {} — {} round {} seq {} ({}, {}) — {}",
+                settled.landed(&receipt.location),
                 args.change_id,
                 args.round,
                 args.seq,
                 severity_slug(args.severity),
                 args.disposition.as_str(),
-                crate::write_mode::STAGED_FOR_GATE_PROMOTE
+                settled.suffix()
             );
             if args.introduced_by.is_none() {
                 // Said on the success path, not only in `--help`: this
@@ -661,7 +671,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
                     "canon finding add: note — no --introduced-by, so this finding is UNSOURCED for fix-of-fix derivation. That is the correct record when the introducing commit was not established; never guess one."
                 );
             }
-            0
+            settled.exit_code()
         }
         Err(e) => {
             eprintln!("canon finding add: {e}");
@@ -695,6 +705,8 @@ pub struct FindingCloseArgs {
     /// The session that authored the transition, recorded as
     /// `actor.session_id`.
     pub session_id: Option<SessionId>,
+    /// `--promote`/`--no-promote` (0.16 D2; [`crate::write_mode`]).
+    pub promote: crate::write_mode::PromoteFlag,
 }
 
 /// Stage the DISPOSITION TRANSITION of one already-committed finding
@@ -722,6 +734,13 @@ pub struct FindingCloseArgs {
 /// same bar as this command's output.
 pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     let repo = resolve_repo_root(repo);
+    let promote = match crate::write_mode::should_promote(&repo, args.promote) {
+        Ok(promote) => promote,
+        Err(error) => {
+            eprintln!("canon finding close: refused — {error}");
+            return 2;
+        }
+    };
 
     if args.round == 0 || args.seq == 0 {
         eprintln!(
@@ -879,17 +898,18 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     let body = serde_json::to_value(&transitioned).expect("a Finding always serializes");
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
+            let settled = crate::gate::promote_after_stage("canon finding close", &ledger_root, &receipt.location, promote);
             println!(
-                "canon finding close: staged {} — {} round {} seq {} ({} → {}) — {}",
-                receipt.location,
+                "canon finding close: {} — {} round {} seq {} ({} → {}) — {}",
+                settled.landed(&receipt.location),
                 args.change_id,
                 args.round,
                 args.seq,
                 existing.disposition().as_str(),
                 args.disposition.as_str(),
-                crate::write_mode::STAGED_FOR_GATE_PROMOTE
+                settled.suffix()
             );
-            0
+            settled.exit_code()
         }
         Err(e) => {
             eprintln!("canon finding close: {e}");
@@ -1141,6 +1161,7 @@ mod tests {
             actor_id: "canon".to_string(),
             role: RoleId::parse("reviewer").unwrap(),
             session_id: None,
+            promote: crate::write_mode::PromoteFlag::Config,
         }
     }
 
@@ -1466,6 +1487,7 @@ mod tests {
             actor_id: "canon".to_string(),
             role: RoleId::parse("reviewer").unwrap(),
             session_id: None,
+            promote: crate::write_mode::PromoteFlag::Config,
         }
     }
 

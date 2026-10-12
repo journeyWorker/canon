@@ -74,16 +74,26 @@ is attributed, and is fresh — never on a self-report. See
    - **`.canon/policy.yaml`**, a starter policy that turns `spec_coverage`
      on: every scenario needs evidence, every feature surface needs a
      `@case:failure` scenario, and work on a subject claimed done needs an
-     independent review. The gate grades the work against it, so a human
-     reviews it and approves it with `canon policy approve --by <who>`;
+     independent review. That is the default `strict` level;
+     `--policy standard` leaves out the review and `--policy light` also
+     the failure case, keeping them as commented lines to uncomment when
+     you raise the level. The first line, `# canon policy level: <level>`,
+     names it, and `canon status` shows it. The gate grades the work
+     against the policy, so a human approves it, in the same answer that
+     approves a subject's brief, and the agent records that answer with
+     `canon policy approve --by <the human> --note "<their words>"`;
      until then `canon gate check` and `canon status` print an advisory.
    - **A canon block in `AGENTS.md`**, between `<!-- canon:begin -->` and
      `<!-- canon:end -->`. It tells any agent that features are managed
      with canon, lists the working loop, and points to `canon status` and
-     the canon skill. The file is created if absent; otherwise only the text
-     between the markers is canon's. Markers count only as standalone lines
-     outside code fences; a duplicate or unmatched marker is refused and
-     nothing is written.
+     the canon skill. The loop stops for a human once per scope: a new
+     subject, or a change to an approved subject's scope, needs one answer
+     approving the brief and the policy. Inside an approved scope the
+     agent fixes, follows up, gets each change independently reviewed and
+     ships without stopping. The file is created if absent; otherwise only
+     the text between the markers is canon's. Markers count only as
+     standalone lines outside code fences; a duplicate or unmatched marker
+     is refused and nothing is written.
 
    `--no-agents-md` and `--no-policy` skip those two. `init` never
    overwrites an existing `canon.yaml` or `policy.yaml`; rerunning it only
@@ -100,6 +110,14 @@ is attributed, and is fresh — never on a self-report. See
    bunx @journeykit/canon subject new auth --domain dev --title "Auth"
    bunx @journeykit/canon change new add-login --subject auth --title "Add login"
    ```
+
+   The brief goes in the change's `proposal.md`. When the human approves
+   it, the agent adds an `Approved: <who> <when> — "<their words>"` line
+   there; `canon status` reads that line in the subject's newest adopted
+   change to show whether its brief is approved, and asks for a human only
+   when it is missing. Fixes and follow-ups go in as tasks in that change's
+   `tasks.md`; a new `canon change new` is a new scope that needs the
+   human's approval.
 
 2. **See the authoring surface.** Before writing any canon artifact, ask
    the repo what vocabulary and schemas it resolves to:
@@ -173,7 +191,15 @@ bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon re
 
 `skills check` and `skills doctor` are read-only: `check` reports missing or
 stale projections, while `doctor` reports provider, drift, and legacy-remnant
-diagnostics across all four managed roots without deleting user files.
+diagnostics across all four managed roots without deleting user files. The
+install lock records the canon version that wrote it, so after you upgrade
+canon both say "installed by canon X, this canon is Y — run
+`canon skills install`" (or "an unknown canon version" for a lock from
+before 0.16) until you reinstall. `doctor` also names other skills in the
+same provider roots whose description claims build work, meaning one
+sentence pairs a build verb (build, create, implement, …) with a build object
+(site, app, game, feature, tool, service, …): if an agent picks one of those
+for build work, canon's loop will not run. It only reports them.
 
 Upgrading from canon 0.13.0 or earlier? Those releases wrote Codex's skill to
 `.codex/skills/canon.md`, which Codex never reads. Re-run `skills install`: it

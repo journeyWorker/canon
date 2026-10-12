@@ -185,9 +185,24 @@
 //! dispatch begin --task` makes (s41 extracted the D8 ownership rule
 //! into one place precisely because a second copy had already drifted).
 //!
+//! # Nothing is attested under an unapproved brief (0.16 M7)
+//! The approval is the one thing an agent never assumes: it writes the
+//! brief, stops and reports it. As the backstop for that stop, an add is
+//! refused (exit `1`, nothing staged) while a subject it attests for has
+//! a brief [`crate::brief::brief_of`] reads as enforced and not approved:
+//! the scenario's `@subject` owner, and every subject adopting the
+//! task's change ([`crate::brief::attested_briefs`]). Each refusal is an
+//! `unreviewed-promotion` naming the subject and its `proposal.md`, as
+//! the ship guard prints it. `--override-reason` attests anyway and
+//! records a [`BriefOverride`] (reason, waived refusals, actor) on the
+//! record, which `canon status` and `canon gate check` list. A subject
+//! with no brief to answer is unaffected. `canon review add` and `canon
+//! finding add` are not refused.
+//!
 //! # Exit-code contract (`crate::gate`'s, unchanged)
 //! `0` staged, `1` the authored record would be gate-red (a fabrication
-//! marker, or a typed atom that fails vocabulary validation), `2`
+//! marker, or a typed atom that fails vocabulary validation) or a brief
+//! refuses it, `2`
 //! usage-or-infra (an unknown/ungrammatical task, no plan corpus, a
 //! malformed flag combination, a line separator in a document-bound
 //! field, an unparseable typed-atoms file, a tier write failure). Each
@@ -196,18 +211,57 @@
 
 use std::path::{Path, PathBuf};
 
-use canon_gate::{scan_note_text, verify_risk_approval, GateCtx};
+use canon_gate::{scan_note_text, verify_risk_approval, FailureClass, GateContext, GateCtx, Violation};
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{
-    approval_payload_bytes, Actor, AttachmentDrop, AuditResult, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord,
-    RecordKind, ReportFormat, RoleId, RunId, ScenarioId, SessionId, Sha, TaskId, APPROVAL_NAMESPACE,
+    approval_payload_bytes, Actor, AttachmentDrop, AuditResult, BriefOverride, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId,
+    RawRecord, RecordKind, ReportFormat, RoleId, RunId, ScenarioId, SessionId, Sha, TaskId, WaivedViolation, APPROVAL_NAMESPACE,
 };
+use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier, TierQuery};
 use chrono::{DateTime, Utc};
 
 use crate::context::resolve_repo_root;
 use crate::gate::{evidence_staging_dir, typed_evidence_contract_for_task};
+
+/// What `canon evidence add` tells the agent when a brief refuses the
+/// attestation (0.16 M7): the stop belongs at the brief.
+const BRIEF_STOP: &str = "stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — \"<their words>\"` in that proposal.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record";
+
+/// The brief refusals for this attestation (module doc, 0.16 M7): one
+/// `unreviewed-promotion` per subject it attests for whose brief
+/// [`crate::brief::brief_of`] reads as enforced and not approved, the
+/// class and subject the ship guard's brief check prints. The subjects
+/// come from [`crate::brief::attested_briefs`]: the scenario's
+/// `@subject` owner and every subject adopting the task's change. `Err`
+/// when the ledger cannot be read.
+fn brief_refusals(repo: &Path, args: &EvidenceArgs) -> Result<Vec<Violation>, String> {
+    let ctx = GateCtx::from_repo(repo)
+        .map_err(|e| e.to_string())
+        .and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string()))?;
+    // An unreadable `plans:` section finds no proposal.md, so no brief is
+    // enforced; `canon status` warns about it.
+    let plan_roots = crate::brief::plan_roots(repo).unwrap_or_default();
+    let scenario = args.project_id.as_ref().zip(args.scenario_id.as_ref());
+    let what = [args.scenario_id.as_ref().map(|s| s.as_str().to_string()), args.task_id.as_ref().map(ToString::to_string)]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" and ");
+    Ok(crate::brief::attested_briefs(repo, &plan_roots, &ctx, args.task_id.as_ref(), scenario)
+        .into_iter()
+        .filter(|(_, brief)| brief.enforced)
+        .map(|(subject, brief)| {
+            let proposal = brief.proposal.as_deref().unwrap_or_default();
+            Violation::new(
+                FailureClass::UnreviewedPromotion,
+                subject.subject_id.as_str(),
+                format!("evidence for {what}: brief not approved — {proposal} has no `Approved:` line, so the human has not answered it"),
+            )
+        })
+        .collect())
+}
 
 /// `--verdict`'s clap `value_parser`. Kebab-cased on the CLI, matching
 /// `crate::divergence::parse_status`'s established spelling for a
@@ -357,6 +411,13 @@ pub struct EvidenceArgs {
     /// `drop_reason` recorded for all of them.
     pub drop_attachments: Vec<String>,
     pub drop_reason: Option<String>,
+    /// 0.16 M7: attest anyway while a subject this record attests for has
+    /// an enforced, unapproved brief ([`brief_refusals`]); recorded on the
+    /// record as its [`BriefOverride`], with the actor.
+    pub override_reason: Option<String>,
+    /// `--promote`/`--no-promote` (0.16 D2): whether this run promotes
+    /// the record it stages ([`crate::write_mode`]).
+    pub promote: crate::write_mode::PromoteFlag,
 }
 
 /// The `--kind` value that marks an audited outcome (0.15 D3).
@@ -620,6 +681,13 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     // ancestor walk of its own — so the walk happens HERE, once, exactly
     // as `crate::gate`'s every subcommand does it.
     let repo = resolve_repo_root(repo);
+    let promote = match crate::write_mode::should_promote(&repo, args.promote) {
+        Ok(promote) => promote,
+        Err(error) => {
+            eprintln!("canon evidence add: refused — {error}");
+            return 2;
+        }
+    };
 
     if args.kind.trim().is_empty() || args.evidence_ref.trim().is_empty() {
         eprintln!("canon evidence add: refused — --kind and --ref must both be non-empty; an empty companion narrows the gate's typed evidence slice to nothing");
@@ -639,6 +707,12 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     if let Err(error) = check_drop_flags(args) {
         eprintln!("canon evidence add: refused — {error}");
         return 2;
+    }
+    if let Some(reason) = &args.override_reason {
+        if reason.trim().is_empty() || first_row_line_break(reason).is_some() {
+            eprintln!("canon evidence add: refused — --override-reason must be one non-empty line; it is recorded on the evidence record as the accountable reason");
+            return 2;
+        }
     }
     for surface in &args.surface_ref {
         if let Err(error) = parse_surface_ref(surface) {
@@ -780,6 +854,38 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             }
         }
     }
+    // 0.16 M7: nothing is attested for a subject whose brief awaits the
+    // human's answer (module doc). Before anything is bound or staged.
+    let brief_override = match brief_refusals(&repo, args) {
+        Ok(refusals) if refusals.is_empty() => {
+            if args.override_reason.is_some() {
+                eprintln!("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation");
+            }
+            None
+        }
+        Ok(refusals) => {
+            let Some(reason) = &args.override_reason else {
+                for refusal in &refusals {
+                    eprintln!("canon evidence add: {}", refusal.line());
+                }
+                eprintln!("canon evidence add: refused — {BRIEF_STOP}");
+                return 1;
+            };
+            for refusal in &refusals {
+                eprintln!("canon evidence add: waived {}", refusal.line());
+            }
+            eprintln!("canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
+            Some(BriefOverride {
+                reason: reason.clone(),
+                waived: refusals.iter().map(|v| WaivedViolation { class: v.class.as_str().to_string(), subject: v.subject.clone() }).collect(),
+                actor: Actor::new_unattributed(args.actor_id.as_str()),
+            })
+        }
+        Err(e) => {
+            eprintln!("canon evidence add: {e}");
+            return 2;
+        }
+    };
     // Experimental binding: read (never run) the files the caller names,
     // before anything is staged, so a refused binding leaves no record.
     if !args.report_cases.is_empty() && args.reports.is_empty() {
@@ -835,6 +941,9 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     .with_attachments(bound.attachments);
     if let Some(attachment_drop) = attachment_drop {
         record = record.with_attachment_drop(attachment_drop);
+    }
+    if let Some(brief_override) = brief_override {
+        record = record.with_brief_override(brief_override);
     }
     if let Some(audit) = audit {
         record = record.with_audit(audit);
@@ -939,28 +1048,15 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
 
     // Store the bound bytes before staging (module doc): every refusal
     // is behind us, and a record must never name a blob the store lacks.
-    // A file that changed since `bind` hashed it is refused rather than
-    // stored under a digest its bytes no longer have.
-    let mut stored = 0usize;
-    for file in &bound.files {
-        let outcome = std::fs::File::open(&file.resolved)
-            .map_err(canon_gate::artifact_store::StoreError::from)
-            .and_then(|reader| canon_gate::artifact_store::store(&repo, &file.sha256, reader));
-        match outcome {
-            Ok(canon_gate::artifact_store::StoreOutcome::Stored) => stored += 1,
-            Ok(canon_gate::artifact_store::StoreOutcome::AlreadyStored) => {}
-            Err(e) => {
-                eprintln!("canon evidence add: refused — could not store {} in the artifact store: {e}", file.resolved.display());
-                return 2;
-            }
+    let stored = match crate::evidence_attach::store_files(&repo, &bound.files) {
+        Ok(stored) => stored,
+        Err((file, e)) => {
+            eprintln!("canon evidence add: refused — could not store {} in the artifact store: {e}", file.resolved.display());
+            return 2;
         }
-    }
+    };
     if !bound.files.is_empty() {
-        println!(
-            "canon evidence add: artifact store holds {} bound file(s) under {}/ ({stored} newly stored) — commit them with the ledger",
-            bound.files.len(),
-            canon_model::paths::ARTIFACTS_SHA256_DIR
-        );
+        println!("{}", crate::evidence_attach::stored_line("canon evidence add", bound.files.len(), stored));
     }
 
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
@@ -981,14 +1077,9 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
                 Some(result) => format!("audit {}", result.as_str()),
                 None => format!("verdict {}", verdict_slug(verdict)),
             };
-            println!(
-                "canon evidence add: staged {} for {} ({outcome}) — {}, {}",
-                receipt.location,
-                subject,
-                crate::write_mode::STAGED_FOR_GATE_PROMOTE,
-                next
-            );
-            0
+            let settled = crate::gate::promote_after_stage("canon evidence add", &ledger_root, &receipt.location, promote);
+            println!("canon evidence add: {} for {} ({outcome}) — {}, {}", settled.landed(&receipt.location), subject, settled.suffix(), next);
+            settled.exit_code()
         }
         Err(e) => {
             eprintln!("canon evidence add: {e}");
@@ -1010,7 +1101,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
 /// matters is the gate's question, and a superseded record's lost file
 /// never does. `2` when the ledger cannot be read or a write fails.
 pub fn run_vault(repo: &Path, max_artifact_mib: u64) -> i32 {
-    use canon_gate::artifact_store::{blob_display, store, stored_blob, working_tree_path, StoreError, StoreOutcome, MIB};
+    use canon_gate::artifact_store::{blob_display, stored_blob, working_tree_path, StoreError, StoreLock, StoreOutcome, MIB};
 
     let repo = resolve_repo_root(repo);
     let ledger_root = match GateCtx::from_repo(&repo) {
@@ -1034,7 +1125,18 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64) -> i32 {
     let max_bytes = max_artifact_mib.saturating_mul(MIB);
     let (mut stored, mut already) = (Vec::new(), 0usize);
     let mut missing = Vec::new();
+    // One hold of the store lock for the whole pass, so "already
+    // stored" is never decided while another writer may still roll back.
+    // Nothing to store takes no lock.
+    let lock = match (!files.is_empty()).then(|| StoreLock::acquire(&repo)).transpose() {
+        Ok(lock) => lock,
+        Err(e) => {
+            eprintln!("canon evidence vault: {e}");
+            return 2;
+        }
+    };
     for (path, sha256) in &files {
+        let lock = lock.as_ref().expect("the lock is taken whenever there is a file");
         if stored_blob(&repo, sha256).as_str() == sha256 {
             already += 1;
             continue;
@@ -1058,11 +1160,11 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64) -> i32 {
             ));
             continue;
         }
-        match store(&repo, sha256, file) {
+        match lock.store(sha256, file) {
             Ok(StoreOutcome::Stored) => stored.push(format!("{} <- {path}", blob_display(sha256))),
             Ok(StoreOutcome::AlreadyStored) => already += 1,
             Err(StoreError::Changed { actual, .. }) => missing.push(format!("{path} (recorded sha256 {sha256}): working tree: {actual}")),
-            Err(e @ (StoreError::Io(_) | StoreError::InvalidDigest(_) | StoreError::UnsafeStoreDir)) => {
+            Err(e @ (StoreError::Io(_) | StoreError::InvalidDigest(_) | StoreError::UnsafeStoreDir | StoreError::Locked(_))) => {
                 eprintln!("canon evidence vault: could not write {}: {e}", blob_display(sha256));
                 return 2;
             }
@@ -1162,6 +1264,8 @@ mod tests {
             audit_result: None,
             drop_attachments: Vec::new(),
             drop_reason: None,
+            override_reason: None,
+            promote: crate::write_mode::PromoteFlag::Config,
         }
     }
 

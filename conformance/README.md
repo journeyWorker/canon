@@ -139,6 +139,19 @@ A conformance fixture repository has no commits, so the resolving side of short
 SHAs (`finding add/close` storing the full SHA) is pinned by
 `crates/canon-cli/tests/finding.rs` instead.
 
+## Legacy reviews checked against their pin (0.16)
+
+A review written before 0.15 carries no pins, only the commit it reviewed. The
+gate reads the scenario at that commit. A fixture repository has no commits,
+so only the undecidable side is a case here:
+
+| Situation | Case | What a consumer sees |
+|---|---|---|
+| Pinned commit not in the clone (fake sha) | `gate-check-legacy-review-missing-pin` | the review still counts: `subject status … verifying` and `gate check` exit 0, with an advisory counting it undecidable and naming `fetch-depth: 0` |
+
+The current, stale-by-spec, stale-by-evidence and moved-file cases need real
+history and are pinned by `crates/canon-cli/tests/legacy_pins.rs`.
+
 ## The version case (live stamp)
 
 `cases/version` pins `canon --version` to the workspace version, and the

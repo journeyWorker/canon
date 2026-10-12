@@ -2,7 +2,8 @@
 //! what to do next.
 //!
 //! `canon context` answers what CAN be authored; this answers what HAS
-//! been: each subject's scenario, evidence and review counts, its open
+//! been: the policy's level (0.16 D3, [`crate::policy_level`]), each
+//! subject's scenario, evidence and review counts, its open
 //! blockers and missing required cases, the scenarios no subject owns,
 //! the bindings a re-attestation dropped on purpose (0.15 D2), the audit
 //! obligations `spec_coverage.require_audit` sampled and every refuted
@@ -27,8 +28,39 @@
 //! (the rest are counted, never listed). Subjects are visited closest to
 //! done first: verifying, building, specced, proposed, then shipped.
 //!
+//! # The brief (0.16 D1, M7)
+//! One human answer approves a subject's scope: its brief and the
+//! policy. [`crate::brief::brief_of`] decides whether a subject's brief
+//! is approved, and the `verifying → shipped` guard of `canon subject
+//! status` and `canon evidence add` refuse on the same call, so status
+//! and the guards cannot disagree. A subject whose newest change has a
+//! `proposal.md` without the `Approved:` line (the brief is enforced)
+//! gets the one `human` step status ever emits, and it is the subject's
+//! only step, whatever its status: the agent stops and reports the
+//! brief, and nothing is built or attested for the subject (no `feature
+//! new`, `scenario new`, `evidence add`, review or status advance)
+//! before the human answers. With no `proposal.md` to answer, the
+//! `brief:` line still says not approved, as an advisory, and nothing is
+//! withheld. A `proposed` subject shows its brief once its newest change
+//! has a `proposal.md`. Evidence attested under a brief
+//! override is listed as a warning ([`crate::brief::override_lines`]).
+//! Every other step is the agent's.
+//!
+//! # No bookkeeping steps (0.16 M6)
+//! Readers refresh a stale scenario index themselves
+//! ([`crate::inventory::refresh_stale_index`]), so no step says "then
+//! `canon inventory sync`": the sync step appears only when the refresh
+//! refused (a format violation or a duplicate id), and
+//! `canon inventory sync` names why (see Failing closed). The evidence step names
+//! `canon gate promote` only when `canon.yaml` keeps writes staged
+//! (`write.promote: manual`, the default without a `write:` key).
+//!
 //! # Failing closed
-//! Status never suggests progress the gate would refuse. A corpus kind
+//! Status never suggests progress the gate would refuse. A spec root
+//! whose changed `.feature` files the index refresh could not take
+//! ([`crate::inventory::unrefreshable_roots`], the decision `canon gate
+//! check` and the ship guard also fail on) makes `canon inventory sync`
+//! the only step, since every count would describe the old specs. A corpus kind
 //! routed away from the rung status reads (`scenario`, `subject`,
 //! `review`, `finding`) would read as empty, so status then lists only
 //! the routing repair, like the ship gate and `spec_coverage` refuse
@@ -38,10 +70,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use canon_gate::policy::subject_status_name;
-use canon_gate::review_gate::{open_blockers, review_gap, unpinned_review_advisory, unpinned_review_note, ReviewGapKind};
+use canon_gate::review_gate::{legacy_review_advisory, open_blockers, review_gap, ReviewGapKind};
 use canon_gate::spec_coverage::{case_gaps, latest_scenarios, latest_subjects, subject_scenarios};
 use canon_gate::review_gate::active_require_review;
 use canon_gate::audit;
@@ -52,11 +84,14 @@ use chrono::Utc;
 use serde::Serialize;
 
 use crate::context::{resolve_repo_root, spec_coverage_surface, SpecCoverageSurface};
+use crate::brief::BriefStatus;
 use crate::inventory::{load_spec_roots, scan_feature_corpus};
 
 /// `canon status --json`'s shape version. Bumped when a field changes
-/// meaning or is removed; an added field does not bump it.
-const STATUS_VERSION: u32 = 1;
+/// meaning or is removed; an added field does not bump it. `2` (0.16):
+/// a `next` entry's `command` is a canon command line only when its
+/// `actor` is `agent`.
+const STATUS_VERSION: u32 = 2;
 
 /// The most `next:` entries status prints.
 pub const NEXT_LIMIT: usize = 5;
@@ -147,6 +182,10 @@ pub struct PolicyStatus {
     /// The effective `spec_coverage` section, keyed like `policy.yaml`
     /// (the same shape `canon context --json` prints); `null` when absent.
     pub spec_coverage: Option<SpecCoverageSurface>,
+    /// The policy's level (0.16 D3, [`crate::policy_level::detect`]):
+    /// `light`, `standard`, `strict`, or `custom`; `null` when the
+    /// policy is absent.
+    pub level: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -178,6 +217,12 @@ pub struct SubjectSummary {
     /// Open blocker findings on the subject's adopted changes.
     pub open_blockers: usize,
     pub missing_cases: Vec<MissingCase>,
+    /// Whether the brief is approved (0.16 D1): present for `building`,
+    /// `verifying` and `shipped` subjects, and for a `proposed` subject
+    /// whose newest adopted change has a `proposal.md`; omitted for the
+    /// others.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub brief: Option<BriefStatus>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -192,8 +237,20 @@ pub struct MissingCase {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct NextStep {
+    /// A canon command line when `actor` is `agent`; what to get from
+    /// the human when it is `human`.
     pub command: String,
     pub why: String,
+    pub actor: StepActor,
+}
+
+/// Who carries out a `next` step (0.16 D1). The only `human` step is
+/// getting a brief approved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StepActor {
+    Agent,
+    Human,
 }
 
 /// The policy warning `canon status` and `canon context`'s header print:
@@ -239,11 +296,11 @@ pub fn resolve(repo: &Path) -> StatusReport {
 
     if !repo.join("canon.yaml").is_file() {
         warnings.push(format!("no canon.yaml at {} — canon is not set up in this repo", repo.display()));
-        next.push(NextStep { command: "canon init".into(), why: "set canon up here".into() });
+        next.push(NextStep { command: "canon init".into(), why: "set canon up here".into(), actor: StepActor::Agent });
     }
 
     let loaded = GateCtx::from_repo(repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &registry, Utc::now()).map_err(|e| e.to_string()));
-    let ctx = match loaded {
+    let mut ctx = match loaded {
         Ok(ctx) => ctx,
         Err(e) => {
             // The ledger cannot be read, so nothing below can be counted.
@@ -251,11 +308,12 @@ pub fn resolve(repo: &Path) -> StatusReport {
             warnings.extend(policy_warning(&policy));
             warnings.extend(crate::policy_approval::advisory(repo));
             warnings.push(format!("cannot read this repo's ledger: {e}"));
-            next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into() });
-            return finish(&policy, warnings, Vec::new(), Vec::new(), Vec::new(), None, next);
+            next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into(), actor: StepActor::Agent });
+            return finish(repo, &policy, warnings, Vec::new(), Vec::new(), Vec::new(), None, next);
         }
     };
 
+    crate::inventory::resolve_legacy_pins(&mut ctx);
     warnings.extend(policy_warning(&ctx.policy));
     warnings.extend(crate::policy_approval::advisory(repo));
     let routed_away: Vec<&str> = ctx
@@ -271,15 +329,23 @@ pub fn resolve(repo: &Path) -> StatusReport {
     if unreadable > 0 {
         warnings.push(format!("{unreadable} ledger record(s) could not be read and are not counted; `canon gate check` names them"));
     }
-    if let Some(count) = unpinned_review_advisory(&ctx) {
-        warnings.push(unpinned_review_note(count));
+    if let Some(counts) = legacy_review_advisory(&ctx) {
+        warnings.push(counts.note());
     }
+    warnings.extend(crate::brief::override_lines(&ctx));
 
     let joins = Joins { verdicts: latest_verdicts(&ctx), blockers: open_blockers(&ctx) };
     let subjects = latest_subjects(&ctx);
     let spec_roots = load_spec_roots(&repo.join("canon.yaml")).unwrap_or_default();
     let roots: Vec<ProjectId> = spec_roots.iter().map(|r| r.id.clone()).collect();
-    let mut summaries: Vec<(&Subject, SubjectSummary)> = subjects.iter().map(|s| (*s, summarize(&ctx, &joins, s))).collect();
+    let plan_roots: Vec<PathBuf> = match crate::brief::plan_roots(repo) {
+        Ok(roots) => roots,
+        Err(e) => {
+            warnings.push(format!("canon.yaml's `plans:` section cannot be read ({e}), so no brief reads as approved; `canon init --check-config` names the problem"));
+            Vec::new()
+        }
+    };
+    let mut summaries: Vec<(&Subject, SubjectSummary)> = subjects.iter().map(|s| (*s, summarize(&ctx, &joins, repo, &plan_roots, s))).collect();
     summaries.sort_by_key(|(s, _)| (rank(&DISPLAY_ORDER, s.status), s.subject_id.as_str().to_string()));
 
     let scenarios = latest_scenarios(&ctx);
@@ -298,6 +364,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
     if !routed_away.is_empty() {
         let settings = routed_away.iter().map(|kind| format!("routing.{kind}: local")).collect::<Vec<_>>().join(", ");
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: "canon init --check-config".into(),
             why: format!(
                 "set `{settings}` in canon.yaml, then check it: status and the gate read only the local rung, so every count and step would rest on an empty corpus"
@@ -305,7 +372,31 @@ pub fn resolve(repo: &Path) -> StatusReport {
         });
         let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
         let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
-        return finish(&ctx.policy, warnings, summaries, unowned, drops, audits, next);
+        return finish(repo, &ctx.policy, warnings, summaries, unowned, drops, audits, next);
+    }
+
+    // ── fail closed: .feature edits the index refresh could not take ──
+    // The same decision `canon gate check` and the ship guard fail on:
+    // every count below would describe specs the files no longer say, so
+    // the sync that names the problems is the only step.
+    let unrefreshable = crate::inventory::unrefreshable_roots(repo);
+    if !unrefreshable.is_empty() {
+        let ids = unrefreshable.iter().map(|root| format!("`{}`", root.id.as_str())).collect::<Vec<_>>().join(", ");
+        let (violations, errors) = unrefreshable.iter().fold((0, 0), |(v, e), root| (v + root.violations, e + root.sync_errors));
+        if scenarios.is_empty() {
+            warnings.push("the ledger holds no scenario records, so every subject reads as owning none".into());
+        }
+        warnings.push(format!("the scenario index for spec root(s) {ids} is stale and could not be refreshed, so `canon gate check` fails and no subject is suggested to move on"));
+        next.push(NextStep {
+            actor: StepActor::Agent,
+            command: "canon inventory sync".into(),
+            why: format!(
+                "the .feature files under spec root(s) {ids} changed, but the automatic refresh could not index them ({violations} format violation(s), {errors} sync error(s)); this names each format violation or duplicate id to fix"
+            ),
+        });
+        let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
+        let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
+        return finish(repo, &ctx.policy, warnings, summaries, unowned, drops, audits, next);
     }
 
     // ── next: global rules ──
@@ -314,6 +405,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
     let policy_blocks = match &ctx.policy.spec_coverage {
         Some(SpecCoverage::Invalid { detail }) => {
             next.push(NextStep {
+                actor: StepActor::Agent,
                 command: "canon gate check".into(),
                 why: format!("fix `spec_coverage` in .canon/policy.yaml ({detail}); the gate refuses until it parses, so no subject is suggested to move on"),
             });
@@ -324,32 +416,43 @@ pub fn resolve(repo: &Path) -> StatusReport {
     for (id, tagged) in &dangling {
         warnings.push(format!("{} scenario(s) are tagged `@subject:{id}` but no subject `{id}` exists (first: {})", tagged.len(), tagged[0]));
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: format!("canon subject new {id} --domain <domain> --title \"<title>\" --actor-id <unit>"),
             why: format!("{} scenario(s) are tagged @subject:{id}, which no subject record carries", tagged.len()),
         });
     }
     if subjects.is_empty() && dangling.is_empty() {
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>".into(),
             why: "no subject exists yet; a subject is the unit status, review and shipping track".into(),
         });
     }
 
     // ── next: per-subject rules, closest to done first ──
-    // An empty scenario corpus under existing subjects is almost always an
-    // index never built (scenario records are derived and often
-    // gitignored), not a dozen subjects with no spec: say that once
+    // `canon status` refreshes a stale scenario index before this runs
+    // (module doc), so an empty index under a .feature corpus that holds
+    // scenarios means the refresh refused: a format violation or a
+    // duplicate id, which `canon inventory sync` names. Say that once
     // instead of one "owns no scenario" step per subject. But when the
-    // .feature corpus itself holds no scenario, a sync indexes nothing:
-    // the next step is writing features and scenarios, so each subject
-    // gets its `scenario new … --subject` step below.
+    // .feature corpus itself holds no scenario, there is nothing to
+    // index: the next step is writing features and scenarios, so each
+    // subject gets its `scenario new … --subject` step below.
     let corpus_has_scenarios = || spec_roots.iter().any(|root| !scan_feature_corpus(&root.root).is_empty());
+    let promote_manual = crate::write_mode::configured_promote_mode(&repo.join("canon.yaml")) != Ok(crate::write_mode::PromoteMode::Auto);
     if scenarios.is_empty() && !subjects.is_empty() && corpus_has_scenarios() {
         warnings.push("the ledger holds no scenario records, so every subject reads as owning none".into());
-        next.push(NextStep { command: "canon inventory sync".into(), why: "index the .feature corpus into scenario records; status counts nothing until then".into() });
+        next.push(NextStep {
+            command: "canon inventory sync".into(),
+            why: "the .feature files hold scenarios but the index holds none, so the automatic refresh could not index them; this names each format violation or duplicate id to fix".into(),
+            actor: StepActor::Agent,
+        });
     } else {
-        if scenarios.is_empty() && !subjects.is_empty() {
+        // A subject waiting on its brief starts no work, so it asks for
+        // no feature either.
+        if scenarios.is_empty() && summaries.iter().any(|(_, summary)| !awaits_brief(summary)) {
             next.push(NextStep {
+                actor: StepActor::Agent,
                 command: format!("canon feature new <area>.<surface> --title \"<feature>\"{}", project_flag(&roots, None)),
                 why: "no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject <id>`".into(),
             });
@@ -357,15 +460,16 @@ pub fn resolve(repo: &Path) -> StatusReport {
         let mut by_priority: Vec<&(&Subject, SubjectSummary)> = summaries.iter().filter(|(s, _)| NEXT_ORDER.contains(&s.status)).collect();
         by_priority.sort_by_key(|(s, _)| (rank(&NEXT_ORDER, s.status), s.subject_id.as_str().to_string()));
         for (subject, summary) in by_priority {
-            subject_steps(&ctx, &joins, &scenarios, &roots, !policy_blocks, subject, summary, &mut next);
+            subject_steps(&ctx, &joins, &scenarios, &roots, !policy_blocks, promote_manual, subject, summary, &mut next);
         }
     }
 
     if let Some(first) = unowned.first() {
         next.push(NextStep {
-            command: "canon inventory sync".into(),
+            actor: StepActor::Agent,
+            command: "canon status".into(),
             why: format!(
-                "{} scenario(s) carry no @subject tag (first: {}); add `@subject:<id>` above each in its .feature file, then sync",
+                "{} scenario(s) carry no @subject tag (first: {}); add `@subject:<id>` above each in its .feature file, then check again: status re-indexes the edited files itself",
                 unowned.len(),
                 first.scenario_id.as_str()
             ),
@@ -374,10 +478,12 @@ pub fn resolve(repo: &Path) -> StatusReport {
 
     let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
     let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
-    finish(&ctx.policy, warnings, summaries, unowned, drops, audits, next)
+    finish(repo, &ctx.policy, warnings, summaries, unowned, drops, audits, next)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn finish(
+    repo: &Path,
     policy: &PolicyResolution,
     warnings: Vec<String>,
     subjects: Vec<SubjectSummary>,
@@ -394,6 +500,7 @@ fn finish(
         policy: PolicyStatus {
             present: !policy.diagnostics.iter().any(|d| matches!(d, PolicyDiagnostic::Missing { .. })),
             spec_coverage: spec_coverage_surface(policy),
+            level: crate::policy_level::detect(repo, policy),
         },
         warnings,
         subjects,
@@ -529,7 +636,7 @@ fn counted<'a>(ctx: &'a GateContext, subject: &Subject) -> (Vec<&'a Scenario>, u
     (counted, excluded)
 }
 
-fn summarize(ctx: &GateContext, joins: &Joins, subject: &Subject) -> SubjectSummary {
+fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBuf], subject: &Subject) -> SubjectSummary {
     let (counted, excluded) = counted(ctx, subject);
     let (_, require_cases) = coverage_settings(ctx);
     let rr = review_rule(ctx);
@@ -565,6 +672,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, subject: &Subject) -> SubjectSumm
         review_due: rr.is_some_and(|rr| rr.covers(subject.status) || next_status(subject.status).is_some_and(|n| rr.covers(n))),
         open_blockers,
         missing_cases,
+        brief: crate::brief::brief_of(repo, plan_roots, subject),
     }
 }
 
@@ -591,9 +699,17 @@ fn project_flag(roots: &[ProjectId], project: Option<&str>) -> String {
     format!(" --project {}", project.unwrap_or("<root-id>"))
 }
 
+/// Whether `subject`'s brief is enforced and not approved (module doc):
+/// the human answers before anything is built or attested for it.
+fn awaits_brief(summary: &SubjectSummary) -> bool {
+    summary.brief.as_ref().is_some_and(|brief| brief.enforced)
+}
+
 /// The per-subject `next:` rules (module doc), each producing at most one
-/// step. Gap rules come first; the status advance only when none fired
-/// and `may_advance` (no blocking policy gap).
+/// step. An enforced unapproved brief is the subject's only step; else
+/// the gap rules; the status advance only when none fired and
+/// `may_advance` (no blocking policy gap). `promote_manual` is whether
+/// `canon.yaml` keeps writes staged for `canon gate promote`.
 #[allow(clippy::too_many_arguments)]
 fn subject_steps(
     ctx: &GateContext,
@@ -601,6 +717,7 @@ fn subject_steps(
     all: &[&Scenario],
     roots: &[ProjectId],
     may_advance: bool,
+    promote_manual: bool,
     subject: &Subject,
     summary: &SubjectSummary,
     next: &mut Vec<NextStep>,
@@ -609,17 +726,31 @@ fn subject_steps(
     let status = subject.status;
     let before = next.len();
 
+    if let Some(brief) = summary.brief.as_ref().filter(|brief| brief.enforced) {
+        let proposal = brief.proposal.as_deref().unwrap_or_default();
+        next.push(NextStep {
+            actor: StepActor::Human,
+            command: format!("stop and report the brief in {proposal}; build and attest nothing for {id} until the human answers (one answer approves brief and policy)"),
+            why: format!(
+                "{id}: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses {id}'s scenarios and tasks until it is recorded; once the human answers, record their words as `Approved: <who> <when> — \"<their words>\"` in {proposal} and run `canon policy approve --by <the human> --note \"<their words>\"`"
+            ),
+        });
+        return;
+    }
+
     if summary.scenarios + summary.excluded == 0 {
         let roots_note = if roots.len() > 1 { format!(" (spec roots: {})", roots.iter().map(ProjectId::as_str).collect::<Vec<_>>().join(", ")) } else { String::new() };
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject {id} --case happy{}", project_flag(roots, None)),
-            why: format!("{id} owns no scenario; specify its behavior, then `canon inventory sync`{roots_note}"),
+            why: format!("{id} owns no scenario; specify its behavior, one scenario per behavior{roots_note}"),
         });
         return;
     }
 
     if let Some(gap) = summary.missing_cases.first() {
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: format!(
                 "canon scenario new {} --title \"<what happens on this path>\" --subject {id} --case {}{}",
                 next_number(all, &gap.project_id, &gap.surface),
@@ -635,16 +766,23 @@ fn subject_steps(
     if attested {
         if let Some(first) = counted.iter().find(|s| !joins.verdict_state(s).0) {
             next.push(NextStep {
+                actor: StepActor::Agent,
                 command: format!(
                     "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
-                why: format!("{id}: {} of {} scenario(s) have no evidence; attest each, then `canon gate promote`", summary.scenarios - summary.evidenced, summary.scenarios),
+                why: format!(
+                    "{id}: {} of {} scenario(s) have no evidence; attest each{}",
+                    summary.scenarios - summary.evidenced,
+                    summary.scenarios,
+                    if promote_manual { ", then `canon gate promote` (`write.promote: manual`)" } else { "" }
+                ),
             });
         }
         if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1) {
             next.push(NextStep {
+                actor: StepActor::Agent,
                 command: format!(
                     "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
@@ -657,6 +795,7 @@ fn subject_steps(
 
     if let Some(blocker) = joins.blockers_of(subject).first() {
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: format!(
                 "canon finding close --change-id {} --round {} --seq {} --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
                 blocker.change_id.as_str(),
@@ -671,6 +810,7 @@ fn subject_steps(
         let distinct_actor = review_rule(ctx).is_some_and(|rr| rr.distinct_actor);
         if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).0 && review_gap(ctx, s, distinct_actor).is_some()) {
             next.push(NextStep {
+                actor: StepActor::Agent,
                 command: format!(
                     "canon review add --project-id {} --scenario-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
                     first.project_id.as_str(),
@@ -722,7 +862,7 @@ fn subject_steps(
             if class == canon_gate::FailureClass::FalseSuccess {
                 command.push_str(&counterexample_drops(&first.subject));
             }
-            next.push(NextStep { command, why: format!("{id}: {} {why} (first: {})", gaps.len(), first.subject) });
+            next.push(NextStep { command, why: format!("{id}: {} {why} (first: {})", gaps.len(), first.subject), actor: StepActor::Agent });
         }
     }
 
@@ -733,11 +873,17 @@ fn subject_steps(
     }
     if let Some(to) = next_status(status) {
         let to = subject_status_name(to);
+        let reviewed = if summary.review_due { " and reviewed" } else { "" };
         next.push(NextStep {
+            actor: StepActor::Agent,
             command: format!("canon subject status {id} {to} --actor-id <unit>"),
             why: match status {
                 SubjectStatus::Proposed | SubjectStatus::Specced => format!("{id} has its scenarios and every required case; move it on"),
-                _ => format!("{id}: every scenario is evidenced{}, with no blocker or case gap", if summary.review_due { " and reviewed" } else { "" }),
+                SubjectStatus::Verifying => {
+                    let brief = if summary.brief.as_ref().is_some_and(|brief| brief.approved) { "the brief is approved" } else { "no brief is written to approve" };
+                    format!("{id}: every scenario is evidenced{reviewed}, with no blocker or case gap, and {brief}; ship it yourself unless the brief says the human ships")
+                }
+                _ => format!("{id}: every scenario is evidenced{reviewed}, with no blocker or case gap"),
             },
         });
     }
@@ -780,6 +926,16 @@ pub fn render(report: &StatusReport) -> String {
             }
         }
     }
+    if let Some(level) = report.policy.level {
+        match crate::policy_level::raise_hint(level) {
+            Some(hint) => {
+                let _ = writeln!(out, "  level: {level} — {hint}");
+            }
+            None => {
+                let _ = writeln!(out, "  level: {level}");
+            }
+        }
+    }
     for warning in &report.warnings {
         let _ = writeln!(out, "warning: {warning}");
     }
@@ -817,6 +973,14 @@ pub fn render(report: &StatusReport) -> String {
             for gap in &s.missing_cases {
                 let _ = writeln!(out, "      missing @case:{} on {}", gap.case, gap.surface);
             }
+            if let Some(brief) = &s.brief {
+                let _ = match (&brief.approval, &brief.proposal, &brief.change) {
+                    (Some(approval), Some(proposal), _) => writeln!(out, "      brief: approved in {proposal} — {approval}"),
+                    (None, Some(proposal), _) => writeln!(out, "      brief: not approved ({proposal} has no `Approved:` line)"),
+                    (_, None, Some(change)) => writeln!(out, "      brief: not approved (change `{change}` has no proposal.md; advisory, nothing to approve yet)"),
+                    _ => writeln!(out, "      brief: not approved (no adopted change; advisory, nothing to approve yet)"),
+                };
+            }
         }
     }
 
@@ -853,7 +1017,10 @@ pub fn render(report: &StatusReport) -> String {
         let _ = writeln!(out, "next:");
         for step in &report.next {
             let _ = writeln!(out, "  # {}", step.why);
-            let _ = writeln!(out, "  {}", step.command);
+            let _ = match step.actor {
+                StepActor::Agent => writeln!(out, "  {}", step.command),
+                StepActor::Human => writeln!(out, "  human: {}", step.command),
+            };
         }
         if report.next_omitted > 0 {
             let _ = writeln!(out, "  … {} more once these are done", report.next_omitted);

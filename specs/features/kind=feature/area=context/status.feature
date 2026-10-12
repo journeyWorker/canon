@@ -42,7 +42,7 @@ Feature: context status
     Given scenarios that carry no subject tag beside one that does
     When status is run
     Then the untagged scenarios are listed as unowned
-    And the next list ends with tagging them and syncing the inventory
+    And the next list ends with tagging them in their .feature files and running canon status again, never an inventory sync
 
   # canon: {"schema":1,"at":"2026-10-10T15:35:47Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -90,10 +90,11 @@ Feature: context status
   @case:edge
   @context.status.09
   Scenario: Status on subjects with no scenario records points at the inventory sync
-    Given subjects and a .feature corpus with scenarios, but no scenario records in the ledger
+    Given subjects and a .feature corpus with scenarios that its own refresh cannot index, so the ledger holds no scenario records
     When status is run
     Then it warns that the ledger holds no scenario records
     And its only next command is the inventory sync, not one empty-subject step per subject
+    And its reason says the automatic refresh could not index the files and that the sync names each format violation or duplicate id
 
   # canon: {"schema":1,"at":"2026-10-10T15:59:34Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -170,3 +171,131 @@ Feature: context status
     Then it warns that the policy is not approved, or changed since approval, and names `canon policy approve`
     And the warning appears in the --json warnings too
     And status still exits 0
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:45Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:context-capability
+  @case:happy
+  @context.status.60
+  Scenario: Status reads a subject's brief approval from its newest change's proposal.md
+    Given a building subject adopting two changes, the newer of whose proposal.md has a line starting "Approved:" with the human's words
+    And a shipped subject with an approved brief and a specced subject
+    When canon status runs
+    Then the building and shipped subjects each show their brief as approved, naming the newest change, its proposal.md and the recorded words, in --json and the human form
+    And the specced subject carries no brief field
+    And no step is addressed to a human
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.61
+  Scenario: An unapproved brief is the only human step and withholds the move-on
+    Given a verifying subject whose scenarios are all evidenced and reviewed, and whose newest change's proposal.md has no "Approved:" line
+    And a building subject that adopts no change
+    When canon status runs
+    Then the verifying subject gets one step whose actor is human: stop and report the brief, building and attesting nothing for the subject until the human answers, one answer covering brief and policy
+    And its reason names the proposal.md the "Approved:" line goes in, says canon evidence add refuses the subject's scenarios and tasks until then, and names the canon policy approve --by <the human> --note command
+    And the human step is the verifying subject's only step, so it is not suggested to move on
+    And the subject with no change has no brief to answer, so it gets no human step and its next step is the agent's
+    And the human form prints the step as "human:" and both briefs as not approved, the one with no change as an advisory
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.62
+  Scenario: With the brief approved and the guard passing, shipping is the agent's own step
+    Given a verifying subject whose scenarios are all evidenced and reviewed, and whose change's proposal.md carries an "Approved:" line
+    When canon status runs
+    Then the only step is the agent's canon subject status <id> shipped command
+    And its reason says to ship it yourself unless the brief says the human ships, and asks nobody
+    And following it succeeds, after which status lists nothing next
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.63
+  Scenario: An approval that is only mentioned, commented out or quoted in code does not approve the brief
+    Given building subjects whose change's proposal.md holds an empty "Approved:" line, "Approved:" mid-line, an "Approved:" line in a one-line or multi-line HTML comment, or one inside a backtick, tilde, nested or unclosed code fence
+    And control subjects whose "Approved:" line follows a comment or fence that has closed
+    When canon status runs
+    Then each of the first reads as not approved and gets the human step to get the brief approved
+    And each control reads as approved
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.64
+  Scenario: Status reads briefs under the configured openspec plan sources
+    Given canon.yaml configures a superpowers source, then an openspec source rooted at a changes dir, then a second openspec source
+    And a change exists in both openspec sources, approved only in the second, and an archived change is approved in the first
+    When canon status runs
+    Then the first openspec source holding a change owns its brief, so the change reads as not approved
+    And the archived change's approval is read
+    And with plans.sources empty no proposal.md is found, so the brief reads as not approved
+
+  # canon: {"schema":1,"at":"2026-10-11T15:16:45Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.65
+  Scenario: An older change's approval does not cover a newer adopted change
+    Given a ship-ready verifying subject whose older change is approved and whose newer adopted change's proposal.md has no "Approved:" line
+    And a building subject whose older change is approved and whose newer change has no proposal.md
+    When canon status runs
+    Then each brief reads as not approved and names the newest change
+    And the verifying subject gets the human step naming the newest change's proposal.md, and is not suggested to ship
+    And the building subject's newest change has no brief to answer, so it gets no human step and its brief line is an advisory
+
+  # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.80
+  Scenario: Status names the policy level from its level line, else from its sections, else custom
+    Given policies whose level line names a level, whose level line is missing or names no known level, and whose sections match no level
+    When status is run on each
+    Then the level is the level line's level when it names a known one, even if the sections differ
+    And without a usable level line it is the level the spec_coverage section matches exactly
+    And a section with any other setting, such as a scope, an audit or a non-default review, is custom
+    And --json carries the same level under policy.level, null when there is no policy
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:10Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.66
+  Scenario: A proposed subject whose brief is unapproved shows the brief and asks only the human
+    Given a proposed subject owning no scenario, whose newest adopted change has a proposal.md with no "Approved:" line, in a repo whose .feature files hold no scenario
+    When canon status runs
+    Then the subject shows its brief as not approved, naming that proposal.md, in --json and the human form
+    And its only next step is the human's: get the brief approved, one human answer covering brief and policy
+    And no step starts the work: neither canon feature new nor canon scenario new is suggested
+    And once the proposal.md carries an "Approved:" line the brief reads as approved and the feature and scenario steps come back
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:10Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.67
+  Scenario: A proposed subject with no brief to answer keeps its steps, and showing a brief adds no transition check
+    Given a proposed subject that adopts no change, and a proposed subject whose newest adopted change has no proposal.md
+    When canon status runs
+    Then neither carries a brief field or a brief line, and neither gets a human step
+    And each still gets its canon scenario new step, after one canon feature new step
+    And a proposed subject whose brief is unapproved still moves to specced, with no brief line in its output: status reads that brief, the move to specced does not
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:10Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:happy
+  @context.status.68
+  Scenario: No status step names a sync while the readers refresh the index themselves
+    Given a building subject owning no scenario beside one that owns scenarios, and a scenario with no subject tag
+    When canon status runs
+    Then the empty subject's canon scenario new step gives its reason without naming canon inventory sync
+    And the untagged scenario's step is canon status, with a reason to add the @subject tag in its .feature file
+    And no step names canon inventory sync, canon format or canon ingest plans
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:11Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.69
+  Scenario: The evidence step names gate promote only when writes stay staged
+    Given a building subject with an unevidenced scenario
+    When canon status runs in a repo whose canon.yaml says write promote auto
+    Then the evidence step's reason says to attest each scenario and does not name canon gate promote
+    And in a repo with write promote manual, or with no write section, the same reason ends by naming canon gate promote

@@ -134,8 +134,19 @@ the scenario, and the review is stale — `unreviewed-promotion` naming the
 spec, the evidence, or both. Only a `signed` review counts; a reviewer run
 recorded `--outcome indeterminate` or `unavailable` is a gap, and the
 latest review per reviewer wins. Reviews written before 0.15 carry no
-pins: they keep counting, and `gate check` prints one `advisory: N
-review(s) predate review pinning (0.15) …` line.
+pins, but each names the commit it reviewed (`pin`). The gate reads the
+scenario there through `git`, with the same per-scenario digest `inventory
+sync` computes: a review stays current while that digest equals today's
+and no declared evidence is newer than the review, and is stale
+otherwise. When the commit, or the scenario at it, is not in the clone
+(a shallow checkout, rewritten history), the review is undecidable and
+still counts — a missing commit is never a violation. `gate check` prints
+one `advisory: N review(s) predate review pinning (0.15) and were checked
+against the commit each one pinned: C current, S stale, U undecidable …`
+line. A stale one whose scenario already has another current review is
+counted as superseded; only the scenarios still owed a review are named
+for re-review. In CI, check out full history
+(`actions/checkout` with `fetch-depth: 0`) for the gate job.
 
 With `block_on_findings`, review findings (`canon finding add
 --severity blocker|should-fix|note`) are read at their latest version per

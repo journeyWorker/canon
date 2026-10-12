@@ -88,6 +88,10 @@ fn a_task_flip_keeps_the_changes_adopted_subject() {
     tasks.push_str("\n- [ ] 1 Write the failure-path scenarios\n");
     std::fs::write(&tasks_path, tasks).unwrap();
     assert!(run(repo, &["ingest", "plans"]).status.success());
+    // The human approved the brief (0.16 M7: nothing is attested before).
+    let proposal_path = repo.join("openspec/changes/add-login/proposal.md");
+    let proposal = std::fs::read_to_string(&proposal_path).unwrap();
+    std::fs::write(&proposal_path, format!("{proposal}\nApproved: Journey 2026-10-12 — \"go\"\n")).unwrap();
 
     let evidence = run(repo, &["evidence", "add", "--task", "add-login#1", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"]);
     assert!(evidence.status.success(), "{}", stderr(&evidence));

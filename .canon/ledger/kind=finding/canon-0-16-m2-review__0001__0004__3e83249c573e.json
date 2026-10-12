@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-016-m2",
+    "role": "reviewer",
+    "session_id": "review-016-m2"
+  },
+  "at": "2026-10-11T16:13:46.763802Z",
+  "change_id": "canon-0-16-m2-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "e4de67535ba1e695e402021e6b9c749150a1afaa",
+  "reviewed_sha": "61c08031b5baa246e00009a2fef6101b83696d93",
+  "reviewer": "canon-reviewer-016-m2",
+  "round": 1,
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "artifact ingest still joined titles from tombstoned scenarios"
+}

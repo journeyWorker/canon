@@ -149,7 +149,127 @@ Every query, export, and purge appends an actor-stamped record to
 `.canon/audit/access.jsonl` (mode `0600` on creation) in the repository
 whose `canon.yaml` it read (through `--repo` or `--canon-yaml`), never in
 the current directory; with no `canon.yaml` there is no audit and nothing
-is written. `CANON_ACTOR` takes
+is written. The log is local operator state: `canon init` keeps
+`.canon/audit/` out of git (below). `CANON_ACTOR` takes
 precedence over the OS username. Audit rows contain operation, kind, scope,
 sensitive flag, counts, and timestamp only—never query text, secrets, or
 record bodies.
+
+## Staged writes and promotion
+
+Four writes stage their record instead of committing it: `canon evidence
+add`, `canon finding add` and `canon finding close` (under
+`.canon/ledger/_staging/`, committed by `canon gate promote`) and `canon
+divergence stage` (committed by `canon divergence promote`). `canon.yaml`'s
+`write:` section decides whether they promote in the same run:
+
+```yaml
+write:
+  promote: auto   # or manual
+```
+
+- `auto` — the command stages, then promotes that one record through the
+  same validation and assignment `canon gate promote` (or `canon
+  divergence promote`) applies. Records other runs staged stay staged;
+  only `canon gate promote` / `canon divergence promote` commit
+  everything staged. The one success line names the committed record
+  (`wrote kind=…/….json`; promotion renames it, so the staged file is not
+  named) and ends `— staged and promoted in this run; nothing to
+  promote`. `canon init` writes `auto`.
+- `manual` — the record stays staged and the line ends ``— run `canon
+  gate promote` to commit it``. An absent `write:` key (or `promote:`
+  field) is `manual`, so a repo that never set it is unchanged.
+
+`--promote` / `--no-promote` decide for one write and win over the config
+without reading it; both at once is a usage error (exit `2`). If the
+promotion refuses the command's own record, the record stays staged, the
+line ends ``— run `canon gate promote` to commit it`` (`canon divergence
+promote` for a divergence), and the command exits `1`. With neither flag,
+a malformed `write:` section (anything but `promote: auto | manual`)
+refuses the write, exit `2`, before anything is staged. `canon init
+--check-config` reports `[PASS] write (promote: auto)`, `[not configured]
+write (promote: manual)`, or `[FAIL] write: …`. `canon gate promote` still
+works under `auto` and is idempotent: with nothing staged it prints
+`nothing staged` and exits `0`.
+
+## The scenario index
+
+`canon inventory sync` materializes one `Scenario` record per
+`(project_id, scenario_id)` under `.canon/ledger/kind=scenario/`. The
+index is derived — a pure function of the `.feature` files — so the
+commands that read it rebuild it first: `canon gate check`, `canon
+status`, `canon subject status`, `canon review add` and `canon evidence
+add`. The index is stale when a `.feature` file holds a scenario with no
+live index record, or one whose recorded source digest differs from the
+file's current bytes, or when the index holds a scenario of a spec root
+that no `.feature` file of it declares any more. The reader then runs
+`canon inventory sync`'s code on the changed files (validation still
+covers the whole root) and prints one stderr line:
+
+```
+canon status: refreshed the scenario index from 1 changed feature file(s) (specs/features/kind=feature/area=cart/add.feature): 1 record(s) written
+```
+
+A deleted scenario is not erased: `canon inventory sync` — and a reader's
+refresh, identically — appends a tombstone, a new generation of its
+record with `removed: true`. The gate, `canon status`, `canon query` and
+the report panels then treat it as absent; re-adding the scenario writes
+a live generation that supersedes the tombstone. A root that fails to
+sync writes no tombstone either.
+
+```
+canon status: refreshed the scenario index from 1 scenario(s) no longer in any feature file (cart.pay.01): 1 record(s) written
+```
+
+`canon inventory sync` and every refresh hold an OS file lock on
+`.canon/scenario-index.lock` while they write, so concurrent runs never
+index one change twice; a refresh that waited checks staleness again and
+is silent if another run already did the work. The lock is released when
+its holder exits, however it exits, so it never goes stale; a writer
+gives up after 30 s with a message naming the file (`canon inventory
+sync` exits `2`; a reader skips the refresh and still runs).
+
+A fresh index prints nothing. A root that fails to sync (format
+violations, a duplicate id) is named and left as it was, and the command
+still runs; `canon gate check` then fails with `uncovered-cell <root>`,
+the `verifying → shipped` guard refuses, and `canon status` lists only
+`canon inventory sync`, while the reporting readers (`query`, `context`)
+keep only this line:
+
+```
+canon gate check: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them
+```
+
+Nothing is written in a directory without `canon.yaml`. `canon inventory
+sync` stays the explicit command, and the one that lists violations and
+tag diagnostics.
+
+## The artifact store lock
+
+Every write to the evidence artifact store (`.canon/artifacts/sha256/`:
+`canon evidence add`, `canon review add`, `canon evidence vault`) holds an
+OS file lock on `.canon/artifact-store.lock` from its "already stored?"
+check through its last rename, so a write that fails and rolls back never
+removes a blob another writer published or counted as stored. A rollback
+removes only the blobs its own write renamed into place; a blob already
+stored intact counts as stored and is not written again. The lock is
+released when its holder exits, however it exits, so it never goes stale;
+a writer gives up after 30 s with a message naming the file and saying to
+retry (the command exits `2` and writes no record).
+
+## What `canon init` keeps out of git
+
+A fresh `canon init` writes these lines to `.gitignore` (each under a
+comment, only the missing ones):
+
+- `.canon/hot.db*` — the sqlite hot tier and its WAL/SHM sidecars.
+- `.canon/audit/` — the query/export/purge access log.
+- `.canon/ledger/kind=scenario/` — the scenario index; every reader
+  rebuilds it.
+- `.canon/scenario-index.lock` — the lock serializing index rebuilds.
+- `.canon/artifact-store.lock` — the lock serializing artifact store
+  writes.
+
+A rerun on a repo that already has `canon.yaml` only refreshes
+`AGENTS.md`, so an existing repo's `.gitignore` is unchanged; add the
+lines by hand to adopt them.

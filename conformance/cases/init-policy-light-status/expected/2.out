@@ -1,0 +1,15 @@
+canon 0.16.0
+policy: .canon/policy.yaml
+  spec_coverage: require_evidence=true scope=<every scenario>
+  require_cases: <none>
+  require_review: <absent>
+  level: light — raise it by uncommenting `require_cases: [failure]` (standard) and `require_review: {}` (strict) in .canon/policy.yaml and changing its level line; a human approves the edit with `canon policy approve --by <who>`
+warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+
+subjects (0):
+
+unowned: none
+
+next:
+  # no subject exists yet; a subject is the unit status, review and shipping track
+  canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit>

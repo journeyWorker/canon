@@ -22,7 +22,7 @@
 //! verdict-ledger check (task 1.3), staleness (task 1.7), and `canon
 //! gate check`'s dispatcher (task 1.9) are S5 wave-2.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use canon_model::{validate_evidence_batch, Divergence, EvidenceRecord, EvidenceViolation, Finding, RawRecord, RecordKind, Review, Scenario, Subject};
@@ -31,6 +31,7 @@ use canon_store::git_tier::GitTier;
 use canon_store::tier::{StoreError, Tier, TierQuery};
 use chrono::{DateTime, Utc};
 
+use crate::legacy_pins::LegacyPins;
 use crate::policy::PolicyResolution;
 use crate::Violation;
 
@@ -161,7 +162,10 @@ pub struct GateContext {
     /// that already HAVE evidence (`crate::coverage`'s own interface-gap
     /// note); a scenario nobody has attested to appears in no group, so
     /// the corpus itself has to be in the context for
-    /// [`crate::spec_coverage`] to left-join against it.
+    /// [`crate::spec_coverage`] to left-join against it. A scenario whose
+    /// latest generation is a tombstone (`Scenario::removed`: no feature
+    /// file declares it any more) is absent, every generation of it
+    /// ([`without_removed`]).
     pub scenarios: Vec<Scenario>,
     /// Divergence lifecycle events, unfolded. `crate::spec_coverage`
     /// folds them through `canon_model::fold` rather than reading
@@ -180,6 +184,13 @@ pub struct GateContext {
     /// unfolded, with read problems in `corpus_violations`.
     pub reviews: Vec<Review>,
     pub findings: Vec<Finding>,
+    /// What each in-effect legacy review's pinned commit holds for its
+    /// scenario (0.16 D6, [`crate::legacy_pins`]). [`GateContext::load`]
+    /// leaves it empty: reading git is the caller's step
+    /// ([`crate::legacy_pins::resolve`]), taken by `canon gate check`,
+    /// `canon subject status` and `canon status`. Empty, every legacy
+    /// review is undecidable and counts, as in 0.15.
+    pub legacy_pins: LegacyPins,
     pub violations: Vec<EvidenceViolation>,
     /// Read problems from the corpus kinds above, each tagged with the
     /// kind it was read as, kept OUT of `violations` deliberately.
@@ -239,7 +250,7 @@ impl GateContext {
         violations.extend(validation_violations);
 
         let mut corpus_violations = Vec::new();
-        let scenarios = read_corpus_kind(&tier, RecordKind::Scenario, &mut corpus_violations)?;
+        let scenarios = without_removed(read_corpus_kind(&tier, RecordKind::Scenario, &mut corpus_violations)?);
         let divergences = read_corpus_kind(&tier, RecordKind::Divergence, &mut corpus_violations)?;
         let subjects = read_corpus_kind(&tier, RecordKind::Subject, &mut corpus_violations)?;
         let reviews = read_corpus_kind(&tier, RecordKind::Review, &mut corpus_violations)?;
@@ -257,6 +268,7 @@ impl GateContext {
             subjects,
             reviews,
             findings,
+            legacy_pins: LegacyPins::default(),
             violations,
             corpus_violations,
             unreadable_kinds,
@@ -309,6 +321,20 @@ fn read_corpus_kind<T: serde::de::DeserializeOwned>(
         }
     }
     Ok(out)
+}
+
+/// `scenarios` minus every generation of each scenario whose LATEST
+/// generation is a tombstone — the record `canon inventory sync` appends
+/// with `removed: true` once no `.feature` file declares the scenario.
+/// Dropping the whole key, not only the tombstone row, matters: the
+/// fold every reader runs ([`crate::spec_coverage::latest_by_key`])
+/// would otherwise hand back the generation before it and grade a
+/// deleted scenario as present. A re-added scenario's live generation
+/// supersedes its tombstone, so it is kept again.
+fn without_removed(scenarios: Vec<Scenario>) -> Vec<Scenario> {
+    let key = |s: &Scenario| (s.project_id.clone(), s.scenario_id.clone());
+    let removed: BTreeSet<_> = crate::spec_coverage::latest_by_key(&scenarios, key).into_iter().filter(|s| s.removed).map(key).collect();
+    scenarios.into_iter().filter(|s| !removed.contains(&key(s))).collect()
 }
 
 /// The kinds `spec_coverage`'s evidence, case, and mismatch rules read.

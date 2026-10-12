@@ -234,6 +234,18 @@ fn tasks_md_path(root: &Path, change_id: &ChangeId) -> PathBuf {
     change_dir(root, change_id).join("tasks.md")
 }
 
+/// The `proposal.md` of the change dir named `change_id` under a source
+/// rooted at `root`, found the way [`discover_change_dirs`] finds change
+/// dirs, a live dir before an archived one; `None` when neither holds
+/// that file. `canon status` reads a brief's `Approved:` line from it
+/// (0.16 D1), so status and `canon ingest plans` agree on which
+/// directory is the change.
+pub fn proposal_path(root: &Path, change_id: &ChangeId) -> Option<PathBuf> {
+    let mut dirs: Vec<PathBuf> = discover_change_dirs(root).into_iter().filter(|dir| dir.file_name() == Some(OsStr::new(change_id.as_str()))).collect();
+    dirs.sort_by_key(|dir| is_archived(dir));
+    dirs.into_iter().map(|dir| dir.join("proposal.md")).find(|path| path.is_file())
+}
+
 /// The `<n>` half of a `<change_id>#<n>` join-spine [`TaskId`] — the row
 /// id token a `tasks.md` row carries (mirrors the pre-s35 `gate_task`'s
 /// own `rsplit_once('#')` extraction).
@@ -760,6 +772,27 @@ mod tests {
         let config = PlanSourceConfig { root: Some(PathBuf::from("/tmp/some-openspec-root")) };
         let source = OpenspecPlanAdapter.resolve_source(&config);
         assert_eq!(source, Some(PlanSourceHandle::Path(PathBuf::from("/tmp/some-openspec-root"))));
+    }
+
+    /// 0.16 D1: `proposal_path` finds a change's proposal.md in both
+    /// root shapes discovery accepts, prefers a live dir over an archived
+    /// one, and answers `None` for a change dir with no proposal.md.
+    #[test]
+    fn proposal_path_follows_discovery_and_prefers_the_live_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let changes = tmp.path().join("openspec/changes");
+        for dir in ["add-login", "archive/add-login", "archive/old-change", "no-proposal"] {
+            fs::create_dir_all(changes.join(dir)).unwrap();
+        }
+        for dir in ["add-login", "archive/add-login", "archive/old-change"] {
+            fs::write(changes.join(dir).join("proposal.md"), "## Why\nx\n").unwrap();
+        }
+        let id = |s: &str| ChangeId::parse(s).unwrap();
+        assert_eq!(proposal_path(tmp.path(), &id("add-login")), Some(changes.join("add-login/proposal.md")));
+        assert_eq!(proposal_path(&changes, &id("add-login")), Some(changes.join("add-login/proposal.md")), "a changes dir passed directly");
+        assert_eq!(proposal_path(tmp.path(), &id("old-change")), Some(changes.join("archive/old-change/proposal.md")));
+        assert_eq!(proposal_path(tmp.path(), &id("no-proposal")), None);
+        assert_eq!(proposal_path(tmp.path(), &id("absent")), None);
     }
 
     #[test]

@@ -1,1 +1,1 @@
-canon policy approve: .canon/policy.yaml (sha256:52812801d921b0344a67ed4aed7d321fb8a9bda34ee5104a6f04dbc4a3c00f67) approved by `alice` — wrote .canon/policy.approval.json — written directly; nothing to promote
+canon policy approve: .canon/policy.yaml (sha256:37ea31cbc65ce1dc5a28165f2ecfcd870018257b763728efc2d80ef91af9a3e3) approved by `alice` — wrote .canon/policy.approval.json — written directly; nothing to promote

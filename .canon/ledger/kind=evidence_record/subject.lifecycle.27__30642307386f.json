@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "final-fix-016"
+  },
+  "at": "2026-10-12T02:16:10.336509Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject subject_lifecycle_27_a_subject_with_no_adopted_change_ships_with_an_advisory"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 26,
+  "scenario_id": "subject.lifecycle.27",
+  "schema": 1,
+  "staging_id": "f63944935ba5",
+  "verdict": "faithful"
+}

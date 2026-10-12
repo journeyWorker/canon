@@ -534,6 +534,7 @@ mod tests {
             subjects: corpus.subjects,
             reviews: corpus.reviews,
             findings: corpus.findings,
+            legacy_pins: Default::default(),
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: corpus.unreadable,
@@ -1168,11 +1169,11 @@ mod tests {
         assert!(SpecCoverageCheck.run(&ctx).is_empty());
     }
 
-    /// gate.check.40: a legacy (unpinned) review keeps qualifying with no freshness
-    /// check, and is what the unpinned-review advisory counts, once per
-    /// reviewer and scenario.
+    /// gate.check.40: a legacy (unpinned) review whose pin nobody could
+    /// read is undecidable: it keeps qualifying, and the advisory counts
+    /// it once per reviewer and scenario.
     #[test]
-    fn an_unpinned_review_still_counts_and_is_counted_by_the_advisory() {
+    fn an_unresolved_legacy_review_still_counts_and_is_counted_as_undecidable() {
         let mut ctx = pinned_corpus();
         let mut earlier = review("p.a.01", "reviewer-2", "reviewer-2");
         earlier.envelope.at -= chrono::Duration::seconds(5);
@@ -1181,12 +1182,113 @@ mod tests {
         edited.envelope.at += chrono::Duration::seconds(5);
         edited.source_digest = SpecDigest::of(b"edited bytes");
         ctx.scenarios.push(edited);
-        assert!(SpecCoverageCheck.run(&ctx).is_empty(), "an unpinned review cannot be stale");
-        assert_eq!(crate::review_gate::unpinned_review_advisory(&ctx), Some(1));
+        assert!(SpecCoverageCheck.run(&ctx).is_empty(), "an undecidable legacy review still counts");
+        let counts = crate::review_gate::legacy_review_advisory(&ctx).unwrap();
+        assert_eq!((counts.current, counts.stale, counts.undecidable), (0, 0, 1));
+        assert!(counts.note().contains("`fetch-depth: 0` in CI"), "{}", counts.note());
 
         let pinned = pinned_review(&ctx, "reviewer-2", canon_model::ReviewOutcome::Signed, 10);
         ctx.reviews.push(pinned);
-        assert_eq!(crate::review_gate::unpinned_review_advisory(&ctx), None, "a pinned re-review supersedes the reviewer's legacy one");
+        assert_eq!(crate::review_gate::legacy_review_advisory(&ctx), None, "a pinned re-review supersedes the reviewer's legacy one");
+    }
+
+    /// gate.check.90–93 (0.16 D6): a legacy review is checked against
+    /// what its pinned commit holds. The same scenario digest and no newer
+    /// evidence: current. Another digest: stale, naming the pin. Evidence
+    /// recorded after the review: stale. A commit or scenario the clone
+    /// lacks: undecidable, still counting.
+    #[test]
+    fn a_legacy_review_is_current_stale_or_undecidable_by_its_pinned_commit() {
+        use crate::legacy_pins::PinnedScenario;
+        let digest = SpecDigest::of(b"own v1");
+        let with = |at_pin: PinnedScenario, review_offset: i64| {
+            let mut ctx = pinned_corpus();
+            for s in &mut ctx.scenarios {
+                s.scenario_digest = Some(digest.clone());
+            }
+            let mut legacy = review("p.a.01", "reviewer-2", "reviewer-2");
+            legacy.envelope.at = ctx.evidence[0].envelope.at + chrono::Duration::seconds(review_offset);
+            ctx.legacy_pins.insert(legacy.pin.clone(), project(), ScenarioId::parse("p.a.01").unwrap(), at_pin);
+            ctx.reviews = vec![legacy];
+            ctx
+        };
+        let counted = |ctx: &GateContext| {
+            let c = crate::review_gate::legacy_review_advisory(ctx).unwrap();
+            (c.current, c.stale, c.undecidable)
+        };
+
+        let current = with(PinnedScenario::Digest(digest.clone()), 10);
+        assert!(SpecCoverageCheck.run(&current).is_empty(), "an unchanged scenario keeps its legacy review");
+        assert_eq!(counted(&current), (1, 0, 0));
+
+        let spec = with(PinnedScenario::Digest(SpecDigest::of(b"own v0")), 10);
+        let out = SpecCoverageCheck.run(&spec);
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert_eq!(out[0].class, FailureClass::UnreviewedPromotion);
+        assert_eq!(
+            out[0].detail,
+            "stale review by `reviewer-2` (written before review pinning; checked against commit pin-1): its spec changed since pin-1 (the scenario's digest at that commit is not its current one); a review counts only while what it saw is current — review it again (`canon review add`)"
+        );
+        assert_eq!(crate::review_gate::review_gap(&spec, latest_scenarios(&spec)[0], true).unwrap().kind, crate::review_gate::ReviewGapKind::Stale);
+        assert_eq!(counted(&spec), (0, 1, 0));
+        assert!(crate::review_gate::legacy_review_advisory(&spec).unwrap().note().ends_with(": p.a.01"));
+
+        let evidence = with(PinnedScenario::Digest(digest.clone()), -10);
+        assert!(SpecCoverageCheck.run(&evidence)[0].detail.contains("): it has declared evidence newer than the review;"));
+        assert_eq!(counted(&evidence), (0, 1, 0));
+
+        let both = with(PinnedScenario::Digest(SpecDigest::of(b"own v0")), -10);
+        assert!(SpecCoverageCheck.run(&both)[0].detail.contains("its spec changed since pin-1 (the scenario's digest at that commit is not its current one), and it has declared evidence newer than the review"));
+
+        for missing in [PinnedScenario::CommitMissing, PinnedScenario::ScenarioMissing] {
+            let ctx = with(missing, -10);
+            assert!(SpecCoverageCheck.run(&ctx).is_empty(), "a pin the clone cannot read never becomes a violation");
+            assert_eq!(counted(&ctx), (0, 0, 1));
+        }
+    }
+
+    /// A stale legacy review whose scenario another reviewer has reviewed
+    /// since (current, signed, distinct) is counted stale but superseded,
+    /// and the advisory names no scenario to review again. A non-distinct
+    /// or unsigned later review supersedes nothing.
+    #[test]
+    fn a_stale_legacy_review_superseded_by_a_qualifying_review_is_not_named_for_re_review() {
+        use crate::legacy_pins::PinnedScenario;
+        use canon_model::ReviewOutcome::{Indeterminate, Signed};
+        let stale_legacy = || {
+            let mut ctx = pinned_corpus();
+            let digest = SpecDigest::of(b"own v1");
+            for s in &mut ctx.scenarios {
+                s.scenario_digest = Some(digest.clone());
+            }
+            let mut legacy = review("p.a.01", "reviewer-2", "reviewer-2");
+            legacy.envelope.at = ctx.evidence[0].envelope.at + chrono::Duration::seconds(10);
+            ctx.legacy_pins.insert(legacy.pin.clone(), project(), ScenarioId::parse("p.a.01").unwrap(), PinnedScenario::Digest(SpecDigest::of(b"own v0")));
+            ctx.reviews = vec![legacy];
+            ctx
+        };
+
+        let mut superseded = stale_legacy();
+        let current = pinned_review(&superseded, "reviewer-3", Signed, 20);
+        superseded.reviews.push(current);
+        assert!(SpecCoverageCheck.run(&superseded).is_empty(), "the other reviewer's current review qualifies");
+        let counts = crate::review_gate::legacy_review_advisory(&superseded).unwrap();
+        assert_eq!((counts.current, counts.stale, counts.superseded, counts.undecidable), (0, 1, 1, 0));
+        assert!(counts.needs_review.is_empty());
+        assert_eq!(
+            counts.note(),
+            "1 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 0 current, 1 stale, 0 undecidable; 1 stale one(s) superseded by a current review of the same scenario, so nothing is owed for them"
+        );
+
+        for (reviewer, actor, outcome) in [("agent-a", "agent-a", Signed), ("reviewer-3", "reviewer-3", Indeterminate)] {
+            let mut owed = stale_legacy();
+            let mut later = pinned_review(&owed, reviewer, outcome, 20);
+            later.envelope.actor.agent_id = actor.into();
+            owed.reviews.push(later);
+            let counts = crate::review_gate::legacy_review_advisory(&owed).unwrap();
+            assert_eq!((counts.stale, counts.superseded), (1, 0), "{reviewer} {outcome:?} supersedes nothing");
+            assert!(counts.note().ends_with("review its scenario again (`canon review add`): p.a.01"), "{}", counts.note());
+        }
     }
 
     /// Findings fold latest-by-natural-key first: a blocker later closed

@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-016-final",
+    "role": "reviewer",
+    "session_id": "review-016-final"
+  },
+  "at": "2026-10-12T03:56:08.686191Z",
+  "change_id": "canon-0-16-final-review",
+  "disposition": "fixed",
+  "file_ref": "README.md:213-216",
+  "kind": "finding",
+  "resolution_sha": "e90649fceb4a943824a0191ab4c4e5cc1e7e1523",
+  "reviewed_sha": "f565c7559c1851b6f73ef1d1473b62a02c6e4968",
+  "reviewer": "canon-reviewer-016-final",
+  "round": 1,
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "README 0.16.0 legacy-review counts did not match the ledger"
+}

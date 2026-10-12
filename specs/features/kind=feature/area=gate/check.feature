@@ -309,11 +309,11 @@ Feature: gate check
   @subject:gate-trust-spine
   @case:edge
   @gate.check.40
-  Scenario: Reviews written before pinning keep counting, and the gate names them in one advisory line
-    Given require_review and a review written before 0.15, with no pins
+  Scenario: Reviews written before pinning whose pin cannot be read keep counting, and the gate names them in one advisory line
+    Given require_review and a review written before 0.15, with no pins, whose pin is no commit of this clone
     When its scenario's spec changes and `canon gate check` runs
     Then the review still counts and the gate exits 0
-    And one advisory line names how many in-effect reviews predate review pinning
+    And one advisory line counts the in-effect reviews that predate review pinning as current, stale and undecidable
     And `canon status` prints the same advisory, and `canon subject status` prints it for the subject's own scenarios
 
   # canon: {"schema":1,"at":"2026-10-10T20:02:32Z","actor":{"agent_id":"canon"}}
@@ -326,3 +326,68 @@ Feature: gate check
     Then the false-success line and the re-audit next command name --drop-attachment with the counterexample path shell-quoted, and --drop-reason
     And the printed command, placeholders filled in, runs through a shell, is accepted and clears the gate
     And a refutation that binds no counterexample names no drop
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.80
+  Scenario: Gate check re-indexes only the edited feature file and is silent when the index is fresh
+    Given a synced scenario index and an edited feature file
+    When gate check runs
+    Then one stderr line says the index was refreshed from that one file
+    And only the edited scenario gets a new record
+    And a later inventory sync writes nothing
+    And the next reader prints no refresh line
+
+  # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:happy
+  @gate.check.90
+  Scenario: A review written before pinning still counts while its scenario is unchanged since the commit it pinned
+    Given require_review and a review written before 0.15 whose pin is the commit it reviewed
+    And the scenario's file changed since that commit only in comments and indentation
+    When `canon gate check` runs
+    Then the scenario's digest at the pinned commit, computed as inventory sync computes it, equals its current digest
+    And the review counts and the gate exits 0
+    And the advisory counts the review as checked against its commit and current
+
+  # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.91
+  Scenario: A review written before pinning goes stale when its scenario changed after the commit it pinned
+    Given require_review and reviews written before 0.15 of two scenarios, pinned to the commit they reviewed
+    When one scenario's steps change in a later commit and `canon gate check` runs
+    Then the gate exits 1 with unreviewed-promotion on that scenario, saying its spec changed since the pinned commit
+    And the other scenario's review still counts
+    And the advisory counts one current and one stale review and names the stale scenario
+    And `canon status` prints the same advisory
+
+  # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.92
+  Scenario: A review written before pinning goes stale when its scenario has evidence newer than the review
+    Given require_review and a review written before 0.15 of a scenario unchanged since its pinned commit
+    When evidence for that scenario is recorded after the review and `canon gate check` runs
+    Then the gate exits 1 with unreviewed-promotion on that scenario, saying it has declared evidence newer than the review
+
+  # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.93
+  Scenario: A review written before pinning whose commit or scenario is not in the clone counts and is named in the advisory
+    Given require_review and reviews written before 0.15, one pinned to a commit this clone does not have and one to a commit that predates its scenario
+    When `canon gate check` runs
+    Then both reviews still count and the gate exits 0, never reporting a missing commit as a violation
+    And the advisory counts them as undecidable and suggests checking out full history with fetch-depth 0
+
+  # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.94
+  Scenario: A review written before pinning finds its scenario in the file it lived in at the pinned commit
+    Given require_review and reviews written before 0.15 pinned to a commit where their scenarios lived in another feature file
+    When the scenarios have since moved, unchanged, to a new file and `canon gate check` runs
+    Then the scenarios are found in the old file at the pinned commit
+    And both reviews count as current and the gate exits 0

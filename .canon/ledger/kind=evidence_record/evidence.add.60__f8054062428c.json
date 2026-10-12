@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m6-impl"
+  },
+  "at": "2026-10-12T03:49:31.540439Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test write_path promote_flag_commits_in_the_same_run_and_a_later_gate_promote_is_a_no_op && cargo test -p canon-cli --lib gate::tests::promote_after_stage_reads_the_records_own_outcome_off_staging"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 41,
+  "scenario_id": "evidence.add.60",
+  "schema": 1,
+  "staging_id": "611d1773d42a",
+  "verdict": "faithful"
+}

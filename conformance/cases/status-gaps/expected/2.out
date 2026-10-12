@@ -1,6 +1,6 @@
 {
-  "statusVersion": 1,
-  "canonVersion": "0.15.0",
+  "statusVersion": 2,
+  "canonVersion": "0.16.0",
   "policy": {
     "present": true,
     "spec_coverage": {
@@ -16,11 +16,12 @@
         "distinct_actor": true,
         "block_on_findings": true
       }
-    }
+    },
+    "level": "custom"
   },
   "warnings": [
     "policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`",
-    "1 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw"
+    "1 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 0 current, 0 stale, 1 undecidable; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it"
   ],
   "subjects": [
     {
@@ -36,14 +37,22 @@
       "unsignedReviews": 0,
       "reviewDue": true,
       "openBlockers": 1,
-      "missingCases": []
+      "missingCases": [],
+      "brief": {
+        "approved": true,
+        "enforced": false,
+        "change": "c-cart",
+        "proposal": "openspec/changes/c-cart/proposal.md",
+        "approval": "Journey 2026-10-08 — \"approved, go ahead\""
+      }
     }
   ],
   "unowned": [],
   "next": [
     {
       "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
-      "why": "cart: 1 open blocker finding(s) (first: adding an item twice duplicates the line); fix it, commit, then close it"
+      "why": "cart: 1 open blocker finding(s) (first: adding an item twice duplicates the line); fix it, commit, then close it",
+      "actor": "agent"
     }
   ],
   "nextOmitted": 0

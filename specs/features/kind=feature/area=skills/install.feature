@@ -107,3 +107,93 @@ Feature: skills install
     And its first section is the working loop, naming brief, subject, scenarios, units, implement, evidence, independent review and transition in that order
     And the command reference comes after the loop
     And the AGENTS.md block canon init writes names the same steps in the same order
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:skills-install
+  @case:happy
+  @skills.install.20
+  Scenario: The skill and the AGENTS.md block carry one human approval per scope
+    Given canon's own skill source and the AGENTS.md block canon init writes
+    When each is read with its wrapped lines joined
+    Then each says a new subject or a scope change needs one human answer approving the brief and the policy
+    And each tells the agent to record that answer at once, as an "Approved: <who> <when>" line in the change's proposal.md and as canon policy approve --by <the human> --note, and never to approve without a human answer
+    And each says that inside an approved scope the agent never stops for a human, that independent review happens on every change, and that when no human can answer it writes the assumption and proceeds
+    And each says a fix or follow-up stays in the approved change as tasks in its tasks.md, never a canon change new, because a new change is a new scope
+    And each says the agent moves the subject to shipped itself once the guard passes, unless the brief says the human ships
+
+  # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.21
+  Scenario: The skill and the AGENTS.md block name no second human stop
+    Given canon's own skill source and the AGENTS.md block canon init writes
+    When each is read with its wrapped lines joined
+    Then neither keeps a fixed pair of human stops, a brief approval for every request, or a rule that the agent never runs the policy approval for the human
+
+  # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:happy
+  @skills.install.40
+  Scenario: The install lock records the canon version and the source commit
+    Given a canonical skill source inside a git checkout
+    When canon skills install writes the projections
+    Then the install lock records this canon's version and the checkout's HEAD commit
+    And a rerun with nothing changed reports unchanged and leaves the lock byte-identical, even after a new commit that leaves the bundle as it was
+    And a source outside any git checkout records no source commit
+
+  # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.41
+  Scenario: A lock another canon version wrote is reported with the install fix
+    Given projections whose install lock records another canon version
+    When the read-only check and the doctor inspect the target
+    Then both say "installed by canon <that version>, this canon is <this version>" and name `canon skills install` for the selected providers
+    And the check exits 1 while the doctor exits 0
+    And after the install both are clean and the lock records this canon's version
+
+  # canon: {"schema":1,"at":"2026-10-11T14:43:37Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.42
+  Scenario: A lock from before 0.16 is reported as an unknown canon version with the same fix
+    Given projections whose install lock was written before canon 0.16 and records no canon version
+    When the read-only check and the doctor inspect the target
+    Then both report the projections as installed by an unknown canon version and name the same install command
+    And the check exits 1 until the install rewrites the lock
+
+  # canon: {"schema":1,"at":"2026-10-11T14:43:37Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:happy
+  @skills.install.43
+  Scenario: Doctor warns about co-installed skills that claim build work and never edits them
+    Given a target with canon's projections and, in the provider skill roots, a skill whose description claims site, app or game work and a skill that claims none
+    When canon skills doctor runs
+    Then it names the claiming skill, its directory and the build words its description holds, and warns that if an agent picks it for build work canon's loop will not run
+    And it says nothing about canon's own skill or the skill that claims no build work
+    And it exits 0 and still reports the projections as healthy
+    And every other skill's files are byte-identical afterwards
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:11Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.22
+  Scenario: The skill, the AGENTS.md block and the write help name no bookkeeping step the commands already do
+    Given canon's own skill source, the AGENTS.md block canon init writes, and the help of canon evidence, canon finding and canon finding add
+    When each is read with its wrapped lines joined
+    Then the working loop never tells the agent to run canon format specs or canon ingest plans
+    And it names canon inventory sync only for a command that printed "NOT refreshed"
+    And every mention of canon gate promote is conditioned on write.promote manual
+    And no help loop lists canon gate promote as a step of its own
+
+  # canon: {"schema":1,"at":"2026-10-12T07:31:04Z","actor":{"agent_id":"canon"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.44
+  Scenario: The skill and the AGENTS.md block stop at the brief and never assume the approval
+    Given canon's own skill source and the AGENTS.md block canon init writes
+    When each is read with its wrapped lines joined
+    Then each tells the agent to write the brief, then stop and report it, and to build and attest nothing for that scope until the human answers
+    And each says the approval is never assumed, even when the human said they cannot answer until the agent reports, because the brief is that report
+    And each limits proceeding on an assumption to the brief's questions and work inside an approved scope, never the approval
+    And each calls the ship refusal and the evidence add refusal backstops, with the stop at the brief

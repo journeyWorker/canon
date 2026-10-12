@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m2-impl"
+  },
+  "at": "2026-10-11T15:45:39.103843Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test write_path concurrent_syncs_and_refreshes_write_each_index_record_once"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 18,
+  "scenario_id": "inventory.sync.45",
+  "schema": 1,
+  "staging_id": "75762156debd",
+  "verdict": "faithful"
+}

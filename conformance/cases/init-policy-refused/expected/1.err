@@ -1,0 +1,4 @@
+error: invalid value 'extreme' for '--policy <LEVEL>'
+  [possible values: light, standard, strict]
+
+For more information, try '--help'.

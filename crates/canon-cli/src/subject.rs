@@ -45,6 +45,23 @@
 //! [`is_valid_transition`] chain; an off-chain transition is refused
 //! (exit `2`), the record likewise unchanged.
 //!
+//! # `verifying → shipped` needs the approved brief where one exists (0.16 D1)
+//! The same transition also refuses when the subject's brief is
+//! enforced and not approved, through [`crate::brief::brief_of`], the
+//! one call `canon status` reports the brief with: its newest adopted
+//! change has a `proposal.md` under the plan sources, and it carries no
+//! `Approved:` line outside HTML comments and code fences. The refusal
+//! names that `proposal.md` and says a human must answer the brief; the
+//! agent records the line only from that answer. It is an
+//! `unreviewed-promotion` naming the subject, a review check like those
+//! below, so `--override-reason` lets it through and records it in the
+//! waiver. With no plan source, no adopted change or no `proposal.md`
+//! there is no brief to answer: the guard prints an advisory saying the
+//! brief is not approved and does not refuse. A brief that says the
+//! human ships changes who runs the transition, not the guard. It runs
+//! whatever the policy says, as status reports the brief whatever the
+//! policy says.
+//!
 //! # `spec_coverage.require_review` guards every transition into its scope
 //! With the policy present (issue #2), a transition whose target status
 //! `require_review.scope` covers also runs
@@ -64,7 +81,7 @@
 use std::path::Path;
 
 use canon_gate::review_gate::{
-    active_require_review, malformed_findings, subject_guard, unpinned_review_note, unpinned_reviews, unreadable_review_kinds, unreadable_violation,
+    active_require_review, malformed_findings, subject_guard, unreadable_review_kinds, unreadable_violation, LegacyReviewCounts,
 };
 use canon_gate::spec_coverage::{case_gaps, subject_scenarios};
 use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, PolicyResolution, RequireReview, SpecCoverage, Violation};
@@ -510,11 +527,14 @@ pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Sub
 /// `canon subject status <id> <state>` (module doc): apply a lifecycle
 /// transition. Refuses an off-chain step ([`is_valid_transition`], exit
 /// `2`); for `verifying → shipped` additionally runs
-/// [`ship_gate_violations`], and for a target `require_review.scope`
-/// covers, the review guard (module doc). On any violation it prints
-/// each by failure class and exits `1` with the record UNCHANGED (fail
-/// closed), unless every violation is a review check and
-/// `override_reason` waives them. A successful transition re-stamps the
+/// [`ship_gate_violations`], the brief check ([`brief_violation`]) and
+/// the unrefreshable-index check ([`crate::inventory::unrefreshable_roots`],
+/// unwaivable),
+/// and for a target `require_review.scope` covers, the review guard
+/// (module doc). On any violation it prints each by failure class and
+/// exits `1` with the record UNCHANGED (fail closed), unless every
+/// violation is a review check or the brief check and `override_reason`
+/// waives them. A successful transition re-stamps the
 /// subject (fresh `at`) and persists it through the routed tier.
 pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, override_reason: Option<&str>, actor_id: &str, json: bool) -> i32 {
     if let Some(reason) = override_reason {
@@ -565,7 +585,12 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
     };
     let gate_context = if ships || reviews {
         match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &schemas, Utc::now()).map_err(|e| e.to_string())) {
-            Ok(ctx) => Some(ctx),
+            Ok(mut ctx) => {
+                if reviews {
+                    crate::inventory::resolve_legacy_pins(&mut ctx);
+                }
+                Some(ctx)
+            }
             Err(e) => {
                 eprintln!("canon subject status: {e}");
                 return EXIT_REFUSED;
@@ -579,6 +604,11 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
         (true, Some(ctx)) => ship_gate_violations(ctx, subject_id),
         _ => Vec::new(),
     };
+    // The same decision `canon gate check` fails on (0.16 M6): shipping on
+    // an index the `.feature` edits are not in would ship ungraded specs.
+    if ships {
+        blocking.extend(crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation("verifying → shipped: ")));
+    }
     let mut waivable = Vec::new();
     report_review_guard(&policy, current, target, subject.change_ids.len());
     if let (true, Some(ctx)) = (reviews, &gate_context) {
@@ -588,20 +618,23 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
             // An unreadable finding blocks, unwaivably: it might be an
             // open blocker on this subject's changes.
             blocking.extend(malformed_findings(ctx, rr));
-            waivable = subject_guard(ctx, rr, exclude_lanes, subject_id, &subject.change_ids);
+            waivable.extend(subject_guard(ctx, rr, exclude_lanes, subject_id, &subject.change_ids));
             for violation in &mut waivable {
                 violation.detail = format!("{} → {}: {}", status_str(current), status_str(target), violation.detail);
             }
             let owned: std::collections::BTreeSet<(&ProjectId, &ScenarioId)> =
                 subject_scenarios(ctx, subject_id).into_iter().map(|s| (&s.project_id, &s.scenario_id)).collect();
-            let unpinned = unpinned_reviews(ctx).into_iter().filter(|r| owned.contains(&(&r.project_id, &r.scenario_id))).count();
-            if unpinned > 0 {
-                eprintln!("canon subject status: advisory: {}", unpinned_review_note(unpinned));
+            let legacy = LegacyReviewCounts::of(ctx, |s| owned.contains(&(&s.project_id, &s.scenario_id)));
+            if legacy.total() > 0 {
+                eprintln!("canon subject status: advisory: {}", legacy.note());
             }
         } else {
             blocking.push(unreadable_violation(&unreadable));
         }
     }
+    let brief_gap = if ships { brief_violation(&repo, &subject) } else { None };
+    let review_gaps = !waivable.is_empty();
+    waivable.extend(brief_gap.iter().cloned());
 
     if !blocking.is_empty() {
         for v in blocking.iter().chain(&waivable) {
@@ -621,8 +654,17 @@ pub fn run_status(repo: &Path, subject_id: &SubjectId, target: SubjectStatus, ov
             for v in &waivable {
                 eprintln!("canon subject status: {}", v.line());
             }
+            let mut fixes = Vec::new();
+            if review_gaps {
+                fixes.push("record an independent review (`canon review add`) and close blocker findings");
+            }
+            if brief_gap.is_some() {
+                fixes.push("get the human's answer to the brief and record it as its `Approved:` line");
+            }
             eprintln!(
-                "canon subject status: refused — record an independent review (`canon review add`) and close blocker findings, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject and `canon gate check` keeps listing these gaps"
+                "canon subject status: refused — {}, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject{}",
+                fixes.join("; "),
+                if review_gaps { " and `canon gate check` keeps listing these gaps" } else { "" }
             );
             return EXIT_GATED;
         };
@@ -766,6 +808,36 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
         violation
     }));
     violations
+}
+
+/// The `verifying → shipped` brief check (module doc): an
+/// `unreviewed-promotion` naming the subject when [`crate::brief::brief_of`],
+/// the decision `canon status` reports, reads its brief as enforced and
+/// not approved. An unapproved brief that is not enforced (nothing to
+/// answer) prints an advisory instead. `None` when the brief is
+/// approved, not enforced, or the subject needs none.
+fn brief_violation(repo: &Path, subject: &Subject) -> Option<Violation> {
+    let (roots, unreadable) = match crate::brief::plan_roots(repo) {
+        Ok(roots) => (roots, None),
+        Err(e) => (Vec::new(), Some(e)),
+    };
+    let brief = crate::brief::brief_of(repo, &roots, subject).filter(|brief| !brief.approved)?;
+    let id = subject.subject_id.as_str();
+    if !brief.enforced {
+        let why = match (unreadable, &brief.change) {
+            (Some(e), _) => format!("canon.yaml's `plans:` section cannot be read ({e}), so no proposal.md is found"),
+            (None, Some(change)) => format!("its newest adopted change `{change}` has no proposal.md under the openspec plan sources"),
+            (None, None) => format!("{id} adopts no change"),
+        };
+        eprintln!("canon subject status: advisory: {id}'s brief is not approved — {why}, so there is no brief to answer and shipping is not refused");
+        return None;
+    }
+    let proposal = brief.proposal.as_deref().unwrap_or_default();
+    Some(Violation::new(
+        FailureClass::UnreviewedPromotion,
+        id,
+        format!("verifying → shipped: brief not approved — {proposal} has no `Approved:` line; a human must answer the brief, and the agent records `Approved: <who> <when> — \"<their words>\"` there only from that answer"),
+    ))
 }
 
 #[cfg(test)]

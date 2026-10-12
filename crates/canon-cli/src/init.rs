@@ -1,8 +1,10 @@
-//! `canon init [--repo <dir>] [--no-agents-md] [--no-policy]` + `canon
-//! init --check-config [--repo <dir>]` (s19 `canon-init-scaffold` spec,
-//! 0.14 D2): scaffolds a fresh, WORKING `canon.yaml` skeleton (design
-//! D8/D9) at `<repo>/canon.yaml`, plus what a repo needs to start the
-//! working loop: a starter `.canon/policy.yaml` a human approves, the
+//! `canon init [--repo <dir>] [--no-agents-md] [--policy <level> |
+//! --no-policy]` + `canon init --check-config [--repo <dir>]` (s19
+//! `canon-init-scaffold` spec, 0.14 D2): scaffolds a fresh, WORKING
+//! `canon.yaml` skeleton (design D8/D9) at `<repo>/canon.yaml`, plus what
+//! a repo needs to start the working loop: a starter `.canon/policy.yaml`
+//! a human approves, at the level `--policy` names
+//! ([`crate::policy_level`], 0.16 D3; `strict` by default), the
 //! `openspec/changes/` home the default plans source points at, and a
 //! canon block in `AGENTS.md` between `<!-- canon:begin -->`/`<!-- canon:end -->`.
 //! It never overwrites an existing `canon.yaml` or `policy.yaml`; a
@@ -37,6 +39,8 @@ use canon_model::envelope::RecordKind;
 use canon_model::paths;
 use canon_store::policy::{BackendConfig, TierPolicy};
 
+use crate::policy_level::{starter_policy, PolicyLevel};
+
 /// Kinds routed to `hot` by [`skeleton_yaml`] (s32 `sqlite-hot-backend`):
 /// the same hot-class set the tiered-storage docs/this repo's own
 /// `canon.yaml` already use (task/handoff/session/run/event) --
@@ -47,12 +51,25 @@ use canon_store::policy::{BackendConfig, TierPolicy};
 /// OTHER kind (`RecordKind::ALL` minus this set) routes to `local`.
 const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, RecordKind::Session, RecordKind::Run, RecordKind::Event];
 
-/// The line [`scaffold_gitignore`] ensures is present in
-/// `<repo>/.gitignore`: one glob covering the sqlite hot tier's db
-/// file AND its WAL/SHM sidecars (`.canon/hot.db-wal`/`.canon/hot.db-shm`
-/// -- sqlite's own WAL-journal-mode naming convention), since all
-/// three share the `.canon/hot.db` prefix.
-const GITIGNORE_LINE: &str = paths::HOT_DB_GITIGNORE;
+/// The lines [`scaffold_gitignore`] ensures are present in
+/// `<repo>/.gitignore`, each under its own comment: one glob covering
+/// the sqlite hot tier's db file AND its WAL/SHM sidecars
+/// (`.canon/hot.db-wal`/`.canon/hot.db-shm` -- sqlite's own
+/// WAL-journal-mode naming convention), since all three share the
+/// `.canon/hot.db` prefix; the read-access audit directory `canon
+/// query`/`export`/`purge` append to (#8), which is local operator
+/// state and would otherwise show up as untracked after the first
+/// query; the derived scenario index, which every reader rebuilds
+/// from the `.feature` files when stale (0.16 D2), so committing it
+/// would only commit churn; and the lock files that serialize those
+/// rebuilds and artifact-store writes, which are local process state.
+const GITIGNORE_LINES: [(&str, &str); 5] = [
+    ("# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.", paths::HOT_DB_GITIGNORE),
+    ("# canon's read-access audit log (canon query/export/purge) -- local, never committed.", paths::AUDIT_GITIGNORE),
+    ("# canon's scenario index -- derived from the .feature files, rebuilt by every reader.", paths::SCENARIO_INDEX_GITIGNORE),
+    ("# the lock that serializes scenario index rebuilds -- local process state.", paths::SCENARIO_INDEX_LOCK_FILE),
+    ("# the lock that serializes artifact store writes -- local process state.", paths::ARTIFACT_STORE_LOCK_FILE),
+];
 
 /// D8/D9's skeleton `canon.yaml` body: every one of `RecordKind::ALL`'s
 /// fourteen wire strings (s36: `subject` is the reviewed 13th kind;
@@ -116,29 +133,37 @@ fn skeleton_yaml() -> String {
     out.push_str("  sources:\n");
     out.push_str("    - dialect: openspec\n");
     out.push_str("      root: .\n");
+    out.push_str("write:\n");
+    out.push_str("  # Staged writes (`canon evidence add`, `canon finding add|close`,\n");
+    out.push_str("  # `canon divergence stage`) promote in the same run. `manual` keeps\n");
+    out.push_str("  # them staged until `canon gate promote`; `--no-promote` keeps one.\n");
+    out.push_str("  promote: auto\n");
     out
 }
 
-/// Ensures [`GITIGNORE_LINE`] is present in `<repo>/.gitignore` --
-/// appends it (creating the file if absent) UNLESS it is already
-/// there, so a `.gitignore` a prior `canon init` (or the repo's own
-/// `git init`) already wrote is never duplicated. `canon init` itself
-/// stays a fresh-repo bootstrap (`run_init`'s `canon.yaml` refuses to
-/// overwrite), but `.gitignore` commonly PRE-EXISTS a `canon init`
-/// invocation (e.g. a `git init`-then-`canon init` sequence), so this
-/// appends rather than mirroring `canon.yaml`'s create-fails-if-exists
-/// refusal.
+/// Ensures every [`GITIGNORE_LINES`] entry is present in
+/// `<repo>/.gitignore` -- appends each missing one under its comment
+/// (creating the file if absent), so a `.gitignore` a prior `canon init`
+/// (or the repo's own `git init`) already wrote is never duplicated.
+/// `canon init` itself stays a fresh-repo bootstrap (`run_init`'s
+/// `canon.yaml` refuses to overwrite), but `.gitignore` commonly
+/// PRE-EXISTS a `canon init` invocation (e.g. a `git init`-then-`canon
+/// init` sequence), so this appends rather than mirroring `canon.yaml`'s
+/// create-fails-if-exists refusal.
 fn scaffold_gitignore(repo: &Path) -> std::io::Result<()> {
     let path = repo.join(".gitignore");
     let existing = fs::read_to_string(&path).unwrap_or_default();
-    if existing.lines().any(|line| line.trim() == GITIGNORE_LINE) {
+    let missing: Vec<&(&str, &str)> = GITIGNORE_LINES.iter().filter(|(_, line)| !existing.lines().any(|have| have.trim() == *line)).collect();
+    if missing.is_empty() {
         return Ok(());
     }
     let mut file = fs::OpenOptions::new().create(true).append(true).open(&path)?;
     if !existing.is_empty() && !existing.ends_with('\n') {
         file.write_all(b"\n")?;
     }
-    file.write_all(format!("# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.\n{GITIGNORE_LINE}\n").as_bytes())?;
+    for (comment, line) in missing {
+        file.write_all(format!("{comment}\n{line}\n").as_bytes())?;
+    }
     Ok(())
 }
 
@@ -148,34 +173,6 @@ fn scaffold_gitignore(repo: &Path) -> std::io::Result<()> {
 /// would fall back to treating the repo root itself as the changes dir
 /// and report every top-level directory as a malformed change.
 pub(crate) const CHANGES_DIR: &str = "openspec/changes";
-
-/// The starter `.canon/policy.yaml` (0.14 D2). It turns `spec_coverage`
-/// on so the gate reports unevidenced scenarios, golden-path-only
-/// surfaces and unreviewed work from the first scenario on, instead of
-/// passing on zero evidence. It parses with zero diagnostics through
-/// `canon_gate::PolicyResolution::resolve` (pinned by a unit test
-/// below).
-const STARTER_POLICY_YAML: &str = "\
-# .canon/policy.yaml -- scaffolded by `canon init`.
-#
-# This file is what `canon gate check` grades the work against. A human
-# should review and approve it, and every later change to it, with
-# `canon policy approve --by <who>`: the agent doing the work should not
-# write the rules it is graded by.
-spec_coverage:
-  # Every scenario in the spec corpus needs evidence (`canon evidence
-  # add`). Add `scope: [building, verifying]` to check only scenarios
-  # whose subject is in one of those statuses.
-  require_evidence: true
-  # Every feature surface (`<area>.<surface>`) needs at least one
-  # `@case:failure` scenario, so no feature is specified by its golden
-  # path alone.
-  require_cases: [failure]
-  # Every scenario of a subject in `verifying` or `shipped` needs a
-  # review (`canon review add`) by an actor other than its evidence
-  # author, and an open blocker finding on an adopted change blocks.
-  require_review: {}
-";
 
 /// Opening marker of the canon block `init` owns in `AGENTS.md`.
 pub(crate) const AGENTS_BEGIN: &str = "<!-- canon:begin -->";
@@ -195,23 +192,25 @@ feature.
 
 The loop:
 
-1. Brief: record the request and your assumptions; a human approves it.
-2. Subject: `canon subject new`, then `canon change new` for the change.
+1. Brief: for a new subject or a scope change, record the request and your assumptions in the change's `proposal.md`, then stop and report the brief: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy. Record it at once: an `Approved: <who> <when> — \"<their words>\"` line in the change's `proposal.md`, and `canon policy approve --by <the human> --note \"<their words>\"`. Never approve without a human answer.
+2. Subject: `canon subject new`, then `canon change new` for the change; its `proposal.md` holds the brief.
 3. Scenarios: `canon scenario new`, failure paths included (`--case failure`).
 4. Units: split the work; one actor id and session per unit.
 5. Implement: tests named by scenario id.
-6. Evidence: `canon evidence add`, then `canon gate promote`.
-7. Independent review: a different session records `canon review add` and `canon finding add`.
-8. Transition: `canon subject status`, with `canon gate check` clean.
+6. Evidence: `canon evidence add` (it promotes itself under `write: { promote: auto }`; only under `write.promote: manual` run `canon gate promote` after it).
+7. Independent review: a different session records `canon review add` and `canon finding add`, on every change.
+8. Transition: `canon subject status`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships. The ship guard and `canon evidence add` refuse while the brief is unapproved; they are backstops, the stop is at step 1.
 
-`.canon/policy.yaml` is what the gate grades against; a human approves it with `canon policy approve --by <who>`.
+Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, as tasks in its `tasks.md`, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review. When no human can answer one of the brief's questions, write your assumption into the brief and proceed on it; that covers the brief's questions and work inside an approved scope, never the approval. `.canon/policy.yaml` is what the gate grades against.
 <!-- canon:end -->";
 
 /// A fence opener/closer line: up to three spaces, then three or more
 /// backticks or tildes (CommonMark). Returns the fence character, its
 /// run length, and whether only whitespace follows the run (a closing
-/// fence may carry nothing else).
-fn fence_of(line: &str) -> Option<(char, usize, bool)> {
+/// fence may carry nothing else). [`crate::brief`] uses it too (for
+/// `canon status` and the ship guard), so an `Approved:` line quoted in
+/// a fence is not read as one.
+pub(crate) fn fence_of(line: &str) -> Option<(char, usize, bool)> {
     let indent = line.len() - line.trim_start_matches(' ').len();
     if indent > 3 {
         return None;
@@ -294,8 +293,9 @@ fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
 pub struct InitOptions {
     /// Write or refresh the canon block in `AGENTS.md`.
     pub agents_md: bool,
-    /// Write the starter `.canon/policy.yaml`.
-    pub policy: bool,
+    /// The level of the starter `.canon/policy.yaml` to write; `None`
+    /// writes none.
+    pub policy: Option<PolicyLevel>,
 }
 
 /// Write `merged` to `AGENTS.md` unless it already holds exactly those
@@ -311,14 +311,17 @@ fn write_agents_md(path: &Path, existing: Option<&str>, merged: &str) -> std::io
     Ok(())
 }
 
-/// Write the starter policy unless `.canon/policy.yaml` exists, which
-/// is left byte-for-byte alone.
-fn scaffold_policy(repo: &Path) -> std::io::Result<()> {
+/// Write the starter policy at `level` (0.14 D2, 0.16 D3) unless
+/// `.canon/policy.yaml` exists, which is left byte-for-byte alone. Every
+/// level parses with zero diagnostics through
+/// `canon_gate::PolicyResolution::resolve` (pinned by
+/// [`crate::policy_level`]'s tests).
+fn scaffold_policy(repo: &Path, level: PolicyLevel) -> std::io::Result<()> {
     let path = repo.join(paths::POLICY_FILE);
     fs::create_dir_all(repo.join(paths::CANON_DIR))?;
     match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
         Ok(mut file) => {
-            file.write_all(STARTER_POLICY_YAML.as_bytes())?;
+            file.write_all(starter_policy(level).as_bytes())?;
             println!(
                 "canon init: wrote {} — a human reviews it and approves it with `canon policy approve --by <who>`: the gate grades the work against it, and `canon status` and `canon gate check` say so until it is approved",
                 path.display()
@@ -343,12 +346,14 @@ fn scaffold_changes_dir(repo: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// `canon init [--repo <dir>] [--no-agents-md] [--no-policy]` (task 4.1,
-/// 0.14 D2). Returns the process exit code.
+/// `canon init [--repo <dir>] [--no-agents-md] [--policy <level> |
+/// --no-policy]` (task 4.1, 0.14 D2, 0.16 D3). Returns the process exit
+/// code.
 ///
 /// - A fresh repo gets `canon.yaml`, the `.gitignore` line, the
-///   `openspec/changes/` plans home, the starter policy (unless
-///   `--no-policy`) and the `AGENTS.md` block (unless `--no-agents-md`):
+///   `openspec/changes/` plans home, the starter policy at the requested
+///   level (unless `--no-policy`) and the `AGENTS.md` block (unless
+///   `--no-agents-md`):
 ///   exit `0`.
 /// - A repo whose `canon.yaml` exists keeps it byte-identical
 ///   (`create_new` is the atomic refusal) and only refreshes the
@@ -417,8 +422,8 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
         eprintln!("canon init: failed to create `{}`: {e}", repo.join(CHANGES_DIR).display());
         return 2;
     }
-    if options.policy {
-        if let Err(e) = scaffold_policy(repo) {
+    if let Some(level) = options.policy {
+        if let Err(e) = scaffold_policy(repo, level) {
             eprintln!("canon init: failed to write `{}`: {e}", repo.join(paths::POLICY_FILE).display());
             return 2;
         }
@@ -506,6 +511,18 @@ pub fn run_check_config(repo: &Path) -> i32 {
         }
     }
 
+    // `write:` (0.16 D2): absent is the `manual` default, so it is
+    // reported as such rather than as a pass of nothing.
+    let write_present = serde_yaml::from_str::<serde_yaml::Value>(&text).ok().and_then(|doc| doc.get("write").cloned()).is_some();
+    match crate::write_mode::configured_promote_mode(&canon_yaml_path) {
+        Ok(mode) if write_present => report.push_str(&format!("[PASS] write (promote: {})\n", mode.as_str())),
+        Ok(_) => report.push_str("[not configured] write (promote: manual)\n"),
+        Err(e) => {
+            all_ok = false;
+            report.push_str(&format!("[FAIL] write: {e}\n"));
+        }
+    }
+
     print!("{report}");
     if all_ok { 0 } else { 1 }
 }
@@ -552,14 +569,20 @@ mod tests {
         assert!(TierPolicy::from_yaml_at(&text, dir.path()).is_ok());
         assert!(crate::inventory::load_spec_roots(&canon_yaml_path).is_ok());
         assert!(crate::plans::load_plan_sources_from_config(&canon_yaml_path, dir.path()).is_ok());
+        assert_eq!(crate::write_mode::configured_promote_mode(&canon_yaml_path), Ok(crate::write_mode::PromoteMode::Auto), "a new repo promotes on write");
+    }
+
+    fn has_every_gitignore_line(text: &str) -> bool {
+        GITIGNORE_LINES.iter().all(|(_, line)| text.lines().any(|have| have.trim() == *line))
     }
 
     #[test]
-    fn scaffold_gitignore_creates_a_fresh_file_with_the_hot_db_glob() {
+    fn scaffold_gitignore_creates_a_fresh_file_with_the_hot_db_glob_and_the_audit_dir() {
         let dir = tempfile::tempdir().unwrap();
         scaffold_gitignore(dir.path()).unwrap();
         let text = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
-        assert!(text.lines().any(|line| line.trim() == GITIGNORE_LINE), "{text}");
+        assert!(has_every_gitignore_line(&text), "{text}");
+        assert!(text.lines().any(|line| line.trim() == paths::AUDIT_GITIGNORE), "{text}");
     }
 
     #[test]
@@ -569,23 +592,55 @@ mod tests {
         scaffold_gitignore(dir.path()).unwrap();
         let text = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
         assert!(text.contains("target/\n"), "{text}");
-        assert!(text.lines().any(|line| line.trim() == GITIGNORE_LINE), "{text}");
+        assert!(has_every_gitignore_line(&text), "{text}");
     }
 
     #[test]
-    fn scaffold_gitignore_is_idempotent() {
+    fn scaffold_gitignore_is_idempotent_and_adds_only_the_missing_line() {
         let dir = tempfile::tempdir().unwrap();
+        // A repo initialized before #8 already carries the hot-db line.
+        std::fs::write(dir.path().join(".gitignore"), format!("{}\n", paths::HOT_DB_GITIGNORE)).unwrap();
         scaffold_gitignore(dir.path()).unwrap();
         scaffold_gitignore(dir.path()).unwrap();
         let text = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
-        assert_eq!(text.matches(GITIGNORE_LINE).count(), 1, "the line must never be duplicated across repeated scaffolds: {text}");
+        for (_, line) in GITIGNORE_LINES {
+            assert_eq!(text.lines().filter(|have| have.trim() == line).count(), 1, "`{line}` must appear exactly once across repeated scaffolds: {text}");
+        }
+    }
+
+    /// The default (`strict`) starter is 0.15's starter byte for byte,
+    /// under one added level line.
+    #[test]
+    fn strict_starter_policy_is_the_pre_level_starter_under_one_level_line() {
+        const PRE_LEVEL_STARTER: &str = "\
+# .canon/policy.yaml -- scaffolded by `canon init`.
+#
+# This file is what `canon gate check` grades the work against. A human
+# should review and approve it, and every later change to it, with
+# `canon policy approve --by <who>`: the agent doing the work should not
+# write the rules it is graded by.
+spec_coverage:
+  # Every scenario in the spec corpus needs evidence (`canon evidence
+  # add`). Add `scope: [building, verifying]` to check only scenarios
+  # whose subject is in one of those statuses.
+  require_evidence: true
+  # Every feature surface (`<area>.<surface>`) needs at least one
+  # `@case:failure` scenario, so no feature is specified by its golden
+  # path alone.
+  require_cases: [failure]
+  # Every scenario of a subject in `verifying` or `shipped` needs a
+  # review (`canon review add`) by an actor other than its evidence
+  # author, and an open blocker finding on an adopted change blocks.
+  require_review: {}
+";
+        assert_eq!(starter_policy(PolicyLevel::Strict), format!("# canon policy level: strict\n{PRE_LEVEL_STARTER}"));
     }
 
     #[test]
     fn starter_policy_resolves_with_zero_diagnostics_and_turns_spec_coverage_on() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
-        std::fs::write(dir.path().join(paths::POLICY_FILE), STARTER_POLICY_YAML).unwrap();
+        std::fs::write(dir.path().join(paths::POLICY_FILE), starter_policy(PolicyLevel::Strict)).unwrap();
         let policy = canon_gate::PolicyResolution::resolve(dir.path(), &canon_policy::SchemaRegistry::load());
         assert!(policy.diagnostics.is_empty(), "the starter policy must load clean, unknown-key check included: {:?}", policy.diagnostics);
         match policy.spec_coverage {

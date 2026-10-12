@@ -1,0 +1,17 @@
+description: "0.16 D2: in a repo `canon init` scaffolded (`write: { promote: auto }`), a scenario written by `canon scenario new` and never synced is indexed by the next reader: `canon status` prints one stderr line naming the changed .feature file and the records written, and counts the scenario; the next `canon status` is silent because the index is fresh; `canon evidence add` promotes itself, so `canon gate check` sees the evidence with no `canon gate promote` or `canon inventory sync` step"
+env: { CANON_ACTOR: canon }
+steps:
+  - args: [init, --no-agents-md, --no-policy]
+    exit: 0
+  - args: [subject, new, cart, --domain, dev, --title, Cart]
+    exit: 0
+  - args: [scenario, new, cart.add.01, --title, An empty cart refuses checkout, --case, failure, --subject, cart]
+    exit: 0
+  - args: [status]
+    exit: 0
+  - args: [status]
+    exit: 0
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent]
+    exit: 0
+  - args: [gate, check]
+    exit: 0

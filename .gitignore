@@ -65,6 +65,14 @@ packages/core-*/bin/*
 # runtime state -- never committed, and not yet reconciled into the
 # record store (s40 proposal's "does NOT do").
 .canon/dispatch/
+# The read-access audit log `canon query`/`export`/`purge` append to
+# (#8): local operator state, never committed.
+.canon/audit/
+# The lock `canon inventory sync` and every reader's scenario-index
+# refresh hold while writing the index (0.16): local process state.
+.canon/scenario-index.lock
+# The lock every artifact-store write holds (0.16): local process state.
+.canon/artifact-store.lock
 .canon/REPORT.md
 .env
 .env.*

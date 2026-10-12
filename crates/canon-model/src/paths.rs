@@ -74,6 +74,37 @@ pub const PRE_COMMIT_SCRIPT: &str = ".canon/scripts/canon-gate-pre-commit.sh";
 /// it is git-tracked, never ignored.
 pub const ARTIFACTS_SHA256_DIR: &str = ".canon/artifacts/sha256";
 
+/// The read-access audit log `canon query`/`export`/`purge` append to.
+/// Local operator state, never committed: `canon init` ignores its
+/// directory ([`AUDIT_GITIGNORE`]).
+pub const ACCESS_AUDIT_FILE: &str = ".canon/audit/access.jsonl";
+
+/// The `.gitignore` line covering [`ACCESS_AUDIT_FILE`]'s directory.
+pub const AUDIT_GITIGNORE: &str = ".canon/audit/";
+
+/// The `.gitignore` line covering the default ledger's `Scenario` index
+/// (`kind=scenario/` under [`LEDGER_DIR`]): derived from the `.feature`
+/// files, and rebuilt by every reader of it when stale (0.16 D2), so
+/// `canon init` keeps it out of git.
+pub const SCENARIO_INDEX_GITIGNORE: &str = ".canon/ledger/kind=scenario/";
+
+/// The advisory lock `canon inventory sync` and every reader's
+/// stale-index refresh hold while they write the scenario index, so two
+/// of them never index the same change twice. An OS file lock
+/// (`flock`/`LockFileEx`), released when the holder exits — even when it
+/// is killed — so the file never goes stale and is never deleted. Local
+/// state, so `canon init` ignores it.
+pub const SCENARIO_INDEX_LOCK_FILE: &str = ".canon/scenario-index.lock";
+
+/// The advisory lock every write to the evidence artifact store
+/// ([`ARTIFACTS_SHA256_DIR`]) holds from its "already stored?" check to
+/// its last rename or rollback, so a rollback never removes a blob
+/// another writer published or counted as stored. An OS file lock
+/// (`flock`/`LockFileEx`), released when the holder exits — even when it
+/// is killed — so the file never goes stale and is never deleted. Local
+/// state, so `canon init` ignores it.
+pub const ARTIFACT_STORE_LOCK_FILE: &str = ".canon/artifact-store.lock";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,6 +128,11 @@ mod tests {
             INGEST_CURSORS_DIR,
             PRE_COMMIT_SCRIPT,
             ARTIFACTS_SHA256_DIR,
+            ACCESS_AUDIT_FILE,
+            AUDIT_GITIGNORE,
+            SCENARIO_INDEX_GITIGNORE,
+            SCENARIO_INDEX_LOCK_FILE,
+            ARTIFACT_STORE_LOCK_FILE,
         ];
         for path in all {
             assert!(

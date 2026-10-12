@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-016-m1",
+    "role": "reviewer",
+    "session_id": "review-016-m1"
+  },
+  "at": "2026-10-11T16:13:41.356487Z",
+  "change_id": "canon-0-16-m1-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "7294350dfc02a61cfff619cd534568922e25df79",
+  "reviewed_sha": "abcfdbe216479c07f33bcafba42935209b278f7d",
+  "reviewer": "canon-reviewer-016-m1",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "status accepted an Approved: line inside an HTML comment or fenced code block as a human approval"
+}

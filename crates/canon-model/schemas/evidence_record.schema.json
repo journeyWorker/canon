@@ -50,6 +50,17 @@
         }
       ]
     },
+    "brief_override": {
+      "description": "Present only on a record attested under `--override-reason` while\na subject it attests for had an enforced, unapproved brief (0.16\nM7). Additive.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BriefOverride"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "evidence_sha": {
       "anyOf": [
         {
@@ -232,6 +243,32 @@
           "type": "string",
           "const": "indeterminate"
         }
+      ]
+    },
+    "BriefOverride": {
+      "description": "The accountable waiver an attestation was let through under, when\n`canon evidence add` refused it because a subject it attests for has\nan enforced, unapproved brief (0.16 M7) and the operator passed\n`--override-reason`. [`StatusOverride`]'s shape without `to`: an\nattestation moves no status. `waived` lists the refusals it let\nthrough as `(unreviewed-promotion, <subject id>)`, the pair the ship\nguard's brief check prints.",
+      "type": "object",
+      "properties": {
+        "actor": {
+          "description": "Who waived it.",
+          "$ref": "#/$defs/Actor"
+        },
+        "reason": {
+          "description": "The operator's reason, verbatim (one line).",
+          "type": "string"
+        },
+        "waived": {
+          "description": "Exactly the brief refusals this waiver let through, sorted.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WaivedViolation"
+          }
+        }
+      },
+      "required": [
+        "reason",
+        "waived",
+        "actor"
       ]
     },
     "EvidenceApproval": {
@@ -508,6 +545,22 @@
         "draft",
         "reviewed",
         "ratified"
+      ]
+    },
+    "WaivedViolation": {
+      "description": "One violation a [`StatusOverride`] let through: the gate failure\nclass (`unreviewed-promotion`, `open-blocker`) and the violation's\nsubject (a scenario id, or `<change_id>#<round>.<seq>` for a\nblocker), as `canon gate check` prints them.",
+      "type": "object",
+      "properties": {
+        "class": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "class",
+        "subject"
       ]
     }
   }

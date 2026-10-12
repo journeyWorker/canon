@@ -1,0 +1,11 @@
+{
+  "actor": {
+    "agent_id": "canon-plan-import-openspec"
+  },
+  "at": "2026-10-08T17:55:56.333Z",
+  "kind": "task",
+  "schema": 2,
+  "status": "done",
+  "task_id": "c-cart#1.1",
+  "title": "add to cart"
+}

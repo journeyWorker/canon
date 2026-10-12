@@ -8,7 +8,10 @@
 //! # Four subcommands, two mechanisms
 //! - `stage` writes an unordered staging candidate carrying no
 //!   `run_seq` (`canon_gate::stage_divergence`) — a candidate of ANY
-//!   status, including `Resolved`/`Deferred`.
+//!   status, including `Resolved`/`Deferred`. With `--promote` it
+//!   then promotes that one candidate
+//!   (`canon_gate::promote_staged_divergence`), never another staged
+//!   one.
 //! - `promote` batch-promotes every currently-staged candidate
 //!   (`canon_gate::promote_divergence`), assigning each a monotonic
 //!   `run_seq` within its `(project_id, role, surface)` partition.
@@ -22,7 +25,9 @@
 
 use std::path::Path;
 
-use canon_gate::{commit_divergence, divergence_staging_dir, promote_divergence, stage_divergence, DivergenceCandidate, GateCtx, PromoteReport};
+use canon_gate::{
+    commit_divergence, divergence_staging_dir, promote_divergence, promote_staged_divergence, stage_divergence, DivergenceCandidate, GateCtx, PromoteReport,
+};
 use canon_model::{Actor, DivergenceStatus, Envelope, RecordKind, RoleId, Sha};
 use canon_store::git_tier::GitTier;
 use chrono::{DateTime, Utc};
@@ -62,6 +67,17 @@ pub fn parse_status(status: &str, reason: Option<&str>, expiry: Option<DateTime<
 }
 
 fn format_promote_report(report: &PromoteReport, dry_run: bool) -> String {
+    let mut out = format_candidate_lines(report, dry_run);
+    if report.promoted.is_empty() && report.refused.is_empty() {
+        out.push_str("canon divergence promote: nothing staged\n");
+    }
+    out
+}
+
+/// One line per candidate in `report` — [`format_promote_report`]'s
+/// body, and the whole of what `stage --promote` prints for its one
+/// candidate.
+fn format_candidate_lines(report: &PromoteReport, dry_run: bool) -> String {
     let verb = if dry_run { "would promote" } else { "promoted" };
     let mut out = String::new();
     for p in &report.promoted {
@@ -70,14 +86,15 @@ fn format_promote_report(report: &PromoteReport, dry_run: bool) -> String {
     for r in &report.refused {
         out.push_str(&format!("refused: {}\n", r.violation.line()));
     }
-    if report.promoted.is_empty() && report.refused.is_empty() {
-        out.push_str("canon divergence promote: nothing staged\n");
-    }
     out
 }
 
 /// `canon divergence stage` (module doc): writes ONE unordered staging
-/// candidate — `run_seq` is assigned later, at `promote` time.
+/// candidate — `run_seq` is assigned later, at `promote` time. With
+/// `--promote` or `write: { promote: auto }` (0.16 D2) the same run then
+/// promotes that one candidate (`canon_gate::promote_staged_divergence`)
+/// and leaves every other staged candidate for `canon divergence
+/// promote` ([`crate::write_mode`]).
 #[allow(clippy::too_many_arguments)]
 pub fn run_stage(
     repo: &Path,
@@ -90,8 +107,16 @@ pub fn run_stage(
     detail: &str,
     actor_id: &str,
     role: &RoleId,
+    promote: crate::write_mode::PromoteFlag,
 ) -> i32 {
     let repo = resolve_repo_root(repo);
+    let promote = match crate::write_mode::should_promote(&repo, promote) {
+        Ok(promote) => promote,
+        Err(error) => {
+            eprintln!("canon divergence stage: refused — {error}");
+            return 2;
+        }
+    };
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
@@ -112,16 +137,32 @@ pub fn run_stage(
         detail: detail.to_string(),
     };
 
-    match stage_divergence(&staging_dir, &candidate) {
-        Ok(path) => {
-            println!("canon divergence stage: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
-            0
-        }
+    let path = match stage_divergence(&staging_dir, &candidate) {
+        Ok(path) => path,
         Err(e) => {
             eprintln!("canon divergence stage: {e}");
-            2
+            return 2;
         }
+    };
+    if !promote {
+        println!("canon divergence stage: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
+        return 0;
     }
+    // Only the file this run staged: another reviewer's staged candidate
+    // is theirs to promote. Once it lands, the success line names the
+    // committed record alone, never the staged file promotion moved.
+    match promote_staged_divergence(&path, &GitTier::new(&gate_ctx.ledger_root)) {
+        Ok(report) => match report.promoted.iter().chain(&report.recovered).next().filter(|_| report.is_clean()) {
+            Some(landed) => {
+                println!("canon divergence stage: wrote {} — {}", landed.target.display(), crate::write_mode::PROMOTED);
+                return 0;
+            }
+            None => print!("{}", format_candidate_lines(&report, false)),
+        },
+        Err(e) => eprintln!("canon divergence stage: staged, but promoting it failed: {e}"),
+    }
+    println!("canon divergence stage: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
+    1
 }
 
 /// `canon divergence promote [--dry-run]` (module doc): batch-promotes
@@ -322,8 +363,8 @@ mod tests {
         let (project_id, scenario_id_a, role, sha) = ids();
         let scenario_id_b = ScenarioId::parse("world.firstbuy-hotdeal.27").unwrap();
 
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_a, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role), 0);
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_b, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_a, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default()), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_b, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default()), 0);
 
         let code = run_promote(dir.path(), false);
         assert_eq!(code, 0);
@@ -360,7 +401,7 @@ mod tests {
         };
         stage_divergence(&staging_dir, &malformed).unwrap();
 
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default()), 0);
 
         let code = run_promote(dir.path(), false);
         assert_eq!(code, 1, "a refusal reports a non-zero (but not usage-error) exit code");
@@ -400,7 +441,7 @@ mod tests {
         let deferred_id = ScenarioId::parse("world.firstbuy-hotdeal.51").unwrap();
 
         // Something else is mid-`stage`.
-        assert_eq!(run_stage(dir.path(), &project_id, &ScenarioId::parse("world.firstbuy-hotdeal.50").unwrap(), &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &ScenarioId::parse("world.firstbuy-hotdeal.50").unwrap(), &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default()), 0);
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
         let staged_before = files_with_bytes(&staging_dir);

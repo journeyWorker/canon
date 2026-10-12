@@ -435,12 +435,23 @@ pub struct Scenario {
     /// `None` (fail-soft), never a hard parse error here.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject_id: Option<SubjectId>,
+    /// `true` on the generation `canon inventory sync` appends when this
+    /// scenario's id is no longer in any `.feature` file of its spec root
+    /// (0.16): a tombstone. Every reader folds to the latest generation
+    /// per `(project_id, scenario_id)` and treats a removed one as absent,
+    /// so a deleted scenario stops being graded, counted or reviewable;
+    /// re-adding the scenario appends a live generation that supersedes
+    /// it. Additive and skipped when `false`, so every live record is
+    /// byte-identical on the wire (its `at` is derivation time, so no
+    /// schema bump).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub removed: bool,
 }
 
 impl Scenario {
     pub fn new(envelope: Envelope, project_id: ProjectId, scenario_id: ScenarioId, title: impl Into<String>, description: impl Into<String>, source_digest: SpecDigest) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Scenario);
-        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, scenario_digest: None, lane: None, case: None, subject_id: None }
+        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, scenario_digest: None, lane: None, case: None, subject_id: None, removed: false }
     }
 }
 
@@ -760,6 +771,10 @@ pub enum ProvenanceRef {
 ///   approval; the other two are recorded gaps.
 /// - `reviewer_provider`/`reviewer_model`/`reviewer_harness` (D4): the
 ///   runtime that produced the review, as the caller reports it.
+///
+/// 0.16 D5 adds `artifacts`: the files the reviewer looked at
+/// (screenshots, recordings), stored like evidence attachments and
+/// re-hashed by the gate. Absent when empty.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Review {
     #[serde(flatten)]
@@ -786,6 +801,21 @@ pub struct Review {
     /// The harness that ran the reviewer (D4), e.g. `omp` or `codex`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reviewer_harness: Option<String>,
+    /// What the reviewer looked at (0.16 D5), each file stored in the
+    /// artifact store under its digest. Absent on the wire when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<ReviewArtifact>,
+}
+
+/// A file a [`Review`] binds (0.16 D5): what the reviewer looked at,
+/// by repository-relative path and the sha256 of its bytes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ReviewArtifact {
+    /// Repository-relative path, `/`-separated, as read at review time.
+    pub path: String,
+    /// 64 lowercase hex characters: sha256 over the file's bytes.
+    #[serde(deserialize_with = "deserialize_sha256_hex")]
+    pub sha256: String,
 }
 
 impl Review {
@@ -810,6 +840,7 @@ impl Review {
             reviewer_provider: None,
             reviewer_model: None,
             reviewer_harness: None,
+            artifacts: Vec::new(),
         }
     }
 }
@@ -1221,6 +1252,23 @@ pub struct AttachmentDrop {
     pub reason: String,
 }
 
+/// The accountable waiver an attestation was let through under, when
+/// `canon evidence add` refused it because a subject it attests for has
+/// an enforced, unapproved brief (0.16 M7) and the operator passed
+/// `--override-reason`. [`StatusOverride`]'s shape without `to`: an
+/// attestation moves no status. `waived` lists the refusals it let
+/// through as `(unreviewed-promotion, <subject id>)`, the pair the ship
+/// guard's brief check prints.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct BriefOverride {
+    /// The operator's reason, verbatim (one line).
+    pub reason: String,
+    /// Exactly the brief refusals this waiver let through, sorted.
+    pub waived: Vec<WaivedViolation>,
+    /// Who waived it.
+    pub actor: Actor,
+}
+
 /// The evidence-integrity spec's own record kind: the candidate shape
 /// [`crate::evidence::validate_evidence`] validates. Carries whichever
 /// join keys are relevant to what it attests (join-spine `task_id`
@@ -1273,6 +1321,11 @@ pub struct EvidenceRecord {
     /// external evaluator and its result. Additive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audit: Option<EvidenceAudit>,
+    /// Present only on a record attested under `--override-reason` while
+    /// a subject it attests for had an enforced, unapproved brief (0.16
+    /// M7). Additive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brief_override: Option<BriefOverride>,
 }
 
 impl EvidenceRecord {
@@ -1300,6 +1353,7 @@ impl EvidenceRecord {
             attachments: Vec::new(),
             attachment_drop: None,
             audit: None,
+            brief_override: None,
         }
     }
 
@@ -1349,6 +1403,11 @@ impl EvidenceRecord {
 
     pub fn with_audit(mut self, audit: EvidenceAudit) -> Self {
         self.audit = Some(audit);
+        self
+    }
+
+    pub fn with_brief_override(mut self, brief_override: BriefOverride) -> Self {
+        self.brief_override = Some(brief_override);
         self
     }
 
@@ -2503,6 +2562,14 @@ mod tests {
         let json = serde_json::to_value(&review).unwrap();
         assert_eq!(json["outcome"], "indeterminate");
         assert_eq!(serde_json::from_value::<Review>(json.clone()).unwrap(), review);
+
+        review.artifacts.push(ReviewArtifact { path: "reports/title.png".into(), sha256: "a".repeat(64) });
+        let json = serde_json::to_value(&review).unwrap();
+        assert_eq!(json["artifacts"], serde_json::json!([{"path": "reports/title.png", "sha256": "a".repeat(64)}]));
+        assert_eq!(serde_json::from_value::<Review>(json.clone()).unwrap(), review);
+        let mut bad_digest = json.clone();
+        bad_digest["artifacts"][0]["sha256"] = serde_json::json!("not-a-digest");
+        assert!(serde_json::from_value::<Review>(bad_digest).is_err(), "a review artifact names a real sha256 or is refused");
 
         let mut bad = json;
         bad["outcome"] = serde_json::json!("approved");

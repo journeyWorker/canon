@@ -30,12 +30,15 @@
 //! foreign-namespace overlay record), never a core sync-populated
 //! field.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use canon_fmt::Violation;
-use canon_gate::GateCtx;
+use canon_gate::legacy_pins::SpecSources;
+use canon_gate::{GateContext, GateCtx};
 use canon_model::ids::SpecDigest;
-use canon_model::{Actor, Envelope, ProjectId, RecordKind, Scenario, ScenarioId, SubjectId};
+use canon_model::{paths, Actor, Envelope, ProjectId, RecordKind, Scenario, ScenarioId, SubjectId};
+use canon_store::file_lock::{FileLock, FileLockError};
 use canon_store::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{StoreError, Tier, TierQuery};
@@ -79,6 +82,10 @@ pub enum InventoryError {
     /// sync would write to cannot be resolved ([`GateCtx::from_repo`]).
     #[error(transparent)]
     CanonYaml(#[from] canon_gate::CanonYamlError),
+    /// Another canon process held the repo's scenario-index lock for
+    /// longer than a writer waits ([`lock_index`]).
+    #[error("{0}")]
+    Locked(String),
 }
 
 /// `canon.yaml`'s `specs:` section, parsed STRICTLY
@@ -239,7 +246,11 @@ pub struct RootSyncOutcome {
     /// resulted in a new write (logical idempotence may no-op most of
     /// them).
     pub scanned: usize,
+    /// Records this run wrote, tombstones included.
     pub written: usize,
+    /// Of `written`: tombstones for scenarios the corpus no longer
+    /// declares ([`sync_one_root`]).
+    pub removed: usize,
     pub violations: Vec<Violation>,
     /// Per-root sync-level abort reasons the frozen
     /// [`canon_fmt::FmtFailureClass`] deliberately cannot express (its
@@ -291,9 +302,14 @@ impl SyncOutcome {
 /// delegates to [`run_sync_with_ctx`] — the CLI's own behavior/exit
 /// codes are unchanged, now routed through the same seam a
 /// fixture-corpus `canon selftest` run drives.
+///
+/// Holds the repo's scenario-index lock ([`lock_index`]) for the whole
+/// run, so it never interleaves with another sync or a reader's
+/// [`refresh_stale_index`].
 pub fn run_sync(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
     let repo = resolve_repo_root(repo);
     let ctx = SyncCtx::from_repo(&repo)?;
+    let _lock = lock_index(&ctx.repo)?;
     run_sync_with_ctx(&ctx, spec_root)
 }
 
@@ -301,7 +317,9 @@ pub fn run_sync(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, In
 /// Req 2's "no downstream sync code branches on which constructor built
 /// its ctx" scenario): [`run_sync`] (production, [`SyncCtx::from_repo`])
 /// and `canon selftest`'s inventory fixtures ([`SyncCtx::from_fixture`])
-/// both call this exact function, unconditionally.
+/// both call this exact function, unconditionally. Takes no lock itself:
+/// a fixture run owns its fresh scratch directory, and [`run_sync`]
+/// holds the lock around this call.
 pub fn run_sync_with_ctx(ctx: &SyncCtx, spec_root_override: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
     let roots = ctx.spec_roots(spec_root_override)?;
     let tier = GitTier::new(&ctx.ledger_root);
@@ -310,12 +328,95 @@ pub fn run_sync_with_ctx(ctx: &SyncCtx, spec_root_override: Option<&Path>) -> Re
     // `canon-gate`'s own `Actor::new_unattributed("canon-gate")` for
     // its typed-task compile path (never an agent-authored record).
     let actor = Actor::new_unattributed("canon-inventory-sync");
+    let scans: Vec<Vec<ScannedScenario>> = roots.iter().map(|root| scan_feature_corpus_detailed(&root.root)).collect();
+    let corpus = corpus_ids(&roots, &scans);
 
     let mut outcomes = Vec::with_capacity(roots.len());
-    for spec_root in &roots {
-        outcomes.push(sync_one_root(&tier, &ctx.repo, spec_root, &actor)?);
+    for (spec_root, scanned) in roots.iter().zip(&scans) {
+        outcomes.push(sync_one_root(&tier, &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?);
     }
     Ok(SyncOutcome { roots: outcomes })
+}
+
+/// Every scenario id the `.feature` corpus declares, per project, over
+/// all of `roots` — what a tombstone is decided against. A union across
+/// roots that share one id, so two roots misconfigured under one
+/// `project_id` never mark each other's scenarios removed. `scans[i]` is
+/// `roots[i]`'s scan.
+fn corpus_ids(roots: &[SpecRoot], scans: &[Vec<ScannedScenario>]) -> BTreeMap<ProjectId, BTreeSet<ScenarioId>> {
+    let mut ids: BTreeMap<ProjectId, BTreeSet<ScenarioId>> = BTreeMap::new();
+    for (root, scanned) in roots.iter().zip(scans) {
+        ids.entry(root.id.clone()).or_default().extend(scanned.iter().map(|s| s.scenario_id.clone()));
+    }
+    ids
+}
+
+/// The latest generation of every indexed scenario, per `(project_id,
+/// scenario_id)` — tombstones included, since a removed latest
+/// generation is exactly what a re-added scenario must supersede. The
+/// fold [`sync_one_root`] writes against and [`stale_roots`] compares
+/// with, so the two never disagree about what the index holds.
+///
+/// Each record's OWN content digest and format generation ride along
+/// into the fold (s21 D3: the tie-break needs a real digest, never just
+/// `at`; `s38-evidence-bearing-memory`: an equal-`at` tie is decided by
+/// `envelope.schema` FIRST) — `content_digest12` over the record's raw
+/// JSON, the same digest `GitTier`/`PgTier` writes already compute.
+fn latest_index(tier: &GitTier) -> Result<BTreeMap<(ProjectId, ScenarioId), Scenario>, InventoryError> {
+    let existing = tier.read(&TierQuery::kind(RecordKind::Scenario))?;
+    let indexed: Vec<(Scenario, String)> = existing
+        .records
+        .iter()
+        .filter_map(|raw| serde_json::from_value::<Scenario>(raw.0.clone()).ok().map(|scenario| (scenario, canon_store::partition::content_digest12(&raw.0))))
+        .collect();
+    Ok(fold_latest_by_key(
+        indexed,
+        |(scenario, _)| (scenario.project_id.clone(), scenario.scenario_id.clone()),
+        |(scenario, _)| scenario.envelope.at,
+        |(scenario, _)| scenario.envelope.schema,
+        |(_, digest)| digest.as_str(),
+    )
+    .into_iter()
+    .map(|(key, (scenario, _))| (key, scenario))
+    .collect())
+}
+
+/// The scenarios of project `id` the index still holds live (latest
+/// generation not removed) but `corpus` no longer declares: what a sync
+/// of that project marks removed.
+fn removed_from_corpus<'a>(latest: &'a BTreeMap<(ProjectId, ScenarioId), Scenario>, id: &ProjectId, corpus: &BTreeSet<ScenarioId>) -> Vec<&'a Scenario> {
+    latest.values().filter(|scenario| &scenario.project_id == id && !scenario.removed && !corpus.contains(&scenario.scenario_id)).collect()
+}
+
+/// How long a writer of the scenario index waits for another one to
+/// finish before giving up.
+const INDEX_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// The repo's scenario-index lock ([`paths::SCENARIO_INDEX_LOCK_FILE`]),
+/// held until this value is dropped.
+///
+/// An OS advisory lock on the file ([`canon_store::file_lock`]: `flock`
+/// on Unix, `LockFileEx` on Windows), not the file's existence: closing
+/// the file releases it, and so does the holder's death, however it
+/// died, so a killed sync never leaves a stale lock behind and the file
+/// itself is never deleted. Waiting is bounded ([`INDEX_LOCK_WAIT`],
+/// polled), and running out is [`InventoryError::Locked`], naming the
+/// file.
+struct IndexLock {
+    _lock: FileLock,
+}
+
+/// Take [`IndexLock`] for the repo rooted at `repo`.
+fn lock_index(repo: &Path) -> Result<IndexLock, InventoryError> {
+    match FileLock::acquire(&repo.join(paths::SCENARIO_INDEX_LOCK_FILE), INDEX_LOCK_WAIT) {
+        Ok(lock) => Ok(IndexLock { _lock: lock }),
+        Err(FileLockError::Busy(waited)) => Err(InventoryError::Locked(format!(
+            "another canon process has been writing the scenario index for {}s (it holds `{}`); retry once it finishes",
+            waited.as_secs(),
+            paths::SCENARIO_INDEX_LOCK_FILE
+        ))),
+        Err(FileLockError::Io(e)) => Err(StoreError::from(e).into()),
+    }
 }
 
 /// Scan `root`'s `features/` corpus for every well-formed
@@ -339,6 +440,8 @@ pub fn scan_feature_corpus(root: &Path) -> Vec<(ScenarioId, String, SpecDigest)>
 /// the scan lexed for it (s36/s49).
 #[derive(Debug, Clone)]
 pub struct ScannedScenario {
+    /// The `.feature` file the scenario was scanned from.
+    pub path: PathBuf,
     pub scenario_id: ScenarioId,
     pub title: String,
     pub source_digest: SpecDigest,
@@ -368,6 +471,7 @@ pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
         for candidate in scan.scenarios {
             if let Ok(scenario_id) = ScenarioId::parse(&candidate.scenario_id) {
                 scanned.push(ScannedScenario {
+                    path: path.clone(),
                     scenario_id,
                     title: candidate.title,
                     source_digest: digest.clone(),
@@ -381,6 +485,36 @@ pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
         }
     }
     scanned
+}
+
+/// Read every legacy review's pinned commit into `ctx` (0.16 D6,
+/// [`canon_gate::legacy_pins`]): `canon gate check`, `canon status` and
+/// `canon subject status` call this right after loading, so the three
+/// decide a legacy review's currency from the same reads. The spec corpus
+/// is scanned for each scenario's current file only when there is a
+/// legacy review to check.
+pub fn resolve_legacy_pins(ctx: &mut GateContext) {
+    let repo = ctx.ctx.repo.clone();
+    ctx.legacy_pins = canon_gate::legacy_pins::resolve(ctx, || spec_sources(&repo));
+}
+
+/// Each scenario's current `.feature` file and each spec root, relative
+/// to `repo`. A root outside the repo has no history to read and is left
+/// out; an unusable `specs:` section leaves everything out, so every
+/// legacy review stays undecidable rather than misjudged.
+fn spec_sources(repo: &Path) -> SpecSources {
+    let mut sources = SpecSources::default();
+    let Ok(roots) = load_spec_roots(&repo.join("canon.yaml")) else { return sources };
+    for root in roots {
+        let Ok(relative) = root.root.strip_prefix(repo) else { continue };
+        sources.roots.insert(root.id.clone(), relative.to_path_buf());
+        for scanned in scan_feature_corpus_detailed(&root.root) {
+            if let Ok(file) = scanned.path.strip_prefix(repo) {
+                sources.files.insert((root.id.clone(), scanned.scenario_id), file.to_path_buf());
+            }
+        }
+    }
+    sources
 }
 
 /// Resolve a scanned scenario's `@subject:` tag(s) into the optional
@@ -454,96 +588,92 @@ fn resolve_axis_tag(axis: &str, tags: &[String], scenario_id: &ScenarioId, root_
     Some(first.clone())
 }
 
-/// One configured root's validate → scan → materialize pass (module
-/// doc). A fresh `existing` read per root keeps the fold correct even
-/// if two roots were misconfigured to share a `project_id` — every
-/// candidate is checked against the LATEST already-committed state,
-/// never a snapshot taken before this run started.
-fn sync_one_root(tier: &GitTier, repo: &Path, spec_root: &SpecRoot, actor: &Actor) -> Result<RootSyncOutcome, InventoryError> {
+/// Why a root refuses to sync, as `(format violations, sync errors)`;
+/// both empty when it syncs. A `canon format` violation anywhere in the
+/// root aborts it; so does a `scenario_id` scanned more than once WITHIN
+/// its scan (D5: exactly one index record per `(project_id,
+/// scenario_id)`, so no winning title/source_digest can be picked).
+/// That is a per-root corpus authoring fault, parallel to a format
+/// abort: NOT a `FmtFailureClass` (frozen to the 11 audited gaps, never
+/// a 12th) and NOT an `InventoryError` (that would short-circuit sibling
+/// roots and mis-map to the exit-2 config lane instead of the exit-1
+/// root-abort lane). [`sync_one_root`] and [`unrefreshable_roots`] both
+/// decide through this one function.
+fn root_refusal(spec_root: &SpecRoot, scanned: &[ScannedScenario]) -> (Vec<Violation>, Vec<String>) {
     let report = canon_fmt::check(&spec_root.root);
     if !report.is_clean() {
-        return Ok(RootSyncOutcome {
-            id: spec_root.id.clone(),
-            root: spec_root.root.clone(),
-            scanned: 0,
-            written: 0,
-            violations: report.violations,
-            sync_errors: Vec::new(),
-            tag_diagnostics: Vec::new(),
-        });
+        return (report.violations, Vec::new());
     }
-
-    // Scan `features/` alone — NEVER `inventory/` (module doc: the
-    // index is feature-corpus-derived only). The detailed scan also
-    // carries each scenario's raw `@subject:` tag(s) (s36 task 6.2).
-    let scanned: Vec<ScannedScenario> = scan_feature_corpus_detailed(&spec_root.root);
-    // D5: exactly one index record per `(project_id, scenario_id)`. A
-    // duplicate scenario_id WITHIN this root's scan can't pick a
-    // winning title/source_digest, so abort THIS root (0 writes) — a
-    // per-root corpus authoring fault, parallel to an S11 abort. NOT a
-    // `FmtFailureClass` (frozen to the 11 audited gaps, never a 12th)
-    // and NOT an `InventoryError` (that would short-circuit sibling
-    // roots and mis-map to the exit-2 config lane instead of the
-    // exit-1 root-abort lane).
-    let mut seen: std::collections::BTreeSet<&ScenarioId> = std::collections::BTreeSet::new();
-    let mut dups: std::collections::BTreeSet<&ScenarioId> = std::collections::BTreeSet::new();
-    for s in &scanned {
+    let mut seen: BTreeSet<&ScenarioId> = BTreeSet::new();
+    let mut dups: BTreeSet<&ScenarioId> = BTreeSet::new();
+    for s in scanned {
         if !seen.insert(&s.scenario_id) {
             dups.insert(&s.scenario_id);
         }
     }
-    if !dups.is_empty() {
-        let sync_errors = dups
-            .iter()
-            .map(|id| {
-                format!(
-                    "scenario_id `{}` is scanned more than once under root `{}` — deduplicate the `.feature` corpus (D5: exactly one index record per (project_id, scenario_id))",
-                    id.as_str(),
-                    spec_root.id.as_str()
-                )
-            })
-            .collect();
+    let sync_errors = dups
+        .iter()
+        .map(|id| {
+            format!(
+                "scenario_id `{}` is scanned more than once under root `{}` — deduplicate the `.feature` corpus (D5: exactly one index record per (project_id, scenario_id))",
+                id.as_str(),
+                spec_root.id.as_str()
+            )
+        })
+        .collect();
+    (Vec::new(), sync_errors)
+}
+
+/// One configured root's validate → materialize pass over its `scanned`
+/// corpus (module doc). A fresh index read per root keeps the fold
+/// correct even if two roots were misconfigured to share a
+/// `project_id` — every candidate is checked against the LATEST
+/// already-committed state, never a snapshot taken before this run
+/// started.
+///
+/// A scenario the index still holds live for this project but
+/// `project_corpus` (every id this run's roots under that project
+/// declare, [`corpus_ids`]) no longer carries gets a tombstone: a new
+/// generation of its latest record with `removed: true`, so every
+/// reader stops grading and counting it. A root that aborts writes no
+/// tombstone either.
+///
+/// `only` scopes the MATERIALIZATION of scanned scenarios to those
+/// `.feature` files (a reader's stale-index refresh,
+/// [`refresh_stale_index`]). Validation, the duplicate check and the
+/// tombstones still cover the whole root, so a scoped run refuses and
+/// removes exactly what a full `canon inventory sync` would.
+#[allow(clippy::too_many_arguments)]
+fn sync_one_root(
+    tier: &GitTier,
+    repo: &Path,
+    spec_root: &SpecRoot,
+    scanned: &[ScannedScenario],
+    project_corpus: &BTreeSet<ScenarioId>,
+    actor: &Actor,
+    only: Option<&BTreeSet<PathBuf>>,
+) -> Result<RootSyncOutcome, InventoryError> {
+    let (violations, sync_errors) = root_refusal(spec_root, scanned);
+    if !violations.is_empty() || !sync_errors.is_empty() {
         return Ok(RootSyncOutcome {
             id: spec_root.id.clone(),
             root: spec_root.root.clone(),
-            scanned: scanned.len(),
+            scanned: if violations.is_empty() { scanned.len() } else { 0 },
             written: 0,
-            violations: Vec::new(),
+            removed: 0,
+            violations,
             sync_errors,
             tag_diagnostics: Vec::new(),
         });
     }
 
-    let existing = tier.read(&TierQuery::kind(RecordKind::Scenario))?;
-    // Keep each record's OWN content digest and format generation
-    // alongside its typed `Scenario` (s21 D3: the fold's tie-break needs
-    // a real digest, never just `at`; `s38-evidence-bearing-memory`: an
-    // equal-`at` tie is decided by `envelope.schema` FIRST, so a
-    // `Scenario` schema bump supersedes deterministically rather than by
-    // digest luck) — `content_digest12` over the record's raw JSON, the
-    // same digest `GitTier`/`PgTier` writes already compute.
-    struct ExistingScenario {
-        scenario: Scenario,
-        digest: String,
-    }
-    let existing_scenarios: Vec<ExistingScenario> = existing
-        .records
-        .iter()
-        .filter_map(|raw| serde_json::from_value::<Scenario>(raw.0.clone()).ok().map(|scenario| ExistingScenario { digest: canon_store::partition::content_digest12(&raw.0), scenario }))
-        .collect();
-    let folded = fold_latest_by_key(
-        existing_scenarios,
-        |e: &ExistingScenario| (e.scenario.project_id.clone(), e.scenario.scenario_id.clone()),
-        |e: &ExistingScenario| e.scenario.envelope.at,
-        |e: &ExistingScenario| e.scenario.envelope.schema,
-        |e: &ExistingScenario| e.digest.as_str(),
-    );
+    let folded = latest_index(tier)?;
 
     let mut written = 0;
     // Fail-soft tag diagnostics accumulate across the whole root but
     // never abort it (see `RootSyncOutcome::tag_diagnostics`).
     let mut tag_diagnostics = Vec::new();
-    for candidate in &scanned {
+    for candidate in scanned.iter().filter(|candidate| only.is_none_or(|only| only.contains(&candidate.path))) {
         // Resolve BEFORE the idempotence check so a persistently
         // malformed/duplicate tag is reported on EVERY sync run, not
         // just the write that first introduced it.
@@ -566,16 +696,15 @@ fn sync_one_root(tier: &GitTier, repo: &Path, spec_root: &SpecRoot, actor: &Acto
         // The subject join joins the idempotence key: a record written
         // before this field existed (or before the tag was added) gets
         // rewritten to carry the join, even if title/digest match.
-        let unchanged = folded
-            .get(&key)
-            .is_some_and(|latest| {
-                latest.scenario.source_digest == candidate.source_digest
-                    && latest.scenario.scenario_digest == candidate.scenario_digest
-                    && latest.scenario.title == candidate.title
-                    && latest.scenario.subject_id == subject_id
-                    && latest.scenario.lane.as_deref() == lane.as_deref()
-                    && latest.scenario.case.as_deref() == case.as_deref()
-            });
+        let unchanged = folded.get(&key).is_some_and(|latest| {
+            !latest.removed
+                && latest.source_digest == candidate.source_digest
+                && latest.scenario_digest == candidate.scenario_digest
+                && latest.title == candidate.title
+                && latest.subject_id == subject_id
+                && latest.lane.as_deref() == lane.as_deref()
+                && latest.case.as_deref() == case.as_deref()
+        });
         if unchanged {
             continue;
         }
@@ -595,11 +724,21 @@ fn sync_one_root(tier: &GitTier, repo: &Path, spec_root: &SpecRoot, actor: &Acto
         written += 1;
     }
 
+    let mut removed = 0;
+    for gone in removed_from_corpus(&folded, &spec_root.id, project_corpus) {
+        let mut tombstone = gone.clone();
+        tombstone.envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), actor.clone());
+        tombstone.removed = true;
+        tier.write(&tombstone)?;
+        removed += 1;
+    }
+
     Ok(RootSyncOutcome {
         id: spec_root.id.clone(),
         root: spec_root.root.clone(),
         scanned: scanned.len(),
-        written,
+        written: written + removed,
+        removed,
         violations: Vec::new(),
         sync_errors: Vec::new(),
         tag_diagnostics,
@@ -611,8 +750,9 @@ pub fn format_human(outcome: &SyncOutcome) -> String {
     let mut out = String::new();
     for root in &outcome.roots {
         if root.is_clean() {
+            let removed = if root.removed > 0 { format!(" ({} marking scenario(s) no longer in any feature file as removed)", root.removed) } else { String::new() };
             out.push_str(&format!(
-                "canon inventory sync: root `{}` ({}) — {} scenario(s) scanned, {} record(s) written\n",
+                "canon inventory sync: root `{}` ({}) — {} scenario(s) scanned, {} record(s) written{removed}\n",
                 root.id,
                 root.root.display(),
                 root.scanned,
@@ -640,6 +780,221 @@ pub fn format_human(outcome: &SyncOutcome) -> String {
         }
     }
     out
+}
+
+/// One root's stale part of the scenario index ([`stale_roots`]).
+struct StaleRoot {
+    root: SpecRoot,
+    /// The root's scan, reused by the sync that refreshes it.
+    scanned: Vec<ScannedScenario>,
+    /// Every `.feature` file holding a scenario whose latest `Scenario`
+    /// generation is missing, removed, or carries another
+    /// `source_digest` than the file's bytes have now. A file with no
+    /// scenario has nothing to index and is never stale.
+    files: BTreeSet<PathBuf>,
+    /// Scenarios the index still holds live for this root's project
+    /// that no `.feature` file declares any more — what a full sync
+    /// marks removed ([`removed_from_corpus`]).
+    removed: Vec<ScenarioId>,
+}
+
+/// Every root whose index differs from what `canon inventory sync` would
+/// leave, with the per-project corpus ids ([`corpus_ids`]) that was
+/// judged against. Two differences count: a scanned scenario the index
+/// lacks or holds at another `source_digest`, and an indexed scenario
+/// the corpus no longer declares — the indexed id set and the corpus id
+/// set of a project must be equal.
+fn stale_roots(tier: &GitTier, roots: &[SpecRoot]) -> Result<(Vec<StaleRoot>, BTreeMap<ProjectId, BTreeSet<ScenarioId>>), InventoryError> {
+    let latest = latest_index(tier)?;
+    let scans: Vec<Vec<ScannedScenario>> = roots.iter().map(|root| scan_feature_corpus_detailed(&root.root)).collect();
+    let corpus = corpus_ids(roots, &scans);
+
+    let mut stale = Vec::new();
+    for (root, scanned) in roots.iter().zip(scans) {
+        let files: BTreeSet<PathBuf> = scanned
+            .iter()
+            .filter(|candidate| {
+                !latest
+                    .get(&(root.id.clone(), candidate.scenario_id.clone()))
+                    .is_some_and(|record| !record.removed && record.source_digest == candidate.source_digest)
+            })
+            .map(|candidate| candidate.path.clone())
+            .collect();
+        let removed: Vec<ScenarioId> = removed_from_corpus(&latest, &root.id, &corpus[&root.id]).into_iter().map(|scenario| scenario.scenario_id.clone()).collect();
+        if !files.is_empty() || !removed.is_empty() {
+            stale.push(StaleRoot { root: root.clone(), scanned, files, removed });
+        }
+    }
+    Ok((stale, corpus))
+}
+
+/// At most three of `items`, then how many more.
+fn first_three(items: &[String]) -> String {
+    match items.len() {
+        0..=3 => items.join(", "),
+        n => format!("{}, +{} more", items[..3].join(", "), n - 3),
+    }
+}
+
+/// A reader's stale-index refresh (0.16 D2): `canon gate check`,
+/// `canon status`, `canon subject status`, `canon review add` and
+/// `canon evidence add` call this before they read the scenario index,
+/// so an edited, added or deleted scenario never needs a separate
+/// `canon inventory sync` step.
+///
+/// It runs the same materialization `canon inventory sync` runs
+/// ([`sync_one_root`]), scoped to the changed files, plus the same
+/// tombstones for scenarios no feature file declares any more, and says
+/// what it did in ONE stderr line prefixed with `command` (stderr, so a
+/// `--json` stdout stays parseable). Silent when nothing is stale. Never
+/// writes into a directory without `canon.yaml`, and never fails the
+/// caller: a config error is the caller's own to report, and a root
+/// that refuses to sync (format violations, a duplicate id) is named
+/// with the command that shows why. The readers that grade or advance
+/// (`gate check`, the ship guard, `status`) then fail closed on
+/// [`unrefreshable_roots`].
+///
+/// The staleness check runs without a lock, so a fresh index costs no
+/// waiting. A stale one is rewritten under the repo's scenario-index
+/// lock ([`lock_index`]), shared with `canon inventory sync`, and
+/// staleness is checked again once the lock is held: a refresh that
+/// waited for another writer finds its work done and stays silent
+/// instead of indexing the same change twice.
+///
+/// The index is derived from the `.feature` files, so rebuilding it is
+/// not the kind of write a read-only command must avoid: it changes no
+/// authored record, and grading a stale index would answer about specs
+/// that no longer exist.
+pub fn refresh_stale_index(repo: &Path, command: &str) {
+    let repo = resolve_repo_root(repo);
+    if !repo.join("canon.yaml").is_file() {
+        return;
+    }
+    let Ok(ctx) = SyncCtx::from_repo(&repo) else { return };
+    let Ok(roots) = ctx.spec_roots(None) else { return };
+    let tier = GitTier::new(&ctx.ledger_root);
+    let checked = |tier: &GitTier| match stale_roots(tier, &roots) {
+        Ok(stale) => Some(stale),
+        Err(e) => {
+            eprintln!("{command}: could not check the scenario index for staleness: {e}");
+            None
+        }
+    };
+    match checked(&tier) {
+        Some((stale, _)) if !stale.is_empty() => {}
+        _ => return,
+    }
+    let _lock = match lock_index(&ctx.repo) {
+        Ok(lock) => lock,
+        Err(e) => {
+            eprintln!("{command}: the scenario index is stale but was not refreshed: {e}");
+            return;
+        }
+    };
+    let Some((stale, corpus)) = checked(&tier) else { return };
+    if stale.is_empty() {
+        return;
+    }
+
+    let files: Vec<String> = stale
+        .iter()
+        .flat_map(|stale| stale.files.iter())
+        .map(|path| path.strip_prefix(&ctx.repo).unwrap_or(path).display().to_string())
+        .collect();
+    let removed: Vec<String> =
+        stale.iter().flat_map(|stale| stale.removed.iter().map(|id| id.as_str().to_string())).collect::<BTreeSet<_>>().into_iter().collect();
+
+    let actor = Actor::new_unattributed("canon-inventory-sync");
+    let (mut written, mut diagnostics, mut refused) = (0usize, 0usize, Vec::new());
+    for StaleRoot { root, scanned, files, .. } in &stale {
+        match sync_one_root(&tier, &ctx.repo, root, scanned, &corpus[&root.id], &actor, Some(files)) {
+            Ok(outcome) if outcome.is_clean() => {
+                written += outcome.written;
+                diagnostics += outcome.tag_diagnostics.len();
+            }
+            Ok(outcome) => refused.push(format!("root `{}` ({} format violation(s), {} sync error(s))", outcome.id, outcome.violations.len(), outcome.sync_errors.len())),
+            Err(e) => refused.push(format!("root `{}` ({e})", root.id)),
+        }
+    }
+
+    let mut what = Vec::new();
+    if !files.is_empty() {
+        what.push(format!("{} changed feature file(s) ({})", files.len(), first_three(&files)));
+    }
+    if !removed.is_empty() {
+        what.push(format!("{} scenario(s) no longer in any feature file ({})", removed.len(), first_three(&removed)));
+    }
+    let verb = if refused.len() == stale.len() { "found the scenario index stale for" } else { "refreshed the scenario index from" };
+    let mut line = format!("{command}: {verb} {}: {written} record(s) written", what.join(" and "));
+    if diagnostics > 0 {
+        line.push_str(&format!(", {diagnostics} tag diagnostic(s)"));
+    }
+    if !refused.is_empty() {
+        line.push_str(&format!("; NOT refreshed: {}", refused.join(", ")));
+    }
+    if diagnostics > 0 || !refused.is_empty() {
+        line.push_str(" — `canon inventory sync` lists them");
+    }
+    eprintln!("{line}");
+}
+
+/// A configured spec root whose scenario index is stale and cannot be
+/// refreshed (the `NOT refreshed` case of [`refresh_stale_index`]): its
+/// `.feature` files changed, but the root has format violations or a
+/// duplicate id, so every reader is reading an index those changes are
+/// not in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnrefreshableRoot {
+    pub id: ProjectId,
+    pub violations: usize,
+    pub sync_errors: usize,
+}
+
+impl UnrefreshableRoot {
+    /// The gate's violation for this root (0.16 M6, fail closed): an
+    /// `uncovered-cell` naming the root, the class the ship gate already
+    /// uses for "this subject's scenarios cannot be counted" (`scenario`
+    /// routed away), because the root's changed scenarios cannot be
+    /// graded at all. `prefix` is prepended to the detail (the
+    /// transition, for the ship guard).
+    pub fn violation(&self, prefix: &str) -> canon_gate::Violation {
+        canon_gate::Violation::new(
+            canon_gate::FailureClass::UncoveredCell,
+            self.id.as_str(),
+            format!(
+                "{prefix}the scenario index for spec root `{}` is stale and could not be refreshed ({} format violation(s), {} sync error(s)), so its changed .feature files are not graded; `canon inventory sync` lists the problems to fix",
+                self.id.as_str(),
+                self.violations,
+                self.sync_errors
+            ),
+        )
+    }
+}
+
+/// Every configured spec root whose stale index cannot be refreshed: the
+/// ONE decision `canon gate check`, the `verifying → shipped` guard of
+/// `canon subject status`, and `canon status` fail closed on (0.16 M6),
+/// so none of them grades or advances on an index the `.feature` edits
+/// are not in. Readers that only report (`query`, `context`) keep the
+/// stderr line of [`refresh_stale_index`] instead. It reads the same
+/// staleness and the same refusal ([`root_refusal`]) the refresh acts
+/// on, and writes nothing. Empty without `canon.yaml`, or when the
+/// config or the index cannot be read: the caller reports those itself.
+pub fn unrefreshable_roots(repo: &Path) -> Vec<UnrefreshableRoot> {
+    let repo = resolve_repo_root(repo);
+    if !repo.join("canon.yaml").is_file() {
+        return Vec::new();
+    }
+    let Ok(ctx) = SyncCtx::from_repo(&repo) else { return Vec::new() };
+    let Ok(roots) = ctx.spec_roots(None) else { return Vec::new() };
+    let Ok((stale, _)) = stale_roots(&GitTier::new(&ctx.ledger_root), &roots) else { return Vec::new() };
+    stale
+        .iter()
+        .filter_map(|stale| {
+            let (violations, sync_errors) = root_refusal(&stale.root, &stale.scanned);
+            (!violations.is_empty() || !sync_errors.is_empty()).then(|| UnrefreshableRoot { id: stale.root.id.clone(), violations: violations.len(), sync_errors: sync_errors.len() })
+        })
+        .collect()
 }
 
 #[cfg(test)]

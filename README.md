@@ -76,6 +76,414 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.16.0 release
+
+Version 0.16.0 lets the agent drive after one approval: the human answers
+once per scope, canon does its own bookkeeping, `canon init` offers policy
+levels, a reviewer can attach what it looked at, and reviews written before
+0.15 are checked against the commit they pinned.
+
+**Why.** The maintainer's rule (2026-10-11): an agent reviewing another
+agent is cheap; a human blocking the work is expensive. After one
+approval the agent should run on its own, with independent review on every
+change kept. Dogfood eval 2 measured two human stops (brief and policy
+approval at the start, then `shipped` left for the human after 68 minutes
+of autonomous work, because the skill did not say who ships), no canon
+refusals in 116 calls, and about a fifth of calls spent on bookkeeping (16
+`gate promote`, 5 `format`, 4 `inventory sync`). The skill applied the
+human-approved brief to every feature change, including a one-line fix
+inside an already approved subject.
+
+**D1: one approval per scope (#21).** Only a new subject, or a change to
+an approved subject's scope, needs the human, and one answer approves both
+the brief and the policy. The agent records it at once: an
+`Approved: <who> <when> — "<their words>"` line in the change's
+`proposal.md`, and `canon policy approve --by <the human> --note "<their
+words>"` run on the human's behalf; it never approves without a human
+answer. The approval is the one thing never assumed (M7): the agent
+writes the brief, then stops and reports it, and builds and attests
+nothing for that scope until the human answers. Inside an approved scope
+the agent never stops for a human: fixes, follow-ups, review rounds and
+re-reviews go to scenario → implement →
+evidence → independent review, and a fix stays in the approved change as
+tasks in its `tasks.md` (a new `canon change new` is a new scope). The
+agent moves the subject to `shipped` itself once the ship guard passes,
+unless the brief says the human ships. The skill, the `AGENTS.md` block
+`canon init` writes, `canon status` and `canon evidence add` carry the
+rule:
+
+- The skill's step 1 and the `AGENTS.md` block say: write the brief,
+  then stop and report it; build and attest nothing for that scope until
+  the human answers. The approval is never assumed, even when the human
+  said they cannot answer until you report: the brief is that report.
+  "When no human can answer" covers one of the brief's questions and work
+  inside an approved scope, never the approval. Step 8 calls the ship
+  refusal and the evidence refusal backstops; the stop is at step 1.
+- `canon status` shows, for each building, verifying and shipped subject,
+  and each proposed subject whose newest adopted change has a
+  `proposal.md`, whether its brief is approved, read from the `proposal.md` of the
+  subject's newest adopted change under the openspec plan sources. An
+  older change's approval does not cover a newer scope, and an
+  `Approved:` line counts only outside HTML comments and fenced code.
+- An unapproved brief that exists is the subject's only step, whatever
+  its status: when the newest adopted change has a `proposal.md` with no
+  `Approved:` line, `next:` lists `human: stop and report the brief in
+  <proposal.md>; build and attest nothing for <id> until the human answers
+  (one answer approves brief and policy)` and no evidence, review or ship
+  step for that subject. Its reason adds that `canon evidence add` refuses
+  the subject's scenarios and tasks until the line is recorded. With no
+  plan source, no adopted change or no `proposal.md` there is no brief to
+  answer: the `brief:` line still says not approved, as an advisory, and
+  nothing is withheld. With the brief approved (or none to answer) and the
+  guard passing, the ship step says to ship it yourself unless the brief
+  says the human ships.
+- `canon evidence add` refuses evidence under an unapproved brief (M7).
+  A `--scenario-id` resolves to the scenario's `@subject` owner; a
+  `--task <change>#<n>` resolves to every subject whose adopted changes
+  include that change. For each such subject whose brief is enforced and
+  not approved, it prints `canon evidence add: unreviewed-promotion
+  <subject> — evidence for <scenario or task>: brief not approved — …`
+  naming the `proposal.md`, then a `refused` line telling the agent to
+  stop, report the brief and wait for the human's answer. It exits 1 and
+  stages nothing. Subjects with no brief to answer are not refused, and
+  neither are `canon review add` and `canon finding add`.
+- `canon evidence add --override-reason <one line>` attests anyway. It
+  prints the `waived unreviewed-promotion …` lines and
+  ``override recorded by `<actor>` for the N brief refusal(s) above``, and
+  the record carries `brief_override: {reason, waived: [{class, subject}],
+  actor}` (an optional field on the evidence record, no new record kind).
+  A blank or multi-line reason exits 2. An override when nothing was
+  refused records nothing and says so. `canon status` lists each
+  overridden record as a warning naming the actor, the time, the subject
+  and the reason, and `canon gate check` lists them under a
+  `brief overrides:` advisory that does not fail the gate.
+- The ship guard checks the brief too, through the same check status
+  uses, so status never says `ship` for a subject the guard refuses.
+  `canon subject status <id> shipped` refuses only where a brief exists:
+  a newest adopted change whose `proposal.md` has no `Approved:` line,
+  as `unreviewed-promotion <subject>`, naming that `proposal.md` and
+  saying a human must answer; the agent writes the line only from that
+  answer. `--override-reason` waives it like a review gap and records it
+  in the waiver. With no brief to answer the move prints an advisory and
+  is not refused. A brief that says the human ships changes who runs the
+  move, not the check. This refusal and the evidence refusal are
+  backstops: the agent stops at the brief before either fires.
+- `status --json` is `statusVersion: 2`: `next[].actor` (`agent` or
+  `human`) and `subjects[].brief` (`approved`, `enforced`, `change`,
+  `proposal`, `approval`) are new; `enforced` is true when the missing
+  approval blocks.
+
+**D2: fewer bookkeeping calls (#22).**
+
+- *Promote on write.* `evidence add`, `finding add`, `finding close` and
+  `divergence stage` take `--promote` and `--no-promote`. With
+  `--promote`, or under `canon.yaml`'s `write: { promote: auto }`, they
+  promote the one record they just staged in the same run (the same
+  validation and `run_seq` assignment as `gate promote`) and print one
+  success line naming the committed record (`wrote kind=…/….json`, not
+  the staged file promotion renamed), ending
+  `— staged and promoted in this run; nothing to promote`. A record
+  another run staged stays staged, and a promotion that refuses the record
+  leaves it staged and exits 1. `canon init` writes `promote: auto` for
+  new repos; without a `write:` key a repo keeps the 0.15 behavior
+  (`manual`). A malformed `write:` section refuses every staged write
+  (exit 2) before anything is staged, and `init --check-config` reports
+  it as `[FAIL] write`.
+- *Fresh index without a sync step.* `gate check`, `status`,
+  `subject status`, `review add` and `evidence add` rebuild a stale
+  scenario index from the `.feature` files before reading it: the same
+  idempotent sync, materializing only the changed files, with one stderr
+  line naming them. A fresh index prints nothing. `inventory sync` stays.
+  A lock (`.canon/scenario-index.lock`) serializes concurrent syncs and
+  refreshes so each record is written once.
+- *Removed scenarios.* When a scenario's id is gone from every
+  `.feature` file of its root, sync (or a reader's refresh) appends a
+  `removed: true` generation. Every reader, the report marts and artifact
+  ingest treat it as absent, so a deleted scenario stops being graded,
+  counted or reviewable; re-adding it supersedes the tombstone. A root
+  that cannot sync marks nothing removed.
+
+**D3: starter policy levels (#23).** `canon init --policy
+light|standard|strict`: `light` requires evidence, `standard` adds a
+failure case per feature, `strict` adds independent review. The default
+stays `strict`, byte-identical to the 0.15 starter under a first line
+`# canon policy level: <level>`; the lower levels carry the left-out
+requirements as commented lines. An unknown level, or `--policy` with
+`--no-policy`, is a usage error (exit 2) and nothing is written.
+`canon status` names the level (the level line, else the level the
+`spec_coverage` section matches exactly, else `custom`; `policy.level` in
+`--json`, `null` without a policy) and, for `light` and `standard`, how to
+raise it.
+
+**D4: small next items.**
+
+- *#8:* `canon init`'s `.gitignore` ignores `.canon/audit/` (the access
+  audit `query`, `export` and `purge` append to), the scenario index
+  `.canon/ledger/kind=scenario/`, `.canon/scenario-index.lock` and
+  `.canon/artifact-store.lock`. canon's own `.gitignore` ignores the audit
+  directory and both locks.
+- *#9:* the skills install lock records `canon_version` and
+  `source_commit` (provenance only; a new commit that leaves the bundle
+  unchanged does not rewrite the lock). When the lock's `canon_version`
+  is not this canon's, or the lock predates 0.16 and records none,
+  `skills check` exits 1 and both `check` and `doctor` (as an `outdated:`
+  line) name the install command.
+- *#10:* `skills doctor` lists co-installed skills in `.claude/skills`,
+  `.agents/skills`, `.omp/skills` and `.pi/skills` whose frontmatter
+  description claims build work (one sentence holds a build verb and a
+  build object), as an advisory `competing-skill:` line warning that
+  canon's loop will not run if an agent picks one for build work. It never
+  edits them and still exits 0.
+
+**D5: review artifacts (#11).** `canon review add --artifact <path>`
+(repeatable, with `--max-artifact-mib`) stores what the reviewer looked at
+like evidence: in-repo, size-limited, written to
+`.canon/artifacts/sha256/` before the review, all or nothing, and recorded
+as `artifacts: [{path, sha256}]` on the review. `gate check` re-hashes the
+stored blobs of every in-effect review; a missing or altered blob is
+`stale-evidence` naming the review. A file outside the repository is
+refused (exit 2) and no review is written. The skill tells reviewers of
+user-visible behavior to attach screenshots or recordings, and authors to
+bind them to visual scenarios.
+
+Writes to the artifact store hold a repo lock (`.canon/artifact-store.lock`)
+from the "already stored?" check to the last rename, so a rollback never
+removes a blob another writer published or counted as stored. A blob
+already present with the same bytes counts as stored and is never removed
+by a rollback.
+
+**D6: legacy reviews checked against their pin (#12).** A review written
+before 0.15 carries no pins, only `pin`, the commit it reviewed.
+`gate check`, `status` and `subject status` read the scenario at that
+commit through one `git cat-file --batch` process (never fetching) and
+decide the same way:
+
+- *current* when the scenario's per-scenario digest at the pin equals
+  today's and no declared evidence is newer than the review: it counts;
+- *stale* when its spec changed since the pin or evidence is newer:
+  `unreviewed-promotion`, like a stale pinned review;
+- *undecidable* when the commit or the scenario at it is not in this
+  clone (shallow clone, rewritten history): it still counts, as in 0.15.
+  A missing commit is never a violation.
+
+A scenario that lived in another feature file at the pin is found there.
+The advisory now counts current, stale and undecidable, counts a stale
+one as superseded when its scenario already has a qualifying review, names
+only the scenarios still owed a review, and suggests `fetch-depth: 0`.
+canon's own CI gate job checks out full history. On canon's checked-in
+ledger, `canon gate check` prints 338 legacy reviews: 316 current, 14
+stale and 8 undecidable, with 9 of the stale ones superseded by a current
+review of the same scenario (M6's spec edits staled two more, both already
+re-reviewed). The plan's 348 counted every legacy review
+record; canon counts only the latest review per scenario and reviewer on a
+scenario that still exists, which leaves out 8 replaced by the same
+reviewer's later review and 2 of scenarios no feature file declares any
+more (`skills.install.05` and `skills.install.06`).
+
+**M6: no bookkeeping steps in the guidance (dogfood eval 3).** The eval 3
+acceptance run measured bookkeeping at 11 of 130 canon call sites (8.5%,
+over the 5% bar): 5 `format` and 5 `inventory sync` calls, and one
+`gate promote` that found nothing staged. Promote on write and the
+stale-index refresh both worked; the skill and `canon status` still told
+the agent to run the commands, so it always synced first and the refresh
+never fired. The guidance now names a bookkeeping command only where it
+is needed:
+
+- The skill's loop has no format or sync step: the readers index edited
+  `.feature` files themselves, and `canon inventory sync` is named only
+  for a command that printed `NOT refreshed` (a format violation, such as
+  a hand-written header with no `# canon:` line, or a duplicate id).
+- *Fail closed on a refused refresh.* When a root's `.feature` files
+  changed but its refresh is refused, `canon gate check` exits 1 with
+  `uncovered-cell <root>` (the class the ship gate already uses when a
+  subject's scenarios cannot be counted) saying `canon inventory sync`
+  lists the problems; `canon subject status <id> shipped` refuses with
+  the same violation; and `canon status` lists the sync as its only step.
+  All three read one decision (`unrefreshable_roots`). Before, the gate
+  graded the old index and could pass. `canon evidence add --task` and
+  `canon gate task` read `tasks.md` as it is, so a new task row needs no
+  `canon ingest plans`. `canon gate promote` is named only for
+  `write.promote: manual`, in the skill, the `AGENTS.md` block and the
+  loop in `canon evidence --help`, `canon finding --help` and
+  `canon finding add --help`.
+- `canon status`: a subject with no scenario says "specify its behavior,
+  one scenario per behavior" (was "…, then `canon inventory sync`"); the
+  unowned-scenario step is `canon status` after tagging (was
+  `canon inventory sync`); the remaining sync step, for `.feature`
+  scenarios with an empty index, says the automatic refresh could not
+  index them; and the evidence step adds "then `canon gate promote`" only
+  under `write.promote: manual`.
+- `canon status` shows the brief for a `proposed` subject once its newest
+  adopted change has a `proposal.md`. While that brief is unapproved the
+  human step is the subject's only step, with no `feature new` or
+  `scenario new`. A proposed subject with no adopted change or no
+  `proposal.md` is unchanged. M7 makes the human step the only step at
+  every status and adds the `canon evidence add` refusal (see D1).
+- A promote on write prints one success line naming the committed file
+  (`canon evidence add: wrote kind=evidence_record/… — staged and promoted
+  in this run; …`), where it printed the promote line and the staged
+  file's different name.
+
+**M7: stop at the brief (dogfood eval 3b).** Eval 3b regressed on
+criterion (a), one human stop before `shipped`. The agent wrote the
+brief, and `canon status` showed the human step, but the agent kept
+building for 2 hours with no approval. It read the skill's "when no human
+can answer, write the question into the brief, proceed on the assumption"
+as covering the approval, and step 8 presented brief approval as a ship
+gate only, so it read that only `verifying → shipped` is refused. The
+maintainer decided that the approval is the one thing never assumed, and
+that canon enforces it: `canon evidence add` refuses a scenario or task
+whose subject's brief is enforced and not approved, unless an explicit
+`--override-reason` is given, which is recorded. D1 above describes the
+skill wording, the refusal, the override and the new status step.
+
+*Migration:*
+
+- Re-run `canon skills install` (with your `--providers`). Until you do,
+  `canon skills check` exits 1: the lock was written by 0.15 or earlier,
+  which records no `canon_version`.
+- Re-run `canon init` in an existing repo to refresh the `AGENTS.md`
+  block with the one-approval loop; it leaves `canon.yaml` and the policy
+  untouched.
+- `canon init --policy light|standard|strict` picks the starter level;
+  the default `strict` policy is unchanged apart from its level line, so
+  its `policy_digest` differs from a 0.15 starter's. An existing policy
+  has no level line and `status` shows the level it matches, or `custom`.
+- Add `write: { promote: auto }` to `canon.yaml` to promote on write;
+  without it, staged writes still wait for `canon gate promote`.
+- Add `.canon/audit/`, `.canon/scenario-index.lock` and
+  `.canon/artifact-store.lock` to `.gitignore`
+  (`init` does this only for new repos). New repos also ignore the
+  scenario index `.canon/ledger/kind=scenario/`; an existing repo may keep
+  it tracked, since every reader rebuilds a stale index.
+- Set `fetch-depth: 0` on the CI checkout that runs `canon gate check`,
+  or every legacy review stays undecidable and unchecked. With full
+  history, a legacy review whose scenario drifted since its pin turns the
+  gate red until a new `canon review add` pins it.
+- Record each subject's brief approval as an `Approved:` line in its
+  newest adopted change's `proposal.md`; while that file lacks one,
+  `canon status` lists the human step (stop and report the brief) as the
+  subject's only step, `canon evidence add` refuses its scenarios and
+  tasks, and `canon subject status <id> shipped` refuses. Subjects with no
+  adopted change or no `proposal.md` ship as before, with an advisory.
+- An agent or script that attests evidence before the brief's `Approved:`
+  line exists now gets exit 1 from `canon evidence add`. Record the
+  human's answer first, or pass `--override-reason <text>`, which is
+  recorded on the evidence record. Repos whose subjects have no
+  `proposal.md` (canon's own and Kino's existing subjects) see no change.
+- Scripts that match the `canon status` human step must match the new
+  text: `human: stop and report the brief in <proposal.md>; build and
+  attest nothing for <id> until the human answers (one answer approves
+  brief and policy)`.
+- Scripts that parse `canon status --json` see `statusVersion: 2`, with
+  `policy.level`, `subjects[].brief` and `next[].actor`.
+
+**Changed conformance expectations.** `version` and every case that
+prints the version re-blessed for `canon 0.16.0`: the `status-*` cases,
+`evidence-add-drop-attachment`, `gate-check-audit-false-success`,
+`gate-check-audit-sampling-fixed-seed`, `policy-approve-and-advisory`,
+`policy-approve-changed-advisory` and `review-pin-stale-spec`, and the new
+`init-policy-light-status`, `init-policy-refused`,
+`skills-check-outdated-lock`, `status-brief-unapproved`,
+`status-refreshes-stale-index`, `evidence-add-refused-unapproved-brief`
+and `evidence-add-brief-override`. Existing cases re-blessed:
+
+- `context-json-policy-summary` — the schema lists the review's
+  `artifacts`, the scenario's `removed`, and the evidence record's
+  `brief_override` (M7).
+- `evidence-add-drop-attachment`, `gate-check-audit-false-success`,
+  `policy-approve-and-advisory`, `policy-approve-changed-advisory`,
+  `status-gaps`, `status-no-scenarios`, `status-ship-ready`,
+  `review-pin-stale-spec` — `status` prints the policy `level:` line.
+- `policy-approve-and-advisory` — the starter policy's digest changes
+  with its level line.
+- `gate-check-audit-sampling-fixed-seed`, `status-gaps`,
+  `status-no-policy`, `status-ship-ready` — `status --json` is
+  `statusVersion: 2` with `policy.level`, `next[].actor` and, for
+  building, verifying and shipped subjects, `subjects[].brief`.
+- `status-gaps`, `status-ship-ready` — the fixtures gain an approved
+  `proposal.md` and `status` prints the `brief:` line; the ship step reads
+  "and the brief is approved; ship it yourself unless the brief says the
+  human ships".
+- `finding-add-self-found-blocker`, `review-gate-distinct-review-passes`,
+  `review-gate-malformed-finding`, `review-gate-open-blocker`,
+  `review-gate-self-review-not-counted`, `status-gaps` — the legacy-review
+  advisory counts current, stale and undecidable reviews and suggests
+  `fetch-depth: 0`.
+- `review-pin-stale-spec` — `review add` first refreshes the stale index
+  and pins the scenario's current text by its scenario digest, so the
+  later `inventory sync` writes nothing, `gate check` is clean (exit 1 → 0
+  in `case.yaml`), and `status` counts the review and asks for the brief
+  approval. A spec edit after the review is pinned by
+  `tests/review_pins.rs`.
+- `subject-ship-refused-missing-verdict`,
+  `subject-ship-refused-no-tagged-scenarios`,
+  `subject-ship-refused-require-cases-gap`, `review-pin-stale-evidence` —
+  the subject adopts no change, or its change has no `proposal.md`, so
+  the guard adds one advisory line that the brief is not approved; the
+  refusals themselves are unchanged.
+- `review-pin-stale-spec` — its change `c-cart` has no `proposal.md`, so
+  `status` shows the brief as an advisory and suggests the agent's ship
+  step instead of the human step.
+- `status-brief-unapproved`, `status-gaps`, `status-ship-ready` —
+  `subjects[].brief` carries `enforced`.
+- `subject-ship-allowed` — the fixture gains an adopted change whose
+  `proposal.md` carries an `Approved:` line; its output is unchanged.
+
+- `evidence-add-drop-attachment`, `gate-check-audit-false-success`,
+  `gate-check-audit-sampling-fixed-seed` (M6) — the unowned-scenario step
+  is `canon status`, "then check again: status re-indexes the edited
+  files itself", not `canon inventory sync`.
+- `status-no-scenarios` (M6) — the empty subject's reason is "specify its
+  behavior, one scenario per behavior", without the sync.
+- `evidence-add-promote-on-write`, `status-refreshes-stale-index` (M6) —
+  a promote on write prints one line, `wrote <committed file>`, instead of
+  the promote line and `staged <staged file>`.
+- `status-brief-unapproved`, `status-brief-proposed`,
+  `subject-ship-refused-unapproved-brief` (M7) — the human step reads
+  `human: stop and report the brief in <proposal.md>; build and attest
+  nothing for <id> until the human answers (one answer approves brief and
+  policy)`, and its reason adds that `canon evidence add` refuses the
+  subject's scenarios and tasks until the line is recorded.
+
+New cases: `evidence-add-promote-on-write`,
+`evidence-add-refused-malformed-write-config`,
+`gate-check-legacy-review-missing-pin`,
+`gate-check-review-artifact-stale-evidence`, `init-policy-light-status`,
+`init-policy-refused`, `review-add-artifact-stored`,
+`review-add-refused-artifact-outside-repo`, `skills-check-outdated-lock`,
+`skills-doctor-competing-skill`, `status-brief-unapproved`,
+`status-brief-proposed` (M6), `status-refreshes-stale-index`,
+`subject-ship-refused-unapproved-brief`,
+`evidence-add-refused-unapproved-brief` (M7),
+`evidence-add-brief-override` (M7). Every other case is unchanged.
+
+**Closed issues:** #8, #9, #10, #11, #12, #21, #22, #23. **Deferred:**
+#13 (Codex eval), as the maintainer asked.
+
+**Acceptance (plan D7, dogfood eval 3c).** The release ran the eval-1
+one-line request ("make a cat-themed Vampire-Survivors-like game") with omp
+in a fresh repo initialized with this build. It used three turns: the
+request, one human answer, then a follow-up fix with no approval. All four
+criteria pass.
+
+- **(a) One human stop before `shipped`.** The agent stopped at the brief
+  after 91 seconds, before writing any code. It recorded the human's words
+  as `Approved:` and as `canon policy approve`, then shipped in 73 minutes
+  with no further stop.
+- **(b) The follow-up fix needed no human.** The agent added it as a task in
+  the approved change, wrote a new scenario and its evidence, and got an
+  independent review.
+- **(c) Bookkeeping was gone.** Across the four sessions, 0 of 49 canon call
+  sites were bookkeeping (`gate promote`, `inventory sync`, `format`).
+  Eval 2 had 21.6%; the first eval-3 run had 8.5%, which M6 fixed.
+- **(d) Everything was reviewed and the gate was clean.** All 30 scenarios
+  have a review from a different actor and session than their evidence, and
+  the gate is clean.
+
+An intermediate rerun (3b) failed (a), which is what M7 fixes. The evidence
+is in `~/Workspace/canon-dogfood/PROTOCOL-3.md` and `FINDINGS-3.md`.
+
 ## 0.15.0 release
 
 Version 0.15.0 makes the evidence chain hold over time: a review counts only

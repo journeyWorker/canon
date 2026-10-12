@@ -280,3 +280,134 @@ Feature: evidence add
     Then the record carries the evaluator id, version, digest and result, and a divergent verdict
     And the counterexample report is bound and stored like any report
     And the scenario's declared verdict is still the faithful one
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.60
+  Scenario: Promote on the command line commits the record in the same run
+    Given a repository whose canon.yaml has no write section
+    When evidence add runs with --promote
+    Then the same run promotes the record and prints one success line naming the committed record
+    And the success line ends "staged and promoted in this run; nothing to promote"
+    And a later gate promote finds nothing staged and exits 0
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.61
+  Scenario: Without a write key a staged record waits for gate promote
+    Given a repository whose canon.yaml has no write section
+    When evidence add runs without a promote flag
+    Then the record stays staged and the line names canon gate promote
+    And gate promote commits it
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.62
+  Scenario: Auto promotion commits every staged write and no-promote keeps one staged
+    Given a repository whose canon.yaml says write promote auto, as canon init writes it
+    When evidence add, finding add, finding close and divergence stage run
+    Then nothing is left staged
+    And an evidence add with --no-promote stays staged until gate promote
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.63
+  Scenario: A malformed write section or both promote flags are refused before anything is staged
+    Given a canon.yaml whose write section says promote always
+    When a staged write runs
+    Then it is refused with exit 2 naming the write section and nothing is staged
+    And init --check-config reports the write section as failed
+    And --promote together with --no-promote is a usage error with exit 2
+
+  # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.64
+  Scenario: A promotion that refuses the record just staged leaves it staged and exits 1
+    Given a staged write whose own record promotion refuses
+    When the write runs with --promote
+    Then the record is still staged
+    And the success line names canon gate promote
+    And the command exits 1
+
+  # canon: {"schema":1,"at":"2026-10-11T15:45:12Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.65
+  Scenario: A promote on write commits only the record its own run staged
+    Given another author staged an evidence record and a divergence candidate with --no-promote
+    When evidence add and divergence stage run under write promote auto
+    Then each run promotes and names its own record only
+    And the other author's records are still staged
+    And gate promote and divergence promote commit them afterwards
+
+  # canon: {"schema":1,"at":"2026-10-11T17:14:21Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.66
+  Scenario: A store rollback never removes a blob another writer published
+    Given two files staged into the artifact store under its lock
+    And another writer has already stored the first file's blob intact
+    When publishing the second file fails and the store rolls back
+    Then the first file's blob is still stored and hashes to its name
+    And no temp file is left in the store
+    And a second writer of the same repo waits for the lock and is refused naming the lock file
+
+  # canon: {"schema":1,"at":"2026-10-12T03:41:11Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.67
+  Scenario: A promoted write prints one success line that names the committed record
+    Given a repository whose canon.yaml says write promote auto, as canon init writes it
+    When evidence add, finding add, finding close and divergence stage run
+    Then each prints one success line, naming the record's committed file under the ledger, which exists
+    And no line names the staged file promotion moved, and no separate promote line is printed
+    And with --no-promote, evidence add and finding add print the staged file and canon gate promote, and divergence stage prints the staged file and canon divergence promote
+
+  # canon: {"schema":1,"at":"2026-10-12T07:30:40Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.68
+  Scenario: Evidence for a subject whose brief is not approved is refused, and nothing is staged
+    Given a building subject owning a scenario and adopting a change whose proposal.md has no "Approved:" line, with a task row in its tasks.md
+    When evidence is added for the scenario, and then for the task
+    Then each add exits 1 with an unreviewed-promotion line naming the subject and that proposal.md
+    And the refusal tells the agent to stop, report the brief and wait for the human's answer, and names --override-reason
+    And nothing is staged or committed
+    And canon review add and canon finding add for the same scenario and change are not refused
+
+  # canon: {"schema":1,"at":"2026-10-12T07:30:41Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.69
+  Scenario: A subject with no brief to answer is attested as before
+    Given a building subject that adopts no change, one whose newest change has no proposal.md, and a scenario no subject owns
+    When evidence is added for each scenario
+    Then each add succeeds with no brief refusal
+    And the record carries no brief override and canon status lists none
+
+  # canon: {"schema":1,"at":"2026-10-12T07:30:41Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.70
+  Scenario: An override attests anyway and records its reason and actor where a reader sees it
+    Given a building subject owning a scenario whose newest change's proposal.md has no "Approved:" line
+    When evidence is added for the scenario with a blank --override-reason, then with a one-line reason and an actor id
+    Then the blank reason exits 2 and nothing is written
+    And the reasoned add succeeds, printing the waived unreviewed-promotion line and who recorded the override
+    And the record carries brief_override with the reason, the waived unreviewed-promotion naming the subject, and the actor
+    And canon status lists it as a warning and canon gate check as an advisory, without failing
+    And once the brief is approved, an override nothing needed is not recorded
+
+  # canon: {"schema":1,"at":"2026-10-12T07:30:41Z","actor":{"agent_id":"canon"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.71
+  Scenario: Recording the human's approval lifts the refusal
+    Given a building subject whose scenario and task attestations are refused because its brief has no "Approved:" line
+    When the human's answer is recorded as the "Approved:" line in its proposal.md
+    Then the same scenario and task attestations succeed with no override

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-016-m2",
+    "role": "reviewer",
+    "session_id": "review-016-m2"
+  },
+  "at": "2026-10-11T16:13:46.331923Z",
+  "change_id": "canon-0-16-m2-review",
+  "disposition": "fixed",
+  "kind": "finding",
+  "resolution_sha": "61c08031b5baa246e00009a2fef6101b83696d93",
+  "reviewed_sha": "79ae41a2941ab5e5fe456ad0d159fae6e3013318",
+  "reviewer": "canon-reviewer-016-m2",
+  "round": 1,
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "the stale-index refresh (and full sync) never retired scenarios deleted from every feature file, so the gate kept grading them"
+}

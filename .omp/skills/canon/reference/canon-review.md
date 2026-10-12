@@ -17,8 +17,10 @@ state they are in.
 The order an agent follows to claim a subject done:
 
 1. **Test-run evidence** per owned scenario (`canon evidence add
-   --scenario-id <id> --project-id <root-id> ... --session-id <session>`,
-   then `canon gate promote`). See `canon-gate`.
+   --scenario-id <id> --project-id <root-id> ... --session-id <session>`;
+   final when it returns under `write: { promote: auto }`, which
+   `canon init` writes, and followed by `canon gate promote` only under
+   `write.promote: manual`). See `canon-gate`.
 2. **Independent review** of the change(s) the subject adopted. Record
    each issue the reviewer raises as a Finding, fix it, then close it:
 
@@ -26,12 +28,13 @@ The order an agent follows to claim a subject done:
    canon finding add --change-id c-demo --round 1 --seq 1 \
      --severity blocker --disposition open --reviewer reviewer-2 \
      --summary "unbounded subprocess wait" --session-id review-session-1
-   canon gate promote
    # ... fix, commit ...
    canon finding close --change-id c-demo --round 1 --seq 1 \
      --disposition fixed --resolution-sha "$(git rev-parse HEAD)"
-   canon gate promote
    ```
+
+   Under `write.promote: manual` (or no `write:` key), run
+   `canon gate promote` after each of the two.
 
 3. **One Review per scenario**, by someone other than the evidence actor,
    from a session other than the one that attested the evidence, after
@@ -48,7 +51,9 @@ The order an agent follows to claim a subject done:
    reviewer could not reach a verdict, record that instead of signing:
    `--outcome indeterminate` (or `unavailable` when it could not run).
    Changing the scenario or re-attesting it afterwards makes the review
-   stale; review it again.
+   stale; review it again. A reviewer of user-visible behavior attaches
+   the screenshots or recordings it looked at with `--artifact <path>`
+   (below).
 
 4. **Move the subject**: `canon subject status <id> verifying`, later
    `shipped`. See `canon-subject`.
@@ -70,8 +75,12 @@ canon finding close --change-id <c> --round <n> --seq <n> \
   --disposition fixed --resolution-sha <sha> [--session-id <id>]   # or rejected / deferred / open
 ```
 
-Both stage a candidate; `canon gate promote` commits it, and both say so
-(``… — run `canon gate promote` to commit it``). `finding close`
+Both stage a candidate. Under `write: { promote: auto }` (what
+`canon init` writes) the same run promotes it and the success line names
+the committed record (``wrote kind=finding/… — staged and promoted in this
+run; nothing to promote``); under `write.promote: manual`
+`canon gate promote` commits it, and the line says so (``staged … — run
+`canon gate promote` to commit it``). `finding close`
 changes only the disposition (and `resolution_sha` with it); severity,
 reviewer, summary, and refs are copied from the committed record. It
 appends a second version at the same natural key — the first stays. Its
@@ -130,7 +139,8 @@ canon review add --project-id <root-id> --scenario-id <id> \
   --reviewer <who> --pin <sha-or-ref> --role <role> \
   (--upstream-ref <ref> | --original-spec-ref <ref>) [--actor-id <id>] [--session-id <id>] \
   [--outcome signed|indeterminate|unavailable] \
-  [--reviewer-provider <p>] [--reviewer-model <m>] [--reviewer-harness <h>]
+  [--reviewer-provider <p>] [--reviewer-model <m>] [--reviewer-harness <h>] \
+  [--artifact <path>]... [--max-artifact-mib <MiB>]
 ```
 
 One attributed Review record for one scenario, joined on
@@ -142,6 +152,40 @@ ship gate still refuses missing or `Divergent` evidence verdicts on its
 own. It is written directly to the ledger, with no staging step, and says
 so: `canon review add: wrote <path> (new) — written directly; nothing to
 promote`.
+
+### What the reviewer looked at (artifacts)
+
+`--artifact <path>` (repeatable) binds a file the reviewer looked at — a
+screenshot, a recording, a trace — exactly as `canon evidence add
+--artifact` binds one: the path must resolve to a file inside the
+repository, a file over 25 MiB is refused unless `--max-artifact-mib <N>`
+raises the limit, and the bytes are copied into
+`.canon/artifacts/sha256/<hex>` (commit it with the ledger) before the
+review is written. Any refusal exits 2 and writes and stores nothing. The
+review records each distinct file once, in the order given:
+
+```json
+"artifacts": [{"path": "reports/title.png", "sha256": "<64 hex>"}]
+```
+
+The field is absent when no `--artifact` is given. `review add` prints
+`canon review add: artifact store holds <n> bound file(s) under
+.canon/artifacts/sha256/ (<k> newly stored) — commit them with the
+ledger`.
+
+`canon gate check` re-hashes the stored blob of every file bound to an
+in-effect review (the latest per `(project_id, scenario_id, reviewer)`).
+A missing or altered blob is `stale-evidence` on the review's scenario,
+naming the review, even when the working-tree file still matches (see
+`canon-gate`, "Bound evidence stays provable"):
+
+```
+stale-evidence world.demo.01 — review by `reviewer-2` (actor `reviewer-2`, 2026-10-11T09:00:00Z) bound file `reports/title.png` recorded sha256 <hex>; stored blob .canon/artifacts/sha256/<hex>: missing; working tree: <hex> — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`
+```
+
+The reviewer's later review replaces the earlier one, so its files are
+the ones checked. Canon binds and re-checks bytes only; it never compares
+images or judges what a screenshot shows.
 
 ### What the review saw (pins)
 
@@ -245,20 +289,43 @@ The scenario is reviewed when at least one of those latest reviews:
 1. is `signed`;
 2. still matches its pins — the scenario record's current
    `source_digest`, and its current latest evidence record per role —
-   when it has pins;
+   when it has pins; or, written before 0.15 without pins, still
+   describes its scenario at the commit it pinned (below);
 3. passes `distinct_actor`, when that is on.
 
-A review written before 0.15 has no pins. It keeps counting under rules
-1 and 3, without the freshness check, and `canon gate check` prints one
-advisory line counting such in-effect reviews (exit code unchanged):
+### Reviews written before pinning
+
+A review written before 0.15 has no pins, only `pin`: the commit it
+reviewed. The gate reads the scenario's `.feature` file at that commit
+(`git`, with the same per-scenario normalization `canon inventory sync`
+uses for `scenario_digest`; if the scenario was in another file then, the
+spec root's files at that commit are searched for its id) and decides:
+
+- **current** when that digest equals the scenario's current one and no
+  declared evidence record of the scenario is newer than the review: it
+  counts under rules 1 and 3;
+- **stale** when the scenario changed since the commit (`its spec changed
+  since <pin>`) or has evidence newer than the review (`it has declared
+  evidence newer than the review`): it no longer counts, exactly like a
+  stale pinned review;
+- **undecidable** when the pin is not a commit in this clone (shallow
+  clone, rewritten history) or the scenario id is absent at it: it keeps
+  counting, as in 0.15. A missing commit never becomes a violation.
+
+`canon gate check` prints one advisory line with the split (exit code
+unchanged by the line itself). A stale one whose scenario already has
+another qualifying review is counted as superseded and not named:
 
 ```
-advisory: 340 review(s) predate review pinning (0.15) and still count without a check that their scenario's spec and evidence are unchanged; a new `canon review add` pins what it saw
+advisory: 338 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 318 current, 12 stale, 8 undecidable; 7 stale one(s) superseded by a current review of the same scenario, so nothing is owed for them; a stale one with no current review in its place no longer counts — review its scenario again (`canon review add`): platformer.movement.01, platformer.movement.02, …; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it
 ```
 
 `canon status` prints the same line as a warning, and `canon subject
-status` prints it on stderr for the subject's own scenarios. Reviewing
-the scenario again pins it and drops it from the count.
+status` prints it on stderr for the subject's own scenarios; all three
+make the same decision. Re-review exactly the scenarios the line names:
+the new review pins what it saw and replaces the reviewer's legacy one.
+In CI, check out full history (`fetch-depth: 0`) for the job that runs
+the gate, or every legacy review is undecidable.
 
 ### `unreviewed-promotion`
 

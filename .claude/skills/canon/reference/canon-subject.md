@@ -20,11 +20,13 @@ authored in one place:
 - **Changes**: `change_ids` on the Subject, appended by `canon subject
   adopt`.
 - **Scenarios**: the `@subject:<id>` tag on each Gherkin scenario,
-  indexed onto `Scenario.subject_id` by `canon inventory sync`. The
-  Subject record carries no scenario list — the spec corpus is the only
-  source, and the Subjects report panel, `spec_coverage.scope`, and the
-  shipped gate all read it from there. To link a scenario, tag it and
-  re-sync; there is no subject-side command for it.
+  indexed onto `Scenario.subject_id` by the scenario index (rebuilt by
+  `canon inventory sync`, and refreshed by every command that reads it).
+  The Subject record carries no scenario list — the spec corpus is the
+  only source, and the Subjects report panel, `spec_coverage.scope`, and
+  the shipped gate all read it from there. To link a scenario, tag it;
+  the next `canon status` or `canon gate check` indexes the tag. There is
+  no subject-side command for it.
 
 ## The 4-step loop
 
@@ -81,9 +83,10 @@ canon retrieve --role dev --domain dev --subject subject-domain-loop --k 5
 ### 3. Work → pin every artifact to `subject_id`
 
 - **Scenarios**: `canon scenario new <tag> --subject <subject-id>` emits
-  the `@subject:<subject-id>` tag; `canon inventory sync` maps the tag
-  onto the scenario's `subject_id`. A malformed/absent tag leaves it
-  unset (fail-soft), never an error. See `canon-authoring`.
+  the `@subject:<subject-id>` tag; the scenario index maps the tag onto
+  the scenario's `subject_id` the next time a command reads it (no sync
+  step; see `canon-inventory`). A malformed/absent tag leaves it unset
+  (fail-soft), never an error. See `canon-authoring`.
 - **Changes**: adopt imported plan changes under the Subject (see
   [Adopt flow](#adopt-flow)).
 - **Reviews / evidence / divergences**: authored as usual (`canon review
@@ -145,6 +148,36 @@ empty set; so is one whose `scenario` records route away from the
 gate's rung. Each refusal prints by failure class (`uncovered-cell`),
 exits 1, and the status stays `verifying`. `retired` is not gated.
 
+**The brief (0.16):** `verifying → shipped` also refuses where a brief
+exists and is not approved, read exactly as `canon status` reads it (one
+shared check, so status says `ship` only when this passes): the subject's
+newest adopted change has a `proposal.md` under the openspec plan sources,
+and it carries no `Approved:` line outside HTML comments and code fences.
+It runs with or without a policy. The refusal is an `unreviewed-promotion`
+naming the subject, and says what to do:
+
+```
+canon subject status: unreviewed-promotion demo-subject — verifying → shipped: brief not approved — openspec/changes/c-demo/proposal.md has no `Approved:` line; a human must answer the brief, and the agent records `Approved: <who> <when> — "<their words>"` there only from that answer
+canon subject status: refused — get the human's answer to the brief and record it as its `Approved:` line, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject
+```
+
+Never write the line without the human's answer. When there is no brief to
+answer (no openspec plan source, no adopted change, or a change with no
+`proposal.md`), the move is not refused: it prints
+`canon subject status: advisory: <id>'s brief is not approved — <why>, so
+there is no brief to answer and shipping is not refused`, and status shows
+the brief as not approved, as an advisory. `subjects[].brief.enforced` in
+`canon status --json` says which case applies. A brief that says the human
+ships changes who runs the transition, not the check.
+
+This refusal is a backstop, and so is the evidence one: shipping is not
+the first thing an unapproved brief stops. The agent writes the brief,
+then stops and reports it, and nothing is built or attested for the
+subject until the human answers. `canon evidence add` refuses (exit 1,
+nothing staged) a scenario whose `@subject` owner, or a task whose change
+an adopting subject, has an enforced, unapproved brief, through the same
+check; see `canon-gate`.
+
 ### The review guard (`spec_coverage.require_review`, opt-in)
 
 When `.canon/policy.yaml` sets `spec_coverage.require_review` (see
@@ -172,9 +205,11 @@ canon subject status demo-subject verifying \
   --override-reason "reviewer out until Monday" --actor-id lead
 ```
 
-`--override-reason "<one line>"` waives ONLY `unreviewed-promotion` and
-`open-blocker` — never a ship-gate verdict or case gap, never unreadable
-routing. It prints the `waived ...` lines and `override recorded by
+`--override-reason "<one line>"` waives ONLY `unreviewed-promotion` (the
+review gaps and the brief check) and `open-blocker` — never a ship-gate
+verdict or case gap, never unreadable routing. A waived brief is recorded
+as `{ class: unreviewed-promotion, subject: <subject id> }`. It prints
+the `waived ...` lines and `override recorded by
 `lead` for the N violation(s) above: <reason>`, and records on the new
 Subject record exactly the violations it let through:
 
@@ -192,19 +227,27 @@ subject's next status write, so it never outlives the status it was
 granted for. While it stands, `canon gate check` lists the recorded gaps
 as advisories instead of failing; a gap it did not record (a blocker
 raised later, a scenario tagged later) still fails the gate. Without
-`require_review`, nothing is printed and nothing changes.
+`require_review`, nothing is printed and nothing changes, except that
+`shipped` still runs the brief check above.
 
 ## Adopt flow
 
-Planning docs become change/task records via `canon ingest plans` (see
-`canon-plan-import`), but that stops at import. `canon subject adopt`
-lifts an imported change into a managed Subject:
+Planning docs written outside canon become change/task records via
+`canon ingest plans` (see `canon-plan-import`), but that stops at import.
+`canon subject adopt` lifts an imported change into a managed Subject:
 
 ```bash
 canon ingest plans --repo .                          # import → change/task rows
 canon subject adopt subject-domain-loop-plan \
   --subject subject-domain-loop                        # link change → subject
 ```
+
+A change made with `canon change new` (below) is recorded and adopted
+already, and editing its `tasks.md` needs no import either:
+`canon evidence add --task` and `canon gate task` read the file as it is,
+and a flip re-imports that change itself. Run `canon ingest plans` for a
+plan written outside canon, or when `canon query --kind task` must list
+rows nobody has flipped yet.
 
 `adopt` stamps the change's `subject_id` and adds it to the Subject's
 `change_ids`, so `canon query --kind change --change-id …` and `canon
@@ -251,9 +294,10 @@ canon change new add-login --subject auth --title "Add login"
   exist, when the slug already has a change dir (active or archived) or a
   `change` record, or when `canon.yaml` has no `openspec` plans source.
 
-Add task rows to `tasks.md` as `- [ ] <n> <title>`, rerun `canon ingest
-plans`, and flip each with `canon gate task <slug>#<n>` once evidence
-exists.
+Add task rows to `tasks.md` as `- [ ] <n> <title>`, and flip each with
+`canon gate task <slug>#<n>` once evidence exists. `canon evidence add
+--task` and the flip read `tasks.md` as it is, so a new row needs no
+`canon ingest plans` run.
 
 ## Where are we: `canon status`
 
@@ -286,7 +330,26 @@ uses, so status and the gate cannot disagree about a gap:
   stale or whose latest reviews are all `indeterminate`/`unavailable`
   (see `canon-review`), and the `canon review add` step names both. With
   `require_review` on, a `warning:` line counts the in-effect reviews that
-  predate review pinning (0.15).
+  predate review pinning (0.15), checked against the commit each pinned:
+  current, stale (named) and undecidable.
+- **Brief** (0.16) — for each `building`, `verifying` or `shipped`
+  subject, and each `proposed` subject whose newest adopted change has a
+  `proposal.md`, a `brief:` line under it says whether the brief is approved:
+  `brief: approved in <proposal.md> — <the recorded words>`, or
+  `brief: not approved (…)`. Approval is an `Approved:` line in the
+  `proposal.md` of the subject's newest adopted change (the last one
+  adopted): a line that starts with `Approved:` (indent allowed), says
+  something after it, and sits outside HTML comments (`<!-- … -->`,
+  multi-line included) and fenced code blocks (```` ``` ```` or `~~~`),
+  written by the agent once the human answers, as
+  `Approved: <who> <when> — "<the human's words>"`. Fixes and follow-ups
+  live as tasks in the approved change, so a newly adopted change is a
+  new scope: an older change's approval does not cover it. Status reads
+  the line from the change dir under the repo's `openspec` plans sources,
+  in config order (the first source holding the change owns it, a live
+  dir before an archived one; with no `plans:` section, the `openspec`
+  source rooted at the repo that `canon gate task` also falls back to).
+  There is no record kind for it; the file is the record.
 - **Unowned** — scenarios with no `@subject:` tag.
 - **Audits** — how many scenarios are sampled for
   `spec_coverage.require_audit`, confirmed, owed (no audit or
@@ -296,23 +359,54 @@ uses, so status and the gate cannot disagree about a gap:
   one).
 - **Dropped bindings** — `dropped bindings (N):` lists every recorded
   `--drop-attachment` (scenario, paths, reason); `drops[]` in `--json`.
-- **`next:`** — at most five commands, each with a one-line reason; the
+- **Brief overrides** — a `warning:` line per evidence record attested
+  with `canon evidence add --override-reason` while its subject's brief
+  was not approved: what it attests, who, when, the subject and the
+  reason (see `canon-gate`).
+- **`next:`** — at most five steps, each with a one-line reason; the
   rest are counted. Rules, in order: no `canon.yaml` → `canon init`; an
   unreadable one → `canon init --check-config`; a scenario tagged with a
   subject that has no record → `canon subject new <that id>`; no subject
-  at all → `canon subject new`; subjects but no scenario records →
-  `canon inventory sync`. Then per subject, verifying first, then
-  building, specced, proposed, shipped: no scenario → `canon scenario new
-  … --subject <id>`; a missing case → `canon scenario new <surface>.<next
-  nn> … --case <case>`; (building and later) an unevidenced or divergent
-  scenario → `canon evidence add --scenario-id …`; an open blocker →
-  `canon finding close …`; a due, unreviewed, evidenced scenario →
-  `canon review add …` from another session; none of these →
-  `canon subject status <id> <next status>`. Last, unowned scenarios →
-  tag them and `canon inventory sync`. With more than one `specs.roots[]`
-  entry, every suggested `canon scenario new` carries `--project`: the
-  owning root for a missing case, `<root-id>` (the reason lists the
-  roots) for a subject that owns no scenario yet.
+  at all → `canon subject new`; subjects and `.feature` scenarios but no
+  scenario records → `canon inventory sync` (status refreshes the index
+  itself first, so this means the refresh refused on a format violation
+  or a duplicate id, which the sync names). Then per subject, verifying
+  first, then building, specced, proposed, shipped: an unapproved brief
+  (building and later, and proposed once its change has a `proposal.md`)
+  → the human step below, which is then the subject's
+  only step; no scenario → `canon scenario new … --subject <id>` (and, when no
+  `.feature` file holds a scenario yet, `canon feature new` first, unless
+  every subject waits on its brief); a missing case → `canon scenario new
+  <surface>.<next nn> … --case <case>`; (building and later) an
+  unevidenced or divergent scenario → `canon evidence add --scenario-id
+  …` (its reason adds "then `canon gate promote`" only under
+  `write.promote: manual`); an open blocker → `canon finding close …`; a
+  due, unreviewed, evidenced scenario → `canon review add …` from another
+  session; none of these → `canon subject status <id> <next status>`.
+  Last, unowned scenarios → `canon status`, after tagging them in their
+  `.feature` files (status re-indexes the edit; no sync step). With more
+  than one `specs.roots[]` entry, every suggested `canon scenario new`
+  carries `--project`: the owning root for a missing case, `<root-id>`
+  (the reason lists the roots) for a subject that owns no scenario yet.
+- **The one human step.** Every step is the agent's to run except one:
+  a subject whose brief is enforced (its newest change has a
+  `proposal.md` with no `Approved:` line) gets
+  `human: stop and report the brief in <proposal.md>; build and attest nothing for <id> until the human answers (one answer approves brief and policy)`,
+  whose reason names that `proposal.md`, says `canon evidence add`
+  refuses the subject's scenarios and tasks until the line is recorded,
+  and names `canon policy approve --by <the human> --note "<their words>"`.
+  It is the subject's only step, whatever its status: nothing suggests
+  `canon feature new`, `canon scenario new`, `canon evidence add`, a
+  review or a move-on for it before the human answers, and
+  `canon subject status <id> shipped` refuses on the same check. The
+  approval is never assumed. A subject with no brief to answer gets no human step;
+  its `brief:` line says
+  `not approved (no adopted change; advisory, nothing to approve yet)` or
+  ``not approved (change `<id>` has no proposal.md; advisory, nothing to
+  approve yet)`` and nothing is withheld (a `proposed` subject with no
+  `proposal.md`, and a `specced` subject, show no `brief:` line at all). Once nothing blocks, a
+  ship-ready verifying subject gets the agent's own
+  `canon subject status <id> shipped`; status never asks a human to ship.
 
 Status fails closed rather than suggest progress the gate would refuse:
 
@@ -330,19 +424,24 @@ Status fails closed rather than suggest progress the gate would refuse:
 
 ```json
 {
-  "statusVersion": 1,
-  "canonVersion": "0.14.0",
+  "statusVersion": 2,
+  "canonVersion": "0.16.0",
   "policy": { "present": true, "spec_coverage": { "require_evidence": true, "scope": [], "exclude_lanes": [], "require_cases": ["failure"], "require_review": { "scope": ["verifying", "shipped"], "distinct_actor": true, "block_on_findings": true } } },
   "warnings": [],
   "subjects": [
     { "id": "cart", "title": "Cart", "status": "building", "scenarios": 2, "excluded": 0, "evidenced": 2, "divergent": 0,
-      "reviewed": 1, "staleReviews": 0, "unsignedReviews": 0, "reviewDue": true, "openBlockers": 1, "missingCases": [] }
+      "reviewed": 1, "staleReviews": 0, "unsignedReviews": 0, "reviewDue": true, "openBlockers": 1, "missingCases": [],
+      "brief": { "approved": true, "enforced": false, "change": "c-cart", "proposal": "openspec/changes/c-cart/proposal.md", "approval": "Journey 2026-10-11 — \"approved\"" } },
+    { "id": "promo", "title": "Promo", "status": "verifying", "scenarios": 1, "excluded": 0, "evidenced": 1, "divergent": 0,
+      "reviewed": 1, "staleReviews": 0, "unsignedReviews": 0, "reviewDue": true, "openBlockers": 0, "missingCases": [],
+      "brief": { "approved": false, "enforced": true, "change": "c-promo", "proposal": "openspec/changes/c-promo/proposal.md" } }
   ],
   "unowned": ["cart.promo.01"],
   "next": [
-    { "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>", "why": "cart: 1 open blocker finding(s) (first: …); fix it, commit, then close it" },
-    { "command": "canon review add --project-id root --scenario-id cart.add.02 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"", "why": "cart: 1 of 2 scenario(s) lack a qualifying review; …" },
-    { "command": "canon inventory sync", "why": "1 scenario(s) carry no @subject tag (first: cart.promo.01); …" }
+    { "command": "stop and report the brief in openspec/changes/c-promo/proposal.md; build and attest nothing for promo until the human answers (one answer approves brief and policy)", "why": "promo: its newest adopted change's proposal.md carries no `Approved:` line …", "actor": "human" },
+    { "command": "canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>", "why": "cart: 1 open blocker finding(s) (first: …); fix it, commit, then close it", "actor": "agent" },
+    { "command": "canon review add --project-id root --scenario-id cart.add.02 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"", "why": "cart: 1 of 2 scenario(s) lack a qualifying review; …", "actor": "agent" },
+    { "command": "canon status", "why": "1 scenario(s) carry no @subject tag (first: cart.promo.01); add `@subject:<id>` above each in its .feature file, then check again: …", "actor": "agent" }
   ],
   "nextOmitted": 0
 }
@@ -351,9 +450,22 @@ Status fails closed rather than suggest progress the gate would refuse:
 Each `missingCases` entry is `{ "projectId", "surface", "case" }`: the
 spec root, the `<area>.<surface>`, and the required case it lacks.
 
+`brief` is present for `building`, `verifying` and `shipped` subjects,
+and for a `proposed` subject whose newest adopted change has a
+`proposal.md`. `change` is the newest adopted change (omitted when the
+subject adopts none), `proposal` its `proposal.md` (omitted when no
+`openspec` source holds one), `approval` the text after `Approved:`, and
+`enforced` whether the missing approval blocks (a `proposal.md` exists to
+carry it).
+
+Each `next` entry's `actor` is `agent` (its `command` is a canon command
+line) or `human` (its `command` says what to get from the human).
+
 `policy.spec_coverage` has the shape `canon context --json` prints
 (`null` when absent, `{"invalid": …}` when unusable). `statusVersion`
-changes only when a field changes meaning or is removed.
+changes only when a field changes meaning or is removed. It is `2`
+since 0.16, when `next[].command` stopped always being a command line
+(`actor` tells which); `brief` was added alongside.
 
 `subject new`, `adopt` and `status` write their records directly; the
 human-readable success line ends `— written directly; nothing to

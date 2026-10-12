@@ -1,0 +1,6 @@
+canon gate check: 1 violation(s)
+
+stale-evidence (1):
+  stale-evidence cart.add.01 — review by `reviewer-2` (actor `reviewer-2`, <ts>) bound file `reports/cart-badge.png` recorded sha256 98480205986e97b7aebbc23224203c1dc96c32eeacf9237258980f436c985b79; stored blob .canon/artifacts/sha256/98480205986e97b7aebbc23224203c1dc96c32eeacf9237258980f436c985b79: missing; working tree: 98480205986e97b7aebbc23224203c1dc96c32eeacf9237258980f436c985b79 — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`
+
+advisory: spec_coverage is off — 2 scenario(s) are not checked for evidence; see .canon/policy.yaml

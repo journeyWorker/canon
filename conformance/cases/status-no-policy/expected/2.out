@@ -1,9 +1,10 @@
 {
-  "statusVersion": 1,
-  "canonVersion": "0.15.0",
+  "statusVersion": 2,
+  "canonVersion": "0.16.0",
   "policy": {
     "present": false,
-    "spec_coverage": null
+    "spec_coverage": null,
+    "level": null
   },
   "warnings": [
     "no policy: .canon/policy.yaml not found, so `canon gate check` requires no evidence, failure cases or review here"
@@ -13,7 +14,8 @@
   "next": [
     {
       "command": "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>",
-      "why": "no subject exists yet; a subject is the unit status, review and shipping track"
+      "why": "no subject exists yet; a subject is the unit status, review and shipping track",
+      "actor": "agent"
     }
   ],
   "nextOmitted": 0

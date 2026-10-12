@@ -170,6 +170,17 @@
 //! reconciling a DIFFERENT staging representation, a different staging
 //! directory, and a different CLI surface, which is its own change.
 //! [`STAGED_KINDS`] is the seam that stops a FOURTH one appearing.
+//!
+//! # Promote on write: one candidate, never the batch (0.16)
+//! An authoring command run with `--promote` (or under `write: {
+//! promote: auto }`) promotes the ONE record it just staged:
+//! [`promote_staged`] for the [`STAGED_KINDS`] families,
+//! [`promote_staged_divergence`] for a divergence candidate. Both run
+//! the batch path's own per-kind code over a one-candidate set, so the
+//! validation and assignment are identical; what they never do is drain
+//! a record some other author staged and has not chosen to commit.
+//! `canon gate promote` / `canon divergence promote` remain the only
+//! commands that drain everything.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -550,17 +561,82 @@ pub const STAGED_KINDS: [StagedKind; 2] = [
 pub fn promote(staging: &GitTier, committed: &GitTier, dry_run: bool) -> Result<PromoteReport, StoreError> {
     let mut report = PromoteReport::default();
     for staged_kind in STAGED_KINDS {
-        match staged_kind.assignment {
-            StagedAssignment::RunSeqPerRoleSurface => promote_with_run_seq(staging, committed, dry_run, &mut report)?,
-            StagedAssignment::Nothing => promote_verbatim(staged_kind, staging, committed, dry_run, &mut report)?,
-        }
+        promote_kind(staged_kind, staging, committed, Scope::All, dry_run, &mut report)?;
     }
     Ok(report)
 }
 
-/// Drain every staged candidate of a kind promotion assigns NOTHING to
-/// ([`StagedAssignment::Nothing`]): re-validate, commit the staged body
-/// UNCHANGED, delete the staging source.
+/// Promote ONE staged candidate — the record at staging-relative
+/// `relative` (an authoring command's own `WriteReceipt::location`) —
+/// and nothing else staged beside it (0.16 promote on write).
+///
+/// The candidate goes through the SAME per-kind path [`promote`] runs:
+/// the same re-validation (`GitTier::read_at` shares the scan's per-file
+/// check), the same `run_seq`/`staging_id` assignment and recovery for
+/// `EvidenceRecord`, the same [`NaturalKeyRule::Unique`], transition and
+/// obstruction rules for `Finding`. Only the candidate set differs: one
+/// path instead of the whole staging tier. Every other staged record,
+/// whoever wrote it, stays staged for `canon gate promote`.
+///
+/// The report carries exactly that one candidate, in exactly one of
+/// `promoted`/`recovered`/`refused`. A path outside every
+/// [`STAGED_KINDS`] directory, or one nothing is staged at, is a
+/// refusal naming the path.
+pub fn promote_staged(staging: &GitTier, committed: &GitTier, relative: &Path) -> Result<PromoteReport, StoreError> {
+    let mut report = PromoteReport::default();
+    let subject = relative.display().to_string();
+    let kind_segment = relative.components().next().and_then(|component| component.as_os_str().to_str());
+    let Some(staged_kind) = STAGED_KINDS.into_iter().find(|staged| kind_segment == Some(format!("kind={}", staged.kind.as_str()).as_str())) else {
+        report.refused.push(refuse(subject, "not under a promotable kind's staging directory (`kind=<kind>/` for a kind in STAGED_KINDS)"));
+        return Ok(report);
+    };
+    promote_kind(staged_kind, staging, committed, Scope::One(relative), false, &mut report)?;
+    Ok(report)
+}
+
+/// Which staged candidates one promotion covers: the whole staging tier
+/// ([`promote`]) or the one path an authoring command just wrote
+/// ([`promote_staged`]). The per-kind functions take it so both entry
+/// points run one implementation.
+#[derive(Debug, Clone, Copy)]
+enum Scope<'a> {
+    All,
+    One(&'a Path),
+}
+
+/// Promote `staged_kind`'s candidates in `scope` — the one branch on
+/// [`StagedAssignment`] both entry points share.
+fn promote_kind(staged_kind: StagedKind, staging: &GitTier, committed: &GitTier, scope: Scope<'_>, dry_run: bool, report: &mut PromoteReport) -> Result<(), StoreError> {
+    match staged_kind.assignment {
+        StagedAssignment::RunSeqPerRoleSurface => promote_with_run_seq(staging, committed, scope, dry_run, report),
+        StagedAssignment::Nothing => promote_verbatim(staged_kind, staging, committed, scope, dry_run, report),
+    }
+}
+
+/// The well-formed staged `kind` candidates in `scope`, plus a refusal
+/// for each malformed one — the module doc's re-validation guarantee:
+/// both arms validate through the staging tier's own read path, so a
+/// candidate the gate's read would reject never reaches a write.
+fn staged_in_scope(staging: &GitTier, kind: RecordKind, scope: Scope<'_>) -> Result<(Vec<RawRecord>, Vec<Refused>), StoreError> {
+    match scope {
+        Scope::All => {
+            let staged = staging.read(&TierQuery::kind(kind))?;
+            Ok((staged.records, staged.violations.into_iter().map(|violation| refuse(violation.subject, violation.detail)).collect()))
+        }
+        Scope::One(relative) => match staging.read_at(kind, relative) {
+            Ok(Ok(raw)) => Ok((vec![raw], Vec::new())),
+            Ok(Err(violation)) => Ok((Vec::new(), vec![refuse(violation.subject, violation.detail)])),
+            Err(StoreError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {
+                Ok((Vec::new(), vec![refuse(relative.display().to_string(), "nothing is staged at this path — it left staging before this promotion read it")]))
+            }
+            Err(e) => Err(e),
+        },
+    }
+}
+
+/// Promote the staged candidates in `scope` of a kind promotion assigns
+/// NOTHING to ([`StagedAssignment::Nothing`]): re-validate, commit the
+/// staged body UNCHANGED, delete the staging source.
 ///
 /// No `run_seq`, no `staging_id` companion, and no recovery index —
 /// none of which is a simplification of [`promote_with_run_seq`]'s
@@ -622,23 +698,22 @@ fn promote_verbatim(
     staged_kind: StagedKind,
     staging: &GitTier,
     committed: &GitTier,
+    scope: Scope<'_>,
     dry_run: bool,
     report: &mut PromoteReport,
 ) -> Result<(), StoreError> {
     let kind = staged_kind.kind;
-    let staged = staging.read(&TierQuery::kind(kind))?;
 
     // The same re-validation guarantee [`promote_with_run_seq`] states:
-    // `staging.read()` has already run
+    // the staging read has already run
     // `canon_store::partition::validate_body` over every candidate —
     // for `Finding` that arm IS `Finding::from_body`, whose
     // `check_coherence` the committed read path runs identically — so a
     // candidate the gate's own read would reject cannot reach the write
     // below. A malformed candidate is refused with its staging file left
     // in place, never deleted, so it can be fixed and re-promoted.
-    for violation in staged.violations {
-        report.refused.push(refuse(violation.subject, violation.detail));
-    }
+    let (staged, malformed) = staged_in_scope(staging, kind, scope)?;
+    report.refused.extend(malformed);
 
     // The committed corpus AS READ — every record here survived the
     // layout check and `validate_body`, so its content-derived path IS
@@ -685,8 +760,8 @@ fn promote_verbatim(
     // in the same order every run rather than in filesystem-walk order —
     // the determinism [`promote_with_run_seq`] gets from sorting by
     // subject, over the only total order this path has.
-    let mut candidates: Vec<(PathBuf, String, RawRecord)> = Vec::with_capacity(staged.records.len());
-    for raw in staged.records {
+    let mut candidates: Vec<(PathBuf, String, RawRecord)> = Vec::with_capacity(staged.len());
+    for raw in staged {
         let relative = expected_relative_path(kind, &raw.0).map_err(StoreError::Layout)?;
         let natural_key = resolve_partition(kind, &raw.0).map_err(StoreError::Layout)?.natural_key;
         candidates.push((relative, natural_key, raw));
@@ -883,8 +958,8 @@ fn obstruction_at(absolute: &Path) -> Option<String> {
     }
 }
 
-/// Drain every staged `EvidenceRecord`, assigning each the monotonic
-/// per-`(role, surface)` `run_seq` it has none of until now
+/// Promote the staged `EvidenceRecord`s in `scope`, assigning each the
+/// monotonic per-`(role, surface)` `run_seq` it has none of until now
 /// ([`StagedAssignment::RunSeqPerRoleSurface`]).
 ///
 /// Hardcoded to `EvidenceRecord`, and honestly so: the partition key it
@@ -904,14 +979,11 @@ fn obstruction_at(absolute: &Path) -> Option<String> {
 /// something unreadable. No `Path::exists` appears on this path at all;
 /// staging is removed only after this call's own successful
 /// `committed.write`, or after a VALIDATED prior commit was found.
-fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, dry_run: bool, report: &mut PromoteReport) -> Result<(), StoreError> {
-    let staged = staging.read(&TierQuery::kind(RecordKind::EvidenceRecord))?;
-
+fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, scope: Scope<'_>, dry_run: bool, report: &mut PromoteReport) -> Result<(), StoreError> {
     // Malformed/misfiled staging candidates never reach run_seq
     // assignment at all (module doc's re-validation guarantee).
-    for violation in staged.violations {
-        report.refused.push(refuse(violation.subject, violation.detail));
-    }
+    let (staged, malformed) = staged_in_scope(staging, RecordKind::EvidenceRecord, scope)?;
+    report.refused.extend(malformed);
 
     // `1 + max(run_seq)` per (role, surface), scanning only the
     // committed tier's own already-landed records (parity.py
@@ -953,15 +1025,15 @@ fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, dry_run: bool, r
     // order is deterministic (same staging set -> same run_seq
     // assignment every run) rather than filesystem-walk order.
     let mut candidates: Vec<(EvidenceRecord, RawRecord)> = Vec::new();
-    for raw in staged.records {
+    for raw in staged {
         match serde_json::from_value::<EvidenceRecord>(raw.0.clone()) {
             Ok(record) => candidates.push((record, raw)),
             Err(e) => {
-                // Unreachable in practice — `staging.read()` already
+                // Unreachable in practice — the staging read already
                 // validated this exact JSON as an EvidenceRecord a few
                 // lines above — but §7 forbids assuming that instead
                 // of handling it.
-                report.refused.push(refuse("<staging>", format!("candidate re-parse failed after passing staging.read()'s own validation: {e}")));
+                report.refused.push(refuse("<staging>", format!("candidate re-parse failed after passing the staging read's own validation: {e}")));
             }
         }
     }
@@ -1092,13 +1164,23 @@ fn read_staged_divergence(staging_dir: &Path) -> (Vec<(PathBuf, DivergenceCandid
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
             continue;
         }
-        match std::fs::read_to_string(&path).ok().and_then(|s| serde_json::from_str::<DivergenceCandidate>(&s).ok()) {
-            Some(candidate) => candidates.push((path, candidate)),
-            None => refused.push(refuse("<staging-divergence>", format!("{}: malformed staged Divergence candidate", path.display()))),
+        match read_staged_divergence_file(&path) {
+            Ok(candidate) => candidates.push((path, candidate)),
+            Err(malformed) => refused.push(malformed),
         }
     }
     candidates.sort_by_key(|(_, c)| (c.project_id.clone(), c.scenario_id.clone(), c.round));
     (candidates, refused)
+}
+
+/// One staged [`DivergenceCandidate`] file, or the refusal
+/// [`read_staged_divergence`] reports for a malformed one — the per-file
+/// read the batch and [`promote_staged_divergence`] share.
+fn read_staged_divergence_file(path: &Path) -> Result<DivergenceCandidate, Refused> {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<DivergenceCandidate>(&s).ok())
+        .ok_or_else(|| refuse("<staging-divergence>", format!("{}: malformed staged Divergence candidate", path.display())))
 }
 
 /// This candidate's `(project_id, role, surface)` run_seq-partition key
@@ -1189,18 +1271,51 @@ pub fn promote_divergence(staging_dir: &Path, committed: &GitTier, dry_run: bool
     let mut next_seq = scan_divergence_next_seq(committed)?;
 
     for (path, candidate) in candidates {
-        match commit_divergence_candidate(&candidate, committed, &mut next_seq, dry_run)? {
-            Ok(promoted) => {
-                if !dry_run {
-                    std::fs::remove_file(&path)?;
-                }
-                report.promoted.push(promoted);
-            }
-            Err(refused) => report.refused.push(refused),
-        }
+        promote_divergence_file(&path, &candidate, committed, &mut next_seq, dry_run, &mut report)?;
     }
 
     Ok(report)
+}
+
+/// Promote ONE staged divergence candidate — the file at `staging_file`
+/// that [`stage_divergence`] returned — and nothing else staged beside
+/// it (0.16 promote on write): the same per-file read, the same
+/// `run_seq` assignment and the same staging removal
+/// [`promote_divergence`] applies to each candidate. Every other staged
+/// candidate stays staged for `canon divergence promote`.
+pub fn promote_staged_divergence(staging_file: &Path, committed: &GitTier) -> Result<PromoteReport, StoreError> {
+    let mut report = PromoteReport::default();
+    match read_staged_divergence_file(staging_file) {
+        Ok(candidate) => {
+            let mut next_seq = scan_divergence_next_seq(committed)?;
+            promote_divergence_file(staging_file, &candidate, committed, &mut next_seq, false, &mut report)?;
+        }
+        Err(malformed) => report.refused.push(malformed),
+    }
+    Ok(report)
+}
+
+/// Commit one staged candidate read from `path` and, on success, delete
+/// that staging file — the per-candidate step both
+/// [`promote_divergence`] and [`promote_staged_divergence`] run.
+fn promote_divergence_file(
+    path: &Path,
+    candidate: &DivergenceCandidate,
+    committed: &GitTier,
+    next_seq: &mut HashMap<(ProjectId, RoleId, String), u64>,
+    dry_run: bool,
+    report: &mut PromoteReport,
+) -> Result<(), StoreError> {
+    match commit_divergence_candidate(candidate, committed, next_seq, dry_run)? {
+        Ok(promoted) => {
+            if !dry_run {
+                std::fs::remove_file(path)?;
+            }
+            report.promoted.push(promoted);
+        }
+        Err(refused) => report.refused.push(refused),
+    }
+    Ok(())
 }
 
 /// `canon divergence resolve`/`defer`'s own direct-commit convenience
@@ -1282,6 +1397,59 @@ mod tests {
 
         assert!(staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.is_empty(), "promotion drains finding staging");
         assert_eq!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 2);
+    }
+
+    /// 0.16 promote on write: [`promote_staged`] commits the ONE named
+    /// candidate through the same per-kind rules [`promote`] applies —
+    /// `run_seq` assigned within the committed partition, a finding's
+    /// occupied natural key refused — and leaves every other staged
+    /// record exactly where it was.
+    #[test]
+    fn promote_staged_commits_only_the_named_candidate_under_the_batch_rules() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+
+        let bystander = staging.write(&evidence("implementer", Some("world.firstbuy-hotdeal.14"))).unwrap().location;
+        let own = staging.write(&evidence("implementer", Some("world.firstbuy-hotdeal.26"))).unwrap().location;
+        let report = promote_staged(&staging, &committed, Path::new(&own)).unwrap();
+        assert!(report.is_clean() && report.recovered.is_empty(), "{report:?}");
+        assert_eq!(report.promoted.len(), 1);
+        assert_eq!(report.promoted[0].run_seq(), Some(1), "the same per-(role, surface) run_seq the batch assigns");
+        assert!(!staging.root().join(&own).exists(), "the named candidate leaves staging");
+        assert!(staging.root().join(&bystander).exists(), "every other staged record stays");
+
+        // A second finding body under a committed natural key: the
+        // `Unique` rule refuses it on this path exactly as in the batch.
+        let first = staging.write(&finding("s43-findings-are-records", 1, 1)).unwrap().location;
+        assert!(promote_staged(&staging, &committed, Path::new(&first)).unwrap().is_clean());
+        let mut duplicate = finding("s43-findings-are-records", 1, 1);
+        duplicate.summary = "a different finding under the same key".to_string();
+        let second = staging.write(&duplicate).unwrap().location;
+        let report = promote_staged(&staging, &committed, Path::new(&second)).unwrap();
+        assert_eq!((report.promoted.len(), report.refused.len()), (0, 1), "{report:?}");
+        assert!(staging.root().join(&second).exists(), "a refused candidate stays staged");
+
+        let gone = promote_staged(&staging, &committed, Path::new(&own)).unwrap();
+        assert_eq!(gone.refused.len(), 1, "nothing staged at the path is a refusal, never a silent success: {gone:?}");
+        let outside = promote_staged(&staging, &committed, Path::new("kind=divergence/x.json")).unwrap();
+        assert_eq!(outside.refused.len(), 1, "a path outside every promotable kind is refused: {outside:?}");
+    }
+
+    /// [`promote_staged_divergence`] commits the one staged file it is
+    /// given and leaves every other staged candidate in place.
+    #[test]
+    fn promote_staged_divergence_commits_only_the_named_file() {
+        let dir = TempDir::new().unwrap();
+        let (_, committed) = tiers(&dir);
+        let staging_dir = divergence_staging_dir(committed.root());
+        let bystander = stage_divergence(&staging_dir, &divergence_candidate("app-a", "world.firstbuy-hotdeal.14", "reviewer", DivergenceStatus::Open, 1)).unwrap();
+        let own = stage_divergence(&staging_dir, &divergence_candidate("app-a", "world.firstbuy-hotdeal.26", "reviewer", DivergenceStatus::Open, 1)).unwrap();
+
+        let report = promote_staged_divergence(&own, &committed).unwrap();
+        assert!(report.is_clean(), "{report:?}");
+        assert_eq!(report.promoted.len(), 1);
+        assert!(!own.exists() && bystander.exists());
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap().records.len(), 1);
     }
 
     /// The committed body of an unassigned kind is the staged body

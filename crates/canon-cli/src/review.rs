@@ -34,13 +34,24 @@
 //! `unavailable`; only `signed` is an approval. `--reviewer-provider`,
 //! `--reviewer-model` and `--reviewer-harness` record the runtime that
 //! produced the review, as the caller reports it.
+//!
+//! # What the reviewer looked at is stored (0.16 D5)
+//! `--artifact <path>` (repeatable) binds a file the reviewer looked at —
+//! a screenshot, a recording — through the same binding as `canon
+//! evidence add --artifact` ([`crate::evidence_attach::bind_artifacts`]):
+//! inside the repository, within `--max-artifact-mib`, its bytes copied
+//! into `.canon/artifacts/sha256/<hex>` after every refusal has passed
+//! and before the review is written. The review records each file's
+//! `{path, sha256}`; `canon gate check` re-hashes the stored blob of
+//! every in-effect review and reports a missing or altered one as
+//! `stale-evidence` naming the review. Canon never compares images.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use canon_gate::review_gate::current_pins;
 use canon_gate::spec_coverage::latest_scenarios;
 use canon_gate::{GateContext, GateCtx};
-use canon_model::{Actor, Envelope, PinnedSpec, ProjectId, ProvenanceRef, RecordKind, Review, ReviewOutcome, RoleId, ScenarioId, SessionId};
+use canon_model::{Actor, Envelope, PinnedSpec, ProjectId, ProvenanceRef, RecordKind, Review, ReviewArtifact, ReviewOutcome, RoleId, ScenarioId, SessionId};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -97,6 +108,10 @@ pub struct ReviewAddArgs {
     pub reviewer_provider: Option<String>,
     pub reviewer_model: Option<String>,
     pub reviewer_harness: Option<String>,
+    /// Files the reviewer looked at (module doc), as given on the CLI.
+    pub artifacts: Vec<PathBuf>,
+    /// The artifact store's per-file size limit, in MiB.
+    pub max_artifact_mib: u64,
 }
 
 /// `canon review add` (module doc). Both provenance refs `None` or both
@@ -134,6 +149,23 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         return 2;
     };
     let pins = current_pins(&gate_context, scenario);
+    let bound = match crate::evidence_attach::bind_artifacts(&repo, &args.artifacts, args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB)) {
+        Ok(bound) => bound,
+        Err(e) => {
+            eprintln!("canon review add: refused — {}", e.message());
+            return 2;
+        }
+    };
+    let mut artifacts: Vec<ReviewArtifact> = Vec::new();
+    let mut files: Vec<crate::evidence_attach::BoundFile> = Vec::new();
+    for (path, file) in bound {
+        if !artifacts.iter().any(|a| a.path == path && a.sha256 == file.sha256) {
+            artifacts.push(ReviewArtifact { path, sha256: file.sha256.clone() });
+        }
+        if !files.iter().any(|f| f.sha256 == file.sha256) {
+            files.push(file);
+        }
+    }
     let committed = GitTier::new(&gate_context.ctx.ledger_root);
 
     let mut actor = Actor::new(&args.actor_id, args.role.clone());
@@ -152,6 +184,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     review.reviewer_provider = args.reviewer_provider.clone();
     review.reviewer_model = args.reviewer_model.clone();
     review.reviewer_harness = args.reviewer_harness.clone();
+    review.artifacts = artifacts;
     let pinned = format!(
         "canon review add: pinned {} at {} {} and {} latest evidence record(s); the review counts only while both are unchanged",
         args.scenario_id.as_str(),
@@ -164,9 +197,23 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     );
     review.pins = Some(pins);
 
+    // Store the bytes before the review is written (module doc): every
+    // refusal is behind us, and a review must never name a blob the
+    // store lacks.
+    let stored = match crate::evidence_attach::store_files(&repo, &files) {
+        Ok(stored) => stored,
+        Err((file, e)) => {
+            eprintln!("canon review add: refused — could not store {} in the artifact store: {e}", file.resolved.display());
+            return 2;
+        }
+    };
+
     match committed.write(&review) {
         Ok(receipt) => {
             println!("{pinned}");
+            if !files.is_empty() {
+                println!("{}", crate::evidence_attach::stored_line("canon review add", files.len(), stored));
+            }
             if !args.outcome.is_signed() {
                 println!("canon review add: outcome `{}` is recorded as a review gap, never as an approval", args.outcome.as_str());
             }
@@ -208,6 +255,8 @@ mod tests {
             reviewer_provider: None,
             reviewer_model: None,
             reviewer_harness: None,
+            artifacts: Vec::new(),
+            max_artifact_mib: canon_gate::DEFAULT_MAX_ARTIFACT_MIB,
         }
     }
 
