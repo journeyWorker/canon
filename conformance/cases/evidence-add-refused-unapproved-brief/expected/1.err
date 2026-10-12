@@ -1,0 +1,2 @@
+canon evidence add: unreviewed-promotion checkout — evidence for checkout.pay.01: brief not approved — openspec/changes/c-checkout/proposal.md has no `Approved:` line, so the human has not answered it
+canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — "<their words>"` in that proposal.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record

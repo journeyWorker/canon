@@ -105,8 +105,14 @@ fn seed_blocker(repo: &Path, change: &str) {
 /// The approval line the agent records once the human answers (0.16 D1).
 const APPROVED: &str = "Approved: Journey 2026-10-11 — \"승인. 네 가정대로 진행\"";
 
-/// The one `next` step status addresses to a human.
-const BRIEF_STEP: &str = "get the brief approved (one human answer covers brief and policy)";
+/// The one `next` step status addresses to a human, for subject `id`
+/// whose newest adopted change is `change` (0.16 M7: stop and report).
+fn brief_step(id: &str, change: &str) -> String {
+    format!("stop and report the brief in openspec/changes/{change}/proposal.md; build and attest nothing for {id} until the human answers (one answer approves brief and policy)")
+}
+
+/// The prefix every human step's command starts with.
+const BRIEF_STEP_PREFIX: &str = "stop and report the brief in ";
 
 /// `proposal.md` for `change` at `<root>/openspec/changes/<change>/`,
 /// with `extra` after the `## Why` paragraph. `root` is the repo for the
@@ -131,7 +137,10 @@ fn status_json(repo: &Path) -> Value {
     for step in report["next"].as_array().unwrap() {
         match step["actor"].as_str() {
             Some("agent") => {}
-            Some("human") => assert_eq!(step["command"], BRIEF_STEP, "the brief is the only step status addresses to a human: {step}"),
+            Some("human") => assert!(
+                step["command"].as_str().unwrap().starts_with(BRIEF_STEP_PREFIX),
+                "the brief is the only step status addresses to a human: {step}"
+            ),
             _ => panic!("every step names its actor: {step}"),
         }
     }
@@ -540,6 +549,10 @@ fn context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_m
     assert_eq!(human_steps(&report), ["demo-subject"], "{report}");
     assert!(commands(&report).iter().all(|c| !c.starts_with("canon subject status demo-subject")), "no move-on without an approved brief: {report}");
     assert!(
+        report["next"].as_array().unwrap().iter().filter(|n| n["why"].as_str().unwrap().starts_with("demo-subject")).all(|n| n["actor"] == "human"),
+        "the human step is the subject's only step: nothing is built or attested before the answer: {report}"
+    );
+    assert!(
         report["next"].as_array().unwrap().iter().any(|n| n["actor"] == "agent" && n["why"].as_str().unwrap().starts_with("bare-subject")),
         "nothing to answer withholds nothing: the subject with no change gets the agent's next step: {report}"
     );
@@ -547,6 +560,7 @@ fn context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_m
     assert!(whys[0].contains("openspec/changes/c-demo-subject/proposal.md"), "{}", whys[0]);
     for why in &whys {
         assert!(why.contains("Approved: <who> <when>") && why.contains("canon policy approve --by <the human> --note"), "{why}");
+        assert!(why.contains("`canon evidence add` refuses demo-subject's scenarios and tasks"), "{why}");
     }
     let demo = subject(&report, "demo-subject");
     assert_eq!(
@@ -558,7 +572,7 @@ fn context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_m
     let text = stdout(&run(dir.path(), &["status"]));
     assert!(text.contains("      brief: not approved (openspec/changes/c-demo-subject/proposal.md has no `Approved:` line)\n"), "{text}");
     assert!(text.contains("      brief: not approved (no adopted change; advisory, nothing to approve yet)\n"), "{text}");
-    assert!(text.contains(&format!("\n  human: {BRIEF_STEP}\n")), "{text}");
+    assert!(text.contains(&format!("\n  human: {}\n", brief_step("demo-subject", "c-demo-subject"))), "{text}");
 }
 
 /// context.status.60: the brief is approved when the subject's newest
@@ -632,7 +646,7 @@ fn context_status_63_a_line_that_only_mentions_approval_does_not_approve() {
         assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], false, "{case} must not approve:\n{body}");
         let humans: Vec<&Value> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").collect();
         assert_eq!(humans.len(), 1, "{case}: exactly one human step: {report}");
-        assert_eq!(humans[0]["command"], BRIEF_STEP, "{case}: {report}");
+        assert_eq!(humans[0]["command"], brief_step("demo-subject", &format!("c-{case}")), "{case}: {report}");
         assert!(humans[0]["why"].as_str().unwrap().starts_with("demo-subject: "), "{case}: the step is the subject's: {report}");
         assert!(humans[0]["why"].as_str().unwrap().contains(&format!("openspec/changes/c-{case}/proposal.md")), "{case}: {report}");
     }
@@ -862,7 +876,7 @@ fn context_status_66_a_proposed_subject_with_an_unapproved_brief_asks_only_the_h
     assert_eq!(report["next"].as_array().unwrap().len(), 1, "the human step is the only step: {report}");
     let text = stdout(&run(dir.path(), &["status"]));
     assert!(text.contains("      brief: not approved (openspec/changes/c-demo-subject/proposal.md has no `Approved:` line)\n"), "{text}");
-    assert!(text.contains(&format!("\n  human: {BRIEF_STEP}\n")), "{text}");
+    assert!(text.contains(&format!("\n  human: {}\n", brief_step("demo-subject", "c-demo-subject"))), "{text}");
     assert!(!text.contains("canon feature new") && !text.contains("canon scenario new"), "{text}");
 
     write_proposal(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));

@@ -185,9 +185,24 @@
 //! dispatch begin --task` makes (s41 extracted the D8 ownership rule
 //! into one place precisely because a second copy had already drifted).
 //!
+//! # Nothing is attested under an unapproved brief (0.16 M7)
+//! The approval is the one thing an agent never assumes: it writes the
+//! brief, stops and reports it. As the backstop for that stop, an add is
+//! refused (exit `1`, nothing staged) while a subject it attests for has
+//! a brief [`crate::brief::brief_of`] reads as enforced and not approved:
+//! the scenario's `@subject` owner, and every subject adopting the
+//! task's change ([`crate::brief::attested_briefs`]). Each refusal is an
+//! `unreviewed-promotion` naming the subject and its `proposal.md`, as
+//! the ship guard prints it. `--override-reason` attests anyway and
+//! records a [`BriefOverride`] (reason, waived refusals, actor) on the
+//! record, which `canon status` and `canon gate check` list. A subject
+//! with no brief to answer is unaffected. `canon review add` and `canon
+//! finding add` are not refused.
+//!
 //! # Exit-code contract (`crate::gate`'s, unchanged)
 //! `0` staged, `1` the authored record would be gate-red (a fabrication
-//! marker, or a typed atom that fails vocabulary validation), `2`
+//! marker, or a typed atom that fails vocabulary validation) or a brief
+//! refuses it, `2`
 //! usage-or-infra (an unknown/ungrammatical task, no plan corpus, a
 //! malformed flag combination, a line separator in a document-bound
 //! field, an unparseable typed-atoms file, a tier write failure). Each
@@ -196,18 +211,57 @@
 
 use std::path::{Path, PathBuf};
 
-use canon_gate::{scan_note_text, verify_risk_approval, GateCtx};
+use canon_gate::{scan_note_text, verify_risk_approval, FailureClass, GateContext, GateCtx, Violation};
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{
-    approval_payload_bytes, Actor, AttachmentDrop, AuditResult, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord,
-    RecordKind, ReportFormat, RoleId, RunId, ScenarioId, SessionId, Sha, TaskId, APPROVAL_NAMESPACE,
+    approval_payload_bytes, Actor, AttachmentDrop, AuditResult, BriefOverride, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId,
+    RawRecord, RecordKind, ReportFormat, RoleId, RunId, ScenarioId, SessionId, Sha, TaskId, WaivedViolation, APPROVAL_NAMESPACE,
 };
+use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier, TierQuery};
 use chrono::{DateTime, Utc};
 
 use crate::context::resolve_repo_root;
 use crate::gate::{evidence_staging_dir, typed_evidence_contract_for_task};
+
+/// What `canon evidence add` tells the agent when a brief refuses the
+/// attestation (0.16 M7): the stop belongs at the brief.
+const BRIEF_STOP: &str = "stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — \"<their words>\"` in that proposal.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record";
+
+/// The brief refusals for this attestation (module doc, 0.16 M7): one
+/// `unreviewed-promotion` per subject it attests for whose brief
+/// [`crate::brief::brief_of`] reads as enforced and not approved, the
+/// class and subject the ship guard's brief check prints. The subjects
+/// come from [`crate::brief::attested_briefs`]: the scenario's
+/// `@subject` owner and every subject adopting the task's change. `Err`
+/// when the ledger cannot be read.
+fn brief_refusals(repo: &Path, args: &EvidenceArgs) -> Result<Vec<Violation>, String> {
+    let ctx = GateCtx::from_repo(repo)
+        .map_err(|e| e.to_string())
+        .and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string()))?;
+    // An unreadable `plans:` section finds no proposal.md, so no brief is
+    // enforced; `canon status` warns about it.
+    let plan_roots = crate::brief::plan_roots(repo).unwrap_or_default();
+    let scenario = args.project_id.as_ref().zip(args.scenario_id.as_ref());
+    let what = [args.scenario_id.as_ref().map(|s| s.as_str().to_string()), args.task_id.as_ref().map(ToString::to_string)]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" and ");
+    Ok(crate::brief::attested_briefs(repo, &plan_roots, &ctx, args.task_id.as_ref(), scenario)
+        .into_iter()
+        .filter(|(_, brief)| brief.enforced)
+        .map(|(subject, brief)| {
+            let proposal = brief.proposal.as_deref().unwrap_or_default();
+            Violation::new(
+                FailureClass::UnreviewedPromotion,
+                subject.subject_id.as_str(),
+                format!("evidence for {what}: brief not approved — {proposal} has no `Approved:` line, so the human has not answered it"),
+            )
+        })
+        .collect())
+}
 
 /// `--verdict`'s clap `value_parser`. Kebab-cased on the CLI, matching
 /// `crate::divergence::parse_status`'s established spelling for a
@@ -357,6 +411,10 @@ pub struct EvidenceArgs {
     /// `drop_reason` recorded for all of them.
     pub drop_attachments: Vec<String>,
     pub drop_reason: Option<String>,
+    /// 0.16 M7: attest anyway while a subject this record attests for has
+    /// an enforced, unapproved brief ([`brief_refusals`]); recorded on the
+    /// record as its [`BriefOverride`], with the actor.
+    pub override_reason: Option<String>,
     /// `--promote`/`--no-promote` (0.16 D2): whether this run promotes
     /// the record it stages ([`crate::write_mode`]).
     pub promote: crate::write_mode::PromoteFlag,
@@ -650,6 +708,12 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         eprintln!("canon evidence add: refused — {error}");
         return 2;
     }
+    if let Some(reason) = &args.override_reason {
+        if reason.trim().is_empty() || first_row_line_break(reason).is_some() {
+            eprintln!("canon evidence add: refused — --override-reason must be one non-empty line; it is recorded on the evidence record as the accountable reason");
+            return 2;
+        }
+    }
     for surface in &args.surface_ref {
         if let Err(error) = parse_surface_ref(surface) {
             eprintln!("canon evidence add: refused — --surface-ref `{surface}` is invalid: {error}");
@@ -790,6 +854,38 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             }
         }
     }
+    // 0.16 M7: nothing is attested for a subject whose brief awaits the
+    // human's answer (module doc). Before anything is bound or staged.
+    let brief_override = match brief_refusals(&repo, args) {
+        Ok(refusals) if refusals.is_empty() => {
+            if args.override_reason.is_some() {
+                eprintln!("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation");
+            }
+            None
+        }
+        Ok(refusals) => {
+            let Some(reason) = &args.override_reason else {
+                for refusal in &refusals {
+                    eprintln!("canon evidence add: {}", refusal.line());
+                }
+                eprintln!("canon evidence add: refused — {BRIEF_STOP}");
+                return 1;
+            };
+            for refusal in &refusals {
+                eprintln!("canon evidence add: waived {}", refusal.line());
+            }
+            eprintln!("canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
+            Some(BriefOverride {
+                reason: reason.clone(),
+                waived: refusals.iter().map(|v| WaivedViolation { class: v.class.as_str().to_string(), subject: v.subject.clone() }).collect(),
+                actor: Actor::new_unattributed(args.actor_id.as_str()),
+            })
+        }
+        Err(e) => {
+            eprintln!("canon evidence add: {e}");
+            return 2;
+        }
+    };
     // Experimental binding: read (never run) the files the caller names,
     // before anything is staged, so a refused binding leaves no record.
     if !args.report_cases.is_empty() && args.reports.is_empty() {
@@ -845,6 +941,9 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     .with_attachments(bound.attachments);
     if let Some(attachment_drop) = attachment_drop {
         record = record.with_attachment_drop(attachment_drop);
+    }
+    if let Some(brief_override) = brief_override {
+        record = record.with_brief_override(brief_override);
     }
     if let Some(audit) = audit {
         record = record.with_audit(audit);
@@ -1165,6 +1264,7 @@ mod tests {
             audit_result: None,
             drop_attachments: Vec::new(),
             drop_reason: None,
+            override_reason: None,
             promote: crate::write_mode::PromoteFlag::Config,
         }
     }

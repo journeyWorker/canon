@@ -50,8 +50,8 @@
   "unowned": [],
   "next": [
     {
-      "command": "get the brief approved (one human answer covers brief and policy)",
-      "why": "cart: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope); once the human answers, record their words as `Approved: <who> <when> — \"<their words>\"` in openspec/changes/cart-v1/proposal.md and run `canon policy approve --by <the human> --note \"<their words>\"`",
+      "command": "stop and report the brief in openspec/changes/cart-v1/proposal.md; build and attest nothing for cart until the human answers (one answer approves brief and policy)",
+      "why": "cart: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses cart's scenarios and tasks until it is recorded; once the human answers, record their words as `Approved: <who> <when> — \"<their words>\"` in openspec/changes/cart-v1/proposal.md and run `canon policy approve --by <the human> --note \"<their words>\"`",
       "actor": "human"
     }
   ],

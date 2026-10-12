@@ -1252,6 +1252,23 @@ pub struct AttachmentDrop {
     pub reason: String,
 }
 
+/// The accountable waiver an attestation was let through under, when
+/// `canon evidence add` refused it because a subject it attests for has
+/// an enforced, unapproved brief (0.16 M7) and the operator passed
+/// `--override-reason`. [`StatusOverride`]'s shape without `to`: an
+/// attestation moves no status. `waived` lists the refusals it let
+/// through as `(unreviewed-promotion, <subject id>)`, the pair the ship
+/// guard's brief check prints.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct BriefOverride {
+    /// The operator's reason, verbatim (one line).
+    pub reason: String,
+    /// Exactly the brief refusals this waiver let through, sorted.
+    pub waived: Vec<WaivedViolation>,
+    /// Who waived it.
+    pub actor: Actor,
+}
+
 /// The evidence-integrity spec's own record kind: the candidate shape
 /// [`crate::evidence::validate_evidence`] validates. Carries whichever
 /// join keys are relevant to what it attests (join-spine `task_id`
@@ -1304,6 +1321,11 @@ pub struct EvidenceRecord {
     /// external evaluator and its result. Additive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audit: Option<EvidenceAudit>,
+    /// Present only on a record attested under `--override-reason` while
+    /// a subject it attests for had an enforced, unapproved brief (0.16
+    /// M7). Additive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brief_override: Option<BriefOverride>,
 }
 
 impl EvidenceRecord {
@@ -1331,6 +1353,7 @@ impl EvidenceRecord {
             attachments: Vec::new(),
             attachment_drop: None,
             audit: None,
+            brief_override: None,
         }
     }
 
@@ -1380,6 +1403,11 @@ impl EvidenceRecord {
 
     pub fn with_audit(mut self, audit: EvidenceAudit) -> Self {
         self.audit = Some(audit);
+        self
+    }
+
+    pub fn with_brief_override(mut self, brief_override: BriefOverride) -> Self {
+        self.brief_override = Some(brief_override);
         self
     }
 

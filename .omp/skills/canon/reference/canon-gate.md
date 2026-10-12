@@ -239,6 +239,48 @@ actually dropped, a multi-line reason, or a drop without
 `--scenario-id` (task-only evidence has no drop guard). `canon status`
 lists recorded drops (`dropped bindings (N):`; `drops[]` in `--json`).
 
+### Nothing is attested before the brief is approved (`--override-reason`)
+
+The approval is never assumed: the agent writes the brief, stops and
+reports it, and builds nothing for that scope until the human answers.
+`canon evidence add` is the backstop for that stop (0.16 M7). It
+refuses (exit `1`, nothing staged or stored) while a subject the record
+attests for has an enforced, unapproved brief: the newest adopted
+change has a `proposal.md` under the openspec plan sources with no
+`Approved:` line (the check `canon status` and the ship guard use; see
+`canon-subject`). The subjects are the scenario's `@subject` owner for
+`--scenario-id`, and every subject adopting the task's change for
+`--task`:
+
+```
+canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — openspec/changes/c-demo/proposal.md has no `Approved:` line, so the human has not answered it
+canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — "<their words>"` in that proposal.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
+```
+
+A subject with no brief to answer (no openspec source, no adopted change,
+no `proposal.md`) and a scenario no subject owns are unaffected.
+`canon review add` and `canon finding add` are never refused.
+`--override-reason "<one line>"` attests anyway, prints the `waived …`
+lines and `override recorded by `<actor>` for the N brief refusal(s)
+above: <reason>`, and records on the evidence record:
+
+```yaml
+brief_override:
+  reason: the human approved in chat; the line follows
+  waived:
+    - { class: unreviewed-promotion, subject: demo-subject }
+  actor: { agent_id: lead }   # from --actor-id
+```
+
+A blank or multi-line reason exits 2; an override when nothing refused is
+not recorded. `canon status` lists each such record as a `warning:`, and
+`canon gate check` prints them after the result without failing:
+
+```
+brief overrides: 1 evidence record(s) attested before their brief was approved — not failing the gate:
+  evidence for world.demo.01 was attested by `lead` at 2026-10-12T07:00:00Z while the brief of demo-subject was not approved (override: the human approved in chat; the line follows)
+```
+
 ### Review-waiver advisories
 
 A subject moved into a review-scoped status with `canon subject status
@@ -259,8 +301,10 @@ The waiver lasts only until the subject's next status write.
 has no `Approved:` line (the subject's newest adopted change has a
 `proposal.md`; see `canon-subject`), as an `unreviewed-promotion` naming
 the subject. With no brief to answer it prints an advisory and does not
-refuse. `canon gate check` does not read briefs, so a waived brief prints
-no advisory here; `canon status` keeps showing the brief as not approved.
+refuse. Like the evidence refusal above, it is a backstop: the stop is at
+the brief. `canon gate check` does not grade briefs, so a waived ship
+brief prints no advisory here; `canon status` keeps showing the brief as
+not approved.
 
 ### Reviews that predate pinning (checked against their pin)
 

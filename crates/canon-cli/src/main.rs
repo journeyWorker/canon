@@ -815,7 +815,7 @@ enum EvidenceCommand {
         repo: PathBuf,
     },
     /// Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)
-    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).\n\nRE-ATTESTING NEVER DROPS A BINDING SILENTLY (--drop-attachment).\nFor a scenario, a record that leaves out a file the scenario's latest record binds is refused (exit 2) until it re-binds the file (new bytes at the same path are fine) or names it with --drop-attachment <path> (repeatable) --drop-reason <text>. The drop is recorded on the record and listed by canon status. Task-only evidence has no drop guard.\n\nAUDITS (--kind audit).\nRecords an external evaluator's re-audit of one scenario: --evaluator-id, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
+    #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path> or cucumber:<path> also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).\n\nRE-ATTESTING NEVER DROPS A BINDING SILENTLY (--drop-attachment).\nFor a scenario, a record that leaves out a file the scenario's latest record binds is refused (exit 2) until it re-binds the file (new bytes at the same path are fine) or names it with --drop-attachment <path> (repeatable) --drop-reason <text>. The drop is recorded on the record and listed by canon status. Task-only evidence has no drop guard.\n\nNOTHING IS ATTESTED BEFORE THE BRIEF IS APPROVED (--override-reason).\nWhile a subject this record attests for (the scenario's @subject owner, or any subject adopting the task's change) has a newest change whose proposal.md has no `Approved:` line, the add is refused (exit 1, nothing staged): stop, report the brief and wait for the human's answer. --override-reason <text> attests anyway; the reason, the waived subjects and --actor-id are recorded on the record and listed by canon status and canon gate check. A subject with no proposal.md to answer is unaffected; review add and finding add are never refused.\n\nAUDITS (--kind audit).\nRecords an external evaluator's re-audit of one scenario: --evaluator-id, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
     Add {
         /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
@@ -901,6 +901,9 @@ enum EvidenceCommand {
         /// Why the --drop-attachment files are no longer bound (one line, recorded on the record)
         #[arg(long)]
         drop_reason: Option<String>,
+        /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)
+        #[arg(long)]
+        override_reason: Option<String>,
         #[command(flatten)]
         promote: PromoteArgs,
         /// Repo root (default: nearest ancestor with a canon.yaml)
@@ -1478,6 +1481,7 @@ fn main() -> ExitCode {
                 audit_result,
                 drop_attachments,
                 drop_reason,
+                override_reason,
                 promote,
                 repo,
             } => {
@@ -1514,6 +1518,7 @@ fn main() -> ExitCode {
                             audit_result,
                             drop_attachments,
                             drop_reason,
+                            override_reason,
                             promote: promote.flag(),
                         },
                     ) as u8,

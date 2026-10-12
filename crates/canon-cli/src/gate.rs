@@ -154,6 +154,7 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     if let Some(counts) = canon_gate::review_gate::legacy_review_advisory(&gate_context) {
         print!("\nadvisory: {}\n", counts.note());
     }
+    print!("{}", format_brief_overrides(&crate::brief::override_lines(&gate_context)));
     print!("{}", format_unstored_attachments(&canon_gate::unstored_attachments(&gate_context)));
     report.exit_code()
 }
@@ -180,6 +181,20 @@ fn format_unstored_attachments(unstored: &[canon_gate::UnstoredAttachment]) -> S
     );
     for attachment in unstored {
         out.push_str(&format!("  unstored {}\n", attachment.line()));
+    }
+    out
+}
+
+/// Evidence attested under `canon evidence add --override-reason` while
+/// its subject's brief was not approved (0.16 M7). Advisories, never
+/// violations; prints nothing when there are none.
+fn format_brief_overrides(lines: &[String]) -> String {
+    if lines.is_empty() {
+        return String::new();
+    }
+    let mut out = format!("\nbrief overrides: {} evidence record(s) attested before their brief was approved — not failing the gate:\n", lines.len());
+    for line in lines {
+        out.push_str(&format!("  {line}\n"));
     }
     out
 }

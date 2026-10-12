@@ -1,0 +1,19 @@
+canon 0.16.0
+policy: .canon/policy.yaml
+  spec_coverage: require_evidence=false scope=<every scenario>
+  require_cases: failure
+  require_review: <absent>
+  level: custom
+warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+warning: evidence for checkout.pay.01 was attested by `lead` at <ts> while the brief of checkout was not approved (override: the human approved in chat; the line follows)
+
+subjects (1):
+  verifying (1):
+    checkout: 2 scenarios, 2 evidenced, 0 reviewed, 0 open blockers
+      brief: not approved (openspec/changes/c-checkout/proposal.md has no `Approved:` line)
+
+unowned: none
+
+next:
+  # checkout: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses checkout's scenarios and tasks until it is recorded; once the human answers, record their words as `Approved: <who> <when> — "<their words>"` in openspec/changes/c-checkout/proposal.md and run `canon policy approve --by <the human> --note "<their words>"`
+  human: stop and report the brief in openspec/changes/c-checkout/proposal.md; build and attest nothing for checkout until the human answers (one answer approves brief and policy)

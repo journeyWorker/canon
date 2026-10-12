@@ -100,29 +100,63 @@ the brief and the policy. The agent records it at once: an
 `Approved: <who> <when> — "<their words>"` line in the change's
 `proposal.md`, and `canon policy approve --by <the human> --note "<their
 words>"` run on the human's behalf; it never approves without a human
-answer. Inside an approved scope the agent never stops for a human: fixes,
-follow-ups, review rounds and re-reviews go to scenario → implement →
+answer. The approval is the one thing never assumed (M7): the agent
+writes the brief, then stops and reports it, and builds and attests
+nothing for that scope until the human answers. Inside an approved scope
+the agent never stops for a human: fixes, follow-ups, review rounds and
+re-reviews go to scenario → implement →
 evidence → independent review, and a fix stays in the approved change as
 tasks in its `tasks.md` (a new `canon change new` is a new scope). The
 agent moves the subject to `shipped` itself once the ship guard passes,
 unless the brief says the human ships. The skill, the `AGENTS.md` block
-`canon init` writes, and `canon status` carry the rule:
+`canon init` writes, `canon status` and `canon evidence add` carry the
+rule:
 
+- The skill's step 1 and the `AGENTS.md` block say: write the brief,
+  then stop and report it; build and attest nothing for that scope until
+  the human answers. The approval is never assumed, even when the human
+  said they cannot answer until you report: the brief is that report.
+  "When no human can answer" covers one of the brief's questions and work
+  inside an approved scope, never the approval. Step 8 calls the ship
+  refusal and the evidence refusal backstops; the stop is at step 1.
 - `canon status` shows, for each building, verifying and shipped subject,
   and each proposed subject whose newest adopted change has a
   `proposal.md`, whether its brief is approved, read from the `proposal.md` of the
   subject's newest adopted change under the openspec plan sources. An
   older change's approval does not cover a newer scope, and an
   `Approved:` line counts only outside HTML comments and fenced code.
-- An unapproved brief that exists is the only human step: when the newest
-  adopted change has a `proposal.md` with no `Approved:` line, `next:`
-  lists `human: get the brief approved (one human answer covers brief and
-  policy)` and withholds the move-on. With no plan source, no adopted
-  change or no `proposal.md` there is no brief to answer: the `brief:`
-  line still says not approved, as an advisory, and nothing is withheld.
-  With the brief approved (or none to answer) and the guard passing, the
-  ship step says to ship it yourself unless the brief says the human
-  ships.
+- An unapproved brief that exists is the subject's only step, whatever
+  its status: when the newest adopted change has a `proposal.md` with no
+  `Approved:` line, `next:` lists `human: stop and report the brief in
+  <proposal.md>; build and attest nothing for <id> until the human answers
+  (one answer approves brief and policy)` and no evidence, review or ship
+  step for that subject. Its reason adds that `canon evidence add` refuses
+  the subject's scenarios and tasks until the line is recorded. With no
+  plan source, no adopted change or no `proposal.md` there is no brief to
+  answer: the `brief:` line still says not approved, as an advisory, and
+  nothing is withheld. With the brief approved (or none to answer) and the
+  guard passing, the ship step says to ship it yourself unless the brief
+  says the human ships.
+- `canon evidence add` refuses evidence under an unapproved brief (M7).
+  A `--scenario-id` resolves to the scenario's `@subject` owner; a
+  `--task <change>#<n>` resolves to every subject whose adopted changes
+  include that change. For each such subject whose brief is enforced and
+  not approved, it prints `canon evidence add: unreviewed-promotion
+  <subject> — evidence for <scenario or task>: brief not approved — …`
+  naming the `proposal.md`, then a `refused` line telling the agent to
+  stop, report the brief and wait for the human's answer. It exits 1 and
+  stages nothing. Subjects with no brief to answer are not refused, and
+  neither are `canon review add` and `canon finding add`.
+- `canon evidence add --override-reason <one line>` attests anyway. It
+  prints the `waived unreviewed-promotion …` lines and
+  ``override recorded by `<actor>` for the N brief refusal(s) above``, and
+  the record carries `brief_override: {reason, waived: [{class, subject}],
+  actor}` (an optional field on the evidence record, no new record kind).
+  A blank or multi-line reason exits 2. An override when nothing was
+  refused records nothing and says so. `canon status` lists each
+  overridden record as a warning naming the actor, the time, the subject
+  and the reason, and `canon gate check` lists them under a
+  `brief overrides:` advisory that does not fail the gate.
 - The ship guard checks the brief too, through the same check status
   uses, so status never says `ship` for a subject the guard refuses.
   `canon subject status <id> shipped` refuses only where a brief exists:
@@ -132,7 +166,8 @@ unless the brief says the human ships. The skill, the `AGENTS.md` block
   answer. `--override-reason` waives it like a review gap and records it
   in the waiver. With no brief to answer the move prints an advisory and
   is not refused. A brief that says the human ships changes who runs the
-  move, not the check.
+  move, not the check. This refusal and the evidence refusal are
+  backstops: the agent stops at the brief before either fires.
 - `status --json` is `statusVersion: 2`: `next[].actor` (`agent` or
   `human`) and `subjects[].brief` (`approved`, `enforced`, `change`,
   `proposal`, `approval`) are new; `enforced` is true when the missing
@@ -281,12 +316,25 @@ is needed:
   adopted change has a `proposal.md`. While that brief is unapproved the
   human step is the subject's only step, with no `feature new` or
   `scenario new`. A proposed subject with no adopted change or no
-  `proposal.md` is unchanged, and the ship guard still reads the brief on
-  `verifying → shipped` only.
+  `proposal.md` is unchanged. M7 makes the human step the only step at
+  every status and adds the `canon evidence add` refusal (see D1).
 - A promote on write prints one success line naming the committed file
   (`canon evidence add: wrote kind=evidence_record/… — staged and promoted
   in this run; …`), where it printed the promote line and the staged
   file's different name.
+
+**M7: stop at the brief (dogfood eval 3b).** Eval 3b regressed on
+criterion (a), one human stop before `shipped`. The agent wrote the
+brief, and `canon status` showed the human step, but the agent kept
+building for 2 hours with no approval. It read the skill's "when no human
+can answer, write the question into the brief, proceed on the assumption"
+as covering the approval, and step 8 presented brief approval as a ship
+gate only, so it read that only `verifying → shipped` is refused. The
+maintainer decided that the approval is the one thing never assumed, and
+that canon enforces it: `canon evidence add` refuses a scenario or task
+whose subject's brief is enforced and not approved, unless an explicit
+`--override-reason` is given, which is recorded. D1 above describes the
+skill wording, the refusal, the override and the new status step.
 
 *Migration:*
 
@@ -313,10 +361,19 @@ is needed:
   gate red until a new `canon review add` pins it.
 - Record each subject's brief approval as an `Approved:` line in its
   newest adopted change's `proposal.md`; while that file lacks one,
-  `canon status` lists getting the brief approved as the human step
-  instead of the ship step, and `canon subject status <id> shipped`
-  refuses. Subjects with no adopted change or no `proposal.md` ship as
-  before, with an advisory.
+  `canon status` lists the human step (stop and report the brief) as the
+  subject's only step, `canon evidence add` refuses its scenarios and
+  tasks, and `canon subject status <id> shipped` refuses. Subjects with no
+  adopted change or no `proposal.md` ship as before, with an advisory.
+- An agent or script that attests evidence before the brief's `Approved:`
+  line exists now gets exit 1 from `canon evidence add`. Record the
+  human's answer first, or pass `--override-reason <text>`, which is
+  recorded on the evidence record. Repos whose subjects have no
+  `proposal.md` (canon's own and Kino's existing subjects) see no change.
+- Scripts that match the `canon status` human step must match the new
+  text: `human: stop and report the brief in <proposal.md>; build and
+  attest nothing for <id> until the human answers (one answer approves
+  brief and policy)`.
 - Scripts that parse `canon status --json` see `statusVersion: 2`, with
   `policy.level`, `subjects[].brief` and `next[].actor`.
 
@@ -326,11 +383,13 @@ prints the version re-blessed for `canon 0.16.0`: the `status-*` cases,
 `gate-check-audit-sampling-fixed-seed`, `policy-approve-and-advisory`,
 `policy-approve-changed-advisory` and `review-pin-stale-spec`, and the new
 `init-policy-light-status`, `init-policy-refused`,
-`skills-check-outdated-lock`, `status-brief-unapproved` and
-`status-refreshes-stale-index`. Existing cases re-blessed:
+`skills-check-outdated-lock`, `status-brief-unapproved`,
+`status-refreshes-stale-index`, `evidence-add-refused-unapproved-brief`
+and `evidence-add-brief-override`. Existing cases re-blessed:
 
 - `context-json-policy-summary` — the schema lists the review's
-  `artifacts` and the scenario's `removed`.
+  `artifacts`, the scenario's `removed`, and the evidence record's
+  `brief_override` (M7).
 - `evidence-add-drop-attachment`, `gate-check-audit-false-success`,
   `policy-approve-and-advisory`, `policy-approve-changed-advisory`,
   `status-gaps`, `status-no-scenarios`, `status-ship-ready`,
@@ -379,6 +438,12 @@ prints the version re-blessed for `canon 0.16.0`: the `status-*` cases,
 - `evidence-add-promote-on-write`, `status-refreshes-stale-index` (M6) —
   a promote on write prints one line, `wrote <committed file>`, instead of
   the promote line and `staged <staged file>`.
+- `status-brief-unapproved`, `status-brief-proposed`,
+  `subject-ship-refused-unapproved-brief` (M7) — the human step reads
+  `human: stop and report the brief in <proposal.md>; build and attest
+  nothing for <id> until the human answers (one answer approves brief and
+  policy)`, and its reason adds that `canon evidence add` refuses the
+  subject's scenarios and tasks until the line is recorded.
 
 New cases: `evidence-add-promote-on-write`,
 `evidence-add-refused-malformed-write-config`,
@@ -388,7 +453,9 @@ New cases: `evidence-add-promote-on-write`,
 `review-add-refused-artifact-outside-repo`, `skills-check-outdated-lock`,
 `skills-doctor-competing-skill`, `status-brief-unapproved`,
 `status-brief-proposed` (M6), `status-refreshes-stale-index`,
-`subject-ship-refused-unapproved-brief`. Every other case is unchanged.
+`subject-ship-refused-unapproved-brief`,
+`evidence-add-refused-unapproved-brief` (M7),
+`evidence-add-brief-override` (M7). Every other case is unchanged.
 
 **Closed issues:** #8, #9, #10, #11, #12, #21, #22, #23. **Deferred:**
 #13 (Codex eval), as the maintainer asked.

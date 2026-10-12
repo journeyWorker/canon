@@ -28,21 +28,23 @@
 //! (the rest are counted, never listed). Subjects are visited closest to
 //! done first: verifying, building, specced, proposed, then shipped.
 //!
-//! # The brief (0.16 D1)
+//! # The brief (0.16 D1, M7)
 //! One human answer approves a subject's scope: its brief and the
 //! policy. [`crate::brief::brief_of`] decides whether a subject's brief
 //! is approved, and the `verifying → shipped` guard of `canon subject
-//! status` refuses on the same call, so status and the guard cannot
-//! disagree. A `building`, `verifying` or `shipped` subject whose newest
-//! change has a `proposal.md` without the `Approved:` line (the brief is
-//! enforced) gets the one `human` step status ever emits, and no status
-//! advance. With no `proposal.md` to answer, the `brief:` line still says
-//! not approved, as an advisory, and nothing is withheld. A `proposed`
-//! subject shows its brief once its newest change has a `proposal.md`;
-//! while that brief is unapproved the human step is the subject's only
-//! step, so nothing suggests starting the work (no `feature new` or
-//! `scenario new`) before the human answers. Every other step is the
-//! agent's.
+//! status` and `canon evidence add` refuse on the same call, so status
+//! and the guards cannot disagree. A subject whose newest change has a
+//! `proposal.md` without the `Approved:` line (the brief is enforced)
+//! gets the one `human` step status ever emits, and it is the subject's
+//! only step, whatever its status: the agent stops and reports the
+//! brief, and nothing is built or attested for the subject (no `feature
+//! new`, `scenario new`, `evidence add`, review or status advance)
+//! before the human answers. With no `proposal.md` to answer, the
+//! `brief:` line still says not approved, as an advisory, and nothing is
+//! withheld. A `proposed` subject shows its brief once its newest change
+//! has a `proposal.md`. Evidence attested under a brief
+//! override is listed as a warning ([`crate::brief::override_lines`]).
+//! Every other step is the agent's.
 //!
 //! # No bookkeeping steps (0.16 M6)
 //! Readers refresh a stale scenario index themselves
@@ -330,6 +332,7 @@ pub fn resolve(repo: &Path) -> StatusReport {
     if let Some(counts) = legacy_review_advisory(&ctx) {
         warnings.push(counts.note());
     }
+    warnings.extend(crate::brief::override_lines(&ctx));
 
     let joins = Joins { verdicts: latest_verdicts(&ctx), blockers: open_blockers(&ctx) };
     let subjects = latest_subjects(&ctx);
@@ -445,9 +448,9 @@ pub fn resolve(repo: &Path) -> StatusReport {
             actor: StepActor::Agent,
         });
     } else {
-        // A `proposed` subject waiting on its brief starts no work, so it
-        // asks for no feature either.
-        if scenarios.is_empty() && summaries.iter().any(|(subject, summary)| !awaits_brief(subject, summary)) {
+        // A subject waiting on its brief starts no work, so it asks for
+        // no feature either.
+        if scenarios.is_empty() && summaries.iter().any(|(_, summary)| !awaits_brief(summary)) {
             next.push(NextStep {
                 actor: StepActor::Agent,
                 command: format!("canon feature new <area>.<surface> --title \"<feature>\"{}", project_flag(&roots, None)),
@@ -696,18 +699,17 @@ fn project_flag(roots: &[ProjectId], project: Option<&str>) -> String {
     format!(" --project {}", project.unwrap_or("<root-id>"))
 }
 
-/// Whether `subject` is `proposed` and its brief is enforced and not
-/// approved (module doc): the human answers before any work starts.
-fn awaits_brief(subject: &Subject, summary: &SubjectSummary) -> bool {
-    subject.status == SubjectStatus::Proposed && summary.brief.as_ref().is_some_and(|brief| brief.enforced)
+/// Whether `subject`'s brief is enforced and not approved (module doc):
+/// the human answers before anything is built or attested for it.
+fn awaits_brief(summary: &SubjectSummary) -> bool {
+    summary.brief.as_ref().is_some_and(|brief| brief.enforced)
 }
 
 /// The per-subject `next:` rules (module doc), each producing at most one
-/// step. An enforced unapproved brief comes first, and for a `proposed`
-/// subject it is the only step; then the gap rules; the status advance
-/// only when none fired and `may_advance` (no blocking policy gap).
-/// `promote_manual` is whether `canon.yaml` keeps writes staged for
-/// `canon gate promote`.
+/// step. An enforced unapproved brief is the subject's only step; else
+/// the gap rules; the status advance only when none fired and
+/// `may_advance` (no blocking policy gap). `promote_manual` is whether
+/// `canon.yaml` keeps writes staged for `canon gate promote`.
 #[allow(clippy::too_many_arguments)]
 fn subject_steps(
     ctx: &GateContext,
@@ -728,13 +730,11 @@ fn subject_steps(
         let proposal = brief.proposal.as_deref().unwrap_or_default();
         next.push(NextStep {
             actor: StepActor::Human,
-            command: "get the brief approved (one human answer covers brief and policy)".into(),
+            command: format!("stop and report the brief in {proposal}; build and attest nothing for {id} until the human answers (one answer approves brief and policy)"),
             why: format!(
-                "{id}: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope); once the human answers, record their words as `Approved: <who> <when> — \"<their words>\"` in {proposal} and run `canon policy approve --by <the human> --note \"<their words>\"`"
+                "{id}: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses {id}'s scenarios and tasks until it is recorded; once the human answers, record their words as `Approved: <who> <when> — \"<their words>\"` in {proposal} and run `canon policy approve --by <the human> --note \"<their words>\"`"
             ),
         });
-    }
-    if awaits_brief(subject, summary) {
         return;
     }
 
