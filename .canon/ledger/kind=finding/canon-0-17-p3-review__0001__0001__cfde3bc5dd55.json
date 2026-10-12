@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-017-p3",
+    "role": "reviewer",
+    "session_id": "review-017-p3"
+  },
+  "at": "2026-10-12T11:20:02.836557Z",
+  "change_id": "canon-0-17-p3-review",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/skills.rs:658-682",
+  "kind": "finding",
+  "resolution_sha": "fb880c6e97e5ea641ad8b24f8f7664a94a7d212b",
+  "reviewed_sha": "0a1349b78435b8be0ce851dd96b21196ef950041",
+  "reviewer": "canon-reviewer-017-p3",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "skills: rewrite hard-coded LF and broke CRLF canon.yaml files"
+}
