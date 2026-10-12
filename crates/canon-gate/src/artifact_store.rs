@@ -874,7 +874,10 @@ mod tests {
         assert!(matches!(busy, StoreError::Locked(_)), "{busy}");
         assert!(busy.to_string().contains(paths::ARTIFACT_STORE_LOCK_FILE) && busy.to_string().contains("retry"), "{busy}");
         drop(first);
-        let second = StoreLock::acquire_within(dir.path(), std::time::Duration::ZERO).unwrap();
+        // A parallel test that forks a child briefly holds a copy of the fd
+        // until the child execs, so the release is not instant: retry within
+        // a bound, as `acquire` does.
+        let second = StoreLock::acquire_within(dir.path(), std::time::Duration::from_secs(5)).unwrap();
         assert_eq!(second.store(&sha(b"v1"), &b"v1"[..]).unwrap(), StoreOutcome::Stored);
         assert!(dir.path().join(paths::ARTIFACT_STORE_LOCK_FILE).is_file(), "the lock file is never deleted");
     }
