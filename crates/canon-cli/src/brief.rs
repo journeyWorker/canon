@@ -11,6 +11,16 @@
 //! openspec plan sources (no record kind), outside HTML comments and
 //! code fences. Fixes live as tasks in the approved change, so the
 //! subject's newest adopted change is its current scope.
+//!
+//! # Enforced only where a brief exists
+//! The approval is enforced ([`BriefStatus::enforced`]) only when there
+//! is a brief a human can answer: the newest adopted change has a
+//! `proposal.md` under the plan sources, and it carries no `Approved:`
+//! line. Then status lists the human step and withholds the move-on,
+//! and the ship guard refuses. With no plan source, no adopted change
+//! or no `proposal.md`, there is nothing to answer: status still shows
+//! the brief as not approved, the guard prints it as an advisory, and
+//! neither blocks.
 
 use std::path::{Path, PathBuf};
 
@@ -26,6 +36,11 @@ use serde::Serialize;
 #[serde(rename_all = "camelCase")]
 pub struct BriefStatus {
     pub approved: bool,
+    /// Whether the missing approval blocks (module doc): not approved,
+    /// and the newest adopted change has a `proposal.md` to carry it.
+    /// Then status asks the human and the ship guard refuses; otherwise
+    /// both only report it.
+    pub enforced: bool,
     /// The newest adopted change (the last in `change_ids`, adoption
     /// order), whose `proposal.md` must carry the approval. Omitted when
     /// the subject adopts no change.
@@ -63,13 +78,14 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject) -> Optio
         return None;
     }
     let Some(change) = subject.change_ids.last() else {
-        return Some(BriefStatus { approved: false, change: None, proposal: None, approval: None });
+        return Some(BriefStatus { approved: false, enforced: false, change: None, proposal: None, approval: None });
     };
     let path = plan_roots.iter().find_map(|root| canon_ingest::plan_adapters::openspec::proposal_path(root, change));
     let text = path.as_ref().and_then(|path| std::fs::read_to_string(path).ok()).unwrap_or_default();
     let approval = approval_line(&text).map(str::to_string);
     Some(BriefStatus {
         approved: approval.is_some(),
+        enforced: approval.is_none() && path.is_some(),
         change: Some(change.as_str().to_string()),
         proposal: path.map(|path| path.strip_prefix(repo).unwrap_or(&path).display().to_string()),
         approval,

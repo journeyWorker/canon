@@ -45,18 +45,22 @@
 //! [`is_valid_transition`] chain; an off-chain transition is refused
 //! (exit `2`), the record likewise unchanged.
 //!
-//! # `verifying → shipped` needs the approved brief (0.16 D1)
-//! The same transition also refuses when the subject's brief is not
-//! approved, through [`crate::brief::brief_of`], the one call `canon
-//! status` reports the brief with: its newest adopted change's
-//! `proposal.md` carries no `Approved:` line outside HTML comments and
-//! code fences. The refusal names that `proposal.md` and says a human
-//! must answer the brief; the agent records the line only from that
-//! answer. It is an `unreviewed-promotion` naming the subject, a review
-//! check like those below, so `--override-reason` lets it through and
-//! records it in the waiver. A brief that says the human ships changes
-//! who runs the transition, not the guard. It runs whatever the policy
-//! says, as status reports the brief whatever the policy says.
+//! # `verifying → shipped` needs the approved brief where one exists (0.16 D1)
+//! The same transition also refuses when the subject's brief is
+//! enforced and not approved, through [`crate::brief::brief_of`], the
+//! one call `canon status` reports the brief with: its newest adopted
+//! change has a `proposal.md` under the plan sources, and it carries no
+//! `Approved:` line outside HTML comments and code fences. The refusal
+//! names that `proposal.md` and says a human must answer the brief; the
+//! agent records the line only from that answer. It is an
+//! `unreviewed-promotion` naming the subject, a review check like those
+//! below, so `--override-reason` lets it through and records it in the
+//! waiver. With no plan source, no adopted change or no `proposal.md`
+//! there is no brief to answer: the guard prints an advisory saying the
+//! brief is not approved and does not refuse. A brief that says the
+//! human ships changes who runs the transition, not the guard. It runs
+//! whatever the policy says, as status reports the brief whatever the
+//! policy says.
 //!
 //! # `spec_coverage.require_review` guards every transition into its scope
 //! With the policy present (issue #2), a transition whose target status
@@ -801,8 +805,10 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
 
 /// The `verifying → shipped` brief check (module doc): an
 /// `unreviewed-promotion` naming the subject when [`crate::brief::brief_of`],
-/// the decision `canon status` reports, reads its brief as not approved.
-/// `None` when the brief is approved or the subject needs none.
+/// the decision `canon status` reports, reads its brief as enforced and
+/// not approved. An unapproved brief that is not enforced (nothing to
+/// answer) prints an advisory instead. `None` when the brief is
+/// approved, not enforced, or the subject needs none.
 fn brief_violation(repo: &Path, subject: &Subject) -> Option<Violation> {
     let (roots, unreadable) = match crate::brief::plan_roots(repo) {
         Ok(roots) => (roots, None),
@@ -810,19 +816,21 @@ fn brief_violation(repo: &Path, subject: &Subject) -> Option<Violation> {
     };
     let brief = crate::brief::brief_of(repo, &roots, subject).filter(|brief| !brief.approved)?;
     let id = subject.subject_id.as_str();
-    let answer = |place: &str| format!("a human must answer the brief, and the agent records `Approved: <who> <when> — \"<their words>\"` {place} only from that answer");
-    let detail = match (unreadable, &brief.proposal, &brief.change) {
-        (Some(e), _, _) => format!("canon.yaml's `plans:` section cannot be read ({e}), so no brief reads as approved; `canon init --check-config` names the problem"),
-        (None, Some(proposal), _) => format!("{proposal} has no `Approved:` line; {}", answer("there")),
-        (None, None, Some(change)) => {
-            format!("its newest adopted change `{change}` has no proposal.md under the openspec plan sources; write the brief there; {}", answer("in it"))
-        }
-        (None, None, None) => format!(
-            "{id} adopts no change to carry the brief; write one with `canon change new <slug> --subject {id} --title \"<title>\"`; {}",
-            answer("in its proposal.md")
-        ),
-    };
-    Some(Violation::new(FailureClass::UnreviewedPromotion, id, format!("verifying → shipped: brief not approved — {detail}")))
+    if !brief.enforced {
+        let why = match (unreadable, &brief.change) {
+            (Some(e), _) => format!("canon.yaml's `plans:` section cannot be read ({e}), so no proposal.md is found"),
+            (None, Some(change)) => format!("its newest adopted change `{change}` has no proposal.md under the openspec plan sources"),
+            (None, None) => format!("{id} adopts no change"),
+        };
+        eprintln!("canon subject status: advisory: {id}'s brief is not approved — {why}, so there is no brief to answer and shipping is not refused");
+        return None;
+    }
+    let proposal = brief.proposal.as_deref().unwrap_or_default();
+    Some(Violation::new(
+        FailureClass::UnreviewedPromotion,
+        id,
+        format!("verifying → shipped: brief not approved — {proposal} has no `Approved:` line; a human must answer the brief, and the agent records `Approved: <who> <when> — \"<their words>\"` there only from that answer"),
+    ))
 }
 
 #[cfg(test)]

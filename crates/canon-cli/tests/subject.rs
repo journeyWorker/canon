@@ -1021,7 +1021,10 @@ fn subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line
     );
     assert!(!err.contains("uncovered-cell") && !err.contains("world.demo.01"), "only the brief refuses: {err}");
     assert_eq!(current_subject(dir.path())["status"], "verifying", "a refusal leaves the record unchanged");
-    assert_eq!(status_brief(dir.path()), serde_json::json!({"approved": false, "change": "c-demo", "proposal": "openspec/changes/c-demo/proposal.md"}));
+    assert_eq!(
+        status_brief(dir.path()),
+        serde_json::json!({"approved": false, "enforced": true, "change": "c-demo", "proposal": "openspec/changes/c-demo/proposal.md"})
+    );
 
     write_proposal(dir.path(), "c-demo", &format!("Status: approved.\n\n{APPROVED}\n"));
     let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
@@ -1078,4 +1081,29 @@ fn subject_lifecycle_26_an_override_ships_an_unapproved_brief_and_records_the_wa
             "actor": {"agent_id": "lead"}
         })
     );
+}
+
+/// subject.lifecycle.27: a subject that adopts no change has no brief a
+/// human could answer, so `verifying → shipped` passes its gates with an
+/// advisory that the brief is not approved and no refusal; status reads
+/// the same brief as not approved and not enforced, with no human step.
+#[test]
+fn subject_lifecycle_27_a_subject_with_no_adopted_change_ships_with_an_advisory() {
+    let dir = repo();
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
+    seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
+    assert_eq!(status_brief(dir.path()), serde_json::json!({"approved": false, "enforced": false}));
+    let status = run(dir.path(), &["status"]);
+    assert!(!stdout(&status).contains("human:"), "nothing to answer, so no human step: {}", stdout(&status));
+    assert!(stdout(&status).contains("      brief: not approved (no adopted change; advisory, nothing to approve yet)\n"), "{}", stdout(&status));
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(
+        stderr(&out),
+        "canon subject status: advisory: demo-subject's brief is not approved — demo-subject adopts no change, so there is no brief to answer and shipping is not refused\n"
+    );
+    let subject = current_subject(dir.path());
+    assert_eq!(subject["status"], "shipped");
+    assert!(subject.get("status_override").is_none(), "nothing was waived: {subject}");
 }

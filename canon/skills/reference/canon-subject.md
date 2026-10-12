@@ -145,23 +145,27 @@ empty set; so is one whose `scenario` records route away from the
 gate's rung. Each refusal prints by failure class (`uncovered-cell`),
 exits 1, and the status stays `verifying`. `retired` is not gated.
 
-**The brief (0.16):** `verifying → shipped` also refuses while the
-subject's brief is not approved, read exactly as `canon status` reads it
-(one shared check, so status says `ship` only when this passes): the
-`proposal.md` of the subject's newest adopted change must carry an
-`Approved:` line outside HTML comments and code fences. It runs with or
-without a policy. The refusal is an `unreviewed-promotion` naming the
-subject, and says what to do:
+**The brief (0.16):** `verifying → shipped` also refuses where a brief
+exists and is not approved, read exactly as `canon status` reads it (one
+shared check, so status says `ship` only when this passes): the subject's
+newest adopted change has a `proposal.md` under the openspec plan sources,
+and it carries no `Approved:` line outside HTML comments and code fences.
+It runs with or without a policy. The refusal is an `unreviewed-promotion`
+naming the subject, and says what to do:
 
 ```
 canon subject status: unreviewed-promotion demo-subject — verifying → shipped: brief not approved — openspec/changes/c-demo/proposal.md has no `Approved:` line; a human must answer the brief, and the agent records `Approved: <who> <when> — "<their words>"` there only from that answer
 canon subject status: refused — get the human's answer to the brief and record it as its `Approved:` line, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject
 ```
 
-Never write the line without the human's answer. A subject with no
-adopted change, or whose change has no `proposal.md`, is refused the same
-way, naming what is missing. A brief that says the human ships changes who
-runs the transition, not the check.
+Never write the line without the human's answer. When there is no brief to
+answer (no openspec plan source, no adopted change, or a change with no
+`proposal.md`), the move is not refused: it prints
+`canon subject status: advisory: <id>'s brief is not approved — <why>, so
+there is no brief to answer and shipping is not refused`, and status shows
+the brief as not approved, as an advisory. `subjects[].brief.enforced` in
+`canon status --json` says which case applies. A brief that says the human
+ships changes who runs the transition, not the check.
 
 ### The review guard (`spec_coverage.require_review`, opt-in)
 
@@ -354,15 +358,18 @@ uses, so status and the gate cannot disagree about a gap:
   owning root for a missing case, `<root-id>` (the reason lists the
   roots) for a subject that owns no scenario yet.
 - **The one human step.** Every step is the agent's to run except one:
-  a subject whose brief is not approved gets
+  a subject whose brief is enforced (its newest change has a
+  `proposal.md` with no `Approved:` line) gets
   `human: get the brief approved (one human answer covers brief and policy)`,
-  whose reason names the newest change's `proposal.md` to write the
-  `Approved:` line in (or `canon change new` when the subject has no
-  change) and
+  whose reason names that `proposal.md` and
   `canon policy approve --by <the human> --note "<their words>"`. Until
   the line exists the subject is not suggested to move on, and
-  `canon subject status <id> shipped` refuses on the same check. Once it
-  does, a ship-ready verifying subject gets the agent's own
+  `canon subject status <id> shipped` refuses on the same check. A subject
+  with no brief to answer gets no human step; its `brief:` line says
+  `not approved (no adopted change; advisory, nothing to approve yet)` or
+  ``not approved (change `<id>` has no proposal.md; advisory, nothing to
+  approve yet)`` and nothing is withheld. Once nothing blocks, a
+  ship-ready verifying subject gets the agent's own
   `canon subject status <id> shipped`; status never asks a human to ship.
 
 Status fails closed rather than suggest progress the gate would refuse:

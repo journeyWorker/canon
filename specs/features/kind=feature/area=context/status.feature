@@ -191,10 +191,11 @@ Feature: context status
     Given a verifying subject whose scenarios are all evidenced and reviewed, and whose newest change's proposal.md has no "Approved:" line
     And a building subject that adopts no change
     When canon status runs
-    Then each subject gets one step whose actor is human: get the brief approved, one human answer covering brief and policy
-    And its reason names where the "Approved:" line goes and the canon policy approve --by <the human> --note command
-    And neither subject is suggested to move on
-    And the human form prints the step as "human:" and each subject's brief as not approved
+    Then the verifying subject gets one step whose actor is human: get the brief approved, one human answer covering brief and policy
+    And its reason names the proposal.md the "Approved:" line goes in and the canon policy approve --by <the human> --note command
+    And the verifying subject is not suggested to move on
+    And the subject with no change has no brief to answer, so it gets no human step and its next step is the agent's
+    And the human form prints the step as "human:" and both briefs as not approved, the one with no change as an advisory
 
   # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:context-capability
@@ -239,8 +240,8 @@ Feature: context status
     And a building subject whose older change is approved and whose newer change has no proposal.md
     When canon status runs
     Then each brief reads as not approved and names the newest change
-    And each subject gets the human step, naming the newest change's proposal.md or the change itself
-    And neither subject is suggested to move on, so the ship step never appears
+    And the verifying subject gets the human step naming the newest change's proposal.md, and is not suggested to ship
+    And the building subject's newest change has no brief to answer, so it gets no human step and its brief line is an advisory
 
   # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
   @subject:context-capability

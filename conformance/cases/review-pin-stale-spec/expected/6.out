@@ -9,10 +9,10 @@ warning: policy not approved: .canon/policy.yaml has no approval record (.canon/
 subjects (1):
   verifying (1):
     cart: 1 scenarios, 1 evidenced, 1 reviewed, 0 open blockers
-      brief: not approved (change `c-cart` has no proposal.md)
+      brief: not approved (change `c-cart` has no proposal.md; advisory, nothing to approve yet)
 
 unowned: none
 
 next:
-  # cart: its newest adopted change `c-cart` has no proposal.md under the openspec plan sources; write its brief there, and once the human answers, record their words as `Approved: <who> <when> — "<their words>"` in it and run `canon policy approve --by <the human> --note "<their words>"`
-  human: get the brief approved (one human answer covers brief and policy)
+  # cart: every scenario is evidenced and reviewed, with no blocker or case gap, and no brief is written to approve; ship it yourself unless the brief says the human ships
+  canon subject status cart shipped --actor-id <unit>

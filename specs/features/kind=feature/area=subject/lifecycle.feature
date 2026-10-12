@@ -259,3 +259,14 @@ Feature: subject lifecycle
     When the subject is moved to shipped with an override reason
     Then the subject ships and the command names the waived brief check
     And the subject record carries the reason, the actor and the waived unreviewed-promotion naming the subject
+
+  # canon: {"schema":1,"at":"2026-10-12T03:00:00Z","actor":{"agent_id":"canon-scaffold"}}
+  @subject:subject-lifecycle
+  @case:edge
+  @subject.lifecycle.27
+  Scenario: A subject with no adopted change ships with an advisory that its brief is not approved
+    Given a verifying subject that passes every technical gate and adopts no change
+    When the subject is moved to shipped
+    Then it ships, and the command prints one advisory that the brief is not approved because there is no brief to answer
+    And no waiver is recorded
+    And status shows the brief as not approved and not enforced, with no human step

@@ -40,6 +40,7 @@
       "missingCases": [],
       "brief": {
         "approved": true,
+        "enforced": false,
         "change": "c-cart",
         "proposal": "openspec/changes/c-cart/proposal.md",
         "approval": "Journey 2026-10-08 — \"approved, go ahead\""

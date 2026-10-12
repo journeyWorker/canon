@@ -34,6 +34,7 @@
       "missingCases": [],
       "brief": {
         "approved": true,
+        "enforced": false,
         "change": "c-checkout",
         "proposal": "openspec/changes/c-checkout/proposal.md",
         "approval": "Journey 2026-10-11 — \"승인. 네 가정대로 진행\""

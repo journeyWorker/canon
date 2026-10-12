@@ -525,7 +525,8 @@ fn context_status_62_ship_is_the_agents_step_once_the_brief_is_approved() {
 
 /// context.status.61: a ship-ready subject whose newest adopted change's
 /// proposal.md carries no `Approved:` line gets the one human step and no
-/// move-on; a subject with no change at all is told where the brief goes.
+/// move-on; a subject with no change at all has no brief to answer, so it
+/// gets no human step and its brief line is an advisory.
 #[test]
 fn context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_move_on() {
     let dir = repo();
@@ -536,21 +537,27 @@ fn context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_m
     seed_evidence(dir.path(), "world.bare.01", EvidenceVerdict::Faithful);
 
     let report = status_json(dir.path());
-    assert_eq!(human_steps(&report), ["demo-subject", "bare-subject"], "{report}");
-    assert!(commands(&report).iter().all(|c| !c.starts_with("canon subject status")), "no move-on without an approved brief: {report}");
+    assert_eq!(human_steps(&report), ["demo-subject"], "{report}");
+    assert!(commands(&report).iter().all(|c| !c.starts_with("canon subject status demo-subject")), "no move-on without an approved brief: {report}");
+    assert!(
+        report["next"].as_array().unwrap().iter().any(|n| n["actor"] == "agent" && n["why"].as_str().unwrap().starts_with("bare-subject")),
+        "nothing to answer withholds nothing: the subject with no change gets the agent's next step: {report}"
+    );
     let whys: Vec<&str> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").map(|n| n["why"].as_str().unwrap()).collect();
     assert!(whys[0].contains("openspec/changes/c-demo-subject/proposal.md"), "{}", whys[0]);
     for why in &whys {
         assert!(why.contains("Approved: <who> <when>") && why.contains("canon policy approve --by <the human> --note"), "{why}");
     }
-    assert!(whys[1].contains("canon change new <slug> --subject bare-subject"), "{}", whys[1]);
     let demo = subject(&report, "demo-subject");
-    assert_eq!(demo["brief"], serde_json::json!({"approved": false, "change": "c-demo-subject", "proposal": "openspec/changes/c-demo-subject/proposal.md"}));
-    assert_eq!(subject(&report, "bare-subject")["brief"], serde_json::json!({"approved": false}));
+    assert_eq!(
+        demo["brief"],
+        serde_json::json!({"approved": false, "enforced": true, "change": "c-demo-subject", "proposal": "openspec/changes/c-demo-subject/proposal.md"})
+    );
+    assert_eq!(subject(&report, "bare-subject")["brief"], serde_json::json!({"approved": false, "enforced": false}));
 
     let text = stdout(&run(dir.path(), &["status"]));
     assert!(text.contains("      brief: not approved (openspec/changes/c-demo-subject/proposal.md has no `Approved:` line)\n"), "{text}");
-    assert!(text.contains("      brief: not approved (no adopted change)\n"), "{text}");
+    assert!(text.contains("      brief: not approved (no adopted change; advisory, nothing to approve yet)\n"), "{text}");
     assert!(text.contains(&format!("\n  human: {BRIEF_STEP}\n")), "{text}");
 }
 
@@ -572,11 +579,11 @@ fn context_status_60_status_reads_the_approval_from_the_changes_proposal() {
     let words = APPROVED.strip_prefix("Approved: ").unwrap();
     assert_eq!(
         subject(&report, "demo-subject")["brief"],
-        serde_json::json!({"approved": true, "change": "c-second", "proposal": "openspec/changes/c-second/proposal.md", "approval": words})
+        serde_json::json!({"approved": true, "enforced": false, "change": "c-second", "proposal": "openspec/changes/c-second/proposal.md", "approval": words})
     );
     assert_eq!(
         subject(&report, "done-subject")["brief"],
-        serde_json::json!({"approved": true, "change": "c-done-subject", "proposal": "openspec/changes/c-done-subject/proposal.md", "approval": words}),
+        serde_json::json!({"approved": true, "enforced": false, "change": "c-done-subject", "proposal": "openspec/changes/c-done-subject/proposal.md", "approval": words}),
         "a shipped subject shows its brief in full"
     );
     assert!(subject(&report, "early-subject").get("brief").is_none(), "a specced subject carries no brief field");
@@ -653,19 +660,20 @@ fn context_status_65_an_older_changes_approval_does_not_cover_a_newer_change() {
     let report = status_json(dir.path());
     assert_eq!(
         subject(&report, "demo-subject")["brief"],
-        serde_json::json!({"approved": false, "change": "c-scope-two", "proposal": "openspec/changes/c-scope-two/proposal.md"})
+        serde_json::json!({"approved": false, "enforced": true, "change": "c-scope-two", "proposal": "openspec/changes/c-scope-two/proposal.md"})
     );
-    assert_eq!(subject(&report, "other-subject")["brief"], serde_json::json!({"approved": false, "change": "c-other-new"}), "no proposal.md for the newest change");
-    let mut humans = human_steps(&report);
-    humans.sort();
-    assert_eq!(humans, ["demo-subject", "other-subject"], "{report}");
-    assert!(commands(&report).iter().all(|c| !c.starts_with("canon subject status")), "an older approval never unlocks the ship step: {report}");
+    assert_eq!(
+        subject(&report, "other-subject")["brief"],
+        serde_json::json!({"approved": false, "enforced": false, "change": "c-other-new"}),
+        "no proposal.md for the newest change"
+    );
+    assert_eq!(human_steps(&report), ["demo-subject"], "a change with no proposal.md has no brief to answer: {report}");
+    assert!(!commands(&report).iter().any(|c| c.starts_with("canon subject status demo-subject")), "an older approval never unlocks the ship step: {report}");
     let why = |id: &str| report["next"].as_array().unwrap().iter().find(|n| n["actor"] == "human" && n["why"].as_str().unwrap().starts_with(id)).unwrap()["why"].as_str().unwrap().to_string();
     assert!(why("demo-subject").contains("openspec/changes/c-scope-two/proposal.md"), "{}", why("demo-subject"));
-    assert!(why("other-subject").contains("`c-other-new`"), "{}", why("other-subject"));
     let text = stdout(&run(dir.path(), &["status"]));
     assert!(text.contains("      brief: not approved (openspec/changes/c-scope-two/proposal.md has no `Approved:` line)\n"), "{text}");
-    assert!(text.contains("      brief: not approved (change `c-other-new` has no proposal.md)\n"), "{text}");
+    assert!(text.contains("      brief: not approved (change `c-other-new` has no proposal.md; advisory, nothing to approve yet)\n"), "{text}");
 }
 
 /// context.status.64: the brief is read under canon.yaml's openspec plan
@@ -701,7 +709,7 @@ fn context_status_64_status_reads_briefs_under_the_configured_openspec_sources()
 
     std::fs::write(dir.path().join("canon.yaml"), format!("{CANON_YAML}plans:\n  sources: []\n")).unwrap();
     let report = status_json(dir.path());
-    assert_eq!(subject(&report, "old-subject")["brief"], serde_json::json!({"approved": false, "change": "c-old"}), "{report}");
+    assert_eq!(subject(&report, "old-subject")["brief"], serde_json::json!({"approved": false, "enforced": false, "change": "c-old"}), "{report}");
 }
 
 #[test]

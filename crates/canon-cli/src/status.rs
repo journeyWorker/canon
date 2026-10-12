@@ -34,9 +34,11 @@
 //! is approved, and the `verifying → shipped` guard of `canon subject
 //! status` refuses on the same call, so status and the guard cannot
 //! disagree. A `building`, `verifying` or `shipped` subject whose newest
-//! change does not carry the `Approved:` line gets the one `human` step
-//! status ever emits, and no status advance; every other step is the
-//! agent's.
+//! change has a `proposal.md` without the `Approved:` line (the brief is
+//! enforced) gets the one `human` step status ever emits, and no status
+//! advance. With no `proposal.md` to answer, the `brief:` line still says
+//! not approved, as an advisory, and nothing is withheld. Every other
+//! step is the agent's.
 //!
 //! # Failing closed
 //! Status never suggests progress the gate would refuse. A corpus kind
@@ -644,7 +646,7 @@ fn project_flag(roots: &[ProjectId], project: Option<&str>) -> String {
 }
 
 /// The per-subject `next:` rules (module doc), each producing at most one
-/// step. An unapproved brief comes first; then the gap rules; the status
+/// step. An enforced unapproved brief comes first; then the gap rules; the status
 /// advance only when none fired and `may_advance` (no blocking policy
 /// gap).
 #[allow(clippy::too_many_arguments)]
@@ -662,23 +664,14 @@ fn subject_steps(
     let status = subject.status;
     let before = next.len();
 
-    if let Some(brief) = summary.brief.as_ref().filter(|brief| !brief.approved) {
-        let record = "record their words as `Approved: <who> <when> — \"<their words>\"`";
-        let approve = "and run `canon policy approve --by <the human> --note \"<their words>\"`";
+    if let Some(brief) = summary.brief.as_ref().filter(|brief| brief.enforced) {
+        let proposal = brief.proposal.as_deref().unwrap_or_default();
         next.push(NextStep {
             actor: StepActor::Human,
             command: "get the brief approved (one human answer covers brief and policy)".into(),
-            why: match (&brief.proposal, &brief.change) {
-                (Some(proposal), _) => format!(
-                    "{id}: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope); once the human answers, {record} in {proposal} {approve}"
-                ),
-                (None, Some(change)) => format!(
-                    "{id}: its newest adopted change `{change}` has no proposal.md under the openspec plan sources; write its brief there, and once the human answers, {record} in it {approve}"
-                ),
-                (None, None) => format!(
-                    "{id}: it adopts no change to carry the brief; `canon change new <slug> --subject {id} --title \"<title>\"` writes one, and once the human answers, {record} in it {approve}"
-                ),
-            },
+            why: format!(
+                "{id}: its newest adopted change's proposal.md carries no `Approved:` line (an older change's approval does not cover a new scope); once the human answers, record their words as `Approved: <who> <when> — \"<their words>\"` in {proposal} and run `canon policy approve --by <the human> --note \"<their words>\"`"
+            ),
         });
     }
 
@@ -819,7 +812,8 @@ fn subject_steps(
             why: match status {
                 SubjectStatus::Proposed | SubjectStatus::Specced => format!("{id} has its scenarios and every required case; move it on"),
                 SubjectStatus::Verifying => {
-                    format!("{id}: every scenario is evidenced{reviewed}, with no blocker or case gap, and the brief is approved; ship it yourself unless the brief says the human ships")
+                    let brief = if summary.brief.as_ref().is_some_and(|brief| brief.approved) { "the brief is approved" } else { "no brief is written to approve" };
+                    format!("{id}: every scenario is evidenced{reviewed}, with no blocker or case gap, and {brief}; ship it yourself unless the brief says the human ships")
                 }
                 _ => format!("{id}: every scenario is evidenced{reviewed}, with no blocker or case gap"),
             },
@@ -915,8 +909,8 @@ pub fn render(report: &StatusReport) -> String {
                 let _ = match (&brief.approval, &brief.proposal, &brief.change) {
                     (Some(approval), Some(proposal), _) => writeln!(out, "      brief: approved in {proposal} — {approval}"),
                     (None, Some(proposal), _) => writeln!(out, "      brief: not approved ({proposal} has no `Approved:` line)"),
-                    (_, None, Some(change)) => writeln!(out, "      brief: not approved (change `{change}` has no proposal.md)"),
-                    _ => writeln!(out, "      brief: not approved (no adopted change)"),
+                    (_, None, Some(change)) => writeln!(out, "      brief: not approved (change `{change}` has no proposal.md; advisory, nothing to approve yet)"),
+                    _ => writeln!(out, "      brief: not approved (no adopted change; advisory, nothing to approve yet)"),
                 };
             }
         }

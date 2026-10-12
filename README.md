@@ -113,22 +113,29 @@ unless the brief says the human ships. The skill, the `AGENTS.md` block
   subject's newest adopted change under the openspec plan sources. An
   older change's approval does not cover a newer scope, and an
   `Approved:` line counts only outside HTML comments and fenced code.
-- An unapproved brief is the only human step: `next:` lists it as
-  `human: get the brief approved (one human answer covers brief and
-  policy)` and withholds the move-on. With the brief approved and the
-  guard passing, the ship step says to ship it yourself unless the brief
-  says the human ships.
+- An unapproved brief that exists is the only human step: when the newest
+  adopted change has a `proposal.md` with no `Approved:` line, `next:`
+  lists `human: get the brief approved (one human answer covers brief and
+  policy)` and withholds the move-on. With no plan source, no adopted
+  change or no `proposal.md` there is no brief to answer: the `brief:`
+  line still says not approved, as an advisory, and nothing is withheld.
+  With the brief approved (or none to answer) and the guard passing, the
+  ship step says to ship it yourself unless the brief says the human
+  ships.
 - The ship guard checks the brief too, through the same check status
   uses, so status never says `ship` for a subject the guard refuses.
-  `canon subject status <id> shipped` refuses a subject whose brief has
-  no `Approved:` line as `unreviewed-promotion <subject>`, naming the
-  change's `proposal.md` and saying a human must answer; the agent writes
-  the line only from that answer. `--override-reason` waives it like a
-  review gap and records it in the waiver. A brief that says the human
-  ships changes who runs the move, not the check.
+  `canon subject status <id> shipped` refuses only where a brief exists:
+  a newest adopted change whose `proposal.md` has no `Approved:` line,
+  as `unreviewed-promotion <subject>`, naming that `proposal.md` and
+  saying a human must answer; the agent writes the line only from that
+  answer. `--override-reason` waives it like a review gap and records it
+  in the waiver. With no brief to answer the move prints an advisory and
+  is not refused. A brief that says the human ships changes who runs the
+  move, not the check.
 - `status --json` is `statusVersion: 2`: `next[].actor` (`agent` or
-  `human`) and `subjects[].brief` (`approved`, `change`, `proposal`,
-  `approval`) are new.
+  `human`) and `subjects[].brief` (`approved`, `enforced`, `change`,
+  `proposal`, `approval`) are new; `enforced` is true when the missing
+  approval blocks.
 
 **D2: fewer bookkeeping calls (#22).**
 
@@ -258,12 +265,11 @@ more (`skills.install.05` and `skills.install.06`).
   history, a legacy review whose scenario drifted since its pin turns the
   gate red until a new `canon review add` pins it.
 - Record each subject's brief approval as an `Approved:` line in its
-  newest adopted change's `proposal.md`; until then `canon status` lists
-  getting the brief approved as the human step instead of the ship step,
-  and `canon subject status <id> shipped` refuses. A repo whose
-  `canon.yaml` has `plans: { sources: [] }` reads no brief at all: add the
-  `openspec` source `canon init` writes (`- dialect: openspec`,
-  `root: .`).
+  newest adopted change's `proposal.md`; while that file lacks one,
+  `canon status` lists getting the brief approved as the human step
+  instead of the ship step, and `canon subject status <id> shipped`
+  refuses. Subjects with no adopted change or no `proposal.md` ship as
+  before, with an advisory.
 - Scripts that parse `canon status --json` see `statusVersion: 2`, with
   `policy.level`, `subjects[].brief` and `next[].actor`.
 
@@ -306,9 +312,14 @@ prints the version re-blessed for `canon 0.16.0`: the `status-*` cases,
 - `subject-ship-refused-missing-verdict`,
   `subject-ship-refused-no-tagged-scenarios`,
   `subject-ship-refused-require-cases-gap`, `review-pin-stale-evidence` —
-  the ship refusal also names the unapproved brief (`unreviewed-promotion
-  <subject>`), and when a review gap refuses too, the closing line asks
-  for both.
+  the subject adopts no change, or its change has no `proposal.md`, so
+  the guard adds one advisory line that the brief is not approved; the
+  refusals themselves are unchanged.
+- `review-pin-stale-spec` — its change `c-cart` has no `proposal.md`, so
+  `status` shows the brief as an advisory and suggests the agent's ship
+  step instead of the human step.
+- `status-brief-unapproved`, `status-gaps`, `status-ship-ready` —
+  `subjects[].brief` carries `enforced`.
 - `subject-ship-allowed` — the fixture gains an adopted change whose
   `proposal.md` carries an `Approved:` line; its output is unchanged.
 
