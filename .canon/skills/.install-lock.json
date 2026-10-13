@@ -1,8 +1,8 @@
 {
   "version": 1,
   "canon_version": "0.19.0",
-  "source_commit": "c8671f8b8733f6d905860b8a298cfeb94872372c",
-  "source_hash": "sha256:5ec76d32b3bd9041f5d983e58492165deb2210894d978f916e7358d362f23d5a",
+  "source_commit": "726834ca8b801772126961bfd52718d729eb01bc",
+  "source_hash": "sha256:5a37813ff586b90bac3d14b6752625409fbb7dd745c444e3514c8c7a91f5e3cf",
   "providers": [
     "claude",
     "codex",
@@ -10,7 +10,7 @@
     "pi"
   ],
   "files": {
-    ".agents/skills/canon/SKILL.md": "sha256:d5f401fa4f5c940d2ed11377edaab2c23b44e379610a87fb879f6e221564b42a",
+    ".agents/skills/canon/SKILL.md": "sha256:4c44da1b10e2642241109cf5b2e394f9403934b64d8d7f0d6c955af89763ff12",
     ".agents/skills/canon/reference/brief-align.md": "sha256:52d5c18a513c9acb12f96d280b4b4c83381f13ada7eed3690fcc94bd30c2407a",
     ".agents/skills/canon/reference/brief-clarify.md": "sha256:e74f39db33c71bf9cfee17418116a983b94a8d86eb5741040ab626a9fd4382da",
     ".agents/skills/canon/reference/brief-harden.md": "sha256:c0bb015558686cacab190c1a913cc960a0007c7279897410588a99c2cc2ee193",
@@ -34,7 +34,7 @@
     ".agents/skills/canon/reference/canon-subject.md": "sha256:627eed4ba7bf9bdc59593b17d64075e537fe905c72e91df966ec92b3c26b303e",
     ".agents/skills/canon/reference/canon-vocab.md": "sha256:a5a4d546c0f8414b08ec151a0a635e88cc01bb5d12960e78d3cc5bef4e3fc204",
     ".agents/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:bd63c90f8f579a3b00922ea14b95369b5e778772c9da35908a63da69616e1c00",
-    ".claude/skills/canon/SKILL.md": "sha256:d5f401fa4f5c940d2ed11377edaab2c23b44e379610a87fb879f6e221564b42a",
+    ".claude/skills/canon/SKILL.md": "sha256:4c44da1b10e2642241109cf5b2e394f9403934b64d8d7f0d6c955af89763ff12",
     ".claude/skills/canon/reference/brief-align.md": "sha256:52d5c18a513c9acb12f96d280b4b4c83381f13ada7eed3690fcc94bd30c2407a",
     ".claude/skills/canon/reference/brief-clarify.md": "sha256:e74f39db33c71bf9cfee17418116a983b94a8d86eb5741040ab626a9fd4382da",
     ".claude/skills/canon/reference/brief-harden.md": "sha256:c0bb015558686cacab190c1a913cc960a0007c7279897410588a99c2cc2ee193",
@@ -58,7 +58,7 @@
     ".claude/skills/canon/reference/canon-subject.md": "sha256:627eed4ba7bf9bdc59593b17d64075e537fe905c72e91df966ec92b3c26b303e",
     ".claude/skills/canon/reference/canon-vocab.md": "sha256:a5a4d546c0f8414b08ec151a0a635e88cc01bb5d12960e78d3cc5bef4e3fc204",
     ".claude/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:bd63c90f8f579a3b00922ea14b95369b5e778772c9da35908a63da69616e1c00",
-    ".omp/skills/canon/SKILL.md": "sha256:d5f401fa4f5c940d2ed11377edaab2c23b44e379610a87fb879f6e221564b42a",
+    ".omp/skills/canon/SKILL.md": "sha256:4c44da1b10e2642241109cf5b2e394f9403934b64d8d7f0d6c955af89763ff12",
     ".omp/skills/canon/reference/brief-align.md": "sha256:52d5c18a513c9acb12f96d280b4b4c83381f13ada7eed3690fcc94bd30c2407a",
     ".omp/skills/canon/reference/brief-clarify.md": "sha256:e74f39db33c71bf9cfee17418116a983b94a8d86eb5741040ab626a9fd4382da",
     ".omp/skills/canon/reference/brief-harden.md": "sha256:c0bb015558686cacab190c1a913cc960a0007c7279897410588a99c2cc2ee193",
@@ -82,7 +82,7 @@
     ".omp/skills/canon/reference/canon-subject.md": "sha256:627eed4ba7bf9bdc59593b17d64075e537fe905c72e91df966ec92b3c26b303e",
     ".omp/skills/canon/reference/canon-vocab.md": "sha256:a5a4d546c0f8414b08ec151a0a635e88cc01bb5d12960e78d3cc5bef4e3fc204",
     ".omp/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:bd63c90f8f579a3b00922ea14b95369b5e778772c9da35908a63da69616e1c00",
-    ".pi/skills/canon/SKILL.md": "sha256:d5f401fa4f5c940d2ed11377edaab2c23b44e379610a87fb879f6e221564b42a",
+    ".pi/skills/canon/SKILL.md": "sha256:4c44da1b10e2642241109cf5b2e394f9403934b64d8d7f0d6c955af89763ff12",
     ".pi/skills/canon/reference/brief-align.md": "sha256:52d5c18a513c9acb12f96d280b4b4c83381f13ada7eed3690fcc94bd30c2407a",
     ".pi/skills/canon/reference/brief-clarify.md": "sha256:e74f39db33c71bf9cfee17418116a983b94a8d86eb5741040ab626a9fd4382da",
     ".pi/skills/canon/reference/brief-harden.md": "sha256:c0bb015558686cacab190c1a913cc960a0007c7279897410588a99c2cc2ee193",

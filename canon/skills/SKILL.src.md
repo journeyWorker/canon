@@ -144,7 +144,11 @@ approval itself.
    no `canon ingest plans` first. A canon-owned change has no task rows to
    attest: its scenarios are the checklist.
 7. **Independent review.** A different session from the one that wrote the
-   code and evidence reviews the change. The review session must be able
+   code and evidence reviews the change: a separate process with its own
+   session, never the same session under another `--actor-id` or
+   `--session-id` label. A harness with no subagent tool starts one (a new
+   `codex exec` run in this repo, say), and the reviewer passes that
+   session's real id as `--session-id`. The review session must be able
    to run the checks it signs off (the build, the tests, the app); a
    reviewer that cannot run the tests says so and does not sign off. The
    reviewer records every defect
