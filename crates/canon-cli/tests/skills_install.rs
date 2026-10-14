@@ -757,9 +757,13 @@ fn skills_install_20_skill_and_block_carry_one_approval_per_scope() {
             "in the approved change",
             "tasks.md",
             "a new change is a new scope",
+            "edited after its approval",
+            "is an optional work note nothing gates on",
         ] {
             assert!(text.to_lowercase().contains(&rule.to_lowercase()), "the {name} must say {rule:?}: {text}");
         }
+        let edited = text.to_lowercase().find("edited after its approval").unwrap();
+        assert!(text.to_lowercase()[edited..].contains("needs a new"), "the {name} must say an edited brief needs a new answer: {text}");
     }
 }
 

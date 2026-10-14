@@ -117,7 +117,7 @@ Feature: skills install
     When each is read with its wrapped lines joined
     Then each says a new subject or a scope change needs one human answer approving the brief and the policy
     And each tells the agent to record that answer at once with canon brief approve --change <slug> --by <the human> --note "<their words>", which writes the "Approved: <who> <when> — "<words>" (brief sha256:<digest>)" line into .canon/changes/<slug>/brief.md and records the policy approval in the same call, and never to approve without a human answer
-    And each says a brief edited after its approval reads as not approved (BRIEF_CHANGED_SINCE_APPROVAL) until a human answers again and canon brief approve runs again
+    And each says a brief edited after its approval needs a new human answer before it counts as approved again
     And each says a change from an external plan gets its brief there too, a brief.md whose "Source: <path>" line points at the plan, which canon never edits
     And each says that inside an approved scope the agent never stops for a human, that independent review happens on every change, and that when no human can answer it writes the assumption and proceeds
     And each says a fix or follow-up stays in the approved change, never a canon change new, because a new change is a new scope, and that tasks.md is an optional work note nothing gates on

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-019-r",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-019-r-1"
+  },
+  "at": "2026-10-14T16:04:57.687174Z",
+  "change_id": "s49-authoring-the-corpus-agents-write",
+  "disposition": "open",
+  "file_ref": ".canon/specs/kind=feature/area=skills/install.feature:118-120",
+  "kind": "finding",
+  "reviewer": "canon-reviewer-019-r",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Expand skills.install.20 test to assert digest invalidation and optional tasks wording added by a59b1df3"
+}
