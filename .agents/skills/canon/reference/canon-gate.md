@@ -256,7 +256,8 @@ reports it, and builds nothing for that scope until the human answers.
 refuses (exit `1`, nothing staged or stored) while a subject the record
 attests for has an enforced, unapproved brief: the newest adopted
 change's canon `.canon/changes/<change>/brief.md` has no `Approved:`
-line, or there is no canon `brief.md` yet but the change comes from an
+line, was edited after its approval (`BRIEF_CHANGED_SINCE_APPROVAL`), or
+there is no canon `brief.md` yet but the change comes from an
 external openspec plan with a `proposal.md` under the plan sources (the
 check `canon status` and the ship guard use; see
 `canon-subject`). The subjects are the scenario's `@subject` owner for
@@ -264,8 +265,8 @@ check `canon status` and the ship guard use; see
 `--task`:
 
 ```
-canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words as `Approved: <who> <when> — "<their words>"` in .canon/changes/c-demo/brief.md
-canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — "<their words>"` in that brief.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
+canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve --change c-demo --by <the human> --note "<their words>"`
+canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their answer with `canon brief approve --by <the human> --note "<their words>"` only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
 ```
 
 For a change from an external plan with no canon brief yet, the first
@@ -274,8 +275,8 @@ change `c-ext` comes from the external plan
 openspec/changes/c-ext/proposal.md, which canon reads and never edits, so
 its approval lives in that canon file, so the human has not answered it;
 once they do, create .canon/changes/c-ext/brief.md holding a `Source:
-openspec/changes/c-ext/proposal.md` line and record their words there as
-`Approved: <who> <when> — "<their words>"` ``. An `Approved:` line in the
+openspec/changes/c-ext/proposal.md` line, then record their words with
+`canon brief approve --change c-ext --by <the human> --note "<their words>"` ``. An `Approved:` line in the
 external `proposal.md` itself is never read.
 
 A subject with no brief to answer (no adopted change, or a newest change
@@ -320,14 +321,17 @@ review waivers: 1 advisory(ies) — not failing the gate:
 The waiver lasts only until the subject's next status write.
 
 `canon subject status <id> shipped` also refuses where a brief exists and
-has no `Approved:` line (the subject's newest adopted change has a canon
-`brief.md`, or an external `proposal.md` and no canon `brief.md` yet;
+is not approved (the subject's newest adopted change has a canon
+`brief.md` with no `Approved:` line or one the brief's text no longer
+matches, or an external `proposal.md` and no canon `brief.md` yet;
 see `canon-subject`), as an `unreviewed-promotion` naming
-the subject. With no brief to answer it prints an advisory and does not
-refuse. Like the evidence refusal above, it is a backstop: the stop is at
-the brief. `canon gate check` does not grade briefs, so a waived ship
-brief prints no advisory here; `canon status` keeps showing the brief as
-not approved.
+the subject, and while `canon brief check` has structure blockers or a
+flow step has no scenario or no failure scenario (the coverage rules gate
+shipping, never approval). With no brief to answer it prints an advisory
+and does not refuse. Like the evidence refusal above, it is a backstop:
+the stop is at the brief. `canon gate check` does not grade briefs, so a
+waived ship brief prints no advisory here; `canon status` keeps showing
+the brief as not approved.
 
 ### Reviews that predate pinning (checked against their pin)
 
@@ -579,6 +583,11 @@ violation (`risk_tiers policy-invalid: ...`) instead of degrading to an
 empty clean map.
 
 ## `canon gate task <task_id> [--repo <dir>]`
+
+For imported external plans, and for a `tasks.md` that already exists in
+a canon change. `canon change new` writes no `tasks.md` (0.19), and
+nothing gates on one: a canon-owned change is covered by its flow steps'
+scenarios (`canon status`).
 
 The evidence-gated task checkbox flip. Resolves `<task_id>`
 (`<change_id>#<n>`) through `.canon/changes/` (canon's own changes, read

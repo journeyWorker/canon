@@ -893,7 +893,7 @@ fn subject_steps(
                 brief.report_in()
             ),
             why: format!(
-                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses {id}'s scenarios and tasks until it is recorded; once the human answers, {} and run `canon policy approve --by <the human> --note \"<their words>\"`",
+                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses {id}'s scenarios and tasks until it is recorded; once the human answers, {} (one call records the brief and the policy approval)",
                 brief.unanswered(),
                 brief.record()
             ),
@@ -905,14 +905,14 @@ fn subject_steps(
     // every gap below is follow-up work inside its approved change.
     if status == SubjectStatus::Shipped && !summary.red.is_empty() {
         let tasks = match summary.brief.as_ref().and_then(|brief| brief.change.as_deref()) {
-            Some(change) => format!("as tasks in its approved change `{change}` (never `canon change new`)"),
-            None => "as tasks in its change".to_string(),
+            Some(change) => format!("keep the follow-up in its approved change `{change}` (never `canon change new`)"),
+            None => "keep the follow-up in its change".to_string(),
         };
         next.push(NextStep {
             actor: StepActor::Agent,
             command: reopen_command(id),
             why: format!(
-                "{id} is shipped but its gate is red ({}); reopen it, add the follow-up {tasks}, then scenario, evidence and review, and ship it again",
+                "{id} is shipped but its gate is red ({}); reopen it, {tasks}, then scenario, evidence and review, and ship it again",
                 summary.red.join(", ")
             ),
         });

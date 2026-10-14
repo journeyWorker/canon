@@ -74,8 +74,10 @@ canon policy approve --by <who> [--note <text>] [--repo <dir>]
 
 A human approves the policy after reviewing `.canon/policy.yaml`, in the
 same answer that approves a subject's brief (0.16; see the skill's working
-loop). The human runs this, or the agent runs it right after that answer
-as `canon policy approve --by <the human> --note "<their words>"`. It
+loop). `canon brief approve` records both in one call, so the agent does
+not run this command next to it. Run `canon policy approve` alone for a
+policy-only change, as the human, or as the agent right after that answer
+(`canon policy approve --by <the human> --note "<their words>"`). It
 writes `.canon/policy.approval.json` directly (nothing to promote):
 
 ```json

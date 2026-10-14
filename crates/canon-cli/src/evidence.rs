@@ -229,7 +229,7 @@ use crate::gate::{evidence_staging_dir, typed_evidence_contract_for_task};
 
 /// What `canon evidence add` tells the agent when a brief refuses the
 /// attestation (0.16 M7): the stop belongs at the brief.
-const BRIEF_STOP: &str = "stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — \"<their words>\"` in that brief.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record";
+const BRIEF_STOP: &str = "stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their answer with `canon brief approve --by <the human> --note \"<their words>\"` only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record";
 
 /// The gate's view of the repository, as every check here reads it.
 fn load_gate_context(repo: &Path) -> Result<GateContext, String> {

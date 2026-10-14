@@ -744,10 +744,10 @@ fn skills_install_20_skill_and_block_carry_one_approval_per_scope() {
     for (name, text) in skill_and_block() {
         for rule in [
             "for a new subject or a scope change",
-            "Approved: <who> <when> — \"<",
+            "canon brief check",
             ".canon/changes/<slug>/brief.md",
             "Source: <path>",
-            "canon policy approve --by <the human> --note \"<their words>\"",
+            "canon brief approve --change <slug> --by <the human> --note \"<their words>\"",
             "Never approve without a human answer",
             "Inside an approved scope, never stop for a human",
             "When no human can answer",

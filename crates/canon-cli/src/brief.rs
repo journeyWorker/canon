@@ -11,7 +11,7 @@
 //! `Approved:` line in canon's own file for the change,
 //! `.canon/changes/<change>/brief.md` (no record kind), read outside HTML
 //! comments and code fences ([`canon_ingest::markdown::field`]). Fixes
-//! live as tasks in the approved change, so the subject's newest adopted
+//! stay in the approved change, so the subject's newest adopted
 //! change is its current scope.
 //!
 //! # The approval is bound to the brief's bytes (0.19 D3, #46)
@@ -133,7 +133,7 @@ pub fn approval_of(text: &str) -> Approval {
 
 /// Whether a subject's newest adopted change records the human's
 /// approval of its brief: an `Approved:` line in that change's canon
-/// `brief.md` (module doc). A fix lives as tasks inside the approved
+/// `brief.md` (module doc). A fix stays inside the approved
 /// change, so a newer adopted change is a new scope, and an older
 /// change's approval does not cover it.
 #[derive(Debug, Clone, Serialize)]
@@ -221,9 +221,10 @@ impl BriefStatus {
         }
         match (self.brief_exists, &self.source) {
             (false, Some(source)) => format!(
-                "create {brief} holding a `Source: {source}` line and record their words there as `Approved: <who> <when> — \"<their words>\"`"
+                "create {brief} holding a `Source: {source}` line, then record their words with `canon brief approve --change {} --by <the human> --note \"<their words>\"`",
+                self.change.as_deref().unwrap_or("<change>")
             ),
-            _ => format!("record their words as `Approved: <who> <when> — \"<their words>\"` in {brief}"),
+            _ => format!("record their words with `canon brief approve --change {} --by <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>")),
         }
     }
 }

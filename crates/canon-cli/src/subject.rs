@@ -777,7 +777,7 @@ pub fn run_status(
                 fixes.push("record an independent review (`canon review add`) and close blocker findings");
             }
             if brief_gap.is_some() {
-                fixes.push("get the human's answer to the brief and record it as its `Approved:` line");
+                fixes.push("get the human's answer to the brief and record it with `canon brief approve`");
             }
             eprintln!(
                 "canon subject status: refused — {}, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject{}",
@@ -802,8 +802,8 @@ pub fn run_status(
     if let (true, Some(reason)) = (reopens, reason) {
         let change = changes.last().cloned();
         let into = match &change {
-            Some(change) => format!("add the follow-up as tasks in its approved change `{}`", change.as_str()),
-            None => "add the follow-up as tasks in its change".to_string(),
+            Some(change) => format!("keep the follow-up in its approved change `{}`", change.as_str()),
+            None => "keep the follow-up in its change".to_string(),
         };
         eprintln!(
             "canon subject status: reopened `{}` from shipped, recorded by `{actor_id}`: {reason}; {into}, then scenario, evidence and review; shipping again runs every guard",
