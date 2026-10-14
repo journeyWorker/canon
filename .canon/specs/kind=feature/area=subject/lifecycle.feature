@@ -287,10 +287,10 @@ Feature: subject lifecycle
   @case:happy
   @subject.lifecycle.29
   Scenario: A shipped subject reopens inside its approved scope and records why
-    Given a shipped subject whose newest adopted change's brief.md carries an Approved line
+    Given a shipped subject whose newest adopted change's brief.md carries an Approved line (with a digest that still matches the brief, or a pre-0.19 line with none)
     When it is moved to verifying with a reason and an actor
     Then it moves with no human, and the review guard says it skipped its checks because a reopen moves the subject back to fix its gaps
-    And the new record carries the reason, the actor and the approved change the follow-up goes into as tasks
+    And the new record carries the reason, the actor and the approved change the follow-up stays in
     And the next status write clears that note, so it belongs to the reopen that wrote it
 
   # canon: {"schema":1,"at":"2026-10-12T18:00:01Z","actor":{"agent_id":"018-n2-impl"}}
