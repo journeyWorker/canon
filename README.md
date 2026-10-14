@@ -82,6 +82,183 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.20.0 release
+
+Version 0.20.0 makes canon's CLI something an agent can drive without
+reading `--help`: `canon schema` describes every command, every command
+takes `--json` and keeps stdout to one JSON document, every refusal has a
+stable code, lists are bounded and pageable, `purge` deletes only a
+reviewed plan, and `canon … | head` ends quietly. Plan:
+`docs/superpowers/plans/2026-10-15-canon-0.20.0-cli-contract.md`.
+
+**Why.** Issue #53, from `docs/research/deep-research-report.md`: an agent
+spends its calls on discovery and recovery (wrong command, `--help`, parse
+prose, retry), not on the work. The plan inventoried 0.19 against the
+report's checklist:
+
+| Checklist item | 0.19 |
+|---|---|
+| Discovery without reading help | `canon context --json` described record kinds, not commands |
+| `--json` on every command | missing on `init`, `migrate`, `format`, `feature new`, `scenario new`, `change new`, `inventory sync`, `plugin sync`, `skills *`, `tier age`, `report`, `dashboard`, `gate check` |
+| Stable string error codes | only `canon brief` / `brief approve`; everything else was free text on stderr |
+| Exit codes documented | 0/1/2 by convention, with per-module exceptions |
+| Bounded lists | no `--limit`/`--cursor`; `query`, `finding list`, `divergence status`, `export` returned everything |
+| Field projection | none |
+| One verb per meaning | `learn request` duplicated `learn approve` |
+| Risky writes need a plan digest | `purge --dry-run` existed, with no confirm-by-digest |
+
+### D1: `canon schema` (discovery)
+
+`canon schema [<command path>…] [--json] [--errors]` reads the clap command
+tree, so it cannot drift from what the parser accepts, plus one metadata
+table that adds what clap cannot know. It touches no repo and no network.
+Bare `canon schema` (or a group such as `canon schema evidence`) lists
+leaf commands; `canon schema evidence add --json` returns one command.
+With `--json`, the output is `{ "data", "meta": { "command": "schema" } }`;
+a command is:
+
+```json
+{ "command": "evidence add", "path": ["evidence", "add"], "aliases": [],
+  "about": "…", "effect": "write", "supportsJson": true,
+  "arguments": [], "options": [{ "name": "…", "kind": "value", "short": null,
+    "aliases": [], "valueName": "…", "required": false, "repeatable": false,
+    "possibleValues": [], "default": [], "help": "…" }],
+  "exits": [{ "code": 0, "meaning": "staged" }],
+  "errorCodes": ["BRIEF_UNAPPROVED", "…"] }
+```
+
+`effect` is `read`, `write` or `destructive` (`purge` is the destructive
+one); `kind` is `positional`, `flag`, `count` or `value`. `canon schema
+--errors` prints the registry of every error code. A command path that
+does not resolve is `UNKNOWN_COMMAND`. Two tests keep it honest: one fails
+when a leaf command has no metadata row (or a row has no leaf), the other
+derives each command's `errorCodes` from the sources and fails on any
+difference.
+
+### D3: one error contract, and the exit policy
+
+Every refusal and operational failure is one `CliError { code, message,
+hint, retryable, exit }`.
+
+- Human mode, on stderr: `canon <command path>: <CODE> — <message>`, then
+  an optional `hint: <next step>` line. The old `canon <cmd>: refused — …`
+  and `canon <cmd>: <rule> <subject> — …` lines are gone.
+- JSON mode, on stdout: `{"error": {"code", "message", "hint", "retryable"}}`
+  (`hint` is `null` when there is none); the human lines still go to
+  stderr.
+- A refusal that used to print one line per violation (the subject, ship
+  and reopen guards) is one error: its message lists every violation and
+  the next step is the `hint`; the code names the kind
+  (`SUBJECT_GATE_VIOLATION`, `BRIEF_UNAPPROVED`,
+  `BRIEF_CHANGED_SINCE_APPROVAL`, …). A failure that also has a report
+  (`gate check`, `format`) keeps its human report on stdout and, in JSON
+  mode, answers one document carrying `error`, `data` and `meta`.
+- Exit codes keep their 0.19 meaning: 0 ok, 1 a gate failure or an
+  operational error, 2 a refusal or a usage error (clap usage errors are
+  code `USAGE`). The per-command exceptions (`context` always 0,
+  `dispatch diff` 0, `evidence vault` 0 on a partial pass) stay and are now
+  listed in `canon schema` under `exits`. CI that reads exit codes keeps
+  working; the code is the precise contract.
+
+### D2: `--json` everywhere, JSON-only stdout
+
+Every leaf command accepts `--json` (`canon schema` reports
+`supportsJson`; a sweep test runs each leaf with `--json` and parses its
+stdout). In JSON mode stdout is exactly one JSON document, success or
+error; narration, refresh notices and advisories go to stderr. Existing
+shapes keep their fields (`status` keeps `statusVersion: 3`). A command
+that gained `--json` answers `{ "data": …, "meta": { "command": "<path>" } }`.
+
+### D4: bounded lists and `--fields`
+
+`query`, `finding list`, `divergence status` and `export` take
+`--limit <n>` (default 100, at least 1), `--cursor <opaque>` and `--all`
+(which conflicts with `--limit`). The JSON result gains a `meta` object
+with `returned`, `total` (every record the command matched, across all
+pages), `hasMore` and `nextCursor` (`null` on the last page). Human mode
+ends with `N of M shown; next cursor: … (rerun with --cursor …, or --all)`
+when more remain. A cursor is opaque: it names the listing it came from and
+the key of the last record returned, so it stays valid while the result is
+unchanged and is refused as `INVALID_CURSOR` for another listing or when
+that record is gone. `--fields a,b,c` keeps only those top-level fields of
+each record in `query` and `finding list`; an unknown name is
+`UNKNOWN_FIELD` and the hint lists the known ones.
+
+### D5: `purge` plans, then confirms
+
+`canon purge --kind <kind> --before <time> --plan` prints the records it
+would remove and a `planDigest`; nothing is deleted. `--confirm <digest>`
+recomputes the plan and deletes only if the digest still matches, else
+`PLAN_CHANGED` and nothing is deleted. The digest covers the kind, the
+cutoff, each rung's count and the identity of every record the plan would
+remove (the sorted record keys, including the learn store), so a record
+added, removed or swapped between `--plan` and `--confirm` changes it even
+when the count does not. A bare `purge` is refused with
+`PURGE_PLAN_REQUIRED`. `--dry-run` is gone (a clean cutover: `--plan` is
+the same step with a digest).
+
+### D6: one name per meaning
+
+`canon learn request` is removed; `canon learn approve` was already the
+same implementation. `fmt` stays a clap alias of `format`, but `schema`
+and errors name `format`. No other command was renamed.
+
+### D7: skill and AGENTS block, and a closed pipe
+
+- The skill tells an agent unsure of a command to start from `canon schema
+  <command> --json`, to pass `--json` and read `error.code`, and to page
+  with `--cursor`; the AGENTS block gains one line. The website CLI pages
+  follow.
+- A closed stdout ends canon quietly. Rust starts a process with SIGPIPE
+  ignored, so `canon status | head` panicked and exited 101; canon now
+  restores the default action and dies of SIGPIPE (exit 141 in a shell),
+  as other command-line tools do. `canon dashboard` keeps SIGPIPE ignored
+  so a client that disconnects never kills the server.
+
+**Migration.** For a 0.19 consumer:
+
+- Run `canon skills install` for the 0.20 skill.
+- `query`, `finding list` and `export` return at most 100 records by
+  default and carry a `meta` object (`returned`, `total`, `hasMore`,
+  `nextCursor`); a script that read everything must pass `--all` or follow
+  `nextCursor`. `divergence status` is bounded the same way. Existing
+  fields are unchanged.
+- `canon purge --dry-run` is removed: use `--plan`, then `--confirm
+  <planDigest>`. A bare `purge` is refused.
+- `canon learn request` is removed: use `canon learn approve`.
+- stderr lines are now `canon <cmd>: <CODE> — <message>` followed by
+  `hint: …`; a script that matched `refused —` or a rule name should match
+  the code. A refusal that listed several violations is one error with one
+  hint. Exit codes did not change.
+- Commands that gained `--json` answer `{ "data", "meta" }`; in JSON mode
+  a failure is `{ "error": { code, message, hint, retryable } }` on stdout.
+- `canon … | head` now ends by SIGPIPE (exit 141) instead of panicking
+  with 101.
+
+**Changed conformance expectations.** Every case that prints the version
+prints 0.20.0. Forty-seven expected-stderr files change to the new error contract:
+`canon <cmd>: refused — …` and `canon <cmd>: <rule> <subject> — …` become
+`canon <cmd>: <CODE> — …`, and the trailing guidance moves to a `hint:`
+line (`change-new`, the `evidence-add-*` refusals and overrides,
+`finding-add-*`, `gate-check-*`, `init-*`, `migrate-refused-uncommitted`,
+`policy-approve-refused-no-policy`, `review-add-*`, `review-gate-*`,
+`review-outcome-*`, `review-pin-stale-evidence`, `subject-reopen-*`,
+`subject-ship-*`, `subject-status-off-chain-transition`,
+`usage-error-unreadable-canon-yaml`). `finding-list-open-json`,
+`query-subject-json`, `review-add-batch`, `review-gate-override-recorded`,
+`review-outcome-indeterminate-gap`, `subject-adopt-second-subject`,
+`subject-reopen-refused-unapproved-brief` and
+`subject-ship-refused-unapproved-brief` gain the `meta` object in their
+JSON output. No exit code changed.
+
+**New conformance cases:** none (coverage lives in `tests/schema.rs`,
+`tests/schema_codes.rs`, `tests/cli_error.rs`, `tests/json_contract.rs`,
+`tests/paging.rs` and `tests/pipe.rs`).
+
+**Closed issues:** #53.
+
+ACCEPTANCE-PLACEHOLDER: dogfood eval 8 (omp, copy of `nyan-omp-020`, a new small feature) compares calls per success and recovery depth with eval 7 via `trace_check`; results are recorded here once the run completes.
+
 ## 0.19.0 release
 
 Version 0.19.0 makes the brief a PRD that canon can check: a fixed
