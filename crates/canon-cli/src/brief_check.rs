@@ -23,6 +23,14 @@
 //!   the threshold and the measured value, never an authorship verdict.
 //! - **`brief.legacy` (advisory)**: a brief with no section markers (every
 //!   brief before 0.19) is read as before; no other rule applies to it.
+//! - **Chore briefs (0.19 D5)**: a brief carrying `<!-- canon:kind chore -->`
+//!   is judged by the chore rule set: sections intent, category,
+//!   invariants, checks, out-of-scope, in that order; a flow, detail or
+//!   acceptance section is `brief.chore-section`; a category that is not
+//!   one of [`CHORE_CATEGORIES`] is `brief.chore-category`; invariants or
+//!   checks that say only "none" are `brief.chore-empty`. Placeholders
+//!   block and the prose rules apply to the normative sections (invariants,
+//!   checks) as for any brief. The flow-coverage rules never apply.
 //!
 //! Sections are found by their marker comment, never by heading text.
 //! A marker key canon does not know is skipped, not reported.
@@ -54,7 +62,7 @@ use canon_ingest::markdown::fence_of;
 use canon_model::{paths, ChangeId, SubjectStatus};
 use serde::Serialize;
 
-use crate::brief_template::{heading_of, marker, Role, PRD_SECTIONS};
+use crate::brief_template::{canonical_role, heading_of, marker, ChangeKind, Role, CHORE_CATEGORIES};
 use crate::context::resolve_repo_root;
 use crate::language::{Language, Shipped};
 
@@ -81,7 +89,7 @@ impl Severity {
 }
 
 /// Every rule id and its severity. A waiver names one of these.
-pub const RULES: [(&str, Severity); 19] = [
+pub const RULES: [(&str, Severity); 22] = [
     ("brief.section-missing", Severity::Blocker),
     ("brief.section-duplicate", Severity::Blocker),
     ("brief.section-order", Severity::Blocker),
@@ -91,6 +99,9 @@ pub const RULES: [(&str, Severity); 19] = [
     ("brief.detail-mismatch", Severity::Blocker),
     ("brief.flow-uncovered", Severity::Blocker),
     ("brief.flow-no-failure", Severity::Blocker),
+    ("brief.chore-section", Severity::Blocker),
+    ("brief.chore-category", Severity::Blocker),
+    ("brief.chore-empty", Severity::Blocker),
     ("brief.waiver-invalid", Severity::Blocker),
     ("brief.legacy", Severity::Advisory),
     ("prose.evaluative", Severity::Advisory),
@@ -102,6 +113,11 @@ pub const RULES: [(&str, Severity); 19] = [
     ("prose.paragraph-length", Severity::Advisory),
     ("prose.key-sentence", Severity::Advisory),
 ];
+
+/// The blocker rules that grade the scenarios against the brief rather than
+/// the brief itself. They gate shipping; `canon brief approve` ignores them,
+/// since a scope is approved before its scenarios exist (0.19 D3).
+pub const COVERAGE_RULES: [&str; 2] = ["brief.flow-uncovered", "brief.flow-no-failure"];
 
 fn severity_of(rule: &str) -> Option<Severity> {
     RULES.iter().find(|(id, _)| *id == rule).map(|(_, severity)| *severity)
@@ -372,7 +388,7 @@ fn sections<'a>(lines: &'a [Line], comments: &[Comment]) -> Vec<Section<'a>> {
     let mut out = Vec::new();
     for (i, (line, key, role)) in markers.iter().enumerate() {
         let end = markers.get(i + 1).map_or(usize::MAX, |m| m.0);
-        let canonical = PRD_SECTIONS.iter().find(|s| s.key == key).map(|s| s.role);
+        let canonical = canonical_role(key);
         out.push(Section {
             key: key.clone(),
             role: role.or(canonical).unwrap_or(Role::Context),
@@ -443,15 +459,22 @@ pub fn evaluate(text: &str, language: &Language, flows: Option<&FlowIndex>) -> E
         return Evaluation { findings: out.findings, waivers: Vec::new(), legacy: true, open_questions: 0, approval, approved };
     }
 
+    let kind = kind_of_comments(&comments);
     let mut out = Out { findings: Vec::new() };
-    structure(&mut out, &secs, language);
+    structure(&mut out, &secs, language, kind);
     placeholders(&mut out, &secs, &comments);
-    let flow_ids = flow_and_detail(&mut out, &secs, language);
-    if let Some(index) = flows {
-        coverage(&mut out, &secs, &flow_ids, index);
+    match kind {
+        ChangeKind::Feature => {
+            let flow_ids = flow_and_detail(&mut out, &secs, language);
+            if let Some(index) = flows {
+                coverage(&mut out, &secs, &flow_ids, index);
+            }
+        }
+        ChangeKind::Chore => chore_rules(&mut out, &secs),
     }
     if let Some(shipped) = language.prose_rules() {
-        for section in secs.iter().filter(|s| s.role == Role::Normative) {
+        let judged = |s: &&Section| kind == ChangeKind::Feature || kind.sections().iter().any(|k| k.key == s.key);
+        for section in secs.iter().filter(|s| s.role == Role::Normative).filter(judged) {
             prose(&mut out, section, shipped);
         }
     }
@@ -464,14 +487,33 @@ pub fn evaluate(text: &str, language: &Language, flows: Option<&FlowIndex>) -> E
     Evaluation { findings, waivers, legacy: false, open_questions, approval, approved }
 }
 
+/// The kind a brief's `canon:kind` comment names; no marker, or a value
+/// canon does not know, is a feature brief.
+fn kind_of_comments(comments: &[Comment]) -> ChangeKind {
+    comments
+        .iter()
+        .find_map(|c| {
+            let mut tokens = c.body.split_whitespace();
+            (tokens.next() == Some("canon:kind")).then(|| tokens.next().and_then(ChangeKind::parse))
+        })
+        .flatten()
+        .unwrap_or(ChangeKind::Feature)
+}
+
+/// Whether `text` is a chore brief (carries [`CHORE_KIND_MARKER`]).
+pub fn is_chore(text: &str) -> bool {
+    kind_of_comments(&scan(text).1) == ChangeKind::Chore
+}
+
 fn is_none_answer(line: &str) -> bool {
     let word = line.trim().trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
     ["none", "n/a", "없음", "해당 없음"].contains(&word.as_str())
 }
 
 /// Missing, duplicated and out-of-order sections.
-fn structure(out: &mut Out, secs: &[Section], language: &Language) {
-    for expected in &PRD_SECTIONS {
+fn structure(out: &mut Out, secs: &[Section], language: &Language, kind: ChangeKind) {
+    let expected_sections = kind.sections();
+    for expected in expected_sections {
         let found: Vec<&Section> = secs.iter().filter(|s| s.key == expected.key).collect();
         let heading = heading_of(language, expected.key);
         if found.is_empty() {
@@ -487,7 +529,7 @@ fn structure(out: &mut Out, secs: &[Section], language: &Language) {
             out.push("brief.section-duplicate", Some(expected.key), extra.marker_line, format!("second `{}` marker", expected.key), "keep one section per key".to_string());
         }
     }
-    let order = |key: &str| PRD_SECTIONS.iter().position(|s| s.key == key);
+    let order = |key: &str| expected_sections.iter().position(|s| s.key == key);
     let known: Vec<(&Section, usize)> = secs.iter().filter_map(|s| order(&s.key).map(|o| (s, o))).collect();
     if let Some(pair) = known.windows(2).find(|w| w[1].1 < w[0].1) {
         let section = pair[1].0;
@@ -496,8 +538,51 @@ fn structure(out: &mut Out, secs: &[Section], language: &Language) {
             Some(&section.key),
             section.marker_line,
             format!("`{}` follows `{}`", section.key, pair[0].0.key),
-            format!("sections go in this order: {}", PRD_SECTIONS.iter().map(|s| s.key).collect::<Vec<_>>().join(" → ")),
+            format!("sections go in this order: {}", expected_sections.iter().map(|s| s.key).collect::<Vec<_>>().join(" → ")),
         );
+    }
+}
+
+/// The chore rule set's own rules: no flow, detail or acceptance; one
+/// valid category; invariants and checks that say something.
+fn chore_rules(out: &mut Out, secs: &[Section]) {
+    for section in secs.iter().filter(|s| ["flow", "detail", "acceptance"].contains(&s.key.as_str())) {
+        out.push(
+            "brief.chore-section",
+            Some(&section.key),
+            section.marker_line,
+            format!("a chore brief has no `{}` section", section.key),
+            "a chore adds no flow, detail or acceptance; work that changes behavior is a feature change (`canon change new` without `--kind chore`)".to_string(),
+        );
+    }
+    if let Some(category) = secs.iter().find(|s| s.key == "category") {
+        let body = category.body();
+        if !body.is_empty() {
+            let joined = body.iter().map(|l| l.text.trim()).collect::<Vec<_>>().join(" ");
+            let value = joined.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+            if !CHORE_CATEGORIES.contains(&value.as_str()) {
+                out.push(
+                    "brief.chore-category",
+                    Some("category"),
+                    body[0].no,
+                    excerpt(&joined),
+                    format!("the category is exactly one of: {}", CHORE_CATEGORIES.join(", ")),
+                );
+            }
+        }
+    }
+    for key in ["invariants", "checks"] {
+        let Some(section) = secs.iter().find(|s| s.key == key) else { continue };
+        let body = section.body();
+        if !body.is_empty() && body.iter().all(|l| is_none_answer(&l.text)) {
+            out.push(
+                "brief.chore-empty",
+                Some(key),
+                body[0].no,
+                excerpt(&body[0].text),
+                format!("a chore states what must not change and how that is checked; `{key}` cannot be \"none\""),
+            );
+        }
     }
 }
 
@@ -945,7 +1030,7 @@ pub fn check(repo: &Path, requested: Option<&ChangeId>) -> Result<Checked, Check
     let language = crate::language::configured(repo).map_err(|e| CheckError::new("CONFIG_UNREADABLE", e))?;
     let phase = phase_of(repo, &change);
     let flows = match phase {
-        Phase::Building => Some(flow_scenarios(repo, &change).map_err(|e| CheckError::new("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")))?),
+        Phase::Building if !is_chore(&text) => Some(flow_scenarios(repo, &change).map_err(|e| CheckError::new("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")))?),
         _ => None,
     };
     let evaluation = evaluate(&text, &language, flows.as_ref());
@@ -1073,7 +1158,7 @@ fn next_steps(ev: &Evaluation) -> Vec<Step> {
         }
         return steps;
     }
-    if ev.has(&["brief.section-missing", "brief.section-duplicate", "brief.section-order", "brief.placeholder", "brief.flow-no-steps", "brief.waiver-invalid"]) {
+    if ev.has(&["brief.section-missing", "brief.section-duplicate", "brief.section-order", "brief.placeholder", "brief.flow-no-steps", "brief.waiver-invalid", "brief.chore-section", "brief.chore-category", "brief.chore-empty"]) {
         steps.push(Step { step: "shape", why: "sections are missing, out of order or still hold the template's placeholders".to_string() });
     }
     if ev.open_questions > 0 {

@@ -76,7 +76,15 @@ pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
         Ok(checked) => checked,
         Err(e) => return refuse(json, e.code, &e.message, EXIT_ERROR),
     };
-    let blockers: Vec<_> = checked.evaluation.findings.iter().filter(|f| f.severity == Severity::Blocker).collect();
+    // Coverage rules (a flow step with no scenario or no failure case) gate
+    // shipping, not approval: the human approves the scope before its
+    // scenarios exist, and re-approves a changed scope mid-build (0.19 D3).
+    let blockers: Vec<_> = checked
+        .evaluation
+        .findings
+        .iter()
+        .filter(|f| f.severity == Severity::Blocker && !crate::brief_check::COVERAGE_RULES.contains(&f.rule.as_ref()))
+        .collect();
     if !blockers.is_empty() {
         let listed = blockers.iter().map(|f| format!("{} line {}", f.rule, f.line)).collect::<Vec<_>>().join(", ");
         return refuse(

@@ -41,7 +41,7 @@ fn repo_with_clean_brief() -> TempDir {
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     std::fs::write(brief_path(repo), en_brief("")).unwrap();
     let tasks = repo.join(".canon/changes/add-login/tasks.md");
-    let mut text = std::fs::read_to_string(&tasks).unwrap();
+    let mut text = std::fs::read_to_string(&tasks).unwrap_or_else(|_| "# Tasks: Add login\n".to_string());
     text.push_str("\n- [ ] 1 Write the failure-path scenarios\n");
     std::fs::write(&tasks, text).unwrap();
     ok(repo, &["ingest", "plans"]);
@@ -71,6 +71,25 @@ fn en_brief(extra: &str) -> String {
 <!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n\
 <!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nSocial sign-in.\n\n{extra}"
     )
+}
+
+#[test]
+fn a_scope_changed_mid_build_is_reapproved_before_its_scenarios_exist() {
+    let dir = repo_with_clean_brief();
+    let repo = dir.path();
+    assert!(approve(repo, "Ana", "Go.").status.success());
+    for to in ["specced", "building"] {
+        ok(repo, &["subject", "status", "demo", to, "--reason", "start"]);
+    }
+    let text = std::fs::read_to_string(brief_path(repo)).unwrap();
+    std::fs::write(brief_path(repo), text.replace("thirty seconds", "sixty seconds")).unwrap();
+    let check: Value = serde_json::from_slice(&run(repo, &["brief", "check", "--json"]).stdout).unwrap();
+    let rules: Vec<&str> = check["findings"].as_array().unwrap().iter().filter_map(|f| f["rule"].as_str()).collect();
+    assert!(rules.contains(&"brief.flow-uncovered"), "building with no tagged scenario: {rules:?}");
+
+    let out = approve(repo, "Ana", "Sixty seconds, go.");
+    assert!(out.status.success(), "coverage gates shipping, not approval: {}", stderr(&out));
+    assert!(!status_text(repo).contains("BRIEF_CHANGED_SINCE_APPROVAL"));
 }
 
 #[test]

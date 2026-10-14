@@ -40,17 +40,19 @@ use canon_ingest::{native_plan_adapter, PlanSourceHandle};
 use canon_model::{paths, Change, ChangeId, SubjectId};
 
 use crate::context::resolve_repo_root;
+use crate::brief_template::ChangeKind;
 use crate::language::Language;
 
 /// Exit code for a refused invocation or a failed write — mirrors
 /// `canon subject`'s own `2`.
 const EXIT_REFUSED: i32 = 2;
 
-/// `brief.md`: the PRD brief ([`crate::brief_template`], 0.19 D1) in the
-/// repo's `language:`. The Intent section's first paragraph is the
-/// title, which imports as `Change.summary`.
-fn brief_md(title: &str, language: &Language) -> String {
-    crate::brief_template::prd_brief(title, language)
+/// `brief.md`: the PRD brief or, for a chore, the chore brief
+/// ([`crate::brief_template`], 0.19 D1/D5) in the repo's `language:`.
+/// The Intent section's first paragraph is the title, which imports as
+/// `Change.summary`.
+fn brief_md(kind: ChangeKind, title: &str, language: &Language) -> String {
+    crate::brief_template::brief(kind, title, language)
 }
 
 /// `path` relative to `repo` for output, or as-is when it is not under it.
@@ -95,10 +97,10 @@ fn first_missing_ancestor(dir: &Path) -> PathBuf {
 /// the native `canon` plan adapter: the one `Change` it yields is
 /// exactly what `canon ingest plans` would import from the published
 /// dir.
-fn stage_change(staging: &Path, slug: &ChangeId, title: &str, language: &Language) -> Result<Change, String> {
+fn stage_change(staging: &Path, slug: &ChangeId, kind: ChangeKind, title: &str, language: &Language) -> Result<Change, String> {
     let dir = staging.join(slug.as_str());
     fs::create_dir_all(&dir).map_err(|e| format!("failed to create the staging dir `{}`: {e}", dir.display()))?;
-    fs::write(dir.join("brief.md"), brief_md(title, language)).map_err(|e| format!("failed to stage `brief.md`: {e}"))?;
+    fs::write(dir.join("brief.md"), brief_md(kind, title, language)).map_err(|e| format!("failed to stage `brief.md`: {e}"))?;
     let entry = native_plan_adapter();
     let outcome = entry.adapter.parse(&PlanSourceHandle::Path(staging.to_path_buf()));
     if !outcome.malformed.is_empty() {
@@ -113,7 +115,7 @@ fn stage_change(staging: &Path, slug: &ChangeId, title: &str, language: &Languag
 
 /// `canon change new` (module doc). Exit `0` written + adopted, `2`
 /// refused or failed with nothing left behind.
-pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, title: &str) -> i32 {
+pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: ChangeKind, title: &str) -> i32 {
     let repo = resolve_repo_root(repo);
     let language = match crate::language::configured(&repo) {
         Ok(language) => language,
@@ -150,7 +152,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, title: &str
 
     let staging_path = repo.join(paths::CANON_DIR).join(format!("change-new-{}-{}", slug.as_str(), std::process::id()));
     let staging = Created(Some(first_missing_ancestor(&staging_path)));
-    let change = match stage_change(&staging_path, slug, title, &language) {
+    let change = match stage_change(&staging_path, slug, kind, title, &language) {
         Ok(change) => change,
         Err(e) => {
             eprintln!("canon change new: {e}");

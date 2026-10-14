@@ -1330,6 +1330,10 @@ enum ChangeCommand {
         /// The existing subject to adopt the change under
         #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
         subject: SubjectId,
+        /// `feature` (default): the PRD brief. `chore`: a short brief for work that
+        /// changes how the subject is built or kept, never what it does
+        #[arg(long, default_value = "feature", value_parser = canon_cli::brief_template::parse_kind)]
+        kind: canon_cli::brief_template::ChangeKind,
         /// The change's title (also its brief's summary)
         #[arg(long)]
         title: String,
@@ -1763,7 +1767,7 @@ fn main() -> ExitCode {
             }
         },
         Command::Change { action } => match action {
-            ChangeCommand::New { slug, subject, title, repo } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject, &title) as u8),
+            ChangeCommand::New { slug, subject, kind, title, repo } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject, kind, &title) as u8),
         },
         Command::Brief { action, change, repo, json } => ExitCode::from(match action {
             Some(BriefCommand::Check) => canon_cli::brief_check::run_check(&repo, change.as_ref(), json),
