@@ -248,6 +248,41 @@ pub struct SubjectSummary {
     /// Status then names the reopen command. Omitted when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub red: Vec<String>,
+    /// The flow steps of the subject's current (newest adopted) change's
+    /// brief with the scenarios tagged `@flow:<change>.<F-id>` (0.19 D4).
+    /// Omitted for a brief with no flow steps (a legacy brief) or no brief.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub flow: Vec<FlowStep>,
+}
+
+/// One flow step of the brief and what covers it.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlowStep {
+    /// `F1`.
+    pub id: String,
+    /// The change whose brief defines it.
+    pub change: String,
+    pub scenarios: Vec<FlowScenarioState>,
+    /// `no scenario` and/or `no failure case`; empty when covered.
+    pub gaps: Vec<&'static str>,
+}
+
+/// One scenario covering a flow step, with the evidence and review state
+/// the gate reads for it.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlowScenarioState {
+    pub id: String,
+    pub title: String,
+    /// Tagged `@case:failure`.
+    pub failure: bool,
+    /// Has a ledger verdict ([`Joins::verdict_state`]).
+    pub evidenced: bool,
+    /// `reviewed`, or the review gap's kind: `missing`, `stale`,
+    /// `unsigned`, `not-distinct`; `not-indexed` when the scenario index
+    /// has no record for the id yet (`canon inventory sync`).
+    pub review: &'static str,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -718,7 +753,54 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         missing_cases,
         brief: brief_with_findings(repo, plan_roots, subject, &changes),
         red,
+        flow: changes.last().map(|change| flow_steps(ctx, joins, repo, change, distinct_actor)).unwrap_or_default(),
     }
+}
+
+/// [`SubjectSummary::flow`]: each step of `change`'s brief, joined to its
+/// scenarios through [`crate::brief_check::flow_scenarios`] (the one
+/// `@flow:` lookup the brief rules also read) and to their evidence and
+/// review state through the gate's own joins.
+fn flow_steps(ctx: &GateContext, joins: &Joins, repo: &Path, change: &ChangeId, distinct_actor: bool) -> Vec<FlowStep> {
+    let ids = crate::brief_check::flow_ids(repo, change);
+    if ids.is_empty() {
+        return Vec::new();
+    }
+    let index = crate::brief_check::flow_scenarios(repo, change).unwrap_or_default();
+    let known = latest_scenarios(ctx);
+    ids.into_iter()
+        .map(|id| {
+            let scenarios: Vec<FlowScenarioState> = index
+                .get(&id)
+                .into_iter()
+                .flatten()
+                .map(|found| {
+                    let record = known.iter().find(|s| s.scenario_id.as_str() == found.id);
+                    let (evidenced, review) = match record {
+                        None => (false, "not-indexed"),
+                        Some(record) => (
+                            joins.verdict_state(record).0,
+                            match review_gap(ctx, record, distinct_actor).map(|gap| gap.kind) {
+                                None => "reviewed",
+                                Some(ReviewGapKind::Missing) => "missing",
+                                Some(ReviewGapKind::Unsigned) => "unsigned",
+                                Some(ReviewGapKind::Stale) => "stale",
+                                Some(ReviewGapKind::NotDistinct) => "not-distinct",
+                            },
+                        ),
+                    };
+                    FlowScenarioState { id: found.id.clone(), title: found.title.clone(), failure: found.failure, evidenced, review }
+                })
+                .collect();
+            let mut gaps = Vec::new();
+            if scenarios.is_empty() {
+                gaps.push("no scenario");
+            } else if !scenarios.iter().any(|s| s.failure) {
+                gaps.push("no failure case");
+            }
+            FlowStep { id, change: change.as_str().to_string(), scenarios, gaps }
+        })
+        .collect()
 }
 
 /// [`crate::brief::brief_of`] plus what `canon brief check` found in the
@@ -1082,6 +1164,20 @@ pub fn render(report: &StatusReport) -> String {
             }
             if let Some(counts) = s.brief.as_ref().and_then(|b| b.findings) {
                 let _ = writeln!(out, "      brief check: {} blocker(s), {} advisory(ies); `canon brief` names the next step", counts.blockers, counts.advisories);
+            }
+            for step in &s.flow {
+                let _ = writeln!(out, "      flow {}{}", step.id, if step.gaps.is_empty() { String::new() } else { format!(" — {}", step.gaps.join(", ")) });
+                for scenario in &step.scenarios {
+                    let _ = writeln!(
+                        out,
+                        "        {} \"{}\"{} — evidence: {}, review: {}",
+                        scenario.id,
+                        scenario.title,
+                        if scenario.failure { " [failure]" } else { "" },
+                        if scenario.evidenced { "yes" } else { "none" },
+                        scenario.review
+                    );
+                }
             }
             if !s.red.is_empty() {
                 let _ = writeln!(out, "      gate: red — {}; reopen with `{}`", s.red.join(", "), reopen_command(&s.id));

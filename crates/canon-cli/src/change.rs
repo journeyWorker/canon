@@ -1,6 +1,7 @@
 //! `canon change new <slug> --subject <id> --title <t>` (0.14 D2, 0.17
 //! D2): the official path to a plan change. It writes canon's own
-//! change dir, `.canon/changes/<slug>/` (`brief.md` + `tasks.md`), reads
+//! change dir, `.canon/changes/<slug>/` (`brief.md` only, 0.19 D4: flow coverage
+//! replaces the task checklist; an existing `tasks.md` is still read), reads
 //! it back with the native `canon` plan adapter `canon ingest plans`
 //! reads that directory with, and records it adopted into the subject
 //! through the same write `canon subject adopt` performs
@@ -52,14 +53,6 @@ fn brief_md(title: &str, language: &Language) -> String {
     crate::brief_template::prd_brief(title, language)
 }
 
-/// `tasks.md`: no rows yet, so the change imports as `proposed`. The
-/// row grammar is named in a comment, which the row parser never reads.
-fn tasks_md(title: &str) -> String {
-    format!(
-        "# Tasks: {title}\n\n<!-- One checkbox row per task, numbered: `- [ ] 1 Write the failure-path scenarios`. Each row imports as task `<slug>#<n>`; flip it with `canon gate task` once evidence exists, never by hand. -->\n"
-    )
-}
-
 /// `path` relative to `repo` for output, or as-is when it is not under it.
 fn display_rel(path: &Path, repo: &Path) -> String {
     path.strip_prefix(repo).unwrap_or(path).display().to_string()
@@ -98,16 +91,14 @@ fn first_missing_ancestor(dir: &Path) -> PathBuf {
     missing
 }
 
-/// Write the two files into `staging/<slug>/` and read them back with
+/// Write `brief.md` into `staging/<slug>/` and read them back with
 /// the native `canon` plan adapter: the one `Change` it yields is
 /// exactly what `canon ingest plans` would import from the published
 /// dir.
 fn stage_change(staging: &Path, slug: &ChangeId, title: &str, language: &Language) -> Result<Change, String> {
     let dir = staging.join(slug.as_str());
     fs::create_dir_all(&dir).map_err(|e| format!("failed to create the staging dir `{}`: {e}", dir.display()))?;
-    for (name, content) in [("brief.md", brief_md(title, language)), ("tasks.md", tasks_md(title))] {
-        fs::write(dir.join(name), content).map_err(|e| format!("failed to stage `{name}`: {e}"))?;
-    }
+    fs::write(dir.join("brief.md"), brief_md(title, language)).map_err(|e| format!("failed to stage `brief.md`: {e}"))?;
     let entry = native_plan_adapter();
     let outcome = entry.adapter.parse(&PlanSourceHandle::Path(staging.to_path_buf()));
     if !outcome.malformed.is_empty() {
@@ -187,9 +178,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, title: &str
     }
     published.keep();
 
-    for name in ["brief.md", "tasks.md"] {
-        println!("canon change new: wrote {}", display_rel(&dir.join(name), &repo));
-    }
+    println!("canon change new: wrote {}", display_rel(&dir.join("brief.md"), &repo));
     println!(
         "canon change new: recorded change `{}` adopted into subject `{}` — {}",
         slug.as_str(),

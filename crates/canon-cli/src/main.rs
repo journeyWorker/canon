@@ -195,7 +195,7 @@ enum Command {
         #[command(subcommand)]
         action: SubjectCommand,
     },
-    /// Write a plan change (.canon/changes/<slug>: brief + tasks) adopted into a subject
+    /// Write a plan change (.canon/changes/<slug>/brief.md) and adopt it into a subject
     #[command(after_help = "Examples:\n  canon change new add-login --subject auth --title 'Add login'")]
     Change {
         #[command(subcommand)]
@@ -1260,6 +1260,13 @@ enum ScenarioCommand {
         /// specifies (`happy`, `failure`, `edge` in the base vocabulary)
         #[arg(long, value_parser = canon_cli::scaffold::parse_lane_slug)]
         case: Option<String>,
+        /// The brief flow step this scenario covers (`F1`): writes `@flow:<change>.<F-id>`.
+        /// The change is --change, else the newest change of --subject, else the only live change
+        #[arg(long, value_name = "F-ID")]
+        flow: Option<String>,
+        /// The change whose brief defines --flow (default: --subject's newest adopted change)
+        #[arg(long, requires = "flow", value_parser = canon_cli::subject::parse_change_id)]
+        change: Option<ChangeId>,
         /// Agent id written into provenance (env: CANON_ACTOR)
         #[arg(long, env = "CANON_ACTOR", default_value = "canon-scaffold")]
         actor: String,
@@ -1305,7 +1312,7 @@ enum BriefCommand {
 
 #[derive(Subcommand)]
 enum ChangeCommand {
-    /// Write .canon/changes/<slug>/{brief,tasks}.md, import it, and adopt it into a subject
+    /// Write .canon/changes/<slug>/brief.md, import it, and adopt it into a subject
     New {
         /// The change's slug (its change_id)
         #[arg(value_parser = canon_cli::subject::parse_change_id)]
@@ -1712,11 +1719,22 @@ fn main() -> ExitCode {
             PluginCommand::Sync { plugin_id, repo, spec_root } => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref()),
         },
         Command::Scenario { action } => match action {
-            ScenarioCommand::New { tag, title, subject, lane, case, actor, feature, project, repo } => {
+            ScenarioCommand::New { tag, title, subject, lane, case, flow, change, actor, feature, project, repo } => {
+                let flow_tag = match &flow {
+                    None => None,
+                    Some(flow) => match canon_cli::brief_check::flow_tag_value(&canon_cli::context::resolve_repo_root(&repo), subject.as_ref(), change.as_ref(), flow) {
+                        Ok(value) => Some(value),
+                        Err(e) => {
+                            eprintln!("canon scenario new: refused — {e}");
+                            return ExitCode::from(2);
+                        }
+                    },
+                };
                 let axes = canon_cli::scaffold::ScenarioAxes {
                     subject: subject.as_ref().map(SubjectId::as_str),
                     lane: lane.as_deref(),
                     case: case.as_deref(),
+                    flow: flow_tag.as_deref(),
                 };
                 run_scenario_new(&repo, &tag, &title, feature.as_deref(), project.as_ref(), axes, &actor)
             }

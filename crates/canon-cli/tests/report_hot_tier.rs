@@ -39,9 +39,7 @@ fn fresh_repo_with_tasks() -> tempfile::TempDir {
     ok(run_canon(&["subject", "new", "auth", "--domain", "dev", "--title", "Auth"], repo), "subject new");
     ok(run_canon(&["change", "new", "add-login", "--subject", "auth", "--title", "Add login"], repo), "change new");
     let tasks = repo.join(".canon/changes/add-login/tasks.md");
-    let mut text = fs::read_to_string(&tasks).unwrap();
-    text.push_str("- [ ] 1 Write the login scenarios\n- [ ] 2 Implement login\n");
-    fs::write(&tasks, text).unwrap();
+    fs::write(&tasks, "- [ ] 1 Write the login scenarios\n- [ ] 2 Implement login\n").unwrap();
     let brief = repo.join(".canon/changes/add-login/brief.md");
     let mut text = fs::read_to_string(&brief).unwrap();
     text.push_str("\nApproved: journey 2026-10-12 — \"go\"\n");

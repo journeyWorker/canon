@@ -52,7 +52,8 @@ fn change_new_scaffolds_imports_and_adopts_with_no_config_edit() {
 
     let brief = std::fs::read_to_string(dir.path().join(".canon/changes/add-login/brief.md")).unwrap();
     assert!(brief.contains("<!-- canon:section intent role=context -->\n## Intent\n\nAdd login\n") && brief.contains("<!-- canon:section out-of-scope role=context -->"), "{brief}");
-    assert!(dir.path().join(".canon/changes/add-login/tasks.md").is_file());
+    assert!(!dir.path().join(".canon/changes/add-login/tasks.md").exists(), "0.19 D4: change new writes the brief only");
+    assert!(stdout(&out).contains("brief.md") && !stdout(&out).contains("tasks.md"), "{}", stdout(&out));
 
     let changes = query(dir.path(), "change");
     assert!(
@@ -67,12 +68,10 @@ fn change_new_scaffolds_imports_and_adopts_with_no_config_edit() {
     assert_eq!(subjects.len(), 1);
     assert!(subjects[0]["change_ids"].as_array().unwrap().iter().any(|c| c == "add-login"), "{subjects:?}");
 
-    // A task row added to the written tasks.md imports through canon's
-    // own plan source, with no `plans:` entry.
+    // A tasks.md written by hand is still read through canon's own plan
+    // source, with no `plans:` entry.
     let tasks_path = dir.path().join(".canon/changes/add-login/tasks.md");
-    let mut tasks = std::fs::read_to_string(&tasks_path).unwrap();
-    tasks.push_str("\n- [ ] 1 Write the failure-path scenarios\n");
-    std::fs::write(&tasks_path, tasks).unwrap();
+    std::fs::write(&tasks_path, "# Tasks\n\n- [ ] 1 Write the failure-path scenarios\n").unwrap();
     let ingest = run(dir.path(), &["ingest", "plans"]);
     assert!(ingest.status.success(), "{}", stderr(&ingest));
     let task_rows = query(dir.path(), "task");
@@ -91,9 +90,7 @@ fn a_task_flip_keeps_the_changes_adopted_subject() {
     let created = run(repo, &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     assert!(created.status.success(), "{}", stderr(&created));
     let tasks_path = repo.join(".canon/changes/add-login/tasks.md");
-    let mut tasks = std::fs::read_to_string(&tasks_path).unwrap();
-    tasks.push_str("\n- [ ] 1 Write the failure-path scenarios\n");
-    std::fs::write(&tasks_path, tasks).unwrap();
+    std::fs::write(&tasks_path, "# Tasks\n\n- [ ] 1 Write the failure-path scenarios\n").unwrap();
     assert!(run(repo, &["ingest", "plans"]).status.success());
     // The human approved the brief (0.16 M7: nothing is attested before).
     let brief_path = repo.join(".canon/changes/add-login/brief.md");
