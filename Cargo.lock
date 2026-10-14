@@ -521,6 +521,7 @@ dependencies = [
  "canon-vocab",
  "chrono",
  "clap",
+ "libc",
  "quick-xml",
  "rustix",
  "serde",

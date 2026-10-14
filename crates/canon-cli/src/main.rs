@@ -1622,11 +1622,33 @@ fn usage_error(error: &clap::Error) -> ExitCode {
     ExitCode::from(usage.emit("canon", true) as u8)
 }
 
+/// Rust starts with SIGPIPE ignored, so every write to a stdout whose reader
+/// has gone (`canon status | head`) fails and `println!` panics (exit 101).
+/// canon restores the default action: the process ends quietly on SIGPIPE,
+/// as other command-line tools do (0.20). `dashboard` serves sockets and
+/// keeps it ignored, so a client that disconnects never kills the server.
+#[cfg(unix)]
+fn set_sigpipe(default: bool) {
+    let action = if default { libc::SIG_DFL } else { libc::SIG_IGN };
+    // SAFETY: called on the main thread before any other thread exists or
+    // any output is written; it only changes the process's SIGPIPE action.
+    unsafe {
+        libc::signal(libc::SIGPIPE, action);
+    }
+}
+
+#[cfg(not(unix))]
+fn set_sigpipe(_default: bool) {}
+
 fn main() -> ExitCode {
+    set_sigpipe(true);
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(error) => return usage_error(&error),
     };
+    if matches!(cli.command, Command::Dashboard { .. }) {
+        set_sigpipe(false);
+    }
     match cli.command {
         Command::Skills { action } => match action {
             SkillsCommand::Install { source, target, providers, json } => run_skills_install(source.as_deref(), &target, providers.as_deref(), json),
