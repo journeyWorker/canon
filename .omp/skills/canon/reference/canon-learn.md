@@ -46,15 +46,12 @@ The production activation path is a signed, paired-evaluation workflow:
    ```bash
    canon learn approve <strategy_id> --evaluation evaluation.json \
      --principal alice --repo .
-   # `request` is an exact alias:
-   canon learn request <strategy_id> --evaluation evaluation.json \
-     --principal alice --repo .
    ```
 
    The JSON output contains the evaluation digest, RFC3339 `approved_at`,
    subject `strategy:<strategy_id>`, namespace
-   `canon-learning-approval-v1`, and `payload_hex`. `approve`/`request` never
-   read a private key and never set `verified`.
+   `canon-learning-approval-v1`, and `payload_hex`. `approve` never
+   reads a private key and never sets `verified`.
 6. Decode `payload_hex` to the exact canonical JSON bytes. The signed object
    is:
 

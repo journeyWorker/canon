@@ -25,6 +25,8 @@ pub enum RetentionError {
     Learn(#[from] canon_learn::LearnError),
     #[error("partial purge: {matched} record(s) matched; at least {deleted} deleted: {reason}; purge backends are non-transactional")]
     PartialPurge { matched: usize, deleted: usize, reason: String },
+    #[error("plan digest {expected} no longer matches the data (now {actual})")]
+    PlanChanged { expected: String, actual: String },
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("json: {0}")]
@@ -200,21 +202,67 @@ fn partial_purge_value(kind: RecordKind, before: DateTime<Utc>, matched: usize, 
     })
 }
 
-pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, dry_run: bool, json_output: bool) -> u8 {
+/// What `canon purge` was asked to do. A bare `purge` is refused before
+/// this is built: deleting needs a reviewed plan.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PurgeMode {
+    /// `--plan`: report what would be removed and its `planDigest`; delete nothing.
+    Plan,
+    /// `--confirm <digest>`: delete only if the plan recomputed now still has this digest.
+    Confirm(String),
+}
+
+/// The digest of a purge plan: the kind, the cutoff, what the preflight
+/// counted at every rung and in the learn store, and the identity of every
+/// record it would remove (the sorted keys, streamed into the hash). A
+/// record added, removed or swapped for another between `--plan` and
+/// `--confirm` changes the digest even when the count does not.
+fn plan_digest(kind: RecordKind, before: DateTime<Utc>, outcome: &PurgeOutcome, learn_matched: Option<usize>, keys: &[String], learn_keys: Option<&[String]>) -> String {
+    use sha2::{Digest, Sha256};
+    let header = json!({
+        "kind": kind.as_str(),
+        "before": before.to_rfc3339(),
+        "rungs": outcome.rungs.iter().map(|r| json!([r.rung.as_str(), r.backend.as_str(), r.matched])).collect::<Vec<_>>(),
+        "unavailable": outcome.unavailable,
+        "learn_matched": learn_matched,
+    });
+    let mut hasher = Sha256::new();
+    hasher.update(header.to_string().as_bytes());
+    for (label, set) in [("registry", Some(keys)), ("learn", learn_keys)] {
+        hasher.update(format!("\n{label}:{}\n", set.map_or(0, <[String]>::len)).as_bytes());
+        for key in set.unwrap_or_default() {
+            hasher.update(key.as_bytes());
+            hasher.update(b"\n");
+        }
+    }
+    hasher.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Option<PurgeMode>, json_output: bool) -> u8 {
+    let Some(mode) = mode else {
+        return CliError::refused("PURGE_PLAN_REQUIRED", "`canon purge` deletes only a reviewed plan, and none was given")
+            .hint(format!("run `canon purge --kind {} --before {} --plan`, review it, then rerun with `--confirm <planDigest>`", kind.as_str(), before.to_rfc3339()))
+            .emit("canon purge", json_output) as u8;
+    };
     let result = (|| -> Result<(), RetentionError> {
         let (yaml, registry) = loaded_registry(repo, kind)?;
         let learn_store = if kind == RecordKind::Trajectory { Some(loaded_trajectory_store(repo, &yaml)?) } else { None };
         let learn_preflight = if let Some(store) = &learn_store { Some(store.purge_before(before, true)?) } else { None };
-        let outcome = match RetentionService::new(&registry).purge(kind, before, dry_run) {
-            Ok(outcome) => outcome,
-            Err(err) => return Err(err.into()),
+        let plan = RetentionService::new(&registry).purge(kind, before, true)?;
+        let keys = RetentionService::new(&registry).purge_plan_keys(kind, before)?;
+        let learn_keys = if let Some(store) = &learn_store { Some(store.purge_keys_before(before)?) } else { None };
+        let digest = plan_digest(kind, before, &plan, learn_preflight, &keys, learn_keys.as_deref());
+        let confirmed = match &mode {
+            PurgeMode::Plan => false,
+            PurgeMode::Confirm(expected) if *expected == digest => true,
+            PurgeMode::Confirm(expected) => return Err(RetentionError::PlanChanged { expected: expected.clone(), actual: digest }),
         };
+        let outcome = if confirmed { RetentionService::new(&registry).purge(kind, before, false)? } else { plan };
         let registry_matched: usize = outcome.rungs.iter().map(|r| r.matched).sum();
         let registry_deleted: usize = outcome.rungs.iter().map(|r| r.deleted).sum();
         let learn_counts = if let Some(store) = learn_store {
-            if dry_run {
-                let count = learn_preflight.expect("trajectory preflight count");
-                Some((count, 0))
+            if !confirmed {
+                Some((learn_preflight.expect("trajectory preflight count"), 0))
             } else {
                 let count = store.purge_before(before, false).map_err(|err| RetentionError::PartialPurge {
                     matched: registry_matched + learn_preflight.unwrap_or(0),
@@ -228,15 +276,32 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, dry_run: 
         };
         let learn_matched = learn_counts.map(|(matched, _)| matched).unwrap_or(0);
         let learn_deleted = learn_counts.map(|(_, deleted)| deleted).unwrap_or(0);
-        let value = purge_value(&outcome, learn_counts);
+        let mut value = purge_value(&outcome, learn_counts);
+        value.as_object_mut().expect("purge manifest object").insert("planDigest".to_string(), json!(digest));
         let matched = registry_matched + learn_matched;
         let deleted = registry_deleted + learn_deleted;
         append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
-        output_json_or_human(&value, json_output, &format!("canon purge --kind {}: {} matched, {} deleted", kind.as_str(), matched, deleted));
+        let summary = if confirmed {
+            format!("canon purge --kind {}: {} matched, {} deleted", kind.as_str(), matched, deleted)
+        } else {
+            format!(
+                "canon purge --kind {} --plan: {matched} record(s) would be removed (planDigest {digest}); delete them with `canon purge --kind {} --before {} --confirm {digest}`",
+                kind.as_str(),
+                kind.as_str(),
+                before.to_rfc3339()
+            )
+        };
+        output_json_or_human(&value, json_output, &summary);
         Ok(())
     })();
     match result {
         Ok(()) => 0,
+        Err(RetentionError::PlanChanged { expected, actual }) => {
+            let _ = append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, 0, 0);
+            CliError::refused("PLAN_CHANGED", format!("the plan digest {expected} no longer matches the data (now {actual}); nothing was deleted"))
+                .hint(format!("run `canon purge --kind {} --before {} --plan` again and review it", kind.as_str(), before.to_rfc3339()))
+                .emit("canon purge", json_output) as u8
+        }
         Err(err) => {
             let (matched, deleted) = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) => (*matched, *deleted),
@@ -272,14 +337,34 @@ fn redacted_metadata(kind: RecordKind, raw: &canon_model::evidence::RawRecord) -
     json!({"kind": kind.as_str(), "at": at, "id": id, "digest": digest})
 }
 
-pub fn run_export(repo: &Path, kind: RecordKind, before: Option<DateTime<Utc>>, after: Option<DateTime<Utc>>, out: Option<&Path>, json_output: bool, include_sensitive: bool) -> u8 {
-    let result = (|| -> Result<(), RetentionError> {
+pub fn run_export(
+    repo: &Path,
+    kind: RecordKind,
+    before: Option<DateTime<Utc>>,
+    after: Option<DateTime<Utc>>,
+    out: Option<&Path>,
+    json_output: bool,
+    include_sensitive: bool,
+    page: &crate::paging::Page,
+) -> u8 {
+    let mut next_cursor_line = None;
+    let result = (|| -> Result<(), ExportFailure> {
         ensure_sensitive(repo, include_sensitive)?;
         let (_, registry) = loaded_registry(repo, kind)?;
         let mut query = TierQuery::kind(kind);
         if let Some(after) = after { query = query.since(after); }
         let rows = registry.query(&query)?.records;
         let rows: Vec<_> = rows.into_iter().filter(|raw| before.is_none_or(|cutoff| raw_record_at(raw) < cutoff)).collect();
+        let (rows, meta) = crate::paging::paginate(
+            &format!("export:{}", kind.as_str()),
+            rows,
+            |raw| {
+                let metadata = redacted_metadata(kind, raw);
+                format!("{}|{}|{}", metadata["at"].as_str().unwrap_or_default(), metadata["id"].as_str().unwrap_or_default(), metadata["digest"].as_str().unwrap_or_default())
+            },
+            page,
+        )
+        .map_err(ExportFailure::Cursor)?;
         let metadata: Vec<Value> = rows.iter().map(|raw| redacted_metadata(kind, raw)).collect();
         let mut manifest = json!({
             "schema": "canon.retention.export",
@@ -292,6 +377,7 @@ pub fn run_export(repo: &Path, kind: RecordKind, before: Option<DateTime<Utc>>, 
             "content_digests": metadata.iter().filter_map(|m| m.get("digest").cloned()).collect::<Vec<_>>(),
             "records": metadata,
             "sensitive": include_sensitive,
+            "meta": meta.to_json(),
         });
         if include_sensitive {
             manifest.as_object_mut().expect("manifest object").insert("sensitive_records".to_string(), Value::Array(rows.iter().map(|r| r.0.clone()).collect()));
@@ -312,14 +398,39 @@ pub fn run_export(repo: &Path, kind: RecordKind, before: Option<DateTime<Utc>>, 
         }
         append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
         if out.is_some() && !json_output { eprintln!("canon export: wrote {} record(s)", rows.len()); }
+        // The manifest itself is JSON on stdout, so the human cursor line
+        // goes to stderr and never breaks a pipe into a JSON parser.
+        next_cursor_line = meta.human_line();
         Ok(())
     })();
     match result {
-        Ok(()) => 0,
-        Err(err) => {
+        Ok(()) => {
+            if let Some(line) = next_cursor_line {
+                eprintln!("{line}");
+            }
+            0
+        }
+        Err(ExportFailure::Cursor(err)) => {
+            let _ = append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, 0, 0);
+            err.emit("canon export", json_output) as u8
+        }
+        Err(ExportFailure::Retention(err)) => {
             let _ = append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, 0, 0);
             CliError::refused("RETENTION_EXPORT_FAILED", err.to_string()).emit("canon export", json_output) as u8
         }
+    }
+}
+
+/// Why an export stopped: a bad `--cursor`, or the retention failures
+/// `RETENTION_EXPORT_FAILED` has always covered.
+enum ExportFailure {
+    Cursor(CliError),
+    Retention(RetentionError),
+}
+
+impl<E: Into<RetentionError>> From<E> for ExportFailure {
+    fn from(err: E) -> Self {
+        ExportFailure::Retention(err.into())
     }
 }
 

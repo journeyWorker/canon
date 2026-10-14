@@ -11,5 +11,11 @@
       "severity": "should-fix",
       "summary": "the count was typed by hand"
     }
-  ]
+  ],
+  "meta": {
+    "hasMore": false,
+    "nextCursor": null,
+    "returned": 1,
+    "total": 1
+  }
 }

@@ -355,6 +355,12 @@ enum Command {
         /// Permit sensitive query output only when policy explicitly allows it
         #[arg(long)]
         include_sensitive: bool,
+        /// Return at most this many records per page, `--cursor` to continue, `--all` for every record
+        #[command(flatten)]
+        page: canon_cli::paging::PageFlags,
+        /// With --json, keep only these top-level record fields (comma-separated); an unknown field is refused
+        #[arg(long, value_delimiter = ',')]
+        fields: Option<Vec<String>>,
     },
     /// Export a redacted retention manifest without deleting records
     Export {
@@ -372,8 +378,10 @@ enum Command {
         json: bool,
         #[arg(long)]
         include_sensitive: bool,
+        #[command(flatten)]
+        page: canon_cli::paging::PageFlags,
     },
-    /// Permanently remove allowlisted records older than a cutoff
+    /// Remove allowlisted records older than a cutoff: `--plan` shows the removal set and its planDigest, `--confirm <planDigest>` deletes it
     Purge {
         #[arg(long, value_parser = canon_cli::query::parse_kind)]
         kind: RecordKind,
@@ -381,8 +389,12 @@ enum Command {
         before: DateTime<Utc>,
         #[arg(long, default_value = ".")]
         repo: PathBuf,
-        #[arg(long)]
-        dry_run: bool,
+        /// Print the removal set and its `planDigest`; delete nothing
+        #[arg(long, conflicts_with = "confirm")]
+        plan: bool,
+        /// Delete, but only if the plan recomputed now has this `planDigest`
+        #[arg(long, value_name = "PLAN_DIGEST")]
+        confirm: Option<String>,
         #[arg(long)]
         json: bool,
     },
@@ -601,19 +613,6 @@ enum LearnCommand {
     },
     /// Produce an unsigned, externally signable approval payload
     Approve {
-        #[arg(value_parser = canon_cli::learn::parse_strategy_id)]
-        strategy_id: StrategyId,
-        #[arg(long)]
-        evaluation: PathBuf,
-        #[arg(long)]
-        principal: String,
-        #[arg(long, default_value = ".")]
-        repo: PathBuf,
-        #[arg(long)]
-        json: bool,
-    },
-    /// Alias for approve: produce an unsigned approval request payload
-    Request {
         #[arg(value_parser = canon_cli::learn::parse_strategy_id)]
         strategy_id: StrategyId,
         #[arg(long)]
@@ -1127,12 +1126,17 @@ enum FindingCommand {
         /// Only findings whose current disposition is open
         #[arg(long)]
         open: bool,
-        /// Print `{change_id, findings: [...]}` as JSON
+        /// Print `{change_id, findings: [...], meta}` as JSON
         #[arg(long)]
         json: bool,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        #[command(flatten)]
+        page: canon_cli::paging::PageFlags,
+        /// With --json, keep only these finding fields (comma-separated): round, seq, severity, disposition, reviewer, summary, resolution_sha, file_ref
+        #[arg(long, value_delimiter = ',')]
+        fields: Option<Vec<String>>,
     },
 }
 
@@ -1301,9 +1305,11 @@ enum DivergenceCliCommand {
         /// Governs Deferred expiry; defaults to now
         #[arg(long, value_parser = canon_cli::divergence::parse_timestamp)]
         as_of: Option<DateTime<Utc>>,
-        /// Output JSON instead of the human-readable form
+        /// Print `{data, meta}` as JSON
         #[arg(long)]
         json: bool,
+        #[command(flatten)]
+        page: canon_cli::paging::PageFlags,
     },
 }
 
@@ -1627,11 +1633,18 @@ fn main() -> ExitCode {
         Command::Tier { action } => match action {
             TierCommand::Age { dry_run, repo, canon_yaml, json } => run_tier_age(&repo, canon_yaml.as_deref(), dry_run, json),
         },
-        Command::Query { kind, since, repo, canon_yaml, json, plugin, change_id, status, domain, include_sensitive } => {
-            run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, change_id, status, domain, include_sensitive)
+        Command::Query { kind, since, repo, canon_yaml, json, plugin, change_id, status, domain, include_sensitive, page, fields } => {
+            run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, change_id, status, domain, include_sensitive, page.page(), fields)
         }
-        Command::Export { kind, before, after, out, repo, json, include_sensitive } => ExitCode::from(canon_cli::retention::run_export(&repo, kind, before, after, out.as_deref(), json, include_sensitive)),
-        Command::Purge { kind, before, repo, dry_run, json } => ExitCode::from(canon_cli::retention::run_purge(&repo, kind, before, dry_run, json)),
+        Command::Export { kind, before, after, out, repo, json, include_sensitive, page } => ExitCode::from(canon_cli::retention::run_export(&repo, kind, before, after, out.as_deref(), json, include_sensitive, &page.page())),
+        Command::Purge { kind, before, repo, plan, confirm, json } => {
+            let mode = match (plan, confirm) {
+                (_, Some(digest)) => Some(canon_cli::retention::PurgeMode::Confirm(digest)),
+                (true, None) => Some(canon_cli::retention::PurgeMode::Plan),
+                (false, None) => None,
+            };
+            ExitCode::from(canon_cli::retention::run_purge(&repo, kind, before, mode, json))
+        }
         Command::Format { check: _, root, repo, json } => run_fmt(&root, repo.as_deref(), json),
         Command::Context { repo, json } => run_context(&repo, json),
         Command::Status { repo, json } => {
@@ -1808,8 +1821,8 @@ fn main() -> ExitCode {
                     &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, promote: promote.flag(), json },
                 ) as u8)
             }
-            FindingCommand::List { change_id, open, json, repo } => {
-                ExitCode::from(canon_cli::finding::run_list(&repo, &canon_cli::finding::FindingListArgs { change_id, open, json }) as u8)
+            FindingCommand::List { change_id, open, json, repo, page, fields } => {
+                ExitCode::from(canon_cli::finding::run_list(&repo, &canon_cli::finding::FindingListArgs { change_id, open, json, page: page.page(), fields }) as u8)
             }
         },
         Command::Review { action } => match action {
@@ -1874,7 +1887,7 @@ fn main() -> ExitCode {
             DivergenceCliCommand::Defer { project_id, scenario_id, sha, round, reviewer, reason, expiry, actor_id, role, repo, json } => {
                 ExitCode::from(canon_cli::divergence::run_defer(&repo, &project_id, &scenario_id, &sha, round, &reviewer, &reason, expiry, &actor_id, &role, json) as u8)
             }
-            DivergenceCliCommand::Status { repo, as_of, json } => ExitCode::from(canon_cli::divergence::run_status(&repo, as_of, json) as u8),
+            DivergenceCliCommand::Status { repo, as_of, json, page } => ExitCode::from(canon_cli::divergence::run_status(&repo, as_of, json, &page.page()) as u8),
         },
         Command::Inventory { action } => match action {
             InventoryCommand::Sync { repo, spec_root, json } => run_inventory_sync(&repo, spec_root.as_deref(), json),
@@ -1948,8 +1961,6 @@ fn main() -> ExitCode {
                 canon_cli::learn::run_promote_with_evidence(&repo, &strategy_id, dry_run, evaluation.as_deref(), approval.as_deref(), signature.as_deref(), json),
             LearnCommand::Approve { strategy_id, evaluation, principal, repo, json } =>
                 canon_cli::learn::run_approve(&repo, &strategy_id, &evaluation, &principal, json),
-            LearnCommand::Request { strategy_id, evaluation, principal, repo, json } =>
-                canon_cli::learn::run_request(&repo, &strategy_id, &evaluation, &principal, json),
             LearnCommand::Rollback { strategy_id, reason, actor, signature_file, approved_at, contradicting_trajectory_id, repo, json } =>
                 canon_cli::learn::run_rollback(&repo, &strategy_id, &reason, &actor, contradicting_trajectory_id.as_deref(), &signature_file, &approved_at, json),
         },
@@ -2116,6 +2127,8 @@ fn run_query(
     status: Option<String>,
     domain: Option<String>,
     include_sensitive: bool,
+    page: canon_cli::paging::Page,
+    fields: Option<Vec<String>>,
 ) -> ExitCode {
     // s19 `query-scope-filters` design D5: kind-gating + status-domain
     // validation runs BEFORE any tier read (task 3.2/3.3) -- a usage
@@ -2134,6 +2147,13 @@ fn run_query(
     let Some(plugin_id) = plugin else {
         return match canon_cli::query::run(repo, canon_yaml, kind, since, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
             Ok(outcome) => {
+                let outcome = match canon_cli::query::page_outcome(outcome, &page, fields, false) {
+                    Ok(outcome) => outcome,
+                    Err(err) => {
+                        let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
+                        return ExitCode::from(err.emit("canon query", json) as u8);
+                    }
+                };
                 let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, outcome.records.len());
                 if json {
                     println!("{}", canon_cli::query::format_json_with_sensitive(&outcome, include_sensitive));
@@ -2151,6 +2171,13 @@ fn run_query(
 
     match canon_cli::query::run_with_plugin(repo, canon_yaml, kind, since, &plugin_id, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
         Ok((outcome, plugin_outcome)) => {
+            let outcome = match canon_cli::query::page_outcome(outcome, &page, fields, true) {
+                Ok(outcome) => outcome,
+                Err(err) => {
+                    let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
+                    return ExitCode::from(err.emit("canon query", json) as u8);
+                }
+            };
             let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, outcome.records.len());
             for msg in &plugin_outcome.diagnostics {
                 eprintln!("canon query --plugin {plugin_id}: {msg}");

@@ -1,6 +1,12 @@
 {
   "count": 1,
   "kind": "subject",
+  "meta": {
+    "hasMore": false,
+    "nextCursor": null,
+    "returned": 1,
+    "total": 1
+  },
   "records": [
     {
       "actor": {

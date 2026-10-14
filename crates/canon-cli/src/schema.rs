@@ -113,7 +113,6 @@ pub const META: &[CommandMeta] = &[
     row("inventory sync", Write),
     row("learn approve", Write),
     row("learn promote", Write),
-    row("learn request", Write),
     row("learn rollback", Write),
     row("migrate", Write),
     row("plugin sync", Write),

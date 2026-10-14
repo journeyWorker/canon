@@ -16,7 +16,7 @@
 //! resolved (`PluginQueryOutcome::projections` non-empty), and otherwise
 //! uses the core formatter path.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use canon_model::envelope::RecordKind;
@@ -33,6 +33,8 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 use crate::context::resolve_canon_yaml;
+use crate::paging::{self, Page, PageMeta};
+use crate::cli_error::CliError;
 use crate::tiers::{self, TierCliError};
 
 #[derive(Debug, thiserror::Error)]
@@ -53,6 +55,11 @@ pub struct QueryOutcome {
     /// `--change-id`/`--status` filtering) — every other kind's
     /// `QueryOutcome` always carries `None`.
     pub rollup: Option<(usize, usize)>,
+    /// Set by [`page_outcome`]: what the page says about the rest of the
+    /// result. `None` leaves `records` and the output unbounded.
+    pub page: Option<PageMeta>,
+    /// `--fields`: the top-level record fields JSON output keeps.
+    pub fields: Option<Vec<String>>,
 }
 
 /// `--kind`'s `clap` value parser — `<k>` is a [`RecordKind`] wire
@@ -375,7 +382,49 @@ pub fn run(
     let records = fold_rewritten_kind(kind, records);
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
-    Ok(QueryOutcome { kind, since, records, violation_count, rollup })
+    Ok(QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None })
+}
+
+/// The top-level record fields `--fields` may name for `kind`: what the
+/// kind's schema declares (`canon context --json`'s `kinds.<kind>`), plus
+/// the fields `--json` adds on top (a change's `subject_ids`, a
+/// `--plugin` overlay's `overlay`).
+pub fn known_fields(kind: RecordKind, plugin: bool) -> BTreeSet<String> {
+    let registry = canon_policy::SchemaRegistry::load();
+    let mut fields: BTreeSet<String> = registry
+        .get(kind)
+        .and_then(|schema| schema.as_value().get("properties").and_then(Value::as_object).map(|props| props.keys().cloned().collect()))
+        .unwrap_or_default();
+    if kind == RecordKind::Change {
+        fields.insert("subject_ids".to_string());
+    }
+    if plugin {
+        fields.insert("overlay".to_string());
+    }
+    fields
+}
+
+/// The key a cursor names a record by: `at`, id and content digest, the
+/// same three the human table shows.
+fn record_key(kind: RecordKind, raw: &RawRecord) -> String {
+    let id = canon_store::partition::resolve_partition(kind, &raw.0).map(|p| p.natural_key).unwrap_or_default();
+    format!("{}|{id}|{}", canon_store::tier::raw_record_at(raw).to_rfc3339(), canon_store::partition::content_digest12(&raw.0))
+}
+
+/// Applies `--limit`/`--cursor`/`--all` and `--fields` to a finished query:
+/// `outcome.records` becomes the requested page, in the order the query
+/// returned them, and `page` records what remains. `--fields` is checked
+/// before anything is cut, so a typo fails on the first call, not the last.
+pub fn page_outcome(mut outcome: QueryOutcome, page: &Page, fields: Option<Vec<String>>, plugin: bool) -> Result<QueryOutcome, CliError> {
+    if let Some(requested) = &fields {
+        paging::check_fields("canon query", requested, &known_fields(outcome.kind, plugin))?;
+    }
+    let kind = outcome.kind;
+    let (records, meta) = paging::paginate(&format!("query:{}", kind.as_str()), std::mem::take(&mut outcome.records), |raw| record_key(kind, raw), page)?;
+    outcome.records = records;
+    outcome.page = Some(meta);
+    outcome.fields = fields;
+    Ok(outcome)
 }
 
 /// Default human-table report: a header line (`--kind`, `--since`,
@@ -416,7 +465,7 @@ pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: b
         let digest = canon_store::partition::content_digest12(&raw.0);
         out.push_str(&format!("{:<30} {:<30} {}\n", at.to_rfc3339(), id, digest));
     }
-    out
+    finish_human(out, outcome)
 }
 
 /// Replace the open-ended parts of an event body that commonly carry
@@ -520,12 +569,40 @@ pub fn format_json_with_sensitive(outcome: &QueryOutcome, include_sensitive: boo
         "since": outcome.since.map(|s| s.to_rfc3339()),
         "count": outcome.records.len(),
         "violations": outcome.violation_count,
-        "records": outcome.records.iter().map(|r| query_record(outcome.kind, r, include_sensitive)).collect::<Vec<_>>(),
+        "records": outcome.records.iter().map(|r| shape_record(outcome, query_record(outcome.kind, r, include_sensitive))).collect::<Vec<_>>(),
     });
-    if let Some((done, total)) = outcome.rollup {
-        payload.as_object_mut().expect("payload is always a JSON object").insert("rollup".to_string(), serde_json::json!({"done": done, "total": total}));
-    }
+    finish_json(&mut payload, outcome);
     serde_json::to_string_pretty(&payload).expect("serde_json::Value always serializes")
+}
+
+/// `--fields`' projection of one JSON record, a no-op without `--fields`.
+fn shape_record(outcome: &QueryOutcome, record: Value) -> Value {
+    match &outcome.fields {
+        Some(fields) => paging::project(&record, fields),
+        None => record,
+    }
+}
+
+/// The JSON tail both formatters share: the `--kind task` rollup and the
+/// page `meta`.
+fn finish_json(payload: &mut Value, outcome: &QueryOutcome) {
+    let object = payload.as_object_mut().expect("payload is always a JSON object");
+    if let Some((done, total)) = outcome.rollup {
+        object.insert("rollup".to_string(), serde_json::json!({"done": done, "total": total}));
+    }
+    if let Some(page) = &outcome.page {
+        object.insert("meta".to_string(), page.to_json());
+    }
+}
+
+/// The human tail both formatters share: the next-cursor line when more
+/// records remain.
+fn finish_human(mut out: String, outcome: &QueryOutcome) -> String {
+    if let Some(line) = outcome.page.as_ref().and_then(PageMeta::human_line) {
+        out.push_str(&line);
+        out.push('\n');
+    }
+    out
 }
 
 /// One resolved overlay's projected view (task 3.3): the `<namespace>.
@@ -693,7 +770,7 @@ pub fn run_with_plugin(
     let records = fold_rewritten_kind(kind, records);
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
-    let outcome = QueryOutcome { kind, since, records, violation_count, rollup };
+    let outcome = QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None };
 
     let git = git_root.map(GitTier::new);
     let plugin_outcome = resolve_and_project(&project_dir, git.as_ref(), kind, plugin_id, &outcome.records);
@@ -716,7 +793,7 @@ pub fn format_json_with_overlay(outcome: &QueryOutcome, plugin_id: &str, project
 }
 
 pub fn format_json_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], include_sensitive: bool) -> String {
-    let records: Vec<Value> = outcome.records.iter().map(|raw| merge_overlay_fields(outcome.kind, raw, projections, include_sensitive)).collect();
+    let records: Vec<Value> = outcome.records.iter().map(|raw| shape_record(outcome, merge_overlay_fields(outcome.kind, raw, projections, include_sensitive))).collect();
     let mut payload = serde_json::json!({
         "kind": outcome.kind.as_str(),
         "since": outcome.since.map(|s| s.to_rfc3339()),
@@ -726,9 +803,7 @@ pub fn format_json_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id:
         "overlays": projections.iter().map(|p| p.identity.clone()).collect::<Vec<_>>(),
         "records": records,
     });
-    if let Some((done, total)) = outcome.rollup {
-        payload.as_object_mut().expect("payload is always a JSON object").insert("rollup".to_string(), serde_json::json!({"done": done, "total": total}));
-    }
+    finish_json(&mut payload, outcome);
     serde_json::to_string_pretty(&payload).expect("serde_json::Value always serializes")
 }
 
@@ -804,7 +879,7 @@ pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id
             .unwrap_or_else(|| "-".to_string());
         out.push_str(&format!("{:<30} {:<30} {:<16} {}\n", at.to_rfc3339(), id, digest, overlay_desc));
     }
-    out
+    finish_human(out, outcome)
 }
 
 #[cfg(test)]
@@ -831,6 +906,8 @@ mod tests {
             }))],
             violation_count: 0,
             rollup: None,
+            page: None,
+            fields: None,
         }
     }
 
