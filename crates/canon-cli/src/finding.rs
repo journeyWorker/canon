@@ -893,6 +893,9 @@ pub struct FindingListArgs {
     /// Only findings whose CURRENT disposition is `open`.
     pub open: bool,
     pub json: bool,
+    pub page: crate::paging::Page,
+    /// `--fields`: the row fields `--json` keeps.
+    pub fields: Option<Vec<String>>,
 }
 
 /// The current version of every committed finding on `change_id`, one
@@ -947,12 +950,23 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
     if args.open {
         findings.retain(|f| f.disposition() == FindingDisposition::Open);
     }
+    if let Some(requested) = &args.fields {
+        let known: std::collections::BTreeSet<String> = LIST_FIELDS.iter().map(|f| f.to_string()).collect();
+        if let Err(e) = crate::paging::check_fields("canon finding list", requested, &known) {
+            return e.emit("canon finding list", args.json);
+        }
+    }
+    let scope = format!("finding list:{}", args.change_id);
+    let (findings, meta) = match crate::paging::paginate(&scope, findings, |f| format!("{}-{}", f.round, f.seq), &args.page) {
+        Ok(paged) => paged,
+        Err(e) => return e.emit("canon finding list", args.json),
+    };
 
     if args.json {
         let rows: Vec<serde_json::Value> = findings
             .iter()
             .map(|f| {
-                serde_json::json!({
+                let row = serde_json::json!({
                     "round": f.round,
                     "seq": f.seq,
                     "severity": severity_slug(f.severity),
@@ -961,22 +975,32 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
                     "summary": f.summary,
                     "resolution_sha": f.resolution_sha().map(|sha| sha.as_str()),
                     "file_ref": f.file_ref,
-                })
+                });
+                match &args.fields {
+                    Some(fields) => crate::paging::project(&row, fields),
+                    None => row,
+                }
             })
             .collect();
-        let out = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows });
+        let out = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows, "meta": meta.to_json() });
         println!("{}", serde_json::to_string_pretty(&out).expect("a JSON value always serializes"));
     } else if findings.is_empty() {
         let which = if args.open { "open findings" } else { "findings" };
         println!("canon finding list: no committed {which} on change `{}`", args.change_id);
     } else {
         print!("{}", render_finding_table(&findings));
+        if let Some(line) = meta.human_line() {
+            println!("{line}");
+        }
     }
     if staged > 0 {
         eprintln!("canon finding list: {staged} staged finding(s) on change `{}` are not listed until committed — run `canon gate promote`", args.change_id);
     }
     0
 }
+
+/// The JSON fields of one `finding list` row, which `--fields` may name.
+const LIST_FIELDS: [&str; 8] = ["round", "seq", "severity", "disposition", "reviewer", "summary", "resolution_sha", "file_ref"];
 
 /// One header row and one row per finding, columns padded to their
 /// widest cell; the summary, last, is never padded.

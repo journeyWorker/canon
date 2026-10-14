@@ -1,6 +1,12 @@
 {
   "count": 3,
   "kind": "review",
+  "meta": {
+    "hasMore": false,
+    "nextCursor": null,
+    "returned": 3,
+    "total": 3
+  },
   "records": [
     {
       "actor": {

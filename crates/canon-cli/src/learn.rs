@@ -252,10 +252,6 @@ pub fn run_approve(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path
     ExitCode::SUCCESS
 }
 
-pub fn run_request(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path, principal: &str, json_output: bool) -> ExitCode {
-    run_approve(repo, strategy_id, evaluation_path, principal, json_output)
-}
-
 pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: &str, contradicting: Option<&str>, signature_path: &Path, approved_at: &str) -> ExitCode {
     let repo = resolve_repo_root(repo);
     let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {

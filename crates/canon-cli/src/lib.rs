@@ -28,6 +28,7 @@ pub mod inventory_selftest;
 pub mod language;
 pub mod learn;
 pub mod migrate;
+pub mod paging;
 pub mod plans;
 pub mod plugin_sync;
 pub mod policy_approval;

@@ -299,18 +299,55 @@ pub fn run_defer(
 /// with `mart_review_burndown`'s per-day TREND). `as_of` defaults to
 /// "now"; ALWAYS exits `0` — a read-only capability query over
 /// whatever is currently on the ledger, never a gate.
-pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>) -> i32 {
+pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page) -> i32 {
     let repo = resolve_repo_root(repo);
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon divergence status", false);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon divergence status", json);
         }
     };
     let as_of = as_of.unwrap_or_else(Utc::now);
 
     let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, as_of);
     let summary = canon_report::divergence::summarize(&states);
+    let (rows, meta) = match crate::paging::paginate("divergence status", states.into_iter().collect::<Vec<_>>(), |((project_id, scenario_id), _)| format!("{project_id}/{scenario_id}"), page) {
+        Ok(paged) => paged,
+        Err(e) => return e.emit("canon divergence status", json),
+    };
+
+    if json {
+        let scenarios: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|((project_id, scenario_id), state)| {
+                let mut row = serde_json::json!({ "project_id": project_id.as_str(), "scenario_id": scenario_id.as_str(), "state": state_slug(state) });
+                if let canon_model::FoldedState::Deferred { reason, expiry } = state {
+                    row["reason"] = serde_json::json!(reason);
+                    row["expiry"] = serde_json::json!(expiry.to_string());
+                }
+                row
+            })
+            .collect();
+        let mut meta_json = serde_json::json!({ "command": "divergence status" });
+        meta.insert_into(meta_json.as_object_mut().expect("meta is an object"));
+        let out = serde_json::json!({
+            "data": {
+                "as_of": as_of.to_rfc3339(),
+                "summary": {
+                    "open": summary.open,
+                    "resolved": summary.resolved,
+                    "still_divergent": summary.still_divergent,
+                    "deferred": summary.deferred,
+                    "resolved_invalid": summary.resolved_invalid,
+                    "total": summary.total(),
+                },
+                "scenarios": scenarios,
+            },
+            "meta": meta_json,
+        });
+        println!("{}", serde_json::to_string_pretty(&out).expect("a JSON value always serializes"));
+        return 0;
+    }
 
     println!(
         "canon divergence status (as of {as_of}): open={} resolved={} still-divergent={} deferred={} resolved-invalid={} (total={})",
@@ -321,17 +358,27 @@ pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>) -> i32 {
         summary.resolved_invalid,
         summary.total()
     );
-    for ((project_id, scenario_id), state) in &states {
+    for ((project_id, scenario_id), state) in &rows {
         let state_str = match state {
-            canon_model::FoldedState::Open => "open".to_string(),
-            canon_model::FoldedState::Resolved => "resolved".to_string(),
-            canon_model::FoldedState::StillDivergent => "still-divergent".to_string(),
             canon_model::FoldedState::Deferred { reason, expiry } => format!("deferred({reason}, until {expiry})"),
-            canon_model::FoldedState::ResolvedInvalid => "resolved-invalid".to_string(),
+            other => state_slug(other).to_string(),
         };
         println!("  {project_id}/{scenario_id}: {state_str}");
     }
+    if let Some(line) = meta.human_line() {
+        println!("{line}");
+    }
     0
+}
+
+fn state_slug(state: &canon_model::FoldedState) -> &'static str {
+    match state {
+        canon_model::FoldedState::Open => "open",
+        canon_model::FoldedState::Resolved => "resolved",
+        canon_model::FoldedState::StillDivergent => "still-divergent",
+        canon_model::FoldedState::Deferred { .. } => "deferred",
+        canon_model::FoldedState::ResolvedInvalid => "resolved-invalid",
+    }
 }
 
 #[cfg(test)]
@@ -470,7 +517,7 @@ mod tests {
         assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role), 0);
 
         // Read-only capability query — always exits 0.
-        assert_eq!(run_status(dir.path(), None), 0);
+        assert_eq!(run_status(dir.path(), None, false, &crate::paging::Page::first_page()), 0);
 
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, Utc::now());
@@ -500,7 +547,7 @@ mod tests {
         let persisted_before = files_with_bytes(&divergence_dir);
         assert_eq!(persisted_before.len(), 1, "exactly the one committed resolution");
 
-        assert_eq!(run_status(dir.path(), None), 0);
+        assert_eq!(run_status(dir.path(), None, false, &crate::paging::Page::first_page()), 0);
         let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, Utc::now());
         assert_eq!(states.get(&(project_id, scenario_id)), Some(&canon_model::FoldedState::ResolvedInvalid));
 
