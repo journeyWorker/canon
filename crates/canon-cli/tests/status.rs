@@ -670,11 +670,11 @@ fn context_status_60_status_reads_the_approval_from_the_changes_brief() {
     let words = APPROVED.strip_prefix("Approved: ").unwrap();
     assert_eq!(
         subject(&report, "demo-subject")["brief"],
-        serde_json::json!({"approved": true, "enforced": false, "change": "c-second", "brief": ".canon/changes/c-second/brief.md", "briefExists": true, "approval": words})
+        serde_json::json!({"approved": true, "enforced": false, "change": "c-second", "brief": ".canon/changes/c-second/brief.md", "briefExists": true, "approval": words, "legacyApproval": true})
     );
     assert_eq!(
         subject(&report, "done-subject")["brief"],
-        serde_json::json!({"approved": true, "enforced": false, "change": "c-done-subject", "brief": ".canon/changes/c-done-subject/brief.md", "briefExists": true, "approval": words}),
+        serde_json::json!({"approved": true, "enforced": false, "change": "c-done-subject", "brief": ".canon/changes/c-done-subject/brief.md", "briefExists": true, "approval": words, "legacyApproval": true}),
         "a shipped subject shows its brief in full"
     );
     assert!(subject(&report, "early-subject").get("brief").is_none(), "a specced subject carries no brief field");
@@ -807,7 +807,7 @@ fn context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points
     let words = APPROVED.strip_prefix("Approved: ").unwrap();
     assert_eq!(
         subject(&report, "old-subject")["brief"],
-        serde_json::json!({"approved": true, "enforced": false, "change": "c-old", "brief": ".canon/changes/c-old/brief.md", "briefExists": true, "source": "plans/changes/archive/c-old/proposal.md", "approval": words}),
+        serde_json::json!({"approved": true, "enforced": false, "change": "c-old", "brief": ".canon/changes/c-old/brief.md", "briefExists": true, "source": "plans/changes/archive/c-old/proposal.md", "approval": words, "legacyApproval": true}),
         "{report}"
     );
     let human: Vec<&Value> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").collect();

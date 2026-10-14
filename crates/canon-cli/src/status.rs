@@ -1074,6 +1074,12 @@ pub fn render(report: &StatusReport) -> String {
             }
             if let Some(brief) = &s.brief {
                 let _ = match (&brief.approval, &brief.brief, &brief.change) {
+                    (Some(_), Some(_), _) if brief.changed => writeln!(out, "      brief: not approved ({}); {}", brief.unanswered(), brief.record()),
+                    (Some(approval), Some(path), _) if brief.legacy_approval => writeln!(
+                        out,
+                        "      brief: approved in {path} — {approval}\n      advisory: that approval has no digest, so it does not follow the brief's text; {} to bind it",
+                        brief.record_digest_hint()
+                    ),
                     (Some(approval), Some(path), _) => writeln!(out, "      brief: approved in {path} — {approval}"),
                     (None, Some(_), _) => writeln!(out, "      brief: not approved ({})", brief.unanswered()),
                     (_, None, Some(change)) => writeln!(out, "      brief: not approved (change `{change}` has no brief; advisory, nothing to approve yet)"),
