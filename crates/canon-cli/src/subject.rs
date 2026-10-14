@@ -725,6 +725,7 @@ pub fn run_status(
     // an index the `.feature` edits are not in would ship ungraded specs.
     if ships {
         blocking.extend(crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation("verifying → shipped: ")));
+        blocking.extend(brief_check_violation(&repo, subject_id, &changes));
     }
     if reopens {
         blocking.extend(reopen_violation(&repo, &subject, &changes));
@@ -976,6 +977,29 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
         violation
     }));
     violations
+}
+
+/// The `verifying → shipped` brief-structure check (0.19 D2): the blocker
+/// rules of `canon brief check` over the subject's newest adopted change's
+/// brief, as one `unreviewed-promotion` naming each finding. Not waivable
+/// by `--override-reason`: the brief waives its own findings, one rule in
+/// one section (`canon:waive`). `None` when there is no such brief, it is a
+/// pre-0.19 brief, or nothing blocks.
+fn brief_check_violation(repo: &Path, subject_id: &SubjectId, changes: &[ChangeId]) -> Option<Violation> {
+    let findings = crate::brief_check::guard_blockers(repo, changes.last()?);
+    if findings.is_empty() {
+        return None;
+    }
+    let listed = findings
+        .iter()
+        .map(|f| format!("{} [{}] line {}", f.rule, f.section.as_deref().unwrap_or("-"), f.line))
+        .collect::<Vec<_>>()
+        .join("; ");
+    Some(Violation::new(
+        FailureClass::UnreviewedPromotion,
+        subject_id.as_str(),
+        format!("verifying → shipped: the brief has {} blocker finding(s): {listed}; `canon brief check` shows them", findings.len()),
+    ))
 }
 
 /// The `verifying → shipped` brief check (module doc): an

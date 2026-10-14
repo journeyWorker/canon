@@ -1588,3 +1588,35 @@ fn subject_lifecycle_34_a_pre_0_18_change_reads_as_a_one_element_list_and_a_seco
     assert_eq!(changes["count"], 1, "the old and the new version fold to one row: {changes}");
     assert_eq!(changes["records"][0]["subject_ids"], serde_json::json!(["perception", "editing"]), "{changes}");
 }
+
+// ── the ship guard runs the brief's blocker rules (0.19 D2) ──
+
+/// A PRD brief with one flow step, `F1`, approved by a human.
+fn prd_brief_with(extra: &str) -> String {
+    format!(
+        "# Demo\n\n<!-- canon:section intent role=context -->\n## Intent\n\nDemo\n\nWhy.\n\n<!-- canon:section outcome role=normative -->\n## Desired outcome\n\nIt works. ==**It works.**==\n\n<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 The user sees → does → becomes. ==**One step.**==\n\n<!-- canon:section detail role=normative -->\n## Step detail\n\n### F1 Step\n\nRules. ==**Rules.**==\n\n<!-- canon:section acceptance role=normative -->\n## Acceptance\n\nF1 observable, failure covered. ==**Covered.**==\n\n<!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nNone.\n\n{APPROVED}\n{extra}"
+    )
+}
+
+/// 0.19 D2: an approved PRD brief whose flow step no scenario points at
+/// refuses the ship, `--override-reason` does not waive it, and the brief's
+/// own waiver (one rule, one section, a reason) is what clears it.
+#[test]
+fn the_ship_guard_refuses_brief_blockers_and_only_the_briefs_own_waiver_clears_them() {
+    let dir = repo();
+    seed_technically_ship_ready(dir.path(), "");
+    std::fs::write(dir.path().join(".canon/changes/c-demo/brief.md"), prd_brief_with("")).unwrap();
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("brief.flow-uncovered [flow]"), "{}", stderr(&out));
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped", "--override-reason", "ship it"]);
+    assert_eq!(out.status.code(), Some(1), "an override never waives brief blockers: {}", stderr(&out));
+    assert_eq!(query_subjects(dir.path(), &[])["records"][0]["status"], "verifying");
+
+    let waiver = "<!-- canon:waive brief.flow-uncovered flow \"world.demo.01 predates flow tags\" -->\n";
+    std::fs::write(dir.path().join(".canon/changes/c-demo/brief.md"), prd_brief_with(waiver)).unwrap();
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(query_subjects(dir.path(), &[])["records"][0]["status"], "shipped");
+}

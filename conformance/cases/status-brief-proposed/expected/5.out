@@ -44,7 +44,11 @@
         "enforced": true,
         "change": "cart-v1",
         "brief": ".canon/changes/cart-v1/brief.md",
-        "briefExists": true
+        "briefExists": true,
+        "findings": {
+          "blockers": 7,
+          "advisories": 0
+        }
       }
     }
   ],
