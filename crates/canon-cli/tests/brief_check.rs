@@ -218,14 +218,40 @@ fn prose_rules_flag_only_normative_sections_in_en_and_ko_and_never_block() {
     assert_eq!((code, rules(&report)), (0, Vec::<String>::new()), "no prose rules for fr: {report}");
 }
 
+/// Dogfood eval 7: a flow step is three clauses ("sees → does → becomes"),
+/// so length is judged per clause; one overlong clause still fires.
 #[test]
-fn flow_coverage_blocks_once_the_subject_is_building_and_reads_the_flow_tag() {
+fn a_flow_step_is_measured_clause_by_clause() {
+    let dir = repo_with_change(None);
+    let clause = "word ".repeat(20);
+    let long = "word ".repeat(40);
+    let brief = en_brief("")
+        .replace("1. F1 The visitor sees the form → submits credentials → lands on the catalog.", &format!("1. F1 {clause}→ {clause}→ {clause}."))
+        .replace("2. F2 The visitor submits a wrong password → sees an error → can retry.", &format!("2. F2 {clause}→ {long}→ {clause}."));
+    std::fs::write(brief_path(dir.path()), brief).unwrap();
+    let (_, report) = check(dir.path(), &[]);
+    let long_lines: Vec<&str> = report["findings"].as_array().unwrap().iter().filter(|f| f["rule"] == "prose.sentence-length").filter_map(|f| f["excerpt"].as_str()).collect();
+    assert_eq!(long_lines.len(), 1, "only the step with a 40-word clause: {report}");
+    assert!(long_lines[0].starts_with("F2"), "{long_lines:?}");
+}
+
+/// A digest-less approval line: enough for the coverage rules to apply.
+const APPROVED: &str = "Approved: Ana 2026-10-14 — \"Go.\"\n";
+
+#[test]
+fn flow_coverage_blocks_once_the_brief_is_approved_and_the_subject_is_building() {
     let dir = repo_with_change(None);
     std::fs::write(brief_path(dir.path()), en_brief("")).unwrap();
     assert_eq!(check(dir.path(), &[]).0, 0, "before building, no coverage rule applies");
 
     ok(dir.path(), &["subject", "status", "demo", "specced"]);
     ok(dir.path(), &["subject", "status", "demo", "building"]);
+    // A new scope on a subject already past `building` (dogfood eval 7):
+    // its scenarios come after the approval, so none is due yet.
+    let (code, report) = check(dir.path(), &[]);
+    assert_eq!((code, report["phase"].as_str(), rules(&report)), (0, Some("shaping"), Vec::<String>::new()), "{report}");
+
+    std::fs::write(brief_path(dir.path()), en_brief(APPROVED)).unwrap();
     let (code, report) = check(dir.path(), &[]);
     assert_eq!(code, 2);
     assert_eq!(report["phase"], "building");
@@ -258,7 +284,7 @@ fn flow_coverage_blocks_once_the_subject_is_building_and_reads_the_flow_tag() {
 fn scenario_new_flow_tags_the_step_and_status_lists_per_step_coverage() {
     let dir = repo_with_change(None);
     let repo = dir.path();
-    std::fs::write(brief_path(repo), en_brief("")).unwrap();
+    std::fs::write(brief_path(repo), en_brief(APPROVED)).unwrap();
     assert!(!repo.join(".canon/changes/add-login/tasks.md").exists(), "change new writes no tasks.md");
     ok(repo, &["subject", "status", "demo", "specced"]);
     ok(repo, &["subject", "status", "demo", "building"]);
@@ -397,7 +423,7 @@ fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
     let (code, report) = en("bump-client", none_invariants);
     assert!(code == 2 && rules(&report).contains(&"brief.chore-empty".to_string()), "{report}");
 
-    std::fs::write(&path, chore_brief("infra")).unwrap();
+    std::fs::write(&path, format!("{}\n{APPROVED}", chore_brief("infra"))).unwrap();
     ok(dir.path(), &["subject", "status", "demo", "specced"]);
     ok(dir.path(), &["subject", "status", "demo", "building"]);
     let (code, report) = check(dir.path(), &["--change", "bump-client"]);
