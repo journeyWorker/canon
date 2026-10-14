@@ -58,6 +58,10 @@ impl<'a> RetentionService<'a> {
     pub fn purge(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<PurgeOutcome, StoreError> {
         self.registry.purge(kind, before, dry_run)
     }
+
+    pub fn purge_plan_keys(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
+        self.registry.purge_plan_keys(kind, before)
+    }
 }
 pub struct TierRegistry {
 
@@ -258,6 +262,27 @@ impl TierRegistry {
             }
         }
         Ok(PurgeOutcome { kind, before, dry_run, rungs: reports, unavailable })
+    }
+
+    /// The identity of every record [`Self::purge`] would remove, sorted and
+    /// prefixed with its rung and backend. Rungs that cannot be attached are
+    /// skipped, as a dry-run purge reports them in `unavailable`.
+    pub fn purge_plan_keys(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
+        if !is_purgeable_kind(kind) {
+            return Err(StoreError::PurgeKindUnsupported { kind: kind.as_str().to_string() });
+        }
+        let mut rungs = self.tiers_for_read(kind)?;
+        rungs.sort();
+        rungs.dedup();
+        let mut keys = Vec::new();
+        for rung in rungs {
+            let Ok(tier) = self.handle(rung) else { continue };
+            for key in tier.purge_keys(kind, before)? {
+                keys.push(format!("{}:{}:{key}", rung.as_str(), tier.backend().as_str()));
+            }
+        }
+        keys.sort();
+        Ok(keys)
     }
 
 

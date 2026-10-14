@@ -1350,7 +1350,8 @@ fn finding_list_json_carries_the_same_rows() {
             "findings": [
                 {"round": 1, "seq": 1, "severity": "blocker", "disposition": "rejected", "reviewer": "rev-a", "summary": "teardown races HMR", "resolution_sha": null, "file_ref": null},
                 {"round": 1, "seq": 2, "severity": "should-fix", "disposition": "open", "reviewer": "rev-b", "summary": "the count was typed by hand", "resolution_sha": null, "file_ref": null},
-            ]
+            ],
+            "meta": {"returned": 2, "total": 2, "hasMore": false, "nextCursor": null}
         })
     );
     let open = run_canon(&["finding", "list", "--change-id", "s43-findings-are-records", "--open", "--json"], dir.path());

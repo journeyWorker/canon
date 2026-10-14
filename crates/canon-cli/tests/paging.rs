@@ -168,3 +168,34 @@ fn plain_purge_is_refused_with_the_way_to_a_plan() {
     let dry_run = fixture.run_canon_with_repo(&purge_args(&before, &["--dry-run"]));
     assert_eq!(dry_run.status.code(), Some(2), "--dry-run is gone, not an alias");
 }
+
+fn first_file_under(dir: &std::path::Path) -> std::path::PathBuf {
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            return first_file_under(&path);
+        }
+        return path;
+    }
+    panic!("no file under {}", dir.display());
+}
+
+#[test]
+fn replacing_a_matching_record_with_another_at_equal_count_is_plan_changed() {
+    let fixture = purge_fixture();
+    let before = (Utc::now() - Duration::days(1)).to_rfc3339();
+    let plan = fixture.run_canon_with_repo(&purge_args(&before, &["--plan"]));
+    assert!(plan.status.success(), "{}", stderr(&plan));
+    let digest = json(&plan)["planDigest"].as_str().unwrap().to_string();
+    assert_eq!(fixture.git_file_count(), 2);
+
+    // Same count, different removal set: one planned record goes, another matching one arrives.
+    std::fs::remove_file(first_file_under(&fixture.git_root())).unwrap();
+    fixture.plant_trajectory_in_git(Utc::now() - Duration::days(3), 0.9);
+    assert_eq!(fixture.git_file_count(), 2);
+
+    let out = fixture.run_canon_with_repo(&purge_args(&before, &["--confirm", &digest]));
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(error_code(&out), "PLAN_CHANGED");
+    assert_eq!(fixture.git_file_count(), 2, "nothing was deleted");
+}

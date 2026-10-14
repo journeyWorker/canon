@@ -462,6 +462,22 @@ impl Tier for R2Tier {
         }
         Ok(TierReadResult { records, violations })
     }
+    fn purge_keys(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
+        let mut keys = Vec::new();
+        for path in self.list_kind(kind)? {
+            self.ensure_local_path_safe(&path)?;
+            let bytes = self.rt.block_on(async {
+                let result = self.store.get(&path).await.map_err(|e| StoreError::ObjectStore(e.to_string()))?;
+                result.bytes().await.map_err(|e| StoreError::ObjectStore(e.to_string()))
+            })?;
+            let Ok((rows, _)) = decode_rows(bytes, &path, kind) else { continue };
+            if rows.iter().any(|raw| raw_record_at(raw) < before) {
+                keys.push(path.to_string());
+            }
+        }
+        keys.sort();
+        Ok(keys)
+    }
     fn purge_before(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
         let mut matched = 0;
         let mut deleted = 0;

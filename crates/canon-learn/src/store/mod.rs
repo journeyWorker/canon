@@ -160,6 +160,9 @@ pub trait TrajectoryStore {
     /// Purge trajectories older than `before`, addressed by their
     /// `(regime_key, id)` file key. Dry runs only count matching rows.
     fn purge_before(&self, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<usize, LearnError>;
+    /// The identities `purge_before` would remove: the store-relative path
+    /// of every trajectory file holding a row older than `before`, sorted.
+    fn purge_keys_before(&self, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, LearnError>;
 
 }
 

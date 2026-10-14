@@ -345,6 +345,12 @@ pub trait Tier: Send + Sync {
     /// by their complete digest/key identity and MUST NOT follow symlinks.
     fn purge_before(&self, kind: RecordKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError>;
 
+    /// The identity of every record `purge_before` would remove, sorted:
+    /// a path or `(id, digest)` key, so a plan can tell a changed removal
+    /// set from an unchanged one at equal count. Read-only; reads no more
+    /// than the dry-run count already does.
+    fn purge_keys(&self, kind: RecordKind, before: DateTime<Utc>) -> Result<Vec<String>, StoreError>;
+
     /// Move every `rule.kind` record older than `rule.after` (by `at`)
     /// from this tier to `rule.destination`, deleting the source copy
     /// only after the destination write confirms (tier-policy spec).

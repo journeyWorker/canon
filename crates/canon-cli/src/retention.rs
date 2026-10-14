@@ -212,20 +212,30 @@ pub enum PurgeMode {
     Confirm(String),
 }
 
-/// The digest of a purge plan: the kind, the cutoff and what the preflight
-/// found at every rung (and in the learn store). Adding or removing a
-/// record the purge would take changes a count, so a plan reviewed before
-/// the change no longer confirms.
-fn plan_digest(kind: RecordKind, before: DateTime<Utc>, outcome: &PurgeOutcome, learn_matched: Option<usize>) -> String {
+/// The digest of a purge plan: the kind, the cutoff, what the preflight
+/// counted at every rung and in the learn store, and the identity of every
+/// record it would remove (the sorted keys, streamed into the hash). A
+/// record added, removed or swapped for another between `--plan` and
+/// `--confirm` changes the digest even when the count does not.
+fn plan_digest(kind: RecordKind, before: DateTime<Utc>, outcome: &PurgeOutcome, learn_matched: Option<usize>, keys: &[String], learn_keys: Option<&[String]>) -> String {
     use sha2::{Digest, Sha256};
-    let canonical = json!({
+    let header = json!({
         "kind": kind.as_str(),
         "before": before.to_rfc3339(),
         "rungs": outcome.rungs.iter().map(|r| json!([r.rung.as_str(), r.backend.as_str(), r.matched])).collect::<Vec<_>>(),
         "unavailable": outcome.unavailable,
         "learn_matched": learn_matched,
     });
-    Sha256::digest(canonical.to_string().as_bytes()).iter().map(|b| format!("{b:02x}")).collect()
+    let mut hasher = Sha256::new();
+    hasher.update(header.to_string().as_bytes());
+    for (label, set) in [("registry", Some(keys)), ("learn", learn_keys)] {
+        hasher.update(format!("\n{label}:{}\n", set.map_or(0, <[String]>::len)).as_bytes());
+        for key in set.unwrap_or_default() {
+            hasher.update(key.as_bytes());
+            hasher.update(b"\n");
+        }
+    }
+    hasher.finalize().iter().map(|b| format!("{b:02x}")).collect()
 }
 
 pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Option<PurgeMode>, json_output: bool) -> u8 {
@@ -239,7 +249,9 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
         let learn_store = if kind == RecordKind::Trajectory { Some(loaded_trajectory_store(repo, &yaml)?) } else { None };
         let learn_preflight = if let Some(store) = &learn_store { Some(store.purge_before(before, true)?) } else { None };
         let plan = RetentionService::new(&registry).purge(kind, before, true)?;
-        let digest = plan_digest(kind, before, &plan, learn_preflight);
+        let keys = RetentionService::new(&registry).purge_plan_keys(kind, before)?;
+        let learn_keys = if let Some(store) = &learn_store { Some(store.purge_keys_before(before)?) } else { None };
+        let digest = plan_digest(kind, before, &plan, learn_preflight, &keys, learn_keys.as_deref());
         let confirmed = match &mode {
             PurgeMode::Plan => false,
             PurgeMode::Confirm(expected) if *expected == digest => true,

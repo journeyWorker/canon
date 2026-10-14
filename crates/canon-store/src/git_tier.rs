@@ -522,6 +522,13 @@ impl Tier for GitTier {
         Ok(TierReadResult { records: found.into_iter().map(|(_, raw)| raw).collect(), violations })
     }
 
+    fn purge_keys(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
+        let (candidates, _) = self.scan_kind_where(kind, |at| at < before)?;
+        let mut keys: Vec<String> = candidates.iter().map(|(relative, raw)| format!("{}#{}", relative.display(), crate::partition::content_digest12(&raw.0))).collect();
+        keys.sort();
+        Ok(keys)
+    }
+
     fn purge_before(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<crate::tier::PurgeCount, StoreError> {
         let (candidates, _) = self.scan_kind_where(kind, |at| at < before)?;
         let matched = candidates.len();
