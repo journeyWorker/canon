@@ -261,7 +261,7 @@ fn load_gate_context(repo: &Path) -> Result<GateContext, String> {
 /// class and subject the ship guard's brief check prints. The subjects
 /// come from [`crate::brief::attested_briefs`]: the scenario's
 /// `@subject` owner and every subject adopting the task's change.
-fn brief_refusals(repo: &Path, ctx: &GateContext, task_id: Option<&TaskId>, scenario: Option<(&ProjectId, &ScenarioId)>) -> Vec<Violation> {
+fn brief_refusals(repo: &Path, ctx: &GateContext, task_id: Option<&TaskId>, scenario: Option<(&ProjectId, &ScenarioId)>) -> Vec<BriefRefusal> {
     // An unreadable `plans:` section finds no external proposal.md;
     // `canon status` warns about it.
     let plan_roots = crate::brief::plan_roots(repo).unwrap_or_default();
@@ -273,14 +273,25 @@ fn brief_refusals(repo: &Path, ctx: &GateContext, task_id: Option<&TaskId>, scen
     crate::brief::attested_briefs(repo, &plan_roots, ctx, task_id, scenario)
         .into_iter()
         .filter(|(_, brief)| brief.enforced)
-        .map(|(subject, brief)| {
-            Violation::new(
+        .map(|(subject, brief)| BriefRefusal {
+            violation: Violation::new(
                 FailureClass::UnreviewedPromotion,
                 subject.subject_id.as_str(),
                 format!("evidence for {what}: brief not approved — {}, so the human has not answered it; once they do, {}", brief.unanswered(), brief.record()),
-            )
+            ),
+            changed: brief.changed,
         })
         .collect()
+}
+
+/// One brief refusal: the `unreviewed-promotion` violation it prints, and
+/// whether the brief was approved once and edited since (the code readers
+/// branch on is `BRIEF_CHANGED_SINCE_APPROVAL` then, `BRIEF_UNAPPROVED`
+/// otherwise). Carried as a field, not read back out of the refusal text.
+#[derive(Clone)]
+struct BriefRefusal {
+    violation: Violation,
+    changed: bool,
 }
 
 /// `--verdict`'s clap `value_parser`. Kebab-cased on the CLI, matching
@@ -1102,7 +1113,7 @@ fn record_body(record: &EvidenceRecord, args: &EvidenceArgs) -> serde_json::Valu
 
 /// Prints `refusals` (0.16 M7, module doc). `Err(1)` when they refuse
 /// the attestation; with `--override-reason` they are printed as waived.
-fn report_brief_refusals(args: &EvidenceArgs, refusals: &[Violation]) -> Result<(), CliError> {
+fn report_brief_refusals(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Result<(), CliError> {
     if refusals.is_empty() {
         if args.override_reason.is_some() {
             eprintln!("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation");
@@ -1110,14 +1121,12 @@ fn report_brief_refusals(args: &EvidenceArgs, refusals: &[Violation]) -> Result<
         return Ok(());
     }
     let Some(reason) = &args.override_reason else {
-        let lines = refusals.iter().map(Violation::line).collect::<Vec<_>>().join("\n");
-        // The code readers branch on: a brief edited after its approval says
-        // `BRIEF_CHANGED_SINCE_APPROVAL` in its refusal text (0.19 D3).
-        let code = if refusals.iter().any(|v| v.detail.contains(crate::brief::CHANGED_CODE)) { crate::brief::CHANGED_CODE } else { "BRIEF_UNAPPROVED" };
+        let lines = refusals.iter().map(|r| r.violation.line()).collect::<Vec<_>>().join("\n");
+        let code = if refusals.iter().any(|r| r.changed) { crate::brief::CHANGED_CODE } else { "BRIEF_UNAPPROVED" };
         return Err(CliError::failed(code, lines).hint(BRIEF_STOP));
     };
     for refusal in refusals {
-        eprintln!("canon evidence add: waived {}", refusal.line());
+        eprintln!("canon evidence add: waived {}", refusal.violation.line());
     }
     eprintln!("canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
     Ok(())
@@ -1125,11 +1134,11 @@ fn report_brief_refusals(args: &EvidenceArgs, refusals: &[Violation]) -> Result<
 
 /// The [`BriefOverride`] a record carries for the brief `refusals` it
 /// waived, or `None` when nothing was waived.
-fn brief_override_of(args: &EvidenceArgs, refusals: &[Violation]) -> Option<BriefOverride> {
+fn brief_override_of(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Option<BriefOverride> {
     let reason = args.override_reason.as_ref().filter(|_| !refusals.is_empty())?;
     Some(BriefOverride {
         reason: reason.clone(),
-        waived: refusals.iter().map(|v| WaivedViolation { class: v.class.as_str().to_string(), subject: v.subject.clone() }).collect(),
+        waived: refusals.iter().map(|r| WaivedViolation { class: r.violation.class.as_str().to_string(), subject: r.violation.subject.clone() }).collect(),
         actor: Actor::new_unattributed(args.actor_id.as_str()),
     })
 }
@@ -1221,7 +1230,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         }
     }
 
-    let refusals: Vec<Vec<Violation>> = scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, None, Some((project_id, id)))).collect();
+    let refusals: Vec<Vec<BriefRefusal>> = scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, None, Some((project_id, id)))).collect();
     if let Err(error) = report_brief_refusals(args, &refusals.concat()) {
         let hint = format!("no record of the batch is written; {}", error.hint.as_deref().unwrap_or_default());
         return error.hint(hint).emit("canon evidence add", args.json);

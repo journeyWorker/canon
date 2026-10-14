@@ -453,13 +453,16 @@ enum Command {
         json: bool,
     },
     /// Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes
-    #[command(after_help = "Examples:\n  canon schema\n  canon schema --json\n  canon schema evidence add --json\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An alias (`fmt`) resolves to its\ncanonical command and the output names the canonical one. An unknown path exits 2 and names the\nnearest matches.")]
+    #[command(after_help = "Examples:\n  canon schema\n  canon schema --json\n  canon schema evidence add --json\n  canon schema --errors --json\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An alias (`fmt`) resolves to its\ncanonical command and the output names the canonical one. An unknown path exits 2 and names the\nnearest matches.")]
     Schema {
         /// Command path, e.g. `evidence add` (omit to list every command)
         path: Vec<String>,
         /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
+        /// Print every error code any command can emit, with its meaning, instead of a command
+        #[arg(long, conflicts_with = "path")]
+        errors: bool,
     },
 }
 
@@ -1981,7 +1984,7 @@ fn main() -> ExitCode {
             DispatchCommand::Diff { repo, json } => canon_cli::dispatch::run_diff(&repo, json),
         },
         Command::Selftest { json } => canon_cli::selftest::run_selftest(json),
-        Command::Schema { path, json } => ExitCode::from(canon_cli::schema::run(&Cli::command(), &path, json)),
+        Command::Schema { path, json, errors } => ExitCode::from(canon_cli::schema::run(&Cli::command(), &path, json, errors)),
     }
 }
 
