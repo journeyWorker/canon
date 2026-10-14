@@ -11,7 +11,9 @@ fn canon(args: &[&str]) -> Output {
 fn json(args: &[&str]) -> serde_json::Value {
     let out = canon(args);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-    serde_json::from_slice(&out.stdout).expect("stdout is JSON")
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("stdout is JSON");
+    assert_eq!(v["meta"]["command"], "schema", "{v}");
+    v["data"].clone()
 }
 
 #[test]
@@ -36,8 +38,8 @@ fn one_command_shows_options_with_their_shape() {
     assert_eq!(opt("all-scenarios")["kind"], "flag");
     assert_eq!(opt("report")["repeatable"], true);
     assert_eq!(v["effect"], "write");
-    assert_eq!(v["supports_json"], v["options"].as_array().unwrap().iter().any(|o| o["name"] == "json"));
-    let codes: Vec<&str> = v["error_codes"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
+    assert_eq!(v["supportsJson"], v["options"].as_array().unwrap().iter().any(|o| o["name"] == "json"));
+    let codes: Vec<&str> = v["errorCodes"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
     for code in ["EVIDENCE_FABRICATED", "BRIEF_UNAPPROVED", "BRIEF_CHANGED_SINCE_APPROVAL", "EVIDENCE_INVALID_ARGUMENT", "USAGE"] {
         assert!(codes.contains(&code), "{code} missing from {codes:?}");
     }
@@ -79,7 +81,7 @@ fn errors_lists_the_whole_registry() {
 fn enum_options_list_their_values_and_defaults() {
     let v = json(&["schema", "init", "--json"]);
     let policy = v["options"].as_array().unwrap().iter().find(|o| o["name"] == "policy").unwrap().clone();
-    assert!(policy["possible_values"].as_array().unwrap().iter().any(|p| p == "strict"));
+    assert!(policy["possibleValues"].as_array().unwrap().iter().any(|p| p == "strict"));
     let repo = v["options"].as_array().unwrap().iter().find(|o| o["name"] == "repo").unwrap().clone();
     assert_eq!(repo["default"][0], ".");
 }

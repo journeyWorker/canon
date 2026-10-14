@@ -251,6 +251,7 @@ const CODES: &[(&str, &str)] = &[
     ("TASK_ROW_NOT_FOUND", "the task's row is missing from its plan document"),
     ("TIER_FAILED", "tier aging failed"),
     ("TYPED_ATOMS_INVALID", "the typed-atoms file for the change does not parse"),
+    ("UNKNOWN_COMMAND", "`canon schema` was given a command path canon does not have"),
     ("UNKNOWN_FIELD", "`--fields` names a field the records do not have"),
     ("USAGE", "the command line did not parse: an unknown flag or subcommand, or a missing or malformed argument"),
     ("WRITE_FAILED", "a file or ledger record could not be written"),

@@ -115,7 +115,7 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
     let repo = scratch_repo();
     let listing = run(repo.path(), &["schema", "--json"]);
     let listing: Value = serde_json::from_slice(&listing.stdout).expect("schema lists the leaves");
-    let leaves: Vec<String> = listing["commands"].as_array().unwrap().iter().map(|c| c["command"].as_str().unwrap().to_string()).collect();
+    let leaves: Vec<String> = listing["data"]["commands"].as_array().unwrap().iter().map(|c| c["command"].as_str().unwrap().to_string()).collect();
     assert!(leaves.len() > 60, "{leaves:?}");
 
     let regime = String::from_utf8(run(repo.path(), &["regime-key", "--role", "reviewer", "--repo", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
@@ -129,6 +129,7 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
         schema_args.extend(leaf.split(' ').map(str::to_string));
         schema_args.push("--json".to_string());
         let schema: Value = serde_json::from_slice(&canon(repo.path(), &schema_args).stdout).unwrap();
+        let schema = schema["data"].clone();
         let has = |name: &str| schema["options"].as_array().unwrap().iter().any(|o| o["name"] == name);
         if !has("json") {
             problems.push(format!("{leaf}: does not accept --json"));

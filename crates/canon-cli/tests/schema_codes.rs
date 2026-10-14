@@ -24,8 +24,8 @@ use canon_cli::schema::{error_codes, META};
 /// How many lines after a code literal its `emit("canon …")` may sit.
 const EMIT_WINDOW: usize = 6;
 
-/// Files that are not error sites: the registry and the schema itself.
-const IGNORED: &[&str] = &["cli_error.rs", "schema.rs", "schema_codes.rs"];
+/// Files that are not error sites: the registry and the generated table.
+const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs"];
 
 /// For each source file, the command prefixes that get a code the file builds
 /// without an `emit("canon …")` next to it: helpers, `to_cli_error`
@@ -53,9 +53,14 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("main.rs", &[]),
     ("migrate.rs", &["migrate"]),
     ("policy_approval.rs", &["brief approve", "policy approve"]),
+    ("paging.rs", &["query", "finding list", "divergence status", "export"]),
     ("retention.rs", &["export", "purge"]),
     ("review.rs", &["review add"]),
+    // Every code is next to its `human("canon selftest")`.
+    ("selftest.rs", &[]),
     ("scaffold.rs", &["feature new", "scenario new"]),
+    // `UNKNOWN_COMMAND` is next to its `emit("canon schema", …)`.
+    ("schema.rs", &[]),
     ("status.rs", &["status"]),
     ("subject.rs", &["subject"]),
 ];
@@ -63,6 +68,10 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
 /// An `emit(&format!("canon <prefix> {verb}"), …)` shared by several commands:
 /// the commands that reach it.
 const TEMPLATED: &[(&str, &[&str])] = &[("divergence", &["divergence resolve", "divergence defer"])];
+
+/// A code spliced into a command's own JSON document (`to_json()`), with no
+/// `emit` to name its command: the command that prints it.
+const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans")];
 
 fn src_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
@@ -84,7 +93,7 @@ fn emitted_command(line: &str) -> Option<String> {
     if line.contains(".emit(command,") {
         return Some("<caller>".to_string());
     }
-    let start = line.find("emit(\"canon").or_else(|| line.find("emit(&format!(\"canon"))?;
+    let start = ["emit(\"canon", "emit(&format!(\"canon", "emit_with_data(\"canon", "human(\"canon"].iter().find_map(|p| line.find(p))?;
     let rest = &line[start..];
     let quoted = &rest[rest.find("\"canon")? + 1..];
     let text = &quoted[..quoted.find('"')?];
@@ -126,7 +135,8 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
             for code in codes.iter().filter(|c| line.contains(&format!("\"{c}\""))) {
                 file_has_codes = true;
                 let window = &lines[i..(i + 1 + EMIT_WINDOW).min(lines.len())];
-                let targets: Vec<&'static str> = match window.iter().find_map(|l| emitted_command(l)) {
+                let spliced = SPLICED.iter().find(|(c, _)| c == code).map(|(_, command)| command.to_string());
+                let targets: Vec<&'static str> = match window.iter().find_map(|l| emitted_command(l)).or(spliced) {
                     // Bare `canon` is usage, every command has it; a caller-supplied
                     // command is covered by the `promote_after_stage` rule below.
                     Some(command) if command.is_empty() || command == "<caller>" => continue,

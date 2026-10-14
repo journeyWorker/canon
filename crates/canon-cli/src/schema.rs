@@ -202,6 +202,7 @@ pub fn check_metadata(root: &Command, meta: &[CommandMeta]) -> Vec<String> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ArgSchema {
     /// Positional name or option long name (without `--`).
     name: String,
@@ -219,6 +220,7 @@ struct ArgSchema {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct CommandSchema {
     /// Canonical path, aliases resolved.
     command: String,
@@ -412,16 +414,13 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool) -> u8 {
     let root = &built;
     let resolved = match resolve(root, tokens) {
         Ok(r) => r,
-        Err(Refusal(msg)) => {
-            eprintln!("canon schema: {msg}");
-            return 2;
-        }
+        Err(Refusal(msg)) => return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", msg).hint("`canon schema` lists every command").emit("canon schema", json) as u8,
     };
     match resolved {
         Resolved::Group(under) => {
             let commands = list_entries(root, &under);
             if json {
-                println!("{}", serde_json::to_string_pretty(&ListSchema { commands }).expect("schema serializes"));
+                crate::json_out::data("schema", serde_json::to_value(ListSchema { commands }).expect("schema serializes"));
             } else {
                 let width = commands.iter().map(|c| c.command.len()).max().unwrap_or(0);
                 for c in &commands {
@@ -432,7 +431,7 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool) -> u8 {
         Resolved::Leaf(path, cmd) => {
             let schema = command_schema(&path, cmd);
             if json {
-                println!("{}", serde_json::to_string_pretty(&schema).expect("schema serializes"));
+                crate::json_out::data("schema", serde_json::to_value(&schema).expect("schema serializes"));
             } else {
                 print_human(&schema);
             }
@@ -451,7 +450,7 @@ struct ErrorEntry {
 fn print_errors(json: bool) {
     let entries: Vec<ErrorEntry> = crate::cli_error::all_codes().iter().map(|(code, meaning)| ErrorEntry { code, meaning }).collect();
     if json {
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({ "errors": entries })).expect("schema serializes"));
+        crate::json_out::data("schema", serde_json::json!({ "errors": entries }));
     } else {
         let width = entries.iter().map(|e| e.code.len()).max().unwrap_or(0);
         for e in &entries {
