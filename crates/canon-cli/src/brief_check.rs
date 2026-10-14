@@ -58,7 +58,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use canon_ingest::markdown::fence_of;
+use canon_ingest::markdown::{fence_of, field};
 use canon_model::{paths, ChangeId, SubjectStatus};
 use serde::Serialize;
 
@@ -916,12 +916,22 @@ fn prose(out: &mut Out, section: &Section, shipped: Shipped) {
             for (rule, phrase) in phrase_hits(shipped, sentence) {
                 out.push(rule, key, line, excerpt(sentence), format!("matched `{phrase}`; say what the system does or the user sees instead"));
             }
-            let (measured, threshold, unit) = match shipped {
-                Shipped::En => (words(sentence).count(), EN_SENTENCE_WORDS, "words"),
-                Shipped::Ko => (plain(sentence).chars().count(), KO_SENTENCE_CHARS, "characters"),
+            // A flow step is three clauses by design ("sees → does →
+            // becomes"), so each clause is measured on its own.
+            let longest = sentence
+                .split('→')
+                .map(|clause| match shipped {
+                    Shipped::En => words(clause).count(),
+                    Shipped::Ko => plain(clause).chars().count(),
+                })
+                .max()
+                .unwrap_or(0);
+            let (threshold, unit) = match shipped {
+                Shipped::En => (EN_SENTENCE_WORDS, "words"),
+                Shipped::Ko => (KO_SENTENCE_CHARS, "characters"),
             };
-            if measured > threshold {
-                out.push("prose.sentence-length", key, line, excerpt(sentence), format!("{measured} {unit}; threshold {threshold}"));
+            if longest > threshold {
+                out.push("prose.sentence-length", key, line, excerpt(sentence), format!("{longest} {unit}; threshold {threshold}"));
             }
         }
         if all.len() > PARAGRAPH_SENTENCES {
@@ -955,23 +965,32 @@ impl CheckError {
     }
 }
 
-/// The subject phase the flow-coverage rules need.
+/// The phase the flow-coverage rules need.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Phase {
-    /// No adopting subject is `building` yet.
+    /// The brief is not approved yet, or no adopting subject is
+    /// `building` yet: its scenarios are not due.
     Shaping,
-    /// An adopting subject is `building`, `verifying` or `shipped`.
+    /// The brief carries an approval and an adopting subject is
+    /// `building`, `verifying` or `shipped`.
     Building,
     /// The ledger could not be read, so the phase is not known and the
     /// coverage rules are skipped.
     Unknown,
 }
 
-/// The phase of `change`'s subjects.
-pub fn phase_of(repo: &Path, change: &ChangeId) -> Phase {
+/// The phase of `change`, whose brief reads `text`. Scenarios are written
+/// after the human approves the scope (0.19 D3), so an unapproved brief is
+/// `Shaping` even when its subject is already past `building`: a new
+/// change on a shipped subject is not judged on scenarios that cannot
+/// exist yet (dogfood eval 7).
+pub fn phase_of(repo: &Path, change: &ChangeId, text: &str) -> Phase {
     use canon_gate::spec_coverage::change_subjects;
     use canon_gate::{GateContext, GateCtx};
+    if field(text, "Approved:").is_none() {
+        return Phase::Shaping;
+    }
     let registry = canon_policy::SchemaRegistry::load();
     let Ok(ctx) = GateCtx::from_repo(repo) else { return Phase::Unknown };
     let Ok(ctx) = GateContext::load(ctx, &registry, chrono::Utc::now()) else { return Phase::Unknown };
@@ -1028,7 +1047,7 @@ pub fn check(repo: &Path, requested: Option<&ChangeId>) -> Result<Checked, Check
     let (change, path) = resolve_change(repo, requested)?;
     let text = std::fs::read_to_string(&path).map_err(|e| CheckError::new("BRIEF_UNREADABLE", format!("cannot read `{}`: {e}", rel(repo, &path))))?;
     let language = crate::language::configured(repo).map_err(|e| CheckError::new("CONFIG_UNREADABLE", e))?;
-    let phase = phase_of(repo, &change);
+    let phase = phase_of(repo, &change, &text);
     let flows = match phase {
         Phase::Building if !is_chore(&text) => Some(flow_scenarios(repo, &change).map_err(|e| CheckError::new("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")))?),
         _ => None,
@@ -1057,7 +1076,7 @@ pub fn status_counts(repo: &Path, change: &ChangeId, building: bool) -> Option<C
     let path = crate::brief::canon_brief(repo, change)?;
     let text = std::fs::read_to_string(&path).ok()?;
     let language = crate::language::configured(repo).unwrap_or_else(|_| Language::unset());
-    let flows = if building { flow_scenarios(repo, change).ok() } else { None };
+    let flows = if building && field(&text, "Approved:").is_some() { flow_scenarios(repo, change).ok() } else { None };
     let evaluation = evaluate(&text, &language, flows.as_ref());
     (!evaluation.legacy).then(|| evaluation.counts())
 }
