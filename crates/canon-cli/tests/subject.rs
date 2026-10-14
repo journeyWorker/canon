@@ -998,7 +998,7 @@ fn status_brief(repo: &Path) -> Value {
     report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo-subject").unwrap()["brief"].clone()
 }
 
-const BRIEF_REFUSAL: &str = "canon subject status: unreviewed-promotion demo-subject — verifying → shipped: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words as `Approved: <who> <when> — \"<their words>\"` in .canon/changes/c-demo/brief.md\n";
+const BRIEF_REFUSAL: &str = "canon subject status: unreviewed-promotion demo-subject — verifying → shipped: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words with `canon brief approve --change c-demo --by <the human> --note \"<their words>\"`\n";
 
 /// subject.lifecycle.24: with every technical gate passing, a brief
 /// with no `Approved:` line refuses `verifying → shipped`, naming the
@@ -1016,7 +1016,7 @@ fn subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line
     let err = stderr(&out);
     assert!(err.contains(BRIEF_REFUSAL), "{err}");
     assert!(
-        err.contains("canon subject status: refused — get the human's answer to the brief and record it as its `Approved:` line, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject\n"),
+        err.contains("canon subject status: refused — get the human's answer to the brief and record it with `canon brief approve`, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject\n"),
         "{err}"
     );
     assert!(!err.contains("uncovered-cell") && !err.contains("world.demo.01"), "only the brief refuses: {err}");
@@ -1155,12 +1155,12 @@ fn attest_task(repo: &Path, extra: &[&str]) -> Output {
     run(repo, &args)
 }
 
-const EVIDENCE_REFUSAL: &str = "canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their words as `Approved: <who> <when> — \"<their words>\"` in that brief.md only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record\n";
+const EVIDENCE_REFUSAL: &str = "canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their answer with `canon brief approve --by <the human> --note \"<their words>\"` only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record\n";
 
 /// The violation line `canon evidence add` prints for `demo-subject`'s
 /// unapproved brief, attesting `what`.
 fn evidence_brief_line(what: &str) -> String {
-    format!("canon evidence add: unreviewed-promotion demo-subject — evidence for {what}: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words as `Approved: <who> <when> — \"<their words>\"` in .canon/changes/c-demo/brief.md\n")
+    format!("canon evidence add: unreviewed-promotion demo-subject — evidence for {what}: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve --change c-demo --by <the human> --note \"<their words>\"`\n")
 }
 
 /// evidence.add.68: while the subject's brief is enforced and not
@@ -1310,7 +1310,7 @@ fn write_pointer_brief(repo: &Path, change: &str) {
 
 /// What the refusals ask for when `c-ext`'s canon brief does not exist.
 const EXTERNAL_UNANSWERED: &str = ".canon/changes/c-ext/brief.md does not exist yet: change `c-ext` comes from the external plan openspec/changes/c-ext/proposal.md, which canon reads and never edits, so its approval lives in that canon file";
-const EXTERNAL_RECORD: &str = "create .canon/changes/c-ext/brief.md holding a `Source: openspec/changes/c-ext/proposal.md` line and record their words there as `Approved: <who> <when> — \"<their words>\"`";
+const EXTERNAL_RECORD: &str = "create .canon/changes/c-ext/brief.md holding a `Source: openspec/changes/c-ext/proposal.md` line, then record their words with `canon brief approve --change c-ext --by <the human> --note \"<their words>\"`";
 
 /// evidence.add.72: a subject adopting a change from an external openspec
 /// plan with no canon brief has a brief to answer. `canon evidence add`
@@ -1423,7 +1423,7 @@ fn subject_lifecycle_29_a_shipped_subject_reopens_inside_its_approved_scope_and_
     let err = stderr(&out);
     assert!(
         err.contains(&format!(
-            "canon subject status: reopened `demo-subject` from shipped, recorded by `impl-agent`: {REOPEN_REASON}; add the follow-up as tasks in its approved change `c-demo`, then scenario, evidence and review; shipping again runs every guard\n"
+            "canon subject status: reopened `demo-subject` from shipped, recorded by `impl-agent`: {REOPEN_REASON}; keep the follow-up in its approved change `c-demo`, then scenario, evidence and review; shipping again runs every guard\n"
         )),
         "{err}"
     );
@@ -1451,7 +1451,7 @@ fn subject_lifecycle_30_reopening_outside_an_approved_scope_is_refused_naming_th
     assert!(run(dir.path(), &["subject", "adopt", "c-next", "--subject", "demo-subject"]).status.success());
     write_brief(dir.path(), "c-next", "Status: draft, awaiting the human.\n");
 
-    let refusal = "canon subject status: unreviewed-promotion demo-subject — shipped → verifying: reopening needs the approved scope, and the brief is not approved — .canon/changes/c-next/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words as `Approved: <who> <when> — \"<their words>\"` in .canon/changes/c-next/brief.md\n";
+    let refusal = "canon subject status: unreviewed-promotion demo-subject — shipped → verifying: reopening needs the approved scope, and the brief is not approved — .canon/changes/c-next/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words with `canon brief approve --change c-next --by <the human> --note \"<their words>\"`\n";
     let out = reopen(dir.path(), &[]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains(refusal), "{}", stderr(&out));

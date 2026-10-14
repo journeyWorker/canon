@@ -147,7 +147,7 @@ fn skeleton_yaml() -> String {
     out.push_str(&format!("      root: {}\n", paths::SPECS_DIR));
     out.push_str("plans:\n");
     out.push_str("  # canon's own changes live in .canon/changes/<slug>/ (`canon change\n");
-    out.push_str("  # new` writes brief.md + tasks.md there); every reader reads them\n");
+    out.push_str("  # new` writes brief.md there); every reader reads them\n");
     out.push_str("  # with no entry here. `sources` lists external plans you prepare,\n");
     out.push_str("  # which canon only reads: it never writes into them, except that\n");
     out.push_str("  # `canon gate task` flips a task's checkbox in their tasks.md.\n");
@@ -217,16 +217,16 @@ feature.
 
 The loop:
 
-1. Brief: for a new subject or a scope change, record the request and your assumptions in the change's `.canon/changes/<slug>/brief.md`, then stop and report the brief: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy. Record it at once: an `Approved: <who> <when> — \"<their words>\"` line in that `brief.md`, and `canon policy approve --by <the human> --note \"<their words>\"`. Never approve without a human answer.
-2. Subject: `canon subject new`, then `canon change new` for the change; it writes `.canon/changes/<slug>/brief.md`, which holds the brief. A change from an external plan (an openspec `proposal.md`) gets its brief there too: a `brief.md` whose `Source: <path>` line points at the plan; canon never edits the plan.
-3. Scenarios: `canon scenario new`, failure paths included (`--case failure`).
+1. Brief: for a new subject or a scope change, write the PRD brief in the change's `.canon/changes/<slug>/brief.md` (intent, outcome, user flow `F1`, `F2`, …, step detail, acceptance, questions and assumptions, out of scope), in the `language:` of `canon.yaml` (unset: the request's language, with \"which language?\" in the questions). Run `canon brief check` until it has no blockers, then stop and report the brief to the human in that language: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy; record it in one call: `canon brief approve --change <slug> --by <the human> --note \"<their words>\"`. Never approve without a human answer. A brief edited after its approval needs a new answer.
+2. Subject: `canon subject new`, then `canon change new` for the change (`--kind chore` for a refactor, dependency, build, CI or infra change that alters no behavior: short brief, no scenarios, the suite run again with `canon evidence add --all-scenarios`, then re-review; behavior-changing work is never a chore); it writes the brief skeleton `.canon/changes/<slug>/brief.md`. A change from an external plan (an openspec `proposal.md`) gets its brief there too: a `brief.md` whose `Source: <path>` line points at the plan; canon never edits the plan.
+3. Scenarios: `canon scenario new --flow <F-id>`, one per behavior of a flow step, failure paths included (`--case failure`).
 4. Units: split the work; one actor id and session per unit.
 5. Implement: tests named by scenario id.
 6. Evidence: `canon evidence add` (it promotes itself under `write: { promote: auto }`; only under `write.promote: manual` run `canon gate promote` after it).
 7. Independent review: a different session, one that can run the checks it signs off, records `canon review add` and `canon finding add`, on every change; a reviewer that cannot run the tests says so and does not sign off.
-8. Transition: `canon subject status`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships. The ship guard and `canon evidence add` refuse while the brief is unapproved; they are backstops, the stop is at step 1.
+8. Transition: `canon subject status`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships. The ship guard and `canon evidence add` refuse while the brief is unapproved or was edited after approval, and shipping also needs every flow step covered by a scenario with a failure case; they are backstops, the stop is at step 1.
 
-Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, as tasks in its `tasks.md`, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review. When no human can answer one of the brief's questions, write your assumption into the brief and proceed on it; that covers the brief's questions and work inside an approved scope, never the approval. `.canon/policy.yaml` is what the gate grades against.
+Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review; a follow-up that adds or changes a step of the brief edits it, which needs a new answer. `tasks.md` is an optional work note nothing gates on. When no human can answer one of the brief's questions, write your assumption into the brief and proceed on it; that covers the brief's questions and work inside an approved scope, never the approval. `.canon/policy.yaml` is what the gate grades against.
 <!-- canon:end -->";
 
 /// The byte span `[start, end)` of every standalone `marker` line (the

@@ -10,8 +10,9 @@ one, and neither can `canon gate`.
 ## 1. Canon's own changes and external `plans:` sources
 
 `.canon/changes/` is canon's native plan source (dialect id `canon`):
-one `<slug>/` directory per change holding `brief.md` and `tasks.md`,
-written by `canon change new` (see `canon-subject`). Every plan reader —
+one `<slug>/` directory per change holding `brief.md` (and a `tasks.md`
+only when someone adds one: an optional work note), written by
+`canon change new` (see `canon-subject`). Every plan reader —
 `canon ingest plans`, `canon gate task`, `canon evidence add --task`,
 `canon dispatch --task`, `canon status` and the brief check — reads it
 first whenever the directory exists, with no `plans:` entry. Being first,
@@ -21,7 +22,8 @@ Its records carry the actor `canon-plan-import-canon`; an external
 openspec change's carry `canon-plan-import-openspec`. A `brief.md` with a
 `Source: <path>` line is not a change of its own: it is the canon brief
 of a change imported from an external plan (it points at the external
-document and holds the human's `Approved:` line), so the native reader
+document and holds the human's `Approved:` line, written by
+`canon brief approve`), so the native reader
 skips that directory and the external source keeps the change id.
 
 `plans.sources` lists only EXTERNAL plans — documents you prepare outside
@@ -89,12 +91,13 @@ No dialect/plugin filter exists or is needed — an imported `change`/
 ## The `canon` dialect (`.canon/changes/`)
 
 Uses the `openspec` change-dir grammar below, with three differences:
-the brief is `brief.md` (its `## Why` first paragraph is the summary; a
+the brief is `brief.md` (the first paragraph of its intent section, or of
+`## Why` in a pre-0.19 brief, is the summary; a
 missing one is a `missing-brief-md` malformed dir), the source root is
 always `.canon/changes/` itself (archived changes under
 `.canon/changes/archive/`), and a `brief.md` carrying a `Source:` line is
-skipped (a pointer brief, above). `tasks.md` uses the same checkbox row
-grammar.
+skipped (a pointer brief, above). An existing `tasks.md` uses the same
+checkbox row grammar; a change with none imports with zero tasks.
 
 ## The `openspec` dialect
 
@@ -175,7 +178,7 @@ downstream reader's job.
 ## What this skill does NOT cover
 
 - **Authoring a change** — `canon change new` writes
-  `.canon/changes/<slug>/brief.md` and `tasks.md` and adopts the change
+  `.canon/changes/<slug>/brief.md` (no `tasks.md`) and adopts the change
   into a subject (see `canon-subject`); it never scaffolds an openspec
   change dir. This skill covers IMPORTING plans.
 - **`canon gate check`/`canon gate task`** (the hand-authored one-task-at-
