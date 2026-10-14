@@ -86,7 +86,7 @@ enum Command {
         #[arg(long, default_value = ".")]
         repo: PathBuf,
         /// Validate an existing canon.yaml instead of writing one
-        #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy", "policy", "providers"])]
+        #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy", "policy", "providers", "language"])]
         check_config: bool,
         /// Do not write or refresh the canon block in AGENTS.md
         #[arg(long)]
@@ -100,6 +100,9 @@ enum Command {
         /// Harnesses to install the canon skill for, without asking (`claude`, `codex`, `omp`, `pi`, comma-separated; `none` for none)
         #[arg(long, value_name = "LIST")]
         providers: Option<String>,
+        /// Language the briefs are written in (`en`, `ko`, or any tag: `en` headings, structure rules only); recorded as `language:` in canon.yaml
+        #[arg(long, value_name = "TAG")]
+        language: Option<String>,
     },
     /// Move a repo set up by canon 0.16 or earlier onto the 0.17 layout (specs, changes, approvals, skills, .gitignore)
     #[command(after_help = "Examples:\n  canon migrate --dry-run\n  canon migrate\n\nPrints the plan, then applies it; --dry-run stops after the plan. Idempotent:\na second run finds nothing to move, and a run that stopped partway is finished\nby the next one.\n\n- A spec root's features/kind=feature/ moves to <root>/kind=feature/ (git mv in a\n  git work tree). A root at the repo-level `specs` moves to .canon/specs, and\n  canon.yaml records `former_roots: [specs]` so reviews pinned before the move\n  still find their scenarios.\n- Changes `canon change new` wrote under openspec/changes move to\n  .canon/changes/<slug>/ (proposal.md -> brief.md, tasks.md alongside); every\n  other change stays and is named. A change counts as canon's when its files are\n  still that command's scaffold and its first stored version was already adopted:\n  0.16 kept no durable provenance. A false positive keeps its content and ids and\n  is one `git mv` to undo; --dry-run shows exactly which changes move.\n  canon init's `{ dialect: openspec, root: . }` source goes once nothing unread is\n  left under it.\n- An external proposal.md's Approved: line is copied into a canon pointer\n  brief, .canon/changes/<change>/brief.md, with a Source: line.\n- skills.providers is written from the install lock; missing canon .gitignore\n  lines are added; the scenario index is rebuilt (full sync).\n\nRefuses (exit 2, nothing written) on uncommitted changes under a path it\nmoves, on a destination that already exists, on a change directory that could\nstop halfway, and on a canon.yaml edit it cannot make with every other byte\nkept. canon.yaml is written atomically.")]
@@ -197,6 +200,21 @@ enum Command {
     Change {
         #[command(subcommand)]
         action: ChangeCommand,
+    },
+    /// Check a change's brief (PRD format) and see the next steps; never edits
+    #[command(after_help = "Examples:\n  canon brief                          State and the next one to three steps\n  canon brief check                    Findings; exit 0 clean, 2 blockers, 1 error\n  canon brief check --change add-login --json\n\nThe brief is the PRD `canon change new` writes: sections are found by their\n`<!-- canon:section <key> role=… -->` marker, never by heading text. Blockers\n(structure) are a missing or out-of-order section, a duplicate flow id, step\ndetail that does not match the flow ids, leftover placeholders, and, once the\nsubject is building, a flow step with no scenario or no failure scenario.\nAdvisories (prose, `language:` en or ko only) apply to normative sections.\nWaive one rule in one section with\n  <!-- canon:waive <rule-id> <section-key> \"<reason>\" -->\nA brief without markers (written before 0.19) checks as `brief.legacy`, an\nadvisory. Without --change, the repo's only live change is checked.")]
+    Brief {
+        #[command(subcommand)]
+        action: Option<BriefCommand>,
+        /// The change to read (default: the repo's only live change)
+        #[arg(long, global = true, value_parser = canon_cli::subject::parse_change_id)]
+        change: Option<ChangeId>,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, global = true, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long, global = true)]
+        json: bool,
     },
     /// Index a validated .feature corpus into the scenario ledger
     Inventory {
@@ -1280,6 +1298,12 @@ enum FeatureCommand {
 }
 
 #[derive(Subcommand)]
+enum BriefCommand {
+    /// Read the brief against the rules: blocker and advisory findings (exit 0 clean, 2 blockers, 1 error)
+    Check,
+}
+
+#[derive(Subcommand)]
 enum ChangeCommand {
     /// Write .canon/changes/<slug>/{brief,tasks}.md, import it, and adopt it into a subject
     New {
@@ -1713,13 +1737,17 @@ fn main() -> ExitCode {
         Command::Change { action } => match action {
             ChangeCommand::New { slug, subject, title, repo } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject, &title) as u8),
         },
-        Command::Init { repo, check_config, no_agents_md, policy, no_policy, providers } => {
+        Command::Brief { action, change, repo, json } => ExitCode::from(match action {
+            Some(BriefCommand::Check) => canon_cli::brief_check::run_check(&repo, change.as_ref(), json),
+            None => canon_cli::brief_check::run_next(&repo, change.as_ref(), json),
+        } as u8),
+        Command::Init { repo, check_config, no_agents_md, policy, no_policy, providers, language } => {
             let policy = (!no_policy).then(|| policy.unwrap_or(canon_cli::policy_level::PolicyLevel::Strict));
             let skills = match providers {
                 Some(list) => canon_cli::init::SkillsChoice::Providers(list),
                 None => canon_cli::init::SkillsChoice::Ask,
             };
-            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy, skills })
+            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy, skills, language })
         }
         Command::Migrate { repo, dry_run } => ExitCode::from(canon_cli::migrate::run(&repo, dry_run) as u8),
         Command::Policy { action } => match action {

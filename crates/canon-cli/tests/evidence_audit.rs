@@ -68,8 +68,8 @@ fn approve_brief(repo: &Path, subject: &str) {
     let change = format!("c-{subject}");
     ok(repo, &["change", "new", &change, "--subject", subject, "--title", "The brief"]);
     let brief = repo.join(".canon/changes").join(&change).join("brief.md");
-    let text = std::fs::read_to_string(&brief).unwrap();
-    std::fs::write(brief, format!("{text}\nApproved: Journey 2026-10-12 — \"승인\"\n")).unwrap();
+    // These tests are about evidence, not the brief's format: a pre-0.19 brief is read as before.
+    std::fs::write(brief, "# The brief\n\n## Why\n\nThe brief.\n\nApproved: Journey 2026-10-12 — \"승인\"\n").unwrap();
 }
 
 fn write(repo: &Path, path: &str, bytes: &[u8]) {

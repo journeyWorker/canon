@@ -716,9 +716,21 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         review_due,
         open_blockers,
         missing_cases,
-        brief: crate::brief::brief_of(repo, plan_roots, subject, &changes),
+        brief: brief_with_findings(repo, plan_roots, subject, &changes),
         red,
     }
+}
+
+/// [`crate::brief::brief_of`] plus what `canon brief check` found in the
+/// brief's text (0.19 D2): the counts `canon status` shows. Omitted for a
+/// pre-0.19 brief and for a brief that does not exist yet.
+fn brief_with_findings(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes: &[ChangeId]) -> Option<BriefStatus> {
+    let mut brief = crate::brief::brief_of(repo, plan_roots, subject, changes)?;
+    if let (true, Some(change)) = (brief.brief_exists, changes.last()) {
+        let building = matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying | SubjectStatus::Shipped);
+        brief.findings = crate::brief_check::status_counts(repo, change, building);
+    }
+    Some(brief)
 }
 
 /// What makes a `shipped` subject's gate red ([`SubjectSummary::red`]):
@@ -1067,6 +1079,9 @@ pub fn render(report: &StatusReport) -> String {
                     (_, None, Some(change)) => writeln!(out, "      brief: not approved (change `{change}` has no brief; advisory, nothing to approve yet)"),
                     _ => writeln!(out, "      brief: not approved (no adopted change; advisory, nothing to approve yet)"),
                 };
+            }
+            if let Some(counts) = s.brief.as_ref().and_then(|b| b.findings) {
+                let _ = writeln!(out, "      brief check: {} blocker(s), {} advisory(ies); `canon brief` names the next step", counts.blockers, counts.advisories);
             }
             if !s.red.is_empty() {
                 let _ = writeln!(out, "      gate: red — {}; reopen with `{}`", s.red.join(", "), reopen_command(&s.id));

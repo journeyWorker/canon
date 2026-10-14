@@ -307,6 +307,10 @@ pub struct InitOptions {
     /// How a fresh `init` picks the harnesses to install the canon skill
     /// for (0.17 D5).
     pub skills: SkillsChoice,
+    /// `--language <tag>` (0.19 D6): recorded as `canon.yaml`'s
+    /// `language:`, the language briefs are written in. `None` records
+    /// nothing (an unset language reads as `en`).
+    pub language: Option<String>,
 }
 
 /// How a fresh `canon init` picks the harnesses (0.17 D5).
@@ -390,6 +394,17 @@ fn skills_section(skills: Option<&InitSkills>) -> String {
     match skills {
         Some(chosen) if chosen.recorded => out.push_str(&skills::skills_config_block(&chosen.providers)),
         _ => out.push_str("# skills:\n#   providers: [claude, codex]\n"),
+    }
+    out
+}
+
+/// The `language:` line appended to the skeleton (0.19 D6): the recorded
+/// tag, or a commented example when none is given.
+fn language_section(language: Option<&crate::language::Language>) -> String {
+    let mut out = String::from("# The language briefs are written in: templates and prose rules ship for\n# `en` and `ko`; any other tag gets `en` headings and the structure rules.\n");
+    match language {
+        Some(language) => out.push_str(&format!("language: {}\n", language.tag)),
+        None => out.push_str("# language: en\n"),
     }
     out
 }
@@ -493,6 +508,13 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
         return 2;
     }
     let agents_path = repo.join("AGENTS.md");
+    let language = match options.language.as_deref().map(crate::language::Language::parse).transpose() {
+        Ok(language) => language,
+        Err(e) => {
+            eprintln!("canon init: refused — --language: {e}");
+            return 2;
+        }
+    };
     let agents = if options.agents_md {
         let existing = match fs::read_to_string(&agents_path) {
             Ok(text) => Some(text),
@@ -527,7 +549,7 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
     };
     match fs::OpenOptions::new().write(true).create_new(true).open(&canon_yaml_path) {
         Ok(mut file) => {
-            let config = skeleton_yaml() + &skills_section(skills.as_ref());
+            let config = skeleton_yaml() + &language_section(language.as_ref()) + &skills_section(skills.as_ref());
             if let Err(e) = file.write_all(config.as_bytes()) {
                 eprintln!("canon init: failed to write `{}`: {e}", canon_yaml_path.display());
                 return 2;
@@ -544,6 +566,9 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
             println!("canon init: {} already exists — left unchanged; {refreshed}", canon_yaml_path.display());
             if matches!(options.skills, SkillsChoice::Providers(_)) {
                 println!("canon init: --providers is not applied to an existing canon.yaml; run `canon skills install --providers=<list>`, which records the list in skills.providers");
+            }
+            if options.language.is_some() {
+                println!("canon init: --language is not applied to an existing canon.yaml; add `language: <tag>` to it by hand");
             }
             match scaffold_gitignore(repo) {
                 Ok(added) if !added.is_empty() => println!("canon init: added to .gitignore: {}", added.join(", ")),
@@ -684,6 +709,16 @@ pub fn run_check_config(repo: &Path) -> i32 {
         Err(e) => {
             all_ok = false;
             report.push_str(&format!("[FAIL] skills: {e}\n"));
+        }
+    }
+
+    // `language:` (0.19 D6): absent reads as `en`, so it is not a failure.
+    match crate::language::from_yaml(&text) {
+        Ok(language) if text.lines().any(|l| l.starts_with("language:")) => report.push_str(&format!("[PASS] language ({})\n", language.tag)),
+        Ok(_) => {}
+        Err(e) => {
+            all_ok = false;
+            report.push_str(&format!("[FAIL] language: {e}\n"));
         }
     }
 

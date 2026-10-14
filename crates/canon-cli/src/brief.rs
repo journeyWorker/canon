@@ -100,6 +100,11 @@ pub struct BriefStatus {
     /// The approval line's text after `Approved:`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approval: Option<String>,
+    /// What `canon brief check` found in the brief's text (0.19 D2):
+    /// filled by `canon status` only, for a brief in the PRD format.
+    /// Omitted for a pre-0.19 brief, which is read as before.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub findings: Option<crate::brief_check::Counts>,
 }
 
 impl BriefStatus {
@@ -150,7 +155,7 @@ pub fn plan_roots(repo: &Path) -> Result<Vec<PathBuf>, String> {
 
 /// `change`'s canon `brief.md` under `repo`'s `.canon/changes/`, a live
 /// dir before an archived one; `None` when neither holds the file.
-fn canon_brief(repo: &Path, change: &ChangeId) -> Option<PathBuf> {
+pub(crate) fn canon_brief(repo: &Path, change: &ChangeId) -> Option<PathBuf> {
     let changes = repo.join(paths::CHANGES_DIR);
     [changes.join(change.as_str()), changes.join("archive").join(change.as_str())].into_iter().map(|dir| dir.join("brief.md")).find(|path| path.is_file())
 }
@@ -185,6 +190,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             brief_exists: false,
             source: None,
             approval: None,
+            findings: None,
         });
     };
     let brief = canon_brief(repo, change);
@@ -201,6 +207,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 brief_exists: true,
                 source: field(&text, "Source:").map(str::to_string),
                 approval,
+                findings: None,
             }
         }
         None => match external() {
@@ -212,6 +219,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 brief_exists: false,
                 source: Some(rel(repo, &proposal)),
                 approval: None,
+                findings: None,
             },
             None if proposed => return None,
             None => BriefStatus {
@@ -222,6 +230,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 brief_exists: false,
                 source: None,
                 approval: None,
+                findings: None,
             },
         },
     };

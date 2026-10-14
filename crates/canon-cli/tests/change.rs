@@ -51,7 +51,7 @@ fn change_new_scaffolds_imports_and_adopts_with_no_config_edit() {
     assert!(!dir.path().join("openspec").exists(), "canon writes no openspec directory");
 
     let brief = std::fs::read_to_string(dir.path().join(".canon/changes/add-login/brief.md")).unwrap();
-    assert!(brief.contains("## Why\n\nAdd login\n") && brief.contains("## What Changes"), "{brief}");
+    assert!(brief.contains("<!-- canon:section intent role=context -->\n## Intent\n\nAdd login\n") && brief.contains("<!-- canon:section out-of-scope role=context -->"), "{brief}");
     assert!(dir.path().join(".canon/changes/add-login/tasks.md").is_file());
 
     let changes = query(dir.path(), "change");
