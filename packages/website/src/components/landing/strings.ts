@@ -68,8 +68,8 @@ const matrix: MatrixRow[] = [
         source: "Bug fixing guide",
         href: `${SPECKIT_DOCS}/guides/bugfix.html`,
         note: {
-          en: "The bug-fix extension records pass/fail per check, not per requirement",
-          ko: "버그 수정 확장이 요구사항이 아닌 검사 단위로 pass/fail을 기록",
+          en: "The bug-fix extension ends in one verified, partial, or failed verdict after re-running the original reproduction",
+          ko: "버그 수정 확장은 원래 재현 절차를 다시 실행한 뒤 verified, partial, failed 중 하나의 판정으로 끝남",
         },
       },
       {
@@ -161,11 +161,11 @@ const matrix: MatrixRow[] = [
       },
       {
         state: "yes",
-        source: "Interaction modes",
-        href: `${AIDLC_DOCS}/guide/07-interaction-modes.md`,
+        source: "Phases and stages",
+        href: `${AIDLC_DOCS}/guide/04-phases-and-stages.md`,
         note: {
-          en: "Every stage after initialization ends at an approval gate",
-          ko: "초기화 이후 모든 단계가 승인 게이트로 끝남",
+          en: "Every stage your scope runs ends at an approval gate; Construction checkpoints can run automatically",
+          ko: "범위에 포함된 모든 단계가 승인 게이트로 끝나며, Construction 체크포인트는 자동 진행으로 바꿀 수 있음",
         },
       },
       {
@@ -194,11 +194,11 @@ const matrix: MatrixRow[] = [
     cells: [
       {
         state: "partial",
-        source: "Custom agents",
-        href: `${OH_DOCS}/sdk/guides/agent-custom`,
+        source: "Issue to PR",
+        href: `${OH_DOCS}/openhands/usage/agent-canvas/prebuilt/issue-to-pr`,
         note: {
-          en: "A planning agent writes a plan; no spec-to-task stages",
-          ko: "플래닝 에이전트가 플랜을 쓰지만 스펙→태스크 단계는 없음",
+          en: "Issue-to-PR automation reads an issue's acceptance criteria; no spec-to-task stages",
+          ko: "이슈 투 PR 자동화가 이슈의 인수 기준을 읽지만 스펙→태스크 단계는 없음",
         },
       },
       {
@@ -233,8 +233,8 @@ const matrix: MatrixRow[] = [
         source: "Goal completion loop",
         href: `${OH_DOCS}/sdk/guides/convo-goal`,
         note: {
-          en: "Opt-in /goal: a judge model must see the evidence",
-          ko: "옵트인 /goal: 판정 모델이 증거를 봐야 함",
+          en: "Opt-in /goal: a second judge audits the evidence; ends complete or capped",
+          ko: "옵트인 /goal: 두 번째 판정 모델이 증거를 감사하고 complete 또는 capped로 끝남",
         },
       },
       {
@@ -284,8 +284,8 @@ const matrix: MatrixRow[] = [
         source: "README",
         href: SWE,
         note: {
-          en: "Runs the LM agent loop; its README now recommends mini-SWE-agent",
-          ko: "LM 에이전트 루프를 실행하며, README는 이제 mini-SWE-agent를 권장",
+          en: "Runs the LM agent loop; its README says mini-SWE-agent has superseded it",
+          ko: "LM 에이전트 루프를 실행하며, README는 mini-SWE-agent가 이를 대체했다고 밝힘",
         },
       },
       {
@@ -538,7 +538,7 @@ const en = {
     source: "Source",
     rows: rowsFor("en", "/"),
     canonNote: "Experimental (0.11.0, off by default): evidence binding to artifacts and JUnit/Cucumber reports.",
-    footnote: "Claims about other tools were checked against each project's own README or docs on 2026-10-09.",
+    footnote: "Claims about other tools were checked against each project's own README or docs on 2026-10-14.",
   },
 
   quick: {
@@ -696,7 +696,7 @@ const ko: Strings = {
     source: "출처",
     rows: rowsFor("ko", "/ko/"),
     canonNote: "실험 기능(0.11.0, 기본값 off): 아티팩트와 JUnit/Cucumber 리포트에 대한 증거 바인딩.",
-    footnote: "다른 도구에 대한 내용은 2026-10-09에 각 프로젝트의 README 또는 문서와 대조해 확인했습니다.",
+    footnote: "다른 도구에 대한 내용은 2026-10-14에 각 프로젝트의 README 또는 문서와 대조해 확인했습니다.",
   },
 
   quick: {
