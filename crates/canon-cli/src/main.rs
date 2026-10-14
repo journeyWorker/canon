@@ -46,7 +46,7 @@ use canon_learn::StrategyId;
 use canon_cli::finding::CommitArg;
 use canon_cli::scaffold::AreaSurface;
 use chrono::{DateTime, Timelike, Utc};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(
@@ -417,6 +417,15 @@ enum Command {
     },
     /// Run canon's built-in fixture self-tests
     Selftest {
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
+    /// Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes
+    #[command(after_help = "Examples:\n  canon schema\n  canon schema --json\n  canon schema evidence add --json\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An alias (`fmt`) resolves to its\ncanonical command and the output names the canonical one. An unknown path exits 2 and names the\nnearest matches.")]
+    Schema {
+        /// Command path, e.g. `evidence add` (omit to list every command)
+        path: Vec<String>,
         /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
@@ -1821,6 +1830,7 @@ fn main() -> ExitCode {
             DispatchCommand::Diff { repo, json } => canon_cli::dispatch::run_diff(&repo, json),
         },
         Command::Selftest { json } => canon_cli::selftest::run_selftest(json),
+        Command::Schema { path, json } => ExitCode::from(canon_cli::schema::run(&Cli::command(), &path, json)),
     }
 }
 
@@ -2593,5 +2603,18 @@ fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path::Path>, por
                 _ => ExitCode::FAILURE,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod schema_drift {
+    use super::*;
+
+    /// Every clap leaf command needs a metadata row and every row a clap
+    /// leaf, so `canon schema` cannot drift from the parser.
+    #[test]
+    fn schema_metadata_matches_the_command_tree() {
+        let problems = canon_cli::schema::check_metadata(&Cli::command(), canon_cli::schema::META);
+        assert!(problems.is_empty(), "{}", problems.join("\n"));
     }
 }
