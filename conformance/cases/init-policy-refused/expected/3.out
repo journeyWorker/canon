@@ -1,4 +1,4 @@
-canon 0.19.0
+canon 0.20.0
 policy: absent
 warning: no canon.yaml at <repo> — canon is not set up in this repo
 warning: no policy: .canon/policy.yaml not found, so `canon gate check` requires no evidence, failure cases or review here
