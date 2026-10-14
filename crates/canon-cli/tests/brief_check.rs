@@ -309,3 +309,62 @@ fn init_language_is_validated_recorded_and_checked() {
     assert_eq!(out.status.code(), Some(1));
     assert!(stdout(&out).contains("[FAIL] language"), "{}", stdout(&out));
 }
+
+/// A filled-in English chore brief; `category` is the category section's text.
+fn chore_brief(category: &str) -> String {
+    format!(
+        "# Bump the client\n\n<!-- canon:kind chore -->\n\n\
+<!-- canon:section intent role=context -->\n## Intent\n\nBump the client\n\nThe client has a security fix.\n\n\
+<!-- canon:section category role=context -->\n## Category\n\n{category}\n\n\
+<!-- canon:section invariants role=normative -->\n## Invariants\n\n- Requests and responses stay byte-identical. ==**No behavior changes.**==\n\n\
+<!-- canon:section checks role=normative -->\n## Checks\n\n- The suite runs again at the chore commit. ==**The suite is the check.**==\n\n\
+<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nNone.\n"
+    )
+}
+
+/// 0.19 D5: `change new --kind chore` writes the kind marker and the five
+/// chore sections in the repo's language; the chore rule set blocks the
+/// template, a category outside the five, a flow/detail/acceptance
+/// section and "none" invariants; and the flow-coverage rules never apply,
+/// even once the subject is building.
+#[test]
+fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
+    let dir = repo_with_change(Some("ko"));
+    ok(dir.path(), &["change", "new", "bump-client", "--subject", "demo", "--kind", "chore", "--title", "클라이언트 올리기"]);
+    let path = dir.path().join(".canon/changes/bump-client/brief.md");
+    let brief = std::fs::read_to_string(&path).unwrap();
+    assert!(brief.contains("<!-- canon:kind chore -->") && brief.contains("## 불변 조건") && brief.contains("## 분류"), "{brief}");
+    assert!(!brief.contains("canon:section flow"), "{brief}");
+    let (code, report) = check(dir.path(), &["--change", "bump-client"]);
+    assert_eq!(code, 2);
+    assert_eq!(rules(&report), vec!["brief.placeholder"; 5], "{report}");
+
+    let en = |name: &str, brief: String| {
+        std::fs::write(&path, brief).unwrap();
+        check(dir.path(), &["--change", name])
+    };
+    let (code, report) = en("bump-client", chore_brief("`Dependency`."));
+    assert_eq!((code, rules(&report)), (0, Vec::<String>::new()), "a clean chore, category case and punctuation aside: {report}");
+
+    let (code, report) = en("bump-client", chore_brief("upgrade"));
+    assert_eq!((code, rules(&report)), (2, vec!["brief.chore-category".to_string()]), "{report}");
+    let (_, report) = en("bump-client", chore_brief("refactor and build"));
+    assert_eq!(rules(&report), vec!["brief.chore-category"], "two categories are not one: {report}");
+
+    let with_flow = chore_brief("ci").replace("<!-- canon:section invariants", "<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 x\n\n<!-- canon:section invariants");
+    let (code, report) = en("bump-client", with_flow);
+    assert_eq!((code, rules(&report)), (2, vec!["brief.chore-section".to_string()]), "{report}");
+
+    let none_invariants = chore_brief("ci").replace("- Requests and responses stay byte-identical. ==**No behavior changes.**==", "None.");
+    let (code, report) = en("bump-client", none_invariants);
+    assert!(code == 2 && rules(&report).contains(&"brief.chore-empty".to_string()), "{report}");
+
+    std::fs::write(&path, chore_brief("infra")).unwrap();
+    ok(dir.path(), &["subject", "status", "demo", "specced"]);
+    ok(dir.path(), &["subject", "status", "demo", "building"]);
+    let (code, report) = check(dir.path(), &["--change", "bump-client"]);
+    assert_eq!((code, report["phase"].as_str(), rules(&report)), (0, Some("building"), Vec::<String>::new()), "a chore has no flow to cover: {report}");
+
+    let out = run(dir.path(), &["change", "new", "x", "--subject", "demo", "--kind", "epic", "--title", "x"]);
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+}
