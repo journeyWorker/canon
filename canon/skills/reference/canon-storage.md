@@ -98,6 +98,11 @@ canon query --kind handoff --since 2026-06-01T00:00:00Z
 
 # Machine-readable output instead of the human table.
 canon query --kind trajectory --json
+
+# Page a long result and keep only the fields you need; `meta` carries
+# returned, total, hasMore and nextCursor (`--all` returns everything).
+canon query --kind trajectory --json --limit 50 --fields at,kind
+canon query --kind trajectory --json --limit 50 --cursor <nextCursor>
 ```
 
 ## What `canon report` does and doesn't read
