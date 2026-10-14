@@ -317,12 +317,13 @@ pub fn run_scenario_new(
     axes: ScenarioAxes<'_>,
     actor: &Actor,
     at: DateTime<Utc>,
+    json: bool,
 ) -> i32 {
     let repo_root = resolve_repo_root(repo);
     let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
         Ok(roots) => roots,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon scenario new", false);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon scenario new", json);
         }
     };
 
@@ -339,7 +340,7 @@ pub fn run_scenario_new(
             let root = match resolve_spec_root("canon scenario new", &roots, project) {
                 Ok(root) => root,
                 Err(msg) => {
-                    return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.to_string()).emit("canon scenario new", false);
+                    return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.to_string()).emit("canon scenario new", json);
                 }
             };
             resolve_feature_path(root, tag.area(), tag.surface())
@@ -350,14 +351,14 @@ pub fn run_scenario_new(
                 return CliError::refused("FEATURE_OUTSIDE_SPEC_ROOTS", format!("`{}` does not resolve under any configured `specs.roots[]` entry ({}); never a silent orphan write outside the validated corpus",
                     resolved.display(),
                     roots.iter().map(|r| r.root.display().to_string()).collect::<Vec<_>>().join(", ")
-                )).emit("canon scenario new", false);
+                )).emit("canon scenario new", json);
             }
             resolved
         }
     };
     for root in roots.iter().filter(|root| path_under_root(&feature_path, &root.root)) {
         if let Err(msg) = refuse_pre_0_17(&repo_root, root) {
-            return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.to_string()).emit("canon scenario new", false);
+            return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.to_string()).emit("canon scenario new", json);
         }
     }
 
@@ -367,7 +368,7 @@ pub fn run_scenario_new(
                 tag.as_str(),
                 root.id.as_str(),
                 root.root.display()
-            )).emit("canon scenario new", false);
+            )).emit("canon scenario new", json);
         }
     }
 
@@ -375,7 +376,7 @@ pub fn run_scenario_new(
         match fs::read_to_string(&feature_path) {
             Ok(text) => text,
             Err(e) => {
-                return CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", feature_path.display())).emit("canon scenario new", false);
+                return CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", feature_path.display())).emit("canon scenario new", json);
             }
         }
     } else {
@@ -387,7 +388,7 @@ pub fn run_scenario_new(
     // `.feature` file that already carries" the tag, the SAME target
     // file, regardless of corpus-root config.
     if canon_fmt::gherkin::scan(&existing).scenario_ids.iter().any(|t| t == tag.as_str()) {
-        return CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists in `{}`; never a silent duplicate", tag.as_str(), feature_path.display())).emit("canon scenario new", false);
+        return CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists in `{}`; never a silent duplicate", tag.as_str(), feature_path.display())).emit("canon scenario new", json);
     }
 
     let prov_line = provenance_line(at, actor);
@@ -404,13 +405,16 @@ pub fn run_scenario_new(
 
     if let Some(parent) = feature_path.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
-            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).emit("canon scenario new", false);
+            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).emit("canon scenario new", json);
         }
     }
     if let Err(e) = fs::write(&feature_path, &out) {
-        return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", feature_path.display())).emit("canon scenario new", false);
+        return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", feature_path.display())).emit("canon scenario new", json);
     }
-    println!("canon scenario new: wrote `@{}` to {} — {}", tag.as_str(), feature_path.display(), crate::write_mode::DIRECT);
+    crate::say!(json, "canon scenario new: wrote `@{}` to {} — {}", tag.as_str(), feature_path.display(), crate::write_mode::DIRECT);
+    if json {
+        crate::json_out::data("scenario new", serde_json::json!({ "scenarioId": tag.as_str(), "feature": feature_path.display().to_string() }));
+    }
     0
 }
 
@@ -457,23 +461,24 @@ pub fn run_feature_new(
     project: Option<&ProjectId>,
     actor: &Actor,
     at: DateTime<Utc>,
+    json: bool,
 ) -> i32 {
     let repo_root = resolve_repo_root(repo);
     let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
         Ok(roots) => roots,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon feature new", false);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon feature new", json);
         }
     };
     let root = match resolve_spec_root("canon feature new", &roots, project) {
         Ok(root) => root,
         Err(msg) => {
-            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.to_string()).emit("canon feature new", false);
+            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.to_string()).emit("canon feature new", json);
         }
     };
 
     if let Err(msg) = refuse_pre_0_17(&repo_root, root) {
-        return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.to_string()).emit("canon feature new", false);
+        return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.to_string()).emit("canon feature new", json);
     }
 
     let feature_path = resolve_feature_path(root, &area_surface.area, &area_surface.surface);
@@ -486,7 +491,7 @@ pub fn run_feature_new(
 
     if let Some(parent) = feature_path.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
-            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).emit("canon feature new", false);
+            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).emit("canon feature new", json);
         }
     }
 
@@ -494,22 +499,23 @@ pub fn run_feature_new(
     match fs::OpenOptions::new().write(true).create_new(true).open(&feature_path) {
         Ok(mut file) => match file.write_all(content.as_bytes()) {
             Ok(()) => {
-                println!("canon feature new: wrote {} — {}", feature_path.display(), crate::write_mode::DIRECT);
-                println!(
-                    "canon feature new: next: `canon scenario new {}.{}.01 --title '<label>'{project_hint} [--feature <path>]` to make it fmt-clean",
-                    area_surface.area, area_surface.surface
-                );
+                let next = format!("canon scenario new {}.{}.01 --title '<label>'{project_hint} [--feature <path>]", area_surface.area, area_surface.surface);
+                crate::say!(json, "canon feature new: wrote {} — {}", feature_path.display(), crate::write_mode::DIRECT);
+                crate::say!(json, "canon feature new: next: `{next}` to make it fmt-clean");
+                if json {
+                    crate::json_out::data("feature new", serde_json::json!({ "feature": feature_path.display().to_string(), "next": next }));
+                }
                 0
             }
             Err(e) => {
-                CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", feature_path.display())).emit("canon feature new", false)
+                CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", feature_path.display())).emit("canon feature new", json)
             }
         },
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            CliError::refused("FEATURE_EXISTS", format!("`{}` already exists; never overwriting an existing feature file", feature_path.display())).emit("canon feature new", false)
+            CliError::refused("FEATURE_EXISTS", format!("`{}` already exists; never overwriting an existing feature file", feature_path.display())).emit("canon feature new", json)
         }
         Err(e) => {
-            CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", feature_path.display())).emit("canon feature new", false)
+            CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", feature_path.display())).emit("canon feature new", json)
         }
     }
 }
@@ -659,7 +665,7 @@ mod tests {
         // The single-root repo never has to learn the flag exists.
         let dir = repo_with_spec_roots(1);
         let surface = AreaSurface::parse("world.hotdeal").unwrap();
-        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", None, &actor(), at()), 0);
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", None, &actor(), at(), false), 0);
         assert!(dir.path().join("specs-p0/kind=feature/area=world/hotdeal.feature").is_file());
     }
 
@@ -667,7 +673,7 @@ mod tests {
     fn feature_new_writes_under_the_project_named_root_when_several_are_configured() {
         let dir = repo_with_spec_roots(2);
         let surface = AreaSurface::parse("world.hotdeal").unwrap();
-        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", Some(&project("p1")), &actor(), at()), 0);
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", Some(&project("p1")), &actor(), at(), false), 0);
         assert!(dir.path().join("specs-p1/kind=feature/area=world/hotdeal.feature").is_file());
         assert!(!dir.path().join("specs-p0").exists(), "the unnamed root must be left entirely alone");
     }
@@ -676,7 +682,7 @@ mod tests {
     fn feature_new_refuses_an_unknown_project_id_with_zero_bytes_written() {
         let dir = repo_with_spec_roots(2);
         let surface = AreaSurface::parse("world.hotdeal").unwrap();
-        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", Some(&project("p9")), &actor(), at()), 2);
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", Some(&project("p9")), &actor(), at(), false), 2);
         assert!(!dir.path().join("specs-p0").exists());
         assert!(!dir.path().join("specs-p1").exists());
     }
@@ -685,7 +691,7 @@ mod tests {
     fn feature_new_refuses_several_configured_roots_with_no_project_flag() {
         let dir = repo_with_spec_roots(2);
         let surface = AreaSurface::parse("world.hotdeal").unwrap();
-        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", None, &actor(), at()), 2);
+        assert_eq!(run_feature_new(dir.path(), &surface, "Hot deals", None, &actor(), at(), false), 2);
         assert!(!dir.path().join("specs-p0").exists());
         assert!(!dir.path().join("specs-p1").exists());
     }

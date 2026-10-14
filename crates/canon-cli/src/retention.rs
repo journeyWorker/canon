@@ -244,14 +244,23 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, dry_run: 
                 _ => (0, 0),
             };
             let _ = append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted);
-            if json_output {
-                if let RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) = &err {
-                    println!("{}", serde_json::to_string_pretty(&partial_purge_value(kind, before, *matched, *deleted, &err.to_string())).expect("partial purge manifest is serializable"));
-                } else if let RetentionError::PartialPurge { matched, deleted, .. } = &err {
-                    println!("{}", serde_json::to_string_pretty(&partial_purge_value(kind, before, *matched, *deleted, &err.to_string())).expect("partial purge manifest is serializable"));
+            let error = CliError::refused("RETENTION_PURGE_FAILED", err.to_string());
+            let partial = match &err {
+                RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) | RetentionError::PartialPurge { matched, deleted, .. } => {
+                    Some(partial_purge_value(kind, before, *matched, *deleted, &err.to_string()))
                 }
+                _ => None,
+            };
+            match partial {
+                // One document: the partial-purge manifest keeps its fields and gains the shared `error`.
+                Some(mut manifest) if json_output => {
+                    eprintln!("{}", error.human("canon purge"));
+                    manifest["error"] = error.to_json()["error"].clone();
+                    println!("{}", serde_json::to_string_pretty(&manifest).expect("partial purge manifest is serializable"));
+                    error.exit as u8
+                }
+                _ => error.emit("canon purge", json_output) as u8,
             }
-            CliError::refused("RETENTION_PURGE_FAILED", err.to_string()).emit("canon purge", false) as u8
         }
     }
 }

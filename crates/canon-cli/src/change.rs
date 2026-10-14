@@ -112,25 +112,25 @@ fn stage_change(staging: &Path, slug: &ChangeId, kind: ChangeKind, title: &str, 
 
 /// `canon change new` (module doc). Exit `0` written + adopted, `2`
 /// refused or failed with nothing left behind.
-pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: ChangeKind, title: &str) -> i32 {
+pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: ChangeKind, title: &str, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let language = match crate::language::configured(&repo) {
         Ok(language) => language,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon change new", false);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon change new", json);
         }
     };
 
     let subject = match crate::subject::lookup_adoption(&repo, subject_id, slug) {
         Ok((None, _)) => {
-            return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())).emit("canon change new", false);
+            return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())).emit("canon change new", json);
         }
         Ok((Some(_), Some(_))) => {
-            return CliError::refused("CHANGE_EXISTS", format!("change `{}` already exists; pick another slug", slug.as_str())).emit("canon change new", false);
+            return CliError::refused("CHANGE_EXISTS", format!("change `{}` already exists; pick another slug", slug.as_str())).emit("canon change new", json);
         }
         Ok((Some(subject), None)) => subject,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon change new", false);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon change new", json);
         }
     };
 
@@ -139,7 +139,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let archived = changes.join("archive").join(slug.as_str());
     if dir.exists() || archived.exists() {
         let existing = if dir.exists() { &dir } else { &archived };
-        return CliError::refused("CHANGE_EXISTS", format!("`{}` already exists; pick another slug", display_rel(existing, &repo))).emit("canon change new", false);
+        return CliError::refused("CHANGE_EXISTS", format!("`{}` already exists; pick another slug", display_rel(existing, &repo))).emit("canon change new", json);
     }
 
     let staging_path = repo.join(paths::CANON_DIR).join(format!("change-new-{}-{}", slug.as_str(), std::process::id()));
@@ -147,14 +147,14 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let change = match stage_change(&staging_path, slug, kind, title, &language) {
         Ok(change) => change,
         Err(e) => {
-            return CliError::refused("CHANGE_INVALID_ARGUMENT", e.to_string()).emit("canon change new", false);
+            return CliError::refused("CHANGE_INVALID_ARGUMENT", e.to_string()).emit("canon change new", json);
         }
     };
 
     let published = Created(Some(first_missing_ancestor(&dir)));
     let publish = fs::create_dir_all(&changes).and_then(|()| fs::rename(staging_path.join(slug.as_str()), &dir));
     if let Err(e) = publish {
-        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", display_rel(&dir, &repo))).emit("canon change new", false);
+        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", display_rel(&dir, &repo))).emit("canon change new", json);
     }
     drop(staging);
 
@@ -167,16 +167,21 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         }
         let message = e.describe(slug, subject_id, &repair);
         let error = if e.subject_written { CliError::refused("CHANGE_ADOPTION_INCOMPLETE", message) } else { CliError::refused("WRITE_FAILED", message) };
-        return error.emit("canon change new", false);
+        return error.emit("canon change new", json);
     }
     published.keep();
 
-    println!("canon change new: wrote {}", display_rel(&dir.join("brief.md"), &repo));
-    println!(
+    let brief = display_rel(&dir.join("brief.md"), &repo);
+    crate::say!(json, "canon change new: wrote {brief}");
+    crate::say!(
+        json,
         "canon change new: recorded change `{}` adopted into subject `{}` — {}",
         slug.as_str(),
         subject_id.as_str(),
         crate::write_mode::DIRECT
     );
+    if json {
+        crate::json_out::data("change new", serde_json::json!({ "changeId": slug.as_str(), "subjectId": subject_id.as_str(), "brief": brief }));
+    }
     0
 }

@@ -25,6 +25,7 @@ pub mod ingest;
 pub mod init;
 pub mod inventory;
 pub mod inventory_selftest;
+pub mod json_out;
 pub mod language;
 pub mod learn;
 pub mod migrate;

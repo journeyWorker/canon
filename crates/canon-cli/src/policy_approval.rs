@@ -139,11 +139,12 @@ pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApprova
 /// `canon policy approve`. Returns the process exit code: `0` written,
 /// `2` refused (no policy to approve, an empty `--by`, or a write
 /// failure).
-pub fn run_approve(repo: &Path, by: &str, note: Option<&str>) -> i32 {
+pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     match record(&repo, by, note) {
         Ok(approval) => {
-            println!(
+            crate::say!(
+                json,
                 "canon policy approve: {} ({}) approved by `{}` — wrote {} — {}",
                 paths::POLICY_FILE,
                 approval.policy_digest,
@@ -151,10 +152,16 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>) -> i32 {
                 paths::POLICY_APPROVAL_FILE,
                 crate::write_mode::DIRECT
             );
+            if json {
+                crate::json_out::data(
+                    "policy approve",
+                    serde_json::json!({ "policy": paths::POLICY_FILE, "policyDigest": approval.policy_digest, "approvedBy": approval.approved_by, "approvedAt": approval.approved_at, "approval": paths::POLICY_APPROVAL_FILE }),
+                );
+            }
             0
         }
         Err(e) => {
-            CliError::refused("POLICY_APPROVAL_FAILED", e.to_string()).emit("canon policy approve", false)
+            CliError::refused("POLICY_APPROVAL_FAILED", e.to_string()).emit("canon policy approve", json)
         }
     }
 }
@@ -174,7 +181,7 @@ mod tests {
     fn approval_tracks_the_policy_bytes() {
         let dir = repo_with_policy("spec_coverage: {}\n");
         assert_eq!(approval_state(dir.path()), ApprovalState::Unapproved);
-        assert_eq!(run_approve(dir.path(), "alice", Some("first look")), 0);
+        assert_eq!(run_approve(dir.path(), "alice", Some("first look"), false), 0);
         assert!(matches!(&approval_state(dir.path()), ApprovalState::Approved(a) if a.approved_by == "alice" && a.note.as_deref() == Some("first look")));
         assert_eq!(advisory(dir.path()), None);
 
@@ -186,7 +193,7 @@ mod tests {
     #[test]
     fn no_policy_is_refused_and_says_nothing() {
         let dir = tempfile::tempdir().unwrap();
-        assert_eq!(run_approve(dir.path(), "alice", None), 2);
+        assert_eq!(run_approve(dir.path(), "alice", None, false), 2);
         assert!(!dir.path().join(paths::POLICY_APPROVAL_FILE).exists());
         assert_eq!(advisory(dir.path()), None);
     }

@@ -91,6 +91,23 @@ impl CliError {
         }
         self.exit
     }
+
+    /// [`CliError::emit`] for a failure that also has a report worth reading,
+    /// such as the violations a failed gate found. The caller has already
+    /// printed that report in its human form, so human mode adds nothing: the
+    /// exit code is the whole signal there, as it was before `--json`. In JSON
+    /// mode the one document carries `error` (the branch point), `data` (the
+    /// detail) and `meta`.
+    pub fn emit_with_data(&self, command: &str, json: bool, data: serde_json::Value) -> i32 {
+        debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
+        if json {
+            let mut body = self.to_json();
+            body["data"] = data;
+            body["meta"] = json!({ "command": command.strip_prefix("canon ").unwrap_or(command) });
+            println!("{body}");
+        }
+        self.exit
+    }
 }
 
 fn is_registered(code: &str) -> bool {
@@ -161,16 +178,20 @@ const CODES: &[(&str, &str)] = &[
     ("FINDING_SEQ_OCCUPIED", "a finding already holds that change, round and seq"),
     ("FINDING_STAGED", "the finding is still staged and cannot be closed until committed"),
     ("FINDING_UNRESOLVABLE_COMMIT", "a commit reference names no commit in this repository"),
+    ("FORMAT_VIOLATIONS", "`format` found spec-corpus violations; data.violations names each"),
     ("GATE_TASK_BLOCKED", "`gate task` refused to flip the task: its evidence does not support it"),
     ("GATE_TASK_EVIDENCE_INVALID", "the evidence or typed atom for the task is invalid"),
     ("GATE_TASK_INVALID_ARGUMENT", "the task id is malformed"),
     ("GATE_TASK_UNSUPPORTED", "the plan dialect cannot flip this task"),
+    ("GATE_VIOLATIONS", "the evidence gate found violations; data.violations names each"),
     ("HOOKS_INSTALL_FAILED", "a hook entry could not be installed"),
     ("INGEST_FAILED", "an ingest command failed"),
+    ("INGEST_SOURCE_UNUSABLE", "an `ingest plans` source was malformed and persisted nothing; check its root"),
     ("INIT_AGENTS_MD_CONFLICT", "AGENTS.md cannot take the canon block without overwriting content"),
     ("INIT_CONFIG_EXISTS", "canon.yaml already exists and there is nothing else to refresh"),
     ("INIT_INVALID_ARGUMENT", "an `init` option is invalid (language or skill providers)"),
     ("INIT_SKILL_INSTALL_FAILED", "canon.yaml was written but the canon skill was not installed"),
+    ("INVENTORY_ABORTED", "`inventory sync` aborted a spec root on violations or duplicate scenarios; data.roots names each"),
     ("INVENTORY_FAILED", "the scenario index could not be built"),
     ("LAYOUT_MIGRATION_REQUIRED", "the spec root uses a pre-0.17 layout; run `canon migrate`"),
     ("LEARN_EVALUATION_REJECTED", "the promotion evaluation does not fit the candidate strategy"),
@@ -189,14 +210,17 @@ const CODES: &[(&str, &str)] = &[
     ("NO_BRIEF", "no live change has a brief"),
     ("PLAN_CORPUS_UNREADABLE", "the plan corpus could not be read to resolve a task"),
     ("PLAN_SOURCES_MISSING", "the repository configures no plan sources"),
+    ("PLUGIN_SYNC_ERRORS", "`plugin sync` could not write some candidates; data.roots names each error"),
     ("PLUGIN_SYNC_FAILED", "plugin sync failed"),
     ("POLICY_APPROVAL_FAILED", "the policy approval could not be recorded"),
     ("PROMOTE_FAILED", "a staged record was written but promoting it to the ledger failed"),
+    ("PROMOTE_REFUSED", "`gate promote` refused one or more staged records; data.refused names each"),
     ("PROMPT_BUNDLE_INVALID", "a prompt bundle is invalid"),
     ("QUERY_FAILED", "the query could not read the ledger"),
     ("QUERY_INVALID_ARGUMENT", "a query flag is invalid for this kind"),
     ("REGIME_KEY_INVALID", "a regime key part is malformed"),
     ("REPORT_FAILED", "the report could not be built or checked"),
+    ("REPORT_STALE", "`report --check` found the report missing or out of date"),
     ("REPO_UNREADABLE", "the repository, its ledger or an input file could not be read"),
     ("RETENTION_EXPORT_FAILED", "the export failed"),
     ("RETENTION_PURGE_FAILED", "the purge failed or stopped partway"),
@@ -206,7 +230,9 @@ const CODES: &[(&str, &str)] = &[
     ("REVIEW_SCENARIO_NOT_INDEXED", "a reviewed scenario has no indexed record; run `canon inventory sync`"),
     ("SCAFFOLD_INVALID_ARGUMENT", "a scaffold argument is invalid"),
     ("SCENARIO_TAG_EXISTS", "the scenario tag already exists"),
+    ("SELFTEST_FAILED", "a selftest suite or fixture did not match its expected result"),
     ("SERIALIZE_FAILED", "the result could not be serialized"),
+    ("SKILLS_DRIFT", "`skills check` found an installed skill missing, stale, a legacy remnant, or written by another canon version"),
     ("SKILLS_FAILED", "a skills command failed"),
     ("SPEC_ROOTS_UNREADABLE", "the scenario files a brief's flow steps point at could not be read"),
     ("SPEC_ROOT_UNRESOLVED", "no single spec root could be chosen; pass --project"),

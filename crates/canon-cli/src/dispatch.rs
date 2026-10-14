@@ -823,7 +823,7 @@ pub fn run_begin(
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(err.to_cli_error().emit("canon dispatch begin", false) as u8)
+            ExitCode::from(err.to_cli_error().emit("canon dispatch begin", json) as u8)
         }
     }
 }
@@ -1284,7 +1284,7 @@ pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> Exi
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(err.to_cli_error().emit("canon dispatch end", false) as u8)
+            ExitCode::from(err.to_cli_error().emit("canon dispatch end", json) as u8)
         }
     }
 }

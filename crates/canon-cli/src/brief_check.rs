@@ -1108,8 +1108,16 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
             findings: &ev.findings,
             waivers: &ev.waivers,
         };
-        match serde_json::to_string_pretty(&body) {
-            Ok(text) => println!("{text}"),
+        match serde_json::to_value(&body) {
+            Ok(mut value) => {
+                if counts.blockers > 0 {
+                    // One document: the findings keep their fields and gain the shared `error`.
+                    let error = CliError::refused("BRIEF_HAS_BLOCKERS", format!("{} blocker(s) in {}", counts.blockers, checked.brief)).hint("fix each blocker in `findings`, then run `canon brief check` again");
+                    eprintln!("{}", error.human("canon brief check"));
+                    value["error"] = error.to_json()["error"].clone();
+                }
+                println!("{}", serde_json::to_string_pretty(&value).expect("a JSON value always serializes"));
+            }
             Err(e) => return CliError::failed("SERIALIZE_FAILED", e.to_string()).emit("canon brief check", true),
         }
     } else {

@@ -71,8 +71,8 @@ pub fn parse_strategy_id(s: &str) -> Result<StrategyId, String> {
 }
 
 /// `canon learn promote <strategy_id> [--repo <dir>] [--dry-run]`.
-pub fn run_promote(repo: &Path, strategy_id: &StrategyId, dry_run: bool) -> ExitCode {
-    run_promote_with_evidence(repo, strategy_id, dry_run, None, None, None)
+pub fn run_promote(repo: &Path, strategy_id: &StrategyId, dry_run: bool, json: bool) -> ExitCode {
+    run_promote_with_evidence(repo, strategy_id, dry_run, None, None, None, json)
 }
 
 pub fn run_promote_with_evidence(
@@ -82,6 +82,7 @@ pub fn run_promote_with_evidence(
     evaluation_path: Option<&Path>,
     approval_path: Option<&Path>,
     signature_path: Option<&Path>,
+    json: bool,
 ) -> ExitCode {
     let repo = resolve_repo_root(repo);
     let canon_yaml_text = std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default();
@@ -92,7 +93,7 @@ pub fn run_promote_with_evidence(
     let learn_config = match LearnConfig::from_manifest(&canon_yaml_text) {
         Ok(config) => config,
         Err(err) => {
-            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", err.to_string()).emit("canon learn promote", false) as u8);
+            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", err.to_string()).emit("canon learn promote", json) as u8);
         }
     };
 
@@ -104,13 +105,13 @@ pub fn run_promote_with_evidence(
             let evaluation: PromotionEvaluation = match read_json(eval) {
                 Ok(value) => value,
                 Err(error) => {
-                    return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid evaluation: {error}")).emit("canon learn promote", false) as u8);
+                    return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid evaluation: {error}")).emit("canon learn promote", json) as u8);
                 }
             };
             let mut approval: PromotionApproval = match read_json(approval) {
                 Ok(value) => value,
                 Err(error) => {
-                    return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid approval: {error}")).emit("canon learn promote", false) as u8);
+                    return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid approval: {error}")).emit("canon learn promote", json) as u8);
                 }
             };
             if let Some(signature) = signature_path {
@@ -121,14 +122,14 @@ pub fn run_promote_with_evidence(
                         approval.integrity_digest = approval.recomputed_integrity_digest();
                     }
                     Err(error) => {
-                        return ExitCode::from(CliError::failed("LEARN_SIGNATURE_UNREADABLE", format!("cannot read detached signature: {error}")).emit("canon learn promote", false) as u8);
+                        return ExitCode::from(CliError::failed("LEARN_SIGNATURE_UNREADABLE", format!("cannot read detached signature: {error}")).emit("canon learn promote", json) as u8);
                     }
                 }
             }
             Some((evaluation, approval))
         }
         _ => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", "--evaluation and --approval must be supplied together").emit("canon learn promote", false) as u8);
+            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", "--evaluation and --approval must be supplied together").emit("canon learn promote", json) as u8);
         }
     };
     let git_tier_root = repo.join(&learn_config.strategies_root);
@@ -140,7 +141,7 @@ pub fn run_promote_with_evidence(
     let decision = match promotion_decision(&repo, &learn_config, &strategy_store, strategy_id) {
         Ok(decision) => decision,
         Err(err) => {
-            return ExitCode::from(CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).emit("canon learn promote", false) as u8);
+            return ExitCode::from(CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).emit("canon learn promote", json) as u8);
         }
     };
     let blocked = decision.as_ref().is_some_and(|d| !d.is_promote());
@@ -169,7 +170,7 @@ pub fn run_promote_with_evidence(
     // alongside the refusal reason is the whole point of a preview — but
     // its exit code stays honest about the refusal.
     if blocked && !dry_run {
-        return report_block(decision.as_ref().expect("blocked implies a decision"));
+        return report_block(decision.as_ref().expect("blocked implies a decision"), json);
     }
 
     let outcome = if dry_run {
@@ -186,17 +187,20 @@ pub fn run_promote_with_evidence(
                 eprintln!("canon learn promote: advisory: {warning}");
             }
             if dry_run {
-                println!("[dry-run] would promote {strategy_id} -> {}", path.display());
+                crate::say!(json, "[dry-run] would promote {strategy_id} -> {}", path.display());
                 if blocked {
-                    return report_block(decision.as_ref().expect("blocked implies a decision"));
+                    return report_block(decision.as_ref().expect("blocked implies a decision"), json);
                 }
             } else {
-                println!("promoted {strategy_id} -> {}", path.display());
+                crate::say!(json, "promoted {strategy_id} -> {}", path.display());
+            }
+            if json {
+                crate::json_out::data("learn promote", json!({ "strategyId": strategy_id.to_string(), "path": path.display().to_string(), "dryRun": dry_run, "advisories": warnings.iter().map(|w| w.to_string()).collect::<Vec<_>>() }));
             }
             ExitCode::SUCCESS
         }
         Err(err) => {
-            CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).emit("canon learn promote", false);
+            CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).emit("canon learn promote", json);
             ExitCode::from(1)
         }
     }
@@ -209,31 +213,31 @@ fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
 
 /// Emit the exact domain-separated bytes an external SSH signer must sign.
 /// This command never reads a private key and never sets `verified`.
-pub fn run_approve(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path, principal: &str, _json_output: bool) -> ExitCode {
+pub fn run_approve(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path, principal: &str, json: bool) -> ExitCode {
     let repo = resolve_repo_root(repo);
     let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", error.to_string()).emit("canon learn approve", false) as u8);
+            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", error.to_string()).emit("canon learn approve", json) as u8);
         }
     };
     let store = ParquetStrategyStore::open(repo.join(&config.root).join("strategies"));
     let Some(candidate) = (match store.find_by_id(strategy_id) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("REPO_UNREADABLE", error.to_string()).emit("canon learn approve", false) as u8);
+            return ExitCode::from(CliError::failed("REPO_UNREADABLE", error.to_string()).emit("canon learn approve", json) as u8);
         }
     }) else {
-        return ExitCode::from(CliError::failed("LEARN_STRATEGY_NOT_FOUND", format!("unknown strategy {strategy_id}")).emit("canon learn approve", false) as u8);
+        return ExitCode::from(CliError::failed("LEARN_STRATEGY_NOT_FOUND", format!("unknown strategy {strategy_id}")).emit("canon learn approve", json) as u8);
     };
     let evaluation: PromotionEvaluation = match read_json(evaluation_path) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid evaluation: {error}")).emit("canon learn approve", false) as u8);
+            return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid evaluation: {error}")).emit("canon learn approve", json) as u8);
         }
     };
     if let Err(error) = evaluation.validate_for(&candidate) {
-        return ExitCode::from(CliError::failed("LEARN_EVALUATION_REJECTED", format!("evaluation rejected: {error}")).emit("canon learn approve", false) as u8);
+        return ExitCode::from(CliError::failed("LEARN_EVALUATION_REJECTED", format!("evaluation rejected: {error}")).emit("canon learn approve", json) as u8);
     }
     let approved_at = Utc::now();
     let payload = canon_model::approval_payload_bytes(
@@ -252,23 +256,23 @@ pub fn run_approve(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path
     ExitCode::SUCCESS
 }
 
-pub fn run_request(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path, principal: &str, json_output: bool) -> ExitCode {
-    run_approve(repo, strategy_id, evaluation_path, principal, json_output)
+pub fn run_request(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path, principal: &str, json: bool) -> ExitCode {
+    run_approve(repo, strategy_id, evaluation_path, principal, json)
 }
 
-pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: &str, contradicting: Option<&str>, signature_path: &Path, approved_at: &str) -> ExitCode {
+pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: &str, contradicting: Option<&str>, signature_path: &Path, approved_at: &str, json: bool) -> ExitCode {
     let repo = resolve_repo_root(repo);
     let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", error.to_string()).emit("canon learn rollback", false) as u8);
+            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", error.to_string()).emit("canon learn rollback", json) as u8);
         }
     };
     let store = ParquetStrategyStore::open(repo.join(&config.root).join("strategies"));
     let contradicting = match contradicting.map(canon_learn::TrajectoryId::parse).transpose() {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", format!("invalid contradicting trajectory id: {error}")).emit("canon learn rollback", false) as u8);
+            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", format!("invalid contradicting trajectory id: {error}")).emit("canon learn rollback", json) as u8);
         }
     };
     let trajectory_store = ParquetTrajectoryStore::open(repo.join(&config.root).join("trajectories"));
@@ -276,23 +280,23 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
         match trajectory_store.find_by_id(id) {
             Ok(Some(_)) => {}
             Ok(None) => {
-                return ExitCode::from(CliError::failed("LEARN_TRAJECTORY_NOT_FOUND", "contradicting trajectory does not exist").emit("canon learn rollback", false) as u8);
+                return ExitCode::from(CliError::failed("LEARN_TRAJECTORY_NOT_FOUND", "contradicting trajectory does not exist").emit("canon learn rollback", json) as u8);
             }
             Err(error) => {
-                return ExitCode::from(CliError::failed("REPO_UNREADABLE", format!("cannot verify contradicting trajectory: {error}")).emit("canon learn rollback", false) as u8);
+                return ExitCode::from(CliError::failed("REPO_UNREADABLE", format!("cannot verify contradicting trajectory: {error}")).emit("canon learn rollback", json) as u8);
             }
         }
     }
     let signature = match std::fs::read_to_string(signature_path) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("LEARN_SIGNATURE_UNREADABLE", format!("cannot read detached signature: {error}")).emit("canon learn rollback", false) as u8);
+            return ExitCode::from(CliError::failed("LEARN_SIGNATURE_UNREADABLE", format!("cannot read detached signature: {error}")).emit("canon learn rollback", json) as u8);
         }
     };
     let approved_at = match chrono::DateTime::parse_from_rfc3339(approved_at) {
         Ok(value) => value.with_timezone(&Utc),
         Err(error) => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", format!("invalid --approved-at timestamp: {error}")).emit("canon learn rollback", false) as u8);
+            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", format!("invalid --approved-at timestamp: {error}")).emit("canon learn rollback", json) as u8);
         }
     };
     match rollback_strategy_authenticated(&store, *strategy_id, reason, actor, contradicting, &repo.join(&config.strategies_root), &signature, approved_at) {
@@ -301,7 +305,7 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
             ExitCode::SUCCESS
         }
         Err(error) => {
-            CliError::failed("LEARN_ROLLBACK_FAILED", error.to_string()).emit("canon learn rollback", false);
+            CliError::failed("LEARN_ROLLBACK_FAILED", error.to_string()).emit("canon learn rollback", json);
             ExitCode::from(1)
         }
     }
@@ -309,12 +313,12 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
 
 /// The one place a refusal is reported, so the real and dry-run paths
 /// can never drift in wording.
-fn report_block(decision: &PromotionDecision) -> ExitCode {
+fn report_block(decision: &PromotionDecision, json: bool) -> ExitCode {
     let code = CliError::failed("LEARN_PROMOTION_BLOCKED", format!("blocked by the promotion gate: {}", decision.reason())).hint(
         "the gate reads each trajectory's RESOLVED `verdict_record.outcome`, not its raw verdict rows — \
          run `canon ingest artifacts` to resolve pending trajectories for this regime, then retry.",
     );
-    ExitCode::from(code.emit("canon learn promote", false) as u8)
+    ExitCode::from(code.emit("canon learn promote", json) as u8)
 }
 
 /// Resolves `strategy_id`'s own regime, reads that regime's
