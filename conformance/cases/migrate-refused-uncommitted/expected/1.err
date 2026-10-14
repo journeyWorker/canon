@@ -1,2 +1,2 @@
-canon migrate: refused — uncommitted changes under the paths it moves; commit or stash them, then run it again:
+canon migrate: MIGRATE_UNCOMMITTED — uncommitted changes under the paths it moves; commit or stash them, then run it again:
   ?? specs/features/kind=feature/area=cart/add.feature

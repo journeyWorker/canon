@@ -33,6 +33,7 @@ use canon_store::git_tier::GitTier;
 use chrono::{DateTime, Utc};
 
 pub use crate::review::{parse_project_id, parse_scenario_id};
+use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 
 /// `--sha`'s `clap` value parser.
@@ -113,15 +114,13 @@ pub fn run_stage(
     let promote = match crate::write_mode::should_promote(&repo, promote) {
         Ok(promote) => promote,
         Err(error) => {
-            eprintln!("canon divergence stage: refused — {error}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).emit("canon divergence stage", false);
         }
     };
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            eprintln!("canon divergence stage: {e}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon divergence stage", false);
         }
     };
     let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
@@ -140,8 +139,7 @@ pub fn run_stage(
     let path = match stage_divergence(&staging_dir, &candidate) {
         Ok(path) => path,
         Err(e) => {
-            eprintln!("canon divergence stage: {e}");
-            return 2;
+            return CliError::refused("WRITE_FAILED", e.to_string()).emit("canon divergence stage", false);
         }
     };
     if !promote {
@@ -159,7 +157,9 @@ pub fn run_stage(
             }
             None => print!("{}", format_candidate_lines(&report, false)),
         },
-        Err(e) => eprintln!("canon divergence stage: staged, but promoting it failed: {e}"),
+        Err(e) => {
+            CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).emit("canon divergence stage", false);
+        }
     }
     println!("canon divergence stage: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
     1
@@ -172,8 +172,7 @@ pub fn run_promote(repo: &Path, dry_run: bool) -> i32 {
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            eprintln!("canon divergence promote: {e}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon divergence promote", false);
         }
     };
     let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
@@ -189,8 +188,7 @@ pub fn run_promote(repo: &Path, dry_run: bool) -> i32 {
             }
         }
         Err(e) => {
-            eprintln!("canon divergence promote: {e}");
-            2
+            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon divergence promote", false)
         }
     }
 }
@@ -216,8 +214,7 @@ fn run_commit(
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            eprintln!("canon divergence {verb}: {e}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit(&format!("canon divergence {verb}"), false);
         }
     };
     let committed = GitTier::new(&gate_ctx.ledger_root);
@@ -239,12 +236,10 @@ fn run_commit(
             0
         }
         Ok(Err(refused)) => {
-            eprintln!("canon divergence {verb}: refused: {}", refused.violation.line());
-            1
+            CliError::failed("DIVERGENCE_REFUSED", refused.violation.line()).emit(&format!("canon divergence {verb}"), false)
         }
         Err(e) => {
-            eprintln!("canon divergence {verb}: {e}");
-            2
+            CliError::refused("WRITE_FAILED", e.to_string()).emit(&format!("canon divergence {verb}"), false)
         }
     }
 }
@@ -309,8 +304,7 @@ pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>) -> i32 {
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            eprintln!("canon divergence status: {e}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon divergence status", false);
         }
     };
     let as_of = as_of.unwrap_or_else(Utc::now);

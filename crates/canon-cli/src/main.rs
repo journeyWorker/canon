@@ -43,6 +43,7 @@ use std::process::ExitCode;
 use canon_model::envelope::RecordKind;
 use canon_model::{regime_key, Actor, ChangeId, EvidenceVerdict, ProjectId, RegimeKey, RoleId, RunId, RunStatus, ScenarioId, Sha, SubjectId, TaskId};
 use canon_learn::StrategyId;
+use canon_cli::cli_error::CliError;
 use canon_cli::finding::CommitArg;
 use canon_cli::scaffold::AreaSurface;
 use chrono::{DateTime, Timelike, Utc};
@@ -1471,8 +1472,31 @@ enum TierCommand {
     },
 }
 
+/// A clap usage error (0.20 D3). Help and version requests print as clap
+/// prints them. Any other parse failure keeps clap's own text and exit `2`,
+/// unless `--json` is in argv: then it is the shared `USAGE` error, so a
+/// caller that asked for JSON gets JSON on stdout.
+fn usage_error(error: &clap::Error) -> ExitCode {
+    let json = std::env::args().skip(1).take_while(|arg| arg != "--").any(|arg| arg == "--json");
+    if !json || !error.use_stderr() {
+        error.exit();
+    }
+    let text = error.render().to_string();
+    let mut lines = text.lines().filter(|line| !line.trim().is_empty());
+    let message = lines.next().unwrap_or_default().trim_start_matches("error: ").to_string();
+    let hint = lines.map(str::trim).collect::<Vec<_>>().join(" ");
+    let mut usage = CliError::refused("USAGE", message);
+    if !hint.is_empty() {
+        usage = usage.hint(hint);
+    }
+    ExitCode::from(usage.emit("canon", true) as u8)
+}
+
 fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(error) => return usage_error(&error),
+    };
     match cli.command {
         Command::Skills { action } => match action {
             SkillsCommand::Install { source, target, providers } => run_skills_install(source.as_deref(), &target, providers.as_deref()),
@@ -1712,8 +1736,7 @@ fn main() -> ExitCode {
                 match canon_cli::divergence::parse_status(&status, reason.as_deref(), expiry) {
                     Ok(status) => ExitCode::from(canon_cli::divergence::run_stage(&repo, &project_id, &scenario_id, &sha, status, round, &reviewer, &detail, &actor_id, &role, promote.flag()) as u8),
                     Err(e) => {
-                        eprintln!("canon divergence stage: {e}");
-                        ExitCode::from(2)
+                        ExitCode::from(CliError::refused("DIVERGENCE_INVALID_ARGUMENT", e.to_string()).emit("canon divergence stage", false) as u8)
                     }
                 }
             }
@@ -1739,8 +1762,7 @@ fn main() -> ExitCode {
                     Some(flow) => match canon_cli::brief_check::flow_tag_value(&canon_cli::context::resolve_repo_root(&repo), subject.as_ref(), change.as_ref(), flow) {
                         Ok(value) => Some(value),
                         Err(e) => {
-                            eprintln!("canon scenario new: refused — {e}");
-                            return ExitCode::from(2);
+                            return ExitCode::from(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e.to_string()).emit("canon scenario new", false) as u8);
                         }
                     },
                 };
@@ -1835,7 +1857,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                 }
                 ExitCode::SUCCESS
             }
-            Err(err) => { eprintln!("canon skills install: {err}"); ExitCode::FAILURE }
+            Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills install", false) as u8) }
         };
     }
     match canon_cli::skills::install_canonical(&source, target, providers) {
@@ -1859,7 +1881,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
             }
             ExitCode::SUCCESS
         }
-        Err(err) => { eprintln!("canon skills install: {err}"); ExitCode::FAILURE }
+        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills install", false) as u8) }
     }
 }
 
@@ -1877,7 +1899,7 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
             if let Some(outdated) = &report.outdated { println!("{} — outdated ({})", outdated.path.display(), outdated.describe(&report.providers)); }
             if report.manifest_ok && report.remnants.is_empty() && report.outdated.is_none() && report.statuses.iter().all(|status| status.state == "ok") { ExitCode::SUCCESS } else { ExitCode::from(1) }
         }
-        Err(err) => { eprintln!("canon skills check: {err}"); ExitCode::FAILURE }
+        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills check", false) as u8) }
     }
 }
 
@@ -1885,7 +1907,7 @@ fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path,
     let source = canon_cli::skills::resolve_source(source);
     match canon_cli::skills::doctor(&source, target, providers) {
         Ok(lines) => { for line in lines { println!("{line}"); } ExitCode::SUCCESS }
-        Err(err) => { eprintln!("canon skills doctor: {err}"); ExitCode::FAILURE }
+        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills doctor", false) as u8) }
     }
 }
 
@@ -1897,8 +1919,7 @@ fn run_tier_age(repo: &std::path::Path, canon_yaml: Option<&std::path::Path>, dr
             ExitCode::SUCCESS
         }
         Err(err) => {
-            eprintln!("canon tier age: {err}");
-            ExitCode::FAILURE
+            ExitCode::from(CliError::failed("TIER_FAILED", err.to_string()).emit("canon tier age", false) as u8)
         }
     }
 }
@@ -1928,13 +1949,13 @@ fn run_query(
     // validation runs BEFORE any tier read (task 3.2/3.3) -- a usage
     // fault here is a clean, nothing-read `2`, never a store error.
     if let Err(e) = canon_cli::query::validate_scope(kind, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
-        eprintln!("canon query: {e}");
+        CliError::refused("QUERY_INVALID_ARGUMENT", e.to_string()).emit("canon query", json);
         let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
         return ExitCode::from(2);
     }
 
     if let Err(err) = canon_cli::retention::validate_sensitive(repo, include_sensitive) {
-        eprintln!("canon query: {err}");
+        CliError::refused("QUERY_INVALID_ARGUMENT", err.to_string()).emit("canon query", json);
         let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
         return ExitCode::from(2);
     }
@@ -1951,8 +1972,7 @@ fn run_query(
             }
             Err(err) => {
                 let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
-                eprintln!("canon query: {err}");
-                ExitCode::FAILURE
+                ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).emit("canon query", json) as u8)
             }
         };
     };
@@ -1978,8 +1998,7 @@ fn run_query(
         }
         Err(err) => {
             let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
-            eprintln!("canon query: {err}");
-            ExitCode::FAILURE
+            ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).emit("canon query", json) as u8)
         }
     }
 }
@@ -2014,8 +2033,7 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
             if outcome.is_clean() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
         }
         Err(err) => {
-            eprintln!("canon inventory sync: {err}");
-            ExitCode::from(2)
+            ExitCode::from(CliError::refused("INVENTORY_FAILED", err.to_string()).emit("canon inventory sync", false) as u8)
         }
     }
 }
@@ -2035,8 +2053,7 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
             if outcome.is_clean() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
         }
         Err(err) => {
-            eprintln!("canon plugin sync: {err}");
-            ExitCode::from(2)
+            ExitCode::from(CliError::refused("PLUGIN_SYNC_FAILED", err.to_string()).emit("canon plugin sync", false) as u8)
         }
     }
 }
@@ -2065,8 +2082,7 @@ fn run_scenario_new(
     for (axis, value) in [("lane", axes.lane), ("case", axes.case)] {
         if let Some(value) = value {
             if let Some(violation) = canon_cli::subject::enum_membership_violation(&resolved, axis, value) {
-                eprintln!("canon scenario new: refused — {violation}");
-                return ExitCode::from(2);
+                return ExitCode::from(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", violation.to_string()).emit("canon scenario new", false) as u8);
             }
         }
     }
@@ -2129,24 +2145,6 @@ fn run_context(repo: &std::path::Path, json: bool) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn context_pack_error_code(error: &canon_cli::context_pack::ContextPackError) -> ExitCode {
-    use canon_cli::context_pack::ContextPackError;
-    let code = match error {
-        ContextPackError::UnsafePath(_)
-        | ContextPackError::InvalidManifestVersion(_)
-        | ContextPackError::MissingInput(_)
-        | ContextPackError::MissingPack(_)
-        | ContextPackError::PromptBundle { .. }
-        | ContextPackError::SecretDetected(_)
-        | ContextPackError::Serialize(_) => 2,
-        ContextPackError::Io { .. }
-        | ContextPackError::ObjectConflict { .. }
-        | ContextPackError::Tampered { .. }
-        | ContextPackError::Git(_) => 1,
-    };
-    ExitCode::from(code)
-}
-
 /// `canon adapter validate` is deliberately read-only: it parses one response
 /// envelope and prints a redacted summary. Provider execution and capability
 /// enforcement remain outside canon.
@@ -2154,8 +2152,7 @@ fn run_adapter_validate(response: &std::path::Path, repo: Option<&std::path::Pat
     let mut summary = match canon_cli::adapter::validate_response(response) {
         Ok(summary) => summary,
         Err(error) => {
-            eprintln!("canon adapter validate: {error}");
-            return ExitCode::FAILURE;
+            return ExitCode::from(CliError::failed("ADAPTER_REFUSED", error.to_string()).emit("canon adapter validate", json) as u8);
         }
     };
 
@@ -2168,8 +2165,7 @@ fn run_adapter_validate(response: &std::path::Path, repo: Option<&std::path::Pat
         match serde_json::to_string_pretty(&summary) {
             Ok(output) => println!("{output}"),
             Err(error) => {
-                eprintln!("canon adapter validate: cannot render summary: {error}");
-                return ExitCode::FAILURE;
+                return ExitCode::from(CliError::failed("SERIALIZE_FAILED", format!("cannot render summary: {error}")).emit("canon adapter validate", false) as u8);
             }
         }
     } else {
@@ -2197,8 +2193,7 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
     let result = match canon_cli::adapter::authorize_response(response, repo) {
         Ok(result) => result,
         Err(error) => {
-            eprintln!("canon adapter authorize: {error}");
-            return ExitCode::FAILURE;
+            return ExitCode::from(CliError::failed("ADAPTER_REFUSED", error.to_string()).emit("canon adapter authorize", json) as u8);
         }
     };
     if json {
@@ -2209,9 +2204,10 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
         println!("sandbox_enforced: false");
         for reason in &result.reasons { println!("reason: {reason}"); }
     }
-    if result.execution_authorized { ExitCode::SUCCESS } else {
-        eprintln!("execution_not_authorized");
-        ExitCode::FAILURE
+    if result.execution_authorized {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(CliError::failed("ADAPTER_EXECUTION_NOT_AUTHORIZED", "execution_not_authorized").emit("canon adapter authorize", false) as u8)
     }
 }
 
@@ -2246,8 +2242,7 @@ fn run_context_pack_create(repo: &std::path::Path, manifest: &std::path::Path, j
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("canon context-pack create: {error}");
-            context_pack_error_code(&error)
+            ExitCode::from(error.to_cli_error().emit("canon context-pack create", json) as u8)
         }
     }
 }
@@ -2264,8 +2259,7 @@ fn run_context_pack_show(repo: &std::path::Path, id: &str, json: bool) -> ExitCo
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("canon context-pack show: {error}");
-            context_pack_error_code(&error)
+            ExitCode::from(error.to_cli_error().emit("canon context-pack show", json) as u8)
         }
     }
 }
@@ -2282,8 +2276,7 @@ fn run_context_pack_verify(repo: &std::path::Path, id: &str, json: bool) -> Exit
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("canon context-pack verify: {error}");
-            context_pack_error_code(&error)
+            ExitCode::from(error.to_cli_error().emit("canon context-pack verify", json) as u8)
         }
     }
 }
@@ -2300,8 +2293,7 @@ fn run_prompt_register(repo: &std::path::Path, name: &str, version: &str, manife
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("canon prompt register: {error}");
-            context_pack_error_code(&error)
+            ExitCode::from(error.to_cli_error().emit("canon prompt register", json) as u8)
         }
     }
 }
@@ -2318,8 +2310,7 @@ fn run_prompt_show(repo: &std::path::Path, name: &str, version: &str, json: bool
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("canon prompt show: {error}");
-            context_pack_error_code(&error)
+            ExitCode::from(error.to_cli_error().emit("canon prompt show", json) as u8)
         }
     }
 }
@@ -2330,8 +2321,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
         None => match std::env::var_os("HOME") {
             Some(h) => PathBuf::from(h),
             None => {
-                eprintln!("canon ingest sessions: no `--home` given and $HOME is unset");
-                return ExitCode::FAILURE;
+                return ExitCode::from(CliError::failed("INGEST_FAILED", "no `--home` given and $HOME is unset").emit("canon ingest sessions", false) as u8);
             }
         },
     };
@@ -2357,8 +2347,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
                 }
             }
             Err(err) => {
-                eprintln!("canon ingest sessions: {err}");
-                return ExitCode::FAILURE;
+                return ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).emit("canon ingest sessions", false) as u8);
             }
         }
         if !watch {
@@ -2387,8 +2376,7 @@ fn run_ingest_artifacts(repo: &std::path::Path, watch: bool, interval_secs: u64,
                 }
             }
             Err(err) => {
-                eprintln!("canon ingest artifacts: {err}");
-                return ExitCode::FAILURE;
+                return ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).emit("canon ingest artifacts", json) as u8);
             }
         }
         if !watch {
@@ -2438,8 +2426,7 @@ fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Optio
             if outcome.non_clean_sources.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
         }
         Err(err) => {
-            eprintln!("canon ingest plans: {err}");
-            ExitCode::FAILURE
+            ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).emit("canon ingest plans", json) as u8)
         }
     }
 }
@@ -2468,8 +2455,7 @@ fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option<&RegimeKey
             ExitCode::SUCCESS
         }
         Err(e) => {
-            eprintln!("canon retrieve: {e}");
-            ExitCode::from(2)
+            ExitCode::from(CliError::refused("RETRIEVE_FAILED", e.to_string()).emit("canon retrieve", json) as u8)
         }
     }
 }
@@ -2490,8 +2476,7 @@ fn run_regime_key(role: &str, repo: &str, area: &str, hash: &str) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(err) => {
-            eprintln!("canon regime-key: {err}");
-            ExitCode::from(2)
+            ExitCode::from(CliError::refused("REGIME_KEY_INVALID", err.to_string()).emit("canon regime-key", false) as u8)
         }
     }
 }
@@ -2521,8 +2506,7 @@ fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::pa
     let (repo, inputs) = match canon_cli::report::resolve_inputs(repo) {
         Ok(resolved) => resolved,
         Err(err) => {
-            eprintln!("canon report: {err}");
-            return ExitCode::from(2);
+            return ExitCode::from(CliError::refused("CONFIG_UNREADABLE", err.to_string()).emit("canon report", false) as u8);
         }
     };
 
@@ -2538,8 +2522,7 @@ fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::pa
                 ExitCode::SUCCESS
             }
             Err(err) => {
-                eprintln!("canon report --snapshot: {err}");
-                ExitCode::FAILURE
+                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).emit("canon report --snapshot", false) as u8)
             }
         };
     }
@@ -2553,8 +2536,7 @@ fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::pa
                 ExitCode::from(outcome.exit_code() as u8)
             }
             Err(err) => {
-                eprintln!("canon report --check: {err}");
-                ExitCode::FAILURE
+                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).emit("canon report --check", false) as u8)
             }
         };
     }
@@ -2565,8 +2547,7 @@ fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::pa
             ExitCode::SUCCESS
         }
         Err(err) => {
-            eprintln!("canon report: {err}");
-            ExitCode::FAILURE
+            ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).emit("canon report", false) as u8)
         }
     }
 }
@@ -2587,11 +2568,11 @@ fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path::Path>, por
             ExitCode::SUCCESS
         }
         Err(err) => {
-            eprintln!("canon dashboard: {err}");
-            match err {
-                canon_cli::dashboard::DashboardError::Config(_) => ExitCode::from(2),
-                _ => ExitCode::FAILURE,
-            }
+            let error = match err {
+                canon_cli::dashboard::DashboardError::Config(_) => CliError::refused("DASHBOARD_CONFIG_INVALID", err.to_string()),
+                _ => CliError::failed("DASHBOARD_FAILED", err.to_string()),
+            };
+            ExitCode::from(error.emit("canon dashboard", false) as u8)
         }
     }
 }

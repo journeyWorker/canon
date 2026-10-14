@@ -30,6 +30,7 @@ use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 
 /// The approval record's wire shape. Unknown keys are refused on read,
@@ -112,13 +113,13 @@ pub fn advisory(repo: &Path) -> Option<String> {
 /// and `canon brief approve`, which records both in one call.
 pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApproval, String> {
     if by.trim().is_empty() {
-        return Err("refused — --by must name who approved the policy".to_string());
+        return Err("--by must name who approved the policy".to_string());
     }
     let policy_path = repo.join(paths::POLICY_FILE);
     let policy = match fs::read(&policy_path) {
         Ok(bytes) => bytes,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Err(format!("refused — {} does not exist, so there is no policy to approve; `canon init` writes a starter policy", policy_path.display()));
+            return Err(format!("{} does not exist, so there is no policy to approve; `canon init` writes a starter policy", policy_path.display()));
         }
         Err(e) => return Err(format!("cannot read {}: {e}", policy_path.display())),
     };
@@ -153,8 +154,7 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>) -> i32 {
             0
         }
         Err(e) => {
-            eprintln!("canon policy approve: {e}");
-            2
+            CliError::refused("POLICY_APPROVAL_FAILED", e.to_string()).emit("canon policy approve", false)
         }
     }
 }

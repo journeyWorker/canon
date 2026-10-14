@@ -118,13 +118,10 @@ use canon_store::tier::{StoreError, TierQuery};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
+use crate::cli_error::CliError;
 use crate::context::{resolve_canon_yaml, resolve_repo_root};
 use crate::tiers::{self, TierCliError};
 
-/// Exit code for a refused/malformed invocation (duplicate id, unknown
-/// change/subject, an off-chain transition) — nothing written, mirrors
-/// `canon review add`/`canon divergence stage`'s own `2`.
-const EXIT_REFUSED: i32 = 2;
 /// Exit code for the `verifying → shipped` evidence-gate block: the
 /// transition is well-formed but the linked scenarios are not covered
 /// by non-`Divergent` verdicts — record unchanged, fail closed
@@ -362,8 +359,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
     // BEFORE `Subject::new` so a malformed value is a clean refusal
     // here, never the model's debug-assert panic.
     if SubjectId::parse(domain).is_err() {
-        eprintln!("canon subject new: refused — domain `{domain}` is not a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)");
-        return EXIT_REFUSED;
+        return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("domain `{domain}` is not a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)")).emit("canon subject new", json);
     }
 
     // Membership is a SEPARATE question from shape, and needs the
@@ -372,27 +368,23 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 
     let repo = resolve_repo_root(repo);
     if let Some(violation) = domain_membership_violation(&repo, domain) {
-        eprintln!("canon subject new: refused — {violation}");
-        return EXIT_REFUSED;
+        return CliError::refused("SUBJECT_INVALID_ARGUMENT", violation.to_string()).emit("canon subject new", json);
     }
     let canon_yaml_path = resolve_canon_yaml(&repo, None);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("canon subject new: {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject new", json);
         }
     };
 
     match find_subject(&registry, subject_id) {
         Ok(Some(_)) => {
-            eprintln!("canon subject new: refused — subject `{}` already exists", subject_id.as_str());
-            return EXIT_REFUSED;
+            return CliError::refused("SUBJECT_EXISTS", format!("subject `{}` already exists", subject_id.as_str())).emit("canon subject new", json);
         }
         Ok(None) => {}
         Err(e) => {
-            eprintln!("canon subject new: {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject new", json);
         }
     }
 
@@ -405,8 +397,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
             0
         }
         Err(e) => {
-            eprintln!("canon subject new: {e}");
-            EXIT_REFUSED
+            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon subject new", json)
         }
     }
 }
@@ -444,8 +435,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
             0
         }
         Err(e) => {
-            eprintln!("canon subject adopt: {e}");
-            EXIT_REFUSED
+            CliError::refused("SUBJECT_ADOPT_REFUSED", e.to_string()).emit("canon subject adopt", json)
         }
     }
 }
@@ -468,10 +458,10 @@ fn quoted_list(ids: &[SubjectId]) -> String {
 pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId) -> Result<(Subject, Vec<SubjectId>, bool), String> {
     let (subject, change) = lookup_adoption(repo, subject_id, change_id)?;
     let Some(subject) = subject else {
-        return Err(format!("refused — subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str()));
+        return Err(format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str()));
     };
     let Some(change) = change else {
-        return Err(format!("refused — change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str()));
+        return Err(format!("change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str()));
     };
     let (subject, change, wrote) =
         persist_adoption(repo, change, subject).map_err(|e| e.describe(change_id, subject_id, &adopt_command(change_id, subject_id)))?;
@@ -631,8 +621,7 @@ pub fn run_status(
         ("--reason", reason, "why it reopens, with the actor"),
     ] {
         if text.is_some_and(|text| text.trim().is_empty() || text.contains(['\n', '\r'])) {
-            eprintln!("canon subject status: refused — {flag} must be one non-empty line; it is recorded on the subject as {recorded}");
-            return EXIT_REFUSED;
+            return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("{flag} must be one non-empty line; it is recorded on the subject as {recorded}")).emit("canon subject status", json);
         }
     }
 
@@ -641,48 +630,39 @@ pub fn run_status(
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("canon subject status: {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json);
         }
     };
 
     let mut subject = match find_subject(&registry, subject_id) {
         Ok(Some(s)) => s,
         Ok(None) => {
-            eprintln!("canon subject status: refused — subject `{}` does not exist", subject_id.as_str());
-            return EXIT_REFUSED;
+            return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).emit("canon subject status", json);
         }
         Err(e) => {
-            eprintln!("canon subject status: {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json);
         }
     };
 
     let current = subject.status;
     if !is_valid_transition(current, target) {
-        eprintln!(
-            "canon subject status: refused — invalid transition {} → {} (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)",
+        return CliError::refused("SUBJECT_INVALID_TRANSITION", format!("invalid transition {} → {} (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)",
             status_str(current),
             status_str(target)
-        );
-        return EXIT_REFUSED;
+        )).emit("canon subject status", json);
     }
     let reopens = current == SubjectStatus::Shipped && target == SubjectStatus::Verifying;
     match (reopens, reason) {
         (true, None) => {
-            eprintln!(
-                "canon subject status: refused — reopening {} (shipped → verifying) needs --reason <text>: why it reopens, recorded on the subject with the actor",
+            return CliError::refused("SUBJECT_REASON_REQUIRED", format!("reopening {} (shipped → verifying) needs --reason <text>: why it reopens, recorded on the subject with the actor",
                 subject_id.as_str()
-            );
-            return EXIT_REFUSED;
+            )).emit("canon subject status", json);
         }
         (false, Some(_)) => {
-            eprintln!(
-                "canon subject status: refused — --reason records why a shipped subject reopens and applies only to shipped → verifying, not {} → {}",
+            return CliError::refused("SUBJECT_REASON_UNEXPECTED", format!("--reason records why a shipped subject reopens and applies only to shipped → verifying, not {} → {}",
                 status_str(current),
                 status_str(target)
-            );
-            return EXIT_REFUSED;
+            )).emit("canon subject status", json);
         }
         _ => {}
     }
@@ -707,8 +687,7 @@ pub fn run_status(
                 Some(ctx)
             }
             Err(e) => {
-                eprintln!("canon subject status: {e}");
-                return EXIT_REFUSED;
+                return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json);
             }
         }
     } else {
@@ -754,13 +733,12 @@ pub fn run_status(
     waivable.extend(brief_gap.iter().cloned());
 
     if !blocking.is_empty() {
-        for v in blocking.iter().chain(&waivable) {
-            eprintln!("canon subject status: {}", v.line());
-        }
+        let lines = blocking.iter().chain(&waivable).map(Violation::line).collect::<Vec<_>>().join("\n");
+        let mut error = CliError::failed("SUBJECT_GATE_VIOLATION", lines).with_exit(EXIT_GATED);
         if override_reason.is_some() {
-            eprintln!("canon subject status: --override-reason waives only the review checks (unreviewed-promotion, open-blocker); the violations above that are not review checks still refuse this transition");
+            error = error.hint("--override-reason waives only the review checks (unreviewed-promotion, open-blocker); the violations above that are not review checks still refuse this transition");
         }
-        return EXIT_GATED;
+        return error.emit("canon subject status", json);
     }
 
     // A waiver, and a reopen note, belong to the transition that needed
@@ -769,9 +747,7 @@ pub fn run_status(
     subject.reopen = None;
     if !waivable.is_empty() {
         let Some(reason) = override_reason else {
-            for v in &waivable {
-                eprintln!("canon subject status: {}", v.line());
-            }
+            let lines = waivable.iter().map(Violation::line).collect::<Vec<_>>().join("\n");
             let mut fixes = Vec::new();
             if review_gaps {
                 fixes.push("record an independent review (`canon review add`) and close blocker findings");
@@ -779,12 +755,14 @@ pub fn run_status(
             if brief_gap.is_some() {
                 fixes.push("get the human's answer to the brief and record it with `canon brief approve`");
             }
-            eprintln!(
-                "canon subject status: refused — {}, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject{}",
-                fixes.join("; "),
-                if review_gaps { " and `canon gate check` keeps listing these gaps" } else { "" }
-            );
-            return EXIT_GATED;
+            return CliError::failed("SUBJECT_GATE_VIOLATION", lines)
+                .with_exit(EXIT_GATED)
+                .hint(format!(
+                    "{}, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject{}",
+                    fixes.join("; "),
+                    if review_gaps { " and `canon gate check` keeps listing these gaps" } else { "" }
+                ))
+                .emit("canon subject status", json);
         };
         for v in &waivable {
             eprintln!("canon subject status: waived {}", v.line());
@@ -825,8 +803,7 @@ pub fn run_status(
             0
         }
         Err(e) => {
-            eprintln!("canon subject status: {e}");
-            EXIT_REFUSED
+            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon subject status", json)
         }
     }
 }

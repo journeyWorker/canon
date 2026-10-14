@@ -1,1 +1,1 @@
-canon change new: refused — subject `no-such-subject` does not exist (author it with `canon subject new` first)
+canon change new: SUBJECT_NOT_FOUND — subject `no-such-subject` does not exist (author it with `canon subject new` first)

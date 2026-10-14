@@ -59,6 +59,7 @@ use canon_model::family::FamilyKind;
 use canon_model::{Actor, ProjectId, ScenarioId};
 use chrono::{DateTime, Utc};
 
+use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::inventory::{SpecRoot, SyncCtx};
 
@@ -199,7 +200,7 @@ pub fn resolve_feature_path(root: &SpecRoot, area: &str, surface: &str) -> PathB
 /// the command prefix, naming the root and `canon migrate`.
 fn refuse_pre_0_17(repo: &Path, root: &SpecRoot) -> Result<(), String> {
     match crate::inventory::pre_0_17_detail(repo, root) {
-        Some(detail) => Err(format!("refused — {detail}; nothing written")),
+        Some(detail) => Err(format!("{detail}; nothing written")),
         None => Ok(()),
     }
 }
@@ -279,11 +280,11 @@ fn resolve_spec_root<'a>(command: &str, roots: &'a [SpecRoot], project: Option<&
     let configured = || roots.iter().map(|r| r.id.as_str()).collect::<Vec<_>>().join(", ");
     match (project, roots) {
         (Some(id), _) => roots.iter().find(|r| &r.id == id).ok_or_else(|| {
-            format!("refused — `--project {}` names no configured `specs.roots[]` entry (configured ids: {})", id.as_str(), configured())
+            format!("`--project {}` names no configured `specs.roots[]` entry (configured ids: {})", id.as_str(), configured())
         }),
         (None, [one]) => Ok(one),
         (None, many) => Err(format!(
-            "refused — {} configured `specs.roots[]` entries (ids: {}); pass `--project <id>` to select which one `{command}` writes under",
+            "{} configured `specs.roots[]` entries (ids: {}); pass `--project <id>` to select which one `{command}` writes under",
             many.len(),
             configured()
         )),
@@ -321,8 +322,7 @@ pub fn run_scenario_new(
     let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
         Ok(roots) => roots,
         Err(e) => {
-            eprintln!("canon scenario new: {e}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon scenario new", false);
         }
     };
 
@@ -339,8 +339,7 @@ pub fn run_scenario_new(
             let root = match resolve_spec_root("canon scenario new", &roots, project) {
                 Ok(root) => root,
                 Err(msg) => {
-                    eprintln!("canon scenario new: {msg}");
-                    return 2;
+                    return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.to_string()).emit("canon scenario new", false);
                 }
             };
             resolve_feature_path(root, tag.area(), tag.surface())
@@ -348,32 +347,27 @@ pub fn run_scenario_new(
         Some(feature) => {
             let resolved: PathBuf = if feature.is_absolute() { feature.to_path_buf() } else { repo_root.join(feature) };
             if !path_under_any_root(&resolved, &roots) {
-                eprintln!(
-                    "canon scenario new: refused — `{}` does not resolve under any configured `specs.roots[]` entry ({}); never a silent orphan write outside the validated corpus",
+                return CliError::refused("FEATURE_OUTSIDE_SPEC_ROOTS", format!("`{}` does not resolve under any configured `specs.roots[]` entry ({}); never a silent orphan write outside the validated corpus",
                     resolved.display(),
                     roots.iter().map(|r| r.root.display().to_string()).collect::<Vec<_>>().join(", ")
-                );
-                return 2;
+                )).emit("canon scenario new", false);
             }
             resolved
         }
     };
     for root in roots.iter().filter(|root| path_under_root(&feature_path, &root.root)) {
         if let Err(msg) = refuse_pre_0_17(&repo_root, root) {
-            eprintln!("canon scenario new: {msg}");
-            return 2;
+            return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.to_string()).emit("canon scenario new", false);
         }
     }
 
     for root in &roots {
         if corpus_tags(&root.root).contains(tag.as_str()) {
-            eprintln!(
-                "canon scenario new: refused — `@{}` already exists under spec root `{}` ({}); never a silent duplicate",
+            return CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists under spec root `{}` ({}); never a silent duplicate",
                 tag.as_str(),
                 root.id.as_str(),
                 root.root.display()
-            );
-            return 2;
+            )).emit("canon scenario new", false);
         }
     }
 
@@ -381,8 +375,7 @@ pub fn run_scenario_new(
         match fs::read_to_string(&feature_path) {
             Ok(text) => text,
             Err(e) => {
-                eprintln!("canon scenario new: failed to read `{}`: {e}", feature_path.display());
-                return 2;
+                return CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", feature_path.display())).emit("canon scenario new", false);
             }
         }
     } else {
@@ -394,8 +387,7 @@ pub fn run_scenario_new(
     // `.feature` file that already carries" the tag, the SAME target
     // file, regardless of corpus-root config.
     if canon_fmt::gherkin::scan(&existing).scenario_ids.iter().any(|t| t == tag.as_str()) {
-        eprintln!("canon scenario new: refused — `@{}` already exists in `{}`; never a silent duplicate", tag.as_str(), feature_path.display());
-        return 2;
+        return CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists in `{}`; never a silent duplicate", tag.as_str(), feature_path.display())).emit("canon scenario new", false);
     }
 
     let prov_line = provenance_line(at, actor);
@@ -412,13 +404,11 @@ pub fn run_scenario_new(
 
     if let Some(parent) = feature_path.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
-            eprintln!("canon scenario new: failed to create `{}`: {e}", parent.display());
-            return 2;
+            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).emit("canon scenario new", false);
         }
     }
     if let Err(e) = fs::write(&feature_path, &out) {
-        eprintln!("canon scenario new: failed to write `{}`: {e}", feature_path.display());
-        return 2;
+        return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", feature_path.display())).emit("canon scenario new", false);
     }
     println!("canon scenario new: wrote `@{}` to {} — {}", tag.as_str(), feature_path.display(), crate::write_mode::DIRECT);
     0
@@ -472,21 +462,18 @@ pub fn run_feature_new(
     let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
         Ok(roots) => roots,
         Err(e) => {
-            eprintln!("canon feature new: {e}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon feature new", false);
         }
     };
     let root = match resolve_spec_root("canon feature new", &roots, project) {
         Ok(root) => root,
         Err(msg) => {
-            eprintln!("canon feature new: {msg}");
-            return 2;
+            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.to_string()).emit("canon feature new", false);
         }
     };
 
     if let Err(msg) = refuse_pre_0_17(&repo_root, root) {
-        eprintln!("canon feature new: {msg}");
-        return 2;
+        return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.to_string()).emit("canon feature new", false);
     }
 
     let feature_path = resolve_feature_path(root, &area_surface.area, &area_surface.surface);
@@ -499,8 +486,7 @@ pub fn run_feature_new(
 
     if let Some(parent) = feature_path.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
-            eprintln!("canon feature new: failed to create `{}`: {e}", parent.display());
-            return 2;
+            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).emit("canon feature new", false);
         }
     }
 
@@ -516,17 +502,14 @@ pub fn run_feature_new(
                 0
             }
             Err(e) => {
-                eprintln!("canon feature new: failed to write `{}`: {e}", feature_path.display());
-                2
+                CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", feature_path.display())).emit("canon feature new", false)
             }
         },
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            eprintln!("canon feature new: refused — `{}` already exists; never overwriting an existing feature file", feature_path.display());
-            2
+            CliError::refused("FEATURE_EXISTS", format!("`{}` already exists; never overwriting an existing feature file", feature_path.display())).emit("canon feature new", false)
         }
         Err(e) => {
-            eprintln!("canon feature new: failed to create `{}`: {e}", feature_path.display());
-            2
+            CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", feature_path.display())).emit("canon feature new", false)
         }
     }
 }

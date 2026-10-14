@@ -70,10 +70,10 @@ use canon_model::{paths, ChangeId, RecordKind};
 use canon_store::tier::TierQuery;
 use serde_yaml::Value;
 
+use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::skills::{self, Provider, ProviderOrigin};
 
-const EXIT_REFUSED: i32 = 2;
 
 /// The spec root 0.16 defaulted to, and the one that moves into `.canon/`.
 const OLD_DEFAULT_ROOT: &str = "specs";
@@ -184,28 +184,24 @@ pub fn run(repo: &Path, dry_run: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let canon_yaml = repo.join("canon.yaml");
     let Ok(text) = fs::read_to_string(&canon_yaml) else {
-        eprintln!("canon migrate: refused — `{}` does not exist; run it in a repo canon manages (`canon init` sets one up)", canon_yaml.display());
-        return EXIT_REFUSED;
+        return CliError::refused("CONFIG_MISSING", format!("`{}` does not exist; run it in a repo canon manages (`canon init` sets one up)", canon_yaml.display())).emit("canon migrate", false);
     };
     let git = in_git_work_tree(&repo);
     let plan = match plan(&repo, &text) {
         Ok(plan) => plan,
         Err(e) => {
-            eprintln!("canon migrate: refused — {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("MIGRATE_REFUSED", e.to_string()).emit("canon migrate", false);
         }
     };
     let config = match render_config(&text, &plan, plan.roots.len(), plan.drop_source.is_some()) {
         Ok(config) => config,
         Err(e) => {
-            eprintln!("canon migrate: refused — {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("MIGRATE_REFUSED", e.to_string()).emit("canon migrate", false);
         }
     };
     if git {
         if let Some(dirty) = uncommitted(&repo, &plan.moved_paths) {
-            eprintln!("canon migrate: refused — uncommitted changes under the paths it moves; commit or stash them, then run it again:\n{dirty}");
-            return EXIT_REFUSED;
+            return CliError::refused("MIGRATE_UNCOMMITTED", format!("uncommitted changes under the paths it moves; commit or stash them, then run it again:\n{dirty}")).emit("canon migrate", false);
         }
     }
 
@@ -223,15 +219,13 @@ pub fn run(repo: &Path, dry_run: bool) -> i32 {
         .map_err(|e| format!("could not rewrite canon.yaml: {e}"))
         .and_then(|config| if config == text { Ok(()) } else { write_atomic(&canon_yaml, &config) });
     if let Err(e) = written {
-        eprintln!("canon migrate: stopped — {e}; canon.yaml is unchanged, and running `canon migrate` again finishes what this run started");
-        return EXIT_REFUSED;
+        return CliError::refused("MIGRATE_STOPPED", format!("{e}; canon.yaml is unchanged, and running `canon migrate` again finishes what this run started")).emit("canon migrate", false);
     }
     if config != text && applied.error.is_none() {
         println!("canon migrate: rewrote canon.yaml");
     }
     if let Some(e) = applied.error {
-        eprintln!("canon migrate: stopped — {e}; what moved is recorded in canon.yaml, so running `canon migrate` again finishes the rest");
-        return EXIT_REFUSED;
+        return CliError::refused("MIGRATE_STOPPED", format!("{e}; what moved is recorded in canon.yaml, so running `canon migrate` again finishes the rest")).emit("canon migrate", false);
     }
     // Only now that canon.yaml no longer lists the openspec source do its
     // placeholder and emptied directories go: removed earlier, a stopped
@@ -239,8 +233,7 @@ pub fn run(repo: &Path, dry_run: bool) -> i32 {
     // gone, which the openspec reader then reads as the repo root.
     if drop_source && plan.drop_source.is_some() {
         if let Err(e) = remove_dropped_source(&repo, &plan, git) {
-            eprintln!("canon migrate: stopped — {e}; canon.yaml no longer lists the source, so remove it by hand");
-            return EXIT_REFUSED;
+            return CliError::refused("MIGRATE_STOPPED", format!("{e}; canon.yaml no longer lists the source, so remove it by hand")).emit("canon migrate", false);
         }
     }
 
@@ -249,8 +242,7 @@ pub fn run(repo: &Path, dry_run: bool) -> i32 {
         match crate::plans::refresh_change(&repo, change) {
             Ok(_) => println!("canon migrate: re-imported change `{}` from {} (same change id; its tasks and adoption keep joining)", change.as_str(), rel(&repo, dir)),
             Err(e) => {
-                eprintln!("canon migrate: moved change `{}` but could not re-import it: {e}; run `canon migrate` again", change.as_str());
-                return EXIT_REFUSED;
+                return CliError::refused("MIGRATE_STOPPED", format!("moved change `{}` but could not re-import it: {e}; run `canon migrate` again", change.as_str())).emit("canon migrate", false);
             }
         }
     }
@@ -258,8 +250,7 @@ pub fn run(repo: &Path, dry_run: bool) -> i32 {
         Ok(added) if !added.is_empty() => println!("canon migrate: added to .gitignore: {}", added.join(", ")),
         Ok(_) => {}
         Err(e) => {
-            eprintln!("canon migrate: failed to update .gitignore: {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("WRITE_FAILED", format!("failed to update .gitignore: {e}")).emit("canon migrate", false);
         }
     }
     if git {
@@ -1065,12 +1056,10 @@ fn rebuild_index(repo: &Path) -> i32 {
         }
         Ok(outcome) => {
             print!("{}", crate::inventory::format_human(&outcome));
-            eprintln!("canon migrate: the files moved, but the scenario index rebuild found the problems above; fix them, then run `canon inventory sync`");
-            1
+            CliError::failed("MIGRATE_INDEX_FAILED", "the files moved, but the scenario index rebuild found the problems above; fix them, then run `canon inventory sync`").emit("canon migrate", false)
         }
         Err(e) => {
-            eprintln!("canon migrate: the files moved, but the scenario index was not rebuilt: {e}; run `canon inventory sync`");
-            EXIT_REFUSED
+            CliError::refused("MIGRATE_INDEX_FAILED", format!("the files moved, but the scenario index was not rebuilt: {e}; run `canon inventory sync`")).emit("canon migrate", false)
         }
     }
 }

@@ -1,1 +1,1 @@
-canon evidence add: refused — --all-scenarios needs --project-id: the cases are matched against that spec root's indexed scenarios
+canon evidence add: EVIDENCE_INVALID_ARGUMENT — --all-scenarios needs --project-id: the cases are matched against that spec root's indexed scenarios

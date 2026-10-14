@@ -19,6 +19,7 @@ use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, RecordKind, 
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
 
+use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 
 /// The one scenario the demo's evidence loop is keyed to — `<area>.
@@ -76,18 +77,15 @@ pub fn run_demo_init(repo: &Path) -> i32 {
     let policy_path = repo.join(".canon").join("policy.yaml");
     if let Some(parent) = policy_path.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
-            eprintln!("canon demo init: failed to create `{}`: {e}", parent.display());
-            return 2;
+            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).emit("canon demo init", false);
         }
     }
     if let Err(e) = std::fs::write(&policy_path, DEMO_POLICY_YAML) {
-        eprintln!("canon demo init: failed to write `{}`: {e}", policy_path.display());
-        return 2;
+        return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", policy_path.display())).emit("canon demo init", false);
     }
 
     if let Err(e) = write_evidence(repo, "dev-agent", "dev") {
-        eprintln!("canon demo init: failed to seed dev evidence: {e}");
-        return 2;
+        return CliError::refused("WRITE_FAILED", format!("failed to seed dev evidence: {e}")).emit("canon demo init", false);
     }
 
     println!("canon demo: scaffolded a throwaway evidence loop in `{}`.", repo.display());
@@ -111,13 +109,11 @@ pub fn run_demo_init(repo: &Path) -> i32 {
 pub fn run_demo_attest(repo: &Path) -> i32 {
     let root = resolve_repo_root(repo);
     if !root.join("canon.yaml").exists() {
-        eprintln!("canon demo attest: no `canon.yaml` found under `{}` — run `canon demo init` first", root.display());
-        return 2;
+        return CliError::refused("DEMO_NOT_INITIALIZED", format!("no `canon.yaml` found under `{}` — run `canon demo init` first", root.display())).emit("canon demo attest", false);
     }
 
     if let Err(e) = write_evidence(&root, "reviewer-agent", "reviewer") {
-        eprintln!("canon demo attest: failed to record reviewer evidence: {e}");
-        return 2;
+        return CliError::refused("WRITE_FAILED", format!("failed to record reviewer evidence: {e}")).emit("canon demo attest", false);
     }
 
     println!("canon demo: recorded the reviewer's evidence for scenario `{DEMO_SCENARIO}`.");

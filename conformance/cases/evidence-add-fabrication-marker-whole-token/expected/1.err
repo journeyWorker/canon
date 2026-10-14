@@ -1,2 +1,2 @@
 canon evidence add: refreshed the scenario index from 1 changed feature file(s) (specs/kind=feature/area=cart/add.feature): 2 record(s) written
-canon evidence add: refused — fabricated-evidence cart.add.01 — summary field contains fabrication marker "n/a": "atlas check: n/a"
+canon evidence add: EVIDENCE_FABRICATED — fabricated-evidence cart.add.01 — summary field contains fabrication marker "n/a": "atlas check: n/a"

@@ -57,6 +57,7 @@ use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
 use chrono::Utc;
 
+use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 
 /// `--project-id`'s `clap` value parser.
@@ -169,19 +170,16 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         (Some(r), None) => ProvenanceRef::UpstreamRef(r.clone()),
         (None, Some(r)) => ProvenanceRef::OriginalSpecRef(r.clone()),
         (None, None) => {
-            eprintln!("canon review add: refused — neither --upstream-ref nor --original-spec-ref given; a review must carry a resolvable provenance ref");
-            return 2;
+            return CliError::refused("REVIEW_INVALID_ARGUMENT", "neither --upstream-ref nor --original-spec-ref given; a review must carry a resolvable provenance ref").emit("canon review add", false);
         }
         (Some(_), Some(_)) => {
-            eprintln!("canon review add: refused — --upstream-ref and --original-spec-ref are mutually exclusive; exactly one provenance ref is required");
-            return 2;
+            return CliError::refused("REVIEW_INVALID_ARGUMENT", "--upstream-ref and --original-spec-ref are mutually exclusive; exactly one provenance ref is required").emit("canon review add", false);
         }
     };
     let scenario_ids = match requested_scenarios(args) {
         Ok(ids) => ids,
         Err(e) => {
-            eprintln!("canon review add: refused — {e}");
-            return 2;
+            return CliError::refused("REVIEW_INVALID_ARGUMENT", e.to_string()).emit("canon review add", false);
         }
     };
 
@@ -189,8 +187,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(ctx) => ctx,
         Err(e) => {
-            eprintln!("canon review add: {e}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon review add", false);
         }
     };
     let indexed = latest_scenarios(&gate_context);
@@ -199,17 +196,14 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     if !missing.is_empty() {
         let ids = missing.iter().map(|(id, _)| format!("`{}`", id.as_str())).collect::<Vec<_>>().join(", ");
         let nothing = if scenario_ids.len() > 1 { " (nothing is written for any of the scenarios)" } else { "" };
-        eprintln!(
-            "canon review add: refused — no scenario record for {ids} in spec root `{}`; a review pins the scenario it saw, so index it first (`canon inventory sync`){nothing}",
+        return CliError::refused("REVIEW_SCENARIO_NOT_INDEXED", format!("no scenario record for {ids} in spec root `{}`; a review pins the scenario it saw, so index it first (`canon inventory sync`){nothing}",
             args.project_id.as_str()
-        );
-        return 2;
+        )).emit("canon review add", false);
     }
     let bound = match crate::evidence_attach::bind_artifacts(&repo, &args.artifacts, args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB)) {
         Ok(bound) => bound,
         Err(e) => {
-            eprintln!("canon review add: refused — {}", e.message());
-            return 2;
+            return CliError::refused("REVIEW_ARTIFACT_REFUSED", e.message().to_string()).emit("canon review add", false);
         }
     };
     let mut artifacts: Vec<ReviewArtifact> = Vec::new();
@@ -268,11 +262,11 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let (stored, written) = match write_reviews(&repo, &gate_context.ctx.ledger_root, &files, &only_reviews, &mut |tier, review| tier.write(review)) {
         Ok(landed) => landed,
         Err(error) => {
-            eprintln!("canon review add: {error}");
+            let mut error = CliError::refused("WRITE_FAILED", error.to_string());
             if reviews.len() > 1 {
-                eprintln!("canon review add: refused — no review is written: every review and blob this run wrote or stored was removed");
+                error = error.hint("no review is written: every review and blob this run wrote or stored was removed");
             }
-            return 2;
+            return error.emit("canon review add", false);
         }
     };
     for (_, pinned) in &reviews {
@@ -306,12 +300,12 @@ fn write_reviews(
 ) -> Result<(usize, Vec<(String, bool)>), String> {
     let dir = ledger_root.join(format!("kind={}", RecordKind::Review.as_str()));
     match std::fs::create_dir_all(&dir).and_then(|()| std::fs::metadata(&dir)) {
-        Ok(meta) if meta.permissions().readonly() => return Err(format!("refused — {} is read-only", dir.display())),
+        Ok(meta) if meta.permissions().readonly() => return Err(format!("{} is read-only", dir.display())),
         Ok(_) => {}
-        Err(e) => return Err(format!("refused — cannot prepare {}: {e}", dir.display())),
+        Err(e) => return Err(format!("cannot prepare {}: {e}", dir.display())),
     }
     let held = crate::evidence_attach::store_files_held(repo, files)
-        .map_err(|(file, e)| format!("refused — could not store {} in the artifact store: {e}", file.resolved.display()))?;
+        .map_err(|(file, e)| format!("could not store {} in the artifact store: {e}", file.resolved.display()))?;
     let committed = GitTier::new(ledger_root);
     let mut written: Vec<(String, bool)> = Vec::new();
     for review in reviews {

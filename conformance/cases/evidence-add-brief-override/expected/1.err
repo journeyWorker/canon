@@ -1,2 +1,2 @@
 canon evidence add: refreshed the scenario index from 1 changed feature file(s) (specs/kind=feature/area=checkout/add.feature): 2 record(s) written
-canon evidence add: refused — --override-reason must be one non-empty line; it is recorded on the evidence record as the accountable reason
+canon evidence add: EVIDENCE_INVALID_ARGUMENT — --override-reason must be one non-empty line; it is recorded on the evidence record as the accountable reason

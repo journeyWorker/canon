@@ -8,6 +8,7 @@ pub mod brief;
 pub mod brief_approve;
 pub mod brief_check;
 pub mod brief_template;
+pub mod cli_error;
 pub mod change;
 pub mod context;
 pub mod context_pack;
