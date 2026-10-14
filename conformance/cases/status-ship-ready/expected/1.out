@@ -10,6 +10,7 @@ subjects (1):
   verifying (1):
     checkout: 2 scenarios, 2 evidenced, 0 reviewed, 0 open blockers
       brief: approved in .canon/changes/c-checkout/brief.md — Journey 2026-10-11 — "승인. 네 가정대로 진행"
+      advisory: that approval has no digest, so it does not follow the brief's text; re-approve with `canon brief approve --change c-checkout --by <the human> --note "<their words>"` to bind it
 
 unowned: none
 

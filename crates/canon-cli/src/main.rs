@@ -1301,6 +1301,16 @@ enum FeatureCommand {
 enum BriefCommand {
     /// Read the brief against the rules: blocker and advisory findings (exit 0 clean, 2 blockers, 1 error)
     Check,
+    /// Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers
+    #[command(after_help = "Examples:\n  canon brief approve --change add-login --by Ana --note 'Go. Ship the failure flow too.'\n\nWrites `Approved: <who> <when> — \"<words>\" (brief sha256:<digest>)` into the\nbrief (the digest covers the brief without its `Approved:` lines) and records\n`canon policy approve` in the same call. Edit the brief afterwards and it reads as\nnot approved (BRIEF_CHANGED_SINCE_APPROVAL) until a human answers again and this\nruns again. Run it only from the human's answer, with their words as --note.")]
+    Approve {
+        /// Who approved (the human, not the agent)
+        #[arg(long)]
+        by: String,
+        /// The human's own words
+        #[arg(long)]
+        note: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1739,6 +1749,7 @@ fn main() -> ExitCode {
         },
         Command::Brief { action, change, repo, json } => ExitCode::from(match action {
             Some(BriefCommand::Check) => canon_cli::brief_check::run_check(&repo, change.as_ref(), json),
+            Some(BriefCommand::Approve { by, note }) => canon_cli::brief_approve::run_approve(&repo, change.as_ref(), &by, &note, json),
             None => canon_cli::brief_check::run_next(&repo, change.as_ref(), json),
         } as u8),
         Command::Init { repo, check_config, no_agents_md, policy, no_policy, providers, language } => {

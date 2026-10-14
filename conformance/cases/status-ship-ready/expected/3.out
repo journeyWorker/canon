@@ -38,7 +38,8 @@
         "change": "c-checkout",
         "brief": ".canon/changes/c-checkout/brief.md",
         "briefExists": true,
-        "approval": "Journey 2026-10-11 — \"승인. 네 가정대로 진행\""
+        "approval": "Journey 2026-10-11 — \"승인. 네 가정대로 진행\"",
+        "legacyApproval": true
       }
     }
   ],

@@ -49,7 +49,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use canon_ingest::markdown::{fence_of, field};
+use canon_ingest::markdown::fence_of;
 use canon_model::{paths, ChangeId, SubjectStatus};
 use serde::Serialize;
 
@@ -146,7 +146,10 @@ pub struct Evaluation {
     pub legacy: bool,
     /// Lines of the questions section that are not a "none" answer.
     pub open_questions: usize,
-    /// Whether the brief carries an `Approved:` line.
+    /// What the brief's `Approved:` line says about its text (0.19 D3).
+    pub approval: crate::brief::Approval,
+    /// Whether the brief reads as approved (a digest that matches, or a
+    /// pre-0.19 line with none).
     pub approved: bool,
 }
 
@@ -383,7 +386,8 @@ impl Out {
 /// `building` or later: only then do the flow-coverage rules apply.
 pub fn evaluate(text: &str, language: &Language, flows: Option<&FlowIndex>) -> Evaluation {
     let (lines, comments) = scan(text);
-    let approved = field(text, "Approved:").is_some();
+    let approval = crate::brief::approval_of(text);
+    let approved = approval.approved();
     let secs = sections(&lines, &comments);
     if secs.is_empty() {
         let mut out = Out { findings: Vec::new() };
@@ -394,7 +398,7 @@ pub fn evaluate(text: &str, language: &Language, flows: Option<&FlowIndex>) -> E
             "no `canon:section` markers".to_string(),
             "a pre-0.19 brief is read as before; the structure and prose rules do not apply to it. `canon change new` writes the PRD format".to_string(),
         );
-        return Evaluation { findings: out.findings, waivers: Vec::new(), legacy: true, open_questions: 0, approved };
+        return Evaluation { findings: out.findings, waivers: Vec::new(), legacy: true, open_questions: 0, approval, approved };
     }
 
     let mut out = Out { findings: Vec::new() };
@@ -415,7 +419,7 @@ pub fn evaluate(text: &str, language: &Language, flows: Option<&FlowIndex>) -> E
         .map_or(0, |s| s.body().iter().filter(|l| !is_none_answer(&l.text)).count());
 
     let (findings, waivers) = apply_waivers(out.findings, &comments);
-    Evaluation { findings, waivers, legacy: false, open_questions, approved }
+    Evaluation { findings, waivers, legacy: false, open_questions, approval, approved }
 }
 
 fn is_none_answer(line: &str) -> bool {
@@ -1007,12 +1011,23 @@ struct Step {
     why: String,
 }
 
+/// The `approve` step: `fresh` when the brief was never approved, the
+/// re-approval when its text changed after the approval (0.19 D3).
+fn approve_step(ev: &Evaluation, fresh: &str) -> Step {
+    let why = if matches!(ev.approval, crate::brief::Approval::Changed { .. }) {
+        format!("the brief changed after its approval ({}); the human answers the changed brief and `canon brief approve` records it", crate::brief::CHANGED_CODE)
+    } else {
+        format!("{fresh}; `canon brief approve --by <the human> --note \"<their words>\"` records it")
+    };
+    Step { step: "approve", why }
+}
+
 /// The next one to three steps for `ev` (module doc).
 fn next_steps(ev: &Evaluation) -> Vec<Step> {
     let mut steps = Vec::new();
     if ev.legacy {
         if !ev.approved {
-            steps.push(Step { step: "approve", why: "the brief has no `Approved:` line; the human answers it".to_string() });
+            steps.push(approve_step(ev, "the brief has no `Approved:` line; the human answers it"));
         }
         return steps;
     }
@@ -1032,7 +1047,7 @@ fn next_steps(ev: &Evaluation) -> Vec<Step> {
         steps.push(Step { step: "polish", why: "prose advisories remain in the normative sections".to_string() });
     }
     if ev.counts().blockers == 0 && !ev.approved {
-        steps.push(Step { step: "approve", why: "no blockers; the human answers the brief".to_string() });
+        steps.push(approve_step(ev, "no blockers; the human answers the brief"));
     }
     steps.truncate(3);
     steps
@@ -1057,7 +1072,9 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     };
     let ev = &checked.evaluation;
     let counts = ev.counts();
+    let changed = matches!(ev.approval, crate::brief::Approval::Changed { .. });
     let state = match (ev.legacy, ev.approved, counts.blockers) {
+        _ if changed => "changed-since-approval",
         (true, true, _) => "legacy-approved",
         (true, false, _) => "legacy",
         (false, true, _) => "approved",

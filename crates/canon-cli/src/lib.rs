@@ -5,6 +5,7 @@
 pub mod adapter;
 pub mod artifact_ingest;
 pub mod brief;
+pub mod brief_approve;
 pub mod brief_check;
 pub mod brief_template;
 pub mod change;
