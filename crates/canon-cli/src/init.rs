@@ -216,6 +216,9 @@ Features in this repo are managed with canon. Start with `canon status`,
 and read the canon skill (`canon skills install`) before you change a
 feature.
 
+Unsure of a command or its flags: `canon schema <command> --json`. Pass
+`--json` and read `error.code` and `error.hint` when a command fails.
+
 The loop:
 
 1. Brief: for a new subject or a scope change, write the PRD brief in the change's `.canon/changes/<slug>/brief.md` (intent, outcome, user flow `F1`, `F2`, …, step detail, acceptance, questions and assumptions, out of scope), in the `language:` of `canon.yaml` (unset: the request's language, with \"which language?\" in the questions). Run `canon brief check` until it has no blockers, then stop and report the brief to the human in that language: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy; record it in one call: `canon brief approve --change <slug> --by <the human> --note \"<their words>\"`. Never approve without a human answer. A brief edited after its approval needs a new answer.

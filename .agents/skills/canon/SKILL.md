@@ -197,6 +197,22 @@ Every write command says whether the record is final (`written directly`,
 or `staged and promoted in this run`) or staged; only a staged record
 needs `canon gate promote`, and only `write.promote: manual` leaves one.
 
+## Driving the CLI
+
+- Unsure of a command or its flags: run `canon schema <command> --json`
+  (one call: arguments, options, exits, error codes) instead of reading
+  `--help`. `canon schema` alone lists every command.
+- Pass `--json` and read stdout as one document. On failure it is
+  `{"error":{"code","message","hint","retryable"}}`: branch on `error.code`
+  and follow `error.hint`. The codes are stable; `canon schema --errors --json`
+  lists them.
+- Page long lists with `--limit <n>` and `--cursor <nextCursor>` (`--all`
+  for everything), and project fields with `--fields a,b` (`canon query`,
+  `canon finding list`; `meta` carries `returned`, `total`, `hasMore`,
+  `nextCursor`).
+- `canon purge` deletes only in two steps: `--plan` prints the removal set
+  and a `planDigest`; then `--confirm <planDigest>`.
+
 ## Command reference
 
 Load only the reference the current step needs.

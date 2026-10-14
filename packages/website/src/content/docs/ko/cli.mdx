@@ -11,8 +11,9 @@ description: canon --help 출력을 기준으로 목적별로 묶은 전체 서�
 대부분의 서브커맨드는 `--repo <dir>` (기본값 `.`)를 받습니다: 리터럴
 `.` 기본값은 `cwd`의 조상 디렉터리를 거슬러 올라가며 가장 가까운
 `canon.yaml`을 찾고, 다른 명시적 경로는 그대로 사용되며 탐색을 하지
-않습니다. 일부는 기본 사람이 읽기 좋은 표/요약 대신 기계가 읽을 수 있는
-출력을 위한 `--json`도 받습니다.
+않습니다. 모든 명령은 기본 사람이 읽기 좋은 표/요약 대신 stdout에 기계가
+읽을 수 있는 문서 하나를 내는 `--json`을 받습니다. [에이전트로 canon
+구동하기](#에이전트로-canon-구동하기)를 참고하세요.
 
 ## Try it
 
@@ -192,10 +193,50 @@ undecidable이 됩니다.
 | `canon report [--repo <dir>] [--check] [--snapshot <dir>]` | markdown 상태 리포트를 생성하거나(기본값), 커밋된 사본과 byte-diff하거나(`--check`, drift 시 종료 코드 `1`), panel mart를 Parquet + `manifest.json`으로 export합니다(`--snapshot`, 둘 다 주어지면 우선). |
 | `canon dashboard [--repo <dir>] [--snapshot <dir>] [--port <n>]` | 로컬에서 빌드된 대시보드 앱을 스냅샷 기준으로 서빙합니다. 기본 포트는 `4173`이며, `--snapshot`을 생략하면 매 실행마다 `.canon/dashboard-snapshot`에 새로 생성됩니다. |
 | `canon query --kind <kind> [--since <ts>] [--repo <dir>] [--canon-yaml <path>] [--json] [--plugin <id>] [--change-id <id>] [--domain <d>] [--status <s>] [--limit <n> \| --all] [--cursor <c>] [--fields a,b,c]` | 레코드 종류의 읽기를 그것이 있을 수 있는 모든 티어에 걸쳐 팬아웃하고 `at` 기준으로 병합합니다. `--plugin`은 해석된 플러그인의 오버레이 필드를 각 레코드에 투영하며, 미해석 플러그인이나 종류 불일치 시 fail-soft합니다. `--change-id`는 `--kind change`/`--kind task`에, `--domain`/`--status`는 `--kind subject`(도메인별 관리 뷰)에 범위를 제한하며, `--status`는 `--kind change`/`--kind task`에도 적용됩니다. 모든 호출은 읽은 `canon.yaml`의 레포(`--repo` 또는 `--canon-yaml`)의 `.canon/audit/access.jsonl`에 기록되며, 현재 디렉터리에는 쓰지 않습니다. `canon.yaml`이 없으면 아무것도 쓰지 않습니다. 최대 `--limit`개(기본 100, 0.20에서 "전부"에서 바뀜)만 반환하며, `--json`은 `meta: {returned, total, hasMore, nextCursor}`를 더하고 사람용 출력은 다음 cursor로 끝납니다. `--cursor <c>`로 이어 읽고(다른 목록의 cursor는 `INVALID_CURSOR`), `--all`은 나머지를 모두 반환합니다. `--fields`는 `--json` 레코드에서 지정한 최상위 필드만 남깁니다(없는 필드는 `UNKNOWN_FIELD`). |
-| `canon purge --kind &lt;session|run|event|trajectory&gt; --before &lt;RFC3339&gt; (--plan \| --confirm &lt;planDigest&gt;) [--repo &lt;dir&gt;] [--json]` | 일치하는 레코드를 라우팅된 rung과 모든 aging 대상에서 과거 버전을 포함해 제거합니다. `--plan`은 제거 대상과 `planDigest`를 출력하고 아무것도 지우지 않으며, `--confirm <planDigest>`는 지금 다시 계산한 plan의 digest가 같을 때만 지우고 아니면 `PLAN_CHANGED`(종료 코드 2)입니다. 옵션 없는 `purge`는 `PURGE_PLAN_REQUIRED`로 거부됩니다. 원본 transcript나 Git history는 삭제하지 않습니다. |
+| `canon purge --kind <session\|run\|event\|trajectory> --before <RFC3339> (--plan \| --confirm <planDigest>) [--repo <dir>] [--json]` | 일치하는 레코드를 라우팅된 rung과 모든 aging 대상에서 과거 버전을 포함해 제거합니다. `--plan`은 제거 대상과 `planDigest`를 출력하고 아무것도 지우지 않으며, `--confirm <planDigest>`는 지금 다시 계산한 plan의 digest가 같을 때만 지우고 아니면 `PLAN_CHANGED`(종료 코드 2)입니다. 옵션 없는 `purge`는 `PURGE_PLAN_REQUIRED`로 거부됩니다. 원본 transcript나 Git history는 삭제하지 않습니다. |
 | `canon tier age [--dry-run] [--repo <dir>] [--canon-yaml <path>]` | 모든 `canon.yaml` `aging:` 규칙을 한 번 적용해, 임계값을 넘은 레코드를 설정된 대상 티어로 이동시킵니다. `--dry-run`은 쓰지 않고 미리보기만 합니다. |
 | `canon plugin sync <PLUGIN_ID> [--repo <dir>] [--spec-root <dir>]` | `<plugin-id>`의 매니페스트에 선언된 오버레이를 해석하고, 각각을 등록된 소스로 넘긴 뒤, 모든 candidate를 validate-then-write 파이프라인으로 씁니다. |
 | `canon selftest [--json]` | 등록된 모든 크레이트의 fixture 코퍼스 셀프 테스트를 실행하고 EXPECTED oracle과 비교합니다. `canon gate selftest`와 별도로 추가됩니다. |
+
+## 에이전트로 canon 구동하기
+
+모든 명령은 하나의 머신 계약(0.20)을 공유하므로, 에이전트가 `--help`나 사람용
+텍스트를 긁어 읽을 필요가 없습니다.
+
+**`canon schema`로 파악합니다.** 한 번의 호출로 명령 하나를 설명합니다:
+
+```bash
+canon schema                      # 모든 명령과 effect, 한 줄씩
+canon schema purge --json         # {data, meta}: arguments, options, exits, errorCodes
+canon schema --errors --json      # 고정된 모든 오류 코드와 의미
+```
+
+`data`에는 `command`, `effect`(`read`, `write`, `destructive`),
+`supportsJson`, `arguments`, `options`(`name`, `kind`, `valueName`,
+`required`, `repeatable`, `possibleValues`, `default`), `exits`(`code`,
+`meaning`), `errorCodes`가 담깁니다.
+
+**`--json` 출력.** stdout에는 JSON 문서가 정확히 하나만 나오고, 안내 문구는
+stderr로 갑니다.
+
+**오류.** 실패하면 stderr에 `canon <command>: CODE — message`와 `hint:` 줄을
+냅니다. `--json`이면 stdout에 대신
+`{"error": {"code", "message", "hint", "retryable"}}`가 나옵니다. 코드는 고정된
+문자열이며, 커맨드라인 파싱 오류는 `USAGE`입니다. 종료 코드 `2`는 호출이나
+입력이 잘못되어 고칠 수 있다는 뜻(아무것도 쓰지 않음)이고, `1`은 운영 실패
+또는 명령이 보고하는 blocking finding입니다.
+
+**페이징과 필드.** `canon query`, `canon finding list`,
+`canon divergence status`, `canon export`는 최대 `--limit`개(기본 100)만
+반환합니다. `--all`은 전부, `--cursor <nextCursor>`는 이어서 가져옵니다.
+`--json`은 `meta: {returned, total, hasMore, nextCursor}`를 더합니다.
+`canon query`와 `canon finding list`는 `--fields a,b,c`로 레코드를 투영할 수
+있으며, 모르는 필드는 `UNKNOWN_FIELD`이고 hint가 알려진 필드를 나열합니다.
+
+**파괴적 명령은 계획이 먼저입니다.** `canon purge --plan`은 제거 대상과
+`planDigest`를 출력하고 아무것도 지우지 않습니다. `canon purge --confirm
+<planDigest>`는 지금 다시 계산한 plan의 digest가 같을 때만 지우며, 아니면
+`PLAN_CHANGED`입니다. `purge`에 `--dry-run`은 없습니다.
 
 ## Next
 
