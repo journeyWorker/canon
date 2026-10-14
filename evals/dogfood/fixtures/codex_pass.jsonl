@@ -1,0 +1,5 @@
+{"type":"thread.started","thread_id":"codex-pass","timestamp":"2026-01-01T00:05:00Z"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"i1","type":"command_execution","command":"canon status","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"i1","type":"command_execution","command":"canon status","aggregated_output":"ok","exit_code":0,"status":"completed"}}
+{"type":"turn.completed"}
