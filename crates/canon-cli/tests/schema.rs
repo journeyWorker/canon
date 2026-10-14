@@ -37,8 +37,42 @@ fn one_command_shows_options_with_their_shape() {
     assert_eq!(opt("report")["repeatable"], true);
     assert_eq!(v["effect"], "write");
     assert_eq!(v["supports_json"], v["options"].as_array().unwrap().iter().any(|o| o["name"] == "json"));
-    assert!(v["error_codes"].as_array().unwrap().is_empty());
-    assert!(v["exits"].as_array().unwrap().iter().any(|e| e["code"] == 2));
+    let codes: Vec<&str> = v["error_codes"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
+    for code in ["EVIDENCE_FABRICATED", "BRIEF_UNAPPROVED", "BRIEF_CHANGED_SINCE_APPROVAL", "EVIDENCE_INVALID_ARGUMENT", "USAGE"] {
+        assert!(codes.contains(&code), "{code} missing from {codes:?}");
+    }
+    assert!(!codes.contains(&"EVIDENCE_VAULT_FAILED"), "a sibling command's code leaked in: {codes:?}");
+    let exits: Vec<u64> = v["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect();
+    assert_eq!(exits, [0, 1, 2]);
+}
+
+#[test]
+fn exits_follow_each_commands_own_contract() {
+    let exits = |cmd: &[&str]| {
+        let mut args = vec!["schema"];
+        args.extend_from_slice(cmd);
+        args.push("--json");
+        json(&args)["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect::<Vec<_>>()
+    };
+    assert_eq!(exits(&["context"]), [0]);
+    assert_eq!(exits(&["dispatch", "diff"]), [0]);
+    assert_eq!(exits(&["finding", "list"]), [0, 2]);
+    assert_eq!(exits(&["evidence", "vault"]), [0, 2]);
+    assert_eq!(exits(&["gate", "check"]), [0, 1, 2]);
+    assert_eq!(exits(&["brief", "check"]), [0, 1, 2]);
+    assert_eq!(exits(&["finding", "add"]), [0, 2]);
+}
+
+#[test]
+fn errors_lists_the_whole_registry() {
+    let v = json(&["schema", "--errors", "--json"]);
+    let listed: Vec<&str> = v["errors"].as_array().unwrap().iter().map(|e| e["code"].as_str().unwrap()).collect();
+    let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|(c, _)| *c).collect();
+    assert_eq!(listed, registry);
+    assert!(v["errors"].as_array().unwrap().iter().all(|e| !e["meaning"].as_str().unwrap().is_empty()));
+    let human = canon(&["schema", "--errors"]);
+    assert!(human.status.success() && String::from_utf8_lossy(&human.stdout).contains("BRIEF_CHANGED_SINCE_APPROVAL"));
+    assert_eq!(canon(&["schema", "--errors", "evidence", "add"]).status.code(), Some(2));
 }
 
 #[test]

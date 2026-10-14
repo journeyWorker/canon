@@ -39,6 +39,7 @@ pub mod retrieve;
 pub mod review;
 pub mod scaffold;
 pub mod schema;
+mod schema_codes;
 pub mod subject;
 pub mod selftest;
 pub mod skills;

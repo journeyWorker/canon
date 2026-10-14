@@ -9,6 +9,11 @@
 //! leaf without a row and every row clap has no leaf for; the binary's test
 //! suite fails on either, so the table cannot drift from clap.
 //!
+//! Each command's `error_codes` come from [`crate::schema_codes`], a table
+//! generated from the sources (`tests/schema_codes.rs` derives it and fails on
+//! any difference; `CANON_BLESS_SCHEMA_CODES=1` rewrites it). `canon schema
+//! --errors` prints the whole registry of [`crate::cli_error::all_codes`].
+//!
 //! The command touches no repo and no network: it only walks the in-memory
 //! clap tree, so it works outside a canon repo. Output order is
 //! deterministic: leaves sort by canonical path, arguments and options keep
@@ -46,7 +51,11 @@ pub struct ExitMeta {
     pub meaning: &'static str,
 }
 
-/// The exit codes every canon command shares.
+const fn exit(code: u8, meaning: &'static str) -> ExitMeta {
+    ExitMeta { code, meaning }
+}
+
+/// The default exits, for a command whose module documents nothing narrower.
 pub const STANDARD_EXITS: &[ExitMeta] = &[
     ExitMeta { code: 0, meaning: "success" },
     ExitMeta { code: 1, meaning: "operational failure, or a blocking finding the command reports" },
@@ -59,14 +68,22 @@ pub struct CommandMeta {
     pub path: &'static str,
     pub effect: Effect,
     pub exits: &'static [ExitMeta],
-    /// Stable error codes the command can emit. Empty until the error-code
-    /// registry lands; the registry fills this field per command.
-    pub error_codes: &'static [&'static str],
 }
 
 const fn row(path: &'static str, effect: Effect) -> CommandMeta {
-    CommandMeta { path, effect, exits: STANDARD_EXITS, error_codes: &[] }
+    CommandMeta { path, effect, exits: STANDARD_EXITS }
 }
+
+/// A row whose exits differ from [`STANDARD_EXITS`], as its module documents.
+const fn row_exits(path: &'static str, effect: Effect, exits: &'static [ExitMeta]) -> CommandMeta {
+    CommandMeta { path, effect, exits }
+}
+
+/// A command that writes only when it succeeds and has no operational lane:
+/// every failure is a refusal.
+const REFUSES: &[ExitMeta] = &[exit(0, "success"), exit(2, "refused or failed; nothing is left written")];
+/// A command that reports and has no failing exit.
+const ALWAYS_OK: &[ExitMeta] = &[exit(0, "always: the command reports and has no failing exit")];
 
 use Effect::{Destructive, Read, Write};
 
@@ -75,49 +92,49 @@ pub const META: &[CommandMeta] = &[
     row("adapter authorize", Read),
     row("adapter validate", Read),
     row("brief approve", Write),
-    row("brief check", Read),
-    row("change new", Write),
-    row("context", Read),
+    row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "operational error, with a stable error code"), exit(2, "blocker findings")]),
+    row_exits("change new", Write, REFUSES),
+    row_exits("context", Read, ALWAYS_OK),
     row("context-pack create", Write),
     row("context-pack show", Read),
     row("context-pack verify", Read),
     row("dashboard", Read),
-    row("demo attest", Write),
-    row("demo init", Write),
+    row_exits("demo attest", Write, REFUSES),
+    row_exits("demo init", Write, REFUSES),
     row("dispatch begin", Write),
-    row("dispatch diff", Read),
+    row_exits("dispatch diff", Read, &[exit(0, "always, including when the observed graph differs from the declared plan: it reports, it never gates")]),
     row("dispatch end", Write),
     row("divergence defer", Write),
     row("divergence promote", Write),
     row("divergence resolve", Write),
     row("divergence stage", Write),
-    row("divergence status", Read),
-    row("evidence add", Write),
+    row_exits("divergence status", Read, &[exit(0, "always on a successful read: a capability query, never a gate"), exit(2, "refused: canon.yaml or the ledger cannot be read")]),
+    row_exits("evidence add", Write, &[exit(0, "staged"), exit(1, "gate-red: a fabrication marker, an invalid typed atom, a contradicting report, or an unapproved brief refuses the record; nothing is staged"), exit(2, "usage or infrastructure: a malformed flag combination, an unknown task, no plan corpus, a write failure; nothing is staged")]),
     row("evidence approval-payload", Read),
-    row("evidence vault", Write),
+    row_exits("evidence vault", Write, &[exit(0, "the pass ran, whatever it could store: files that could not be stored are listed, not an error"), exit(2, "refused: the ledger cannot be read or a write failed")]),
     row("export", Write),
-    row("feature new", Write),
-    row("finding add", Write),
-    row("finding close", Write),
-    row("finding list", Read),
-    row("format", Read),
-    row("gate check", Read),
+    row_exits("feature new", Write, REFUSES),
+    row_exits("finding add", Write, REFUSES),
+    row_exits("finding close", Write, REFUSES),
+    row_exits("finding list", Read, &[exit(0, "whether or not any finding matched"), exit(2, "refused: the ledger cannot be read")]),
+    row_exits("format", Read, &[exit(0, "clean"), exit(1, "the corpus has violations")]),
+    row_exits("gate check", Read, &[exit(0, "clean"), exit(1, "the gate found violations"), exit(2, "the gate could not run: bad --repo or an unreadable ledger or config")]),
     row("gate install-hooks", Write),
     row("gate promote", Write),
-    row("gate selftest", Read),
-    row("gate task", Write),
+    row_exits("gate selftest", Read, &[exit(0, "every fixture is clean"), exit(1, "a fixture failed")]),
+    row_exits("gate task", Write, &[exit(0, "the task row was flipped"), exit(1, "gate-red: the row is not ready to flip; nothing is written"), exit(2, "usage or infrastructure: an unknown task, unreadable plan or config; nothing is written")]),
     row("ingest artifacts", Write),
     row("ingest plans", Write),
     row("ingest sessions", Write),
-    row("init", Write),
+    row_exits("init", Write, REFUSES),
     row("inventory sync", Write),
     row("learn approve", Write),
     row("learn promote", Write),
     row("learn request", Write),
     row("learn rollback", Write),
-    row("migrate", Write),
+    row_exits("migrate", Write, &[exit(0, "migrated, or nothing to do"), exit(1, "migrated, but the index rebuild found the corpus unclean"), exit(2, "refused or failed; nothing is written")]),
     row("plugin sync", Write),
-    row("policy approve", Write),
+    row_exits("policy approve", Write, REFUSES),
     row("prompt register", Write),
     row("prompt show", Read),
     row("purge", Destructive),
@@ -125,17 +142,17 @@ pub const META: &[CommandMeta] = &[
     row("regime-key", Read),
     row("report", Write),
     row("retrieve", Read),
-    row("review add", Write),
-    row("scenario new", Write),
-    row("schema", Read),
-    row("selftest", Read),
+    row_exits("review add", Write, REFUSES),
+    row_exits("scenario new", Write, REFUSES),
+    row_exits("schema", Read, &[exit(0, "success"), exit(2, "refused: the command path does not resolve")]),
+    row_exits("selftest", Read, &[exit(0, "every suite is clean"), exit(1, "a suite failed")]),
     row("skills check", Read),
     row("skills doctor", Read),
     row("skills install", Write),
-    row("status", Read),
-    row("subject adopt", Write),
-    row("subject new", Write),
-    row("subject status", Read),
+    row_exits("status", Read, &[exit(0, "always: a problem reading the repo is a warning"), exit(1, "the report could not be serialized (--json)")]),
+    row_exits("subject adopt", Write, REFUSES),
+    row_exits("subject new", Write, REFUSES),
+    row_exits("subject status", Read, &[exit(0, "the transition was recorded"), exit(1, "an evidence, brief or review guard blocked the transition; the record is unchanged"), exit(2, "refused: an off-chain step, a missing reason, or a store failure")]),
     row("tier age", Write),
 ];
 
@@ -214,6 +231,8 @@ struct CommandSchema {
     arguments: Vec<ArgSchema>,
     options: Vec<ArgSchema>,
     exits: Vec<ExitMeta>,
+    /// Every stable code the command can emit (module granularity; see
+    /// `crate::schema_codes`).
     error_codes: Vec<&'static str>,
 }
 
@@ -299,6 +318,13 @@ fn resolve<'a>(root: &'a Command, tokens: &[String]) -> Result<Resolved<'a>, Ref
     }
 }
 
+/// The stable error codes `path` can emit, sorted. The table is derived from
+/// the sources and kept in step by `tests/schema_codes.rs`; a path the table
+/// does not know has none.
+pub fn error_codes(path: &str) -> Vec<&'static str> {
+    crate::schema_codes::ERROR_CODES.iter().find(|(p, _)| *p == path).map_or_else(Vec::new, |(_, codes)| codes.to_vec())
+}
+
 fn meta_for(path: &str) -> Option<&'static CommandMeta> {
     META.iter().find(|m| m.path == path)
 }
@@ -334,6 +360,7 @@ fn arg_schema(arg: &clap::Arg) -> ArgSchema {
 fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
     let key = canonical.join(" ");
     let meta = meta_for(&key);
+    let codes = error_codes(&key);
     let mut cmd = cmd.clone();
     cmd.build();
     let visible = |a: &&clap::Arg| !a.is_hide_set() && a.get_id() != "help" && a.get_id() != "version";
@@ -350,7 +377,7 @@ fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
         arguments,
         options,
         exits: meta.map_or(STANDARD_EXITS, |m| m.exits).to_vec(),
-        error_codes: meta.map_or(&[][..], |m| m.error_codes).to_vec(),
+        error_codes: codes,
     }
 }
 
@@ -371,7 +398,11 @@ fn list_entries(root: &Command, under: &[String]) -> Vec<ListEntry> {
 
 /// Run `canon schema`: print to stdout and return the exit code. A path that
 /// does not resolve is a refusal (exit 2) on stderr naming the nearest matches.
-pub fn run(root: &Command, tokens: &[String], json: bool) -> u8 {
+pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool) -> u8 {
+    if errors {
+        print_errors(json);
+        return 0;
+    }
     let resolved = match resolve(root, tokens) {
         Ok(r) => r,
         Err(Refusal(msg)) => {
@@ -401,6 +432,25 @@ pub fn run(root: &Command, tokens: &[String], json: bool) -> u8 {
         }
     }
     0
+}
+
+#[derive(Serialize)]
+struct ErrorEntry {
+    code: &'static str,
+    meaning: &'static str,
+}
+
+/// `canon schema --errors`: the whole registry, sorted by code.
+fn print_errors(json: bool) {
+    let entries: Vec<ErrorEntry> = crate::cli_error::all_codes().iter().map(|(code, meaning)| ErrorEntry { code, meaning }).collect();
+    if json {
+        println!("{}", serde_json::to_string_pretty(&serde_json::json!({ "errors": entries })).expect("schema serializes"));
+    } else {
+        let width = entries.iter().map(|e| e.code.len()).max().unwrap_or(0);
+        for e in &entries {
+            println!("{:<width$}  {}", e.code, e.meaning);
+        }
+    }
 }
 
 fn print_human(s: &CommandSchema) {
@@ -449,6 +499,9 @@ fn print_human(s: &CommandSchema) {
     println!("exits:");
     for e in &s.exits {
         println!("  {}  {}", e.code, e.meaning);
+    }
+    if !s.error_codes.is_empty() {
+        println!("error codes: {}", s.error_codes.join(", "));
     }
 }
 
