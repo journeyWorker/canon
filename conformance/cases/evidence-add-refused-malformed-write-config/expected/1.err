@@ -1,1 +1,1 @@
-canon evidence add: refused — canon.yaml `write:` section is malformed (expected `write: { promote: auto | manual }`): unknown variant `always`, expected `auto` or `manual`
+canon evidence add: CONFIG_UNREADABLE — canon.yaml `write:` section is malformed (expected `write: { promote: auto | manual }`): unknown variant `always`, expected `auto` or `manual`

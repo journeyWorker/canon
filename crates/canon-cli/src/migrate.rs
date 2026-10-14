@@ -70,10 +70,10 @@ use canon_model::{paths, ChangeId, RecordKind};
 use canon_store::tier::TierQuery;
 use serde_yaml::Value;
 
+use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::skills::{self, Provider, ProviderOrigin};
 
-const EXIT_REFUSED: i32 = 2;
 
 /// The spec root 0.16 defaulted to, and the one that moves into `.canon/`.
 const OLD_DEFAULT_ROOT: &str = "specs";
@@ -180,42 +180,42 @@ impl Plan {
 /// `canon migrate` (module doc). Exit `0` migrated or nothing to do, `1`
 /// migrated but the index rebuild found the corpus unclean, `2` refused
 /// or failed.
-pub fn run(repo: &Path, dry_run: bool) -> i32 {
+pub fn run(repo: &Path, dry_run: bool, json: bool) -> i32 {
+    let mut log = crate::json_out::Log::new(json);
     let repo = resolve_repo_root(repo);
     let canon_yaml = repo.join("canon.yaml");
     let Ok(text) = fs::read_to_string(&canon_yaml) else {
-        eprintln!("canon migrate: refused — `{}` does not exist; run it in a repo canon manages (`canon init` sets one up)", canon_yaml.display());
-        return EXIT_REFUSED;
+        return CliError::refused("CONFIG_MISSING", format!("`{}` does not exist; run it in a repo canon manages (`canon init` sets one up)", canon_yaml.display())).emit("canon migrate", json);
     };
     let git = in_git_work_tree(&repo);
     let plan = match plan(&repo, &text) {
         Ok(plan) => plan,
         Err(e) => {
-            eprintln!("canon migrate: refused — {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("MIGRATE_REFUSED", e.to_string()).emit("canon migrate", json);
         }
     };
     let config = match render_config(&text, &plan, plan.roots.len(), plan.drop_source.is_some()) {
         Ok(config) => config,
         Err(e) => {
-            eprintln!("canon migrate: refused — {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("MIGRATE_REFUSED", e.to_string()).emit("canon migrate", json);
         }
     };
     if git {
         if let Some(dirty) = uncommitted(&repo, &plan.moved_paths) {
-            eprintln!("canon migrate: refused — uncommitted changes under the paths it moves; commit or stash them, then run it again:\n{dirty}");
-            return EXIT_REFUSED;
+            return CliError::refused("MIGRATE_UNCOMMITTED", format!("uncommitted changes under the paths it moves; commit or stash them, then run it again:\n{dirty}")).emit("canon migrate", json);
         }
     }
 
-    print_plan(&repo, &plan, config != text);
+    print_plan(&repo, &plan, config != text, &mut log);
     if dry_run {
-        println!("canon migrate: --dry-run, nothing written");
+        log.line("canon migrate: --dry-run, nothing written");
+        if json {
+            crate::json_out::data("migrate", serde_json::json!({ "dryRun": true, "steps": log.into_lines() }));
+        }
         return 0;
     }
 
-    let applied = apply(&repo, &plan, git);
+    let applied = apply(&repo, &plan, git, &mut log);
     // The openspec source goes only once every change moved and every
     // pointer brief is written: a rerun reads the approvals still there.
     let drop_source = applied.error.is_none() && applied.briefs_done;
@@ -223,56 +223,51 @@ pub fn run(repo: &Path, dry_run: bool) -> i32 {
         .map_err(|e| format!("could not rewrite canon.yaml: {e}"))
         .and_then(|config| if config == text { Ok(()) } else { write_atomic(&canon_yaml, &config) });
     if let Err(e) = written {
-        eprintln!("canon migrate: stopped — {e}; canon.yaml is unchanged, and running `canon migrate` again finishes what this run started");
-        return EXIT_REFUSED;
+        return CliError::refused("MIGRATE_STOPPED", format!("{e}; canon.yaml is unchanged, and running `canon migrate` again finishes what this run started")).emit("canon migrate", json);
     }
     if config != text && applied.error.is_none() {
-        println!("canon migrate: rewrote canon.yaml");
+        log.line("canon migrate: rewrote canon.yaml");
     }
     if let Some(e) = applied.error {
-        eprintln!("canon migrate: stopped — {e}; what moved is recorded in canon.yaml, so running `canon migrate` again finishes the rest");
-        return EXIT_REFUSED;
+        return CliError::refused("MIGRATE_STOPPED", format!("{e}; what moved is recorded in canon.yaml, so running `canon migrate` again finishes the rest")).emit("canon migrate", json);
     }
     // Only now that canon.yaml no longer lists the openspec source do its
     // placeholder and emptied directories go: removed earlier, a stopped
     // run would leave a configured source whose `openspec/changes/` is
     // gone, which the openspec reader then reads as the repo root.
     if drop_source && plan.drop_source.is_some() {
-        if let Err(e) = remove_dropped_source(&repo, &plan, git) {
-            eprintln!("canon migrate: stopped — {e}; canon.yaml no longer lists the source, so remove it by hand");
-            return EXIT_REFUSED;
+        if let Err(e) = remove_dropped_source(&repo, &plan, git, &mut log) {
+            return CliError::refused("MIGRATE_STOPPED", format!("{e}; canon.yaml no longer lists the source, so remove it by hand")).emit("canon migrate", json);
         }
     }
 
     let moved = plan.changes.iter().chain(&plan.renames).map(|c| (&c.change, if c.to.ends_with("brief.md") { c.to.parent().unwrap_or(&c.to) } else { c.to.as_path() }));
     for (change, dir) in moved.chain(plan.reimport.iter().map(|(change, dir)| (change, dir.as_path()))) {
         match crate::plans::refresh_change(&repo, change) {
-            Ok(_) => println!("canon migrate: re-imported change `{}` from {} (same change id; its tasks and adoption keep joining)", change.as_str(), rel(&repo, dir)),
+            Ok(_) => log.line(format!("canon migrate: re-imported change `{}` from {} (same change id; its tasks and adoption keep joining)", change.as_str(), rel(&repo, dir))),
             Err(e) => {
-                eprintln!("canon migrate: moved change `{}` but could not re-import it: {e}; run `canon migrate` again", change.as_str());
-                return EXIT_REFUSED;
+                return CliError::refused("MIGRATE_STOPPED", format!("moved change `{}` but could not re-import it: {e}; run `canon migrate` again", change.as_str())).emit("canon migrate", json);
             }
         }
     }
     match crate::init::scaffold_gitignore(&repo) {
-        Ok(added) if !added.is_empty() => println!("canon migrate: added to .gitignore: {}", added.join(", ")),
+        Ok(added) if !added.is_empty() => log.line(format!("canon migrate: added to .gitignore: {}", added.join(", "))),
         Ok(_) => {}
         Err(e) => {
-            eprintln!("canon migrate: failed to update .gitignore: {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("WRITE_FAILED", format!("failed to update .gitignore: {e}")).emit("canon migrate", json);
         }
     }
     if git {
         let tracked = tracked_index_files(&repo);
         if tracked > 0 {
-            println!(
+            log.line(format!(
                 "canon migrate: note — {tracked} scenario index file(s) under {} are tracked in git; the index is derived and now ignored, so `git rm -r --cached {}` stops tracking them",
                 paths::SCENARIO_INDEX_GITIGNORE,
                 paths::SCENARIO_INDEX_GITIGNORE
-            );
+            ));
         }
     }
-    rebuild_index(&repo)
+    rebuild_index(&repo, log, json)
 }
 
 /// The plan for `repo` with `canon.yaml` `text`, or why it is refused.
@@ -847,13 +842,13 @@ fn rel(repo: &Path, path: &Path) -> String {
     path.strip_prefix(repo).unwrap_or(path).display().to_string()
 }
 
-fn print_plan(repo: &Path, plan: &Plan, config_changes: bool) {
+fn print_plan(repo: &Path, plan: &Plan, config_changes: bool, log: &mut crate::json_out::Log) {
     if !plan.changes_files() && plan.left.is_empty() {
-        println!("canon migrate: nothing to migrate; the repo is on the 0.17 layout");
-        println!("canon migrate: plan: rebuild the scenario index (full sync)");
+        log.line("canon migrate: nothing to migrate; the repo is on the 0.17 layout");
+        log.line("canon migrate: plan: rebuild the scenario index (full sync)");
         return;
     }
-    println!("canon migrate: plan:");
+    log.line("canon migrate: plan:");
     for root in &plan.roots {
         let config = match &root.config {
             Some(RootConfigEdit::Entry { new_root, former, explicit_root: true, .. }) => format!("; canon.yaml root: {new_root}, former_roots: [{former}]"),
@@ -862,46 +857,46 @@ fn print_plan(repo: &Path, plan: &Plan, config_changes: bool) {
             None => String::new(),
         };
         match &root.from {
-            Some(from) => println!("  move {} -> {} (spec root `{}`{config})", rel(repo, from), rel(repo, &root.to), root.id),
-            None => println!("  spec root `{}` is already at {} (an earlier run stopped before writing canon.yaml){config}", root.id, rel(repo, &root.to)),
+            Some(from) => log.line(format!("  move {} -> {} (spec root `{}`{config})", rel(repo, from), rel(repo, &root.to), root.id)),
+            None => log.line(format!("  spec root `{}` is already at {} (an earlier run stopped before writing canon.yaml){config}", root.id, rel(repo, &root.to))),
         }
     }
     for change in &plan.changes {
-        println!("  move {} -> {} (proposal.md -> brief.md; written by `canon change new`)", rel(repo, &change.from), rel(repo, &change.to));
+        log.line(format!("  move {} -> {} (proposal.md -> brief.md; written by `canon change new`)", rel(repo, &change.from), rel(repo, &change.to)));
     }
     for rename in &plan.renames {
-        println!("  rename {} -> {} (an earlier run moved change `{}` and stopped before this rename)", rel(repo, &rename.from), rel(repo, &rename.to), rename.change.as_str());
+        log.line(format!("  rename {} -> {} (an earlier run moved change `{}` and stopped before this rename)", rel(repo, &rename.from), rel(repo, &rename.to), rename.change.as_str()));
     }
     for (change, dir) in &plan.reimport {
-        println!("  re-import change `{}` from {} (an earlier run moved it and stopped before re-importing it)", change.as_str(), rel(repo, dir));
+        log.line(format!("  re-import change `{}` from {} (an earlier run moved it and stopped before re-importing it)", change.as_str(), rel(repo, dir)));
     }
     for brief in &plan.briefs {
-        println!(
+        log.line(format!(
             "  write {} (Source: {}; Approved: {}); the Approved: line stays in {}, which canon does not edit",
             rel(repo, &brief.path),
             brief.source,
             brief.approval,
             brief.source
-        );
+        ));
     }
     if plan.drop_source.is_some() {
-        println!("  canon.yaml: remove the plans source `{{ dialect: openspec, root: . }}` canon init wrote; no change is left under it");
+        log.line(format!("  canon.yaml: remove the plans source `{{ dialect: openspec, root: . }}` canon init wrote; no change is left under it"));
     }
     if let Some(gitkeep) = &plan.gitkeep {
-        println!("  remove {} (canon init's placeholder for that source)", rel(repo, gitkeep));
+        log.line(format!("  remove {} (canon init's placeholder for that source)", rel(repo, gitkeep)));
     }
     if let Some(providers) = &plan.providers {
-        println!("  canon.yaml: skills.providers: [{}] (from the install lock)", providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "));
+        log.line(format!("  canon.yaml: skills.providers: [{}] (from the install lock)", providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", ")));
     }
     if !plan.gitignore.is_empty() {
-        println!("  .gitignore: add {}", plan.gitignore.join(", "));
+        log.line(format!("  .gitignore: add {}", plan.gitignore.join(", ")));
     }
     if config_changes {
-        println!("  canon.yaml: every other byte kept");
+        log.line("  canon.yaml: every other byte kept");
     }
-    println!("  rebuild the scenario index (full sync)");
+    log.line("  rebuild the scenario index (full sync)");
     for left in &plan.left {
-        println!("  left: {left}");
+        log.line(format!("  left: {left}"));
     }
 }
 
@@ -915,7 +910,7 @@ struct Applied {
 
 /// Perform the plan's file moves and writes, stopping at the first
 /// failure ([`Applied`]).
-fn apply(repo: &Path, plan: &Plan, git: bool) -> Applied {
+fn apply(repo: &Path, plan: &Plan, git: bool, log: &mut crate::json_out::Log) -> Applied {
     let mut applied = Applied { roots: 0, briefs_done: false, error: None };
     for root in &plan.roots {
         if let Some(from) = &root.from {
@@ -923,12 +918,12 @@ fn apply(repo: &Path, plan: &Plan, git: bool) -> Applied {
                 applied.error = Some(e);
                 return applied;
             }
-            println!("canon migrate: moved {} -> {}", rel(repo, from), rel(repo, &root.to));
+            log.line(format!("canon migrate: moved {} -> {}", rel(repo, from), rel(repo, &root.to)));
         }
         applied.roots += 1;
         for dir in &root.emptied {
             if fs::remove_dir(dir).is_err() && dir.is_dir() {
-                println!("canon migrate: left {} in place; it still holds files canon does not move", rel(repo, dir));
+                log.line(format!("canon migrate: left {} in place; it still holds files canon does not move", rel(repo, dir)));
             }
         }
     }
@@ -937,7 +932,7 @@ fn apply(repo: &Path, plan: &Plan, git: bool) -> Applied {
             applied.error = Some(e);
             return applied;
         }
-        println!("canon migrate: renamed {} -> {}", rel(repo, &rename.from), rel(repo, &rename.to));
+        log.line(format!("canon migrate: renamed {} -> {}", rel(repo, &rename.from), rel(repo, &rename.to)));
     }
     for change in &plan.changes {
         if let Err(e) = move_dir(repo, &change.from, &change.to, git) {
@@ -953,7 +948,7 @@ fn apply(repo: &Path, plan: &Plan, git: bool) -> Applied {
             });
             return applied;
         }
-        println!("canon migrate: moved {} -> {} (proposal.md -> brief.md)", rel(repo, &change.from), rel(repo, &change.to));
+        log.line(format!("canon migrate: moved {} -> {} (proposal.md -> brief.md)", rel(repo, &change.from), rel(repo, &change.to)));
     }
     for brief in &plan.briefs {
         let written = fs::create_dir_all(brief.path.parent().unwrap_or(repo))
@@ -962,7 +957,7 @@ fn apply(repo: &Path, plan: &Plan, git: bool) -> Applied {
             applied.error = Some(format!("failed to write {}: {e}", rel(repo, &brief.path)));
             return applied;
         }
-        println!("canon migrate: wrote {} (Source: {}); the Approved: line left in {} is no longer read", rel(repo, &brief.path), brief.source, brief.source);
+        log.line(format!("canon migrate: wrote {} (Source: {}); the Approved: line left in {} is no longer read", rel(repo, &brief.path), brief.source, brief.source));
     }
     applied.briefs_done = true;
     applied
@@ -971,11 +966,11 @@ fn apply(repo: &Path, plan: &Plan, git: bool) -> Applied {
 /// Remove `openspec/changes/.gitkeep` and the emptied `openspec/`
 /// directories of the source this run dropped. Only empty directories go:
 /// whatever else the repo keeps there stays.
-fn remove_dropped_source(repo: &Path, plan: &Plan, git: bool) -> Result<(), String> {
+fn remove_dropped_source(repo: &Path, plan: &Plan, git: bool, log: &mut crate::json_out::Log) -> Result<(), String> {
     if let Some(gitkeep) = &plan.gitkeep {
         let removed = if git && is_tracked(repo, gitkeep) { git_run(repo, &["rm", "-q", "--", &rel(repo, gitkeep)]) } else { fs::remove_file(gitkeep).map_err(|e| e.to_string()) };
         removed.map_err(|e| format!("failed to remove {}: {e}", rel(repo, gitkeep)))?;
-        println!("canon migrate: removed {}", rel(repo, gitkeep));
+        log.line(format!("canon migrate: removed {}", rel(repo, gitkeep)));
     }
     for dir in ["openspec/changes/archive", "openspec/changes", "openspec"] {
         let _ = fs::remove_dir(repo.join(dir));
@@ -1057,20 +1052,22 @@ fn tracked_index_files(repo: &Path) -> usize {
 /// The full index rebuild (module doc). Exit `1` when a root does not
 /// sync clean: the migration stands, and `canon inventory sync` lists
 /// what to fix.
-fn rebuild_index(repo: &Path) -> i32 {
+fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, json: bool) -> i32 {
     match crate::inventory::run_sync(repo, None) {
         Ok(outcome) if outcome.is_clean() => {
-            println!("canon migrate: rebuilt the scenario index: {} record(s) written", outcome.total_written());
+            log.line(format!("canon migrate: rebuilt the scenario index: {} record(s) written", outcome.total_written()));
+            if json {
+                crate::json_out::data("migrate", serde_json::json!({ "dryRun": false, "steps": log.into_lines(), "indexRecordsWritten": outcome.total_written() }));
+            }
             0
         }
         Ok(outcome) => {
-            print!("{}", crate::inventory::format_human(&outcome));
-            eprintln!("canon migrate: the files moved, but the scenario index rebuild found the problems above; fix them, then run `canon inventory sync`");
-            1
+            crate::say_raw!(json, "{}", crate::inventory::format_human(&outcome));
+            CliError::failed("MIGRATE_INDEX_FAILED", "the files moved, but the scenario index rebuild found the problems; fix them, then run `canon inventory sync`")
+                .emit_with_data("canon migrate", json, serde_json::json!({ "steps": log.into_lines(), "index": crate::inventory::format_json(&outcome) }))
         }
         Err(e) => {
-            eprintln!("canon migrate: the files moved, but the scenario index was not rebuilt: {e}; run `canon inventory sync`");
-            EXIT_REFUSED
+            CliError::refused("MIGRATE_INDEX_FAILED", format!("the files moved, but the scenario index was not rebuilt: {e}; run `canon inventory sync`")).emit("canon migrate", json)
         }
     }
 }

@@ -53,6 +53,7 @@ use canon_model::envelope::RecordKind;
 use canon_model::paths;
 use canon_store::policy::{BackendConfig, TierPolicy};
 
+use crate::cli_error::CliError;
 use crate::policy_level::{starter_policy, PolicyLevel};
 use crate::skills::{self, Provider};
 
@@ -215,6 +216,9 @@ Features in this repo are managed with canon. Start with `canon status`,
 and read the canon skill (`canon skills install`) before you change a
 feature.
 
+Unsure of a command or its flags: `canon schema <command> --json`. Pass
+`--json` and read `error.code` and `error.hint` when a command fails.
+
 The loop:
 
 1. Brief: for a new subject or a scope change, write the PRD brief in the change's `.canon/changes/<slug>/brief.md` (intent, outcome, user flow `F1`, `F2`, …, step detail, acceptance, questions and assumptions, out of scope), in the `language:` of `canon.yaml` (unset: the request's language, with \"which language?\" in the questions). Run `canon brief check` until it has no blockers, then stop and report the brief to the human in that language: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy; record it in one call: `canon brief approve --change <slug> --by <the human> --note \"<their words>\"`. Never approve without a human answer. A brief edited after its approval needs a new answer.
@@ -293,6 +297,35 @@ fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
             begins.len(),
             ends.len()
         )),
+    }
+}
+
+/// What a `canon init` run did, step by step: each step is said in human
+/// form (stdout, or stderr under `--json`) and kept as `{ "step", "detail" }`
+/// for the JSON `data.steps`.
+struct InitLog {
+    json: bool,
+    /// Whether [`InitLog::finish`] prints the JSON document; `canon demo init`
+    /// runs `init` inside its own command and prints one of its own.
+    emit_data: bool,
+    steps: Vec<serde_json::Value>,
+}
+
+impl InitLog {
+    fn new(json: bool, emit_data: bool) -> Self {
+        Self { json, emit_data, steps: Vec::new() }
+    }
+
+    fn step(&mut self, step: &str, detail: impl Into<String>, line: String) {
+        crate::say!(self.json, "{line}");
+        self.steps.push(serde_json::json!({ "step": step, "detail": detail.into() }));
+    }
+
+    fn finish(self) -> i32 {
+        if self.json && self.emit_data {
+            crate::json_out::data("init", serde_json::json!({ "steps": self.steps }));
+        }
+        0
     }
 }
 
@@ -412,12 +445,12 @@ fn language_section(language: Option<&crate::language::Language>) -> String {
 /// Installs the canon skill for the chosen harnesses through
 /// [`skills::install_canonical`] (which follows the `skills.providers`
 /// just written), and prints what happened. `Err` carries the exit code.
-fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkills) -> Result<(), i32> {
+fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkills, log: &mut InitLog) -> Result<(), i32> {
     if chosen.providers.is_empty() {
         if chosen.recorded {
-            println!("canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`");
+            log.step("skills-none", "skills.providers is []", "canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`".to_string());
         } else {
-            println!("canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; {}", skills::CHOOSE_PROVIDERS);
+            log.step("skills-none", "no harness detected", format!("canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; {}", skills::CHOOSE_PROVIDERS));
         }
         return Ok(());
     }
@@ -430,31 +463,34 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
                 .map(|provider| skills::provider_bundle_root(repo, *provider).display().to_string())
                 .collect::<Vec<_>>()
                 .join(", ");
-            println!("canon init: installed the canon skill for {} ({dirs})", skills::provider_names(&report.providers));
+            log.step("skills-installed", dirs.clone(), format!("canon init: installed the canon skill for {} ({dirs})", skills::provider_names(&report.providers)));
             Ok(())
         }
         Err(e) => {
-            eprintln!(
-                "canon init: wrote `skills: {{ providers: [{}] }}` to {} but did not install the canon skill: {e}; once the skill source is available, run `canon skills install` (set {} or pass --source <dir>; it follows skills.providers)",
-                chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "),
-                canon_yaml_path.display(),
-                skills::CANONICAL_SOURCE_ENV
-            );
-            Err(2)
+            Err(CliError::refused(
+                "INIT_SKILL_INSTALL_FAILED",
+                format!(
+                    "wrote `skills: {{ providers: [{}] }}` to {} but did not install the canon skill: {e}",
+                    chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "),
+                    canon_yaml_path.display()
+                ),
+            )
+            .hint(format!("once the skill source is available, run `canon skills install` (set {} or pass --source <dir>; it follows skills.providers)", skills::CANONICAL_SOURCE_ENV))
+            .emit("canon init", log.json))
         }
     }
 }
 
 /// Write `merged` to `AGENTS.md` unless it already holds exactly those
 /// bytes, and print what happened.
-fn write_agents_md(path: &Path, existing: Option<&str>, merged: &str) -> std::io::Result<()> {
+fn write_agents_md(path: &Path, existing: Option<&str>, merged: &str, log: &mut InitLog) -> std::io::Result<()> {
     if existing == Some(merged) {
-        println!("canon init: the canon block in {} is already current", path.display());
+        log.step("agents-md-current", path.display().to_string(), format!("canon init: the canon block in {} is already current", path.display()));
         return Ok(());
     }
     fs::write(path, merged)?;
     let verb = if existing.is_some() { "refreshed" } else { "wrote" };
-    println!("canon init: {verb} the canon block in {}", path.display());
+    log.step("agents-md", path.display().to_string(), format!("canon init: {verb} the canon block in {}", path.display()));
     Ok(())
 }
 
@@ -463,19 +499,23 @@ fn write_agents_md(path: &Path, existing: Option<&str>, merged: &str) -> std::io
 /// level parses with zero diagnostics through
 /// `canon_gate::PolicyResolution::resolve` (pinned by
 /// [`crate::policy_level`]'s tests).
-fn scaffold_policy(repo: &Path, level: PolicyLevel) -> std::io::Result<()> {
+fn scaffold_policy(repo: &Path, level: PolicyLevel, log: &mut InitLog) -> std::io::Result<()> {
     let path = repo.join(paths::POLICY_FILE);
     fs::create_dir_all(repo.join(paths::CANON_DIR))?;
     match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
         Ok(mut file) => {
             file.write_all(starter_policy(level).as_bytes())?;
-            println!(
-                "canon init: wrote {} — a human reviews it and approves it with `canon policy approve --by <who>`: the gate grades the work against it, and `canon status` and `canon gate check` say so until it is approved",
-                path.display()
+            log.step(
+                "policy",
+                path.display().to_string(),
+                format!(
+                    "canon init: wrote {} — a human reviews it and approves it with `canon policy approve --by <who>`: the gate grades the work against it, and `canon status` and `canon gate check` say so until it is approved",
+                    path.display()
+                ),
             );
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            println!("canon init: {} already exists — left unchanged", path.display());
+            log.step("policy-exists", path.display().to_string(), format!("canon init: {} already exists — left unchanged", path.display()));
         }
         Err(e) => return Err(e),
     }
@@ -502,17 +542,22 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel) -> std::io::Result<()> {
 /// - A fresh repo also records and installs the harness choice
 ///   ([`SkillsChoice`], 0.17 D5); an install that fails after the writes
 ///   exits `2` naming the retry. A rerun never asks and never installs.
-pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
+pub fn run_init(repo: &Path, options: InitOptions, json: bool) -> i32 {
+    run_init_in(repo, options, json, true)
+}
+
+/// [`run_init`], with `emit_data: false` leaving the JSON document to the
+/// calling command (`canon demo init`).
+pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_data: bool) -> i32 {
+    let mut log = InitLog::new(json, emit_data);
     if let Err(e) = fs::create_dir_all(repo) {
-        eprintln!("canon init: failed to create `{}`: {e}", repo.display());
-        return 2;
+        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", repo.display())).emit("canon init", json);
     }
     let agents_path = repo.join("AGENTS.md");
     let language = match options.language.as_deref().map(crate::language::Language::parse).transpose() {
         Ok(language) => language,
         Err(e) => {
-            eprintln!("canon init: refused — --language: {e}");
-            return 2;
+            return CliError::refused("INIT_INVALID_ARGUMENT", format!("--language: {e}")).emit("canon init", json);
         }
     };
     let agents = if options.agents_md {
@@ -520,15 +565,13 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
             Ok(text) => Some(text),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
             Err(e) => {
-                eprintln!("canon init: failed to read `{}`: {e}", agents_path.display());
-                return 2;
+                return CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", agents_path.display())).emit("canon init", json);
             }
         };
         match merge_agents_md(existing.as_deref()) {
             Ok(merged) => Some((existing, merged)),
             Err(e) => {
-                eprintln!("canon init: refused — {e}");
-                return 2;
+                return CliError::refused("INIT_AGENTS_MD_CONFLICT", e.to_string()).emit("canon init", json);
             }
         }
     } else {
@@ -542,8 +585,7 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
         match choose_skills(repo, &options.skills) {
             Ok(skills) => skills,
             Err(e) => {
-                eprintln!("canon init: refused — {e}");
-                return 2;
+                return CliError::refused("INIT_INVALID_ARGUMENT", e.to_string()).emit("canon init", json);
             }
         }
     };
@@ -551,69 +593,61 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
         Ok(mut file) => {
             let config = skeleton_yaml() + &language_section(language.as_ref()) + &skills_section(skills.as_ref());
             if let Err(e) = file.write_all(config.as_bytes()) {
-                eprintln!("canon init: failed to write `{}`: {e}", canon_yaml_path.display());
-                return 2;
+                return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", canon_yaml_path.display())).emit("canon init", json);
             }
-            println!("canon init: wrote {}", canon_yaml_path.display());
+            log.step("config", canon_yaml_path.display().to_string(), format!("canon init: wrote {}", canon_yaml_path.display()));
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             let missing = missing_gitignore_lines(repo);
             if agents.is_none() && missing.is_empty() {
-                eprintln!("canon init: refused — `{}` already exists; never overwriting an existing config", canon_yaml_path.display());
-                return 2;
+                return CliError::refused("INIT_CONFIG_EXISTS", format!("`{}` already exists; never overwriting an existing config", canon_yaml_path.display())).emit("canon init", json);
             }
             let refreshed = if agents.is_some() { "the AGENTS.md block and the canon .gitignore lines are refreshed" } else { "the canon .gitignore lines are refreshed" };
-            println!("canon init: {} already exists — left unchanged; {refreshed}", canon_yaml_path.display());
+            log.step("config-exists", canon_yaml_path.display().to_string(), format!("canon init: {} already exists — left unchanged; {refreshed}", canon_yaml_path.display()));
             if matches!(options.skills, SkillsChoice::Providers(_)) {
-                println!("canon init: --providers is not applied to an existing canon.yaml; run `canon skills install --providers=<list>`, which records the list in skills.providers");
+                log.step("providers-ignored", "--providers", "canon init: --providers is not applied to an existing canon.yaml; run `canon skills install --providers=<list>`, which records the list in skills.providers".to_string());
             }
             if options.language.is_some() {
-                println!("canon init: --language is not applied to an existing canon.yaml; add `language: <tag>` to it by hand");
+                log.step("language-ignored", "--language", "canon init: --language is not applied to an existing canon.yaml; add `language: <tag>` to it by hand".to_string());
             }
             match scaffold_gitignore(repo) {
-                Ok(added) if !added.is_empty() => println!("canon init: added to .gitignore: {}", added.join(", ")),
+                Ok(added) if !added.is_empty() => log.step("gitignore", added.join(", "), format!("canon init: added to .gitignore: {}", added.join(", "))),
                 Ok(_) => {}
                 Err(e) => {
-                    eprintln!("canon init: failed to update `.gitignore`: {e}");
-                    return 2;
+                    return CliError::refused("WRITE_FAILED", format!("failed to update `.gitignore`: {e}")).emit("canon init", json);
                 }
             }
             if let Some((existing, merged)) = agents {
-                if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged) {
-                    eprintln!("canon init: failed to write `{}`: {e}", agents_path.display());
-                    return 2;
+                if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged, &mut log) {
+                    return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).emit("canon init", json);
                 }
             }
-            return 0;
+            return log.finish();
         }
         Err(e) => {
-            eprintln!("canon init: failed to create `{}`: {e}", canon_yaml_path.display());
-            return 2;
+            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", canon_yaml_path.display())).emit("canon init", json);
         }
     }
 
     if let Err(e) = scaffold_gitignore(repo) {
-        eprintln!("canon init: wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display());
-        return 2;
+        return CliError::refused("WRITE_FAILED", format!("wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display())).emit("canon init", json);
     }
     if let Some(level) = options.policy {
-        if let Err(e) = scaffold_policy(repo, level) {
-            eprintln!("canon init: failed to write `{}`: {e}", repo.join(paths::POLICY_FILE).display());
-            return 2;
+        if let Err(e) = scaffold_policy(repo, level, &mut log) {
+            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", repo.join(paths::POLICY_FILE).display())).emit("canon init", json);
         }
     }
     if let Some((existing, merged)) = agents {
-        if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged) {
-            eprintln!("canon init: failed to write `{}`: {e}", agents_path.display());
-            return 2;
+        if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged, &mut log) {
+            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).emit("canon init", json);
         }
     }
     if let Some(chosen) = &skills {
-        if let Err(code) = install_chosen_skills(repo, &canon_yaml_path, chosen) {
+        if let Err(code) = install_chosen_skills(repo, &canon_yaml_path, chosen, &mut log) {
             return code;
         }
     }
-    0
+    log.finish()
 }
 
 /// `canon init --check-config [--repo <dir>]` (task 4.2). Returns the
@@ -623,11 +657,10 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
 /// least one present section fails -- printing one PASS/FAIL/"not
 /// configured" line per section regardless (never stopping at the
 /// first failure, design D7).
-pub fn run_check_config(repo: &Path) -> i32 {
+pub fn run_check_config(repo: &Path, json: bool) -> i32 {
     let canon_yaml_path = repo.join("canon.yaml");
     let Ok(text) = fs::read_to_string(&canon_yaml_path) else {
-        eprintln!("canon init --check-config: refused — `{}` does not exist; run `canon init` first", canon_yaml_path.display());
-        return 2;
+        return CliError::refused("CONFIG_MISSING", format!("`{}` does not exist; run `canon init` first", canon_yaml_path.display())).emit("canon init --check-config", json);
     };
 
     let mut all_ok = true;
@@ -722,8 +755,25 @@ pub fn run_check_config(repo: &Path) -> i32 {
         }
     }
 
-    print!("{report}");
-    if all_ok { 0 } else { 1 }
+    crate::say_raw!(json, "{report}");
+    let sections: Vec<serde_json::Value> = report
+        .lines()
+        .filter_map(|line| {
+            let (status, rest) = line.strip_prefix('[')?.split_once("] ")?;
+            let section = rest.split([' ', ':']).next().unwrap_or(rest);
+            let status = if status == "not configured" { "not-configured" } else { status };
+            Some(serde_json::json!({ "section": section, "status": status.to_ascii_lowercase(), "detail": rest }))
+        })
+        .collect();
+    let data = serde_json::json!({ "ok": all_ok, "sections": sections });
+    if all_ok {
+        if json {
+            crate::json_out::data("init", data);
+        }
+        0
+    } else {
+        CliError::failed("CONFIG_UNREADABLE", "a present canon.yaml section fails its loader").hint("data.sections names each failing section").emit_with_data("canon init --check-config", json, data)
+    }
 }
 
 #[cfg(test)]

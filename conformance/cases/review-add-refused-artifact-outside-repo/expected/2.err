@@ -1,1 +1,1 @@
-canon review add: refused — /etc/hosts is outside the repository; bound files are recorded by repository-relative path
+canon review add: REVIEW_ARTIFACT_REFUSED — /etc/hosts is outside the repository; bound files are recorded by repository-relative path

@@ -260,7 +260,44 @@ impl TrajectoryStore for ParquetTrajectoryStore {
     fn purge_before(&self, before: chrono::DateTime<Utc>, dry_run: bool) -> Result<usize, LearnError> {
         purge_trajectory_files(&self.root, before, dry_run)
     }
+    fn purge_keys_before(&self, before: chrono::DateTime<Utc>) -> Result<Vec<String>, LearnError> {
+        let mut keys = Vec::new();
+        purge_candidate_files(&self.root, &self.root, before, &mut keys)?;
+        keys.sort();
+        Ok(keys)
+    }
 
+}
+
+/// Every trajectory file under `dir` holding a row older than `before`, as
+/// its path relative to `root`; the symlink policy of
+/// [`purge_trajectory_files`] applies.
+fn purge_candidate_files(root: &Path, dir: &Path, before: chrono::DateTime<Utc>, out: &mut Vec<String>) -> Result<(), LearnError> {
+    let metadata = match fs::symlink_metadata(dir) {
+        Ok(metadata) => metadata,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(err) => return Err(err.into()),
+    };
+    if metadata.file_type().is_symlink() {
+        return Err(symlink_policy_error(dir));
+    }
+    if !metadata.is_dir() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            return Err(symlink_policy_error(&path));
+        }
+        if file_type.is_dir() {
+            purge_candidate_files(root, &path, before, out)?;
+        } else if file_type.is_file() && path.extension().is_some_and(|ext| ext == "parquet") && decode_trajectories(File::open(&path)?)?.iter().any(|row| row.recorded_at < before) {
+            out.push(path.strip_prefix(root).unwrap_or(&path).display().to_string());
+        }
+    }
+    Ok(())
 }
 fn purge_trajectory_files(dir: &Path, before: chrono::DateTime<Utc>, dry_run: bool) -> Result<usize, LearnError> {
     let metadata = match fs::symlink_metadata(dir) {

@@ -63,13 +63,12 @@ use canon_model::{paths, ChangeId, SubjectStatus};
 use serde::Serialize;
 
 use crate::brief_template::{canonical_role, heading_of, marker, ChangeKind, Role, CHORE_CATEGORIES};
+use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::language::{Language, Shipped};
 
 /// Exit code for blocker findings (mirrors `canon change new`'s refusal).
 const EXIT_BLOCKERS: i32 = 2;
-/// Exit code for an operational error.
-const EXIT_ERROR: i32 = 1;
 
 /// A finding's severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -952,19 +951,6 @@ fn prose(out: &mut Out, section: &Section, shipped: Shipped) {
 
 // ───────────────────────────── loading ─────────────────────────────
 
-/// An operational failure: a stable `code` and a message.
-#[derive(Debug)]
-pub struct CheckError {
-    pub code: &'static str,
-    pub message: String,
-}
-
-impl CheckError {
-    fn new(code: &'static str, message: String) -> Self {
-        CheckError { code, message }
-    }
-}
-
 /// The phase the flow-coverage rules need.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -1017,11 +1003,11 @@ fn rel(repo: &Path, path: &Path) -> String {
 }
 
 /// The change to check: `requested`, or the repo's only live change.
-fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId, PathBuf), CheckError> {
+fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId, PathBuf), CliError> {
     if let Some(change) = requested {
         return crate::brief::canon_brief(repo, change)
             .map(|path| (change.clone(), path))
-            .ok_or_else(|| CheckError::new("BRIEF_NOT_FOUND", format!("no brief at {}/{}/brief.md", paths::CHANGES_DIR, change.as_str())));
+            .ok_or_else(|| CliError::failed("BRIEF_NOT_FOUND", format!("no brief at {}/{}/brief.md", paths::CHANGES_DIR, change.as_str())));
     }
     let dir = repo.join(paths::CHANGES_DIR);
     let mut live: Vec<(ChangeId, PathBuf)> = std::fs::read_dir(&dir)
@@ -1033,9 +1019,9 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
         .collect();
     live.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
     match live.len() {
-        0 => Err(CheckError::new("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR))),
+        0 => Err(CliError::failed("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR))),
         1 => Ok(live.remove(0)),
-        _ => Err(CheckError::new(
+        _ => Err(CliError::failed(
             "CHANGE_AMBIGUOUS",
             format!("{} live changes have a brief ({}); pass --change <slug>", live.len(), live.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>().join(", ")),
         )),
@@ -1043,13 +1029,13 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
 }
 
 /// Reads and judges the brief of `requested` (or the only live change).
-pub fn check(repo: &Path, requested: Option<&ChangeId>) -> Result<Checked, CheckError> {
+pub fn check(repo: &Path, requested: Option<&ChangeId>) -> Result<Checked, CliError> {
     let (change, path) = resolve_change(repo, requested)?;
-    let text = std::fs::read_to_string(&path).map_err(|e| CheckError::new("BRIEF_UNREADABLE", format!("cannot read `{}`: {e}", rel(repo, &path))))?;
-    let language = crate::language::configured(repo).map_err(|e| CheckError::new("CONFIG_UNREADABLE", e))?;
+    let text = std::fs::read_to_string(&path).map_err(|e| CliError::failed("BRIEF_UNREADABLE", format!("cannot read `{}`: {e}", rel(repo, &path))))?;
+    let language = crate::language::configured(repo).map_err(|e| CliError::failed("CONFIG_UNREADABLE", e))?;
     let phase = phase_of(repo, &change, &text);
     let flows = match phase {
-        Phase::Building if !is_chore(&text) => Some(flow_scenarios(repo, &change).map_err(|e| CheckError::new("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")))?),
+        Phase::Building if !is_chore(&text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")))?),
         _ => None,
     };
     let evaluation = evaluate(&text, &language, flows.as_ref());
@@ -1083,12 +1069,8 @@ pub fn status_counts(repo: &Path, change: &ChangeId, building: bool) -> Option<C
 
 // ───────────────────────────── commands ─────────────────────────────
 
-fn fail(json: bool, error: &CheckError) -> i32 {
-    eprintln!("canon brief: {} — {}", error.code, error.message);
-    if json {
-        println!("{}", serde_json::json!({ "error": { "code": error.code, "message": error.message } }));
-    }
-    EXIT_ERROR
+fn fail(json: bool, error: &CliError) -> i32 {
+    error.emit("canon brief", json)
 }
 
 #[derive(Serialize)]
@@ -1126,7 +1108,18 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
             findings: &ev.findings,
             waivers: &ev.waivers,
         };
-        println!("{}", serde_json::to_string_pretty(&body).unwrap_or_else(|e| format!("{{\"error\":{{\"code\":\"SERIALIZE_FAILED\",\"message\":\"{e}\"}}}}")));
+        match serde_json::to_value(&body) {
+            Ok(mut value) => {
+                if counts.blockers > 0 {
+                    // One document: the findings keep their fields and gain the shared `error`.
+                    let error = CliError::refused("BRIEF_HAS_BLOCKERS", format!("{} blocker(s) in {}", counts.blockers, checked.brief)).hint("fix each blocker in `findings`, then run `canon brief check` again");
+                    eprintln!("{}", error.human("canon brief check"));
+                    value["error"] = error.to_json()["error"].clone();
+                }
+                println!("{}", serde_json::to_string_pretty(&value).expect("a JSON value always serializes"));
+            }
+            Err(e) => return CliError::failed("SERIALIZE_FAILED", e.to_string()).emit("canon brief check", true),
+        }
     } else {
         println!("canon brief check: {} ({}) — {} blocker(s), {} advisory(ies)", checked.brief, checked.language.tag, counts.blockers, counts.advisories);
         if checked.phase == Phase::Unknown {

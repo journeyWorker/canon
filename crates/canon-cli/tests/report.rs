@@ -158,7 +158,7 @@ fn report_refuses_an_unparseable_canon_yaml_in_every_mode() {
         let output = run_canon(args, dir.path());
         assert_eq!(output.status.code(), Some(2), "{args:?}: stdout: {}\nstderr: {}", stdout(&output), stderr(&output));
         let err = stderr(&output);
-        assert!(err.starts_with("canon report: parsing `") && err.contains("canon.yaml`: "), "{args:?} must name the file: {err}");
+        assert!(err.starts_with("canon report: CONFIG_UNREADABLE — parsing `") && err.contains("canon.yaml`: "), "{args:?} must name the file: {err}");
         assert!(err.contains("line 2"), "{args:?} must carry the parse error: {err}");
     }
     assert!(!dir.path().join(".canon/REPORT.md").exists(), "a refused report writes nothing");

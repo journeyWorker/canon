@@ -98,6 +98,11 @@ canon query --kind handoff --since 2026-06-01T00:00:00Z
 
 # Machine-readable output instead of the human table.
 canon query --kind trajectory --json
+
+# Page a long result and keep only the fields you need; `meta` carries
+# returned, total, hasMore and nextCursor (`--all` returns everything).
+canon query --kind trajectory --json --limit 50 --fields at,kind
+canon query --kind trajectory --json --limit 50 --cursor <nextCursor>
 ```
 
 ## What `canon report` does and doesn't read
@@ -120,8 +125,11 @@ section listing them and emits a matching stderr `WARN`.
 
 ## Retention, export, and access audit
 
-`canon purge --kind <kind> --before <RFC3339> [--repo <dir>] [--dry-run] [--json]`
-is the canonical data-lifecycle boundary. The only purgeable kinds are
+`canon purge --kind <kind> --before <RFC3339> (--plan | --confirm <planDigest>) [--repo <dir>] [--json]`
+is the canonical data-lifecycle boundary: `--plan` prints the removal set and
+its `planDigest` and deletes nothing; `--confirm <planDigest>` deletes only if
+the plan recomputed now has the same digest (`PLAN_CHANGED`, exit 2, when the
+data moved), and a bare `purge` is refused (`PURGE_PLAN_REQUIRED`). The only purgeable kinds are
 `session`, `run`, `event`, and `trajectory`; the cutoff applies to every
 routed rung and every configured aging destination, including retained
 historical versions. For `trajectory`, the command also purges the
@@ -135,7 +143,7 @@ status. Purge never rewrites Git history or deletes source transcript
 files.
 
 `canon export --kind <kind> [--before <RFC3339>] [--after <RFC3339>]
-[--out <file>] [--json]` emits a versioned manifest containing source scope,
+[--out <file>] [--json] [--limit <n> | --all] [--cursor <c>]` emits a versioned manifest containing source scope,
 counts, digests, and redacted metadata. It does not authorize backend access;
 credentials remain an operator prerequisite. New output files are mode
 `0600`. Raw event detail text is excluded unless `--include-sensitive` is

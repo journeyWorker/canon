@@ -1,1 +1,1 @@
-canon subject status: refused — invalid transition proposed → shipped (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)
+canon subject status: SUBJECT_INVALID_TRANSITION — invalid transition proposed → shipped (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)

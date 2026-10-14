@@ -322,6 +322,7 @@ use canon_store::partition::{content_digest12, resolve_partition};
 use canon_store::tier::{RawWrite, Tier, TierQuery};
 use chrono::Utc;
 
+use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::gate::evidence_staging_dir;
 
@@ -481,6 +482,8 @@ pub struct FindingArgs {
     pub session_id: Option<SessionId>,
     /// `--promote`/`--no-promote` (0.16 D2; [`crate::write_mode`]).
     pub promote: crate::write_mode::PromoteFlag,
+    /// `--json`: one JSON document on stdout, every human line on stderr.
+    pub json: bool,
 }
 
 /// The envelope actor for a record this module stages: the id, the role,
@@ -511,23 +514,19 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            eprintln!("canon finding add: refused — {error}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).emit("canon finding add", args.json);
         }
     };
 
     if args.round == 0 || args.seq == 0 {
-        eprintln!(
-            "canon finding add: refused — --round and --seq are 1-based (got --round {} --seq {}); a 0 would sort ahead of the first real finding in a key whose whole job is ordering rounds",
+        return CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); a 0 would sort ahead of the first real finding in a key whose whole job is ordering rounds",
             args.round, args.seq
-        );
-        return 2;
+        )).emit("canon finding add", args.json);
     }
 
     for (flag, value) in [("--reviewer", args.reviewer.as_str()), ("--summary", args.summary.as_str())] {
         if value.trim().is_empty() {
-            eprintln!("canon finding add: refused — {flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..]);
-            return 2;
+            return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).emit("canon finding add", args.json);
         }
     }
 
@@ -544,10 +543,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         ("--actor-id", Some(args.actor_id.as_str())),
     ] {
         let Some((offset, separator)) = value.and_then(first_row_line_break) else { continue };
-        eprintln!(
-            "canon finding add: refused — {flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs"
-        );
-        return 2;
+        return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).emit("canon finding add", args.json);
     }
 
     // The coherence pair, as a NAMED diagnostic rather than a second
@@ -557,17 +553,12 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     // `malformed` record two commands later.
     match (args.disposition, &args.resolution_sha) {
         (FindingDisposition::Fixed, None) => {
-            eprintln!(
-                "canon finding add: refused — --disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at"
-            );
-            return 2;
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").emit("canon finding add", args.json);
         }
         (disposition, Some(sha)) if disposition != FindingDisposition::Fixed => {
-            eprintln!(
-                "canon finding add: refused — --resolution-sha {sha} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the sha or set --disposition fixed",
+            return CliError::refused("FINDING_RESOLUTION_SHA_UNEXPECTED", format!("--resolution-sha {sha} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the sha or set --disposition fixed",
                 disposition.as_str()
-            );
-            return 2;
+            )).emit("canon finding add", args.json);
         }
         _ => {}
     }
@@ -581,8 +572,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let shas = match resolve_shas(&repo, args) {
         Ok(shas) => shas,
         Err(refusal) => {
-            eprintln!("{refusal}");
-            return 2;
+            return refusal.emit("canon finding add", args.json);
         }
     };
 
@@ -608,8 +598,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         // Unreachable: `(Fixed, None)` was refused above. Handled
         // rather than assumed away, and never by fabricating a sha.
         (FindingDisposition::Fixed, None) => {
-            eprintln!("canon finding add: refused — --disposition fixed requires --resolution-sha");
-            return 2;
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").emit("canon finding add", args.json);
         }
     };
     if let Some(sha) = shas.reviewed {
@@ -626,39 +615,35 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let natural_key = match resolve_partition(RecordKind::Finding, &body) {
         Ok(key) => key.natural_key,
         Err(violation) => {
-            eprintln!("canon finding add: {}", violation.detail);
-            return 2;
+            return CliError::refused("FINDING_INVALID_ARGUMENT", violation.detail.to_string()).emit("canon finding add", args.json);
         }
     };
 
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            eprintln!("canon finding add: {e}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon finding add", args.json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
     let committed = GitTier::new(&ledger_root);
     match occupied_by(&natural_key, &staging, &committed) {
         Ok(Some(occupant)) => {
-            eprintln!(
-                "canon finding add: refused — {} is already occupied by a {occupant} finding (`{}`, round {}, seq {}); pick the next free --seq rather than authoring a second record under one finding's identity. To move THAT finding's disposition instead, use `canon finding close`.",
+            return CliError::refused("FINDING_SEQ_OCCUPIED", format!("{} is already occupied by a {occupant} finding (`{}`, round {}, seq {}); pick the next free --seq rather than authoring a second record under one finding's identity. To move THAT finding's disposition instead, use `canon finding close`.",
                 natural_key, args.change_id, args.round, args.seq
-            );
-            return 2;
+            )).emit("canon finding add", args.json);
         }
         Ok(None) => {}
         Err(e) => {
-            eprintln!("canon finding add: {e}");
-            return 2;
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon finding add", args.json);
         }
     }
 
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
-            let settled = crate::gate::promote_after_stage("canon finding add", &ledger_root, &receipt.location, promote);
-            println!(
+            let settled = crate::gate::promote_after_stage("canon finding add", &ledger_root, &receipt.location, promote, args.json);
+            crate::say!(
+                args.json,
                 "canon finding add: {} — {} round {} seq {} ({}, {}) — {}",
                 settled.landed(&receipt.location),
                 args.change_id,
@@ -674,15 +659,25 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
                 // introducing commit was sourced, and an unsourced
                 // record is one of the two reasons the derived count
                 // UNDER-counts (module doc's canonical sentence).
-                println!(
+                crate::say!(
+                    args.json,
                     "canon finding add: note — no --introduced-by, so this finding is UNSOURCED for fix-of-fix derivation. That is the correct record when the introducing commit was not established; never guess one."
                 );
+            }
+            if args.json && settled.exit_code() == 0 {
+                let mut record = settled.json(&receipt.location);
+                record["changeId"] = serde_json::json!(args.change_id.as_str());
+                record["round"] = serde_json::json!(args.round);
+                record["seq"] = serde_json::json!(args.seq);
+                record["severity"] = serde_json::json!(severity_slug(args.severity));
+                record["disposition"] = serde_json::json!(args.disposition.as_str());
+                record["unsourced"] = serde_json::json!(args.introduced_by.is_none());
+                crate::json_out::data("finding add", record);
             }
             settled.exit_code()
         }
         Err(e) => {
-            eprintln!("canon finding add: {e}");
-            2
+            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon finding add", args.json)
         }
     }
 }
@@ -714,6 +709,8 @@ pub struct FindingCloseArgs {
     pub session_id: Option<SessionId>,
     /// `--promote`/`--no-promote` (0.16 D2; [`crate::write_mode`]).
     pub promote: crate::write_mode::PromoteFlag,
+    /// `--json`: one JSON document on stdout, every human line on stderr.
+    pub json: bool,
 }
 
 /// Stage the DISPOSITION TRANSITION of one already-committed finding
@@ -744,17 +741,14 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            eprintln!("canon finding close: refused — {error}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).emit("canon finding close", args.json);
         }
     };
 
     if args.round == 0 || args.seq == 0 {
-        eprintln!(
-            "canon finding close: refused — --round and --seq are 1-based (got --round {} --seq {}); no finding was ever authored under a 0",
+        return CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); no finding was ever authored under a 0",
             args.round, args.seq
-        );
-        return 2;
+        )).emit("canon finding close", args.json);
     }
 
     // The same coherence pair `add` enforces, in this command's own
@@ -763,17 +757,12 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     // correctly does not exist.
     match (args.disposition, &args.resolution_sha) {
         (FindingDisposition::Fixed, None) => {
-            eprintln!(
-                "canon finding close: refused — --disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at"
-            );
-            return 2;
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").emit("canon finding close", args.json);
         }
         (disposition, Some(sha)) if disposition != FindingDisposition::Fixed => {
-            eprintln!(
-                "canon finding close: refused — --resolution-sha {sha} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the sha or set --disposition fixed",
+            return CliError::refused("FINDING_RESOLUTION_SHA_UNEXPECTED", format!("--resolution-sha {sha} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the sha or set --disposition fixed",
                 disposition.as_str()
-            );
-            return 2;
+            )).emit("canon finding close", args.json);
         }
         _ => {}
     }
@@ -781,23 +770,19 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     let resolution_sha = match args.resolution_sha.as_ref().map(|arg| resolve_commit(&repo, arg, true)).transpose() {
         Ok(sha) => sha,
         Err(Unresolved::NoCommit) => {
-            eprintln!(
-                "canon finding close: refused — --resolution-sha {} does not name a commit this repository holds; a resolution sha nobody can check out closes nothing",
+            return CliError::refused("FINDING_UNRESOLVABLE_COMMIT", format!("--resolution-sha {} does not name a commit this repository holds; a resolution sha nobody can check out closes nothing",
                 args.resolution_sha.as_ref().expect("only a present flag can fail to resolve")
-            );
-            return 2;
+            )).emit("canon finding close", args.json);
         }
         Err(Unresolved::Abbreviation(why)) => {
-            eprintln!("{}", abbreviation_refusal("canon finding close", "--resolution-sha", args.resolution_sha.as_ref().expect("only a present flag can fail to resolve"), &why));
-            return 2;
+            return abbreviation_refusal("--resolution-sha", args.resolution_sha.as_ref().expect("only a present flag can fail to resolve"), &why).emit("canon finding close", args.json);
         }
     };
 
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            eprintln!("canon finding close: {e}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon finding close", args.json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
@@ -810,34 +795,28 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     // between them. Editing the staged copy is the honest repair.
     match find_finding(args, &staging) {
         Ok(Some(_)) => {
-            eprintln!(
-                "canon finding close: refused — `{}` round {} seq {} is still STAGED, never committed, so there is no recorded disposition to move. Run `canon gate promote` first, or delete the staged copy and re-author it with `canon finding add --disposition {}`.",
+            return CliError::refused("FINDING_STAGED", format!("`{}` round {} seq {} is still STAGED, never committed, so there is no recorded disposition to move. Run `canon gate promote` first, or delete the staged copy and re-author it with `canon finding add --disposition {}`.",
                 args.change_id,
                 args.round,
                 args.seq,
                 args.disposition.as_str()
-            );
-            return 2;
+            )).emit("canon finding close", args.json);
         }
         Ok(None) => {}
         Err(e) => {
-            eprintln!("canon finding close: {e}");
-            return 2;
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon finding close", args.json);
         }
     }
 
     let existing = match find_finding(args, &committed) {
         Ok(Some(finding)) => finding,
         Ok(None) => {
-            eprintln!(
-                "canon finding close: refused — no committed finding at (`{}`, round {}, seq {}). `close` moves an EXISTING finding's disposition; authoring a new one is `canon finding add`.",
+            return CliError::refused("FINDING_NOT_FOUND", format!("no committed finding at (`{}`, round {}, seq {}). `close` moves an EXISTING finding's disposition; authoring a new one is `canon finding add`.",
                 args.change_id, args.round, args.seq
-            );
-            return 2;
+            )).emit("canon finding close", args.json);
         }
         Err(e) => {
-            eprintln!("canon finding close: {e}");
-            return 2;
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon finding close", args.json);
         }
     };
 
@@ -847,13 +826,20 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         // body at one key is not a transition, `promote` would refuse
         // it, and saying so here is cheaper than a refusal two commands
         // later.
-        println!(
+        crate::say!(
+            args.json,
             "canon finding close: no-op — (`{}`, round {}, seq {}) is already `{}`; nothing staged.",
             args.change_id,
             args.round,
             args.seq,
             args.disposition.as_str()
         );
+        if args.json {
+            crate::json_out::data(
+                "finding close",
+                serde_json::json!({ "changeId": args.change_id.as_str(), "round": args.round, "seq": args.seq, "disposition": args.disposition.as_str(), "noop": true }),
+            );
+        }
         return 0;
     }
 
@@ -879,8 +865,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         // Unreachable: refused by the coherence pair above. Handled
         // rather than assumed away, and never by fabricating a sha.
         (FindingDisposition::Fixed, None) => {
-            eprintln!("canon finding close: refused — --disposition fixed requires --resolution-sha");
-            return 2;
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").emit("canon finding close", args.json);
         }
     };
     if let Some(sha) = existing.reviewed_sha.clone() {
@@ -905,8 +890,9 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     let body = serde_json::to_value(&transitioned).expect("a Finding always serializes");
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
-            let settled = crate::gate::promote_after_stage("canon finding close", &ledger_root, &receipt.location, promote);
-            println!(
+            let settled = crate::gate::promote_after_stage("canon finding close", &ledger_root, &receipt.location, promote, args.json);
+            crate::say!(
+                args.json,
                 "canon finding close: {} — {} round {} seq {} ({} → {}) — {}",
                 settled.landed(&receipt.location),
                 args.change_id,
@@ -916,11 +902,20 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
                 args.disposition.as_str(),
                 settled.suffix()
             );
+            if args.json && settled.exit_code() == 0 {
+                let mut record = settled.json(&receipt.location);
+                record["changeId"] = serde_json::json!(args.change_id.as_str());
+                record["round"] = serde_json::json!(args.round);
+                record["seq"] = serde_json::json!(args.seq);
+                record["from"] = serde_json::json!(existing.disposition().as_str());
+                record["disposition"] = serde_json::json!(args.disposition.as_str());
+                record["noop"] = serde_json::json!(false);
+                crate::json_out::data("finding close", record);
+            }
             settled.exit_code()
         }
         Err(e) => {
-            eprintln!("canon finding close: {e}");
-            2
+            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon finding close", args.json)
         }
     }
 }
@@ -932,6 +927,9 @@ pub struct FindingListArgs {
     /// Only findings whose CURRENT disposition is `open`.
     pub open: bool,
     pub json: bool,
+    pub page: crate::paging::Page,
+    /// `--fields`: the row fields `--json` keeps.
+    pub fields: Option<Vec<String>>,
 }
 
 /// The current version of every committed finding on `change_id`, one
@@ -972,8 +970,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            eprintln!("canon finding list: {e}");
-            return 2;
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon finding list", args.json);
         }
     };
     let read = current_findings(&GitTier::new(&ledger_root), &args.change_id)
@@ -981,19 +978,29 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
     let (mut findings, staged) = match read {
         Ok(read) => read,
         Err(e) => {
-            eprintln!("canon finding list: {e}");
-            return 2;
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon finding list", args.json);
         }
     };
     if args.open {
         findings.retain(|f| f.disposition() == FindingDisposition::Open);
     }
+    if let Some(requested) = &args.fields {
+        let known: std::collections::BTreeSet<String> = LIST_FIELDS.iter().map(|f| f.to_string()).collect();
+        if let Err(e) = crate::paging::check_fields("canon finding list", requested, &known) {
+            return e.emit("canon finding list", args.json);
+        }
+    }
+    let scope = format!("finding list:{}", args.change_id);
+    let (findings, meta) = match crate::paging::paginate(&scope, findings, |f| format!("{}-{}", f.round, f.seq), &args.page) {
+        Ok(paged) => paged,
+        Err(e) => return e.emit("canon finding list", args.json),
+    };
 
     if args.json {
         let rows: Vec<serde_json::Value> = findings
             .iter()
             .map(|f| {
-                serde_json::json!({
+                let row = serde_json::json!({
                     "round": f.round,
                     "seq": f.seq,
                     "severity": severity_slug(f.severity),
@@ -1002,22 +1009,32 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
                     "summary": f.summary,
                     "resolution_sha": f.resolution_sha().map(|sha| sha.as_str()),
                     "file_ref": f.file_ref,
-                })
+                });
+                match &args.fields {
+                    Some(fields) => crate::paging::project(&row, fields),
+                    None => row,
+                }
             })
             .collect();
-        let out = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows });
+        let out = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows, "meta": meta.to_json() });
         println!("{}", serde_json::to_string_pretty(&out).expect("a JSON value always serializes"));
     } else if findings.is_empty() {
         let which = if args.open { "open findings" } else { "findings" };
         println!("canon finding list: no committed {which} on change `{}`", args.change_id);
     } else {
         print!("{}", render_finding_table(&findings));
+        if let Some(line) = meta.human_line() {
+            println!("{line}");
+        }
     }
     if staged > 0 {
         eprintln!("canon finding list: {staged} staged finding(s) on change `{}` are not listed until committed — run `canon gate promote`", args.change_id);
     }
     0
 }
+
+/// The JSON fields of one `finding list` row, which `--fields` may name.
+const LIST_FIELDS: [&str; 8] = ["round", "seq", "severity", "disposition", "reviewer", "summary", "resolution_sha", "file_ref"];
 
 /// One header row and one row per finding, columns padded to their
 /// widest cell; the summary, last, is never padded.
@@ -1149,7 +1166,7 @@ struct ResolvedShas {
 /// Returns the whole message rather than a bool so the flag NAME and the
 /// value travel with the failure: "a sha did not resolve" is unusable
 /// when three flags could have carried it.
-fn resolve_shas(repo: &Path, args: &FindingArgs) -> Result<ResolvedShas, String> {
+fn resolve_shas(repo: &Path, args: &FindingArgs) -> Result<ResolvedShas, CliError> {
     let flags = [
         ("--reviewed-sha", args.reviewed_sha.as_ref()),
         ("--resolution-sha", args.resolution_sha.as_ref()),
@@ -1169,10 +1186,10 @@ fn resolve_shas(repo: &Path, args: &FindingArgs) -> Result<ResolvedShas, String>
     for (slot, (flag, arg)) in resolved.iter_mut().zip(flags) {
         let Some(arg) = arg else { continue };
         *slot = Some(resolve_commit(repo, arg, verify_full).map_err(|unresolved| match unresolved {
-            Unresolved::NoCommit => format!(
-                "canon finding add: refused — {flag} {arg} is well-formed but names no commit in this repository. Canon does not read the commit's message or diff and is not doing so now; it only refuses a record whose provenance points at nothing. This flag is commit-only, so an object id that names a tag, a tree or a blob is refused here too. Check the sha (a short sha padded to 40 characters is the way this has actually happened), or omit the flag."
-            ),
-            Unresolved::Abbreviation(why) => abbreviation_refusal("canon finding add", flag, arg, &why),
+            Unresolved::NoCommit => CliError::refused("FINDING_UNRESOLVABLE_COMMIT", format!(
+                "{flag} {arg} is well-formed but names no commit in this repository. Canon does not read the commit's message or diff and is not doing so now; it only refuses a record whose provenance points at nothing. This flag is commit-only, so an object id that names a tag, a tree or a blob is refused here too. Check the sha (a short sha padded to 40 characters is the way this has actually happened), or omit the flag."
+            )),
+            Unresolved::Abbreviation(why) => abbreviation_refusal(flag, arg, &why),
         })?);
     }
     let [reviewed, resolution, introduced_by] = resolved;
@@ -1226,9 +1243,9 @@ fn resolve_commit(repo: &Path, arg: &CommitArg, verify_full: bool) -> Result<Sha
 }
 
 /// The refusal for an abbreviation that did not resolve, naming the
-/// command, the flag, the value and why.
-fn abbreviation_refusal(command: &str, flag: &str, arg: &CommitArg, why: &str) -> String {
-    format!("{command}: refused — {flag} {arg} cannot be resolved to a commit: {why}. Pass more of the sha, or the full sha (`git rev-parse <rev>` prints it).")
+/// flag, the value and why.
+fn abbreviation_refusal(flag: &str, arg: &CommitArg, why: &str) -> CliError {
+    CliError::refused("FINDING_UNRESOLVABLE_COMMIT", format!("{flag} {arg} cannot be resolved to a commit: {why}. Pass more of the sha, or the full sha (`git rev-parse <rev>` prints it)."))
 }
 
 /// `true` iff `git -C repo <args>` succeeds and prints exactly
@@ -1307,6 +1324,7 @@ mod tests {
             role: RoleId::parse("reviewer").unwrap(),
             session_id: None,
             promote: crate::write_mode::PromoteFlag::Config,
+            json: false,
         }
     }
 
@@ -1633,6 +1651,7 @@ mod tests {
             role: RoleId::parse("reviewer").unwrap(),
             session_id: None,
             promote: crate::write_mode::PromoteFlag::Config,
+            json: false,
         }
     }
 

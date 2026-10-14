@@ -1,1 +1,1 @@
-canon init: refused — invalid provider `gemini`; expected one of: claude, codex, omp, pi, or none
+canon init: INIT_INVALID_ARGUMENT — invalid provider `gemini`; expected one of: claude, codex, omp, pi, or none

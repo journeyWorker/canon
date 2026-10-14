@@ -116,6 +116,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+use crate::cli_error::CliError;
 use crate::context::{render_json, resolve_canon_yaml, resolve_repo_root, resolve_surface, ContextOptions};
 use crate::context_pack::{create_dispatch_pack, load_manifest_spec, ContextPackError, ContextPackSpec, PromptBundleSelection};
 
@@ -285,6 +286,30 @@ impl DispatchError {
             // broken" — exit `1`, retryable, never a flag to fix.
             Self::EndInProgress { .. } | Self::Io(_) | Self::Serialize(_) => false,
         }
+    }
+
+    /// The shared error contract for this failure (0.20 D3): a stable code
+    /// per variant, exit `2` for a usage error and `1` for an operational
+    /// one, and `retryable` where another process holds the close.
+    pub(crate) fn to_cli_error(&self) -> CliError {
+        let code = match self {
+            Self::RoleRegimeMismatch { .. } => "DISPATCH_ROLE_REGIME_MISMATCH",
+            Self::SkillDigestWithoutId => "DISPATCH_INVALID_ARGUMENT",
+            Self::Io(_) => "WRITE_FAILED",
+            Self::Serialize(_) => "SERIALIZE_FAILED",
+            Self::ContextPack(inner) => inner.to_cli_error().code,
+            Self::TaskNotFound { .. } => "TASK_NOT_FOUND",
+            Self::NoPlanSources { .. } => "PLAN_SOURCES_MISSING",
+            Self::PlanCorpus { .. } => "PLAN_CORPUS_UNREADABLE",
+            Self::NoSuchRun { .. } => "DISPATCH_RUN_NOT_FOUND",
+            Self::AlreadyEnded { .. } => "DISPATCH_ALREADY_ENDED",
+            Self::NotRunning { .. } => "DISPATCH_NOT_RUNNING",
+            Self::RunIdMismatch { .. } => "DISPATCH_MANIFEST_MISMATCH",
+            Self::EndInProgress { .. } => "DISPATCH_END_IN_PROGRESS",
+            Self::Unreadable { .. } => "DISPATCH_MANIFEST_UNREADABLE",
+        };
+        let error = if self.is_usage() { CliError::refused(code, self.to_string()) } else { CliError::failed(code, self.to_string()) };
+        if matches!(self, Self::EndInProgress { .. }) { error.retryable() } else { error }
     }
 }
 
@@ -798,8 +823,7 @@ pub fn run_begin(
             ExitCode::SUCCESS
         }
         Err(err) => {
-            eprintln!("canon dispatch begin: {err}");
-            ExitCode::from(if err.is_usage() { 2 } else { 1 })
+            ExitCode::from(err.to_cli_error().emit("canon dispatch begin", json) as u8)
         }
     }
 }
@@ -1260,8 +1284,7 @@ pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> Exi
             ExitCode::SUCCESS
         }
         Err(err) => {
-            eprintln!("canon dispatch end: {err}");
-            ExitCode::from(if err.is_usage() { 2 } else { 1 })
+            ExitCode::from(err.to_cli_error().emit("canon dispatch end", json) as u8)
         }
     }
 }

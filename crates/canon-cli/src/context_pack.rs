@@ -15,6 +15,8 @@ use canon_store::write_atomic;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::cli_error::CliError;
+
 pub const CONTEXT_PACK_FORMAT_VERSION: u32 = 1;
 pub const CONTEXT_PACK_DIR: &str = ".canon/context-packs";
 pub const PROMPT_REGISTRY_DIR: &str = ".canon/prompts";
@@ -43,6 +45,26 @@ pub enum ContextPackError {
     Git(String),
     #[error("prompt bundle `{name}@{version}` is invalid: {detail}")]
     PromptBundle { name: String, version: String, detail: String },
+}
+
+impl ContextPackError {
+    /// The shared error contract for this failure (0.20 D3): exit `2` for
+    /// a bad input, `1` for an operational or integrity failure.
+    pub fn to_cli_error(&self) -> CliError {
+        match self {
+            Self::UnsafePath(_) => CliError::refused("CONTEXT_UNSAFE_PATH", self.to_string()),
+            Self::InvalidManifestVersion(_) => CliError::refused("CONTEXT_MANIFEST_INVALID", self.to_string()),
+            Self::MissingInput(_) => CliError::refused("CONTEXT_INPUT_MISSING", self.to_string()),
+            Self::SecretDetected(_) => CliError::refused("CONTEXT_SECRET_DETECTED", self.to_string()),
+            Self::MissingPack(_) => CliError::refused("CONTEXT_PACK_NOT_FOUND", self.to_string()),
+            Self::PromptBundle { .. } => CliError::refused("PROMPT_BUNDLE_INVALID", self.to_string()),
+            Self::Serialize(_) => CliError::refused("SERIALIZE_FAILED", self.to_string()),
+            Self::Io { .. } => CliError::failed("REPO_UNREADABLE", self.to_string()),
+            Self::ObjectConflict { .. } => CliError::failed("CONTEXT_OBJECT_CONFLICT", self.to_string()),
+            Self::Tampered { .. } => CliError::failed("CONTEXT_PACK_TAMPERED", self.to_string()),
+            Self::Git(_) => CliError::failed("CONTEXT_GIT_UNAVAILABLE", self.to_string()),
+        }
+    }
 }
 
 fn io(path: &Path, source: std::io::Error) -> ContextPackError {

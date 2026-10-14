@@ -452,6 +452,17 @@ impl Tier for PgTier {
         let records = self.read_rows(query, None)?;
         Ok(TierReadResult { records, violations: Vec::new() })
     }
+    fn purge_keys(&self, kind: canon_model::envelope::RecordKind, before: DateTime<Utc>) -> Result<Vec<String>, StoreError> {
+        self.rt.block_on(async {
+            let rows = sqlx::query(sqlx::AssertSqlSafe(format!("SELECT id, digest FROM {}.records_history WHERE kind = $1 AND at < $2 ORDER BY id, digest", self.schema)))
+                .bind(kind.as_str())
+                .bind(before)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| StoreError::Sql(e.to_string()))?;
+            Ok(rows.iter().map(|r| format!("{}#{}", r.get::<String, _>("id"), r.get::<String, _>("digest"))).collect())
+        })
+    }
     fn purge_before(&self, kind: canon_model::envelope::RecordKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
         self.rt.block_on(async {
             let matched = sqlx::query(sqlx::AssertSqlSafe(purge_count_sql(&self.schema)))

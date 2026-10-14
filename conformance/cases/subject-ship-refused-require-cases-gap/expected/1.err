@@ -1,3 +1,3 @@
 canon subject status: refreshed the scenario index from 1 changed feature file(s) (specs/kind=feature/area=checkout/add.feature): 2 record(s) written
 canon subject status: advisory: checkout's brief is not approved — checkout adopts no change, so there is no brief to answer and shipping is not refused
-canon subject status: uncovered-cell checkout.pay — verifying → shipped: feature surface `checkout.pay` (root `root`) has no `@case:failure` scenario among its 2 in-scope scenario(s) — its spec covers only other paths; specify what happens on that path
+canon subject status: SUBJECT_GATE_VIOLATION — uncovered-cell checkout.pay — verifying → shipped: feature surface `checkout.pay` (root `root`) has no `@case:failure` scenario among its 2 in-scope scenario(s) — its spec covers only other paths; specify what happens on that path

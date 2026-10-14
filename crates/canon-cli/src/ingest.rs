@@ -1005,6 +1005,37 @@ pub fn format_json(outcome: &IngestOutcome) -> Option<String> {
     outcome.unwritten.as_ref().map(|sessions| serde_json::to_string_pretty(&degraded_metadata(outcome, sessions)).expect("metadata JSON always serializes"))
 }
 
+/// The `--json` data for one ingest pass: the counts the human summary
+/// prints, plus `unwritten` (the [`format_json`] metadata, or `null`) when the
+/// store's tiers were unreachable.
+pub fn summary_json(outcome: &IngestOutcome) -> serde_json::Value {
+    let adapters: Vec<serde_json::Value> = outcome
+        .adapters
+        .iter()
+        .map(|a| {
+            serde_json::json!({
+                "client": a.client_id,
+                "filesScanned": a.files_scanned,
+                "reparsed": a.reparsed,
+                "skippedUnchanged": a.skipped_unchanged,
+                "rowsParsed": a.rows_parsed,
+                "malformedRecords": a.malformed_records,
+            })
+        })
+        .collect();
+    serde_json::json!({
+        "scope": outcome.scope_summary,
+        "adapters": adapters,
+        "sessionsNormalized": outcome.sessions_normalized,
+        "malformedRecords": outcome.malformed_records,
+        "rowsSkipped": outcome.skipped_rows,
+        "runsWritten": outcome.runs_written,
+        "eventsWritten": outcome.events_written,
+        "degradeReason": outcome.degrade_reason,
+        "unwritten": outcome.unwritten.as_ref().map(|sessions| degraded_metadata(outcome, sessions)),
+    })
+}
+
 fn degraded_metadata(outcome: &IngestOutcome, sessions: &[NormalizedSession]) -> serde_json::Value {
     let session_entries: Vec<serde_json::Value> = sessions
         .iter()

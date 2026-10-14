@@ -315,7 +315,7 @@ fn authoring_migrate_03_a_dirty_path_it_moves_is_refused() {
     let out = canon(repo, &["migrate"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let err = String::from_utf8_lossy(&out.stderr);
-    assert!(err.contains("canon migrate: refused — uncommitted changes under the paths it moves; commit or stash them, then run it again:"), "{err}");
+    assert!(err.contains("canon migrate: MIGRATE_UNCOMMITTED — uncommitted changes under the paths it moves; commit or stash them, then run it again:"), "{err}");
     assert!(err.contains(&format!(" M {OLD_FEATURE}")) && err.contains("?? specs/features/kind=feature/area=cart/new.feature"), "{err}");
     assert!(repo.join(OLD_FEATURE).is_file() && !repo.join(".canon/specs").exists(), "nothing moved");
     assert_eq!(read(repo, "canon.yaml"), yaml);
@@ -334,7 +334,7 @@ fn authoring_migrate_04_an_existing_destination_is_refused() {
     let out = canon(repo, &["migrate", "--dry-run"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
-        text(&out).contains("canon migrate: refused — spec root `root`: specs/features/kind=feature would move to .canon/specs/kind=feature, which already exists; move what is there out of the way first"),
+        text(&out).contains("canon migrate: MIGRATE_REFUSED — spec root `root`: specs/features/kind=feature would move to .canon/specs/kind=feature, which already exists; move what is there out of the way first"),
         "{}",
         text(&out)
     );
@@ -454,7 +454,7 @@ fn authoring_migrate_08_a_canon_yaml_it_cannot_edit_safely_is_refused() {
     let out = canon(repo, &["migrate"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
-        text(&out).contains("canon migrate: refused — could not rewrite canon.yaml `specs.roots` safely (its `roots:` entries are not a block list)"),
+        text(&out).contains("canon migrate: MIGRATE_REFUSED — could not rewrite canon.yaml `specs.roots` safely (its `roots:` entries are not a block list)"),
         "{}",
         text(&out)
     );
@@ -494,7 +494,7 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
     std::fs::create_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
     let out = canon(repo, &["migrate"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
-    assert!(text(&out).contains("canon migrate: stopped — failed to write"), "{}", text(&out));
+    assert!(text(&out).contains("canon migrate: MIGRATE_STOPPED — failed to write"), "{}", text(&out));
     assert!(text(&out).contains("canon.yaml is unchanged, and running `canon migrate` again finishes what this run started"), "{}", text(&out));
     assert_eq!(read(repo, "canon.yaml"), OLD_YAML, "never half-written");
     assert!(repo.join(NEW_FEATURE).is_file() && repo.join(".canon/changes/add-cart/brief.md").is_file(), "the moves happened before the write failed");
@@ -536,7 +536,7 @@ fn authoring_migrate_10_a_failed_pointer_brief_keeps_the_source_that_holds_the_a
     let out = canon(repo, &["migrate"]);
     set_mode(&repo.join(".canon/changes"), 0o755);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
-    assert!(text(&out).contains("canon migrate: stopped — failed to write .canon/changes/checkout/brief.md"), "{}", text(&out));
+    assert!(text(&out).contains("canon migrate: MIGRATE_STOPPED — failed to write .canon/changes/checkout/brief.md"), "{}", text(&out));
     assert_eq!(read(repo, "canon.yaml"), yaml, "the source canon init wrote stays while the approval is not copied");
     assert!(repo.join("openspec/changes/.gitkeep").is_file());
 
@@ -560,7 +560,7 @@ fn authoring_migrate_11_a_change_move_is_preflighted_and_a_half_moved_change_is_
     set_mode(&repo.join("openspec/changes/add-cart"), 0o755);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
-        text(&out).contains("canon migrate: refused — openspec/changes/add-cart is not writable, so change dir openspec/changes/add-cart cannot be moved"),
+        text(&out).contains("canon migrate: MIGRATE_REFUSED — openspec/changes/add-cart is not writable, so change dir openspec/changes/add-cart cannot be moved"),
         "{}",
         text(&out)
     );
