@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "canon_version": "0.18.0",
-  "source_commit": "8fcd55d789756c47cf4ee38e0ce5f8cc1e61bb67",
-  "source_hash": "sha256:a046103b2048650e07bed75a3704b76f03001939588393883dfc0752299dd839",
+  "canon_version": "0.19.0",
+  "source_commit": "c8671f8b8733f6d905860b8a298cfeb94872372c",
+  "source_hash": "sha256:5ec76d32b3bd9041f5d983e58492165deb2210894d978f916e7358d362f23d5a",
   "providers": [
     "claude",
     "codex",
@@ -31,7 +31,7 @@
     ".agents/skills/canon/reference/canon-review.md": "sha256:9fa81bfc3f64988ec4bfae3901d8521470eb844ae4935c5ac6863905d2405814",
     ".agents/skills/canon/reference/canon-session-ingest.md": "sha256:dcbce2d31df27ace318ffd0f4fef7b72019e597a5ac6dc5efde0974448548e24",
     ".agents/skills/canon/reference/canon-storage.md": "sha256:0b498d423b0754e098a130832fe87dbbda0d9e26815b5002272252d8de17a8f5",
-    ".agents/skills/canon/reference/canon-subject.md": "sha256:7d7ac6d22d3282de5016246019b95cd19467afdbe8544c86b924dc6eef24cea5",
+    ".agents/skills/canon/reference/canon-subject.md": "sha256:627eed4ba7bf9bdc59593b17d64075e537fe905c72e91df966ec92b3c26b303e",
     ".agents/skills/canon/reference/canon-vocab.md": "sha256:a5a4d546c0f8414b08ec151a0a635e88cc01bb5d12960e78d3cc5bef4e3fc204",
     ".agents/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:bd63c90f8f579a3b00922ea14b95369b5e778772c9da35908a63da69616e1c00",
     ".claude/skills/canon/SKILL.md": "sha256:d5f401fa4f5c940d2ed11377edaab2c23b44e379610a87fb879f6e221564b42a",
@@ -55,7 +55,7 @@
     ".claude/skills/canon/reference/canon-review.md": "sha256:9fa81bfc3f64988ec4bfae3901d8521470eb844ae4935c5ac6863905d2405814",
     ".claude/skills/canon/reference/canon-session-ingest.md": "sha256:dcbce2d31df27ace318ffd0f4fef7b72019e597a5ac6dc5efde0974448548e24",
     ".claude/skills/canon/reference/canon-storage.md": "sha256:0b498d423b0754e098a130832fe87dbbda0d9e26815b5002272252d8de17a8f5",
-    ".claude/skills/canon/reference/canon-subject.md": "sha256:7d7ac6d22d3282de5016246019b95cd19467afdbe8544c86b924dc6eef24cea5",
+    ".claude/skills/canon/reference/canon-subject.md": "sha256:627eed4ba7bf9bdc59593b17d64075e537fe905c72e91df966ec92b3c26b303e",
     ".claude/skills/canon/reference/canon-vocab.md": "sha256:a5a4d546c0f8414b08ec151a0a635e88cc01bb5d12960e78d3cc5bef4e3fc204",
     ".claude/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:bd63c90f8f579a3b00922ea14b95369b5e778772c9da35908a63da69616e1c00",
     ".omp/skills/canon/SKILL.md": "sha256:d5f401fa4f5c940d2ed11377edaab2c23b44e379610a87fb879f6e221564b42a",
@@ -79,7 +79,7 @@
     ".omp/skills/canon/reference/canon-review.md": "sha256:9fa81bfc3f64988ec4bfae3901d8521470eb844ae4935c5ac6863905d2405814",
     ".omp/skills/canon/reference/canon-session-ingest.md": "sha256:dcbce2d31df27ace318ffd0f4fef7b72019e597a5ac6dc5efde0974448548e24",
     ".omp/skills/canon/reference/canon-storage.md": "sha256:0b498d423b0754e098a130832fe87dbbda0d9e26815b5002272252d8de17a8f5",
-    ".omp/skills/canon/reference/canon-subject.md": "sha256:7d7ac6d22d3282de5016246019b95cd19467afdbe8544c86b924dc6eef24cea5",
+    ".omp/skills/canon/reference/canon-subject.md": "sha256:627eed4ba7bf9bdc59593b17d64075e537fe905c72e91df966ec92b3c26b303e",
     ".omp/skills/canon/reference/canon-vocab.md": "sha256:a5a4d546c0f8414b08ec151a0a635e88cc01bb5d12960e78d3cc5bef4e3fc204",
     ".omp/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:bd63c90f8f579a3b00922ea14b95369b5e778772c9da35908a63da69616e1c00",
     ".pi/skills/canon/SKILL.md": "sha256:d5f401fa4f5c940d2ed11377edaab2c23b44e379610a87fb879f6e221564b42a",
@@ -103,7 +103,7 @@
     ".pi/skills/canon/reference/canon-review.md": "sha256:9fa81bfc3f64988ec4bfae3901d8521470eb844ae4935c5ac6863905d2405814",
     ".pi/skills/canon/reference/canon-session-ingest.md": "sha256:dcbce2d31df27ace318ffd0f4fef7b72019e597a5ac6dc5efde0974448548e24",
     ".pi/skills/canon/reference/canon-storage.md": "sha256:0b498d423b0754e098a130832fe87dbbda0d9e26815b5002272252d8de17a8f5",
-    ".pi/skills/canon/reference/canon-subject.md": "sha256:7d7ac6d22d3282de5016246019b95cd19467afdbe8544c86b924dc6eef24cea5",
+    ".pi/skills/canon/reference/canon-subject.md": "sha256:627eed4ba7bf9bdc59593b17d64075e537fe905c72e91df966ec92b3c26b303e",
     ".pi/skills/canon/reference/canon-vocab.md": "sha256:a5a4d546c0f8414b08ec151a0a635e88cc01bb5d12960e78d3cc5bef4e3fc204",
     ".pi/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:bd63c90f8f579a3b00922ea14b95369b5e778772c9da35908a63da69616e1c00"
   }

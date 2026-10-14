@@ -353,8 +353,8 @@ const matrix: MatrixRow[] = [
         source: "Trust spine",
         href: "/concepts/trust-spine/",
         note: {
-          en: "Imports openspec and superpowers plans and gates each task row; it does not write them",
-          ko: "openspec·superpowers 플랜을 가져와 태스크 행마다 게이트하며, 직접 작성하지는 않음",
+          en: "Scaffolds and checks a PRD brief (canon brief check); imports openspec and superpowers plans and gates each task row",
+          ko: "PRD 브리프를 만들고 검사(canon brief check)하며, openspec·superpowers 플랜을 가져와 태스크 행마다 게이트",
         },
       },
       {
@@ -380,8 +380,8 @@ const matrix: MatrixRow[] = [
         source: "Trust spine",
         href: "/concepts/trust-spine/",
         note: {
-          en: "An attributed evidence record per scenario, in the ledger",
-          ko: "레저에 시나리오별로 귀속된 증거 레코드",
+          en: "An attributed evidence record per scenario, in the ledger; on by default under the starter policy",
+          ko: "레저에 시나리오별로 귀속된 증거 레코드. 스타터 policy에서 기본으로 켜짐",
         },
       },
       {
@@ -398,8 +398,8 @@ const matrix: MatrixRow[] = [
         source: "README",
         href: CANON,
         note: {
-          en: "Risk tiers require policy-pinned SSH approval",
-          ko: "위험 등급은 policy에 pin된 SSH 승인을 요구",
+          en: "The brief's approval is bound to its bytes: an edit after approval reads as not approved. Risk tiers require policy-pinned SSH approval",
+          ko: "브리프 승인은 브리프의 바이트에 묶여, 승인 후 수정하면 미승인으로 읽힘. 위험 등급은 policy에 pin된 SSH 승인을 요구",
         },
       },
       {
@@ -407,8 +407,8 @@ const matrix: MatrixRow[] = [
         source: "Trust spine",
         href: "/concepts/trust-spine/",
         note: {
-          en: "Opt-in: spec_coverage.require_review (0.12.0)",
-          ko: "옵트인: spec_coverage.require_review (0.12.0)",
+          en: "Required by the default strict starter policy, from an actor other than the evidence author (spec_coverage.require_review)",
+          ko: "기본 strict 스타터 policy가 요구하며, 증거 작성자가 아닌 다른 행위자의 리뷰여야 함 (spec_coverage.require_review)",
         },
       },
       {
@@ -537,7 +537,7 @@ const en = {
     states: { yes: "Yes", partial: "Partial", no: "No", nd: "Not documented" } as Record<CellState, string>,
     source: "Source",
     rows: rowsFor("en", "/"),
-    canonNote: "Experimental (0.11.0, off by default): evidence binding to artifacts and JUnit/Cucumber reports.",
+    canonNote: "0.19: per-scenario evidence is on by default under the starter policy, the strict starter requires independent review, and a brief's approval is bound to its text.",
     footnote: "Claims about other tools were checked against each project's own README or docs on 2026-10-14.",
   },
 
@@ -695,7 +695,7 @@ const ko: Strings = {
     states: { yes: "예", partial: "부분", no: "아니요", nd: "문서화되지 않음" },
     source: "출처",
     rows: rowsFor("ko", "/ko/"),
-    canonNote: "실험 기능(0.11.0, 기본값 off): 아티팩트와 JUnit/Cucumber 리포트에 대한 증거 바인딩.",
+    canonNote: "0.19: 스타터 policy에서 시나리오별 증거가 기본으로 켜지고, strict 스타터는 독립 리뷰를 요구하며, 브리프 승인은 브리프 본문에 묶입니다.",
     footnote: "다른 도구에 대한 내용은 2026-10-14에 각 프로젝트의 README 또는 문서와 대조해 확인했습니다.",
   },
 
