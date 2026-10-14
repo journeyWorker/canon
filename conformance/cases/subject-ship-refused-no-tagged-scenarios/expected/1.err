@@ -1,2 +1,2 @@
 canon subject status: advisory: checkout's brief is not approved — checkout adopts no change, so there is no brief to answer and shipping is not refused
-canon subject status: uncovered-cell checkout — verifying → shipped: no scenario is tagged `@subject:checkout` — tag its scenarios and run `canon inventory sync`; shipping needs evidence, not an empty set
+canon subject status: SUBJECT_GATE_VIOLATION — uncovered-cell checkout — verifying → shipped: no scenario is tagged `@subject:checkout` — tag its scenarios and run `canon inventory sync`; shipping needs evidence, not an empty set

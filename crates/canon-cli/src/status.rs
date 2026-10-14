@@ -341,7 +341,10 @@ pub fn run(repo: &Path, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let report = resolve(&repo);
     if json {
-        println!("{}", serde_json::to_string_pretty(&report).unwrap_or_else(|e| format!("{{\"error\": \"failed to serialize status: {e}\"}}")));
+        match serde_json::to_string_pretty(&report) {
+            Ok(text) => println!("{text}"),
+            Err(e) => return crate::cli_error::CliError::failed("SERIALIZE_FAILED", format!("failed to serialize status: {e}")).emit("canon status", true),
+        }
     } else {
         print!("{}", render(&report));
     }

@@ -22,6 +22,7 @@ use serde::Serialize;
 
 use crate::brief::brief_digest;
 use crate::brief_check::{check, Severity};
+use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::policy_approval::ApprovalState;
 use canon_ingest::markdown::{field, without_field};
@@ -52,12 +53,8 @@ struct ApproveJson<'a> {
     policy_approved: bool,
 }
 
-fn refuse(json: bool, code: &str, message: &str, exit: i32) -> i32 {
-    eprintln!("canon brief approve: {code} — {message}");
-    if json {
-        println!("{}", serde_json::json!({ "error": { "code": code, "message": message } }));
-    }
-    exit
+fn refuse(json: bool, code: &'static str, message: &str, exit: i32) -> i32 {
+    CliError::failed(code, message).with_exit(exit).emit("canon brief approve", json)
 }
 
 /// `canon brief approve`. Returns the process exit code.
@@ -74,7 +71,7 @@ pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
     }
     let checked = match check(&repo, change) {
         Ok(checked) => checked,
-        Err(e) => return refuse(json, e.code, &e.message, EXIT_ERROR),
+        Err(e) => return e.emit("canon brief approve", json),
     };
     // Coverage rules (a flow step with no scenario or no failure case) gate
     // shipping, not approval: the human approves the scope before its

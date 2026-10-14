@@ -214,14 +214,14 @@ fn evidence_add_83_any_refusal_refuses_the_whole_batch() {
     let out = attest_all(repo, "junit:reports/junit.xml", &[]);
     assert_eq!(out.status.code(), Some(1), "{}{}", stdout(&out), stderr(&out));
     let err = stderr(&out);
-    assert!(err.contains("canon evidence add: unreviewed-promotion demo — evidence for shop.cart.01: brief not approved"), "{err}");
-    assert!(err.contains("canon evidence add: refused — no record of the batch is written"), "{err}");
+    assert!(err.contains("canon evidence add: BRIEF_UNAPPROVED — unreviewed-promotion demo — evidence for shop.cart.01: brief not approved"), "{err}");
+    assert!(err.contains("hint: no record of the batch is written"), "{err}");
     assert!(evidence_files(repo).is_empty(), "shop.cart.02 is not attested either");
 
     write(repo, ".canon/changes/c-demo/brief.md", "## Why\n\nSeeded brief.\n\nApproved: Journey 2026-10-12 — \"go\"\n");
     let out = attest_all(repo, "junit:reports/junit.xml", &["--summary", "would pass"]);
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
-    assert!(stderr(&out).contains("canon evidence add: refused — fabricated-evidence"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("canon evidence add: EVIDENCE_FABRICATED — fabricated-evidence"), "{}", stderr(&out));
     assert!(evidence_files(repo).is_empty(), "a fabricated summary writes nothing");
 
     write(repo, "trace.txt", "trace");
@@ -241,7 +241,7 @@ fn evidence_add_83_any_refusal_refuses_the_whole_batch() {
     ] {
         let out = attest_all(repo, "junit:reports/junit.xml", &extra);
         assert_eq!(out.status.code(), Some(2), "{flag}: {}", stderr(&out));
-        assert!(stderr(&out).contains(&format!("refused — {flag}")) && stderr(&out).contains("do(es) not combine with --all-scenarios"), "{flag}: {}", stderr(&out));
+        assert!(stderr(&out).contains(&format!("EVIDENCE_INVALID_ARGUMENT — {flag}")) && stderr(&out).contains("do(es) not combine with --all-scenarios"), "{flag}: {}", stderr(&out));
     }
     let bare = canon(repo, &["evidence", "add", "--project-id", "root", "--all-scenarios", "--kind", "test-run", "--ref", "x", "--role", "implementer"]);
     assert_eq!(bare.status.code(), Some(2));
@@ -440,7 +440,7 @@ fn review_add_81_a_batch_with_an_unindexed_scenario_writes_nothing() {
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(
         stderr(&out),
-        "canon review add: refused — no scenario record for `shop.cart.77` in spec root `root`; a review pins the scenario it saw, so index it first (`canon inventory sync`) (nothing is written for any of the scenarios)\n"
+        "canon review add: REVIEW_SCENARIO_NOT_INDEXED — no scenario record for `shop.cart.77` in spec root `root`; a review pins the scenario it saw, so index it first (`canon inventory sync`) (nothing is written for any of the scenarios)\n"
     );
     assert!(reviews(repo).is_empty());
 

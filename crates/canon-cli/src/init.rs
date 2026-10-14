@@ -53,6 +53,7 @@ use canon_model::envelope::RecordKind;
 use canon_model::paths;
 use canon_store::policy::{BackendConfig, TierPolicy};
 
+use crate::cli_error::CliError;
 use crate::policy_level::{starter_policy, PolicyLevel};
 use crate::skills::{self, Provider};
 
@@ -434,13 +435,16 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
             Ok(())
         }
         Err(e) => {
-            eprintln!(
-                "canon init: wrote `skills: {{ providers: [{}] }}` to {} but did not install the canon skill: {e}; once the skill source is available, run `canon skills install` (set {} or pass --source <dir>; it follows skills.providers)",
-                chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "),
-                canon_yaml_path.display(),
-                skills::CANONICAL_SOURCE_ENV
-            );
-            Err(2)
+            Err(CliError::refused(
+                "INIT_SKILL_INSTALL_FAILED",
+                format!(
+                    "wrote `skills: {{ providers: [{}] }}` to {} but did not install the canon skill: {e}",
+                    chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "),
+                    canon_yaml_path.display()
+                ),
+            )
+            .hint(format!("once the skill source is available, run `canon skills install` (set {} or pass --source <dir>; it follows skills.providers)", skills::CANONICAL_SOURCE_ENV))
+            .emit("canon init", false))
         }
     }
 }
@@ -504,15 +508,13 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel) -> std::io::Result<()> {
 ///   exits `2` naming the retry. A rerun never asks and never installs.
 pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
     if let Err(e) = fs::create_dir_all(repo) {
-        eprintln!("canon init: failed to create `{}`: {e}", repo.display());
-        return 2;
+        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", repo.display())).emit("canon init", false);
     }
     let agents_path = repo.join("AGENTS.md");
     let language = match options.language.as_deref().map(crate::language::Language::parse).transpose() {
         Ok(language) => language,
         Err(e) => {
-            eprintln!("canon init: refused — --language: {e}");
-            return 2;
+            return CliError::refused("INIT_INVALID_ARGUMENT", format!("--language: {e}")).emit("canon init", false);
         }
     };
     let agents = if options.agents_md {
@@ -520,15 +522,13 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
             Ok(text) => Some(text),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
             Err(e) => {
-                eprintln!("canon init: failed to read `{}`: {e}", agents_path.display());
-                return 2;
+                return CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", agents_path.display())).emit("canon init", false);
             }
         };
         match merge_agents_md(existing.as_deref()) {
             Ok(merged) => Some((existing, merged)),
             Err(e) => {
-                eprintln!("canon init: refused — {e}");
-                return 2;
+                return CliError::refused("INIT_AGENTS_MD_CONFLICT", e.to_string()).emit("canon init", false);
             }
         }
     } else {
@@ -542,8 +542,7 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
         match choose_skills(repo, &options.skills) {
             Ok(skills) => skills,
             Err(e) => {
-                eprintln!("canon init: refused — {e}");
-                return 2;
+                return CliError::refused("INIT_INVALID_ARGUMENT", e.to_string()).emit("canon init", false);
             }
         }
     };
@@ -551,16 +550,14 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
         Ok(mut file) => {
             let config = skeleton_yaml() + &language_section(language.as_ref()) + &skills_section(skills.as_ref());
             if let Err(e) = file.write_all(config.as_bytes()) {
-                eprintln!("canon init: failed to write `{}`: {e}", canon_yaml_path.display());
-                return 2;
+                return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", canon_yaml_path.display())).emit("canon init", false);
             }
             println!("canon init: wrote {}", canon_yaml_path.display());
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             let missing = missing_gitignore_lines(repo);
             if agents.is_none() && missing.is_empty() {
-                eprintln!("canon init: refused — `{}` already exists; never overwriting an existing config", canon_yaml_path.display());
-                return 2;
+                return CliError::refused("INIT_CONFIG_EXISTS", format!("`{}` already exists; never overwriting an existing config", canon_yaml_path.display())).emit("canon init", false);
             }
             let refreshed = if agents.is_some() { "the AGENTS.md block and the canon .gitignore lines are refreshed" } else { "the canon .gitignore lines are refreshed" };
             println!("canon init: {} already exists — left unchanged; {refreshed}", canon_yaml_path.display());
@@ -574,38 +571,32 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
                 Ok(added) if !added.is_empty() => println!("canon init: added to .gitignore: {}", added.join(", ")),
                 Ok(_) => {}
                 Err(e) => {
-                    eprintln!("canon init: failed to update `.gitignore`: {e}");
-                    return 2;
+                    return CliError::refused("WRITE_FAILED", format!("failed to update `.gitignore`: {e}")).emit("canon init", false);
                 }
             }
             if let Some((existing, merged)) = agents {
                 if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged) {
-                    eprintln!("canon init: failed to write `{}`: {e}", agents_path.display());
-                    return 2;
+                    return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).emit("canon init", false);
                 }
             }
             return 0;
         }
         Err(e) => {
-            eprintln!("canon init: failed to create `{}`: {e}", canon_yaml_path.display());
-            return 2;
+            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", canon_yaml_path.display())).emit("canon init", false);
         }
     }
 
     if let Err(e) = scaffold_gitignore(repo) {
-        eprintln!("canon init: wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display());
-        return 2;
+        return CliError::refused("WRITE_FAILED", format!("wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display())).emit("canon init", false);
     }
     if let Some(level) = options.policy {
         if let Err(e) = scaffold_policy(repo, level) {
-            eprintln!("canon init: failed to write `{}`: {e}", repo.join(paths::POLICY_FILE).display());
-            return 2;
+            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", repo.join(paths::POLICY_FILE).display())).emit("canon init", false);
         }
     }
     if let Some((existing, merged)) = agents {
         if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged) {
-            eprintln!("canon init: failed to write `{}`: {e}", agents_path.display());
-            return 2;
+            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).emit("canon init", false);
         }
     }
     if let Some(chosen) = &skills {
@@ -626,8 +617,7 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
 pub fn run_check_config(repo: &Path) -> i32 {
     let canon_yaml_path = repo.join("canon.yaml");
     let Ok(text) = fs::read_to_string(&canon_yaml_path) else {
-        eprintln!("canon init --check-config: refused — `{}` does not exist; run `canon init` first", canon_yaml_path.display());
-        return 2;
+        return CliError::refused("CONFIG_MISSING", format!("`{}` does not exist; run `canon init` first", canon_yaml_path.display())).emit("canon init --check-config", false);
     };
 
     let mut all_ok = true;

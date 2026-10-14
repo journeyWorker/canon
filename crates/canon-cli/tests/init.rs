@@ -688,7 +688,7 @@ fn authoring_init_94_an_unknown_provider_is_refused_and_nothing_is_written() {
 
     let out = init_with_source(&["--providers", "claude,gemini"], &repo, &source);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
-    assert_eq!(stderr(&out), "canon init: refused — invalid provider `gemini`; expected one of: claude, codex, omp, pi, or none\n");
+    assert_eq!(stderr(&out), "canon init: INIT_INVALID_ARGUMENT — invalid provider `gemini`; expected one of: claude, codex, omp, pi, or none\n");
     assert_eq!(std::fs::read_dir(&repo).unwrap().count(), 0, "nothing is written");
 }
 

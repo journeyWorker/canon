@@ -11,6 +11,7 @@ use canon_store::tier::{raw_record_at, TierQuery};
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 
+use crate::cli_error::CliError;
 use crate::context::resolve_canon_yaml;
 use crate::tiers;
 
@@ -250,8 +251,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, dry_run: 
                     println!("{}", serde_json::to_string_pretty(&partial_purge_value(kind, before, *matched, *deleted, &err.to_string())).expect("partial purge manifest is serializable"));
                 }
             }
-            eprintln!("canon purge: {err}");
-            2
+            CliError::refused("RETENTION_PURGE_FAILED", err.to_string()).emit("canon purge", false) as u8
         }
     }
 }
@@ -309,8 +309,7 @@ pub fn run_export(repo: &Path, kind: RecordKind, before: Option<DateTime<Utc>>, 
         Ok(()) => 0,
         Err(err) => {
             let _ = append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, 0, 0);
-            eprintln!("canon export: {err}");
-            2
+            CliError::refused("RETENTION_EXPORT_FAILED", err.to_string()).emit("canon export", json_output) as u8
         }
     }
 }

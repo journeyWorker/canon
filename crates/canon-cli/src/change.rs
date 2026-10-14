@@ -39,13 +39,10 @@ use std::path::{Path, PathBuf};
 use canon_ingest::{native_plan_adapter, PlanSourceHandle};
 use canon_model::{paths, Change, ChangeId, SubjectId};
 
+use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::brief_template::ChangeKind;
 use crate::language::Language;
-
-/// Exit code for a refused invocation or a failed write — mirrors
-/// `canon subject`'s own `2`.
-const EXIT_REFUSED: i32 = 2;
 
 /// `brief.md`: the PRD brief or, for a chore, the chore brief
 /// ([`crate::brief_template`], 0.19 D1/D5) in the repo's `language:`.
@@ -120,24 +117,20 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let language = match crate::language::configured(&repo) {
         Ok(language) => language,
         Err(e) => {
-            eprintln!("canon change new: refused — {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon change new", false);
         }
     };
 
     let subject = match crate::subject::lookup_adoption(&repo, subject_id, slug) {
         Ok((None, _)) => {
-            eprintln!("canon change new: refused — subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str());
-            return EXIT_REFUSED;
+            return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())).emit("canon change new", false);
         }
         Ok((Some(_), Some(_))) => {
-            eprintln!("canon change new: refused — change `{}` already exists; pick another slug", slug.as_str());
-            return EXIT_REFUSED;
+            return CliError::refused("CHANGE_EXISTS", format!("change `{}` already exists; pick another slug", slug.as_str())).emit("canon change new", false);
         }
         Ok((Some(subject), None)) => subject,
         Err(e) => {
-            eprintln!("canon change new: {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon change new", false);
         }
     };
 
@@ -146,8 +139,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let archived = changes.join("archive").join(slug.as_str());
     if dir.exists() || archived.exists() {
         let existing = if dir.exists() { &dir } else { &archived };
-        eprintln!("canon change new: refused — `{}` already exists; pick another slug", display_rel(existing, &repo));
-        return EXIT_REFUSED;
+        return CliError::refused("CHANGE_EXISTS", format!("`{}` already exists; pick another slug", display_rel(existing, &repo))).emit("canon change new", false);
     }
 
     let staging_path = repo.join(paths::CANON_DIR).join(format!("change-new-{}-{}", slug.as_str(), std::process::id()));
@@ -155,28 +147,27 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let change = match stage_change(&staging_path, slug, kind, title, &language) {
         Ok(change) => change,
         Err(e) => {
-            eprintln!("canon change new: {e}");
-            return EXIT_REFUSED;
+            return CliError::refused("CHANGE_INVALID_ARGUMENT", e.to_string()).emit("canon change new", false);
         }
     };
 
     let published = Created(Some(first_missing_ancestor(&dir)));
     let publish = fs::create_dir_all(&changes).and_then(|()| fs::rename(staging_path.join(slug.as_str()), &dir));
     if let Err(e) = publish {
-        eprintln!("canon change new: failed to create `{}`: {e}", display_rel(&dir, &repo));
-        return EXIT_REFUSED;
+        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", display_rel(&dir, &repo))).emit("canon change new", false);
     }
     drop(staging);
 
     if let Err(e) = crate::subject::persist_adoption(&repo, change, subject) {
         let repair = format!("canon ingest plans && {}", crate::subject::adopt_command(slug, subject_id));
-        eprintln!("canon change new: {}", e.describe(slug, subject_id, &repair));
         if e.subject_written {
             // The subject record exists and cannot be taken back; the
             // change dir stays so the repair can import it.
             published.keep();
         }
-        return EXIT_REFUSED;
+        let message = e.describe(slug, subject_id, &repair);
+        let error = if e.subject_written { CliError::refused("CHANGE_ADOPTION_INCOMPLETE", message) } else { CliError::refused("WRITE_FAILED", message) };
+        return error.emit("canon change new", false);
     }
     published.keep();
 

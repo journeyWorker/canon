@@ -1,1 +1,1 @@
-canon policy approve: refused — <repo>/.canon/policy.yaml does not exist, so there is no policy to approve; `canon init` writes a starter policy
+canon policy approve: POLICY_APPROVAL_FAILED — <repo>/.canon/policy.yaml does not exist, so there is no policy to approve; `canon init` writes a starter policy

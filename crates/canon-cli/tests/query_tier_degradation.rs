@@ -181,7 +181,16 @@ fn pg_routed_kind_query_fails_naming_pg_and_the_no_live_dsn_reason() {
         assert!(err.contains("hot"), "{args:?}: error must name the rung: {err}");
         assert!(err.contains("postgres"), "{args:?}: error must name the backend: {err}");
         assert!(err.contains("no live DSN"), "{args:?}: error must name the reason: {err}");
-        assert_eq!(stdout(&output), "", "{args:?}: no result payload or empty-result report may be emitted");
+        // No result payload or empty-result report: the only thing a `--json`
+        // run may print is the shared error object (0.20 D3).
+        let out = stdout(&output);
+        if args.contains(&"--json") {
+            let body: serde_json::Value = serde_json::from_str(&out).unwrap_or_else(|e| panic!("{args:?}: stdout is not the error object ({e}): {out}"));
+            assert_eq!(body["error"]["code"], "QUERY_FAILED", "{args:?}: {out}");
+            assert_eq!(body.as_object().map(|o| o.len()), Some(1), "{args:?}: {out}");
+        } else {
+            assert_eq!(out, "", "{args:?}: no result payload or empty-result report may be emitted");
+        }
     }
 }
 
