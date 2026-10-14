@@ -37,6 +37,14 @@ class TraceCheckTests(unittest.TestCase):
         self.assertFalse(report["hard_checks_passed"])
         self.assertIn("reviewer_is_implementer", {f["check"] for f in report["failures"]})
 
+    def test_help_and_out_of_repo_scratch_do_not_change_roles(self):
+        # Dogfood eval 8: the implementer read `canon review add --help`, and the
+        # reviewer wrote its own harness under /tmp; neither is the other role.
+        report = self.report("help_impl.jsonl", "scratch_review.jsonl")
+        self.assertNotIn("reviewer_is_implementer", {f["check"] for f in report["failures"]})
+        self.assertEqual(report["implementer_sessions"], ["help-impl"])
+        self.assertEqual(report["reviewer_sessions"], ["scratch-review"])
+
     def test_recovery_depth_counts_intervening_canon_calls(self):
         report = self.report("reviewer_recovery_fail.jsonl")
         session = report["sessions"][0]

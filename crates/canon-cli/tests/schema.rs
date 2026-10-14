@@ -93,6 +93,12 @@ fn an_alias_resolves_to_the_canonical_command() {
     assert_eq!(v["aliases"][0], "fmt");
 }
 
+/// Dogfood eval 8: an agent quoted the path as one word.
+#[test]
+fn a_quoted_command_path_names_the_same_command() {
+    assert_eq!(json(&["schema", "evidence add", "--json"]), json(&["schema", "evidence", "add", "--json"]));
+}
+
 #[test]
 fn an_unknown_path_is_a_refusal_naming_the_nearest_matches() {
     let out = canon(&["schema", "evidence", "ad"]);

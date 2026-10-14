@@ -412,7 +412,10 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool) -> u8 {
     let mut built = root.clone();
     built.build();
     let root = &built;
-    let resolved = match resolve(root, tokens) {
+    // `canon schema "evidence add"` (one quoted word, dogfood eval 8) names
+    // the same command as `canon schema evidence add`.
+    let tokens: Vec<String> = tokens.iter().flat_map(|t| t.split_whitespace()).map(str::to_string).collect();
+    let resolved = match resolve(root, &tokens) {
         Ok(r) => r,
         Err(Refusal(msg)) => return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", msg).hint("`canon schema` lists every command").emit("canon schema", json) as u8,
     };

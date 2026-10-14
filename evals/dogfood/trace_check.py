@@ -227,8 +227,14 @@ CODE_SUFFIXES = {
 
 
 def is_code_path(path):
-    """Conservative classifier for implementation ownership, separate from write checks."""
+    """Conservative classifier for implementation ownership, separate from write checks.
+
+    Only repository files count: a scratch script outside the repo (a
+    reviewer's own determinism harness under /tmp, say) implements nothing.
+    """
     candidate = path.split("?", 1)[0].lower()
+    if candidate.startswith(("../", "/")):
+        return False
     if any(part in candidate.split("/") for part in ("reports", "screens", "fixtures", ".canon")):
         return False
     return Path(candidate).suffix in CODE_SUFFIXES
@@ -324,7 +330,9 @@ def shell_activity(command, cwd, result):
             verb = words[0] if words else "<bare>"
             action = words[1] if len(words) > 1 else ""
             calls.append({"verb": verb, "action": action, "exit_code": known,
-                          "command": shlex.join(argv)})
+                          "command": shlex.join(argv),
+                          # `canon review add --help` reads usage; it records nothing.
+                          "help": "--help" in args or "-h" in args})
             if "--help" not in args and "--version" not in args and verb not in READ_ONLY and action not in READ_ACTIONS:
                 if not (verb in ("brief", "finding", "subject", "skills", "gate") and not action):
                     writes.append((f".canon/<{verb}{' ' + action if action else ''}>", current_cwd))
@@ -480,7 +488,7 @@ def analyze(inputs, question_turns=()):
         for call in session["calls"]:
             turns[call["turn"]]["calls"].append(call)
         implements = any(w["code"] for w in session["writes"])
-        reviews = any(c["verb"] == "review" and c["action"] == "add" for c in session["calls"])
+        reviews = any(c["verb"] == "review" and c["action"] == "add" and not c["help"] for c in session["calls"])
         if implements:
             implementers.append(sid)
         if reviews:

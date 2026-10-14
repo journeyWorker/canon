@@ -257,7 +257,23 @@ JSON output. No exit code changed.
 
 **Closed issues:** #53.
 
-ACCEPTANCE-PLACEHOLDER: dogfood eval 8 (omp, copy of `nyan-omp-020`, a new small feature) compares calls per success and recovery depth with eval 7 via `trace_check`; results are recorded here once the run completes.
+**Acceptance (dogfood eval 8, omp, `language: ko`,
+`docs/research/2026-10-15-dogfood-eval-8.md`).**
+
+- A results-screen feature on the shipped game: a Korean PRD brief and a
+  stop after 94 s with no write outside `.canon/`; after the answer,
+  `canon brief approve`, 11 new scenarios (4 failure cases), 83/83
+  evidenced and reviewed by another session, gate clean.
+- canon calls per new scenario fell from 3.1 (eval 7's feature turns, 37
+  calls for 12 scenarios) to 2.1 (23 calls for 11). Every attributable
+  canon failure was recovered by the next call. The agent used
+  `canon schema` three times to check a command's flags.
+- Fixed from the run: a closed stdout panicked canon (`canon … | head`);
+  `canon schema "evidence add"` (the path quoted as one word) was refused;
+  `evals/dogfood/trace_check.py` counted `canon review add --help` as a
+  review and scratch files outside the repo as code.
+- Open from the run: #58, a suite-wide `--all-scenarios` batch is refused
+  when earlier evidence bound attachments the batch does not repeat.
 
 ## 0.19.0 release
 
