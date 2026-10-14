@@ -38,6 +38,7 @@ pub mod report;
 pub mod retrieve;
 pub mod review;
 pub mod scaffold;
+pub mod schema;
 pub mod subject;
 pub mod selftest;
 pub mod skills;
