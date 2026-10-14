@@ -251,6 +251,44 @@ fn flow_coverage_blocks_once_the_subject_is_building_and_reads_the_flow_tag() {
     assert_eq!((code, rules(&report)), (0, Vec::<String>::new()), "{report}");
 }
 
+/// 0.19 D4: `scenario new --flow` writes `@flow:<change>.<F-id>` (the
+/// change is the subject's newest adopted one), refuses a step the brief
+/// does not define, and `canon status` lists each step with its scenarios.
+#[test]
+fn scenario_new_flow_tags_the_step_and_status_lists_per_step_coverage() {
+    let dir = repo_with_change(None);
+    let repo = dir.path();
+    std::fs::write(brief_path(repo), en_brief("")).unwrap();
+    assert!(!repo.join(".canon/changes/add-login/tasks.md").exists(), "change new writes no tasks.md");
+    ok(repo, &["subject", "status", "demo", "specced"]);
+    ok(repo, &["subject", "status", "demo", "building"]);
+
+    let refused = run(repo, &["scenario", "new", "world.login.01", "--title", "x", "--subject", "demo", "--flow", "F9"]);
+    assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
+    assert!(stderr(&refused).contains("defines no flow step `F9` (it has F1, F2)"), "{}", stderr(&refused));
+    assert!(!repo.join(".canon/specs/kind=feature/area=world/login.feature").exists(), "a refused flow writes nothing");
+
+    ok(repo, &["scenario", "new", "world.login.01", "--title", "Valid sign-in", "--subject", "demo", "--flow", "F1"]);
+    ok(repo, &["scenario", "new", "world.login.02", "--title", "Wrong password", "--subject", "demo", "--flow", "F1", "--case", "failure"]);
+    let feature = std::fs::read_to_string(repo.join(".canon/specs/kind=feature/area=world/login.feature")).unwrap();
+    assert!(feature.contains("  @flow:add-login.F1\n  @world.login.01\n"), "{feature}");
+
+    // F1 is covered with a failure case; F2 has no scenario: the brief blocks.
+    let (code, report) = check(repo, &[]);
+    assert_eq!((code, rules(&report)), (2, vec!["brief.flow-uncovered".to_string()]), "{report}");
+    let out = run(repo, &["status"]);
+    let text = stdout(&out);
+    assert!(text.contains("flow F1\n") && text.contains("world.login.02 \"Wrong password\" [failure] — evidence: none, review: missing"), "{text}");
+    assert!(text.contains("flow F2 — no scenario"), "{text}");
+    let json: Value = serde_json::from_str(&stdout(&run(repo, &["status", "--json"]))).unwrap();
+    let flow = &json["subjects"][0]["flow"];
+    assert_eq!((flow[0]["id"].as_str(), flow[1]["gaps"][0].as_str()), (Some("F1"), Some("no scenario")), "{flow}");
+
+    ok(repo, &["scenario", "new", "world.login.03", "--title", "Retry", "--subject", "demo", "--flow", "F2"]);
+    let text = stdout(&run(repo, &["status"]));
+    assert!(text.contains("flow F2 — no failure case"), "{text}");
+}
+
 #[test]
 fn operational_errors_carry_a_string_code_and_exit_1() {
     let dir = TempDir::new().unwrap();

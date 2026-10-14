@@ -36,10 +36,11 @@
 //! # Flow coverage
 //! The flow rules read scenarios through [`flow_scenarios`], the one
 //! place that maps a flow step to its scenarios by their
-//! `@flow:<change>.<F-id>` tag (0.19 D4). The scenario index does not
-//! carry arbitrary tags yet, so it reads the `.feature` files under the
-//! spec roots directly; the slice that indexes the tag replaces this
-//! function's body and nothing else.
+//! `@flow:<change>.<F-id>` tag (0.19 D4), written by `canon scenario new
+//! --flow <F-id>`. It reads the spec roots' `.feature` files through the
+//! scan `canon inventory sync` uses (`canon_fmt::gherkin`), so a tag
+//! counts as soon as it is written. `canon status` joins the same index
+//! to each scenario's evidence and review state.
 //!
 //! # `canon brief`
 //! Prints the brief's state and the next one to three steps (`shape`,
@@ -169,6 +170,8 @@ impl Evaluation {
 /// One scenario a flow step points at.
 #[derive(Debug, Clone)]
 pub struct FlowScenario {
+    /// The scenario's `<area>.<surface>.<nn>` id.
+    pub id: String,
     pub title: String,
     /// Whether it is tagged `@case:failure`.
     pub failure: bool,
@@ -178,38 +181,77 @@ pub struct FlowScenario {
 pub type FlowIndex = BTreeMap<String, Vec<FlowScenario>>;
 
 /// The scenarios pointing at `change`'s flow steps (module doc, "Flow
-/// coverage"): the one function the `@flow:` tag lookup lives in.
+/// coverage"): the one function the `@flow:` tag lookup lives in. It
+/// reads the `.feature` files under the spec roots through the same
+/// Gherkin scan `canon inventory sync` indexes them with, so the gate,
+/// status and the brief rules cannot disagree, and a tag written a
+/// moment ago counts without a sync.
 pub fn flow_scenarios(repo: &Path, change: &ChangeId) -> Result<FlowIndex, String> {
     let roots = crate::inventory::load_spec_roots(&repo.join("canon.yaml")).map_err(|e| e.to_string())?;
-    let prefix = format!("@flow:{}.", change.as_str());
+    let prefix = format!("{}.", change.as_str());
     let mut index = FlowIndex::new();
     for root in roots {
         for path in canon_fmt::util::feature_files(&root.root) {
             let Ok(text) = std::fs::read_to_string(&path) else { continue };
-            let mut feature_tags: Vec<String> = Vec::new();
-            let mut pending: Vec<String> = Vec::new();
-            for raw in text.lines() {
-                let line = raw.trim();
-                if line.starts_with('@') {
-                    pending.extend(line.split_whitespace().take_while(|t| t.starts_with('@')).map(str::to_string));
-                } else if line.is_empty() || line.starts_with('#') {
-                    continue;
-                } else if line.starts_with("Feature:") {
-                    feature_tags = std::mem::take(&mut pending);
-                } else if let Some(title) = ["Scenario Outline:", "Scenario Template:", "Scenario:", "Example:"].iter().find_map(|k| line.strip_prefix(k)) {
-                    let tags: Vec<String> = feature_tags.iter().chain(pending.iter()).cloned().collect();
-                    let failure = tags.iter().any(|t| t == "@case:failure");
-                    for tag in tags.iter().filter_map(|t| t.strip_prefix(&prefix)) {
-                        index.entry(tag.to_string()).or_default().push(FlowScenario { title: title.trim().to_string(), failure });
+            for scenario in canon_fmt::gherkin::scan(&text).scenarios {
+                let failure = scenario.case_tags.iter().any(|c| c == "failure");
+                for step in scenario.flow_tags.iter().filter_map(|t| t.strip_prefix(&prefix)) {
+                    let entry = FlowScenario { id: scenario.scenario_id.clone(), title: scenario.title.clone(), failure };
+                    let steps = index.entry(step.to_string()).or_default();
+                    if !steps.iter().any(|s| s.id == entry.id) {
+                        steps.push(entry);
                     }
-                    pending.clear();
-                } else {
-                    pending.clear();
                 }
             }
         }
     }
     Ok(index)
+}
+
+/// The flow step ids `change`'s brief defines, in order; empty for a
+/// legacy brief or no brief.
+pub fn flow_ids(repo: &Path, change: &ChangeId) -> Vec<String> {
+    let Some(path) = crate::brief::canon_brief(repo, change) else { return Vec::new() };
+    let Ok(text) = std::fs::read_to_string(&path) else { return Vec::new() };
+    let language = crate::language::configured(repo).unwrap_or_else(|_| Language::unset());
+    let (lines, comments) = scan(&text);
+    let secs = sections(&lines, &comments);
+    let mut sink = Out { findings: Vec::new() };
+    flow_and_detail(&mut sink, &secs, &language).into_iter().map(|(id, _)| id).collect()
+}
+
+/// The `<change>.<F-id>` value of the `@flow:` tag `canon scenario new
+/// --flow <flow>` writes. The change is `change` when given, else the
+/// newest change `subject` adopted, else the repo's only live change.
+/// Refuses a flow id the change's brief does not define.
+pub fn flow_tag_value(repo: &Path, subject: Option<&canon_model::SubjectId>, change: Option<&ChangeId>, flow: &str) -> Result<String, String> {
+    let change = match (change, subject) {
+        (Some(change), _) => change.clone(),
+        (None, Some(subject)) => newest_change_of(repo, subject)?,
+        (None, None) => resolve_change(repo, None).map(|(change, _)| change).map_err(|e| format!("{} — {}; pass --change or --subject", e.code, e.message))?,
+    };
+    if crate::brief::canon_brief(repo, &change).is_none() {
+        return Err(format!("change `{}` has no brief at {}/{}/brief.md; write it with `canon change new`", change.as_str(), paths::CHANGES_DIR, change.as_str()));
+    }
+    let ids = flow_ids(repo, &change);
+    if ids.iter().any(|id| id == flow) {
+        return Ok(format!("{}.{flow}", change.as_str()));
+    }
+    Err(if ids.is_empty() {
+        format!("the brief of change `{}` defines no flow steps (`F1`, `F2`, …); write the flow first", change.as_str())
+    } else {
+        format!("the brief of change `{}` defines no flow step `{flow}` (it has {})", change.as_str(), ids.join(", "))
+    })
+}
+
+/// The newest change `subject` adopted ([`canon_gate::spec_coverage::subject_change_ids`]'s last).
+pub fn newest_change_of(repo: &Path, subject: &canon_model::SubjectId) -> Result<ChangeId, String> {
+    use canon_gate::spec_coverage::{latest_subjects, subject_change_ids};
+    use canon_gate::{GateContext, GateCtx};
+    let registry = canon_policy::SchemaRegistry::load();
+    let ctx = GateCtx::from_repo(repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &registry, chrono::Utc::now()).map_err(|e| e.to_string()))?;
+    let found = latest_subjects(&ctx).into_iter().find(|s| &s.subject_id == subject).ok_or_else(|| format!("no subject `{}`", subject.as_str()))?;
+    subject_change_ids(&ctx, found).pop().ok_or_else(|| format!("subject `{}` has not adopted a change; run `canon change new <slug> --subject {}`", subject.as_str(), subject.as_str()))
 }
 
 // ───────────────────────────── document scan ─────────────────────────────

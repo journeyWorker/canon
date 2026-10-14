@@ -1,4 +1,4 @@
-description: "`canon change new <slug> --subject <id> --title <t>` on a fresh `canon init` repo writes .canon/changes/<slug>/{brief,tasks}.md (no plans source, no openspec dir), imports the change and adopts it into the subject (exit 0); an existing slug (exit 2) and an unknown subject (exit 2) are refused"
+description: "`canon change new <slug> --subject <id> --title <t>` on a fresh `canon init` repo writes .canon/changes/<slug>/brief.md (no plans source, no openspec dir), imports the change and adopts it into the subject (exit 0); an existing slug (exit 2) and an unknown subject (exit 2) are refused"
 steps:
   - args: [init, --no-agents-md, --no-policy]
     exit: 0

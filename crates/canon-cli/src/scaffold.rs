@@ -18,6 +18,8 @@
 //!   # canon: {"schema":1,"at":"...","actor":{"agent_id":"..."}}
 //!   [@subject:<id>]
 //!   [@lane:<value>]
+//!   [@case:<value>]
+//!   [@flow:<change>.<F-id>]
 //!   @<area>.<surface>.<nn>
 //!   Scenario: <label>
 //!     Given a step
@@ -159,16 +161,19 @@ pub struct ScenarioAxes<'a> {
     pub subject: Option<&'a str>,
     pub lane: Option<&'a str>,
     pub case: Option<&'a str>,
+    /// `<change>.<F-id>` of the brief flow step this scenario covers
+    /// (0.19 D4), written as `@flow:<value>`.
+    pub flow: Option<&'a str>,
 }
 
 /// Append one scenario block. Provenance leads the block, followed by
-/// the optional subject/lane/case tags in that order, then the id tag
+/// the optional subject/lane/case/flow tags in that order, then the id tag
 /// and header.
 fn append_scenario_block(existing: &str, tag: &str, title: &str, prov_line: &str, axes: ScenarioAxes<'_>) -> String {
     let mut block = String::new();
     block.push_str(prov_line);
     block.push('\n');
-    for (axis, value) in [("subject", axes.subject), ("lane", axes.lane), ("case", axes.case)] {
+    for (axis, value) in [("subject", axes.subject), ("lane", axes.lane), ("case", axes.case), ("flow", axes.flow)] {
         if let Some(value) = value {
             block.push_str(&format!("  @{axis}:{value}\n"));
         }
@@ -588,10 +593,10 @@ mod tests {
     }
 
     #[test]
-    fn axis_tags_are_written_subject_lane_case_above_the_id_tag() {
-        let axes = ScenarioAxes { subject: Some("cart"), lane: Some("behavior"), case: Some("failure") };
+    fn axis_tags_are_written_subject_lane_case_flow_above_the_id_tag() {
+        let axes = ScenarioAxes { subject: Some("cart"), lane: Some("behavior"), case: Some("failure"), flow: Some("add-cart.F1") };
         let out = append_scenario_block("Feature: x\n", "a.b.01", "t", "  # canon: {}", axes);
-        assert!(out.ends_with("  @subject:cart\n  @lane:behavior\n  @case:failure\n  @a.b.01\n  Scenario: t\n    Given a step\n"), "{out}");
+        assert!(out.ends_with("  @subject:cart\n  @lane:behavior\n  @case:failure\n  @flow:add-cart.F1\n  @a.b.01\n  Scenario: t\n    Given a step\n"), "{out}");
     }
 
     /// `<n>` configured roots, ids `p0..p<n-1>`, each under its own
