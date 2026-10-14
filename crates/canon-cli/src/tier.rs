@@ -124,3 +124,21 @@ pub fn format_report(reports: &[AgeRuleReport], dry_run: bool) -> String {
     }
     out
 }
+
+/// The `--json` data for `canon tier age`: one entry per `aging:` rule.
+pub fn format_json(reports: &[AgeRuleReport], dry_run: bool) -> serde_json::Value {
+    let rules: Vec<_> = reports
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "kind": r.kind.as_str(),
+                "source": r.source.as_str(),
+                "destination": r.destination.as_str(),
+                "after": format_duration(r.after),
+                "moved": r.moved,
+                "alreadyAged": r.already_aged,
+            })
+        })
+        .collect();
+    serde_json::json!({ "dryRun": dry_run, "rules": rules })
+}

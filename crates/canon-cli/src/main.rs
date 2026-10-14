@@ -104,6 +104,9 @@ enum Command {
         /// Language the briefs are written in (`en`, `ko`, or any tag: `en` headings, structure rules only); recorded as `language:` in canon.yaml
         #[arg(long, value_name = "TAG")]
         language: Option<String>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Move a repo set up by canon 0.16 or earlier onto the 0.17 layout (specs, changes, approvals, skills, .gitignore)
     #[command(after_help = "Examples:\n  canon migrate --dry-run\n  canon migrate\n\nPrints the plan, then applies it; --dry-run stops after the plan. Idempotent:\na second run finds nothing to move, and a run that stopped partway is finished\nby the next one.\n\n- A spec root's features/kind=feature/ moves to <root>/kind=feature/ (git mv in a\n  git work tree). A root at the repo-level `specs` moves to .canon/specs, and\n  canon.yaml records `former_roots: [specs]` so reviews pinned before the move\n  still find their scenarios.\n- Changes `canon change new` wrote under openspec/changes move to\n  .canon/changes/<slug>/ (proposal.md -> brief.md, tasks.md alongside); every\n  other change stays and is named. A change counts as canon's when its files are\n  still that command's scaffold and its first stored version was already adopted:\n  0.16 kept no durable provenance. A false positive keeps its content and ids and\n  is one `git mv` to undo; --dry-run shows exactly which changes move.\n  canon init's `{ dialect: openspec, root: . }` source goes once nothing unread is\n  left under it.\n- An external proposal.md's Approved: line is copied into a canon pointer\n  brief, .canon/changes/<change>/brief.md, with a Source: line.\n- skills.providers is written from the install lock; missing canon .gitignore\n  lines are added; the scenario index is rebuilt (full sync).\n\nRefuses (exit 2, nothing written) on uncommitted changes under a path it\nmoves, on a destination that already exists, on a change directory that could\nstop halfway, and on a canon.yaml edit it cannot make with every other byte\nkept. canon.yaml is written atomically.")]
@@ -114,6 +117,9 @@ enum Command {
         /// Print the plan and write nothing
         #[arg(long)]
         dry_run: bool,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Record who approved the gate's policy (.canon/policy.yaml) and which bytes
     #[command(after_help = "Examples:\n  canon policy approve --by alice --note 'reviewed the starter policy'\n\nWrites .canon/policy.approval.json (commit it): the policy's sha256, who\napproved it, when, and the note. `canon gate check` and `canon status` print an\nadvisory while the policy is unapproved or has changed since its approval;\nthe advisory never changes an exit code.")]
@@ -180,6 +186,9 @@ enum Command {
         /// Repo root the corpus is resolved under (default: root used as-is)
         #[arg(long)]
         repo: Option<PathBuf>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Scaffold a new .feature spec file
     Feature {
@@ -308,6 +317,9 @@ enum Command {
         /// The <hash> segment (6-64-char lowercase hex; passed through, never re-hashed)
         #[arg(long)]
         hash: String,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 
     // ── Reading & reporting ──
@@ -386,6 +398,9 @@ enum Command {
         /// Export panel marts to <dir>/*.parquet + manifest.json instead
         #[arg(long)]
         snapshot: Option<PathBuf>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Serve the local status dashboard
     Dashboard {
@@ -398,6 +413,9 @@ enum Command {
         /// Local port to bind (0 = OS-assigned free port)
         #[arg(long, default_value_t = 4173)]
         port: u16,
+        /// Print one JSON document naming the address it serves (`data.url`), then serve until stopped; the human lines go to stderr
+        #[arg(long)]
+        json: bool,
     },
 
     // ── Maintenance ──
@@ -446,6 +464,9 @@ enum PolicyCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -574,6 +595,9 @@ enum LearnCommand {
         /// Preview without writing anything
         #[arg(long)]
         dry_run: bool,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Produce an unsigned, externally signable approval payload
     Approve {
@@ -617,6 +641,9 @@ enum LearnCommand {
         contradicting_trajectory_id: Option<String>,
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -627,12 +654,18 @@ enum DemoCommand {
         /// Directory to set up (used as-is)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Record the missing reviewer evidence (gate turns GREEN)
     Attest {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -728,6 +761,9 @@ enum IngestCommand {
         /// Scan every workspace on this machine, not just this project
         #[arg(long)]
         all_workspaces: bool,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Import review/divergence/task/handoff artifacts and derive verdicts
     Artifacts {
@@ -774,6 +810,9 @@ enum GateCommand {
         /// Additionally engage the release-scoped trust check
         #[arg(long)]
         release: bool,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Flip one task checkbox, gated on real evidence (fails closed)
     Task {
@@ -782,6 +821,9 @@ enum GateCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Promote staged evidence records to the committed ledger
     Promote {
@@ -791,6 +833,9 @@ enum GateCommand {
         /// Preview without writing anything
         #[arg(long)]
         dry_run: bool,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Install the gate hook into .claude/settings.json / .codex/hooks.json
     InstallHooks {
@@ -809,9 +854,16 @@ enum GateCommand {
         /// Hook timeout in seconds
         #[arg(long, default_value_t = 30)]
         timeout: u32,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Run the gate's self-contained fixture self-test
-    Selftest,
+    Selftest {
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 /// `--promote`/`--no-promote`, flattened into every staged write
@@ -854,6 +906,9 @@ enum EvidenceCommand {
         approval_at: String,
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)
     #[command(after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path>, cucumber:<path> or swift-testing:<path> (the JSON-lines event stream of `swift test --experimental-event-stream-output`) also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, a Swift Testing display name, then function name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. With --task and no --scenario-id, every case in the report is bound. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).\n\nONE REPORT, MANY SCENARIOS (--all-scenarios).\nWith --report and --project-id, writes one record per indexed scenario that owns a case in the report, each with its own cases and its own verdict: --verdict when given, else derived (faithful when every case passed, divergent when one failed, not-applicable when one was skipped). A case whose id is not indexed is named and skipped. All or nothing: any refusal (a claimed faithful verdict over a failed case, a fabrication marker, an unapproved brief, a dropped binding) writes no record. The records share the stored report and --artifact files.\n\nA WRITE THAT BREAKS A REVIEW PIN SAYS SO.\nWhen the new record supersedes evidence a current pinned review saw, one line per review now stale names the reviewer, the scenario and the `canon review add ... --pin <sha>` that re-pins it.\n\nRE-ATTESTING NEVER DROPS A BINDING SILENTLY (--drop-attachment).\nFor a scenario, a record that leaves out a file the scenario's latest record binds is refused (exit 2) until it re-binds the file (new bytes at the same path are fine) or names it with --drop-attachment <path> (repeatable) --drop-reason <text>. The drop is recorded on the record and listed by canon status. Task-only evidence has no drop guard.\n\nNOTHING IS ATTESTED BEFORE THE BRIEF IS APPROVED (--override-reason).\nWhile a subject this record attests for (the scenario's @subject owner, or any subject adopting the task's change) has a newest change whose proposal.md has no `Approved:` line, the add is refused (exit 1, nothing staged): stop, report the brief and wait for the human's answer. --override-reason <text> attests anyway; the reason, the waived subjects and --actor-id are recorded on the record and listed by canon status and canon gate check. A subject with no proposal.md to answer is unaffected; review add and finding add are never refused.\n\nAUDITS (--kind audit).\nRecords an external evaluator's re-audit of one scenario: --evaluator-id, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
@@ -953,6 +1008,9 @@ enum EvidenceCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)
     #[command(after_help = "For records written before canon stored bound bytes (0.11-0.13), and for any evidence file, or file of a current review, whose stored blob was lost. Each attachment whose working-tree file still hashes to the recorded digest is copied into .canon/artifacts/sha256/<hex>; everything else is listed as not stored, with why. A superseded review's files are not vaulted, as the gate does not check them. Commit the store with the ledger.\n\nExit 0 when the pass ran (the gate decides whether an unstored file matters), 2 when the ledger cannot be read or a write fails.")]
@@ -963,6 +1021,9 @@ enum EvidenceCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1018,6 +1079,9 @@ enum FindingCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Move an already-committed finding's disposition (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)
     #[command(after_help = "A finding is raised `open` and later closed. This is the ONLY way to record\nthat second state: `canon finding add` refuses an occupied natural key,\nbecause two DIFFERENT findings under one (change, round, seq) are two\nreviewers' work collapsed into one identity.\n\nWhat it changes: the disposition, and `resolution_sha` with it. NOTHING else.\nSeverity, reviewer, summary, --reviewed-sha, --introduced-by and --file-ref\nare READ from the committed record and copied byte-identically — this command\ncannot edit them, and no command can. A finding recorded wrongly stays\nwrongly recorded; that is the append-only ledger working, not a gap.\n\nThe committed record STAYS. This appends a second version at the same\nnatural key, and the pair IS the history: `open` at one instant, `fixed` at\nanother, each with its own author and timestamp. Every reader folds by\nnatural key to the latest version, so the finding is still counted once.\n\n`canon gate promote` re-derives the transition rule itself before committing\nthe second version, so a hand-written body must clear the same bar.\n\nExamples:\n  canon finding close --change-id s44-spec-derived-worklist --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n  canon finding close --change-id s44-spec-derived-worklist --round 1 --seq 9 \\\n      --disposition rejected")]
@@ -1051,6 +1115,9 @@ enum FindingCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// List a change's committed findings at their latest version: round, seq, severity, disposition, reviewer and summary
     List {
@@ -1120,6 +1187,9 @@ enum ReviewCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1155,6 +1225,9 @@ enum DivergenceCliCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Promote all staged candidates, assigning run_seq
     Promote {
@@ -1164,6 +1237,9 @@ enum DivergenceCliCommand {
         /// Preview without writing anything
         #[arg(long)]
         dry_run: bool,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Directly record a resolved divergence
     Resolve {
@@ -1186,6 +1262,9 @@ enum DivergenceCliCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Directly record a deferred divergence (requires --reason/--expiry)
     Defer {
@@ -1210,6 +1289,9 @@ enum DivergenceCliCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Show the current divergence burn-down state
     Status {
@@ -1219,6 +1301,9 @@ enum DivergenceCliCommand {
         /// Governs Deferred expiry; defaults to now
         #[arg(long, value_parser = canon_cli::divergence::parse_timestamp)]
         as_of: Option<DateTime<Utc>>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1232,6 +1317,9 @@ enum InventoryCommand {
         /// Sync exactly one ad hoc root, overriding canon.yaml's specs.roots[]
         #[arg(long)]
         spec_root: Option<PathBuf>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1247,6 +1335,9 @@ enum PluginCommand {
         /// Sync exactly one ad hoc root, overriding canon.yaml's specs.roots[]
         #[arg(long)]
         spec_root: Option<PathBuf>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1289,6 +1380,9 @@ enum ScenarioCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1311,6 +1405,9 @@ enum FeatureCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1350,6 +1447,9 @@ enum ChangeCommand {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1440,6 +1540,9 @@ enum SkillsCommand {
         /// projected to `.agents/skills/canon/`.
         #[arg(long)]
         providers: Option<String>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote.
     Check {
@@ -1451,6 +1554,9 @@ enum SkillsCommand {
         /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install.
         #[arg(long)]
         providers: Option<String>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
     /// Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits.
     Doctor {
@@ -1462,6 +1568,9 @@ enum SkillsCommand {
         /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install.
         #[arg(long)]
         providers: Option<String>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1478,6 +1587,9 @@ enum TierCommand {
         /// Explicit canon.yaml path (overrides --repo resolution)
         #[arg(long)]
         canon_yaml: Option<PathBuf>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1508,19 +1620,19 @@ fn main() -> ExitCode {
     };
     match cli.command {
         Command::Skills { action } => match action {
-            SkillsCommand::Install { source, target, providers } => run_skills_install(source.as_deref(), &target, providers.as_deref()),
-            SkillsCommand::Check { source, target, providers } => run_skills_check(source.as_deref(), &target, providers.as_deref()),
-            SkillsCommand::Doctor { source, target, providers } => run_skills_doctor(source.as_deref(), &target, providers.as_deref()),
+            SkillsCommand::Install { source, target, providers, json } => run_skills_install(source.as_deref(), &target, providers.as_deref(), json),
+            SkillsCommand::Check { source, target, providers, json } => run_skills_check(source.as_deref(), &target, providers.as_deref(), json),
+            SkillsCommand::Doctor { source, target, providers, json } => run_skills_doctor(source.as_deref(), &target, providers.as_deref(), json),
         },
         Command::Tier { action } => match action {
-            TierCommand::Age { dry_run, repo, canon_yaml } => run_tier_age(&repo, canon_yaml.as_deref(), dry_run),
+            TierCommand::Age { dry_run, repo, canon_yaml, json } => run_tier_age(&repo, canon_yaml.as_deref(), dry_run, json),
         },
         Command::Query { kind, since, repo, canon_yaml, json, plugin, change_id, status, domain, include_sensitive } => {
             run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, change_id, status, domain, include_sensitive)
         }
         Command::Export { kind, before, after, out, repo, json, include_sensitive } => ExitCode::from(canon_cli::retention::run_export(&repo, kind, before, after, out.as_deref(), json, include_sensitive)),
         Command::Purge { kind, before, repo, dry_run, json } => ExitCode::from(canon_cli::retention::run_purge(&repo, kind, before, dry_run, json)),
-        Command::Format { check: _, root, repo } => run_fmt(&root, repo.as_deref()),
+        Command::Format { check: _, root, repo, json } => run_fmt(&root, repo.as_deref(), json),
         Command::Context { repo, json } => run_context(&repo, json),
         Command::Status { repo, json } => {
             canon_cli::inventory::refresh_stale_index(&repo, "canon status");
@@ -1542,31 +1654,31 @@ fn main() -> ExitCode {
             PromptCommand::Show { name, version, repo, json } => run_prompt_show(&repo, &name, &version, json),
         },
         Command::Ingest { action } => match action {
-            IngestCommand::Sessions { watch, interval_secs, home, canon_yaml, full, all_workspaces } => run_ingest_sessions(&canon_yaml, home.as_deref(), watch, interval_secs, full, all_workspaces),
+            IngestCommand::Sessions { watch, interval_secs, home, canon_yaml, full, all_workspaces, json } => run_ingest_sessions(&canon_yaml, home.as_deref(), watch, interval_secs, full, all_workspaces, json),
             IngestCommand::Artifacts { watch, interval_secs, repo, json, run } => run_ingest_artifacts(&repo, watch, interval_secs, json, run.as_ref()),
             IngestCommand::Plans { dialect, source, repo, json } => run_ingest_plans(&repo, dialect.as_deref(), source.as_deref(), json),
         },
         Command::Gate { action } => match action {
-            GateCommand::Check { repo, release } => {
+            GateCommand::Check { repo, release, json } => {
                 canon_cli::inventory::refresh_stale_index(&repo, "canon gate check");
-                ExitCode::from(canon_cli::gate::run_check(&repo, release) as u8)
+                ExitCode::from(canon_cli::gate::run_check(&repo, release, json) as u8)
             }
-            GateCommand::Task { task_id, repo } => ExitCode::from(canon_cli::gate::run_task(&repo, &task_id) as u8),
-            GateCommand::Promote { repo, dry_run } => ExitCode::from(canon_cli::gate::run_promote(&repo, dry_run) as u8),
-            GateCommand::InstallHooks { repo, event, matcher, command, timeout } => {
-                ExitCode::from(canon_cli::gate::run_install_hooks(&repo, &event, matcher.as_deref(), &command, timeout) as u8)
+            GateCommand::Task { task_id, repo, json } => ExitCode::from(canon_cli::gate::run_task(&repo, &task_id, json) as u8),
+            GateCommand::Promote { repo, dry_run, json } => ExitCode::from(canon_cli::gate::run_promote(&repo, dry_run, json) as u8),
+            GateCommand::InstallHooks { repo, event, matcher, command, timeout, json } => {
+                ExitCode::from(canon_cli::gate::run_install_hooks(&repo, &event, matcher.as_deref(), &command, timeout, json) as u8)
             }
-            GateCommand::Selftest => ExitCode::from(canon_cli::gate::run_selftest() as u8),
+            GateCommand::Selftest { json } => ExitCode::from(canon_cli::gate::run_selftest(json) as u8),
         },
         Command::Evidence { action } => match action {
             EvidenceCommand::ApprovalPayload {
                 task, project_id, scenario_id, run_id, artifact_sha, surface_ref,
-                approval_by, approval_at, repo,
+                approval_by, approval_at, repo, json,
             } => ExitCode::from(canon_cli::evidence::run_approval_payload(
                 &repo,
                 &canon_cli::evidence::ApprovalPayloadArgs {
                     task_id: task, scenario_id, project_id, run_id, artifact_sha,
-                    surface_ref, approval_by, approval_at,
+                    surface_ref, approval_by, approval_at, json,
                 },
             ) as u8),
             EvidenceCommand::Add {
@@ -1602,6 +1714,7 @@ fn main() -> ExitCode {
                 override_reason,
                 promote,
                 repo,
+                json,
             } => {
                 canon_cli::inventory::refresh_stale_index(&repo, "canon evidence add");
                 ExitCode::from(
@@ -1639,13 +1752,14 @@ fn main() -> ExitCode {
                             drop_reason,
                             override_reason,
                             promote: promote.flag(),
+                            json,
                         },
                     ) as u8,
                 )
             }
-            EvidenceCommand::Vault { max_artifact_mib, repo } => {
+            EvidenceCommand::Vault { max_artifact_mib, repo, json } => {
                 canon_cli::inventory::refresh_stale_index(&repo, "canon evidence vault");
-                ExitCode::from(canon_cli::evidence::run_vault(&repo, max_artifact_mib) as u8)
+                ExitCode::from(canon_cli::evidence::run_vault(&repo, max_artifact_mib, json) as u8)
             }
         },
         Command::Finding { action } => match action {
@@ -1666,6 +1780,7 @@ fn main() -> ExitCode {
                 session_id,
                 promote,
                 repo,
+                json,
             } => ExitCode::from(canon_cli::finding::run_add(
                 &repo,
                 &canon_cli::finding::FindingArgs {
@@ -1684,12 +1799,13 @@ fn main() -> ExitCode {
                     role,
                     session_id,
                     promote: promote.flag(),
+                    json,
                 },
             ) as u8),
-            FindingCommand::Close { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, promote, repo } => {
+            FindingCommand::Close { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, promote, repo, json } => {
                 ExitCode::from(canon_cli::finding::run_close(
                     &repo,
-                    &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, promote: promote.flag() },
+                    &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, promote: promote.flag(), json },
                 ) as u8)
             }
             FindingCommand::List { change_id, open, json, repo } => {
@@ -1715,6 +1831,7 @@ fn main() -> ExitCode {
                 artifacts,
                 max_artifact_mib,
                 repo,
+                json,
             } => {
                 canon_cli::inventory::refresh_stale_index(&repo, "canon review add");
                 ExitCode::from(canon_cli::review::run_add(
@@ -1736,42 +1853,43 @@ fn main() -> ExitCode {
                         reviewer_harness,
                         artifacts,
                         max_artifact_mib,
+                        json,
                     },
                 ) as u8)
             }
         },
         Command::Divergence { action } => match action {
-            DivergenceCliCommand::Stage { project_id, scenario_id, sha, status, reason, expiry, round, reviewer, detail, actor_id, role, promote, repo } => {
+            DivergenceCliCommand::Stage { project_id, scenario_id, sha, status, reason, expiry, round, reviewer, detail, actor_id, role, promote, repo, json } => {
                 match canon_cli::divergence::parse_status(&status, reason.as_deref(), expiry) {
-                    Ok(status) => ExitCode::from(canon_cli::divergence::run_stage(&repo, &project_id, &scenario_id, &sha, status, round, &reviewer, &detail, &actor_id, &role, promote.flag()) as u8),
+                    Ok(status) => ExitCode::from(canon_cli::divergence::run_stage(&repo, &project_id, &scenario_id, &sha, status, round, &reviewer, &detail, &actor_id, &role, promote.flag(), json) as u8),
                     Err(e) => {
-                        ExitCode::from(CliError::refused("DIVERGENCE_INVALID_ARGUMENT", e.to_string()).emit("canon divergence stage", false) as u8)
+                        ExitCode::from(CliError::refused("DIVERGENCE_INVALID_ARGUMENT", e.to_string()).emit("canon divergence stage", json) as u8)
                     }
                 }
             }
-            DivergenceCliCommand::Promote { repo, dry_run } => ExitCode::from(canon_cli::divergence::run_promote(&repo, dry_run) as u8),
-            DivergenceCliCommand::Resolve { project_id, scenario_id, sha, round, reviewer, detail, actor_id, role, repo } => {
-                ExitCode::from(canon_cli::divergence::run_resolve(&repo, &project_id, &scenario_id, &sha, round, &reviewer, &detail, &actor_id, &role) as u8)
+            DivergenceCliCommand::Promote { repo, dry_run, json } => ExitCode::from(canon_cli::divergence::run_promote(&repo, dry_run, json) as u8),
+            DivergenceCliCommand::Resolve { project_id, scenario_id, sha, round, reviewer, detail, actor_id, role, repo, json } => {
+                ExitCode::from(canon_cli::divergence::run_resolve(&repo, &project_id, &scenario_id, &sha, round, &reviewer, &detail, &actor_id, &role, json) as u8)
             }
-            DivergenceCliCommand::Defer { project_id, scenario_id, sha, round, reviewer, reason, expiry, actor_id, role, repo } => {
-                ExitCode::from(canon_cli::divergence::run_defer(&repo, &project_id, &scenario_id, &sha, round, &reviewer, &reason, expiry, &actor_id, &role) as u8)
+            DivergenceCliCommand::Defer { project_id, scenario_id, sha, round, reviewer, reason, expiry, actor_id, role, repo, json } => {
+                ExitCode::from(canon_cli::divergence::run_defer(&repo, &project_id, &scenario_id, &sha, round, &reviewer, &reason, expiry, &actor_id, &role, json) as u8)
             }
-            DivergenceCliCommand::Status { repo, as_of } => ExitCode::from(canon_cli::divergence::run_status(&repo, as_of) as u8),
+            DivergenceCliCommand::Status { repo, as_of, json } => ExitCode::from(canon_cli::divergence::run_status(&repo, as_of, json) as u8),
         },
         Command::Inventory { action } => match action {
-            InventoryCommand::Sync { repo, spec_root } => run_inventory_sync(&repo, spec_root.as_deref()),
+            InventoryCommand::Sync { repo, spec_root, json } => run_inventory_sync(&repo, spec_root.as_deref(), json),
         },
         Command::Plugin { action } => match action {
-            PluginCommand::Sync { plugin_id, repo, spec_root } => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref()),
+            PluginCommand::Sync { plugin_id, repo, spec_root, json } => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref(), json),
         },
         Command::Scenario { action } => match action {
-            ScenarioCommand::New { tag, title, subject, lane, case, flow, change, actor, feature, project, repo } => {
+            ScenarioCommand::New { tag, title, subject, lane, case, flow, change, actor, feature, project, repo, json } => {
                 let flow_tag = match &flow {
                     None => None,
                     Some(flow) => match canon_cli::brief_check::flow_tag_value(&canon_cli::context::resolve_repo_root(&repo), subject.as_ref(), change.as_ref(), flow) {
                         Ok(value) => Some(value),
                         Err(e) => {
-                            return ExitCode::from(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e.to_string()).emit("canon scenario new", false) as u8);
+                            return ExitCode::from(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e.to_string()).emit("canon scenario new", json) as u8);
                         }
                     },
                 };
@@ -1781,11 +1899,11 @@ fn main() -> ExitCode {
                     case: case.as_deref(),
                     flow: flow_tag.as_deref(),
                 };
-                run_scenario_new(&repo, &tag, &title, feature.as_deref(), project.as_ref(), axes, &actor)
+                run_scenario_new(&repo, &tag, &title, feature.as_deref(), project.as_ref(), axes, &actor, json)
             }
         },
         Command::Feature { action } => match action {
-            FeatureCommand::New { surface, title, actor, project, repo } => run_feature_new(&repo, &surface, &title, project.as_ref(), &actor),
+            FeatureCommand::New { surface, title, actor, project, repo, json } => run_feature_new(&repo, &surface, &title, project.as_ref(), &actor, json),
         },
         Command::Subject { action } => match action {
             SubjectCommand::New { id, domain, title, summary, owner_role, actor_id, repo, json } => {
@@ -1798,42 +1916,42 @@ fn main() -> ExitCode {
             }
         },
         Command::Change { action } => match action {
-            ChangeCommand::New { slug, subject, kind, title, repo } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject, kind, &title) as u8),
+            ChangeCommand::New { slug, subject, kind, title, repo, json } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject, kind, &title, json) as u8),
         },
         Command::Brief { action, change, repo, json } => ExitCode::from(match action {
             Some(BriefCommand::Check) => canon_cli::brief_check::run_check(&repo, change.as_ref(), json),
             Some(BriefCommand::Approve { by, note }) => canon_cli::brief_approve::run_approve(&repo, change.as_ref(), &by, &note, json),
             None => canon_cli::brief_check::run_next(&repo, change.as_ref(), json),
         } as u8),
-        Command::Init { repo, check_config, no_agents_md, policy, no_policy, providers, language } => {
+        Command::Init { repo, check_config, no_agents_md, policy, no_policy, providers, language, json } => {
             let policy = (!no_policy).then(|| policy.unwrap_or(canon_cli::policy_level::PolicyLevel::Strict));
             let skills = match providers {
                 Some(list) => canon_cli::init::SkillsChoice::Providers(list),
                 None => canon_cli::init::SkillsChoice::Ask,
             };
-            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy, skills, language })
+            run_init(&repo, check_config, canon_cli::init::InitOptions { agents_md: !no_agents_md, policy, skills, language }, json)
         }
-        Command::Migrate { repo, dry_run } => ExitCode::from(canon_cli::migrate::run(&repo, dry_run) as u8),
+        Command::Migrate { repo, dry_run, json } => ExitCode::from(canon_cli::migrate::run(&repo, dry_run, json) as u8),
         Command::Policy { action } => match action {
-            PolicyCommand::Approve { by, note, repo } => ExitCode::from(canon_cli::policy_approval::run_approve(&repo, &by, note.as_deref()) as u8),
+            PolicyCommand::Approve { by, note, repo, json } => ExitCode::from(canon_cli::policy_approval::run_approve(&repo, &by, note.as_deref(), json) as u8),
         },
         Command::Demo { action } => match action {
-            DemoCommand::Init { repo } => ExitCode::from(canon_cli::demo::run_demo_init(&repo) as u8),
-            DemoCommand::Attest { repo } => ExitCode::from(canon_cli::demo::run_demo_attest(&repo) as u8),
+            DemoCommand::Init { repo, json } => ExitCode::from(canon_cli::demo::run_demo_init(&repo, json) as u8),
+            DemoCommand::Attest { repo, json } => ExitCode::from(canon_cli::demo::run_demo_attest(&repo, json) as u8),
         },
         Command::Retrieve { role, regime, domain, subject, k, repo, json } => run_retrieve(&repo, &role, regime.as_ref(), domain.as_deref(), subject.as_ref(), k, json),
-        Command::Report { repo, check, snapshot } => run_report(&repo, check, snapshot.as_deref()),
-        Command::Dashboard { repo, snapshot, port } => run_dashboard(&repo, snapshot.as_deref(), port),
-        Command::RegimeKey { role, repo, area, hash } => run_regime_key(&role, &repo, &area, &hash),
+        Command::Report { repo, check, snapshot, json } => run_report(&repo, check, snapshot.as_deref(), json),
+        Command::Dashboard { repo, snapshot, port, json } => run_dashboard(&repo, snapshot.as_deref(), port, json),
+        Command::RegimeKey { role, repo, area, hash, json } => run_regime_key(&role, &repo, &area, &hash, json),
         Command::Learn { action } => match action {
-            LearnCommand::Promote { strategy_id, repo, evaluation, approval, signature, dry_run } =>
-                canon_cli::learn::run_promote_with_evidence(&repo, &strategy_id, dry_run, evaluation.as_deref(), approval.as_deref(), signature.as_deref()),
+            LearnCommand::Promote { strategy_id, repo, evaluation, approval, signature, dry_run, json } =>
+                canon_cli::learn::run_promote_with_evidence(&repo, &strategy_id, dry_run, evaluation.as_deref(), approval.as_deref(), signature.as_deref(), json),
             LearnCommand::Approve { strategy_id, evaluation, principal, repo, json } =>
                 canon_cli::learn::run_approve(&repo, &strategy_id, &evaluation, &principal, json),
             LearnCommand::Request { strategy_id, evaluation, principal, repo, json } =>
                 canon_cli::learn::run_request(&repo, &strategy_id, &evaluation, &principal, json),
-            LearnCommand::Rollback { strategy_id, reason, actor, signature_file, approved_at, contradicting_trajectory_id, repo } =>
-                canon_cli::learn::run_rollback(&repo, &strategy_id, &reason, &actor, contradicting_trajectory_id.as_deref(), &signature_file, &approved_at),
+            LearnCommand::Rollback { strategy_id, reason, actor, signature_file, approved_at, contradicting_trajectory_id, repo, json } =>
+                canon_cli::learn::run_rollback(&repo, &strategy_id, &reason, &actor, contradicting_trajectory_id.as_deref(), &signature_file, &approved_at, json),
         },
         Command::Dispatch { action } => match action {
             DispatchCommand::Begin { role, regime, agent_id, provider, model, skill_id, skill_digest, context_manifest, prompt_bundle, task, parent_run, repo, json } => {
@@ -1856,18 +1974,22 @@ fn main() -> ExitCode {
     }
 }
 
-fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>) -> ExitCode {
+fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>, json: bool) -> ExitCode {
     let source = canon_cli::skills::resolve_source(source);
     if !source.join("SKILL.src.md").is_file() {
         return match canon_cli::skills::install(&source, target) {
             Ok(report) => {
                 for skill in &report.installed {
                     let status = if skill.changed { "installed" } else { "unchanged" };
-                    println!("{} v{} — {}", skill.name, skill.version, status);
+                    canon_cli::say!(json, "{} v{} — {}", skill.name, skill.version, status);
+                }
+                if json {
+                    let skills: Vec<_> = report.installed.iter().map(|s| serde_json::json!({ "name": s.name, "version": s.version, "changed": s.changed })).collect();
+                    canon_cli::json_out::data("skills install", serde_json::json!({ "skills": skills }));
                 }
                 ExitCode::SUCCESS
             }
-            Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills install", false) as u8) }
+            Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills install", json) as u8) }
         };
     }
     match canon_cli::skills::install_canonical(&source, target, providers) {
@@ -1877,59 +1999,99 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
             if report.providers.is_empty() {
                 let hint = if report.origin == canon_cli::skills::ProviderOrigin::Detected { format!("; {}", canon_cli::skills::CHOOSE_PROVIDERS) } else { String::new() };
                 let lock = if report.changed { "; install lock rewritten" } else { "" };
-                println!("canon v1 — nothing installed: no provider selected ({}){lock}{hint}", selection.describe());
+                canon_cli::say!(json, "canon v1 — nothing installed: no provider selected ({}){lock}{hint}", selection.describe());
             } else if report.origin == canon_cli::skills::ProviderOrigin::Flag {
-                println!("canon v1 — {status} ({})", selection.names());
+                canon_cli::say!(json, "canon v1 — {status} ({})", selection.names());
             } else {
-                println!("canon v1 — {status} ({}; {})", selection.names(), selection.describe());
+                canon_cli::say!(json, "canon v1 — {status} ({}; {})", selection.names(), selection.describe());
             }
             if let Some(path) = &report.config_written {
-                println!("canon skills install: wrote `skills: {{ providers: [{}] }}` to {}", report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "), path.display());
+                canon_cli::say!(json, "canon skills install: wrote `skills: {{ providers: [{}] }}` to {}", report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "), path.display());
             }
-            for line in canon_cli::skills::owned_paths_lines(&report.providers) {
-                println!("{line}");
+            let owned = canon_cli::skills::owned_paths_lines(&report.providers);
+            for line in &owned {
+                canon_cli::say!(json, "{line}");
+            }
+            if json {
+                canon_cli::json_out::data(
+                    "skills install",
+                    serde_json::json!({
+                        "providers": report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
+                        "selection": selection.describe(),
+                        "changed": report.changed,
+                        "configWritten": report.config_written.as_ref().map(|p| p.display().to_string()),
+                        "ownedPaths": owned,
+                    }),
+                );
             }
             ExitCode::SUCCESS
         }
-        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills install", false) as u8) }
+        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills install", json) as u8) }
     }
 }
 
-fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>) -> ExitCode {
+fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>, json: bool) -> ExitCode {
     let source = canon_cli::skills::resolve_source(source);
     match canon_cli::skills::check(&source, target, providers) {
         Ok(report) => {
+            let selection = canon_cli::skills::ProviderSelection { providers: report.providers.clone(), origin: report.origin };
             if report.origin != canon_cli::skills::ProviderOrigin::Flag {
-                let selection = canon_cli::skills::ProviderSelection { providers: report.providers.clone(), origin: report.origin };
                 let hint = if report.providers.is_empty() && report.origin == canon_cli::skills::ProviderOrigin::Detected { format!("; {}", canon_cli::skills::CHOOSE_PROVIDERS) } else { String::new() };
-                println!("providers: {} ({}){hint}", selection.names(), selection.describe());
+                canon_cli::say!(json, "providers: {} ({}){hint}", selection.names(), selection.describe());
             }
-            for status in &report.statuses { println!("{} — {} ({})", status.path.display(), status.state, status.provider.as_str()); }
-            for remnant in &report.remnants { println!("{} — legacy-remnant (codex reads .agents/skills; fix: `{}`)", remnant.display(), canon_cli::skills::install_command(&report.providers)); }
-            if let Some(outdated) = &report.outdated { println!("{} — outdated ({})", outdated.path.display(), outdated.describe(&report.providers)); }
-            if report.manifest_ok && report.remnants.is_empty() && report.outdated.is_none() && report.statuses.iter().all(|status| status.state == "ok") { ExitCode::SUCCESS } else { ExitCode::from(1) }
+            for status in &report.statuses { canon_cli::say!(json, "{} — {} ({})", status.path.display(), status.state, status.provider.as_str()); }
+            for remnant in &report.remnants { canon_cli::say!(json, "{} — legacy-remnant (codex reads .agents/skills; fix: `{}`)", remnant.display(), canon_cli::skills::install_command(&report.providers)); }
+            if let Some(outdated) = &report.outdated { canon_cli::say!(json, "{} — outdated ({})", outdated.path.display(), outdated.describe(&report.providers)); }
+            let clean = report.manifest_ok && report.remnants.is_empty() && report.outdated.is_none() && report.statuses.iter().all(|status| status.state == "ok");
+            let data = serde_json::json!({
+                "clean": clean,
+                "providers": report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
+                "selection": selection.describe(),
+                "manifestOk": report.manifest_ok,
+                "statuses": report.statuses.iter().map(|s| serde_json::json!({ "path": s.path.display().to_string(), "state": s.state, "provider": s.provider.as_str() })).collect::<Vec<_>>(),
+                "remnants": report.remnants.iter().map(|r| r.display().to_string()).collect::<Vec<_>>(),
+                "outdated": report.outdated.as_ref().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "installedBy": o.installed_by, "message": o.describe(&report.providers) })),
+            });
+            if clean {
+                if json {
+                    canon_cli::json_out::data("skills check", data);
+                }
+                ExitCode::SUCCESS
+            } else {
+                let fix = canon_cli::skills::install_command(&report.providers);
+                ExitCode::from(CliError::failed("SKILLS_DRIFT", "an installed skill is missing, stale, a legacy remnant, or written by another canon version").hint(format!("run `{fix}`")).emit_with_data("canon skills check", json, data) as u8)
+            }
         }
-        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills check", false) as u8) }
+        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills check", json) as u8) }
     }
 }
 
-fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>) -> ExitCode {
+fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>, json: bool) -> ExitCode {
     let source = canon_cli::skills::resolve_source(source);
     match canon_cli::skills::doctor(&source, target, providers) {
-        Ok(lines) => { for line in lines { println!("{line}"); } ExitCode::SUCCESS }
-        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills doctor", false) as u8) }
+        Ok(lines) => {
+            for line in &lines { canon_cli::say!(json, "{line}"); }
+            if json {
+                canon_cli::json_out::data("skills doctor", serde_json::json!({ "lines": lines }));
+            }
+            ExitCode::SUCCESS
+        }
+        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).emit("canon skills doctor", json) as u8) }
     }
 }
 
-fn run_tier_age(repo: &std::path::Path, canon_yaml: Option<&std::path::Path>, dry_run: bool) -> ExitCode {
+fn run_tier_age(repo: &std::path::Path, canon_yaml: Option<&std::path::Path>, dry_run: bool, json: bool) -> ExitCode {
     let canon_yaml_path = canon_cli::context::resolve_canon_yaml(repo, canon_yaml);
     match canon_cli::tier::run(&canon_yaml_path, dry_run) {
         Ok(reports) => {
-            print!("{}", canon_cli::tier::format_report(&reports, dry_run));
+            canon_cli::say_raw!(json, "{}", canon_cli::tier::format_report(&reports, dry_run));
+            if json {
+                canon_cli::json_out::data("tier age", canon_cli::tier::format_json(&reports, dry_run));
+            }
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::failed("TIER_FAILED", err.to_string()).emit("canon tier age", false) as u8)
+            ExitCode::from(CliError::failed("TIER_FAILED", err.to_string()).emit("canon tier age", json) as u8)
         }
     }
 }
@@ -2018,14 +2180,23 @@ fn run_query(
 /// Some(r)` resolves the corpus actually checked as
 /// `resolve_repo_root(r).join(root)` -- `root` stays the corpus-relative
 /// suffix, `--repo` supplies the base.
-fn run_fmt(root: &std::path::Path, repo: Option<&std::path::Path>) -> ExitCode {
+fn run_fmt(root: &std::path::Path, repo: Option<&std::path::Path>, json: bool) -> ExitCode {
     let resolved_root = match repo {
         Some(r) => canon_cli::context::resolve_repo_root(r).join(root),
         None => root.to_path_buf(),
     };
     let report = canon_cli::fmt::run(&resolved_root);
-    print!("{}", canon_cli::fmt::format_human(&report));
-    if report.is_clean() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+    canon_cli::say_raw!(json, "{}", canon_cli::fmt::format_human(&report));
+    let data = canon_cli::fmt::format_json(&report);
+    if report.is_clean() {
+        if json {
+            canon_cli::json_out::data("format", data);
+        }
+        ExitCode::SUCCESS
+    } else {
+        let error = CliError::failed("FORMAT_VIOLATIONS", format!("{} violation(s) in {} checked file(s)", report.violations.len(), report.files_checked)).hint("fix each violation named in data.violations, then run `canon format` again");
+        ExitCode::from(error.emit_with_data("canon format", json, data) as u8)
+    }
 }
 
 /// `canon inventory sync [--spec-root <dir>]` (s15 P3a): mirrors `canon
@@ -2036,14 +2207,23 @@ fn run_fmt(root: &std::path::Path, repo: Option<&std::path::Path>) -> ExitCode {
 /// mirrors `canon review add`/`canon divergence stage`'s own refused-
 /// invocation exit code), `0` otherwise (including the common
 /// zero-writes no-op re-sync case).
-fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path>) -> ExitCode {
+fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path>, json: bool) -> ExitCode {
     match canon_cli::inventory::run_sync(repo, spec_root) {
         Ok(outcome) => {
-            print!("{}", canon_cli::inventory::format_human(&outcome));
-            if outcome.is_clean() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+            canon_cli::say_raw!(json, "{}", canon_cli::inventory::format_human(&outcome));
+            let data = canon_cli::inventory::format_json(&outcome);
+            if outcome.is_clean() {
+                if json {
+                    canon_cli::json_out::data("inventory sync", data);
+                }
+                ExitCode::SUCCESS
+            } else {
+                let error = CliError::failed("INVENTORY_ABORTED", "a spec root was aborted on violations or duplicate scenarios; nothing was written for it").hint("data.roots names each violation; fix them, then run `canon inventory sync` again");
+                ExitCode::from(error.emit_with_data("canon inventory sync", json, data) as u8)
+            }
         }
         Err(err) => {
-            ExitCode::from(CliError::refused("INVENTORY_FAILED", err.to_string()).emit("canon inventory sync", false) as u8)
+            ExitCode::from(CliError::refused("INVENTORY_FAILED", err.to_string()).emit("canon inventory sync", json) as u8)
         }
     }
 }
@@ -2056,14 +2236,23 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
 /// failed for some candidate (`outcome.is_clean()` false), `0`
 /// otherwise (including the common zero-new-writes idempotent re-sync
 /// case).
-fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&std::path::Path>) -> ExitCode {
+fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&std::path::Path>, json: bool) -> ExitCode {
     match canon_cli::plugin_sync::run_sync(repo, plugin_id, spec_root) {
         Ok(outcome) => {
-            print!("{}", canon_cli::plugin_sync::format_human(&outcome));
-            if outcome.is_clean() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+            canon_cli::say_raw!(json, "{}", canon_cli::plugin_sync::format_human(&outcome));
+            let data = canon_cli::plugin_sync::format_json(&outcome);
+            if outcome.is_clean() {
+                if json {
+                    canon_cli::json_out::data("plugin sync", data);
+                }
+                ExitCode::SUCCESS
+            } else {
+                let error = CliError::failed("PLUGIN_SYNC_ERRORS", "some candidates could not be written").hint("data.roots names each error");
+                ExitCode::from(error.emit_with_data("canon plugin sync", json, data) as u8)
+            }
         }
         Err(err) => {
-            ExitCode::from(CliError::refused("PLUGIN_SYNC_FAILED", err.to_string()).emit("canon plugin sync", false) as u8)
+            ExitCode::from(CliError::refused("PLUGIN_SYNC_FAILED", err.to_string()).emit("canon plugin sync", json) as u8)
         }
     }
 }
@@ -2087,12 +2276,13 @@ fn run_scenario_new(
     project: Option<&ProjectId>,
     axes: canon_cli::scaffold::ScenarioAxes<'_>,
     actor_id: &str,
+    json: bool,
 ) -> ExitCode {
     let resolved = canon_cli::context::resolve_repo_root(repo);
     for (axis, value) in [("lane", axes.lane), ("case", axes.case)] {
         if let Some(value) = value {
             if let Some(violation) = canon_cli::subject::enum_membership_violation(&resolved, axis, value) {
-                return ExitCode::from(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", violation.to_string()).emit("canon scenario new", false) as u8);
+                return ExitCode::from(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", violation.to_string()).emit("canon scenario new", json) as u8);
             }
         }
     }
@@ -2108,6 +2298,7 @@ fn run_scenario_new(
             axes,
             &actor,
             at,
+            json,
         ) as u8,
     )
 }
@@ -2119,10 +2310,10 @@ fn run_scenario_new(
 /// `--project` rules can't pin down, or an already-existing target
 /// file), `0` on a fresh file
 /// written.
-fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, project: Option<&ProjectId>, actor_id: &str) -> ExitCode {
+fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, project: Option<&ProjectId>, actor_id: &str, json: bool) -> ExitCode {
     let at = Utc::now().with_nanosecond(0).expect("0 is a valid nanosecond");
     let actor = Actor::new_unattributed(actor_id);
-    ExitCode::from(canon_cli::scaffold::run_feature_new(repo, surface, title, project, &actor, at) as u8)
+    ExitCode::from(canon_cli::scaffold::run_feature_new(repo, surface, title, project, &actor, at, json) as u8)
 }
 
 /// `canon init [--repo <dir>] [--no-agents-md] [--policy <level> | --no-policy]` / `canon
@@ -2133,8 +2324,8 @@ fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, p
 /// READ-ONLY validates an existing config instead (`2` on a missing
 /// file, `0` when every present section parses clean, `1` when a
 /// present section fails).
-fn run_init(repo: &std::path::Path, check_config: bool, options: canon_cli::init::InitOptions) -> ExitCode {
-    let code = if check_config { canon_cli::init::run_check_config(repo) } else { canon_cli::init::run_init(repo, options) };
+fn run_init(repo: &std::path::Path, check_config: bool, options: canon_cli::init::InitOptions, json: bool) -> ExitCode {
+    let code = if check_config { canon_cli::init::run_check_config(repo, json) } else { canon_cli::init::run_init(repo, options, json) };
     ExitCode::from(code as u8)
 }
 
@@ -2175,7 +2366,7 @@ fn run_adapter_validate(response: &std::path::Path, repo: Option<&std::path::Pat
         match serde_json::to_string_pretty(&summary) {
             Ok(output) => println!("{output}"),
             Err(error) => {
-                return ExitCode::from(CliError::failed("SERIALIZE_FAILED", format!("cannot render summary: {error}")).emit("canon adapter validate", false) as u8);
+                return ExitCode::from(CliError::failed("SERIALIZE_FAILED", format!("cannot render summary: {error}")).emit("canon adapter validate", json) as u8);
             }
         }
     } else {
@@ -2206,8 +2397,16 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
             return ExitCode::from(CliError::failed("ADAPTER_REFUSED", error.to_string()).emit("canon adapter authorize", json) as u8);
         }
     };
-    if json {
+    if json && result.execution_authorized {
         println!("{}", serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".into()));
+    } else if json {
+        // One document: the result keeps its own fields and gains the shared `error`.
+        let error = CliError::failed("ADAPTER_EXECUTION_NOT_AUTHORIZED", "execution_not_authorized");
+        eprintln!("{}", error.human("canon adapter authorize"));
+        let mut body = serde_json::to_value(&result).unwrap_or_else(|_| serde_json::json!({}));
+        body["error"] = error.to_json()["error"].clone();
+        println!("{}", serde_json::to_string_pretty(&body).unwrap_or_else(|_| "{}".into()));
+        return ExitCode::from(error.exit as u8);
     } else {
         println!("execution_authorized: {}", result.execution_authorized);
         println!("execution_performed: false");
@@ -2325,19 +2524,24 @@ fn run_prompt_show(repo: &std::path::Path, name: &str, version: &str, json: bool
     }
 }
 
-fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Path>, watch: bool, interval_secs: u64, full: bool, all_workspaces: bool) -> ExitCode {
+fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Path>, watch: bool, interval_secs: u64, full: bool, all_workspaces: bool, json: bool) -> ExitCode {
     let home = match home {
         Some(h) => h.to_path_buf(),
         None => match std::env::var_os("HOME") {
             Some(h) => PathBuf::from(h),
             None => {
-                return ExitCode::from(CliError::failed("INGEST_FAILED", "no `--home` given and $HOME is unset").emit("canon ingest sessions", false) as u8);
+                return ExitCode::from(CliError::failed("INGEST_FAILED", "no `--home` given and $HOME is unset").emit("canon ingest sessions", json) as u8);
             }
         },
     };
 
     loop {
         match canon_cli::ingest::run(canon_yaml, &home, true, full, all_workspaces) {
+            Ok(outcome) if json => {
+                // One document per pass (one per poll under `--watch`); the human summary goes to stderr.
+                eprint!("{}", canon_cli::ingest::format_human(&outcome));
+                canon_cli::json_out::data("ingest sessions", canon_cli::ingest::summary_json(&outcome));
+            }
             Ok(outcome) => {
                 print!("{}", canon_cli::ingest::format_human(&outcome));
                 // The documented JSON fallback (`canon_cli::ingest`'s
@@ -2357,7 +2561,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
                 }
             }
             Err(err) => {
-                return ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).emit("canon ingest sessions", false) as u8);
+                return ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).emit("canon ingest sessions", json) as u8);
             }
         }
         if !watch {
@@ -2420,7 +2624,12 @@ fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Optio
     match canon_cli::plans::run(repo, dialect, source) {
         Ok(outcome) => {
             if json {
-                println!("{}", canon_cli::plans::format_json(&outcome));
+                let mut body: serde_json::Value = serde_json::from_str(&canon_cli::plans::format_json(&outcome)).expect("plans JSON is one value");
+                if !outcome.non_clean_sources.is_empty() {
+                    // The failure keeps this command's own shape and gains the shared `error`.
+                    body["error"] = CliError::failed("INGEST_SOURCE_UNUSABLE", "a plan source was malformed and persisted nothing").to_json()["error"].clone();
+                }
+                println!("{body}");
             } else {
                 print!("{}", canon_cli::plans::format_human(&outcome));
                 if let Some(body) = canon_cli::plans::format_unwritten_json(&outcome) {
@@ -2479,14 +2688,18 @@ fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option<&RegimeKey
 /// can still produce — see its doc) reports to stderr and exits `2`
 /// with nothing on stdout, so the hook's own `|| exit 0` degrades it to
 /// a silent no-op rather than passing a malformed `--regime` on.
-fn run_regime_key(role: &str, repo: &str, area: &str, hash: &str) -> ExitCode {
+fn run_regime_key(role: &str, repo: &str, area: &str, hash: &str, json: bool) -> ExitCode {
     match RegimeKey::parse(regime_key(role, repo, area, hash)) {
         Ok(valid) => {
-            println!("{}", valid.as_str());
+            if json {
+                canon_cli::json_out::data("regime-key", serde_json::json!({ "regimeKey": valid.as_str() }));
+            } else {
+                println!("{}", valid.as_str());
+            }
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::refused("REGIME_KEY_INVALID", err.to_string()).emit("canon regime-key", false) as u8)
+            ExitCode::from(CliError::refused("REGIME_KEY_INVALID", err.to_string()).emit("canon regime-key", json) as u8)
         }
     }
 }
@@ -2509,14 +2722,14 @@ fn run_regime_key(role: &str, repo: &str, area: &str, hash: &str) -> ExitCode {
 /// derivation the written report's own `## Kinds not read directly`
 /// section reads, so the two can never disagree; silent for a repo
 /// with nothing routed to a backend that is not read directly.
-fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::path::Path>) -> ExitCode {
+fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::path::Path>, json: bool) -> ExitCode {
     // A present but unusable `canon.yaml` is a usage error (exit 2),
     // the same refusal `canon gate check` makes — never a report of
     // the default ledger.
     let (repo, inputs) = match canon_cli::report::resolve_inputs(repo) {
         Ok(resolved) => resolved,
         Err(err) => {
-            return ExitCode::from(CliError::refused("CONFIG_UNREADABLE", err.to_string()).emit("canon report", false) as u8);
+            return ExitCode::from(CliError::refused("CONFIG_UNREADABLE", err.to_string()).emit("canon report", json) as u8);
         }
     };
 
@@ -2528,11 +2741,15 @@ fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::pa
     if let Some(dir) = snapshot_dir {
         return match canon_report::snapshot(&inputs, dir) {
             Ok(manifest) => {
-                println!("canon report --snapshot: wrote {} table(s) to {}", manifest.tables.len(), dir.display());
+                canon_cli::say!(json, "canon report --snapshot: wrote {} table(s) to {}", manifest.tables.len(), dir.display());
+                if json {
+                    let tables: Vec<_> = manifest.tables.iter().map(|t| serde_json::json!({ "table": t.table, "file": t.file })).collect();
+                    canon_cli::json_out::data("report", serde_json::json!({ "mode": "snapshot", "directory": dir.display().to_string(), "tables": tables }));
+                }
                 ExitCode::SUCCESS
             }
             Err(err) => {
-                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).emit("canon report --snapshot", false) as u8)
+                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).emit("canon report --snapshot", json) as u8)
             }
         };
     }
@@ -2543,21 +2760,38 @@ fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::pa
         return match canon_report::check_report(&inputs, &report_path) {
             Ok(outcome) => {
                 eprintln!("{}", outcome.message(&report_path));
-                ExitCode::from(outcome.exit_code() as u8)
+                let state = match outcome {
+                    canon_report::CheckOutcome::NoDrift => "fresh",
+                    canon_report::CheckOutcome::Missing => "missing",
+                    canon_report::CheckOutcome::Drift => "drift",
+                };
+                let data = serde_json::json!({ "mode": "check", "state": state, "report": report_path.display().to_string() });
+                if outcome.exit_code() == 0 {
+                    if json {
+                        canon_cli::json_out::data("report", data);
+                    }
+                    ExitCode::SUCCESS
+                } else {
+                    let error = CliError::failed("REPORT_STALE", format!("the report is {state}")).hint("regenerate it with `canon report`");
+                    ExitCode::from(error.with_exit(outcome.exit_code()).emit_with_data("canon report --check", json, data) as u8)
+                }
             }
             Err(err) => {
-                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).emit("canon report --check", false) as u8)
+                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).emit("canon report --check", json) as u8)
             }
         };
     }
 
     match canon_report::write_report(&inputs, &report_path) {
         Ok(_content) => {
-            println!("canon report: wrote {}", report_path.display());
+            canon_cli::say!(json, "canon report: wrote {}", report_path.display());
+            if json {
+                canon_cli::json_out::data("report", serde_json::json!({ "mode": "write", "report": report_path.display().to_string() }));
+            }
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).emit("canon report", false) as u8)
+            ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).emit("canon report", json) as u8)
         }
     }
 }
@@ -2568,12 +2802,19 @@ fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::pa
 /// forever — this subcommand never returns on success; the process exits
 /// only via the standard SIGINT/SIGTERM default handler (no signal
 /// handling installed, matching every other local dev-server tool).
-fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path::Path>, port: u16) -> ExitCode {
+fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path::Path>, port: u16, json: bool) -> ExitCode {
     match canon_cli::dashboard::prepare(repo, snapshot, port) {
         Ok(bound) => {
-            println!("canon dashboard: app       = {}", bound.dist_dir.display());
-            println!("canon dashboard: snapshot  = {}", bound.snapshot_dir.display());
-            println!("canon dashboard: serving {}", bound.url());
+            canon_cli::say!(json, "canon dashboard: app       = {}", bound.dist_dir.display());
+            canon_cli::say!(json, "canon dashboard: snapshot  = {}", bound.snapshot_dir.display());
+            canon_cli::say!(json, "canon dashboard: serving {}", bound.url());
+            if json {
+                // The one document: where it serves. The server then runs until the process is stopped.
+                canon_cli::json_out::data(
+                    "dashboard",
+                    serde_json::json!({ "url": bound.url(), "app": bound.dist_dir.display().to_string(), "snapshot": bound.snapshot_dir.display().to_string() }),
+                );
+            }
             bound.serve_forever();
             ExitCode::SUCCESS
         }
@@ -2582,7 +2823,7 @@ fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path::Path>, por
                 canon_cli::dashboard::DashboardError::Config(_) => CliError::refused("DASHBOARD_CONFIG_INVALID", err.to_string()),
                 _ => CliError::failed("DASHBOARD_FAILED", err.to_string()),
             };
-            ExitCode::from(error.emit("canon dashboard", false) as u8)
+            ExitCode::from(error.emit("canon dashboard", json) as u8)
         }
     }
 }

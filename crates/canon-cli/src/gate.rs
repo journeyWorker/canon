@@ -109,12 +109,12 @@ use crate::context::resolve_repo_root;
 /// `--release` is given — `canon_gate::dispatch`'s own module doc: the
 /// dispatcher never drops `TrustLadderCheck` when a release profile is
 /// engaged) and runs it over the resolved repo's `GateContext`.
-pub fn run_check(repo: &Path, release: bool) -> i32 {
+pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon gate check", false);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon gate check", json);
         }
     };
     let registry = SchemaRegistry::load();
@@ -127,7 +127,7 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     let mut gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon gate check", false);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon gate check", json);
         }
     };
     crate::inventory::resolve_legacy_pins(&mut gate_context);
@@ -137,25 +137,65 @@ pub fn run_check(repo: &Path, release: bool) -> i32 {
     // exist (0.16 M6): fail closed, one violation per unrefreshable root.
     let unrefreshable = crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation(""));
     let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).collect());
-    print!("{}", format_gate_report(&report));
+    let mut advisories: Vec<serde_json::Value> = Vec::new();
+    let advisory = |kind: &str, message: String, items: Vec<String>| serde_json::json!({ "kind": kind, "message": message, "items": items });
+    crate::say_raw!(json, "{}", format_gate_report(&report));
     if let Some(count) = canon_gate::spec_coverage::coverage_off_scenarios(&gate_context) {
-        print!("{}", format_coverage_off_advisory(count));
+        crate::say_raw!(json, "{}", format_coverage_off_advisory(count));
+        advisories.push(advisory("spec_coverage_off", format!("{count} scenario(s) are not checked for evidence; see .canon/policy.yaml"), Vec::new()));
     }
     if let Some(line) = crate::policy_approval::advisory(&repo) {
-        print!("\nadvisory: {line}\n");
+        crate::say_raw!(json, "\nadvisory: {line}\n");
+        advisories.push(advisory("policy_approval", line, Vec::new()));
     }
     if let Some(summary) = canon_gate::binding_summary(&gate_context) {
-        print!("{}", format_binding_summary(&summary));
+        crate::say_raw!(json, "{}", format_binding_summary(&summary));
+        let gaps = if summary.mode == canon_gate::BindingMode::Warn {
+            summary.gaps.iter().map(|gap| format!("{} — {}", gap.scenario_id.as_str(), gap.detail())).collect()
+        } else {
+            Vec::new()
+        };
+        advisories.push(advisory("evidence_binding", format!("experimental evidence binding, requires {}", summary.required.as_str()), gaps));
     }
-    if let Some(advisories) = canon_gate::review_advisories(&gate_context) {
-        print!("{}", format_review_advisories(&advisories));
+    if let Some(review) = canon_gate::review_advisories(&gate_context) {
+        crate::say_raw!(json, "{}", format_review_advisories(&review));
+        if !review.is_empty() {
+            advisories.push(advisory("review_waivers", format!("{} waived review gap(s) — not failing the gate", review.len()), review.iter().map(|a| a.line()).collect()));
+        }
     }
     if let Some(counts) = canon_gate::review_gate::legacy_review_advisory(&gate_context) {
-        print!("\nadvisory: {}\n", counts.note());
+        crate::say_raw!(json, "\nadvisory: {}\n", counts.note());
+        advisories.push(advisory("legacy_review", counts.note().to_string(), Vec::new()));
     }
-    print!("{}", format_brief_overrides(&crate::brief::override_lines(&gate_context)));
-    print!("{}", format_unstored_attachments(&canon_gate::unstored_attachments(&gate_context)));
-    report.exit_code()
+    let overrides = crate::brief::override_lines(&gate_context);
+    crate::say_raw!(json, "{}", format_brief_overrides(&overrides));
+    if !overrides.is_empty() {
+        advisories.push(advisory("brief_overrides", format!("{} evidence record(s) attested before their brief was approved — not failing the gate", overrides.len()), overrides));
+    }
+    let unstored = canon_gate::unstored_attachments(&gate_context);
+    crate::say_raw!(json, "{}", format_unstored_attachments(&unstored));
+    if !unstored.is_empty() {
+        advisories.push(advisory(
+            "unstored_attachments",
+            format!("{} bound file(s) not in the artifact store; run `canon evidence vault` to store them", unstored.len()),
+            unstored.iter().map(|a| a.line()).collect(),
+        ));
+    }
+    let violations: Vec<serde_json::Value> = report
+        .violations
+        .iter()
+        .map(|v| serde_json::json!({ "class": v.class.as_str(), "subject": v.subject, "message": v.detail, "line": v.line() }))
+        .collect();
+    let data = serde_json::json!({ "clean": report.is_clean(), "violations": violations, "advisories": advisories });
+    if report.is_clean() {
+        if json {
+            crate::json_out::data("gate check", data);
+        }
+        return 0;
+    }
+    CliError::failed("GATE_VIOLATIONS", format!("{} violation(s)", report.violations.len()))
+        .hint("fix each violation named in data.violations, then run `canon gate check` again")
+        .emit_with_data("canon gate check", json, data)
 }
 
 /// The one-line advisory (0.14 D3) printed when the spec corpus has
@@ -337,12 +377,12 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
 /// the evidence decision — so an already-done row is a success no-op and
 /// a missing row is a gate-red "no matching row" regardless of what the
 /// evidence says (the pre-s35 precedence, preserved).
-pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
+pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let task_id = match TaskId::parse(task_id_str) {
         Ok(t) => t,
         Err(e) => {
-            return CliError::refused("GATE_TASK_INVALID_ARGUMENT", e.to_string()).emit("canon gate task", false);
+            return CliError::refused("GATE_TASK_INVALID_ARGUMENT", e.to_string()).emit("canon gate task", json);
         }
     };
 
@@ -354,21 +394,21 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
     let LocatedTask { write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
         Ok(located) => located,
         Err(e) => {
-            return CliError::refused("TASK_NOT_FOUND", e.to_string()).emit("canon gate task", false);
+            return CliError::refused("TASK_NOT_FOUND", e.to_string()).emit("canon gate task", json);
         }
     };
 
     let document = match std::fs::read_to_string(&document_path) {
         Ok(d) => d,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", format!("cannot read {}: {e}", document_path.display())).emit("canon gate task", false);
+            return CliError::refused("REPO_UNREADABLE", format!("cannot read {}: {e}", document_path.display())).emit("canon gate task", json);
         }
     };
 
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon gate task", false);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon gate task", json);
         }
     };
     let registry = SchemaRegistry::load();
@@ -379,14 +419,14 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
     let gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon gate task", false);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon gate task", json);
         }
     };
 
     let raw_records = match GitTier::new(gate_context.ctx.ledger_root.clone()).read(&TierQuery::kind(RecordKind::EvidenceRecord)) {
         Ok(read) => read.records,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon gate task", false);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon gate task", json);
         }
     };
 
@@ -403,7 +443,7 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
         Ok(Some(atom)) => match typed_path_evidence(&repo, &atom, &raw_records, &task_id) {
             Ok(pair) => pair,
             Err(e) => {
-                return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).emit("canon gate task", false);
+                return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).emit("canon gate task", json);
             }
         },
         Ok(None) => {
@@ -411,13 +451,13 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
             let notes = match notes_of(same_task_id, &task_id) {
                 Ok(n) => n,
                 Err(e) => {
-                    return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).emit("canon gate task", false);
+                    return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).emit("canon gate task", json);
                 }
             };
             (gate_context.evidence.clone(), notes)
         }
         Err(e) => {
-            return CliError::refused("TYPED_ATOMS_INVALID", e.to_string()).emit("canon gate task", false);
+            return CliError::refused("TYPED_ATOMS_INVALID", e.to_string()).emit("canon gate task", json);
         }
     };
 
@@ -436,7 +476,7 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
     let flip = match write_back.flip_task(&document, &task_id, approved_note.as_deref().unwrap_or("")) {
         Ok(o) => o,
         Err(e @ WriteBackError::RowNotFound(_)) => {
-            return CliError::failed("TASK_ROW_NOT_FOUND", e.to_string()).emit("canon gate task", false);
+            return CliError::failed("TASK_ROW_NOT_FOUND", e.to_string()).emit("canon gate task", json);
         }
         // Gate-red, not usage (the variant's own doc): the offending
         // text came from an already-COMMITTED ledger record's approved
@@ -447,10 +487,10 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
         // authored some other way still cannot forge a second checked
         // row.
         Err(e @ WriteBackError::MultiLineEvidenceNote { .. }) => {
-            return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).emit("canon gate task", false);
+            return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).emit("canon gate task", json);
         }
         Err(e @ WriteBackError::Unsupported { .. }) => {
-            return CliError::refused("GATE_TASK_UNSUPPORTED", e.to_string()).emit("canon gate task", false);
+            return CliError::refused("GATE_TASK_UNSUPPORTED", e.to_string()).emit("canon gate task", json);
         }
     };
 
@@ -458,24 +498,30 @@ pub fn run_task(repo: &Path, task_id_str: &str) -> i32 {
         // Row already `[x]` — idempotent no-op, regardless of the
         // evidence decision (fail-open only for an ALREADY-satisfied
         // row, never a fresh flip).
-        println!("canon gate task: {task_id} already done (idempotent no-op)");
+        crate::say!(json, "canon gate task: {task_id} already done (idempotent no-op)");
+        if json {
+            crate::json_out::data("gate task", serde_json::json!({ "taskId": task_id.as_str(), "flipped": false }));
+        }
         return 0;
     }
 
     match decision {
         TaskFlipDecision::Approved { .. } => {
             if let Err(e) = std::fs::write(&document_path, &flip.document) {
-                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", document_path.display())).emit("canon gate task", false);
+                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", document_path.display())).emit("canon gate task", json);
             }
-            println!("canon gate task: {task_id} flipped — {}", crate::write_mode::DIRECT);
+            crate::say!(json, "canon gate task: {task_id} flipped — {}", crate::write_mode::DIRECT);
             if let Some(warning) = canon_command_proof_warning(&task_id, &raw_records) {
                 eprintln!("{warning}");
             }
             refresh_task_status(&repo, &task_id.change_id());
+            if json {
+                crate::json_out::data("gate task", serde_json::json!({ "taskId": task_id.as_str(), "flipped": true, "document": document_path.display().to_string() }));
+            }
             0
         }
         TaskFlipDecision::Blocked { violations } => {
-            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(|v| v.line()).collect::<Vec<_>>().join("\n")).emit("canon gate task", false)
+            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(|v| v.line()).collect::<Vec<_>>().join("\n")).emit("canon gate task", json)
         }
     }
 }
@@ -764,29 +810,48 @@ pub(crate) fn evidence_staging_dir(ledger_root: &Path) -> PathBuf {
 /// idempotent per staged candidate (its own recovery section), so a
 /// re-run drains a candidate whose record already landed instead of
 /// committing it twice, and still exits `0`.
-pub fn run_promote(repo: &Path, dry_run: bool) -> i32 {
+pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon gate promote", false);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon gate promote", json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ctx.ledger_root));
     let committed = GitTier::new(ctx.ledger_root.clone());
     match gate_promote(&staging, &committed, dry_run) {
         Ok(report) => {
-            print!("{}", format_promote_report(&report, dry_run));
+            crate::say_raw!(json, "{}", format_promote_report(&report, dry_run));
+            let data = promote_json(&report, dry_run);
             if report.is_clean() {
+                if json {
+                    crate::json_out::data("gate promote", data);
+                }
                 0
             } else {
-                1
+                CliError::failed("PROMOTE_REFUSED", format!("{} staged record(s) refused", report.refused.len()))
+                    .hint("each refusal is named in data.refused; fix the staged record or re-add it, then run `canon gate promote` again")
+                    .emit_with_data("canon gate promote", json, data)
             }
         }
         Err(e) => {
-            CliError::refused("PROMOTE_FAILED", e.to_string()).emit("canon gate promote", false)
+            CliError::refused("PROMOTE_FAILED", e.to_string()).emit("canon gate promote", json)
         }
     }
+}
+
+/// The `--json` data for one [`PromoteReport`].
+pub(crate) fn promote_json(report: &PromoteReport, dry_run: bool) -> serde_json::Value {
+    let landed = |list: &[Promoted]| -> Vec<serde_json::Value> {
+        list.iter().map(|p| serde_json::json!({ "kind": p.kind.as_str(), "label": p.label(), "target": p.target.display().to_string() })).collect()
+    };
+    serde_json::json!({
+        "dryRun": dry_run,
+        "promoted": landed(&report.promoted),
+        "recovered": landed(&report.recovered),
+        "refused": report.refused.iter().map(|r| serde_json::json!({ "class": r.violation.class.as_str(), "subject": r.violation.subject, "message": r.violation.detail })).collect::<Vec<_>>(),
+    })
 }
 
 /// Where a staged write ended up once its command decided whether to
@@ -823,6 +888,16 @@ impl StagedOutcome {
         }
     }
 
+    /// The `--json` record of where the write landed: `staged` is the staged
+    /// location, `committed` the ledger path once promoted (`null` otherwise).
+    pub(crate) fn json(&self, staged: &str) -> serde_json::Value {
+        let committed = match self {
+            Self::Promoted { target } => Some(target.as_str()),
+            Self::Staged | Self::Refused => None,
+        };
+        serde_json::json!({ "staged": staged, "committed": committed })
+    }
+
     /// The exit code: a refused promotion is refused-by-policy.
     pub(crate) fn exit_code(&self) -> i32 {
         match self {
@@ -841,24 +916,48 @@ impl StagedOutcome {
 /// record: committed (or recovered) means promoted, and the caller's
 /// one success line names the committed path; refused means it is
 /// still staged, and the refusal lines are printed here.
-pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &str, promote: bool) -> StagedOutcome {
+pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &str, promote: bool, json: bool) -> StagedOutcome {
     if !promote {
         return StagedOutcome::Staged;
     }
+    match try_promote(ledger_root, location) {
+        Ok(target) => StagedOutcome::Promoted { target },
+        Err(refusal) => {
+            crate::say_raw!(json, "{}", refusal.lines);
+            match refusal.data {
+                Some(data) => refusal.error.emit_with_data(command, json, data),
+                None => refusal.error.emit(command, json),
+            };
+            StagedOutcome::Refused
+        }
+    }
+}
+
+/// Why [`try_promote`] did not land a record: the per-candidate lines the
+/// promotion printed (empty when promotion itself failed), the error, and the
+/// refusal detail for `--json`.
+pub(crate) struct PromoteRefusal {
+    pub(crate) lines: String,
+    pub(crate) error: CliError,
+    pub(crate) data: Option<serde_json::Value>,
+}
+
+/// [`promote_after_stage`]'s promotion, without its reporting: the committed
+/// path (relative to the ledger root), or why not.
+pub(crate) fn try_promote(ledger_root: &Path, location: &str) -> Result<String, PromoteRefusal> {
     match promote_staged(&GitTier::new(evidence_staging_dir(ledger_root)), &GitTier::new(ledger_root), Path::new(location)) {
         // The report carries exactly this one candidate: committed or
         // recovered, or refused.
         Ok(report) => match report.promoted.iter().chain(&report.recovered).next().filter(|_| report.is_clean()) {
-            Some(landed) => StagedOutcome::Promoted { target: landed.target.display().to_string() },
-            None => {
-                print!("{}", format_candidate_lines(&report, false));
-                StagedOutcome::Refused
-            }
+            Some(landed) => Ok(landed.target.display().to_string()),
+            None => Err(PromoteRefusal {
+                lines: format_candidate_lines(&report, false),
+                error: CliError::failed("PROMOTE_REFUSED", "staged, but promotion refused the record; it stays staged")
+                    .hint("the refusal is named in data.refused; fix it and run `canon gate promote`"),
+                data: Some(promote_json(&report, false)),
+            }),
         },
-        Err(e) => {
-            CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).emit(command, false);
-            StagedOutcome::Refused
-        }
+        Err(e) => Err(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")), data: None }),
     }
 }
 
@@ -949,7 +1048,7 @@ fn promotable_kinds() -> String {
 /// `<repo>/.canon/scripts/`, matching spec.md's "a non-donor repo gets a generic
 /// pre-commit script" scenario.
 #[allow(clippy::too_many_arguments)]
-pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32) -> i32 {
+pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);
 
@@ -961,29 +1060,36 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     let claude_outcome = match install_into(&claude_path, &entry) {
         Ok(o) => o,
         Err(e) => {
-            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).emit("canon gate install-hooks", false);
+            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).emit("canon gate install-hooks", json);
         }
     };
     let codex_outcome = match install_into(&codex_path, &entry) {
         Ok(o) => o,
         Err(e) => {
-            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).emit("canon gate install-hooks", false);
+            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).emit("canon gate install-hooks", json);
         }
     };
 
+    let mut script_written = false;
     if !already_has_canon_gate_command {
         let script_path = repo.join(paths::PRE_COMMIT_SCRIPT);
         if !script_path.exists() {
             if let Err(e) = write_pre_commit_script(&script_path) {
-                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).emit("canon gate install-hooks", false);
+                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).emit("canon gate install-hooks", json);
             }
-            println!("canon gate install-hooks: wrote {}", script_path.display());
+            script_written = true;
+            crate::say!(json, "canon gate install-hooks: wrote {}", script_path.display());
         }
     }
 
-    match (claude_outcome, codex_outcome) {
-        (InstallOutcome::Unchanged, InstallOutcome::Unchanged) => println!("canon gate install-hooks: no diff, nothing written"),
-        _ => println!("canon gate install-hooks: installed"),
+    let changed = !matches!((claude_outcome, codex_outcome), (InstallOutcome::Unchanged, InstallOutcome::Unchanged));
+    if changed {
+        crate::say!(json, "canon gate install-hooks: installed");
+    } else {
+        crate::say!(json, "canon gate install-hooks: no diff, nothing written");
+    }
+    if json {
+        crate::json_out::data("gate install-hooks", serde_json::json!({ "installed": changed, "preCommitScriptWritten": script_written }));
     }
     0
 }
@@ -1031,10 +1137,30 @@ fn write_pre_commit_script(path: &Path) -> std::io::Result<()> {
 /// `canon gate selftest` (task 5.2's CLI wiring): runs the shipped
 /// fixture corpus (`canon_gate::selftest::run`), never touches a real
 /// repo — no `--repo` flag.
-pub fn run_selftest() -> i32 {
+pub fn run_selftest(json: bool) -> i32 {
     let report = selftest::run();
-    print!("{}", report.format_human());
-    report.exit_code()
+    crate::say_raw!(json, "{}", report.format_human());
+    if report.is_clean() {
+        if json {
+            crate::json_out::data("gate selftest", serde_json::json!({ "clean": true, "fixtures": report.outcomes.len() }));
+        }
+        return 0;
+    }
+    let failures: Vec<serde_json::Value> = report
+        .outcomes
+        .iter()
+        .filter(|o| !o.is_clean())
+        .map(|o| {
+            serde_json::json!({
+                "class": o.class.as_str(),
+                "malformedExpected": o.expected_parse_error,
+                "missing": o.missing.iter().map(|(c, s)| format!("{} {}", c.as_str(), s)).collect::<Vec<_>>(),
+                "extra": o.extra.iter().map(|(c, s)| format!("{} {}", c.as_str(), s)).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    CliError::failed("SELFTEST_FAILED", format!("{} fixture(s) did not match their expected violations", failures.len()))
+        .emit_with_data("canon gate selftest", json, serde_json::json!({ "clean": false, "failures": failures }))
 }
 
 #[cfg(test)]
@@ -1068,10 +1194,10 @@ mod tests {
         let bystander = stage(&ledger_root, Actor::new("other", RoleId::parse("reviewer").unwrap()));
 
         let kept = stage(&ledger_root, Actor::new("impl", RoleId::parse("implementer").unwrap()));
-        assert_eq!(promote_after_stage("t", &ledger_root, &kept, false), StagedOutcome::Staged);
+        assert_eq!(promote_after_stage("t", &ledger_root, &kept, false, false), StagedOutcome::Staged);
         assert!(evidence_staging_dir(&ledger_root).join(&kept).exists(), "not asked to promote: nothing moves");
 
-        let promoted = promote_after_stage("t", &ledger_root, &kept, true);
+        let promoted = promote_after_stage("t", &ledger_root, &kept, true, false);
         let StagedOutcome::Promoted { target } = &promoted else { panic!("promoted: {promoted:?}") };
         assert!(ledger_root.join(target).is_file(), "the outcome names the committed record: {target}");
         assert_ne!(target, &kept, "promotion assigns the committed record its own name");
@@ -1085,7 +1211,7 @@ mod tests {
         // bystander beside it stays untouched rather than being promoted
         // in its place.
         let refused = stage(&ledger_root, Actor::new_unattributed("legacy-writer"));
-        let outcome = promote_after_stage("t", &ledger_root, &refused, true);
+        let outcome = promote_after_stage("t", &ledger_root, &refused, true, false);
         assert_eq!((outcome.exit_code(), outcome.suffix()), (1, crate::write_mode::STAGED_FOR_GATE_PROMOTE));
         assert_eq!(outcome, StagedOutcome::Refused);
         assert!(evidence_staging_dir(&ledger_root).join(&refused).exists(), "a refused record stays staged");

@@ -175,7 +175,13 @@ pub fn run_selftest(json: bool) -> ExitCode {
             .iter()
             .map(|s| serde_json::json!({ "name": s.name, "clean": s.is_clean(), "passed": s.passed, "failures": s.failures }))
             .collect();
-        let summary = serde_json::json!({ "clean": report.is_clean(), "suites": suites });
+        let mut summary = serde_json::json!({ "clean": report.is_clean(), "suites": suites });
+        if !report.is_clean() {
+            // The failure keeps this command's own shape and gains the shared `error`.
+            let error = crate::cli_error::CliError::failed("SELFTEST_FAILED", "a selftest suite did not pass against its fixtures");
+            eprintln!("{}", error.human("canon selftest"));
+            summary["error"] = error.to_json()["error"].clone();
+        }
         println!("{}", serde_json::to_string_pretty(&summary).expect("selftest summary is always serializable"));
     } else {
         print!("{}", report.format_human());

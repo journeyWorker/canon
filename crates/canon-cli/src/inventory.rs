@@ -799,6 +799,29 @@ pub fn format_human(outcome: &SyncOutcome) -> String {
     out
 }
 
+/// The `--json` data for [`SyncOutcome`]: one entry per root, with the
+/// violations and sync errors that aborted it.
+pub fn format_json(outcome: &SyncOutcome) -> serde_json::Value {
+    let roots: Vec<serde_json::Value> = outcome
+        .roots
+        .iter()
+        .map(|root| {
+            serde_json::json!({
+                "id": root.id,
+                "root": root.root.display().to_string(),
+                "clean": root.is_clean(),
+                "scanned": root.scanned,
+                "written": root.written,
+                "removed": root.removed,
+                "violations": root.violations.iter().map(|v| serde_json::json!({ "class": v.class.as_str(), "path": v.path.display().to_string(), "message": v.detail })).collect::<Vec<_>>(),
+                "syncErrors": root.sync_errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
+                "tagDiagnostics": root.tag_diagnostics.iter().map(|d| d.to_string()).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    serde_json::json!({ "clean": outcome.is_clean(), "totalWritten": outcome.total_written(), "roots": roots })
+}
+
 /// One root's stale part of the scenario index ([`stale_roots`]).
 struct StaleRoot {
     root: SpecRoot,

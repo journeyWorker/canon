@@ -329,6 +329,32 @@ pub fn format_human(outcome: &PluginSyncOutcome) -> String {
     out
 }
 
+/// The `--json` data for [`PluginSyncOutcome`].
+pub fn format_json(outcome: &PluginSyncOutcome) -> serde_json::Value {
+    let roots: Vec<serde_json::Value> = outcome
+        .roots
+        .iter()
+        .map(|root| {
+            serde_json::json!({
+                "rootId": root.root_id,
+                "root": root.root.display().to_string(),
+                "overlay": root.overlay,
+                "candidates": root.candidates,
+                "written": root.written,
+                "deduped": root.deduped,
+                "errors": root.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    serde_json::json!({
+        "pluginId": outcome.plugin_id,
+        "clean": outcome.is_clean(),
+        "written": outcome.total_written(),
+        "deduped": outcome.total_deduped(),
+        "roots": roots,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use canon_model::ids::{ProjectId, SpecDigest};

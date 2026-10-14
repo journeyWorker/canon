@@ -336,7 +336,11 @@ fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
     let meta = meta_for(&key);
     let mut cmd = cmd.clone();
     cmd.build();
-    let visible = |a: &&clap::Arg| !a.is_hide_set() && a.get_id() != "help" && a.get_id() != "version";
+    // clap's own `--help` / `--version` flags are noise; a command's own argument that happens to be
+    // called `version` (`prompt register --version`) is not.
+    let visible = |a: &&clap::Arg| {
+        !a.is_hide_set() && !matches!(a.get_action(), clap::ArgAction::Help | clap::ArgAction::HelpShort | clap::ArgAction::HelpLong | clap::ArgAction::Version)
+    };
     let arguments: Vec<ArgSchema> = cmd.get_positionals().filter(visible).map(arg_schema).collect();
     let options: Vec<ArgSchema> = cmd.get_arguments().filter(|a| !a.is_positional()).filter(visible).map(arg_schema).collect();
     let supports_json = options.iter().any(|o| o.name == "json");
@@ -372,6 +376,10 @@ fn list_entries(root: &Command, under: &[String]) -> Vec<ListEntry> {
 /// Run `canon schema`: print to stdout and return the exit code. A path that
 /// does not resolve is a refusal (exit 2) on stderr naming the nearest matches.
 pub fn run(root: &Command, tokens: &[String], json: bool) -> u8 {
+    // Building the tree first copies a parent's `global = true` flags (`brief --json`) down to its leaves.
+    let mut built = root.clone();
+    built.build();
+    let root = &built;
     let resolved = match resolve(root, tokens) {
         Ok(r) => r,
         Err(Refusal(msg)) => {
