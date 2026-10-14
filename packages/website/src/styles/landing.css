@@ -672,6 +672,7 @@ body.lp {
   position: relative;
   display: block;
   color: var(--c-text-2);
+  overflow-wrap: anywhere;
   text-decoration: underline dotted;
   text-decoration-color: #4a535e;
   text-underline-offset: 3px;

@@ -147,7 +147,7 @@ fn skeleton_yaml() -> String {
     out.push_str(&format!("      root: {}\n", paths::SPECS_DIR));
     out.push_str("plans:\n");
     out.push_str("  # canon's own changes live in .canon/changes/<slug>/ (`canon change\n");
-    out.push_str("  # new` writes brief.md + tasks.md there); every reader reads them\n");
+    out.push_str("  # new` writes brief.md there); every reader reads them\n");
     out.push_str("  # with no entry here. `sources` lists external plans you prepare,\n");
     out.push_str("  # which canon only reads: it never writes into them, except that\n");
     out.push_str("  # `canon gate task` flips a task's checkbox in their tasks.md.\n");
@@ -217,16 +217,16 @@ feature.
 
 The loop:
 
-1. Brief: for a new subject or a scope change, record the request and your assumptions in the change's `.canon/changes/<slug>/brief.md`, then stop and report the brief: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy. Record it at once: an `Approved: <who> <when> — \"<their words>\"` line in that `brief.md`, and `canon policy approve --by <the human> --note \"<their words>\"`. Never approve without a human answer.
-2. Subject: `canon subject new`, then `canon change new` for the change; it writes `.canon/changes/<slug>/brief.md`, which holds the brief. A change from an external plan (an openspec `proposal.md`) gets its brief there too: a `brief.md` whose `Source: <path>` line points at the plan; canon never edits the plan.
-3. Scenarios: `canon scenario new`, failure paths included (`--case failure`).
+1. Brief: for a new subject or a scope change, write the PRD brief in the change's `.canon/changes/<slug>/brief.md` (intent, outcome, user flow `F1`, `F2`, …, step detail, acceptance, questions and assumptions, out of scope), in the `language:` of `canon.yaml` (unset: the request's language, with \"which language?\" in the questions). Run `canon brief check` until it has no blockers, then stop and report the brief to the human in that language: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy; record it in one call: `canon brief approve --change <slug> --by <the human> --note \"<their words>\"`. Never approve without a human answer. A brief edited after its approval needs a new answer.
+2. Subject: `canon subject new`, then `canon change new` for the change (`--kind chore` for a refactor, dependency, build, CI or infra change that alters no behavior: short brief, no scenarios, the suite run again with `canon evidence add --all-scenarios`, then re-review; behavior-changing work is never a chore); it writes the brief skeleton `.canon/changes/<slug>/brief.md`. A change from an external plan (an openspec `proposal.md`) gets its brief there too: a `brief.md` whose `Source: <path>` line points at the plan; canon never edits the plan.
+3. Scenarios: `canon scenario new --flow <F-id>`, one per behavior of a flow step, failure paths included (`--case failure`).
 4. Units: split the work; one actor id and session per unit.
 5. Implement: tests named by scenario id.
 6. Evidence: `canon evidence add` (it promotes itself under `write: { promote: auto }`; only under `write.promote: manual` run `canon gate promote` after it).
 7. Independent review: a different session, one that can run the checks it signs off, records `canon review add` and `canon finding add`, on every change; a reviewer that cannot run the tests says so and does not sign off.
-8. Transition: `canon subject status`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships. The ship guard and `canon evidence add` refuse while the brief is unapproved; they are backstops, the stop is at step 1.
+8. Transition: `canon subject status`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships. The ship guard and `canon evidence add` refuse while the brief is unapproved or was edited after approval, and shipping also needs every flow step covered by a scenario with a failure case; they are backstops, the stop is at step 1.
 
-Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, as tasks in its `tasks.md`, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review. When no human can answer one of the brief's questions, write your assumption into the brief and proceed on it; that covers the brief's questions and work inside an approved scope, never the approval. `.canon/policy.yaml` is what the gate grades against.
+Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review; a follow-up that adds or changes a step of the brief edits it, which needs a new answer. `tasks.md` is an optional work note nothing gates on. When no human can answer one of the brief's questions, write your assumption into the brief and proceed on it; that covers the brief's questions and work inside an approved scope, never the approval. `.canon/policy.yaml` is what the gate grades against.
 <!-- canon:end -->";
 
 /// The byte span `[start, end)` of every standalone `marker` line (the
@@ -307,6 +307,10 @@ pub struct InitOptions {
     /// How a fresh `init` picks the harnesses to install the canon skill
     /// for (0.17 D5).
     pub skills: SkillsChoice,
+    /// `--language <tag>` (0.19 D6): recorded as `canon.yaml`'s
+    /// `language:`, the language briefs are written in. `None` records
+    /// nothing (an unset language reads as `en`).
+    pub language: Option<String>,
 }
 
 /// How a fresh `canon init` picks the harnesses (0.17 D5).
@@ -390,6 +394,17 @@ fn skills_section(skills: Option<&InitSkills>) -> String {
     match skills {
         Some(chosen) if chosen.recorded => out.push_str(&skills::skills_config_block(&chosen.providers)),
         _ => out.push_str("# skills:\n#   providers: [claude, codex]\n"),
+    }
+    out
+}
+
+/// The `language:` line appended to the skeleton (0.19 D6): the recorded
+/// tag, or a commented example when none is given.
+fn language_section(language: Option<&crate::language::Language>) -> String {
+    let mut out = String::from("# The language briefs are written in: templates and prose rules ship for\n# `en` and `ko`; any other tag gets `en` headings and the structure rules.\n");
+    match language {
+        Some(language) => out.push_str(&format!("language: {}\n", language.tag)),
+        None => out.push_str("# language: en\n"),
     }
     out
 }
@@ -493,6 +508,13 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
         return 2;
     }
     let agents_path = repo.join("AGENTS.md");
+    let language = match options.language.as_deref().map(crate::language::Language::parse).transpose() {
+        Ok(language) => language,
+        Err(e) => {
+            eprintln!("canon init: refused — --language: {e}");
+            return 2;
+        }
+    };
     let agents = if options.agents_md {
         let existing = match fs::read_to_string(&agents_path) {
             Ok(text) => Some(text),
@@ -527,7 +549,7 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
     };
     match fs::OpenOptions::new().write(true).create_new(true).open(&canon_yaml_path) {
         Ok(mut file) => {
-            let config = skeleton_yaml() + &skills_section(skills.as_ref());
+            let config = skeleton_yaml() + &language_section(language.as_ref()) + &skills_section(skills.as_ref());
             if let Err(e) = file.write_all(config.as_bytes()) {
                 eprintln!("canon init: failed to write `{}`: {e}", canon_yaml_path.display());
                 return 2;
@@ -544,6 +566,9 @@ pub fn run_init(repo: &Path, options: InitOptions) -> i32 {
             println!("canon init: {} already exists — left unchanged; {refreshed}", canon_yaml_path.display());
             if matches!(options.skills, SkillsChoice::Providers(_)) {
                 println!("canon init: --providers is not applied to an existing canon.yaml; run `canon skills install --providers=<list>`, which records the list in skills.providers");
+            }
+            if options.language.is_some() {
+                println!("canon init: --language is not applied to an existing canon.yaml; add `language: <tag>` to it by hand");
             }
             match scaffold_gitignore(repo) {
                 Ok(added) if !added.is_empty() => println!("canon init: added to .gitignore: {}", added.join(", ")),
@@ -684,6 +709,16 @@ pub fn run_check_config(repo: &Path) -> i32 {
         Err(e) => {
             all_ok = false;
             report.push_str(&format!("[FAIL] skills: {e}\n"));
+        }
+    }
+
+    // `language:` (0.19 D6): absent reads as `en`, so it is not a failure.
+    match crate::language::from_yaml(&text) {
+        Ok(language) if text.lines().any(|l| l.starts_with("language:")) => report.push_str(&format!("[PASS] language ({})\n", language.tag)),
+        Ok(_) => {}
+        Err(e) => {
+            all_ok = false;
+            report.push_str(&format!("[FAIL] language: {e}\n"));
         }
     }
 

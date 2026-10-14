@@ -1,6 +1,6 @@
 {
   "statusVersion": 3,
-  "canonVersion": "0.18.0",
+  "canonVersion": "0.19.0",
   "policy": {
     "present": true,
     "spec_coverage": {
@@ -38,7 +38,8 @@
         "change": "c-checkout",
         "brief": ".canon/changes/c-checkout/brief.md",
         "briefExists": true,
-        "approval": "Journey 2026-10-11 — \"승인. 네 가정대로 진행\""
+        "approval": "Journey 2026-10-11 — \"승인. 네 가정대로 진행\"",
+        "legacyApproval": true
       }
     }
   ],

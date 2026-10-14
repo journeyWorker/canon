@@ -1,0 +1,13 @@
+{"type":"session","version":3,"id":"reviewer-recovery-fail","timestamp":"2026-01-01T00:04:00Z","cwd":"/workspace"}
+{"type":"message","id":"u1","message":{"role":"user","content":[{"type":"text","text":"build and review"}]},"timestamp":"2026-01-01T00:04:01Z"}
+{"type":"message","id":"a1","message":{"role":"assistant","content":[{"type":"toolCall","id":"w1","name":"write","arguments":{"path":".canon/changes/demo/brief.md","content":"brief"}}]},"timestamp":"2026-01-01T00:04:02Z"}
+{"type":"message","id":"r1","message":{"role":"toolResult","toolCallId":"w1","content":[{"type":"text","text":"ok"}],"isError":false},"timestamp":"2026-01-01T00:04:03Z"}
+{"type":"message","id":"a2","message":{"role":"assistant","content":[],"stopReason":"stop"},"timestamp":"2026-01-01T00:04:04Z"}
+{"type":"message","id":"a3","message":{"role":"assistant","content":[{"type":"toolCall","id":"w2","name":"write","arguments":{"path":"src/main.py","content":"print(1)"}}]},"timestamp":"2026-01-01T00:04:05Z"}
+{"type":"message","id":"r2","message":{"role":"toolResult","toolCallId":"w2","content":[{"type":"text","text":"ok"}],"isError":false},"timestamp":"2026-01-01T00:04:06Z"}
+{"type":"message","id":"a4","message":{"role":"assistant","content":[{"type":"toolCall","id":"c1","name":"bash","arguments":{"command":"canon review add --scenario-id demo.01","cwd":"/workspace"}}]},"timestamp":"2026-01-01T00:04:07Z"}
+{"type":"message","id":"r3","message":{"role":"toolResult","toolCallId":"c1","content":[{"type":"text","text":"written directly"}],"isError":false},"timestamp":"2026-01-01T00:04:08Z"}
+{"type":"message","id":"a5","message":{"role":"assistant","content":[{"type":"toolCall","id":"c2","name":"bash","arguments":{"command":"canon status","cwd":"/workspace"}}]},"timestamp":"2026-01-01T00:04:09Z"}
+{"type":"message","id":"r4","message":{"role":"toolResult","toolCallId":"c2","content":[{"type":"text","text":"failed"}],"isError":true,"details":{"exit_code":2}},"timestamp":"2026-01-01T00:04:10Z"}
+{"type":"message","id":"a6","message":{"role":"assistant","content":[{"type":"toolCall","id":"c3","name":"bash","arguments":{"command":"canon gate check","cwd":"/workspace"}}]},"timestamp":"2026-01-01T00:04:11Z"}
+{"type":"message","id":"r5","message":{"role":"toolResult","toolCallId":"c3","content":[{"type":"text","text":"ok"}],"isError":false},"timestamp":"2026-01-01T00:04:12Z"}

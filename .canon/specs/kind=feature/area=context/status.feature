@@ -193,7 +193,7 @@ Feature: context status
     And a building subject that adopts no change
     When canon status runs
     Then the verifying subject gets one step whose actor is human: stop and report the brief, building and attesting nothing for the subject until the human answers, one answer covering brief and policy
-    And its reason names the brief.md the "Approved:" line goes in, says canon evidence add refuses the subject's scenarios and tasks until then, and names the canon policy approve --by <the human> --note command
+    And its reason names the brief.md that has no "Approved:" line, says canon evidence add refuses the subject's scenarios and tasks until then, and names the canon brief approve --change <slug> --by <the human> --note "<their words>" command, which records the brief and the policy approval in one call
     And the human step is the verifying subject's only step, so it is not suggested to move on
     And the subject with no change has no brief to answer, so it gets no human step and its next step is the agent's
     And the human form prints the step as "human:" and both briefs as not approved, the one with no change as an advisory
@@ -312,5 +312,5 @@ Feature: context status
     When canon status runs
     Then the subject is flagged red, naming the uncovered scenario, the unreviewed scenario and the open blocker
     And its only step is canon subject status with verifying and a reason, which parses as printed
-    And the reason says to add the follow-up as tasks in its approved change, then scenario, evidence and review, and ship it again
+    And the reason says to keep the follow-up in its approved change (never canon change new), then scenario, evidence and review, and ship it again
     And once the reopen is followed the flag and the reopen step are gone

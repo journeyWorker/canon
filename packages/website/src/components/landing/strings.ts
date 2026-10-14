@@ -68,8 +68,8 @@ const matrix: MatrixRow[] = [
         source: "Bug fixing guide",
         href: `${SPECKIT_DOCS}/guides/bugfix.html`,
         note: {
-          en: "The bug-fix extension records pass/fail per check, not per requirement",
-          ko: "버그 수정 확장이 요구사항이 아닌 검사 단위로 pass/fail을 기록",
+          en: "The bug-fix extension ends in one verified, partial, or failed verdict after re-running the original reproduction",
+          ko: "버그 수정 확장은 원래 재현 절차를 다시 실행한 뒤 verified, partial, failed 중 하나의 판정으로 끝남",
         },
       },
       {
@@ -161,11 +161,11 @@ const matrix: MatrixRow[] = [
       },
       {
         state: "yes",
-        source: "Interaction modes",
-        href: `${AIDLC_DOCS}/guide/07-interaction-modes.md`,
+        source: "Phases and stages",
+        href: `${AIDLC_DOCS}/guide/04-phases-and-stages.md`,
         note: {
-          en: "Every stage after initialization ends at an approval gate",
-          ko: "초기화 이후 모든 단계가 승인 게이트로 끝남",
+          en: "Every stage your scope runs ends at an approval gate; Construction checkpoints can run automatically",
+          ko: "범위에 포함된 모든 단계가 승인 게이트로 끝나며, Construction 체크포인트는 자동 진행으로 바꿀 수 있음",
         },
       },
       {
@@ -194,11 +194,11 @@ const matrix: MatrixRow[] = [
     cells: [
       {
         state: "partial",
-        source: "Custom agents",
-        href: `${OH_DOCS}/sdk/guides/agent-custom`,
+        source: "Issue to PR",
+        href: `${OH_DOCS}/openhands/usage/agent-canvas/prebuilt/issue-to-pr`,
         note: {
-          en: "A planning agent writes a plan; no spec-to-task stages",
-          ko: "플래닝 에이전트가 플랜을 쓰지만 스펙→태스크 단계는 없음",
+          en: "Issue-to-PR automation reads an issue's acceptance criteria; no spec-to-task stages",
+          ko: "이슈 투 PR 자동화가 이슈의 인수 기준을 읽지만 스펙→태스크 단계는 없음",
         },
       },
       {
@@ -233,8 +233,8 @@ const matrix: MatrixRow[] = [
         source: "Goal completion loop",
         href: `${OH_DOCS}/sdk/guides/convo-goal`,
         note: {
-          en: "Opt-in /goal: a judge model must see the evidence",
-          ko: "옵트인 /goal: 판정 모델이 증거를 봐야 함",
+          en: "Opt-in /goal: a second judge audits the evidence; ends complete or capped",
+          ko: "옵트인 /goal: 두 번째 판정 모델이 증거를 감사하고 complete 또는 capped로 끝남",
         },
       },
       {
@@ -284,8 +284,8 @@ const matrix: MatrixRow[] = [
         source: "README",
         href: SWE,
         note: {
-          en: "Runs the LM agent loop; its README now recommends mini-SWE-agent",
-          ko: "LM 에이전트 루프를 실행하며, README는 이제 mini-SWE-agent를 권장",
+          en: "Runs the LM agent loop; its README says mini-SWE-agent has superseded it",
+          ko: "LM 에이전트 루프를 실행하며, README는 mini-SWE-agent가 이를 대체했다고 밝힘",
         },
       },
       {
@@ -353,8 +353,8 @@ const matrix: MatrixRow[] = [
         source: "Trust spine",
         href: "/concepts/trust-spine/",
         note: {
-          en: "Imports openspec and superpowers plans and gates each task row; it does not write them",
-          ko: "openspec·superpowers 플랜을 가져와 태스크 행마다 게이트하며, 직접 작성하지는 않음",
+          en: "Scaffolds and checks a PRD brief (canon brief check); imports openspec and superpowers plans and gates each task row",
+          ko: "PRD 브리프를 만들고 검사(canon brief check)하며, openspec·superpowers 플랜을 가져와 태스크 행마다 게이트",
         },
       },
       {
@@ -380,8 +380,8 @@ const matrix: MatrixRow[] = [
         source: "Trust spine",
         href: "/concepts/trust-spine/",
         note: {
-          en: "An attributed evidence record per scenario, in the ledger",
-          ko: "레저에 시나리오별로 귀속된 증거 레코드",
+          en: "An attributed evidence record per scenario, in the ledger; on by default under the starter policy",
+          ko: "레저에 시나리오별로 귀속된 증거 레코드. 스타터 policy에서 기본으로 켜짐",
         },
       },
       {
@@ -398,8 +398,8 @@ const matrix: MatrixRow[] = [
         source: "README",
         href: CANON,
         note: {
-          en: "Risk tiers require policy-pinned SSH approval",
-          ko: "위험 등급은 policy에 pin된 SSH 승인을 요구",
+          en: "The brief's approval is bound to its bytes: an edit after approval reads as not approved. Risk tiers require policy-pinned SSH approval",
+          ko: "브리프 승인은 브리프의 바이트에 묶여, 승인 후 수정하면 미승인으로 읽힘. 위험 등급은 policy에 pin된 SSH 승인을 요구",
         },
       },
       {
@@ -407,8 +407,8 @@ const matrix: MatrixRow[] = [
         source: "Trust spine",
         href: "/concepts/trust-spine/",
         note: {
-          en: "Opt-in: spec_coverage.require_review (0.12.0)",
-          ko: "옵트인: spec_coverage.require_review (0.12.0)",
+          en: "Required by the default strict starter policy, from an actor other than the evidence author (spec_coverage.require_review)",
+          ko: "기본 strict 스타터 policy가 요구하며, 증거 작성자가 아닌 다른 행위자의 리뷰여야 함 (spec_coverage.require_review)",
         },
       },
       {
@@ -537,8 +537,8 @@ const en = {
     states: { yes: "Yes", partial: "Partial", no: "No", nd: "Not documented" } as Record<CellState, string>,
     source: "Source",
     rows: rowsFor("en", "/"),
-    canonNote: "Experimental (0.11.0, off by default): evidence binding to artifacts and JUnit/Cucumber reports.",
-    footnote: "Claims about other tools were checked against each project's own README or docs on 2026-10-09.",
+    canonNote: "0.19: per-scenario evidence is on by default under the starter policy, the strict starter requires independent review, and a brief's approval is bound to its text.",
+    footnote: "Claims about other tools were checked against each project's own README or docs on 2026-10-14.",
   },
 
   quick: {
@@ -695,8 +695,8 @@ const ko: Strings = {
     states: { yes: "예", partial: "부분", no: "아니요", nd: "문서화되지 않음" },
     source: "출처",
     rows: rowsFor("ko", "/ko/"),
-    canonNote: "실험 기능(0.11.0, 기본값 off): 아티팩트와 JUnit/Cucumber 리포트에 대한 증거 바인딩.",
-    footnote: "다른 도구에 대한 내용은 2026-10-09에 각 프로젝트의 README 또는 문서와 대조해 확인했습니다.",
+    canonNote: "0.19: 스타터 policy에서 시나리오별 증거가 기본으로 켜지고, strict 스타터는 독립 리뷰를 요구하며, 브리프 승인은 브리프 본문에 묶입니다.",
+    footnote: "다른 도구에 대한 내용은 2026-10-14에 각 프로젝트의 README 또는 문서와 대조해 확인했습니다.",
   },
 
   quick: {

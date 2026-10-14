@@ -744,10 +744,10 @@ fn skills_install_20_skill_and_block_carry_one_approval_per_scope() {
     for (name, text) in skill_and_block() {
         for rule in [
             "for a new subject or a scope change",
-            "Approved: <who> <when> — \"<",
+            "canon brief check",
             ".canon/changes/<slug>/brief.md",
             "Source: <path>",
-            "canon policy approve --by <the human> --note \"<their words>\"",
+            "canon brief approve --change <slug> --by <the human> --note \"<their words>\"",
             "Never approve without a human answer",
             "Inside an approved scope, never stop for a human",
             "When no human can answer",
@@ -757,9 +757,13 @@ fn skills_install_20_skill_and_block_carry_one_approval_per_scope() {
             "in the approved change",
             "tasks.md",
             "a new change is a new scope",
+            "edited after its approval",
+            "is an optional work note nothing gates on",
         ] {
             assert!(text.to_lowercase().contains(&rule.to_lowercase()), "the {name} must say {rule:?}: {text}");
         }
+        let edited = text.to_lowercase().find("edited after its approval").unwrap();
+        assert!(text.to_lowercase()[edited..].contains("needs a new"), "the {name} must say an edited brief needs a new answer: {text}");
     }
 }
 

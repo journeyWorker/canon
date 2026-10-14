@@ -49,8 +49,11 @@ pub struct ScenarioScan {
     /// scenario specifies — e.g. `happy`, `failure`, `edge`), retained
     /// exactly as authored for inventory sync's fail-soft diagnostic.
     pub case_tags: Vec<String>,
+    /// Raw `@flow:<change>.<F-id>` tag values (0.19 D4): the brief flow
+    /// step(s) the scenario covers, retained as authored.
+    pub flow_tags: Vec<String>,
     /// Namespaces from `@name:value`-shaped tags other than the
-    /// recognized `subject`, `lane`, and `case` axes. Plain tags are
+    /// recognized `subject`, `lane`, `case`, and `flow` axes. Plain tags are
     /// ignored.
     pub unknown_namespace_tags: Vec<String>,
 }
@@ -85,6 +88,7 @@ pub fn scan(text: &str) -> FeatureScan {
     let mut pending_subject_tags: Vec<String> = Vec::new();
     let mut pending_lane_tags: Vec<String> = Vec::new();
     let mut pending_case_tags: Vec<String> = Vec::new();
+    let mut pending_flow_tags: Vec<String> = Vec::new();
     let mut pending_unknown_namespace_tags: Vec<String> = Vec::new();
     // The line index of the provenance comment the PREVIOUS header
     // claimed in the trailing position. One comment serves one header:
@@ -129,18 +133,21 @@ pub fn scan(text: &str) -> FeatureScan {
                         subject_tags: pending_subject_tags.clone(),
                         lane_tags: pending_lane_tags.clone(),
                         case_tags: pending_case_tags.clone(),
+                        flow_tags: pending_flow_tags.clone(),
                         unknown_namespace_tags: pending_unknown_namespace_tags.clone(),
                     });
                 }
                 pending_subject_tags.clear();
                 pending_lane_tags.clear();
                 pending_case_tags.clear();
+                pending_flow_tags.clear();
                 pending_unknown_namespace_tags.clear();
             } else {
                 pending_scenario_ids.clear();
                 pending_subject_tags.clear();
                 pending_lane_tags.clear();
                 pending_case_tags.clear();
+                pending_flow_tags.clear();
                 pending_unknown_namespace_tags.clear();
             }
         }
@@ -152,6 +159,8 @@ pub fn scan(text: &str) -> FeatureScan {
                 pending_lane_tags.push(lane.to_string());
             } else if let Some(case) = candidate.strip_prefix("case:") {
                 pending_case_tags.push(case.to_string());
+            } else if let Some(flow) = candidate.strip_prefix("flow:") {
+                pending_flow_tags.push(flow.to_string());
             } else if let Some((namespace, _value)) = candidate.split_once(':') {
                 if !namespace.is_empty()
                     && namespace.as_bytes()[0].is_ascii_lowercase()
@@ -522,7 +531,7 @@ mod tests {
     #[test]
     fn scenario_tag_pairs_with_its_following_header_as_title() {
         let scan = scan(SAMPLE);
-        assert_eq!(scan.scenarios, vec![ScenarioScan { scenario_id: "idolive.replay-detail.01".to_string(), title: "Opening a replay loads its detail".to_string(), subject_tags: vec![], lane_tags: vec![], case_tags: vec![], unknown_namespace_tags: vec![] }]);
+        assert_eq!(scan.scenarios, vec![ScenarioScan { scenario_id: "idolive.replay-detail.01".to_string(), title: "Opening a replay loads its detail".to_string(), subject_tags: vec![], lane_tags: vec![], case_tags: vec![], flow_tags: vec![], unknown_namespace_tags: vec![] }]);
     }
 
     #[test]
@@ -554,7 +563,7 @@ mod tests {
         );
         assert_eq!(
             scan.scenarios,
-            vec![ScenarioScan { scenario_id: "world.hotdeal.02".to_string(), title: "Buying triggers the coupon".to_string(), subject_tags: vec![], lane_tags: vec![], case_tags: vec![], unknown_namespace_tags: vec![] }],
+            vec![ScenarioScan { scenario_id: "world.hotdeal.02".to_string(), title: "Buying triggers the coupon".to_string(), subject_tags: vec![], lane_tags: vec![], case_tags: vec![], flow_tags: vec![], unknown_namespace_tags: vec![] }],
             "only the tag within the scenario block pairs; the pre-`Feature:` tag is drained, never paired to a later scenario"
         );
     }
@@ -566,8 +575,8 @@ mod tests {
         assert_eq!(
             scan.scenarios,
             vec![
-                ScenarioScan { scenario_id: "a.b.01".to_string(), title: "First one".to_string(), subject_tags: vec![], lane_tags: vec![], case_tags: vec![], unknown_namespace_tags: vec![] },
-                ScenarioScan { scenario_id: "a.b.02".to_string(), title: "Second one".to_string(), subject_tags: vec![], lane_tags: vec![], case_tags: vec![], unknown_namespace_tags: vec![] },
+                ScenarioScan { scenario_id: "a.b.01".to_string(), title: "First one".to_string(), subject_tags: vec![], lane_tags: vec![], case_tags: vec![], flow_tags: vec![], unknown_namespace_tags: vec![] },
+                ScenarioScan { scenario_id: "a.b.02".to_string(), title: "Second one".to_string(), subject_tags: vec![], lane_tags: vec![], case_tags: vec![], flow_tags: vec![], unknown_namespace_tags: vec![] },
             ]
         );
     }
@@ -578,9 +587,17 @@ mod tests {
         let scan = scan(text);
         assert_eq!(
             scan.scenarios,
-        vec![ScenarioScan { scenario_id: "a.b.01".to_string(), title: "One".to_string(), subject_tags: vec!["payments-core".to_string()], lane_tags: vec![], case_tags: vec![], unknown_namespace_tags: vec![] }],
+        vec![ScenarioScan { scenario_id: "a.b.01".to_string(), title: "One".to_string(), subject_tags: vec!["payments-core".to_string()], lane_tags: vec![], case_tags: vec![], flow_tags: vec![], unknown_namespace_tags: vec![] }],
             "the raw @subject: value is paired with its scenario, unvalidated"
         );
+    }
+
+    #[test]
+    fn flow_tags_are_collected_and_are_not_an_unknown_namespace() {
+        let text = "Feature: Tagged\n\n  @a.b.01 @flow:add-login.F1 @flow:add-login.F2 @case:failure\n  Scenario: One\n    Given a\n";
+        let scan = scan(text);
+        assert_eq!(scan.scenarios[0].flow_tags, vec!["add-login.F1".to_string(), "add-login.F2".to_string()]);
+        assert!(scan.scenarios[0].unknown_namespace_tags.is_empty());
     }
 
     #[test]

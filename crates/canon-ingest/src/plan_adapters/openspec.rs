@@ -736,16 +736,32 @@ pub(crate) fn derive_status(archived: bool, done_count: usize, open_count: usize
     }
 }
 
-/// The first paragraph under proposal.md's `## Why` heading,
-/// whitespace-normalized, plus whether the heading was found at all
-/// (task 2.2: an absent heading yields an empty summary AND a
-/// diagnostic — never invented prose). The paragraph ends at the first
-/// blank line or the next heading, whichever comes first; leading
-/// blank lines between the heading and its first content line are
-/// skipped.
+/// The change's summary: the first paragraph under proposal.md's
+/// `## Why` heading, or, in a 0.19 PRD brief (one with a
+/// `<!-- canon:section intent … -->` marker), the first paragraph of the
+/// Intent section, after its heading. Whitespace-normalized, plus
+/// whether the heading was found at all (task 2.2: an absent heading
+/// yields an empty summary AND a diagnostic — never invented prose). The
+/// paragraph ends at the first blank line or the next heading, whichever
+/// comes first; leading blank lines between the heading and its first
+/// content line are skipped. In the Intent section a comment line ends
+/// the paragraph (a template hint is not a summary).
 fn why_summary(proposal_text: &str) -> (String, bool) {
+    const INTENT_MARKER: &str = "<!-- canon:section intent";
     let mut lines = proposal_text.lines();
-    let found = lines.by_ref().any(|line| line.trim() == "## Why");
+    let prd = proposal_text.lines().any(|line| line.trim_start().starts_with(INTENT_MARKER));
+    let found = if prd {
+        let marked = lines.by_ref().any(|line| line.trim_start().starts_with(INTENT_MARKER));
+        let mut rest = lines.clone();
+        // Skip the Intent heading itself, which sits between the marker
+        // and the paragraph.
+        if rest.find(|line| !line.trim().is_empty()).is_some_and(|heading| heading.trim_start().starts_with('#')) {
+            lines = rest;
+        }
+        marked
+    } else {
+        lines.by_ref().any(|line| line.trim() == "## Why")
+    };
     if !found {
         return (String::new(), false);
     }
@@ -760,8 +776,8 @@ fn why_summary(proposal_text: &str) -> (String, bool) {
             }
             continue; // still skipping leading blank lines
         }
-        if trimmed.starts_with('#') {
-            break; // hit the next heading before any paragraph content
+        if trimmed.starts_with('#') || (prd && trimmed.starts_with("<!--")) {
+            break; // the next heading (or, in a PRD brief, a hint) before any paragraph content
         }
         if paragraph_started {
             raw.push(' ');
@@ -960,6 +976,17 @@ mod tests {
         let change = find_change(&outcome, "proposal-only-change");
         assert_eq!(change.status, ChangeStatus::Proposed);
         assert!(outcome.tasks.iter().all(|t| !t.task_id.as_str().starts_with("proposal-only-change#")));
+    }
+
+    /// 0.19 D1: a PRD brief has no `## Why`; its summary is the first
+    /// paragraph of the Intent section, whatever language the heading is
+    /// in, and a template hint is never the summary.
+    #[test]
+    fn a_prd_brief_summary_is_the_intent_sections_first_paragraph() {
+        let brief = "# 제목\n\n<!-- canon:section intent role=context -->\n## 의도\n\n로그인 추가\n\n더 긴 설명.\n\n<!-- canon:section outcome role=normative -->\n## 원하는 결과\n\n본문.\n";
+        assert_eq!(why_summary(brief), ("로그인 추가".to_string(), true));
+        let hint_only = "<!-- canon:section intent role=context -->\n## Intent\n\n<!-- canon:hint what and why -->\n";
+        assert_eq!(why_summary(hint_only), (String::new(), true), "a hint is not a summary");
     }
 
     #[test]

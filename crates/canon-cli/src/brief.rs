@@ -11,8 +11,19 @@
 //! `Approved:` line in canon's own file for the change,
 //! `.canon/changes/<change>/brief.md` (no record kind), read outside HTML
 //! comments and code fences ([`canon_ingest::markdown::field`]). Fixes
-//! live as tasks in the approved change, so the subject's newest adopted
+//! stay in the approved change, so the subject's newest adopted
 //! change is its current scope.
+//!
+//! # The approval is bound to the brief's bytes (0.19 D3, #46)
+//! `canon brief approve` records the line as
+//! `Approved: <who> <when> — "<words>" (brief sha256:<digest>)`, the
+//! digest over the brief with every `Approved:` line removed
+//! ([`brief_digest`]). Every reader goes through [`approval_of`]: a digest
+//! that no longer matches means the brief changed after the human
+//! answered, so it is not approved ([`BriefStatus::changed`], code
+//! [`CHANGED_CODE`]) until `canon brief approve` runs again on a new
+//! answer. A line with no digest (written before 0.19) stays approved
+//! ([`BriefStatus::legacy_approval`]); status advises re-approving it.
 //!
 //! # Canon never writes into an external plan (0.17 D3)
 //! The approval is read only from that canon `brief.md`. A change
@@ -59,13 +70,70 @@ use std::path::{Path, PathBuf};
 
 use canon_gate::spec_coverage::{latest_scenarios, latest_subjects, subject_change_ids};
 use canon_gate::GateContext;
-use canon_ingest::markdown::field;
+use canon_ingest::markdown::{field, without_field};
 use canon_model::{paths, ChangeId, ProjectId, ScenarioId, Subject, SubjectStatus, TaskId};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
+
+/// The error code readers print when a brief changed after its approval.
+pub const CHANGED_CODE: &str = "BRIEF_CHANGED_SINCE_APPROVAL";
+
+/// `sha256:<hex>` over `text` with every `Approved:` line removed: what
+/// an approval binds to.
+pub fn brief_digest(text: &str) -> String {
+    format!("sha256:{:x}", Sha256::digest(without_field(text, "Approved:").as_bytes()))
+}
+
+/// What a brief's `Approved:` line says about its text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Approval {
+    /// No `Approved:` line.
+    Missing,
+    /// The line's digest matches the brief's text.
+    Bound { line: String },
+    /// A line with no digest (pre-0.19): approved, advisory to re-approve.
+    Unbound { line: String },
+    /// The line's digest does not match: the brief changed after it.
+    Changed { line: String, recorded: String, current: String },
+}
+
+impl Approval {
+    /// Whether the brief reads as approved.
+    pub fn approved(&self) -> bool {
+        matches!(self, Approval::Bound { .. } | Approval::Unbound { .. })
+    }
+}
+
+/// The digest an `Approved:` line carries: its trailing
+/// `(brief sha256:<64 hex>)`.
+fn recorded_digest(line: &str) -> Option<&str> {
+    let inner = line.trim_end().strip_suffix(')')?;
+    let (_, digest) = inner.rsplit_once("(brief ")?;
+    let hex = digest.strip_prefix("sha256:")?;
+    (hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit())).then_some(digest)
+}
+
+/// Reads the approval of the brief `text` (module doc). The first
+/// readable `Approved:` line decides, as [`field`] reads it.
+pub fn approval_of(text: &str) -> Approval {
+    let Some(line) = field(text, "Approved:") else { return Approval::Missing };
+    let line = line.to_string();
+    match recorded_digest(&line) {
+        None => Approval::Unbound { line },
+        Some(recorded) => {
+            let current = brief_digest(text);
+            if recorded == current {
+                Approval::Bound { line }
+            } else {
+                Approval::Changed { recorded: recorded.to_string(), line, current }
+            }
+        }
+    }
+}
 
 /// Whether a subject's newest adopted change records the human's
 /// approval of its brief: an `Approved:` line in that change's canon
-/// `brief.md` (module doc). A fix lives as tasks inside the approved
+/// `brief.md` (module doc). A fix stays inside the approved
 /// change, so a newer adopted change is a new scope, and an older
 /// change's approval does not cover it.
 #[derive(Debug, Clone, Serialize)]
@@ -100,6 +168,20 @@ pub struct BriefStatus {
     /// The approval line's text after `Approved:`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approval: Option<String>,
+    /// The brief changed after its approval (0.19 D3): the line's digest
+    /// no longer matches, so it is not approved and `canon brief approve`
+    /// must run again.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub changed: bool,
+    /// The approval line has no digest (pre-0.19): approved, but status
+    /// advises re-approving it so it binds to the brief's text.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_approval: bool,
+    /// What `canon brief check` found in the brief's text (0.19 D2):
+    /// filled by `canon status` only, for a brief in the PRD format.
+    /// Omitted for a pre-0.19 brief, which is read as before.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub findings: Option<crate::brief_check::Counts>,
 }
 
 impl BriefStatus {
@@ -121,18 +203,28 @@ impl BriefStatus {
                 "{brief} does not exist yet: change `{}` comes from the external plan {source}, which canon reads and never edits, so its approval lives in that canon file",
                 self.change.as_deref().unwrap_or_default()
             ),
+            _ if self.changed => format!("{brief} changed after its approval ({CHANGED_CODE})"),
             _ => format!("{brief} has no `Approved:` line"),
         }
+    }
+
+    /// The re-approval advice for a digest-less approval line.
+    pub fn record_digest_hint(&self) -> String {
+        format!("re-approve with `canon brief approve --change {} --by <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>"))
     }
 
     /// How the agent records the human's answer, for an enforced brief.
     pub fn record(&self) -> String {
         let brief = self.brief.as_deref().unwrap_or_default();
+        if self.changed {
+            return self.record_digest_hint();
+        }
         match (self.brief_exists, &self.source) {
             (false, Some(source)) => format!(
-                "create {brief} holding a `Source: {source}` line and record their words there as `Approved: <who> <when> — \"<their words>\"`"
+                "create {brief} holding a `Source: {source}` line, then record their words with `canon brief approve --change {} --by <the human> --note \"<their words>\"`",
+                self.change.as_deref().unwrap_or("<change>")
             ),
-            _ => format!("record their words as `Approved: <who> <when> — \"<their words>\"` in {brief}"),
+            _ => format!("record their words with `canon brief approve --change {} --by <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>")),
         }
     }
 }
@@ -150,7 +242,7 @@ pub fn plan_roots(repo: &Path) -> Result<Vec<PathBuf>, String> {
 
 /// `change`'s canon `brief.md` under `repo`'s `.canon/changes/`, a live
 /// dir before an archived one; `None` when neither holds the file.
-fn canon_brief(repo: &Path, change: &ChangeId) -> Option<PathBuf> {
+pub(crate) fn canon_brief(repo: &Path, change: &ChangeId) -> Option<PathBuf> {
     let changes = repo.join(paths::CHANGES_DIR);
     [changes.join(change.as_str()), changes.join("archive").join(change.as_str())].into_iter().map(|dir| dir.join("brief.md")).find(|path| path.is_file())
 }
@@ -185,6 +277,9 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             brief_exists: false,
             source: None,
             approval: None,
+            changed: false,
+            legacy_approval: false,
+            findings: None,
         });
     };
     let brief = canon_brief(repo, change);
@@ -192,15 +287,19 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
     let status = match brief {
         Some(path) => {
             let text = std::fs::read_to_string(&path).unwrap_or_default();
+            let verdict = approval_of(&text);
             let approval = field(&text, "Approved:").map(str::to_string);
             BriefStatus {
-                approved: approval.is_some(),
-                enforced: approval.is_none(),
+                approved: verdict.approved(),
+                enforced: !verdict.approved(),
                 change: Some(change.as_str().to_string()),
                 brief: Some(rel(repo, &path)),
                 brief_exists: true,
                 source: field(&text, "Source:").map(str::to_string),
                 approval,
+                changed: matches!(verdict, Approval::Changed { .. }),
+                legacy_approval: matches!(verdict, Approval::Unbound { .. }),
+                findings: None,
             }
         }
         None => match external() {
@@ -212,6 +311,9 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 brief_exists: false,
                 source: Some(rel(repo, &proposal)),
                 approval: None,
+                changed: false,
+                legacy_approval: false,
+                findings: None,
             },
             None if proposed => return None,
             None => BriefStatus {
@@ -222,6 +324,9 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 brief_exists: false,
                 source: None,
                 approval: None,
+                changed: false,
+                legacy_approval: false,
+                findings: None,
             },
         },
     };

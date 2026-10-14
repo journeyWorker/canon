@@ -82,6 +82,150 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.19.0 release
+
+Version 0.19.0 makes the brief a PRD that canon can check: a fixed
+skeleton with numbered flow steps, `canon brief check` for structure and
+prose, an approval bound to the brief's bytes, flow-step coverage in place
+of the checklist, a short brief for non-behavior work, and a language for
+the brief and the report. Plan:
+`docs/superpowers/plans/2026-10-14-canon-0.19.0-brief-as-prd.md`.
+
+**Why.** Dogfood eval 6 (`docs/research/2026-10-14-dogfood-eval-6.md`)
+passed its gates, but the brief was two loose sections that mixed intent,
+an implementation choice, the scenario plan and the questions; the
+change's `tasks.md` shipped 0/7 checked because nothing read it; an
+art-pipeline swap with no behavior had no path of its own; a Korean
+request got an English report; and an `Approved:` line stayed valid after
+the brief under it changed. Research behind the decisions:
+`docs/research/2026-10-14-compared-tools-research.md`,
+`2026-10-14-non-feature-work-research.md`, `deep-research-report.md`.
+
+### D1, D2: the brief is a PRD, and canon checks it (#44, #45)
+
+- `canon change new` writes Intent → Desired outcome → User flow → Step
+  detail → Acceptance → Questions and assumptions → Out of scope. Each
+  heading follows a `<!-- canon:section <key> role=<normative|context|question> -->`
+  marker, so headings can be in any language. Flow steps start with
+  stable ids `F1`, `F2`, … and read "sees → does → becomes"; step-detail
+  subheadings follow the same ids in order.
+- `canon brief check [--change <slug>] [--json]` is read-only. Blockers
+  (`brief.*`): missing, duplicate or out-of-order sections, leftover
+  template hints, duplicate flow ids, detail headings that do not match
+  the flow, and, once the brief is approved and its subject is building,
+  a flow step no scenario covers or one with no failure case. Advisories
+  (`prose.*`, normative sections only): evaluative phrases, essay
+  connectives, contrast rhetoric, colloquial endings (`ko`), degree
+  adverbs, sentence and paragraph length (a flow step is measured clause
+  by clause), and a missing `==**key sentence**==`. Exit 0 clean, 2
+  blockers, 1 operational error with a string `error.code`.
+- A waiver is `<!-- canon:waive <rule-id> <section-key> "<reason>" -->`:
+  one rule in one section, reason required, listed in the output.
+- Bare `canon brief` prints the brief's state and the next one to three
+  steps; it never edits. The ship guard refuses on the brief's blockers;
+  `canon status` shows the finding counts.
+- A brief without section markers (every brief before 0.19) checks as one
+  `brief.legacy` advisory and gates as before.
+
+### D3: the approval is bound to the brief's bytes (#46)
+
+`canon brief approve --change <slug> --by <human> --note "<their words>"`
+writes `Approved: <who> <when> — "<words>" (brief sha256:<digest>)` and
+records the policy approval in the same call. The digest covers the brief
+without its `Approved:` lines. It refuses while the brief has structure
+blockers; coverage rules do not apply to approval, since the scope is
+approved before its scenarios exist. Once the brief changes, `canon
+status`, `canon evidence add`, the ship guard and the reopen guard read it
+as not approved (`BRIEF_CHANGED_SINCE_APPROVAL`) and name the re-approval.
+An `Approved:` line with no digest stays approved, with a status advisory
+to re-approve.
+
+### D4: flow coverage replaces the checklist (#48, closes #43)
+
+`canon scenario new --flow <F-id> [--change <slug>]` tags
+`@flow:<change>.<F-id>` and refuses a step the brief does not define.
+`canon status` lists each flow step of the subject's current change with
+its scenarios and their evidence and review state, and flags a step with
+no scenario or no failure case. `canon change new` no longer writes
+`tasks.md`; an existing one is still read, and `canon gate task` and
+`evidence add --task` are unchanged for imported plans.
+
+### D5: chore changes (#49)
+
+`canon change new --kind chore` writes a brief with Intent, Category
+(`refactor|dependency|build|ci|infra`), Invariants, Checks and Out of
+scope, marked `<!-- canon:kind chore -->`. A chore adds no scenarios: its
+evidence is the subject's suite run again with `evidence add --report …
+--all-scenarios`, which stales the pinned reviews and forces a re-review.
+The ship guard is the normal one. Work that changes behavior is a feature
+change.
+
+### D6: language (#50)
+
+`canon init --language <tag>` writes `language:` to `canon.yaml`.
+Templates and prose rules ship for `en` and `ko`; another tag gets `en`
+headings and structure rules only. The skill writes the brief and the
+report in that language.
+
+### D7–D9: skill, evals, website (#47, #51, #52)
+
+- The skill's loop uses the PRD brief, `brief check`, `brief approve`,
+  `--flow` and `--kind chore`; five references (`brief-shape`,
+  `brief-clarify`, `brief-harden`, `brief-align`, `brief-polish`) each
+  carry scope, what to inspect, NEVER cases, verification and the next
+  step. No pass invents policy, and explaining writes nothing.
+- `evals/dogfood/trace_check.py` reads omp and Codex session logs and
+  fails on a write before the brief stop, a write in a question-only
+  turn, or a reviewer session that also wrote code; it reports canon calls
+  per verb, first-command validity and recovery depth.
+- The compare table's five stale cells are rechecked against their
+  sources, the canon row describes 0.19, and long cell notes wrap.
+
+**Migration.** For a 0.18 consumer:
+
+- Run `canon skills install` for the new skill and references.
+- Existing briefs keep working as `legacy`; `canon status` advises
+  re-approving a digest-less approval with `canon brief approve`.
+- `canon change new` writes no `tasks.md`. Scripts that read it should
+  treat it as optional.
+- `canon policy approve` still exists; `canon brief approve` records the
+  policy approval too.
+- `canon status --json` (`statusVersion` stays `3`) adds, per subject,
+  `brief.findings {blockers, advisories}`, `brief.changed`,
+  `brief.legacyApproval` and `flow[]`.
+
+**Changed conformance expectations.** Every case that prints the version
+prints 0.19.0. `change-new`, `status-brief-proposed` and
+`subject-adopt-second-subject` no longer print a `tasks.md` line.
+`status-brief-proposed` gains the `brief check` line and the `findings`
+JSON field. `status-gaps`, `status-ship-ready`,
+`status-shipped-red-reopen` and `migrate-pointer-brief-and-config` gain
+the digest-less approval advisory or `legacyApproval`. Guidance lines in
+the evidence, status, subject and policy cases name `canon brief approve`
+instead of a hand-written `Approved:` line. No exit code changed; no new
+conformance case (coverage lives in `tests/brief_check.rs`,
+`tests/brief_approve.rs` and `evals/dogfood/test_trace_check.py`).
+
+**Closed issues:** #43, #44, #45, #46, #47, #48, #49, #50, #51, #52.
+
+**Acceptance (dogfood eval 7, omp, `language: ko`,
+`docs/research/2026-10-15-dogfood-eval-7.md`).**
+
+- A character-select feature on the shipped game: a Korean PRD brief
+  (F1–F4) and a stop after 99 s with no write outside `.canon/`; after the
+  answer, `canon brief approve` wrote a digest-bound approval, every flow
+  step got scenarios with a failure case, 72/72 scenarios evidenced and
+  reviewed by another session, gate clean.
+- Editing one word of the approved brief made `canon status`, `canon
+  evidence add` and the reopen guard refuse with
+  `BRIEF_CHANGED_SINCE_APPROVAL`.
+- A refactor request became a `--kind chore` change: one stop, no new
+  scenario, the suite re-bound with `--all-scenarios`, re-reviewed by
+  another session, shipped, gate clean.
+- Two defects found by the run are fixed in this release: coverage rules
+  fired on a new scope before its approval, and flow steps drew sentence
+  length advisories for their three clauses.
+
 ## 0.18.0 release
 
 Version 0.18.0 cuts the calls an attestation costs and makes the

@@ -248,6 +248,41 @@ pub struct SubjectSummary {
     /// Status then names the reopen command. Omitted when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub red: Vec<String>,
+    /// The flow steps of the subject's current (newest adopted) change's
+    /// brief with the scenarios tagged `@flow:<change>.<F-id>` (0.19 D4).
+    /// Omitted for a brief with no flow steps (a legacy brief) or no brief.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub flow: Vec<FlowStep>,
+}
+
+/// One flow step of the brief and what covers it.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlowStep {
+    /// `F1`.
+    pub id: String,
+    /// The change whose brief defines it.
+    pub change: String,
+    pub scenarios: Vec<FlowScenarioState>,
+    /// `no scenario` and/or `no failure case`; empty when covered.
+    pub gaps: Vec<&'static str>,
+}
+
+/// One scenario covering a flow step, with the evidence and review state
+/// the gate reads for it.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlowScenarioState {
+    pub id: String,
+    pub title: String,
+    /// Tagged `@case:failure`.
+    pub failure: bool,
+    /// Has a ledger verdict ([`Joins::verdict_state`]).
+    pub evidenced: bool,
+    /// `reviewed`, or the review gap's kind: `missing`, `stale`,
+    /// `unsigned`, `not-distinct`; `not-indexed` when the scenario index
+    /// has no record for the id yet (`canon inventory sync`).
+    pub review: &'static str,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -716,9 +751,68 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         review_due,
         open_blockers,
         missing_cases,
-        brief: crate::brief::brief_of(repo, plan_roots, subject, &changes),
+        brief: brief_with_findings(repo, plan_roots, subject, &changes),
         red,
+        flow: changes.last().map(|change| flow_steps(ctx, joins, repo, change, distinct_actor)).unwrap_or_default(),
     }
+}
+
+/// [`SubjectSummary::flow`]: each step of `change`'s brief, joined to its
+/// scenarios through [`crate::brief_check::flow_scenarios`] (the one
+/// `@flow:` lookup the brief rules also read) and to their evidence and
+/// review state through the gate's own joins.
+fn flow_steps(ctx: &GateContext, joins: &Joins, repo: &Path, change: &ChangeId, distinct_actor: bool) -> Vec<FlowStep> {
+    let ids = crate::brief_check::flow_ids(repo, change);
+    if ids.is_empty() {
+        return Vec::new();
+    }
+    let index = crate::brief_check::flow_scenarios(repo, change).unwrap_or_default();
+    let known = latest_scenarios(ctx);
+    ids.into_iter()
+        .map(|id| {
+            let scenarios: Vec<FlowScenarioState> = index
+                .get(&id)
+                .into_iter()
+                .flatten()
+                .map(|found| {
+                    let record = known.iter().find(|s| s.scenario_id.as_str() == found.id);
+                    let (evidenced, review) = match record {
+                        None => (false, "not-indexed"),
+                        Some(record) => (
+                            joins.verdict_state(record).0,
+                            match review_gap(ctx, record, distinct_actor).map(|gap| gap.kind) {
+                                None => "reviewed",
+                                Some(ReviewGapKind::Missing) => "missing",
+                                Some(ReviewGapKind::Unsigned) => "unsigned",
+                                Some(ReviewGapKind::Stale) => "stale",
+                                Some(ReviewGapKind::NotDistinct) => "not-distinct",
+                            },
+                        ),
+                    };
+                    FlowScenarioState { id: found.id.clone(), title: found.title.clone(), failure: found.failure, evidenced, review }
+                })
+                .collect();
+            let mut gaps = Vec::new();
+            if scenarios.is_empty() {
+                gaps.push("no scenario");
+            } else if !scenarios.iter().any(|s| s.failure) {
+                gaps.push("no failure case");
+            }
+            FlowStep { id, change: change.as_str().to_string(), scenarios, gaps }
+        })
+        .collect()
+}
+
+/// [`crate::brief::brief_of`] plus what `canon brief check` found in the
+/// brief's text (0.19 D2): the counts `canon status` shows. Omitted for a
+/// pre-0.19 brief and for a brief that does not exist yet.
+fn brief_with_findings(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes: &[ChangeId]) -> Option<BriefStatus> {
+    let mut brief = crate::brief::brief_of(repo, plan_roots, subject, changes)?;
+    if let (true, Some(change)) = (brief.brief_exists, changes.last()) {
+        let building = matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying | SubjectStatus::Shipped);
+        brief.findings = crate::brief_check::status_counts(repo, change, building);
+    }
+    Some(brief)
 }
 
 /// What makes a `shipped` subject's gate red ([`SubjectSummary::red`]):
@@ -799,7 +893,7 @@ fn subject_steps(
                 brief.report_in()
             ),
             why: format!(
-                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses {id}'s scenarios and tasks until it is recorded; once the human answers, {} and run `canon policy approve --by <the human> --note \"<their words>\"`",
+                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses {id}'s scenarios and tasks until it is recorded; once the human answers, {} (one call records the brief and the policy approval)",
                 brief.unanswered(),
                 brief.record()
             ),
@@ -811,14 +905,14 @@ fn subject_steps(
     // every gap below is follow-up work inside its approved change.
     if status == SubjectStatus::Shipped && !summary.red.is_empty() {
         let tasks = match summary.brief.as_ref().and_then(|brief| brief.change.as_deref()) {
-            Some(change) => format!("as tasks in its approved change `{change}` (never `canon change new`)"),
-            None => "as tasks in its change".to_string(),
+            Some(change) => format!("keep the follow-up in its approved change `{change}` (never `canon change new`)"),
+            None => "keep the follow-up in its change".to_string(),
         };
         next.push(NextStep {
             actor: StepActor::Agent,
             command: reopen_command(id),
             why: format!(
-                "{id} is shipped but its gate is red ({}); reopen it, add the follow-up {tasks}, then scenario, evidence and review, and ship it again",
+                "{id} is shipped but its gate is red ({}); reopen it, {tasks}, then scenario, evidence and review, and ship it again",
                 summary.red.join(", ")
             ),
         });
@@ -1062,11 +1156,34 @@ pub fn render(report: &StatusReport) -> String {
             }
             if let Some(brief) = &s.brief {
                 let _ = match (&brief.approval, &brief.brief, &brief.change) {
+                    (Some(_), Some(_), _) if brief.changed => writeln!(out, "      brief: not approved ({}); {}", brief.unanswered(), brief.record()),
+                    (Some(approval), Some(path), _) if brief.legacy_approval => writeln!(
+                        out,
+                        "      brief: approved in {path} — {approval}\n      advisory: that approval has no digest, so it does not follow the brief's text; {} to bind it",
+                        brief.record_digest_hint()
+                    ),
                     (Some(approval), Some(path), _) => writeln!(out, "      brief: approved in {path} — {approval}"),
                     (None, Some(_), _) => writeln!(out, "      brief: not approved ({})", brief.unanswered()),
                     (_, None, Some(change)) => writeln!(out, "      brief: not approved (change `{change}` has no brief; advisory, nothing to approve yet)"),
                     _ => writeln!(out, "      brief: not approved (no adopted change; advisory, nothing to approve yet)"),
                 };
+            }
+            if let Some(counts) = s.brief.as_ref().and_then(|b| b.findings) {
+                let _ = writeln!(out, "      brief check: {} blocker(s), {} advisory(ies); `canon brief` names the next step", counts.blockers, counts.advisories);
+            }
+            for step in &s.flow {
+                let _ = writeln!(out, "      flow {}{}", step.id, if step.gaps.is_empty() { String::new() } else { format!(" — {}", step.gaps.join(", ")) });
+                for scenario in &step.scenarios {
+                    let _ = writeln!(
+                        out,
+                        "        {} \"{}\"{} — evidence: {}, review: {}",
+                        scenario.id,
+                        scenario.title,
+                        if scenario.failure { " [failure]" } else { "" },
+                        if scenario.evidenced { "yes" } else { "none" },
+                        scenario.review
+                    );
+                }
             }
             if !s.red.is_empty() {
                 let _ = writeln!(out, "      gate: red — {}; reopen with `{}`", s.red.join(", "), reopen_command(&s.id));

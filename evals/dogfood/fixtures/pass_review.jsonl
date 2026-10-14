@@ -1,0 +1,5 @@
+{"type":"session","version":3,"id":"pass-review","timestamp":"2026-01-01T00:01:00Z","cwd":"/workspace"}
+{"type":"message","id":"u1","message":{"role":"user","content":[{"type":"text","text":"review"}]},"timestamp":"2026-01-01T00:01:01Z"}
+{"type":"message","id":"a1","message":{"role":"assistant","content":[{"type":"toolCall","id":"c1","name":"bash","arguments":{"command":"canon review add --scenario-id demo.01","cwd":"/workspace"}}]},"timestamp":"2026-01-01T00:01:02Z"}
+{"type":"message","id":"r1","message":{"role":"toolResult","toolCallId":"c1","content":[{"type":"text","text":"written directly"}],"isError":false},"timestamp":"2026-01-01T00:01:03Z"}
+{"type":"message","id":"a2","message":{"role":"assistant","content":[],"stopReason":"stop"},"timestamp":"2026-01-01T00:01:04Z"}

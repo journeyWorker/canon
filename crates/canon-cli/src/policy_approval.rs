@@ -106,26 +106,21 @@ pub fn advisory(repo: &Path) -> Option<String> {
     }
 }
 
-/// `canon policy approve`. Returns the process exit code: `0` written,
-/// `2` refused (no policy to approve, an empty `--by`, or a write
-/// failure).
-pub fn run_approve(repo: &Path, by: &str, note: Option<&str>) -> i32 {
-    let repo = resolve_repo_root(repo);
+/// Writes the policy approval record for `by` under an already-resolved
+/// repo root. `Err` carries the refusal text (no policy to approve, an
+/// empty `by`, or a read/write failure). Shared by `canon policy approve`
+/// and `canon brief approve`, which records both in one call.
+pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApproval, String> {
     if by.trim().is_empty() {
-        eprintln!("canon policy approve: refused — --by must name who approved the policy");
-        return 2;
+        return Err("refused — --by must name who approved the policy".to_string());
     }
     let policy_path = repo.join(paths::POLICY_FILE);
     let policy = match fs::read(&policy_path) {
         Ok(bytes) => bytes,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            eprintln!("canon policy approve: refused — {} does not exist, so there is no policy to approve; `canon init` writes a starter policy", policy_path.display());
-            return 2;
+            return Err(format!("refused — {} does not exist, so there is no policy to approve; `canon init` writes a starter policy", policy_path.display()));
         }
-        Err(e) => {
-            eprintln!("canon policy approve: cannot read {}: {e}", policy_path.display());
-            return 2;
-        }
+        Err(e) => return Err(format!("cannot read {}: {e}", policy_path.display())),
     };
     let approval = PolicyApproval {
         policy_digest: policy_digest(&policy),
@@ -136,19 +131,32 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>) -> i32 {
     let approval_path = repo.join(paths::POLICY_APPROVAL_FILE);
     let mut body = serde_json::to_string_pretty(&approval).expect("a PolicyApproval always serializes");
     body.push('\n');
-    if let Err(e) = fs::write(&approval_path, body) {
-        eprintln!("canon policy approve: cannot write {}: {e}", approval_path.display());
-        return 2;
+    fs::write(&approval_path, body).map_err(|e| format!("cannot write {}: {e}", approval_path.display()))?;
+    Ok(approval)
+}
+
+/// `canon policy approve`. Returns the process exit code: `0` written,
+/// `2` refused (no policy to approve, an empty `--by`, or a write
+/// failure).
+pub fn run_approve(repo: &Path, by: &str, note: Option<&str>) -> i32 {
+    let repo = resolve_repo_root(repo);
+    match record(&repo, by, note) {
+        Ok(approval) => {
+            println!(
+                "canon policy approve: {} ({}) approved by `{}` — wrote {} — {}",
+                paths::POLICY_FILE,
+                approval.policy_digest,
+                approval.approved_by,
+                paths::POLICY_APPROVAL_FILE,
+                crate::write_mode::DIRECT
+            );
+            0
+        }
+        Err(e) => {
+            eprintln!("canon policy approve: {e}");
+            2
+        }
     }
-    println!(
-        "canon policy approve: {} ({}) approved by `{}` — wrote {} — {}",
-        paths::POLICY_FILE,
-        approval.policy_digest,
-        approval.approved_by,
-        paths::POLICY_APPROVAL_FILE,
-        crate::write_mode::DIRECT
-    );
-    0
 }
 
 #[cfg(test)]

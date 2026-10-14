@@ -118,4 +118,24 @@ false-pass rate, regression, latency, and cost are unknown (`null`), not zero an
 not an improvement claim. The repository does not claim measured agent uplift
 until baseline and candidate tasks have both been exercised and their result
 provenance is available. A scoreboard with no result files is therefore not a
+
 performance report; it is simply an unmeasured state.
+
+## Trace-checked dogfood evals (D8)
+
+`dogfood/trace_check.py` is a read-only, Python 3 standard-library checker for
+OMP session JSONL (a main file also discovers its sibling subagent files) and
+Codex `codex exec --json` JSONL:
+
+```sh
+python3 evals/dogfood/trace_check.py /path/to/session.jsonl
+python3 evals/dogfood/trace_check.py /path/to/session-dir --question-turn 1 --json
+```
+
+The report lists writes outside `.canon/` before the first brief stop, writes in
+caller-marked question-only turns, code-writing versus review sessions, Canon
+calls by verb, first-call exit validity, and recovery depth (intervening Canon
+calls after a failed call). A hard check violation exits 1; malformed input or
+an unreadable path exits 2. `--json` is intended for CI aggregation. The
+checker reports only side effects explicit in the trace; it does not claim to
+audit arbitrary subprocess filesystem activity.

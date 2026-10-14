@@ -27,29 +27,43 @@ pub fn fence_of(line: &str) -> Option<(char, usize, bool)> {
 /// something, and sits outside fenced code blocks and HTML comments,
 /// which may span lines.
 pub fn field<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+    field_lines(text, key).next().map(|(_, value)| value)
+}
+
+/// `text` with every line [`field`] would read for `key` removed (a line
+/// inside a fence or an HTML comment is not a field and stays). Every
+/// other byte, line endings included, is kept.
+pub fn without_field(text: &str, key: &str) -> String {
+    let dropped: Vec<usize> = field_lines(text, key).map(|(index, _)| index).collect();
+    text.split_inclusive('\n').enumerate().filter(|(index, _)| !dropped.contains(index)).map(|(_, line)| line).collect()
+}
+
+/// Every line [`field`] reads for `key`, with its 0-based line index.
+fn field_lines<'t, 'k>(text: &'t str, key: &'k str) -> impl Iterator<Item = (usize, &'t str)> + use<'t, 'k> {
     let mut fence: Option<(char, usize)> = None;
     let mut in_comment = false;
-    for line in text.lines() {
+    text.lines().enumerate().filter_map(move |(index, line)| {
         if !in_comment {
             match (fence, fence_of(line)) {
                 (None, Some((ch, run, _))) => {
                     fence = Some((ch, run));
-                    continue;
+                    return None;
                 }
                 (Some((open_ch, open_run)), Some((ch, run, true))) if ch == open_ch && run >= open_run => {
                     fence = None;
-                    continue;
+                    return None;
                 }
-                (Some(_), _) => continue,
+                (Some(_), _) => return None,
                 (None, None) => {}
             }
             if let Some(value) = line.trim_start().strip_prefix(key).map(str::trim).filter(|rest| !rest.is_empty()) {
-                return Some(value);
+                in_comment = comment_open_after(line, in_comment);
+                return Some((index, value));
             }
         }
         in_comment = comment_open_after(line, in_comment);
-    }
-    None
+        None
+    })
 }
 
 /// Whether an HTML comment is open at the end of `line`, given whether

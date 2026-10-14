@@ -16,63 +16,85 @@ Follow these steps in order for every request that builds, changes or fixes
 a feature, a one-line request included. A human is needed once per scope:
 
 - **The approval** (step 1). A new subject, or a change to an approved
-  subject's scope, needs the human to approve its brief: the request, your
-  assumptions, your open questions. Write the brief, then stop and report
-  it: build nothing for that scope (no scenarios, code or evidence) before
-  the human answers. The approval is the one thing you never assume, even
-  when the human said they cannot answer until you report: the brief is
-  that report. In the same answer the human approves the policy,
-  `.canon/policy.yaml` (written by `canon init`), which is what the gate
-  grades the work against. When the human answers, record both at once:
-  an `Approved: <who> <when> — "<the human's words>"` line in the change's
-  `.canon/changes/<slug>/brief.md`, and
-  `canon policy approve --by <the human> --note "<their words>"`. Never
-  approve without a human answer, and never edit the policy to make the
-  gate pass.
+  subject's scope, needs the human to approve its brief. Write the brief,
+  run `canon brief check` until it reports no blockers, then stop and
+  report the brief to the human, in the brief's language: build nothing for
+  that scope (no scenarios, code or evidence) before the human answers. The
+  approval is the one thing you never assume, even when the human said they
+  cannot answer until you report: the brief is that report. The one answer
+  approves the brief and the policy, `.canon/policy.yaml` (written by
+  `canon init`), which is what the gate grades the work against. Record it
+  in one call:
+  `canon brief approve --change <slug> --by <the human> --note "<their words>"`.
+  Never approve without a human answer, and never edit the policy to make
+  the gate pass. A brief edited after its approval is not approved
+  (`BRIEF_CHANGED_SINCE_APPROVAL`): it needs a new human answer and a new
+  `canon brief approve`.
 - **Inside an approved scope, never stop for a human.** Fixes, follow-ups,
   review rounds and re-reviews go straight on: add or extend the scenario,
   implement, gather evidence, and get an independent review in another
   session. Independent review happens on every change. A fix or follow-up
-  stays in the approved change: add it as tasks in that change's
-  `tasks.md`, never with `canon change new`, because a new change is a new
-  scope and needs the human's approval.
+  stays in the approved change, never `canon change new`, because a new
+  change is a new scope and needs the human's approval. A follow-up that
+  adds or changes a step of the brief edits the brief: that is a scope
+  change, and it needs a new answer.
 - **A follow-up on a shipped subject reopens it.** Reopen it with
   `canon subject status <id> verifying --reason "<why>" --actor-id <unit>`
   (no human inside the approved scope; the reason and your id are
-  recorded), add the follow-up as tasks in the approved change's
-  `tasks.md`, then its scenario, evidence and an independent review, and
-  ship again with `canon subject status <id> shipped`, which runs every
-  guard again. `canon status` flags a shipped subject whose gate went red
-  and names the reopen.
+  recorded), add its scenario, evidence and an independent review, and ship
+  again with `canon subject status <id> shipped`, which runs every guard
+  again. `canon status` flags a shipped subject whose gate went red and
+  names the reopen.
+- **Non-behavior work is a chore.** A refactor, dependency, build, CI or
+  infra change that alters nothing a user can observe:
+  `canon change new <slug> --subject <id> --kind chore --title "…"`. Its
+  brief is short (intent, category, invariants, checks, out of scope) and
+  approved like any brief, one human stop. A chore adds no scenarios: run
+  the subject's suite again and bind it with
+  `canon evidence add --all-scenarios --report <kind>:<path> …`; that
+  supersedes the old evidence and makes the pinned reviews stale, so an
+  independent re-review follows. Work that changes behavior is never a
+  chore: it is a feature change.
 
 When no human can answer one of the brief's questions, write the question
-into the brief, state the assumption you will build on, and say so in your
-report. Proceeding on an assumption applies to the brief's questions and to
-work inside an approved scope, never to the approval itself.
+into the brief's Questions and assumptions, state the assumption you will
+build on, and say so in your report. Proceeding on an assumption applies to
+the brief's questions and to work inside an approved scope, never to the
+approval itself.
 
-1. **Brief.** For a new subject or a scope change, write down the request
-   verbatim, your assumptions, and the questions you could not ask. It
-   becomes the change's `.canon/changes/<slug>/brief.md`, which
-   `canon change new <slug> --subject <id> --title "…"` writes once the
-   subject exists (step 2). A change that comes from an external plan the
-   human prepared (an openspec `proposal.md` read through
-   `plans.sources`) gets its brief there too: a `brief.md` whose
-   `Source: <path>` line points at the plan; canon never edits the plan.
-   Once the brief is there, stop and report it,
-   asking the human once for the brief and the policy; go on to step 3
-   only after the human answers, and record the answer as above. Inside an
-   approved scope there is no new brief: go to step 3 under the existing
-   subject and change.
+1. **Brief.** For a new subject or a scope change, write the PRD brief in
+   the change's `.canon/changes/<slug>/brief.md`, which
+   `canon change new` writes as a skeleton once the subject exists
+   (step 2): intent, desired outcome, the user flow as numbered steps
+   `F1`, `F2`, … (sees → does → becomes), step detail per step, acceptance
+   per step with its failure path, questions and assumptions, out of scope.
+   Write it in the `language:` of `canon.yaml`; unset, in the request's
+   language, and add "which language?" to the questions. Anything that
+   could change policy goes to the questions: never decide it yourself.
+   `canon brief check` (read-only, `--json`) lists findings; fix every
+   blocker (structure) before you stop, and treat advisories (prose) as
+   optional. Bare `canon brief` names the next steps. Five optional
+   refinement passes, each standing alone: `reference/brief-shape.md`,
+   `brief-clarify.md`, `brief-harden.md`, `brief-align.md`,
+   `brief-polish.md`. Then stop and report the brief to the human in that
+   language, asking once; go on to step 3 only after the human answers, and
+   record the answer with `canon brief approve`. A change that comes from
+   an external plan the human prepared (an openspec `proposal.md` read
+   through `plans.sources`) gets a `brief.md` whose `Source: <path>` line
+   points at the plan; canon never edits the plan. Inside an approved scope
+   there is no new brief: go to step 3 under the existing subject and
+   change.
 2. **Subject.** `canon subject new <id> --domain <domain> --title "…"`, then
-   `canon change new <slug> --subject <id> --title "…"`, and put the brief in
-   the `.canon/changes/<slug>/brief.md` it writes. For a new subject or a
-   scope change, this is where you stop until the human answers (step 1).
-   A change that also serves another subject is adopted there too,
+   `canon change new <slug> --subject <id> --title "…"` (it writes
+   `brief.md` and no `tasks.md`), and fill in the brief (step 1). For a new
+   subject or a scope change, this is where you stop until the human
+   answers. A change that also serves another subject is adopted there too,
    `canon subject adopt <slug> --subject <other>`: it then belongs to both,
-   and its open blockers gate both.
+   and its open blockers gate both. `tasks.md` is an optional work note
+   nothing gates on.
 3. **Scenarios.** `canon feature new <area>.<surface> --title "…"`, then one
-   `canon scenario new <area>.<surface>.<nn> --subject <id> --case <case> --title "…"`
-   per behavior, with failure paths (`--case failure`) as well as `happy`
+   `canon scenario new <area>.<surface>.<nn> --subject <id> --flow <F-id> --case <case> --title "…"`
+   per behavior, each pointing at the brief's flow step it proves, with failure paths (`--case failure`) as well as `happy`
    and `edge`. When the gate asks for a missing case (`require_cases`), add
    a new scenario; never retag an existing one to satisfy it. There is no
    sync or format step: `canon status`, `canon gate check`,
@@ -115,11 +137,12 @@ work inside an approved scope, never to the approval itself.
    again before running it.
    An external evaluator's audit is recorded with `canon evidence add --kind
    audit`; canon never generates one.
-   Evidence for a plan task (`--task <id>`, before `canon gate task`) must
-   bind the artifact or report that proves the task; a canon command
-   (`canon status`, `canon gate check`) is never that proof. Both read the
-   change's `tasks.md` as it is now, so a task row you add needs no
-   `canon ingest plans` first.
+   Evidence for a task of an imported external plan (`--task <id>`, before
+   `canon gate task`) must bind the artifact or report that proves the
+   task; a canon command (`canon status`, `canon gate check`) is never that
+   proof. Both read the plan's `tasks.md` as it is now, so a task row needs
+   no `canon ingest plans` first. A canon-owned change has no task rows to
+   attest: its scenarios are the checklist.
 7. **Independent review.** A different session from the one that wrote the
    code and evidence reviews the change. The review session must be able
    to run the checks it signs off (the build, the tests, the app); a
@@ -148,22 +171,23 @@ work inside an approved scope, never to the approval itself.
    blocker findings); fix the gap rather than overriding, and finish with
    `canon gate check` clean. A root whose `.feature` edits could not be
    indexed fails the gate and refuses `shipped` (`uncovered-cell <root>`;
-   see step 3). `shipped` also refuses while the change's
-   `.canon/changes/<slug>/brief.md` has no `Approved:` line (for a change
-   from an external plan with no canon brief yet, it names the `brief.md`
-   to create with its `Source:` line), and `canon evidence add` refuses the
-   subject's scenarios and tasks the same way. Both are backstops: the stop
-   itself is at step 1, so you never reach them for a brief the human has
-   not answered. You record the line only from the human's answer (with no
-   brief to answer there is nothing to refuse, and the
-   ship guard only prints an advisory). Move the subject to
-   `shipped` yourself once `canon subject status <id> shipped` passes its
-   guard, unless the brief says the human ships. `canon status` shows
-   whether each subject's brief is approved, by the same check, and names
-   the next step. `shipped → verifying` reopens a shipped subject for a
-   follow-up (see the working loop above): it needs `--reason`, and it is
-   refused, naming the brief, when the subject's newest change is not
-   approved.
+   see step 3). `shipped` also refuses while the change's brief is not
+   approved, was edited after its approval (`BRIEF_CHANGED_SINCE_APPROVAL`),
+   or has structure blockers (`canon brief check`), and while a flow step
+   has no scenario or no failure scenario (`canon status` lists each step's
+   coverage). For a change from an external plan with no canon brief yet it
+   names the `brief.md` to create with its `Source:` line.
+   `canon evidence add` refuses an unapproved brief's scenarios the same
+   way. Both are backstops: the stop itself is at step 1. You record the
+   approval only from the human's answer, with `canon brief approve` (with
+   no brief to answer there is nothing to refuse, and the ship guard only
+   prints an advisory). Move the subject to `shipped` yourself once
+   `canon subject status <id> shipped` passes its guard, unless the brief
+   says the human ships. `canon status` shows whether each subject's brief
+   is approved, by the same check, and names the next step.
+   `shipped → verifying` reopens a shipped subject for a follow-up (see the
+   working loop above): it needs `--reason`, and it is refused, naming the
+   brief, when the subject's newest change is not approved.
 
 Every write command says whether the record is final (`written directly`,
 or `staged and promoted in this run`) or staged; only a staged record
@@ -211,11 +235,12 @@ legacy source and is installed explicitly with `--source canon/skills-dev`.
 ### Route by task
 
 - **Where the repo stands, subjects and changes (loop steps 1, 2, 8):** read `reference/canon-subject.md`; it covers `canon status`, `canon subject new|adopt|status` and `canon change new`.
+- **Refine a brief before the human stop (step 1):** read one of `reference/brief-shape.md` (structure), `brief-clarify.md` (open questions), `brief-harden.md` (flow and step detail agree), `brief-align.md` (scenarios cover the flow), `brief-polish.md` (prose). Each stands alone; none needs another first.
 - **Write or reorganize `.feature` specs (step 3):** read `reference/canon-authoring.md` before editing; use the scaffold.
 - **Understand available fields/enums/policy bindings:** read `reference/canon-context.md` and `reference/canon-vocab.md`.
 - **Capture replayable run inputs / version prompts:** read `reference/canon-context.md`, then use `canon context-pack create|show|verify` and `canon prompt register|show` with explicit repository-relative JSON manifests.
 - **Validate or index specs:** read `reference/canon-fmt.md` and `reference/canon-inventory.md`.
-- **Evidence, gates, task checkboxes, hooks (step 6):** read `reference/canon-gate.md`.
+- **Evidence, gates, imported-plan task checkboxes, hooks (step 6):** read `reference/canon-gate.md`.
 - **Findings and reviews (step 7):** read `reference/canon-review.md`.
 - **Ingest artifacts, sessions or plans:** read `reference/canon-artifact-ingest.md`, `reference/canon-session-ingest.md`, or `reference/canon-plan-import.md`.
 - **Configure storage, policy, plugins, or strategy learning:** read `reference/canon-storage.md`, `reference/canon-policy.md`, `reference/canon-plugins.md`, or `reference/canon-learn.md`.

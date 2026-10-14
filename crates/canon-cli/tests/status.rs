@@ -563,7 +563,7 @@ fn context_status_70_a_shipped_subject_whose_gate_is_red_is_flagged_and_its_step
     assert_eq!(commands(&report), [reopen]);
     assert_eq!(
         report["next"][0]["why"],
-        format!("demo-subject is shipped but its gate is red ({red}); reopen it, add the follow-up as tasks in its approved change `c-demo-subject` (never `canon change new`), then scenario, evidence and review, and ship it again")
+        format!("demo-subject is shipped but its gate is red ({red}); reopen it, keep the follow-up in its approved change `c-demo-subject` (never `canon change new`), then scenario, evidence and review, and ship it again")
     );
     let human = stdout(&run(dir.path(), &["status"]));
     assert!(human.contains(&format!("      gate: red — {red}; reopen with `{reopen}`\n")), "{human}");
@@ -636,7 +636,7 @@ fn context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_m
     let whys: Vec<&str> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").map(|n| n["why"].as_str().unwrap()).collect();
     assert!(whys[0].contains(".canon/changes/c-demo-subject/brief.md"), "{}", whys[0]);
     for why in &whys {
-        assert!(why.contains("Approved: <who> <when>") && why.contains("canon policy approve --by <the human> --note"), "{why}");
+        assert!(why.contains("`canon brief approve --change ") && why.contains("--by <the human> --note"), "{why}");
         assert!(why.contains("`canon evidence add` refuses demo-subject's scenarios and tasks"), "{why}");
     }
     let demo = subject(&report, "demo-subject");
@@ -670,11 +670,11 @@ fn context_status_60_status_reads_the_approval_from_the_changes_brief() {
     let words = APPROVED.strip_prefix("Approved: ").unwrap();
     assert_eq!(
         subject(&report, "demo-subject")["brief"],
-        serde_json::json!({"approved": true, "enforced": false, "change": "c-second", "brief": ".canon/changes/c-second/brief.md", "briefExists": true, "approval": words})
+        serde_json::json!({"approved": true, "enforced": false, "change": "c-second", "brief": ".canon/changes/c-second/brief.md", "briefExists": true, "approval": words, "legacyApproval": true})
     );
     assert_eq!(
         subject(&report, "done-subject")["brief"],
-        serde_json::json!({"approved": true, "enforced": false, "change": "c-done-subject", "brief": ".canon/changes/c-done-subject/brief.md", "briefExists": true, "approval": words}),
+        serde_json::json!({"approved": true, "enforced": false, "change": "c-done-subject", "brief": ".canon/changes/c-done-subject/brief.md", "briefExists": true, "approval": words, "legacyApproval": true}),
         "a shipped subject shows its brief in full"
     );
     assert!(subject(&report, "early-subject").get("brief").is_none(), "a specced subject carries no brief field");
@@ -734,7 +734,7 @@ fn context_status_63_a_line_that_only_mentions_approval_does_not_approve() {
     }
 }
 
-/// context.status.65: a fix lives as tasks inside the approved change, so
+/// context.status.65: a fix stays inside the approved change, so
 /// a newer adopted change is a new scope. An approval on an older change
 /// does not cover it: status names the newest change, asks for the human,
 /// and withholds the ship step.
@@ -807,7 +807,7 @@ fn context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points
     let words = APPROVED.strip_prefix("Approved: ").unwrap();
     assert_eq!(
         subject(&report, "old-subject")["brief"],
-        serde_json::json!({"approved": true, "enforced": false, "change": "c-old", "brief": ".canon/changes/c-old/brief.md", "briefExists": true, "source": "plans/changes/archive/c-old/proposal.md", "approval": words}),
+        serde_json::json!({"approved": true, "enforced": false, "change": "c-old", "brief": ".canon/changes/c-old/brief.md", "briefExists": true, "source": "plans/changes/archive/c-old/proposal.md", "approval": words, "legacyApproval": true}),
         "{report}"
     );
     let human: Vec<&Value> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").collect();
@@ -820,7 +820,7 @@ fn context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points
     assert!(
         why.contains(".canon/changes/c-live/brief.md does not exist yet")
             && why.contains("create .canon/changes/c-live/brief.md holding a `Source: plans/changes/c-live/proposal.md` line")
-            && why.contains("`Approved: <who> <when>"),
+            && why.contains("`canon brief approve --change c-live --by <the human> --note"),
         "{why}"
     );
     let text = stdout(&run(dir.path(), &["status"]));

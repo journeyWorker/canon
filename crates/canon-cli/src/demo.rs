@@ -68,7 +68,7 @@ pub fn run_demo_init(repo: &Path) -> i32 {
     // with no AGENTS.md block to refresh, a rerun has nothing to do. The
     // demo writes its own policy below, so init's starter policy is off,
     // and a sandbox gets no canon skill, so the harness choice is skipped.
-    let code = crate::init::run_init(repo, crate::init::InitOptions { agents_md: false, policy: None, skills: crate::init::SkillsChoice::Skip });
+    let code = crate::init::run_init(repo, crate::init::InitOptions { agents_md: false, policy: None, skills: crate::init::SkillsChoice::Skip, language: None });
     if code != 0 {
         return code;
     }

@@ -725,6 +725,7 @@ pub fn run_status(
     // an index the `.feature` edits are not in would ship ungraded specs.
     if ships {
         blocking.extend(crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation("verifying → shipped: ")));
+        blocking.extend(brief_check_violation(&repo, subject_id, &changes));
     }
     if reopens {
         blocking.extend(reopen_violation(&repo, &subject, &changes));
@@ -776,7 +777,7 @@ pub fn run_status(
                 fixes.push("record an independent review (`canon review add`) and close blocker findings");
             }
             if brief_gap.is_some() {
-                fixes.push("get the human's answer to the brief and record it as its `Approved:` line");
+                fixes.push("get the human's answer to the brief and record it with `canon brief approve`");
             }
             eprintln!(
                 "canon subject status: refused — {}, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject{}",
@@ -801,8 +802,8 @@ pub fn run_status(
     if let (true, Some(reason)) = (reopens, reason) {
         let change = changes.last().cloned();
         let into = match &change {
-            Some(change) => format!("add the follow-up as tasks in its approved change `{}`", change.as_str()),
-            None => "add the follow-up as tasks in its change".to_string(),
+            Some(change) => format!("keep the follow-up in its approved change `{}`", change.as_str()),
+            None => "keep the follow-up in its change".to_string(),
         };
         eprintln!(
             "canon subject status: reopened `{}` from shipped, recorded by `{actor_id}`: {reason}; {into}, then scenario, evidence and review; shipping again runs every guard",
@@ -976,6 +977,29 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
         violation
     }));
     violations
+}
+
+/// The `verifying → shipped` brief-structure check (0.19 D2): the blocker
+/// rules of `canon brief check` over the subject's newest adopted change's
+/// brief, as one `unreviewed-promotion` naming each finding. Not waivable
+/// by `--override-reason`: the brief waives its own findings, one rule in
+/// one section (`canon:waive`). `None` when there is no such brief, it is a
+/// pre-0.19 brief, or nothing blocks.
+fn brief_check_violation(repo: &Path, subject_id: &SubjectId, changes: &[ChangeId]) -> Option<Violation> {
+    let findings = crate::brief_check::guard_blockers(repo, changes.last()?);
+    if findings.is_empty() {
+        return None;
+    }
+    let listed = findings
+        .iter()
+        .map(|f| format!("{} [{}] line {}", f.rule, f.section.as_deref().unwrap_or("-"), f.line))
+        .collect::<Vec<_>>()
+        .join("; ");
+    Some(Violation::new(
+        FailureClass::UnreviewedPromotion,
+        subject_id.as_str(),
+        format!("verifying → shipped: the brief has {} blocker finding(s): {listed}; `canon brief check` shows them", findings.len()),
+    ))
 }
 
 /// The `verifying → shipped` brief check (module doc): an
