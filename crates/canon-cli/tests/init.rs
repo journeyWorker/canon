@@ -422,7 +422,10 @@ fn init_then_ingest_plans_exits_0_as_a_clean_no_op() {
 
     let out = run_canon(&["ingest", "plans", "--repo", ".", "--json"], dir.path());
     assert!(out.status.success(), "canon ingest plans right after init must be a clean no-op: {}", stderr(&out));
-    let payload: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    let body: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    let payload = &body["data"];
+    assert_eq!(body["meta"]["command"], "ingest plans", "{body}");
+    assert!(body["meta"]["next"].is_array(), "a write names what follows: {body}");
     assert_eq!(payload["sources"].as_array().map(Vec::len), Some(0), "no external source and no .canon/changes yet: {payload}");
     assert_eq!(payload["changes_persisted"], 0, "{payload}");
 }

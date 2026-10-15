@@ -415,7 +415,7 @@ pub fn example_for(path: &str) -> Option<&'static str> {
 pub fn check_examples(root: &Command) -> Vec<String> {
     let leaves = leaf_paths(root);
     let mut problems = Vec::new();
-    for leaf in &leaves {
+    for leaf in leaves.iter().filter(|leaf| crate::deprecation::lookup(leaf).is_none()) {
         if example_for(leaf).is_none() {
             problems.push(format!("clap leaf `{leaf}` has no example"));
         }

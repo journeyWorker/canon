@@ -243,3 +243,45 @@ fn a_declared_role_keeps_its_steps_and_counts_the_rest() {
     assert!(!steps.is_empty() && steps.iter().all(|s| s["role"] == "reviewer"), "{steps:?}");
     assert_eq!(wrote["meta"]["waitingOn"]["implementer"], 1, "{wrote}");
 }
+
+/// [`brief`] with a second flow step, `F2`.
+fn brief_with_two_flows() -> String {
+    brief()
+        .replace("lands on the catalog. ==**Only a valid sign-in opens a session.**==\n\n", "lands on the catalog. ==**Only a valid sign-in opens a session.**==\n2. F2 The visitor signs out → the session ends. ==**A signed-out cart stays saved.**==\n\n")
+        .replace("The password is never logged.**==\n\n", "The password is never logged.**==\n\n### F2 Sign out\n\nThe server ends the session. ==**The cookie is cleared.**==\n\n")
+        .replace("set a session cookie.\n\n", "set a session cookie.\n- F2: signing out clears the cookie.\n\n")
+}
+
+/// The step `status` names for `demo` that carries `--flow <flow>`.
+fn flow_step_of(repo: &Path, flow: &str) -> Option<Value> {
+    let report = json_of(&canon(repo, &["status", "--json"], None), "status");
+    report["next"].as_array().unwrap().iter().find(|step| step["command"].as_str().unwrap_or("").contains(&format!("--flow {flow} "))).cloned()
+}
+
+#[test]
+fn a_flow_step_with_only_a_happy_scenario_is_asked_for_its_failure_case_with_its_flow() {
+    let (dir, _) = repo_with_change();
+    let repo = dir.path();
+    std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_two_flows()).unwrap();
+    ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
+    ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject", "demo", "--case", "failure", "--flow", "F1", "--json"]);
+
+    // F2 has no scenario yet: the step is the happy case, owned by the planner.
+    let none = flow_step_of(repo, "F2").expect("a step for F2");
+    let command = none["command"].as_str().unwrap();
+    assert!(command.starts_with("canon scenario new auth.login.03 --subject demo --case happy --flow F2 --title "), "{none}");
+    assert_eq!(none["role"], "planner", "{none}");
+
+    // F2 gains only its happy scenario: the same step now asks for the failure case.
+    let wrote = ok(repo, &["scenario", "new", "auth.login.03", "--title", "Sign out", "--subject", "demo", "--case", "happy", "--flow", "F2", "--json"]);
+    for step in [flow_step_of(repo, "F2").expect("status names F2's failure case"), meta_next(&wrote).into_iter().find(|s| s["command"].as_str().unwrap().contains("--flow F2 ")).expect("meta.next names it too")] {
+        let command = step["command"].as_str().unwrap();
+        assert!(command.starts_with("canon scenario new auth.login.04 --subject demo --case failure --flow F2 --title "), "{step}");
+        assert_eq!(step["role"], "implementer", "{step}");
+    }
+
+    // Once F2 has a failure scenario, no step asks for it again.
+    ok(repo, &["scenario", "new", "auth.login.04", "--title", "Sign out twice", "--subject", "demo", "--case", "failure", "--flow", "F2", "--json"]);
+    assert!(flow_step_of(repo, "F2").is_none(), "F2 is covered");
+}

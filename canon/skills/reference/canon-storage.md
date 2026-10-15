@@ -142,6 +142,12 @@ an explicit `partial` result with matched/deleted counts and a nonzero
 status. Purge never rewrites Git history or deletes source transcript
 files.
 
+With `--json`, `purge` and `export` answer `{ "data", "meta" }` like every other
+command: `data` is the plan or manifest, `meta.next` the step after (a plan's is the
+human's review and `--confirm`), and an export's page state (`total`, `returned`,
+`nextCursor`) sits in `meta`. `export --json --out <file>` writes the manifest to the
+file and answers with `data: { out, kind, recordCount }`.
+
 `canon export --kind <kind> [--before <RFC3339>] [--after <RFC3339>]
 [--out <file>] [--json] [--limit <n> | --all] [--cursor <c>]` emits a versioned manifest containing source scope,
 counts, digests, and redacted metadata. It does not authorize backend access;

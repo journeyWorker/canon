@@ -225,8 +225,9 @@ fn subject_status_to_transitions_and_without_to_shows() {
 #[test]
 fn the_two_positional_subject_status_form_warns_and_still_transitions() {
     let dir = subject_repo();
-    let old = ok(dir.path(), &["subject", "status", "demo", "specced"]);
+    let old = ok(dir.path(), &["subject", "status", "demo", "specced", "--json"]);
     assert!(stderr(&old).contains(&warning("subject status <id> <state>", "subject status <id> --to <state>")), "{}", stderr(&old));
+    deprecated_meta(&old, "subject status <id> --to <state>");
     let shown = ok(dir.path(), &["subject", "status", "demo"]);
     assert!(stdout(&shown).contains("(dev, specced)"), "the deprecated form transitioned the subject: {}", stdout(&shown));
 

@@ -2760,7 +2760,7 @@ fn run_ingest_artifacts(repo: &std::path::Path, watch: bool, interval_secs: u64,
         match canon_cli::artifact_ingest::run(repo, run_id) {
             Ok(outcome) => {
                 if json {
-                    println!("{}", canon_cli::artifact_ingest::format_json(&outcome));
+                    canon_cli::next::finish(repo, "ingest artifacts", &canon_cli::next::Scope::Repo, false, true, serde_json::from_str(&canon_cli::artifact_ingest::format_json(&outcome)).expect("the outcome is one JSON value"));
                 } else {
                     print!("{}", canon_cli::artifact_ingest::format_human(&outcome));
                 }
@@ -2800,12 +2800,13 @@ fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Optio
     match canon_cli::plans::run(repo, dialect, source) {
         Ok(outcome) => {
             if json {
-                let mut body: serde_json::Value = serde_json::from_str(&canon_cli::plans::format_json(&outcome)).expect("plans JSON is one value");
-                if !outcome.non_clean_sources.is_empty() {
-                    // The failure keeps this command's own shape and gains the shared `error`.
-                    body["error"] = CliError::failed("INGEST_SOURCE_UNUSABLE", "a plan source was malformed and persisted nothing").to_json()["error"].clone();
+                let body: serde_json::Value = serde_json::from_str(&canon_cli::plans::format_json(&outcome)).expect("plans JSON is one value");
+                if outcome.non_clean_sources.is_empty() {
+                    canon_cli::next::finish(repo, "ingest plans", &canon_cli::next::Scope::Repo, false, true, body);
+                } else {
+                    // The failure keeps the outcome as `data` beside the shared `error`.
+                    CliError::failed("INGEST_SOURCE_UNUSABLE", "a plan source was malformed and persisted nothing").emit_with_data("canon ingest plans", true, body);
                 }
-                println!("{body}");
             } else {
                 print!("{}", canon_cli::plans::format_human(&outcome));
                 if let Some(body) = canon_cli::plans::format_unwritten_json(&outcome) {
