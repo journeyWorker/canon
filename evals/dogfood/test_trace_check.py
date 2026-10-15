@@ -45,6 +45,15 @@ class TraceCheckTests(unittest.TestCase):
         self.assertEqual(report["implementer_sessions"], ["help-impl"])
         self.assertEqual(report["reviewer_sessions"], ["scratch-review"])
 
+    def test_orchestrated_roles_brief_by_subagent_review_from_eval(self):
+        # Dogfood eval 9: the planner subagent wrote the brief, so the root's
+        # first stop after it is the brief stop; the reviewer recorded its
+        # review from an eval cell (Bun.$`canon review add …`).
+        report = self.report("orch_root.jsonl")
+        self.assertTrue(report["hard_checks_passed"], report["failures"])
+        self.assertEqual(report["implementer_sessions"], ["orch-impl"])
+        self.assertEqual(report["reviewer_sessions"], ["orch-reviewer"])
+
     def test_recovery_depth_counts_intervening_canon_calls(self):
         report = self.report("reviewer_recovery_fail.jsonl")
         session = report["sessions"][0]
