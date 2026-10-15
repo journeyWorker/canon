@@ -138,9 +138,10 @@ fn require_mode_holds_a_scenario_to_a_passing_report_and_warn_never_fails() {
     );
 
     // warn: a newer unbound attestation is an advisory, never a failure.
-    // Leaving the bound report out is a recorded drop (0.15 D2).
+    // Leaving the bound report out is a recorded drop (0.15 D2); naming
+    // nothing carries it forward (0.21 T7).
     policy(repo, "warn");
-    assert!(attest(repo, &[]).status.code() == Some(2), "dropping the bound report silently is refused");
+    assert!(attest(repo, &[]).status.success(), "an attestation naming no file carries the bound report forward");
     assert!(attest(repo, &["--drop-attachment", "reports/junit.xml", "--drop-reason", "re-attested without the report"]).status.success());
     let warn = canon(repo, &["gate", "check"]);
     assert!(

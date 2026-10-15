@@ -1032,7 +1032,7 @@ enum EvidenceCommand {
         /// --kind audit: confirmed / refuted / indeterminate
         #[arg(long)]
         audit_result: Option<String>,
-        /// A file the scenario's latest record binds that this one deliberately does not (repository-relative path, as the refusal names it); repeatable; needs --drop-reason
+        /// Drop a file the scenario's latest record binds (repository-relative path); repeatable; needs --drop-reason. Without it every earlier attachment is carried into the new record unchanged; with --all-scenarios the drop applies to each scenario that binds the path
         #[arg(long = "drop-attachment", value_name = "PATH")]
         drop_attachments: Vec<String>,
         /// Why the --drop-attachment files are no longer bound (one line, recorded on the record)

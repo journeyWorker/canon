@@ -201,6 +201,7 @@ const CODES: &[(&str, &str)] = &[
     ("EVIDENCE_APPROVAL_INVALID", "the human approval attached to an attestation is missing, malformed or fails verification"),
     ("EVIDENCE_BATCH_REFUSED", "a batch attestation was refused and none of it was written"),
     ("EVIDENCE_BIND_REFUSED", "a --report or --file binding was refused"),
+    ("EVIDENCE_CARRY_BLOB_MISSING", "an earlier attachment to carry forward has no intact blob in the artifact store"),
     ("EVIDENCE_CONTRACT_MISMATCH", "the record's kind and ref differ from the task's typed evidence contract"),
     ("EVIDENCE_FABRICATED", "the note carries a fabrication marker or an unsupported verified claim"),
     ("EVIDENCE_INVALID_ARGUMENT", "an `evidence add` argument is empty, malformed or contradicts another"),

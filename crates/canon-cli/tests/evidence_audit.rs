@@ -119,12 +119,12 @@ fn write_policy(repo: &Path, yaml: &str) {
     write(repo, ".canon/policy.yaml", yaml.as_bytes());
 }
 
-/// evidence.add.40 / .41: a re-attest that leaves out a bound file is
-/// refused, naming the file and both ways out; re-binding new bytes at
-/// the same path is fine; `--drop-attachment` records the drop, which
-/// `canon status` lists.
+/// evidence.add.40 / .41: a re-attest that names no file for a bound
+/// path carries the earlier binding forward (0.21 T7); re-binding new
+/// bytes at the same path replaces it; `--drop-attachment` is the only
+/// way to lose a binding, records the drop, and `canon status` lists it.
 #[test]
-fn a_reattest_that_drops_a_binding_is_refused_until_rebound_or_dropped_on_purpose() {
+fn a_reattest_carries_bindings_forward_unless_dropped_on_purpose() {
     let dir = setup();
     let repo = dir.path();
     scenario(repo, "game.run.01", None);
@@ -132,10 +132,14 @@ fn a_reattest_that_drops_a_binding_is_refused_until_rebound_or_dropped_on_purpos
     write(repo, "reports/run.log", b"ok");
     record(repo, &attest_args("game.run.01", &["--artifact", "reports/shot.png", "--artifact", "reports/run.log"]));
 
-    let out = refused(repo, &attest_args("game.run.01", &["--artifact", "reports/run.log"]));
-    assert!(out.contains("binds file(s) this record does not: `reports/shot.png`"), "{out}");
-    assert!(out.contains("re-bind them") && out.contains("--drop-attachment <path>") && out.contains("--drop-reason <text>"), "names both ways out: {out}");
-    assert_eq!(staged(repo), 0, "a refused add stages nothing");
+    let out = ok(repo, &attest_args("game.run.01", &["--artifact", "reports/run.log", "--json"]));
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["data"]["records"][0]["carried"], serde_json::json!(["reports/shot.png"]), "{json}");
+    ok(repo, &["gate", "promote"]);
+    let latest = committed(repo).pop().unwrap();
+    let paths: Vec<&str> = latest["attachments"].as_array().unwrap().iter().map(|a| a["path"].as_str().unwrap()).collect();
+    assert!(paths.contains(&"reports/shot.png") && paths.contains(&"reports/run.log"), "the screenshot is still bound: {latest}");
+    assert!(latest.get("attachment_drop").is_none(), "{latest}");
 
     write(repo, "reports/shot.png", b"second frame");
     record(repo, &attest_args("game.run.01", &["--artifact", "reports/shot.png", "--artifact", "reports/run.log"]));
@@ -162,18 +166,21 @@ fn a_reattest_that_drops_a_binding_is_refused_until_rebound_or_dropped_on_purpos
 }
 
 /// evidence.add.42: the latest record includes one still in staging
-/// (`--no-promote`: `canon init` repos promote on write).
+/// (`--no-promote`: `canon init` repos promote on write), so its files
+/// are carried too.
 #[test]
-fn an_unpromoted_record_is_the_latest_the_guard_compares_with() {
+fn an_unpromoted_record_is_the_latest_the_carry_reads() {
     let dir = setup();
     let repo = dir.path();
     scenario(repo, "game.run.01", None);
     write(repo, "reports/a.txt", b"a");
     write(repo, "reports/b.txt", b"b");
+    write(repo, "reports/c.txt", b"c");
     ok(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt", "--artifact", "reports/b.txt", "--no-promote"]));
-    let out = refused(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt"]));
-    assert!(out.contains("`reports/b.txt`"), "{out}");
-    assert_eq!(staged(repo), 1);
+    let out = ok(repo, &attest_args("game.run.01", &["--artifact", "reports/c.txt", "--no-promote", "--json"]));
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["data"]["records"][0]["carried"], serde_json::json!(["reports/a.txt", "reports/b.txt"]), "{json}");
+    assert_eq!(staged(repo), 2);
 }
 
 /// evidence.add.43: malformed drop flags are refused before anything is read.
