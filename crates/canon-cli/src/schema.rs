@@ -288,6 +288,11 @@ struct CommandSchema {
     arguments: Vec<ArgSchema>,
     options: Vec<ArgSchema>,
     exits: Vec<ExitMeta>,
+    /// Option sets of which exactly one is required (`review add`'s
+    /// `--upstream-ref` / `--original-spec-ref`): no member is `required` on
+    /// its own, so an agent reads the requirement here.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    required_one_of: Vec<Vec<String>>,
     /// One minimal invocation of the command (`tests/schema_examples.rs` runs it).
     example: Option<&'static str>,
     /// Every stable code the command can emit (module granularity; see
@@ -498,6 +503,16 @@ fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
         arguments,
         options,
         exits: meta.map_or(STANDARD_EXITS, |m| m.exits).to_vec(),
+        required_one_of: cmd
+            .get_groups()
+            .filter(|g| g.is_required_set() && !(*g).clone().is_multiple())
+            .map(|g| {
+                g.get_args()
+                    .filter_map(|id| cmd.get_arguments().find(|a| a.get_id() == id))
+                    .map(|a| a.get_long().map(|l| format!("--{l}")).unwrap_or_else(|| a.get_id().to_string()))
+                    .collect()
+            })
+            .collect(),
         example: example_for(&key_for_example),
         error_codes: codes,
     }

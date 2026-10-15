@@ -151,6 +151,15 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
                 args.push(value_for(leaf, name, &regime));
             }
         }
+        // One member of each required one-of group, the way an agent reading
+        // `requiredOneOf` would build the line.
+        for group in schema["requiredOneOf"].as_array().into_iter().flatten() {
+            let flag = group[0].as_str().unwrap();
+            if !args.iter().any(|a| a == flag) {
+                args.push(flag.to_string());
+                args.push(value_for(leaf, flag.trim_start_matches("--"), &regime));
+            }
+        }
         args.extend(extra_args(leaf, repo.path()));
         args.push("--json".to_string());
 

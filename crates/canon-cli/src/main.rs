@@ -1182,6 +1182,7 @@ enum FindingCommand {
 #[derive(Subcommand)]
 enum ReviewCommand {
     /// Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required). Each review pins its scenario's source digest and latest evidence; it counts only while both are unchanged
+    #[command(group(clap::ArgGroup::new("provenance").args(["upstream_ref", "original_spec_ref"]).required(true).multiple(false)))]
     Add {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: ProjectId,
