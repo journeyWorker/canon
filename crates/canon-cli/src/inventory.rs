@@ -641,6 +641,12 @@ fn root_refusal(spec_root: &SpecRoot, scanned: &[ScannedScenario]) -> (Vec<Viola
     (Vec::new(), sync_errors)
 }
 
+/// What syncing one root decides: its outcome and the records it would write.
+struct RootPlan {
+    outcome: RootSyncOutcome,
+    records: Vec<Scenario>,
+}
+
 /// One configured root's validate → materialize pass over its `scanned`
 /// corpus (module doc). A fresh index read per root keeps the fold
 /// correct even if two roots were misconfigured to share a
@@ -660,19 +666,23 @@ fn root_refusal(spec_root: &SpecRoot, scanned: &[ScannedScenario]) -> (Vec<Viola
 /// [`refresh_stale_index`]). Validation, the duplicate check and the
 /// tombstones still cover the whole root, so a scoped run refuses and
 /// removes exactly what a full `canon inventory sync` would.
+///
+/// Decide what syncing `spec_root` writes against the index as it stands
+/// (`folded`, read only when the root is not refused), without writing.
+/// [`sync_one_root`] writes it; [`overlay_stale_index`] only reads it.
 #[allow(clippy::too_many_arguments)]
-fn sync_one_root(
-    tier: &GitTier,
+fn plan_one_root(
+    folded: impl FnOnce() -> Result<BTreeMap<(ProjectId, ScenarioId), Scenario>, InventoryError>,
     repo: &Path,
     spec_root: &SpecRoot,
     scanned: &[ScannedScenario],
     project_corpus: &BTreeSet<ScenarioId>,
     actor: &Actor,
     only: Option<&BTreeSet<PathBuf>>,
-) -> Result<RootSyncOutcome, InventoryError> {
+) -> Result<RootPlan, InventoryError> {
     let (violations, sync_errors) = root_refusal(spec_root, scanned);
     if !violations.is_empty() || !sync_errors.is_empty() {
-        return Ok(RootSyncOutcome {
+        let outcome = RootSyncOutcome {
             id: spec_root.id.clone(),
             root: spec_root.root.clone(),
             scanned: if violations.is_empty() { scanned.len() } else { 0 },
@@ -681,12 +691,13 @@ fn sync_one_root(
             violations,
             sync_errors,
             tag_diagnostics: Vec::new(),
-        });
+        };
+        return Ok(RootPlan { outcome, records: Vec::new() });
     }
 
-    let folded = latest_index(tier)?;
+    let folded = folded()?;
 
-    let mut written = 0;
+    let mut records = Vec::new();
     // Fail-soft tag diagnostics accumulate across the whole root but
     // never abort it (see `RootSyncOutcome::tag_diagnostics`).
     let mut tag_diagnostics = Vec::new();
@@ -737,8 +748,7 @@ fn sync_one_root(
         record.lane = lane;
         record.case = case;
         record.subject_id = subject_id;
-        tier.write(&record)?;
-        written += 1;
+        records.push(record);
     }
 
     let mut removed = 0;
@@ -746,20 +756,67 @@ fn sync_one_root(
         let mut tombstone = gone.clone();
         tombstone.envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), actor.clone());
         tombstone.removed = true;
-        tier.write(&tombstone)?;
+        records.push(tombstone);
         removed += 1;
     }
 
-    Ok(RootSyncOutcome {
+    let outcome = RootSyncOutcome {
         id: spec_root.id.clone(),
         root: spec_root.root.clone(),
         scanned: scanned.len(),
-        written: written + removed,
+        written: records.len(),
         removed,
         violations: Vec::new(),
         sync_errors: Vec::new(),
         tag_diagnostics,
-    })
+    };
+    Ok(RootPlan { outcome, records })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn sync_one_root(
+    tier: &GitTier,
+    repo: &Path,
+    spec_root: &SpecRoot,
+    scanned: &[ScannedScenario],
+    project_corpus: &BTreeSet<ScenarioId>,
+    actor: &Actor,
+    only: Option<&BTreeSet<PathBuf>>,
+) -> Result<RootSyncOutcome, InventoryError> {
+    let plan = plan_one_root(|| latest_index(tier), repo, spec_root, scanned, project_corpus, actor, only)?;
+    for record in &plan.records {
+        tier.write(record)?;
+    }
+    Ok(plan.outcome)
+}
+
+/// Lay the scenario index a refresh would write over `ctx`, in memory:
+/// what a reader sees after [`refresh_stale_index`], for a command that
+/// must leave the ledger as it found it (`canon scenario new` writes only
+/// a `.feature` file, and its `meta.next` is read from the specs it just
+/// wrote). A root the refresh would refuse is left as it is: the readers
+/// fail closed on it ([`unrefreshable_roots`]).
+pub fn overlay_stale_index(ctx: &mut GateContext) {
+    let repo = ctx.ctx.repo.clone();
+    let Ok(sync) = SyncCtx::from_repo(&repo) else { return };
+    let Ok(roots) = sync.spec_roots(None) else { return };
+    let (_, roots) = split_pre_0_17(&sync.repo, roots);
+    let tier = GitTier::new(&sync.ledger_root);
+    let Ok((stale, corpus)) = stale_roots(&tier, &roots) else { return };
+    let Ok(folded) = latest_index(&tier) else { return };
+    let actor = Actor::new_unattributed("canon-inventory-sync");
+    for StaleRoot { root, scanned, files, .. } in &stale {
+        let Ok(plan) = plan_one_root(|| Ok(folded.clone()), &repo, root, scanned, &corpus[&root.id], &actor, Some(files)) else { continue };
+        if !plan.outcome.is_clean() {
+            continue;
+        }
+        for record in plan.records {
+            ctx.scenarios.retain(|s| !(s.project_id == record.project_id && s.scenario_id == record.scenario_id));
+            if !record.removed {
+                ctx.scenarios.push(record);
+            }
+        }
+    }
 }
 
 /// `canon inventory sync`'s stdout — one block per configured root.

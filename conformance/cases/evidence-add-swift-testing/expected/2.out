@@ -5,3 +5,4 @@ canon evidence add: staged kind=evidence_record/shop.cart.03__<digest12>.json fo
 canon evidence add: staged kind=evidence_record/shop.cart.05__<digest12>.json for shop.cart.05 (verdict divergent) — run `canon gate promote` to commit it, then `canon gate check`
 canon evidence add: skipped shop.cart.06 — not an indexed scenario of spec root `root` (case `shop.cart.06 not run yet`); index it (`canon inventory sync`) or fix the test name
 canon evidence add: skipped shop_cart_04 — not an indexed scenario of spec root `root` (case `shop_cart_04_count_never_negative()`); index it (`canon inventory sync`) or fix the test name
+next: canon gate promote — the record is staged, not in the ledger yet; promote it so status and the gate count it

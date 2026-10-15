@@ -261,22 +261,15 @@ fn find_change(registry: &TierRegistry, id: &ChangeId) -> Result<Option<Change>,
     Ok(None)
 }
 
-/// Print a written subject: its full record body on `--json`, else a
-/// one-line human receipt.
-fn report_subject(subject: &Subject, verb: &str, json: bool) {
-    if json {
-        // The full merged record body — the updated record, per the
-        // contract's "`--json` emits the updated record".
-        println!("{}", serde_json::to_string_pretty(subject).unwrap_or_default());
-    } else {
-        println!(
-            "canon subject {verb}: {} ({}, {}) — {}",
-            subject.subject_id.as_str(),
-            subject.domain,
-            status_str(subject.status),
-            crate::write_mode::DIRECT
-        );
+/// Report a written subject: `human` and the `next:` line, or on `--json`
+/// the full record body (the updated record) with `meta.next` for the
+/// subject.
+fn report_subject(repo: &Path, subject: &Subject, verb: &str, json: bool, human: &str) {
+    if !json {
+        println!("{human}");
     }
+    let record = serde_json::to_value(subject).unwrap_or_default();
+    crate::next::finish(repo, &format!("subject {verb}"), &crate::next::Scope::Subject(subject.subject_id.as_str().to_string()), false, json, record);
 }
 
 /// The `domain` enum name `canon.core` declares and a consumer repo
@@ -393,7 +386,8 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 
     match registry.persist(&subject) {
         Ok(_) => {
-            report_subject(&subject, "new", json);
+            let human = format!("canon subject new: {} ({}, {}) — {}", subject.subject_id.as_str(), subject.domain, status_str(subject.status), crate::write_mode::DIRECT);
+            report_subject(&repo, &subject, "new", json, &human);
             0
         }
         Err(e) => {
@@ -412,26 +406,20 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json: bool) -> i32 {
     match adopt_change(repo, change_id, subject_id) {
         Ok((subject, owners, wrote)) => {
-            if json {
-                report_subject(&subject, "adopt", true);
-            } else if wrote && owners.len() > 1 {
-                println!(
+            let human = if wrote && owners.len() > 1 {
+                format!(
                     "canon subject adopt: linked change `{}` to subject `{}` as well; the change now belongs to {} — {}",
                     change_id.as_str(),
                     subject_id.as_str(),
                     quoted_list(&owners),
                     crate::write_mode::DIRECT
-                );
+                )
             } else if wrote {
-                println!(
-                    "canon subject adopt: linked change `{}` to subject `{}` — {}",
-                    change_id.as_str(),
-                    subject_id.as_str(),
-                    crate::write_mode::DIRECT
-                );
+                format!("canon subject adopt: linked change `{}` to subject `{}` — {}", change_id.as_str(), subject_id.as_str(), crate::write_mode::DIRECT)
             } else {
-                println!("canon subject adopt: change `{}` is already linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str());
-            }
+                format!("canon subject adopt: change `{}` is already linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str())
+            };
+            report_subject(repo, &subject, "adopt", json, &human);
             0
         }
         Err(e) => {
@@ -795,11 +783,7 @@ pub fn run_status(
 
     match registry.persist(&subject) {
         Ok(_) => {
-            if json {
-                report_subject(&subject, "status", true);
-            } else {
-                println!("canon subject status: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT);
-            }
+            report_subject(&repo, &subject, "status", json, &format!("canon subject status: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT));
             0
         }
         Err(e) => {

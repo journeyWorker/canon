@@ -5,3 +5,4 @@ canon review add: artifact store holds 1 bound file(s) under .canon/artifacts/sh
 canon review add: wrote kind=review/area=cart/root__cart.add.01__r1__<digest12>.json (new) — written directly; nothing to promote
 canon review add: wrote kind=review/area=cart/root__cart.add.02__r1__<digest12>.json (new) — written directly; nothing to promote
 canon review add: wrote kind=review/area=cart/root__cart.add.03__r1__<digest12>.json (new) — written directly; nothing to promote
+next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> — no subject exists yet; a subject is the unit status, review and shipping track (+1 more)

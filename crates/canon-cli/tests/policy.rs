@@ -15,6 +15,11 @@ fn stdout(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
+/// A write command's stdout without its closing `next:` line (0.21 D2).
+fn without_next(text: &str) -> String {
+    text.lines().filter(|line| !line.starts_with("next: ")).map(|line| format!("{line}\n")).collect()
+}
+
 fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
@@ -43,7 +48,7 @@ fn approve_records_the_policy_digest_the_approver_the_time_and_the_note() {
 
     let out = run_canon(&["policy", "approve", "--by", "alice", "--note", "reviewed the starter policy"], repo);
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
-    assert!(stdout(&out).ends_with("— written directly; nothing to promote\n"), "the direct-write suffix: {}", stdout(&out));
+    assert!(without_next(&stdout(&out)).ends_with("— written directly; nothing to promote\n"), "the direct-write suffix: {}", stdout(&out));
 
     let policy = std::fs::read(repo.join(".canon/policy.yaml")).unwrap();
     let recorded = approval(repo);

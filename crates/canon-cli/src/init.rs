@@ -321,9 +321,9 @@ impl InitLog {
         self.steps.push(serde_json::json!({ "step": step, "detail": detail.into() }));
     }
 
-    fn finish(self) -> i32 {
-        if self.json && self.emit_data {
-            crate::json_out::data("init", serde_json::json!({ "steps": self.steps }));
+    fn finish(self, repo: &Path) -> i32 {
+        if self.emit_data {
+            crate::next::finish(repo, "init", &crate::next::Scope::Repo, false, self.json, serde_json::json!({ "steps": self.steps }));
         }
         0
     }
@@ -622,7 +622,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
                     return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).emit("canon init", json);
                 }
             }
-            return log.finish();
+            return log.finish(repo);
         }
         Err(e) => {
             return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", canon_yaml_path.display())).emit("canon init", json);
@@ -647,7 +647,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
             return code;
         }
     }
-    log.finish()
+    log.finish(repo)
 }
 
 /// `canon init --check-config [--repo <dir>]` (task 4.2). Returns the

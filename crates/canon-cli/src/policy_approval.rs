@@ -152,12 +152,8 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32
                 paths::POLICY_APPROVAL_FILE,
                 crate::write_mode::DIRECT
             );
-            if json {
-                crate::json_out::data(
-                    "policy approve",
-                    serde_json::json!({ "policy": paths::POLICY_FILE, "policyDigest": approval.policy_digest, "approvedBy": approval.approved_by, "approvedAt": approval.approved_at, "approval": paths::POLICY_APPROVAL_FILE }),
-                );
-            }
+            let data = serde_json::json!({ "policy": paths::POLICY_FILE, "policyDigest": approval.policy_digest, "approvedBy": approval.approved_by, "approvedAt": approval.approved_at, "approval": paths::POLICY_APPROVAL_FILE });
+            crate::next::finish(&repo, "policy approve", &crate::next::Scope::Repo, false, json, data);
             0
         }
         Err(e) => {

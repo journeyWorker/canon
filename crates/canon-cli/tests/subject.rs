@@ -48,6 +48,11 @@ fn stdout(o: &Output) -> String {
     String::from_utf8_lossy(&o.stdout).to_string()
 }
 
+/// A write command's stdout without its closing `next:` line (0.21 D2).
+fn without_next(text: &str) -> String {
+    text.lines().filter(|line| !line.starts_with("next: ")).map(|line| format!("{line}\n")).collect()
+}
+
 fn stderr(o: &Output) -> String {
     String::from_utf8_lossy(&o.stderr).to_string()
 }
@@ -866,7 +871,7 @@ fn an_absent_require_review_is_byte_identical() {
         let status = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
         let gate = run(dir.path(), &["gate", "check"]);
         let subject = current_subject(dir.path());
-        (status.status.code(), stdout(&status), stderr(&status), gate.status.code(), stdout(&gate), subject.get("status_override").is_some())
+        (status.status.code(), without_next(&stdout(&status)), stderr(&status), gate.status.code(), stdout(&gate), subject.get("status_override").is_some())
     };
     let plain = outputs(false);
     assert_eq!(plain.0, Some(0));

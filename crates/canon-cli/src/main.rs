@@ -2265,9 +2265,7 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
             canon_cli::say_raw!(json, "{}", canon_cli::inventory::format_human(&outcome));
             let data = canon_cli::inventory::format_json(&outcome);
             if outcome.is_clean() {
-                if json {
-                    canon_cli::json_out::data("inventory sync", data);
-                }
+                canon_cli::next::finish(repo, "inventory sync", &canon_cli::next::Scope::Repo, false, json, data);
                 ExitCode::SUCCESS
             } else {
                 let error = CliError::failed("INVENTORY_ABORTED", "a spec root was aborted on violations or duplicate scenarios; nothing was written for it").hint("data.roots names each violation; fix them, then run `canon inventory sync` again");

@@ -28,6 +28,11 @@ fn stdout(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
+/// A write command's stdout without its closing `next:` line (0.21 D2).
+fn without_next(text: &str) -> String {
+    text.lines().filter(|line| !line.starts_with("next: ")).map(|line| format!("{line}\n")).collect()
+}
+
 fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
@@ -591,7 +596,7 @@ fn authoring_init_90_non_tty_init_installs_only_the_detected_harness_and_records
 
     let out = init_with_source(&[], &repo, &source);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
-    assert!(stdout(&out).ends_with("canon init: installed the canon skill for omp (./.omp/skills/canon)\n"), "{}", stdout(&out));
+    assert!(without_next(&stdout(&out)).ends_with("canon init: installed the canon skill for omp (./.omp/skills/canon)\n"), "{}", stdout(&out));
     assert_eq!(projected(&repo), vec![".omp/skills/canon"], ".agents alone selects nothing");
     let config = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
     assert!(config.ends_with("skills:\n  providers: [omp]\n"), "{config}");
@@ -639,7 +644,7 @@ fn authoring_init_92_a_bare_repo_installs_nothing_and_names_the_flag() {
     let out = init_with_source(&[], &repo, &source);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     assert!(
-        stdout(&out).ends_with("canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; choose with `canon skills install --providers=<list>` (any of claude, codex, omp, pi)\n"),
+        without_next(&stdout(&out)).ends_with("canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; choose with `canon skills install --providers=<list>` (any of claude, codex, omp, pi)\n"),
         "{}",
         stdout(&out)
     );
@@ -662,7 +667,7 @@ fn authoring_init_93_an_explicit_empty_choice_is_recorded() {
 
     let out = init_with_source(&["--providers", "none"], &repo, &source);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
-    assert!(stdout(&out).ends_with("canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`\n"), "{}", stdout(&out));
+    assert!(without_next(&stdout(&out)).ends_with("canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`\n"), "{}", stdout(&out));
     assert!(projected(&repo).is_empty());
     assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: []\n"));
     let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "check"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();

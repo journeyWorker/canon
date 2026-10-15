@@ -1,3 +1,4 @@
 canon review add: pinned cart.add.01 at scenario digest 6bb1bf143405 and 1 latest evidence record(s); the review counts only while both are unchanged
 canon review add: outcome `unavailable` is recorded as a review gap, never as an approval
 canon review add: wrote kind=review/area=cart/root__cart.add.01__r1__<digest12>.json (new) — written directly; nothing to promote
+next: canon review add --project-id root --scenario-id cart.add.01 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref "<feature file>" — cart: 1 of 1 scenario(s) lack a qualifying review (1 with only indeterminate or unavailable reviews); review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor

@@ -1,1 +1,2 @@
 canon subject status: cart → verifying — written directly; nothing to promote
+next: canon review add --project-id root --scenario-id cart.add.01 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref "<feature file>" — cart: 1 of 1 scenario(s) lack a qualifying review; review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor

@@ -515,9 +515,8 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
                 eprintln!("{warning}");
             }
             refresh_task_status(&repo, &task_id.change_id());
-            if json {
-                crate::json_out::data("gate task", serde_json::json!({ "taskId": task_id.as_str(), "flipped": true, "document": document_path.display().to_string() }));
-            }
+            let change = crate::next::Scope::Change(task_id.change_id().as_str().to_string());
+            crate::next::finish(&repo, "gate task", &change, false, json, serde_json::json!({ "taskId": task_id.as_str(), "flipped": true, "document": document_path.display().to_string() }));
             0
         }
         TaskFlipDecision::Blocked { violations } => {
@@ -825,8 +824,12 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
             crate::say_raw!(json, "{}", format_promote_report(&report, dry_run));
             let data = promote_json(&report, dry_run);
             if report.is_clean() {
-                if json {
-                    crate::json_out::data("gate promote", data);
+                if dry_run {
+                    if json {
+                        crate::json_out::data("gate promote", data);
+                    }
+                } else {
+                    crate::next::finish(&repo, "gate promote", &crate::next::Scope::Repo, false, json, data);
                 }
                 0
             } else {

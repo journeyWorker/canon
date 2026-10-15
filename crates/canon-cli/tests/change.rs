@@ -18,6 +18,11 @@ fn stdout(o: &Output) -> String {
     String::from_utf8_lossy(&o.stdout).to_string()
 }
 
+/// A write command's stdout without its closing `next:` line (0.21 D2).
+fn without_next(text: &str) -> String {
+    text.lines().filter(|line| !line.starts_with("next: ")).map(|line| format!("{line}\n")).collect()
+}
+
 fn stderr(o: &Output) -> String {
     String::from_utf8_lossy(&o.stderr).to_string()
 }
@@ -342,7 +347,7 @@ fn subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and
     let adopt = run(repo, &["subject", "adopt", "refactor-core", "--subject", "editing"]);
     assert!(adopt.status.success(), "{}", stderr(&adopt));
     assert_eq!(
-        stdout(&adopt),
+        without_next(&stdout(&adopt)),
         "canon subject adopt: linked change `refactor-core` to subject `editing` as well; the change now belongs to `perception` and `editing` — written directly; nothing to promote\n"
     );
 
