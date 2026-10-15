@@ -1400,14 +1400,23 @@ enum PluginCommand {
 
 #[derive(Subcommand)]
 enum ScenarioCommand {
-    /// Append a tagged scenario stub to its .feature file (created if missing)
+    /// Append a tagged scenario stub to its .feature file (created if missing), or many with --from
+    #[command(group(clap::ArgGroup::new("scenario_source").args(["from", "tag"]).required(true).multiple(false)))]
     New {
         /// <area>.<surface>.<nn> scenario tag
         #[arg(value_parser = canon_cli::scaffold::parse_scenario_tag)]
-        tag: ScenarioId,
+        tag: Option<ScenarioId>,
+        /// Write many scenarios from NDJSON (a file, or `-` for stdin): one JSON object per line,
+        /// blank lines and `#` comments skipped. A line carries this command's fields by long flag
+        /// name: id (the tag), title, subject, lane, case, flow, change, feature, project, e.g.
+        /// {"id":"auth.login.02","title":"Sign out","subject":"demo","case":"failure","flow":"F1"}.
+        /// Every line is checked first; one bad line writes nothing and `data.items` lists each
+        /// `{line, id, error}`. Otherwise `data.items` lists each `{line, id, path}`
+        #[arg(long, value_name = "FILE|-", conflicts_with_all = ["title", "subject", "lane", "case", "flow", "change", "feature", "project"])]
+        from: Option<String>,
         /// The Scenario: header label
-        #[arg(long)]
-        title: String,
+        #[arg(long, required_unless_present = "from")]
+        title: Option<String>,
         /// Optional subject id tag to pin above the scenario
         #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
         subject: Option<SubjectId>,
@@ -2028,23 +2037,18 @@ fn main() -> ExitCode {
             PluginCommand::Sync { plugin_id, repo, spec_root, json } => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref(), json),
         },
         Command::Scenario { action } => match action {
-            ScenarioCommand::New { tag, title, subject, lane, case, flow, change, actor, feature, project, repo, json } => {
-                let flow_tag = match &flow {
-                    None => None,
-                    Some(flow) => match canon_cli::brief_check::flow_tag_value(&canon_cli::context::resolve_repo_root(&repo), subject.as_ref(), change.as_ref(), flow) {
-                        Ok(value) => Some(value),
-                        Err(e) => {
-                            return ExitCode::from(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e.to_string()).emit("canon scenario new", json) as u8);
-                        }
-                    },
+            ScenarioCommand::New { tag, from, title, subject, lane, case, flow, change, actor, feature, project, repo, json } => {
+                let at = Utc::now().with_nanosecond(0).expect("0 is a valid nanosecond");
+                let actor = Actor::new_unattributed(&actor);
+                let code = match (from, tag, title) {
+                    (Some(source), _, _) => canon_cli::scaffold::run_scenario_batch(&repo, &source, &actor, at, json),
+                    (None, Some(tag), Some(title)) => {
+                        let spec = canon_cli::scaffold::ScenarioSpec { tag, title, subject, lane, case, flow, change, feature, project };
+                        canon_cli::scaffold::run_scenario_new(&repo, &spec, &actor, at, json)
+                    }
+                    (None, _, _) => unreachable!("clap requires <tag> and --title unless --from is given"),
                 };
-                let axes = canon_cli::scaffold::ScenarioAxes {
-                    subject: subject.as_ref().map(SubjectId::as_str),
-                    lane: lane.as_deref(),
-                    case: case.as_deref(),
-                    flow: flow_tag.as_deref(),
-                };
-                run_scenario_new(&repo, &tag, &title, feature.as_deref(), project.as_ref(), axes, &actor, json)
+                ExitCode::from(code as u8)
             }
         },
         Command::Feature { action } => match action {
@@ -2424,56 +2428,10 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
     }
 }
 
-/// `canon scenario new <tag> --title <label> [--subject <id>] [--lane
-/// <v>] [--case <v>] [--actor <id>] [--feature <path>] [--project <id>]` (s16 P5,
-/// `canon_cli::scaffold::run_scenario_new`'s own doc): the ONE
-/// `Utc::now()` call for this command — computed here, at the
-/// dispatch boundary, so a brand-new `.feature` file's `Feature:` +
-/// first `Scenario:` provenance comments never straddle two different
-/// timestamps (`canon_cli::scaffold`'s module doc, "deterministic
-/// provenance"). `2` on a refused invocation (config fault, a spec
-/// root the `--project` rules can't pin down for the derived path, an
-/// out-of-root explicit `--feature`, or a duplicate tag), `0` on a
-/// successful append/create.
-fn run_scenario_new(
-    repo: &std::path::Path,
-    tag: &ScenarioId,
-    title: &str,
-    feature: Option<&std::path::Path>,
-    project: Option<&ProjectId>,
-    axes: canon_cli::scaffold::ScenarioAxes<'_>,
-    actor_id: &str,
-    json: bool,
-) -> ExitCode {
-    let resolved = canon_cli::context::resolve_repo_root(repo);
-    for (axis, value) in [("lane", axes.lane), ("case", axes.case)] {
-        if let Some(value) = value {
-            if let Some(violation) = canon_cli::subject::enum_membership_violation(&resolved, axis, value) {
-                return ExitCode::from(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", violation.to_string()).emit("canon scenario new", json) as u8);
-            }
-        }
-    }
-    let at = Utc::now().with_nanosecond(0).expect("0 is a valid nanosecond");
-    let actor = Actor::new_unattributed(actor_id);
-    ExitCode::from(
-        canon_cli::scaffold::run_scenario_new(
-            repo,
-            tag,
-            title,
-            feature,
-            project,
-            axes,
-            &actor,
-            at,
-            json,
-        ) as u8,
-    )
-}
-
 /// `canon feature new <area>.<surface> --title <label> [--project
 /// <id>]` (s16 P5, `canon_cli::scaffold::run_feature_new`'s own doc)
-/// — same single-`Utc::now()`-call discipline as [`run_scenario_new`]
-/// above. `2` on a refused invocation (config fault, a spec root the
+/// — same single-`Utc::now()`-call discipline as `canon scenario new`.
+/// `2` on a refused invocation (config fault, a spec root the
 /// `--project` rules can't pin down, or an already-existing target
 /// file), `0` on a fresh file
 /// written.

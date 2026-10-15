@@ -60,7 +60,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("review.rs", &["review add"]),
     // Every code is next to its `human("canon selftest")`.
     ("selftest.rs", &[]),
-    ("scaffold.rs", &["feature new", "scenario new"]),
+    // The shared scenario validation (`Planner`) builds its errors for its caller, `scenario new`.
+    ("scaffold.rs", &["scenario new"]),
     // `UNKNOWN_COMMAND` is next to its `emit("canon schema", …)`.
     ("schema.rs", &[]),
     ("status.rs", &["status"]),
