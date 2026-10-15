@@ -233,20 +233,33 @@ canon evidence add --kind audit --project-id root --scenario-id cart.add.01 \
 - `canon status` shows an `audits` section (sampled / confirmed / owed /
   refuted) and suggests `canon evidence add --kind audit …` in `next:`.
 
-### Dropping a binding (`--drop-attachment`)
+### Carrying and dropping bindings (`--drop-attachment`)
 
-`canon evidence add` for a scenario refuses (exit `2`) when the
-scenario's current latest record of the same fold (declared records, or
-audit records for an audit) — committed ledger plus `_staging` — binds
-files the new record does not. The refusal names the paths and two ways
-out: re-bind them (`--artifact`/`--report`; new bytes at the same path
-are fine), or drop them on purpose with `--drop-attachment <path>`
-(repeatable) and one single-line `--drop-reason <text>`. The drop is
-recorded as `attachment_drop: {paths, reason}`. Refused (`2`): a drop
-without a reason, a reason without a drop, a drop path that is not
-actually dropped, a multi-line reason, or a drop without
-`--scenario-id` (task-only evidence has no drop guard). `canon status`
-lists recorded drops (`dropped bindings (N):`; `drops[]` in `--json`).
+`canon evidence add` for a scenario carries forward what the scenario's
+current latest record of the same fold (declared records, or audit
+records for an audit; committed ledger plus `_staging`) bound: every
+file the new write does not name again is bound into the new record
+unchanged (same path, digest and stored blob), and `--json` lists it as
+`carried: [paths]`. A file named again (`--artifact`/`--report`, new
+bytes at the same path included) replaces its earlier binding. A suite
+batch (`--all-scenarios`) therefore never costs a scenario its
+screenshots. A carried file whose blob the artifact store does not
+hold intact is refused (exit `2`, `EVIDENCE_CARRY_BLOB_MISSING`, nothing
+written): re-bind it, run `canon evidence vault`, or drop it. The audit
+fold (`--kind audit`) does not carry: an audit that leaves out a file
+the latest audit bound is refused (exit `2`) unless it names the file
+again or drops it with `--drop-attachment`, so a counterexample never
+rides along into a confirming audit.
+
+The only way to lose a binding is `--drop-attachment <path>`
+(repeatable) with one single-line `--drop-reason <text>`, recorded as
+`attachment_drop: {paths, reason}`. With `--all-scenarios` the drop
+applies to each scenario that binds the path. Refused (`2`): a drop
+without a reason, a reason without a drop, a drop path that no
+scenario of the write leaves out, a multi-line reason, or a drop
+without `--scenario-id`/`--all-scenarios` (task-only evidence has no
+carry or drop). `canon status` lists recorded drops (`dropped bindings
+(N):`; `drops[]` in `--json`).
 
 ### Nothing is attested before the brief is approved (`--override-reason`)
 
@@ -465,11 +478,12 @@ scenario with its verdict on its own line.
 
 It is all or nothing: a claimed `faithful` verdict over a failed case,
 a fabrication marker in `--summary`, an unapproved brief for any
-scenario's subject, or a scenario whose latest record binds a file the
-batch does not refuses the whole batch, and nothing is written.
-`--scenario-id`, `--task`, `--report-case`, `--kind audit`,
-`--drop-attachment` and the approval flags name one subject and are
-refused with `--all-scenarios`.
+scenario's subject, or a carried attachment whose blob is missing from the
+store refuses the whole batch, and nothing is written. Each scenario's
+earlier attachments are carried into its new record (see above), and
+`--drop-attachment` applies per scenario. `--scenario-id`, `--task`,
+`--report-case`, `--kind audit` and the approval flags name one subject
+and are refused with `--all-scenarios`.
 
 A task's evidence with `--report` and no `--scenario-id` binds EVERY case
 in the report, so a `faithful` verdict needs all of them to pass.
