@@ -993,6 +993,37 @@ fn project_flag(roots: &[ProjectId], project: Option<&str>) -> String {
     format!(" --project {}", project.unwrap_or("<root-id>"))
 }
 
+/// The step for the first brief flow step with no scenario or no failure
+/// case: `canon scenario new … --flow <F-id>`, which tags the scenario
+/// `@flow:<change>.<F-id>` so it covers that step. `hint` is the
+/// `(project, <area>.<surface>)` to number the suggested id on, when the
+/// subject has one; a flow step that already has a scenario numbers on its
+/// surface.
+fn flow_step(id: &str, all: &[&Scenario], roots: &[ProjectId], summary: &SubjectSummary, hint: Option<(String, String)>) -> Option<NextStep> {
+    let step = summary.flow.iter().find(|step| !step.gaps.is_empty())?;
+    let (case, role, gap, title) = if step.scenarios.is_empty() {
+        ("happy", Role::Planner, "no scenario", "<behavior>")
+    } else {
+        ("failure", Role::Implementer, "no failure case", "<what happens on this path>")
+    };
+    let located = step
+        .scenarios
+        .first()
+        .and_then(|covering| all.iter().find(|s| s.scenario_id.as_str() == covering.id))
+        .and_then(|s| s.scenario_id.as_str().rsplit_once('.').map(|(surface, _)| (s.project_id.as_str().to_string(), surface.to_string())))
+        .or(hint);
+    let (suggested, project) = match located {
+        Some((project, surface)) => (next_number(all, &project, &surface), Some(project)),
+        None => ("<area>.<surface>.01".to_string(), None),
+    };
+    Some(NextStep {
+        actor: StepActor::Agent,
+        role: Some(role),
+        command: format!("canon scenario new {suggested} --subject {id} --case {case} --flow {} --title \"{title}\"{}", step.id, project_flag(roots, project.as_deref())),
+        why: format!("{id}: brief flow step {} has {gap}, and the ship guard refuses until it has one; tag it with --flow so it covers the step", step.id),
+    })
+}
+
 /// Whether `subject`'s brief is enforced and not approved (module doc):
 /// the human answers before anything is built or attested for it.
 fn awaits_brief(summary: &SubjectSummary) -> bool {
@@ -1057,6 +1088,10 @@ fn subject_steps(
     }
 
     if summary.scenarios + summary.excluded == 0 {
+        if let Some(step) = flow_step(id, all, roots, summary, None) {
+            next.push(step);
+            return;
+        }
         let roots_note = if roots.len() > 1 { format!(" (spec roots: {})", roots.iter().map(ProjectId::as_str).collect::<Vec<_>>().join(", ")) } else { String::new() };
         next.push(NextStep {
             actor: StepActor::Agent,
@@ -1067,7 +1102,18 @@ fn subject_steps(
         return;
     }
 
-    if let Some(gap) = summary.missing_cases.first() {
+    let attested = matches!(status, SubjectStatus::Building | SubjectStatus::Verifying | SubjectStatus::Shipped);
+    let (counted, _) = counted(ctx, subject);
+    // A brief flow step with no scenario or no failure case is the more specific
+    // scenario to add (the ship guard refuses on it), so it replaces the generic one.
+    let hint = summary
+        .missing_cases
+        .first()
+        .map(|gap| (gap.project_id.clone(), gap.surface.clone()))
+        .or_else(|| counted.first().and_then(|s| s.scenario_id.as_str().rsplit_once('.').map(|(surface, _)| (s.project_id.as_str().to_string(), surface.to_string()))));
+    if let Some(step) = flow_step(id, all, roots, summary, hint) {
+        next.push(step);
+    } else if let Some(gap) = summary.missing_cases.first() {
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Implementer),
@@ -1081,8 +1127,6 @@ fn subject_steps(
         });
     }
 
-    let attested = matches!(status, SubjectStatus::Building | SubjectStatus::Verifying | SubjectStatus::Shipped);
-    let (counted, _) = counted(ctx, subject);
     if attested {
         if let Some(first) = counted.iter().find(|s| !joins.verdict_state(s).0) {
             next.push(NextStep {

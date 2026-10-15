@@ -158,9 +158,14 @@ impl After {
 /// A write's last output: its JSON result with `meta.next` (JSON mode), or
 /// the human `next:` line.
 pub fn finish(repo: &Path, command: &str, scope: &Scope, staged: bool, json: bool, data: Value) {
+    finish_with_meta(repo, command, scope, staged, json, data, Value::Null);
+}
+
+/// [`finish`] with extra `meta` keys beside `next` (a page's cursor).
+pub fn finish_with_meta(repo: &Path, command: &str, scope: &Scope, staged: bool, json: bool, data: Value, extra_meta: Value) {
     let after = after(repo, scope, staged);
     if json {
-        crate::json_out::data_with_next(command, data, &after);
+        crate::json_out::data_with_next_and_meta(command, data, &after, extra_meta);
     } else {
         for line in after.lines() {
             println!("{line}");

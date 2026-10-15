@@ -18,9 +18,9 @@ const NEEDS_STATE: &[(&str, &str)] = &[
     ("adapter validate", "a provider's adapter response file"),
     ("brief approve", "a brief with no blockers (the scaffolded one is a template to fill in)"),
     ("brief check", "a finished brief: the scaffolded one has blocker findings, which exit 2 by contract"),
-    ("context-pack create", "a context manifest file"),
-    ("context-pack show", "a context pack made by `context-pack create`"),
-    ("context-pack verify", "a context pack made by `context-pack create`"),
+    ("context-pack new", "a context manifest file"),
+    ("context-pack show", "a context pack made by `context-pack new`"),
+    ("context-pack verify", "a context pack made by `context-pack new`"),
     ("evidence approval-payload", "a git commit to bind: --artifact-sha must name a commit of the repo"),
     ("dispatch end", "a run opened by `dispatch begin`, whose run id this one closes"),
     ("gate check", "a repo that passes the gate: the scratch repo has unattested scenarios, which exit 1 by contract"),
@@ -29,7 +29,7 @@ const NEEDS_STATE: &[(&str, &str)] = &[
     ("learn promote", "a strategy in the strategy store"),
     ("learn rollback", "a strategy, and a human's signed approval"),
     ("plugin sync", "an installed plugin"),
-    ("prompt register", "a prompt bundle manifest file"),
+    ("prompt add", "a prompt bundle manifest file"),
     ("prompt show", "a registered prompt bundle"),
 ];
 

@@ -253,7 +253,22 @@ pub fn run_approve(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path
         "payload_hex": payload.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
         "instructions": "Sign payload_hex externally; put the armored detached signature in approval.signature, set signer_key to approver_identity, and run canon learn promote with --evaluation and --approval.",
     });
-    println!("{}", serde_json::to_string_pretty(&response).expect("approval payload serializes"));
+    if json {
+        // The payload is for a human's external signer, which reads `payload_hex`,
+        // not a file template `learn promote` parses: it envelopes like every result.
+        let step = crate::status::NextStep {
+            command: format!(
+                "sign payload_hex with `ssh-keygen -Y sign -n canon-learning-approval-v1`, put the signature in an approval file, then run `canon learn promote {strategy_id} --evaluation {} --approval <approval.json>`",
+                evaluation_path.display()
+            ),
+            why: "approve only prepares the bytes to sign; it never reads a private key, so the approval needs a human signature".into(),
+            actor: crate::status::StepActor::Human,
+            role: None,
+        };
+        crate::json_out::data_with_next("learn approve", response, &crate::next::After::fixed(vec![step]));
+    } else {
+        println!("{}", serde_json::to_string_pretty(&response).expect("approval payload serializes"));
+    }
     ExitCode::SUCCESS
 }
 
@@ -298,7 +313,12 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
     };
     match rollback_strategy_authenticated(&store, *strategy_id, reason, actor, contradicting, &repo.join(&config.strategies_root), &signature, approved_at) {
         Ok(record) => {
-            println!("{}", serde_json::to_string(&record).expect("rollback record serializes"));
+            if json {
+                let data = serde_json::to_value(&record).expect("rollback record serializes");
+                crate::next::finish(&repo, "learn rollback", &crate::next::Scope::Repo, false, true, data);
+            } else {
+                println!("{}", serde_json::to_string(&record).expect("rollback record serializes"));
+            }
             ExitCode::SUCCESS
         }
         Err(error) => {

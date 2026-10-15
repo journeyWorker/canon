@@ -12,6 +12,13 @@ use canon_store::git_tier::GitTier;
 use canon_store::tier::{Tier, TierQuery};
 use serde_json::Value;
 
+/// `data` of an `ingest plans --json` document (`{ "data", "meta" }`; a failed pass adds `error`).
+fn data_of(stdout: &str) -> Value {
+    let body: Value = serde_json::from_str(stdout).unwrap_or_else(|e| panic!("invalid JSON: {e}\nstdout: {stdout}"));
+    assert_eq!(body["meta"]["command"], "ingest plans", "{body}");
+    body["data"].clone()
+}
+
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env_remove("CANON_PG_DSN_S17_TEST_UNSET").current_dir(cwd).output().expect("spawn canon binary")
 }
@@ -71,7 +78,7 @@ fn ingest_json(dir: &Path, args: &[&str]) -> Value {
     full.extend_from_slice(args);
     let output = run_canon(&full, dir);
     assert!(output.status.success(), "canon ingest plans --json failed: stderr={} stdout={}", stderr(&output), stdout(&output));
-    serde_json::from_str(&stdout(&output)).unwrap_or_else(|e| panic!("invalid JSON: {e}\nstdout: {}", stdout(&output)))
+    data_of(&stdout(&output))
 }
 
 // ── task 3.2: canon.yaml `plans:` config ──
@@ -322,7 +329,7 @@ fn pg_unreachable_task_persists_git_change_but_degrades_task_to_unwritten_and_do
 
     let output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(output.status.success(), "an unreachable pg tier must be non-fatal: stderr={}", stderr(&output));
-    let json: Value = serde_json::from_str(&stdout(&output)).unwrap();
+    let json: Value = data_of(&stdout(&output));
 
     assert_eq!(json["changes_persisted"], 1, "git-routed Change must still persist: {json}");
     assert_eq!(json["tasks_persisted"], 0, "{json}");
@@ -542,7 +549,7 @@ fn root_pointed_one_level_above_openspec_changes_exits_non_zero_with_named_diagn
         assert!(err.contains("openspec"), "run #{run_number}: WARN must name the source's dialect: {err}");
         assert!(err.contains('1'), "run #{run_number}: WARN must name the malformed count: {err}");
 
-        let json: Value = serde_json::from_str(&stdout(&output)).unwrap_or_else(|e| panic!("run #{run_number}: invalid JSON: {e}\nstdout: {}", stdout(&output)));
+        let json: Value = data_of(&stdout(&output));
         assert_eq!(json["changes_persisted"], 0, "run #{run_number}: {json}");
         assert_eq!(json["tasks_persisted"], 0, "run #{run_number}: {json}");
         assert_eq!(json["sources"][0]["skipped_unchanged"], false, "run #{run_number}: a malformed-only source must never be silently skipped: {json}");
@@ -569,7 +576,7 @@ fn a_malformed_only_source_becomes_quiet_once_the_config_is_fixed() {
     // zero-persisted, loud, no cursor written (s23).
     let first = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(!first.status.success(), "run #1 must fail loud: stdout={}", stdout(&first));
-    let first_json: Value = serde_json::from_str(&stdout(&first)).unwrap();
+    let first_json: Value = data_of(&stdout(&first));
     assert_eq!(first_json["sources"][0]["cursor_advanced"], false, "{first_json}");
 
     // Fix: give `openspec/changes/` (root's own immediate child, the
@@ -592,7 +599,7 @@ fn a_malformed_only_source_becomes_quiet_once_the_config_is_fixed() {
     let third_output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(third_output.status.success(), "run #3 must be a quiet no-op once fixed: stderr={}", stderr(&third_output));
     assert!(!stderr(&third_output).contains("WARN"), "stderr: {}", stderr(&third_output));
-    let third: Value = serde_json::from_str(&stdout(&third_output)).unwrap();
+    let third: Value = data_of(&stdout(&third_output));
     assert_eq!(third["sources"][0]["skipped_unchanged"], true, "{third}");
     assert_eq!(third["changes_persisted"], 0, "{third}");
 }
@@ -611,7 +618,7 @@ fn a_legitimately_empty_source_stays_a_clean_silent_no_op() {
     let first_output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(first_output.status.success(), "a legitimately empty source must stay a clean 0-exit no-op: stderr={}", stderr(&first_output));
     assert!(!stderr(&first_output).contains("WARN"), "no WARN for a genuinely empty/fresh plan tree: {}", stderr(&first_output));
-    let first: Value = serde_json::from_str(&stdout(&first_output)).unwrap();
+    let first: Value = data_of(&stdout(&first_output));
     assert_eq!(
         first["sources"][0]["cursor_advanced"], true,
         "a genuinely empty, well-formed source must still earn a cursor (s23 targets `malformed > 0`, never `changes_parsed == 0` alone): {first}"
@@ -623,7 +630,7 @@ fn a_legitimately_empty_source_stays_a_clean_silent_no_op() {
     let second_output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(second_output.status.success(), "run #2 must stay a clean 0-exit no-op: stderr={}", stderr(&second_output));
     assert!(!stderr(&second_output).contains("WARN"), "{}", stderr(&second_output));
-    let second: Value = serde_json::from_str(&stdout(&second_output)).unwrap();
+    let second: Value = data_of(&stdout(&second_output));
     assert_eq!(second["sources"][0]["skipped_unchanged"], true, "{second}");
 }
 
@@ -644,7 +651,7 @@ fn a_source_with_some_malformed_dirs_but_at_least_one_persisted_record_stays_cle
     let first_output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(first_output.status.success(), "a source with SOME malformed dirs but at least one persisted record must stay clean: stderr={}", stderr(&first_output));
     assert!(!stderr(&first_output).contains("WARN"), "stderr: {}", stderr(&first_output));
-    let first: Value = serde_json::from_str(&stdout(&first_output)).unwrap();
+    let first: Value = data_of(&stdout(&first_output));
     assert_eq!(
         first["sources"][0]["cursor_advanced"], true,
         "partial success must still advance its cursor -- s23 does not widen the exclusion to ANY malformed entry: {first}"
@@ -656,7 +663,7 @@ fn a_source_with_some_malformed_dirs_but_at_least_one_persisted_record_stays_cle
     let second_output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(second_output.status.success(), "run #2 must stay a clean, silent no-op: stderr={}", stderr(&second_output));
     assert!(!stderr(&second_output).contains("WARN"), "stderr: {}", stderr(&second_output));
-    let second: Value = serde_json::from_str(&stdout(&second_output)).unwrap();
+    let second: Value = data_of(&stdout(&second_output));
     assert_eq!(second["sources"][0]["skipped_unchanged"], true, "{second}");
     assert_eq!(second["changes_persisted"], 0, "{second}");
 }
@@ -676,7 +683,7 @@ fn one_flagged_source_among_several_makes_the_whole_pass_non_zero() {
     let output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(!output.status.success(), "one flagged source among several must make the whole pass non-zero");
 
-    let json: Value = serde_json::from_str(&stdout(&output)).unwrap_or_else(|e| panic!("invalid JSON: {e}\nstdout: {}", stdout(&output)));
+    let json: Value = data_of(&stdout(&output));
     assert_eq!(json["changes_persisted"], 1, "the well-formed source's records must still persist normally, visible in the summary: {json}");
     assert_eq!(json["tasks_persisted"], 1, "{json}");
 }

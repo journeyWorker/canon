@@ -38,11 +38,28 @@ pub fn data(command: &str, data: Value) {
 /// Prints a write's success envelope with the steps that follow it
 /// ([`crate::next`]).
 pub fn data_with_next(command: &str, data: Value, after: &crate::next::After) {
+    data_with_next_and_meta(command, data, after, Value::Null);
+}
+
+/// [`data_with_next`] with extra `meta` keys (a page's `nextCursor`, …).
+pub fn data_with_next_and_meta(command: &str, data: Value, after: &crate::next::After, extra_meta: Value) {
     let mut envelope = envelope(command, data);
-    if let (Some(meta), Some(extra)) = (envelope["meta"].as_object_mut(), after.meta().as_object()) {
-        meta.extend(extra.clone());
+    if let Some(meta) = envelope["meta"].as_object_mut() {
+        for extra in [&extra_meta, &after.meta()] {
+            if let Some(extra) = extra.as_object() {
+                meta.extend(extra.iter().map(|(k, v)| (k.clone(), v.clone())));
+            }
+        }
     }
     println!("{envelope}");
+}
+
+/// Splits a payload that carries its own page `meta` ([`crate::paging`]'s
+/// `total`, `returned`, `nextCursor`) into `(data, meta)`, so the page
+/// state lands in `meta` beside `command` instead of inside `data`.
+pub fn split_meta(mut payload: Value) -> (Value, Value) {
+    let meta = payload.as_object_mut().and_then(|object| object.remove("meta")).unwrap_or(Value::Null);
+    (payload, meta)
 }
 
 /// [`data`] with extra `meta` keys beside `command` (`unchanged`, …).

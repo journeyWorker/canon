@@ -45,7 +45,31 @@ fn dispatch_begin(repo: &Path) -> serde_json::Value {
         .output()
         .expect("spawn canon dispatch begin");
     assert!(output.status.success(), "dispatch begin must exit 0; stderr: {}", String::from_utf8_lossy(&output.stderr));
-    serde_json::from_slice(&output.stdout).expect("--json emits a JSON summary object")
+    let body: serde_json::Value = serde_json::from_slice(&output.stdout).expect("--json emits one JSON document");
+    // 0.21: the summary is `data` of the `{ data, meta }` envelope, and a write names its next step.
+    assert_eq!(body["meta"]["command"], "dispatch begin", "{body}");
+    assert!(body["meta"]["next"].is_array(), "a write carries meta.next: {body}");
+    assert!(body.get("run_id").is_none(), "the old top-level keys are gone: {body}");
+    body["data"].clone()
+}
+
+#[test]
+fn a_consumer_reads_the_run_id_from_data_and_closes_that_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let begun = dispatch_begin(dir.path());
+    let run_id = begun["run_id"].as_str().expect("`.data.run_id` is the run id a hook closes later").to_string();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["dispatch", "end", "--run", &run_id, "--status", "succeeded", "--json", "--repo"])
+        .arg(dir.path())
+        .output()
+        .expect("spawn canon dispatch end");
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    let ended: serde_json::Value = serde_json::from_slice(&output.stdout).expect("one JSON document");
+    assert_eq!(ended["meta"]["command"], "dispatch end", "{ended}");
+    assert!(ended["meta"]["next"].is_array(), "{ended}");
+    assert_eq!(ended["data"]["run_id"], run_id.as_str(), "{ended}");
+    assert_eq!(ended["data"]["status"], "succeeded", "{ended}");
 }
 
 #[test]
