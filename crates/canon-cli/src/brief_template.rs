@@ -62,6 +62,11 @@ pub const PRD_SECTIONS: [PrdSection; 7] = [
     PrdSection { key: "out-of-scope", role: Role::Context },
 ];
 
+/// `--kind` for clap, with `feature` and `chore` known to it.
+pub fn kind_parser() -> impl clap::builder::TypedValueParser<Value = ChangeKind> {
+    crate::cli_error::closed_set(["feature", "chore"], parse_kind)
+}
+
 /// `--kind` for clap: `feature` (the default) or `chore`.
 pub fn parse_kind(raw: &str) -> Result<ChangeKind, String> {
     ChangeKind::parse(raw).ok_or_else(|| format!("unknown change kind `{raw}`; expected `feature` or `chore`"))

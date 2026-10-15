@@ -145,6 +145,7 @@ pub fn run_promote_with_evidence(
         }
     };
     let blocked = decision.as_ref().is_some_and(|d| !d.is_promote());
+    let mut demotion_failure: Option<String> = None;
     if blocked && !dry_run {
         if let Ok(Some(item)) = strategy_store.find_by_id(strategy_id) {
             if item.lifecycle == Some(StrategyLifecycle::Active) {
@@ -154,7 +155,7 @@ pub fn run_promote_with_evidence(
                     }) {
                         let demotion_policy = if learn_config.demotion.hard_delete { DemotionPolicy::HARD_DELETE } else { DemotionPolicy::SOFT_FLAG };
                         if let Err(error) = demote_strategy(&strategy_store, *strategy_id, contradiction.id, &git_tier_root, demotion_policy) {
-                            eprintln!("canon learn promote: contradiction detected but demotion failed: {error}");
+                            demotion_failure = Some(error.to_string());
                         } else {
                             eprintln!("canon learn promote: later contradictory evidence demoted {strategy_id}");
                         }
@@ -170,7 +171,7 @@ pub fn run_promote_with_evidence(
     // alongside the refusal reason is the whole point of a preview — but
     // its exit code stays honest about the refusal.
     if blocked && !dry_run {
-        return report_block(decision.as_ref().expect("blocked implies a decision"), json);
+        return report_block(decision.as_ref().expect("blocked implies a decision"), demotion_failure.as_deref(), json);
     }
 
     let outcome = if dry_run {
@@ -189,7 +190,7 @@ pub fn run_promote_with_evidence(
             if dry_run {
                 crate::say!(json, "[dry-run] would promote {strategy_id} -> {}", path.display());
                 if blocked {
-                    return report_block(decision.as_ref().expect("blocked implies a decision"), json);
+                    return report_block(decision.as_ref().expect("blocked implies a decision"), None, json);
                 }
             } else {
                 crate::say!(json, "promoted {strategy_id} -> {}", path.display());
@@ -309,12 +310,21 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
 
 /// The one place a refusal is reported, so the real and dry-run paths
 /// can never drift in wording.
-fn report_block(decision: &PromotionDecision, json: bool) -> ExitCode {
-    let code = CliError::failed("LEARN_PROMOTION_BLOCKED", format!("blocked by the promotion gate: {}", decision.reason())).hint(
-        "the gate reads each trajectory's RESOLVED `verdict_record.outcome`, not its raw verdict rows — \
-         run `canon ingest artifacts` to resolve pending trajectories for this regime, then retry.",
-    );
-    ExitCode::from(code.emit("canon learn promote", json) as u8)
+///
+/// `demotion_failure` is the error of the demotion a contradicting
+/// trajectory triggered, when that demotion failed: the promotion is still
+/// blocked, but the strategy stays active, which a caller must be able to
+/// tell apart (`LEARN_DEMOTION_FAILED`).
+fn report_block(decision: &PromotionDecision, demotion_failure: Option<&str>, json: bool) -> ExitCode {
+    let error = match demotion_failure {
+        Some(failure) => CliError::failed("LEARN_DEMOTION_FAILED", format!("blocked by the promotion gate: {}; demoting the strategy after a contradicting trajectory also failed: {failure}", decision.reason()))
+            .hint("the strategy is still active; fix the strategy store named above and run `canon learn promote` again to retry the demotion"),
+        None => CliError::failed("LEARN_PROMOTION_BLOCKED", format!("blocked by the promotion gate: {}", decision.reason())).hint(
+            "the gate reads each trajectory's RESOLVED `verdict_record.outcome`, not its raw verdict rows — \
+             run `canon ingest artifacts` to resolve pending trajectories for this regime, then retry.",
+        ),
+    };
+    ExitCode::from(error.emit("canon learn promote", json) as u8)
 }
 
 /// Resolves `strategy_id`'s own regime, reads that regime's

@@ -54,6 +54,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("migrate.rs", &["migrate"]),
     ("policy_approval.rs", &["brief approve", "policy approve"]),
     ("paging.rs", &["query", "finding list", "divergence status", "export"]),
+    // `ScopeError::to_cli_error`, emitted by `query`.
+    ("query.rs", &["query"]),
     ("retention.rs", &["export", "purge"]),
     ("review.rs", &["review add"]),
     // Every code is next to its `human("canon selftest")`.

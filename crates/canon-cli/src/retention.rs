@@ -337,6 +337,9 @@ fn redacted_metadata(kind: RecordKind, raw: &canon_model::evidence::RawRecord) -
     json!({"kind": kind.as_str(), "at": at, "id": id, "digest": digest})
 }
 
+/// The fields of one exported record, which `--fields` may name.
+const RECORD_FIELDS: [&str; 4] = ["kind", "at", "id", "digest"];
+
 pub fn run_export(
     repo: &Path,
     kind: RecordKind,
@@ -346,9 +349,13 @@ pub fn run_export(
     json_output: bool,
     include_sensitive: bool,
     page: &crate::paging::Page,
+    fields: Option<&[String]>,
 ) -> u8 {
     let mut next_cursor_line = None;
     let result = (|| -> Result<(), ExportFailure> {
+        if let Some(requested) = fields {
+            crate::paging::check_known("canon export", requested, &RECORD_FIELDS).map_err(ExportFailure::Cursor)?;
+        }
         ensure_sensitive(repo, include_sensitive)?;
         let (_, registry) = loaded_registry(repo, kind)?;
         let mut query = TierQuery::kind(kind);
@@ -375,7 +382,10 @@ pub fn run_export(
             "after": after.map(|t| t.to_rfc3339()),
             "record_count": rows.len(),
             "content_digests": metadata.iter().filter_map(|m| m.get("digest").cloned()).collect::<Vec<_>>(),
-            "records": metadata,
+            "records": match fields {
+                Some(requested) => metadata.iter().map(|m| crate::paging::project(m, requested)).collect::<Vec<_>>(),
+                None => metadata,
+            },
             "sensitive": include_sensitive,
             "meta": meta.to_json(),
         });

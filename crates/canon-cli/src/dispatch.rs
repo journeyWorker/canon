@@ -308,7 +308,10 @@ impl DispatchError {
             Self::EndInProgress { .. } => "DISPATCH_END_IN_PROGRESS",
             Self::Unreadable { .. } => "DISPATCH_MANIFEST_UNREADABLE",
         };
-        let error = if self.is_usage() { CliError::refused(code, self.to_string()) } else { CliError::failed(code, self.to_string()) };
+        let mut error = if self.is_usage() { CliError::refused(code, self.to_string()) } else { CliError::failed(code, self.to_string()) };
+        if let Self::RoleRegimeMismatch { regime_role, .. } = self {
+            error = error.field("--role").expected([regime_role.clone()]);
+        }
         if matches!(self, Self::EndInProgress { .. }) { error.retryable() } else { error }
     }
 }
@@ -852,6 +855,11 @@ pub fn parse_run_id(s: &str) -> Result<RunId, String> {
 /// own run: `pending`/`running` are not terminal, and `aborted` is an
 /// ingest-time classification of a transcript that stopped, not
 /// something a closing dispatcher observes about itself.
+pub fn run_status_parser() -> impl clap::builder::TypedValueParser<Value = RunStatus> {
+    crate::cli_error::closed_set(["succeeded", "failed"], parse_run_status)
+}
+
+/// A terminal run status, as `--status` spells it.
 pub fn parse_run_status(s: &str) -> Result<RunStatus, String> {
     match s {
         "succeeded" => Ok(RunStatus::Succeeded),

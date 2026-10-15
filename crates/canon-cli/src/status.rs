@@ -337,11 +337,20 @@ pub fn policy_warning(policy: &PolicyResolution) -> Option<String> {
 }
 
 /// `canon status`: resolve, report, exit `0`.
-pub fn run(repo: &Path, json: bool) -> i32 {
+pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
+    if let Some(requested) = fields {
+        if let Err(e) = crate::paging::check_known("canon status", requested, &REPORT_FIELDS) {
+            return e.emit("canon status", json);
+        }
+    }
     let repo = resolve_repo_root(repo);
     let report = resolve(&repo);
     if json {
-        match serde_json::to_string_pretty(&report) {
+        let shown = match fields {
+            Some(requested) => serde_json::to_value(&report).and_then(|v| serde_json::to_string_pretty(&crate::paging::project(&v, requested))),
+            None => serde_json::to_string_pretty(&report),
+        };
+        match shown {
             Ok(text) => println!("{text}"),
             Err(e) => return crate::cli_error::CliError::failed("SERIALIZE_FAILED", format!("failed to serialize status: {e}")).emit("canon status", true),
         }
@@ -350,6 +359,10 @@ pub fn run(repo: &Path, json: bool) -> i32 {
     }
     0
 }
+
+/// The top-level fields of the `--json` report, which `--fields` may name.
+/// `drops` and `audits` are omitted from a report that has none.
+const REPORT_FIELDS: [&str; 10] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "drops", "audits", "next", "nextOmitted"];
 
 /// Build the report for an already-resolved repo root.
 pub fn resolve(repo: &Path) -> StatusReport {

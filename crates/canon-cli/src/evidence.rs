@@ -301,6 +301,11 @@ struct BriefRefusal {
 /// `canon_gate::gate_task` treats as blocking. Authoring it is a real
 /// operation ("the evidence says this did NOT hold"), not a mistake to
 /// be prevented here; refusing to flip on it is the gate's job.
+pub fn verdict_parser() -> impl clap::builder::TypedValueParser<Value = EvidenceVerdict> {
+    crate::cli_error::closed_set(["faithful", "not-applicable", "divergent"], parse_verdict)
+}
+
+/// `--verdict`'s clap `value_parser`.
 pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, String> {
     match s {
         "faithful" => Ok(EvidenceVerdict::Faithful),
@@ -1035,6 +1040,27 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     }
 
     let body = record_body(&record, args);
+
+    // A repeat of the subject's latest record writes nothing (`crate::retry`).
+    let (subject, next) = match &args.task_id {
+        Some(task_id) => (task_id.to_string(), format!("then `canon gate task {task_id}`")),
+        None => (args.scenario_id.as_ref().expect("one of --task/--scenario-id is required, checked above").as_str().to_string(), "then `canon gate check`".to_string()),
+    };
+    let outcome = match &record_audit_result {
+        Some(result) => format!("audit {}", result.as_str()),
+        None => format!("verdict {}", verdict_slug(verdict)),
+    };
+    if let Some(existing) = repeat_of_latest(&ledger_root, &body) {
+        crate::say!(args.json, "canon evidence add: unchanged — an identical record for {subject} ({outcome}) is already {}; nothing written", existing.describe());
+        if args.json {
+            let mut entry = existing.json();
+            entry["subject"] = serde_json::json!(subject);
+            entry["outcome"] = serde_json::json!(outcome);
+            entry["next"] = serde_json::json!(next);
+            crate::json_out::data_with_meta("evidence add", serde_json::json!({ "records": [entry], "staleReviews": [] }), serde_json::json!({ "unchanged": true }));
+        }
+        return 0;
+    }
     let stale_reviews = stale_review_notices(&mut gate_context, std::slice::from_ref(&record));
 
     // Store the bound bytes before staging (module doc): every refusal
@@ -1056,17 +1082,6 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             // feeds a checkbox flip, a scenario-only one feeds
             // `canon gate check`'s spec-coverage pass. Naming the wrong
             // one would send an operator to a command that cannot apply.
-            let (subject, next) = match &args.task_id {
-                Some(task_id) => (task_id.to_string(), format!("then `canon gate task {task_id}`")),
-                None => {
-                    let scenario = args.scenario_id.as_ref().expect("one of --task/--scenario-id is required, checked above");
-                    (scenario.as_str().to_string(), "then `canon gate check`".to_string())
-                }
-            };
-            let outcome = match &record_audit_result {
-                Some(result) => format!("audit {}", result.as_str()),
-                None => format!("verdict {}", verdict_slug(verdict)),
-            };
             let settled = crate::gate::promote_after_stage("canon evidence add", &ledger_root, &receipt.location, promote, args.json);
             crate::say!(args.json, "canon evidence add: {} for {} ({outcome}) — {}, {}", settled.landed(&receipt.location), subject, settled.suffix(), next);
             let stale = print_stale_reviews(&repo, &stale_reviews, matches!(settled, crate::gate::StagedOutcome::Promoted { .. }), args.json);
@@ -1083,6 +1098,29 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             CliError::refused("WRITE_FAILED", e.to_string()).emit("canon evidence add", args.json)
         }
     }
+}
+
+/// The existing evidence record that `body` would repeat (`crate::retry`):
+/// the subject's latest one says the same, and no review of the scenario
+/// landed after it (a review pins the evidence it saw, so evidence added again
+/// after one is deliberate: it supersedes what the review saw).
+fn repeat_of_latest(ledger_root: &Path, body: &serde_json::Value) -> Option<crate::retry::Existing> {
+    let reviewed = |review: &serde_json::Value| ["project_id", "scenario_id"].iter().all(|key| review.get(key) == body.get(key));
+    crate::retry::repeats_latest(
+        ledger_root,
+        Some(&evidence_staging_dir(ledger_root)),
+        RecordKind::EvidenceRecord.as_str(),
+        body,
+        |stored| same_evidence_subject(stored, body),
+        Some((RecordKind::Review.as_str(), &reviewed)),
+    )
+}
+
+/// Whether the stored record `stored` attests the same subject as `body`:
+/// the same task, scenario and spec root, and the same fold (a declared
+/// record never repeats an audit).
+fn same_evidence_subject(stored: &serde_json::Value, body: &serde_json::Value) -> bool {
+    ["task_id", "scenario_id", "project_id"].iter().all(|key| stored.get(key) == body.get(key)) && stored.get("audit").is_some() == body.get("audit").is_some()
 }
 
 /// The staged body of `record`: the record, plus the `evidence: {kind,
@@ -1281,9 +1319,39 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
             record
         })
         .collect();
+
+    // A record that repeats its scenario's latest one is not written again
+    // (`crate::retry`); the rest of the batch is.
+    let all_bodies: Vec<serde_json::Value> = records.iter().map(|record| record_body(record, args)).collect();
+    let repeats: Vec<Option<crate::retry::Existing>> = all_bodies
+        .iter()
+        .map(|body| repeat_of_latest(&ledger_root, body))
+        .collect();
+    let mut unchanged = Vec::new();
+    for ((record, id), repeat) in records.iter().zip(&scenario_ids).zip(&repeats) {
+        if let Some(existing) = repeat {
+            crate::say!(args.json, "canon evidence add: unchanged — an identical record for {} (verdict {}) is already {}; nothing written", id.as_str(), verdict_slug(record.verdict), existing.describe());
+            let mut entry = existing.json();
+            entry["subject"] = serde_json::json!(id.as_str());
+            entry["outcome"] = serde_json::json!(format!("verdict {}", verdict_slug(record.verdict)));
+            entry["unchanged"] = serde_json::json!(true);
+            unchanged.push(entry);
+        }
+    }
+    let (records, bodies, scenario_ids): (Vec<EvidenceRecord>, Vec<serde_json::Value>, Vec<ScenarioId>) =
+        unzip3(records.into_iter().zip(all_bodies).zip(scenario_ids).zip(&repeats).filter(|(_, repeat)| repeat.is_none()).map(|(((record, body), id), _)| (record, body, id)));
+    if records.is_empty() {
+        if args.json {
+            crate::json_out::data_with_meta(
+                "evidence add",
+                serde_json::json!({ "records": unchanged, "skipped": [], "casesWithoutScenarioId": batch.without_id, "staleReviews": [] }),
+                serde_json::json!({ "unchanged": true }),
+            );
+        }
+        return 0;
+    }
     let stale_reviews = stale_review_notices(&mut gate_context, &records);
 
-    let bodies: Vec<serde_json::Value> = records.iter().map(|record| record_body(record, args)).collect();
     let landed = match land_batch(repo, &ledger_root, &batch.files, bodies, promote, &mut |tier, write| tier.write(write)) {
         Ok(landed) => landed,
         Err((error, code)) => {
@@ -1314,6 +1382,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         entry["outcome"] = serde_json::json!(format!("verdict {}", verdict_slug(record.verdict)));
         written.push(entry);
     }
+    written.extend(unchanged);
     let mut skipped = Vec::new();
     for (id, case) in &batch.unindexed {
         crate::say!(json, "canon evidence add: skipped {id} — not an indexed scenario of spec root `{}` (case `{case}`); index it (`canon inventory sync`) or fix the test name", project_id.as_str());
@@ -1327,6 +1396,17 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         crate::json_out::data("evidence add", serde_json::json!({ "records": written, "skipped": skipped, "casesWithoutScenarioId": batch.without_id, "staleReviews": stale }));
     }
     0
+}
+
+/// Unzips three-element tuples (std has `unzip` for pairs only).
+fn unzip3<A, B, C>(rows: impl Iterator<Item = (A, B, C)>) -> (Vec<A>, Vec<B>, Vec<C>) {
+    let (mut a, mut b, mut c) = (Vec::new(), Vec::new(), Vec::new());
+    for (x, y, z) in rows {
+        a.push(x);
+        b.push(y);
+        c.push(z);
+    }
+    (a, b, c)
 }
 
 /// Where one record of a batch landed: its staging location, and its

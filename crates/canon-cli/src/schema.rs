@@ -82,8 +82,6 @@ const fn row_exits(path: &'static str, effect: Effect, exits: &'static [ExitMeta
 /// A command that writes only when it succeeds and has no operational lane:
 /// every failure is a refusal.
 const REFUSES: &[ExitMeta] = &[exit(0, "success"), exit(2, "refused or failed; nothing is left written")];
-/// A command that reports and has no failing exit.
-const ALWAYS_OK: &[ExitMeta] = &[exit(0, "always: the command reports and has no failing exit")];
 
 use Effect::{Destructive, Read, Write};
 
@@ -94,7 +92,7 @@ pub const META: &[CommandMeta] = &[
     row("brief approve", Write),
     row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "operational error, with a stable error code"), exit(2, "blocker findings")]),
     row_exits("change new", Write, REFUSES),
-    row_exits("context", Read, ALWAYS_OK),
+    row_exits("context", Read, &[exit(0, "always: it describes what can be authored and never gates; an unreadable canon.yaml or policy degrades to the built-in surface, with the reason in policy.diagnostics")]),
     row("context-pack create", Write),
     row("context-pack show", Read),
     row("context-pack verify", Read),
@@ -102,7 +100,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("demo attest", Write, REFUSES),
     row_exits("demo init", Write, REFUSES),
     row("dispatch begin", Write),
-    row_exits("dispatch diff", Read, &[exit(0, "always, including when the observed graph differs from the declared plan: it reports, it never gates")]),
+    row_exits("dispatch diff", Read, &[exit(0, "always, including when the observed graph differs from the declared plan or a side cannot be read (a note on stderr and in `notes`): it reports, it never gates")]),
     row("dispatch end", Write),
     row("divergence defer", Write),
     row("divergence promote", Write),
@@ -111,7 +109,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("divergence status", Read, &[exit(0, "always on a successful read: a capability query, never a gate"), exit(2, "refused: canon.yaml or the ledger cannot be read")]),
     row_exits("evidence add", Write, &[exit(0, "staged"), exit(1, "gate-red: a fabrication marker, an invalid typed atom, a contradicting report, or an unapproved brief refuses the record; nothing is staged"), exit(2, "usage or infrastructure: a malformed flag combination, an unknown task, no plan corpus, a write failure; nothing is staged")]),
     row("evidence approval-payload", Read),
-    row_exits("evidence vault", Write, &[exit(0, "the pass ran, whatever it could store: files that could not be stored are listed, not an error"), exit(2, "refused: the ledger cannot be read or a write failed")]),
+    row_exits("evidence vault", Write, &[exit(0, "the pass ran, whatever it could store: files it could not store are listed in `notStored`, not an error; their bytes are gone, so no retry could clear a failing exit (`canon gate check` reports the stale evidence)"), exit(2, "refused: the ledger cannot be read or a write failed")]),
     row("export", Write),
     row_exits("feature new", Write, REFUSES),
     row_exits("finding add", Write, REFUSES),
@@ -232,6 +230,8 @@ struct CommandSchema {
     arguments: Vec<ArgSchema>,
     options: Vec<ArgSchema>,
     exits: Vec<ExitMeta>,
+    /// One minimal invocation of the command (`tests/schema_examples.rs` runs it).
+    example: Option<&'static str>,
     /// Every stable code the command can emit (module granularity; see
     /// `crate::schema_codes`).
     error_codes: Vec<&'static str>,
@@ -326,6 +326,37 @@ pub fn error_codes(path: &str) -> Vec<&'static str> {
     crate::schema_codes::ERROR_CODES.iter().find(|(p, _)| *p == path).map_or_else(Vec::new, |(_, codes)| codes.to_vec())
 }
 
+/// The minimal example invocation of the leaf command `path`.
+pub fn example_for(path: &str) -> Option<&'static str> {
+    crate::schema_examples::EXAMPLES.iter().find(|(p, _)| *p == path).map(|(_, example)| *example)
+}
+
+/// Drift between clap and the example table: empty when every leaf has one
+/// example and every example names a leaf.
+pub fn check_examples(root: &Command) -> Vec<String> {
+    let leaves = leaf_paths(root);
+    let mut problems = Vec::new();
+    for leaf in &leaves {
+        if example_for(leaf).is_none() {
+            problems.push(format!("clap leaf `{leaf}` has no example"));
+        }
+    }
+    let mut seen: Vec<&str> = Vec::new();
+    for (path, example) in crate::schema_examples::EXAMPLES {
+        if !leaves.iter().any(|l| l == path) {
+            problems.push(format!("example row `{path}` names no clap leaf command"));
+        }
+        if seen.contains(path) {
+            problems.push(format!("example row `{path}` appears twice"));
+        }
+        seen.push(path);
+        if !example.starts_with(&format!("canon {path}")) {
+            problems.push(format!("example for `{path}` does not start with `canon {path}`: {example}"));
+        }
+    }
+    problems
+}
+
 fn meta_for(path: &str) -> Option<&'static CommandMeta> {
     META.iter().find(|m| m.path == path)
 }
@@ -360,6 +391,7 @@ fn arg_schema(arg: &clap::Arg) -> ArgSchema {
 
 fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
     let key = canonical.join(" ");
+    let key_for_example = key.clone();
     let meta = meta_for(&key);
     let codes = error_codes(&key);
     let mut cmd = cmd.clone();
@@ -382,6 +414,7 @@ fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
         arguments,
         options,
         exits: meta.map_or(STANDARD_EXITS, |m| m.exits).to_vec(),
+        example: example_for(&key_for_example),
         error_codes: codes,
     }
 }
@@ -508,6 +541,9 @@ fn print_human(s: &CommandSchema) {
     println!("exits:");
     for e in &s.exits {
         println!("  {}  {}", e.code, e.meaning);
+    }
+    if let Some(example) = s.example {
+        println!("example: {example}");
     }
     if !s.error_codes.is_empty() {
         println!("error codes: {}", s.error_codes.join(", "));

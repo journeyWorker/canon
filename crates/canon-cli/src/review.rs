@@ -256,6 +256,32 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         })
         .collect();
 
+    // A review that repeats its scenario's latest one by this reviewer is not
+    // written again (`crate::retry`); the others are.
+    let ledger_root = &gate_context.ctx.ledger_root;
+    let repeats: Vec<Option<crate::retry::Existing>> = reviews
+        .iter()
+        .map(|(review, _)| {
+            let body = serde_json::to_value(review).expect("a Review always serializes");
+            crate::retry::repeats_latest(ledger_root, None, RecordKind::Review.as_str(), &body, |stored| {
+                ["project_id", "scenario_id", "reviewer"].iter().all(|key| stored.get(key) == body.get(key))
+            }, None)
+        })
+        .collect();
+    let unchanged: Vec<(String, crate::retry::Existing)> =
+        reviews.iter().zip(&repeats).filter_map(|((review, _), repeat)| repeat.clone().map(|existing| (review.scenario_id.as_str().to_string(), existing))).collect();
+    for (scenario, existing) in &unchanged {
+        crate::say!(args.json, "canon review add: unchanged — an identical review of {scenario} is already {}; nothing written", existing.describe());
+    }
+    let reviews: Vec<(Review, String)> = reviews.into_iter().zip(&repeats).filter(|(_, repeat)| repeat.is_none()).map(|(review, _)| review).collect();
+    if reviews.is_empty() {
+        if args.json {
+            let wrote: Vec<serde_json::Value> = unchanged.iter().map(|(scenario, existing)| serde_json::json!({ "location": existing.committed, "scenarioId": scenario, "unchanged": true })).collect();
+            crate::json_out::data_with_meta("review add", serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": 0 }), serde_json::json!({ "unchanged": true }));
+        }
+        return 0;
+    }
+
     // Store the bytes before any review is written (module doc): every
     // refusal is behind us, and a review must never name a blob the
     // store lacks. All or nothing (0.18 D1): a failed write removes what
@@ -284,7 +310,8 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         crate::say!(args.json, "canon review add: wrote {location} ({}) — {}", if *deduped { "deduped" } else { "new" }, crate::write_mode::DIRECT);
     }
     if args.json {
-        let wrote: Vec<serde_json::Value> = written.iter().map(|(location, deduped)| serde_json::json!({ "location": location, "deduped": deduped })).collect();
+        let mut wrote: Vec<serde_json::Value> = written.iter().map(|(location, deduped)| serde_json::json!({ "location": location, "deduped": deduped })).collect();
+        wrote.extend(unchanged.iter().map(|(scenario, existing)| serde_json::json!({ "location": existing.committed, "scenarioId": scenario, "unchanged": true })));
         crate::json_out::data("review add", serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": stored }));
     }
     0

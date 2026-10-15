@@ -8,7 +8,10 @@
 //! - human mode, on stderr: `canon <command path>: <CODE> — <message>`, then
 //!   an optional `hint: <hint>` line;
 //! - JSON mode, on stdout: `{"error":{"code","message","hint","retryable"}}`
-//!   (`hint` is `null` when there is none). The human line is still written
+//!   (`hint` is `null` when there is none). A refusal about one argument or
+//!   record field adds `field` (the argument, e.g. `--to`) and, when the
+//!   field takes a closed set, `expected` (its values); both keys are absent
+//!   otherwise. The human line is still written
 //!   to stderr, so a log reader sees the same failure.
 //!
 //! Exit codes keep their 0.19 meaning: `0` ok, `1` a gate failure or an
@@ -36,22 +39,42 @@ pub struct CliError {
     /// Whether running the same command again, unchanged, can succeed.
     pub retryable: bool,
     pub exit: i32,
+    /// The argument or record field that was refused (`--to`, `--kind`).
+    pub field: Option<String>,
+    /// The values `field` accepts, when the refusal is about a closed set.
+    pub expected: Option<Vec<String>>,
 }
 
 impl CliError {
     /// A refusal: the command was understood and declined (exit 2).
     pub fn refused(code: &'static str, message: impl Into<String>) -> Self {
-        Self { code, message: message.into(), hint: None, retryable: false, exit: EXIT_REFUSED }
+        Self { code, message: message.into(), hint: None, retryable: false, exit: EXIT_REFUSED, field: None, expected: None }
     }
 
     /// An operational failure: the command could not do its work (exit 1).
     pub fn failed(code: &'static str, message: impl Into<String>) -> Self {
-        Self { code, message: message.into(), hint: None, retryable: false, exit: EXIT_FAILED }
+        Self { code, message: message.into(), hint: None, retryable: false, exit: EXIT_FAILED, field: None, expected: None }
     }
 
     /// The next step the caller can take.
     pub fn hint(mut self, hint: impl Into<String>) -> Self {
         self.hint = Some(hint.into());
+        self
+    }
+
+    /// Names the refused argument or field (`--to`, `--kind`).
+    pub fn field(mut self, field: impl Into<String>) -> Self {
+        self.field = Some(field.into());
+        self
+    }
+
+    /// Lists the values the refused field accepts.
+    pub fn expected<I, S>(mut self, expected: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.expected = Some(expected.into_iter().map(Into::into).collect());
         self
     }
 
@@ -79,7 +102,14 @@ impl CliError {
 
     /// The `--json` body.
     pub fn to_json(&self) -> serde_json::Value {
-        json!({ "error": { "code": self.code, "message": self.message, "hint": self.hint, "retryable": self.retryable } })
+        let mut error = json!({ "code": self.code, "message": self.message, "hint": self.hint, "retryable": self.retryable });
+        if let Some(field) = &self.field {
+            error["field"] = json!(field);
+        }
+        if let Some(expected) = &self.expected {
+            error["expected"] = json!(expected);
+        }
+        json!({ "error": error })
     }
 
     /// Renders the error (see the module docs) and returns the exit code.
@@ -108,6 +138,15 @@ impl CliError {
         }
         self.exit
     }
+}
+
+/// A clap value parser for an argument that takes one of a closed set of
+/// words. clap then knows the set: a bad value is refused with
+/// `possible values`, `canon schema` lists them as `possibleValues`, and the
+/// `--json` usage error carries them as `expected`.
+pub fn closed_set<T: Clone + Send + Sync + 'static>(values: impl Into<clap::builder::PossibleValuesParser>, parse: fn(&str) -> Result<T, String>) -> impl clap::builder::TypedValueParser<Value = T> {
+    use clap::builder::TypedValueParser;
+    clap::builder::PossibleValuesParser::new(values).try_map(move |word: String| parse(&word))
 }
 
 fn is_registered(code: &str) -> bool {
@@ -195,6 +234,7 @@ const CODES: &[(&str, &str)] = &[
     ("INVENTORY_ABORTED", "`inventory sync` aborted a spec root on violations or duplicate scenarios; data.roots names each"),
     ("INVENTORY_FAILED", "the scenario index could not be built"),
     ("LAYOUT_MIGRATION_REQUIRED", "the spec root uses a pre-0.17 layout; run `canon migrate`"),
+    ("LEARN_DEMOTION_FAILED", "promotion is blocked and the demotion a contradicting trajectory triggered also failed; the strategy is still active"),
     ("LEARN_EVALUATION_REJECTED", "the promotion evaluation does not fit the candidate strategy"),
     ("LEARN_INVALID_ARGUMENT", "a `learn` flag value is invalid"),
     ("LEARN_INVALID_INPUT", "a `learn` evaluation or approval file is invalid"),
