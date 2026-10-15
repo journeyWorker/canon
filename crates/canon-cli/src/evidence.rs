@@ -575,8 +575,8 @@ fn check_drop_flags(args: &EvidenceArgs) -> Result<(), String> {
             }
         }
     }
-    if args.scenario_id.is_none() {
-        return Err("--drop-attachment applies to scenario evidence (--scenario-id); task-only evidence carries no drop guard".to_string());
+    if args.scenario_id.is_none() && !args.all_scenarios {
+        return Err("--drop-attachment applies to scenario evidence (--scenario-id or --all-scenarios); task-only evidence carries no drop guard".to_string());
     }
     Ok(())
 }
@@ -599,21 +599,54 @@ fn ledger_and_staged_evidence(ledger_root: &Path) -> Result<Vec<EvidenceRecord>,
     Ok(all)
 }
 
-/// The drop guard (0.15 D2). The scenario's current latest record of the
-/// SAME fold — declared, or audit for an audit — is read from the
-/// committed ledger and the staging area together, so an unpromoted
-/// record counts too. Every path it binds that the new record does not
-/// must be named by `--drop-attachment`, and every `--drop-attachment`
-/// must name such a path. Re-binding a path to new bytes is not a drop.
-/// `Ok(Some)` is the drop to record on the new record; `Ok(None)` when
-/// nothing is dropped. `records` is [`ledger_and_staged_evidence`].
-fn drop_guard(
+/// What a scenario's new record binds once its earlier attachments are
+/// carried forward (0.21 T7).
+struct AttachmentPlan {
+    /// The record's attachments: this write's own, then the carried ones.
+    attachments: Vec<canon_model::EvidenceAttachment>,
+    /// Paths of the earlier attachments bound again unchanged.
+    carried: Vec<String>,
+    /// The explicit `--drop-attachment` drop to record, if any.
+    drop: Option<AttachmentDrop>,
+    /// Earlier paths this write does not re-bind: what a drop may name.
+    leaves_out: std::collections::BTreeSet<String>,
+}
+
+/// A refusal to plan a record's attachments: `code` is the error code.
+struct PlanRefusal {
+    code: &'static str,
+    message: String,
+}
+
+impl PlanRefusal {
+    fn refused(message: String) -> Self {
+        Self { code: "EVIDENCE_REFUSED", message }
+    }
+}
+
+/// Carry-forward plus the drop guard (0.15 D2, 0.21 T7). The scenario's
+/// current latest record of the SAME fold — declared, or audit for an
+/// audit — is read from the committed ledger and the staging area
+/// together (`records` is [`ledger_and_staged_evidence`]). Every file it
+/// binds that this write does not name again is carried into the new
+/// record unchanged (same path, digest and stored blob); a file named
+/// again replaces its earlier binding. The only way to lose a binding is
+/// `--drop-attachment <path>`, recorded as a drop. A carried file whose
+/// blob the artifact store does not hold intact is refused
+/// (`EVIDENCE_CARRY_BLOB_MISSING`): the store cannot vouch for it.
+/// With `strict`, a `--drop-attachment` that names no file this record
+/// leaves out is refused (the single-scenario path); a batch checks that
+/// across all its scenarios instead. The audit fold does not carry: an
+/// audit leaving out an earlier binding is refused unless dropped.
+fn plan_attachments(
     records: &[EvidenceRecord],
+    repo: &Path,
     args: &EvidenceArgs,
     (project_id, scenario_id): (&ProjectId, &ScenarioId),
     is_audit: bool,
     attachments: &[canon_model::EvidenceAttachment],
-) -> Result<Option<AttachmentDrop>, String> {
+    strict: bool,
+) -> Result<AttachmentPlan, PlanRefusal> {
     use std::collections::BTreeSet;
 
     let same_fold: Vec<EvidenceRecord> = records
@@ -624,31 +657,63 @@ fn drop_guard(
     let latest = canon_gate::spec_coverage::latest_by_scenario(&same_fold);
     let previous = latest.get(&(project_id.clone(), scenario_id.clone())).copied();
     let bound: BTreeSet<&str> = attachments.iter().map(|a| a.path.as_str()).collect();
-    let dropped: BTreeSet<&str> = previous.map(|p| p.attachments.iter().map(|a| a.path.as_str()).filter(|path| !bound.contains(path)).collect()).unwrap_or_default();
+    let earlier: Vec<&canon_model::EvidenceAttachment> = previous.map(|p| p.attachments.iter().filter(|a| !bound.contains(a.path.as_str())).collect()).unwrap_or_default();
+    let leaves_out: BTreeSet<String> = earlier.iter().map(|a| a.path.clone()).collect();
     let requested: BTreeSet<&str> = args.drop_attachments.iter().map(String::as_str).collect();
     let fold = if is_audit { "audit record" } else { "evidence record" };
     let scenario = scenario_id.as_str();
 
-    if let Some(stray) = requested.iter().find(|path| !dropped.contains(*path)) {
-        let leaves_out = if dropped.is_empty() { "nothing".to_string() } else { dropped.iter().map(|p| format!("`{p}`")).collect::<Vec<_>>().join(", ") };
-        return Err(format!(
-            "--drop-attachment `{stray}` is not a file the latest {fold} for {scenario} binds and this record leaves out (it leaves out: {leaves_out})"
-        ));
+    if strict {
+        if let Some(stray) = requested.iter().find(|path| !leaves_out.contains(**path)) {
+            return Err(PlanRefusal::refused(stray_drop_message(stray, fold, scenario, &leaves_out)));
+        }
     }
-    let unexplained: Vec<String> = dropped.difference(&requested).map(|p| format!("`{p}`")).collect();
-    if let (false, Some(previous)) = (unexplained.is_empty(), previous) {
-        return Err(format!(
-            "the latest {fold} for {scenario} (project {}), by `{}` at {}, binds file(s) this record does not: {}; re-bind them (--artifact <path> or --report <format>:<path>; new bytes at the same path are fine), or record the drop with --drop-attachment <path> (repeatable) --drop-reason <text>",
-            project_id.as_str(),
-            previous.envelope.actor.agent_id,
-            previous.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-            unexplained.join(", ")
-        ));
+    // An audit is one evaluator's verdict on its own evidence (a refuting
+    // counterexample, say): the audit fold never inherits a binding, so
+    // leaving one out stays the drop guard's refusal (0.15 D2).
+    if is_audit {
+        let unexplained: Vec<String> = leaves_out.iter().filter(|p| !requested.contains(p.as_str())).map(|p| format!("`{p}`")).collect();
+        if let (false, Some(previous)) = (unexplained.is_empty(), previous) {
+            return Err(PlanRefusal::refused(format!(
+                "the latest {fold} for {scenario} (project {}), by `{}` at {}, binds file(s) this record does not: {}; re-bind them (--artifact <path> or --report <format>:<path>; new bytes at the same path are fine), or record the drop with --drop-attachment <path> (repeatable) --drop-reason <text>",
+                project_id.as_str(),
+                previous.envelope.actor.agent_id,
+                previous.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                unexplained.join(", ")
+            )));
+        }
     }
-    Ok(args.drop_reason.as_ref().filter(|_| !requested.is_empty()).map(|reason| AttachmentDrop {
-        paths: requested.iter().map(|path| path.to_string()).collect(),
+    let (dropped, carried): (Vec<&canon_model::EvidenceAttachment>, Vec<&canon_model::EvidenceAttachment>) = earlier.into_iter().partition(|a| is_audit || requested.contains(a.path.as_str()));
+    let missing: Vec<String> = carried
+        .iter()
+        .filter(|a| canon_gate::artifact_store::stored_blob(repo, &a.sha256).as_str() != a.sha256)
+        .map(|a| format!("`{}` (sha256 {})", a.path, a.sha256))
+        .collect();
+    if let (false, Some(previous)) = (missing.is_empty(), previous) {
+        return Err(PlanRefusal {
+            code: "EVIDENCE_CARRY_BLOB_MISSING",
+            message: format!(
+                "the latest {fold} for {scenario} (project {}), by `{}` at {}, binds file(s) whose bytes the artifact store does not hold intact, so they cannot be carried into this record: {}; re-bind them (--artifact <path> or --report <format>:<path>), `canon evidence vault` stores them again when the working-tree file still matches, or drop them with --drop-attachment <path> --drop-reason <text>",
+                project_id.as_str(),
+                previous.envelope.actor.agent_id,
+                previous.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                missing.join(", ")
+            ),
+        });
+    }
+    let drop = args.drop_reason.as_ref().filter(|_| !dropped.is_empty()).map(|reason| AttachmentDrop {
+        paths: dropped.iter().map(|a| a.path.clone()).collect::<BTreeSet<_>>().into_iter().collect(),
         reason: reason.clone(),
-    }))
+    });
+    let carried_paths: Vec<String> = carried.iter().map(|a| a.path.clone()).collect();
+    let mut all = attachments.to_vec();
+    all.extend(carried.into_iter().cloned());
+    Ok(AttachmentPlan { attachments: all, carried: carried_paths, drop, leaves_out })
+}
+
+fn stray_drop_message(stray: &str, fold: &str, scenario: &str, leaves_out: &std::collections::BTreeSet<String>) -> String {
+    let listed = if leaves_out.is_empty() { "nothing".to_string() } else { leaves_out.iter().map(|p| format!("`{p}`")).collect::<Vec<_>>().join(", ") };
+    format!("--drop-attachment `{stray}` is not a file the latest {fold} for {scenario} binds and this record leaves out (it leaves out: {listed})")
 }
 
 /// Inputs shared by payload export and authenticated evidence staging.
@@ -931,15 +996,16 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     };
 
     let ledger_root = gate_context.ctx.ledger_root.clone();
-    // 0.15 D2: a new latest record never silently drops what the
-    // previous one bound. Checked after binding (the new paths are known)
-    // and before anything is stored or staged.
-    let attachment_drop = match args.project_id.as_ref().zip(args.scenario_id.as_ref()) {
-        None => None,
-        Some(scenario) => match ledger_and_staged_evidence(&ledger_root).and_then(|records| drop_guard(&records, args, scenario, audit.is_some(), &bound.attachments)) {
-            Ok(attachment_drop) => attachment_drop,
+    // 0.15 D2 / 0.21 T7: a new latest record never silently drops what
+    // the previous one bound: it carries those files forward unless
+    // `--drop-attachment` names them. Checked after binding (the new
+    // paths are known) and before anything is stored or staged.
+    let (attachments, carried, attachment_drop) = match args.project_id.as_ref().zip(args.scenario_id.as_ref()) {
+        None => (bound.attachments.clone(), Vec::new(), None),
+        Some(scenario) => match ledger_and_staged_evidence(&ledger_root).map_err(PlanRefusal::refused).and_then(|records| plan_attachments(&records, &repo, args, scenario, audit.is_some(), &bound.attachments, true)) {
+            Ok(plan) => (plan.attachments, plan.carried, plan.drop),
             Err(error) => {
-                return CliError::refused("EVIDENCE_REFUSED", error.to_string()).emit("canon evidence add", args.json);
+                return CliError::refused(error.code, error.message).emit("canon evidence add", args.json);
             }
         },
     };
@@ -956,7 +1022,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         args.run_id.clone(),
         verdict,
     )
-    .with_attachments(bound.attachments);
+    .with_attachments(attachments);
     if let Some(attachment_drop) = attachment_drop {
         record = record.with_attachment_drop(attachment_drop);
     }
@@ -1084,12 +1150,18 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             // one would send an operator to a command that cannot apply.
             let settled = crate::gate::promote_after_stage("canon evidence add", &ledger_root, &receipt.location, promote, args.json);
             crate::say!(args.json, "canon evidence add: {} for {} ({outcome}) — {}, {}", settled.landed(&receipt.location), subject, settled.suffix(), next);
+            if !carried.is_empty() {
+                crate::say!(args.json, "canon evidence add: carried forward {} earlier attachment(s) unchanged: {}", carried.len(), carried.join(", "));
+            }
             let stale = print_stale_reviews(&repo, &stale_reviews, matches!(settled, crate::gate::StagedOutcome::Promoted { .. }), args.json);
             if settled.exit_code() == 0 {
                 let mut record = settled.json(&receipt.location);
                 record["subject"] = serde_json::json!(subject);
                 record["outcome"] = serde_json::json!(outcome);
                 record["next"] = serde_json::json!(next);
+                if args.scenario_id.is_some() {
+                    record["carried"] = serde_json::json!(carried);
+                }
                 let scope = match &args.task_id {
                     Some(_) => crate::next::Scope::Repo,
                     None => crate::next::Scope::Scenarios(vec![subject.clone()]),
@@ -1190,7 +1262,7 @@ fn brief_override_of(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Option<B
 /// anything else: it needs a `--report` to split and the `--project-id`
 /// whose indexed scenarios own the cases, and refuses every flag that
 /// names one subject (`--scenario-id`, `--task`, `--report-case`, an
-/// audit, a drop, an approval).
+/// audit, an approval).
 fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), String> {
     if !args.all_scenarios {
         return Ok(());
@@ -1200,8 +1272,6 @@ fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), String> {
         ("--task", args.task_id.is_some()),
         ("--report-case", !args.report_cases.is_empty()),
         ("--kind audit", args.kind == AUDIT_KIND),
-        ("--drop-attachment", !args.drop_attachments.is_empty()),
-        ("--drop-reason", args.drop_reason.is_some()),
         ("--approval-by", args.approval_by.is_some()),
         ("--approval-role", args.approval_role.is_some()),
         ("--approval-signature-file", args.approval_signature_file.is_some()),
@@ -1286,17 +1356,31 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
             return CliError::refused("EVIDENCE_REFUSED", error.to_string()).emit("canon evidence add", args.json);
         }
     };
-    let drops: Vec<String> = batch
-        .scenarios
-        .iter()
-        .zip(&scenario_ids)
-        .filter_map(|(binding, id)| drop_guard(&existing, args, (project_id, id), false, &binding.attachments).err())
-        .collect();
-    if !drops.is_empty() {
-        return CliError::refused("EVIDENCE_BATCH_REFUSED", drops.join("\n"))
-            .hint("no record of the batch is written; attest a scenario whose files changed on its own with --scenario-id (and --drop-attachment if it drops one)")
-            .emit("canon evidence add", args.json);
+    let mut plans = Vec::new();
+    let mut refusals_found: Vec<PlanRefusal> = Vec::new();
+    for (binding, id) in batch.scenarios.iter().zip(&scenario_ids) {
+        match plan_attachments(&existing, repo, args, (project_id, id), false, &binding.attachments, false) {
+            Ok(plan) => plans.push(plan),
+            Err(refusal) => refusals_found.push(refusal),
+        }
     }
+    if refusals_found.is_empty() {
+        // A drop that no scenario of the batch leaves out names nothing.
+        let leaves_out: std::collections::BTreeSet<String> = plans.iter().flat_map(|plan| plan.leaves_out.iter().cloned()).collect();
+        if let Some(stray) = args.drop_attachments.iter().find(|path| !leaves_out.contains(path.as_str())) {
+            let listed = if leaves_out.is_empty() { "nothing".to_string() } else { leaves_out.iter().map(|p| format!("`{p}`")).collect::<Vec<_>>().join(", ") };
+            refusals_found.push(PlanRefusal::refused(format!(
+                "--drop-attachment `{stray}` is not a file the latest evidence record of any scenario in this batch binds and this write leaves out (the batch leaves out: {listed})"
+            )));
+        }
+    }
+    if !refusals_found.is_empty() {
+        let code = if refusals_found.iter().all(|r| r.code == "EVIDENCE_REFUSED") { "EVIDENCE_BATCH_REFUSED" } else { refusals_found[0].code };
+        let message = refusals_found.iter().map(|r| r.message.as_str()).collect::<Vec<_>>().join("\n");
+        return CliError::refused(code, message).hint("no record of the batch is written; re-bind the named files, run `canon evidence vault`, or attest the scenario on its own with --scenario-id").emit("canon evidence add", args.json);
+    }
+    let carried_by_scenario: std::collections::BTreeMap<String, Vec<String>> =
+        scenario_ids.iter().zip(&plans).map(|(id, plan)| (id.as_str().to_string(), plan.carried.clone())).collect();
 
     let at = Utc::now();
     let mut actor = Actor::new(args.actor_id.as_str(), args.role.clone());
@@ -1308,10 +1392,14 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         .iter()
         .zip(&scenario_ids)
         .zip(&refusals)
-        .map(|((binding, id), refusals)| {
+        .zip(plans)
+        .map(|(((binding, id), refusals), plan)| {
             let mut record = EvidenceRecord::new(Envelope::current(RecordKind::EvidenceRecord, at, actor.clone()), None, Some(id.clone()), args.run_id.clone(), binding.verdict)
-                .with_attachments(binding.attachments.clone())
+                .with_attachments(plan.attachments)
                 .with_project_id(project_id.clone());
+            if let Some(attachment_drop) = plan.drop {
+                record = record.with_attachment_drop(attachment_drop);
+            }
             if let Some(brief_override) = brief_override_of(args, refusals) {
                 record = record.with_brief_override(brief_override);
             }
@@ -1385,6 +1473,11 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         let mut entry = settled.json(&location.staged);
         entry["subject"] = serde_json::json!(id.as_str());
         entry["outcome"] = serde_json::json!(format!("verdict {}", verdict_slug(record.verdict)));
+        let carried = carried_by_scenario.get(id.as_str()).cloned().unwrap_or_default();
+        if !carried.is_empty() {
+            crate::say!(json, "canon evidence add: carried forward {} earlier attachment(s) of {} unchanged: {}", carried.len(), id.as_str(), carried.join(", "));
+        }
+        entry["carried"] = serde_json::json!(carried);
         written.push(entry);
     }
     written.extend(unchanged);
