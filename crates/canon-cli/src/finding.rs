@@ -334,6 +334,16 @@ pub const SEVERITY_VALUES: [&str; 3] = ["blocker", "should-fix", "note"];
 /// `--disposition`'s accepted values. `canon context` lists these.
 pub const DISPOSITION_VALUES: [&str; 4] = ["open", "fixed", "rejected", "deferred"];
 
+/// `--severity` for clap, with the accepted values known to it.
+pub fn severity_parser() -> impl clap::builder::TypedValueParser<Value = FindingSeverity> {
+    crate::cli_error::closed_set(SEVERITY_VALUES, parse_severity)
+}
+
+/// `--disposition` for clap, with the accepted values known to it.
+pub fn disposition_parser() -> impl clap::builder::TypedValueParser<Value = FindingDisposition> {
+    crate::cli_error::closed_set(DISPOSITION_VALUES, parse_disposition)
+}
+
 /// `--severity`'s clap `value_parser`. Kebab-cased on the CLI, matching
 /// `crate::divergence::parse_status`'s established spelling for a
 /// snake_case-serialized model enum, and exhaustive over
@@ -553,12 +563,12 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     // `malformed` record two commands later.
     match (args.disposition, &args.resolution_sha) {
         (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").emit("canon finding add", args.json);
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").field("--resolution-sha").emit("canon finding add", args.json);
         }
         (disposition, Some(sha)) if disposition != FindingDisposition::Fixed => {
             return CliError::refused("FINDING_RESOLUTION_SHA_UNEXPECTED", format!("--resolution-sha {sha} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the sha or set --disposition fixed",
                 disposition.as_str()
-            )).emit("canon finding add", args.json);
+            )).field("--resolution-sha").emit("canon finding add", args.json);
         }
         _ => {}
     }
@@ -598,7 +608,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         // Unreachable: `(Fixed, None)` was refused above. Handled
         // rather than assumed away, and never by fabricating a sha.
         (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").emit("canon finding add", args.json);
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").field("--resolution-sha").emit("canon finding add", args.json);
         }
     };
     if let Some(sha) = shas.reviewed {
@@ -757,12 +767,12 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     // correctly does not exist.
     match (args.disposition, &args.resolution_sha) {
         (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").emit("canon finding close", args.json);
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").field("--resolution-sha").emit("canon finding close", args.json);
         }
         (disposition, Some(sha)) if disposition != FindingDisposition::Fixed => {
             return CliError::refused("FINDING_RESOLUTION_SHA_UNEXPECTED", format!("--resolution-sha {sha} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the sha or set --disposition fixed",
                 disposition.as_str()
-            )).emit("canon finding close", args.json);
+            )).field("--resolution-sha").emit("canon finding close", args.json);
         }
         _ => {}
     }
@@ -861,7 +871,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         // Unreachable: refused by the coherence pair above. Handled
         // rather than assumed away, and never by fabricating a sha.
         (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").emit("canon finding close", args.json);
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").field("--resolution-sha").emit("canon finding close", args.json);
         }
     };
     if let Some(sha) = existing.reviewed_sha.clone() {

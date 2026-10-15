@@ -1,0 +1,78 @@
+//! One minimal example invocation per leaf command, shown by `canon schema
+//! <command>` as `example` (0.21 D5).
+//!
+//! `tests/schema_examples.rs` runs every row in a scratch repo, so an
+//! example cannot rot: it must exit 0, or refuse with a code the command
+//! documents, and the test names each example that needs state a scratch
+//! repo cannot cheaply have. `schema::check_examples` keeps this table in
+//! step with the clap tree: one row per leaf, starting `canon <path>`.
+//!
+//! The examples share one story: a subject `demo` in domain `dev`, its change
+//! `add-login`, and the scenario `auth.login.01` of the spec root `root`.
+
+pub(crate) const EXAMPLES: &[(&str, &str)] = &[
+    ("adapter authorize", "canon adapter authorize --response adapter-response.json --repo ."),
+    ("adapter validate", "canon adapter validate --response adapter-response.json"),
+    ("brief approve", "canon brief approve --by alice --note \"approved as written\""),
+    ("brief check", "canon brief check"),
+    ("change new", "canon change new add-search --subject demo --title \"Add search\""),
+    ("context", "canon context"),
+    ("context-pack new", "canon context-pack new --manifest .canon/context-manifest.json"),
+    ("context-pack show", "canon context-pack show sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+    ("context-pack verify", "canon context-pack verify sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+    ("dashboard", "canon dashboard"),
+    ("demo add", "canon demo add"),
+    ("demo init", "canon demo init --repo canon-demo"),
+    ("dispatch begin", "canon dispatch begin --role implementer --regime implementer/my-repo/api/abcdef012345"),
+    ("dispatch diff", "canon dispatch diff"),
+    ("dispatch end", "canon dispatch end --run 01ARZ3NDEKTSV4RRFFQ69G5FAV --status succeeded"),
+    ("divergence add", "canon divergence add --project-id root --scenario-id auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --reviewer alice --role reviewer"),
+    ("divergence defer", "canon divergence defer --project-id root --scenario-id auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --reviewer alice --reason \"waiting on the vendor\" --expiry 2030-01-01T00:00:00Z --role reviewer"),
+    ("divergence promote", "canon divergence promote"),
+    ("divergence resolve", "canon divergence resolve --project-id root --scenario-id auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --reviewer alice --role reviewer"),
+    ("divergence status", "canon divergence status"),
+    ("evidence add", "canon evidence add --project-id root --scenario-id auth.login.01 --kind test-run --ref \"npm test\" --role implementer"),
+    ("evidence approval-payload", "canon evidence approval-payload --scenario-id auth.login.01 --project-id root --artifact-sha 0123456789abcdef0123456789abcdef01234567 --approval-by alice --approval-at 2030-01-01T00:00:00Z"),
+    ("evidence vault", "canon evidence vault"),
+    ("export", "canon export --kind evidence_record"),
+    ("feature new", "canon feature new billing.invoice --title Invoices"),
+    ("finding add", "canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --reviewer alice --summary \"Token is logged\""),
+    ("finding close", "canon finding close --change-id add-login --round 1 --seq 1 --disposition rejected"),
+    ("finding list", "canon finding list --change-id add-login"),
+    ("format", "canon format .canon/specs"),
+    ("gate check", "canon gate check"),
+    ("gate install-hooks", "canon gate install-hooks"),
+    ("gate promote", "canon gate promote"),
+    ("gate selftest", "canon gate selftest"),
+    ("gate task", "canon gate task add-login#1"),
+    ("ingest artifacts", "canon ingest artifacts"),
+    ("ingest plans", "canon ingest plans"),
+    ("ingest sessions", "canon ingest sessions"),
+    ("init", "canon init"),
+    ("inventory sync", "canon inventory sync"),
+    ("learn approve", "canon learn approve 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --principal alice"),
+    ("learn promote", "canon learn promote 01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+    ("learn rollback", "canon learn rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approved-at 2030-01-01T00:00:00Z"),
+    ("migrate", "canon migrate"),
+    ("plugin sync", "canon plugin sync my-plugin"),
+    ("policy approve", "canon policy approve --by alice"),
+    ("prompt add", "canon prompt add --name reviewer --version v1 --manifest .canon/prompt-manifest.json"),
+    ("prompt show", "canon prompt show --name reviewer --version v1"),
+    ("purge", "canon purge --kind session --before 2020-01-01T00:00:00Z --plan"),
+    ("query", "canon query --kind evidence_record"),
+    ("regime-key", "canon regime-key --role reviewer --repo my-repo --area api --hash abcdef012345"),
+    ("report", "canon report"),
+    ("retrieve", "canon retrieve --role reviewer --domain dev"),
+    ("review add", "canon review add --project-id root --scenario-id auth.login.01 --reviewer alice --pin abc123 --role reviewer --original-spec-ref docs/prd.md"),
+    ("scenario new", "canon scenario new auth.login.02 --title \"Sign out\" --feature .canon/specs/kind=feature/area=auth/login.feature"),
+    ("schema", "canon schema evidence add"),
+    ("selftest", "canon selftest"),
+    ("skills check", "canon skills check"),
+    ("skills doctor", "canon skills doctor"),
+    ("skills install", "canon skills install"),
+    ("status", "canon status"),
+    ("subject adopt", "canon subject adopt add-login --subject demo"),
+    ("subject new", "canon subject new payments --domain dev --title Payments"),
+    ("subject status", "canon subject status demo --to specced"),
+    ("tier age", "canon tier age"),
+];

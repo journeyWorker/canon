@@ -80,6 +80,8 @@ pub fn init(flag: Option<Role>) -> Result<Option<Role>, CliError> {
         None => match std::env::var(ENV) {
             Ok(value) if !value.trim().is_empty() => Some(Role::parse(&value).ok_or_else(|| {
                 CliError::refused("UNKNOWN_ROLE", format!("{ENV}=`{}` is not a role", value.trim()))
+                    .field(ENV)
+                    .expected(["planner", "implementer", "reviewer", "orchestrator"])
                     .hint(format!("use one of: {}; or pass --as <role>", ALL.iter().map(|r| r.as_str()).collect::<Vec<_>>().join(", ")))
             })?),
             _ => None,

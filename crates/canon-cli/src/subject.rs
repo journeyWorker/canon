@@ -143,6 +143,11 @@ pub fn parse_change_id(s: &str) -> Result<ChangeId, String> {
 /// `<state>`'s `clap` value parser — the closed [`SubjectStatus`]
 /// vocabulary, snake_case wire spelling (mirrors the model's
 /// `#[serde(rename_all = "snake_case")]`), never a second casing.
+pub fn status_parser() -> impl clap::builder::TypedValueParser<Value = SubjectStatus> {
+    crate::cli_error::closed_set(["proposed", "specced", "building", "verifying", "shipped", "retired"], parse_status)
+}
+
+/// A subject status, as the CLI spells it.
 pub fn parse_status(s: &str) -> Result<SubjectStatus, String> {
     match s {
         "proposed" => Ok(SubjectStatus::Proposed),
@@ -637,20 +642,20 @@ pub fn run_status(
         return CliError::refused("SUBJECT_INVALID_TRANSITION", format!("invalid transition {} → {} (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)",
             status_str(current),
             status_str(target)
-        )).emit("canon subject status", json);
+        )).field("--to").expected(["proposed", "specced", "building", "verifying", "shipped", "retired"].into_iter().filter(|s| parse_status(s).is_ok_and(|to| is_valid_transition(current, to)))).emit("canon subject status", json);
     }
     let reopens = current == SubjectStatus::Shipped && target == SubjectStatus::Verifying;
     match (reopens, reason) {
         (true, None) => {
             return CliError::refused("SUBJECT_REASON_REQUIRED", format!("reopening {} (shipped → verifying) needs --reason <text>: why it reopens, recorded on the subject with the actor",
                 subject_id.as_str()
-            )).emit("canon subject status", json);
+            )).field("--reason").emit("canon subject status", json);
         }
         (false, Some(_)) => {
             return CliError::refused("SUBJECT_REASON_UNEXPECTED", format!("--reason records why a shipped subject reopens and applies only to shipped → verifying, not {} → {}",
                 status_str(current),
                 status_str(target)
-            )).emit("canon subject status", json);
+            )).field("--reason").emit("canon subject status", json);
         }
         _ => {}
     }

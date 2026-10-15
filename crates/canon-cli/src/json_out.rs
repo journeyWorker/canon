@@ -45,6 +45,15 @@ pub fn data_with_next(command: &str, data: Value, after: &crate::next::After) {
     println!("{envelope}");
 }
 
+/// [`data`] with extra `meta` keys beside `command` (`unchanged`, …).
+pub fn data_with_meta(command: &str, data: Value, extra_meta: Value) {
+    let mut body = envelope(command, data);
+    if let (Some(meta), Some(extra)) = (body["meta"].as_object_mut(), extra_meta.as_object()) {
+        meta.extend(extra.iter().map(|(k, v)| (k.clone(), v.clone())));
+    }
+    println!("{body}");
+}
+
 /// A command's narration: each line is said (stdout, or stderr under
 /// `--json`) and kept, so the JSON result can carry the same account.
 pub struct Log {

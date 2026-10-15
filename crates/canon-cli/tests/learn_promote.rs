@@ -323,3 +323,28 @@ fn the_per_role_promotion_config_in_canon_yaml_drives_the_gate() {
         "configured statistical gate must not bypass activation approval"
     );
 }
+
+/// A contradicting trajectory demotes an active, blocked strategy. When the
+/// demotion itself fails (here: its git-tier file has no front matter to
+/// flag) the refusal says so under its own code, and the strategy is left
+/// active.
+#[test]
+fn a_failed_demotion_has_its_own_error_code() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = ParquetStrategyStore::open(dir.path().join(".canon").join("learn").join("strategies"));
+    let id = StrategyId::new();
+    let item = StrategyItem::new(id, fixture_regime(), dev_role(), "review guidance", "one-liner", "demotable", vec![TrajectoryId::new()], Utc::now()).with_lifecycle(StrategyLifecycle::Active);
+    store.append(&item).expect("seed active strategy");
+    seed_proven_regime(dir.path());
+    let trajectories = ParquetTrajectoryStore::open(dir.path().join(".canon").join("learn").join("trajectories"));
+    append_trajectory(&trajectories, Utc::now(), VerdictOutcome::Failure);
+    let tier_file = git_tier_file(dir.path(), &id);
+    std::fs::create_dir_all(tier_file.parent().unwrap()).unwrap();
+    std::fs::write(&tier_file, "no front matter here\n").unwrap();
+
+    let output = run_promote(dir.path(), &id, &["--json"]);
+    assert_eq!(output.status.code(), Some(1), "{}", String::from_utf8_lossy(&output.stderr));
+    let body: serde_json::Value = serde_json::from_slice(&output.stdout).expect("one JSON document");
+    assert_eq!(body["error"]["code"], "LEARN_DEMOTION_FAILED", "{body}");
+    assert!(body["error"]["message"].as_str().unwrap().contains("promotion gate"), "the block that triggered it is still named: {body}");
+}

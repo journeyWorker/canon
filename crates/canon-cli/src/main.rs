@@ -145,6 +145,9 @@ enum Command {
         /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
+        /// With --json, keep only these top-level report fields (comma-separated); an unknown field is refused
+        #[arg(long, value_delimiter = ',')]
+        fields: Option<Vec<String>>,
     },
     /// Show what you can author here: record kinds, fields, enums, policies
     Context {
@@ -154,6 +157,9 @@ enum Command {
         /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
+        /// With --json, keep only these top-level surface sections (comma-separated); an unknown field is refused
+        #[arg(long, value_delimiter = ',')]
+        fields: Option<Vec<String>>,
     },
     /// Create, inspect, and verify reproducible context packs
     #[command(after_help = "Examples:\n  canon context-pack new --manifest .canon/context-manifest.json\n  canon context-pack show sha256:<pack-digest> --repo . --json\n  canon context-pack verify sha256:<pack-digest>")]
@@ -329,7 +335,7 @@ enum Command {
     /// Read stored records across every storage tier
     Query {
         /// Record kind to read (e.g. handoff, strategy_item)
-        #[arg(long, value_parser = canon_cli::query::parse_kind)]
+        #[arg(long, value_parser = canon_cli::query::kind_parser())]
         kind: RecordKind,
         /// Only records with at >= <since> (RFC3339/ISO-8601)
         #[arg(long, value_parser = canon_cli::query::parse_since)]
@@ -367,7 +373,7 @@ enum Command {
     },
     /// Export a redacted retention manifest without deleting records
     Export {
-        #[arg(long, value_parser = canon_cli::query::parse_kind)]
+        #[arg(long, value_parser = canon_cli::query::kind_parser())]
         kind: RecordKind,
         #[arg(long, value_parser = canon_cli::query::parse_since)]
         before: Option<DateTime<Utc>>,
@@ -383,10 +389,13 @@ enum Command {
         include_sensitive: bool,
         #[command(flatten)]
         page: canon_cli::paging::PageFlags,
+        /// Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused
+        #[arg(long, value_delimiter = ',')]
+        fields: Option<Vec<String>>,
     },
     /// Remove allowlisted records older than a cutoff: `--plan` shows the removal set and its planDigest, `--confirm <planDigest>` deletes it
     Purge {
-        #[arg(long, value_parser = canon_cli::query::parse_kind)]
+        #[arg(long, value_parser = canon_cli::query::kind_parser())]
         kind: RecordKind,
         #[arg(long, value_parser = canon_cli::query::parse_since)]
         before: DateTime<Utc>,
@@ -748,7 +757,7 @@ enum DispatchCommand {
         #[arg(long, value_parser = canon_cli::dispatch::parse_run_id)]
         run: RunId,
         /// Terminal outcome: succeeded or failed
-        #[arg(long, value_parser = canon_cli::dispatch::parse_run_status)]
+        #[arg(long, value_parser = canon_cli::dispatch::run_status_parser())]
         status: RunStatus,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
@@ -955,7 +964,7 @@ enum EvidenceCommand {
         #[arg(long = "ref", value_name = "REF")]
         evidence_ref: String,
         /// faithful / not-applicable / divergent; refused with --kind audit, whose verdict follows --audit-result. Default faithful; with --all-scenarios, each record's verdict is derived from its own cases unless this is given
-        #[arg(long, value_parser = canon_cli::evidence::parse_verdict)]
+        #[arg(long, value_parser = canon_cli::evidence::verdict_parser())]
         verdict: Option<EvidenceVerdict>,
         /// One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)
         #[arg(long)]
@@ -1071,10 +1080,10 @@ enum FindingCommand {
         #[arg(long)]
         seq: u32,
         /// blocker / should-fix / note — the reviewer's own judgement, never a score canon derives
-        #[arg(long, value_parser = canon_cli::finding::parse_severity)]
+        #[arg(long, value_parser = canon_cli::finding::severity_parser())]
         severity: canon_model::FindingSeverity,
         /// open / fixed / rejected / deferred (fixed requires --resolution-sha, and only fixed may carry one)
-        #[arg(long, default_value = "open", value_parser = canon_cli::finding::parse_disposition)]
+        #[arg(long, default_value = "open", value_parser = canon_cli::finding::disposition_parser())]
         disposition: canon_model::FindingDisposition,
         /// Who raised it (line breaks refused)
         #[arg(long)]
@@ -1125,7 +1134,7 @@ enum FindingCommand {
         #[arg(long)]
         seq: u32,
         /// Where it lands: fixed / rejected / deferred / open (reopening is a real transition). fixed requires --resolution-sha, and only fixed may carry one
-        #[arg(long, value_parser = canon_cli::finding::parse_disposition)]
+        #[arg(long, value_parser = canon_cli::finding::disposition_parser())]
         disposition: canon_model::FindingDisposition,
         /// The commit that closed it. Required by, and permitted only with, --disposition fixed. A full or short sha (resolved through git). Must name a COMMIT object this repo holds
         #[arg(long, value_parser = canon_cli::finding::parse_commit)]
@@ -1348,6 +1357,9 @@ enum DivergenceCliCommand {
         json: bool,
         #[command(flatten)]
         page: canon_cli::paging::PageFlags,
+        /// With --json, keep only these scenario fields (comma-separated): project_id, scenario_id, state, reason, expiry; an unknown field is refused
+        #[arg(long, value_delimiter = ',')]
+        fields: Option<Vec<String>>,
     },
 }
 
@@ -1483,7 +1495,7 @@ enum ChangeCommand {
         subject: SubjectId,
         /// `feature` (default): the PRD brief. `chore`: a short brief for work that
         /// changes how the subject is built or kept, never what it does
-        #[arg(long, default_value = "feature", value_parser = canon_cli::brief_template::parse_kind)]
+        #[arg(long, default_value = "feature", value_parser = canon_cli::brief_template::kind_parser())]
         kind: canon_cli::brief_template::ChangeKind,
         /// The change's title (also its brief's summary)
         #[arg(long)]
@@ -1547,10 +1559,10 @@ enum SubjectCommand {
         #[arg(value_parser = canon_cli::subject::parse_subject_id)]
         id: SubjectId,
         /// Move the subject to this state (proposed/specced/building/verifying/shipped/retired); without it the subject is shown and nothing is written
-        #[arg(long, value_name = "STATE", value_parser = canon_cli::subject::parse_status)]
+        #[arg(long, value_name = "STATE", value_parser = canon_cli::subject::status_parser())]
         to: Option<canon_model::SubjectStatus>,
         /// Deprecated: the state as a second positional; use `--to <state>`
-        #[arg(value_parser = canon_cli::subject::parse_status, hide = true, conflicts_with = "to")]
+        #[arg(value_parser = canon_cli::subject::status_parser(), hide = true, conflicts_with = "to")]
         state: Option<canon_model::SubjectStatus>,
         /// Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories
         #[arg(long)]
@@ -1657,6 +1669,14 @@ fn usage_error(error: &clap::Error) -> ExitCode {
     if !hint.is_empty() {
         usage = usage.hint(hint);
     }
+    // The offending argument, and its accepted values when clap knows them.
+    use clap::error::{ContextKind, ContextValue};
+    if let Some(ContextValue::String(arg)) = error.get(ContextKind::InvalidArg) {
+        usage = usage.field(arg.split_whitespace().next().unwrap_or(arg));
+    }
+    if let Some(ContextValue::Strings(values)) = error.get(ContextKind::ValidValue) {
+        usage = usage.expected(values.iter().cloned());
+    }
     ExitCode::from(usage.emit("canon", true) as u8)
 }
 
@@ -1736,7 +1756,7 @@ fn main() -> ExitCode {
         Command::Query { kind, since, repo, canon_yaml, json, plugin, change_id, status, domain, include_sensitive, page, fields } => {
             run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, change_id, status, domain, include_sensitive, page.page(), fields)
         }
-        Command::Export { kind, before, after, out, repo, json, include_sensitive, page } => ExitCode::from(canon_cli::retention::run_export(&repo, kind, before, after, out.as_deref(), json, include_sensitive, &page.page())),
+        Command::Export { kind, before, after, out, repo, json, include_sensitive, page, fields } => ExitCode::from(canon_cli::retention::run_export(&repo, kind, before, after, out.as_deref(), json, include_sensitive, &page.page(), fields.as_deref())),
         Command::Purge { kind, before, repo, plan, confirm, json } => {
             let mode = match (plan, confirm) {
                 (_, Some(digest)) => Some(canon_cli::retention::PurgeMode::Confirm(digest)),
@@ -1746,10 +1766,10 @@ fn main() -> ExitCode {
             ExitCode::from(canon_cli::retention::run_purge(&repo, kind, before, mode, json))
         }
         Command::Format { check: _, root, repo, json } => run_fmt(&root, repo.as_deref(), json),
-        Command::Context { repo, json } => run_context(&repo, json),
-        Command::Status { repo, json } => {
+        Command::Context { repo, json, fields } => run_context(&repo, json, fields),
+        Command::Status { repo, json, fields } => {
             canon_cli::inventory::refresh_stale_index(&repo, "canon status");
-            ExitCode::from(canon_cli::status::run(&repo, json) as u8)
+            ExitCode::from(canon_cli::status::run(&repo, json, fields.as_deref()) as u8)
         }
         Command::ContextPack { action } => match action {
             ContextPackCommand::New(args) => run_context_pack_new(args),
@@ -1998,7 +2018,7 @@ fn main() -> ExitCode {
             DivergenceCliCommand::Defer { project_id, scenario_id, sha, round, reviewer, reason, expiry, actor_id, role, repo, json } => {
                 ExitCode::from(canon_cli::divergence::run_defer(&repo, &project_id, &scenario_id, &sha, round, &reviewer, &reason, expiry, &actor_id, &role, json) as u8)
             }
-            DivergenceCliCommand::Status { repo, as_of, json, page } => ExitCode::from(canon_cli::divergence::run_status(&repo, as_of, json, &page.page()) as u8),
+            DivergenceCliCommand::Status { repo, as_of, json, page, fields } => ExitCode::from(canon_cli::divergence::run_status(&repo, as_of, json, &page.page(), fields.as_deref()) as u8),
         },
         Command::Inventory { action } => match action {
             InventoryCommand::Sync { repo, spec_root, json } => run_inventory_sync(&repo, spec_root.as_deref(), json),
@@ -2255,7 +2275,7 @@ fn run_query(
     // validation runs BEFORE any tier read (task 3.2/3.3) -- a usage
     // fault here is a clean, nothing-read `2`, never a store error.
     if let Err(e) = canon_cli::query::validate_scope(kind, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
-        CliError::refused("QUERY_INVALID_ARGUMENT", e.to_string()).emit("canon query", json);
+        e.to_cli_error().emit("canon query", json);
         let _ = canon_cli::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
         return ExitCode::from(2);
     }
@@ -2481,11 +2501,19 @@ fn run_init(repo: &std::path::Path, check_config: bool, options: canon_cli::init
 /// via [`canon_cli::context::resolve_repo_root`] (design D7, task 1.4) —
 /// the `--repo`-omitted/`--repo .` nearest-`canon.yaml` ancestor walk —
 /// before [`canon_cli::context::resolve_surface`] ever reads it.
-fn run_context(repo: &std::path::Path, json: bool) -> ExitCode {
+fn run_context(repo: &std::path::Path, json: bool, fields: Option<Vec<String>>) -> ExitCode {
+    if let Some(requested) = &fields {
+        if let Err(e) = canon_cli::paging::check_known("canon context", requested, &canon_cli::context::SURFACE_FIELDS) {
+            return ExitCode::from(e.emit("canon context", json) as u8);
+        }
+    }
     let repo = canon_cli::context::resolve_repo_root(repo);
     let surface = canon_cli::context::resolve_surface(&repo, canon_cli::context::ContextOptions::default());
     if json {
-        println!("{}", canon_cli::context::render_json(&surface));
+        match &fields {
+            Some(requested) => println!("{}", canon_cli::context::render_json_fields(&surface, requested)),
+            None => println!("{}", canon_cli::context::render_json(&surface)),
+        }
     } else {
         print!("{}", canon_cli::context::render_outline(&surface));
     }
@@ -2985,6 +3013,13 @@ mod schema_drift {
     #[test]
     fn schema_metadata_matches_the_command_tree() {
         let problems = canon_cli::schema::check_metadata(&Cli::command(), canon_cli::schema::META, canon_cli::deprecation::DEPRECATED);
+        assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    /// Every clap leaf command carries one example and every example names a leaf.
+    #[test]
+    fn schema_examples_match_the_command_tree() {
+        let problems = canon_cli::schema::check_examples(&Cli::command());
         assert!(problems.is_empty(), "{}", problems.join("\n"));
     }
 }

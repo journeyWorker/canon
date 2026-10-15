@@ -157,7 +157,8 @@ fn auto_promotes_every_staged_write_and_no_promote_keeps_one_staged() {
     assert_eq!(staged(repo), 0, "nothing waits for a promote");
     assert_eq!((committed(repo, "evidence_record"), committed(repo, "finding"), committed(repo, "divergence")), (1, 2, 1));
 
-    let out = ok(repo, &with(evidence("game.run.01"), &["--no-promote"]));
+    // A second, different attestation (an identical one is a repeat and writes nothing).
+    let out = ok(repo, &with(evidence("game.run.01"), &["--summary", "attested again", "--no-promote"]));
     assert!(stdout(&out).lines().any(|l| l.contains(STAGED)), "{}", stdout(&out));
     assert_eq!(staged(repo), 1);
     ok(repo, &["gate", "promote"]);
@@ -261,7 +262,7 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     assert_eq!(staged(repo), 0);
 
     let kept: [(&str, Vec<&str>, &str); 3] = [
-        ("canon evidence add", with(evidence("game.run.01"), &["--no-promote"]), STAGED),
+        ("canon evidence add", with(evidence("game.run.01"), &["--summary", "attested again", "--no-promote"]), STAGED),
         ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "2", "--severity", "note", "--reviewer", "r", "--summary", "s", "--no-promote"], STAGED),
         ("canon divergence add", vec!["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"], "— run `canon divergence promote` to commit it"),
     ];

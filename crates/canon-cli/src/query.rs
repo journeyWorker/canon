@@ -74,6 +74,11 @@ pub fn parse_kind(s: &str) -> Result<RecordKind, String> {
     })
 }
 
+/// `--kind`'s clap parser: one of the record kinds, known to clap.
+pub fn kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind> {
+    crate::cli_error::closed_set(RecordKind::ALL.iter().map(|k| k.as_str()).collect::<Vec<_>>(), parse_kind)
+}
+
 /// `--since`'s `clap` value parser — an RFC3339/ISO-8601 timestamp.
 pub fn parse_since(s: &str) -> Result<DateTime<Utc>, String> {
     DateTime::parse_from_rfc3339(s).map(|dt| dt.with_timezone(&Utc)).map_err(|e| format!("invalid --since timestamp `{s}`: {e}"))
@@ -114,6 +119,17 @@ pub enum ScopeError {
     UnsupportedKind { flag: &'static str, supported: &'static str, kind: RecordKind },
     #[error("`--status {value}` is not valid for `--kind {}` (expected one of: {})", .kind.as_str(), .valid.join(", "))]
     InvalidStatus { kind: RecordKind, value: String, valid: Vec<String> },
+}
+
+impl ScopeError {
+    /// The refusal `canon query` reports: the offending flag, and for a bad
+    /// `--status` the values the queried kind accepts.
+    pub fn to_cli_error(&self) -> CliError {
+        match self {
+            ScopeError::UnsupportedKind { flag, .. } => CliError::refused("QUERY_INVALID_ARGUMENT", self.to_string()).field(*flag),
+            ScopeError::InvalidStatus { valid, .. } => CliError::refused("QUERY_INVALID_ARGUMENT", self.to_string()).field("--status").expected(valid.iter().cloned()),
+        }
+    }
 }
 
 /// Validate `--change-id`/`--status`/`--domain` BEFORE any tier read

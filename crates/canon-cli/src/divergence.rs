@@ -323,7 +323,15 @@ pub fn run_defer(
 /// with `mart_review_burndown`'s per-day TREND). `as_of` defaults to
 /// "now"; ALWAYS exits `0` — a read-only capability query over
 /// whatever is currently on the ledger, never a gate.
-pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page) -> i32 {
+/// The fields of one `divergence status` scenario row, which `--fields` may name.
+const ROW_FIELDS: [&str; 5] = ["project_id", "scenario_id", "state", "reason", "expiry"];
+
+pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&[String]>) -> i32 {
+    if let Some(requested) = fields {
+        if let Err(e) = crate::paging::check_known("canon divergence status", requested, &ROW_FIELDS) {
+            return e.emit("canon divergence status", json);
+        }
+    }
     let repo = resolve_repo_root(repo);
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
@@ -349,7 +357,10 @@ pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &
                     row["reason"] = serde_json::json!(reason);
                     row["expiry"] = serde_json::json!(expiry.to_string());
                 }
-                row
+                match fields {
+                    Some(requested) => crate::paging::project(&row, requested),
+                    None => row,
+                }
             })
             .collect();
         let mut meta_json = serde_json::json!({ "command": "divergence status" });
@@ -541,7 +552,7 @@ mod tests {
         assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, false), 0);
 
         // Read-only capability query — always exits 0.
-        assert_eq!(run_status(dir.path(), None, false, &crate::paging::Page::first_page()), 0);
+        assert_eq!(run_status(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
 
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, Utc::now());
@@ -571,7 +582,7 @@ mod tests {
         let persisted_before = files_with_bytes(&divergence_dir);
         assert_eq!(persisted_before.len(), 1, "exactly the one committed resolution");
 
-        assert_eq!(run_status(dir.path(), None, false, &crate::paging::Page::first_page()), 0);
+        assert_eq!(run_status(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
         let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, Utc::now());
         assert_eq!(states.get(&(project_id, scenario_id)), Some(&canon_model::FoldedState::ResolvedInvalid));
 
