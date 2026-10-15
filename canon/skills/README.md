@@ -8,6 +8,8 @@ references and scripts remain lazy-loadable sidecars.
 canon/skills/
   SKILL.src.md                         # read-only authored source
   reference/<topic>.md                 # preserved actionable guidance
+  reference/role-<role>.md             # planner, implementer, reviewer, orchestrator: loaded by role
+  reference/brief-<pass>.md            # five brief refinement passes, linked only from role-planner.md
   scripts/canon-retrieve-pre-dispatch.sh
 ```
 

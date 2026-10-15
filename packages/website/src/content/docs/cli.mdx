@@ -211,7 +211,9 @@ stderr.
 
 **Errors.** Every failure prints `canon <command>: CODE — message` and a
 `hint:` line on stderr. With `--json`, stdout is instead
-`{"error": {"code", "message", "hint", "retryable"}}`. Codes are stable
+`{"error": {"code", "message", "hint", "retryable"}}`, plus `field` (the
+option at fault) and `expected` (its valid values) when a usage error or an
+input check can name them. Codes are stable
 strings; a command-line parse error is `USAGE`. Exit `2` means the
 invocation or its inputs are wrong and fixable (nothing was written); exit
 `1` is an operational failure or a blocking finding the command reports.
@@ -223,6 +225,40 @@ continues. `--json` adds `meta: {returned, total, hasMore, nextCursor}`.
 `canon query` and `canon finding list` also take `--fields a,b,c` to
 project records; an unknown field is `UNKNOWN_FIELD` and the hint lists the
 known ones.
+
+**`meta.next` after a write.** A write that succeeds names the next step
+itself, so an agent does not call `canon status` just to find it: `--json`
+adds `meta.next` (`[{command, why, actor, role}]`, at most five, with
+`meta.nextOmitted` counting the rest), and human output ends with one
+`next: <command> — <why>` line. These are `canon status`'s own steps, narrowed
+to the subject the write touched; `actor: human` marks a step only a human
+takes. canon never runs a step.
+
+**Deprecated names.** A renamed command (`context-pack create`, `prompt
+register`, `divergence stage`, `demo attest`, and `subject status <id>
+<state>`) still runs for one release, warns on stderr, and sets
+`meta.deprecated: {use, removedIn}`.
+
+**Retry safety.** Repeating `evidence add` or `review add` with identical
+input returns the existing record with `meta.unchanged: true`.
+
+### Roles
+
+An agent can declare a role: `planner`, `implementer`, `reviewer` or
+`orchestrator`. Set `CANON_ROLE=<role>` or pass `--as <role>` (the flag wins);
+an unknown value is `UNKNOWN_ROLE`. A role is guidance, not enforcement:
+`canon schema` lists the role's commands, `canon status` and `meta.next` keep
+only the role's steps and count the rest in `waitingOn` (the orchestrator also
+sees the human's steps), and `--role` on `evidence add` and `review add`
+defaults to it. Unset, every command behaves as before.
+
+The canon skill is split the same way: a short shared core plus
+`reference/role-<role>.md`. A spawned agent with a role loads only its role
+reference; one agent doing everything follows `canon status` and loads each
+role reference as its phase starts. The orchestrator starts each role with
+`CANON_ROLE` set and runs the reviewer as a separate process with its own
+session id. `--fields` (on `status`, `export`, `divergence status`, `context`,
+`query`, `finding list`) keeps an agent's context small.
 
 **Destructive commands plan first.** `canon purge --plan` prints the removal
 set and a `planDigest` and deletes nothing; `canon purge --confirm

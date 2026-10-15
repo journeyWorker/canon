@@ -221,7 +221,8 @@ stderr로 갑니다.
 
 **오류.** 실패하면 stderr에 `canon <command>: CODE — message`와 `hint:` 줄을
 냅니다. `--json`이면 stdout에 대신
-`{"error": {"code", "message", "hint", "retryable"}}`가 나옵니다. 코드는 고정된
+`{"error": {"code", "message", "hint", "retryable"}}`가 나오고, 사용 오류나 입력
+검사가 지목할 수 있으면 `field`(문제의 옵션)와 `expected`(유효한 값)가 더해집니다. 코드는 고정된
 문자열이며, 커맨드라인 파싱 오류는 `USAGE`입니다. 종료 코드 `2`는 호출이나
 입력이 잘못되어 고칠 수 있다는 뜻(아무것도 쓰지 않음)이고, `1`은 운영 실패
 또는 명령이 보고하는 blocking finding입니다.
@@ -232,6 +233,40 @@ stderr로 갑니다.
 `--json`은 `meta: {returned, total, hasMore, nextCursor}`를 더합니다.
 `canon query`와 `canon finding list`는 `--fields a,b,c`로 레코드를 투영할 수
 있으며, 모르는 필드는 `UNKNOWN_FIELD`이고 hint가 알려진 필드를 나열합니다.
+
+**쓰기 뒤의 `meta.next`.** 성공한 쓰기 명령은 다음 단계를 직접 알려 주므로,
+에이전트가 그것만 알아내려고 `canon status`를 부를 필요가 없습니다. `--json`은
+`meta.next`(`[{command, why, actor, role}]`, 최대 다섯 개, 나머지 수는
+`meta.nextOmitted`)를 더하고, 사람용 출력은 `next: <command> — <why>` 한 줄로
+끝납니다. 이 단계들은 `canon status`의 단계와 같고 쓰기가 건드린 subject로
+좁혀집니다. `actor: human`은 사람만 할 수 있는 단계입니다. canon은 단계를 직접
+실행하지 않습니다.
+
+**폐기 예정 이름.** 이름이 바뀐 명령(`context-pack create`, `prompt register`,
+`divergence stage`, `demo attest`, `subject status <id> <state>`)은 한 릴리스 동안
+계속 동작하며 stderr에 경고를 내고 `meta.deprecated: {use, removedIn}`을
+설정합니다.
+
+**재시도 안전.** `evidence add`나 `review add`를 같은 입력으로 반복하면 기존
+레코드를 `meta.unchanged: true`와 함께 돌려줍니다.
+
+### 역할
+
+에이전트는 역할을 선언할 수 있습니다: `planner`, `implementer`, `reviewer`,
+`orchestrator`. `CANON_ROLE=<role>`을 설정하거나 `--as <role>`을 넘기며(플래그가
+우선), 모르는 값은 `UNKNOWN_ROLE`입니다. 역할은 강제가 아니라 안내입니다.
+`canon schema`는 그 역할의 명령을 나열하고, `canon status`와 `meta.next`는 그
+역할의 단계만 남기며 나머지는 `waitingOn`에 개수로 셉니다(orchestrator는 사람의
+단계도 봅니다). `evidence add`와 `review add`의 `--role` 기본값도 이 역할입니다.
+설정하지 않으면 모든 명령이 전과 같이 동작합니다.
+
+canon 스킬도 같은 식으로 나뉩니다: 짧은 공용 코어와 `reference/role-<role>.md`.
+역할을 받아 생성된 에이전트는 자기 역할의 reference만 읽고, 혼자 다 하는
+에이전트는 `canon status`를 따르며 각 단계가 시작될 때 해당 역할 reference를
+읽습니다. orchestrator는 각 역할을 `CANON_ROLE`을 설정해 띄우고, reviewer는 고유
+세션 id를 가진 별도 프로세스로 실행합니다. `--fields`(`status`, `export`,
+`divergence status`, `context`, `query`, `finding list`)는 에이전트의 컨텍스트를
+작게 유지합니다.
 
 **파괴적 명령은 계획이 먼저입니다.** `canon purge --plan`은 제거 대상과
 `planDigest`를 출력하고 아무것도 지우지 않습니다. `canon purge --confirm

@@ -306,7 +306,7 @@ brief overrides: 1 evidence record(s) attested before their brief was approved â
 
 ### Review-waiver advisories
 
-A subject moved into a review-scoped status with `canon subject status
+A subject moved into a review-scoped status with `canon subject status <id> --to <state>
 --override-reason` (see `canon-subject`) keeps the `unreviewed-promotion`
 and `open-blocker` gaps its waiver recorded visible without failing the
 gate. Only those exact `(class, subject)` pairs are waived; a gap that
