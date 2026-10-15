@@ -24,6 +24,12 @@ CANON_ROLE=implementer <harness> "<task: change <slug>, scenarios and evidence>"
 CANON_ROLE=reviewer    <harness> "<task: change <slug>; review it>"
 ```
 
+A subagent tool that cannot set its child's environment (most in-harness
+subagents share yours) passes the role in the task instead: tell the child
+its role, to load only `reference/role-<role>.md`, and to pass `--as <role>`
+on every canon call (or run `export CANON_ROLE=<role>` first in its own
+shell).
+
 Order: planner, then (after the human's answer) implementer, then reviewer.
 Give each a unit: its own `--actor-id` and a session id.
 
