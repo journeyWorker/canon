@@ -148,7 +148,7 @@ fn auto_promotes_every_staged_write_and_no_promote_keeps_one_staged() {
     ok(repo, &["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s"]);
     ok(repo, &["finding", "close", "--change-id", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected"]);
     let sha = "a".repeat(40);
-    ok(repo, &["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"]);
+    ok(repo, &["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"]);
     assert_eq!(staged(repo), 0, "nothing waits for a promote");
     assert_eq!((committed(repo, "evidence_record"), committed(repo, "finding"), committed(repo, "divergence")), (1, 2, 1));
 
@@ -210,7 +210,7 @@ fn a_promote_on_write_commits_only_its_own_record() {
 
     let sha = "a".repeat(40);
     let stage = |actor: &str, extra: &[&str]| {
-        let mut args = vec!["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--actor-id", actor];
+        let mut args = vec!["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--actor-id", actor];
         args.extend_from_slice(extra);
         ok(repo, &args)
     };
@@ -241,7 +241,7 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
         ("canon evidence add", evidence("game.run.01")),
         ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s"]),
         ("canon finding close", vec!["finding", "close", "--change-id", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected"]),
-        ("canon divergence stage", vec!["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"]),
+        ("canon divergence add", vec!["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"]),
     ];
     for (command, args) in writes {
         let text = stdout(&ok(repo, &args));
@@ -258,7 +258,7 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     let kept: [(&str, Vec<&str>, &str); 3] = [
         ("canon evidence add", with(evidence("game.run.01"), &["--no-promote"]), STAGED),
         ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "2", "--severity", "note", "--reviewer", "r", "--summary", "s", "--no-promote"], STAGED),
-        ("canon divergence stage", vec!["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"], "— run `canon divergence promote` to commit it"),
+        ("canon divergence add", vec!["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"], "— run `canon divergence promote` to commit it"),
     ];
     for (command, args, suffix) in kept {
         let text = stdout(&ok(repo, &args));
@@ -341,7 +341,7 @@ fn review_add_and_subject_status_need_no_sync_step() {
     let feature = files_under(repo.join(".canon/specs/kind=feature")).pop().unwrap();
     let text = std::fs::read_to_string(&feature).unwrap();
     std::fs::write(&feature, text.replace("A run ends", "A run ends cleanly")).unwrap();
-    let out = ok(repo, &["subject", "status", "runs", "specced", "--actor-id", "lead"]);
+    let out = ok(repo, &["subject", "status", "runs", "--to", "specced", "--actor-id", "lead"]);
     assert!(stderr(&out).contains("canon subject status: refreshed the scenario index"), "{}", stderr(&out));
 }
 
@@ -481,7 +481,7 @@ fn inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_sta
     ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--subject", "demo", "--case", "failure"]);
     ok(repo, &evidence("game.run.01"));
     for state in ["specced", "building", "verifying"] {
-        ok(repo, &["subject", "status", "demo", state, "--actor-id", "lead"]);
+        ok(repo, &["subject", "status", "demo", "--to", state, "--actor-id", "lead"]);
     }
     let feature = files_under(repo.join(".canon/specs/kind=feature")).pop().unwrap();
     let clean = std::fs::read_to_string(&feature).unwrap();
@@ -495,7 +495,7 @@ fn inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_sta
     assert_eq!(gate.status.code(), Some(1), "{}{}", stdout(&gate), stderr(&gate));
     assert!(stdout(&gate).contains(violation), "{}", stdout(&gate));
 
-    let ship = canon(repo, &["subject", "status", "demo", "shipped", "--actor-id", "lead"]);
+    let ship = canon(repo, &["subject", "status", "demo", "--to", "shipped", "--actor-id", "lead"]);
     assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
     assert!(stderr(&ship).contains("uncovered-cell root — verifying → shipped: the scenario index for spec root `root` is stale"), "{}", stderr(&ship));
     let report: serde_json::Value = serde_json::from_slice(&ok(repo, &["status", "--json"]).stdout).unwrap();
@@ -508,7 +508,7 @@ fn inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_sta
     std::fs::write(&feature, &clean).unwrap();
     let gate = canon(repo, &["gate", "check"]);
     assert!(!stdout(&gate).contains("could not be refreshed"), "{}", stdout(&gate));
-    ok(repo, &["subject", "status", "demo", "shipped", "--actor-id", "lead"]);
+    ok(repo, &["subject", "status", "demo", "--to", "shipped", "--actor-id", "lead"]);
 }
 
 /// inventory.sync.45: `canon inventory sync` and every reader's refresh

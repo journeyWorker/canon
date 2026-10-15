@@ -351,10 +351,10 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
 4. **라이프사이클 구동.**
 
    ```bash
-   bunx @journeykit/canon subject status checkout-revamp specced
-   bunx @journeykit/canon subject status checkout-revamp building
-   bunx @journeykit/canon subject status checkout-revamp verifying
-   bunx @journeykit/canon subject status checkout-revamp shipped
+   bunx @journeykit/canon subject status checkout-revamp --to specced
+   bunx @journeykit/canon subject status checkout-revamp --to building
+   bunx @journeykit/canon subject status checkout-revamp --to verifying
+   bunx @journeykit/canon subject status checkout-revamp --to shipped
    ```
 
    `verifying → shipped` 단계는 증거 게이팅됩니다: 서브젝트가 시나리오를
@@ -370,7 +370,7 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
    제시합니다:
 
    ```bash
-   bunx @journeykit/canon subject status checkout-revamp verifying \
+   bunx @journeykit/canon subject status checkout-revamp --to verifying \
      --reason "follow-up: totals round per line" --actor-id impl
    ```
 
@@ -405,7 +405,7 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
 | design | 새 behavior 시나리오 8개 작성 | `canon context` → `canon scenario new` × 8 → `canon fmt --check` (위반 0건) |
 | dev | 16개 시나리오 레저를 대상으로 구현, 플랜 체크박스 반영 | `canon query --kind scenario`, `canon retrieve --role dev` |
 | test | 16개 시나리오 전부 독립적으로 검증, 증명 가능한 결함 2건 수정 | `canon review add` × 16 (attested, 검증된 sha에 고정) |
-| review | 확인된 ship-blocker 8건을 divergence로 기록 | `canon divergence stage`/`promote` × 8 → `resolve` × 6 |
+| review | 확인된 ship-blocker 8건을 divergence로 기록 | `canon divergence add`/`promote` × 8 → `resolve` × 6 |
 
 플랜 문서는 로드맵이고, (`canon inventory sync`로 구체화된)
 16개 시나리오 `.feature` 코퍼스가 dev와 test가 실제로 작업한
@@ -415,7 +415,7 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
 ```
 dev claims done   → plan checkboxes → canon ingest plans   (mirror, never trusted)
 test proves done  → canon review add per scenario           (evidence)
-review disagrees  → canon divergence stage/promote          (tracked, run_seq-ordered)
+review disagrees  → canon divergence add/promote          (tracked, run_seq-ordered)
 fix lands         → re-verify → attest → divergence resolve (burndown to zero)
                   → canon gate check: clean (0 violations)
 ```

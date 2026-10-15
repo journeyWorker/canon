@@ -39,10 +39,10 @@ a feature, a one-line request included. A human is needed once per scope:
   adds or changes a step of the brief edits the brief: that is a scope
   change, and it needs a new answer.
 - **A follow-up on a shipped subject reopens it.** Reopen it with
-  `canon subject status <id> verifying --reason "<why>" --actor-id <unit>`
+  `canon subject status <id> --to verifying --reason "<why>" --actor-id <unit>`
   (no human inside the approved scope; the reason and your id are
   recorded), add its scenario, evidence and an independent review, and ship
-  again with `canon subject status <id> shipped`, which runs every guard
+  again with `canon subject status <id> --to shipped`, which runs every guard
   again. `canon status` flags a shipped subject whose gate went red and
   names the reopen.
 - **Non-behavior work is a chore.** A refactor, dependency, build, CI or
@@ -169,7 +169,7 @@ approval itself.
    behavior attaches what it looked at with `--artifact <path>`
    (repeatable); canon stores and re-checks those bytes and never compares
    images.
-8. **Transition.** `canon subject status <id> <state>` along
+8. **Transition.** `canon subject status <id> --to <state>` along
    `proposed → specced → building → verifying → shipped`. It refuses a move
    the policy does not yet allow (missing evidence, missing reviews, open
    blocker findings); fix the gap rather than overriding, and finish with
@@ -186,7 +186,7 @@ approval itself.
    approval only from the human's answer, with `canon brief approve` (with
    no brief to answer there is nothing to refuse, and the ship guard only
    prints an advisory). Move the subject to `shipped` yourself once
-   `canon subject status <id> shipped` passes its guard, unless the brief
+   `canon subject status <id> --to shipped` passes its guard, unless the brief
    says the human ships. `canon status` shows whether each subject's brief
    is approved, by the same check, and names the next step.
    `shipped → verifying` reopens a shipped subject for a follow-up (see the
@@ -258,7 +258,7 @@ legacy source and is installed explicitly with `--source canon/skills-dev`.
 - **Refine a brief before the human stop (step 1):** read one of `reference/brief-shape.md` (structure), `brief-clarify.md` (open questions), `brief-harden.md` (flow and step detail agree), `brief-align.md` (scenarios cover the flow), `brief-polish.md` (prose). Each stands alone; none needs another first.
 - **Write or reorganize `.feature` specs (step 3):** read `reference/canon-authoring.md` before editing; use the scaffold.
 - **Understand available fields/enums/policy bindings:** read `reference/canon-context.md` and `reference/canon-vocab.md`.
-- **Capture replayable run inputs / version prompts:** read `reference/canon-context.md`, then use `canon context-pack create|show|verify` and `canon prompt register|show` with explicit repository-relative JSON manifests.
+- **Capture replayable run inputs / version prompts:** read `reference/canon-context.md`, then use `canon context-pack new|show|verify` and `canon prompt add|show` with explicit repository-relative JSON manifests.
 - **Validate or index specs:** read `reference/canon-fmt.md` and `reference/canon-inventory.md`.
 - **Evidence, gates, imported-plan task checkboxes, hooks (step 6):** read `reference/canon-gate.md`.
 - **Findings and reviews (step 7):** read `reference/canon-review.md`.

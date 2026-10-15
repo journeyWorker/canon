@@ -10,8 +10,14 @@
 use serde_json::{json, Value};
 
 /// The success envelope for `command` (its canonical path, e.g. `gate check`).
+/// An invocation of a deprecated form carries `meta.deprecated`
+/// ([`crate::deprecation`]).
 pub fn envelope(command: &str, data: Value) -> Value {
-    json!({ "data": data, "meta": { "command": command } })
+    let mut meta = json!({ "command": command });
+    if let Some(deprecated) = crate::deprecation::meta() {
+        meta["deprecated"] = deprecated;
+    }
+    json!({ "data": data, "meta": meta })
 }
 
 /// Prints the success envelope on stdout.

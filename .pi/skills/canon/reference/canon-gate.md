@@ -142,7 +142,7 @@ A present section, even `require_evidence: false` or a malformed one
   case). This is the gap evidence presence cannot see: every scenario
   attested, none of them specifying a refusal. Untagged scenarios satisfy
   no case, so an unclassified corpus is reported, not passed. Works with
-  `require_evidence: false` too. `canon subject status <id> shipped`
+  `require_evidence: false` too. `canon subject status <id> --to shipped`
   applies the same rule to the scenarios the subject owns.
 - **Independent review** (`require_review`) — scenarios whose subject is
   in `require_review.scope` (default `[verifying, shipped]`; `[]` = every
@@ -228,7 +228,7 @@ canon evidence add --kind audit --project-id root --scenario-id cart.add.01 \
 - Audits fold apart: per `(project_id, scenario_id)` there is a latest
   declared record and a latest audit. An audit never becomes the
   scenario's latest declared verdict.
-- `canon subject status <id> shipped` refuses `false-success`, and an
+- `canon subject status <id> --to shipped` refuses `false-success`, and an
   owed sampled audit when `require_audit.scope` covers `shipped`.
 - `canon status` shows an `audits` section (sampled / confirmed / owed /
   refuted) and suggests `canon evidence add --kind audit …` in `next:`.
@@ -320,7 +320,7 @@ review waivers: 1 advisory(ies) — not failing the gate:
 
 The waiver lasts only until the subject's next status write.
 
-`canon subject status <id> shipped` also refuses where a brief exists and
+`canon subject status <id> --to shipped` also refuses where a brief exists and
 is not approved (the subject's newest adopted change has a canon
 `brief.md` with no `Approved:` line or one the brief's text no longer
 matches, or an external `proposal.md` and no canon `brief.md` yet;
@@ -670,7 +670,7 @@ promote`, so no separate
 staged. A record another run staged is not touched: only `gate promote`
 commits everything staged. It stays safe to run anyway: with nothing
 staged it prints
-`nothing staged` and exits `0`. `divergence stage` stages for `canon
+`nothing staged` and exits `0`. `divergence add` stages for `canon
 divergence promote` and names it, under the same `write:` rule. Every
 other write — `review add`, `divergence
 resolve|defer`, `subject new|adopt|status`, `change new`, `scenario new`, `feature new`,

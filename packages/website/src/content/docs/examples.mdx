@@ -338,10 +338,10 @@ guidance, then drive it through its evidence-gated lifecycle.
 4. **Drive the lifecycle.**
 
    ```bash
-   bunx @journeykit/canon subject status checkout-revamp specced
-   bunx @journeykit/canon subject status checkout-revamp building
-   bunx @journeykit/canon subject status checkout-revamp verifying
-   bunx @journeykit/canon subject status checkout-revamp shipped
+   bunx @journeykit/canon subject status checkout-revamp --to specced
+   bunx @journeykit/canon subject status checkout-revamp --to building
+   bunx @journeykit/canon subject status checkout-revamp --to verifying
+   bunx @journeykit/canon subject status checkout-revamp --to shipped
    ```
 
    The `verifying → shipped` step is evidence-gated: it succeeds only
@@ -358,7 +358,7 @@ guidance, then drive it through its evidence-gated lifecycle.
    names this command:
 
    ```bash
-   bunx @journeykit/canon subject status checkout-revamp verifying \
+   bunx @journeykit/canon subject status checkout-revamp --to verifying \
      --reason "follow-up: totals round per line" --actor-id impl
    ```
 
@@ -393,7 +393,7 @@ canon voice, each using the real CLI:
 | design | authored the 8 new behavior scenarios | `canon context` → `canon scenario new` × 8 → `canon fmt --check` (0 violations) |
 | dev | implemented against the 16-scenario ledger, flipped plan checkboxes | `canon query --kind scenario`, `canon retrieve --role dev` |
 | test | independently verified all 16 scenarios, fixed 2 provable defects | `canon review add` × 16 (attested, pinned to the verified sha) |
-| review | filed 8 confirmed ship-blockers as divergences | `canon divergence stage`/`promote` × 8 → `resolve` × 6 |
+| review | filed 8 confirmed ship-blockers as divergences | `canon divergence add`/`promote` × 8 → `resolve` × 6 |
 
 The plan doc is a roadmap; the 16-scenario `.feature` corpus
 (materialized by `canon inventory sync`) is the acceptance authority
@@ -402,7 +402,7 @@ dev and test actually worked against — the two never merge:
 ```
 dev claims done   → plan checkboxes → canon ingest plans   (mirror, never trusted)
 test proves done  → canon review add per scenario           (evidence)
-review disagrees  → canon divergence stage/promote          (tracked, run_seq-ordered)
+review disagrees  → canon divergence add/promote          (tracked, run_seq-ordered)
 fix lands         → re-verify → attest → divergence resolve (burndown to zero)
                   → canon gate check: clean (0 violations)
 ```

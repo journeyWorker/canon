@@ -16,4 +16,4 @@ unowned: none
 
 next:
   # checkout: every scenario is evidenced, with no blocker or case gap, and the brief is approved; ship it yourself unless the brief says the human ships
-  canon subject status checkout shipped --actor-id <unit>
+  canon subject status checkout --to shipped --actor-id <unit>

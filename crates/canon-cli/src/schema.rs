@@ -18,9 +18,21 @@
 //! clap tree, so it works outside a canon repo. Output order is
 //! deterministic: leaves sort by canonical path, arguments and options keep
 //! their declaration order.
+//!
+//! 0.21 adds three things the table and clap cannot say alone. `roles` says
+//! which roles' steps use a command ([`CommandMeta::roles`]); bare `canon
+//! schema` lists only the declared role's commands (`CANON_ROLE` or `--as`),
+//! and `--all` lists every command. A command renamed in 0.21 stays as a
+//! hidden clap subcommand ([`crate::deprecation::DEPRECATED`]); `schema`
+//! answers for it with `deprecated: { use, removedIn }` and the replacement's
+//! effect, exits, roles and error codes, and lists it only under `--all`. A
+//! command whose effect depends on its arguments carries `effectNote`.
 
 use clap::{ArgAction, Command};
 use serde::Serialize;
+
+use crate::deprecation::{self, Deprecation};
+use crate::role::Role;
 
 /// What running a command does to the repo and the machine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -66,17 +78,34 @@ pub const STANDARD_EXITS: &[ExitMeta] = &[
 pub struct CommandMeta {
     /// Canonical space-separated path, e.g. `evidence add`.
     pub path: &'static str,
+    /// The worst the command does on any invocation. A command whose effect
+    /// depends on its arguments says so in `effect_note` (0.21 D1: `subject
+    /// status` is `write`, and reads only without `--to`), rather than
+    /// being listed as the weaker of the two.
     pub effect: Effect,
+    /// The arguments under which the command does less than `effect`.
+    pub effect_note: Option<&'static str>,
     pub exits: &'static [ExitMeta],
+    /// The roles whose steps use the command (0.21 D3, the plan's step
+    /// ownership). Empty: humans only (the command records a human's
+    /// decision); `canon schema --all` still lists it.
+    pub roles: &'static [Role],
 }
 
-const fn row(path: &'static str, effect: Effect) -> CommandMeta {
-    CommandMeta { path, effect, exits: STANDARD_EXITS }
+const fn row(path: &'static str, effect: Effect, roles: &'static [Role]) -> CommandMeta {
+    CommandMeta { path, effect, effect_note: None, exits: STANDARD_EXITS, roles }
 }
 
 /// A row whose exits differ from [`STANDARD_EXITS`], as its module documents.
-const fn row_exits(path: &'static str, effect: Effect, exits: &'static [ExitMeta]) -> CommandMeta {
-    CommandMeta { path, effect, exits }
+const fn row_exits(path: &'static str, effect: Effect, exits: &'static [ExitMeta], roles: &'static [Role]) -> CommandMeta {
+    CommandMeta { path, effect, effect_note: None, exits, roles }
+}
+
+impl CommandMeta {
+    const fn note(mut self, note: &'static str) -> Self {
+        self.effect_note = Some(note);
+        self
+    }
 }
 
 /// A command that writes only when it succeeds and has no operational lane:
@@ -86,73 +115,79 @@ const REFUSES: &[ExitMeta] = &[exit(0, "success"), exit(2, "refused or failed; n
 const ALWAYS_OK: &[ExitMeta] = &[exit(0, "always: the command reports and has no failing exit")];
 
 use Effect::{Destructive, Read, Write};
+use Role::{Implementer as I, Orchestrator as O, Planner as P, Reviewer as R};
 
-/// One row per leaf command, canonical path first.
+const EVERYONE: &[Role] = &[P, I, R, O];
+const HUMAN: &[Role] = &[];
+
+/// One row per leaf command, canonical path first. Deprecated paths
+/// ([`crate::deprecation::DEPRECATED`]) have no row: they answer with their
+/// replacement's.
 pub const META: &[CommandMeta] = &[
-    row("adapter authorize", Read),
-    row("adapter validate", Read),
-    row("brief approve", Write),
-    row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "operational error, with a stable error code"), exit(2, "blocker findings")]),
-    row_exits("change new", Write, REFUSES),
-    row_exits("context", Read, ALWAYS_OK),
-    row("context-pack create", Write),
-    row("context-pack show", Read),
-    row("context-pack verify", Read),
-    row("dashboard", Read),
-    row_exits("demo attest", Write, REFUSES),
-    row_exits("demo init", Write, REFUSES),
-    row("dispatch begin", Write),
-    row_exits("dispatch diff", Read, &[exit(0, "always, including when the observed graph differs from the declared plan: it reports, it never gates")]),
-    row("dispatch end", Write),
-    row("divergence defer", Write),
-    row("divergence promote", Write),
-    row("divergence resolve", Write),
-    row("divergence stage", Write),
-    row_exits("divergence status", Read, &[exit(0, "always on a successful read: a capability query, never a gate"), exit(2, "refused: canon.yaml or the ledger cannot be read")]),
-    row_exits("evidence add", Write, &[exit(0, "staged"), exit(1, "gate-red: a fabrication marker, an invalid typed atom, a contradicting report, or an unapproved brief refuses the record; nothing is staged"), exit(2, "usage or infrastructure: a malformed flag combination, an unknown task, no plan corpus, a write failure; nothing is staged")]),
-    row("evidence approval-payload", Read),
-    row_exits("evidence vault", Write, &[exit(0, "the pass ran, whatever it could store: files that could not be stored are listed, not an error"), exit(2, "refused: the ledger cannot be read or a write failed")]),
-    row("export", Write),
-    row_exits("feature new", Write, REFUSES),
-    row_exits("finding add", Write, REFUSES),
-    row_exits("finding close", Write, REFUSES),
-    row_exits("finding list", Read, &[exit(0, "whether or not any finding matched"), exit(2, "refused: the ledger cannot be read")]),
-    row_exits("format", Read, &[exit(0, "clean"), exit(1, "the corpus has violations")]),
-    row_exits("gate check", Read, &[exit(0, "clean"), exit(1, "the gate found violations"), exit(2, "the gate could not run: bad --repo or an unreadable ledger or config")]),
-    row("gate install-hooks", Write),
-    row("gate promote", Write),
-    row_exits("gate selftest", Read, &[exit(0, "every fixture is clean"), exit(1, "a fixture failed")]),
-    row_exits("gate task", Write, &[exit(0, "the task row was flipped"), exit(1, "gate-red: the row is not ready to flip; nothing is written"), exit(2, "usage or infrastructure: an unknown task, unreadable plan or config; nothing is written")]),
-    row("ingest artifacts", Write),
-    row("ingest plans", Write),
-    row("ingest sessions", Write),
-    row_exits("init", Write, REFUSES),
-    row("inventory sync", Write),
-    row("learn approve", Write),
-    row("learn promote", Write),
-    row("learn rollback", Write),
-    row_exits("migrate", Write, &[exit(0, "migrated, or nothing to do"), exit(1, "migrated, but the index rebuild found the corpus unclean"), exit(2, "refused or failed; nothing is written")]),
-    row("plugin sync", Write),
-    row_exits("policy approve", Write, REFUSES),
-    row("prompt register", Write),
-    row("prompt show", Read),
-    row("purge", Destructive),
-    row("query", Read),
-    row("regime-key", Read),
-    row("report", Write),
-    row("retrieve", Read),
-    row_exits("review add", Write, REFUSES),
-    row_exits("scenario new", Write, REFUSES),
-    row_exits("schema", Read, &[exit(0, "success"), exit(2, "refused: the command path does not resolve")]),
-    row_exits("selftest", Read, &[exit(0, "every suite is clean"), exit(1, "a suite failed")]),
-    row("skills check", Read),
-    row("skills doctor", Read),
-    row("skills install", Write),
-    row_exits("status", Read, &[exit(0, "always: a problem reading the repo is a warning"), exit(1, "the report could not be serialized (--json)")]),
-    row_exits("subject adopt", Write, REFUSES),
-    row_exits("subject new", Write, REFUSES),
-    row_exits("subject status", Read, &[exit(0, "the transition was recorded"), exit(1, "an evidence, brief or review guard blocked the transition; the record is unchanged"), exit(2, "refused: an off-chain step, a missing reason, or a store failure")]),
-    row("tier age", Write),
+    row("adapter authorize", Read, &[O]),
+    row("adapter validate", Read, &[O]),
+    row("brief approve", Write, HUMAN),
+    row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "operational error, with a stable error code"), exit(2, "blocker findings")], &[P, R]),
+    row_exits("change new", Write, REFUSES, &[P]),
+    row_exits("context", Read, ALWAYS_OK, EVERYONE),
+    row("context-pack new", Write, &[O, I]),
+    row("context-pack show", Read, &[O, I]),
+    row("context-pack verify", Read, &[O, I]),
+    row("dashboard", Read, &[O]),
+    row_exits("demo add", Write, REFUSES, &[O]),
+    row_exits("demo init", Write, REFUSES, &[O]),
+    row("dispatch begin", Write, &[O]),
+    row_exits("dispatch diff", Read, &[exit(0, "always, including when the observed graph differs from the declared plan: it reports, it never gates")], &[O]),
+    row("dispatch end", Write, &[O]),
+    row("divergence add", Write, &[I, R]),
+    row("divergence defer", Write, &[I, R]),
+    row("divergence promote", Write, &[I, O]),
+    row("divergence resolve", Write, &[I, R]),
+    row_exits("divergence status", Read, &[exit(0, "always on a successful read: a capability query, never a gate"), exit(2, "refused: canon.yaml or the ledger cannot be read")], EVERYONE),
+    row_exits("evidence add", Write, &[exit(0, "staged"), exit(1, "gate-red: a fabrication marker, an invalid typed atom, a contradicting report, or an unapproved brief refuses the record; nothing is staged"), exit(2, "usage or infrastructure: a malformed flag combination, an unknown task, no plan corpus, a write failure; nothing is staged")], &[I]),
+    row("evidence approval-payload", Read, &[I, O]),
+    row_exits("evidence vault", Write, &[exit(0, "the pass ran, whatever it could store: files that could not be stored are listed, not an error"), exit(2, "refused: the ledger cannot be read or a write failed")], &[O]),
+    row("export", Write, &[O]),
+    row_exits("feature new", Write, REFUSES, &[P, I]),
+    row_exits("finding add", Write, REFUSES, &[R]),
+    row_exits("finding close", Write, REFUSES, &[R]),
+    row_exits("finding list", Read, &[exit(0, "whether or not any finding matched"), exit(2, "refused: the ledger cannot be read")], EVERYONE),
+    row_exits("format", Read, &[exit(0, "clean"), exit(1, "the corpus has violations")], EVERYONE),
+    row_exits("gate check", Read, &[exit(0, "clean"), exit(1, "the gate found violations"), exit(2, "the gate could not run: bad --repo or an unreadable ledger or config")], EVERYONE),
+    row("gate install-hooks", Write, &[O]),
+    row("gate promote", Write, &[I]),
+    row_exits("gate selftest", Read, &[exit(0, "every fixture is clean"), exit(1, "a fixture failed")], &[O]),
+    row_exits("gate task", Write, &[exit(0, "the task row was flipped"), exit(1, "gate-red: the row is not ready to flip; nothing is written"), exit(2, "usage or infrastructure: an unknown task, unreadable plan or config; nothing is written")], &[I]),
+    row("ingest artifacts", Write, &[O]),
+    row("ingest plans", Write, &[O]),
+    row("ingest sessions", Write, &[O]),
+    row_exits("init", Write, REFUSES, &[O]),
+    row("inventory sync", Write, &[I, O]),
+    row("learn approve", Write, &[O]),
+    row("learn promote", Write, &[O]),
+    row("learn rollback", Write, &[O]),
+    row_exits("migrate", Write, &[exit(0, "migrated, or nothing to do"), exit(1, "migrated, but the index rebuild found the corpus unclean"), exit(2, "refused or failed; nothing is written")], &[O]),
+    row("plugin sync", Write, &[O]),
+    row_exits("policy approve", Write, REFUSES, HUMAN),
+    row("prompt add", Write, &[O]),
+    row("prompt show", Read, &[O]),
+    row("purge", Destructive, &[O]),
+    row("query", Read, EVERYONE),
+    row("regime-key", Read, &[O]),
+    row("report", Write, &[O]),
+    row("retrieve", Read, EVERYONE),
+    row_exits("review add", Write, REFUSES, &[R]),
+    row_exits("scenario new", Write, REFUSES, &[P, I]),
+    row_exits("schema", Read, &[exit(0, "success"), exit(2, "refused: the command path does not resolve")], EVERYONE),
+    row_exits("selftest", Read, &[exit(0, "every suite is clean"), exit(1, "a suite failed")], &[O]),
+    row("skills check", Read, &[O]),
+    row("skills doctor", Read, &[O]),
+    row("skills install", Write, &[O]),
+    row_exits("status", Read, &[exit(0, "always: a problem reading the repo is a warning"), exit(1, "the report could not be serialized (--json)")], EVERYONE),
+    row_exits("subject adopt", Write, REFUSES, &[P, O]),
+    row_exits("subject new", Write, REFUSES, &[P, O]),
+    row_exits("subject status", Write, &[exit(0, "the transition was recorded, or the subject was shown (no --to)"), exit(1, "an evidence, brief or review guard blocked the transition; the record is unchanged"), exit(2, "refused: an off-chain step, a missing reason, or a store failure")], &[O]).note("reads without --to: `subject status <id>` shows the subject and writes nothing"),
+    row("tier age", Write, &[O]),
 ];
 
 /// Canonical paths of every leaf command under `cmd`, sorted.
@@ -177,11 +212,14 @@ pub fn leaf_paths(root: &Command) -> Vec<String> {
     out
 }
 
-/// Drift between clap and [`META`]: empty when the two agree exactly.
-pub fn check_metadata(root: &Command, meta: &[CommandMeta]) -> Vec<String> {
+/// Drift between clap, [`META`] and the deprecation table: empty when they
+/// agree exactly. A deprecated path is a clap leaf with no [`META`] row; its
+/// replacement must be a leaf with one.
+pub fn check_metadata(root: &Command, meta: &[CommandMeta], deprecated: &[Deprecation]) -> Vec<String> {
     let leaves = leaf_paths(root);
+    let is_deprecated = |leaf: &str| deprecated.iter().any(|d| d.old == leaf);
     let mut problems = Vec::new();
-    for leaf in &leaves {
+    for leaf in leaves.iter().filter(|l| !is_deprecated(l)) {
         if !meta.iter().any(|m| m.path == leaf) {
             problems.push(format!("clap leaf `{leaf}` has no metadata row"));
         }
@@ -190,6 +228,9 @@ pub fn check_metadata(root: &Command, meta: &[CommandMeta]) -> Vec<String> {
         if !leaves.iter().any(|l| l == m.path) {
             problems.push(format!("metadata row `{}` names no clap leaf command", m.path));
         }
+        if is_deprecated(m.path) {
+            problems.push(format!("metadata row `{}` is for a deprecated path; it answers with its replacement's row", m.path));
+        }
     }
     let mut seen: Vec<&str> = Vec::new();
     for m in meta {
@@ -197,6 +238,14 @@ pub fn check_metadata(root: &Command, meta: &[CommandMeta]) -> Vec<String> {
             problems.push(format!("metadata row `{}` appears twice", m.path));
         }
         seen.push(m.path);
+    }
+    for d in deprecated {
+        if !leaves.iter().any(|l| l == d.old) {
+            problems.push(format!("deprecated path `{}` names no clap leaf command", d.old));
+        }
+        if !meta.iter().any(|m| m.path == d.new) {
+            problems.push(format!("`{}` is deprecated for `{}`, which has no metadata row", d.old, d.new));
+        }
     }
     problems
 }
@@ -228,6 +277,15 @@ struct CommandSchema {
     aliases: Vec<String>,
     about: Option<String>,
     effect: Effect,
+    /// What the command does when invoked with fewer effects than `effect`
+    /// says (see [`CommandMeta::effect_note`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effect_note: Option<&'static str>,
+    /// The roles whose steps use the command; empty means humans only.
+    roles: Vec<Role>,
+    /// Present on a deprecated command: its replacement and the release that removes it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    deprecated: Option<DeprecatedSchema>,
     supports_json: bool,
     arguments: Vec<ArgSchema>,
     options: Vec<ArgSchema>,
@@ -238,14 +296,35 @@ struct CommandSchema {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeprecatedSchema {
+    /// The replacement command path.
+    #[serde(rename = "use")]
+    replacement: &'static str,
+    removed_in: &'static str,
+}
+
+impl DeprecatedSchema {
+    fn of(deprecation: &Deprecation) -> Self {
+        Self { replacement: deprecation.new, removed_in: deprecation::REMOVED_IN }
+    }
+}
+
+#[derive(Serialize)]
 struct ListEntry {
     command: String,
     effect: Effect,
+    roles: Vec<Role>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    deprecated: Option<DeprecatedSchema>,
     about: Option<String>,
 }
 
 #[derive(Serialize)]
 struct ListSchema {
+    /// The role the listing was filtered to; absent when it lists every command.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    role: Option<Role>,
     commands: Vec<ListEntry>,
 }
 
@@ -360,12 +439,14 @@ fn arg_schema(arg: &clap::Arg) -> ArgSchema {
 
 fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
     let key = canonical.join(" ");
-    let meta = meta_for(&key);
-    let codes = error_codes(&key);
+    // A deprecated command answers with its replacement's row and codes.
+    let deprecation = deprecation::lookup(&key);
+    let meta = meta_for(deprecation.map_or(key.as_str(), |d| d.new));
+    let codes = error_codes(deprecation.map_or(key.as_str(), |d| d.new));
     let mut cmd = cmd.clone();
     cmd.build();
     // clap's own `--help` / `--version` flags are noise; a command's own argument that happens to be
-    // called `version` (`prompt register --version`) is not.
+    // called `version` (`prompt add --version`) is not.
     let visible = |a: &&clap::Arg| {
         !a.is_hide_set() && !matches!(a.get_action(), clap::ArgAction::Help | clap::ArgAction::HelpShort | clap::ArgAction::HelpLong | clap::ArgAction::Version)
     };
@@ -378,6 +459,9 @@ fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
         aliases: cmd.get_all_aliases().map(str::to_string).collect(),
         about: cmd.get_about().map(|a| a.to_string()),
         effect: meta.map_or(Effect::Write, |m| m.effect),
+        effect_note: meta.and_then(|m| m.effect_note),
+        roles: meta.map_or_else(Vec::new, |m| m.roles.to_vec()),
+        deprecated: deprecation.map(DeprecatedSchema::of),
         supports_json,
         arguments,
         options,
@@ -386,24 +470,42 @@ fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
     }
 }
 
-fn list_entries(root: &Command, under: &[String]) -> Vec<ListEntry> {
+/// The commands under `under`, hidden from the bare listing when they are
+/// deprecated (unless `all`) or outside the declared `role`'s steps (unless
+/// `all`).
+fn list_entries(root: &Command, under: &[String], role: Option<Role>, all: bool) -> Vec<ListEntry> {
     let prefix = under.join(" ");
     leaf_paths(root)
         .into_iter()
         .filter(|p| prefix.is_empty() || p == &prefix || p.starts_with(&format!("{prefix} ")))
-        .map(|p| {
+        .filter_map(|p| {
+            let deprecation = deprecation::lookup(&p);
+            let meta = meta_for(deprecation.map_or(p.as_str(), |d| d.new));
+            let roles = meta.map_or(&[][..], |m| m.roles);
+            if !all && (deprecation.is_some() || role.is_some_and(|r| !roles.contains(&r))) {
+                return None;
+            }
             let mut cmd = root;
             for t in p.split(' ') {
                 cmd = find_sub(cmd, t).expect("leaf path came from the same tree");
             }
-            ListEntry { effect: meta_for(&p).map_or(Effect::Write, |m| m.effect), about: cmd.get_about().map(|a| a.to_string()), command: p }
+            Some(ListEntry {
+                effect: meta.map_or(Effect::Write, |m| m.effect),
+                roles: roles.to_vec(),
+                deprecated: deprecation.map(DeprecatedSchema::of),
+                about: cmd.get_about().map(|a| a.to_string()),
+                command: p,
+            })
         })
         .collect()
 }
 
 /// Run `canon schema`: print to stdout and return the exit code. A path that
 /// does not resolve is a refusal (exit 2) on stderr naming the nearest matches.
-pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool) -> u8 {
+/// A bare listing shows the declared role's commands (`CANON_ROLE` / `--as`),
+/// or every command without a declared role; `all` lists every command,
+/// deprecated ones included.
+pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, all: bool) -> u8 {
     if errors {
         print_errors(json);
         return 0;
@@ -421,13 +523,18 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool) -> u8 {
     };
     match resolved {
         Resolved::Group(under) => {
-            let commands = list_entries(root, &under);
+            let role = if all { None } else { Role::current(None) };
+            let commands = list_entries(root, &under, role, all);
             if json {
-                crate::json_out::data("schema", serde_json::to_value(ListSchema { commands }).expect("schema serializes"));
+                crate::json_out::data("schema", serde_json::to_value(ListSchema { role, commands }).expect("schema serializes"));
             } else {
                 let width = commands.iter().map(|c| c.command.len()).max().unwrap_or(0);
                 for c in &commands {
-                    println!("{:<width$}  {:<11} {}", c.command, c.effect.as_str(), c.about.as_deref().unwrap_or(""));
+                    let about = c.about.as_deref().unwrap_or("");
+                    match &c.deprecated {
+                        Some(d) => println!("{:<width$}  {:<11} deprecated: use canon {} (removed in {})", c.command, c.effect.as_str(), d.replacement, d.removed_in),
+                        None => println!("{:<width$}  {:<11} {}", c.command, c.effect.as_str(), about),
+                    }
                 }
             }
         }
@@ -468,6 +575,17 @@ fn print_human(s: &CommandSchema) {
         println!("  {about}");
     }
     println!("effect: {}   supports --json: {}", s.effect.as_str(), if s.supports_json { "yes" } else { "no" });
+    if let Some(note) = s.effect_note {
+        println!("  {note}");
+    }
+    if s.roles.is_empty() {
+        println!("roles: humans only");
+    } else {
+        println!("roles: {}", s.roles.iter().map(|r| r.as_str()).collect::<Vec<_>>().join(", "));
+    }
+    if let Some(d) = &s.deprecated {
+        println!("deprecated: use canon {} (removed in {})", d.replacement, d.removed_in);
+    }
     if !s.aliases.is_empty() {
         println!("aliases: {}", s.aliases.join(", "));
     }
@@ -527,11 +645,22 @@ mod tests {
 
     #[test]
     fn drift_is_reported_both_ways() {
-        let meta = [row("format", Read), row("ghost", Read)];
-        let problems = check_metadata(&tree(), &meta);
+        let meta = [row("format", Read, EVERYONE), row("ghost", Read, EVERYONE)];
+        let problems = check_metadata(&tree(), &meta, &[]);
         assert!(problems.iter().any(|p| p.contains("`evidence add`") && p.contains("no metadata row")));
         assert!(problems.iter().any(|p| p.contains("`ghost`")));
-        assert!(check_metadata(&tree(), &[row("format", Read), row("evidence add", Write)]).is_empty());
+        assert!(check_metadata(&tree(), &[row("format", Read, EVERYONE), row("evidence add", Write, &[I])], &[]).is_empty());
+    }
+
+    #[test]
+    fn a_deprecated_leaf_needs_no_row_but_its_replacement_does() {
+        let tree = tree().subcommand(Command::new("old").hide(true));
+        let table = [Deprecation { old: "old", new: "format" }];
+        let meta = [row("format", Read, EVERYONE), row("evidence add", Write, &[I])];
+        assert!(check_metadata(&tree, &meta, &table).is_empty());
+        let gone = [Deprecation { old: "old", new: "nowhere" }];
+        assert!(check_metadata(&tree, &meta, &gone).iter().any(|p| p.contains("`nowhere`") && p.contains("no metadata row")));
+        assert!(check_metadata(&tree, &[row("format", Read, EVERYONE), row("old", Read, EVERYONE), row("evidence add", Write, &[I])], &table).iter().any(|p| p.contains("deprecated path")));
     }
 
     #[test]

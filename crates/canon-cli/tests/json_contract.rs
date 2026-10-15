@@ -56,7 +56,6 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         (("dispatch end", "status"), "succeeded"),
         (("subject new", "id"), "demo-two"),
         (("subject status", "id"), "demo"),
-        (("subject status", "state"), "specced"),
     ]);
     if let Some(value) = by_command.get(&(command, name)) {
         return value.to_string();
@@ -104,6 +103,8 @@ fn extra_args(command: &str, scratch: &Path) -> Vec<String> {
     match command {
         "init" => vec!["--repo".into(), path("fresh"), "--providers".into(), "none".into()],
         "demo init" => vec!["--repo".into(), path("demo")],
+        // `--role` is optional in the schema (a declared role supplies it), but the sweep declares none.
+        "evidence add" | "review add" => vec!["--role".into(), "reviewer".into()],
         "ingest sessions" => vec!["--home".into(), path("home")],
         "skills install" | "skills check" | "skills doctor" => vec!["--target".into(), path("skills-target"), "--source".into(), path("no-skills-source")],
         _ => Vec::new(),

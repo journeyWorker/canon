@@ -252,7 +252,7 @@ fn the_forward_status_chain_advances_and_folds_to_one_row() {
     assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
 
     for state in ["specced", "building", "verifying"] {
-        let out = run(dir.path(), &["subject", "status", "demo-subject", state]);
+        let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", state]);
         assert!(out.status.success(), "transition to {state} failed: {}", stderr(&out));
     }
 
@@ -268,7 +268,7 @@ fn an_off_chain_transition_is_refused_and_the_record_is_unchanged() {
     assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
 
     // proposed → shipped skips the chain.
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert_eq!(out.status.code(), Some(2));
     assert!(stderr(&out).contains("invalid transition"), "stderr: {}", stderr(&out));
 
@@ -281,7 +281,7 @@ fn shipped_is_blocked_when_a_linked_scenario_has_no_verdict() {
     let dir = repo();
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert_eq!(out.status.code(), Some(1), "verifying → shipped must fail closed without evidence");
     let err = stderr(&out);
     assert!(err.contains("uncovered-cell"), "must print by failure class: {err}");
@@ -301,7 +301,7 @@ fn shipped_is_blocked_when_no_scenario_is_tagged_to_the_subject() {
     let dir = repo();
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &[]);
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert_eq!(out.status.code(), Some(1), "an empty owned set must fail closed, not pass vacuously");
     let err = stderr(&out);
     assert!(err.contains("uncovered-cell") && err.contains("@subject:demo-subject"), "must name the missing tag: {err}");
@@ -316,7 +316,7 @@ fn shipped_is_blocked_when_a_linked_scenario_is_divergent() {
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
     seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Divergent);
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert_eq!(out.status.code(), Some(1), "a divergent latest verdict must fail closed");
     assert!(stderr(&out).contains("divergent"), "stderr: {}", stderr(&out));
 
@@ -331,7 +331,7 @@ fn shipped_is_allowed_with_a_faithful_verdict_for_every_linked_scenario() {
     seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
     write_brief(dir.path(), "c-demo", &format!("{APPROVED}\n"));
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
 
     let payload = query_subjects(dir.path(), &[]);
@@ -350,7 +350,7 @@ fn shipped_is_blocked_until_each_owned_surface_specifies_a_required_case() {
     write_brief(dir.path(), "c-demo", &format!("{APPROVED}\n"));
     seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert_eq!(out.status.code(), Some(1), "a golden-path-only surface must fail closed: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("world.demo") && err.contains("@case:failure"), "must name the surface and the missing case: {err}");
@@ -363,7 +363,7 @@ fn shipped_is_blocked_until_each_owned_surface_specifies_a_required_case() {
     ledger(dir.path()).write(&failure).unwrap();
     seed_scenario_verdict(dir.path(), "world.demo.02", EvidenceVerdict::Faithful);
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(query_subjects(dir.path(), &[])["records"][0]["status"], "shipped");
 }
@@ -576,7 +576,7 @@ fn require_review_refuses_entering_its_scope_without_a_review() {
     write_policy(dir.path(), REQUIRE_REVIEW);
     seed_attested_subject(dir.path());
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert_eq!(out.status.code(), Some(1), "an unreviewed subject must not reach verifying: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("ran unreviewed-promotion"), "the guard must say which checks it ran: {err}");
@@ -592,7 +592,7 @@ fn require_review_skips_and_says_so_outside_its_scope() {
     write_policy(dir.path(), REQUIRE_REVIEW);
     assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "specced"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "specced"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("skipped unreviewed-promotion — `specced` is not in require_review.scope"), "{err}");
@@ -607,7 +607,7 @@ fn a_self_review_does_not_count_under_distinct_actor() {
     // Authored by the evidence actor, whatever reviewer it names.
     seed_review(dir.path(), "someone-else", "impl-agent");
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("`impl-agent`") && err.contains("distinct_actor"), "the detail must name the rule and the actor: {err}");
@@ -630,7 +630,7 @@ fn a_review_from_the_evidence_session_does_not_count_under_distinct_actor() {
     let review: Value = serde_json::from_slice(&std::fs::read(review_files(dir.path())[0].clone()).unwrap()).unwrap();
     assert_eq!(review["actor"]["session_id"], "sess-impl", "--session-id fills actor.session_id: {review}");
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(
@@ -642,7 +642,7 @@ fn a_review_from_the_evidence_session_does_not_count_under_distinct_actor() {
 
     // The same reviewer from its own session counts.
     assert!(review_via_cli(dir.path(), "reviewer-2", Some("sess-review")).status.success());
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
 }
 
@@ -656,7 +656,7 @@ fn a_session_on_one_side_only_leaves_the_actor_rule_in_charge() {
         seed_attested_subject_in_session(dir.path(), evidence_session);
         assert!(review_via_cli(dir.path(), "reviewer-2", review_session).status.success());
 
-        let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+        let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
         assert!(out.status.success(), "evidence {evidence_session:?}, review {review_session:?}: {}", stderr(&out));
     }
 }
@@ -701,7 +701,7 @@ fn a_blocker_the_author_found_in_its_own_work_is_accepted_and_still_blocks() {
     let out = run(dir.path(), &["gate", "promote"]);
     assert!(out.status.success(), "the author's finding must promote: {}{}", stdout(&out), stderr(&out));
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("open-blocker c-demo#1.1 — building → verifying: open blocker finding by `impl-agent`"), "{}", stderr(&out));
     assert_eq!(current_subject(dir.path())["status"], "building");
@@ -733,7 +733,7 @@ fn a_distinct_review_lets_the_subject_through_with_no_waiver() {
     seed_attested_subject(dir.path());
     seed_review(dir.path(), "reviewer-2", "reviewer-2");
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let subject = current_subject(dir.path());
     assert_eq!(subject["status"], "verifying");
@@ -751,7 +751,7 @@ fn an_open_blocker_refuses_and_a_fixed_one_clears() {
     seed_review(dir.path(), "reviewer-2", "reviewer-2");
     seed_blocker(dir.path(), None);
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("open-blocker c-demo#1.1"), "stderr: {}", stderr(&out));
     assert_eq!(current_subject(dir.path())["status"], "building");
@@ -759,7 +759,7 @@ fn an_open_blocker_refuses_and_a_fixed_one_clears() {
     // The same natural key, closed later as fixed: the fold reads the
     // latest version, so the blocker no longer counts.
     seed_blocker(dir.path(), Some(5));
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(current_subject(dir.path())["status"], "verifying");
 }
@@ -790,7 +790,7 @@ fn an_override_records_the_reason_and_gate_check_lists_an_advisory() {
     write_policy(dir.path(), REQUIRE_REVIEW);
     seed_attested_subject(dir.path());
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying", "--override-reason", "reviewer out until Monday", "--actor-id", "lead"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying", "--override-reason", "reviewer out until Monday", "--actor-id", "lead"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("waived unreviewed-promotion world.demo.01"), "{err}");
@@ -829,7 +829,7 @@ fn an_override_records_the_reason_and_gate_check_lists_an_advisory() {
 
     // The waiver belongs to the transition that needed it: the next
     // write (retired is outside the default scope) drops it.
-    assert!(run(dir.path(), &["subject", "status", "demo-subject", "retired"]).status.success());
+    assert!(run(dir.path(), &["subject", "status", "demo-subject", "--to", "retired"]).status.success());
     assert!(current_subject(dir.path()).get("status_override").is_none());
 }
 
@@ -839,13 +839,13 @@ fn an_override_never_waives_the_ship_gate_and_a_blank_reason_is_refused() {
     write_policy(dir.path(), REQUIRE_REVIEW);
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped", "--override-reason", "ship it"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped", "--override-reason", "ship it"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("no ledger verdict") && err.contains("waives only the review checks"), "{err}");
     assert_eq!(current_subject(dir.path())["status"], "verifying");
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped", "--override-reason", "  "]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped", "--override-reason", "  "]);
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
 }
 
@@ -863,7 +863,7 @@ fn an_absent_require_review_is_byte_identical() {
             seed_blocker(dir.path(), None);
             seed_review(dir.path(), "impl-agent", "impl-agent");
         }
-        let status = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+        let status = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
         let gate = run(dir.path(), &["gate", "check"]);
         let subject = current_subject(dir.path());
         (status.status.code(), stdout(&status), stderr(&status), gate.status.code(), stdout(&gate), subject.get("status_override").is_some())
@@ -920,7 +920,7 @@ fn an_unavailable_review_is_a_gap_at_the_gate_and_the_status_guard() {
     assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
     assert!(stdout(&gate).contains(detail), "{}", stdout(&gate));
 
-    let guard = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    let guard = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert_eq!(guard.status.code(), Some(1), "stderr: {}", stderr(&guard));
     assert!(stderr(&guard).contains("no signed review: the latest review recorded no sign-off (`reviewer-2` unavailable)"), "{}", stderr(&guard));
     assert_eq!(current_subject(dir.path())["status"], "building", "an unavailable review approves nothing");
@@ -959,7 +959,7 @@ fn an_undecidable_pre_015_review_still_qualifies_and_every_surface_prints_the_ad
     ledger(dir.path()).write(&edited).unwrap();
 
     let advisory = "1 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 0 current, 0 stale, 1 undecidable; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it";
-    let guard = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    let guard = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert_eq!(guard.status.code(), Some(0), "the unpinned review still qualifies: {}", stderr(&guard));
     assert!(stderr(&guard).contains(&format!("canon subject status: advisory: {advisory}\n")), "{}", stderr(&guard));
     assert_eq!(current_subject(dir.path())["status"], "verifying");
@@ -985,7 +985,7 @@ fn seed_technically_ship_ready(repo: &Path, brief: &str) {
     write_policy(repo, REQUIRE_REVIEW);
     seed_attested_subject(repo);
     seed_review(repo, "reviewer-2", "reviewer-2");
-    let out = run(repo, &["subject", "status", "demo-subject", "verifying"]);
+    let out = run(repo, &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     write_brief(repo, "c-demo", brief);
 }
@@ -1011,7 +1011,7 @@ fn subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line
     let gate = run(dir.path(), &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(0), "every technical gate passes: {}", stdout(&gate));
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains(BRIEF_REFUSAL), "{err}");
@@ -1027,7 +1027,7 @@ fn subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line
     );
 
     write_brief(dir.path(), "c-demo", &format!("Status: approved.\n\n{APPROVED}\n"));
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let subject = current_subject(dir.path());
     assert_eq!(subject["status"], "shipped");
@@ -1047,7 +1047,7 @@ fn subject_lifecycle_25_an_approved_line_in_a_comment_or_fence_does_not_ship() {
     ] {
         let dir = repo();
         seed_technically_ship_ready(dir.path(), &body);
-        let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+        let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
         assert_eq!(out.status.code(), Some(1), "{case}: stderr: {}", stderr(&out));
         assert!(stderr(&out).contains(BRIEF_REFUSAL), "{case}: {}", stderr(&out));
         assert_eq!(current_subject(dir.path())["status"], "verifying", "{case}");
@@ -1064,7 +1064,7 @@ fn subject_lifecycle_26_an_override_ships_an_unapproved_brief_and_records_the_wa
     let dir = repo();
     seed_technically_ship_ready(dir.path(), "Status: draft, awaiting the human.\n");
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped", "--override-reason", "the human approved in chat; line to follow", "--actor-id", "lead"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped", "--override-reason", "the human approved in chat; line to follow", "--actor-id", "lead"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains(&BRIEF_REFUSAL.replace("canon subject status: SUBJECT_GATE_VIOLATION — unreviewed-promotion", "canon subject status: waived unreviewed-promotion")), "{err}");
@@ -1097,7 +1097,7 @@ fn subject_lifecycle_27_a_subject_with_no_adopted_change_ships_with_an_advisory(
     assert!(!stdout(&status).contains("human:"), "nothing to answer, so no human step: {}", stdout(&status));
     assert!(stdout(&status).contains("      brief: not approved (no adopted change; advisory, nothing to approve yet)\n"), "{}", stdout(&status));
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(
         stderr(&out),
@@ -1369,7 +1369,7 @@ fn subject_lifecycle_28_shipping_an_external_change_needs_its_canon_brief() {
     let proposal = write_external_proposal(dir.path(), "c-ext");
     let proposal_before = std::fs::read(&proposal).unwrap();
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     assert!(
         stderr(&out).contains(&format!(
@@ -1385,7 +1385,7 @@ fn subject_lifecycle_28_shipping_an_external_change_needs_its_canon_brief() {
     );
 
     write_pointer_brief(dir.path(), "c-ext");
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(current_subject(dir.path())["status"], "shipped");
     assert_eq!(std::fs::read(&proposal).unwrap(), proposal_before, "canon never edits the external plan's proposal");
@@ -1396,14 +1396,14 @@ fn subject_lifecycle_28_shipping_an_external_change_needs_its_canon_brief() {
 /// [`seed_technically_ship_ready`] with an approved brief, shipped.
 fn seed_shipped(repo: &Path) {
     seed_technically_ship_ready(repo, &format!("Status: approved.\n\n{APPROVED}\n"));
-    let out = run(repo, &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(repo, &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
 }
 
 const REOPEN_REASON: &str = "follow-up: the retry path leaks a file handle";
 
 fn reopen(repo: &Path, extra: &[&str]) -> Output {
-    let mut args = vec!["subject", "status", "demo-subject", "verifying", "--reason", REOPEN_REASON, "--actor-id", "impl-agent"];
+    let mut args = vec!["subject", "status", "demo-subject", "--to", "verifying", "--reason", REOPEN_REASON, "--actor-id", "impl-agent"];
     args.extend_from_slice(extra);
     run(repo, &args)
 }
@@ -1432,7 +1432,7 @@ fn subject_lifecycle_29_a_shipped_subject_reopens_inside_its_approved_scope_and_
     assert_eq!(subject["status"], "verifying");
     assert_eq!(subject["reopen"], serde_json::json!({"reason": REOPEN_REASON, "change": "c-demo", "actor": {"agent_id": "impl-agent"}}));
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let subject = current_subject(dir.path());
     assert_eq!(subject["status"], "shipped");
@@ -1476,17 +1476,17 @@ fn subject_lifecycle_31_a_reopen_needs_a_reason_and_a_reason_needs_a_reopen() {
     let dir = repo();
     seed_shipped(dir.path());
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(
         stderr(&out).contains("SUBJECT_REASON_REQUIRED — reopening demo-subject (shipped → verifying) needs --reason <text>: why it reopens, recorded on the subject with the actor"),
         "{}",
         stderr(&out)
     );
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying", "--reason", "  "]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying", "--reason", "  "]);
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("--reason must be one non-empty line"), "{}", stderr(&out));
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "retired", "--reason", "done"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "retired", "--reason", "done"]);
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("--reason records why a shipped subject reopens and applies only to shipped → verifying, not shipped → retired"), "{}", stderr(&out));
     assert_eq!(current_subject(dir.path())["status"], "shipped");
@@ -1508,7 +1508,7 @@ fn subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again() {
     follow_up.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
     ledger(dir.path()).write(&follow_up).unwrap();
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("uncovered-cell world.demo.02 — verifying → shipped: no ledger verdict"), "the evidence gate ran: {err}");
@@ -1531,7 +1531,7 @@ fn subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again() {
         ProvenanceRef::OriginalSpecRef("specs/demo.feature".into()),
     );
     ledger(dir.path()).write(&review).unwrap();
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(current_subject(dir.path())["status"], "shipped");
 }
@@ -1607,16 +1607,16 @@ fn the_ship_guard_refuses_brief_blockers_and_only_the_briefs_own_waiver_clears_t
     seed_technically_ship_ready(dir.path(), "");
     std::fs::write(dir.path().join(".canon/changes/c-demo/brief.md"), prd_brief_with("")).unwrap();
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("brief.flow-uncovered [flow]"), "{}", stderr(&out));
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped", "--override-reason", "ship it"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped", "--override-reason", "ship it"]);
     assert_eq!(out.status.code(), Some(1), "an override never waives brief blockers: {}", stderr(&out));
     assert_eq!(query_subjects(dir.path(), &[])["records"][0]["status"], "verifying");
 
     let waiver = "<!-- canon:waive brief.flow-uncovered flow \"world.demo.01 predates flow tags\" -->\n";
     std::fs::write(dir.path().join(".canon/changes/c-demo/brief.md"), prd_brief_with(waiver)).unwrap();
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(query_subjects(dir.path(), &[])["records"][0]["status"], "shipped");
 }

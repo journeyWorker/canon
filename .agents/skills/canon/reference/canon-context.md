@@ -43,8 +43,8 @@ an immutable content-addressed registry and records only metadata and digests
 in the pack manifest.
 
 ```bash
-canon context-pack create --manifest .canon/context-manifest.json
-canon context-pack create --manifest .canon/context-manifest.json --repo ../my-repo --json
+canon context-pack new --manifest .canon/context-manifest.json
+canon context-pack new --manifest .canon/context-manifest.json --repo ../my-repo --json
 canon context-pack show sha256:<pack-digest> --repo . --json
 canon context-pack verify sha256:<pack-digest>
 ```
@@ -87,7 +87,7 @@ Version prompt inputs separately when several runs should share the same
 prompt files:
 
 ```bash
-canon prompt register --name reviewer --version v1 \
+canon prompt add --name reviewer --version v1 \
   --manifest .canon/reviewer-prompt.json
 canon prompt show --name reviewer --version v1 --json
 ```

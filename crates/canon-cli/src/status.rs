@@ -56,7 +56,7 @@
 //! ownership, verdicts, required cases, audits, and the review guard,
 //! open blockers only under `block_on_findings`, where `require_review`
 //! covers `shipped`) is flagged red ([`SubjectSummary::red`]), and its
-//! only step is the reopen, `canon subject status <id> verifying
+//! only step is the reopen, `canon subject status <id> --to verifying
 //! --reason …`: the follow-up goes into its approved change as tasks,
 //! then scenario, evidence and review, and it ships again through every
 //! guard. A subject's changes are joined from both sides
@@ -832,10 +832,10 @@ fn shipped_red(ctx: &GateContext, subject: &Subject) -> Vec<String> {
     classes.into_iter().map(|(class, count, first)| format!("{count} {class} (first: {first})")).collect()
 }
 
-/// `canon subject status <id> verifying --reason …`: the reopen command
+/// `canon subject status <id> --to verifying --reason …`: the reopen command
 /// status names for a red shipped subject (0.18 D3).
 fn reopen_command(id: &str) -> String {
-    format!("canon subject status {id} verifying --reason \"<why it reopens>\" --actor-id <unit>")
+    format!("canon subject status {id} --to verifying --reason \"<why it reopens>\" --actor-id <unit>")
 }
 
 /// The next scenario number free on `surface` within spec root `project`.
@@ -1060,7 +1060,7 @@ fn subject_steps(
         let reviewed = if summary.review_due { " and reviewed" } else { "" };
         next.push(NextStep {
             actor: StepActor::Agent,
-            command: format!("canon subject status {id} {to} --actor-id <unit>"),
+            command: format!("canon subject status {id} --to {to} --actor-id <unit>"),
             why: match status {
                 SubjectStatus::Proposed | SubjectStatus::Specced => format!("{id} has its scenarios and every required case; move it on"),
                 SubjectStatus::Verifying => {

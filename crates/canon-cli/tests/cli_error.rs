@@ -162,7 +162,7 @@ fn json_failures_from_a_command_with_its_own_flag_carry_code_message_hint_and_re
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
     assert_eq!(json_error(&out)["code"], "BRIEF_NOT_FOUND");
 
-    let out = run(repo, &["subject", "status", "no-such-subject", "specced", "--json"]);
+    let out = run(repo, &["subject", "status", "no-such-subject", "--to", "specced", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert_eq!(json_error(&out)["code"], "SUBJECT_NOT_FOUND");
 }

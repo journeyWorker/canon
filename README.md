@@ -470,7 +470,7 @@ scenarios with canon's own tests instead of the game's.
 
 ### D3, D4: reopening a shipped subject, and a change in several subjects (#31, #28)
 
-- **Reopen (D3, #31).** `canon subject status <id> verifying --reason
+- **Reopen (D3, #31).** `canon subject status <id> --to verifying --reason
   "<why>"` reopens a `shipped` subject for follow-up work. Inside the
   approved scope it needs no human: either the brief of the subject's newest
   adopted change is approved, or there is no brief to answer. Otherwise it
@@ -1129,7 +1129,7 @@ rule:
   `brief overrides:` advisory that does not fail the gate.
 - The ship guard checks the brief too, through the same check status
   uses, so status never says `ship` for a subject the guard refuses.
-  `canon subject status <id> shipped` refuses only where a brief exists:
+  `canon subject status <id> --to shipped` refuses only where a brief exists:
   a newest adopted change whose `proposal.md` has no `Approved:` line,
   as `unreviewed-promotion <subject>`, naming that `proposal.md` and
   saying a human must answer; the agent writes the line only from that
@@ -1146,7 +1146,7 @@ rule:
 **D2: fewer bookkeeping calls (#22).**
 
 - *Promote on write.* `evidence add`, `finding add`, `finding close` and
-  `divergence stage` take `--promote` and `--no-promote`. With
+  `divergence add` take `--promote` and `--no-promote`. With
   `--promote`, or under `canon.yaml`'s `write: { promote: auto }`, they
   promote the one record they just staged in the same run (the same
   validation and `run_seq` assignment as `gate promote`) and print one
@@ -1267,7 +1267,7 @@ is needed:
   changed but its refresh is refused, `canon gate check` exits 1 with
   `uncovered-cell <root>` (the class the ship gate already uses when a
   subject's scenarios cannot be counted) saying `canon inventory sync`
-  lists the problems; `canon subject status <id> shipped` refuses with
+  lists the problems; `canon subject status <id> --to shipped` refuses with
   the same violation; and `canon status` lists the sync as its only step.
   All three read one decision (`unrefreshable_roots`). Before, the gate
   graded the old index and could pass. `canon evidence add --task` and
@@ -1334,7 +1334,7 @@ skill wording, the refusal, the override and the new status step.
   newest adopted change's `proposal.md`; while that file lacks one,
   `canon status` lists the human step (stop and report the brief) as the
   subject's only step, `canon evidence add` refuses its scenarios and
-  tasks, and `canon subject status <id> shipped` refuses. Subjects with no
+  tasks, and `canon subject status <id> --to shipped` refuses. Subjects with no
   adopted change or no `proposal.md` ship as before, with an advisory.
 - An agent or script that attests evidence before the brief's `Approved:`
   line exists now gets exit 1 from `canon evidence add`. Record the
@@ -1708,7 +1708,7 @@ and its open blocker still blocks.
 
 **Write mode in every write command.** Each write's success line now says
 how it landed: `evidence add`, `finding add` and `finding close` end with
-``— run `canon gate promote` to commit it``; `divergence stage` names
+``— run `canon gate promote` to commit it``; `divergence add` names
 `canon divergence promote`; every other write (`review add`,
 `divergence resolve|defer`, `subject new|adopt|status`, `change new`,
 `scenario new`, `feature new`) ends with `— written directly; nothing to
@@ -2006,7 +2006,7 @@ Version 0.10.0 makes golden-path-only specs visible. A scenario can carry a
 `canon scenario new --case`), indexed onto `Scenario.case` by
 `canon inventory sync`. The opt-in `spec_coverage.require_cases: [failure]`
 then reports every feature surface (`<area>.<surface>`) whose in-scope
-scenarios specify no failure path, and `canon subject status <id> shipped`
+scenarios specify no failure path, and `canon subject status <id> --to shipped`
 refuses on the same rule. Nothing changes until a repo sets
 `require_cases`; when it does, untagged scenarios satisfy no case, so tag
 existing failure-path scenarios first. `canon context` now also prints

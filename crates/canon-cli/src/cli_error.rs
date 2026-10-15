@@ -148,7 +148,7 @@ const CODES: &[(&str, &str)] = &[
     ("CONTEXT_UNSAFE_PATH", "a selected path is absolute, leaves the repository, or contains a symlink"),
     ("DASHBOARD_CONFIG_INVALID", "the dashboard's canon.yaml section is present but unusable"),
     ("DASHBOARD_FAILED", "the dashboard could not start (not built, or an I/O failure)"),
-    ("DEMO_NOT_INITIALIZED", "`demo attest` ran before `demo init`"),
+    ("DEMO_NOT_INITIALIZED", "`demo add` ran before `demo init`"),
     ("DISPATCH_ALREADY_ENDED", "the dispatch run was already ended"),
     ("DISPATCH_END_IN_PROGRESS", "another process is closing the run; retry"),
     ("DISPATCH_INVALID_ARGUMENT", "a dispatch flag combination is invalid"),
@@ -253,6 +253,7 @@ const CODES: &[(&str, &str)] = &[
     ("TYPED_ATOMS_INVALID", "the typed-atoms file for the change does not parse"),
     ("UNKNOWN_COMMAND", "`canon schema` was given a command path canon does not have"),
     ("UNKNOWN_FIELD", "`--fields` names a field the records do not have"),
+    ("UNKNOWN_ROLE", "`CANON_ROLE` holds a value that is not a role (planner, implementer, reviewer, orchestrator)"),
     ("USAGE", "the command line did not parse: an unknown flag or subcommand, or a missing or malformed argument"),
     ("WRITE_FAILED", "a file or ledger record could not be written"),
 ];

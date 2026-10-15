@@ -54,7 +54,7 @@ fn scenario(repo: &Path, id: &str, subject: Option<&str>) {
 fn subject_at(repo: &Path, id: &str, status: &str) {
     ok(repo, &["subject", "new", id, "--domain", "dev", "--title", "A run", "--actor-id", "lead"]);
     for step in ["specced", "building", "verifying"] {
-        ok(repo, &["subject", "status", id, step, "--actor-id", "lead"]);
+        ok(repo, &["subject", "status", id, "--to", step, "--actor-id", "lead"]);
         if step == status {
             return;
         }
@@ -264,7 +264,7 @@ fn a_refuted_audit_is_false_success_until_a_newer_audit_confirms() {
     assert_eq!(report["audits"]["refuted"][0]["scenario"], "game.run.01", "{report}");
     assert!(report["next"].as_array().unwrap().iter().any(|n| n["command"].as_str().unwrap().contains("--kind audit --scenario-id game.run.01")), "{report}");
 
-    let ship = canon(repo, &["subject", "status", "run", "shipped", "--actor-id", "lead"]);
+    let ship = canon(repo, &["subject", "status", "run", "--to", "shipped", "--actor-id", "lead"]);
     assert_eq!(ship.status.code(), Some(1), "{}", text(&ship));
     assert!(text(&ship).contains("false-success game.run.01 — verifying → shipped: latest audit refuted"), "{}", text(&ship));
 
@@ -278,7 +278,7 @@ fn a_refuted_audit_is_false_success_until_a_newer_audit_confirms() {
     record(repo, &audit_args("game.run.01", "confirmed", &["--drop-attachment", "reports/counter.xml", "--drop-reason", "the counterexample is fixed"]));
     ok(repo, &["gate", "check"]);
     approve_brief(repo, "run");
-    ok(repo, &["subject", "status", "run", "shipped", "--actor-id", "lead"]);
+    ok(repo, &["subject", "status", "run", "--to", "shipped", "--actor-id", "lead"]);
 }
 
 /// gate.check.65: the false-success fix names the counterexamples a
@@ -426,10 +426,10 @@ fn require_audit_scope_defaults_to_claimed_done_subjects_and_rate_is_inclusive()
     write_policy(repo, "spec_coverage:\n  require_audit:\n    rate: 1\n");
     ok(repo, &["gate", "check"]);
 
-    ok(repo, &["subject", "status", "run", "verifying", "--actor-id", "lead"]);
+    ok(repo, &["subject", "status", "run", "--to", "verifying", "--actor-id", "lead"]);
     let out = text(&canon(repo, &["gate", "check"]));
     assert!(out.contains("uncovered-cell game.run.01 — sampled for audit"), "{out}");
-    let ship = canon(repo, &["subject", "status", "run", "shipped", "--actor-id", "lead"]);
+    let ship = canon(repo, &["subject", "status", "run", "--to", "shipped", "--actor-id", "lead"]);
     assert_eq!(ship.status.code(), Some(1), "the ship guard refuses an owed audit: {}", text(&ship));
     assert!(text(&ship).contains("uncovered-cell game.run.01 — verifying → shipped: sampled for audit"), "{}", text(&ship));
 

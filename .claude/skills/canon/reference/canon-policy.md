@@ -229,7 +229,7 @@ read as a big-endian u64, are less than `rate · 2^64` — computed exactly,
 as a comparison against `ceil(rate · 2^64)`, so `rate: 0` samples nothing
 and `rate: 1` samples everything. A sampled in-scope scenario whose
 latest audit is missing or `indeterminate` is `uncovered-cell`; with
-`shipped` in `scope`, `canon subject status <id> shipped` also refuses
+`shipped` in `scope`, `canon subject status <id> --to shipped` also refuses
 it. `canon context` and the `canon status` policy line show
 `require_audit=(rate=… seed=`…` scope=…)`.
 

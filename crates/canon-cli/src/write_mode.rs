@@ -10,7 +10,7 @@
 //!
 //! # Promote on write (0.16 D2)
 //! A staged write command (`evidence add`, `finding add`, `finding
-//! close`, `divergence stage`) promotes in the same run when asked:
+//! close`, `divergence add`) promotes in the same run when asked:
 //! `--promote` on the command line, or `write: { promote: auto }` in
 //! `canon.yaml`. `--no-promote` keeps one write staged under `auto`. The
 //! run promotes ONLY the record it just staged, through the same

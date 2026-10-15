@@ -32,7 +32,7 @@ mkdir canon-demo && cd canon-demo
 
 bunx @journeykit/canon demo init      # 일회용 evidence loop 스캐폴드
 bunx @journeykit/canon gate check     # RED  — gate가 거부
-bunx @journeykit/canon demo attest    # reviewer의 evidence 기록
+bunx @journeykit/canon demo add    # reviewer의 evidence 기록
 bunx @journeykit/canon gate check     # GREEN — gate 통과
 ```
 
@@ -47,7 +47,7 @@ uncovered-cell (1):
 
 `dev` voice가 scenario `auth.login.01`에 evidence를 남겼지만, `policy.yaml`은
 독립적인 `reviewer`를 요구합니다. reviewer evidence가 없으니 → 이 cell은
-uncovered → gate가 red입니다. `demo attest`가 그 evidence를 기록하면 같은
+uncovered → gate가 red입니다. `demo add`가 그 evidence를 기록하면 같은
 check가 green으로 바뀝니다:
 
 ```

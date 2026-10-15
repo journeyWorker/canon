@@ -27,7 +27,7 @@
       "$ref": "#/$defs/RoleId"
     },
     "reopen": {
-      "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical.",
+      "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical.",
       "anyOf": [
         {
           "$ref": "#/$defs/Reopen"
