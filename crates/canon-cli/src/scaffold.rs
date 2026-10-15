@@ -49,14 +49,14 @@
 //! side effect either has is the one `.feature` file write (module doc
 //! above).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use canon_model::family::feature::FeatureProvenance;
 use canon_model::family::FamilyKind;
-use canon_model::{Actor, ProjectId, ScenarioId};
+use canon_model::{Actor, ChangeId, ProjectId, ScenarioId, SubjectId};
 use chrono::{DateTime, Utc};
 
 use crate::cli_error::CliError;
@@ -291,6 +291,159 @@ fn resolve_spec_root<'a>(command: &str, roots: &'a [SpecRoot], project: Option<&
     }
 }
 
+/// One scenario `canon scenario new` scaffolds: the positional tag and
+/// every flag of the single form, or one line of its `--from` NDJSON.
+#[derive(Debug, Clone)]
+pub struct ScenarioSpec {
+    pub tag: ScenarioId,
+    pub title: String,
+    pub subject: Option<SubjectId>,
+    pub lane: Option<String>,
+    pub case: Option<String>,
+    pub flow: Option<String>,
+    pub change: Option<ChangeId>,
+    pub feature: Option<PathBuf>,
+    pub project: Option<ProjectId>,
+}
+
+/// A validated scenario: where it lands and the `@flow:` value it carries.
+struct Planned {
+    feature_path: PathBuf,
+    flow_tag: Option<String>,
+    /// The target file's text now (empty when it does not exist yet).
+    existing: String,
+}
+
+/// A `.feature` file with the scenarios this run appends, not yet written.
+struct Pending {
+    path: PathBuf,
+    content: String,
+}
+
+type FlowKey = (Option<String>, Option<String>, String);
+
+/// The validation every `scenario new` form shares: loaded once per run, so
+/// a batch scans the corpus and resolves each flow only once.
+struct Planner {
+    repo_root: PathBuf,
+    roots: Vec<SpecRoot>,
+    /// Every `@<id>` tag under each of `roots`, in the same order.
+    corpus: Vec<BTreeSet<String>>,
+    flows: HashMap<FlowKey, Result<String, String>>,
+}
+
+impl Planner {
+    fn new(repo_root: &Path) -> Result<Self, CliError> {
+        let roots = SyncCtx::from_repo(repo_root).and_then(|ctx| ctx.spec_roots(None)).map_err(|e| CliError::refused("CONFIG_UNREADABLE", e.to_string()))?;
+        let corpus = roots.iter().map(|root| corpus_tags(&root.root)).collect();
+        Ok(Self { repo_root: repo_root.to_path_buf(), roots, corpus, flows: HashMap::new() })
+    }
+
+    /// Every check a single `scenario new` makes, in its order; nothing is written.
+    fn plan(&mut self, spec: &ScenarioSpec) -> Result<Planned, CliError> {
+        let flow_tag = match &spec.flow {
+            None => None,
+            Some(flow) => {
+                let key = (spec.subject.as_ref().map(|s| s.as_str().to_string()), spec.change.as_ref().map(|c| c.as_str().to_string()), flow.clone());
+                let repo_root = &self.repo_root;
+                let found = self.flows.entry(key).or_insert_with(|| crate::brief_check::flow_tag_value(repo_root, spec.subject.as_ref(), spec.change.as_ref(), flow)).clone();
+                Some(found.map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).field("flow"))?)
+            }
+        };
+        for (axis, value) in [("lane", spec.lane.as_deref()), ("case", spec.case.as_deref())] {
+            if let Some(value) = value {
+                if let Some(violation) = crate::subject::enum_membership_violation(&self.repo_root, axis, value) {
+                    return Err(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", violation).field(axis));
+                }
+            }
+        }
+        let tag = &spec.tag;
+
+        // Resolve the target `.feature` path FIRST — spec.md's own
+        // ordering requirement (design D3): root-membership validation for
+        // an explicit `--feature` runs BEFORE the duplicate-tag/target-file
+        // checks below.
+        let feature_path: PathBuf = match spec.feature.as_deref() {
+            None => {
+                // D2: the tag-derived default mirrors `run_feature_new`'s
+                // own root selection — the SAME [`resolve_spec_root`], so
+                // `--project` means one thing across both commands and an
+                // unresolvable root is never guessed at.
+                let root = resolve_spec_root("canon scenario new", &self.roots, spec.project.as_ref()).map_err(|msg| CliError::refused("SPEC_ROOT_UNRESOLVED", msg).field("project"))?;
+                resolve_feature_path(root, tag.area(), tag.surface())
+            }
+            Some(feature) => {
+                let resolved: PathBuf = if feature.is_absolute() { feature.to_path_buf() } else { self.repo_root.join(feature) };
+                if !path_under_any_root(&resolved, &self.roots) {
+                    return Err(CliError::refused("FEATURE_OUTSIDE_SPEC_ROOTS", format!("`{}` does not resolve under any configured `specs.roots[]` entry ({}); never a silent orphan write outside the validated corpus",
+                        resolved.display(),
+                        self.roots.iter().map(|r| r.root.display().to_string()).collect::<Vec<_>>().join(", ")
+                    )).field("feature"));
+                }
+                resolved
+            }
+        };
+        for root in self.roots.iter().filter(|root| path_under_root(&feature_path, &root.root)) {
+            if let Err(msg) = refuse_pre_0_17(&self.repo_root, root) {
+                return Err(CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg));
+            }
+        }
+
+        for (root, tags) in self.roots.iter().zip(&self.corpus) {
+            if tags.contains(tag.as_str()) {
+                return Err(CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists under spec root `{}` ({}); never a silent duplicate",
+                    tag.as_str(),
+                    root.id.as_str(),
+                    root.root.display()
+                )).field("id"));
+            }
+        }
+
+        let existing = if feature_path.exists() {
+            fs::read_to_string(&feature_path).map_err(|e| CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", feature_path.display())))?
+        } else {
+            String::new()
+        };
+        // Belt-and-suspenders: guard the target file directly too, even
+        // when it sits outside every configured spec root — spec.md's own
+        // literal duplicate-tag scenario is "runs a second time against a
+        // `.feature` file that already carries" the tag, the SAME target
+        // file, regardless of corpus-root config.
+        if canon_fmt::gherkin::scan(&existing).scenario_ids.iter().any(|t| t == tag.as_str()) {
+            return Err(CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists in `{}`; never a silent duplicate", tag.as_str(), feature_path.display())).field("id"));
+        }
+        Ok(Planned { feature_path, flow_tag, existing })
+    }
+}
+
+/// Append `spec`'s block to its file's pending content, starting the
+/// file's `Feature:` header when it is new (task 5.1). No
+/// `--feature-title` flag exists on this command — `<area> <surface>`
+/// space-joined mirrors the one hand-authored fixture in this workspace.
+fn stage(pending: &mut Vec<Pending>, planned: Planned, spec: &ScenarioSpec, prov_line: &str) {
+    let axes = ScenarioAxes { subject: spec.subject.as_ref().map(SubjectId::as_str), lane: spec.lane.as_deref(), case: spec.case.as_deref(), flow: planned.flow_tag.as_deref() };
+    let at = match pending.iter().position(|p| p.path == planned.feature_path) {
+        Some(at) => at,
+        None => {
+            let content = if planned.existing.trim().is_empty() { format!("Feature: {} {}\n{prov_line}\n", spec.tag.area(), spec.tag.surface()) } else { planned.existing };
+            pending.push(Pending { path: planned.feature_path, content });
+            pending.len() - 1
+        }
+    };
+    pending[at].content = append_scenario_block(&pending[at].content, spec.tag.as_str(), &spec.title, prov_line, axes);
+}
+
+/// Write every pending file, creating its directory.
+fn write_pending(pending: &[Pending]) -> Result<(), CliError> {
+    for file in pending {
+        if let Some(parent) = file.path.parent() {
+            fs::create_dir_all(parent).map_err(|e| CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())))?;
+        }
+        fs::write(&file.path, &file.content).map_err(|e| CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", file.path.display())))?;
+    }
+    Ok(())
+}
+
 /// `canon scenario new <tag> --title <label> [--feature <path>]
 /// [--project <id>]` (task 5.1; s19 `derived-validated-scenario-feature`
 /// makes `--feature` optional, design D1-D3). Returns the process exit
@@ -305,115 +458,172 @@ fn resolve_spec_root<'a>(command: &str, roots: &'a [SpecRoot], project: Option<&
 /// refusal-exits-`2`/nothing-written convention
 /// (`crate::review::run_add`).
 ///
-/// `project` is `--project <id>`: which configured `specs.roots[]`
+/// `spec.project` is `--project <id>`: which configured `specs.roots[]`
 /// entry the DERIVED path lands under, selected by the root's `id`
 /// exactly as [`run_feature_new`] selects it ([`resolve_spec_root`]).
-pub fn run_scenario_new(
-    repo: &Path,
-    tag: &ScenarioId,
-    title: &str,
-    feature: Option<&Path>,
-    project: Option<&ProjectId>,
-    axes: ScenarioAxes<'_>,
-    actor: &Actor,
-    at: DateTime<Utc>,
-    json: bool,
-) -> i32 {
+pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: DateTime<Utc>, json: bool) -> i32 {
     let repo_root = resolve_repo_root(repo);
-    let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
-        Ok(roots) => roots,
-        Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon scenario new", json);
-        }
+    let planned = match Planner::new(&repo_root).and_then(|mut planner| planner.plan(spec)) {
+        Ok(planned) => planned,
+        Err(e) => return e.emit("canon scenario new", json),
     };
-
-    // Resolve the target `.feature` path FIRST — spec.md's own
-    // ordering requirement (design D3): root-membership validation for
-    // an explicit `--feature` runs BEFORE the duplicate-tag/target-file
-    // checks below.
-    let feature_path: PathBuf = match feature {
-        None => {
-            // D2: the tag-derived default mirrors `run_feature_new`'s
-            // own root selection — the SAME [`resolve_spec_root`], so
-            // `--project` means one thing across both commands and an
-            // unresolvable root is never guessed at.
-            let root = match resolve_spec_root("canon scenario new", &roots, project) {
-                Ok(root) => root,
-                Err(msg) => {
-                    return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.to_string()).emit("canon scenario new", json);
-                }
-            };
-            resolve_feature_path(root, tag.area(), tag.surface())
-        }
-        Some(feature) => {
-            let resolved: PathBuf = if feature.is_absolute() { feature.to_path_buf() } else { repo_root.join(feature) };
-            if !path_under_any_root(&resolved, &roots) {
-                return CliError::refused("FEATURE_OUTSIDE_SPEC_ROOTS", format!("`{}` does not resolve under any configured `specs.roots[]` entry ({}); never a silent orphan write outside the validated corpus",
-                    resolved.display(),
-                    roots.iter().map(|r| r.root.display().to_string()).collect::<Vec<_>>().join(", ")
-                )).emit("canon scenario new", json);
-            }
-            resolved
-        }
-    };
-    for root in roots.iter().filter(|root| path_under_root(&feature_path, &root.root)) {
-        if let Err(msg) = refuse_pre_0_17(&repo_root, root) {
-            return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.to_string()).emit("canon scenario new", json);
-        }
+    let feature_path = planned.feature_path.clone();
+    let mut pending = Vec::new();
+    stage(&mut pending, planned, spec, &provenance_line(at, actor));
+    if let Err(e) = write_pending(&pending) {
+        return e.emit("canon scenario new", json);
     }
-
-    for root in &roots {
-        if corpus_tags(&root.root).contains(tag.as_str()) {
-            return CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists under spec root `{}` ({}); never a silent duplicate",
-                tag.as_str(),
-                root.id.as_str(),
-                root.root.display()
-            )).emit("canon scenario new", json);
-        }
-    }
-
-    let existing = if feature_path.exists() {
-        match fs::read_to_string(&feature_path) {
-            Ok(text) => text,
-            Err(e) => {
-                return CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", feature_path.display())).emit("canon scenario new", json);
-            }
-        }
-    } else {
-        String::new()
-    };
-    // Belt-and-suspenders: guard the target file directly too, even
-    // when it sits outside every configured spec root — spec.md's own
-    // literal duplicate-tag scenario is "runs a second time against a
-    // `.feature` file that already carries" the tag, the SAME target
-    // file, regardless of corpus-root config.
-    if canon_fmt::gherkin::scan(&existing).scenario_ids.iter().any(|t| t == tag.as_str()) {
-        return CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists in `{}`; never a silent duplicate", tag.as_str(), feature_path.display())).emit("canon scenario new", json);
-    }
-
-    let prov_line = provenance_line(at, actor);
-    let content = if existing.trim().is_empty() {
-        // New file: emit `Feature:` + provenance first (task 5.1). No
-        // `--feature-title` flag exists on this command — `<area>
-        // <surface>` space-joined mirrors the one hand-authored fixture
-        // in this workspace.
-        format!("Feature: {} {}\n{prov_line}\n", tag.area(), tag.surface())
-    } else {
-        existing
-    };
-    let out = append_scenario_block(&content, tag.as_str(), title, &prov_line, axes);
-
-    if let Some(parent) = feature_path.parent() {
-        if let Err(e) = fs::create_dir_all(parent) {
-            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).emit("canon scenario new", json);
-        }
-    }
-    if let Err(e) = fs::write(&feature_path, &out) {
-        return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", feature_path.display())).emit("canon scenario new", json);
-    }
+    let tag = &spec.tag;
     crate::say!(json, "canon scenario new: wrote `@{}` to {} — {}", tag.as_str(), feature_path.display(), crate::write_mode::DIRECT);
     let scope = crate::next::Scope::Scenarios(vec![tag.as_str().to_string()]);
     crate::next::finish(&repo_root, "scenario new", &scope, false, json, serde_json::json!({ "scenarioId": tag.as_str(), "feature": feature_path.display().to_string() }));
+    0
+}
+
+/// One `--from` line: the single form's fields by their long flag names
+/// (`id` for the positional tag).
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BatchLine {
+    id: String,
+    title: String,
+    subject: Option<String>,
+    lane: Option<String>,
+    case: Option<String>,
+    flow: Option<String>,
+    change: Option<String>,
+    feature: Option<PathBuf>,
+    project: Option<String>,
+}
+
+impl BatchLine {
+    /// The same grammar checks the single form's clap parsers make.
+    fn into_spec(self) -> Result<ScenarioSpec, CliError> {
+        fn field<T>(name: &'static str, parsed: Result<T, String>) -> Result<T, CliError> {
+            parsed.map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).field(name))
+        }
+        if self.change.is_some() && self.flow.is_none() {
+            return Err(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", "`change` needs `flow`").field("change"));
+        }
+        Ok(ScenarioSpec {
+            tag: field("id", parse_scenario_tag(&self.id))?,
+            title: self.title,
+            subject: self.subject.as_deref().map(|s| field("subject", crate::subject::parse_subject_id(s))).transpose()?,
+            lane: self.lane.as_deref().map(|s| field("lane", parse_lane_slug(s))).transpose()?,
+            case: self.case.as_deref().map(|s| field("case", parse_lane_slug(s))).transpose()?,
+            flow: self.flow,
+            change: self.change.as_deref().map(|s| field("change", crate::subject::parse_change_id(s))).transpose()?,
+            feature: self.feature,
+            project: self.project.as_deref().map(|s| field("project", crate::review::parse_project_id(s))).transpose()?,
+        })
+    }
+}
+
+/// A `--from` line that failed validation.
+struct BadLine {
+    line: usize,
+    id: Option<String>,
+    error: CliError,
+}
+
+impl BadLine {
+    fn to_json(&self) -> serde_json::Value {
+        let mut error = serde_json::json!({ "code": self.error.code, "message": self.error.message });
+        if let Some(field) = &self.error.field {
+            error["field"] = serde_json::json!(field);
+        }
+        serde_json::json!({ "line": self.line, "id": self.id, "error": error })
+    }
+}
+
+/// `canon scenario new --from <file|->`: one scenario per NDJSON line
+/// (blank lines and `#` comments skipped), each with the single form's
+/// fields by long flag name. Every line is validated first, with the checks
+/// of the single form plus a repeated id within the batch; any bad line
+/// refuses the whole batch (`2`, nothing written) and `data.items` names
+/// each one. Otherwise every scenario is written as N single calls would
+/// write them, under one provenance timestamp, and `data.items` lists
+/// `{line, id, path}` for each.
+pub fn run_scenario_batch(repo: &Path, source: &str, actor: &Actor, at: DateTime<Utc>, json: bool) -> i32 {
+    const COMMAND: &str = "canon scenario new";
+    let text = if source == "-" {
+        let mut text = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut text).map(|_| text)
+    } else {
+        fs::read_to_string(source)
+    };
+    let text = match text {
+        Ok(text) => text,
+        Err(e) => return CliError::refused("REPO_UNREADABLE", format!("--from {source}: {e}")).field("from").emit(COMMAND, json),
+    };
+    let lines: Vec<(usize, &str)> = text.lines().enumerate().map(|(i, l)| (i + 1, l.trim())).filter(|(_, l)| !l.is_empty() && !l.starts_with('#')).collect();
+    if lines.is_empty() {
+        return CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("--from {source} holds no scenario line (one JSON object per line)")).field("from").emit(COMMAND, json);
+    }
+
+    let repo_root = resolve_repo_root(repo);
+    let mut planner = match Planner::new(&repo_root) {
+        Ok(planner) => planner,
+        Err(e) => return e.emit(COMMAND, json),
+    };
+    let prov_line = provenance_line(at, actor);
+    let mut seen: HashMap<String, usize> = HashMap::new();
+    let mut bad: Vec<BadLine> = Vec::new();
+    let mut good: Vec<(usize, ScenarioSpec, Planned)> = Vec::new();
+    for (line, raw) in &lines {
+        let value: serde_json::Value = match serde_json::from_str(raw) {
+            Ok(value) => value,
+            Err(e) => {
+                bad.push(BadLine { line: *line, id: None, error: CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("not a JSON object: {e}")) });
+                continue;
+            }
+        };
+        let id = value.get("id").and_then(|v| v.as_str()).map(str::to_string);
+        let planned = serde_json::from_value::<BatchLine>(value)
+            .map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e.to_string()))
+            .and_then(BatchLine::into_spec)
+            .and_then(|spec| {
+                let planned = planner.plan(&spec)?;
+                match seen.get(spec.tag.as_str()) {
+                    Some(first) => Err(CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` repeats line {first} of this batch; never a silent duplicate", spec.tag.as_str())).field("id")),
+                    None => Ok((spec, planned)),
+                }
+            });
+        // The first line to use an id owns it, valid or not.
+        if let Some(id) = id.as_deref().and_then(|id| parse_scenario_tag(id).ok()) {
+            seen.entry(id.as_str().to_string()).or_insert(*line);
+        }
+        match planned {
+            Ok((spec, planned)) => good.push((*line, spec, planned)),
+            Err(error) => bad.push(BadLine { line: *line, id, error }),
+        }
+    }
+
+    if !bad.is_empty() {
+        for item in &bad {
+            eprintln!("{COMMAND}: line {}{}: {} — {}", item.line, item.id.as_deref().map(|id| format!(" (`{id}`)")).unwrap_or_default(), item.error.code, item.error.message);
+        }
+        let refusal = CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("{} of {} line(s) invalid; nothing written", bad.len(), lines.len())).hint("fix the listed lines and run the batch again");
+        eprintln!("{}", refusal.human(COMMAND));
+        return refusal.emit_with_data(COMMAND, json, serde_json::json!({ "items": bad.iter().map(BadLine::to_json).collect::<Vec<_>>() }));
+    }
+
+    let mut pending = Vec::new();
+    let mut items = Vec::new();
+    let mut ids = Vec::new();
+    for (line, spec, planned) in good {
+        items.push(serde_json::json!({ "line": line, "id": spec.tag.as_str(), "path": planned.feature_path.display().to_string() }));
+        ids.push(spec.tag.as_str().to_string());
+        stage(&mut pending, planned, &spec, &prov_line);
+    }
+    if let Err(e) = write_pending(&pending) {
+        return e.emit(COMMAND, json);
+    }
+    for item in &items {
+        crate::say!(json, "{COMMAND}: wrote `@{}` to {}", item["id"].as_str().unwrap_or_default(), item["path"].as_str().unwrap_or_default());
+    }
+    crate::say!(json, "{COMMAND}: wrote {} scenario(s) — {}", items.len(), crate::write_mode::DIRECT);
+    crate::next::finish(&repo_root, "scenario new", &crate::next::Scope::Scenarios(ids), false, json, serde_json::json!({ "items": items }));
     0
 }
 

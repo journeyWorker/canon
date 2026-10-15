@@ -15,6 +15,7 @@ a `specs.roots[]` entry in `canon.yaml` (`root` by default).
 canon status --as implementer --json                  # once, at the start
 canon feature new <area>.<surface> --title "<title>" --as implementer --json
 canon scenario new <area>.<surface>.<nn> --subject <subject-id> --flow <F-id> --case <happy|edge|failure> --title "<title>" --as implementer --json
+canon scenario new --from - --as implementer --json     # many at once: NDJSON on stdin, one {"id","title","subject","flow","case",…} per line
 canon evidence add --project-id <root-id> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref "<test command>" --actor-id <unit> --session-id <session> --as implementer --json
 canon evidence add --project-id <root-id> --scenario-id <id> --artifact <path> --kind test-run --role implementer --ref "<what it shows>" --actor-id <unit> --session-id <session> --as implementer --json
 canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <unit> --actor-id <unit> --session-id <session> --summary "<defect>" --as implementer --json
@@ -28,7 +29,8 @@ After the first `status`, follow `meta.next` of each write; do not call
 ## Steps
 
 1. **Scenarios.** One `feature new` per feature surface, then one
-   `scenario new` per behavior, each pointing at the brief's flow step it
+   `scenario new` per behavior (several at once with `scenario new --from -`:
+   one JSON object per line, validated all-or-nothing), each pointing at the brief's flow step it
    proves, with failure paths (`--case failure`) as well as `happy` and
    `edge`. When the gate asks for a missing case (`require_cases`), add a new
    scenario; never retag an existing one. Every bug fix adds or extends a
