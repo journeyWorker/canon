@@ -353,13 +353,13 @@ fn a_task_and_scenario_keyed_record_ships_its_scenario_and_still_flips_its_task(
     ok(repo, &["subject", "new", "cat-run", "--domain", "game", "--title", "Cat run"]);
     scenario(repo, "game.run.01", Some("cat-run"));
     for state in ["specced", "building", "verifying"] {
-        ok(repo, &["subject", "status", "cat-run", state]);
+        ok(repo, &["subject", "status", "cat-run", "--to", state]);
     }
     ok(repo, &["evidence", "add", "--task", "cats#1", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
     ok(repo, &["gate", "promote"]);
 
     approve_brief(repo, "cat-run");
-    let shipped = canon(repo, &["subject", "status", "cat-run", "shipped"]);
+    let shipped = canon(repo, &["subject", "status", "cat-run", "--to", "shipped"]);
     assert!(shipped.status.success(), "the scenario cell has the record's faithful verdict: {}", text(&shipped));
     ok(repo, &["gate", "task", "cats#1"]);
     assert!(std::fs::read_to_string(repo.join(".canon/changes/cats/tasks.md")).unwrap().contains("- [x] 1 Ship the run"));

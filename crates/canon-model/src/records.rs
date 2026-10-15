@@ -206,7 +206,7 @@ pub struct Subject {
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub status_override: Option<StatusOverride>,
     /// Who reopened this subject from `shipped` to `verifying`, and why
-    /// (0.18 D3, `canon subject status <id> verifying --reason`). Set
+    /// (0.18 D3, `canon subject status <id> --to verifying --reason`). Set
     /// only on the record that reopens; every other `canon subject
     /// status` write clears it, like [`Self::status_override`]. Skipped
     /// when absent, so every other subject stays byte-identical.

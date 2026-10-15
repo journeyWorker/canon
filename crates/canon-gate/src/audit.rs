@@ -208,7 +208,7 @@ pub(crate) fn evaluate(ctx: &GateContext, require_audit: &RequireAudit, exclude_
     sampled(ctx, require_audit, exclude_lanes).iter().filter_map(|o| obligation_violation(require_audit, o)).collect()
 }
 
-/// The audit rule `canon subject status <id> shipped` applies: every
+/// The audit rule `canon subject status <id> --to shipped` applies: every
 /// owned scenario whose latest audit is refuted (`false-success`, always),
 /// and — when `require_audit` covers `target` — every owned, sampled
 /// scenario that still owes an audit. The same [`false_success`] and

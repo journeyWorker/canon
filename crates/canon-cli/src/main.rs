@@ -73,6 +73,9 @@ Learn more:
   inspect the target without deleting user files."
 )]
 struct Cli {
+    /// The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` lists the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `review add` defaults to it
+    #[arg(long = "as", global = true, value_enum, value_name = "ROLE")]
+    declared_role: Option<canon_cli::role::Role>,
     #[command(subcommand)]
     command: Command,
 }
@@ -128,7 +131,7 @@ enum Command {
         action: PolicyCommand,
     },
     /// Try the evidence loop end-to-end in a throwaway demo repo
-    #[command(after_help = "Examples:\n  canon demo init --repo /tmp/canon-demo && cd /tmp/canon-demo\n  canon gate check   # RED\n  canon demo attest && canon gate check   # GREEN")]
+    #[command(after_help = "Examples:\n  canon demo init --repo /tmp/canon-demo && cd /tmp/canon-demo\n  canon gate check   # RED\n  canon demo add && canon gate check   # GREEN")]
     Demo {
         #[command(subcommand)]
         action: DemoCommand,
@@ -153,7 +156,7 @@ enum Command {
         json: bool,
     },
     /// Create, inspect, and verify reproducible context packs
-    #[command(after_help = "Examples:\n  canon context-pack create --manifest .canon/context-manifest.json\n  canon context-pack show sha256:<pack-digest> --repo . --json\n  canon context-pack verify sha256:<pack-digest>")]
+    #[command(after_help = "Examples:\n  canon context-pack new --manifest .canon/context-manifest.json\n  canon context-pack show sha256:<pack-digest> --repo . --json\n  canon context-pack verify sha256:<pack-digest>")]
     ContextPack {
         #[command(subcommand)]
         action: ContextPackCommand,
@@ -167,7 +170,7 @@ enum Command {
     /// Register and select versioned prompt bundles
     #[command(
         disable_version_flag = true,
-        after_help = "Examples:\n  canon prompt register --name reviewer --version v1 --manifest .canon/reviewer.json\n  canon prompt show --name reviewer --version v1 --json"
+        after_help = "Examples:\n  canon prompt add --name reviewer --version v1 --manifest .canon/reviewer.json\n  canon prompt show --name reviewer --version v1 --json"
     )]
     Prompt {
         #[command(subcommand)]
@@ -453,7 +456,7 @@ enum Command {
         json: bool,
     },
     /// Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes
-    #[command(after_help = "Examples:\n  canon schema\n  canon schema --json\n  canon schema evidence add --json\n  canon schema --errors --json\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An alias (`fmt`) resolves to its\ncanonical command and the output names the canonical one. An unknown path exits 2 and names the\nnearest matches.")]
+    #[command(after_help = "Examples:\n  canon schema\n  canon schema --all --json\n  canon schema evidence add --json\n  CANON_ROLE=reviewer canon schema --json\n  canon schema --errors --json\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An alias (`fmt`) resolves to its\ncanonical command and the output names the canonical one. An unknown path exits 2 and names the\nnearest matches.\n\nWith a declared role (CANON_ROLE or --as) the bare listing shows only that role's commands; --all\nlists every command, including deprecated ones (which name their replacement and the release that\nremoves them). A command whose effect depends on its arguments carries `effectNote`.")]
     Schema {
         /// Command path, e.g. `evidence add` (omit to list every command)
         path: Vec<String>,
@@ -463,6 +466,9 @@ enum Command {
         /// Print every error code any command can emit, with its meaning, instead of a command
         #[arg(long, conflicts_with = "path")]
         errors: bool,
+        /// List every command, deprecated ones included, instead of the declared role's
+        #[arg(long)]
+        all: bool,
     },
 }
 
@@ -485,20 +491,27 @@ enum PolicyCommand {
     },
 }
 
+/// The flags of `context-pack new`, and of its deprecated form `context-pack create`.
+#[derive(clap::Args)]
+struct ContextPackNewArgs {
+    /// Repository-relative input manifest
+    #[arg(long)]
+    manifest: PathBuf,
+    /// Repo root (default: nearest ancestor with a canon.yaml)
+    #[arg(long, default_value = ".")]
+    repo: PathBuf,
+    /// Output the complete pack manifest as JSON
+    #[arg(long)]
+    json: bool,
+}
+
 #[derive(Subcommand)]
 enum ContextPackCommand {
     /// Create an immutable context pack from a repository-local JSON manifest
-    Create {
-        /// Repository-relative input manifest
-        #[arg(long)]
-        manifest: PathBuf,
-        /// Repo root (default: nearest ancestor with a canon.yaml)
-        #[arg(long, default_value = ".")]
-        repo: PathBuf,
-        /// Output the complete pack manifest as JSON
-        #[arg(long)]
-        json: bool,
-    },
+    New(ContextPackNewArgs),
+    /// Deprecated: use `context-pack new`
+    #[command(hide = true)]
+    Create(ContextPackNewArgs),
     /// Show a context pack after verifying its manifest and content objects
     Show {
         /// Context pack id (sha256:<64 hex digits>)
@@ -551,26 +564,33 @@ enum AdapterCommand {
     },
 }
 
+/// The flags of `prompt add`, and of its deprecated form `prompt register`.
+#[derive(clap::Args)]
+struct PromptAddArgs {
+    /// Bundle name
+    #[arg(long)]
+    name: String,
+    /// Bundle version
+    #[arg(long)]
+    version: String,
+    /// Repository-relative input manifest
+    #[arg(long)]
+    manifest: PathBuf,
+    /// Repo root (default: nearest ancestor with a canon.yaml)
+    #[arg(long, default_value = ".")]
+    repo: PathBuf,
+    /// Output the complete bundle manifest as JSON
+    #[arg(long)]
+    json: bool,
+}
+
 #[derive(Subcommand)]
 enum PromptCommand {
-    /// Register a prompt bundle from a repository-local JSON manifest
-    Register {
-        /// Bundle name
-        #[arg(long)]
-        name: String,
-        /// Bundle version
-        #[arg(long)]
-        version: String,
-        /// Repository-relative input manifest
-        #[arg(long)]
-        manifest: PathBuf,
-        /// Repo root (default: nearest ancestor with a canon.yaml)
-        #[arg(long, default_value = ".")]
-        repo: PathBuf,
-        /// Output the complete bundle manifest as JSON
-        #[arg(long)]
-        json: bool,
-    },
+    /// Add a prompt bundle from a repository-local JSON manifest
+    Add(PromptAddArgs),
+    /// Deprecated: use `prompt add`
+    #[command(hide = true)]
+    Register(PromptAddArgs),
     /// Select a registered prompt bundle version
     Show {
         /// Bundle name
@@ -649,6 +669,17 @@ enum LearnCommand {
     },
 }
 
+/// The flags of `demo add`, and of its deprecated form `demo attest`.
+#[derive(clap::Args)]
+struct DemoAddArgs {
+    /// Repo root (default: nearest ancestor with a canon.yaml)
+    #[arg(long, default_value = ".")]
+    repo: PathBuf,
+    /// Output JSON instead of the human-readable form
+    #[arg(long)]
+    json: bool,
+}
+
 #[derive(Subcommand)]
 enum DemoCommand {
     /// Scaffold the demo repo (gate starts RED)
@@ -661,14 +692,10 @@ enum DemoCommand {
         json: bool,
     },
     /// Record the missing reviewer evidence (gate turns GREEN)
-    Attest {
-        /// Repo root (default: nearest ancestor with a canon.yaml)
-        #[arg(long, default_value = ".")]
-        repo: PathBuf,
-        /// Output JSON instead of the human-readable form
-        #[arg(long)]
-        json: bool,
-    },
+    Add(DemoAddArgs),
+    /// Deprecated: use `demo add`
+    #[command(hide = true)]
+    Attest(DemoAddArgs),
 }
 
 #[derive(Subcommand)]
@@ -948,9 +975,9 @@ enum EvidenceCommand {
         /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
         #[arg(long, default_value = "canon")]
         actor_id: String,
-        /// Required: `canon gate promote` derives its run_seq partition key from it
+        /// The attesting role; `canon gate promote` derives its run_seq partition key from it. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
-        role: RoleId,
+        role: Option<RoleId>,
         /// The attesting session (recorded as actor.session_id). Under require_review.distinct_actor a review from this session does not count
         #[arg(long, value_parser = canon_cli::review::parse_session_id)]
         session_id: Option<canon_model::SessionId>,
@@ -1168,8 +1195,9 @@ enum ReviewCommand {
         /// The invoking actor's id
         #[arg(long, default_value = "canon")]
         actor_id: String,
+        /// The reviewer's role. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
-        role: RoleId,
+        role: Option<RoleId>,
         /// The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count
         #[arg(long, value_parser = canon_cli::review::parse_session_id)]
         session_id: Option<canon_model::SessionId>,
@@ -1200,42 +1228,49 @@ enum ReviewCommand {
     },
 }
 
+/// The flags of `divergence add`, and of its deprecated form `divergence stage`.
+#[derive(clap::Args)]
+struct DivergenceAddArgs {
+    #[arg(long, value_parser = canon_cli::review::parse_project_id)]
+    project_id: ProjectId,
+    #[arg(long, value_parser = canon_cli::review::parse_scenario_id)]
+    scenario_id: ScenarioId,
+    #[arg(long, value_parser = canon_cli::divergence::parse_sha)]
+    sha: Sha,
+    /// open / still-divergent / resolved / deferred (deferred needs --reason/--expiry)
+    #[arg(long, default_value = "open")]
+    status: String,
+    #[arg(long)]
+    reason: Option<String>,
+    #[arg(long, value_parser = canon_cli::divergence::parse_timestamp)]
+    expiry: Option<DateTime<Utc>>,
+    #[arg(long, default_value_t = 1)]
+    round: u32,
+    #[arg(long)]
+    reviewer: String,
+    #[arg(long, default_value = "")]
+    detail: String,
+    #[arg(long, default_value = "canon")]
+    actor_id: String,
+    #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
+    role: RoleId,
+    #[command(flatten)]
+    promote: PromoteArgs,
+    /// Repo root (default: nearest ancestor with a canon.yaml)
+    #[arg(long, default_value = ".")]
+    repo: PathBuf,
+    /// Output JSON instead of the human-readable form
+    #[arg(long)]
+    json: bool,
+}
+
 #[derive(Subcommand)]
 enum DivergenceCliCommand {
-    /// Stage a divergence candidate, no run_seq yet (commit it with `canon divergence promote`, or in the same run with --promote / `write: { promote: auto }`)
-    Stage {
-        #[arg(long, value_parser = canon_cli::review::parse_project_id)]
-        project_id: ProjectId,
-        #[arg(long, value_parser = canon_cli::review::parse_scenario_id)]
-        scenario_id: ScenarioId,
-        #[arg(long, value_parser = canon_cli::divergence::parse_sha)]
-        sha: Sha,
-        /// open / still-divergent / resolved / deferred (deferred needs --reason/--expiry)
-        #[arg(long, default_value = "open")]
-        status: String,
-        #[arg(long)]
-        reason: Option<String>,
-        #[arg(long, value_parser = canon_cli::divergence::parse_timestamp)]
-        expiry: Option<DateTime<Utc>>,
-        #[arg(long, default_value_t = 1)]
-        round: u32,
-        #[arg(long)]
-        reviewer: String,
-        #[arg(long, default_value = "")]
-        detail: String,
-        #[arg(long, default_value = "canon")]
-        actor_id: String,
-        #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
-        role: RoleId,
-        #[command(flatten)]
-        promote: PromoteArgs,
-        /// Repo root (default: nearest ancestor with a canon.yaml)
-        #[arg(long, default_value = ".")]
-        repo: PathBuf,
-        /// Output JSON instead of the human-readable form
-        #[arg(long)]
-        json: bool,
-    },
+    /// Add a divergence candidate, staged with no run_seq yet (commit it with `canon divergence promote`, or in the same run with --promote / `write: { promote: auto }`)
+    Add(DivergenceAddArgs),
+    /// Deprecated: use `divergence add`
+    #[command(hide = true)]
+    Stage(DivergenceAddArgs),
     /// Promote all staged candidates, assigning run_seq
     Promote {
         /// Repo root (default: nearest ancestor with a canon.yaml)
@@ -1506,14 +1541,17 @@ enum SubjectCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Transition a subject's lifecycle status (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)
+    /// Show a subject, or with --to transition its lifecycle status (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)
     Status {
-        /// The subject to transition
+        /// The subject to show, or transition with --to
         #[arg(value_parser = canon_cli::subject::parse_subject_id)]
         id: SubjectId,
-        /// Target state (proposed/specced/building/verifying/shipped/retired)
-        #[arg(value_parser = canon_cli::subject::parse_status)]
-        state: canon_model::SubjectStatus,
+        /// Move the subject to this state (proposed/specced/building/verifying/shipped/retired); without it the subject is shown and nothing is written
+        #[arg(long, value_name = "STATE", value_parser = canon_cli::subject::parse_status)]
+        to: Option<canon_model::SubjectStatus>,
+        /// Deprecated: the state as a second positional; use `--to <state>`
+        #[arg(value_parser = canon_cli::subject::parse_status, hide = true, conflicts_with = "to")]
+        state: Option<canon_model::SubjectStatus>,
         /// Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories
         #[arg(long)]
         override_reason: Option<String>,
@@ -1607,7 +1645,7 @@ enum TierCommand {
 /// unless `--json` is in argv: then it is the shared `USAGE` error, so a
 /// caller that asked for JSON gets JSON on stdout.
 fn usage_error(error: &clap::Error) -> ExitCode {
-    let json = std::env::args().skip(1).take_while(|arg| arg != "--").any(|arg| arg == "--json");
+    let json = argv_wants_json();
     if !json || !error.use_stderr() {
         error.exit();
     }
@@ -1640,12 +1678,49 @@ fn set_sigpipe(default: bool) {
 #[cfg(not(unix))]
 fn set_sigpipe(_default: bool) {}
 
+/// The `--role` an `evidence add` / `review add` record carries: the flag,
+/// else the declared role when it is `implementer` or `reviewer` (0.21 D3).
+/// Any other declared role, or none, leaves the flag required.
+fn record_role(flag: Option<RoleId>, command: &str, json: bool) -> Result<RoleId, ExitCode> {
+    use canon_cli::role::Role;
+    if let Some(role) = flag {
+        return Ok(role);
+    }
+    match Role::current(None).filter(|role| matches!(role, Role::Implementer | Role::Reviewer)) {
+        Some(role) => Ok(RoleId::parse(role.as_str()).expect("a role name is a valid role id")),
+        None => Err(ExitCode::from(
+            CliError::refused("USAGE", "the following required argument was not provided: --role <ROLE>")
+                .hint("pass --role, or declare CANON_ROLE=implementer (or reviewer), or --as implementer (or reviewer)")
+                .emit(command, json) as u8,
+        )),
+    }
+}
+
+/// Whether the command line asked for `--json`, read from argv because the
+/// parse may not have produced a command yet.
+fn argv_wants_json() -> bool {
+    std::env::args().skip(1).take_while(|arg| arg != "--").any(|arg| arg == "--json")
+}
+
+/// `canon divergence add` (and its deprecated form `divergence stage`).
+fn run_divergence_add(args: DivergenceAddArgs) -> ExitCode {
+    let DivergenceAddArgs { project_id, scenario_id, sha, status, reason, expiry, round, reviewer, detail, actor_id, role, promote, repo, json } = args;
+    match canon_cli::divergence::parse_status(&status, reason.as_deref(), expiry) {
+        Ok(status) => ExitCode::from(canon_cli::divergence::run_stage(&repo, &project_id, &scenario_id, &sha, status, round, &reviewer, &detail, &actor_id, &role, promote.flag(), json) as u8),
+        Err(e) => ExitCode::from(CliError::refused("DIVERGENCE_INVALID_ARGUMENT", e.to_string()).emit("canon divergence add", json) as u8),
+    }
+}
+
 fn main() -> ExitCode {
     set_sigpipe(true);
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(error) => return usage_error(&error),
     };
+    // The role is resolved before any command runs, so an unknown `CANON_ROLE` refuses the invocation.
+    if let Err(error) = canon_cli::role::init(cli.declared_role) {
+        return ExitCode::from(error.emit("canon", argv_wants_json()) as u8);
+    }
     if matches!(cli.command, Command::Dashboard { .. }) {
         set_sigpipe(false);
     }
@@ -1677,7 +1752,11 @@ fn main() -> ExitCode {
             ExitCode::from(canon_cli::status::run(&repo, json) as u8)
         }
         Command::ContextPack { action } => match action {
-            ContextPackCommand::Create { manifest, repo, json } => run_context_pack_create(&repo, &manifest, json),
+            ContextPackCommand::New(args) => run_context_pack_new(args),
+            ContextPackCommand::Create(args) => {
+                canon_cli::deprecation::warn_path("context-pack create");
+                run_context_pack_new(args)
+            }
             ContextPackCommand::Show { id, repo, json } => run_context_pack_show(&repo, &id, json),
             ContextPackCommand::Verify { id, repo, json } => run_context_pack_verify(&repo, &id, json),
         },
@@ -1686,8 +1765,10 @@ fn main() -> ExitCode {
             AdapterCommand::Authorize { response, repo, json } => run_adapter_authorize(&response, &repo, json),
         },
         Command::Prompt { action } => match action {
-            PromptCommand::Register { name, version, manifest, repo, json } => {
-                run_prompt_register(&repo, &name, &version, &manifest, json)
+            PromptCommand::Add(args) => run_prompt_add(args),
+            PromptCommand::Register(args) => {
+                canon_cli::deprecation::warn_path("prompt register");
+                run_prompt_add(args)
             }
             PromptCommand::Show { name, version, repo, json } => run_prompt_show(&repo, &name, &version, json),
         },
@@ -1754,6 +1835,10 @@ fn main() -> ExitCode {
                 repo,
                 json,
             } => {
+                let role = match record_role(role, "canon evidence add", json) {
+                    Ok(role) => role,
+                    Err(code) => return code,
+                };
                 canon_cli::inventory::refresh_stale_index(&repo, "canon evidence add");
                 ExitCode::from(
                     canon_cli::evidence::run_add(
@@ -1871,6 +1956,10 @@ fn main() -> ExitCode {
                 repo,
                 json,
             } => {
+                let role = match record_role(role, "canon review add", json) {
+                    Ok(role) => role,
+                    Err(code) => return code,
+                };
                 canon_cli::inventory::refresh_stale_index(&repo, "canon review add");
                 ExitCode::from(canon_cli::review::run_add(
                     &repo,
@@ -1897,13 +1986,10 @@ fn main() -> ExitCode {
             }
         },
         Command::Divergence { action } => match action {
-            DivergenceCliCommand::Stage { project_id, scenario_id, sha, status, reason, expiry, round, reviewer, detail, actor_id, role, promote, repo, json } => {
-                match canon_cli::divergence::parse_status(&status, reason.as_deref(), expiry) {
-                    Ok(status) => ExitCode::from(canon_cli::divergence::run_stage(&repo, &project_id, &scenario_id, &sha, status, round, &reviewer, &detail, &actor_id, &role, promote.flag(), json) as u8),
-                    Err(e) => {
-                        ExitCode::from(CliError::refused("DIVERGENCE_INVALID_ARGUMENT", e.to_string()).emit("canon divergence stage", json) as u8)
-                    }
-                }
+            DivergenceCliCommand::Add(args) => run_divergence_add(args),
+            DivergenceCliCommand::Stage(args) => {
+                canon_cli::deprecation::warn_path("divergence stage");
+                run_divergence_add(args)
             }
             DivergenceCliCommand::Promote { repo, dry_run, json } => ExitCode::from(canon_cli::divergence::run_promote(&repo, dry_run, json) as u8),
             DivergenceCliCommand::Resolve { project_id, scenario_id, sha, round, reviewer, detail, actor_id, role, repo, json } => {
@@ -1948,9 +2034,15 @@ fn main() -> ExitCode {
                 ExitCode::from(canon_cli::subject::run_new(&repo, &id, &domain, &title, &summary, &owner_role, &actor_id, json) as u8)
             }
             SubjectCommand::Adopt { change_id, subject, repo, json } => ExitCode::from(canon_cli::subject::run_adopt(&repo, &change_id, &subject, json) as u8),
-            SubjectCommand::Status { id, state, override_reason, reason, actor_id, repo, json } => {
+            SubjectCommand::Status { id, to, state, override_reason, reason, actor_id, repo, json } => {
+                if state.is_some() {
+                    canon_cli::deprecation::warn(&canon_cli::deprecation::SUBJECT_STATUS_POSITIONAL);
+                }
                 canon_cli::inventory::refresh_stale_index(&repo, "canon subject status");
-                ExitCode::from(canon_cli::subject::run_status(&repo, &id, state, override_reason.as_deref(), reason.as_deref(), &actor_id, json) as u8)
+                ExitCode::from(match to.or(state) {
+                    Some(target) => canon_cli::subject::run_status(&repo, &id, target, override_reason.as_deref(), reason.as_deref(), &actor_id, json),
+                    None => canon_cli::subject::run_show(&repo, &id, override_reason.as_deref(), reason.as_deref(), json),
+                } as u8)
             }
         },
         Command::Change { action } => match action {
@@ -1975,7 +2067,11 @@ fn main() -> ExitCode {
         },
         Command::Demo { action } => match action {
             DemoCommand::Init { repo, json } => ExitCode::from(canon_cli::demo::run_demo_init(&repo, json) as u8),
-            DemoCommand::Attest { repo, json } => ExitCode::from(canon_cli::demo::run_demo_attest(&repo, json) as u8),
+            DemoCommand::Add(args) => ExitCode::from(canon_cli::demo::run_demo_add(&args.repo, args.json) as u8),
+            DemoCommand::Attest(args) => {
+                canon_cli::deprecation::warn_path("demo attest");
+                ExitCode::from(canon_cli::demo::run_demo_add(&args.repo, args.json) as u8)
+            }
         },
         Command::Retrieve { role, regime, domain, subject, k, repo, json } => run_retrieve(&repo, &role, regime.as_ref(), domain.as_deref(), subject.as_ref(), k, json),
         Command::Report { repo, check, snapshot, json } => run_report(&repo, check, snapshot.as_deref(), json),
@@ -2006,7 +2102,7 @@ fn main() -> ExitCode {
             DispatchCommand::Diff { repo, json } => canon_cli::dispatch::run_diff(&repo, json),
         },
         Command::Selftest { json } => canon_cli::selftest::run_selftest(json),
-        Command::Schema { path, json, errors } => ExitCode::from(canon_cli::schema::run(&Cli::command(), &path, json, errors)),
+        Command::Schema { path, json, errors, all } => ExitCode::from(canon_cli::schema::run(&Cli::command(), &path, json, errors, all)),
     }
 }
 
@@ -2256,7 +2352,7 @@ fn run_fmt(root: &std::path::Path, repo: Option<&std::path::Path>, json: bool) -
 /// configured root aborted on an S11 validation violation
 /// (`canon_cli::inventory::run_sync`'s module doc, "whole-root abort"),
 /// `2` on a fail-loud config error (`specs:` present-but-malformed —
-/// mirrors `canon review add`/`canon divergence stage`'s own refused-
+/// mirrors `canon review add`/`canon divergence add`'s own refused-
 /// invocation exit code), `0` otherwise (including the common
 /// zero-writes no-op re-sync case).
 fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path>, json: bool) -> ExitCode {
@@ -2491,19 +2587,20 @@ fn verify_adapter_context_join(repo: &std::path::Path, summary: &canon_cli::adap
     })
 }
 
-fn run_context_pack_create(repo: &std::path::Path, manifest: &std::path::Path, json: bool) -> ExitCode {
-    let repo = canon_cli::context::resolve_repo_root(repo);
-    match canon_cli::context_pack::create_from_manifest(&repo, manifest) {
+fn run_context_pack_new(args: ContextPackNewArgs) -> ExitCode {
+    let ContextPackNewArgs { manifest, repo, json } = args;
+    let repo = canon_cli::context::resolve_repo_root(&repo);
+    match canon_cli::context_pack::create_from_manifest(&repo, &manifest) {
         Ok(pack) => {
             if json {
-                println!("{}", serde_json::to_string_pretty(&pack).expect("context pack is serializable"));
+                canon_cli::json_out::data("context-pack new", serde_json::to_value(&pack).expect("context pack is serializable"));
             } else {
                 println!("{}", pack.id);
             }
             ExitCode::SUCCESS
         }
         Err(error) => {
-            ExitCode::from(error.to_cli_error().emit("canon context-pack create", json) as u8)
+            ExitCode::from(error.to_cli_error().emit("canon context-pack new", json) as u8)
         }
     }
 }
@@ -2542,19 +2639,20 @@ fn run_context_pack_verify(repo: &std::path::Path, id: &str, json: bool) -> Exit
     }
 }
 
-fn run_prompt_register(repo: &std::path::Path, name: &str, version: &str, manifest: &std::path::Path, json: bool) -> ExitCode {
-    let repo = canon_cli::context::resolve_repo_root(repo);
-    match canon_cli::context_pack::register_prompt_bundle_from_manifest(&repo, name, version, manifest) {
+fn run_prompt_add(args: PromptAddArgs) -> ExitCode {
+    let PromptAddArgs { name, version, manifest, repo, json } = args;
+    let repo = canon_cli::context::resolve_repo_root(&repo);
+    match canon_cli::context_pack::register_prompt_bundle_from_manifest(&repo, &name, &version, &manifest) {
         Ok(bundle) => {
             if json {
-                println!("{}", serde_json::to_string_pretty(&bundle).expect("prompt bundle is serializable"));
+                canon_cli::json_out::data("prompt add", serde_json::to_value(&bundle).expect("prompt bundle is serializable"));
             } else {
                 println!("prompt bundle {}@{} registered ({})", bundle.name, bundle.version, bundle.digest);
             }
             ExitCode::SUCCESS
         }
         Err(error) => {
-            ExitCode::from(error.to_cli_error().emit("canon prompt register", json) as u8)
+            ExitCode::from(error.to_cli_error().emit("canon prompt add", json) as u8)
         }
     }
 }
@@ -2888,7 +2986,7 @@ mod schema_drift {
     /// leaf, so `canon schema` cannot drift from the parser.
     #[test]
     fn schema_metadata_matches_the_command_tree() {
-        let problems = canon_cli::schema::check_metadata(&Cli::command(), canon_cli::schema::META);
+        let problems = canon_cli::schema::check_metadata(&Cli::command(), canon_cli::schema::META, canon_cli::deprecation::DEPRECATED);
         assert!(problems.is_empty(), "{}", problems.join("\n"));
     }
 }

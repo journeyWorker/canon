@@ -400,15 +400,15 @@ fn the_subject_status_guard_and_status_apply_the_same_legacy_decision() {
     let repo = dir.path();
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review: {}\n").unwrap();
     ok(repo, &["subject", "new", "cart", "--domain", "shop", "--title", "Cart"]);
-    ok(repo, &["subject", "status", "cart", "specced"]);
-    ok(repo, &["subject", "status", "cart", "building"]);
+    ok(repo, &["subject", "status", "cart", "--to", "specced"]);
+    ok(repo, &["subject", "status", "cart", "--to", "building"]);
     commit_file(repo, FEATURE, &BASE.replace("Then the cart holds two of that item", "Then the cart holds one line with quantity two"), "edit cart.add.02");
     ok(repo, &["inventory", "sync"]);
 
     let status = ok(repo, &["status"]);
     assert!(status.contains(", 1 stale review(s)") && status.contains(&advisory(1, 1, 0).trim_start_matches("advisory: ").to_string()), "{status}");
 
-    let refused = canon(repo, &["subject", "status", "cart", "verifying"]);
+    let refused = canon(repo, &["subject", "status", "cart", "--to", "verifying"]);
     assert_eq!(refused.status.code(), Some(1), "{}", text(&refused));
     let err = String::from_utf8_lossy(&refused.stderr).to_string();
     assert!(err.contains(&format!("unreviewed-promotion cart.add.02 — building → verifying: stale review by `reviewer-2` (written before review pinning; checked against commit {pin}): its spec changed since {pin}")), "{err}");
@@ -421,6 +421,6 @@ fn the_subject_status_guard_and_status_apply_the_same_legacy_decision() {
             "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review",
         ],
     );
-    let moved = canon(repo, &["subject", "status", "cart", "verifying"]);
+    let moved = canon(repo, &["subject", "status", "cart", "--to", "verifying"]);
     assert_eq!(moved.status.code(), Some(0), "{}", text(&moved));
 }

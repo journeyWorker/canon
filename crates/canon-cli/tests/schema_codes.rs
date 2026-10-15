@@ -7,7 +7,7 @@
 //!   (within [`EMIT_WINDOW`] lines);
 //! - a code with no such call (a helper that builds the error for its caller)
 //!   goes to the commands in [`FILE_DEFAULTS`] for its file;
-//! - every command can emit `USAGE` (a `--json` usage error).
+//! - every command can emit the [`GLOBAL`] codes (`USAGE`, `UNKNOWN_ROLE`).
 //!
 //! The test fails on any difference between the derived table and the checked
 //! in one, and on a source file that holds codes but is not accounted for, so
@@ -73,6 +73,10 @@ const TEMPLATED: &[(&str, &[&str])] = &[("divergence", &["divergence resolve", "
 /// `emit` to name its command: the command that prints it.
 const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans")];
 
+/// Codes every command can emit, whatever its sources say: a `--json` usage
+/// error, and the refusal of an unknown `CANON_ROLE` before any command runs.
+const GLOBAL: &[&str] = &["USAGE", "UNKNOWN_ROLE"];
+
 fn src_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
 }
@@ -109,8 +113,8 @@ fn leaves_under(prefix: &str) -> Vec<&'static str> {
 }
 
 fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
-    let mut table: BTreeMap<&'static str, BTreeSet<&'static str>> = META.iter().map(|m| (m.path, BTreeSet::from(["USAGE"]))).collect();
-    let codes: Vec<&'static str> = all_codes().iter().map(|(c, _)| *c).filter(|c| *c != "USAGE").collect();
+    let mut table: BTreeMap<&'static str, BTreeSet<&'static str>> = META.iter().map(|m| (m.path, GLOBAL.iter().copied().collect())).collect();
+    let codes: Vec<&'static str> = all_codes().iter().map(|(c, _)| *c).filter(|c| !GLOBAL.contains(c)).collect();
     let defaults: BTreeMap<&str, &[&str]> = FILE_DEFAULTS.iter().copied().collect();
     let mut problems = Vec::new();
     let mut files: Vec<PathBuf> = fs::read_dir(src_dir()).expect("read src").map(|e| e.expect("dir entry").path()).filter(|p| p.extension().is_some_and(|e| e == "rs")).collect();

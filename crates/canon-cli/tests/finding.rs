@@ -59,7 +59,7 @@ fn help_stdout(args: &[&str], marker: &str, cwd: &Path) -> String {
 /// line, which is present iff the command parsed and printed help at
 /// all, and which no `after_help` wording change can quietly remove.
 const ADD_HELP_MARKER: &str = "Usage: canon finding add";
-const PARENT_HELP_MARKER: &str = "Usage: canon finding <COMMAND>";
+const PARENT_HELP_MARKER: &str = "Usage: canon finding [OPTIONS] <COMMAND>";
 
 /// A repo with nothing but a `canon.yaml`.
 ///

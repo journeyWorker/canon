@@ -144,7 +144,7 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
     ok(repo, &["inventory", "sync"]);
     direct(&["subject", "new", "runs", "--domain", "dev", "--title", "Runs"]);
     direct(&["subject", "adopt", "cats", "--subject", "runs"]);
-    direct(&["subject", "status", "runs", "specced"]);
+    direct(&["subject", "status", "runs", "--to", "specced"]);
     direct(&["change", "new", "runs-boss", "--subject", "runs", "--title", "A boss wave"]);
 
     staged(
@@ -164,9 +164,9 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
 
     let sha = "a".repeat(40);
     staged(
-        &["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"],
+        &["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"],
         "— run `canon divergence promote` to commit it",
     );
-    staged(&["divergence", "stage", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
+    staged(&["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
     direct(&["divergence", "resolve", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "3", "--reviewer", "r", "--role", "reviewer"]);
 }

@@ -1,5 +1,5 @@
 error: the argument '--promote' cannot be used with '--no-promote'
 
-Usage: canon evidence add --kind <KIND> --ref <REF> --role <ROLE> --scenario-id <SCENARIO_ID> --project-id <PROJECT_ID> --actor-id <ACTOR_ID> --promote
+Usage: canon evidence add --kind <KIND> --ref <REF> --scenario-id <SCENARIO_ID> --project-id <PROJECT_ID> --role <ROLE> --actor-id <ACTOR_ID> --promote
 
 For more information, try '--help'.

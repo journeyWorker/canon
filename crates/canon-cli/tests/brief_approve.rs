@@ -79,7 +79,7 @@ fn a_scope_changed_mid_build_is_reapproved_before_its_scenarios_exist() {
     let repo = dir.path();
     assert!(approve(repo, "Ana", "Go.").status.success());
     for to in ["specced", "building"] {
-        ok(repo, &["subject", "status", "demo", to]);
+        ok(repo, &["subject", "status", "demo", "--to", to]);
     }
     let text = std::fs::read_to_string(brief_path(repo)).unwrap();
     std::fs::write(brief_path(repo), text.replace("thirty seconds", "sixty seconds")).unwrap();

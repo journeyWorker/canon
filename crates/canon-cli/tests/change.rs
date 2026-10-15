@@ -368,9 +368,9 @@ fn subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and
     }
     for id in ["perception", "editing"] {
         for state in ["specced", "building"] {
-            assert!(run(repo, &["subject", "status", id, state]).status.success());
+            assert!(run(repo, &["subject", "status", id, "--to", state]).status.success());
         }
-        let out = run(repo, &["subject", "status", id, "verifying"]);
+        let out = run(repo, &["subject", "status", id, "--to", "verifying"]);
         assert_eq!(out.status.code(), Some(1), "{id}: {}", stderr(&out));
         assert!(
             stderr(&out).contains("open-blocker refactor-core#1.1 — building → verifying: open blocker finding by `reviewer-2`"),

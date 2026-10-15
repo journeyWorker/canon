@@ -169,7 +169,7 @@ record bodies.
 Four writes stage their record instead of committing it: `canon evidence
 add`, `canon finding add` and `canon finding close` (under
 `.canon/ledger/_staging/`, committed by `canon gate promote`) and `canon
-divergence stage` (committed by `canon divergence promote`). `canon.yaml`'s
+divergence add` (committed by `canon divergence promote`). `canon.yaml`'s
 `write:` section decides whether they promote in the same run:
 
 ```yaml

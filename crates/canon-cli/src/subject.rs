@@ -591,7 +591,7 @@ pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Sub
     Ok((subject, change, true))
 }
 
-/// `canon subject status <id> <state>` (module doc): apply a lifecycle
+/// `canon subject status <id> --to <state>` (module doc): apply a lifecycle
 /// transition. Refuses an off-chain step ([`is_valid_transition`], exit
 /// `2`); for `verifying → shipped` additionally runs
 /// [`ship_gate_violations`], the brief check ([`brief_violation`]) and
@@ -806,6 +806,46 @@ pub fn run_status(
             CliError::refused("WRITE_FAILED", e.to_string()).emit("canon subject status", json)
         }
     }
+}
+
+/// `canon subject status <id>` without `--to` (0.21 D1): show the subject
+/// and write nothing. `--override-reason` and `--reason` belong to a
+/// transition, so passing either here is refused rather than ignored.
+pub fn run_show(repo: &Path, subject_id: &SubjectId, override_reason: Option<&str>, reason: Option<&str>, json: bool) -> i32 {
+    for (flag, given) in [("--override-reason", override_reason), ("--reason", reason)] {
+        if given.is_some() {
+            return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("{flag} applies to a transition, and `canon subject status {}` without --to only shows the subject", subject_id.as_str()))
+                .hint("add --to <state> to transition the subject")
+                .emit("canon subject status", json);
+        }
+    }
+    let repo = resolve_repo_root(repo);
+    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
+        Ok(r) => r,
+        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json),
+    };
+    let subject = match find_subject(&registry, subject_id) {
+        Ok(Some(s)) => s,
+        Ok(None) => return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).emit("canon subject status", json),
+        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json),
+    };
+    if json {
+        crate::json_out::data("subject status", serde_json::to_value(&subject).expect("subject serializes"));
+    } else {
+        println!("canon subject status: {} ({}, {}) — {}", subject.subject_id.as_str(), subject.domain, status_str(subject.status), subject.title);
+        if !subject.summary.is_empty() {
+            println!("  summary: {}", subject.summary);
+        }
+        println!("  owner: {}", subject.owner_role.as_str());
+        if !subject.change_ids.is_empty() {
+            println!("  changes: {}", subject.change_ids.iter().map(|c| c.as_str()).collect::<Vec<_>>().join(", "));
+        }
+        if let Some(reopen) = &subject.reopen {
+            println!("  reopened: {}", reopen.reason);
+        }
+    }
+    0
 }
 
 /// Print, on stderr, which review checks this transition runs and which

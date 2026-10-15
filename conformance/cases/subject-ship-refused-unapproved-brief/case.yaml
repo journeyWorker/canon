@@ -1,10 +1,10 @@
-description: "0.16 D1: `canon subject status <id> shipped` from `verifying` exits 1 with `unreviewed-promotion <subject>` naming the change's .canon/changes brief.md when it has no `Approved:` line (one inside an HTML comment does not count), even with every scenario evidenced and every required case present; `canon status` reads the same brief as not approved; `--override-reason` ships it and records the waiver (exit 0)"
+description: "0.16 D1: `canon subject status <id> --to shipped` from `verifying` exits 1 with `unreviewed-promotion <subject>` naming the change's .canon/changes brief.md when it has no `Approved:` line (one inside an HTML comment does not count), even with every scenario evidenced and every required case present; `canon status` reads the same brief as not approved; `--override-reason` ships it and records the waiver (exit 0)"
 steps:
-  - args: [subject, status, checkout, shipped]
+  - args: [subject, status, checkout, --to, shipped]
     exit: 1
   - args: [status]
     exit: 0
-  - args: [subject, status, checkout, shipped, --override-reason, "the human approved in chat; the line follows", --actor-id, lead]
+  - args: [subject, status, checkout, --to, shipped, --override-reason, "the human approved in chat; the line follows", --actor-id, lead]
     exit: 0
   - args: [query, --kind, subject, --json]
     exit: 0

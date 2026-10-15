@@ -31,7 +31,7 @@ mkdir canon-demo && cd canon-demo
 
 bunx @journeykit/canon demo init      # scaffold a throwaway evidence loop
 bunx @journeykit/canon gate check     # RED  — the gate refuses
-bunx @journeykit/canon demo attest    # record the reviewer's evidence
+bunx @journeykit/canon demo add    # record the reviewer's evidence
 bunx @journeykit/canon gate check     # GREEN — the gate passes
 ```
 
@@ -46,7 +46,7 @@ uncovered-cell (1):
 
 The `dev` voice recorded evidence for scenario `auth.login.01`, but
 `policy.yaml` requires an independent `reviewer`. No reviewer evidence → the
-cell is uncovered → the gate is red. `demo attest` records that evidence, and
+cell is uncovered → the gate is red. `demo add` records that evidence, and
 the same check turns green:
 
 ```

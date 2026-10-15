@@ -160,7 +160,7 @@ fn skeleton_yaml() -> String {
     out.push_str("  sources: []\n");
     out.push_str("write:\n");
     out.push_str("  # Staged writes (`canon evidence add`, `canon finding add|close`,\n");
-    out.push_str("  # `canon divergence stage`) promote in the same run. `manual` keeps\n");
+    out.push_str("  # `canon divergence add`) promote in the same run. `manual` keeps\n");
     out.push_str("  # them staged until `canon gate promote`; `--no-promote` keeps one.\n");
     out.push_str("  promote: auto\n");
     out

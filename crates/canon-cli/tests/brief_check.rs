@@ -244,8 +244,8 @@ fn flow_coverage_blocks_once_the_brief_is_approved_and_the_subject_is_building()
     std::fs::write(brief_path(dir.path()), en_brief("")).unwrap();
     assert_eq!(check(dir.path(), &[]).0, 0, "before building, no coverage rule applies");
 
-    ok(dir.path(), &["subject", "status", "demo", "specced"]);
-    ok(dir.path(), &["subject", "status", "demo", "building"]);
+    ok(dir.path(), &["subject", "status", "demo", "--to", "specced"]);
+    ok(dir.path(), &["subject", "status", "demo", "--to", "building"]);
     // A new scope on a subject already past `building` (dogfood eval 7):
     // its scenarios come after the approval, so none is due yet.
     let (code, report) = check(dir.path(), &[]);
@@ -286,8 +286,8 @@ fn scenario_new_flow_tags_the_step_and_status_lists_per_step_coverage() {
     let repo = dir.path();
     std::fs::write(brief_path(repo), en_brief(APPROVED)).unwrap();
     assert!(!repo.join(".canon/changes/add-login/tasks.md").exists(), "change new writes no tasks.md");
-    ok(repo, &["subject", "status", "demo", "specced"]);
-    ok(repo, &["subject", "status", "demo", "building"]);
+    ok(repo, &["subject", "status", "demo", "--to", "specced"]);
+    ok(repo, &["subject", "status", "demo", "--to", "building"]);
 
     let refused = run(repo, &["scenario", "new", "world.login.01", "--title", "x", "--subject", "demo", "--flow", "F9"]);
     assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
@@ -424,8 +424,8 @@ fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
     assert!(code == 2 && rules(&report).contains(&"brief.chore-empty".to_string()), "{report}");
 
     std::fs::write(&path, format!("{}\n{APPROVED}", chore_brief("infra"))).unwrap();
-    ok(dir.path(), &["subject", "status", "demo", "specced"]);
-    ok(dir.path(), &["subject", "status", "demo", "building"]);
+    ok(dir.path(), &["subject", "status", "demo", "--to", "specced"]);
+    ok(dir.path(), &["subject", "status", "demo", "--to", "building"]);
     let (code, report) = check(dir.path(), &["--change", "bump-client"]);
     assert_eq!((code, report["phase"].as_str(), rules(&report)), (0, Some("building"), Vec::<String>::new()), "a chore has no flow to cover: {report}");
 
