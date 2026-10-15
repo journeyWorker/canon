@@ -75,7 +75,7 @@ spec_coverage:
 Every feature surface (`<area>.<surface>`) with in-scope scenarios must
 then carry at least one scenario of each listed case, or `canon gate
 check` reports it as `uncovered-cell`, and `canon subject status <id>
-shipped` refuses for a subject that owns such a surface. An untagged
+--to shipped` refuses for a subject that owns such a surface. An untagged
 scenario counts toward its surface but satisfies no case, so an
 untagged corpus reports every surface instead of passing silently. The
 base set comes from `canon.core`; a repo replaces it with its own `case`

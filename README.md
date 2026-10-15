@@ -82,6 +82,258 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.21.0 release
+
+Version 0.21.0 gives canon one verb grammar and makes it answer "what now?"
+itself: every successful write names the next steps, an agent can declare
+its role and see only its own steps and commands, the skill is a short core
+plus one reference per role, and a re-attested scenario keeps the files its
+earlier evidence bound. Plan:
+`docs/superpowers/plans/2026-10-15-canon-0.21.0-roles-and-next-steps.md`.
+
+**Why.** Issue #60, from the 0.20 audit and dogfood evals 8 and 9. After a
+successful write an agent had nothing to read, so it called `canon status`
+again to find the next step (eval 8: 4 `status` and 5 `gate` calls for one
+feature). One skill and one command list served every agent, so a reviewer
+loaded PRD-writing passes it never uses, and a spawned subagent had no way
+to say what it was. Four verbs were synonyms of the shared ones
+(`context-pack create`, `prompt register`, `divergence stage`,
+`demo attest`) and `subject status <id> <state>` took two positionals of
+different meaning. Eval 8 and 9 also hit #58: a suite-wide
+`evidence add --all-scenarios` was refused when earlier evidence had bound
+attachments the batch did not repeat, so the agent counted them as dropped
+work and re-attached by hand.
+
+### D1: one grammar, with deprecation
+
+`new` creates a resource, `add` appends a ledger record, `list` lists, `show`
+shows one; domain verbs with their own meaning (`approve`, `promote`,
+`resolve`, `defer`, `close`, `check`, `sync`, `install`, `begin`, `end`, …)
+stay. Four renames and one reshape:
+
+| 0.20 | 0.21 |
+|---|---|
+| `canon context-pack create` | `canon context-pack new` |
+| `canon prompt register` | `canon prompt add` |
+| `canon divergence stage` | `canon divergence add` |
+| `canon demo attest` | `canon demo add` |
+| `canon subject status <id> <state>` | `canon subject status <id> --to <state>` (`subject status <id>` alone shows the subject) |
+
+The old forms are deprecated, not aliased: for this release they still run,
+print `canon <old>: deprecated — use canon <new>` on stderr, and in JSON
+mode add `meta.deprecated: { "use": "<new>", "removedIn": "0.22.0" }`.
+`canon schema` marks them with `deprecated` and lists them only under
+`--all`. `schema` also stops mislabelling two commands: `subject status` is
+`write` (with a note that it only reads without `--to`) and `format` is
+`write`.
+
+### D2: `meta.next` after every write
+
+Every successful write returns `meta.next: [{ command, why, actor, role }]`
+(plus `nextOmitted` when more were cut), the same shape as `status`'s
+`next[]`, computed by the same engine from the state after the write, for
+the subject, change or scenarios the write touched. Human mode ends with one
+`next: <command> — <why>` line (`(+N more)` when there are others). A staged
+write names `canon gate promote`. canon never runs a step; `actor: human`
+marks the steps only a human takes (brief approval, whose `role` is `null`).
+The envelope now covers the writes that were still bare: `dispatch begin` and
+`end`, `learn approve` and `rollback`, `purge`, `export`, and `ingest
+artifacts` and `plans`. Reads do not carry `meta.next`; `status` and bare
+`brief` keep their own.
+
+### D3: roles
+
+`CANON_ROLE` or the global `--as <role>` (the flag wins) declares one of
+`planner`, `implementer`, `reviewer`, `orchestrator`; any other value is
+`UNKNOWN_ROLE` (exit 2, with `field` and `expected`). canon cannot detect a
+role, so this is guidance, not enforcement: session separation between
+implementer and reviewer stays ledger-based (#39).
+
+- Unset: every command behaves as in 0.20.
+- Set: `status` and `meta.next` keep that role's steps and summarize the rest
+  as counts, `meta.waitingOn` in JSON (`{ "reviewer": 2 }`) and a "waiting
+  on reviewer: 2" line in human mode.
+- `canon schema` gives every command `roles: [...]`; bare `canon schema`
+  lists the declared role's commands, `--all` lists every one. A command
+  with no listed role is shown to everyone.
+- `--role` on `evidence add` and `review add` defaults to the declared role
+  when it is `implementer` or `reviewer`.
+
+### D4: the skill by role
+
+The skill is a shared core (the loop, `status`, `schema`, `meta.next`, how
+to learn your role) plus `reference/role-planner.md`, `role-implementer.md`,
+`role-reviewer.md` and `role-orchestrator.md`. An agent with a declared role
+loads the core and its own reference; the brief passes (`brief-*.md`) are
+linked from the planner reference only. Each role reference ends with a
+Commands block listing exactly the commands that role calls, so it never
+needs `schema` for them. The reviewer reads a PRD with `canon brief check`
+and checks scenarios against its flow; the orchestrator reference says how
+to spawn each role with `CANON_ROLE` set and a separate session for review.
+An agent with no role loads the core and follows `status`. The AGENTS block
+gains a roles line.
+
+### D5: smaller contract items
+
+- `--fields a,b` on `status`, `export`, `divergence status` and `context`,
+  with 0.20's projection rules and `UNKNOWN_FIELD`.
+- Errors gain optional `field` and `expected` (`subject status --to bad`:
+  `field: "--to"`, `expected: ["specced", …]`), set by usage errors and input
+  validation; in JSON they sit beside `code`, `message`, `hint`.
+- `canon schema <command>` returns `example`, one minimal invocation, and
+  `requiredOneOf` for a clap group where one of several flags is required
+  (`review add`'s provenance); a test runs every example.
+- Retry safety: repeating `evidence add` or `review add` with identical
+  input writes nothing, names the record already there and answers
+  `meta.unchanged: true` with exit 0; a batch reports each unchanged scenario.
+- Exit meanings: the per-command exceptions are justified in `schema`'s
+  `exits` (`context`, `dispatch diff` and `divergence status` always 0 on a
+  successful read; `evidence vault` 0 on a partial pass, with
+  `notStored` listed; `subject status` 0 also when it only shows).
+- `learn promote`: when a promotion is blocked and the demotion it triggered
+  after a contradicting trajectory also fails, the error is
+  `LEARN_DEMOTION_FAILED` (the strategy is still active), not
+  `LEARN_PROMOTION_BLOCKED`.
+
+### #58: attachments carry forward
+
+Re-attesting a scenario that names fewer files than its latest record no
+longer counts the rest as dropped. Every file the latest record of the same
+fold binds and the new write does not name again is carried into the new
+record unchanged (same path, digest and stored blob), and a file named again
+replaces its binding; JSON lists them as `carried` and human mode prints
+`carried forward N earlier attachment(s) unchanged: …`. `--drop-attachment
+<path> --drop-reason <text>` stays the only way to lose a binding and is
+still recorded. A carried file whose blob the artifact store does not hold
+intact is refused as `EVIDENCE_CARRY_BLOB_MISSING` (exit 2, nothing written;
+re-bind it, `canon evidence vault`, or drop it). The audit fold is the
+exception: an audit record never inherits bindings, so one that leaves out
+an earlier binding is still refused unless dropped. A suite-wide
+`--all-scenarios` batch carries per scenario.
+
+`evals/dogfood/trace_check.py` also changed (eval 9): a brief written by a
+subagent stops the root session, and `canon` calls spelled out inside eval
+cells (`Bun.$`, subprocess) are counted.
+
+**Migration.** For a 0.20 consumer:
+
+- Run `canon skills install` for the 0.21 skill (core plus role references).
+- The deprecated names above still run in 0.21 and are removed in 0.22.0:
+  switch to `context-pack new`, `prompt add`, `divergence add`, `demo add`
+  and `subject status <id> --to <state>`. A script that read stderr will see
+  the `deprecated —` line; JSON consumers can read `meta.deprecated`.
+- Every write answers `{ data, meta }` with `meta.next`. Shapes that moved:
+  `dispatch begin` puts `run_id` at `.data.run_id`; `export`'s page state
+  (`returned`, `total`, `hasMore`, `nextCursor`) is in `meta`; `brief
+  approve`, `subject *`, `context-pack new` and `prompt add` are enveloped;
+  `dispatch end`, `learn approve|rollback`, `purge` and `ingest
+  artifacts|plans` JSON is enveloped too. Read `.data`, not the top level.
+- `status` and `meta.next` steps gain a `role` member (`null` for a human
+  step).
+- `review add` with neither provenance flag is now a clap `USAGE` error
+  (was `REVIEW_INVALID_ARGUMENT`); enum flags (`--kind`, `--verdict`, …)
+  fail as clap closed-set `USAGE` errors, which name the flag in `field`.
+- Human output gains a trailing `next:` line after writes; a script that
+  matched the last line of a write's output should match the leading lines.
+- `evidence add` repeated with identical input now returns unchanged
+  (exit 0) instead of staging a duplicate; `evidence add --all-scenarios`
+  and single re-attestations carry earlier attachments forward instead of
+  refusing with `EVIDENCE_REFUSED`.
+- `CANON_ROLE` set to anything but the four roles is `UNKNOWN_ROLE`.
+
+**Changed conformance expectations.** `git diff` of `conformance/` against
+0.20.0 touches 63 cases and no exit code except the first one below.
+
+- `evidence-add-drop-attachment`: the re-attest that names fewer files is
+  now exit 0 and carries the file forward (was exit 2 `EVIDENCE_REFUSED`);
+  the drop with `--drop-attachment` is unchanged. The table row in
+  `conformance/README.md` follows.
+- `evidence-add-promote-on-write`: the third step uses a different `--ref`
+  so it is a new record, not an unchanged repeat; its usage-error stderr
+  lists `--role` after `--project-id`.
+- Version: every case that prints the version prints 0.21.0 (`version`,
+  `gate-check-refused-pre-0-17-layout`, `init-policy-refused`,
+  `skills-check-outdated-lock`, and the status and gate cases listed below).
+- Human writes end with a `next:` line (29 cases): `change-new`,
+  `evidence-add-all-scenarios`,
+  `evidence-add-all-scenarios-refused-contradiction`,
+  `evidence-add-brief-override`,
+  `evidence-add-fabrication-marker-whole-token`,
+  `evidence-add-refused-report-contradiction`,
+  `evidence-add-refused-unapproved-brief`, `evidence-add-swift-testing`,
+  `finding-add-refused-unresolvable-short-sha`, `finding-list-open-json`,
+  `gate-check-audit-confirmed-clean`, `gate-check-audit-false-success`,
+  `gate-check-audit-sampled-missing`,
+  `gate-check-audit-sampling-fixed-seed`,
+  `gate-task-warns-canon-command-proof`, `init-policy-light-status`,
+  `init-providers-detected`, `init-scaffold-and-rerun`,
+  `inventory-sync-tag-diagnostics`, `migrate-pointer-brief-and-config`,
+  `policy-approve-and-advisory`, `policy-approve-changed-advisory`,
+  `policy-approve-refused-no-policy`, `review-add-artifact-stored`,
+  `review-add-batch`, `review-add-refused-artifact-outside-repo`,
+  `status-brief-proposed`, `status-no-scenarios`,
+  `subject-adopt-second-subject`; so do `evidence-add-drop-attachment`,
+  `evidence-add-promote-on-write` and the cases in the next group.
+- `subject status <id> <state>` becomes `--to <state>` in the case's args
+  and in the `canon subject status …` text that `status` prints (24 cases):
+  `finding-add-self-found-blocker`, `gate-check-legacy-review-missing-pin`,
+  `review-gate-distinct-review-passes`, `review-gate-malformed-finding`,
+  `review-gate-open-blocker`, `review-gate-override-recorded`,
+  `review-gate-same-session-not-counted`,
+  `review-gate-self-review-not-counted`, `review-gate-unreviewed-refused`,
+  `review-outcome-indeterminate-gap`, `review-outcome-unavailable-gap`,
+  `review-pin-stale-evidence`, `review-pin-stale-spec`,
+  `status-refreshes-stale-index`, `status-ship-ready`,
+  `status-shipped-red-reopen`, `subject-reopen-allowed`,
+  `subject-reopen-refused-unapproved-brief`, `subject-ship-allowed`,
+  `subject-ship-refused-missing-verdict`,
+  `subject-ship-refused-no-tagged-scenarios`,
+  `subject-ship-refused-require-cases-gap`,
+  `subject-ship-refused-unapproved-brief`,
+  `subject-status-off-chain-transition`.
+- `status --json`'s `next[]` entries gain `role`:
+  `gate-check-audit-sampling-fixed-seed`, `status-brief-proposed`,
+  `status-brief-unapproved`, `status-gaps`, `status-no-policy`.
+- `evidence-add-drop-attachment` prints the carry-forward line on the
+  re-attest; `evidence-add-repeat-unchanged` (below) shows the unchanged
+  line.
+
+**New conformance cases:** `evidence-add-repeat-unchanged` (an identical
+`evidence add` writes nothing and exits 0; a different `--ref` is a new
+record). The rest of the coverage lives in `tests/grammar.rs`,
+`tests/schema_examples.rs`, `tests/evidence_batch.rs` and
+`tests/learn_promote.rs`.
+
+**Closed issues:** #58, #60.
+
+**Acceptance (dogfood evals 9 and 9b, omp, `language: ko`).** An
+orchestrator agent was asked for a pause menu on the shipped game and
+spawned planner, implementer and reviewer subagents.
+
+- Eval 9 (before the skill fixes below) shipped: 11 new scenarios, 94/94
+  evidenced and reviewed, gate clean. Each subagent read only the core
+  skill and its own role reference; the reviewer was a separate session,
+  and its first round failed one e2e test that the implementer then fixed.
+  It cost 53 canon calls (4.8 per new scenario, against 2.1 for one agent
+  in eval 8): 16 were `canon schema` probes, and the orchestrator called
+  `status` right after writes. It also dropped 82 still-valid screenshot
+  bindings to get a batch past the attachment guard (#58).
+- Fixed from eval 9 in this release: role references carry complete
+  Commands blocks and send agents to `schema` only for unlisted commands;
+  the orchestrator, implementer and reviewer follow `meta.next` /
+  `meta.waitingOn` instead of re-reading `status`; attachments carry
+  forward (#58); `review add`'s one-of provenance is reported as
+  `requiredOneOf`; scenario steps belong to the implementer; `scenario
+  new --from` batches scenario creation; `evals/dogfood/trace_check.py`
+  reads a brief written by a subagent and canon calls made from eval cells.
+- Eval 9b reran the same request on the fixed build. Up to where it
+  stopped it made 57 canon calls for 22 new scenarios (2.6 per scenario;
+  22 of them one `scenario new` each, which `--from` now makes one call),
+  1 `schema` probe, no dropped bindings, 105/105 scenarios evidenced and
+  100 reviewed; its reviewer filed a real blocker (Title did nothing
+  after a restart) and a second implementer was fixing it. The run did not
+  reach `shipped`: the disk holding the repo was disconnected mid-run.
+
 ## 0.20.0 release
 
 Version 0.20.0 makes canon's CLI something an agent can drive without
@@ -470,7 +722,7 @@ scenarios with canon's own tests instead of the game's.
 
 ### D3, D4: reopening a shipped subject, and a change in several subjects (#31, #28)
 
-- **Reopen (D3, #31).** `canon subject status <id> verifying --reason
+- **Reopen (D3, #31).** `canon subject status <id> --to verifying --reason
   "<why>"` reopens a `shipped` subject for follow-up work. Inside the
   approved scope it needs no human: either the brief of the subject's newest
   adopted change is approved, or there is no brief to answer. Otherwise it
@@ -1129,7 +1381,7 @@ rule:
   `brief overrides:` advisory that does not fail the gate.
 - The ship guard checks the brief too, through the same check status
   uses, so status never says `ship` for a subject the guard refuses.
-  `canon subject status <id> shipped` refuses only where a brief exists:
+  `canon subject status <id> --to shipped` refuses only where a brief exists:
   a newest adopted change whose `proposal.md` has no `Approved:` line,
   as `unreviewed-promotion <subject>`, naming that `proposal.md` and
   saying a human must answer; the agent writes the line only from that
@@ -1146,7 +1398,7 @@ rule:
 **D2: fewer bookkeeping calls (#22).**
 
 - *Promote on write.* `evidence add`, `finding add`, `finding close` and
-  `divergence stage` take `--promote` and `--no-promote`. With
+  `divergence add` take `--promote` and `--no-promote`. With
   `--promote`, or under `canon.yaml`'s `write: { promote: auto }`, they
   promote the one record they just staged in the same run (the same
   validation and `run_seq` assignment as `gate promote`) and print one
@@ -1267,7 +1519,7 @@ is needed:
   changed but its refresh is refused, `canon gate check` exits 1 with
   `uncovered-cell <root>` (the class the ship gate already uses when a
   subject's scenarios cannot be counted) saying `canon inventory sync`
-  lists the problems; `canon subject status <id> shipped` refuses with
+  lists the problems; `canon subject status <id> --to shipped` refuses with
   the same violation; and `canon status` lists the sync as its only step.
   All three read one decision (`unrefreshable_roots`). Before, the gate
   graded the old index and could pass. `canon evidence add --task` and
@@ -1334,7 +1586,7 @@ skill wording, the refusal, the override and the new status step.
   newest adopted change's `proposal.md`; while that file lacks one,
   `canon status` lists the human step (stop and report the brief) as the
   subject's only step, `canon evidence add` refuses its scenarios and
-  tasks, and `canon subject status <id> shipped` refuses. Subjects with no
+  tasks, and `canon subject status <id> --to shipped` refuses. Subjects with no
   adopted change or no `proposal.md` ship as before, with an advisory.
 - An agent or script that attests evidence before the brief's `Approved:`
   line exists now gets exit 1 from `canon evidence add`. Record the
@@ -1708,7 +1960,7 @@ and its open blocker still blocks.
 
 **Write mode in every write command.** Each write's success line now says
 how it landed: `evidence add`, `finding add` and `finding close` end with
-``— run `canon gate promote` to commit it``; `divergence stage` names
+``— run `canon gate promote` to commit it``; `divergence add` names
 `canon divergence promote`; every other write (`review add`,
 `divergence resolve|defer`, `subject new|adopt|status`, `change new`,
 `scenario new`, `feature new`) ends with `— written directly; nothing to
@@ -2006,7 +2258,7 @@ Version 0.10.0 makes golden-path-only specs visible. A scenario can carry a
 `canon scenario new --case`), indexed onto `Scenario.case` by
 `canon inventory sync`. The opt-in `spec_coverage.require_cases: [failure]`
 then reports every feature surface (`<area>.<surface>`) whose in-scope
-scenarios specify no failure path, and `canon subject status <id> shipped`
+scenarios specify no failure path, and `canon subject status <id> --to shipped`
 refuses on the same rule. Nothing changes until a repo sets
 `require_cases`; when it does, untagged scenarios satisfy no case, so tag
 existing failure-path scenarios first. `canon context` now also prints

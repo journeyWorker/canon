@@ -1,6 +1,6 @@
 {
   "statusVersion": 3,
-  "canonVersion": "0.20.0",
+  "canonVersion": "0.21.0",
   "policy": {
     "present": false,
     "spec_coverage": null,
@@ -15,7 +15,8 @@
     {
       "command": "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>",
       "why": "no subject exists yet; a subject is the unit status, review and shipping track",
-      "actor": "agent"
+      "actor": "agent",
+      "role": "planner"
     }
   ],
   "nextOmitted": 0

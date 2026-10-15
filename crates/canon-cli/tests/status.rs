@@ -526,13 +526,13 @@ fn context_status_62_ship_is_the_agents_step_once_the_brief_is_approved() {
     write_brief(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));
 
     let report = status_json(dir.path());
-    assert_eq!(commands(&report), ["canon subject status demo-subject shipped --actor-id <unit>"]);
+    assert_eq!(commands(&report), ["canon subject status demo-subject --to shipped --actor-id <unit>"]);
     let step = &report["next"][0];
     assert_eq!(step["actor"], "agent", "{step}");
     let why = step["why"].as_str().unwrap();
     assert!(why.contains("ship it yourself unless the brief says the human ships"), "{why}");
     assert!(!why.contains("ask"), "shipping asks nobody: {why}");
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "the suggested transition must pass its gates: {}", stderr(&out));
     let report = status_json(dir.path());
     assert_eq!(subject(&report, "demo-subject")["status"], "shipped");
@@ -551,7 +551,7 @@ fn context_status_70_a_shipped_subject_whose_gate_is_red_is_flagged_and_its_step
     let dir = repo();
     ship_ready(dir.path());
     write_brief(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));
-    assert!(run(dir.path(), &["subject", "status", "demo-subject", "shipped"]).status.success());
+    assert!(run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]).status.success());
     assert!(subject(&status_json(dir.path()), "demo-subject").get("red").is_none(), "a green shipped subject is not flagged");
 
     seed_blocker(dir.path(), "c-demo-subject");
@@ -559,7 +559,7 @@ fn context_status_70_a_shipped_subject_whose_gate_is_red_is_flagged_and_its_step
     let report = status_json(dir.path());
     let red = "1 uncovered-cell (first: world.demo.03), 1 unreviewed-promotion (first: world.demo.03), 1 open-blocker (first: c-demo-subject#1.1)";
     assert_eq!(subject(&report, "demo-subject")["red"], serde_json::json!(red.split(", ").collect::<Vec<_>>()));
-    let reopen = "canon subject status demo-subject verifying --reason \"<why it reopens>\" --actor-id <unit>";
+    let reopen = "canon subject status demo-subject --to verifying --reason \"<why it reopens>\" --actor-id <unit>";
     assert_eq!(commands(&report), [reopen]);
     assert_eq!(
         report["next"][0]["why"],
@@ -568,7 +568,7 @@ fn context_status_70_a_shipped_subject_whose_gate_is_red_is_flagged_and_its_step
     let human = stdout(&run(dir.path(), &["status"]));
     assert!(human.contains(&format!("      gate: red — {red}; reopen with `{reopen}`\n")), "{human}");
 
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying", "--reason", "follow-up: a blocker and a new failure path", "--actor-id", "impl-agent"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying", "--reason", "follow-up: a blocker and a new failure path", "--actor-id", "impl-agent"]);
     assert!(out.status.success(), "the suggested reopen goes through: {}", stderr(&out));
     let report = status_json(dir.path());
     assert_eq!(subject(&report, "demo-subject")["status"], "verifying");
@@ -586,7 +586,7 @@ fn context_status_70_the_red_flag_follows_the_ship_guard_audits_in_blockers_only
     ship_ready(dir.path());
     write_policy(dir.path(), "spec_coverage:\n  require_evidence: true\n  require_cases: [failure]\n  require_review:\n    block_on_findings: false\n");
     write_brief(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "{}", stderr(&out));
 
     seed_blocker(dir.path(), "c-demo-subject");
@@ -601,10 +601,10 @@ fn context_status_70_the_red_flag_follows_the_ship_guard_audits_in_blockers_only
     ledger(dir.path()).write(&audit).unwrap();
     let report = status_json(dir.path());
     assert_eq!(subject(&report, "demo-subject")["red"], serde_json::json!(["1 false-success (first: world.demo.01)"]), "{report}");
-    assert_eq!(commands(&report)[0], "canon subject status demo-subject verifying --reason \"<why it reopens>\" --actor-id <unit>");
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "verifying", "--reason", "follow-up: the audit refuted run.01", "--actor-id", "impl-agent"]);
+    assert_eq!(commands(&report)[0], "canon subject status demo-subject --to verifying --reason \"<why it reopens>\" --actor-id <unit>");
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying", "--reason", "follow-up: the audit refuted run.01", "--actor-id", "impl-agent"]);
     assert!(out.status.success(), "{}", stderr(&out));
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "shipped"]);
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert_eq!(out.status.code(), Some(1), "the ship guard refuses on the same gap: {}", stderr(&out));
     assert!(stderr(&out).contains("false-success world.demo.01"), "{}", stderr(&out));
 }
@@ -1029,7 +1029,7 @@ fn context_status_67_a_proposed_subject_with_no_brief_keeps_its_steps_and_its_br
     seed_subject(dir.path(), "held-subject", SubjectStatus::Proposed, &["c-held"]);
     write_brief(dir.path(), "c-held", "Status: draft, awaiting the human.\n");
     seed_scenario(dir.path(), "world.held.01", Some("held-subject"), Some("failure"));
-    let out = run(dir.path(), &["subject", "status", "held-subject", "specced", "--actor-id", "lead"]);
+    let out = run(dir.path(), &["subject", "status", "held-subject", "--to", "specced", "--actor-id", "lead"]);
     assert!(out.status.success(), "the move to specced does not read the brief: {}", stderr(&out));
     assert!(!stderr(&out).contains("brief"), "{}", stderr(&out));
 }

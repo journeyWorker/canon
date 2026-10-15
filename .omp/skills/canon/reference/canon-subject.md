@@ -103,7 +103,7 @@ this subject and domain — the exact memory step 2 retrieves next time.
 
 ## Status lifecycle + the shipped evidence gate
 
-`canon subject status <id> <state> [--override-reason <text>] [--reason <text>] [--actor-id <id>]`
+`canon subject status <id> --to <state> [--override-reason <text>] [--reason <text>] [--actor-id <id>]`
 performs a policy-gated transition.
 The legal chain:
 
@@ -117,10 +117,10 @@ from anywhere). Any other transition is rejected by failure class, exits
 1, and leaves the record UNCHANGED (fail closed).
 
 ```bash
-canon subject status subject-domain-loop specced
-canon subject status subject-domain-loop building
-canon subject status subject-domain-loop verifying
-canon subject status subject-domain-loop shipped   # gated — see below
+canon subject status subject-domain-loop --to specced
+canon subject status subject-domain-loop --to building
+canon subject status subject-domain-loop --to verifying
+canon subject status subject-domain-loop --to shipped   # gated — see below
 ```
 
 On success the status updates in place; `--json` prints the updated
@@ -220,7 +220,7 @@ also refuses a `false-success` (a scenario whose latest audit is
 sampled audit; see `canon-gate`.
 
 ```bash
-canon subject status demo-subject verifying \
+canon subject status demo-subject --to verifying \
   --override-reason "reviewer out until Monday" --actor-id lead
 ```
 
@@ -256,7 +256,7 @@ gate now misses) reopens it: reopen, add tasks to the approved change,
 scenario, evidence, review, ship.
 
 ```bash
-canon subject status demo-subject verifying \
+canon subject status demo-subject --to verifying \
   --reason "follow-up: the retry path leaks a file handle" --actor-id impl
 ```
 
@@ -430,9 +430,8 @@ advisory, and is read as before.
   human answers again and `approve` runs again. Run it only from the
   human's answer, with their words as `--note`.
 
-The refinement passes that fix findings before the human stop are
-`brief-shape.md`, `brief-clarify.md`, `brief-harden.md`,
-`brief-align.md` and `brief-polish.md` in this directory.
+The optional refinement passes that fix findings before the human stop are
+listed in `role-planner.md` in this directory.
 
 A **chore** (`canon change new --kind chore`) changes how the subject is
 built or kept, never what it does. Its brief is intent, category,
@@ -521,7 +520,7 @@ uses, so status and the gate cannot disagree about a gap:
   (owned scenarios, verdicts, required cases, audits, and, where
   `require_review` covers `shipped`, reviews and open blockers under
   `block_on_findings`; a gap its waiver recorded is not counted), prints
-  ``gate: red — <n> <class> (first: <subject>), …; reopen with `canon subject status <id> verifying --reason "<why it reopens>" --actor-id <unit>` ``,
+  ``gate: red — <n> <class> (first: <subject>), …; reopen with `canon subject status <id> --to verifying --reason "<why it reopens>" --actor-id <unit>` ``,
   carries `red: [...]` in `--json`, and that reopen is its only `next:`
   step. Open blockers count against every subject a change belongs to.
 - **Unowned** — scenarios with no `@subject:` tag.
@@ -556,7 +555,7 @@ uses, so status and the gate cannot disagree about a gap:
   …` (its reason adds "then `canon gate promote`" only under
   `write.promote: manual`); an open blocker → `canon finding close …`; a
   due, unreviewed, evidenced scenario → `canon review add …` from another
-  session; none of these → `canon subject status <id> <next status>`.
+  session; none of these → `canon subject status <id> --to <next status>`.
   Last, unowned scenarios → `canon status`, after tagging them in their
   `.feature` files (status re-indexes the edit; no sync step). With more
   than one `specs.roots[]` entry, every suggested `canon scenario new`
@@ -582,7 +581,7 @@ uses, so status and the gate cannot disagree about a gap:
   It is the subject's only step, whatever its status: nothing suggests
   `canon feature new`, `canon scenario new`, `canon evidence add`, a
   review or a move-on for it before the human answers, and
-  `canon subject status <id> shipped` refuses on the same check. The
+  `canon subject status <id> --to shipped` refuses on the same check. The
   approval is never assumed. A subject with no brief to answer gets no human step;
   its `brief:` line says
   `not approved (no adopted change; advisory, nothing to approve yet)` or
@@ -590,7 +589,7 @@ uses, so status and the gate cannot disagree about a gap:
   approve yet)`` and nothing is withheld (a `proposed` subject with no
   brief, and a `specced` subject, show no `brief:` line at all). Once nothing blocks, a
   ship-ready verifying subject gets the agent's own
-  `canon subject status <id> shipped`; status never asks a human to ship.
+  `canon subject status <id> --to shipped`; status never asks a human to ship.
 
 Status fails closed rather than suggest progress the gate would refuse:
 

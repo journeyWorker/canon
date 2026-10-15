@@ -387,13 +387,35 @@ def tool_activity(event, cwd):
     elif name == "file_change":
         writes.extend((c["path"], cwd) for c in args.get("changes", []) if c.get("path"))
     elif name == "eval":
+        code = args.get("code", "")
+        # canon run from a cell (``Bun.$`canon review add …` ``, subprocess):
+        # counted with an unknown exit code, since the cell's result is not
+        # the command's.
+        calls.extend(eval_canon_calls(code))
         if args.get("language") in ("py", "python"):
-            paths, unknown = python_writes(args.get("code", ""))
+            paths, unknown = python_writes(code)
             writes.extend((p, cwd) for p in paths)
             if unknown:
                 warnings.append("unresolved Python write target")
         else:
             warnings.append("eval side effects are not statically resolved")
+    return writes, calls, warnings
+
+
+EVAL_CANON = re.compile(r"""(?:^|[\s`'"(\[,])canon\s+((?:--?[\w-]+(?:\s+(?!-)[\w.-]+)?\s+)*)([a-z][a-z-]*)(?:\s+([a-z][a-z-]*))?(?P<rest>[^`'"\n]*)""")
+
+
+def eval_canon_calls(code):
+    """canon commands spelled out in an eval cell's code."""
+    calls = []
+    for match in EVAL_CANON.finditer(code):
+        verb, action, rest = match.group(2), match.group(3) or "", match.group("rest")
+        if action.startswith("-"):
+            action = ""
+        calls.append({"verb": verb, "action": action, "exit_code": None,
+                      "command": match.group(0).strip(" `'\"([,"),
+                      "help": "--help" in rest or " -h" in rest})
+    return calls
     return writes, calls, warnings
 
 
@@ -429,6 +451,7 @@ def metrics(calls):
 
 def analyze(inputs, question_turns=()):
     sessions = read_sessions(discover(inputs))
+    brief_times = []
     for session in sessions.values():
         session["writes"], session["calls"], session["warnings"] = [], [], []
         session["brief_stop"] = None
@@ -449,6 +472,7 @@ def analyze(inputs, question_turns=()):
                                           "ordinal": ordinal})
                 if inside and (path.endswith("/brief.md") or path == ".canon/brief.md"):
                     brief_written = True
+                    brief_times.append((session, event["time"]))
             session["calls"].extend({**location, **call} for call in calls)
             session["warnings"].extend({**location, "message": w} for w in warnings)
 
@@ -460,6 +484,17 @@ def analyze(inputs, question_turns=()):
             seen.add(session["id"])
             session = sessions[session["parent"]]
         return session
+
+    # A brief written by a subagent (a planner the orchestrator spawned) stops
+    # its root: the root's first stop after that write is the brief stop.
+    for writer, at in sorted(brief_times, key=lambda item: item[1] or 0):
+        root = root_session(writer)
+        if root["brief_stop"] is not None or at is None:
+            continue
+        for ordinal, event in enumerate(root["events"]):
+            if event["kind"] == "stop" and event["time"] is not None and event["time"] >= at:
+                root["brief_stop"] = {**event, "ordinal": ordinal}
+                break
 
     failures, reports = [], []
     implementers, reviewers = [], []

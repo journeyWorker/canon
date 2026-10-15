@@ -33,7 +33,10 @@ fn json_error(out: &Output) -> Value {
     let body: Value = serde_json::from_str(&stdout(out)).unwrap_or_else(|e| panic!("stdout is not JSON ({e}): {}", stdout(out)));
     let error = body.get("error").unwrap_or_else(|| panic!("no `error` object: {body}")).clone();
     let keys: BTreeSet<&str> = error.as_object().expect("error is an object").keys().map(String::as_str).collect();
-    assert_eq!(keys, BTreeSet::from(["code", "message", "hint", "retryable"]), "{error}");
+    // `field` and `expected` appear only on a refusal about one argument.
+    let required = BTreeSet::from(["code", "message", "hint", "retryable"]);
+    assert!(required.is_subset(&keys) && keys.is_subset(&BTreeSet::from(["code", "message", "hint", "retryable", "field", "expected"])), "{error}");
+    assert!(error.get("expected").is_none() || error.get("field").is_some(), "`expected` always comes with `field`: {error}");
     assert!(error["code"].is_string() && error["message"].is_string() && error["retryable"].is_boolean(), "{error}");
     assert!(error["hint"].is_null() || error["hint"].is_string(), "{error}");
     error
@@ -162,7 +165,7 @@ fn json_failures_from_a_command_with_its_own_flag_carry_code_message_hint_and_re
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
     assert_eq!(json_error(&out)["code"], "BRIEF_NOT_FOUND");
 
-    let out = run(repo, &["subject", "status", "no-such-subject", "specced", "--json"]);
+    let out = run(repo, &["subject", "status", "no-such-subject", "--to", "specced", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert_eq!(json_error(&out)["code"], "SUBJECT_NOT_FOUND");
 }

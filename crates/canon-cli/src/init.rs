@@ -160,7 +160,7 @@ fn skeleton_yaml() -> String {
     out.push_str("  sources: []\n");
     out.push_str("write:\n");
     out.push_str("  # Staged writes (`canon evidence add`, `canon finding add|close`,\n");
-    out.push_str("  # `canon divergence stage`) promote in the same run. `manual` keeps\n");
+    out.push_str("  # `canon divergence add`) promote in the same run. `manual` keeps\n");
     out.push_str("  # them staged until `canon gate promote`; `--no-promote` keeps one.\n");
     out.push_str("  promote: auto\n");
     out
@@ -218,6 +218,8 @@ feature.
 
 Unsure of a command or its flags: `canon schema <command> --json`. Pass
 `--json` and read `error.code` and `error.hint` when a command fails.
+
+Roles: if you were spawned as one (planner, implementer, reviewer, orchestrator), set `CANON_ROLE` (or pass `--as`) and load only `reference/role-<role>.md` from the canon skill; with no role, follow `canon status`.
 
 The loop:
 
@@ -321,9 +323,9 @@ impl InitLog {
         self.steps.push(serde_json::json!({ "step": step, "detail": detail.into() }));
     }
 
-    fn finish(self) -> i32 {
-        if self.json && self.emit_data {
-            crate::json_out::data("init", serde_json::json!({ "steps": self.steps }));
+    fn finish(self, repo: &Path) -> i32 {
+        if self.emit_data {
+            crate::next::finish(repo, "init", &crate::next::Scope::Repo, false, self.json, serde_json::json!({ "steps": self.steps }));
         }
         0
     }
@@ -622,7 +624,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
                     return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).emit("canon init", json);
                 }
             }
-            return log.finish();
+            return log.finish(repo);
         }
         Err(e) => {
             return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", canon_yaml_path.display())).emit("canon init", json);
@@ -647,7 +649,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
             return code;
         }
     }
-    log.finish()
+    log.finish(repo)
 }
 
 /// `canon init --check-config [--repo <dir>]` (task 4.2). Returns the

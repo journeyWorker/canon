@@ -1,0 +1,5 @@
+{"type":"session","version":3,"id":"orch-planner","timestamp":"2026-01-01T00:00:03Z","cwd":"/workspace"}
+{"type":"message","id":"u1","message":{"role":"user","content":[{"type":"text","text":"plan"}]},"timestamp":"2026-01-01T00:00:04Z"}
+{"type":"message","id":"a1","message":{"role":"assistant","content":[{"type":"toolCall","id":"c1","name":"write","arguments":{"path":"/workspace/.canon/changes/pause/brief.md","content":"x"}}]},"timestamp":"2026-01-01T00:00:05Z"}
+{"type":"message","id":"r1","message":{"role":"toolResult","content":[{"type":"text","text":"ok"}],"toolCallId":"c1","isError":false},"timestamp":"2026-01-01T00:00:06Z"}
+{"type":"message","id":"a2","message":{"role":"assistant","content":[],"stopReason":"stop"},"timestamp":"2026-01-01T00:00:07Z"}

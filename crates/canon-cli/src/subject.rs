@@ -143,6 +143,11 @@ pub fn parse_change_id(s: &str) -> Result<ChangeId, String> {
 /// `<state>`'s `clap` value parser — the closed [`SubjectStatus`]
 /// vocabulary, snake_case wire spelling (mirrors the model's
 /// `#[serde(rename_all = "snake_case")]`), never a second casing.
+pub fn status_parser() -> impl clap::builder::TypedValueParser<Value = SubjectStatus> {
+    crate::cli_error::closed_set(["proposed", "specced", "building", "verifying", "shipped", "retired"], parse_status)
+}
+
+/// A subject status, as the CLI spells it.
 pub fn parse_status(s: &str) -> Result<SubjectStatus, String> {
     match s {
         "proposed" => Ok(SubjectStatus::Proposed),
@@ -261,22 +266,15 @@ fn find_change(registry: &TierRegistry, id: &ChangeId) -> Result<Option<Change>,
     Ok(None)
 }
 
-/// Print a written subject: its full record body on `--json`, else a
-/// one-line human receipt.
-fn report_subject(subject: &Subject, verb: &str, json: bool) {
-    if json {
-        // The full merged record body — the updated record, per the
-        // contract's "`--json` emits the updated record".
-        println!("{}", serde_json::to_string_pretty(subject).unwrap_or_default());
-    } else {
-        println!(
-            "canon subject {verb}: {} ({}, {}) — {}",
-            subject.subject_id.as_str(),
-            subject.domain,
-            status_str(subject.status),
-            crate::write_mode::DIRECT
-        );
+/// Report a written subject: `human` and the `next:` line, or on `--json`
+/// the full record body (the updated record) with `meta.next` for the
+/// subject.
+fn report_subject(repo: &Path, subject: &Subject, verb: &str, json: bool, human: &str) {
+    if !json {
+        println!("{human}");
     }
+    let record = serde_json::to_value(subject).unwrap_or_default();
+    crate::next::finish(repo, &format!("subject {verb}"), &crate::next::Scope::Subject(subject.subject_id.as_str().to_string()), false, json, record);
 }
 
 /// The `domain` enum name `canon.core` declares and a consumer repo
@@ -393,7 +391,8 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 
     match registry.persist(&subject) {
         Ok(_) => {
-            report_subject(&subject, "new", json);
+            let human = format!("canon subject new: {} ({}, {}) — {}", subject.subject_id.as_str(), subject.domain, status_str(subject.status), crate::write_mode::DIRECT);
+            report_subject(&repo, &subject, "new", json, &human);
             0
         }
         Err(e) => {
@@ -412,26 +411,20 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json: bool) -> i32 {
     match adopt_change(repo, change_id, subject_id) {
         Ok((subject, owners, wrote)) => {
-            if json {
-                report_subject(&subject, "adopt", true);
-            } else if wrote && owners.len() > 1 {
-                println!(
+            let human = if wrote && owners.len() > 1 {
+                format!(
                     "canon subject adopt: linked change `{}` to subject `{}` as well; the change now belongs to {} — {}",
                     change_id.as_str(),
                     subject_id.as_str(),
                     quoted_list(&owners),
                     crate::write_mode::DIRECT
-                );
+                )
             } else if wrote {
-                println!(
-                    "canon subject adopt: linked change `{}` to subject `{}` — {}",
-                    change_id.as_str(),
-                    subject_id.as_str(),
-                    crate::write_mode::DIRECT
-                );
+                format!("canon subject adopt: linked change `{}` to subject `{}` — {}", change_id.as_str(), subject_id.as_str(), crate::write_mode::DIRECT)
             } else {
-                println!("canon subject adopt: change `{}` is already linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str());
-            }
+                format!("canon subject adopt: change `{}` is already linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str())
+            };
+            report_subject(repo, &subject, "adopt", json, &human);
             0
         }
         Err(e) => {
@@ -591,7 +584,7 @@ pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Sub
     Ok((subject, change, true))
 }
 
-/// `canon subject status <id> <state>` (module doc): apply a lifecycle
+/// `canon subject status <id> --to <state>` (module doc): apply a lifecycle
 /// transition. Refuses an off-chain step ([`is_valid_transition`], exit
 /// `2`); for `verifying → shipped` additionally runs
 /// [`ship_gate_violations`], the brief check ([`brief_violation`]) and
@@ -649,20 +642,20 @@ pub fn run_status(
         return CliError::refused("SUBJECT_INVALID_TRANSITION", format!("invalid transition {} → {} (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)",
             status_str(current),
             status_str(target)
-        )).emit("canon subject status", json);
+        )).field("--to").expected(["proposed", "specced", "building", "verifying", "shipped", "retired"].into_iter().filter(|s| parse_status(s).is_ok_and(|to| is_valid_transition(current, to)))).emit("canon subject status", json);
     }
     let reopens = current == SubjectStatus::Shipped && target == SubjectStatus::Verifying;
     match (reopens, reason) {
         (true, None) => {
             return CliError::refused("SUBJECT_REASON_REQUIRED", format!("reopening {} (shipped → verifying) needs --reason <text>: why it reopens, recorded on the subject with the actor",
                 subject_id.as_str()
-            )).emit("canon subject status", json);
+            )).field("--reason").emit("canon subject status", json);
         }
         (false, Some(_)) => {
             return CliError::refused("SUBJECT_REASON_UNEXPECTED", format!("--reason records why a shipped subject reopens and applies only to shipped → verifying, not {} → {}",
                 status_str(current),
                 status_str(target)
-            )).emit("canon subject status", json);
+            )).field("--reason").emit("canon subject status", json);
         }
         _ => {}
     }
@@ -795,17 +788,53 @@ pub fn run_status(
 
     match registry.persist(&subject) {
         Ok(_) => {
-            if json {
-                report_subject(&subject, "status", true);
-            } else {
-                println!("canon subject status: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT);
-            }
+            report_subject(&repo, &subject, "status", json, &format!("canon subject status: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT));
             0
         }
         Err(e) => {
             CliError::refused("WRITE_FAILED", e.to_string()).emit("canon subject status", json)
         }
     }
+}
+
+/// `canon subject status <id>` without `--to` (0.21 D1): show the subject
+/// and write nothing. `--override-reason` and `--reason` belong to a
+/// transition, so passing either here is refused rather than ignored.
+pub fn run_show(repo: &Path, subject_id: &SubjectId, override_reason: Option<&str>, reason: Option<&str>, json: bool) -> i32 {
+    for (flag, given) in [("--override-reason", override_reason), ("--reason", reason)] {
+        if given.is_some() {
+            return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("{flag} applies to a transition, and `canon subject status {}` without --to only shows the subject", subject_id.as_str()))
+                .hint("add --to <state> to transition the subject")
+                .emit("canon subject status", json);
+        }
+    }
+    let repo = resolve_repo_root(repo);
+    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
+        Ok(r) => r,
+        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json),
+    };
+    let subject = match find_subject(&registry, subject_id) {
+        Ok(Some(s)) => s,
+        Ok(None) => return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).emit("canon subject status", json),
+        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json),
+    };
+    if json {
+        crate::json_out::data("subject status", serde_json::to_value(&subject).expect("subject serializes"));
+    } else {
+        println!("canon subject status: {} ({}, {}) — {}", subject.subject_id.as_str(), subject.domain, status_str(subject.status), subject.title);
+        if !subject.summary.is_empty() {
+            println!("  summary: {}", subject.summary);
+        }
+        println!("  owner: {}", subject.owner_role.as_str());
+        if !subject.change_ids.is_empty() {
+            println!("  changes: {}", subject.change_ids.iter().map(|c| c.as_str()).collect::<Vec<_>>().join(", "));
+        }
+        if let Some(reopen) = &subject.reopen {
+            println!("  reopened: {}", reopen.reason);
+        }
+    }
+    0
 }
 
 /// Print, on stderr, which review checks this transition runs and which

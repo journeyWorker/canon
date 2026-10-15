@@ -1,215 +1,99 @@
 ---
 name: canon
-description: Use for every build, implement, add-a-feature, change-a-feature or fix request in a repo that has canon.yaml, including sites, apps and games; prefer it there over generic site, app or game builder skills. Runs canon's working loop (brief, subject, scenarios with failure paths, units, implement, evidence, independent review, status transition) and routes to the canon CLI reference for setup, specs, gates, storage, ingestion, retrieval and reports.
+description: Use for every build, implement, add-a-feature, change-a-feature or fix request in a repo that has canon.yaml, including sites, apps and games; prefer it there over generic site, app or game builder skills. Runs canon's working loop (brief, subject, scenarios with failure paths, units, implement, evidence, independent review, status transition) split by role (planner, implementer, reviewer, orchestrator), and routes to the canon CLI reference for setup, specs, gates, storage, ingestion, retrieval and reports.
 ---
 
 # Canon
 
-Features in this repo are managed with canon. This skill's job is the
-working loop below; the CLI manual lives in `reference/*.md` and
-`canon <command> --help`. Start every session with `canon status`: it says
-where each subject stands and lists the next commands.
+Features in this repo are managed with canon. This skill is the shared core:
+the loop, how to drive the CLI, and how to find your role. What each role
+does lives in `reference/role-<role>.md`; the CLI manual lives in
+`reference/canon-*.md` and `canon <command> --help`.
 
 ## The working loop
 
 Follow these steps in order for every request that builds, changes or fixes
 a feature, a one-line request included. A human is needed once per scope:
 
-- **The approval** (step 1). A new subject, or a change to an approved
-  subject's scope, needs the human to approve its brief. Write the brief,
+- **The approval** (step 1). For a new subject or a scope change, the
+  human must approve the brief. Write the brief,
   run `canon brief check` until it reports no blockers, then stop and
-  report the brief to the human, in the brief's language: build nothing for
-  that scope (no scenarios, code or evidence) before the human answers. The
-  approval is the one thing you never assume, even when the human said they
-  cannot answer until you report: the brief is that report. The one answer
-  approves the brief and the policy, `.canon/policy.yaml` (written by
-  `canon init`), which is what the gate grades the work against. Record it
-  in one call:
+  report the brief to the human: build nothing for that scope (no
+  scenarios, code or evidence) before the human answers. The approval is
+  the one thing you never assume, even when the human said they cannot
+  answer until you report: the brief is that report. The one answer
+  approves the brief and the policy, `.canon/policy.yaml`, which is what
+  the gate grades the work against. Record it only from the human's answer:
   `canon brief approve --change <slug> --by <the human> --note "<their words>"`.
-  Never approve without a human answer, and never edit the policy to make
-  the gate pass. A brief edited after its approval is not approved
-  (`BRIEF_CHANGED_SINCE_APPROVAL`): it needs a new human answer and a new
-  `canon brief approve`.
+  Never edit the policy to make the gate pass. A brief edited after its
+  approval is not approved (`BRIEF_CHANGED_SINCE_APPROVAL`): it needs a new
+  answer. The ship guard and `canon evidence add` refuse an unapproved or
+  edited brief, but those are backstops: the stop itself is at step 1.
 - **Inside an approved scope, never stop for a human.** Fixes, follow-ups,
-  review rounds and re-reviews go straight on: add or extend the scenario,
-  implement, gather evidence, and get an independent review in another
-  session. Independent review happens on every change. A fix or follow-up
-  stays in the approved change, never `canon change new`, because a new
-  change is a new scope and needs the human's approval. A follow-up that
-  adds or changes a step of the brief edits the brief: that is a scope
-  change, and it needs a new answer.
-- **A follow-up on a shipped subject reopens it.** Reopen it with
-  `canon subject status <id> verifying --reason "<why>" --actor-id <unit>`
-  (no human inside the approved scope; the reason and your id are
-  recorded), add its scenario, evidence and an independent review, and ship
-  again with `canon subject status <id> shipped`, which runs every guard
-  again. `canon status` flags a shipped subject whose gate went red and
-  names the reopen.
-- **Non-behavior work is a chore.** A refactor, dependency, build, CI or
-  infra change that alters nothing a user can observe:
-  `canon change new <slug> --subject <id> --kind chore --title "…"`. Its
-  brief is short (intent, category, invariants, checks, out of scope) and
-  approved like any brief, one human stop. A chore adds no scenarios: run
-  the subject's suite again and bind it with
-  `canon evidence add --all-scenarios --report <kind>:<path> …`; that
-  supersedes the old evidence and makes the pinned reviews stale, so an
-  independent re-review follows. Work that changes behavior is never a
-  chore: it is a feature change.
+  review rounds and re-reviews stay in the approved change (never
+  `canon change new`: a new change is a new scope) and go straight on: scenario,
+  implement, evidence, independent review. A follow-up that adds or changes
+  a step of the brief edits the brief: that is a scope change and needs a
+  new answer. A follow-up on a shipped subject reopens it
+  (`canon subject status <id> --to verifying --reason "<why>"`).
+- When no human can answer one of the brief's questions, write your
+  assumption into the brief's Questions and assumptions, build on it, and say
+  so in your report. That covers the brief's questions and work inside an
+  approved scope, never the approval itself.
 
-When no human can answer one of the brief's questions, write the question
-into the brief's Questions and assumptions, state the assumption you will
-build on, and say so in your report. Proceeding on an assumption applies to
-the brief's questions and to work inside an approved scope, never to the
-approval itself.
-
-1. **Brief.** For a new subject or a scope change, write the PRD brief in
-   the change's `.canon/changes/<slug>/brief.md`, which
-   `canon change new` writes as a skeleton once the subject exists
-   (step 2): intent, desired outcome, the user flow as numbered steps
-   `F1`, `F2`, … (sees → does → becomes), step detail per step, acceptance
-   per step with its failure path, questions and assumptions, out of scope.
-   Write it in the `language:` of `canon.yaml`; unset, in the request's
-   language, and add "which language?" to the questions. Anything that
-   could change policy goes to the questions: never decide it yourself.
-   `canon brief check` (read-only, `--json`) lists findings; fix every
-   blocker (structure) before you stop, and treat advisories (prose) as
-   optional. Bare `canon brief` names the next steps. Five optional
-   refinement passes, each standing alone: `reference/brief-shape.md`,
-   `brief-clarify.md`, `brief-harden.md`, `brief-align.md`,
-   `brief-polish.md`. Then stop and report the brief to the human in that
-   language, asking once; go on to step 3 only after the human answers, and
-   record the answer with `canon brief approve`. A change that comes from
-   an external plan the human prepared (an openspec `proposal.md` read
-   through `plans.sources`) gets a `brief.md` whose `Source: <path>` line
-   points at the plan; canon never edits the plan. Inside an approved scope
-   there is no new brief: go to step 3 under the existing subject and
-   change.
-2. **Subject.** `canon subject new <id> --domain <domain> --title "…"`, then
-   `canon change new <slug> --subject <id> --title "…"` (it writes
-   `brief.md` and no `tasks.md`), and fill in the brief (step 1). For a new
-   subject or a scope change, this is where you stop until the human
-   answers. A change that also serves another subject is adopted there too,
-   `canon subject adopt <slug> --subject <other>`: it then belongs to both,
-   and its open blockers gate both. `tasks.md` is an optional work note
-   nothing gates on.
-3. **Scenarios.** `canon feature new <area>.<surface> --title "…"`, then one
-   `canon scenario new <area>.<surface>.<nn> --subject <id> --flow <F-id> --case <case> --title "…"`
-   per behavior, each pointing at the brief's flow step it proves, with failure paths (`--case failure`) as well as `happy`
-   and `edge`. When the gate asks for a missing case (`require_cases`), add
-   a new scenario; never retag an existing one to satisfy it. There is no
-   sync or format step: `canon status`, `canon gate check`,
-   `canon evidence add`, `canon review add` and `canon subject status`
-   index added, edited or deleted `.feature` files themselves. Only when
-   one of them prints `NOT refreshed` (a format violation, such as a
-   hand-written header with no `# canon:` provenance comment, or a
-   duplicate id) run `canon inventory sync`: it names each problem; fix
-   them, and the next command indexes the files. Specs live at
-   `<root>/kind=feature/area=<area>/<surface>.feature` under a
-   `specs.roots[]` root (default `.canon/specs`); a root still on
-   `features/kind=feature/` is refused until you run `canon migrate`.
-4. **Units.** Split the work into units (for example specs, domain code,
-   assets, review). Give each unit its own actor id and session id, and pass
-   them on everything the unit records (`--actor-id <unit> --session-id <session>`),
-   so the ledger shows which unit did what. A delegated unit attests its own
-   work; never attest another unit's work under your id.
-5. **Implement.** Write the code with tests whose names carry the scenario
-   id (`game.run.01: …`), so a test report binds to its scenario. Record a
-   defect you find in your own work as a finding the moment you find it,
-   before review:
-   `canon finding add --change-id <slug> --round <n> --seq <n> --severity <s> --reviewer <me> --actor-id <me> --session-id <session> --summary "…"`.
-6. **Evidence.** Per scenario:
-   `canon evidence add --project-id <root-id> --scenario-id <id> --kind test-run --role implementer --ref "<command>" --actor-id <unit> --session-id <session>`,
-   with `--report junit:<path>` or `--artifact <path>` when files prove it.
-   canon stores those bytes in `.canon/artifacts/sha256/` (commit it with the
-   ledger) and `canon gate check` re-checks them; the bound copy is the one
-   kept, so the working-tree report itself may be gitignored. For a scenario about what
-   users see, bind the screenshot or recording that shows it
-   (`--artifact <path>`). Under `write: { promote: auto }` (what
-   `canon init` writes) the record is final when the command returns; only
-   in a repo with `write.promote: manual` (or no `write:` key) follow it
-   with `canon gate promote`.
-   One test run that proves several scenarios is bound once:
-   `canon evidence add --project-id <root-id> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref "<command>" --actor-id <unit> --session-id <session>`
-   writes one record per indexed scenario owning a case, each with the
-   verdict its own cases show; any refusal writes none. When a new record
-   makes a signed review stale, the add prints the reviewer and the
-   `canon review add … --pin <sha>` that re-pins it; the reviewer looks
-   again before running it.
-   An external evaluator's audit is recorded with `canon evidence add --kind
-   audit`; canon never generates one.
-   Evidence for a task of an imported external plan (`--task <id>`, before
-   `canon gate task`) must bind the artifact or report that proves the
-   task; a canon command (`canon status`, `canon gate check`) is never that
-   proof. Both read the plan's `tasks.md` as it is now, so a task row needs
-   no `canon ingest plans` first. A canon-owned change has no task rows to
-   attest: its scenarios are the checklist.
-7. **Independent review.** A different session from the one that wrote the
-   code and evidence reviews the change: a separate process with its own
-   session, never the same session under another `--actor-id` or
-   `--session-id` label. A harness with no subagent tool starts one (a new
-   `codex exec` run in this repo, say), and the reviewer passes that
-   session's real id as `--session-id`. The review session must be able
-   to run the checks it signs off (the build, the tests, the app); a
-   reviewer that cannot run the tests says so and does not sign off. The
-   reviewer records every defect
-   the review finds as a finding:
-   `canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <me> --actor-id <me> --session-id <session> --summary "…"`;
-   `canon finding list --change-id <slug> [--open] [--json]` shows the
-   change's findings (round, seq, severity, disposition, reviewer, summary),
-   so the next seq and the open blockers are one command away;
-   once fixed,
-   `canon finding close --change-id <slug> --round <n> --seq <n> --disposition fixed --resolution-sha <sha>`
-   (a short sha is fine; canon resolves it). With `write.promote: manual`,
-   follow each with `canon gate promote`. Every bug fix adds or extends a scenario. The
-   reviewer signs off each scenario:
-   `canon review add --project-id <root-id> --scenario-id <id> --reviewer <who> --actor-id <who> --role reviewer --session-id <review-session> --pin <sha> --upstream-ref <ref>`
-   (written directly; nothing to promote). Repeat `--scenario-id`, or pass
-   `--scenario-ids-from <file>`, to sign off several scenarios in one
-   call, all or nothing. A reviewer of user-visible
-   behavior attaches what it looked at with `--artifact <path>`
-   (repeatable); canon stores and re-checks those bytes and never compares
-   images.
-8. **Transition.** `canon subject status <id> <state>` along
-   `proposed → specced → building → verifying → shipped`. It refuses a move
-   the policy does not yet allow (missing evidence, missing reviews, open
-   blocker findings); fix the gap rather than overriding, and finish with
-   `canon gate check` clean. A root whose `.feature` edits could not be
-   indexed fails the gate and refuses `shipped` (`uncovered-cell <root>`;
-   see step 3). `shipped` also refuses while the change's brief is not
-   approved, was edited after its approval (`BRIEF_CHANGED_SINCE_APPROVAL`),
-   or has structure blockers (`canon brief check`), and while a flow step
-   has no scenario or no failure scenario (`canon status` lists each step's
-   coverage). For a change from an external plan with no canon brief yet it
-   names the `brief.md` to create with its `Source:` line.
-   `canon evidence add` refuses an unapproved brief's scenarios the same
-   way. Both are backstops: the stop itself is at step 1. You record the
-   approval only from the human's answer, with `canon brief approve` (with
-   no brief to answer there is nothing to refuse, and the ship guard only
-   prints an advisory). Move the subject to `shipped` yourself once
-   `canon subject status <id> shipped` passes its guard, unless the brief
-   says the human ships. `canon status` shows whether each subject's brief
-   is approved, by the same check, and names the next step.
-   `shipped → verifying` reopens a shipped subject for a follow-up (see the
-   working loop above): it needs `--reason`, and it is refused, naming the
-   brief, when the subject's newest change is not approved.
+1. **Brief.** The planner writes the PRD brief (`.canon/changes/<slug>/brief.md`), checks it with `canon brief check`, and stops for the human. → `reference/role-planner.md`
+2. **Subject.** `canon subject new`, then `canon change new` (`--kind chore` for work that alters no behavior); the change writes the brief skeleton. → `reference/role-planner.md`
+3. **Scenarios.** `canon scenario new --flow <F-id> --case <case>` per behavior of a flow step, failure paths (`--case failure`) included. → `reference/role-implementer.md`
+4. **Units.** Split the work; each unit has its own actor id and session id, passed on everything it records. A unit never attests another unit's work.
+5. **Implement.** Code with tests named by scenario id (`game.run.01: …`). → `reference/role-implementer.md`
+6. **Evidence.** `canon evidence add` binds the test run to its scenarios. → `reference/role-implementer.md`
+7. **Independent review.** A different session, a separate process with its own session id, that can run the checks it signs off, records `canon finding add` and `canon review add`. Every change. → `reference/role-reviewer.md`
+8. **Transition.** `canon subject status <id> --to <state>` along `proposed → specced → building → verifying → shipped`, with `canon gate check` clean; fix a refused guard rather than overriding it. → `reference/role-orchestrator.md`
 
 Every write command says whether the record is final (`written directly`,
 or `staged and promoted in this run`) or staged; only a staged record
 needs `canon gate promote`, and only `write.promote: manual` leaves one.
 
+## Know your role
+
+canon cannot detect a role; you declare it. Pass `--as <role>` or set
+`CANON_ROLE=planner|implementer|reviewer|orchestrator`; a flag wins over the
+variable, and an unknown value is refused (`UNKNOWN_ROLE`).
+
+- **A role is set, or you were spawned as one:** load only
+  `reference/role-<role>.md` and do that role's steps. `canon status`,
+  `meta.next` and `canon schema` then show only your role's steps and
+  commands, and count the others in `waitingOn`. Do not load another role's
+  reference.
+- **No role (one agent doing everything):** follow `canon status` and load
+  each role reference as its phase starts: planner for steps 1–2,
+  implementer for 3–6, reviewer for 7 (in a separate session), orchestrator
+  for 8.
+
+A role is guidance, not enforcement: `--role` on `evidence add` and
+`review add` defaults to it.
+
 ## Driving the CLI
 
-- Unsure of a command or its flags: run `canon schema <command> --json`
-  (one call: arguments, options, exits, error codes) instead of reading
-  `--help`. `canon schema` alone lists every command.
+- Start a session with `canon status`: where each subject stands and the next
+  commands. After that, do not call it only to learn the next step: every
+  write returns `meta.next` (`[{command, why, actor, role}]`), the same steps
+  `status` would give, narrowed to what the write touched. `actor: human`
+  marks a step only the human takes.
+- Your role reference's **Commands** block (`reference/role-<role>.md`) is
+  your complete command set. Run `canon schema <command> --json` only for a
+  command it does not list, or after a `USAGE` refusal (read `error.field`
+  and `expected` first). `canon schema` alone lists every command.
 - Pass `--json` and read stdout as one document. On failure it is
-  `{"error":{"code","message","hint","retryable"}}`: branch on `error.code`
+  `{"error":{"code","message","hint","retryable","field","expected"}}`: branch
+  on `error.code`, fix the option `field` names using the `expected` values,
   and follow `error.hint`. The codes are stable; `canon schema --errors --json`
   lists them.
+- A renamed command still runs for one release, warns on stderr and sets
+  `meta.deprecated`; use the new name it prints.
 - Page long lists with `--limit <n>` and `--cursor <nextCursor>` (`--all`
-  for everything), and project fields with `--fields a,b` (`canon query`,
-  `canon finding list`; `meta` carries `returned`, `total`, `hasMore`,
-  `nextCursor`).
+  for everything), and project fields with `--fields a,b` (`status`, `export`,
+  `query`, `finding list`, `divergence status`, `context`).
 - `canon purge` deletes only in two steps: `--plan` prints the removal set
   and a `planDigest`; then `--confirm <planDigest>`.
 
@@ -231,41 +115,29 @@ canon skills doctor                          # diagnostics, incl. a stray canon 
 `install` and `doctor` end with `owned-paths:`, the globs of every path
 canon writes. Add them to the repo's formatter and linter ignore lists; a
 formatter that rewrites a projection or a ledger record makes canon read
-drift. Specs, `policy.yaml` and the changes are written by hand and are not
-on the list. `doctor` reports a projection whose bytes changed
-but whose content did not as `formatter-rewritten` and names the ignore
-entry to add; a changed file stays `stale`.
-
-The harness list lives in `canon.yaml` as `skills: { providers: [...] }`.
-`.agents` alone never selects Codex; `.codex` does. Change the list with
-`canon skills install --providers=<list>`, never by assuming a default.
-
-The canonical bundle is read-only. Claude receives
-`.claude/skills/canon/SKILL.md`; Codex receives
-`.agents/skills/canon/SKILL.md`; OMP receives `.omp/skills/canon/SKILL.md`; and
-Pi receives `.pi/skills/canon/SKILL.md`. Every selected provider receives
-matching `reference/**` and `scripts/**` sidecars under its `canon` bundle. A
-legacy `.codex/skills/canon*` projection from canon 0.13.0 or earlier is
-migrated by `canon skills install` and reported by `check`/`doctor`. OMP and Pi
-projections are project-local passive skill bundles: the
-`scripts/canon-retrieve-pre-dispatch.sh` file is available as a sidecar, not
-installed as a native hook. `canon/skills-dev` is a separate developer-only
-legacy source and is installed explicitly with `--source canon/skills-dev`.
+drift (`doctor` reports it as `formatter-rewritten` and names the entry to
+add). Specs, `policy.yaml` and the changes are written by hand and are not
+on the list. The harness list lives in `canon.yaml` as
+`skills: { providers: [...] }`; change it with `canon skills install --providers=<list>`,
+never by assuming a default. The projection is a read-only copy: Claude
+`.claude/skills/canon/`, Codex `.agents/skills/canon/`, OMP
+`.omp/skills/canon/`, Pi `.pi/skills/canon/`, each with `reference/**` and
+`scripts/**` sidecars (the retrieve script is a sidecar, not an installed hook).
 
 ### Route by task
 
-- **Where the repo stands, subjects and changes (loop steps 1, 2, 8):** read `reference/canon-subject.md`; it covers `canon status`, `canon subject new|adopt|status` and `canon change new`.
-- **Refine a brief before the human stop (step 1):** read one of `reference/brief-shape.md` (structure), `brief-clarify.md` (open questions), `brief-harden.md` (flow and step detail agree), `brief-align.md` (scenarios cover the flow), `brief-polish.md` (prose). Each stands alone; none needs another first.
-- **Write or reorganize `.feature` specs (step 3):** read `reference/canon-authoring.md` before editing; use the scaffold.
-- **Understand available fields/enums/policy bindings:** read `reference/canon-context.md` and `reference/canon-vocab.md`.
-- **Capture replayable run inputs / version prompts:** read `reference/canon-context.md`, then use `canon context-pack create|show|verify` and `canon prompt register|show` with explicit repository-relative JSON manifests.
-- **Validate or index specs:** read `reference/canon-fmt.md` and `reference/canon-inventory.md`.
-- **Evidence, gates, imported-plan task checkboxes, hooks (step 6):** read `reference/canon-gate.md`.
-- **Findings and reviews (step 7):** read `reference/canon-review.md`.
-- **Ingest artifacts, sessions or plans:** read `reference/canon-artifact-ingest.md`, `reference/canon-session-ingest.md`, or `reference/canon-plan-import.md`.
-- **Configure storage, policy, plugins, or strategy learning:** read `reference/canon-storage.md`, `reference/canon-policy.md`, `reference/canon-plugins.md`, or `reference/canon-learn.md`.
-- **Retrieve dispatch guidance:** read `reference/canon-retrieve.md` and load `scripts/canon-retrieve-pre-dispatch.sh` when wiring hooks.
-- **Read generated reports and dashboards:** read `reference/canon-report-dashboard.md`.
+- **Your role's steps:** `reference/role-planner.md`, `role-implementer.md`, `role-reviewer.md`, `role-orchestrator.md`.
+- **Where the repo stands, subjects and changes:** `reference/canon-subject.md` (`canon status`, `canon subject new|adopt|status`, `canon change new`).
+- **Write or reorganize `.feature` specs:** `reference/canon-authoring.md` before editing; use the scaffold.
+- **Fields, enums, policy bindings:** `reference/canon-context.md` and `reference/canon-vocab.md`.
+- **Replayable run inputs / versioned prompts:** `reference/canon-context.md`, then `canon context-pack new|show|verify` and `canon prompt add|show` with repository-relative JSON manifests.
+- **Validate or index specs:** `reference/canon-fmt.md` and `reference/canon-inventory.md`.
+- **Evidence, gates, imported-plan task checkboxes, hooks:** `reference/canon-gate.md`.
+- **Findings and reviews:** `reference/canon-review.md`.
+- **Ingest artifacts, sessions or plans:** `reference/canon-artifact-ingest.md`, `canon-session-ingest.md`, or `canon-plan-import.md`.
+- **Storage, policy, plugins, strategy learning:** `reference/canon-storage.md`, `canon-policy.md`, `canon-plugins.md`, or `canon-learn.md`.
+- **Dispatch guidance:** `reference/canon-retrieve.md`; load `scripts/canon-retrieve-pre-dispatch.sh` when wiring hooks.
+- **Reports and dashboards:** `reference/canon-report-dashboard.md`.
 
 ### Safety contract
 

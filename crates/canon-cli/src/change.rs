@@ -180,8 +180,6 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         subject_id.as_str(),
         crate::write_mode::DIRECT
     );
-    if json {
-        crate::json_out::data("change new", serde_json::json!({ "changeId": slug.as_str(), "subjectId": subject_id.as_str(), "brief": brief }));
-    }
+    crate::next::finish(&repo, "change new", &crate::next::Scope::Change(slug.as_str().to_string()), false, json, serde_json::json!({ "changeId": slug.as_str(), "subjectId": subject_id.as_str(), "brief": brief }));
     0
 }

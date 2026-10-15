@@ -109,7 +109,8 @@ fn unknown_kind_is_a_clean_cli_error() {
     let fixture = support::Fixture::new(ROUTING, AGING);
     let output = fixture.run_canon(&["query", "--kind", "not-a-real-kind"]);
     assert!(!output.status.success());
-    assert!(support::stderr(&output).contains("unknown record kind"), "stderr: {}", support::stderr(&output));
+    let stderr = support::stderr(&output);
+    assert!(stderr.contains("invalid value 'not-a-real-kind'") && stderr.contains("possible values:") && stderr.contains("trajectory"), "stderr: {stderr}");
 }
 
 /// s18 `uniform-repo-resolution` spec: "canon query with no flags resolves

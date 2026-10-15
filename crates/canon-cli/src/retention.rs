@@ -161,13 +161,9 @@ fn loaded_trajectory_store(repo: &Path, yaml: &Path) -> Result<ParquetTrajectory
     Ok(ParquetTrajectoryStore::open(learn_root.join("trajectories")))
 }
 
-fn output_json_or_human(value: &Value, json_output: bool, summary: &str) {
-    if json_output {
-        println!("{}", serde_json::to_string_pretty(value).expect("manifest is serializable"));
-    } else {
-        println!("{summary}");
-        println!("{}", serde_json::to_string_pretty(value).expect("manifest is serializable"));
-    }
+fn print_human(value: &Value, summary: &str) {
+    println!("{summary}");
+    println!("{}", serde_json::to_string_pretty(value).expect("manifest is serializable"));
 }
 
 fn purge_value(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>) -> Value {
@@ -291,7 +287,20 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
                 before.to_rfc3339()
             )
         };
-        output_json_or_human(&value, json_output, &summary);
+        if !json_output {
+            print_human(&value, &summary);
+        } else if confirmed {
+            crate::next::finish(repo, "purge", &crate::next::Scope::Repo, false, true, value);
+        } else {
+            // A plan deletes nothing: the one step is the human's review, then the confirm.
+            let step = crate::status::NextStep {
+                command: format!("review the plan, then run `canon purge --kind {} --before {} --confirm {digest}`", kind.as_str(), before.to_rfc3339()),
+                why: "the plan only lists what would be removed; deleting takes a reviewed plan digest".into(),
+                actor: crate::status::StepActor::Human,
+                role: None,
+            };
+            crate::json_out::data_with_next("purge", value, &crate::next::After::fixed(vec![step]));
+        }
         Ok(())
     })();
     match result {
@@ -317,12 +326,10 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
                 _ => None,
             };
             match partial {
-                // One document: the partial-purge manifest keeps its fields and gains the shared `error`.
-                Some(mut manifest) if json_output => {
+                // One document: the partial-purge manifest is `data` beside the shared `error`.
+                Some(manifest) if json_output => {
                     eprintln!("{}", error.human("canon purge"));
-                    manifest["error"] = error.to_json()["error"].clone();
-                    println!("{}", serde_json::to_string_pretty(&manifest).expect("partial purge manifest is serializable"));
-                    error.exit as u8
+                    error.emit_with_data("canon purge", true, manifest) as u8
                 }
                 _ => error.emit("canon purge", json_output) as u8,
             }
@@ -337,6 +344,9 @@ fn redacted_metadata(kind: RecordKind, raw: &canon_model::evidence::RawRecord) -
     json!({"kind": kind.as_str(), "at": at, "id": id, "digest": digest})
 }
 
+/// The fields of one exported record, which `--fields` may name.
+const RECORD_FIELDS: [&str; 4] = ["kind", "at", "id", "digest"];
+
 pub fn run_export(
     repo: &Path,
     kind: RecordKind,
@@ -346,9 +356,13 @@ pub fn run_export(
     json_output: bool,
     include_sensitive: bool,
     page: &crate::paging::Page,
+    fields: Option<&[String]>,
 ) -> u8 {
     let mut next_cursor_line = None;
     let result = (|| -> Result<(), ExportFailure> {
+        if let Some(requested) = fields {
+            crate::paging::check_known("canon export", requested, &RECORD_FIELDS).map_err(ExportFailure::Cursor)?;
+        }
         ensure_sensitive(repo, include_sensitive)?;
         let (_, registry) = loaded_registry(repo, kind)?;
         let mut query = TierQuery::kind(kind);
@@ -375,7 +389,10 @@ pub fn run_export(
             "after": after.map(|t| t.to_rfc3339()),
             "record_count": rows.len(),
             "content_digests": metadata.iter().filter_map(|m| m.get("digest").cloned()).collect::<Vec<_>>(),
-            "records": metadata,
+            "records": match fields {
+                Some(requested) => metadata.iter().map(|m| crate::paging::project(m, requested)).collect::<Vec<_>>(),
+                None => metadata,
+            },
             "sensitive": include_sensitive,
             "meta": meta.to_json(),
         });
@@ -393,10 +410,19 @@ pub fn run_export(
             }
             #[cfg(not(unix))]
             fs::write(path, &encoded)?;
-        } else {
+        } else if !json_output {
             println!("{}", String::from_utf8_lossy(&encoded));
         }
         append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
+        if json_output {
+            // The manifest is the result; with `--out` it went to the file, and the result names it.
+            let (manifest, page_meta) = crate::json_out::split_meta(manifest);
+            let data = match out {
+                Some(path) => json!({ "out": path.display().to_string(), "kind": kind.as_str(), "recordCount": rows.len() }),
+                None => manifest,
+            };
+            crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, data, page_meta);
+        }
         if out.is_some() && !json_output { eprintln!("canon export: wrote {} record(s)", rows.len()); }
         // The manifest itself is JSON on stdout, so the human cursor line
         // goes to stderr and never breaks a pipe into a JSON parser.

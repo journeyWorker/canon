@@ -150,7 +150,12 @@ pub fn check_fields(command: &str, requested: &[String], known: &BTreeSet<String
         return Ok(());
     }
     let list = known.iter().map(String::as_str).collect::<Vec<_>>().join(", ");
-    Err(CliError::refused("UNKNOWN_FIELD", format!("`{command}` has no field {}", unknown.iter().map(|f| format!("`{f}`")).collect::<Vec<_>>().join(", "))).hint(format!("known fields: {list}")))
+    Err(CliError::refused("UNKNOWN_FIELD", format!("`{command}` has no field {}", unknown.iter().map(|f| format!("`{f}`")).collect::<Vec<_>>().join(", "))).hint(format!("known fields: {list}")).field("--fields").expected(known.iter().cloned()))
+}
+
+/// [`check_fields`] against a fixed list of field names.
+pub fn check_known(command: &str, requested: &[String], known: &[&str]) -> Result<(), CliError> {
+    check_fields(command, requested, &known.iter().map(|f| f.to_string()).collect())
 }
 
 /// Keeps only `fields` of an object record; a field the record happens

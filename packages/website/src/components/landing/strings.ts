@@ -551,7 +551,7 @@ const en = {
       "#",
       "# uncovered-cell (1):",
       "#   uncovered-cell auth.login.01 — policy-required cell 'reviewer' has no matching-role evidence record",
-      "bunx @journeykit/canon demo attest    # records the reviewer's evidence",
+      "bunx @journeykit/canon demo add    # records the reviewer's evidence",
       "bunx @journeykit/canon gate check     # GREEN",
       "# canon gate check: clean (0 violations)",
     ],

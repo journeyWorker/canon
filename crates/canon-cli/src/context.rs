@@ -697,6 +697,15 @@ pub fn render_json(surface: &AuthoringSurface) -> String {
     serde_json::to_string_pretty(surface).unwrap_or_else(|e| format!("{{\"error\": \"failed to serialize authoring surface: {e}\"}}"))
 }
 
+/// [`render_json`] keeping only the named top-level sections (`--fields`).
+pub fn render_json_fields(surface: &AuthoringSurface, fields: &[String]) -> String {
+    let shown = serde_json::to_value(surface).and_then(|value| serde_json::to_string_pretty(&crate::paging::project(&value, fields)));
+    shown.unwrap_or_else(|e| format!("{{\"error\": \"failed to serialize authoring surface: {e}\"}}"))
+}
+
+/// The top-level sections of the `--json` surface, which `--fields` may name.
+pub const SURFACE_FIELDS: [&str; 8] = ["capabilityVersion", "kinds", "enums", "joinKeys", "policy", "vocab", "review", "cel"];
+
 /// Phase 2, default mode (design D5): a compact, per-section outline — name
 /// counts + name lists, then one indented summary line per entry — for
 /// prompt injection, never a full schema dump (ported from the donor's

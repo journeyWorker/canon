@@ -137,7 +137,13 @@ fn purge_plan_then_confirm_deletes_and_a_stale_digest_deletes_nothing() {
 
     let plan = fixture.run_canon_with_repo(&purge_args(&before, &["--plan"]));
     assert!(plan.status.success(), "{}", stderr(&plan));
-    let digest = json(&plan)["planDigest"].as_str().expect("plan carries a planDigest").to_string();
+    let plan_body = json(&plan);
+    let digest = plan_body["data"]["planDigest"].as_str().expect("plan carries a planDigest").to_string();
+    // The one step after a plan is the human's review, then the confirm that names the digest.
+    assert_eq!(plan_body["meta"]["command"], "purge", "{plan_body}");
+    let step = &plan_body["meta"]["next"][0];
+    assert_eq!(step["actor"], "human", "{plan_body}");
+    assert!(step["command"].as_str().unwrap().contains(&format!("--confirm {digest}")), "{plan_body}");
     assert_eq!(fixture.git_file_count(), 2, "--plan deletes nothing");
 
     // A record the plan did not list lands between plan and confirm.
@@ -148,11 +154,14 @@ fn purge_plan_then_confirm_deletes_and_a_stale_digest_deletes_nothing() {
     assert_eq!(fixture.git_file_count(), 3, "a stale digest deletes nothing");
 
     let replan = fixture.run_canon_with_repo(&purge_args(&before, &["--plan"]));
-    let fresh = json(&replan)["planDigest"].as_str().unwrap().to_string();
+    let fresh = json(&replan)["data"]["planDigest"].as_str().unwrap().to_string();
     assert_ne!(fresh, digest);
     let confirmed = fixture.run_canon_with_repo(&purge_args(&before, &["--confirm", &fresh]));
     assert!(confirmed.status.success(), "{}", stderr(&confirmed));
     assert_eq!(fixture.git_file_count(), 0, "the confirmed plan removed what it listed");
+    let confirmed_body = json(&confirmed);
+    assert_eq!(confirmed_body["data"]["planDigest"], fresh.as_str(), "{confirmed_body}");
+    assert!(confirmed_body["meta"]["next"].is_array(), "a confirmed purge is a write: {confirmed_body}");
 }
 
 #[test]
@@ -186,7 +195,7 @@ fn replacing_a_matching_record_with_another_at_equal_count_is_plan_changed() {
     let before = (Utc::now() - Duration::days(1)).to_rfc3339();
     let plan = fixture.run_canon_with_repo(&purge_args(&before, &["--plan"]));
     assert!(plan.status.success(), "{}", stderr(&plan));
-    let digest = json(&plan)["planDigest"].as_str().unwrap().to_string();
+    let digest = json(&plan)["data"]["planDigest"].as_str().unwrap().to_string();
     assert_eq!(fixture.git_file_count(), 2);
 
     // Same count, different removal set: one planned record goes, another matching one arrives.

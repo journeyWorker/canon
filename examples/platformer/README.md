@@ -28,14 +28,14 @@ Every persona authored REAL canon artifacts with the real CLI:
 | design | design one-pager + authored the 8 new behavior scenarios | `canon context` → `canon scenario new` × 8 → `canon fmt --check` (6 files, 0 violations) |
 | dev | ported v1 → Vite/React/Pixi, implemented features against the 16-scenario corpus, flipped plan checkboxes | `canon query --kind scenario`, `canon retrieve --role dev` (pre-task guidance) |
 | test | independently verified all 16 scenarios in-browser; fixed 2 defects it could prove | `canon review add` × 16 (attested, pinned to the verified sha) |
-| review | code review; 8 confirmed ship-blockers filed as divergences; all fixed then resolved | `canon divergence stage/promote` × 8 → `resolve` × 6 ids |
+| review | code review; 8 confirmed ship-blockers filed as divergences; all fixed then resolved | `canon divergence add/promote` × 8 → `resolve` × 6 ids |
 
 The trust chain this demonstrates:
 
 ```
 dev claims done   → plan checkboxes → canon ingest plans   (mirror, never trusted)
 test proves done  → canon review add per scenario           (evidence)
-review disagrees  → canon divergence stage/promote          (tracked, run_seq-ordered)
+review disagrees  → canon divergence add/promote          (tracked, run_seq-ordered)
 fix lands         → re-verify → attest → divergence resolve (burndown to zero)
                   → canon gate check: clean (0 violations)
 ```

@@ -55,7 +55,7 @@ The order an agent follows to claim a subject done:
    the screenshots or recordings it looked at with `--artifact <path>`
    (below).
 
-4. **Move the subject**: `canon subject status <id> verifying`, later
+4. **Move the subject**: `canon subject status <id> --to verifying`, later
    `shipped`. See `canon-subject`.
 
 ## `canon finding add` / `canon finding close`
@@ -413,7 +413,7 @@ review waivers: 1 advisory(ies) — not failing the gate:
 
 ## The status guard
 
-With `require_review` present, `canon subject status <id> <state>`
+With `require_review` present, `canon subject status <id> --to <state>`
 prints on stderr which review checks it ran or skipped:
 
 ```

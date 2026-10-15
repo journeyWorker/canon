@@ -127,7 +127,7 @@ case that turns the gate red, refuses, or (for the policy) prints an advisory:
 |---|---|---|
 | Scenario text changed after review (stale spec) | `review-pin-stale-spec` | `gate check` exit 1, `unreviewed-promotion` "its spec changed" |
 | Evidence re-attested after review (stale evidence) | `review-pin-stale-evidence` | `gate check` exit 1, `unreviewed-promotion` "its evidence changed"; `subject status … shipped` exit 1 |
-| Re-attest dropping a bound file | `evidence-add-drop-attachment` | `evidence add` exit 2; with `--drop-attachment/--drop-reason` the drop is recorded and listed by `status` |
+| Re-attest naming fewer files | `evidence-add-drop-attachment` | `evidence add` exit 0 carrying the earlier files forward; with `--drop-attachment/--drop-reason` the drop is recorded and listed by `status` |
 | Refuted audit | `gate-check-audit-false-success` | `gate check` exit 1, `false-success` despite a faithful verdict |
 | Indeterminate reviewer | `review-outcome-indeterminate-gap` | `gate check` exit 1, `unreviewed-promotion` "no signed review"; transition refused |
 | Unavailable reviewer | `review-outcome-unavailable-gap` | as indeterminate |

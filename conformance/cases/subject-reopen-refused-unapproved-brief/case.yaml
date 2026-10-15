@@ -1,10 +1,10 @@
-description: "0.18 D3: a subject shipped under an `--override-reason` waiver of its unapproved brief cannot reopen outside an approved scope: `canon subject status <id> verifying --reason <text>` exits 1 with `unreviewed-promotion <id> — shipped → verifying: reopening needs the approved scope, …` naming the brief.md to approve, `--override-reason` does not waive it, and the subject stays shipped"
+description: "0.18 D3: a subject shipped under an `--override-reason` waiver of its unapproved brief cannot reopen outside an approved scope: `canon subject status <id> --to verifying --reason <text>` exits 1 with `unreviewed-promotion <id> — shipped → verifying: reopening needs the approved scope, …` naming the brief.md to approve, `--override-reason` does not waive it, and the subject stays shipped"
 steps:
-  - args: [subject, status, checkout, shipped, --override-reason, "the human approved in chat; line to follow", --actor-id, lead]
+  - args: [subject, status, checkout, --to, shipped, --override-reason, "the human approved in chat; line to follow", --actor-id, lead]
     exit: 0
-  - args: [subject, status, checkout, verifying, --reason, "follow-up: the pay retry double-charges"]
+  - args: [subject, status, checkout, --to, verifying, --reason, "follow-up: the pay retry double-charges"]
     exit: 1
-  - args: [subject, status, checkout, verifying, --reason, "follow-up: the pay retry double-charges", --override-reason, "go"]
+  - args: [subject, status, checkout, --to, verifying, --reason, "follow-up: the pay retry double-charges", --override-reason, "go"]
     exit: 1
   - args: [query, --kind, subject, --json]
     exit: 0

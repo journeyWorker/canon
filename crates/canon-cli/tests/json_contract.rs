@@ -56,7 +56,6 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         (("dispatch end", "status"), "succeeded"),
         (("subject new", "id"), "demo-two"),
         (("subject status", "id"), "demo"),
-        (("subject status", "state"), "specced"),
     ]);
     if let Some(value) = by_command.get(&(command, name)) {
         return value.to_string();
@@ -104,6 +103,8 @@ fn extra_args(command: &str, scratch: &Path) -> Vec<String> {
     match command {
         "init" => vec!["--repo".into(), path("fresh"), "--providers".into(), "none".into()],
         "demo init" => vec!["--repo".into(), path("demo")],
+        // `--role` is optional in the schema (a declared role supplies it), but the sweep declares none.
+        "evidence add" | "review add" => vec!["--role".into(), "reviewer".into()],
         "ingest sessions" => vec!["--home".into(), path("home")],
         "skills install" | "skills check" | "skills doctor" => vec!["--target".into(), path("skills-target"), "--source".into(), path("no-skills-source")],
         _ => Vec::new(),
@@ -148,6 +149,15 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
             args.push(format!("--{name}"));
             if option["kind"] != "flag" {
                 args.push(value_for(leaf, name, &regime));
+            }
+        }
+        // One member of each required one-of group, the way an agent reading
+        // `requiredOneOf` would build the line.
+        for group in schema["requiredOneOf"].as_array().into_iter().flatten() {
+            let flag = group[0].as_str().unwrap();
+            if !args.iter().any(|a| a == flag) {
+                args.push(flag.to_string());
+                args.push(value_for(leaf, flag.trim_start_matches("--"), &regime));
             }
         }
         args.extend(extra_args(leaf, repo.path()));

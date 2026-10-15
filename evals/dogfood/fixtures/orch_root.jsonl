@@ -1,0 +1,9 @@
+{"type":"session","version":3,"id":"orch-root","timestamp":"2026-01-01T00:00:00Z","cwd":"/workspace"}
+{"type":"message","id":"u1","message":{"role":"user","content":[{"type":"text","text":"build"}]},"timestamp":"2026-01-01T00:00:01Z"}
+{"type":"message","id":"a1","message":{"role":"assistant","content":[{"type":"toolCall","id":"c1","name":"task","arguments":{"tasks":[{"name":"Planner"}]}}]},"timestamp":"2026-01-01T00:00:02Z"}
+{"type":"message","id":"r1","message":{"role":"toolResult","content":[{"type":"text","text":"ok"}],"toolCallId":"c1","isError":false},"timestamp":"2026-01-01T00:00:30Z"}
+{"type":"message","id":"a2","message":{"role":"assistant","content":[],"stopReason":"stop"},"timestamp":"2026-01-01T00:00:31Z"}
+{"type":"message","id":"u2","message":{"role":"user","content":[{"type":"text","text":"approved"}]},"timestamp":"2026-01-01T00:01:00Z"}
+{"type":"message","id":"a3","message":{"role":"assistant","content":[{"type":"toolCall","id":"c2","name":"task","arguments":{"tasks":[{"name":"Implementer"},{"name":"Reviewer"}]}}]},"timestamp":"2026-01-01T00:01:01Z"}
+{"type":"message","id":"r3","message":{"role":"toolResult","content":[{"type":"text","text":"ok"}],"toolCallId":"c2","isError":false},"timestamp":"2026-01-01T00:05:00Z"}
+{"type":"message","id":"a4","message":{"role":"assistant","content":[],"stopReason":"stop"},"timestamp":"2026-01-01T00:05:01Z"}

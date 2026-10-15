@@ -7,7 +7,7 @@
 //!   (within [`EMIT_WINDOW`] lines);
 //! - a code with no such call (a helper that builds the error for its caller)
 //!   goes to the commands in [`FILE_DEFAULTS`] for its file;
-//! - every command can emit `USAGE` (a `--json` usage error).
+//! - every command can emit the [`GLOBAL`] codes (`USAGE`, `UNKNOWN_ROLE`).
 //!
 //! The test fails on any difference between the derived table and the checked
 //! in one, and on a source file that holds codes but is not accounted for, so
@@ -54,11 +54,14 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("migrate.rs", &["migrate"]),
     ("policy_approval.rs", &["brief approve", "policy approve"]),
     ("paging.rs", &["query", "finding list", "divergence status", "export"]),
+    // `ScopeError::to_cli_error`, emitted by `query`.
+    ("query.rs", &["query"]),
     ("retention.rs", &["export", "purge"]),
     ("review.rs", &["review add"]),
     // Every code is next to its `human("canon selftest")`.
     ("selftest.rs", &[]),
-    ("scaffold.rs", &["feature new", "scenario new"]),
+    // The shared scenario validation (`Planner`) builds its errors for its caller, `scenario new`.
+    ("scaffold.rs", &["scenario new"]),
     // `UNKNOWN_COMMAND` is next to its `emit("canon schema", …)`.
     ("schema.rs", &[]),
     ("status.rs", &["status"]),
@@ -72,6 +75,10 @@ const TEMPLATED: &[(&str, &[&str])] = &[("divergence", &["divergence resolve", "
 /// A code spliced into a command's own JSON document (`to_json()`), with no
 /// `emit` to name its command: the command that prints it.
 const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans")];
+
+/// Codes every command can emit, whatever its sources say: a `--json` usage
+/// error, and the refusal of an unknown `CANON_ROLE` before any command runs.
+const GLOBAL: &[&str] = &["USAGE", "UNKNOWN_ROLE"];
 
 fn src_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
@@ -109,8 +116,8 @@ fn leaves_under(prefix: &str) -> Vec<&'static str> {
 }
 
 fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
-    let mut table: BTreeMap<&'static str, BTreeSet<&'static str>> = META.iter().map(|m| (m.path, BTreeSet::from(["USAGE"]))).collect();
-    let codes: Vec<&'static str> = all_codes().iter().map(|(c, _)| *c).filter(|c| *c != "USAGE").collect();
+    let mut table: BTreeMap<&'static str, BTreeSet<&'static str>> = META.iter().map(|m| (m.path, GLOBAL.iter().copied().collect())).collect();
+    let codes: Vec<&'static str> = all_codes().iter().map(|(c, _)| *c).filter(|c| !GLOBAL.contains(c)).collect();
     let defaults: BTreeMap<&str, &[&str]> = FILE_DEFAULTS.iter().copied().collect();
     let mut problems = Vec::new();
     let mut files: Vec<PathBuf> = fs::read_dir(src_dir()).expect("read src").map(|e| e.expect("dir entry").path()).filter(|p| p.extension().is_some_and(|e| e == "rs")).collect();

@@ -10,13 +10,65 @@
 use serde_json::{json, Value};
 
 /// The success envelope for `command` (its canonical path, e.g. `gate check`).
+/// An invocation of a deprecated form carries `meta.deprecated`
+/// ([`crate::deprecation`]). A write command carries `meta.next` (0.21 D2);
+/// here it is empty, for a command with no meaningful next step.
+/// [`data_with_next`] fills it.
 pub fn envelope(command: &str, data: Value) -> Value {
-    json!({ "data": data, "meta": { "command": command } })
+    let mut meta = json!({ "command": command });
+    if writes(command) {
+        meta["next"] = json!([]);
+    }
+    if let Some(deprecated) = crate::deprecation::meta() {
+        meta["deprecated"] = deprecated;
+    }
+    json!({ "data": data, "meta": meta })
+}
+
+/// Whether `command` (a canonical path) writes, per [`crate::schema::META`].
+fn writes(command: &str) -> bool {
+    crate::schema::META.iter().any(|row| row.path == command && row.effect != crate::schema::Effect::Read)
 }
 
 /// Prints the success envelope on stdout.
 pub fn data(command: &str, data: Value) {
     println!("{}", envelope(command, data));
+}
+
+/// Prints a write's success envelope with the steps that follow it
+/// ([`crate::next`]).
+pub fn data_with_next(command: &str, data: Value, after: &crate::next::After) {
+    data_with_next_and_meta(command, data, after, Value::Null);
+}
+
+/// [`data_with_next`] with extra `meta` keys (a page's `nextCursor`, …).
+pub fn data_with_next_and_meta(command: &str, data: Value, after: &crate::next::After, extra_meta: Value) {
+    let mut envelope = envelope(command, data);
+    if let Some(meta) = envelope["meta"].as_object_mut() {
+        for extra in [&extra_meta, &after.meta()] {
+            if let Some(extra) = extra.as_object() {
+                meta.extend(extra.iter().map(|(k, v)| (k.clone(), v.clone())));
+            }
+        }
+    }
+    println!("{envelope}");
+}
+
+/// Splits a payload that carries its own page `meta` ([`crate::paging`]'s
+/// `total`, `returned`, `nextCursor`) into `(data, meta)`, so the page
+/// state lands in `meta` beside `command` instead of inside `data`.
+pub fn split_meta(mut payload: Value) -> (Value, Value) {
+    let meta = payload.as_object_mut().and_then(|object| object.remove("meta")).unwrap_or(Value::Null);
+    (payload, meta)
+}
+
+/// [`data`] with extra `meta` keys beside `command` (`unchanged`, …).
+pub fn data_with_meta(command: &str, data: Value, extra_meta: Value) {
+    let mut body = envelope(command, data);
+    if let (Some(meta), Some(extra)) = (body["meta"].as_object_mut(), extra_meta.as_object()) {
+        meta.extend(extra.iter().map(|(k, v)| (k.clone(), v.clone())));
+    }
+    println!("{body}");
 }
 
 /// A command's narration: each line is said (stdout, or stderr under

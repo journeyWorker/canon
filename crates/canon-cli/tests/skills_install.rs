@@ -720,12 +720,18 @@ fn skills_install_43_doctor_warns_about_skills_claiming_build_work_and_never_edi
     assert_eq!(fs::read_to_string(&notes).unwrap(), notes_text);
 }
 
-/// canon's own skill source and the `canon init` AGENTS.md block, each
-/// with its whitespace collapsed so wrapped lines read as one.
+/// canon's own skill (the core, then the four role references it routes
+/// to: the loop's guidance is split across them) and the `canon init`
+/// AGENTS.md block, each with its whitespace collapsed so wrapped lines
+/// read as one.
 fn skill_and_block() -> [(&'static str, String); 2] {
     let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let skill = fs::read_to_string(repo.join("canon/skills/SKILL.src.md")).unwrap();
+    let mut skill = fs::read_to_string(repo.join("canon/skills/SKILL.src.md")).unwrap();
+    for role in ["planner", "implementer", "reviewer", "orchestrator"] {
+        skill.push('\n');
+        skill.push_str(&fs::read_to_string(repo.join(format!("canon/skills/reference/role-{role}.md"))).unwrap());
+    }
     let tmp = tempfile::tempdir().unwrap();
     let init = Command::new(env!("CARGO_BIN_EXE_canon")).arg("init").arg("--repo").arg(tmp.path()).output().unwrap();
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
