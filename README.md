@@ -306,7 +306,33 @@ record). The rest of the coverage lives in `tests/grammar.rs`,
 
 **Closed issues:** #58, #60.
 
-ACCEPTANCE-PLACEHOLDER: dogfood eval 9b
+**Acceptance (dogfood evals 9 and 9b, omp, `language: ko`).** An
+orchestrator agent was asked for a pause menu on the shipped game and
+spawned planner, implementer and reviewer subagents.
+
+- Eval 9 (before the skill fixes below) shipped: 11 new scenarios, 94/94
+  evidenced and reviewed, gate clean. Each subagent read only the core
+  skill and its own role reference; the reviewer was a separate session,
+  and its first round failed one e2e test that the implementer then fixed.
+  It cost 53 canon calls (4.8 per new scenario, against 2.1 for one agent
+  in eval 8): 16 were `canon schema` probes, and the orchestrator called
+  `status` right after writes. It also dropped 82 still-valid screenshot
+  bindings to get a batch past the attachment guard (#58).
+- Fixed from eval 9 in this release: role references carry complete
+  Commands blocks and send agents to `schema` only for unlisted commands;
+  the orchestrator, implementer and reviewer follow `meta.next` /
+  `meta.waitingOn` instead of re-reading `status`; attachments carry
+  forward (#58); `review add`'s one-of provenance is reported as
+  `requiredOneOf`; scenario steps belong to the implementer; `scenario
+  new --from` batches scenario creation; `evals/dogfood/trace_check.py`
+  reads a brief written by a subagent and canon calls made from eval cells.
+- Eval 9b reran the same request on the fixed build. Up to where it
+  stopped it made 57 canon calls for 22 new scenarios (2.6 per scenario;
+  22 of them one `scenario new` each, which `--from` now makes one call),
+  1 `schema` probe, no dropped bindings, 105/105 scenarios evidenced and
+  100 reviewed; its reviewer filed a real blocker (Title did nothing
+  after a restart) and a second implementer was fixing it. The run did not
+  reach `shipped`: the disk holding the repo was disconnected mid-run.
 
 ## 0.20.0 release
 
