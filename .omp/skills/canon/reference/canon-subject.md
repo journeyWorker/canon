@@ -430,9 +430,8 @@ advisory, and is read as before.
   human answers again and `approve` runs again. Run it only from the
   human's answer, with their words as `--note`.
 
-The refinement passes that fix findings before the human stop are
-`brief-shape.md`, `brief-clarify.md`, `brief-harden.md`,
-`brief-align.md` and `brief-polish.md` in this directory.
+The optional refinement passes that fix findings before the human stop are
+listed in `role-planner.md` in this directory.
 
 A **chore** (`canon change new --kind chore`) changes how the subject is
 built or kept, never what it does. Its brief is intent, category,
