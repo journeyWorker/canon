@@ -664,7 +664,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
                     "canon finding add: note — no --introduced-by, so this finding is UNSOURCED for fix-of-fix derivation. That is the correct record when the introducing commit was not established; never guess one."
                 );
             }
-            if args.json && settled.exit_code() == 0 {
+            if settled.exit_code() == 0 {
                 let mut record = settled.json(&receipt.location);
                 record["changeId"] = serde_json::json!(args.change_id.as_str());
                 record["round"] = serde_json::json!(args.round);
@@ -672,7 +672,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
                 record["severity"] = serde_json::json!(severity_slug(args.severity));
                 record["disposition"] = serde_json::json!(args.disposition.as_str());
                 record["unsourced"] = serde_json::json!(args.introduced_by.is_none());
-                crate::json_out::data("finding add", record);
+                crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, record);
             }
             settled.exit_code()
         }
@@ -834,12 +834,8 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
             args.seq,
             args.disposition.as_str()
         );
-        if args.json {
-            crate::json_out::data(
-                "finding close",
-                serde_json::json!({ "changeId": args.change_id.as_str(), "round": args.round, "seq": args.seq, "disposition": args.disposition.as_str(), "noop": true }),
-            );
-        }
+        let noop = serde_json::json!({ "changeId": args.change_id.as_str(), "round": args.round, "seq": args.seq, "disposition": args.disposition.as_str(), "noop": true });
+        crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, noop);
         return 0;
     }
 
@@ -902,7 +898,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
                 args.disposition.as_str(),
                 settled.suffix()
             );
-            if args.json && settled.exit_code() == 0 {
+            if settled.exit_code() == 0 {
                 let mut record = settled.json(&receipt.location);
                 record["changeId"] = serde_json::json!(args.change_id.as_str());
                 record["round"] = serde_json::json!(args.round);
@@ -910,7 +906,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
                 record["from"] = serde_json::json!(existing.disposition().as_str());
                 record["disposition"] = serde_json::json!(args.disposition.as_str());
                 record["noop"] = serde_json::json!(false);
-                crate::json_out::data("finding close", record);
+                crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, record);
             }
             settled.exit_code()
         }

@@ -283,10 +283,9 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     for (location, deduped) in &written {
         crate::say!(args.json, "canon review add: wrote {location} ({}) — {}", if *deduped { "deduped" } else { "new" }, crate::write_mode::DIRECT);
     }
-    if args.json {
-        let wrote: Vec<serde_json::Value> = written.iter().map(|(location, deduped)| serde_json::json!({ "location": location, "deduped": deduped })).collect();
-        crate::json_out::data("review add", serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": stored }));
-    }
+    let wrote: Vec<serde_json::Value> = written.iter().map(|(location, deduped)| serde_json::json!({ "location": location, "deduped": deduped })).collect();
+    let scope = crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect());
+    crate::next::finish(&repo, "review add", &scope, false, args.json, serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": stored }));
     0
 }
 

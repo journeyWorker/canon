@@ -412,9 +412,8 @@ pub fn run_scenario_new(
         return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", feature_path.display())).emit("canon scenario new", json);
     }
     crate::say!(json, "canon scenario new: wrote `@{}` to {} — {}", tag.as_str(), feature_path.display(), crate::write_mode::DIRECT);
-    if json {
-        crate::json_out::data("scenario new", serde_json::json!({ "scenarioId": tag.as_str(), "feature": feature_path.display().to_string() }));
-    }
+    let scope = crate::next::Scope::Scenarios(vec![tag.as_str().to_string()]);
+    crate::next::finish(&repo_root, "scenario new", &scope, false, json, serde_json::json!({ "scenarioId": tag.as_str(), "feature": feature_path.display().to_string() }));
     0
 }
 
@@ -503,7 +502,13 @@ pub fn run_feature_new(
                 crate::say!(json, "canon feature new: wrote {} — {}", feature_path.display(), crate::write_mode::DIRECT);
                 crate::say!(json, "canon feature new: next: `{next}` to make it fmt-clean");
                 if json {
-                    crate::json_out::data("feature new", serde_json::json!({ "feature": feature_path.display().to_string(), "next": next }));
+                    let step = crate::status::NextStep {
+                        command: next.clone(),
+                        why: "the stub holds no scenario yet, so it is not fmt-clean; add the first".into(),
+                        actor: crate::status::StepActor::Agent,
+                        role: Some(crate::role::Role::Planner),
+                    };
+                    crate::json_out::data_with_next("feature new", serde_json::json!({ "feature": feature_path.display().to_string(), "next": next }), &crate::next::After::fixed(vec![step]));
                 }
                 0
             }

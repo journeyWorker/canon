@@ -55,12 +55,14 @@
     {
       "command": "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>",
       "why": "no subject exists yet; a subject is the unit status, review and shipping track",
-      "actor": "agent"
+      "actor": "agent",
+      "role": "planner"
     },
     {
       "command": "canon status",
       "why": "6 scenario(s) carry no @subject tag (first: shop.cart.01); add `@subject:<id>` above each in its .feature file, then check again: status re-indexes the edited files itself",
-      "actor": "agent"
+      "actor": "agent",
+      "role": "orchestrator"
     }
   ],
   "nextOmitted": 0

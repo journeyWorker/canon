@@ -1070,12 +1070,17 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             let settled = crate::gate::promote_after_stage("canon evidence add", &ledger_root, &receipt.location, promote, args.json);
             crate::say!(args.json, "canon evidence add: {} for {} ({outcome}) — {}, {}", settled.landed(&receipt.location), subject, settled.suffix(), next);
             let stale = print_stale_reviews(&repo, &stale_reviews, matches!(settled, crate::gate::StagedOutcome::Promoted { .. }), args.json);
-            if args.json && settled.exit_code() == 0 {
+            if settled.exit_code() == 0 {
                 let mut record = settled.json(&receipt.location);
                 record["subject"] = serde_json::json!(subject);
                 record["outcome"] = serde_json::json!(outcome);
                 record["next"] = serde_json::json!(next);
-                crate::json_out::data("evidence add", serde_json::json!({ "records": [record], "staleReviews": stale }));
+                let scope = match &args.task_id {
+                    Some(_) => crate::next::Scope::Repo,
+                    None => crate::next::Scope::Scenarios(vec![subject.clone()]),
+                };
+                let staged = matches!(settled, crate::gate::StagedOutcome::Staged);
+                crate::next::finish(&repo, "evidence add", &scope, staged, args.json, serde_json::json!({ "records": [record], "staleReviews": stale }));
             }
             settled.exit_code()
         }
@@ -1323,9 +1328,8 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         crate::say!(json, "canon evidence add: skipped {} case(s) that carry no scenario id", batch.without_id);
     }
     let stale = print_stale_reviews(repo, &stale_reviews, promote, json);
-    if json {
-        crate::json_out::data("evidence add", serde_json::json!({ "records": written, "skipped": skipped, "casesWithoutScenarioId": batch.without_id, "staleReviews": stale }));
-    }
+    let scope = crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect());
+    crate::next::finish(repo, "evidence add", &scope, !promote, json, serde_json::json!({ "records": written, "skipped": skipped, "casesWithoutScenarioId": batch.without_id, "staleReviews": stale }));
     0
 }
 

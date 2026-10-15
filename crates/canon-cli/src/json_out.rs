@@ -11,18 +11,38 @@ use serde_json::{json, Value};
 
 /// The success envelope for `command` (its canonical path, e.g. `gate check`).
 /// An invocation of a deprecated form carries `meta.deprecated`
-/// ([`crate::deprecation`]).
+/// ([`crate::deprecation`]). A write command carries `meta.next` (0.21 D2);
+/// here it is empty, for a command with no meaningful next step.
+/// [`data_with_next`] fills it.
 pub fn envelope(command: &str, data: Value) -> Value {
     let mut meta = json!({ "command": command });
+    if writes(command) {
+        meta["next"] = json!([]);
+    }
     if let Some(deprecated) = crate::deprecation::meta() {
         meta["deprecated"] = deprecated;
     }
     json!({ "data": data, "meta": meta })
 }
 
+/// Whether `command` (a canonical path) writes, per [`crate::schema::META`].
+fn writes(command: &str) -> bool {
+    crate::schema::META.iter().any(|row| row.path == command && row.effect != crate::schema::Effect::Read)
+}
+
 /// Prints the success envelope on stdout.
 pub fn data(command: &str, data: Value) {
     println!("{}", envelope(command, data));
+}
+
+/// Prints a write's success envelope with the steps that follow it
+/// ([`crate::next`]).
+pub fn data_with_next(command: &str, data: Value, after: &crate::next::After) {
+    let mut envelope = envelope(command, data);
+    if let (Some(meta), Some(extra)) = (envelope["meta"].as_object_mut(), after.meta().as_object()) {
+        meta.extend(extra.clone());
+    }
+    println!("{envelope}");
 }
 
 /// A command's narration: each line is said (stdout, or stderr under

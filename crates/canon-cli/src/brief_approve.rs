@@ -113,12 +113,11 @@ pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
         return refuse(json, "BRIEF_WRITE_FAILED", &format!("cannot write `{}`: {e}", checked.brief), EXIT_ERROR);
     }
     let digest = brief_digest(&approved);
-    if json {
-        let body = ApproveJson { change: checked.change.as_str(), brief: &checked.brief, digest: &digest, approved_by: by, policy_approved };
-        println!("{}", serde_json::to_string_pretty(&body).unwrap_or_default());
-    } else {
+    if !json {
         let policy = if policy_approved { "; policy approval recorded too" } else { "; no policy file, so no policy approval" };
         println!("canon brief approve: {} approved by `{by}` ({digest}){policy}", checked.brief);
     }
+    let body = ApproveJson { change: checked.change.as_str(), brief: &checked.brief, digest: &digest, approved_by: by, policy_approved };
+    crate::next::finish(&repo, "brief approve", &crate::next::Scope::Change(checked.change.as_str().to_string()), false, json, serde_json::to_value(&body).unwrap_or_default());
     0
 }
