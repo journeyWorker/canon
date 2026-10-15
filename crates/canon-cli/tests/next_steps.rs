@@ -267,11 +267,12 @@ fn a_flow_step_with_only_a_happy_scenario_is_asked_for_its_failure_case_with_its
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject", "demo", "--case", "failure", "--flow", "F1", "--json"]);
 
-    // F2 has no scenario yet: the step is the happy case, owned by the planner.
+    // F2 has no scenario yet: the step is the happy case. Scenarios are the
+    // implementer's (the planner reference writes none).
     let none = flow_step_of(repo, "F2").expect("a step for F2");
     let command = none["command"].as_str().unwrap();
     assert!(command.starts_with("canon scenario new auth.login.03 --subject demo --case happy --flow F2 --title "), "{none}");
-    assert_eq!(none["role"], "planner", "{none}");
+    assert_eq!(none["role"], "implementer", "{none}");
 
     // F2 gains only its happy scenario: the same step now asks for the failure case.
     let wrote = ok(repo, &["scenario", "new", "auth.login.03", "--title", "Sign out", "--subject", "demo", "--case", "happy", "--flow", "F2", "--json"]);

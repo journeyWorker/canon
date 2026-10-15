@@ -634,7 +634,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         if scenarios.is_empty() && summaries.iter().any(|(_, summary)| !awaits_brief(summary)) {
             next.push(NextStep {
                 actor: StepActor::Agent,
-                role: Some(Role::Planner),
+                role: Some(Role::Implementer),
                 command: format!("canon feature new <area>.<surface> --title \"<feature>\"{}", project_flag(&roots, None)),
                 why: "no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject <id>`".into(),
             });
@@ -1002,7 +1002,7 @@ fn project_flag(roots: &[ProjectId], project: Option<&str>) -> String {
 fn flow_step(id: &str, all: &[&Scenario], roots: &[ProjectId], summary: &SubjectSummary, hint: Option<(String, String)>) -> Option<NextStep> {
     let step = summary.flow.iter().find(|step| !step.gaps.is_empty())?;
     let (case, role, gap, title) = if step.scenarios.is_empty() {
-        ("happy", Role::Planner, "no scenario", "<behavior>")
+        ("happy", Role::Implementer, "no scenario", "<behavior>")
     } else {
         ("failure", Role::Implementer, "no failure case", "<what happens on this path>")
     };
@@ -1095,7 +1095,7 @@ fn subject_steps(
         let roots_note = if roots.len() > 1 { format!(" (spec roots: {})", roots.iter().map(ProjectId::as_str).collect::<Vec<_>>().join(", ")) } else { String::new() };
         next.push(NextStep {
             actor: StepActor::Agent,
-            role: Some(Role::Planner),
+            role: Some(Role::Implementer),
             command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject {id} --case happy{}", project_flag(roots, None)),
             why: format!("{id} owns no scenario; specify its behavior, one scenario per behavior{roots_note}"),
         });
