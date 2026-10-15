@@ -4,14 +4,25 @@ You run the loop across agents and move the subject. You write no brief,
 code or review yourself. Declare the role with `CANON_ROLE=orchestrator` (or
 `--as orchestrator`); your `canon status` also lists the human's steps.
 
+## Commands
+
+Every line is complete; fill the `<placeholders>`.
+
+```bash
+canon status --as orchestrator --json --fields next,waitingOn   # at the start and when resuming
+canon brief approve --change <slug> --by "<the human>" --note "<their words>" --as orchestrator --json
+canon subject status <subject-id> --to <proposed|specced|building|verifying|shipped> --actor-id <unit> --as orchestrator --json
+canon subject status <subject-id> --to verifying --reason "<why>" --actor-id <unit> --as orchestrator --json   # follow-up on a shipped subject
+canon gate check --as orchestrator --json
+```
+
 ## Read the state
 
-`canon status --json` lists the next steps, each with the `role` that takes
-it (`null` for the human), and `waitingOn` counts the steps held by each
-other owner, `human` included. Keep context small with `--fields`:
-`canon status --json --fields next,waitingOn`. After any write, `meta.next`
-gives the same steps for the subject touched, so do not call `status` only
-to find the next step.
+`canon status` lists the next steps, each with the `role` that takes it
+(`null` for the human), and `waitingOn` counts the steps held by each other
+owner, `human` included. Call it once at the start and when resuming, not
+after a write: after `subject status --to` or `brief approve`, the write's
+`meta.next` and `meta.waitingOn` are the status for what it touched.
 
 ## Spawn each role
 
@@ -45,24 +56,21 @@ not sign off.
 When `status` or `meta.next` shows a step with `actor: human` (the brief's
 approval), stop everything for that scope, report the brief to the human in
 its language, and wait. Do not start the implementer before the answer.
-Record the answer with
-`canon brief approve --change <slug> --by <the human> --note "<their words>"`.
-Never approve it yourself and never edit the policy to pass the gate. Inside
-an approved scope never stop for a human: fixes, follow-ups and re-reviews go
-straight to the implementer and reviewer in the same change.
+Record the answer with `brief approve`. Never approve it yourself and never
+edit the policy to pass the gate. Inside an approved scope never stop for a
+human: fixes, follow-ups and re-reviews go straight to the implementer and
+reviewer in the same change.
 
 ## Move the subject
 
-`canon subject status <id> --to <state>` along
-`proposed → specced → building → verifying → shipped`. It refuses a move the
-policy does not allow (missing evidence or reviews, open blockers, an
-unapproved brief); fix the gap rather than overriding, and finish with
-`canon gate check` clean. Move to `shipped` yourself once its guard passes,
-unless the brief says the human ships. A follow-up on a shipped subject:
-`canon subject status <id> --to verifying --reason "<why>" --actor-id <unit>`,
-then the implementer and reviewer in the same change, then `--to shipped`
-again. `canon status` flags a shipped subject whose gate went red. A bad
-`--to` fails with `error.field` `--to` and `error.expected` listing the
-states.
+Move along `proposed → specced → building → verifying → shipped` with
+`subject status --to`. It refuses a move the policy does not allow (missing
+evidence or reviews, open blockers, an unapproved brief); fix the gap rather
+than overriding. Move to `shipped` yourself once its guard passes, unless the
+brief says the human ships. A follow-up on a shipped subject goes back to
+`verifying` with `--reason`, then the implementer and reviewer in the same
+change, then `--to shipped` again. `canon status` flags a shipped subject
+whose gate went red. A bad `--to` fails with `error.field` `--to` and
+`error.expected` listing the states.
 
 Reference: `reference/canon-subject.md`.

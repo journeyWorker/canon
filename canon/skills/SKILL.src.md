@@ -80,9 +80,10 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   write returns `meta.next` (`[{command, why, actor, role}]`), the same steps
   `status` would give, narrowed to what the write touched. `actor: human`
   marks a step only the human takes.
-- Unsure of a command or its flags: `canon schema <command> --json` (one call:
-  arguments, options, exits, error codes, an `example` invocation).
-  `canon schema` alone lists every command.
+- Your role reference's **Commands** block (`reference/role-<role>.md`) is
+  your complete command set. Run `canon schema <command> --json` only for a
+  command it does not list, or after a `USAGE` refusal (read `error.field`
+  and `expected` first). `canon schema` alone lists every command.
 - Pass `--json` and read stdout as one document. On failure it is
   `{"error":{"code","message","hint","retryable","field","expected"}}`: branch
   on `error.code`, fix the option `field` names using the `expected` values,
