@@ -89,8 +89,6 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   on `error.code`, fix the option `field` names using the `expected` values,
   and follow `error.hint`. The codes are stable; `canon schema --errors --json`
   lists them.
-- A renamed command still runs for one release, warns on stderr and sets
-  `meta.deprecated`; use the new name it prints.
 - Page long lists with `--limit <n>` and `--cursor <nextCursor>` (`--all`
   for everything), and project fields with `--fields a,b` (`status`, `export`,
   `query`, `finding list`, `divergence status`, `context`).
