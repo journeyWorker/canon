@@ -212,6 +212,23 @@ pub struct Subject {
     /// when absent, so every other subject stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub reopen: Option<Reopen>,
+    /// The note an operator gave the transition that wrote this record
+    /// (`canon subject status <id> --to <state> --reason`, 0.21.1), on
+    /// any transition; a reopen records it here too, next to
+    /// [`Self::reopen`]. Every `canon subject status` write clears it
+    /// and sets it again only when given a `--reason`. Skipped when
+    /// absent, so every other subject stays byte-identical.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub status_reason: Option<StatusReason>,
+}
+
+/// A recorded transition note (see [`Subject::status_reason`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct StatusReason {
+    /// The operator's reason, verbatim (one line).
+    pub reason: String,
+    /// Who gave it.
+    pub actor: Actor,
 }
 
 /// A recorded reopen of a shipped subject (see [`Subject::reopen`]).
@@ -288,6 +305,7 @@ impl Subject {
             change_ids: Vec::new(),
             status_override: None,
             reopen: None,
+            status_reason: None,
         }
     }
 

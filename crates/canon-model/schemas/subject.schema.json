@@ -57,6 +57,17 @@
         }
       ]
     },
+    "status_reason": {
+      "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StatusReason"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "subject_id": {
       "$ref": "#/$defs/SubjectId"
     },
@@ -207,6 +218,24 @@
         "to",
         "reason",
         "waived",
+        "actor"
+      ]
+    },
+    "StatusReason": {
+      "description": "A recorded transition note (see [`Subject::status_reason`]).",
+      "type": "object",
+      "properties": {
+        "actor": {
+          "description": "Who gave it.",
+          "$ref": "#/$defs/Actor"
+        },
+        "reason": {
+          "description": "The operator's reason, verbatim (one line).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
         "actor"
       ]
     },

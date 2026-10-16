@@ -1194,6 +1194,13 @@ fn evidence_add_with_an_artifact_binds_path_and_digest_and_refuses_an_outside_fi
     assert!(stderr(&refused).contains("outside the repository"), "stderr: {}", stderr(&refused));
     assert_eq!(evidence_files(&ledger_root), Vec::<PathBuf>::new(), "a refused add stages nothing");
 
+    // #62: the refusal says how to get unstuck, and names the flag.
+    let refused = run_canon(&scenario_add_args(&["--artifact", outside_path.to_str().unwrap(), "--json"]), dir.path());
+    let error: serde_json::Value = serde_json::from_str(stdout(&refused).lines().last().unwrap()).unwrap();
+    assert_eq!(error["error"]["code"], "EVIDENCE_BIND_REFUSED", "{error}");
+    assert!(error["error"]["hint"].as_str().is_some_and(|hint| hint.contains("copy the file anywhere under the repository")), "{error}");
+    assert_eq!(error["error"]["field"], "--artifact", "{error}");
+
     std::fs::create_dir_all(dir.path().join("traces")).unwrap();
     std::fs::write(dir.path().join("traces/run.zip"), b"trace-bytes").unwrap();
     let added = run_canon(&scenario_add_args(&["--artifact", "traces/run.zip"]), dir.path());

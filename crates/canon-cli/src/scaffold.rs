@@ -444,6 +444,16 @@ fn write_pending(pending: &[Pending]) -> Result<(), CliError> {
     Ok(())
 }
 
+/// What `canon scenario new` says about the `# canon: {...}` lines it
+/// writes (#64): filling in the scenario must not drop them, or
+/// `canon inventory sync` aborts on `missing-provenance`. Human output
+/// prints it; `--json` carries it as `meta.note`.
+const PROVENANCE_NOTE: &str = "keep the `# canon: {...}` provenance lines when you fill in the scenario: one right after `Feature:` and one above the scenario's tags; without them `canon inventory sync` aborts on missing-provenance";
+
+fn provenance_meta() -> serde_json::Value {
+    serde_json::json!({ "note": PROVENANCE_NOTE })
+}
+
 /// `canon scenario new <tag> --title <label> [--feature <path>]
 /// [--project <id>]` (task 5.1; s19 `derived-validated-scenario-feature`
 /// makes `--feature` optional, design D1-D3). Returns the process exit
@@ -475,8 +485,9 @@ pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: Dat
     }
     let tag = &spec.tag;
     crate::say!(json, "canon scenario new: wrote `@{}` to {} — {}", tag.as_str(), feature_path.display(), crate::write_mode::DIRECT);
+    crate::say!(json, "canon scenario new: {PROVENANCE_NOTE}");
     let scope = crate::next::Scope::Scenarios(vec![tag.as_str().to_string()]);
-    crate::next::finish(&repo_root, "scenario new", &scope, false, json, serde_json::json!({ "scenarioId": tag.as_str(), "feature": feature_path.display().to_string() }));
+    crate::next::finish_with_meta(&repo_root, "scenario new", &scope, false, json, serde_json::json!({ "scenarioId": tag.as_str(), "feature": feature_path.display().to_string() }), provenance_meta());
     0
 }
 
@@ -623,7 +634,8 @@ pub fn run_scenario_batch(repo: &Path, source: &str, actor: &Actor, at: DateTime
         crate::say!(json, "{COMMAND}: wrote `@{}` to {}", item["id"].as_str().unwrap_or_default(), item["path"].as_str().unwrap_or_default());
     }
     crate::say!(json, "{COMMAND}: wrote {} scenario(s) — {}", items.len(), crate::write_mode::DIRECT);
-    crate::next::finish(&repo_root, "scenario new", &crate::next::Scope::Scenarios(ids), false, json, serde_json::json!({ "items": items }));
+    crate::say!(json, "{COMMAND}: {PROVENANCE_NOTE}");
+    crate::next::finish_with_meta(&repo_root, "scenario new", &crate::next::Scope::Scenarios(ids), false, json, serde_json::json!({ "items": items }), provenance_meta());
     0
 }
 

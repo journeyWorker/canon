@@ -81,6 +81,11 @@
 //! stderr, which checks it ran and which it skipped. Without the policy
 //! none of this runs and the output is unchanged.
 //!
+//! # A reason on any transition (0.21.1)
+//! `--reason` is accepted on every transition and recorded with the actor
+//! on the new record ([`canon_model::StatusReason`]); the reopen is the one
+//! transition that requires it, and records [`canon_model::Reopen`] too.
+//!
 //! # Reopening a shipped subject (0.18 D3)
 //! `shipped → verifying` is the one backward step: follow-up work on a
 //! shipped subject (a fix, a review round, a scenario its gate now
@@ -109,7 +114,7 @@ use canon_gate::review_gate::{
 use canon_gate::spec_coverage::{case_gaps, subject_change_ids, subject_scenarios};
 use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, PolicyResolution, RequireReview, SpecCoverage, Violation};
 use canon_model::{
-    Actor, Change, ChangeId, Envelope, EvidenceVerdict, ProjectId, RawRecord, RecordKind, Reopen, RoleId, ScenarioId, StatusOverride, Subject, SubjectId,
+    Actor, Change, ChangeId, Envelope, EvidenceVerdict, ProjectId, RawRecord, RecordKind, Reopen, RoleId, ScenarioId, StatusOverride, StatusReason, Subject, SubjectId,
     SubjectStatus, WaivedViolation,
 };
 use canon_policy::SchemaRegistry;
@@ -611,7 +616,7 @@ pub fn run_status(
 ) -> i32 {
     for (flag, text, recorded) in [
         ("--override-reason", override_reason, "the accountable reason"),
-        ("--reason", reason, "why it reopens, with the actor"),
+        ("--reason", reason, "the transition note, with the actor"),
     ] {
         if text.is_some_and(|text| text.trim().is_empty() || text.contains(['\n', '\r'])) {
             return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("{flag} must be one non-empty line; it is recorded on the subject as {recorded}")).emit("canon subject status", json);
@@ -645,19 +650,13 @@ pub fn run_status(
         )).field("--to").expected(["proposed", "specced", "building", "verifying", "shipped", "retired"].into_iter().filter(|s| parse_status(s).is_ok_and(|to| is_valid_transition(current, to)))).emit("canon subject status", json);
     }
     let reopens = current == SubjectStatus::Shipped && target == SubjectStatus::Verifying;
-    match (reopens, reason) {
-        (true, None) => {
-            return CliError::refused("SUBJECT_REASON_REQUIRED", format!("reopening {} (shipped → verifying) needs --reason <text>: why it reopens, recorded on the subject with the actor",
-                subject_id.as_str()
-            )).field("--reason").emit("canon subject status", json);
-        }
-        (false, Some(_)) => {
-            return CliError::refused("SUBJECT_REASON_UNEXPECTED", format!("--reason records why a shipped subject reopens and applies only to shipped → verifying, not {} → {}",
-                status_str(current),
-                status_str(target)
-            )).field("--reason").emit("canon subject status", json);
-        }
-        _ => {}
+    if reopens && reason.is_none() {
+        return CliError::refused("SUBJECT_REASON_REQUIRED", format!("reopening {} (shipped → verifying) needs --reason <text>: why it reopens, recorded on the subject with the actor",
+            subject_id.as_str()
+        ))
+        .field("--reason")
+        .hint(format!("canon subject status {} --to verifying --reason \"<why it reopens>\" --as <role>", subject_id.as_str()))
+        .emit("canon subject status", json);
     }
 
     let schemas = SchemaRegistry::load();
@@ -734,10 +733,12 @@ pub fn run_status(
         return error.emit("canon subject status", json);
     }
 
-    // A waiver, and a reopen note, belong to the transition that needed
-    // them: every write starts without either, so neither carries forward.
+    // A waiver, a reopen note, and a transition reason belong to the
+    // transition that needed them: every write starts without any, so
+    // none carries forward.
     subject.status_override = None;
     subject.reopen = None;
+    subject.status_reason = None;
     if !waivable.is_empty() {
         let Some(reason) = override_reason else {
             let lines = waivable.iter().map(Violation::line).collect::<Vec<_>>().join("\n");
@@ -781,6 +782,9 @@ pub fn run_status(
             subject_id.as_str()
         );
         subject.reopen = Some(Reopen { reason: reason.to_string(), change, actor: Actor::new_unattributed(actor_id) });
+    }
+    if let Some(reason) = reason {
+        subject.status_reason = Some(StatusReason { reason: reason.to_string(), actor: Actor::new_unattributed(actor_id) });
     }
 
     subject.status = target;
@@ -832,6 +836,9 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, override_reason: Option<&st
         }
         if let Some(reopen) = &subject.reopen {
             println!("  reopened: {}", reopen.reason);
+        }
+        if let Some(note) = &subject.status_reason {
+            println!("  reason: {}", note.reason);
         }
     }
     0

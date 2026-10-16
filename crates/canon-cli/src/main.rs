@@ -1577,10 +1577,10 @@ enum SubjectCommand {
         /// Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories
         #[arg(long)]
         override_reason: Option<String>,
-        /// Why a shipped subject reopens (required for shipped → verifying, refused on any other transition); recorded on the subject with the actor
+        /// Why the subject moves (required for shipped → verifying, optional on every other transition); recorded on the subject with the actor
         #[arg(long)]
         reason: Option<String>,
-        /// The invoking actor's id, recorded with an --override-reason waiver or a --reason reopen
+        /// The invoking actor's id, recorded with an --override-reason waiver or a --reason
         #[arg(long, default_value = "canon")]
         actor_id: String,
         /// Repo root (default: nearest ancestor with a canon.yaml)
@@ -2348,6 +2348,16 @@ fn run_query(
     }
 }
 
+/// `base`, plus how to repair a `missing-provenance` violation when one is
+/// among them (#64: editing a generated `.feature` drops the line).
+fn with_provenance_fix(base: &str, missing_provenance: bool) -> String {
+    if missing_provenance {
+        format!("{base}; for missing-provenance, {}", canon_fmt::PROVENANCE_FIX)
+    } else {
+        base.to_string()
+    }
+}
+
 /// `repo: None` (every existing invocation) leaves `root` untouched --
 /// zero new function calls, byte-identical to pre-s26 (design D1). `repo:
 /// Some(r)` resolves the corpus actually checked as
@@ -2367,7 +2377,9 @@ fn run_fmt(root: &std::path::Path, repo: Option<&std::path::Path>, json: bool) -
         }
         ExitCode::SUCCESS
     } else {
-        let error = CliError::failed("FORMAT_VIOLATIONS", format!("{} violation(s) in {} checked file(s)", report.violations.len(), report.files_checked)).hint("fix each violation named in data.violations, then run `canon format` again");
+        let missing_provenance = report.violations.iter().any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
+        let hint = with_provenance_fix("fix each violation named in data.violations, then run `canon format` again", missing_provenance);
+        let error = CliError::failed("FORMAT_VIOLATIONS", format!("{} violation(s) in {} checked file(s)", report.violations.len(), report.files_checked)).hint(hint);
         ExitCode::from(error.emit_with_data("canon format", json, data) as u8)
     }
 }
@@ -2389,7 +2401,9 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
                 canon_cli::next::finish(repo, "inventory sync", &canon_cli::next::Scope::Repo, false, json, data);
                 ExitCode::SUCCESS
             } else {
-                let error = CliError::failed("INVENTORY_ABORTED", "a spec root was aborted on violations or duplicate scenarios; nothing was written for it").hint("data.roots names each violation; fix them, then run `canon inventory sync` again");
+                let missing_provenance = outcome.roots.iter().flat_map(|root| &root.violations).any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
+                let hint = with_provenance_fix("data.roots names each violation; fix them, then run `canon inventory sync` again", missing_provenance);
+                let error = CliError::failed("INVENTORY_ABORTED", "a spec root was aborted on violations or duplicate scenarios; nothing was written for it").hint(hint);
                 ExitCode::from(error.emit_with_data("canon inventory sync", json, data) as u8)
             }
         }

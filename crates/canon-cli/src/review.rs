@@ -205,7 +205,16 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let bound = match crate::evidence_attach::bind_artifacts(&repo, &args.artifacts, args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB)) {
         Ok(bound) => bound,
         Err(e) => {
-            return CliError::refused("REVIEW_ARTIFACT_REFUSED", e.message().to_string()).emit("canon review add", args.json);
+            let refusal = CliError::refused("REVIEW_ARTIFACT_REFUSED", e.message().to_string());
+            let refusal = match e.hint() {
+                Some(hint) => refusal.hint(hint),
+                None => refusal,
+            };
+            let refusal = match e.field() {
+                Some(flag) => refusal.field(flag),
+                None => refusal,
+            };
+            return refusal.emit("canon review add", args.json);
         }
     };
     let mut artifacts: Vec<ReviewArtifact> = Vec::new();

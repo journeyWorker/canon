@@ -257,6 +257,7 @@
         "schema": true,
         "status": true,
         "status_override": false,
+        "status_reason": false,
         "subject_id": true,
         "summary": true,
         "title": true
@@ -696,6 +697,7 @@
         "record.schema": "uint",
         "record.status": "string (one of: proposed, specced, building, verifying, shipped, retired)",
         "record.status_override": "map",
+        "record.status_reason": "map",
         "record.subject_id": "string",
         "record.summary": "string",
         "record.title": "string"

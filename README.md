@@ -82,6 +82,56 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.21.1 release
+
+Patch release for three dogfood findings from a game repo on 0.21.0.
+
+- **Outside-the-repository evidence now says what to do (#62).** `canon
+  evidence add --artifact|--report` and `canon review add --artifact` still
+  refuse a file outside the repository (bound files are recorded by
+  repository-relative path; canon does not accept outside paths), but the
+  refusal now carries a hint (copy the file anywhere under the repository and
+  bind that path; the bytes are stored under `.canon/artifacts/sha256` either
+  way) and, in JSON, `error.field` naming the flag. Every other
+  `EVIDENCE_BIND_REFUSED` cause (unreadable or missing file, directory, over
+  the size limit, not UTF-8, unparseable report, unmatched `--report-case`,
+  no case for an indexed scenario) has a hint too.
+- **`--reason` on every transition (#63).** `canon subject status <id> --to
+  <state> --reason "<text>"` is accepted on any transition and recorded on the
+  subject as `status_reason: { reason, actor }` (a new optional field on the
+  Subject record, cleared by the next status write like `reopen` and
+  `status_override`; `subject status <id>` prints it). The reopen
+  (`shipped → verifying`) still requires it and still records `reopen`;
+  `SUBJECT_REASON_REQUIRED` now has a hint with the full command.
+- **Dropped provenance lines are explained (#64).** `canon scenario new`
+  (single and `--from`) says to keep the `# canon: {...}` provenance lines when
+  filling in the scenario (stdout line; `meta.note` in JSON). The
+  `missing-provenance` violation now lists the lines of the headers lacking
+  it and the line to restore (directly after `Feature:`, and directly above a
+  scenario's tags, in the shape `canon scenario new` writes), and the
+  `FORMAT_VIOLATIONS` and `INVENTORY_ABORTED` hints repeat the fix when one is
+  among the violations. `role-implementer.md` and `canon-authoring.md` say
+  the same in one line. There is no `--fix-provenance` command.
+
+**Migration.** `SUBJECT_REASON_UNEXPECTED` no longer exists: `--reason` is
+accepted on every transition. Callers that branched on that code can drop the
+branch. Subject records gain the optional `status_reason` field (the schema
+`subject.schema.json` is regenerated); existing records read unchanged.
+
+**Changed conformance expectations.** Version strings (`0.21.0` → `0.21.1`)
+in every case that prints one; `evidence-add-refused-file-outside-repo`,
+`evidence-add-refused-no-matching-case` and
+`review-add-refused-artifact-outside-repo` gain a `hint:` line;
+`subject-reopen-allowed` gains the `SUBJECT_REASON_REQUIRED` hint line; `status-refreshes-stale-index` and
+`status-shipped-red-reopen` (both run `scenario new`) gain the provenance note line; the subject field lists in
+`context-json-policy-summary` gain `status_reason`.
+
+Closes #62
+
+Closes #63
+
+Closes #64
+
 ## 0.21.0 release
 
 Version 0.21.0 gives canon one verb grammar and makes it answer "what now?"

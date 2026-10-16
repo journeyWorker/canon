@@ -1473,11 +1473,11 @@ fn subject_lifecycle_30_reopening_outside_an_approved_scope_is_refused_naming_th
     assert_eq!(current_subject(dir.path())["reopen"]["change"], "c-next");
 }
 
-/// subject.lifecycle.31: a reopen without `--reason`, with a blank one,
-/// or a `--reason` on any other transition is a usage refusal that
-/// leaves the subject unchanged.
+/// subject.lifecycle.31: a reopen without `--reason`, or with a blank
+/// one, is a usage refusal, with a hint, that leaves the subject
+/// unchanged.
 #[test]
-fn subject_lifecycle_31_a_reopen_needs_a_reason_and_a_reason_needs_a_reopen() {
+fn subject_lifecycle_31_a_reopen_needs_a_reason() {
     let dir = repo();
     seed_shipped(dir.path());
 
@@ -1488,13 +1488,32 @@ fn subject_lifecycle_31_a_reopen_needs_a_reason_and_a_reason_needs_a_reopen() {
         "{}",
         stderr(&out)
     );
+    assert!(stderr(&out).contains("hint: canon subject status demo-subject --to verifying --reason"), "the refusal says how to retry: {}", stderr(&out));
     let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying", "--reason", "  "]);
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("--reason must be one non-empty line"), "{}", stderr(&out));
-    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "retired", "--reason", "done"]);
-    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
-    assert!(stderr(&out).contains("--reason records why a shipped subject reopens and applies only to shipped → verifying, not shipped → retired"), "{}", stderr(&out));
     assert_eq!(current_subject(dir.path())["status"], "shipped");
+}
+
+/// #63: `--reason` is an audit note on every transition, not only the
+/// reopen: `building → verifying` accepts it and the record carries it
+/// with the actor, and the next write without one clears it.
+#[test]
+fn subject_lifecycle_31b_any_transition_accepts_a_reason_and_records_it() {
+    let dir = repo();
+    seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[]);
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying", "--reason", "story complete", "--actor-id", "impl-agent"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let subject = current_subject(dir.path());
+    assert_eq!(subject["status"], "verifying");
+    assert_eq!(subject["status_reason"]["reason"], "story complete", "{subject}");
+    assert_eq!(subject["status_reason"]["actor"]["agent_id"], "impl-agent", "{subject}");
+    assert!(subject.get("reopen").is_none(), "only a reopen records `reopen`: {subject}");
+
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "retired"]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert!(current_subject(dir.path()).get("status_reason").is_none(), "a reason belongs to the transition that gave it");
 }
 
 /// subject.lifecycle.32: a reopened subject ships through every guard
