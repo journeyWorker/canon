@@ -1,0 +1,1 @@
+{"error":{"code":"USAGE","field":"specced","hint":"Usage: canon subject status [OPTIONS] <ID> For more information, try '--help'.","message":"unexpected argument 'specced' found","retryable":false}}

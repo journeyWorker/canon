@@ -1,0 +1,5 @@
+error: unrecognized subcommand 'attest'
+
+Usage: canon demo [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

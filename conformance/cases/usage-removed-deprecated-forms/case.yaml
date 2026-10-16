@@ -1,0 +1,16 @@
+description: "0.22 D4: the forms 0.21 deprecated (`context-pack create`, `prompt register`, `divergence stage`, `demo attest`, and the two-positional `subject status <id> <state>`) no longer parse: each gets the ordinary `USAGE` refusal (exit 2) as one `--json` error document, the human form names the unrecognized subcommand or argument on stderr, and `canon schema` answers an old path with `UNKNOWN_COMMAND` (exit 2)"
+steps:
+  - args: [context-pack, create, --manifest, manifest.json, --json]
+    exit: 2
+  - args: [prompt, register, --name, reviewer, --version, v1, --manifest, manifest.json, --json]
+    exit: 2
+  - args: [divergence, stage, --project-id, root, --scenario-id, auth.login.01, --sha, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, --reviewer, alice, --role, reviewer, --json]
+    exit: 2
+  - args: [demo, attest, --json]
+    exit: 2
+  - args: [subject, status, checkout, specced, --json]
+    exit: 2
+  - args: [demo, attest]
+    exit: 2
+  - args: [schema, demo, attest, --json]
+    exit: 2

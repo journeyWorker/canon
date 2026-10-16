@@ -1,0 +1,1 @@
+{"error":{"code":"USAGE","hint":"tip: a similar subcommand exists: 'status' Usage: canon divergence [OPTIONS] <COMMAND> For more information, try '--help'.","message":"unrecognized subcommand 'stage'","retryable":false}}

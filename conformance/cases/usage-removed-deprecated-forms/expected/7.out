@@ -1,0 +1,1 @@
+{"error":{"code":"UNKNOWN_COMMAND","hint":"`canon schema` lists every command","message":"unknown command `demo attest`; available: demo init, demo add","retryable":false}}
