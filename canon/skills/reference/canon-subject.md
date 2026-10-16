@@ -265,11 +265,13 @@ canon subject status: reopened `demo-subject` from shipped, recorded by `impl`: 
 canon subject status: demo-subject → verifying — written directly; nothing to promote
 ```
 
-- `--reason "<one line>"` is required for `shipped → verifying` and
-  refused on any other transition (exit 2, as is a blank one). The new
-  record carries it with the actor and the change the work goes into:
+- `--reason "<one line>"` is required for `shipped → verifying` (exit 2
+  without it, as for a blank one) and optional on every other transition,
+  where it is an audit note. The new record carries it with the actor as
+  `status_reason: { reason: …, actor: { agent_id: impl } }`; a reopen also
+  records the change the work goes into:
   `reopen: { reason: …, change: c-demo, actor: { agent_id: impl } }`. The
-  next status write clears it, as it clears a waiver.
+  next status write clears both, as it clears a waiver.
 - Inside the approved scope it needs no human: the subject's newest
   adopted change's brief is approved, or there is no brief to answer.
   Otherwise it refuses, exit 1, naming the brief to approve, and

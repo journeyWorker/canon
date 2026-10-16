@@ -239,11 +239,19 @@ fn fabricated(violations: &[Violation]) -> CliError {
     CliError::failed("EVIDENCE_FABRICATED", violations.iter().map(Violation::line).collect::<Vec<_>>().join("\n"))
 }
 
-/// A `--report`/`--file` binding refusal, with the exit its kind carries.
+/// A `--artifact`/`--report` binding refusal, with the exit its kind
+/// carries. A usage refusal always has a hint and names its flag when one
+/// caused it.
 fn bind_refusal(error: &crate::evidence_attach::BindError) -> CliError {
     use crate::evidence_attach::BindError;
     match error {
-        BindError::Usage(message) => CliError::refused("EVIDENCE_BIND_REFUSED", message.as_str()),
+        BindError::Usage { message, hint, field } => {
+            let refusal = CliError::refused("EVIDENCE_BIND_REFUSED", message.as_str()).hint(hint.as_str());
+            match field {
+                Some(flag) => refusal.field(*flag),
+                None => refusal,
+            }
+        }
         BindError::Contradiction(message) => CliError::failed("EVIDENCE_REPORT_CONTRADICTION", message.as_str()),
     }
 }

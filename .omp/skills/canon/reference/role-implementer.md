@@ -39,7 +39,8 @@ After the first `status`, follow `meta.next` of each write; do not call
    violation or a duplicate id: it names each problem). Specs live at
    `<root>/kind=feature/area=<area>/<surface>.feature` under a `specs.roots[]`
    root (default `.canon/specs`); `reference/canon-authoring.md` has the
-   scaffold.
+   scaffold. When you fill in a scenario, keep its `# canon: {...}` provenance
+   lines: dropping one aborts `inventory sync` on `missing-provenance`.
 2. **Units.** Give each unit its own actor id and session id and pass them on
    everything it records. A delegated unit attests its own work; never attest
    another unit's work under your id.

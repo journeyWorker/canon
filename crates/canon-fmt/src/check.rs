@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use canon_model::family::{layout_problem, FamilyKind, LedgerKind};
 
 use crate::gherkin;
-use crate::report::{FmtFailureClass, FmtReport, Violation};
+use crate::report::{FmtFailureClass, FmtReport, Violation, PROVENANCE_FIX};
 use crate::resolve::{self, ResolveError};
 use crate::schema_registry::{self, SchemaCheck};
 use crate::sha::is_full_sha;
@@ -290,10 +290,17 @@ fn check_features(root: &Path, report: &mut FmtReport) {
         }
 
         if scan.missing_provenance_count() > 0 {
+            let lacking: Vec<String> = scan.headers.iter().filter(|h| !h.has_provenance).map(|h| format!("line {} `{}`", h.line_no, h.label)).collect();
+            let shown = lacking.iter().take(5).cloned().collect::<Vec<_>>().join(", ");
+            let more = if lacking.len() > 5 { format!(", and {} more", lacking.len() - 5) } else { String::new() };
             report.violations.push(Violation::new(
                 FmtFailureClass::MissingProvenance,
                 &rel,
-                format!("{} of {} Feature:/Scenario: header(s) lack a `# canon: {{...}}` provenance comment — it may sit directly above the header (with its tags) or directly below it", scan.missing_provenance_count(), scan.headers.len()),
+                format!(
+                    "{} of {} Feature:/Scenario: header(s) lack a `# canon: {{...}}` provenance comment ({shown}{more}) — it may sit directly above the header (with its tags) or directly below it; {PROVENANCE_FIX}",
+                    lacking.len(),
+                    scan.headers.len()
+                ),
             ));
         }
     }

@@ -110,6 +110,9 @@ Fix it and the next command indexes the files (see `canon-inventory`).
 
 - `--actor <id>` (or `CANON_ACTOR` in the environment) puts YOUR id on the
   provenance line. Default is `canon-scaffold`.
+- **Keep the `# canon:` lines when you fill in the scenario.** Dropping one
+  makes `canon inventory sync` abort on `missing-provenance`; restore it
+  from git history or a sibling scenario (the error shows its shape).
 - **Never hand-type, move, or edit a `# canon:` line.** The scaffold
   writes it directly above the scenario's tags:
 

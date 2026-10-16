@@ -12,7 +12,7 @@ Every line is complete; fill the `<placeholders>`.
 canon status --as orchestrator --json --fields next,waitingOn   # at the start and when resuming
 canon brief approve --change <slug> --by "<the human>" --note "<their words>" --as orchestrator --json
 canon subject status <subject-id> --to <proposed|specced|building|verifying|shipped> --actor-id <unit> --as orchestrator --json
-canon subject status <subject-id> --to verifying --reason "<why>" --actor-id <unit> --as orchestrator --json   # follow-up on a shipped subject
+canon subject status <subject-id> --to verifying --reason "<why>" --actor-id <unit> --as orchestrator --json   # reopen a shipped subject (--reason is required here; any other transition accepts it as a note)
 canon gate check --as orchestrator --json
 ```
 

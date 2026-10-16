@@ -23,7 +23,7 @@ pub mod sha;
 pub mod util;
 
 pub use check::check;
-pub use report::{FmtFailureClass, FmtReport, Violation};
+pub use report::{FmtFailureClass, FmtReport, Violation, PROVENANCE_FIX};
 
 
 /// canon-fmt's shared-contract selftest entry point (Wave-2 `canon

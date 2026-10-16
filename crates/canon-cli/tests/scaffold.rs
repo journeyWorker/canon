@@ -246,6 +246,43 @@ fn inventory_sync_materializes_exactly_the_tagged_scenario_identical_to_a_hand_a
     assert_eq!(scaffolded_record["title"], hand_authored_record["title"]);
 }
 
+// ── the provenance lines survive filling in a scenario (#64) ──
+
+/// `scenario new` says to keep the `# canon:` lines: on stdout for a human,
+/// in `meta.note` for `--json`.
+#[test]
+fn scenario_new_says_to_keep_the_provenance_lines() {
+    let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path());
+    let human = scenario_new_no_feature(dir.path(), "world.checkout.01", "Start checkout");
+    assert!(stdout(&human).contains("keep the `# canon: {...}` provenance lines"), "{}", stdout(&human));
+
+    let json = run_canon(&["scenario", "new", "world.checkout.02", "--title", "Pay", "--json"], dir.path());
+    let envelope: Value = serde_json::from_str(&stdout(&json)).unwrap();
+    assert!(envelope["meta"]["note"].as_str().is_some_and(|note| note.contains("keep the `# canon: {...}` provenance lines")), "{envelope}");
+}
+
+/// A scenario file whose provenance line was edited away aborts
+/// `inventory sync`, and the failure names the line to restore.
+#[test]
+fn inventory_sync_on_a_dropped_provenance_line_names_the_line_to_restore() {
+    let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path());
+    assert!(scenario_new_no_feature(dir.path(), "world.checkout.01", "Start checkout").status.success());
+    let path = dir.path().join(".canon/specs/kind=feature/area=world/checkout.feature");
+    let stripped: String = std::fs::read_to_string(&path).unwrap().lines().filter(|line| !line.trim_start().starts_with("# canon:")).map(|line| format!("{line}\n")).collect();
+    std::fs::write(&path, stripped).unwrap();
+
+    let out = run_canon(&["inventory", "sync", "--repo", ".", "--json"], dir.path());
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    let envelope: Value = serde_json::from_str(stdout(&out).lines().last().unwrap()).unwrap();
+    assert_eq!(envelope["error"]["code"], "INVENTORY_ABORTED", "{envelope}");
+    let hint = envelope["error"]["hint"].as_str().unwrap();
+    assert!(hint.contains("restore the `# canon: {...}` line") && hint.contains("directly after `Feature:`"), "{hint}");
+    let message = envelope["data"]["roots"][0]["violations"][0]["message"].as_str().unwrap();
+    assert!(message.contains("line 1 `world checkout`") && message.contains("restore the `# canon: {...}` line"), "{message}");
+}
+
 // ── writes no ledger record ──
 
 #[test]

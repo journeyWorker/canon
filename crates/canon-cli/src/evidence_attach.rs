@@ -77,22 +77,50 @@ const MAX_REPORT_BYTES: u64 = 64 * 1024 * 1024;
 #[derive(Debug)]
 pub enum BindError {
     /// The invocation is wrong (missing file, bad format, no case): 2.
-    Usage(String),
+    /// Every refusal says how to get unstuck (`hint`) and, when one flag
+    /// caused it, which (`field`).
+    Usage { message: String, hint: String, field: Option<&'static str> },
     /// The report contradicts the verdict: 1.
     Contradiction(String),
 }
 
 impl BindError {
+    fn usage(message: impl Into<String>, hint: impl Into<String>) -> Self {
+        BindError::Usage { message: message.into(), hint: hint.into(), field: None }
+    }
+
+    /// Names the flag the refused file was given with.
+    fn on(self, flag: &'static str) -> Self {
+        match self {
+            BindError::Usage { message, hint, .. } => BindError::Usage { message, hint, field: Some(flag) },
+            other => other,
+        }
+    }
+
     pub fn exit_code(&self) -> i32 {
         match self {
-            BindError::Usage(_) => 2,
+            BindError::Usage { .. } => 2,
             BindError::Contradiction(_) => 1,
         }
     }
 
     pub fn message(&self) -> &str {
         match self {
-            BindError::Usage(m) | BindError::Contradiction(m) => m,
+            BindError::Usage { message, .. } | BindError::Contradiction(message) => message,
+        }
+    }
+
+    pub fn hint(&self) -> Option<&str> {
+        match self {
+            BindError::Usage { hint, .. } => Some(hint),
+            BindError::Contradiction(_) => None,
+        }
+    }
+
+    pub fn field(&self) -> Option<&'static str> {
+        match self {
+            BindError::Usage { field, .. } => *field,
+            BindError::Contradiction(_) => None,
         }
     }
 }
@@ -182,12 +210,13 @@ pub fn bind_artifacts(repo: &Path, artifacts: &[PathBuf], max_bytes: u64) -> Res
 }
 
 fn canonical_repo(repo: &Path) -> Result<PathBuf, BindError> {
-    repo.canonicalize().map_err(|e| BindError::Usage(format!("resolve repository root: {e}")))
+    repo.canonicalize().map_err(|e| BindError::usage(format!("resolve repository root: {e}"), "run canon from inside the repository, or pass --repo <root>"))
 }
 
 fn hash_artifact(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, BoundFile), BindError> {
-    let (relative, resolved, file) = open_in_repo(repo, path, max_bytes)?;
-    let sha256 = canon_gate::artifact_store::sha256_reader(file).map_err(|e| BindError::Usage(format!("read {}: {e}", path.display())))?;
+    let (relative, resolved, file) = open_in_repo(repo, path, max_bytes).map_err(|e| e.on("--artifact"))?;
+    let sha256 = canon_gate::artifact_store::sha256_reader(file)
+        .map_err(|e| BindError::usage(format!("read {}: {e}", path.display()), "check the file is readable by this user").on("--artifact"))?;
     Ok((relative, BoundFile { resolved, sha256 }))
 }
 
@@ -302,30 +331,33 @@ impl ParsedReport {
 const FAITHFUL_NEEDS_PASSES: &str = "a faithful verdict needs every bound case to pass (attest the verdict the report shows, or fix the test)";
 
 fn read_report(repo: &Path, format: ReportFormat, path: &Path, max_bytes: u64) -> Result<ParsedReport, BindError> {
+    read_report_file(repo, format, path, max_bytes).map_err(|e| e.on("--report"))
+}
+
+fn read_report_file(repo: &Path, format: ReportFormat, path: &Path, max_bytes: u64) -> Result<ParsedReport, BindError> {
     let (relative, resolved, file) = open_in_repo(repo, path, max_bytes)?;
     let mut bytes = Vec::new();
     file.take(MAX_REPORT_BYTES + 1)
         .read_to_end(&mut bytes)
-        .map_err(|e| BindError::Usage(format!("read {}: {e}", path.display())))?;
+        .map_err(|e| BindError::usage(format!("read {}: {e}", path.display()), "check the file is readable by this user and not being written by the test run still"))?;
     if bytes.len() as u64 > MAX_REPORT_BYTES {
-        return Err(BindError::Usage(format!(
-            "{} is larger than {MAX_REPORT_BYTES} bytes; bind it with --artifact instead",
-            path.display()
-        )));
+        return Err(BindError::usage(
+            format!("{} is larger than {MAX_REPORT_BYTES} bytes; bind it with --artifact instead", path.display()),
+            "bind the file as an opaque --artifact, or split the report per suite",
+        ));
     }
     let text = std::str::from_utf8(&bytes)
-        .map_err(|_| BindError::Usage(format!("{} is not UTF-8", path.display())))?;
+        .map_err(|_| BindError::usage(format!("{} is not UTF-8", path.display()), "write the report as UTF-8 (a test runner's XML/JSON output is), or bind the file as an opaque --artifact"))?;
     let cases = match format {
         ReportFormat::Junit => parse_junit(text),
         ReportFormat::Cucumber => parse_cucumber(text),
         ReportFormat::SwiftTesting => parse_swift_testing(text),
     }
     .map_err(|e| {
-        BindError::Usage(format!(
-            "{} is not a readable {} report: {e}",
-            path.display(),
-            format_name(format)
-        ))
+        BindError::usage(
+            format!("{} is not a readable {} report: {e}", path.display(), format_name(format)),
+            "pass --report <format>:<path> with the format the file really is (junit, cucumber or swift-testing), regenerate the report if the run was cut short, or bind the file as an opaque --artifact",
+        )
     })?;
     let sha256 = format!("{:x}", Sha256::digest(&bytes));
     Ok(ParsedReport { format, given: path.to_path_buf(), relative, resolved, sha256, cases })
@@ -356,7 +388,10 @@ pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
             report.cases.iter().collect()
         } else {
             match_cases(&report.cases, request.report_cases, request.scenario_id)
-                .map_err(|e| BindError::Usage(format!("{}: {e}", path.display())))?
+                .map_err(|e| {
+                    BindError::usage(format!("{}: {e}", path.display()), "name the cases to bind with --report-case <name>, or start each test name with the scenario id so it is picked up by default")
+                        .on("--report-case")
+                })?
         };
         named_unmatched.retain(|name| !matched.iter().any(|c| names_case(c, name)));
         if request.verdict == EvidenceVerdict::Faithful {
@@ -368,9 +403,11 @@ pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
         bound.attachments.extend(matched.iter().map(|case| report.attachment(case)));
     }
     if let Some(name) = named_unmatched.first() {
-        return Err(BindError::Usage(format!(
-            "--report-case `{name}` names no case in any --report; a binding that names nothing is not a binding"
-        )));
+        return Err(BindError::usage(
+            format!("--report-case `{name}` names no case in any --report; a binding that names nothing is not a binding"),
+            "copy a case name from the report (the suffix after `::` is enough), or drop --report-case to bind the cases carrying the scenario id",
+        )
+        .on("--report-case"));
     }
     Ok(bound)
 }
@@ -499,9 +536,11 @@ pub fn bind_all_scenarios(request: &BatchRequest<'_>) -> Result<BatchBound, Bind
         } else {
             format!(" (not indexed: {})", batch.unindexed.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>().join(", "))
         };
-        return Err(BindError::Usage(format!(
-            "no case among the report's {cases} case(s) belongs to an indexed scenario{named}; start each test name with its scenario id or tag it, and index the scenarios (`canon inventory sync`)"
-        )));
+        return Err(BindError::usage(
+            format!("no case among the report's {cases} case(s) belongs to an indexed scenario{named}; start each test name with its scenario id or tag it, and index the scenarios (`canon inventory sync`)"),
+            "name each test after its scenario id (or tag it with the id), run `canon inventory sync`, then retry",
+        )
+        .on("--report"));
     }
     for report in &reports {
         if !batch.files.iter().any(|f| f.sha256 == report.sha256) {
@@ -554,20 +593,20 @@ fn outcome_name(outcome: ReportOutcome) -> &'static str {
 /// path and its resolved location. A path outside the repo would record
 /// a machine-local location no reviewer can find.
 fn open_in_repo(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, PathBuf, std::fs::File), BindError> {
-    let resolved = path
-        .canonicalize()
-        .map_err(|e| BindError::Usage(format!("{}: {e}", path.display())))?;
+    let resolved = path.canonicalize().map_err(|e| {
+        BindError::usage(format!("{}: {e}", path.display()), "check the path exists and is readable from the directory canon runs in; a relative path is resolved against it")
+    })?;
     if !resolved.is_file() {
-        return Err(BindError::Usage(format!(
-            "{} is not a file",
-            path.display()
-        )));
+        return Err(BindError::usage(
+            format!("{} is not a file", path.display()),
+            "name a file, not a directory; archive a directory first (zip or tar) and bind the archive",
+        ));
     }
     let relative = resolved.strip_prefix(repo).map_err(|_| {
-        BindError::Usage(format!(
-            "{} is outside the repository; bound files are recorded by repository-relative path",
-            path.display()
-        ))
+        BindError::usage(
+            format!("{} is outside the repository; bound files are recorded by repository-relative path", path.display()),
+            "copy the file anywhere under the repository and bind that path; canon stores the bytes under .canon/artifacts/sha256 either way",
+        )
     })?;
     let relative = relative
         .components()
@@ -575,17 +614,20 @@ fn open_in_repo(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Pat
         .collect::<Vec<_>>()
         .join("/");
     let file = std::fs::File::open(&resolved)
-        .map_err(|e| BindError::Usage(format!("open {}: {e}", path.display())))?;
+        .map_err(|e| BindError::usage(format!("open {}: {e}", path.display()), "check the file is readable by this user (permissions) and not locked by another process"))?;
     let size = file
         .metadata()
-        .map_err(|e| BindError::Usage(format!("stat {}: {e}", path.display())))?
+        .map_err(|e| BindError::usage(format!("stat {}: {e}", path.display()), "check the file is readable by this user (permissions) and still exists"))?
         .len();
     if size > max_bytes {
-        return Err(BindError::Usage(format!(
-            "{} is {size} bytes, over the artifact store's limit of {max_bytes} bytes; raise it with {} <MiB> if the file belongs in git",
-            path.display(),
-            canon_gate::MAX_ARTIFACT_FLAG
-        )));
+        return Err(BindError::usage(
+            format!(
+                "{} is {size} bytes, over the artifact store's limit of {max_bytes} bytes; raise it with {} <MiB> if the file belongs in git",
+                path.display(),
+                canon_gate::MAX_ARTIFACT_FLAG
+            ),
+            format!("raise the limit with {} <MiB>, or bind a smaller file (trim or compress it)", canon_gate::MAX_ARTIFACT_FLAG),
+        ));
     }
     Ok((relative, resolved, file))
 }
@@ -1173,17 +1215,17 @@ mod tests {
         assert_eq!(bind(&honest).unwrap().attachments[0].outcome, Some(ReportOutcome::Failed), "a divergent verdict may cite the failing case");
         let unknown = vec!["no_such_test".to_string()];
         let nameless = BindRequest { report_cases: &unknown, ..request(repo.path(), &[], &reports, EvidenceVerdict::Faithful) };
-        assert!(matches!(bind(&nameless), Err(BindError::Usage(m)) if m.contains("no_such_test")), "a --report-case that names nothing refuses");
+        assert!(matches!(bind(&nameless), Err(BindError::Usage { message: m, .. }) if m.contains("no_such_test")), "a --report-case that names nothing refuses");
 
         let outside = TempDir::new().unwrap();
         std::fs::write(outside.path().join("x.log"), b"x").unwrap();
         let elsewhere = vec![outside.path().join("x.log")];
         let err = bind(&request(repo.path(), &elsewhere, &[], EvidenceVerdict::Faithful)).unwrap_err();
-        assert!(matches!(&err, BindError::Usage(m) if m.contains("outside the repository")), "{err:?}");
+        assert!(matches!(&err, BindError::Usage { message: m, hint: h, field: Some("--artifact") } if m.contains("outside the repository") && h.contains("copy the file")), "{err:?}");
 
         let oversized = BindRequest { max_bytes: 4, ..request(repo.path(), &artifacts, &[], EvidenceVerdict::Faithful) };
         assert!(
-            matches!(bind(&oversized), Err(BindError::Usage(m)) if m.contains("--max-artifact-mib")),
+            matches!(bind(&oversized), Err(BindError::Usage { message: m, .. }) if m.contains("--max-artifact-mib")),
             "a file over the size limit refuses, naming the override flag"
         );
     }
@@ -1360,7 +1402,7 @@ mod tests {
             "{faithful:?}"
         );
         let nobody = bind_all_scenarios(&BatchRequest { indexed: &["shop.cart.05"], ..request }).unwrap_err();
-        assert!(matches!(&nobody, BindError::Usage(m) if m.contains("not indexed: shop.cart.01, shop.cart.02, shop.cart.09, shop_cart_03")), "{nobody:?}");
+        assert!(matches!(&nobody, BindError::Usage { message: m, .. } if m.contains("not indexed: shop.cart.01, shop.cart.02, shop.cart.09, shop_cart_03")), "{nobody:?}");
         assert_eq!(derived_verdict([ReportOutcome::Passed, ReportOutcome::Skipped, ReportOutcome::Failed]), EvidenceVerdict::Divergent);
     }
 
