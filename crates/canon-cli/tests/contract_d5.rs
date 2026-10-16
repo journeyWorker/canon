@@ -82,7 +82,7 @@ fn context_keeps_only_the_named_sections() {
 #[test]
 fn divergence_status_projects_each_scenario_row() {
     let dir = repo();
-    ok(dir.path(), &["divergence", "stage", "--project-id", "root", "--scenario-id", "auth.login.01", "--sha", SHA, "--reviewer", "alice", "--role", "reviewer"]);
+    ok(dir.path(), &["divergence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--sha", SHA, "--reviewer", "alice", "--role", "reviewer"]);
     let all = body(&run(dir.path(), &["divergence", "status", "--json"]));
     assert!(all["data"]["scenarios"][0].as_object().unwrap().len() >= 3, "{all}");
     let out = run(dir.path(), &["divergence", "status", "--json", "--fields", "scenario_id,state"]);
@@ -156,11 +156,11 @@ fn usage_errors_name_the_argument_and_its_possible_values() {
 #[test]
 fn a_subject_status_off_the_chain_lists_the_states_it_may_move_to() {
     let dir = repo();
-    // The state argument is a closed set clap knows.
-    let e = error_of(dir.path(), &["subject", "status", "demo", "nope"]);
+    // The --to state is a closed set clap knows.
+    let e = error_of(dir.path(), &["subject", "status", "demo", "--to", "nope"]);
     assert_eq!(strings(&e["expected"]), ["proposed", "specced", "building", "verifying", "shipped", "retired"]);
     // A known state that is not the next step names the next steps.
-    let e = error_of(dir.path(), &["subject", "status", "demo", "shipped"]);
+    let e = error_of(dir.path(), &["subject", "status", "demo", "--to", "shipped"]);
     assert_eq!(e["code"], "SUBJECT_INVALID_TRANSITION");
     assert_eq!(strings(&e["expected"]), ["specced", "retired"]);
 }
@@ -187,7 +187,7 @@ fn input_validation_refusals_name_the_field_and_the_accepted_values() {
 #[test]
 fn a_refusal_about_no_particular_argument_carries_neither_key() {
     let dir = repo();
-    let e = error_of(dir.path(), &["subject", "status", "ghost", "specced"]);
+    let e = error_of(dir.path(), &["subject", "status", "ghost", "--to", "specced"]);
     assert_eq!(e["code"], "SUBJECT_NOT_FOUND");
     assert!(e.get("field").is_none() && e.get("expected").is_none(), "{e}");
 }

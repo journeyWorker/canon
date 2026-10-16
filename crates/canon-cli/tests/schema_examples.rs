@@ -140,16 +140,9 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
         let scratch = TempDir::new().unwrap();
         let mut cwd = scratch.path().join("repo");
         copy_dir(base.path(), &cwd);
-        match leaf.as_str() {
-            "init" => {
-                cwd = scratch.path().join("fresh");
-                std::fs::create_dir_all(&cwd).unwrap();
-            }
-            "demo attest" => {
-                ok(scratch.path(), home.path(), &["demo", "init", "--repo", "canon-demo"]);
-                cwd = scratch.path().join("canon-demo");
-            }
-            _ => {}
+        if leaf == "init" {
+            cwd = scratch.path().join("fresh");
+            std::fs::create_dir_all(&cwd).unwrap();
         }
         let mut argv = words(example);
         argv.remove(0);
