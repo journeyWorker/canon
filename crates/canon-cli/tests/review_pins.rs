@@ -138,8 +138,13 @@ fn record_suite(repo: &Path, report: &str) {
     ok(repo, &["gate", "promote"]);
 }
 
+/// Every evidence record ever written: the ledger holds the latest per key
+/// and the archive the ones it superseded (0.23 D2).
 fn evidence_records(repo: &Path) -> usize {
-    std::fs::read_dir(repo.join(".canon/ledger/kind=evidence_record")).map(|d| d.count()).unwrap_or(0)
+    [".canon/ledger/kind=evidence_record", ".canon/archive/kind=evidence_record"]
+        .iter()
+        .map(|dir| std::fs::read_dir(repo.join(dir)).map(|d| d.count()).unwrap_or(0))
+        .sum()
 }
 
 /// A repo whose evidence is the suite's report and whose scenarios are both
