@@ -109,8 +109,37 @@ pub fn chore_review_gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> V
     let Some((rr, _)) = active_require_review(ctx).filter(|(rr, _)| rr.covers(SubjectStatus::Shipped)) else { return Vec::new() };
     chore_approvals(repo, ctx, subject)
         .into_iter()
+        .filter(|(_, since, _)| !reviewed_scenario_by_scenario_since(ctx, subject, *since))
         .filter_map(|(change, _, digest)| change_review_gap(ctx, subject, &change, &digest, rr.distinct_actor).map(|why| (change, why)))
         .collect()
+}
+
+/// Whether every evidenced scenario of `subject` carries a current, signed
+/// review recorded after `since` and after the scenario's latest evidence:
+/// a reviewer looked at each scenario as the chore left it, which covers at
+/// least what one change-level review would. That is how a chore was
+/// reviewed before 0.23, so a repo upgraded with such a chore shipped
+/// stays green; the per-scenario reviews' own independence and currency
+/// are the scenario rule's.
+fn reviewed_scenario_by_scenario_since(ctx: &GateContext, subject: &Subject, since: DateTime<Utc>) -> bool {
+    let reviews = canon_gate::review_gate::current_reviews(ctx);
+    let evidenced: Vec<_> = canon_gate::spec_coverage::subject_scenarios(ctx, &subject.subject_id)
+        .into_iter()
+        .filter_map(|scenario| {
+            let latest = canon_gate::freshness::scenario_evidence(ctx, scenario).into_iter().map(|e| e.envelope.at).max()?;
+            Some((scenario, latest))
+        })
+        .collect();
+    !evidenced.is_empty()
+        && evidenced.iter().all(|(scenario, latest_evidence)| {
+            reviews.iter().any(|review| {
+                review.outcome.is_signed()
+                    && review.project_id == scenario.project_id
+                    && review.scenario_id.as_ref() == Some(&scenario.scenario_id)
+                    && review.envelope.at >= since
+                    && review.envelope.at >= *latest_evidence
+            })
+        })
 }
 
 /// Every unmet trigger of `subject`, for `canon status`: the chore

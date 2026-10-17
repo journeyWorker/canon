@@ -19,7 +19,7 @@
 //!    read back, and — when the object was already there — re-hashed from
 //!    the store, because the local copy is about to go;
 //! 2. only when every blob verified, `canon.yaml` gains
-//!    `artifacts: { backend: <to>, prefix: artifacts/ }` (a block canon
+//!    `artifact_store: { backend: <to>, prefix: artifacts/ }` (a block canon
 //!    did not write is never rewritten: it must already name `--to`);
 //! 3. then the local copies are removed and `.canon/artifacts/` is added to
 //!    `.gitignore`.
@@ -47,7 +47,7 @@ use crate::context::resolve_repo_root;
 /// gone, and a stray local blob must never be committed.
 const GITIGNORE_LINE: &str = ".canon/artifacts/";
 
-/// A refusal for a store that cannot be opened (an unusable `artifacts:`
+/// A refusal for a store that cannot be opened (an unusable `artifact_store:`
 /// block) or attached; the caller emits it under its own command.
 fn store_error(e: &StoreError) -> CliError {
     let code = match e {
@@ -154,9 +154,9 @@ fn local_blobs(repo: &Path) -> std::io::Result<(Vec<LocalBlob>, Vec<String>)> {
     Ok((blobs, skipped))
 }
 
-/// The `artifacts:` block to append when `canon.yaml` has none.
+/// The `artifact_store:` block to append when `canon.yaml` has none.
 fn artifacts_block(to: &str) -> String {
-    format!("artifacts:\n  backend: {to}\n  prefix: {DEFAULT_PREFIX}\n")
+    format!("artifact_store:\n  backend: {to}\n  prefix: {DEFAULT_PREFIX}\n")
 }
 
 /// The target config for `--to`, and the new `canon.yaml` text when the
@@ -164,13 +164,13 @@ fn artifacts_block(to: &str) -> String {
 fn resolve_target(repo: &Path, to: &str) -> Result<(ArtifactsConfig, Option<String>), String> {
     let path = repo.join("canon.yaml");
     let text = std::fs::read_to_string(&path).map_err(|e| format!("reading `{}`: {e}", path.display()))?;
-    let has_block = serde_yaml::from_str::<serde_yaml::Value>(&text).map_err(|e| format!("parsing `{}`: {e}", path.display()))?.get("artifacts").is_some();
+    let has_block = serde_yaml::from_str::<serde_yaml::Value>(&text).map_err(|e| format!("parsing `{}`: {e}", path.display()))?.get("artifact_store").is_some();
     if has_block {
         let current = ArtifactsConfig::from_yaml_at(&text, repo).map_err(|e| e.to_string())?;
         return match &current.backend {
             ArtifactsBackend::Tier { name, .. } if name == to => Ok((current, None)),
-            ArtifactsBackend::Tier { name, .. } => Err(format!("canon.yaml's `artifacts:` block already names tier `{name}`, not `{to}`; blobs live there, and canon does not move them between object stores")),
-            ArtifactsBackend::Local => Err(format!("canon.yaml's `artifacts:` block says `backend: local`; set it to `backend: {to}` yourself (canon does not rewrite a block it did not write), then run the command again")),
+            ArtifactsBackend::Tier { name, .. } => Err(format!("canon.yaml's `artifact_store:` block already names tier `{name}`, not `{to}`; blobs live there, and canon does not move them between object stores")),
+            ArtifactsBackend::Local => Err(format!("canon.yaml's `artifact_store:` block says `backend: local`; set it to `backend: {to}` yourself (canon does not rewrite a block it did not write), then run the command again")),
         };
     }
     let separator = if text.ends_with('\n') { "\n" } else { "\n\n" };
@@ -192,7 +192,7 @@ fn ensure_gitignored(repo: &Path) -> std::io::Result<bool> {
     if !existing.is_empty() && !existing.ends_with('\n') {
         file.write_all(b"\n")?;
     }
-    file.write_all(format!("# the artifact bytes live in the object store (canon.yaml `artifacts:`), never in git.\n{GITIGNORE_LINE}\n").as_bytes())?;
+    file.write_all(format!("# the artifact bytes live in the object store (canon.yaml `artifact_store:`), never in git.\n{GITIGNORE_LINE}\n").as_bytes())?;
     Ok(true)
 }
 
@@ -352,12 +352,12 @@ pub fn run_migrate(repo: &Path, to: &str, dry_run: bool, json: bool) -> i32 {
     );
     if dry_run {
         if new_yaml.is_some() {
-            crate::say!(json, "  would add to canon.yaml: artifacts: {{ backend: {to}, prefix: {DEFAULT_PREFIX} }}");
+            crate::say!(json, "  would add to canon.yaml: artifact_store: {{ backend: {to}, prefix: {DEFAULT_PREFIX} }}");
         }
         crate::say!(json, "  would remove {} local cop{} and add {GITIGNORE_LINE} to .gitignore", verified.len(), if verified.len() == 1 { "y" } else { "ies" });
     } else {
         if config_written {
-            crate::say!(json, "  canon.yaml: added artifacts: {{ backend: {to}, prefix: {DEFAULT_PREFIX} }}");
+            crate::say!(json, "  canon.yaml: added artifact_store: {{ backend: {to}, prefix: {DEFAULT_PREFIX} }}");
         }
         if gitignore_added {
             crate::say!(json, "  .gitignore: added {GITIGNORE_LINE}");

@@ -1,6 +1,6 @@
 //! Evidence artifact blobs in an object store (0.23 D3).
 //!
-//! `canon.yaml`'s `artifacts:` block picks where the bytes behind an
+//! `canon.yaml`'s `artifact_store:` block picks where the bytes behind an
 //! evidence digest live: `local` (`.canon/artifacts/sha256`, git-tracked,
 //! the default — owned by `canon-gate`) or the object-store tier named
 //! by `artifacts.backend`. This module owns the second: the config
@@ -48,7 +48,7 @@ pub enum ArtifactsBackend {
     Tier { name: String, config: R2TierConfig },
 }
 
-/// `canon.yaml`'s `artifacts:` block, resolved.
+/// `canon.yaml`'s `artifact_store:` block, resolved.
 #[derive(Debug, Clone)]
 pub struct ArtifactsConfig {
     pub backend: ArtifactsBackend,
@@ -60,7 +60,7 @@ pub struct ArtifactsConfig {
 #[derive(Deserialize, Default)]
 struct YamlRoot {
     #[serde(default)]
-    artifacts: Option<ArtifactsYaml>,
+    artifact_store: Option<ArtifactsYaml>,
 }
 
 #[derive(Deserialize)]
@@ -78,14 +78,14 @@ impl ArtifactsConfig {
         Self { backend: ArtifactsBackend::Local, prefix: DEFAULT_PREFIX.to_string() }
     }
 
-    /// Resolve the `artifacts:` block of `canon_yaml`. Absent, or
+    /// Resolve the `artifact_store:` block of `canon_yaml`. Absent, or
     /// `backend: local`, is [`ArtifactsConfig::local`] and never touches
     /// the tier policy. Any other `backend` must name a tier of
     /// `tiers:` whose backend is `s3`; `base` resolves the policy the
     /// way every other reader of `canon.yaml` does.
     pub fn from_yaml_at(canon_yaml: &str, base: &std::path::Path) -> Result<Self, PolicyError> {
         let root: YamlRoot = serde_yaml::from_str(canon_yaml).map_err(|e| PolicyError(e.to_string()))?;
-        let Some(block) = root.artifacts else { return Ok(Self::local()) };
+        let Some(block) = root.artifact_store else { return Ok(Self::local()) };
         let backend = block.backend.as_deref().unwrap_or("local");
         if backend == "local" {
             if block.prefix.is_some() {
@@ -334,31 +334,31 @@ mod tests {
     #[test]
     fn no_artifacts_block_or_backend_local_is_the_local_default() {
         assert!(matches!(config("").unwrap().backend, ArtifactsBackend::Local));
-        assert!(matches!(config("artifacts: { backend: local }\n").unwrap().backend, ArtifactsBackend::Local));
+        assert!(matches!(config("artifact_store: { backend: local }\n").unwrap().backend, ArtifactsBackend::Local));
     }
 
     #[test]
     fn a_tier_name_selects_that_tier_with_the_default_or_a_normalized_prefix() {
-        let c = config("artifacts: { backend: cold }\n").unwrap();
+        let c = config("artifact_store: { backend: cold }\n").unwrap();
         assert!(matches!(&c.backend, ArtifactsBackend::Tier { name, config } if name == "cold" && config.bucket_env == "CANON_R2_BUCKET"));
         assert_eq!(c.prefix, "artifacts/");
-        assert_eq!(config("artifacts: { backend: cold, prefix: evidence/blobs }\n").unwrap().prefix, "evidence/blobs/");
-        assert_eq!(config("artifacts: { backend: cold, prefix: \"\" }\n").unwrap().prefix, "");
+        assert_eq!(config("artifact_store: { backend: cold, prefix: evidence/blobs }\n").unwrap().prefix, "evidence/blobs/");
+        assert_eq!(config("artifact_store: { backend: cold, prefix: \"\" }\n").unwrap().prefix, "");
     }
 
     #[test]
     fn a_backend_that_is_not_an_s3_tier_is_refused_naming_the_fix() {
-        let err = config("artifacts: { backend: hot }\n").unwrap_err().to_string();
+        let err = config("artifact_store: { backend: hot }\n").unwrap_err().to_string();
         assert!(err.contains("declares no such tier"), "{err}");
-        let err = config("artifacts: { backend: local, prefix: x/ }\n").unwrap_err().to_string();
+        let err = config("artifact_store: { backend: local, prefix: x/ }\n").unwrap_err().to_string();
         assert!(err.contains("only applies to an object-store backend"), "{err}");
-        let err = config("artifacts: { backend: s3 }\n").unwrap_err().to_string();
+        let err = config("artifact_store: { backend: s3 }\n").unwrap_err().to_string();
         assert!(err.contains("neither `local` nor the name of a tier"), "{err}");
         for bad in ["/abs/", "a//b/", "../x/", "a/./b/"] {
-            let err = config(&format!("artifacts: {{ backend: cold, prefix: \"{bad}\" }}\n")).unwrap_err().to_string();
+            let err = config(&format!("artifact_store: {{ backend: cold, prefix: \"{bad}\" }}\n")).unwrap_err().to_string();
             assert!(err.contains("relative key prefix"), "{bad}: {err}");
         }
-        assert!(config("artifacts: { backend: cold, bucket: x }\n").is_err(), "an unknown key is refused, not ignored");
+        assert!(config("artifact_store: { backend: cold, bucket: x }\n").is_err(), "an unknown key is refused, not ignored");
     }
 
     #[test]

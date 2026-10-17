@@ -1,5 +1,5 @@
 //! 0.23 D3 through the real binary: evidence bytes off git. `canon.yaml`'s
-//! `artifacts:` block selects an object-store tier; writes upload by digest
+//! `artifact_store:` block selects an object-store tier; writes upload by digest
 //! key and keep no local copy, the gate and `canon artifacts verify` ask the
 //! store, and `canon artifacts migrate` moves a local store there.
 //!
@@ -86,7 +86,7 @@ fn sha(bytes: &[u8]) -> String {
 }
 
 const COLD_STANZA: &str = "  cold:\n    backend: s3\n    bucket_env: CANON_R2_BUCKET\n    prefix: \"canon/\"\n";
-const ARTIFACTS_COLD: &str = "artifacts:\n  backend: cold\n  prefix: artifacts/\n";
+const ARTIFACTS_COLD: &str = "artifact_store:\n  backend: cold\n  prefix: artifacts/\n";
 
 /// `git init` + `canon init --no-policy` + one scenario, with the `cold`
 /// s3 tier declared. `artifacts` is appended to canon.yaml when given.
@@ -231,19 +231,19 @@ fn an_unreachable_or_unattachable_store_refuses_with_a_hint_and_never_passes() {
 
 #[test]
 fn an_artifacts_block_naming_no_s3_tier_is_refused_where_it_is_used() {
-    let repo = new_repo(Some("artifacts:\n  backend: hot\n"));
+    let repo = new_repo(Some("artifact_store:\n  backend: hot\n"));
     write_report(&repo, V1);
     let add = repo.attest(&["--artifact", "reports/smoke.json"]);
     assert_eq!(add.status.code(), Some(2), "{}", text(&add));
     assert!(text(&add).contains("EVIDENCE_STORE_FAILED") && text(&add).contains("which is not an object store"), "{}", text(&add));
-    assert!(text(&add).contains("`artifacts: { backend: local }`"), "the hint names the way out: {}", text(&add));
+    assert!(text(&add).contains("`artifact_store: { backend: local }`"), "the hint names the way out: {}", text(&add));
 }
 
-/// Local stays the default: no `artifacts:` block, or `backend: local`, is
+/// Local stays the default: no `artifact_store:` block, or `backend: local`, is
 /// today's git-tracked store and touches no object store.
 #[test]
 fn the_local_default_is_unchanged() {
-    for block in [None, Some("artifacts:\n  backend: local\n")] {
+    for block in [None, Some("artifact_store:\n  backend: local\n")] {
         let repo = new_repo(block);
         write_report(&repo, V1);
         let added = repo.attest(&["--artifact", "reports/smoke.json"]);
@@ -338,7 +338,7 @@ fn migrate_refuses_a_target_that_is_not_an_s3_tier_and_never_rewrites_a_block_it
     assert_eq!(hot.status.code(), Some(2), "{}", text(&hot));
     assert!(text(&hot).contains("ARTIFACTS_MIGRATE_REFUSED") && text(&hot).contains("not an object store"), "{}", text(&hot));
 
-    let explicit = new_repo(Some("artifacts:\n  backend: local\n"));
+    let explicit = new_repo(Some("artifact_store:\n  backend: local\n"));
     let out = explicit.canon(&["artifacts", "migrate", "--to", "cold"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(text(&out).contains("set it to `backend: cold` yourself"), "{}", text(&out));
@@ -347,19 +347,19 @@ fn migrate_refuses_a_target_that_is_not_an_s3_tier_and_never_rewrites_a_block_it
     assert!(local.status.success() && text(&local).contains("already local"), "{}", text(&local));
 }
 
-/// `canon init --check-config` judges the `artifacts:` block like every other
+/// `canon init --check-config` judges the `artifact_store:` block like every other
 /// section, so a bad backend fails there and not at the first evidence write.
 #[test]
 fn check_config_reports_the_artifacts_block() {
     let good = new_repo(Some(ARTIFACTS_COLD));
     let out = good.canon(&["init", "--check-config", "--repo", "."]);
-    assert!(out.status.success() && text(&out).contains("[PASS] artifacts (backend: cold, prefix: artifacts/)"), "{}", text(&out));
+    assert!(out.status.success() && text(&out).contains("[PASS] artifact_store (backend: cold, prefix: artifacts/)"), "{}", text(&out));
 
     let none = new_repo(None);
     assert!(!text(&none.canon(&["init", "--check-config", "--repo", "."])).contains("artifacts"), "an absent block is the local default and says nothing");
 
-    let bad = new_repo(Some("artifacts:\n  backend: warm\n"));
+    let bad = new_repo(Some("artifact_store:\n  backend: warm\n"));
     let out = bad.canon(&["init", "--check-config", "--repo", "."]);
     assert_eq!(out.status.code(), Some(1), "{}", text(&out));
-    assert!(text(&out).contains("[FAIL] artifacts:") && text(&out).contains("neither `local` nor the name of a tier"), "{}", text(&out));
+    assert!(text(&out).contains("[FAIL] artifact_store:") && text(&out).contains("neither `local` nor the name of a tier"), "{}", text(&out));
 }

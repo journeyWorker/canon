@@ -267,8 +267,9 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert_eq!(subject_json(r)["status"], "verifying");
 
     // The suite again, same verdict: the scenario review stays current, and
-    // what the chore still needs is its own review.
-    seed_evidence(r, "world.demo.01", ago(10));
+    // what the chore still needs is its own review (that review predates
+    // this evidence, so it did not look at the chore's result).
+    seed_evidence(r, "world.demo.01", ago(0));
     let out = ship(r);
     assert_eq!(out.status.code(), Some(1), "the chore has no review yet: {}", stderr(&out));
     let err = stderr(&out);
@@ -288,6 +289,28 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert_eq!(gate.status.code(), Some(0), "{}", stdout(&gate));
 }
 
+/// A chore reviewed scenario by scenario after its evidence, as 0.22
+/// required, needs no change-level review: a repo upgraded with such a chore
+/// shipped stays green.
+#[test]
+fn a_chore_reviewed_scenario_by_scenario_after_its_evidence_needs_no_change_review() {
+    let dir = repo();
+    let r = dir.path();
+    seed_change(r, "c-demo");
+    seed_change(r, "bump-client");
+    seed_subject(r, SubjectStatus::Verifying, &["c-demo", "bump-client"], ago(250));
+    seed_scenario(r, "world.demo.01");
+    feature_brief(r);
+    write_brief(r, "bump-client", &chore_brief(ago(100)));
+    seed_evidence(r, "world.demo.01", ago(50));
+    review_add(r, "world.demo.01");
+
+    let out = ship(r);
+    assert!(out.status.success(), "reviewed after the chore's evidence: {}", stderr(&out));
+    let gate = run(r, &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(0), "{}", stdout(&gate));
+}
+
 /// 0.23 D5: the chore's review pins its brief. Editing the brief stales it,
 /// an unsigned outcome never counts, and `--change` refuses a feature change.
 #[test]
@@ -300,8 +323,11 @@ fn a_chore_review_goes_stale_when_the_brief_changes_and_a_feature_change_is_refu
     seed_scenario(r, "world.demo.01");
     feature_brief(r);
     write_brief(r, "bump-client", &chore_brief(ago(100)));
-    seed_evidence(r, "world.demo.01", ago(50));
+    seed_evidence(r, "world.demo.01", ago(150));
     review_add(r, "world.demo.01");
+    // The chore's run, after the scenario review: no reviewer has looked at
+    // it per scenario, so the chore's own review is what covers it.
+    seed_evidence(r, "world.demo.01", ago(0));
 
     let refused = change_review(r, "c-demo");
     assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
@@ -331,8 +357,11 @@ fn evidence_recorded_after_the_chore_approval_satisfies_it_and_a_feature_approva
     seed_scenario(r, "world.demo.01");
     write_brief(r, "c-demo", "## Why\n\nSeeded.\n\nApproved: Journey 2026-10-12 — \"go\"\n");
     write_brief(r, "bump-client", &chore_brief(ago(100)));
-    seed_evidence(r, "world.demo.01", ago(50));
+    seed_evidence(r, "world.demo.01", ago(150));
     review_add(r, "world.demo.01");
+    // The chore's run, after the scenario review: no reviewer has looked at
+    // it per scenario, so the chore's own review is what covers it.
+    seed_evidence(r, "world.demo.01", ago(0));
     let out = ship(r);
     assert_eq!(out.status.code(), Some(1), "the chore still needs its review: {}", stderr(&out));
     assert!(!stderr(&out).contains("no evidence recorded after"), "evidence newer than the chore approval is enough: {}", stderr(&out));

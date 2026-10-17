@@ -80,7 +80,7 @@
 //! attachment cost nothing here.
 //!
 //! # Object-store backend (0.23 D3)
-//! `canon.yaml`'s `artifacts: { backend: local | <tier>, prefix: artifacts/ }`
+//! `canon.yaml`'s `artifact_store: { backend: local | <tier>, prefix: artifacts/ }`
 //! moves the bytes off git: [`ArtifactStore`] is the local directory above
 //! (the default, no credentials) or the object-store tier named by
 //! `backend`, keyed `<prefix>sha256/<digest>`. Records keep only digests.
@@ -296,7 +296,7 @@ pub enum StoreError {
         paths::ARTIFACT_STORE_LOCK_FILE
     )]
     Locked(Duration),
-    /// `canon.yaml` or its `artifacts:` block cannot be used.
+    /// `canon.yaml` or its `artifact_store:` block cannot be used.
     #[error("{0}")]
     Config(String),
     /// The object-store tier `artifacts.backend` names cannot be attached
@@ -321,7 +321,7 @@ impl StoreError {
             StoreError::InvalidDigest(_) => "a recorded digest must be 64 lowercase hex characters; fix or re-create the record",
             StoreError::UnsafeStoreDir | StoreError::Io(_) => "check that the artifact store is writable (permissions, disk space), then run the command again",
             StoreError::Locked(_) => "wait for the other canon process to finish, then run the command again",
-            StoreError::Config(_) => "fix the `artifacts:` block of canon.yaml (`canon init --check-config` names the problem), or set `artifacts: { backend: local }`",
+            StoreError::Config(_) => "fix the `artifact_store:` block of canon.yaml (`canon init --check-config` names the problem), or set `artifact_store: { backend: local }`",
             StoreError::Unattached { .. } | StoreError::Remote { .. } => OBJECT_STORE_HINT,
         }
     }
@@ -499,7 +499,7 @@ fn copy_hashed(reader: &mut impl Read, file: &mut File) -> std::io::Result<Strin
 /// Where a repo keeps the bytes behind its evidence digests (0.23 D3):
 /// the local `.canon/artifacts/sha256` store, git-tracked and the
 /// default, or an object-store tier chosen by `canon.yaml`'s
-/// `artifacts: { backend: <tier>, prefix: artifacts/ }`.
+/// `artifact_store: { backend: <tier>, prefix: artifacts/ }`.
 ///
 /// With an object store, a write uploads by digest key
 /// (`<prefix>sha256/<digest>`), reads it back, and keeps no local copy;
@@ -523,7 +523,7 @@ pub struct ObjectArtifacts {
     blobs: ObjectBlobStore,
 }
 
-/// `<repo>/canon.yaml`'s `artifacts:` block, resolved; the local default
+/// `<repo>/canon.yaml`'s `artifact_store:` block, resolved; the local default
 /// when the file or the block is absent.
 pub fn artifacts_config(repo: &Path) -> Result<ArtifactsConfig, StoreError> {
     let path = repo.join("canon.yaml");
@@ -839,7 +839,7 @@ impl GateCheck for ArtifactStoreCheck {
         if files.is_empty() {
             return Vec::new();
         }
-        // A store that cannot be opened (unusable `artifacts:` block, no
+        // A store that cannot be opened (unusable `artifact_store:` block, no
         // credentials) proves nothing: refuse, never fall back to local.
         let store = match ArtifactStore::open(&ctx.ctx.repo) {
             Ok(store) => store,
