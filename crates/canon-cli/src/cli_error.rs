@@ -256,6 +256,8 @@ const CODES: &[(&str, &str)] = &[
     ("PLUGIN_SYNC_ERRORS", "`plugin sync` could not write some candidates; data.roots names each error"),
     ("PLUGIN_SYNC_FAILED", "plugin sync failed"),
     ("POLICY_APPROVAL_FAILED", "the policy approval could not be recorded"),
+    ("POLICY_APPROVAL_UNREADABLE", "`.canon/policy.approval.json` cannot be read, so the policy in force cannot be checked against its approval; shipping or reopening a subject refuses, and `--override-reason` does not waive it"),
+    ("POLICY_CHANGED_SINCE_APPROVAL", "`.canon/policy.yaml` differs from the bytes a human approved; shipping or reopening a subject refuses until it is re-approved or restored, and `--override-reason` does not waive it"),
     ("PROMOTE_FAILED", "a staged record was written but promoting it to the ledger failed"),
     ("PROMOTE_REFUSED", "`gate promote` refused one or more staged records; data.refused names each"),
     ("PROMPT_BUNDLE_INVALID", "a prompt bundle is invalid"),

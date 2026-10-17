@@ -151,7 +151,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("finding close", Write, REFUSES, &[R]),
     row_exits("finding list", Read, &[exit(0, "whether or not any finding matched"), exit(2, "refused: the ledger cannot be read")], EVERYONE),
     row_exits("format", Read, &[exit(0, "clean"), exit(1, "the corpus has violations")], EVERYONE),
-    row_exits("gate check", Read, &[exit(0, "clean"), exit(1, "the gate found violations"), exit(2, "the gate could not run: bad --repo or an unreadable ledger or config")], EVERYONE),
+    row_exits("gate check", Read, &[exit(0, "clean"), exit(1, "the gate found violations, including a policy that changed since its approval"), exit(2, "the gate could not run: bad --repo or an unreadable ledger or config")], EVERYONE),
     row("gate install-hooks", Write, &[O]),
     row("gate promote", Write, &[I]),
     row_exits("gate selftest", Read, &[exit(0, "every fixture is clean"), exit(1, "a fixture failed")], &[O]),
@@ -167,6 +167,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("migrate", Write, &[exit(0, "migrated, or nothing to do"), exit(1, "migrated, but the index rebuild found the corpus unclean"), exit(2, "refused or failed; nothing is written")], &[O]),
     row("plugin sync", Write, &[O]),
     row_exits("policy approve", Write, REFUSES, HUMAN),
+    row("policy show", Read, &[O]),
     row("prompt add", Write, &[O]),
     row("prompt show", Read, &[O]),
     row("purge", Destructive, &[O]),
@@ -184,7 +185,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("status", Read, &[exit(0, "always: a problem reading the repo is a warning"), exit(1, "the report could not be serialized (--json)")], EVERYONE),
     row_exits("subject adopt", Write, REFUSES, &[P, O]),
     row_exits("subject new", Write, REFUSES, &[P, O]),
-    row_exits("subject status", Write, &[exit(0, "the transition was recorded, or the subject was shown (no --to)"), exit(1, "an evidence, brief or review guard blocked the transition; the record is unchanged"), exit(2, "refused: an off-chain step, a missing reason, or a store failure")], &[O]).note("reads without --to: `subject status <id>` shows the subject and writes nothing"),
+    row_exits("subject status", Write, &[exit(0, "the transition was recorded, or the subject was shown (no --to)"), exit(1, "an evidence, brief, review or policy-approval guard blocked the transition; the record is unchanged"), exit(2, "refused: an off-chain step, a missing reason, or a store failure")], &[O]).note("reads without --to: `subject status <id>` shows the subject and writes nothing"),
     row("tier age", Write, &[O]),
 ];
 

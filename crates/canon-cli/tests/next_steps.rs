@@ -108,11 +108,18 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
     let (dir, created) = repo_with_change();
     let repo = dir.path();
 
-    // `change new`: the unapproved brief is the subject's only step, and a human's.
+    // `change new`: the brief is still a skeleton with blockers, so the
+    // subject's step is the planner's, not the human's (0.22 D4).
     let steps = meta_next(&created);
-    assert_eq!(steps[0], status_step(repo, "demo"));
-    assert_eq!(steps[0]["actor"], "human");
-    assert!(steps[0]["role"].is_null());
+    assert_eq!(steps[0]["actor"], "agent");
+    assert_eq!(steps[0]["role"], "planner");
+    assert_eq!(steps[0]["command"], "canon brief check --change add-login");
+    assert!(steps[0]["why"].as_str().unwrap().contains("blocker(s): write the brief"), "{}", steps[0]);
+
+    // Once the brief is written clean, the one human stop is the subject's only step.
+    let step = status_step(repo, "demo");
+    assert_eq!(step["actor"], "human");
+    assert!(step["role"].is_null());
 
     let approved = ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
     assert_eq!(meta_next(&approved)[0], status_step(repo, "demo"), "brief approve");

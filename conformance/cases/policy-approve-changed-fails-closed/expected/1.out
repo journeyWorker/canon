@@ -1,0 +1,4 @@
+canon gate check: 1 violation(s)
+
+unreviewed-promotion (1):
+  unreviewed-promotion policy — policy changed since approval: .canon/policy.yaml is sha256:7afcb13ce4a4ffbcf8d8a63e50afd579206e9aaaa79ff005389af75eb6a7b0ab, but `alice` approved sha256:6105250ca5b6fe06d67d0342f24d3458a5831469d54f1ad4533cf360bc19570e at <ts>; the gate grades the work against the policy in force, so a policy that is not the approved one fails closed (--override-reason does not waive it); the human re-approves the policy in force with `canon policy approve --by <human> --note "<words>"`, or restore the approved .canon/policy.yaml (and .canon/policy.approval.json) from git
