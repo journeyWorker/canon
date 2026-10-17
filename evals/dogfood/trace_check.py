@@ -233,7 +233,7 @@ def is_code_path(path):
     reviewer's own determinism harness under /tmp, say) implements nothing.
     """
     candidate = path.split("?", 1)[0].lower()
-    if candidate.startswith(("../", "/")):
+    if outside_repo(candidate):
         return False
     if any(part in candidate.split("/") for part in ("reports", "screens", "fixtures", ".canon")):
         return False
@@ -419,6 +419,13 @@ def eval_canon_calls(code):
     return writes, calls, warnings
 
 
+def outside_repo(path):
+    """A path that leaves the repository: above its root, absolute, or under
+    an unexpanded shell variable (`$TMPDIR/x`, `${HOME}/x`). Scratch outside
+    the repo neither implements the change nor breaks the brief stop."""
+    return path.startswith(("../", "/", "$")) or path == ".."
+
+
 def normalize_path(path, cwd, root):
     if "://" in path:
         if path.startswith("local://"):
@@ -516,7 +523,7 @@ def analyze(inputs, question_turns=()):
             write["before_brief_stop"] = before
             write["question_only"] = root_turn in question_turns
             turns[write["turn"]]["writes"].append(write)
-            for rule, failed in (("write_before_brief_stop", before and not write["inside_canon"]),
+            for rule, failed in (("write_before_brief_stop", before and not write["inside_canon"] and not outside_repo(write["path"])),
                                  ("write_in_question_turn", write["question_only"])):
                 if failed:
                     failures.append({"check": rule, "session": sid, **write})
