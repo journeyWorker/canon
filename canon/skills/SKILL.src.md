@@ -39,7 +39,8 @@ a feature, a one-line request included. A human is needed once per scope:
   new answer. A follow-up on a shipped subject reopens it
   (`canon subject status <id> --to verifying --reason "<why>"`); a fix
   closed `fixed`, and an approved chore, then need the whole suite evidenced
-  again (`evidence add --all-scenarios`) and re-reviewed before it ships.
+  again (`evidence add --all-scenarios`) before it ships, and a chore also needs
+  its change-level review (`review add --change <slug>`).
 - When no human can answer one of the brief's questions, write your
   assumption into the brief's Questions and assumptions, build on it, and say
   so in your report. That covers the brief's questions and work inside an

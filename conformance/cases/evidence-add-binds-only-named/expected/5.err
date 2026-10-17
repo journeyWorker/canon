@@ -1,0 +1,5 @@
+error: unexpected argument '--drop-attachment' found
+
+Usage: canon evidence add --kind <KIND> --ref <REF> --scenario-id <SCENARIO_ID> --project-id <PROJECT_ID> --role <ROLE> --actor-id <ACTOR_ID> --artifact <PATH>
+
+For more information, try '--help'.

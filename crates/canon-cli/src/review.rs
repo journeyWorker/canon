@@ -20,14 +20,23 @@
 //! the refusal path is directly unit-testable without spawning the
 //! binary.
 //!
-//! # What the review saw is pinned, never typed (0.15 D1)
+//! # What the review saw is pinned, never typed (0.15 D1, 0.23 D5)
 //! [`run_add`] reads the corpus the gate reads and records, on the
-//! review, the scenario's current `source_digest` and the content digest
-//! of its latest evidence record per role
-//! ([`canon_gate::review_gate::current_pins`]). The gate counts the
-//! review only while both still match. A scenario with no record is
+//! review, the scenario's current digest and what its latest evidence per
+//! role says: the verdict and the identity of the checks it bound
+//! ([`canon_gate::freshness::current_pins`]). The gate counts the review
+//! only while both still match, so recording the suite again with the same
+//! verdicts from the same checks leaves it current. A scenario with no record is
 //! refused (exit `2`, nothing written): there is nothing to pin. A
 //! scenario with no evidence pins an empty list.
+//!
+//! # A chore is reviewed as a change (0.23 D5)
+//! `--change <slug>` writes one review of a chore change instead of one
+//! per scenario: the reviewer signs the chore's invariants and checks
+//! against the diff. It pins the brief ([`PinnedSpec::Brief`], the digest
+//! [`crate::brief::brief_digest`] computes), so an edit to the brief
+//! stales it, and it is what `--to shipped` asks of a chore
+//! ([`canon_gate::review_gate::change_review_gap`]).
 //!
 //! # The reviewer's run can fail visibly (0.15 D4)
 //! `--outcome` records `signed` (default), `indeterminate` or
@@ -48,10 +57,10 @@
 
 use std::path::{Path, PathBuf};
 
-use canon_gate::review_gate::current_pins;
+use canon_gate::freshness::current_pins;
 use canon_gate::spec_coverage::latest_scenarios;
 use canon_gate::{GateContext, GateCtx};
-use canon_model::{Actor, Envelope, PinnedSpec, ProjectId, ProvenanceRef, RecordKind, Review, ReviewArtifact, ReviewOutcome, RoleId, ScenarioId, SessionId};
+use canon_model::{Actor, ChangeId, Envelope, PinnedSpec, ProjectId, ProvenanceRef, RecordKind, Review, ReviewArtifact, ReviewPins, ReviewOutcome, RoleId, ScenarioId, SessionId};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -102,6 +111,9 @@ pub struct ReviewAddArgs {
     /// `--scenario-ids-from <file|->`: more ids, one per line, `#`
     /// starting a comment ([`parse_scenario_ids`]).
     pub scenario_ids_from: Option<String>,
+    /// `--change <slug>`: a change-level review of a chore (module doc);
+    /// excludes the scenario ids.
+    pub change: Option<ChangeId>,
     pub reviewer: String,
     pub pin: String,
     pub upstream_ref: Option<String>,
@@ -155,7 +167,7 @@ fn requested_scenarios(args: &ReviewAddArgs) -> Result<Vec<ScenarioId>, String> 
         }
     }
     if unique.is_empty() {
-        return Err("no scenario to review: give --scenario-id <id> (repeatable) or --scenario-ids-from <file|->".to_string());
+        return Err("no scenario to review: give --scenario-id <id> (repeatable), --scenario-ids-from <file|->, or --change <slug> for a chore".to_string());
     }
     Ok(unique)
 }
@@ -178,10 +190,14 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
             return CliError::refused("REVIEW_INVALID_ARGUMENT", "--upstream-ref and --original-spec-ref are mutually exclusive; exactly one provenance ref is required").hint("pass exactly one of --upstream-ref <ref> or --original-spec-ref <ref>").emit("canon review add", args.json);
         }
     };
-    let scenario_ids = match requested_scenarios(args) {
-        Ok(ids) => ids,
-        Err(e) => {
-            return CliError::refused("REVIEW_INVALID_ARGUMENT", e.to_string()).hint("`canon schema review add` lists the accepted arguments and their forms").emit("canon review add", args.json);
+    let scenario_ids = if args.change.is_some() {
+        Vec::new()
+    } else {
+        match requested_scenarios(args) {
+            Ok(ids) => ids,
+            Err(e) => {
+                return CliError::refused("REVIEW_INVALID_ARGUMENT", e.to_string()).hint("`canon schema review add` lists the accepted arguments and their forms").emit("canon review add", args.json);
+            }
         }
     };
 
@@ -191,6 +207,15 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         Err(e) => {
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon review add", args.json);
         }
+    };
+    let brief_digest = match &args.change {
+        Some(change) => match chore_brief_digest(&repo, change) {
+            Ok(digest) => Some(digest),
+            Err(message) => {
+                return CliError::refused("REVIEW_INVALID_ARGUMENT", message).field("--change").hint("a change-level review is for a chore change whose brief is in the repository; review feature scenarios with --scenario-id").emit("canon review add", args.json);
+            }
+        },
+        None => None,
     };
     let indexed = latest_scenarios(&gate_context);
     let (found, missing): (Vec<_>, Vec<_>) =
@@ -232,38 +257,47 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         actor = actor.with_session(session_id.clone());
     }
     let at = Utc::now();
-    let reviews: Vec<(Review, String)> = found
-        .into_iter()
-        .filter_map(|(_, scenario)| scenario.copied())
-        .map(|scenario| {
-            let pins = current_pins(&gate_context, scenario);
-            let mut review = Review::new(
-                Envelope::new(1, RecordKind::Review, at, actor.clone()),
-                args.project_id.clone(),
-                scenario.scenario_id.clone(),
-                &args.reviewer,
-                &args.pin,
-                provenance_ref.clone(),
-            );
-            review.outcome = args.outcome;
-            review.reviewer_provider = args.reviewer_provider.clone();
-            review.reviewer_model = args.reviewer_model.clone();
-            review.reviewer_harness = args.reviewer_harness.clone();
-            review.artifacts = artifacts.clone();
-            let pinned = format!(
-                "canon review add: pinned {} at {} {} and {} latest evidence record(s); the review counts only while both are unchanged",
-                scenario.scenario_id.as_str(),
-                match pins.scenario_digest_scope {
-                    PinnedSpec::Scenario => "scenario digest",
-                    PinnedSpec::File => "source digest",
-                },
-                &pins.scenario_digest.as_str()[..12],
-                pins.evidence.len()
-            );
-            review.pins = Some(pins);
-            (review, pinned)
-        })
-        .collect();
+    let mut reviews: Vec<(Review, String)> = Vec::new();
+    if let (Some(change), Some(digest)) = (&args.change, brief_digest) {
+        let mut review = Review::for_change(Envelope::new(1, RecordKind::Review, at, actor.clone()), args.project_id.clone(), change.clone(), &args.reviewer, &args.pin, provenance_ref.clone());
+        review.outcome = args.outcome;
+        review.reviewer_provider = args.reviewer_provider.clone();
+        review.reviewer_model = args.reviewer_model.clone();
+        review.reviewer_harness = args.reviewer_harness.clone();
+        review.artifacts = artifacts.clone();
+        let pinned = format!("canon review add: pinned change {} at brief digest {}; the review counts only while the brief is unchanged", change.as_str(), &digest.as_str()[..12]);
+        review.pins = Some(ReviewPins { scenario_digest: digest, scenario_digest_scope: PinnedSpec::Brief, checks: Some(Vec::new()), evidence: Vec::new() });
+        reviews.push((review, pinned));
+    }
+    reviews.extend(found.into_iter().filter_map(|(_, scenario)| scenario.copied()).map(|scenario| {
+        let pins = current_pins(&gate_context, scenario);
+        let mut review = Review::new(
+            Envelope::new(1, RecordKind::Review, at, actor.clone()),
+            args.project_id.clone(),
+            scenario.scenario_id.clone(),
+            &args.reviewer,
+            &args.pin,
+            provenance_ref.clone(),
+        );
+        review.outcome = args.outcome;
+        review.reviewer_provider = args.reviewer_provider.clone();
+        review.reviewer_model = args.reviewer_model.clone();
+        review.reviewer_harness = args.reviewer_harness.clone();
+        review.artifacts = artifacts.clone();
+        let pinned = format!(
+            "canon review add: pinned {} at {} {} and the verdict and checks of its {} role(s) of evidence; the review counts only while they are unchanged",
+            scenario.scenario_id.as_str(),
+            match pins.scenario_digest_scope {
+                PinnedSpec::Scenario => "scenario digest",
+                PinnedSpec::File => "source digest",
+                PinnedSpec::Brief => "brief digest",
+            },
+            &pins.scenario_digest.as_str()[..12],
+            pins.checks.as_ref().map_or(0, Vec::len)
+        );
+        review.pins = Some(pins);
+        (review, pinned)
+    }));
 
     // A review that repeats its scenario's latest one by this reviewer is not
     // written again (`crate::retry`); the others are.
@@ -273,12 +307,12 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         .map(|(review, _)| {
             let body = serde_json::to_value(review).expect("a Review always serializes");
             crate::retry::repeats_latest(ledger_root, None, RecordKind::Review.as_str(), &body, |stored| {
-                ["project_id", "scenario_id", "reviewer"].iter().all(|key| stored.get(key) == body.get(key))
+                ["project_id", "scenario_id", "change_id", "reviewer"].iter().all(|key| stored.get(key) == body.get(key))
             }, None)
         })
         .collect();
     let unchanged: Vec<(String, crate::retry::Existing)> =
-        reviews.iter().zip(&repeats).filter_map(|((review, _), repeat)| repeat.clone().map(|existing| (review.scenario_id.as_str().to_string(), existing))).collect();
+        reviews.iter().zip(&repeats).filter_map(|((review, _), repeat)| repeat.clone().map(|existing| (review.target().to_string(), existing))).collect();
     for (scenario, existing) in &unchanged {
         crate::say!(args.json, "canon review add: unchanged — an identical review of {scenario} is already {}; nothing written", existing.describe());
     }
@@ -320,9 +354,24 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     }
     let mut wrote: Vec<serde_json::Value> = written.iter().map(|(location, deduped)| serde_json::json!({ "location": location, "deduped": deduped })).collect();
     wrote.extend(unchanged.iter().map(|(scenario, existing)| serde_json::json!({ "location": existing.committed, "scenarioId": scenario, "unchanged": true })));
-    let scope = crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect());
+    let scope = match &args.change {
+        Some(change) => crate::next::Scope::Change(change.as_str().to_string()),
+        None => crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect()),
+    };
     crate::next::finish(&repo, "review add", &scope, false, args.json, serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": stored }));
     0
+}
+
+/// The digest a change-level review of `change` pins: its chore brief as
+/// the gate reads it now. A change with no brief in the repository, or a
+/// brief that is not a chore's, is refused with the reason.
+fn chore_brief_digest(repo: &Path, change: &ChangeId) -> Result<canon_model::SpecDigest, String> {
+    let path = crate::brief::canon_brief(repo, change).ok_or_else(|| format!("change `{}` has no brief in the repository", change.as_str()))?;
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("cannot read the brief of change `{}` ({}): {e}", change.as_str(), path.display()))?;
+    if !crate::brief_check::is_chore(&text) {
+        return Err(format!("change `{}` is not a chore: its brief does not mark it one, and a feature is reviewed per scenario", change.as_str()));
+    }
+    Ok(crate::brief::brief_spec_digest(&text))
 }
 
 /// Write `reviews` all or nothing (0.18 D1): check the committed review
@@ -385,6 +434,7 @@ mod tests {
             project_id: ProjectId::parse("app-a").unwrap(),
             scenario_ids: vec![ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap()],
             scenario_ids_from: None,
+            change: None,
             reviewer: "reviewer-1".into(),
             pin: "abc123pin".into(),
             upstream_ref: Some("routes/world.firstbuy-hotdeal.26#onReview".into()),
@@ -436,26 +486,28 @@ mod tests {
         assert_eq!(review.outcome, ReviewOutcome::Signed);
     }
 
-    /// review.add.20 (0.15 D1): the pins are computed from the corpus — the scenario's
-    /// source digest, and an empty evidence list when it has none, then
-    /// the latest evidence record once it does.
+    /// review.add.20 (0.15 D1, 0.23 D5): the pins are computed from the
+    /// corpus: the scenario's digest, and an empty list of checks when it
+    /// has no evidence, then the latest evidence's verdict (and the identity
+    /// of its checks) once it does.
     #[test]
-    fn pins_the_scenario_digest_and_its_latest_evidence() {
+    fn pins_the_scenario_digest_and_what_its_latest_evidence_says() {
         let dir = repo_with_scenario();
         assert_eq!(run_add(dir.path(), &args()), 0);
         let pins = reviews(&dir)[0].pins.clone().expect("review add always pins");
         assert_eq!(pins.scenario_digest, SpecDigest::of(b"feature bytes"));
-        assert!(pins.evidence.is_empty(), "no evidence yet: an empty list, still pinned");
+        assert_eq!(pins.checks, Some(Vec::new()), "no evidence yet: an empty list, still pinned");
+        assert!(pins.evidence.is_empty(), "a new review never pins evidence record ids");
 
         let a = args();
         let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("impl", RoleId::parse("implementer").unwrap()));
         let record = EvidenceRecord::new(envelope, None, Some(a.scenario_ids[0].clone()), None, EvidenceVerdict::Faithful).with_project_id(a.project_id.clone());
-        let receipt = ledger(&dir).write(&record).unwrap();
+        ledger(&dir).write(&record).unwrap();
         assert_eq!(run_add(dir.path(), &ReviewAddArgs { reviewer: "reviewer-2".into(), ..args() }), 0);
         let second = reviews(&dir).into_iter().find(|r| r.reviewer == "reviewer-2").unwrap();
-        let evidence = second.pins.unwrap().evidence;
-        assert_eq!(evidence.len(), 1);
-        assert_eq!(format!("kind=evidence_record/{}__{}.json", evidence[0].key, evidence[0].digest), receipt.location, "the pin names the ledger file");
+        let checks = second.pins.unwrap().checks.unwrap();
+        assert_eq!(checks.len(), 1);
+        assert_eq!((checks[0].role.as_deref(), checks[0].verdict), (Some("implementer"), EvidenceVerdict::Faithful));
     }
 
     /// review.add.26 (0.15 D4): the outcome and reviewer runtime land on the record.

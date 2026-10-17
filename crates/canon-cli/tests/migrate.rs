@@ -401,13 +401,12 @@ fn authoring_migrate_06_an_ambiguous_change_stays_and_is_named() {
     assert!(!out.contains("remove the plans source"), "{out}");
 }
 
-/// authoring.migrate.07: reviews written before review pinning, pinned to
-/// a commit from before the move, stay current after `specs` moves to
-/// `.canon/specs`: the legacy lookup reads `former_roots` at the pin. The
-/// gate prints the same advisory before and after; without
-/// `former_roots` they would be undecidable.
+/// authoring.migrate.07: a review written before review pinning, pinned to
+/// a commit from before the move, is pinned as current by `canon migrate`
+/// after `specs` moves to `.canon/specs`: the lookup reads `former_roots` at
+/// the pin, so the review is checked, not undecidable.
 #[test]
-fn authoring_migrate_07_legacy_reviews_pinned_before_the_move_stay_current() {
+fn authoring_migrate_07_legacy_reviews_pinned_before_the_move_are_pinned_current() {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
     git(repo, &["init", "-q"]);
@@ -427,17 +426,13 @@ fn authoring_migrate_07_legacy_reviews_pinned_before_the_move_stay_current() {
         }),
     );
     commit_all(repo, "evidence and a legacy review");
-    let advisory = "advisory: 1 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 1 current, 0 stale, 0 undecidable\n";
-    assert!(ok(repo, &["gate", "check"]).contains(advisory), "before the move");
+    assert_eq!(canon(repo, &["gate", "check"]).status.code(), Some(1), "a review that predates 0.23 pinning does not count before the migration");
 
-    ok(repo, &["migrate"]);
+    let out = ok(repo, &["migrate"]);
     assert!(read(repo, "canon.yaml").contains("      root: .canon/specs\n      former_roots: [specs]\n"));
+    assert!(out.contains("canon migrate: pinned 1 review(s) to what their evidence says") && !out.contains("could not be checked"), "checked at its former root, so not undecidable: {out}");
     let after = ok(repo, &["gate", "check"]);
-    assert!(after.contains("canon gate check: clean (0 violations)") && after.contains(advisory), "after the move: {after}");
-
-    let yaml = read(repo, "canon.yaml");
-    write(repo, "canon.yaml", &yaml.replace("      former_roots: [specs]\n", ""));
-    assert!(text(&canon(repo, &["gate", "check"])).contains("0 current, 0 stale, 1 undecidable"), "the former root is what finds it");
+    assert!(after.contains("canon gate check: clean (0 violations)"), "after the move: {after}");
 }
 
 /// authoring.migrate.08: a `canon.yaml` whose `specs.roots` it cannot

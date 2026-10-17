@@ -34,7 +34,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use canon_fmt::Violation;
-use canon_gate::legacy_pins::SpecSources;
 use canon_gate::{GateContext, GateCtx};
 use canon_model::ids::SpecDigest;
 use canon_model::{paths, Actor, Envelope, ProjectId, RecordKind, Scenario, ScenarioId, SubjectId};
@@ -45,6 +44,7 @@ use canon_store::tier::{StoreError, Tier, TierQuery};
 use chrono::Utc;
 
 use crate::context::resolve_repo_root;
+use crate::migrate_legacy_pins::SpecSources;
 use crate::subject::enum_membership_violation;
 
 /// The stable literal id BOTH the absent-`specs:` default AND
@@ -109,8 +109,8 @@ struct RawSpecRoot {
     #[serde(default)]
     root: Option<String>,
     /// Where this root lived before `canon migrate` moved it (0.17 D6),
-    /// newest last. Read only by the legacy-pin lookup
-    /// ([`resolve_legacy_pins`]): a review pinned to a commit from before
+    /// newest last. Read only by `canon migrate`'s review pinning
+    /// ([`spec_sources`]): a pre-0.15 review pinned to a commit from before
     /// the move finds its scenario under these paths at that commit.
     #[serde(default)]
     former_roots: Vec<String>,
@@ -501,24 +501,14 @@ pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
     scanned
 }
 
-/// Read every legacy review's pinned commit into `ctx` (0.16 D6,
-/// [`canon_gate::legacy_pins`]): `canon gate check`, `canon status` and
-/// `canon subject status` call this right after loading, so the three
-/// decide a legacy review's currency from the same reads. The spec corpus
-/// is scanned for each scenario's current file only when there is a
-/// legacy review to check.
-pub fn resolve_legacy_pins(ctx: &mut GateContext) {
-    let repo = ctx.ctx.repo.clone();
-    ctx.legacy_pins = canon_gate::legacy_pins::resolve(ctx, || spec_sources(&repo));
-}
-
 /// Each scenario's current `.feature` file and the directories each spec
 /// root's history lives under, relative to `repo`: the root now, then its
 /// `former_roots` (where `canon migrate` moved it from). A root outside
 /// the repo has no history to read and is left out, and so is a former
 /// root outside it; an unusable `specs:` section leaves everything out,
-/// so every legacy review stays undecidable rather than misjudged.
-fn spec_sources(repo: &Path) -> SpecSources {
+/// so every pre-0.15 review stays undecidable rather than misjudged. Read
+/// only by `canon migrate`'s review pinning ([`crate::migrate_pins`]).
+pub(crate) fn spec_sources(repo: &Path) -> SpecSources {
     let mut sources = SpecSources::default();
     let Ok(roots) = load_spec_roots_with_former(&repo.join("canon.yaml")) else { return sources };
     for (root, former) in roots {

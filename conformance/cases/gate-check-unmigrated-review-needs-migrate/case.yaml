@@ -1,0 +1,12 @@
+description: "0.23 D6: a review written before review pinning (pinned to a commit this clone does not have, simulated with a fake sha) does not count until `canon migrate` rewrites it to what the evidence says: `canon subject status <id> --to verifying` and `canon gate check` (while the subject is still building) prints the advisory naming `canon migrate`, and after the migration, which pins it as the scenario stands because its commit cannot be read, the transition and the gate exit 0"
+steps:
+  - args: [subject, status, cart, --to, verifying]
+    exit: 1
+  - args: [gate, check]
+    exit: 0
+  - args: [migrate]
+    exit: 0
+  - args: [subject, status, cart, --to, verifying]
+    exit: 0
+  - args: [gate, check]
+    exit: 0

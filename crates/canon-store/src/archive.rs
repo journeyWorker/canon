@@ -137,10 +137,14 @@ fn classify(kind: RecordKind, raw: &RawRecord) -> Judged {
             Err(_) => unjudged(),
         },
         RecordKind::Review => {
-            let (Some(project), Some(scenario), Some(reviewer)) = (text(&raw.0, "project_id"), text(&raw.0, "scenario_id"), text(&raw.0, "reviewer")) else {
+            // Grouped like the gate's `in_effect_reviews`: per (project,
+            // scenario or change, reviewer). A change-level review (a
+            // chore's, 0.23 D5) has no scenario and is keyed by its change.
+            let target = text(&raw.0, "scenario_id").map(str::to_string).or_else(|| text(&raw.0, "change_id").map(|c| format!("change-{c}")));
+            let (Some(project), Some(target), Some(reviewer)) = (text(&raw.0, "project_id"), target, text(&raw.0, "reviewer")) else {
                 return unjudged();
             };
-            Judged { groups: vec![(format!("review|{project}|{scenario}|{reviewer}"), latest_rank(raw))], pinned: false, approval: None }
+            Judged { groups: vec![(format!("review|{project}|{target}|{reviewer}"), latest_rank(raw))], pinned: false, approval: None }
         }
         RecordKind::Divergence => classify_divergence(raw),
         RecordKind::EvidenceRecord => classify_evidence(raw),
@@ -216,8 +220,7 @@ fn classify_evidence(raw: &RawRecord) -> Judged {
     }
     let flagged = record.flagged.as_ref().is_some_and(|f| f.flagged);
     let reviewed = record.lifecycle == Some(TrustLifecycle::Reviewed);
-    // `attachment_drop` is listed by `status` across records (0.22 carry-forward).
-    let pinned = flagged || reviewed || record.brief_override.is_some() || raw.0.get("attachment_drop").is_some();
+    let pinned = flagged || reviewed || record.brief_override.is_some();
     let approval = record.approval.as_ref().map(|_| ApprovalBinding {
         group_keys: approval_keys,
         project: record.project_id.as_ref().map(ToString::to_string),
@@ -396,7 +399,8 @@ fn scope_of(kind: RecordKind, raw: &RawRecord) -> Option<(PathBuf, Box<dyn Fn(&s
             Some((dir, Box::new(move |name| stem_key(name) == Some(key.as_str()))))
         }
         RecordKind::Review | RecordKind::Divergence => {
-            let prefix = format!("{}__{}__", text(&raw.0, "project_id")?, text(&raw.0, "scenario_id")?);
+            let target = text(&raw.0, "scenario_id").map(str::to_string).or_else(|| text(&raw.0, "change_id").map(|c| format!("change-{c}")))?;
+            let prefix = format!("{}__{}__", text(&raw.0, "project_id")?, target);
             Some((dir, Box::new(move |name| name.starts_with(&prefix))))
         }
         _ => None,
@@ -682,7 +686,7 @@ mod tests {
     fn divergences_keep_the_fold_winner_and_the_latest_acceptance() {
         let dir = tempfile::tempdir().unwrap();
         let tier = ledger(&dir);
-        let accepted = DivergenceStatus::Accepted { reason: "known".into(), tracking: "ISSUE-1".into(), expiry: None, evidence: Vec::new() };
+        let accepted = DivergenceStatus::Accepted { reason: "known".into(), tracking: "ISSUE-1".into(), expiry: None, evidence: Vec::new(), checks: None };
         tier.write(&divergence(1, DivergenceStatus::Open, 0)).unwrap();
         tier.write(&divergence(2, accepted, 10)).unwrap();
         tier.write(&divergence(3, DivergenceStatus::StillDivergent, 20)).unwrap();
@@ -715,6 +719,29 @@ mod tests {
         assert_eq!(names(&tier, RecordKind::Review).len(), 2, "two reviewers at one pin: both are in effect");
         tier.write(&review("alice", "pin-b", 10)).unwrap();
         assert_eq!(names(&tier, RecordKind::Review).len(), 2, "alice's re-review replaced her earlier one, at another pin");
+        assert_eq!(archived(&tier, RecordKind::Review), 1);
+    }
+
+    /// A chore's change-level review (0.23 D5) has no scenario: it is
+    /// grouped by its change, so a re-review supersedes the earlier one
+    /// instead of both staying in the ledger forever.
+    #[test]
+    fn change_level_reviews_supersede_per_change_and_reviewer() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = ledger(&dir);
+        let review = |pin: &str, at: i64| {
+            Review::for_change(
+                Envelope::new(1, RecordKind::Review, base() + Duration::seconds(at), actor("reviewer")),
+                ProjectId::parse("root").unwrap(),
+                ChangeId::parse("split-tables").unwrap(),
+                "alice",
+                pin,
+                ProvenanceRef::OriginalSpecRef("docs/prd.md".into()),
+            )
+        };
+        tier.write(&review("brief-a", 0)).unwrap();
+        tier.write(&review("brief-b", 10)).unwrap();
+        assert_eq!(names(&tier, RecordKind::Review).len(), 1, "the re-review is the one in effect");
         assert_eq!(archived(&tier, RecordKind::Review), 1);
     }
 

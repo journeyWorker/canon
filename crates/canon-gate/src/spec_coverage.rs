@@ -281,7 +281,7 @@ pub fn case_gaps<'a>(scenarios: impl IntoIterator<Item = &'a Scenario>, required
 /// `Divergence` is deliberately NOT folded this way: its supersession is
 /// `(run_seq, round)`, not `(at, schema, digest)`, and
 /// [`fold_to_current_state`] owns that rule and needs every row.
-pub(crate) fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], key: impl Fn(&T) -> K) -> Vec<&'a T> {
+pub fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], key: impl Fn(&T) -> K) -> Vec<&'a T> {
     struct Row<'a, T> {
         record: &'a T,
         at: chrono::DateTime<chrono::Utc>,
@@ -559,14 +559,12 @@ mod tests {
             policy: policy(spec_coverage),
             evidence: corpus.evidence,
             audits: corpus.audits,
-            evidence_file_digests: Default::default(),
             scenarios: corpus.scenarios,
             divergences: corpus.divergences,
             subjects: corpus.subjects,
             changes: corpus.changes,
             reviews: corpus.reviews,
             findings: corpus.findings,
-            legacy_pins: Default::default(),
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: corpus.unreadable,
@@ -932,9 +930,19 @@ mod tests {
         })
     }
 
+    /// A review of `scenario_id` pinned the way `pinned_corpus` reads: the
+    /// fixture scenario's file digest and the implementer's faithful
+    /// evidence, which bound nothing.
     fn review(scenario_id: &str, reviewer: &str, actor: &str) -> Review {
         let envelope = Envelope::new(1, RecordKind::Review, Utc::now(), Actor::new(actor, RoleId::parse("reviewer").unwrap()));
-        Review::new(envelope, project(), ScenarioId::parse(scenario_id).unwrap(), reviewer, "pin-1", ProvenanceRef::OriginalSpecRef("spec".into()))
+        let mut review = Review::new(envelope, project(), ScenarioId::parse(scenario_id).unwrap(), reviewer, "pin-1", ProvenanceRef::OriginalSpecRef("spec".into()));
+        review.pins = Some(canon_model::ReviewPins {
+            scenario_digest: SpecDigest::of(b"bytes"),
+            scenario_digest_scope: canon_model::PinnedSpec::File,
+            checks: Some(vec![canon_model::CheckPin { role: Some("implementer".into()), verdict: EvidenceVerdict::Faithful, checks: Vec::new() }]),
+            evidence: Vec::new(),
+        });
+        review
     }
 
     fn finding(change: &str, seq: u32, severity: FindingSeverity, disposition: FindingDisposition, at_offset: i64) -> Finding {
@@ -1055,7 +1063,7 @@ mod tests {
     fn pinned_review(ctx: &GateContext, reviewer: &str, outcome: canon_model::ReviewOutcome, offset: i64) -> Review {
         let mut r = review("p.a.01", reviewer, reviewer);
         r.envelope.at += chrono::Duration::seconds(offset);
-        r.pins = Some(crate::review_gate::current_pins(ctx, latest_scenarios(ctx)[0]));
+        r.pins = Some(crate::freshness::current_pins(ctx, latest_scenarios(ctx)[0]));
         r.outcome = outcome;
         r
     }
@@ -1068,7 +1076,7 @@ mod tests {
         use canon_model::ReviewOutcome::Signed;
         let mut ctx = pinned_corpus();
         let review = pinned_review(&ctx, "reviewer-2", Signed, 1);
-        assert_eq!(review.pins.as_ref().unwrap().evidence.len(), 1, "the latest implementer record is pinned");
+        assert_eq!(review.pins.as_ref().unwrap().checks.as_ref().unwrap().len(), 1, "the latest implementer record's verdict and checks are pinned");
         ctx.reviews.push(review);
         assert!(SpecCoverageCheck.run(&ctx).is_empty(), "a current pinned review qualifies");
 
@@ -1086,18 +1094,42 @@ mod tests {
         let gap = crate::review_gate::review_gap(&spec_changed, latest_scenarios(&spec_changed)[0], true).unwrap();
         assert_eq!(gap.kind, crate::review_gate::ReviewGapKind::Stale);
 
-        // The scenario was re-attested.
+        // The suite was recorded again with the same verdict from the same
+        // checks (0.23 D5): the review stays current.
         let mut reattested = pinned_corpus();
         reattested.reviews = ctx.reviews.clone();
         let mut again = evidence("p.a.01", EvidenceVerdict::Faithful);
         again.envelope.at += chrono::Duration::seconds(5);
         reattested.evidence.push(again);
-        let out = SpecCoverageCheck.run(&reattested);
+        assert!(SpecCoverageCheck.run(&reattested).is_empty(), "the same verdict from the same checks keeps the review");
+
+        // A different verdict stales it.
+        let mut flipped = pinned_corpus();
+        flipped.reviews = ctx.reviews.clone();
+        let mut flip = evidence("p.a.01", EvidenceVerdict::Divergent);
+        flip.envelope.at += chrono::Duration::seconds(5);
+        flipped.evidence.push(flip);
+        let out = SpecCoverageCheck.run(&flipped);
         assert_eq!(out.len(), 1, "{out:?}");
         assert!(out[0].detail.starts_with("stale review by `reviewer-2`: its evidence changed"), "{}", out[0].detail);
 
+        // So do different checks: a new case bound to the scenario.
+        let mut rechecked = pinned_corpus();
+        rechecked.reviews = ctx.reviews.clone();
+        let mut more = evidence("p.a.01", EvidenceVerdict::Faithful);
+        more.envelope.at += chrono::Duration::seconds(5);
+        more.attachments = vec![canon_model::EvidenceAttachment {
+            path: "reports/junit.xml".into(),
+            sha256: "a".repeat(64),
+            format: Some(canon_model::ReportFormat::Junit),
+            case: Some("p.a.01 holds".into()),
+            outcome: Some(canon_model::ReportOutcome::Passed),
+        }];
+        rechecked.evidence.push(more);
+        assert!(SpecCoverageCheck.run(&rechecked)[0].detail.starts_with("stale review by `reviewer-2`: its evidence changed"));
+
         // Both.
-        let mut both = reattested;
+        let mut both = flipped;
         both.scenarios = spec_changed.scenarios.clone();
         assert!(SpecCoverageCheck.run(&both)[0].detail.starts_with("stale review by `reviewer-2`: its spec and its evidence changed"));
 
@@ -1159,7 +1191,7 @@ mod tests {
         let mut ctx = pinned_corpus();
         ctx.evidence.clear();
         let review = pinned_review(&ctx, "reviewer-2", canon_model::ReviewOutcome::Signed, 1);
-        assert_eq!(review.pins.as_ref().unwrap().evidence, Vec::new());
+        assert_eq!(review.pins.as_ref().unwrap().checks, Some(Vec::new()));
         ctx.reviews.push(review);
         assert!(SpecCoverageCheck.run(&ctx).is_empty());
         ctx.evidence.push(evidence("p.a.01", EvidenceVerdict::Faithful));
@@ -1201,125 +1233,20 @@ mod tests {
         assert!(SpecCoverageCheck.run(&ctx).is_empty());
     }
 
-    /// gate.check.40: a legacy (unpinned) review whose pin nobody could
-    /// read is undecidable: it keeps qualifying, and the advisory counts
-    /// it once per reviewer and scenario.
+    /// gate.check.40 (0.23 D6): a review pinned before 0.23 (to evidence
+    /// record ids, or to nothing at all) is not comparable: it does not
+    /// count, and its gap names `canon migrate`.
     #[test]
-    fn an_unresolved_legacy_review_still_counts_and_is_counted_as_undecidable() {
-        let mut ctx = pinned_corpus();
-        let mut earlier = review("p.a.01", "reviewer-2", "reviewer-2");
-        earlier.envelope.at -= chrono::Duration::seconds(5);
-        ctx.reviews = vec![earlier, review("p.a.01", "reviewer-2", "reviewer-2")];
-        let mut edited = scenario("p.a.01", Some("live"));
-        edited.envelope.at += chrono::Duration::seconds(5);
-        edited.source_digest = SpecDigest::of(b"edited bytes");
-        ctx.scenarios.push(edited);
-        assert!(SpecCoverageCheck.run(&ctx).is_empty(), "an undecidable legacy review still counts");
-        let counts = crate::review_gate::legacy_review_advisory(&ctx).unwrap();
-        assert_eq!((counts.current, counts.stale, counts.undecidable), (0, 0, 1));
-        assert!(counts.note().contains("`fetch-depth: 0` in CI"), "{}", counts.note());
-
-        let pinned = pinned_review(&ctx, "reviewer-2", canon_model::ReviewOutcome::Signed, 10);
-        ctx.reviews.push(pinned);
-        assert_eq!(crate::review_gate::legacy_review_advisory(&ctx), None, "a pinned re-review supersedes the reviewer's legacy one");
-    }
-
-    /// gate.check.90–93 (0.16 D6): a legacy review is checked against
-    /// what its pinned commit holds. The same scenario digest and no newer
-    /// evidence: current. Another digest: stale, naming the pin. Evidence
-    /// recorded after the review: stale. A commit or scenario the clone
-    /// lacks: undecidable, still counting.
-    #[test]
-    fn a_legacy_review_is_current_stale_or_undecidable_by_its_pinned_commit() {
-        use crate::legacy_pins::PinnedScenario;
-        let digest = SpecDigest::of(b"own v1");
-        let with = |at_pin: PinnedScenario, review_offset: i64| {
+    fn a_review_pinned_before_0_23_does_not_count_until_migrated() {
+        for pins in [None, Some(canon_model::ReviewPins { scenario_digest: SpecDigest::of(b"bytes"), scenario_digest_scope: canon_model::PinnedSpec::File, checks: None, evidence: Vec::new() })] {
             let mut ctx = pinned_corpus();
-            for s in &mut ctx.scenarios {
-                s.scenario_digest = Some(digest.clone());
-            }
-            let mut legacy = review("p.a.01", "reviewer-2", "reviewer-2");
-            legacy.envelope.at = ctx.evidence[0].envelope.at + chrono::Duration::seconds(review_offset);
-            ctx.legacy_pins.insert(legacy.pin.clone(), project(), ScenarioId::parse("p.a.01").unwrap(), at_pin);
-            ctx.reviews = vec![legacy];
-            ctx
-        };
-        let counted = |ctx: &GateContext| {
-            let c = crate::review_gate::legacy_review_advisory(ctx).unwrap();
-            (c.current, c.stale, c.undecidable)
-        };
-
-        let current = with(PinnedScenario::Digest(digest.clone()), 10);
-        assert!(SpecCoverageCheck.run(&current).is_empty(), "an unchanged scenario keeps its legacy review");
-        assert_eq!(counted(&current), (1, 0, 0));
-
-        let spec = with(PinnedScenario::Digest(SpecDigest::of(b"own v0")), 10);
-        let out = SpecCoverageCheck.run(&spec);
-        assert_eq!(out.len(), 1, "{out:?}");
-        assert_eq!(out[0].class, FailureClass::UnreviewedPromotion);
-        assert_eq!(
-            out[0].detail,
-            "stale review by `reviewer-2` (written before review pinning; checked against commit pin-1): its spec changed since pin-1 (the scenario's digest at that commit is not its current one); a review counts only while what it saw is current — review it again (`canon review add`)"
-        );
-        assert_eq!(crate::review_gate::review_gap(&spec, latest_scenarios(&spec)[0], true).unwrap().kind, crate::review_gate::ReviewGapKind::Stale);
-        assert_eq!(counted(&spec), (0, 1, 0));
-        assert!(crate::review_gate::legacy_review_advisory(&spec).unwrap().note().ends_with(": p.a.01"));
-
-        let evidence = with(PinnedScenario::Digest(digest.clone()), -10);
-        assert!(SpecCoverageCheck.run(&evidence)[0].detail.contains("): it has declared evidence newer than the review;"));
-        assert_eq!(counted(&evidence), (0, 1, 0));
-
-        let both = with(PinnedScenario::Digest(SpecDigest::of(b"own v0")), -10);
-        assert!(SpecCoverageCheck.run(&both)[0].detail.contains("its spec changed since pin-1 (the scenario's digest at that commit is not its current one), and it has declared evidence newer than the review"));
-
-        for missing in [PinnedScenario::CommitMissing, PinnedScenario::ScenarioMissing] {
-            let ctx = with(missing, -10);
-            assert!(SpecCoverageCheck.run(&ctx).is_empty(), "a pin the clone cannot read never becomes a violation");
-            assert_eq!(counted(&ctx), (0, 0, 1));
-        }
-    }
-
-    /// A stale legacy review whose scenario another reviewer has reviewed
-    /// since (current, signed, distinct) is counted stale but superseded,
-    /// and the advisory names no scenario to review again. A non-distinct
-    /// or unsigned later review supersedes nothing.
-    #[test]
-    fn a_stale_legacy_review_superseded_by_a_qualifying_review_is_not_named_for_re_review() {
-        use crate::legacy_pins::PinnedScenario;
-        use canon_model::ReviewOutcome::{Indeterminate, Signed};
-        let stale_legacy = || {
-            let mut ctx = pinned_corpus();
-            let digest = SpecDigest::of(b"own v1");
-            for s in &mut ctx.scenarios {
-                s.scenario_digest = Some(digest.clone());
-            }
-            let mut legacy = review("p.a.01", "reviewer-2", "reviewer-2");
-            legacy.envelope.at = ctx.evidence[0].envelope.at + chrono::Duration::seconds(10);
-            ctx.legacy_pins.insert(legacy.pin.clone(), project(), ScenarioId::parse("p.a.01").unwrap(), PinnedScenario::Digest(SpecDigest::of(b"own v0")));
-            ctx.reviews = vec![legacy];
-            ctx
-        };
-
-        let mut superseded = stale_legacy();
-        let current = pinned_review(&superseded, "reviewer-3", Signed, 20);
-        superseded.reviews.push(current);
-        assert!(SpecCoverageCheck.run(&superseded).is_empty(), "the other reviewer's current review qualifies");
-        let counts = crate::review_gate::legacy_review_advisory(&superseded).unwrap();
-        assert_eq!((counts.current, counts.stale, counts.superseded, counts.undecidable), (0, 1, 1, 0));
-        assert!(counts.needs_review.is_empty());
-        assert_eq!(
-            counts.note(),
-            "1 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 0 current, 1 stale, 0 undecidable; 1 stale one(s) superseded by a current review of the same scenario, so nothing is owed for them"
-        );
-
-        for (reviewer, actor, outcome) in [("agent-a", "agent-a", Signed), ("reviewer-3", "reviewer-3", Indeterminate)] {
-            let mut owed = stale_legacy();
-            let mut later = pinned_review(&owed, reviewer, outcome, 20);
-            later.envelope.actor.agent_id = actor.into();
-            owed.reviews.push(later);
-            let counts = crate::review_gate::legacy_review_advisory(&owed).unwrap();
-            assert_eq!((counts.stale, counts.superseded), (1, 0), "{reviewer} {outcome:?} supersedes nothing");
-            assert!(counts.note().ends_with("review its scenario again (`canon review add`): p.a.01"), "{}", counts.note());
+            let mut old = review("p.a.01", "reviewer-2", "reviewer-2");
+            old.pins = pins;
+            ctx.reviews = vec![old];
+            let out = SpecCoverageCheck.run(&ctx);
+            assert_eq!(out.len(), 1, "{out:?}");
+            assert!(out[0].detail.contains("predates 0.23 review pinning") && out[0].detail.contains("`canon migrate`"), "{}", out[0].detail);
+            assert_eq!(crate::review_gate::review_gap(&ctx, latest_scenarios(&ctx)[0], true).unwrap().kind, crate::review_gate::ReviewGapKind::Stale);
         }
     }
 

@@ -39,7 +39,8 @@
         "brief": ".canon/changes/c-checkout/brief.md",
         "briefExists": false,
         "source": "openspec/changes/c-checkout/proposal.md"
-      }
+      },
+      "choreReviews": []
     }
   ],
   "unowned": [],

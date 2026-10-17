@@ -13,7 +13,7 @@
   "kind": "review",
   "pin": "r1",
   "pins": {
-    "evidence": [],
+    "checks": [],
     "scenario_digest": "4f40e229159d1ea9df3bd6331bfd77549bedf54a7a121a89b9017fcfd1957ba8",
     "scenario_digest_scope": "scenario"
   },

@@ -453,9 +453,10 @@ built or kept, never what it does. Its brief is intent, category,
 invariants, checks, out of scope; it adds no scenarios, and its evidence
 is the subject's suite run again at the chore commit with
 `canon evidence add --all-scenarios --report <kind>:<path> …`. That
-supersedes the old evidence, which makes the pinned reviews stale, so an
-independent re-review follows. Work that changes behavior is a feature
-change, never a chore.
+supersedes the old evidence; the pinned reviews stay current while the
+verdicts and checks are the same, so the chore itself is reviewed once with
+`canon review add --change <slug> …` before it ships. Work that changes
+behavior is a feature change, never a chore.
 
 ## Where are we: `canon status`
 
@@ -488,8 +489,7 @@ uses, so status and the gate cannot disagree about a gap:
   stale or whose latest reviews are all `indeterminate`/`unavailable`
   (see `canon-review`), and the `canon review add` step names both. With
   `require_review` on, a `warning:` line counts the in-effect reviews that
-  predate review pinning (0.15), checked against the commit each pinned:
-  current, stale (named) and undecidable.
+  predate 0.23 review pinning and wait for `canon migrate`.
 - **Brief** (0.16, 0.17, 0.19) — for each `building`, `verifying` or `shipped`
   subject, and each `proposed` subject whose newest adopted change has a
   brief (a canon `brief.md`, or an external `proposal.md`), a `brief:`
@@ -545,8 +545,6 @@ uses, so status and the gate cannot disagree about a gap:
   refuted audit adds a `next:` step suggesting `canon evidence add
   --kind audit …` (recorded from an external evaluator; canon never runs
   one).
-- **Dropped bindings** — `dropped bindings (N):` lists every recorded
-  `--drop-attachment` (scenario, paths, reason); `drops[]` in `--json`.
 - **Brief overrides** — a `warning:` line per evidence record attested
   with `canon evidence add --override-reason` while its subject's brief
   was not approved: what it attests, who, when, the subject and the

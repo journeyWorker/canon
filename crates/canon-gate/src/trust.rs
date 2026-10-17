@@ -121,8 +121,9 @@ fn review_index(ledger_root: &Path) -> ReviewIndex {
     let reviews = GitTier::new(ledger_root).read(&TierQuery::kind(RecordKind::Review)).map(|read| read.records).unwrap_or_default();
     for raw in reviews {
         let Ok(review) = serde_json::from_value::<Review>(raw.0) else { continue };
-        index.composite.insert((review.project_id.clone(), review.scenario_id.clone()));
-        index.bare.insert(review.scenario_id);
+        let Some(scenario_id) = review.scenario_id else { continue };
+        index.composite.insert((review.project_id.clone(), scenario_id.clone()));
+        index.bare.insert(scenario_id);
     }
     index
 }

@@ -142,6 +142,8 @@ canon review add --project-id <root-id> --scenario-id <id> [--scenario-id <id>].
   [--outcome signed|indeterminate|unavailable] \
   [--reviewer-provider <p>] [--reviewer-model <m>] [--reviewer-harness <h>] \
   [--artifact <path>]... [--max-artifact-mib <MiB>]
+canon review add --project-id <root> --change <slug> --reviewer <who> --pin <sha-or-ref> \
+  --role reviewer (--upstream-ref <ref> | --original-spec-ref <ref>) …   # a chore, below
 ```
 
 One attributed Review record per scenario, joined on
@@ -166,6 +168,20 @@ It is all or nothing: a scenario with no record, or a line in the file
 that is not a scenario id, refuses the call (exit 2) and writes no review.
 This is also the batch re-pin after `canon evidence add` reports reviews
 it made stale (see `canon-gate`).
+
+### A chore is reviewed as a change (`--change`, 0.23)
+
+A chore adds no scenarios, and recording the suite again after it leaves
+every scenario review current (a review pins the evidence's verdict and
+checks, so the same verdicts from the same cases change nothing). What the
+chore needs instead is one change-level review: the reviewer signs its
+invariants and checks against the diff with `canon review add --change
+<slug> …`, in place of `--scenario-id`. The review pins the chore's brief
+(its digest, less the `Approved:` line), so an edit to the brief stales it,
+and `--to shipped` refuses a chore with no signed, current change-level
+review (`spec_coverage.require_review.distinct_actor` asks it of a reviewer
+and session that did not attest the subject's evidence). `--change` takes a
+chore's slug and refuses a feature change.
 
 ### What the reviewer looked at (artifacts)
 
@@ -313,39 +329,20 @@ The scenario is reviewed when at least one of those latest reviews:
    describes its scenario at the commit it pinned (below);
 3. passes `distinct_actor`, when that is on.
 
-### Reviews written before pinning
+### Reviews written before 0.23 pinning
 
-A review written before 0.15 has no pins, only `pin`: the commit it
-reviewed. The gate reads the scenario's `.feature` file at that commit
-(`git`, with the same per-scenario normalization `canon inventory sync`
-uses for `scenario_digest`; if the scenario was in another file then, the
-spec root's files at that commit are searched for its id) and decides:
-
-- **current** when that digest equals the scenario's current one and no
-  declared evidence record of the scenario is newer than the review: it
-  counts under rules 1 and 3;
-- **stale** when the scenario changed since the commit (`its spec changed
-  since <pin>`) or has evidence newer than the review (`it has declared
-  evidence newer than the review`): it no longer counts, exactly like a
-  stale pinned review;
-- **undecidable** when the pin is not a commit in this clone (shallow
-  clone, rewritten history) or the scenario id is absent at it: it keeps
-  counting, as in 0.15. A missing commit never becomes a violation.
-
-`canon gate check` prints one advisory line with the split (exit code
-unchanged by the line itself). A stale one whose scenario already has
-another qualifying review is counted as superseded and not named:
-
-```
-advisory: 338 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 318 current, 12 stale, 8 undecidable; 7 stale one(s) superseded by a current review of the same scenario, so nothing is owed for them; a stale one with no current review in its place no longer counts — review its scenario again (`canon review add`): platformer.movement.01, platformer.movement.02, …; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it
-```
-
-`canon status` prints the same line as a warning, and `canon subject
-status` prints it on stderr for the subject's own scenarios; all three
-make the same decision. Re-review exactly the scenarios the line names:
-the new review pins what it saw and replaces the reviewer's legacy one.
-In CI, check out full history (`fetch-depth: 0`) for the job that runs
-the gate, or every legacy review is undecidable.
+A review written before 0.23 pins something the gate no longer compares: a
+0.15–0.22 review pins evidence record files, and a review written before
+0.15 has no pins, only `pin`, the commit it reviewed. Such a review does not
+count until `canon migrate` rewrites it to what the evidence says (see
+`canon-gate`). A review that was current under the rule it was written under
+becomes a current review; one that was stale stays stale, and its scenario
+needs a new `canon review add`, which pins what it saw and replaces the
+reviewer's earlier one. The gate, `canon status` and `canon subject status`
+print one advisory naming how many scenarios are waiting for `canon
+migrate`. In CI, check out full history (`fetch-depth: 0`) for the job that
+runs `canon migrate`, or a pre-0.15 review whose commit is missing is pinned
+as the scenario stands instead of being checked.
 
 ### `unreviewed-promotion`
 

@@ -1,26 +1,22 @@
-//! What a legacy review's pinned commit says about its scenario (0.16 D6).
+//! What a pre-0.15 review's pinned commit says about its scenario; read
+//! only by `canon migrate` (0.23 D6).
 //!
 //! A review written before 0.15 carries no `pins`, but it carries `pin`,
 //! the commit it reviewed. That commit holds the scenario as the reviewer
 //! saw it, so its per-scenario digest — the exact normalization `canon
 //! inventory sync` stores as `Scenario.scenario_digest`
 //! ([`canon_fmt::gherkin::scenario_digests`]) applied to the file's text
-//! at that commit — tells whether the scenario has changed since. This
-//! module reads those digests out of git; [`crate::review_gate`] makes the
-//! decision (current, stale, or undecidable) from them, the same way for
-//! `canon gate check`, `canon subject status` and `canon status`.
+//! at that commit — tells whether the scenario has changed since.
+//! [`crate::migrate_pins`] decides from these digests whether the review
+//! is still current (it is then pinned to what the scenario and its
+//! evidence say now) or stale (it is left as it is, and stays stale).
 //!
 //! # Where the git read happens
-//! [`crate::GateContext::load`] stays free of process I/O (as it stays
-//! free of the wall clock): it leaves [`crate::GateContext::legacy_pins`]
-//! empty. The CLI calls [`resolve`] once per run, after loading, and
-//! stores the result in the context. `resolve` needs to know which
-//! `.feature` file holds each scenario now and where each spec root lives;
-//! only the CLI parses `canon.yaml`'s `specs.roots`, so it passes them in
-//! as [`SpecSources`]. The `sources` closure runs only when there is a
-//! legacy review to check, so a repo without one never scans its spec
-//! corpus or starts git. A context nobody resolved reads every legacy
-//! review as undecidable, which is the 0.15 behavior.
+//! [`resolve`] needs to know which `.feature` file holds each scenario now
+//! and where each spec root lives; the caller passes them in as
+//! [`SpecSources`]. The `sources` closure runs only when there is a
+//! pre-0.15 review to check, so a repo without one never scans its spec
+//! corpus or starts git.
 //!
 //! # How git is read
 //! One `git cat-file --batch` process serves every read of a run. Each
@@ -37,21 +33,20 @@
 //! A pin that is not a hex object id, is not a commit in this clone
 //! (shallow clone, rewritten history, not a git checkout at all), or a
 //! scenario id that no `.feature` file of its root holds at that commit,
-//! is undecidable. An undecidable review keeps counting, and the advisory
-//! names how many there are; a missing commit never becomes a violation.
+//! is undecidable. Such a review counted unchecked before 0.23, so the
+//! migration pins it to the scenario as it stands and says how many.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
+use canon_gate::review_gate::in_effect_reviews;
+use canon_gate::spec_coverage::latest_scenarios;
+use canon_gate::GateContext;
 use canon_model::{ProjectId, Review, ScenarioId, SpecDigest};
 
-use crate::context::GateContext;
-use crate::review_gate::in_effect_reviews;
-use crate::spec_coverage::latest_scenarios;
-
-/// What a legacy review's pinned commit holds for its scenario.
+/// What a pre-0.15 review's pinned commit holds for its scenario.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PinnedScenario {
     /// The scenario's digest at the pinned commit.
@@ -64,8 +59,7 @@ pub enum PinnedScenario {
 }
 
 /// [`PinnedScenario`] per `(pin, project_id, scenario_id)` of every
-/// in-effect legacy review of a live scenario ([`resolve`]). Empty until
-/// resolved.
+/// in-effect pre-0.15 review of a live scenario ([`resolve`]).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LegacyPins {
     at_pin: BTreeMap<(String, ProjectId, ScenarioId), PinnedScenario>,
@@ -75,7 +69,7 @@ impl LegacyPins {
     /// What `review`'s pin holds for its scenario; `None` when it was not
     /// resolved.
     pub fn get(&self, review: &Review) -> Option<&PinnedScenario> {
-        self.at_pin.get(&(review.pin.clone(), review.project_id.clone(), review.scenario_id.clone()))
+        self.at_pin.get(&(review.pin.clone(), review.project_id.clone(), review.scenario_id.clone()?))
     }
 
     /// Record what `pin` holds for `(project_id, scenario_id)`.
@@ -104,8 +98,8 @@ pub fn resolve(ctx: &GateContext, sources: impl FnOnce() -> SpecSources) -> Lega
     let live: BTreeSet<(&ProjectId, &ScenarioId)> = latest_scenarios(ctx).into_iter().map(|s| (&s.project_id, &s.scenario_id)).collect();
     let targets: BTreeSet<(&str, &ProjectId, &ScenarioId)> = in_effect_reviews(ctx)
         .into_iter()
-        .filter(|r| r.pins.is_none() && live.contains(&(&r.project_id, &r.scenario_id)))
-        .map(|r| (r.pin.as_str(), &r.project_id, &r.scenario_id))
+        .filter(|r| r.pins.is_none())
+        .filter_map(|r| r.scenario_id.as_ref().filter(|id| live.contains(&(&r.project_id, id))).map(|id| (r.pin.as_str(), &r.project_id, id)))
         .collect();
     let mut resolved = LegacyPins::default();
     if targets.is_empty() {

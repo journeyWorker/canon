@@ -18,11 +18,12 @@
 use std::path::Path;
 
 use canon_gate::review_gate::{
-    active_require_review, fixed_blockers, is_reverify, reverify_remedy, reverify_scenarios, scenarios_without_evidence_after,
+    active_require_review, change_review_gap, fixed_blockers, is_reverify, reverify_remedy, reverify_scenarios,
 };
+use canon_gate::freshness::scenarios_without_evidence_after;
 use canon_gate::spec_coverage::subject_change_ids;
 use canon_gate::{FailureClass, GateContext, Violation};
-use canon_model::{ChangeId, Subject};
+use canon_model::{ChangeId, SpecDigest, Subject, SubjectStatus};
 use chrono::{DateTime, SecondsFormat, Utc};
 
 /// What a re-verification gap waits on.
@@ -59,7 +60,7 @@ impl Gap {
     /// The step's text for `subject` in `canon status`.
     pub fn why(&self, subject: &str) -> String {
         format!(
-            "{subject}: {} (since {}) and {} evidenced scenario(s) ({}) have no evidence recorded after it; the ship guard refuses until each does. Run the whole suite again, then the re-review follows (new evidence stales the pinned reviews)",
+            "{subject}: {} (since {}) and {} evidenced scenario(s) ({}) have no evidence recorded after it; the ship guard refuses until each does. Run the whole suite again; a review stays current while the scenario's verdict and checks are unchanged",
             self.trigger,
             self.since.to_rfc3339_opts(SecondsFormat::Secs, true),
             self.scenarios.len(),
@@ -69,9 +70,10 @@ impl Gap {
 }
 
 /// The approved chore changes among `subject`'s adopted changes, each with
-/// its approval time. A chore whose brief is not approved (or whose
-/// approval line carries no readable time) triggers nothing.
-fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(ChangeId, DateTime<Utc>)> {
+/// its approval time and the digest of its brief as it reads now. A chore
+/// whose brief is not approved (or whose approval line carries no readable
+/// time) triggers nothing.
+fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(ChangeId, DateTime<Utc>, SpecDigest)> {
     subject_change_ids(ctx, subject)
         .into_iter()
         .filter_map(|change| {
@@ -80,7 +82,7 @@ fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(Ch
                 return None;
             }
             let at = crate::brief::approved_at(canon_ingest::markdown::field(&text, "Approved:")?)?;
-            Some((change, at))
+            Some((change, at, crate::brief::brief_spec_digest(&text)))
         })
         .collect()
 }
@@ -89,13 +91,25 @@ fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(Ch
 pub fn chore_gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Gap> {
     chore_approvals(repo, ctx, subject)
         .into_iter()
-        .filter_map(|(change, since)| {
+        .filter_map(|(change, since, _)| {
             let scenarios: Vec<(String, String)> = scenarios_without_evidence_after(ctx, &subject.subject_id, since)
                 .into_iter()
                 .map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string()))
                 .collect();
             (!scenarios.is_empty()).then(|| Gap { trigger: format!("chore change `{}` approved", change.as_str()), since, scenarios })
         })
+        .collect()
+}
+
+/// The approved chore changes of `subject` that lack a qualifying
+/// change-level review (0.23 D5), each with why. Only when
+/// `require_review` is active and covers `shipped`: a repo with no review
+/// policy asks no one to review.
+pub fn chore_review_gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(ChangeId, String)> {
+    let Some((rr, _)) = active_require_review(ctx).filter(|(rr, _)| rr.covers(SubjectStatus::Shipped)) else { return Vec::new() };
+    chore_approvals(repo, ctx, subject)
+        .into_iter()
+        .filter_map(|(change, _, digest)| change_review_gap(ctx, subject, &change, &digest, rr.distinct_actor).map(|why| (change, why)))
         .collect()
 }
 
@@ -123,6 +137,13 @@ pub fn gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Gap> {
 /// The `verifying → shipped` violations of the chore trigger: one
 /// `uncovered-cell` per unapproved-by-evidence chore, naming `subject`.
 pub fn chore_violations(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Violation> {
+    let reviews = chore_review_gaps(repo, ctx, subject).into_iter().map(|(change, why)| {
+        Violation::new(
+            FailureClass::UnreviewedPromotion,
+            subject.subject_id.as_str(),
+            format!("chore change `{}` approved: {why}; {}", change.as_str(), chore_review_remedy(&change))
+        )
+    });
     chore_gaps(repo, ctx, subject)
         .into_iter()
         .map(|gap| {
@@ -139,13 +160,22 @@ pub fn chore_violations(repo: &Path, ctx: &GateContext, subject: &Subject) -> Ve
                 ),
             )
         })
+        .chain(reviews)
         .collect()
+}
+
+/// The `canon review add --change` step a chore's review gap names.
+pub fn chore_review_remedy(change: &ChangeId) -> String {
+    format!(
+        "have a reviewer record one review of the chore: `canon review add --project-id <root> --change {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"`",
+        change.as_str()
+    )
 }
 
 /// The hint a refusal carries when any of `violations` is a
 /// re-verification one: the batch command and what follows it.
 pub fn hint(violations: &[&Violation]) -> Option<String> {
     violations.iter().find(|v| is_reverify(v)).map(|_| {
-        "record the suite again for the scenarios named: `canon evidence add --project-id <root> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; the re-review follows (new evidence stales the pinned reviews), then ship".to_string()
+        "record the suite again for the scenarios named: `canon evidence add --project-id <root> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; reviews stay current while a scenario's verdict and checks are unchanged; a chore also needs its change-level review (`canon review add --change <slug>`), then ship".to_string()
     })
 }

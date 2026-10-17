@@ -212,6 +212,14 @@ pub fn run(repo: &Path, dry_run: bool, json: bool) -> i32 {
             Ok(lines) => lines.into_iter().for_each(|line| log.line(line)),
             Err(e) => return e.emit("canon migrate", json),
         }
+        match crate::migrate_pins::run(&repo, false) {
+            Ok(report) => {
+                for line in report.lines(true) {
+                    log.line(line);
+                }
+            }
+            Err(e) => log.line(format!("canon migrate: could not check the reviews against their evidence ({e}); a run that applies the plan checks them again")),
+        }
         log.line("canon migrate: --dry-run, nothing written");
         if json {
             crate::json_out::data("migrate", serde_json::json!({ "dryRun": true, "steps": log.into_lines() }));
@@ -1074,6 +1082,18 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, json: bool) -> i32 
     match crate::inventory::run_sync(repo, None) {
         Ok(outcome) if outcome.is_clean() => {
             log.line(format!("canon migrate: rebuilt the scenario index: {} record(s) written", outcome.total_written()));
+            // After the index: a pre-0.15 review is judged against the
+            // scenario digests the rebuilt index holds.
+            match crate::migrate_pins::run(repo, true) {
+                Ok(report) => {
+                    for line in report.lines(false) {
+                        log.line(line);
+                    }
+                }
+                Err(e) => {
+                    return CliError::refused("MIGRATE_PINS_FAILED", format!("the files moved and the index was rebuilt, but the reviews were not pinned to what their evidence says: {e}")).hint("fix what the message names, then run `canon migrate` again; it finishes the reviews").emit("canon migrate", json);
+                }
+            }
             if json {
                 crate::json_out::data("migrate", serde_json::json!({ "dryRun": false, "steps": log.into_lines(), "indexRecordsWritten": outcome.total_written() }));
             }

@@ -30,6 +30,8 @@ pub mod language;
 pub mod learn;
 pub mod ledger;
 pub mod migrate;
+pub mod migrate_legacy_pins;
+pub mod migrate_pins;
 pub mod next;
 pub mod paging;
 pub mod plans;

@@ -76,9 +76,17 @@ fn repo() -> TempDir {
 }
 
 fn attest(repo: &Path, verdict: EvidenceVerdict) {
+    attest_binding(repo, verdict, None);
+}
+
+/// Attest the scenario, optionally binding one file (a different check).
+fn attest_binding(repo: &Path, verdict: EvidenceVerdict, binding: Option<&str>) {
     let actor = Actor::new("impl-agent", role("implementer")).with_session(SessionId::parse("impl-session").unwrap());
-    let record = EvidenceRecord::new(Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor), None, Some(ScenarioId::parse(SCENARIO).unwrap()), None, verdict)
+    let mut record = EvidenceRecord::new(Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor), None, Some(ScenarioId::parse(SCENARIO).unwrap()), None, verdict)
         .with_project_id(ProjectId::parse("demo").unwrap());
+    if let Some(path) = binding {
+        record.attachments.push(canon_model::EvidenceAttachment { path: path.to_string(), sha256: "a".repeat(64), format: None, case: None, outcome: None });
+    }
     ledger(repo).write(&record).unwrap();
 }
 
@@ -186,15 +194,18 @@ fn acceptance_from_the_evidence_actor_or_session_is_refused() {
     assert_eq!(ship(repo).status.code(), Some(1), "nothing was accepted, so the gap still blocks");
 }
 
-/// New evidence, divergent or not, ends an acceptance: the cell blocks again
-/// and the refusal says the acceptance is stale.
+/// New evidence that says something different (another verdict, or other
+/// checks) ends an acceptance: the cell blocks again and the refusal says the
+/// acceptance is stale. New evidence that says the same does not (0.23 D5).
 #[test]
-fn new_evidence_makes_the_acceptance_stale_and_blocks_again() {
+fn new_evidence_that_says_something_different_makes_the_acceptance_stale_and_blocks_again() {
     let dir = repo();
     let repo = dir.path();
     assert!(accept(repo, &[]).status.success());
     attest(repo, EvidenceVerdict::Divergent);
+    assert!(out(&canon(repo, &["gate", "check"])).contains("accepted-divergence"), "the same verdict from the same checks leaves the acceptance holding");
 
+    attest_binding(repo, EvidenceVerdict::Divergent, Some("reports/other.xml"));
     let shipped = ship(repo);
     assert_eq!(shipped.status.code(), Some(1), "{}", out(&shipped));
     assert!(out(&shipped).contains("the acceptance by reviewer-2") && out(&shipped).contains("is stale"), "{}", out(&shipped));

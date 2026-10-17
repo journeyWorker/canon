@@ -1,6 +1,6 @@
 canon gate check: 1 violation(s)
 
 false-success (1):
-  false-success cart.add.01 — latest audit refuted this scenario's declared success (evaluator `testjack` 1.4.0, sha256 0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0, counterexamples: reports/counter.xml); a declared faithful verdict does not override it — fix the behavior, re-attest, and record the evaluator's new audit with `canon evidence add --kind audit`; a new audit that no longer binds the counterexamples records why: --drop-attachment reports/counter.xml --drop-reason "<why the counterexample no longer applies>"
+  false-success cart.add.01 — latest audit refuted this scenario's declared success (evaluator `testjack` 1.4.0, sha256 0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0, counterexamples: reports/counter.xml); a declared faithful verdict does not override it — fix the behavior, re-attest, and record the evaluator's new audit with `canon evidence add --kind audit`
 
 advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`

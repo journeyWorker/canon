@@ -6,6 +6,17 @@
   "at": "2026-10-08T17:56:52.513023Z",
   "kind": "review",
   "pin": "r1",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "6bb1bf1434056901ffd5b6536d525c726f106806f724be808733ec1d02a15c6a",
+    "scenario_digest_scope": "scenario"
+  },
   "project_id": "root",
   "provenance_ref": {
     "original_spec_ref": "specs/features/kind=feature/area=cart/add.feature"

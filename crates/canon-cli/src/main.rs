@@ -1041,12 +1041,6 @@ enum EvidenceCommand {
         /// --kind audit: confirmed / refuted / indeterminate
         #[arg(long)]
         audit_result: Option<String>,
-        /// Drop a file the scenario's latest record binds (repository-relative path); repeatable; needs --drop-reason. Without it every earlier attachment is carried into the new record unchanged; with --all-scenarios the drop applies to each scenario that binds the path
-        #[arg(long = "drop-attachment", value_name = "PATH")]
-        drop_attachments: Vec<String>,
-        /// Why the --drop-attachment files are no longer bound (one line, recorded on the record)
-        #[arg(long)]
-        drop_reason: Option<String>,
         /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)
         #[arg(long)]
         override_reason: Option<String>,
@@ -1190,7 +1184,7 @@ enum FindingCommand {
 
 #[derive(Subcommand)]
 enum ReviewCommand {
-    /// Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required). Each review pins its scenario's source digest and latest evidence; it counts only while both are unchanged
+    /// Write one attributed Review record per scenario (or, with --change, one for a chore change) directly to the ledger, nothing to promote (exactly one provenance ref required). A scenario review pins the scenario's digest and what its latest evidence says (verdict and checks); it counts only while both are unchanged. A change review pins the chore's brief
     #[command(group(clap::ArgGroup::new("provenance").args(["upstream_ref", "original_spec_ref"]).required(true).multiple(false)))]
     Add {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
@@ -1201,6 +1195,9 @@ enum ReviewCommand {
         /// Read more scenario ids from a file (`-` for stdin): one per line, `#` starts a comment
         #[arg(long, value_name = "FILE|-")]
         scenario_ids_from: Option<String>,
+        /// Review a chore change instead of scenarios: its invariants and checks against the diff. Pins the change's brief; an edit to the brief stales it. A chore needs exactly this one review before `--to shipped`
+        #[arg(long, value_name = "SLUG", value_parser = canon_cli::query::parse_change_id, conflicts_with_all = ["scenario_ids", "scenario_ids_from"])]
+        change: Option<ChangeId>,
         #[arg(long)]
         reviewer: String,
         #[arg(long)]
@@ -1904,8 +1901,6 @@ fn main() -> ExitCode {
                 evaluator_version,
                 evaluator_digest,
                 audit_result,
-                drop_attachments,
-                drop_reason,
                 override_reason,
                 promote,
                 repo,
@@ -1947,8 +1942,6 @@ fn main() -> ExitCode {
                             evaluator_version,
                             evaluator_digest,
                             audit_result,
-                            drop_attachments,
-                            drop_reason,
                             override_reason,
                             promote: promote.flag(),
                             json,
@@ -2016,6 +2009,7 @@ fn main() -> ExitCode {
                 project_id,
                 scenario_ids,
                 scenario_ids_from,
+                change,
                 reviewer,
                 pin,
                 upstream_ref,
@@ -2043,6 +2037,7 @@ fn main() -> ExitCode {
                         project_id,
                         scenario_ids,
                         scenario_ids_from,
+                        change,
                         reviewer,
                         pin,
                         upstream_ref,

@@ -107,12 +107,12 @@ Feature: review add
   @subject:review-attestation
   @case:happy
   @review.add.20
-  Scenario: A review pins the scenario's digest and its latest evidence, computed rather than typed
+  Scenario: A review pins the scenario's digest and what its latest evidence says, computed rather than typed
     Given a scenario with a record and one promoted evidence record
     When a review is added without naming any digest
     Then the review carries the scenario's digest from its record: its own scenario digest, or the file's source digest when the record has none
-    And it carries the evidence record's natural key and ledger file digest
-    And a scenario with no evidence yet is pinned with an empty evidence list, never left unpinned
+    And it carries, per role, the latest evidence's verdict and the identity of the checks it bound, never the record's own id
+    And a scenario with no evidence yet is pinned with an empty list of checks, never left unpinned
 
   # canon: {"schema":1,"at":"2026-10-10T19:30:45Z","actor":{"agent_id":"canon"}}
   @subject:review-attestation
@@ -138,11 +138,12 @@ Feature: review add
   @subject:review-attestation
   @case:failure
   @review.add.23
-  Scenario: A pinned review turns stale when its scenario is re-attested
+  Scenario: A pinned review turns stale when its scenario's evidence says something different
     Given a pinned review that lets its subject enter verifying
-    When the scenario is attested again and promoted
+    When the scenario is attested again with a different verdict, or from a different set of cases, and promoted
     Then `canon gate check` exits 1 with unreviewed-promotion saying the review is stale because the evidence changed
     And the move to shipped is refused on the same stale review
+    And attesting again with the same verdict from the same cases leaves the review current
 
   # canon: {"schema":1,"at":"2026-10-10T19:30:45Z","actor":{"agent_id":"canon"}}
   @subject:review-attestation
@@ -248,16 +249,16 @@ Feature: review add
     Given a review written before 0.15 that is stale because its scenario changed after the commit it pinned
     When the same reviewer reviews the scenario again with `canon review add`
     Then the new review pins what it saw and supersedes the old one
-    And `canon gate check` exits 0 and the advisory no longer counts the old review
+    And `canon gate check` exits 0
 
   # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
   @subject:review-attestation
   @case:failure
   @review.add.61
-  Scenario: The subject status guard and status judge a review written before pinning as the gate does
-    Given a building subject whose scenario's review from before 0.15 is stale against its pinned commit
+  Scenario: The subject status guard and status judge a review that predates 0.23 as the gate does
+    Given a building subject whose scenario's review predates 0.23 pinning
     When the subject is moved to verifying
-    Then the guard refuses with the gate's stale-review detail and prints the advisory for the subject's own scenarios
+    Then the guard refuses with the gate's detail naming `canon migrate` and prints the advisory for the subject's own scenarios
     And `canon status` counts the scenario as a stale review
     And once the scenario is reviewed again the move goes through
 

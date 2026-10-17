@@ -226,9 +226,13 @@ from shipping until every one of its evidenced scenarios has evidence
 recorded after the close or the approval. The refusal names the scenarios
 and the batch command: `canon evidence add --project-id <root-id>
 --all-scenarios --report <format>:<path> --kind test-run --role
-implementer --ref "<test command>" …`. That evidence stales the pinned
-reviews, so a re-review follows (and a new `divergence accept`, where the
-gap remains).
+implementer --ref "<test command>" …`. Reviews pin what the evidence says
+(its verdict and the identity of its checks), not which record it is, so
+recording the suite again with the same verdicts from the same cases leaves
+every scenario review current. A chore instead needs one change-level
+review of the chore itself (`canon review add --change <slug> …`) before
+`--to shipped`; a changed verdict or case set stales that scenario's
+review as before (and a new `divergence accept`, where the gap remains).
 
 ### Audit records (`--kind audit`)
 
@@ -263,33 +267,16 @@ canon evidence add --kind audit --project-id root --scenario-id cart.add.01 \
 - `canon status` shows an `audits` section (sampled / confirmed / owed /
   refuted) and suggests `canon evidence add --kind audit …` in `next:`.
 
-### Carrying and dropping bindings (`--drop-attachment`)
+### A record binds what its own write names
 
-`canon evidence add` for a scenario carries forward what the scenario's
-current latest record of the same fold (declared records, or audit
-records for an audit; committed ledger plus `_staging`) bound: every
-file the new write does not name again is bound into the new record
-unchanged (same path, digest and stored blob), and `--json` lists it as
-`carried: [paths]`. A file named again (`--artifact`/`--report`, new
-bytes at the same path included) replaces its earlier binding. A suite
-batch (`--all-scenarios`) therefore never costs a scenario its
-screenshots. A carried file whose blob the artifact store does not
-hold intact is refused (exit `2`, `EVIDENCE_CARRY_BLOB_MISSING`, nothing
-written): re-bind it, run `canon evidence vault`, or drop it. The audit
-fold (`--kind audit`) does not carry: an audit that leaves out a file
-the latest audit bound is refused (exit `2`) unless it names the file
-again or drops it with `--drop-attachment`, so a counterexample never
-rides along into a confirming audit.
-
-The only way to lose a binding is `--drop-attachment <path>`
-(repeatable) with one single-line `--drop-reason <text>`, recorded as
-`attachment_drop: {paths, reason}`. With `--all-scenarios` the drop
-applies to each scenario that binds the path. Refused (`2`): a drop
-without a reason, a reason without a drop, a drop path that no
-scenario of the write leaves out, a multi-line reason, or a drop
-without `--scenario-id`/`--all-scenarios` (task-only evidence has no
-carry or drop). `canon status` lists recorded drops (`dropped bindings
-(N):`; `drops[]` in `--json`).
+`canon evidence add` binds exactly the files the write names
+(`--artifact`, `--report`, `--report-case`). Nothing is carried forward
+from an earlier record, in a single add or in a suite batch
+(`--all-scenarios`), and no drop is recorded: history keeps the earlier
+records, and a new record is reviewed on its own files. An audit
+(`--kind audit`) replaces a refutation the same way, so a counterexample
+never rides along into a confirming audit. `--drop-attachment` and
+`--drop-reason` no longer exist.
 
 ### Nothing is attested before the brief is approved (`--override-reason`)
 
@@ -376,51 +363,43 @@ the stop is at the brief. `canon gate check` does not grade briefs, so a
 waived ship brief prints no advisory here; `canon status` keeps showing
 the brief as not approved.
 
-### Reviews that predate pinning (checked against their pin)
+### Reviews that predate 0.23 pinning (`canon migrate`)
 
-With `require_review` on, the reviews in effect (latest per reviewer and
-scenario) that carry no pins were written before 0.15. Each still names
-`pin`, the commit it reviewed, and the gate checks it there (0.16):
-
-- **current** — the scenario's digest at that commit (read with `git`,
-  normalized exactly as `canon inventory sync` computes
-  `scenario_digest`) equals its current digest, and no declared evidence
-  record of the scenario is newer than the review. It counts. When the
-  scenario lived in another `.feature` file at that commit, the spec
-  root's files at that commit are searched for its id, then the files
-  under each of the root's `former_roots` (where `canon migrate` moved
-  it from, e.g. `specs` for a root now at `.canon/specs`). Only the
-  root's own directories are searched, never another root's.
-- **stale** — the scenario changed since the commit, or it has newer
-  evidence. It no longer counts, and an in-scope scenario left with no
-  other qualifying review is `unreviewed-promotion`:
-
-  ```
-  unreviewed-promotion gate.check.15 — stale review by `canon-reviewer-g1` (written before review pinning; checked against commit b556ab7529a332aa0b28d0a0f98bdd62fcbb9a63): it has declared evidence newer than the review; a review counts only while what it saw is current — review it again (`canon review add`)
-  ```
-
-  A spec change reads `its spec changed since <pin> (the scenario's
-  digest at that commit is not its current one)`.
-- **undecidable** — the pin is not a commit in this clone (a shallow
-  clone, rewritten history), or no feature file of the scenario's root
-  holds its id at that commit. It keeps counting, as in 0.15: a missing
-  commit never becomes a violation.
-
-One advisory line after the violations counts the three. A stale one
-whose scenario already has another qualifying review (current, signed,
-distinct) is counted as superseded, since nothing is owed for it; only
-the scenarios a stale one leaves without a qualifying review are named
-for re-review. The exit code is unchanged by the line itself:
+A review pins what its scenario's evidence says: the scenario's spec
+digest and, per role, the verdict and the identity of the checks the latest
+evidence bound (`ReviewPins.checks`). Reviews written before 0.23 pin
+something the gate no longer compares: 0.15–0.22 reviews pin evidence
+record files, and reviews written before 0.15 pin only `pin`, the commit
+they reviewed. Such a review does not count until `canon migrate` rewrites
+it; the gate says so:
 
 ```
-advisory: 338 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 318 current, 12 stale, 8 undecidable; 7 stale one(s) superseded by a current review of the same scenario, so nothing is owed for them; a stale one with no current review in its place no longer counts — review its scenario again (`canon review add`): platformer.movement.01, platformer.movement.02, …; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it
+unreviewed-promotion gate.check.15 — review by `canon-reviewer-g1` predates 0.23 review pinning (it pins evidence records, or nothing): `canon migrate` rewrites it to what the evidence says, and a review that is not migrated does not count
 ```
 
-A review of a scenario no feature file declares any more is not counted.
-In CI, check out full history (`actions/checkout` with `fetch-depth: 0`)
-for the job that runs `canon gate check`, or every legacy review is
-undecidable. Each pinned commit is read once per run through one `git
-cat-file --batch` process, and never fetched over the network.
+One advisory line counts the scenarios whose review is not migrated.
+`canon migrate` converts each review (and accepted divergence) that was
+current under the rule it was written under, in place, keeping its
+reviewer, actor, session and artifacts; one that was already stale stays
+stale and its scenario needs a new review.
+
+- **0.15–0.22 reviews** are current when the spec pin matches and the
+  latest evidence record per role is the one the review pinned.
+- **pre-0.15 reviews** are current when the scenario's digest at the pinned
+  commit (read with `git`, normalized as `canon inventory sync` computes
+  `scenario_digest`) equals its current digest and no declared evidence is
+  newer than the review. When the scenario lived in another `.feature`
+  file at that commit, the spec root's files at that commit are searched
+  for its id, then the files under each of the root's `former_roots`
+  (where `canon migrate` moved it from). Only the root's own directories
+  are searched, never another root's. A pin that is not a commit in this
+  clone, or a scenario no file holds at that commit, is undecidable: the
+  review is pinned as the scenario stands (it counted unchecked before
+  0.23), and the migration says how many. In CI, check out full history
+  (`actions/checkout` with `fetch-depth: 0`) for the job that runs
+  `canon migrate` to check them.
+
+A review of a scenario no feature file declares any more is left alone.
 
 ## Experimental: evidence binding (`experimental.evidence_binding`, off by default)
 
@@ -508,10 +487,9 @@ scenario with its verdict on its own line.
 
 It is all or nothing: a claimed `faithful` verdict over a failed case,
 a fabrication marker in `--summary`, an unapproved brief for any
-scenario's subject, or a carried attachment whose blob is missing from the
-store refuses the whole batch, and nothing is written. Each scenario's
-earlier attachments are carried into its new record (see above), and
-`--drop-attachment` applies per scenario. `--scenario-id`, `--task`,
+scenario's subject refuses the whole batch, and nothing is written. Each
+record binds only what the batch names (nothing is carried forward).
+`--scenario-id`, `--task`,
 `--report-case`, `--kind audit` and the approval flags name one subject
 and are refused with `--all-scenarios`.
 
@@ -522,10 +500,10 @@ in the report, so a `faithful` verdict needs all of them to pass.
 
 When new evidence (one record or a batch) supersedes the evidence a
 current pinned review saw, `canon evidence add` prints one line per
-review it makes stale, with the command that re-pins it:
+review it makes stale (its verdict or checks differ from what the review saw), with the command that re-pins it:
 
 ```
-canon evidence add: review by `reviewer-2` of cart.add.01 is now stale (it pinned the evidence this record supersedes); re-pin it: canon review add --project-id root --scenario-id cart.add.01 --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer --pin <HEAD sha> --original-spec-ref specs/kind=feature/area=cart/add.feature
+canon evidence add: review by `reviewer-2` of cart.add.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review add --project-id root --scenario-id cart.add.01 --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer --pin <HEAD sha> --original-spec-ref specs/kind=feature/area=cart/add.feature
 ```
 
 The decision is the gate's own (the same stale-review rule `canon gate
@@ -575,8 +553,7 @@ re-attesting is the fix.
 Files bound to a review (`canon review add --artifact`, see
 `canon-review`) are checked by the same rule for every CURRENT in-effect
 review: the latest per `(project_id, scenario_id, reviewer)`, less any
-that went stale against its scenario (its spec or evidence pin moved, or
-a review from before pinning is stale at its commit). A stale review is
+that went stale against its scenario (its spec or evidence pin moved). A stale review is
 superseded — the gate reads the newer review, or reports the missing
 one as `unreviewed-promotion` — so its files are not re-checked, as a
 superseded evidence record's are not. A missing blob whose working-tree
@@ -715,13 +692,12 @@ staged. A record another run staged is not touched: only `gate promote`
 commits everything staged. It stays safe to run anyway: with nothing
 staged it prints
 `nothing staged` and exits `0`. `divergence add` stages for `canon
-divergence promote` and names it, under the same `write:` rule. Every
-other write — `review add`, `divergence
-resolve|defer`, `subject new|adopt|status`, `change new`, `scenario new`, `feature new`,
+gate promote` and names it, under the same `write:` rule. Every
+other write — `review add`, `subject new|adopt|status`, `change new`, `scenario new`, `feature new`,
 `gate task` (it edits the plan document and re-ingests it)
 — is final when it returns, and its success line ends `— written
 directly; nothing to promote`. Full promote-on-write contract:
-`canon-storage` (Staged writes and promotion).
+`canon-storage` (Staged writes and promotion). `divergence resolve|defer|accept` stage and promote their own record in the same run and end `— staged and promoted in this run; nothing to promote`.
 
 ## `canon gate install-hooks [--repo] [--event] [--matcher] [--command] [--timeout]`
 

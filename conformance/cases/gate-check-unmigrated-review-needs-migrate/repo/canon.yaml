@@ -5,7 +5,7 @@ tiers:
 specs:
   roots:
     - id: root
-      root: specs
+      root: .canon/specs
 routing:
   scenario: local
   evidence_record: local

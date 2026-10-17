@@ -58,26 +58,30 @@ impl ReviewFlywheelAdapter {
     /// (unlike `handoff.rs`'s `events_for`, which can emit several
     /// transitions per row — a `Review` has no transition sequence, it
     /// simply exists once).
-    fn event(record: &Review) -> ArtifactEvent {
-        ArtifactEvent {
+    ///
+    /// A change-level review (0.23, no scenario) joins no scenario, so it
+    /// yields no event; the caller counts it as skipped.
+    fn event(record: &Review) -> Option<ArtifactEvent> {
+        let scenario_id = record.scenario_id.as_ref()?;
+        Some(ArtifactEvent {
             adapter_id: "review",
-            join_key: ArtifactJoinKey::Scenario(record.scenario_id.clone()),
+            join_key: ArtifactJoinKey::Scenario(scenario_id.clone()),
             // Never a verdict via the frozen S4 table (module doc) —
             // the native derivation path reads `detail`/`authoring_role`
             // instead.
             kind: ArtifactEventKind::NonVerdict,
             authoring_role: record.envelope.actor.role.clone(),
-            area: Some(record.scenario_id.area().to_string()),
+            area: Some(scenario_id.area().to_string()),
             trust_level: None,
             at: record.envelope.at,
             detail: serde_json::json!({
                 "native_kind": "review",
-                "scenario_id": record.scenario_id.as_str(),
+                "scenario_id": scenario_id.as_str(),
                 "project_id": record.project_id.as_str(),
                 "pin": record.pin,
                 "reviewer": record.reviewer,
             }),
-        }
+        })
     }
 }
 
@@ -113,7 +117,10 @@ impl ArtifactAdapter for ReviewFlywheelAdapter {
         let mut skipped = 0usize;
         for raw in raws {
             match serde_json::from_value::<Review>(raw.0.clone()) {
-                Ok(record) if record.envelope.kind == RecordKind::Review => events.push(Self::event(&record)),
+                Ok(record) if record.envelope.kind == RecordKind::Review => match Self::event(&record) {
+                    Some(event) => events.push(event),
+                    None => skipped += 1,
+                },
                 _ => skipped += 1,
             }
         }
