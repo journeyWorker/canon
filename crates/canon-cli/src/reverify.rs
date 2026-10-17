@@ -3,7 +3,7 @@
 //! with two triggers. A subject cannot ship while one of its evidenced
 //! scenarios has no evidence recorded after a trigger:
 //!
-//! - a blocker finding closed `fixed` (trigger: when it was raised); that
+//! - a blocker finding closed `fixed` (trigger: when it was closed `fixed`); that
 //!   half lives in the gate's `require_review` rule
 //!   ([`canon_gate::review_gate::fixed_blockers`]) and keeps blocking
 //!   under `block_on_findings`;
@@ -107,13 +107,13 @@ pub fn gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Gap> {
     if active_require_review(ctx).is_some_and(|(rr, _)| rr.block_on_findings) {
         let changes = subject_change_ids(ctx, subject);
         for fixed in fixed_blockers(ctx).into_iter().filter(|f| changes.contains(&f.finding.change_id)) {
-            let scenarios: Vec<(String, String)> = scenarios_without_evidence_after(ctx, &subject.subject_id, fixed.raised)
+            let scenarios: Vec<(String, String)> = scenarios_without_evidence_after(ctx, &subject.subject_id, fixed.closed)
                 .into_iter()
                 .map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string()))
                 .collect();
             if !scenarios.is_empty() {
                 let f = fixed.finding;
-                gaps.push(Gap { trigger: format!("blocker finding {}#{}.{} was closed fixed", f.change_id.as_str(), f.round, f.seq), since: fixed.raised, scenarios });
+                gaps.push(Gap { trigger: format!("blocker finding {}#{}.{} was closed fixed", f.change_id.as_str(), f.round, f.seq), since: fixed.closed, scenarios });
             }
         }
     }

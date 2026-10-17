@@ -65,7 +65,7 @@
 //! A blocker whose latest disposition is `fixed` keeps blocking, as an
 //! `open-blocker` violation, until every evidenced scenario of each
 //! subject holding its change has an evidence record newer than the
-//! finding's FIRST record (when it was raised, [`fixed_blockers`]).
+//! finding's `fixed` record (when it was closed, [`fixed_blockers`]): evidence recorded before the fix cannot verify it.
 //! New evidence already stales a pinned review, so the re-review follows
 //! with no rule of its own. [`scenarios_without_evidence_after`] is the
 //! one freshness rule; the chore trigger (a chore change approved on the
@@ -238,7 +238,7 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
             let Some(holding) = holders.get(&fixed.finding.change_id) else { continue };
             let mut unmet: BTreeSet<(&str, &str)> = BTreeSet::new();
             for subject in holding {
-                unmet.extend(scenarios_without_evidence_after(ctx, &subject.subject_id, fixed.raised).into_iter().map(|s| (s.project_id.as_str(), s.scenario_id.as_str())));
+                unmet.extend(scenarios_without_evidence_after(ctx, &subject.subject_id, fixed.closed).into_iter().map(|s| (s.project_id.as_str(), s.scenario_id.as_str())));
             }
             if unmet.is_empty() {
                 continue;
@@ -282,7 +282,7 @@ pub fn subject_guard(ctx: &GateContext, require_review: &RequireReview, exclude_
         );
         for fixed in fixed_blockers(ctx).into_iter().filter(|f| changes.contains(&f.finding.change_id)) {
             let unmet: Vec<(&str, &str)> =
-                scenarios_without_evidence_after(ctx, subject_id, fixed.raised).into_iter().map(|s| (s.project_id.as_str(), s.scenario_id.as_str())).collect();
+                scenarios_without_evidence_after(ctx, subject_id, fixed.closed).into_iter().map(|s| (s.project_id.as_str(), s.scenario_id.as_str())).collect();
             if !unmet.is_empty() {
                 violations.push(fixed_blocker_violation(&fixed, &[subject_id.as_str()], &unmet));
             }
@@ -725,22 +725,18 @@ fn open_blocker_violation(finding: &Finding, subjects: &[&str]) -> Violation {
 pub struct FixedBlocker<'a> {
     /// Its latest version: the `fixed` one.
     pub finding: &'a Finding,
-    /// When it was raised: the `at` of its first record. A fix is
-    /// re-verified by evidence recorded after this.
-    pub raised: DateTime<Utc>,
+    /// When it was closed `fixed`: the `at` of its latest record. A fix
+    /// is re-verified by evidence recorded after this.
+    pub closed: DateTime<Utc>,
 }
 
 /// Every blocker finding whose latest disposition is `fixed`, each with
-/// the time it was raised (the earliest `at` among all versions of its
-/// natural key).
+/// the time it was closed (the `at` of that latest record).
 pub fn fixed_blockers(ctx: &GateContext) -> Vec<FixedBlocker<'_>> {
     latest_by_key(&ctx.findings, |f| (f.change_id.as_str().to_string(), f.round, f.seq))
         .into_iter()
         .filter(|f| f.severity == FindingSeverity::Blocker && f.disposition() == FindingDisposition::Fixed)
-        .filter_map(|finding| {
-            let raised = ctx.findings.iter().filter(|f| f.change_id == finding.change_id && f.round == finding.round && f.seq == finding.seq).map(|f| f.envelope.at).min()?;
-            Some(FixedBlocker { finding, raised })
-        })
+        .map(|finding| FixedBlocker { finding, closed: finding.envelope.at })
         .collect()
 }
 
@@ -794,12 +790,12 @@ fn fixed_blocker_violation(fixed: &FixedBlocker<'_>, subjects: &[&str], unmet: &
         FailureClass::OpenBlocker,
         format!("{}#{}.{}", finding.change_id.as_str(), finding.round, finding.seq),
         format!(
-            "blocker finding by `{}` on change `{}` (subject {subjects}) is closed `fixed` but not re-verified: {} evidenced scenario(s) ({}) have {REVERIFY_MARK} the finding was raised ({}); {}",
+            "blocker finding by `{}` on change `{}` (subject {subjects}) is closed `fixed` but not re-verified: {} evidenced scenario(s) ({}) have {REVERIFY_MARK} the finding was closed `fixed` ({}); {}",
             finding.reviewer,
             finding.change_id.as_str(),
             unmet.len(),
             reverify_scenarios(unmet),
-            fixed.raised.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            fixed.closed.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
             reverify_remedy(unmet)
         ),
     )

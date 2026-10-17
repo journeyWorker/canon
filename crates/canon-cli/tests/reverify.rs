@@ -146,7 +146,7 @@ fn ship(repo: &Path) -> Output {
 }
 
 /// #72: a blocker closed `fixed` keeps the ship refused until the suite
-/// is recorded again for every evidenced scenario; the re-review follows.
+/// is recorded again after the close for every evidenced scenario; the re-review follows.
 #[test]
 fn a_fixed_blocker_keeps_blocking_until_the_suite_is_evidenced_again_and_reviewed() {
     let dir = repo();
@@ -173,7 +173,15 @@ fn a_fixed_blocker_keeps_blocking_until_the_suite_is_evidenced_again_and_reviewe
     assert_eq!(gate.status.code(), Some(1), "gate check reports the same: {}", stdout(&gate));
     assert!(stdout(&gate).contains("closed `fixed` but not re-verified"), "{}", stdout(&gate));
 
-    // One scenario evidenced again is not enough.
+    // Evidence recorded after the raise but before the close predates the
+    // fix and cannot verify it.
+    seed_evidence(r, "world.demo.01", ago(150));
+    seed_evidence(r, "world.demo.02", ago(150));
+    let out = ship(r);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("`world.demo.01`") && stderr(&out).contains("`world.demo.02`") && stderr(&out).contains("closed `fixed` but not re-verified"), "{}", stderr(&out));
+
+    // One scenario evidenced after the close is not enough.
     seed_evidence(r, "world.demo.01", ago(50));
     review_add(r, "world.demo.01");
     let out = ship(r);

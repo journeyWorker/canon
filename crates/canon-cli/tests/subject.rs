@@ -1565,7 +1565,7 @@ fn subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again() {
 
     seed_blocker(dir.path(), Some(5));
     seed_reverification(dir.path(), "world.demo.01");
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now() + chrono::Duration::seconds(10), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
     let evidence = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("world.demo.02").unwrap()), None, EvidenceVerdict::Faithful)
         .with_project_id(ProjectId::parse("demo").unwrap());
     ledger(dir.path()).write(&evidence).unwrap();
