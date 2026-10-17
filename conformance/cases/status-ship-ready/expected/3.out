@@ -1,6 +1,6 @@
 {
   "statusVersion": 3,
-  "canonVersion": "0.21.1",
+  "canonVersion": "0.22.0",
   "policy": {
     "present": true,
     "spec_coverage": {
