@@ -17,6 +17,7 @@ canon finding list --change-id <slug> --open --as reviewer --json
 canon finding close --change-id <slug> --round <n> --seq <n> --disposition fixed --resolution-sha <sha> --as reviewer --json
 canon review add --project-id <root-id> --scenario-id <id> --scenario-id <id> --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json
 canon review add --project-id <root-id> --scenario-ids-from - --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json   # ids on stdin, one per line
+canon divergence accept --project-id <root-id> --scenario-id <id> --reason "<why the gap stays>" --tracking <issue-url-or-ref> [--expiry YYYY-MM-DD] --reviewer <me> --actor-id <me> --session-id <session> --as reviewer --json
 ```
 
 `review add` needs `--upstream-ref <ref>` or `--original-spec-ref <path>`;
@@ -56,6 +57,27 @@ what you could not run: a reviewer that cannot run the tests says so and
 does not sign off; record that instead (`--outcome indeterminate`, or
 `unavailable` when you could not run).
 
+## Check the checks
+
+Passing is not enough: read each bound test against its scenario's Then
+steps. Record a finding (`finding add`) when a check pins behavior the
+scenario does not require, or skips a Then step the scenario states: such a
+test passes without proving the scenario. Do this before you sign.
+
+## Accept a known gap
+
+`divergence accept` is for a scenario whose honest evidence is `divergent`
+and whose gap is limited by something outside this change (an upstream
+limit, a platform bug) and is tracked there: give the reason and the
+`--tracking` reference, and an `--expiry` when the limit should be gone by
+a date. Never use it to skip a fix you can make in this change. It is your
+step, from a session that did not attest the evidence
+(`DIVERGENCE_ACCEPT_REFUSED` otherwise). The acceptance pins that evidence:
+new evidence for the scenario, or its expiry, ends it, and you accept (or
+the implementer fixes) again. An accepted gap counts as covered for the
+ship guard and stays listed as `accepted-divergence` in `status` and
+`gate check`.
+
 ## Record
 
 - Every defect is a finding; `finding list` shows round, seq, severity and
@@ -64,6 +86,9 @@ does not sign off; record that instead (`--outcome indeterminate`, or
 - Sign off in one batch with `review add`, all or nothing. It writes
   directly; nothing to promote. canon stores and re-checks attached bytes
   and never compares images.
+- A blocker you close `fixed` stays blocking until the implementer records
+  the whole suite again (`evidence add --all-scenarios`); re-review after
+  it, since new evidence makes your pinned review stale.
 - Fixes you ask for return as a re-review of the same change. When a new
   evidence record makes your review stale, look again before you re-pin.
 

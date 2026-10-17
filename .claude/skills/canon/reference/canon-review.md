@@ -150,7 +150,8 @@ may carry the same scenario id. Exactly one provenance ref is required.
 `--actor-id` defaults to `canon`; `--session-id` fills `actor.session_id`.
 A Review carries no verdict about the behavior; the `verifying → shipped`
 ship gate still refuses missing or `Divergent` evidence verdicts on its
-own. It is written directly to the ledger, with no staging step, and says
+own (a `Divergent` one passes only while a reviewer's `canon divergence
+accept` holds). It is written directly to the ledger, with no staging step, and says
 so: `canon review add: wrote <path> (new) — written directly; nothing to
 promote`.
 

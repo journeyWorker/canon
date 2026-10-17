@@ -18,6 +18,7 @@ canon scenario new <area>.<surface>.<nn> --subject <subject-id> --flow <F-id> --
 canon scenario new --from - --as implementer --json     # many at once: NDJSON on stdin, one {"id","title","subject","flow","case",…} per line
 canon evidence add --project-id <root-id> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref "<test command>" --actor-id <unit> --session-id <session> --as implementer --json
 canon evidence add --project-id <root-id> --scenario-id <id> --artifact <path> --kind test-run --role implementer --ref "<what it shows>" --actor-id <unit> --session-id <session> --as implementer --json
+canon evidence add --project-id <root-id> --scenario-id <id> --verdict divergent --artifact <path> --kind test-run --role implementer --ref "<the external limit, and where it is tracked>" --actor-id <unit> --session-id <session> --as implementer --json   # honest divergent evidence
 canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <unit> --actor-id <unit> --session-id <session> --summary "<defect>" --as implementer --json
 canon inventory sync --as implementer --json          # only after a write printed NOT refreshed
 canon gate promote --as implementer --json            # only with write.promote: manual
@@ -57,7 +58,11 @@ After the first `status`, follow `meta.next` of each write; do not call
    or recording (`--artifact <path>`). An external evaluator's audit is
    `--kind audit`; canon never generates one. Evidence for a task of an
    imported plan (`--task <id>`) must bind the artifact or report that proves
-   the task; a canon command is never that proof.
+   the task; a canon command is never that proof. When the behavior cannot
+   match the scenario because of something outside this change, record the
+   evidence `divergent` and say why in `--ref`; never record `faithful` to
+   pass. A reviewer may accept the tracked gap (`canon divergence accept`);
+   fixing the behavior and recording again is the other way out.
 5. **Promote.** Under `write: { promote: auto }` (what `canon init` writes)
    the record is final when `evidence add` returns. Only with
    `write.promote: manual` (or no `write:` key) follow it with
@@ -65,6 +70,13 @@ After the first `status`, follow `meta.next` of each write; do not call
 6. **A new record makes a signed review stale.** The add prints the reviewer
    and the `canon review add … --pin <sha>` that re-pins it; that is the
    reviewer's call. Do not run it yourself.
+7. **After a fix or a chore, record the whole suite again.** A blocker the
+   reviewer closed `fixed`, and an approved chore, are not done until every
+   evidenced scenario has evidence newer than the close or the approval:
+   run the suite and bind it with `canon evidence add --all-scenarios …`
+   (the shipping refusal names the scenarios and this command). The
+   re-review follows; a scenario whose gap was accepted is accepted again
+   by the reviewer once new evidence supersedes the old.
 
 ## Retry safety
 
@@ -77,5 +89,5 @@ response, run it again.
 When every scenario has evidence, the review is the reviewer's session, in a
 separate process: do not review your own change. A chore adds no scenarios:
 run the suite again and bind it with `--all-scenarios`, which supersedes the
-old evidence and makes pinned reviews stale. Reference:
-`reference/canon-gate.md`.
+old evidence and makes pinned reviews stale; shipping needs that evidence
+newer than the chore's approval. Reference: `reference/canon-gate.md`.
