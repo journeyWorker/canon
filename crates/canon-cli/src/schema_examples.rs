@@ -57,6 +57,7 @@ pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("migrate", "canon migrate"),
     ("plugin sync", "canon plugin sync my-plugin"),
     ("policy approve", "canon policy approve --by alice"),
+    ("policy show", "canon policy show"),
     ("prompt add", "canon prompt add --name reviewer --version v1 --manifest .canon/prompt-manifest.json"),
     ("prompt show", "canon prompt show --name reviewer --version v1"),
     ("purge", "canon purge --kind session --before 2020-01-01T00:00:00Z --plan"),

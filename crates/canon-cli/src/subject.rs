@@ -662,6 +662,18 @@ pub fn run_status(
     let schemas = SchemaRegistry::load();
     let policy = PolicyResolution::resolve(&repo, &schemas);
     let ships = current == SubjectStatus::Verifying && target == SubjectStatus::Shipped;
+    // A policy that no longer matches its approval fails closed (0.22 D3):
+    // shipping or reopening would grade against bytes no human approved, and
+    // `--override-reason` waives only review checks.
+    if ships || reopens {
+        if let Some((closed, detail)) = crate::policy_approval::closed_failure(&repo) {
+            let error = match closed {
+                crate::policy_approval::Closed::Unreadable => CliError::failed("POLICY_APPROVAL_UNREADABLE", detail),
+                crate::policy_approval::Closed::Changed => CliError::failed("POLICY_CHANGED_SINCE_APPROVAL", detail),
+            };
+            return error.with_exit(EXIT_GATED).hint(crate::policy_approval::REAPPROVE_HINT).emit("canon subject status", json);
+        }
+    }
     // A reopen moves a subject back to fix its gaps, so the review guard
     // that gates moving forward into its scope does not run on it;
     // shipping again runs it.

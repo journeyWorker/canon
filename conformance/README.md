@@ -132,7 +132,7 @@ case that turns the gate red, refuses, or (for the policy) prints an advisory:
 | Indeterminate reviewer | `review-outcome-indeterminate-gap` | `gate check` exit 1, `unreviewed-promotion` "no signed review"; transition refused |
 | Unavailable reviewer | `review-outcome-unavailable-gap` | as indeterminate |
 | Sampled scenario with no audit | `gate-check-audit-sampled-missing` | `gate check` exit 1, `uncovered-cell` "sampled for audit" |
-| Policy changed after approval | `policy-approve-changed-advisory` | `policy changed since approval` advisory in `gate check` and `status`, exit 0 (advisory by design) |
+| Policy changed after approval | `policy-approve-changed-fails-closed` | `policy changed since approval` violation in `gate check` (exit 1); `status` still warns, exit 0 (0.22 D3) |
 | Short SHA that names no commit in a finding | `finding-add-refused-unresolvable-short-sha` | `finding add` exit 2 |
 
 A conformance fixture repository has no commits, so the resolving side of short

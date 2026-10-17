@@ -86,18 +86,19 @@ fn approve_refuses_an_empty_approver() {
 /// context.status.40: the advisory follows the policy's bytes: present
 /// before approval, gone after it, back (naming both digests) once the
 /// policy changes. `gate check`, `status` and `status --json` all say so,
-/// both name the repair command, and no exit code moves with it.
+/// both name the repair command. Never approved stays advisory (the gate
+/// exits 0); a changed policy is a violation of `gate check` (0.22 D3).
 #[test]
 fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
     let dir = initialized_repo();
     let repo = dir.path();
     const REPAIR: &str = "canon policy approve --by <who>";
 
-    let check = |expect: Option<&str>| {
+    let check = |expect: Option<&str>, gate_exit: i32| {
         let gate = run_canon(&["gate", "check"], repo);
         let status = run_canon(&["status"], repo);
         let json = run_canon(&["status", "--json"], repo);
-        assert_eq!(gate.status.code(), Some(0), "the advisory never changes the gate's exit: {}{}", stdout(&gate), stderr(&gate));
+        assert_eq!(gate.status.code(), Some(gate_exit), "gate exit: {}{}", stdout(&gate), stderr(&gate));
         assert_eq!(status.status.code(), Some(0), "status: {}", stderr(&status));
         assert_eq!(json.status.code(), Some(0), "status --json: {}", stderr(&json));
         let report: serde_json::Value = serde_json::from_str(&stdout(&json)).expect("status --json prints one JSON object");
@@ -105,8 +106,13 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
         let policy_warnings: Vec<&str> = warnings.iter().copied().filter(|w| w.starts_with("policy not approved") || w.starts_with("policy changed")).collect();
         match expect {
             Some(text) => {
-                assert!(stdout(&gate).contains(&format!("advisory: {text}")), "gate check: {}", stdout(&gate));
-                assert!(stdout(&gate).contains(REPAIR), "the advisory names the command: {}", stdout(&gate));
+                if gate_exit == 0 {
+                    assert!(stdout(&gate).contains(&format!("advisory: {text}")), "gate check: {}", stdout(&gate));
+                    assert!(stdout(&gate).contains(REPAIR), "the advisory names the command: {}", stdout(&gate));
+                } else {
+                    assert!(stdout(&gate).contains("policy changed since approval"), "gate check: {}", stdout(&gate));
+                    assert!(stdout(&gate).contains("canon policy approve --by <human>"), "the violation names the re-approval: {}", stdout(&gate));
+                }
                 let line = stdout(&status).lines().find(|line| line.starts_with(&format!("warning: {text}"))).map(str::to_string);
                 let line = line.unwrap_or_else(|| panic!("status: {}", stdout(&status)));
                 assert!(line.contains(REPAIR), "the status warning names the command: {line}");
@@ -122,10 +128,10 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
         }
     };
 
-    check(Some("policy not approved"));
+    check(Some("policy not approved"), 0);
     let approved = run_canon(&["policy", "approve", "--by", "alice"], repo);
     assert_eq!(approved.status.code(), Some(0), "stderr: {}", stderr(&approved));
-    check(None);
+    check(None, 0);
 
     let policy_path = repo.join(".canon/policy.yaml");
     let approved_digest = format!("sha256:{:x}", Sha256::digest(std::fs::read(&policy_path).unwrap()));
@@ -134,10 +140,10 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
     policy.push_str("# loosened later\n");
     std::fs::write(&policy_path, &policy).unwrap();
     let current_digest = format!("sha256:{:x}", Sha256::digest(policy.as_bytes()));
-    check(Some("policy changed since approval"));
+    check(Some("policy changed since approval"), 1);
     let gate = stdout(&run_canon(&["gate", "check"], repo));
-    let changed = gate.lines().find(|line| line.starts_with("advisory: policy changed since approval")).expect("the changed-policy advisory");
-    assert!(changed.contains(&format!("is {current_digest}")), "the advisory names the current digest: {changed}");
+    let changed = gate.lines().find(|line| line.contains("policy changed since approval")).expect("the changed-policy violation");
+    assert!(changed.contains(&format!("is {current_digest}")), "the violation names the current digest: {changed}");
     assert!(changed.contains(&format!("approved {approved_digest}")), "and the approved one: {changed}");
     assert_ne!(approved_digest, current_digest);
 

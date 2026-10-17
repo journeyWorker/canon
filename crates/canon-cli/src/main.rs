@@ -125,7 +125,7 @@ enum Command {
         json: bool,
     },
     /// Record who approved the gate's policy (.canon/policy.yaml) and which bytes
-    #[command(after_help = "Examples:\n  canon policy approve --by alice --note 'reviewed the starter policy'\n\nWrites .canon/policy.approval.json (commit it): the policy's sha256, who\napproved it, when, and the note. `canon gate check` and `canon status` print an\nadvisory while the policy is unapproved or has changed since its approval;\nthe advisory never changes an exit code.")]
+    #[command(after_help = "Examples:\n  canon policy approve --by alice --note 'reviewed the starter policy'\n\nWrites .canon/policy.approval.json (commit it): the policy's sha256, who\napproved it, when, and the note. `canon gate check` and `canon status` print an\nadvisory while the policy was never approved. A policy that changed since its\napproval (or whose approval cannot be read) fails closed: `gate check` exits 1\nand `subject status` refuses to ship or reopen; `--override-reason` does not\nwaive it. `canon policy show` reads the approval back.")]
     Policy {
         #[command(subcommand)]
         action: PolicyCommand,
@@ -491,6 +491,15 @@ enum PolicyCommand {
         /// Why, or what was reviewed
         #[arg(long)]
         note: Option<String>,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show the policy's digest and its approval (who, when, which bytes)
+    Show {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -2130,6 +2139,7 @@ fn main() -> ExitCode {
         }
         Command::Migrate { repo, dry_run, json } => ExitCode::from(canon_cli::migrate::run(&repo, dry_run, json) as u8),
         Command::Policy { action } => match action {
+            PolicyCommand::Show { repo, json } => ExitCode::from(canon_cli::policy_approval::run_show(&repo, json) as u8),
             PolicyCommand::Approve { by, note, repo, json } => ExitCode::from(canon_cli::policy_approval::run_approve(&repo, &by, note.as_deref(), json) as u8),
         },
         Command::Demo { action } => match action {

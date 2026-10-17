@@ -48,7 +48,10 @@
 //! brief to answer (its `.canon/changes/<change>/brief.md`, or an
 //! external openspec `proposal.md` while that canon file does not exist)
 //! and no `Approved:` line in the canon `brief.md` (the brief is
-//! enforced) gets the one `human` step status ever emits, and it is the
+//! enforced) gets the one `human` step status ever emits once `canon brief
+//! check` has no blocker left for it (0.22 D4); while it has some, the
+//! subject's step is the planner's `canon brief check --change <slug>`,
+//! `N blocker(s): write the brief`. Either is the
 //! subject's only step, whatever its status: the agent stops and reports
 //! the brief, and nothing is built or attested for the subject (no
 //! `feature new`, `scenario new`, `evidence add`, review or status
@@ -1068,6 +1071,17 @@ fn subject_steps(
     let before = next.len();
 
     if let Some(brief) = summary.brief.as_ref().filter(|brief| brief.enforced) {
+        // A brief `canon brief check` still has blockers for is the planner's
+        // to write; the human is asked only once it is clean (0.22 D4).
+        if let (Some(change), Some(counts)) = (brief.change.as_deref(), brief.findings.as_ref().filter(|counts| counts.blockers > 0)) {
+            next.push(NextStep {
+                actor: StepActor::Agent,
+                role: Some(Role::Planner),
+                command: format!("canon brief check --change {change}"),
+                why: format!("{id}: {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it", counts.blockers, brief.report_in()),
+            });
+            return;
+        }
         next.push(NextStep {
             actor: StepActor::Human,
             role: None,

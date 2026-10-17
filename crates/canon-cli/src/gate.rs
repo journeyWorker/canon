@@ -143,7 +143,8 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         .filter(|s| matches!(s.status, canon_model::SubjectStatus::Verifying | canon_model::SubjectStatus::Shipped))
         .flat_map(|s| crate::reverify::chore_violations(&repo, &gate_context, s))
         .collect::<Vec<_>>();
-    let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).chain(reverify).collect());
+    // An approval that no longer holds fails closed (0.22 D3); a policy never approved is only an advisory below.
+    let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).chain(reverify).chain(crate::policy_approval::violation(&repo)).collect());
     let mut advisories: Vec<serde_json::Value> = Vec::new();
     let advisory = |kind: &str, message: String, items: Vec<String>| serde_json::json!({ "kind": kind, "message": message, "items": items });
     crate::say_raw!(json, "{}", format_gate_report(&report));
@@ -151,7 +152,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         crate::say_raw!(json, "{}", format_coverage_off_advisory(count));
         advisories.push(advisory("spec_coverage_off", format!("{count} scenario(s) are not checked for evidence; see .canon/policy.yaml"), Vec::new()));
     }
-    if let Some(line) = crate::policy_approval::advisory(&repo) {
+    if let Some(line) = crate::policy_approval::advisory(&repo).filter(|_| crate::policy_approval::closed_failure(&repo).is_none()) {
         crate::say_raw!(json, "\nadvisory: {line}\n");
         advisories.push(advisory("policy_approval", line, Vec::new()));
     }
