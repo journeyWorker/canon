@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-2"
+  },
+  "at": "2026-10-17T20:08:47.168034Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate authoring_migrate_07_legacy_reviews_pinned_before_the_move_are_pinned_current"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "authoring.migrate.07",
+  "schema": 1,
+  "staging_id": "2f094b896b1e",
+  "verdict": "faithful"
+}

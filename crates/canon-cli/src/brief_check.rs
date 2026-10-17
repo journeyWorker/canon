@@ -198,8 +198,9 @@ pub type FlowIndex = BTreeMap<String, Vec<FlowScenario>>;
 /// The scenarios pointing at `change`'s flow steps (module doc, "Flow
 /// coverage"): the one function the `@flow:` tag lookup lives in. It
 /// reads the `.feature` files under the spec roots through the same
-/// Gherkin scan `canon inventory sync` indexes them with, so the gate,
-/// status and the brief rules cannot disagree, and a tag written a
+/// Gherkin scan `canon inventory sync` indexes them with (one scan per
+/// file per process, [`crate::inventory::feature_file_scan`]), so the
+/// gate, status and the brief rules cannot disagree, and a tag written a
 /// moment ago counts without a sync.
 pub fn flow_scenarios(repo: &Path, change: &ChangeId) -> Result<FlowIndex, String> {
     let roots = crate::inventory::load_spec_roots(&repo.join("canon.yaml")).map_err(|e| e.to_string())?;
@@ -207,8 +208,8 @@ pub fn flow_scenarios(repo: &Path, change: &ChangeId) -> Result<FlowIndex, Strin
     let mut index = FlowIndex::new();
     for root in roots {
         for path in canon_fmt::util::feature_files(&root.root) {
-            let Ok(text) = std::fs::read_to_string(&path) else { continue };
-            for scenario in canon_fmt::gherkin::scan(&text).scenarios {
+            let Some(file) = crate::inventory::feature_file_scan(&path) else { continue };
+            for scenario in &file.scan.scenarios {
                 let failure = scenario.case_tags.iter().any(|c| c == "failure");
                 for step in scenario.flow_tags.iter().filter_map(|t| t.strip_prefix(&prefix)) {
                     let entry = FlowScenario { id: scenario.scenario_id.clone(), title: scenario.title.clone(), failure };

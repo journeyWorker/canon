@@ -53,9 +53,10 @@ pub mod coverage;
 pub mod dispatch;
 pub mod evidence_binding;
 pub mod failure_class;
+pub mod history;
+pub mod freshness;
 pub mod hooks;
 pub mod ledger;
-pub mod legacy_pins;
 pub mod markers;
 pub mod policy;
 pub mod policy_keys;
@@ -89,8 +90,7 @@ pub use policy::{
 pub use policy_keys::PolicyKeysCheck;
 pub use review_gate::{review_advisories, ReviewAdvisory};
 pub use promote::{
-    commit_divergence, divergence_staging_dir, promote, promote_divergence, promote_staged, promote_staged_divergence, stage_divergence, DivergenceCandidate,
-    Promoted, PromoteReport, Refused, RunSeqAssignment, StagedAssignment, StagedKind, STAGED_KINDS,
+    promote, promote_only, promote_staged, Promoted, PromoteReport, Refused, RunSeqAssignment, StagedAssignment, StagedKind, STAGED_KINDS,
 };
 pub use report::{GateFailureClass, GateReport, GateViolation};
 pub use selftest::{FixtureOutcome, SelftestReport};

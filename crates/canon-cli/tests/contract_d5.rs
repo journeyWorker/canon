@@ -40,12 +40,13 @@ fn keys(value: &Value) -> Vec<String> {
     value.as_object().unwrap().keys().cloned().collect()
 }
 
+/// Record versions written for `kind`: the ledger's and the archive's.
+/// These tests ask whether a write happened, so they count versions.
 fn files_under(dir: &Path, kind: &str) -> usize {
-    let root = dir.join(".canon/ledger").join(format!("kind={kind}"));
     fn count(path: &Path) -> usize {
         std::fs::read_dir(path).map(|entries| entries.flatten().map(|e| if e.path().is_dir() { count(&e.path()) } else { 1 }).sum()).unwrap_or(0)
     }
-    count(&root)
+    [".canon/ledger", ".canon/archive"].iter().map(|root| count(&dir.join(root).join(format!("kind={kind}")))).sum()
 }
 
 // ---- 1. --fields ---------------------------------------------------------

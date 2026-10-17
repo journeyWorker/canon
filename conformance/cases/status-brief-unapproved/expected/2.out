@@ -1,6 +1,6 @@
 {
   "statusVersion": 3,
-  "canonVersion": "0.22.0",
+  "canonVersion": "0.23.0",
   "policy": {
     "present": true,
     "spec_coverage": {
@@ -39,7 +39,8 @@
         "brief": ".canon/changes/c-checkout/brief.md",
         "briefExists": false,
         "source": "openspec/changes/c-checkout/proposal.md"
-      }
+      },
+      "choreReviews": []
     }
   ],
   "unowned": [],

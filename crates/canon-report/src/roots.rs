@@ -248,13 +248,20 @@ impl Roots {
     }
 
     /// The `(env var, value)` pairs [`crate::query::run_query`] sets
-    /// before every `duckdb` invocation.
-    pub fn env_pairs(&self) -> [(&'static str, String); 3] {
-        [
+    /// before every `duckdb` invocation. The archive root rides along
+    /// when the git root is a ledger directory with an archive beside it
+    /// (`canon_store::archive::archive_root_of`); without one the views
+    /// read no archive.
+    pub fn env_pairs(&self) -> Vec<(&'static str, String)> {
+        let mut pairs = vec![
             (canon_store::CANON_GIT_ROOT_ENV, self.git_root.display().to_string()),
             (canon_store::CANON_R2_ROOT_ENV, self.r2_root.display().to_string()),
             (canon_store::CANON_LEARN_ROOT_ENV, self.learn_root.display().to_string()),
-        ]
+        ];
+        if let Some(archive) = canon_store::archive::archive_root_of(&self.git_root) {
+            pairs.push((canon_store::CANON_ARCHIVE_ROOT_ENV, archive.display().to_string()));
+        }
+        pairs
     }
 }
 

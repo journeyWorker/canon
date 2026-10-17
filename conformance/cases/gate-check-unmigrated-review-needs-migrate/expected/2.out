@@ -1,0 +1,5 @@
+canon gate check: clean (0 violations)
+
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+
+advisory: 1 scenario(s) have a review that predates 0.23 review pinning (cart.add.01); such a review does not count until `canon migrate` rewrites it to what the evidence says

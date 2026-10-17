@@ -111,8 +111,8 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// Move a repo set up by canon 0.16 or earlier onto the 0.17 layout (specs, changes, approvals, skills, .gitignore)
-    #[command(after_help = "Examples:\n  canon migrate --dry-run\n  canon migrate\n\nPrints the plan, then applies it; --dry-run stops after the plan. Idempotent:\na second run finds nothing to move, and a run that stopped partway is finished\nby the next one.\n\n- A spec root's features/kind=feature/ moves to <root>/kind=feature/ (git mv in a\n  git work tree). A root at the repo-level `specs` moves to .canon/specs, and\n  canon.yaml records `former_roots: [specs]` so reviews pinned before the move\n  still find their scenarios.\n- Changes `canon change new` wrote under openspec/changes move to\n  .canon/changes/<slug>/ (proposal.md -> brief.md, tasks.md alongside); every\n  other change stays and is named. A change counts as canon's when its files are\n  still that command's scaffold and its first stored version was already adopted:\n  0.16 kept no durable provenance. A false positive keeps its content and ids and\n  is one `git mv` to undo; --dry-run shows exactly which changes move.\n  canon init's `{ dialect: openspec, root: . }` source goes once nothing unread is\n  left under it.\n- An external proposal.md's Approved: line is copied into a canon pointer\n  brief, .canon/changes/<change>/brief.md, with a Source: line.\n- skills.providers is written from the install lock; missing canon .gitignore\n  lines are added; the scenario index is rebuilt (full sync).\n\nRefuses (exit 2, nothing written) on uncommitted changes under a path it\nmoves, on a destination that already exists, on a change directory that could\nstop halfway, and on a canon.yaml edit it cannot make with every other byte\nkept. canon.yaml is written atomically.")]
+    /// Bring a repo from an earlier canon up to date: the 0.17 layout (specs, changes, approvals, skills, .gitignore), the 0.23 latest-only ledger (superseded versions to .canon/archive) and 0.23 review pins
+    #[command(after_help = "Examples:\n  canon migrate --dry-run\n  canon migrate\n\nPrints the plan, then applies it; --dry-run stops after the plan. Idempotent:\na second run finds nothing to move, and a run that stopped partway is finished\nby the next one.\n\n- A spec root's features/kind=feature/ moves to <root>/kind=feature/ (git mv in a\n  git work tree). A root at the repo-level `specs` moves to .canon/specs, and\n  canon.yaml records `former_roots: [specs]` so reviews pinned before the move\n  still find their scenarios.\n- Changes `canon change new` wrote under openspec/changes move to\n  .canon/changes/<slug>/ (proposal.md -> brief.md, tasks.md alongside); every\n  other change stays and is named. A change counts as canon's when its files are\n  still that command's scaffold and its first stored version was already adopted:\n  0.16 kept no durable provenance. A false positive keeps its content and ids and\n  is one `git mv` to undo; --dry-run shows exactly which changes move.\n  canon init's `{ dialect: openspec, root: . }` source goes once nothing unread is\n  left under it.\n- An external proposal.md's Approved: line is copied into a canon pointer\n  brief, .canon/changes/<change>/brief.md, with a Source: line.\n- skills.providers is written from the install lock; missing canon .gitignore\n  lines are added; the scenario index is rebuilt (full sync).\n- Superseded ledger versions move to .canon/archive (`canon ledger compact`);\n  `canon query --history` still reads them.\n- Reviews written before 0.23 are re-pinned to what their evidence says: a\n  review current under the old rule stays current, a stale one stays stale.\n\nRefuses (exit 2, nothing written) on uncommitted changes under a path it\nmoves, on a destination that already exists, on a change directory that could\nstop halfway, and on a canon.yaml edit it cannot make with every other byte\nkept. canon.yaml is written atomically.")]
     Migrate {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
@@ -254,6 +254,11 @@ enum Command {
         #[command(subcommand)]
         action: EvidenceCommand,
     },
+    /// Check or move the evidence artifact store (local, or an object-store tier)
+    Artifacts {
+        #[command(subcommand)]
+        action: ArtifactsCommand,
+    },
     /// Record one code-review finding as a durable record
     #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --reviewer review-voice \\\n      --summary 'a release metric is asserted, never computed'\n  canon finding close --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n\nThe loop:\n  canon finding add ...     Record a Finding\n  canon finding close ...   Record its disposition TRANSITION, once fixed\nEach is promoted in the same run under `write: { promote: auto }`, which\n`canon init` writes. Under `write.promote: manual` (no `write:` key), run\n`canon gate promote` after each to commit it.\n\nThe committed finding STAYS when it is closed: the ledger is append-only and\nthe pair IS the history. Every reader folds by natural key to the latest\nversion, so the finding is still counted once.\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-by is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
     Finding {
@@ -352,6 +357,9 @@ enum Command {
         /// Project a plugin's overlay fields onto each record (fail-soft)
         #[arg(long)]
         plugin: Option<String>,
+        /// Every version of the kind, the ledger's and the archive's, oldest first, instead of the current records
+        #[arg(long, conflicts_with = "plugin")]
+        history: bool,
         /// Scope --kind change/task to one ChangeId (other kinds exit 2)
         #[arg(long, value_parser = canon_cli::query::parse_change_id)]
         change_id: Option<ChangeId>,
@@ -457,6 +465,12 @@ enum Command {
     Tier {
         #[command(subcommand)]
         action: TierCommand,
+    },
+    /// Keep the ledger to the current version of each record
+    #[command(after_help = "Examples:\n  canon ledger compact --dry-run\n  canon ledger compact\n\nMoves every superseded version of a record (an evidence record a newer one replaced, a\nscenario or finding rewritten since) from .canon/ledger to .canon/archive, once. The\nledger then holds the current decision per key, and every default read (status, gate\ncheck, guards, query) reads only that; `canon query --kind <kind> --history` reads the\narchive too. Appending a new version moves the versions it supersedes on its own, so\nthis is for a ledger written before 0.23, or after an interrupted move. Idempotent;\n`canon migrate` runs it. A record that carries a standing claim (a flagged overlay, a\nbrief override, an approval at the current evidence) stays in the ledger.")]
+    Ledger {
+        #[command(subcommand)]
+        action: LedgerCommand,
     },
     /// Run canon's built-in fixture self-tests
     Selftest {
@@ -1032,12 +1046,6 @@ enum EvidenceCommand {
         /// --kind audit: confirmed / refuted / indeterminate
         #[arg(long)]
         audit_result: Option<String>,
-        /// Drop a file the scenario's latest record binds (repository-relative path); repeatable; needs --drop-reason. Without it every earlier attachment is carried into the new record unchanged; with --all-scenarios the drop applies to each scenario that binds the path
-        #[arg(long = "drop-attachment", value_name = "PATH")]
-        drop_attachments: Vec<String>,
-        /// Why the --drop-attachment files are no longer bound (one line, recorded on the record)
-        #[arg(long)]
-        drop_reason: Option<String>,
         /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)
         #[arg(long)]
         override_reason: Option<String>,
@@ -1181,7 +1189,7 @@ enum FindingCommand {
 
 #[derive(Subcommand)]
 enum ReviewCommand {
-    /// Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required). Each review pins its scenario's source digest and latest evidence; it counts only while both are unchanged
+    /// Write one attributed Review record per scenario (or, with --change, one for a chore change) directly to the ledger, nothing to promote (exactly one provenance ref required). A scenario review pins the scenario's digest and what its latest evidence says (verdict and checks); it counts only while both are unchanged. A change review pins the chore's brief
     #[command(group(clap::ArgGroup::new("provenance").args(["upstream_ref", "original_spec_ref"]).required(true).multiple(false)))]
     Add {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
@@ -1192,6 +1200,9 @@ enum ReviewCommand {
         /// Read more scenario ids from a file (`-` for stdin): one per line, `#` starts a comment
         #[arg(long, value_name = "FILE|-")]
         scenario_ids_from: Option<String>,
+        /// Review a chore change instead of scenarios: its invariants and checks against the diff. Pins the change's brief; an edit to the brief stales it. A chore needs exactly this one review before `--to shipped`
+        #[arg(long, value_name = "SLUG", value_parser = canon_cli::query::parse_change_id, conflicts_with_all = ["scenario_ids", "scenario_ids_from"])]
+        change: Option<ChangeId>,
         #[arg(long)]
         reviewer: String,
         #[arg(long)]
@@ -1672,6 +1683,22 @@ enum SkillsCommand {
 }
 
 #[derive(Subcommand)]
+enum LedgerCommand {
+    /// Move superseded versions of every record out of the ledger into the archive
+    Compact {
+        /// Report what would move and write nothing
+        #[arg(long)]
+        dry_run: bool,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum TierCommand {
     /// Apply canon.yaml aging rules, moving old records to their destination tier
     Age {
@@ -1684,6 +1711,39 @@ enum TierCommand {
         /// Explicit canon.yaml path (overrides --repo resolution)
         #[arg(long)]
         canon_yaml: Option<PathBuf>,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum ArtifactsCommand {
+    /// Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes)
+    #[command(after_help = "Asks the store canon.yaml's `artifacts:` block selects (default: local, .canon/artifacts/sha256) about each bound file, the way `canon gate check` does. For an object store that is one HEAD per distinct digest plus the size and sha256 metadata written at upload; --full downloads each blob and re-hashes it.\n\nExit 0 when every file is stored, 1 when one is missing or altered (data.problems names each), 2 when the store cannot be used or reached: an unreachable store is a refusal, never a pass.")]
+    Verify {
+        /// Download every blob and re-hash it, instead of trusting the store's size and digest metadata
+        #[arg(long)]
+        full: bool,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
+    /// Move the local artifact blobs to an object-store tier, verify them, and remove the local copies
+    #[command(after_help = "Examples:\n  canon artifacts migrate --to cold --dry-run\n  canon artifacts migrate --to cold\n\n--to names an `s3` tier of canon.yaml's `tiers:` (for example `cold`; its credentials are the tier's own). Every blob in .canon/artifacts/sha256 is hashed, uploaded under <prefix>sha256/<digest> (prefix artifacts/), and read back; only when all of them verified does canon.yaml gain `artifacts: { backend: <tier>, prefix: artifacts/ }`, after which the local copies are removed and `.canon/artifacts/` is added to .gitignore. Commit the removal with the ledger.\n\nIdempotent and resumable: a run stopped anywhere leaves a repo the gate still passes, and the next run finishes; a second run finds nothing to do. A blob whose bytes do not match its name is never migrated, and stops the run with nothing removed. `--to local` is a no-op on a local repo; moving bytes back is not supported.")]
+    Migrate {
+        /// The backend to move to: the name of an `s3` tier in canon.yaml (for example `cold`)
+        #[arg(long, value_name = "BACKEND")]
+        to: String,
+        /// Preview what would be uploaded and removed, without writing anything
+        #[arg(long)]
+        dry_run: bool,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
         /// Output JSON instead of the human-readable form
         #[arg(long)]
         json: bool,
@@ -1786,11 +1846,21 @@ fn main() -> ExitCode {
             SkillsCommand::Check { source, target, providers, json } => run_skills_check(source.as_deref(), &target, providers.as_deref(), json),
             SkillsCommand::Doctor { source, target, providers, json } => run_skills_doctor(source.as_deref(), &target, providers.as_deref(), json),
         },
+        Command::Ledger { action } => match action {
+            LedgerCommand::Compact { dry_run, repo, json } => ExitCode::from(canon_cli::ledger::run_compact(&repo, dry_run, json) as u8),
+        },
         Command::Tier { action } => match action {
             TierCommand::Age { dry_run, repo, canon_yaml, json } => run_tier_age(&repo, canon_yaml.as_deref(), dry_run, json),
         },
-        Command::Query { kind, since, repo, canon_yaml, json, plugin, change_id, status, domain, include_sensitive, page, fields } => {
-            run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, change_id, status, domain, include_sensitive, page.page(), fields)
+        Command::Artifacts { action } => match action {
+            ArtifactsCommand::Verify { full, repo, json } => {
+                canon_cli::inventory::refresh_stale_index(&repo, "canon artifacts verify");
+                ExitCode::from(canon_cli::artifacts::run_verify(&repo, full, json) as u8)
+            }
+            ArtifactsCommand::Migrate { to, dry_run, repo, json } => ExitCode::from(canon_cli::artifacts::run_migrate(&repo, &to, dry_run, json) as u8),
+        },
+        Command::Query { kind, since, repo, canon_yaml, json, plugin, history, change_id, status, domain, include_sensitive, page, fields } => {
+            run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, history, change_id, status, domain, include_sensitive, page.page(), fields)
         }
         Command::Export { kind, before, after, out, repo, json, include_sensitive, page, fields } => ExitCode::from(canon_cli::retention::run_export(&repo, kind, before, after, out.as_deref(), json, include_sensitive, &page.page(), fields.as_deref())),
         Command::Purge { kind, before, repo, plan, confirm, json } => {
@@ -1876,8 +1946,6 @@ fn main() -> ExitCode {
                 evaluator_version,
                 evaluator_digest,
                 audit_result,
-                drop_attachments,
-                drop_reason,
                 override_reason,
                 promote,
                 repo,
@@ -1919,8 +1987,6 @@ fn main() -> ExitCode {
                             evaluator_version,
                             evaluator_digest,
                             audit_result,
-                            drop_attachments,
-                            drop_reason,
                             override_reason,
                             promote: promote.flag(),
                             json,
@@ -1988,6 +2054,7 @@ fn main() -> ExitCode {
                 project_id,
                 scenario_ids,
                 scenario_ids_from,
+                change,
                 reviewer,
                 pin,
                 upstream_ref,
@@ -2015,6 +2082,7 @@ fn main() -> ExitCode {
                         project_id,
                         scenario_ids,
                         scenario_ids_from,
+                        change,
                         reviewer,
                         pin,
                         upstream_ref,
@@ -2285,6 +2353,7 @@ fn run_query(
     since: Option<DateTime<Utc>>,
     json: bool,
     plugin: Option<String>,
+    history: bool,
     change_id: Option<ChangeId>,
     status: Option<String>,
     domain: Option<String>,
@@ -2307,7 +2376,7 @@ fn run_query(
         return ExitCode::from(2);
     }
     let Some(plugin_id) = plugin else {
-        return match canon_cli::query::run(repo, canon_yaml, kind, since, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
+        return match canon_cli::query::run(repo, canon_yaml, kind, since, change_id.as_ref(), status.as_deref(), domain.as_deref(), history) {
             Ok(outcome) => {
                 let outcome = match canon_cli::query::page_outcome(outcome, &page, fields, false) {
                     Ok(outcome) => outcome,
@@ -2587,7 +2656,7 @@ fn verify_adapter_context_join(repo: &std::path::Path, summary: &canon_cli::adap
     if canon_cli::context_pack::verify(repo, &summary.context_pack_id).is_err() {
         return false;
     }
-    let Ok(outcome) = canon_cli::query::run(repo, None, RecordKind::Run, None, None, None, None) else {
+    let Ok(outcome) = canon_cli::query::run(repo, None, RecordKind::Run, None, None, None, None, false) else {
         return false;
     };
     outcome.records.iter().any(|record| {

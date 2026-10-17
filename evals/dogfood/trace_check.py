@@ -240,6 +240,23 @@ def is_code_path(path):
     return Path(candidate).suffix in CODE_SUFFIXES
 
 
+def landed(root, path):
+    """Whether `path` ever landed in the repository's git history: code that
+    was committed implements the change; a scratch file written and thrown
+    away (a reviewer's diagnostic spec, a harness under the repo's `tmp/`)
+    does not. When `root` is not a git work tree (a fixture, a deleted repo),
+    every repository path counts, as before."""
+    import subprocess
+    try:
+        inside = subprocess.run(["git", "-C", root, "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True, timeout=10)
+        if inside.returncode != 0:
+            return True
+        found = subprocess.run(["git", "-C", root, "log", "--all", "--format=%H", "-n", "1", "--", path], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return True
+    return found.returncode != 0 or bool(found.stdout.strip())
+
+
 def shell_commands(command):
     """Tokenize shell syntax, keeping quoted prose out of command discovery."""
     lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>()")
@@ -475,7 +492,7 @@ def analyze(inputs, question_turns=()):
                 if path is None:
                     continue
                 session["writes"].append({**location, "path": path, "inside_canon": inside,
-                                          "code": (not inside and is_code_path(path)),
+                                          "code": (not inside and is_code_path(path) and landed(session["cwd"], path)),
                                           "ordinal": ordinal})
                 if inside and (path.endswith("/brief.md") or path == ".canon/brief.md"):
                     brief_written = True

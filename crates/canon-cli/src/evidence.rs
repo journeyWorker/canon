@@ -216,12 +216,12 @@ use canon_gate::review_gate::{in_effect_reviews, review_gap, ReviewGapKind};
 use canon_gate::{scan_note_text, verify_risk_approval, FailureClass, GateContext, GateCtx, Violation};
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{
-    approval_payload_bytes, Actor, AttachmentDrop, AuditResult, BriefOverride, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId,
+    approval_payload_bytes, Actor, AuditResult, BriefOverride, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId,
     ProvenanceRef, RawRecord, RecordKind, ReportFormat, Review, RoleId, RunId, Scenario, ScenarioId, SessionId, Sha, TaskId, WaivedViolation, APPROVAL_NAMESPACE,
 };
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
-use canon_store::tier::{RawWrite, Tier, TierQuery};
+use canon_store::tier::{RawWrite, Tier};
 use chrono::{DateTime, Utc};
 
 use crate::cli_error::CliError;
@@ -454,11 +454,6 @@ pub struct EvidenceArgs {
     pub evaluator_version: Option<String>,
     pub evaluator_digest: Option<String>,
     pub audit_result: Option<String>,
-    /// 0.15 D2: repository-relative paths the scenario's previous latest
-    /// record bound that this record deliberately does not, with the one
-    /// `drop_reason` recorded for all of them.
-    pub drop_attachments: Vec<String>,
-    pub drop_reason: Option<String>,
     /// 0.16 M7: attest anyway while a subject this record attests for has
     /// an enforced, unapproved brief ([`brief_refusals`]); recorded on the
     /// record as its [`BriefOverride`], with the actor.
@@ -570,159 +565,6 @@ fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
     }))
 }
 
-/// `--drop-attachment` and `--drop-reason` come together, on scenario
-/// evidence only (0.15 D2): task-only evidence has no drop guard.
-fn check_drop_flags(args: &EvidenceArgs) -> Result<(), String> {
-    match (args.drop_attachments.is_empty(), &args.drop_reason) {
-        (true, None) => return Ok(()),
-        (true, Some(_)) => return Err("--drop-reason explains a --drop-attachment; none was given".to_string()),
-        (false, None) => return Err("--drop-attachment needs --drop-reason <text>: a dropped binding is recorded with why it was dropped".to_string()),
-        (false, Some(reason)) => {
-            if reason.trim().is_empty() || first_row_line_break(reason).is_some() {
-                return Err("--drop-reason must be non-empty, single-line text".to_string());
-            }
-        }
-    }
-    if args.scenario_id.is_none() && !args.all_scenarios {
-        return Err("--drop-attachment applies to scenario evidence (--scenario-id or --all-scenarios); task-only evidence carries no drop guard".to_string());
-    }
-    Ok(())
-}
-
-/// Every well-formed evidence record in the committed ledger and the
-/// staging area together, which the drop guard compares against, so an
-/// unpromoted record counts too.
-fn ledger_and_staged_evidence(ledger_root: &Path) -> Result<Vec<EvidenceRecord>, String> {
-    let mut all = Vec::new();
-    for root in [ledger_root.to_path_buf(), evidence_staging_dir(ledger_root)] {
-        if !root.is_dir() {
-            continue;
-        }
-        let read = GitTier::new(&root)
-            .read(&TierQuery::kind(RecordKind::EvidenceRecord))
-            .map_err(|e| format!("cannot read {} to compare this record's bindings with the latest one: {e}", root.display()))?;
-        let (records, _malformed) = canon_model::validate_evidence_batch(&read.records);
-        all.extend(records);
-    }
-    Ok(all)
-}
-
-/// What a scenario's new record binds once its earlier attachments are
-/// carried forward (0.21 T7).
-struct AttachmentPlan {
-    /// The record's attachments: this write's own, then the carried ones.
-    attachments: Vec<canon_model::EvidenceAttachment>,
-    /// Paths of the earlier attachments bound again unchanged.
-    carried: Vec<String>,
-    /// The explicit `--drop-attachment` drop to record, if any.
-    drop: Option<AttachmentDrop>,
-    /// Earlier paths this write does not re-bind: what a drop may name.
-    leaves_out: std::collections::BTreeSet<String>,
-}
-
-/// A refusal to plan a record's attachments: `code` is the error code.
-struct PlanRefusal {
-    code: &'static str,
-    message: String,
-}
-
-impl PlanRefusal {
-    fn refused(message: String) -> Self {
-        Self { code: "EVIDENCE_REFUSED", message }
-    }
-}
-
-/// Carry-forward plus the drop guard (0.15 D2, 0.21 T7). The scenario's
-/// current latest record of the SAME fold — declared, or audit for an
-/// audit — is read from the committed ledger and the staging area
-/// together (`records` is [`ledger_and_staged_evidence`]). Every file it
-/// binds that this write does not name again is carried into the new
-/// record unchanged (same path, digest and stored blob); a file named
-/// again replaces its earlier binding. The only way to lose a binding is
-/// `--drop-attachment <path>`, recorded as a drop. A carried file whose
-/// blob the artifact store does not hold intact is refused
-/// (`EVIDENCE_CARRY_BLOB_MISSING`): the store cannot vouch for it.
-/// With `strict`, a `--drop-attachment` that names no file this record
-/// leaves out is refused (the single-scenario path); a batch checks that
-/// across all its scenarios instead. The audit fold does not carry: an
-/// audit leaving out an earlier binding is refused unless dropped.
-fn plan_attachments(
-    records: &[EvidenceRecord],
-    repo: &Path,
-    args: &EvidenceArgs,
-    (project_id, scenario_id): (&ProjectId, &ScenarioId),
-    is_audit: bool,
-    attachments: &[canon_model::EvidenceAttachment],
-    strict: bool,
-) -> Result<AttachmentPlan, PlanRefusal> {
-    use std::collections::BTreeSet;
-
-    let same_fold: Vec<EvidenceRecord> = records
-        .iter()
-        .filter(|r| r.is_audit() == is_audit && r.project_id.as_ref() == Some(project_id) && r.scenario_id.as_ref() == Some(scenario_id))
-        .cloned()
-        .collect();
-    let latest = canon_gate::spec_coverage::latest_by_scenario(&same_fold);
-    let previous = latest.get(&(project_id.clone(), scenario_id.clone())).copied();
-    let bound: BTreeSet<&str> = attachments.iter().map(|a| a.path.as_str()).collect();
-    let earlier: Vec<&canon_model::EvidenceAttachment> = previous.map(|p| p.attachments.iter().filter(|a| !bound.contains(a.path.as_str())).collect()).unwrap_or_default();
-    let leaves_out: BTreeSet<String> = earlier.iter().map(|a| a.path.clone()).collect();
-    let requested: BTreeSet<&str> = args.drop_attachments.iter().map(String::as_str).collect();
-    let fold = if is_audit { "audit record" } else { "evidence record" };
-    let scenario = scenario_id.as_str();
-
-    if strict {
-        if let Some(stray) = requested.iter().find(|path| !leaves_out.contains(**path)) {
-            return Err(PlanRefusal::refused(stray_drop_message(stray, fold, scenario, &leaves_out)));
-        }
-    }
-    // An audit is one evaluator's verdict on its own evidence (a refuting
-    // counterexample, say): the audit fold never inherits a binding, so
-    // leaving one out stays the drop guard's refusal (0.15 D2).
-    if is_audit {
-        let unexplained: Vec<String> = leaves_out.iter().filter(|p| !requested.contains(p.as_str())).map(|p| format!("`{p}`")).collect();
-        if let (false, Some(previous)) = (unexplained.is_empty(), previous) {
-            return Err(PlanRefusal::refused(format!(
-                "the latest {fold} for {scenario} (project {}), by `{}` at {}, binds file(s) this record does not: {}; re-bind them (--artifact <path> or --report <format>:<path>; new bytes at the same path are fine), or record the drop with --drop-attachment <path> (repeatable) --drop-reason <text>",
-                project_id.as_str(),
-                previous.envelope.actor.agent_id,
-                previous.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-                unexplained.join(", ")
-            )));
-        }
-    }
-    let (dropped, carried): (Vec<&canon_model::EvidenceAttachment>, Vec<&canon_model::EvidenceAttachment>) = earlier.into_iter().partition(|a| is_audit || requested.contains(a.path.as_str()));
-    let missing: Vec<String> = carried
-        .iter()
-        .filter(|a| canon_gate::artifact_store::stored_blob(repo, &a.sha256).as_str() != a.sha256)
-        .map(|a| format!("`{}` (sha256 {})", a.path, a.sha256))
-        .collect();
-    if let (false, Some(previous)) = (missing.is_empty(), previous) {
-        return Err(PlanRefusal {
-            code: "EVIDENCE_CARRY_BLOB_MISSING",
-            message: format!(
-                "the latest {fold} for {scenario} (project {}), by `{}` at {}, binds file(s) whose bytes the artifact store does not hold intact, so they cannot be carried into this record: {}; re-bind them (--artifact <path> or --report <format>:<path>), `canon evidence vault` stores them again when the working-tree file still matches, or drop them with --drop-attachment <path> --drop-reason <text>",
-                project_id.as_str(),
-                previous.envelope.actor.agent_id,
-                previous.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-                missing.join(", ")
-            ),
-        });
-    }
-    let drop = args.drop_reason.as_ref().filter(|_| !dropped.is_empty()).map(|reason| AttachmentDrop {
-        paths: dropped.iter().map(|a| a.path.clone()).collect::<BTreeSet<_>>().into_iter().collect(),
-        reason: reason.clone(),
-    });
-    let carried_paths: Vec<String> = carried.iter().map(|a| a.path.clone()).collect();
-    let mut all = attachments.to_vec();
-    all.extend(carried.into_iter().cloned());
-    Ok(AttachmentPlan { attachments: all, carried: carried_paths, drop, leaves_out })
-}
-
-fn stray_drop_message(stray: &str, fold: &str, scenario: &str, leaves_out: &std::collections::BTreeSet<String>) -> String {
-    let listed = if leaves_out.is_empty() { "nothing".to_string() } else { leaves_out.iter().map(|p| format!("`{p}`")).collect::<Vec<_>>().join(", ") };
-    format!("--drop-attachment `{stray}` is not a file the latest {fold} for {scenario} binds and this record leaves out (it leaves out: {listed})")
-}
 
 /// Inputs shared by payload export and authenticated evidence staging.
 pub struct ApprovalPayloadArgs {
@@ -839,9 +681,6 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         Some(audit) => audit_verdict(audit.result),
         None => args.verdict.unwrap_or(EvidenceVerdict::Faithful),
     };
-    if let Err(error) = check_drop_flags(args) {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.to_string()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
-    }
     if let Some(reason) = &args.override_reason {
         if reason.trim().is_empty() || first_row_line_break(reason).is_some() {
             return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--override-reason must be one non-empty line; it is recorded on the evidence record as the accountable reason").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
@@ -1004,19 +843,6 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     };
 
     let ledger_root = gate_context.ctx.ledger_root.clone();
-    // 0.15 D2 / 0.21 T7: a new latest record never silently drops what
-    // the previous one bound: it carries those files forward unless
-    // `--drop-attachment` names them. Checked after binding (the new
-    // paths are known) and before anything is stored or staged.
-    let (attachments, carried, attachment_drop) = match args.project_id.as_ref().zip(args.scenario_id.as_ref()) {
-        None => (bound.attachments.clone(), Vec::new(), None),
-        Some(scenario) => match ledger_and_staged_evidence(&ledger_root).map_err(PlanRefusal::refused).and_then(|records| plan_attachments(&records, &repo, args, scenario, audit.is_some(), &bound.attachments, true)) {
-            Ok(plan) => (plan.attachments, plan.carried, plan.drop),
-            Err(error) => {
-                return CliError::refused(error.code, error.message).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit("canon evidence add", args.json);
-            }
-        },
-    };
 
     let at = Utc::now();
     let mut actor = Actor::new(args.actor_id.as_str(), args.role.clone());
@@ -1030,10 +856,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         args.run_id.clone(),
         verdict,
     )
-    .with_attachments(attachments);
-    if let Some(attachment_drop) = attachment_drop {
-        record = record.with_attachment_drop(attachment_drop);
-    }
+    .with_attachments(bound.attachments.clone());
     if let Some(brief_override) = brief_override {
         record = record.with_brief_override(brief_override);
     }
@@ -1142,11 +965,11 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     let stored = match crate::evidence_attach::store_files(&repo, &bound.files) {
         Ok(stored) => stored,
         Err((file, e)) => {
-            return CliError::refused("EVIDENCE_STORE_FAILED", format!("could not store {} in the artifact store: {e}", file.resolved.display())).hint("check that the artifact store is writable (permissions, disk space), then run the command again").emit("canon evidence add", args.json);
+            return CliError::refused("EVIDENCE_STORE_FAILED", format!("could not store {} in the artifact store: {e}", file.resolved.display())).hint(e.hint()).emit("canon evidence add", args.json);
         }
     };
     if !bound.files.is_empty() {
-        crate::say!(args.json, "{}", crate::evidence_attach::stored_line("canon evidence add", bound.files.len(), stored));
+        crate::say!(args.json, "{}", crate::evidence_attach::stored_line(&repo, "canon evidence add", bound.files.len(), stored));
     }
 
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
@@ -1158,18 +981,12 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             // one would send an operator to a command that cannot apply.
             let settled = crate::gate::promote_after_stage("canon evidence add", &ledger_root, &receipt.location, promote, args.json);
             crate::say!(args.json, "canon evidence add: {} for {} ({outcome}) — {}, {}", settled.landed(&receipt.location), subject, settled.suffix(), next);
-            if !carried.is_empty() {
-                crate::say!(args.json, "canon evidence add: carried forward {} earlier attachment(s) unchanged: {}", carried.len(), carried.join(", "));
-            }
             let stale = print_stale_reviews(&repo, &stale_reviews, matches!(settled, crate::gate::StagedOutcome::Promoted { .. }), args.json);
             if settled.exit_code() == 0 {
                 let mut record = settled.json(&receipt.location);
                 record["subject"] = serde_json::json!(subject);
                 record["outcome"] = serde_json::json!(outcome);
                 record["next"] = serde_json::json!(next);
-                if args.scenario_id.is_some() {
-                    record["carried"] = serde_json::json!(carried);
-                }
                 let scope = match &args.task_id {
                     Some(_) => crate::next::Scope::Repo,
                     None => crate::next::Scope::Scenarios(vec![subject.clone()]),
@@ -1187,8 +1004,9 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
 
 /// The existing evidence record that `body` would repeat (`crate::retry`):
 /// the subject's latest one says the same, and no review of the scenario
-/// landed after it (a review pins the evidence it saw, so evidence added again
-/// after one is deliberate: it supersedes what the review saw).
+/// landed after it (evidence added again after a review is deliberate: it
+/// verifies again what the review saw, and the review stays current when
+/// the new record says the same).
 fn repeat_of_latest(ledger_root: &Path, body: &serde_json::Value) -> Option<crate::retry::Existing> {
     let reviewed = |review: &serde_json::Value| ["project_id", "scenario_id"].iter().all(|key| review.get(key) == body.get(key));
     crate::retry::repeats_latest(
@@ -1306,7 +1124,7 @@ fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), String> {
 /// ([`crate::evidence_attach::bind_all_scenarios`]), each with its own
 /// cases and its own verdict (`--verdict` when given, else derived from
 /// its cases). All or nothing: the fabrication scan, every record's brief
-/// refusals and drop guard, and a claimed `faithful` verdict over any
+/// refusals, and a claimed `faithful` verdict over any
 /// failed case run first, and any refusal writes nothing. The records
 /// share the stored report blob and `--artifact` files. Prints one line
 /// per record, then each unindexed scenario id it skipped, then any
@@ -1358,37 +1176,6 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     }
 
     let ledger_root = gate_context.ctx.ledger_root.clone();
-    let existing = match ledger_and_staged_evidence(&ledger_root) {
-        Ok(records) => records,
-        Err(error) => {
-            return CliError::refused("EVIDENCE_REFUSED", error.to_string()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit("canon evidence add", args.json);
-        }
-    };
-    let mut plans = Vec::new();
-    let mut refusals_found: Vec<PlanRefusal> = Vec::new();
-    for (binding, id) in batch.scenarios.iter().zip(&scenario_ids) {
-        match plan_attachments(&existing, repo, args, (project_id, id), false, &binding.attachments, false) {
-            Ok(plan) => plans.push(plan),
-            Err(refusal) => refusals_found.push(refusal),
-        }
-    }
-    if refusals_found.is_empty() {
-        // A drop that no scenario of the batch leaves out names nothing.
-        let leaves_out: std::collections::BTreeSet<String> = plans.iter().flat_map(|plan| plan.leaves_out.iter().cloned()).collect();
-        if let Some(stray) = args.drop_attachments.iter().find(|path| !leaves_out.contains(path.as_str())) {
-            let listed = if leaves_out.is_empty() { "nothing".to_string() } else { leaves_out.iter().map(|p| format!("`{p}`")).collect::<Vec<_>>().join(", ") };
-            refusals_found.push(PlanRefusal::refused(format!(
-                "--drop-attachment `{stray}` is not a file the latest evidence record of any scenario in this batch binds and this write leaves out (the batch leaves out: {listed})"
-            )));
-        }
-    }
-    if !refusals_found.is_empty() {
-        let code = if refusals_found.iter().all(|r| r.code == "EVIDENCE_REFUSED") { "EVIDENCE_BATCH_REFUSED" } else { refusals_found[0].code };
-        let message = refusals_found.iter().map(|r| r.message.as_str()).collect::<Vec<_>>().join("\n");
-        return CliError::refused(code, message).hint("no record of the batch is written; re-bind the named files, run `canon evidence vault`, or attest the scenario on its own with --scenario-id").emit("canon evidence add", args.json);
-    }
-    let carried_by_scenario: std::collections::BTreeMap<String, Vec<String>> =
-        scenario_ids.iter().zip(&plans).map(|(id, plan)| (id.as_str().to_string(), plan.carried.clone())).collect();
 
     let at = Utc::now();
     let mut actor = Actor::new(args.actor_id.as_str(), args.role.clone());
@@ -1400,14 +1187,10 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         .iter()
         .zip(&scenario_ids)
         .zip(&refusals)
-        .zip(plans)
-        .map(|(((binding, id), refusals), plan)| {
+        .map(|((binding, id), refusals)| {
             let mut record = EvidenceRecord::new(Envelope::current(RecordKind::EvidenceRecord, at, actor.clone()), None, Some(id.clone()), args.run_id.clone(), binding.verdict)
-                .with_attachments(plan.attachments)
+                .with_attachments(binding.attachments.clone())
                 .with_project_id(project_id.clone());
-            if let Some(attachment_drop) = plan.drop {
-                record = record.with_attachment_drop(attachment_drop);
-            }
             if let Some(brief_override) = brief_override_of(args, refusals) {
                 record = record.with_brief_override(brief_override);
             }
@@ -1463,7 +1246,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         }
     };
     let json = args.json;
-    crate::say!(json, "{}", crate::evidence_attach::stored_line("canon evidence add", batch.files.len(), landed.stored));
+    crate::say!(json, "{}", crate::evidence_attach::stored_line(repo, "canon evidence add", batch.files.len(), landed.stored));
     let mut written = Vec::new();
     for ((record, location), id) in records.iter().zip(&landed.locations).zip(&scenario_ids) {
         let settled = match &location.promoted {
@@ -1481,11 +1264,6 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         let mut entry = settled.json(&location.staged);
         entry["subject"] = serde_json::json!(id.as_str());
         entry["outcome"] = serde_json::json!(format!("verdict {}", verdict_slug(record.verdict)));
-        let carried = carried_by_scenario.get(id.as_str()).cloned().unwrap_or_default();
-        if !carried.is_empty() {
-            crate::say!(json, "canon evidence add: carried forward {} earlier attachment(s) of {} unchanged: {}", carried.len(), id.as_str(), carried.join(", "));
-        }
-        entry["carried"] = serde_json::json!(carried);
         written.push(entry);
     }
     written.extend(unchanged);
@@ -1560,7 +1338,7 @@ fn land_batch(
     }
 
     let held = crate::evidence_attach::store_files_held(repo, files)
-        .map_err(|(file, e)| (format!("could not store {} in the artifact store: {e}", file.resolved.display()), 2))?;
+        .map_err(|(file, e)| (format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint()), 2))?;
     let staging = GitTier::new(&staging_root);
     let mut locations: Vec<BatchLocation> = Vec::new();
     let rollback = |locations: &[BatchLocation], held: crate::evidence_attach::HeldStore| {
@@ -1569,6 +1347,9 @@ fn land_batch(
             if let Some(target) = &location.promoted {
                 let _ = std::fs::remove_file(ledger_root.join(target));
             }
+        }
+        if locations.iter().any(|location| location.promoted.is_some()) {
+            crate::ledger::restore_after_rollback(ledger_root, RecordKind::EvidenceRecord);
         }
         held.rollback();
     };
@@ -1613,7 +1394,7 @@ fn stale_review_notices(ctx: &mut GateContext, written: &[EvidenceRecord]) -> Ve
         .flat_map(|s| {
             in_effect_reviews(ctx)
                 .into_iter()
-                .filter(|r| r.pins.is_some() && r.project_id == s.project_id && r.scenario_id == s.scenario_id)
+                .filter(|r| r.pins.is_some() && r.project_id == s.project_id && r.scenario_id.as_ref() == Some(&s.scenario_id))
                 .map(|r| (s.clone(), r.clone()))
                 .collect::<Vec<_>>()
         })
@@ -1659,11 +1440,11 @@ fn print_stale_reviews(repo: &Path, stale: &[Review], promoted: bool, json: bool
             let repin = repin_command(review, &pin);
             crate::say!(
                 json,
-                "canon evidence add: review by `{}` of {} {when} (it pinned the evidence this record supersedes); re-pin it: {repin}",
+                "canon evidence add: review by `{}` of {} {when} (this record's verdict or checks differ from what it saw); re-pin it: {repin}",
                 review.reviewer,
-                review.scenario_id.as_str()
+                review.target()
             );
-            serde_json::json!({ "reviewer": review.reviewer, "scenarioId": review.scenario_id.as_str(), "repin": repin })
+            serde_json::json!({ "reviewer": review.reviewer, "scenarioId": review.target(), "repin": repin })
         })
         .collect()
 }
@@ -1676,7 +1457,7 @@ fn repin_command(review: &Review, pin: &str) -> String {
     let mut words = vec![
         "canon review add".to_string(),
         format!("--project-id {}", shell_quote(review.project_id.as_str())),
-        format!("--scenario-id {}", shell_quote(review.scenario_id.as_str())),
+        format!("--scenario-id {}", shell_quote(review.target())),
         format!("--reviewer {}", shell_quote(&review.reviewer)),
         format!("--actor-id {}", shell_quote(&review.envelope.actor.agent_id)),
         format!("--role {}", shell_quote(role)),
@@ -1727,19 +1508,18 @@ fn head_sha(repo: &Path) -> Option<String> {
 /// gate's question, and a superseded record's lost file never does. `2`
 /// when the ledger cannot be read or a write fails.
 pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
-    use canon_gate::artifact_store::{blob_display, stored_blob, working_tree_path, StoreError, StoreLock, StoreOutcome, MIB};
+    use canon_gate::artifact_store::{working_tree_path, ArtifactStore, Observed, StoreError, StoreLock, StoreOutcome, MIB};
 
     let repo = resolve_repo_root(repo);
     // The gate's own context, so the reviews vaulted are exactly the ones
     // it re-checks. Its evidence read is `validate_evidence_batch` over
     // every committed record, split into declared records and audits.
-    let mut gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
+    let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(gate_context) => gate_context,
         Err(e) => {
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon evidence vault", json);
         }
     };
-    crate::inventory::resolve_legacy_pins(&mut gate_context);
     let files: std::collections::BTreeSet<(String, String)> = gate_context
         .evidence
         .iter()
@@ -1760,9 +1540,22 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
             return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon evidence vault", json);
         }
     };
+    // Read under the lock, like every writer (`store_files_held`).
+    let store = match ArtifactStore::open(&repo) {
+        Ok(store) => store,
+        Err(e) => return CliError::refused("EVIDENCE_VAULT_FAILED", format!("the artifact store cannot be used: {e}")).hint(e.hint()).emit("canon evidence vault", json),
+    };
+    // The lock guards the local store only; an object store is not held
+    // against other writers for the length of its uploads.
+    let lock = lock.filter(|_| store.is_local());
     for (path, sha256) in &files {
-        let lock = lock.as_ref().expect("the lock is taken whenever there is a file");
-        if stored_blob(&repo, sha256).as_str() == sha256 {
+        let observed = store.observe(&repo, sha256, false);
+        if let Observed::Unavailable(why) = &observed {
+            return CliError::refused("EVIDENCE_VAULT_FAILED", format!("could not check {}: {why}", store.display(sha256)))
+                .hint(canon_gate::artifact_store::OBJECT_STORE_HINT)
+                .emit("canon evidence vault", json);
+        }
+        if observed.as_str() == sha256 {
             already += 1;
             continue;
         }
@@ -1785,12 +1578,16 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
             ));
             continue;
         }
-        match lock.store(sha256, file) {
-            Ok(StoreOutcome::Stored) => stored.push(format!("{} <- {path}", blob_display(sha256))),
+        let outcome = match &store {
+            ArtifactStore::Local => lock.as_ref().expect("the lock is taken whenever there is a file").store(sha256, file),
+            ArtifactStore::Object(object) => object.upload(sha256, file),
+        };
+        match outcome {
+            Ok(StoreOutcome::Stored) => stored.push(format!("{} <- {path}", store.display(sha256))),
             Ok(StoreOutcome::AlreadyStored) => already += 1,
             Err(StoreError::Changed { actual, .. }) => missing.push(format!("{path} (recorded sha256 {sha256}): working tree: {actual}")),
-            Err(e @ (StoreError::Io(_) | StoreError::InvalidDigest(_) | StoreError::UnsafeStoreDir | StoreError::Locked(_))) => {
-                return CliError::refused("EVIDENCE_VAULT_FAILED", format!("could not write {}: {e}", blob_display(sha256))).hint("check that the artifact store is writable (permissions, disk space), then run the command again").emit("canon evidence vault", json);
+            Err(e) => {
+                return CliError::refused("EVIDENCE_VAULT_FAILED", format!("could not write {}: {e}", store.display(sha256))).hint(e.hint()).emit("canon evidence vault", json);
             }
         }
     }
@@ -1808,7 +1605,7 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
     for line in &missing {
         crate::say!(json, "  not stored {line}");
     }
-    if !stored.is_empty() {
+    if !stored.is_empty() && store.is_local() {
         crate::say!(json, "commit {}/ with the ledger", canon_model::paths::ARTIFACTS_SHA256_DIR);
     }
     if !missing.is_empty() {
@@ -1894,8 +1691,6 @@ mod tests {
             evaluator_version: None,
             evaluator_digest: None,
             audit_result: None,
-            drop_attachments: Vec::new(),
-            drop_reason: None,
             override_reason: None,
             promote: crate::write_mode::PromoteFlag::Config,
             json: false,

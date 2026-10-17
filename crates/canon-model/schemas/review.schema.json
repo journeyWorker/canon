@@ -18,6 +18,17 @@
       "type": "string",
       "format": "date-time"
     },
+    "change_id": {
+      "description": "The change reviewed, on a change-level review (0.23): a chore's\nsign-off, recorded by `canon review add --change`. Absent on a\nscenario review.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ChangeId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "kind": {
       "$ref": "#/$defs/RecordKind"
     },
@@ -29,7 +40,7 @@
       "type": "string"
     },
     "pins": {
-      "description": "What the review saw (D1). `None` on every review written before\n0.15: such a review keeps counting without the freshness check.",
+      "description": "What the review saw (D1). `None` on a review written before 0.15;\n`canon migrate` pins it (0.23), and until then it does not count.",
       "anyOf": [
         {
           "$ref": "#/$defs/ReviewPins"
@@ -70,7 +81,15 @@
       ]
     },
     "scenario_id": {
-      "$ref": "#/$defs/ScenarioId"
+      "description": "The scenario reviewed. Absent on a change-level review (0.23),\nwhich names the change in `change_id` instead.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ScenarioId"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "schema": {
       "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
@@ -85,7 +104,6 @@
     "at",
     "actor",
     "project_id",
-    "scenario_id",
     "reviewer",
     "pin",
     "provenance_ref"
@@ -129,8 +147,38 @@
         "agent_id"
       ]
     },
+    "ChangeId": {
+      "description": "openspec change slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the directory name under `openspec/changes/` — joins: change ↔ tasks ↔ specs",
+      "type": "string"
+    },
+    "CheckPin": {
+      "description": "What one role's latest evidence for a scenario said (0.23 D5): its\nverdict and the identity of the checks it bound. A report-backed\nrecord's checks are `<format>:<case name>` for each matched case; an\nartifact-only record's are `sha256:<digest>` for each file. New\nevidence with the same verdict and the same checks is the same pin.",
+      "type": "object",
+      "properties": {
+        "checks": {
+          "description": "Sorted, each once.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verdict": {
+          "$ref": "#/$defs/EvidenceVerdict"
+        }
+      },
+      "required": [
+        "verdict",
+        "checks"
+      ]
+    },
     "EvidencePin": {
-      "description": "One pinned evidence record: its ledger natural key (the `task_id`,\nelse the `scenario_id`, it is filed under) and its 12-hex content\ndigest, together the record's ledger file stem `<key>__<digest>`.",
+      "description": "One pinned evidence record (0.15–0.22): its ledger natural key (the\n`task_id`, else the `scenario_id`, it is filed under) and its 12-hex\ncontent digest, together the record's ledger file stem `<key>__<digest>`.",
       "type": "object",
       "properties": {
         "digest": {
@@ -145,6 +193,15 @@
         "digest"
       ]
     },
+    "EvidenceVerdict": {
+      "description": "The three-way verdict an evidence record carries. `Divergent` is an\nexplicit third value rather than \"no record exists\" — the donor\nparity harness represents non-faithful as *absence* of a\ndesign-review/code-review record, which works for a directory-scanned\nledger but not for a single, standalone canon record whose own\n`Deserialize` must always succeed or fail on its own — so canon makes\nthe state explicit instead of leaning on record-absence.",
+      "type": "string",
+      "enum": [
+        "faithful",
+        "not_applicable",
+        "divergent"
+      ]
+    },
     "PinnedSpec": {
       "description": "What a review's spec pin covers (0.15 D1).",
       "oneOf": [
@@ -157,6 +214,11 @@
           "description": "The scenario alone (`Scenario.scenario_digest`): only an edit to\nthe scenario or the context it inherits stales the review.",
           "type": "string",
           "const": "scenario"
+        },
+        {
+          "description": "A change's brief (`brief.md` less its approval line): a\nchange-level review (0.23) goes stale when the brief is edited.",
+          "type": "string",
+          "const": "brief"
         }
       ]
     },
@@ -241,10 +303,21 @@
       ]
     },
     "ReviewPins": {
-      "description": "What a [`Review`] saw (0.15 D1): the reviewed scenario's digest\n(`scenario_digest`, of the kind `scenario_digest_scope` names) and the\nlatest evidence record per role for that scenario. `evidence` is\nalways written, empty when the scenario had none, so \"pinned with no\nevidence\" never reads as \"unpinned\".",
+      "description": "What a [`Review`] saw (0.15 D1, reshaped by 0.23 D5): the reviewed\nscenario's digest (`scenario_digest`, of the kind `scenario_digest_scope`\nnames) and, per role, what the scenario's latest evidence said — its\nverdict and the identity of the checks it bound (`checks`). A new\nevidence record with the same verdict from the same checks leaves the\nreview current. `checks` is written even when empty, so \"pinned with no\nevidence\" never reads as \"unpinned\".",
       "type": "object",
       "properties": {
+        "checks": {
+          "description": "The latest evidence's verdict and checks per role (0.23). `None`\non a review pinned the 0.15–0.22 way, to evidence record ids.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/CheckPin"
+          }
+        },
         "evidence": {
+          "description": "The evidence record files the review saw (0.15–0.22). Read only by\n`canon migrate`, which rewrites the review to `checks`; the gate\ndoes not count a review that carries only these.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/EvidencePin"
@@ -259,8 +332,7 @@
         }
       },
       "required": [
-        "scenario_digest",
-        "evidence"
+        "scenario_digest"
       ]
     },
     "RoleId": {

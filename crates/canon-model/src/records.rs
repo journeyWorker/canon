@@ -850,12 +850,20 @@ pub struct Review {
     #[serde(flatten)]
     pub envelope: Envelope,
     pub project_id: ProjectId,
-    pub scenario_id: ScenarioId,
+    /// The scenario reviewed. Absent on a change-level review (0.23),
+    /// which names the change in `change_id` instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scenario_id: Option<ScenarioId>,
+    /// The change reviewed, on a change-level review (0.23): a chore's
+    /// sign-off, recorded by `canon review add --change`. Absent on a
+    /// scenario review.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change_id: Option<ChangeId>,
     pub reviewer: String,
     pub pin: String,
     pub provenance_ref: ProvenanceRef,
-    /// What the review saw (D1). `None` on every review written before
-    /// 0.15: such a review keeps counting without the freshness check.
+    /// What the review saw (D1). `None` on a review written before 0.15;
+    /// `canon migrate` pins it (0.23), and until then it does not count.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pins: Option<ReviewPins>,
     /// How the reviewer's run ended (D4). Absent on the wire when
@@ -901,7 +909,46 @@ impl Review {
         Self {
             envelope,
             project_id,
-            scenario_id,
+            scenario_id: Some(scenario_id),
+            change_id: None,
+            reviewer: reviewer.into(),
+            pin: pin.into(),
+            provenance_ref,
+            pins: None,
+            outcome: ReviewOutcome::Signed,
+            reviewer_provider: None,
+            reviewer_model: None,
+            reviewer_harness: None,
+            artifacts: Vec::new(),
+        }
+    }
+
+    /// What this review is of, as a label: its scenario id, or the change
+    /// id of a change-level review.
+    pub fn target(&self) -> &str {
+        match (&self.scenario_id, &self.change_id) {
+            (Some(scenario_id), _) => scenario_id.as_str(),
+            (None, Some(change_id)) => change_id.as_str(),
+            (None, None) => "",
+        }
+    }
+
+    /// A change-level review (0.23): the sign-off of one change, as a
+    /// chore's reviewer gives it. Pin it with a [`PinnedSpec::Brief`] pin.
+    pub fn for_change(
+        envelope: Envelope,
+        project_id: ProjectId,
+        change_id: ChangeId,
+        reviewer: impl Into<String>,
+        pin: impl Into<String>,
+        provenance_ref: ProvenanceRef,
+    ) -> Self {
+        debug_assert_eq!(envelope.kind, RecordKind::Review);
+        Self {
+            envelope,
+            project_id,
+            scenario_id: None,
+            change_id: Some(change_id),
             reviewer: reviewer.into(),
             pin: pin.into(),
             provenance_ref,
@@ -922,10 +969,12 @@ impl CanonRecord for Review {
     }
 }
 
-/// What a [`Review`] saw (0.15 D1): the reviewed scenario's digest
-/// (`scenario_digest`, of the kind `scenario_digest_scope` names) and the
-/// latest evidence record per role for that scenario. `evidence` is
-/// always written, empty when the scenario had none, so "pinned with no
+/// What a [`Review`] saw (0.15 D1, reshaped by 0.23 D5): the reviewed
+/// scenario's digest (`scenario_digest`, of the kind `scenario_digest_scope`
+/// names) and, per role, what the scenario's latest evidence said — its
+/// verdict and the identity of the checks it bound (`checks`). A new
+/// evidence record with the same verdict from the same checks leaves the
+/// review current. `checks` is written even when empty, so "pinned with no
 /// evidence" never reads as "unpinned".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ReviewPins {
@@ -936,7 +985,29 @@ pub struct ReviewPins {
     /// `Scenario.scenario_digest` existed.
     #[serde(default, skip_serializing_if = "PinnedSpec::is_file")]
     pub scenario_digest_scope: PinnedSpec,
+    /// The latest evidence's verdict and checks per role (0.23). `None`
+    /// on a review pinned the 0.15–0.22 way, to evidence record ids.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checks: Option<Vec<CheckPin>>,
+    /// The evidence record files the review saw (0.15–0.22). Read only by
+    /// `canon migrate`, which rewrites the review to `checks`; the gate
+    /// does not count a review that carries only these.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<EvidencePin>,
+}
+
+/// What one role's latest evidence for a scenario said (0.23 D5): its
+/// verdict and the identity of the checks it bound. A report-backed
+/// record's checks are `<format>:<case name>` for each matched case; an
+/// artifact-only record's are `sha256:<digest>` for each file. New
+/// evidence with the same verdict and the same checks is the same pin.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+pub struct CheckPin {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    pub verdict: EvidenceVerdict,
+    /// Sorted, each once.
+    pub checks: Vec<String>,
 }
 
 /// What a review's spec pin covers (0.15 D1).
@@ -950,6 +1021,9 @@ pub enum PinnedSpec {
     /// The scenario alone (`Scenario.scenario_digest`): only an edit to
     /// the scenario or the context it inherits stales the review.
     Scenario,
+    /// A change's brief (`brief.md` less its approval line): a
+    /// change-level review (0.23) goes stale when the brief is edited.
+    Brief,
 }
 
 impl PinnedSpec {
@@ -958,9 +1032,9 @@ impl PinnedSpec {
     }
 }
 
-/// One pinned evidence record: its ledger natural key (the `task_id`,
-/// else the `scenario_id`, it is filed under) and its 12-hex content
-/// digest, together the record's ledger file stem `<key>__<digest>`.
+/// One pinned evidence record (0.15–0.22): its ledger natural key (the
+/// `task_id`, else the `scenario_id`, it is filed under) and its 12-hex
+/// content digest, together the record's ledger file stem `<key>__<digest>`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
 pub struct EvidencePin {
     pub key: String,
@@ -1032,7 +1106,13 @@ pub enum DivergenceStatus {
         tracking: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         expiry: Option<DateTime<Utc>>,
-        /// The scenario's latest evidence at acceptance, by ledger file.
+        /// The scenario's latest evidence at acceptance (0.23): verdict and
+        /// checks per role, the pin a review carries.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        checks: Option<Vec<CheckPin>>,
+        /// The latest evidence record files at acceptance (0.22). Read
+        /// only by `canon migrate`.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         evidence: Vec<EvidencePin>,
     },
 }
@@ -1169,7 +1249,7 @@ impl CanonRecord for StrategyItem {
 /// ledger but not for a single, standalone canon record whose own
 /// `Deserialize` must always succeed or fail on its own — so canon makes
 /// the state explicit instead of leaning on record-absence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceVerdict {
     Faithful,
@@ -1332,16 +1412,6 @@ pub struct EvidenceAudit {
     pub result: AuditResult,
 }
 
-/// Files a re-attestation deliberately stopped binding (0.15 D2): the
-/// repository-relative paths the scenario's previous latest record bound
-/// and this record does not, and the author's one-line reason. Without
-/// it `canon evidence add` refuses a record that would drop them.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct AttachmentDrop {
-    pub paths: Vec<String>,
-    pub reason: String,
-}
-
 /// The accountable waiver an attestation was let through under, when
 /// `canon evidence add` refused it because a subject it attests for has
 /// an enforced, unapproved brief (0.16 M7) and the operator passed
@@ -1403,10 +1473,6 @@ pub struct EvidenceRecord {
     /// on the wire).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<EvidenceAttachment>,
-    /// Bound files of the scenario's previous latest record this one
-    /// deliberately no longer binds, and why (0.15 D2). Additive.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub attachment_drop: Option<AttachmentDrop>,
     /// Present only on an audit record (`--kind audit`, 0.15 D3): the
     /// external evaluator and its result. Additive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1441,7 +1507,6 @@ impl EvidenceRecord {
             surface_ref: Vec::new(),
             approval: None,
             attachments: Vec::new(),
-            attachment_drop: None,
             audit: None,
             brief_override: None,
         }
@@ -1483,11 +1548,6 @@ impl EvidenceRecord {
 
     pub fn with_attachments(mut self, attachments: Vec<EvidenceAttachment>) -> Self {
         self.attachments = attachments;
-        self
-    }
-
-    pub fn with_attachment_drop(mut self, attachment_drop: AttachmentDrop) -> Self {
-        self.attachment_drop = Some(attachment_drop);
         self
     }
 
@@ -2682,7 +2742,7 @@ mod tests {
         assert_eq!(serde_json::to_value(&review).unwrap(), legacy);
     }
 
-    /// A pinned review with no evidence keeps its empty `evidence` list on
+    /// A pinned review with no checks keeps its empty `checks` list on
     /// the wire (pinned-with-nothing is not unpinned), a non-signed
     /// outcome and the reviewer runtime round-trip, and an unknown
     /// outcome is refused rather than read as signed.
@@ -2696,9 +2756,10 @@ mod tests {
             "9c93d024b1a2",
             ProvenanceRef::UpstreamRef("pr#1".into()),
         );
-        review.pins = Some(ReviewPins { scenario_digest: SpecDigest::of(b"feature"), scenario_digest_scope: PinnedSpec::File, evidence: Vec::new() });
+        review.pins = Some(ReviewPins { scenario_digest: SpecDigest::of(b"feature"), scenario_digest_scope: PinnedSpec::File, checks: Some(Vec::new()), evidence: Vec::new() });
         let json = serde_json::to_value(&review).unwrap();
-        assert_eq!(json["pins"]["evidence"], serde_json::json!([]));
+        assert_eq!(json["pins"]["checks"], serde_json::json!([]));
+        assert!(json["pins"].get("evidence").is_none(), "the 0.15–0.22 evidence-id list is not written by a 0.23 review");
         assert!(json["pins"].get("scenario_digest_scope").is_none(), "a file pin is the default and is not written, so pre-scope pins read as file pins");
         review.pins.as_mut().unwrap().scenario_digest_scope = PinnedSpec::Scenario;
         let json = serde_json::to_value(&review).unwrap();
@@ -2710,7 +2771,7 @@ mod tests {
         review.reviewer_provider = Some("openai".into());
         review.reviewer_model = Some("gpt-x".into());
         review.reviewer_harness = Some("codex".into());
-        review.pins.as_mut().unwrap().evidence.push(EvidencePin { key: "world.place-lock.01".into(), digest: "0123456789ab".into() });
+        review.pins.as_mut().unwrap().checks = Some(vec![CheckPin { role: Some("implementer".into()), verdict: EvidenceVerdict::Faithful, checks: vec!["junit:cart.add.01".into()] }]);
         let json = serde_json::to_value(&review).unwrap();
         assert_eq!(json["outcome"], "indeterminate");
         assert_eq!(serde_json::from_value::<Review>(json.clone()).unwrap(), review);

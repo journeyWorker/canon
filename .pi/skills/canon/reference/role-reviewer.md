@@ -17,13 +17,24 @@ canon finding list --change-id <slug> --open --as reviewer --json
 canon finding close --change-id <slug> --round <n> --seq <n> --disposition fixed --resolution-sha <sha> --as reviewer --json
 canon review add --project-id <root-id> --scenario-id <id> --scenario-id <id> --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json
 canon review add --project-id <root-id> --scenario-ids-from - --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json   # ids on stdin, one per line
+canon review add --project-id <root-id> --change <chore-slug> --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json   # a chore: one change-level review of its invariants and checks against the diff
 canon divergence accept --project-id <root-id> --scenario-id <id> --reason "<why the gap stays>" --tracking <issue-url-or-ref> [--expiry YYYY-MM-DD] --reviewer <me> --actor-id <me> --session-id <session> --as reviewer --json
+canon artifacts verify --full --as reviewer --json    # the files the evidence and reviews bind are in the artifact store; refuses when an object store is unreachable
+canon query --kind evidence_record --history --as reviewer --json   # every version, not only the current record
 ```
 
 `review add` needs `--upstream-ref <ref>` or `--original-spec-ref <path>`;
 add `--artifact <path>` (repeatable) for user-visible behavior. A short
 `<sha>` is fine. With `write.promote: manual`, follow `finding add` and
 `finding close` with `canon gate promote --as reviewer --json`.
+
+A scenario review pins what you saw: the scenario's digest plus the verdict
+and checks (report format and matched case names, or artifact digests) of its
+latest evidence per role, not which record held them. It stays current when
+the implementer records the same verdict from the same checks again, and
+goes stale when the verdict or the checks differ or the scenario changes.
+Reviews written before 0.23 do not count until `canon migrate` re-pins them
+(an advisory names it); that is the orchestrator's step, not yours.
 
 Run `gate check` once, before `review add`: its `unreviewed-promotion`
 violations are the subjects and scenarios that need your review. Do not loop
@@ -87,9 +98,16 @@ ship guard and stays listed as `accepted-divergence` in `status` and
   directly; nothing to promote. canon stores and re-checks attached bytes
   and never compares images.
 - A blocker you close `fixed` stays blocking until the implementer records
-  the whole suite again (`evidence add --all-scenarios`); re-review after
-  it, since new evidence makes your pinned review stale.
-- Fixes you ask for return as a re-review of the same change. When a new
-  evidence record makes your review stale, look again before you re-pin.
+  the whole suite again (`evidence add --all-scenarios`); your pinned review
+  stays current when the new evidence says the same, otherwise look again.
+- Fixes you ask for return as a re-review of the same change. When new
+  evidence changes a verdict or the checks and so stales your review, look
+  again before you re-pin.
+  A chore has no scenarios: review it with one change-level review, `canon
+  review add --project-id <root-id> --change <slug> --reviewer <me> --role
+  reviewer --pin <sha> --upstream-ref <ref> …`. It signs the chore's
+  invariants and checks against the diff and pins its brief, so editing the
+  brief stales it. The chore also needs evidence recorded after its approval
+  (the implementer's `--all-scenarios` run) before it ships.
 
 Reference: `reference/canon-review.md`.

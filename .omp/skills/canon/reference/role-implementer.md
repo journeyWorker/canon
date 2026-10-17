@@ -19,8 +19,11 @@ canon scenario new --from - --as implementer --json     # many at once: NDJSON o
 canon evidence add --project-id <root-id> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref "<test command>" --actor-id <unit> --session-id <session> --as implementer --json
 canon evidence add --project-id <root-id> --scenario-id <id> --artifact <path> --kind test-run --role implementer --ref "<what it shows>" --actor-id <unit> --session-id <session> --as implementer --json
 canon evidence add --project-id <root-id> --scenario-id <id> --verdict divergent --artifact <path> --kind test-run --role implementer --ref "<the external limit, and where it is tracked>" --actor-id <unit> --session-id <session> --as implementer --json   # honest divergent evidence
+canon artifacts verify --full --as implementer --json  # bound files are in the artifact store (omit --full to trust the store's size and digest metadata); refuses when an object store is unreachable
 canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <unit> --actor-id <unit> --session-id <session> --summary "<defect>" --as implementer --json
 canon inventory sync --as implementer --json          # only after a write printed NOT refreshed
+canon query --kind <kind> --history --as implementer --json   # earlier versions too; without --history only the current record of each key
+canon ledger compact --as implementer --json           # only for a pre-0.23 ledger or an interrupted move (add --dry-run to preview)
 canon gate promote --as implementer --json            # only with write.promote: manual
 ```
 
@@ -52,10 +55,20 @@ After the first `status`, follow `meta.next` of each write; do not call
    `--all-scenarios`: one record per indexed scenario owning a case, each with
    the verdict its own cases show; any refusal writes none. For one scenario
    use `--scenario-id <id>` (repeatable) with `--report` or `--artifact`.
-   canon stores the bytes in `.canon/artifacts/sha256/` (commit it with the
-   ledger) and `canon gate check` re-checks them, so the working-tree report
-   may be gitignored. For a scenario about what users see, bind the screenshot
-   or recording (`--artifact <path>`). An external evaluator's audit is
+   A record binds exactly what its own write names (`--report`,
+   `--artifact`): nothing is carried forward from an earlier record, so name
+   every file the record should prove again. canon stores the bytes by digest
+   in the artifact store (by default `.canon/artifacts/sha256/`, committed
+   with the ledger; an object store when `canon.yaml`'s `artifact_store:` block
+   names one, in which case nothing is kept locally) and `canon gate check`
+   re-checks them, so the working-tree report may be gitignored. Run
+   `canon artifacts verify` to ask the store yourself; it refuses, never
+   passes, when an object store cannot be reached. Moving an existing store
+   (`canon artifacts migrate`) is the repo owner's call: do not run it.
+   For a scenario about what users see, bind its own screenshot or recording
+   with that scenario: `--scenario-id <id> --artifact <path>`. A batch
+   (`--all-scenarios`) binds every file it names to every scenario, so give
+   a batch only the reports; never loop all screenshots into it. An external evaluator's audit is
    `--kind audit`; canon never generates one. Evidence for a task of an
    imported plan (`--task <id>`) must bind the artifact or report that proves
    the task; a canon command is never that proof. When the behavior cannot
@@ -67,16 +80,21 @@ After the first `status`, follow `meta.next` of each write; do not call
    the record is final when `evidence add` returns. Only with
    `write.promote: manual` (or no `write:` key) follow it with
    `gate promote`; `meta.next` names it.
-6. **A new record makes a signed review stale.** The add prints the reviewer
-   and the `canon review add … --pin <sha>` that re-pins it; that is the
-   reviewer's call. Do not run it yourself.
+6. **A changed result makes a signed review stale.** A review pins the
+   verdict and the checks (report format and matched case names, or artifact
+   digests) of the evidence it saw, not which record it was. Recording the
+   same verdict from the same checks keeps every review current; a different
+   verdict, different checks or an edited scenario stales it. The add prints
+   the reviewer and the `canon review add … --pin <sha>` that re-pins it; that
+   is the reviewer's call. Do not run it yourself.
 7. **After a fix or a chore, record the whole suite again.** A blocker the
    reviewer closed `fixed`, and an approved chore, are not done until every
    evidenced scenario has evidence newer than the close or the approval:
    run the suite and bind it with `canon evidence add --all-scenarios …`
-   (the shipping refusal names the scenarios and this command). The
-   re-review follows; a scenario whose gap was accepted is accepted again
-   by the reviewer once new evidence supersedes the old.
+   (the shipping refusal names the scenarios and this command). Reviews stay
+   current while the verdicts and checks are unchanged; a scenario whose gap
+   was accepted is accepted again by the reviewer once new evidence says
+   something different.
 
 ## Retry safety
 
@@ -88,6 +106,8 @@ response, run it again.
 
 When every scenario has evidence, the review is the reviewer's session, in a
 separate process: do not review your own change. A chore adds no scenarios:
-run the suite again and bind it with `--all-scenarios`, which supersedes the
-old evidence and makes pinned reviews stale; shipping needs that evidence
-newer than the chore's approval. Reference: `reference/canon-gate.md`.
+once it is approved, run the suite and bind it with `--all-scenarios`;
+shipping needs that evidence newer than the chore's approval, plus the
+reviewer's one change-level review of the chore (`review add --change`).
+Scenario reviews stay current when the verdicts and checks are unchanged.
+Reference: `reference/canon-gate.md`.

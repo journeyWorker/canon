@@ -224,7 +224,7 @@ Roles: if you were spawned as one (planner, implementer, reviewer, orchestrator)
 The loop:
 
 1. Brief: for a new subject or a scope change, write the PRD brief in the change's `.canon/changes/<slug>/brief.md` (intent, outcome, user flow `F1`, `F2`, …, step detail, acceptance, questions and assumptions, out of scope), in the `language:` of `canon.yaml` (unset: the request's language, with \"which language?\" in the questions). Run `canon brief check` until it has no blockers, then stop and report the brief to the human in that language: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy; record it in one call: `canon brief approve --change <slug> --by <the human> --note \"<their words>\"`. Never approve without a human answer. A brief edited after its approval needs a new answer.
-2. Subject: `canon subject new`, then `canon change new` for the change (`--kind chore` for a refactor, dependency, build, CI or infra change that alters no behavior: short brief, no scenarios, the suite run again with `canon evidence add --all-scenarios`, then re-review; behavior-changing work is never a chore); it writes the brief skeleton `.canon/changes/<slug>/brief.md`. A change from an external plan (an openspec `proposal.md`) gets its brief there too: a `brief.md` whose `Source: <path>` line points at the plan; canon never edits the plan.
+2. Subject: `canon subject new`, then `canon change new` for the change (`--kind chore` for a refactor, dependency, build, CI or infra change that alters no behavior: short brief, no scenarios, the suite run again with `canon evidence add --all-scenarios`, then one change-level review with `canon review add --change <slug>`; behavior-changing work is never a chore); it writes the brief skeleton `.canon/changes/<slug>/brief.md`. A change from an external plan (an openspec `proposal.md`) gets its brief there too: a `brief.md` whose `Source: <path>` line points at the plan; canon never edits the plan.
 3. Scenarios: `canon scenario new --flow <F-id>`, one per behavior of a flow step, failure paths included (`--case failure`).
 4. Units: split the work; one actor id and session per unit.
 5. Implement: tests named by scenario id.
@@ -754,6 +754,22 @@ pub fn run_check_config(repo: &Path, json: bool) -> i32 {
         Err(e) => {
             all_ok = false;
             report.push_str(&format!("[FAIL] language: {e}\n"));
+        }
+    }
+
+    // `artifact_store:` (0.23 D3): absent is the local default and prints
+    // nothing, like `language:`. A backend that names no s3 tier fails
+    // here, not at the first evidence write.
+    let artifacts_present = serde_yaml::from_str::<serde_yaml::Value>(&text).ok().and_then(|doc| doc.get("artifact_store").cloned()).is_some();
+    match canon_store::artifact_blobs::ArtifactsConfig::from_yaml_at(&text, repo) {
+        Ok(config) if artifacts_present => match config.backend {
+            canon_store::artifact_blobs::ArtifactsBackend::Local => report.push_str("[PASS] artifact_store (backend: local)\n"),
+            canon_store::artifact_blobs::ArtifactsBackend::Tier { name, .. } => report.push_str(&format!("[PASS] artifact_store (backend: {name}, prefix: {})\n", config.prefix)),
+        },
+        Ok(_) => {}
+        Err(e) => {
+            all_ok = false;
+            report.push_str(&format!("[FAIL] artifact_store: {e}\n"));
         }
     }
 

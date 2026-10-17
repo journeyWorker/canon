@@ -1,0 +1,16 @@
+description: "0.23 D1: re-attesting a scenario binds exactly the files the new write names (exit 0): the earlier ones are not carried forward and no drop is recorded or listed; `--drop-attachment` no longer exists (exit 2, nothing staged)"
+steps:
+  - args: [inventory, sync]
+    exit: 0
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --artifact, reports/shot.txt, --artifact, reports/run.log]
+    exit: 0
+  - args: [gate, promote]
+    exit: 0
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --artifact, reports/run.log]
+    exit: 0
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --artifact, reports/run.log, --drop-attachment, reports/shot.txt, --drop-reason, "screenshots moved to the e2e lane"]
+    exit: 2
+  - args: [gate, promote]
+    exit: 0
+  - args: [status]
+    exit: 0

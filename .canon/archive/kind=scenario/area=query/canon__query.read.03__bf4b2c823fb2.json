@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-17T19:45:52.139710Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "461735cd1082a3579667c8327dac6633faaf1b17cb219eb19ad1407ab087997f",
+  "scenario_id": "query.read.03",
+  "schema": 1,
+  "source_digest": "10e30c234f8273cb9c25056f08774be29179d14fbe9be082f46eb3ee09bb2a59",
+  "subject_id": "query-reads",
+  "title": "A corpus carrying no supersession folds to itself"
+}

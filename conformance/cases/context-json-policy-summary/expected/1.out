@@ -63,7 +63,6 @@
         "actor": true,
         "approval": false,
         "at": true,
-        "attachment_drop": false,
         "attachments": false,
         "audit": false,
         "brief_override": false,
@@ -144,6 +143,7 @@
         "actor": true,
         "artifacts": false,
         "at": true,
+        "change_id": false,
         "kind": true,
         "outcome": false,
         "pin": true,
@@ -154,7 +154,7 @@
         "reviewer_harness": false,
         "reviewer_model": false,
         "reviewer_provider": false,
-        "scenario_id": true,
+        "scenario_id": false,
         "schema": true
       },
       "partition": {
@@ -448,6 +448,7 @@
       "actor": true,
       "artifacts": false,
       "at": true,
+      "change_id": false,
       "kind": true,
       "outcome": false,
       "pin": true,
@@ -458,7 +459,7 @@
       "reviewer_harness": false,
       "reviewer_model": false,
       "reviewer_provider": false,
-      "scenario_id": true,
+      "scenario_id": false,
       "schema": true
     },
     "requireReview": null
@@ -519,7 +520,6 @@
         "record.actor": "map",
         "record.approval": "map",
         "record.at": "timestamp",
-        "record.attachment_drop": "map",
         "record.attachments": "list<map>",
         "record.audit": "map",
         "record.brief_override": "map",
@@ -594,6 +594,7 @@
         "record.actor": "map",
         "record.artifacts": "list<map>",
         "record.at": "timestamp",
+        "record.change_id": "string",
         "record.kind": "string (one of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence_record, subject, finding)",
         "record.outcome": "string (one of: signed, indeterminate, unavailable)",
         "record.pin": "string",

@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "test-voice",
+    "role": "test"
+  },
+  "at": "2026-07-14T20:56:57.991043Z",
+  "kind": "review",
+  "pin": "ea77374f271e927e59bab97374ffdc70eafef7ba",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:platformer.movement.04: Falling into a pit respawns without touching score"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "c70e6f0035d7890be5252d8cc75e683bf0b277a61e66616c134bd61b3ef907cc",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "platformer",
+  "provenance_ref": {
+    "original_spec_ref": "examples/platformer/specs/features/kind=feature/area=platformer/movement.feature"
+  },
+  "reviewer": "test-voice",
+  "scenario_id": "platformer.movement.04",
+  "schema": 1
+}

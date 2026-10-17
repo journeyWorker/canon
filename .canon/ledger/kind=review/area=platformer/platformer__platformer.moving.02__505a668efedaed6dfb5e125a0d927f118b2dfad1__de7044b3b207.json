@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "test-voice",
+    "role": "test"
+  },
+  "at": "2026-07-14T21:36:55.801732Z",
+  "kind": "review",
+  "pin": "505a668efedaed6dfb5e125a0d927f118b2dfad1",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:platformer.moving.02: Stepping off a platform edge drops cleanly"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "5feef69d2b0fb32ba0fa83c50c68bac6aa664ce248a1b47444d6a49703f356b0",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "platformer",
+  "provenance_ref": {
+    "original_spec_ref": "examples/platformer/specs/features/kind=feature/area=platformer/moving.feature"
+  },
+  "reviewer": "test-voice",
+  "scenario_id": "platformer.moving.02",
+  "schema": 1
+}

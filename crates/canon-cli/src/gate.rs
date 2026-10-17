@@ -97,7 +97,6 @@ use canon_model::paths;
 use canon_model::{validate_evidence_batch, Actor, ChangeId, Envelope, RawRecord, RecordKind, TaskId};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
-use canon_store::tier::{Tier, TierQuery};
 use chrono::Utc;
 
 use crate::cli_error::CliError;
@@ -124,13 +123,12 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     // every check this run engages reads `gate_context.now`, never its
     // own wall-clock read.
     let now = Utc::now();
-    let mut gate_context = match GateContext::load(ctx, &registry, now) {
+    let gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
             return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate check", json);
         }
     };
-    crate::inventory::resolve_legacy_pins(&mut gate_context);
 
     let checks = canon_gate::check_set(release);
     // An index the `.feature` edits are not in grades specs that no longer
@@ -177,9 +175,9 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         crate::say_raw!(json, "{}", format_accepted_divergences(&lines));
         advisories.push(advisory("accepted_divergence", format!("{} divergent scenario(s) accepted as known gaps — not failing the gate", lines.len()), lines));
     }
-    if let Some(counts) = canon_gate::review_gate::legacy_review_advisory(&gate_context) {
-        crate::say_raw!(json, "\nadvisory: {}\n", counts.note());
-        advisories.push(advisory("legacy_review", counts.note().to_string(), Vec::new()));
+    if let Some(note) = canon_gate::review_gate::unmigrated_review_note(&gate_context) {
+        crate::say_raw!(json, "\nadvisory: {}\n", note);
+        advisories.push(advisory("unmigrated_review", note, Vec::new()));
     }
     let overrides = crate::brief::override_lines(&gate_context);
     crate::say_raw!(json, "{}", format_brief_overrides(&overrides));
@@ -451,7 +449,10 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
         }
     };
 
-    let raw_records = match GitTier::new(gate_context.ctx.ledger_root.clone()).read(&TierQuery::kind(RecordKind::EvidenceRecord)) {
+    // The row counts every record bound to the task and scans every note
+    // it carries, so this is a history read: the ledger's records and the
+    // archive's (`canon_gate::history`).
+    let raw_records = match GitTier::new(gate_context.ctx.ledger_root.clone()).read_history(RecordKind::EvidenceRecord) {
         Ok(read) => read.records,
         Err(e) => {
             return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate task", json);
@@ -482,7 +483,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
                     return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon gate task", json);
                 }
             };
-            (gate_context.evidence.clone(), notes)
+            (canon_gate::history::evidence_history(&gate_context), notes)
         }
         Err(e) => {
             return CliError::refused("TYPED_ATOMS_INVALID", e.to_string()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again").emit("canon gate task", json);
@@ -1197,7 +1198,7 @@ pub fn run_selftest(json: bool) -> i32 {
 #[cfg(test)]
 mod tests {
     use canon_model::{EvidenceRecord, EvidenceVerdict, RoleId};
-    use canon_store::tier::RawWrite;
+    use canon_store::tier::{RawWrite, Tier, TierQuery};
 
     use super::*;
 

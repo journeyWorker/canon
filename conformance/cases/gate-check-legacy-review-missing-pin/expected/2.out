@@ -1,5 +1,0 @@
-canon gate check: clean (0 violations)
-
-advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
-
-advisory: 1 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 0 current, 0 stale, 1 undecidable; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it

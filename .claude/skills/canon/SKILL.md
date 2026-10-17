@@ -39,7 +39,9 @@ a feature, a one-line request included. A human is needed once per scope:
   new answer. A follow-up on a shipped subject reopens it
   (`canon subject status <id> --to verifying --reason "<why>"`); a fix
   closed `fixed`, and an approved chore, then need the whole suite evidenced
-  again (`evidence add --all-scenarios`) and re-reviewed before it ships.
+  again (`evidence add --all-scenarios`, for a chore after its approval)
+  before it ships, and a chore also needs one change-level review
+  (`review add --change <slug>`).
 - When no human can answer one of the brief's questions, write your
   assumption into the brief's Questions and assumptions, build on it, and say
   so in your report. That covers the brief's questions and work inside an
@@ -57,6 +59,24 @@ a feature, a one-line request included. A human is needed once per scope:
 Every write command says whether the record is final (`written directly`,
 or `staged and promoted in this run`) or staged; only a staged record
 needs `canon gate promote`, and only `write.promote: manual` leaves one.
+
+The ledger is latest-only. It holds the current record of each key; writing a
+newer version moves what it supersedes to `.canon/archive`, and `status`,
+`gate check`, the guards and `query` read the ledger only. Earlier versions
+are one flag away: `canon query --kind <k> --history`. A ledger written
+before 0.23, or one whose move was interrupted, is brought to one file per
+key by `canon ledger compact` (`canon migrate` runs it). A record binds only
+what its own write names: evidence carries nothing forward from an earlier
+record, and a review stays current while the verdict and checks of the
+evidence it saw are unchanged.
+
+Where artifact bytes live is the repo's choice: `canon.yaml`'s `artifact_store:`
+block defaults to the local, git-tracked `.canon/artifacts/sha256/`, or names
+an object-store tier, in which case `evidence add`, `review add` and
+`evidence vault` upload by digest and keep nothing locally. The gate and
+`canon artifacts verify [--full]` ask the store and refuse, never pass, when
+it cannot be reached. Moving an existing store with `canon artifacts migrate`
+is the repo owner's decision, not a step of the loop.
 
 ## Know your role
 

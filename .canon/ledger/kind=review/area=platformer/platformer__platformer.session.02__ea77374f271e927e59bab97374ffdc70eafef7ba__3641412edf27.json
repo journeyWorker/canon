@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "test-voice",
+    "role": "test"
+  },
+  "at": "2026-07-14T20:56:58.069024Z",
+  "kind": "review",
+  "pin": "ea77374f271e927e59bab97374ffdc70eafef7ba",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:platformer.session.02: Win overlay freezes gameplay input"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "b4fa73a82f1c9216b4a0cca28ed3738ccf3cec6f906ed03b898bb48d8160a42c",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "platformer",
+  "provenance_ref": {
+    "original_spec_ref": "examples/platformer/specs/features/kind=feature/area=platformer/session.feature"
+  },
+  "reviewer": "test-voice",
+  "scenario_id": "platformer.session.02",
+  "schema": 1
+}

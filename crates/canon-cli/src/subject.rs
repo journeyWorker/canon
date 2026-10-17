@@ -109,12 +109,12 @@
 use std::path::Path;
 
 use canon_gate::review_gate::{
-    active_require_review, malformed_findings, subject_guard, unreadable_review_kinds, unreadable_violation, LegacyReviewCounts,
+    active_require_review, malformed_findings, subject_guard, unreadable_review_kinds, unreadable_violation,
 };
 use canon_gate::spec_coverage::{case_gaps, subject_change_ids, subject_scenarios};
 use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, PolicyResolution, RequireReview, SpecCoverage, Violation};
 use canon_model::{
-    Actor, Change, ChangeId, Envelope, EvidenceVerdict, ProjectId, RawRecord, RecordKind, Reopen, RoleId, ScenarioId, StatusOverride, StatusReason, Subject, SubjectId,
+    Actor, Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, Reopen, RoleId, StatusOverride, StatusReason, Subject, SubjectId,
     SubjectStatus, WaivedViolation,
 };
 use canon_policy::SchemaRegistry;
@@ -684,10 +684,7 @@ pub fn run_status(
         };
     let gate_context = if ships || reviews || reopens {
         match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &schemas, Utc::now()).map_err(|e| e.to_string())) {
-            Ok(mut ctx) => {
-                if reviews {
-                    crate::inventory::resolve_legacy_pins(&mut ctx);
-                }
+            Ok(ctx) => {
                 Some(ctx)
             }
             Err(e) => {
@@ -727,11 +724,8 @@ pub fn run_status(
             violation.detail = format!("{} → {}: {}", status_str(current), status_str(target), violation.detail);
         }
         if readable {
-            let owned: std::collections::BTreeSet<(&ProjectId, &ScenarioId)> =
-                subject_scenarios(ctx, subject_id).into_iter().map(|s| (&s.project_id, &s.scenario_id)).collect();
-            let legacy = LegacyReviewCounts::of(ctx, |s| owned.contains(&(&s.project_id, &s.scenario_id)));
-            if legacy.total() > 0 {
-                eprintln!("canon subject status: advisory: {}", legacy.note());
+            if let Some(note) = canon_gate::review_gate::unmigrated_review_note(ctx) {
+                eprintln!("canon subject status: advisory: {note}");
             }
         }
     }
@@ -774,7 +768,7 @@ pub fn run_status(
                 fixes.push("get the human's answer to the brief and record it with `canon brief approve`");
             }
             if waivable.iter().any(canon_gate::review_gate::is_reverify) {
-                fixes.push("record the suite again with `canon evidence add --project-id <root> --all-scenarios --report <format>:<path> …` for the scenarios named, then re-review");
+                fixes.push("record the suite again with `canon evidence add --project-id <root> --all-scenarios --report <format>:<path> …` for the scenarios named (a review stays current while the verdicts and checks are the same)");
             }
             return CliError::failed("SUBJECT_GATE_VIOLATION", lines)
                 .with_exit(EXIT_GATED)

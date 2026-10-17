@@ -73,7 +73,7 @@ Feature: canon migrate
   Scenario: Reviews pinned before the move stay current after the spec root moves into .canon
     Given require_review and a review written before 0.15 pinned to a commit where the scenario sat under specs/
     When canon migrate moves the root to .canon/specs
-    Then canon gate check prints the same legacy advisory before and after, the review checked current at its pin
+    Then the review is pinned to what its evidence says and counts, as it would have had the root not moved
     And without former_roots in canon.yaml the review would be undecidable
 
   # canon: {"schema":1,"at":"2026-10-12T11:44:52Z","actor":{"agent_id":"canon"}}

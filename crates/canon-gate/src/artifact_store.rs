@@ -78,8 +78,23 @@
 //! `spec_coverage` section would otherwise never have its bindings
 //! checked at all — exactly the repo F9 came from. Records with no
 //! attachment cost nothing here.
+//!
+//! # Object-store backend (0.23 D3)
+//! `canon.yaml`'s `artifact_store: { backend: local | <tier>, prefix: artifacts/ }`
+//! moves the bytes off git: [`ArtifactStore`] is the local directory above
+//! (the default, no credentials) or the object-store tier named by
+//! `backend`, keyed `<prefix>sha256/<digest>`. Records keep only digests.
+//! The rules above hold unchanged, asked of the store instead of the
+//! directory, with two differences: the store is asked once per distinct
+//! digest (a HEAD and its size/digest metadata; `canon artifacts verify
+//! --full` downloads and re-hashes), and the working-tree fallback does
+//! not apply — a blob the store lacks is `stale-evidence` whatever the
+//! working tree holds, because the fallback exists for records older than
+//! the store, and `canon evidence vault` uploads those. A store that
+//! cannot be reached or attached ([`Observed::Unavailable`],
+//! [`StoreError::Unattached`]) is a violation with a hint, never a pass.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
@@ -87,6 +102,7 @@ use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
 use canon_model::{paths, EvidenceAttachment, EvidenceRecord, Review, ReviewArtifact};
+use canon_store::artifact_blobs::{ArtifactsBackend, ArtifactsConfig, BlobError, ObjectBlobStore, Probe};
 use canon_store::file_lock::{FileLock, FileLockError};
 use sha2::{Digest, Sha256};
 
@@ -196,19 +212,42 @@ fn create_store_dir(repo: &Path) -> Result<PathBuf, StoreError> {
     Ok(path)
 }
 
-/// What a file at a path holds now.
+/// What a file at a path, or a blob in a store, holds now.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Observed {
     /// No readable file there.
     Missing,
     /// A file whose bytes hash to this digest.
     Sha256(String),
+    /// An object that contradicts its own name; the text says how.
+    Altered(String),
+    /// The store could not be asked (offline, denied); the text says why.
+    /// Never read as present, never read as absent.
+    Unavailable(String),
 }
+
+/// What each file hashed so far in this process held, while its size and
+/// modification time are unchanged ([`canon_store::git_tier::FileStamp`]).
+/// `canon gate check` asks about the same blob once per record and review
+/// that binds it; the bytes are read and hashed once.
+static OBSERVED: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<PathBuf, (canon_store::git_tier::FileStamp, String)>>> = std::sync::LazyLock::new(Default::default);
 
 impl Observed {
     fn of(path: &Path) -> Self {
+        let stamp = std::fs::metadata(path).ok().and_then(|meta| canon_store::git_tier::FileStamp::of(&meta));
+        if let Some(stamp) = stamp {
+            let seen = OBSERVED.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            if let Some((_, sha)) = seen.get(path).filter(|(was, _)| *was == stamp) {
+                return Observed::Sha256(sha.clone());
+            }
+        }
         match File::open(path).and_then(sha256_reader) {
-            Ok(sha) => Observed::Sha256(sha),
+            Ok(sha) => {
+                if let Some(stamp) = stamp {
+                    OBSERVED.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(path.to_path_buf(), (stamp, sha.clone()));
+                }
+                Observed::Sha256(sha)
+            }
             Err(_) => Observed::Missing,
         }
     }
@@ -217,11 +256,12 @@ impl Observed {
         matches!(self, Observed::Sha256(actual) if actual == sha256)
     }
 
-    /// `missing`, or the digest.
+    /// `missing`, the digest, or what is wrong with the object.
     pub fn as_str(&self) -> &str {
         match self {
             Observed::Missing => "missing",
             Observed::Sha256(sha) => sha,
+            Observed::Altered(why) | Observed::Unavailable(why) => why,
         }
     }
 }
@@ -256,8 +296,35 @@ pub enum StoreError {
         paths::ARTIFACT_STORE_LOCK_FILE
     )]
     Locked(Duration),
+    /// `canon.yaml` or its `artifact_store:` block cannot be used.
+    #[error("{0}")]
+    Config(String),
+    /// The object-store tier `artifact_store.backend` names cannot be attached
+    /// (credentials or bucket unset).
+    #[error("the artifact store tier `{tier}` cannot be attached: {reason}")]
+    Unattached { tier: String, reason: String },
+    /// The object store was reached for, and failed or refused.
+    #[error("the artifact store tier `{tier}` failed: {reason}")]
+    Remote { tier: String, reason: String },
     #[error("{0}")]
     Io(#[from] std::io::Error),
+}
+
+/// The next step when the object store cannot be attached or reached.
+pub const OBJECT_STORE_HINT: &str = "check that the object store is reachable and that CANON_S3_ENDPOINT, CANON_S3_ACCESS_KEY, CANON_S3_SECRET_KEY and the tier's bucket variable are set, then run the command again (`canon artifacts verify` re-checks the store)";
+
+impl StoreError {
+    /// The next step for the operator.
+    pub fn hint(&self) -> &'static str {
+        match self {
+            StoreError::Changed { .. } => "re-run what produced the file and bind it again, so the digest matches its bytes",
+            StoreError::InvalidDigest(_) => "a recorded digest must be 64 lowercase hex characters; fix or re-create the record",
+            StoreError::UnsafeStoreDir | StoreError::Io(_) => "check that the artifact store is writable (permissions, disk space), then run the command again",
+            StoreError::Locked(_) => "wait for the other canon process to finish, then run the command again",
+            StoreError::Config(_) => "fix the `artifact_store:` block of canon.yaml (`canon init --check-config` names the problem), or set `artifact_store: { backend: local }`",
+            StoreError::Unattached { .. } | StoreError::Remote { .. } => OBJECT_STORE_HINT,
+        }
+    }
 }
 
 /// How long a writer of the artifact store waits for another one to
@@ -429,6 +496,134 @@ fn copy_hashed(reader: &mut impl Read, file: &mut File) -> std::io::Result<Strin
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+/// Where a repo keeps the bytes behind its evidence digests (0.23 D3):
+/// the local `.canon/artifacts/sha256` store, git-tracked and the
+/// default, or an object-store tier chosen by `canon.yaml`'s
+/// `artifact_store: { backend: <tier>, prefix: artifacts/ }`.
+///
+/// With an object store, a write uploads by digest key
+/// (`<prefix>sha256/<digest>`), reads it back, and keeps no local copy;
+/// the gate asks the store (one HEAD plus size/digest metadata per
+/// distinct digest; [`ArtifactStore::observe`] with `full` downloads and
+/// re-hashes). A store that cannot be reached is
+/// [`Observed::Unavailable`], which fails the gate with a hint — absence
+/// is only ever the store's own "not found", and the working-tree
+/// fallback of the local store does not apply.
+#[derive(Debug)]
+pub enum ArtifactStore {
+    Local,
+    Object(ObjectArtifacts),
+}
+
+/// The object-store side of [`ArtifactStore`]: the tier's name and the
+/// digest-keyed blobs in its bucket.
+#[derive(Debug)]
+pub struct ObjectArtifacts {
+    pub tier: String,
+    blobs: ObjectBlobStore,
+}
+
+/// `<repo>/canon.yaml`'s `artifact_store:` block, resolved; the local default
+/// when the file or the block is absent.
+pub fn artifacts_config(repo: &Path) -> Result<ArtifactsConfig, StoreError> {
+    let path = repo.join("canon.yaml");
+    let content = match std::fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(ArtifactsConfig::local()),
+        Err(e) => return Err(StoreError::Config(format!("reading `{}`: {e}", path.display()))),
+    };
+    ArtifactsConfig::from_yaml_at(&content, repo).map_err(|e| StoreError::Config(e.to_string()))
+}
+
+impl ArtifactStore {
+    /// The store `<repo>/canon.yaml` configures. Builds the client for
+    /// an object store (credentials from the tier's own configuration);
+    /// performs no network I/O.
+    pub fn open(repo: &Path) -> Result<Self, StoreError> {
+        Self::from_config(artifacts_config(repo)?)
+    }
+
+    /// The store `config` names, as [`ArtifactStore::open`].
+    pub fn from_config(config: ArtifactsConfig) -> Result<Self, StoreError> {
+        match config.backend {
+            ArtifactsBackend::Local => Ok(ArtifactStore::Local),
+            ArtifactsBackend::Tier { name, config: tier } => match ObjectBlobStore::attach(&tier, &config.prefix) {
+                Ok(blobs) => Ok(ArtifactStore::Object(ObjectArtifacts { tier: name, blobs })),
+                Err(e) => Err(StoreError::Unattached { tier: name, reason: e.to_string() }),
+            },
+        }
+    }
+
+    pub fn is_local(&self) -> bool {
+        matches!(self, ArtifactStore::Local)
+    }
+
+    /// The blob's name as printed to operators.
+    pub fn display(&self, sha256: &str) -> String {
+        match self {
+            ArtifactStore::Local => blob_display(sha256),
+            ArtifactStore::Object(object) => format!("{}:{}", object.tier, object.blobs.key(sha256)),
+        }
+    }
+
+    /// Where the store keeps blobs, for a sentence ("under …").
+    pub fn location(&self) -> String {
+        match self {
+            ArtifactStore::Local => format!("{}/", paths::ARTIFACTS_SHA256_DIR),
+            ArtifactStore::Object(object) => format!("the `{}` object store ({})", object.tier, object.blobs.key("")),
+        }
+    }
+
+    /// What the store holds for `sha256`. The local store reads the file
+    /// (no links followed, [`stored_blob`]); an object store answers
+    /// from one HEAD, or downloads and re-hashes with `full`.
+    pub fn observe(&self, repo: &Path, sha256: &str, full: bool) -> Observed {
+        match self {
+            ArtifactStore::Local => stored_blob(repo, sha256),
+            ArtifactStore::Object(object) => {
+                let probe = if full { object.blobs.verify_full(sha256) } else { object.blobs.probe(sha256) };
+                match probe {
+                    Ok(Probe::Missing) => Observed::Missing,
+                    Ok(Probe::Present { .. }) => Observed::Sha256(sha256.to_string()),
+                    Ok(Probe::Altered(why)) => Observed::Altered(why),
+                    Err(BlobError::InvalidDigest(_)) => Observed::Missing,
+                    Err(e) => Observed::Unavailable(format!("unavailable: {e}")),
+                }
+            }
+        }
+    }
+}
+
+impl ObjectArtifacts {
+    /// Upload the bytes `reader` yields as the blob for `expected`, read
+    /// it back, keep nothing locally. [`StoreError::Changed`], with
+    /// nothing uploaded, when the bytes do not hash to `expected`;
+    /// [`StoreOutcome::AlreadyStored`] when an object of that size is
+    /// already there.
+    pub fn upload(&self, expected: &str, mut reader: impl Read) -> Result<StoreOutcome, StoreError> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes)?;
+        match self.blobs.put(expected, bytes) {
+            Ok(true) => Ok(StoreOutcome::Stored),
+            Ok(false) => Ok(StoreOutcome::AlreadyStored),
+            Err(e) => Err(self.error(e)),
+        }
+    }
+
+    /// Every digest the store holds.
+    pub fn list(&self) -> Result<Vec<String>, StoreError> {
+        self.blobs.list().map_err(|e| self.error(e))
+    }
+
+    fn error(&self, e: BlobError) -> StoreError {
+        match e {
+            BlobError::Changed { expected, actual } => StoreError::Changed { expected, actual },
+            BlobError::InvalidDigest(digest) => StoreError::InvalidDigest(digest),
+            other => StoreError::Remote { tier: self.tier.clone(), reason: other.to_string() },
+        }
+    }
+}
+
 /// The working-tree file a repository-relative attachment path names,
 /// or `None` when the recorded path would leave the repository (a
 /// hand-written record; the CLI only ever records in-repo paths).
@@ -474,6 +669,109 @@ fn subject_of(record: &EvidenceRecord) -> String {
     CellSubject::of(record).map(|s| s.as_str().to_string()).unwrap_or_default()
 }
 
+/// Who binds a file: a latest evidence record, or a current review.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Binder {
+    Evidence,
+    Review { reviewer: String, actor: String, at: String },
+}
+
+/// One `(path, sha256)` binding the gate re-checks: a distinct attachment
+/// of a latest evidence record, or of a current in-effect review.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundFileRef {
+    pub subject: String,
+    pub path: String,
+    pub sha256: String,
+    pub binder: Binder,
+}
+
+/// Every binding the gate re-checks (module doc): the latest evidence's,
+/// then the current reviews'.
+pub fn bound_files(ctx: &GateContext) -> Vec<BoundFileRef> {
+    let mut out = Vec::new();
+    for record in latest_records(ctx) {
+        for attachment in distinct_files(record) {
+            out.push(BoundFileRef { subject: subject_of(record), path: attachment.path.clone(), sha256: attachment.sha256.clone(), binder: Binder::Evidence });
+        }
+    }
+    for review in current_reviews(ctx) {
+        for artifact in distinct_review_files(review) {
+            out.push(BoundFileRef {
+                subject: review.target().to_string(),
+                path: artifact.path.clone(),
+                sha256: artifact.sha256.clone(),
+                binder: Binder::Review {
+                    reviewer: review.reviewer.clone(),
+                    actor: review.envelope.actor.agent_id.to_string(),
+                    at: review.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                },
+            });
+        }
+    }
+    out
+}
+
+/// How a bound file fared against the store.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileStatus {
+    /// The store holds the blob, intact.
+    Stored,
+    /// Local store only: no blob, but the working-tree file still hashes
+    /// to the digest (module doc's back-compat path).
+    WorkingTreeOnly,
+    /// Missing, altered, or the store could not be asked.
+    Failed,
+}
+
+/// One bound file with what the store and the working tree hold for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileCheck {
+    pub file: BoundFileRef,
+    pub blob: Observed,
+    pub tree: Observed,
+    pub status: FileStatus,
+}
+
+/// Judge every [`bound_files`] entry against `store` ([`check_files`]).
+pub fn check_bound_files(ctx: &GateContext, store: &ArtifactStore, full: bool) -> Vec<FileCheck> {
+    check_files(&ctx.ctx.repo, bound_files(ctx), store, full)
+}
+
+/// Judge `files` against `store`. Each distinct digest is asked of the
+/// store once; `full` re-hashes the stored bytes instead of trusting
+/// size/digest metadata. Once the store fails to answer, the rest are
+/// [`Observed::Unavailable`] without asking again (an unreachable store
+/// is not retried per file).
+fn check_files(repo: &Path, files: Vec<BoundFileRef>, store: &ArtifactStore, full: bool) -> Vec<FileCheck> {
+    let mut seen: BTreeMap<String, Observed> = BTreeMap::new();
+    let mut outage: Option<String> = None;
+    let mut checks = Vec::new();
+    for file in files {
+        let blob = match (&outage, seen.get(&file.sha256)) {
+            (Some(reason), _) => Observed::Unavailable(reason.clone()),
+            (None, Some(blob)) => blob.clone(),
+            (None, None) => {
+                let blob = store.observe(repo, &file.sha256, full);
+                if let Observed::Unavailable(reason) = &blob {
+                    outage = Some(reason.clone());
+                }
+                seen.insert(file.sha256.clone(), blob.clone());
+                blob
+            }
+        };
+        let (tree, status) = if blob.matches(&file.sha256) {
+            (Observed::Missing, FileStatus::Stored)
+        } else {
+            let tree = working_tree(repo, &file.path);
+            let status = if blob == Observed::Missing && store.is_local() && tree.matches(&file.sha256) { FileStatus::WorkingTreeOnly } else { FileStatus::Failed };
+            (tree, status)
+        };
+        checks.push(FileCheck { file, blob, tree, status });
+    }
+    checks
+}
+
 /// One attachment on a latest record, or a current review, whose bytes
 /// exist only in the working tree (module doc's back-compat path): not a
 /// violation, an advisory pointing at `canon evidence vault`.
@@ -498,30 +796,26 @@ impl UnstoredAttachment {
 /// The advisories `canon gate check` prints below its violations: every
 /// attachment on a latest record, and every artifact on a current
 /// review, with no stored blob whose working-tree file still matches.
-/// Sorted by subject, then path, evidence before reviews.
+/// Sorted by subject, then path, evidence before reviews. Only the local
+/// store has this path: an object-store repo has none (the check
+/// refuses instead).
 pub fn unstored_attachments(ctx: &GateContext) -> Vec<UnstoredAttachment> {
-    let repo = &ctx.ctx.repo;
-    let unstored = |path: &str, sha256: &str| stored_blob(repo, sha256) == Observed::Missing && working_tree(repo, path).matches(sha256);
-    let mut out = Vec::new();
-    for record in latest_records(ctx) {
-        for attachment in distinct_files(record) {
-            if unstored(&attachment.path, &attachment.sha256) {
-                out.push(UnstoredAttachment { subject: subject_of(record), path: attachment.path.clone(), sha256: attachment.sha256.clone(), reviewer: None });
-            }
-        }
+    if !matches!(ArtifactStore::open(&ctx.ctx.repo), Ok(ArtifactStore::Local)) {
+        return Vec::new();
     }
-    for review in current_reviews(ctx) {
-        for artifact in distinct_review_files(review) {
-            if unstored(&artifact.path, &artifact.sha256) {
-                out.push(UnstoredAttachment {
-                    subject: review.scenario_id.as_str().to_string(),
-                    path: artifact.path.clone(),
-                    sha256: artifact.sha256.clone(),
-                    reviewer: Some(review.reviewer.clone()),
-                });
-            }
-        }
-    }
+    let mut out: Vec<UnstoredAttachment> = check_bound_files(ctx, &ArtifactStore::Local, false)
+        .into_iter()
+        .filter(|check| check.status == FileStatus::WorkingTreeOnly)
+        .map(|check| UnstoredAttachment {
+            subject: check.file.subject,
+            path: check.file.path,
+            sha256: check.file.sha256,
+            reviewer: match check.file.binder {
+                Binder::Evidence => None,
+                Binder::Review { reviewer, .. } => Some(reviewer),
+            },
+        })
+        .collect();
     out.sort_by(|a, b| (&a.subject, &a.path, &a.reviewer).cmp(&(&b.subject, &b.path, &b.reviewer)));
     out
 }
@@ -541,76 +835,59 @@ impl GateCheck for ArtifactStoreCheck {
     }
 
     fn run(&self, ctx: &GateContext) -> Vec<Violation> {
-        let repo = &ctx.ctx.repo;
-        let mut violations = Vec::new();
-        for record in latest_records(ctx) {
-            for attachment in distinct_files(record) {
-                let blob = stored_blob(repo, &attachment.sha256);
-                if blob.matches(&attachment.sha256) {
-                    continue;
-                }
-                let tree = working_tree(repo, &attachment.path);
-                if blob == Observed::Missing && tree.matches(&attachment.sha256) {
-                    continue;
-                }
-                violations.push(Violation::new(
-                    FailureClass::StaleEvidence,
-                    subject_of(record),
-                    format!(
-                        "bound file `{}` recorded sha256 {}; stored blob {}: {}; working tree: {} — {}, re-run and re-attest with `canon evidence add`",
-                        attachment.path,
-                        attachment.sha256,
-                        blob_display(&attachment.sha256),
+        let files = bound_files(ctx);
+        if files.is_empty() {
+            return Vec::new();
+        }
+        // A store that cannot be opened (unusable `artifact_store:` block, no
+        // credentials) proves nothing: refuse, never fall back to local.
+        let store = match ArtifactStore::open(&ctx.ctx.repo) {
+            Ok(store) => store,
+            Err(e) => return vec![Violation::new(FailureClass::StaleEvidence, "artifacts".to_string(), format!("the artifact store cannot be used, so no bound file can be verified: {e} — {}", e.hint()))],
+        };
+        let mut violations: Vec<Violation> = check_files(&ctx.ctx.repo, files, &store, false)
+            .into_iter()
+            .filter(|check| check.status == FileStatus::Failed)
+            .map(|check| {
+                let FileCheck { file, blob, tree, .. } = check;
+                let stored = store.display(&file.sha256);
+                let detail = match &file.binder {
+                    Binder::Evidence => format!(
+                        "bound file `{}` recorded sha256 {}; stored blob {stored}: {}; working tree: {} — {}",
+                        file.path,
+                        file.sha256,
                         blob.as_str(),
                         tree.as_str(),
-                        diagnosis(&blob)
+                        remedy(&blob, &store, "re-run and re-attest with `canon evidence add`")
                     ),
-                ));
-            }
-        }
-        // Review artifacts (0.18 D5): the evidence rule, over the current
-        // in-effect reviews only (module doc).
-        for review in current_reviews(ctx) {
-            for artifact in distinct_review_files(review) {
-                let blob = stored_blob(repo, &artifact.sha256);
-                if blob.matches(&artifact.sha256) {
-                    continue;
-                }
-                let tree = working_tree(repo, &artifact.path);
-                if blob == Observed::Missing && tree.matches(&artifact.sha256) {
-                    continue;
-                }
-                violations.push(Violation::new(
-                    FailureClass::StaleEvidence,
-                    review.scenario_id.as_str().to_string(),
-                    format!(
-                        "review by `{}` (actor `{}`, {}) bound file `{}` recorded sha256 {}; stored blob {}: {}; working tree: {} — {}, look again and re-record the review with `canon review add --artifact <path>`",
-                        review.reviewer,
-                        review.envelope.actor.agent_id,
-                        review.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-                        artifact.path,
-                        artifact.sha256,
-                        blob_display(&artifact.sha256),
+                    Binder::Review { reviewer, actor, at } => format!(
+                        "review by `{reviewer}` (actor `{actor}`, {at}) bound file `{}` recorded sha256 {}; stored blob {stored}: {}; working tree: {} — {}",
+                        file.path,
+                        file.sha256,
                         blob.as_str(),
                         tree.as_str(),
-                        diagnosis(&blob)
+                        remedy(&blob, &store, "look again and re-record the review with `canon review add --artifact <path>`")
                     ),
-                ));
-            }
-        }
+                };
+                Violation::new(FailureClass::StaleEvidence, file.subject, detail)
+            })
+            .collect();
         violations.sort_by(|a, b| (&a.subject, &a.detail).cmp(&(&b.subject, &b.detail)));
         violations
     }
 }
 
-/// Why a bound file failed: a blob that exists but no longer hashes to
-/// its own name was altered in place; one that is absent took the only
-/// proof with it (0.14 acceptance rerun G11).
-fn diagnosis(blob: &Observed) -> &'static str {
-    if *blob == Observed::Missing {
-        "the bound bytes are gone"
-    } else {
-        "the stored blob does not match its name, so its bytes were altered"
+/// Why a bound file failed and what to do: a blob that exists but no
+/// longer hashes to its own name was altered in place; one that is absent
+/// took the only proof with it (0.14 acceptance rerun G11); an object
+/// store that could not be asked proved nothing either way, and is never
+/// read as "present".
+fn remedy(blob: &Observed, store: &ArtifactStore, reattest: &str) -> String {
+    match blob {
+        Observed::Unavailable(_) => "the artifact store could not be reached, so the bound bytes cannot be verified; check that it is reachable and that its credentials (CANON_S3_ENDPOINT, CANON_S3_ACCESS_KEY, CANON_S3_SECRET_KEY) are set, then run the gate again".to_string(),
+        Observed::Missing if !store.is_local() => format!("the bound bytes are not in the artifact store; `canon evidence vault` uploads them again when the working-tree file still matches, otherwise {reattest}"),
+        Observed::Missing => format!("the bound bytes are gone, {reattest}"),
+        _ => format!("the stored blob does not match its name, so its bytes were altered, {reattest}"),
     }
 }
 
@@ -656,14 +933,12 @@ mod tests {
             },
             evidence,
             audits: Vec::new(),
-            evidence_file_digests: Default::default(),
             scenarios: Vec::new(),
             divergences: Vec::new(),
             subjects: Vec::new(),
             changes: Vec::new(),
             reviews: Vec::new(),
             findings: Vec::new(),
-            legacy_pins: Default::default(),
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),

@@ -1,6 +1,6 @@
 {
   "statusVersion": 3,
-  "canonVersion": "0.22.0",
+  "canonVersion": "0.23.0",
   "policy": {
     "present": true,
     "spec_coverage": {
@@ -40,7 +40,8 @@
         "briefExists": true,
         "approval": "Journey 2026-10-11 — \"승인. 네 가정대로 진행\"",
         "legacyApproval": true
-      }
+      },
+      "choreReviews": []
     }
   ],
   "unowned": [],

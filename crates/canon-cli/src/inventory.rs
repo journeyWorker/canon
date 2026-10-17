@@ -34,7 +34,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use canon_fmt::Violation;
-use canon_gate::legacy_pins::SpecSources;
 use canon_gate::{GateContext, GateCtx};
 use canon_model::ids::SpecDigest;
 use canon_model::{paths, Actor, Envelope, ProjectId, RecordKind, Scenario, ScenarioId, SubjectId};
@@ -45,6 +44,7 @@ use canon_store::tier::{StoreError, Tier, TierQuery};
 use chrono::Utc;
 
 use crate::context::resolve_repo_root;
+use crate::migrate_legacy_pins::SpecSources;
 use crate::subject::enum_membership_violation;
 
 /// The stable literal id BOTH the absent-`specs:` default AND
@@ -109,8 +109,8 @@ struct RawSpecRoot {
     #[serde(default)]
     root: Option<String>,
     /// Where this root lived before `canon migrate` moved it (0.17 D6),
-    /// newest last. Read only by the legacy-pin lookup
-    /// ([`resolve_legacy_pins`]): a review pinned to a commit from before
+    /// newest last. Read only by `canon migrate`'s review pinning
+    /// ([`spec_sources`]): a pre-0.15 review pinned to a commit from before
     /// the move finds its scenario under these paths at that commit.
     #[serde(default)]
     former_roots: Vec<String>,
@@ -477,23 +477,19 @@ pub struct ScannedScenario {
 pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
     let mut scanned = Vec::new();
     for path in canon_fmt::util::feature_files(root) {
-        let Ok(bytes) = std::fs::read(&path) else { continue };
-        let Ok(text) = std::str::from_utf8(&bytes) else { continue };
-        let scan = canon_fmt::gherkin::scan(text);
-        let digest = canon_fmt::gherkin::source_digest(&bytes);
-        let scenario_digests = canon_fmt::gherkin::scenario_digests(text);
-        for candidate in scan.scenarios {
+        let Some(file) = feature_file_scan(&path) else { continue };
+        for candidate in &file.scan.scenarios {
             if let Ok(scenario_id) = ScenarioId::parse(&candidate.scenario_id) {
                 scanned.push(ScannedScenario {
                     path: path.clone(),
                     scenario_id,
-                    title: candidate.title,
-                    source_digest: digest.clone(),
-                    scenario_digest: scenario_digests.get(&candidate.scenario_id).cloned(),
-                    subject_tags: candidate.subject_tags,
-                    lane_tags: candidate.lane_tags,
-                    case_tags: candidate.case_tags,
-                    unknown_namespace_tags: candidate.unknown_namespace_tags,
+                    title: candidate.title.clone(),
+                    source_digest: file.source_digest.clone(),
+                    scenario_digest: file.scenario_digests.get(&candidate.scenario_id).cloned(),
+                    subject_tags: candidate.subject_tags.clone(),
+                    lane_tags: candidate.lane_tags.clone(),
+                    case_tags: candidate.case_tags.clone(),
+                    unknown_namespace_tags: candidate.unknown_namespace_tags.clone(),
                 });
             }
         }
@@ -501,15 +497,42 @@ pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
     scanned
 }
 
-/// Read every legacy review's pinned commit into `ctx` (0.16 D6,
-/// [`canon_gate::legacy_pins`]): `canon gate check`, `canon status` and
-/// `canon subject status` call this right after loading, so the three
-/// decide a legacy review's currency from the same reads. The spec corpus
-/// is scanned for each scenario's current file only when there is a
-/// legacy review to check.
-pub fn resolve_legacy_pins(ctx: &mut GateContext) {
-    let repo = ctx.ctx.repo.clone();
-    ctx.legacy_pins = canon_gate::legacy_pins::resolve(ctx, || spec_sources(&repo));
+/// One `.feature` file as the Gherkin scan reads it.
+pub struct FeatureFileScan {
+    pub scan: canon_fmt::gherkin::FeatureScan,
+    pub source_digest: SpecDigest,
+    pub scenario_digests: BTreeMap<String, SpecDigest>,
+}
+
+/// What each `.feature` file scanned to, by path, while its size and
+/// modification time are unchanged ([`canon_store::git_tier::FileStamp`]).
+/// One command scans the corpus for the staleness check, the refresh,
+/// the status, the gate and the brief's flow coverage; an unchanged file
+/// is read and lexed once, and an edited or new one is read again.
+static FEATURE_MEMO: std::sync::LazyLock<std::sync::Mutex<BTreeMap<PathBuf, (canon_store::git_tier::FileStamp, std::sync::Arc<FeatureFileScan>)>>> =
+    std::sync::LazyLock::new(Default::default);
+
+/// The scan of the `.feature` file at `path`; `None` when it cannot be
+/// read or is not UTF-8 (the file holds no scenario).
+pub fn feature_file_scan(path: &Path) -> Option<std::sync::Arc<FeatureFileScan>> {
+    let stamp = std::fs::metadata(path).ok().and_then(|metadata| canon_store::git_tier::FileStamp::of(&metadata));
+    if let Some(stamp) = stamp {
+        let memo = FEATURE_MEMO.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some((_, file)) = memo.get(path).filter(|(seen, _)| *seen == stamp) {
+            return Some(file.clone());
+        }
+    }
+    let bytes = std::fs::read(path).ok()?;
+    let text = std::str::from_utf8(&bytes).ok()?;
+    let file = std::sync::Arc::new(FeatureFileScan {
+        scan: canon_fmt::gherkin::scan(text),
+        source_digest: canon_fmt::gherkin::source_digest(&bytes),
+        scenario_digests: canon_fmt::gherkin::scenario_digests(text),
+    });
+    if let Some(stamp) = stamp {
+        FEATURE_MEMO.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(path.to_path_buf(), (stamp, file.clone()));
+    }
+    Some(file)
 }
 
 /// Each scenario's current `.feature` file and the directories each spec
@@ -517,8 +540,9 @@ pub fn resolve_legacy_pins(ctx: &mut GateContext) {
 /// `former_roots` (where `canon migrate` moved it from). A root outside
 /// the repo has no history to read and is left out, and so is a former
 /// root outside it; an unusable `specs:` section leaves everything out,
-/// so every legacy review stays undecidable rather than misjudged.
-fn spec_sources(repo: &Path) -> SpecSources {
+/// so every pre-0.15 review stays undecidable rather than misjudged. Read
+/// only by `canon migrate`'s review pinning ([`crate::migrate_pins`]).
+pub(crate) fn spec_sources(repo: &Path) -> SpecSources {
     let mut sources = SpecSources::default();
     let Ok(roots) = load_spec_roots_with_former(&repo.join("canon.yaml")) else { return sources };
     for (root, former) in roots {
@@ -802,8 +826,8 @@ pub fn overlay_stale_index(ctx: &mut GateContext) {
     let Ok(roots) = sync.spec_roots(None) else { return };
     let (_, roots) = split_pre_0_17(&sync.repo, roots);
     let tier = GitTier::new(&sync.ledger_root);
-    let Ok((stale, corpus)) = stale_roots(&tier, &roots) else { return };
     let Ok(folded) = latest_index(&tier) else { return };
+    let (stale, corpus) = stale_roots_against(&folded, &roots);
     let actor = Actor::new_unattributed("canon-inventory-sync");
     for StaleRoot { root, scanned, files, .. } in &stale {
         let Ok(plan) = plan_one_root(|| Ok(folded.clone()), &repo, root, scanned, &corpus[&root.id], &actor, Some(files)) else { continue };
@@ -905,7 +929,11 @@ struct StaleRoot {
 /// an indexed scenario the corpus no longer declares — the indexed id
 /// set and the corpus id set of a project must be equal.
 fn stale_roots(tier: &GitTier, roots: &[SpecRoot]) -> Result<(Vec<StaleRoot>, BTreeMap<ProjectId, BTreeSet<ScenarioId>>), InventoryError> {
-    let latest = latest_index(tier)?;
+    Ok(stale_roots_against(&latest_index(tier)?, roots))
+}
+
+/// [`stale_roots`] against an index already folded ([`latest_index`]).
+fn stale_roots_against(latest: &BTreeMap<(ProjectId, ScenarioId), Scenario>, roots: &[SpecRoot]) -> (Vec<StaleRoot>, BTreeMap<ProjectId, BTreeSet<ScenarioId>>) {
     let scans: Vec<Vec<ScannedScenario>> = roots.iter().map(|root| scan_feature_corpus_detailed(&root.root)).collect();
     let corpus = corpus_ids(roots, &scans);
 
@@ -925,7 +953,7 @@ fn stale_roots(tier: &GitTier, roots: &[SpecRoot]) -> Result<(Vec<StaleRoot>, BT
             stale.push(StaleRoot { root: root.clone(), scanned, files, removed });
         }
     }
-    Ok((stale, corpus))
+    (stale, corpus)
 }
 
 /// At most three of `items`, then how many more.
@@ -1177,6 +1205,24 @@ mod tests {
         write(root, &format!("kind=feature/area={area}/{surface}.feature"), &text);
     }
 
+    /// A `.feature` file scanned twice in one process is read again when
+    /// it changed, even under a settled timestamp.
+    #[test]
+    fn a_repeated_feature_scan_sees_an_edited_file() {
+        let dir = TempDir::new().unwrap();
+        write_clean_feature(dir.path(), "game", "art", "01", "First title");
+        let path = dir.path().join("kind=feature/area=game/art.feature");
+        let age = |secs: u64| std::fs::OpenOptions::new().write(true).open(&path).unwrap().set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(secs)).unwrap();
+        age(3600);
+        let before = scan_feature_corpus_detailed(dir.path());
+        assert_eq!(before.iter().map(|s| s.title.as_str()).collect::<Vec<_>>(), ["First title"]);
+
+        write_clean_feature(dir.path(), "game", "art", "01", "Other title");
+        age(3595);
+        let after = scan_feature_corpus_detailed(dir.path());
+        assert_eq!(after.iter().map(|s| s.title.as_str()).collect::<Vec<_>>(), ["Other title"]);
+    }
+
     fn only_scenario(repo: &Path) -> Scenario {
         let gate_ctx = GateCtx::from_repo(repo).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
@@ -1395,7 +1441,8 @@ mod tests {
         let gate_ctx = GateCtx::from_repo(repo.path()).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
-        assert_eq!(result.records.len(), 2, "the prior record is appended alongside, never overwritten");
+        assert_eq!(result.records.len(), 1, "the ledger holds one record per scenario: the new generation");
+        assert_eq!(tier.read_history(RecordKind::Scenario).unwrap().records.len(), 2, "the prior record is moved to the archive alongside, never overwritten");
     }
 
     #[test]

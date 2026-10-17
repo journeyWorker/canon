@@ -184,6 +184,32 @@ struct S3Connection {
     region: String,
 }
 
+/// The S3 client for `bucket` over `conn`. An `http://` endpoint (the
+/// docker-compose MinIO) must be allowed in the client options themselves.
+fn s3_store(bucket: &str, conn: S3Connection) -> Result<object_store::aws::AmazonS3, StoreError> {
+    object_store::aws::AmazonS3Builder::new()
+        .with_bucket_name(bucket)
+        .with_endpoint(conn.endpoint.clone())
+        .with_region(conn.region)
+        .with_access_key_id(conn.access_key_id)
+        .with_secret_access_key(conn.secret_access_key)
+        .with_virtual_hosted_style_request(false)
+        // An unreachable endpoint must refuse in seconds, not after
+        // object_store's default ten retries over minutes: a gate
+        // check or an evidence write waits on this. `allow_http` lives in
+        // the client options, so it is set here: `with_client_options`
+        // replaces any set on the builder before it.
+        .with_client_options(
+            object_store::ClientOptions::new()
+                .with_allow_http(conn.endpoint.starts_with("http://"))
+                .with_connect_timeout(std::time::Duration::from_secs(5))
+                .with_timeout(std::time::Duration::from_secs(120)),
+        )
+        .with_retry(object_store::RetryConfig { max_retries: 2, retry_timeout: std::time::Duration::from_secs(20), ..Default::default() })
+        .build()
+        .map_err(|e| StoreError::ObjectStore(e.to_string()))
+}
+
 /// [`R2Tier::connect_live`]'s S3 connection builder (design D1,
 /// mirrors [`crate::pg_tier::resolve_pg_dsn`]'s `lookup`-parameterized
 /// pattern): reads `CANON_S3_ENDPOINT`/`CANON_S3_ACCESS_KEY`/
@@ -242,6 +268,16 @@ fn resolve_s3_connection(strict: bool, lookup: impl Fn(&str) -> Option<String>) 
 
     Ok(S3Connection { endpoint: endpoint.unwrap(), access_key_id: access_key_id.unwrap(), secret_access_key: secret_access_key.unwrap(), region })
 }
+
+/// Recognized ONLY by builds with `debug_assertions` — a release `canon`
+/// ignores it — so an offline integration test can exercise a genuine
+/// git+r2 aging move / query fan-out / artifact upload without live R2
+/// credentials or network. The same "rebindable root" convention
+/// `canon/skills/tiered-storage/SKILL.md` documents for the DuckDB views
+/// (`CANON_R2_ROOT`). Unset in ordinary use: a `canon.yaml`-configured
+/// s3-backed rung always resolves via [`R2Tier::connect_live`] — this env
+/// var is a test seam, never a silent production fallback ([`R2Tier::attach`]).
+pub const LOCAL_R2_ROOT_ENV: &str = "CANON_R2_LOCAL_ROOT";
 
 pub struct R2Tier {
     store: Arc<dyn ObjectStore>,
@@ -340,18 +376,42 @@ impl R2Tier {
             .ok_or_else(|| StoreError::BackendUnattached { backend: Backend::S3, reason: format!("`{bucket_env}` (and generic `S3_BUCKET`) are both unset") })?;
         let conn = resolve_s3_connection(cfg!(not(debug_assertions)), |name| std::env::var(name).ok())?;
 
-        let store = object_store::aws::AmazonS3Builder::new()
-            .with_bucket_name(&bucket)
-            .with_allow_http(conn.endpoint.starts_with("http://"))
-            .with_endpoint(conn.endpoint)
-            .with_region(conn.region)
-            .with_access_key_id(conn.access_key_id)
-            .with_secret_access_key(conn.secret_access_key)
-            .with_virtual_hosted_style_request(false)
-            .build()
-            .map_err(|e| StoreError::ObjectStore(e.to_string()))?;
+        let store = s3_store(&bucket, conn)?;
 
         Self::with_object_store(Arc::new(store), prefix.to_string())
+    }
+
+    /// Resolve `cfg`'s s3-backed tier handle — the ONE place every
+    /// consumer (`canon-cli`'s tier builders, the gate's artifact store)
+    /// attaches an s3 rung. In DEBUG builds only, honors
+    /// [`LOCAL_R2_ROOT_ENV`] as an offline test seam ([`R2Tier::local`]);
+    /// the `#[cfg(debug_assertions)]` gate is load-bearing, not
+    /// cosmetic. `cargo build --release` compiles the whole `if` branch
+    /// out of the binary, so no env var — however it got into a
+    /// production shell — can ever substitute a local filesystem for the
+    /// real bucket that `canon tier age`'s destructive move+delete, or
+    /// an artifact upload, targets. A release binary always takes the
+    /// [`R2Tier::connect_live`] path, which fails loud
+    /// (`StoreError::BackendUnattached`) rather than silently succeeding
+    /// against the wrong backing store. Integration tests build in the
+    /// `dev`/`test` profile (`debug_assertions` on), so the override
+    /// keeps working for them.
+    pub fn attach(cfg: &crate::policy::R2TierConfig) -> Result<Self, StoreError> {
+        #[cfg(debug_assertions)]
+        if let Ok(local_root) = std::env::var(LOCAL_R2_ROOT_ENV) {
+            eprintln!(
+                "canon: {LOCAL_R2_ROOT_ENV} is set — substituting a LOCAL filesystem s3 tier at `{local_root}` \
+                 (debug-build test seam only; a release `canon` binary ignores this var and always attaches live s3)"
+            );
+            return Self::local(local_root, cfg.prefix.clone());
+        }
+        Self::connect_live(&cfg.bucket_env, &cfg.prefix)
+    }
+
+    /// The object store behind this tier, for a consumer that keeps its
+    /// own key layout in the same bucket (the artifact blob store).
+    pub(crate) fn object_store(&self) -> Arc<dyn ObjectStore> {
+        Arc::clone(&self.store)
     }
 
     fn object_path(&self, relative: &std::path::Path) -> ObjectPath {
@@ -699,6 +759,19 @@ mod tests {
         assert_eq!(result.records.len(), 1, "the well-formed object still reads");
         assert_eq!(result.violations.len(), 1, "the malformed row becomes exactly one violation, not a panic");
         assert!(result.violations[0].subject.contains("bogus"), "violation names the object path: {:?}", result.violations[0]);
+    }
+
+    /// 0.23: the client allows an `http://` endpoint (docker-compose's
+    /// MinIO). Setting client options must not drop `allow_http`: a request
+    /// then reaches the network (connection refused here, nothing listens)
+    /// instead of failing to build its HTTP client.
+    #[test]
+    fn an_http_endpoint_is_allowed_by_the_client_options() {
+        let conn = S3Connection { endpoint: "http://127.0.0.1:9".into(), access_key_id: "k".into(), secret_access_key: "s".into(), region: "us-east-1".into() };
+        let store = s3_store("bucket", conn).unwrap();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let err = rt.block_on(async { use object_store::ObjectStore; store.head(&object_store::path::Path::from("missing")).await }).unwrap_err().to_string();
+        assert!(!err.contains("builder error"), "the HTTP client was refused before any request: {err}");
     }
 
     #[test]

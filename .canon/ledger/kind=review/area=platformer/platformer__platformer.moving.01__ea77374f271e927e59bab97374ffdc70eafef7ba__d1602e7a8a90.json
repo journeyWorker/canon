@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "test-voice",
+    "role": "test"
+  },
+  "at": "2026-07-14T20:56:58.238999Z",
+  "kind": "review",
+  "pin": "ea77374f271e927e59bab97374ffdc70eafef7ba",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:platformer.moving.01: A moving platform carries the standing player"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "55bf001422a14df557c8f760d8c59cfcd15366cbbce6b872e6afec3b766e301b",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "platformer",
+  "provenance_ref": {
+    "original_spec_ref": "examples/platformer/specs/features/kind=feature/area=platformer/moving.feature"
+  },
+  "reviewer": "test-voice",
+  "scenario_id": "platformer.moving.01",
+  "schema": 1
+}

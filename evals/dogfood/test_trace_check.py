@@ -63,6 +63,22 @@ class TraceCheckTests(unittest.TestCase):
         for path in ("src/game.ts", ".canon/changes/x/brief.md", "e2e/a.spec.ts"):
             self.assertFalse(trace_check.outside_repo(path), path)
 
+    def test_only_code_that_landed_in_git_counts_as_implementation(self):
+        # Dogfood eval 11: a reviewer wrote a diagnostic spec in the repo and
+        # never committed it; only committed code implements the change.
+        import subprocess, tempfile
+        with tempfile.TemporaryDirectory() as root:
+            run = lambda *a: subprocess.run(["git", "-C", root, *a], check=True, capture_output=True)
+            run("init", "-q")
+            (Path(root) / "src.ts").write_text("x")
+            run("add", "src.ts")
+            run("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c")
+            (Path(root) / "diag.spec.ts").write_text("y")
+            self.assertTrue(trace_check.landed(root, "src.ts"))
+            self.assertFalse(trace_check.landed(root, "diag.spec.ts"))
+        with tempfile.TemporaryDirectory() as plain:
+            self.assertTrue(trace_check.landed(plain, "src.ts"), "outside a git work tree every path counts")
+
     def test_recovery_depth_counts_intervening_canon_calls(self):
         report = self.report("reviewer_recovery_fail.jsonl")
         session = report["sessions"][0]

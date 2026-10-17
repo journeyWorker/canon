@@ -140,6 +140,75 @@ A kind currently split across two rungs — some records aged, some not
 — is still read correctly: `canon query` merges both rungs by `at`,
 no cross-tier join.
 
+## The ledger is latest-only; the archive holds history
+
+The `local` rung's directory (`.canon/ledger`) holds the **current**
+record of each key. A write that appends a new version of a record —
+a newer evidence record for a scenario and role, a finding closed, a
+scenario rewritten, a subject moved to its next status — moves the
+versions it supersedes to `.canon/archive`, which has the same
+`kind=<kind>/…` layout and file names and is tracked in git. The gate,
+`canon status`, the guards and `canon query` read the ledger only, so
+their cost follows the number of keys, not the number of edits.
+
+```bash
+# Every version of a kind, the archive's included.
+canon query --kind evidence_record --history
+
+# Bring a ledger written before 0.23 to one file per key (idempotent;
+# `canon migrate` runs it). --dry-run reports and writes nothing.
+canon ledger compact --dry-run
+canon ledger compact
+```
+
+A version is superseded when it is no longer the current record of any
+group a reader folds it into; for evidence that is per scenario and
+role, per project, per task and per run-sequence partition, so a newer
+record of another role never supersedes this one. A record also stays
+while a rule reads it unfolded (a `flagged` overlay, a `reviewed`
+lifecycle tag, a brief override, an approval at the current evidence).
+The few rules that genuinely need history read the archive explicitly:
+`risk_routing` coverage, `canon divergence accept`'s independence check,
+the release trust check, and `canon gate task`.
+
+The write lands first and the move follows, so a crash between the two
+leaves a readable ledger (every fold still picks the latest) that the
+next append or `canon ledger compact` finishes. The archive is local and
+is not routed through `tiers:`; a `tiers.local.root` that is not a
+directory named `ledger` has no archive and keeps every version.
+
+## Where artifact bytes live
+
+An evidence record keeps only digests; the bytes behind them (reports,
+screenshots, recordings) live in the artifact store. Where is a repo
+choice, made in `canon.yaml`:
+
+```yaml
+artifact_store: { backend: local }                        # the default
+# artifact_store: { backend: cold, prefix: artifacts/ }   # an `s3` tier of `tiers:`
+```
+
+`local` is `.canon/artifacts/sha256/`: git-tracked and credential-free.
+With an object-store tier, `canon evidence add`, `canon review add` and
+`canon evidence vault` upload each blob by digest under
+`<prefix>sha256/<digest>` and keep nothing locally. The gate and
+`canon artifacts verify [--full]` ask the store (one HEAD per distinct
+digest against the size and sha256 written at upload; `--full` downloads and
+re-hashes) and refuse, never pass, when the store cannot be reached.
+
+```bash
+canon artifacts verify --full
+canon artifacts migrate --to cold --dry-run   # preview moving an existing local store
+canon artifacts migrate --to cold
+```
+
+`migrate` hashes, uploads and reads back every local blob, and only then
+writes the `artifact_store:` block, removes the local copies and ignores
+`.canon/artifacts/`. Commit the removals, `.gitignore` and `canon.yaml`. It
+is resumable (a stopped run leaves a repo the gate still passes) and a
+second run finds nothing to do. Moving the store is the repo owner's
+decision; moving bytes back to local is not supported.
+
 ## Reading the DuckDB views
 
 `crates/canon-store/sql/views.sql` layers `stg_` / `int_` / `mart_`

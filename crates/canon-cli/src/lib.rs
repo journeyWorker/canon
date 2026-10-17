@@ -4,6 +4,7 @@
 
 pub mod adapter;
 pub mod artifact_ingest;
+pub mod artifacts;
 pub mod brief;
 pub mod brief_approve;
 pub mod brief_check;
@@ -28,7 +29,10 @@ pub mod inventory_selftest;
 pub mod json_out;
 pub mod language;
 pub mod learn;
+pub mod ledger;
 pub mod migrate;
+pub mod migrate_legacy_pins;
+pub mod migrate_pins;
 pub mod next;
 pub mod paging;
 pub mod plans;

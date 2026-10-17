@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "test-voice",
+    "role": "test"
+  },
+  "at": "2026-07-14T21:37:18.184238Z",
+  "kind": "review",
+  "pin": "505a668efedaed6dfb5e125a0d927f118b2dfad1",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:platformer.enemy.02: Losing every heart shows game over and returns to menu"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "68e1708c052d7674c94565693e6bece53179a224dc7f8f99e67853fa56fc5cea",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "platformer",
+  "provenance_ref": {
+    "original_spec_ref": "examples/platformer/specs/features/kind=feature/area=platformer/enemy.feature"
+  },
+  "reviewer": "test-voice",
+  "scenario_id": "platformer.enemy.02",
+  "schema": 1
+}

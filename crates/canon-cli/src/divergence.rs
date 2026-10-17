@@ -5,30 +5,27 @@
 //! source of `Divergence` records at all, leaving the S9 divergence
 //! burn-down permanently empty.
 //!
-//! # Four subcommands, two mechanisms
-//! - `stage` writes an unordered staging candidate carrying no
-//!   `run_seq` (`canon_gate::stage_divergence`) — a candidate of ANY
-//!   status, including `Resolved`/`Deferred`. With `--promote` it
-//!   then promotes that one candidate
-//!   (`canon_gate::promote_staged_divergence`), never another staged
-//!   one.
-//! - `promote` batch-promotes every currently-staged candidate
-//!   (`canon_gate::promote_divergence`), assigning each a monotonic
-//!   `run_seq` within its `(project_id, role, surface)` partition.
-//! - `resolve`/`defer` are convenience wrappers over
-//!   `canon_gate::commit_divergence` — a SINGLE candidate, with status
-//!   `Resolved`/`Deferred{reason, expiry}`, assigned a `run_seq` and
-//!   committed DIRECTLY, without touching the batch staging directory
-//!   at all (so a routine resolve/defer never risks promoting an
-//!   UNRELATED candidate a reviewer is still mid-`stage`ing —
-//!   `canon_gate::promote`'s own module doc).
+//! # One staging shape (0.23)
+//! Every subcommand stages the full `Divergence` record under
+//! `_staging/kind=divergence/` with `run_seq` unassigned
+//! ([`canon_gate::promote::UNASSIGNED_RUN_SEQ`]), like `evidence add` and
+//! `finding add`; promotion assigns the monotonic `run_seq` within the
+//! `(project_id, role, surface)` partition.
+//! - `add` stages a candidate of ANY status. With `--promote` (or `write:
+//!   { promote: auto }`) the same run promotes that one record;
+//!   `--no-promote` keeps it staged.
+//! - `promote` promotes every currently-staged divergence
+//!   (`canon_gate::promote_only`); `canon gate promote` drains them too.
+//! - `resolve`/`defer`/`accept` stage their record and promote it in the
+//!   same run: they have no staged-only mode, because the gate must see the
+//!   resolution or acceptance the moment the command succeeds.
 
 use std::path::Path;
 
-use canon_gate::{
-    commit_divergence, divergence_staging_dir, promote_divergence, promote_staged_divergence, stage_divergence, DivergenceCandidate, GateCtx, PromoteReport,
-};
-use canon_model::{Actor, DivergenceStatus, Envelope, ProjectId, RecordKind, RoleId, ScenarioId, SessionId, Sha};
+use canon_gate::promote::UNASSIGNED_RUN_SEQ;
+use canon_gate::{promote_only, GateCtx, PromoteReport};
+use canon_model::{Actor, Divergence, DivergenceStatus, Envelope, ProjectId, RecordKind, RoleId, ScenarioId, SessionId, Sha, TotalOrder};
+use canon_store::tier::Tier;
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use chrono::{DateTime, Utc};
@@ -125,56 +122,55 @@ pub fn run_stage(
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
-    let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
+    let candidate = candidate(project_id, scenario_id, sha, status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
 
-    let candidate = DivergenceCandidate {
-        envelope: Envelope::new(1, RecordKind::Divergence, Utc::now(), Actor::new(actor_id, role.clone())),
-        project_id: project_id.clone(),
-        scenario_id: scenario_id.clone(),
-        sha: sha.clone(),
-        status,
-        round,
-        reviewer: reviewer.to_string(),
-        detail: detail.to_string(),
-    };
-
-    let path = match stage_divergence(&staging_dir, &candidate) {
-        Ok(path) => path,
+    let location = match stage(&gate_ctx.ledger_root, &candidate) {
+        Ok(location) => location,
         Err(e) => {
             return CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon divergence add", json);
         }
     };
-    if !promote {
-        crate::say!(json, "canon divergence add: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
-        if json {
-            crate::json_out::data("divergence add", serde_json::json!({ "staged": path.display().to_string(), "promoted": false }));
-        }
-        return 0;
+    let outcome = crate::gate::promote_after_stage("canon divergence add", &gate_ctx.ledger_root, &location, promote, json);
+    crate::say!(json, "canon divergence add: {} — {}", outcome.landed(&location), outcome.suffix());
+    if json {
+        crate::json_out::data("divergence add", outcome.json(&location));
     }
-    // Only the file this run staged: another reviewer's staged candidate
-    // is theirs to promote. Once it lands, the success line names the
-    // committed record alone, never the staged file promotion moved.
-    match promote_staged_divergence(&path, &GitTier::new(&gate_ctx.ledger_root)) {
-        Ok(report) => match report.promoted.iter().chain(&report.recovered).next().filter(|_| report.is_clean()) {
-            Some(landed) => {
-                crate::say!(json, "canon divergence add: wrote {} — {}", landed.target.display(), crate::write_mode::PROMOTED);
-                if json {
-                    crate::json_out::data("divergence add", serde_json::json!({ "committed": landed.target.display().to_string(), "promoted": true }));
-                }
-                return 0;
-            }
-            None => {
-                crate::say_raw!(json, "{}", format_candidate_lines(&report, false));
-                crate::say!(json, "canon divergence add: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
-                let mut data = crate::gate::promote_json(&report, false);
-                data["staged"] = serde_json::json!(path.display().to_string());
-                return CliError::failed("PROMOTE_REFUSED", "the staged divergence was refused by promotion; it stays staged").hint("`canon gate check` names what promotion refused; fix it, then run `canon divergence promote` (the record stays staged)").emit_with_data("canon divergence add", json, data);
-            }
-        },
-        Err(e) => {
-            let code = CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).hint("the record is staged; run `canon divergence promote` once the cause the message names is fixed").emit("canon divergence add", json);
-            crate::say!(json, "canon divergence add: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
-            return code;
+    outcome.exit_code()
+}
+
+/// The staged shape of one divergence: the full record, `run_seq` not yet
+/// assigned.
+#[allow(clippy::too_many_arguments)]
+fn candidate(project_id: &ProjectId, scenario_id: &ScenarioId, sha: &Sha, status: DivergenceStatus, round: u32, reviewer: &str, detail: &str, actor: Actor, at: DateTime<Utc>) -> Divergence {
+    Divergence::new(
+        Envelope::new(1, RecordKind::Divergence, at, actor),
+        project_id.clone(),
+        scenario_id.clone(),
+        sha.clone(),
+        status,
+        TotalOrder::new(UNASSIGNED_RUN_SEQ),
+        round,
+        reviewer,
+        detail,
+    )
+}
+
+/// Stage `candidate` in the ledger's one staging directory; the location is
+/// relative to it, as every staged write reports.
+fn stage(ledger_root: &Path, candidate: &Divergence) -> Result<String, canon_store::tier::StoreError> {
+    Ok(GitTier::new(crate::gate::evidence_staging_dir(ledger_root)).write(candidate)?.location)
+}
+
+/// Stage `candidate` and promote exactly that record: the path `resolve`,
+/// `defer` and `accept` take. On refusal the staged file is removed, so a
+/// refused command leaves nothing behind.
+fn stage_and_promote(ledger_root: &Path, candidate: &Divergence) -> Result<std::path::PathBuf, String> {
+    let location = stage(ledger_root, candidate).map_err(|e| e.to_string())?;
+    match crate::gate::try_promote(ledger_root, &location) {
+        Ok(target) => Ok(std::path::PathBuf::from(target)),
+        Err(refusal) => {
+            let _ = std::fs::remove_file(crate::gate::evidence_staging_dir(ledger_root).join(&location));
+            Err(refusal.data.and_then(|data| data["refused"][0]["message"].as_str().map(str::to_string)).unwrap_or_else(|| refusal.error.message.clone()))
         }
     }
 }
@@ -189,10 +185,10 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence promote", json);
         }
     };
-    let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
+    let staging = GitTier::new(crate::gate::evidence_staging_dir(&gate_ctx.ledger_root));
     let committed = GitTier::new(&gate_ctx.ledger_root);
 
-    match promote_divergence(&staging_dir, &committed, dry_run) {
+    match promote_only(RecordKind::Divergence, &staging, &committed, dry_run) {
         Ok(report) => {
             crate::say_raw!(json, "{}", format_promote_report(&report, dry_run));
             let data = crate::gate::promote_json(&report, dry_run);
@@ -211,9 +207,8 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
     }
 }
 
-/// Shared `resolve`/`defer` direct-commit path (module doc): build one
-/// [`DivergenceCandidate`] with `status` and commit it immediately via
-/// [`commit_divergence`], never through the batch staging directory.
+/// Shared `resolve`/`defer` path (module doc): build one
+/// divergence with `status`, stage it and promote that one record.
 #[allow(clippy::too_many_arguments)]
 fn run_commit(
     verb: &str,
@@ -236,38 +231,24 @@ fn run_commit(
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit(&format!("canon divergence {verb}"), json);
         }
     };
-    let committed = GitTier::new(&gate_ctx.ledger_root);
+    let candidate = candidate(project_id, scenario_id, sha, status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
 
-    let candidate = DivergenceCandidate {
-        envelope: Envelope::new(1, RecordKind::Divergence, Utc::now(), Actor::new(actor_id, role.clone())),
-        project_id: project_id.clone(),
-        scenario_id: scenario_id.clone(),
-        sha: sha.clone(),
-        status,
-        round,
-        reviewer: reviewer.to_string(),
-        detail: detail.to_string(),
-    };
-
-    match commit_divergence(&candidate, &committed) {
-        Ok(Ok(promoted)) => {
-            crate::say!(json, "canon divergence {verb}: committed {} -> {} — {}", promoted.label(), promoted.target.display(), crate::write_mode::DIRECT);
+    match stage_and_promote(&gate_ctx.ledger_root, &candidate) {
+        Ok(target) => {
+            crate::say!(json, "canon divergence {verb}: committed {} — {}", target.display(), crate::write_mode::PROMOTED);
             if json {
-                crate::json_out::data(&format!("divergence {verb}"), serde_json::json!({ "committed": promoted.target.display().to_string(), "label": promoted.label() }));
+                crate::json_out::data(&format!("divergence {verb}"), serde_json::json!({ "committed": target.display().to_string() }));
             }
             0
         }
-        Ok(Err(refused)) => {
-            CliError::failed("DIVERGENCE_REFUSED", refused.violation.line()).hint("`canon divergence status` lists the scenario's divergences and their state; fix what the violation names, then run the command again").emit(&format!("canon divergence {verb}"), json)
-        }
-        Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit(&format!("canon divergence {verb}"), json)
+        Err(message) => {
+            CliError::failed("DIVERGENCE_REFUSED", message).hint("`canon divergence status` lists the scenario's divergences and their state; fix what the message names, then run the command again").emit(&format!("canon divergence {verb}"), json)
         }
     }
 }
 
-/// `canon divergence resolve` (module doc): direct-commits a
-/// `Resolved` candidate.
+/// `canon divergence resolve` (module doc): stages and promotes a
+/// `Resolved` record.
 #[allow(clippy::too_many_arguments)]
 pub fn run_resolve(
     repo: &Path,
@@ -285,7 +266,7 @@ pub fn run_resolve(
 }
 
 /// `canon divergence defer --reason <..> --expiry <..>` (module doc):
-/// direct-commits a `Deferred { reason, expiry }` candidate.
+/// stages and promotes a `Deferred { reason, expiry }` record.
 #[allow(clippy::too_many_arguments)]
 pub fn run_defer(
     repo: &Path,
@@ -416,38 +397,41 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
     if let Some(session) = &args.session_id {
         actor = actor.with_session(session.clone());
     }
-    let committed = GitTier::new(&context.ctx.ledger_root);
     let at = Utc::now();
     let mut wrote: Vec<(String, std::path::PathBuf)> = Vec::new();
     for scenario in &scenarios {
-        let candidate = DivergenceCandidate {
-            envelope: Envelope::new(1, RecordKind::Divergence, at, actor.clone()),
-            project_id: scenario.project_id.clone(),
-            scenario_id: scenario.scenario_id.clone(),
+        let record = candidate(
+            &scenario.project_id,
+            &scenario.scenario_id,
             // The commit the divergent evidence was attested against; an
             // acceptance binds to evidence, not to an app state, so a
             // scenario whose evidence carries no commit gets the null one.
-            sha: canon_gate::acceptance::evidence_sha(&context, scenario).unwrap_or_else(|| Sha::parse(&"0".repeat(40)).expect("forty hex digits")),
-            status: DivergenceStatus::Accepted {
+            &canon_gate::acceptance::evidence_sha(&context, scenario).unwrap_or_else(|| Sha::parse(&"0".repeat(40)).expect("forty hex digits")),
+            DivergenceStatus::Accepted {
                 reason: args.reason.clone(),
                 tracking: args.tracking.clone(),
                 expiry: args.expiry,
-                evidence: canon_gate::review_gate::current_pins(&context, scenario).evidence,
+                checks: Some(canon_gate::freshness::current_checks(&context, scenario)),
+                evidence: Vec::new(),
             },
-            round: 1,
-            reviewer: args.reviewer.clone(),
-            detail: args.reason.clone(),
-        };
-        let failure = match commit_divergence(&candidate, &committed) {
-            Ok(Ok(promoted)) => {
-                wrote.push((scenario.scenario_id.as_str().to_string(), promoted.target.clone()));
+            1,
+            &args.reviewer,
+            &args.reason,
+            actor.clone(),
+            at,
+        );
+        let failure = match stage_and_promote(&context.ctx.ledger_root, &record) {
+            Ok(target) => {
+                wrote.push((scenario.scenario_id.as_str().to_string(), target));
                 continue;
             }
-            Ok(Err(refused)) => refused.violation.line(),
-            Err(e) => e.to_string(),
+            Err(message) => message,
         };
         for (_, target) in &wrote {
             let _ = std::fs::remove_file(if target.is_absolute() { target.clone() } else { context.ctx.ledger_root.join(target) });
+        }
+        if !wrote.is_empty() {
+            crate::ledger::restore_after_rollback(&context.ctx.ledger_root, RecordKind::Divergence);
         }
         let error = CliError::refused("WRITE_FAILED", failure).hint(if scenarios.len() > 1 {
             "no acceptance is written (every record this run wrote was removed): check that the ledger directory is writable, then run `canon divergence accept` again"
@@ -457,7 +441,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
         return error.emit(CMD, args.json);
     }
     for (scenario, target) in &wrote {
-        crate::say!(args.json, "canon divergence accept: {scenario} accepted as a known gap ({}) -> {} — {}", args.tracking, target.display(), crate::write_mode::DIRECT);
+        crate::say!(args.json, "canon divergence accept: {scenario} accepted as a known gap ({}) -> {} — {}", args.tracking, target.display(), crate::write_mode::PROMOTED);
     }
     let accepted: Vec<serde_json::Value> = wrote.iter().map(|(scenario, target)| serde_json::json!({ "scenarioId": scenario, "location": target.display().to_string() })).collect();
     let scope = crate::next::Scope::Scenarios(wrote.iter().map(|(scenario, _)| scenario.clone()).collect());
@@ -595,6 +579,10 @@ mod tests {
 
     use super::*;
 
+    fn gate_ctx_root(dir: &TempDir) -> std::path::PathBuf {
+        GateCtx::from_repo(dir.path()).unwrap().ledger_root
+    }
+
     fn ids() -> (ProjectId, ScenarioId, RoleId, Sha) {
         (
             ProjectId::parse("app-a").unwrap(),
@@ -625,8 +613,8 @@ mod tests {
         assert_eq!(seqs, vec![1, 2]);
 
         // Staging is empty afterward.
-        let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
-        assert!(std::fs::read_dir(&staging_dir).map(|mut e| e.next().is_none()).unwrap_or(true));
+        let staging_dir = crate::gate::evidence_staging_dir(&gate_ctx.ledger_root);
+        assert!(files_with_bytes(&staging_dir).is_empty(), "no staged file is left");
     }
 
     #[test]
@@ -635,18 +623,18 @@ mod tests {
         let (project_id, scenario_id, role, sha) = ids();
 
         // Refused: no `actor.role` at all.
-        let staging_dir = divergence_staging_dir(&GateCtx::from_repo(dir.path()).unwrap().ledger_root);
-        let malformed = DivergenceCandidate {
-            envelope: Envelope::new(1, RecordKind::Divergence, Utc::now(), Actor::new_unattributed("legacy-writer")),
-            project_id: project_id.clone(),
-            scenario_id: ScenarioId::parse("world.firstbuy-hotdeal.90").unwrap(),
-            sha: sha.clone(),
-            status: DivergenceStatus::Open,
-            round: 1,
-            reviewer: "reviewer-1".to_string(),
-            detail: String::new(),
-        };
-        stage_divergence(&staging_dir, &malformed).unwrap();
+        let malformed = candidate(
+            &project_id,
+            &ScenarioId::parse("world.firstbuy-hotdeal.90").unwrap(),
+            &sha,
+            DivergenceStatus::Open,
+            1,
+            "reviewer-1",
+            "",
+            Actor::new_unattributed("legacy-writer"),
+            Utc::now(),
+        );
+        stage(&gate_ctx_root(&dir), &malformed).unwrap();
 
         assert_eq!(run_stage(dir.path(), &project_id, &scenario_id, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
 
@@ -682,7 +670,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_and_defer_commit_directly_without_touching_staging() {
+    fn resolve_and_defer_promote_only_their_own_record_and_leave_other_staged_work() {
         let dir = TempDir::new().unwrap();
         let (project_id, scenario_id, role, sha) = ids();
         let deferred_id = ScenarioId::parse("world.firstbuy-hotdeal.51").unwrap();
@@ -690,7 +678,7 @@ mod tests {
         // Something else is mid-`stage`.
         assert_eq!(run_stage(dir.path(), &project_id, &ScenarioId::parse("world.firstbuy-hotdeal.50").unwrap(), &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
-        let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
+        let staging_dir = crate::gate::evidence_staging_dir(&gate_ctx.ledger_root);
         let staged_before = files_with_bytes(&staging_dir);
         assert_eq!(staged_before.len(), 1, "exactly the one unrelated candidate is staged");
 
@@ -704,7 +692,7 @@ mod tests {
         let mut records: Vec<canon_model::records::Divergence> =
             landed.records.into_iter().map(|record| serde_json::from_value(record.0).expect("a committed divergence")).collect();
         records.sort_by(|a, b| a.scenario_id.as_str().cmp(b.scenario_id.as_str()));
-        assert_eq!(records.len(), 2, "resolve + defer both committed without a promote step");
+        assert_eq!(records.len(), 2, "resolve + defer both committed in their own run");
         assert_eq!((&records[0].project_id, &records[0].scenario_id, &records[0].status), (&project_id, &scenario_id, &DivergenceStatus::Resolved));
         assert_eq!(
             (&records[1].project_id, &records[1].scenario_id, &records[1].status),
@@ -712,11 +700,11 @@ mod tests {
         );
 
         // The unrelated staged candidate is still sitting there, byte-identical.
-        assert_eq!(files_with_bytes(&staging_dir), staged_before, "a direct commit must never touch staged work");
+        assert_eq!(files_with_bytes(&staging_dir), staged_before, "resolve and defer must never touch another record's staged work");
     }
 
     #[test]
-    fn status_reflects_a_directly_committed_resolved_divergence() {
+    fn status_reflects_a_resolved_divergence() {
         let dir = TempDir::new().unwrap();
         let (project_id, scenario_id, role, sha) = ids();
 

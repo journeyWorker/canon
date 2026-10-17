@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-015-l3",
+    "role": "reviewer",
+    "session_id": "review-015-l3"
+  },
+  "at": "2026-10-10T19:55:30.348098Z",
+  "kind": "review",
+  "pin": "539d7384fd54858b1cf5b837adf8c84faca3234c",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "71e048b2f18056fc3ea3442bfcbc8fb8f5c828f981b532855cb16d1b58981972",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "docs/superpowers/plans/2026-10-11-canon-0.15.0-evidence-holds.md#L3"
+  },
+  "reviewer": "canon-reviewer-015-l3",
+  "scenario_id": "finding.add.30",
+  "schema": 1
+}

@@ -75,7 +75,10 @@ fn two_reviews_of_one_scenario_at_two_pins_are_two_keys_and_both_read_back() {
     let output = fixture.run_canon(&["query", "--kind", "review", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
     let payload: Value = serde_json::from_str(&support::stdout(&output)).expect("valid JSON on stdout");
-    assert_eq!(payload["count"], 2, "both attestations must survive the read: {payload}");
+    assert_eq!(payload["count"], 1, "the ledger holds the one in-effect review of this reviewer: {payload}");
+    let history: Value = serde_json::from_str(&support::stdout(&fixture.run_canon(&["query", "--kind", "review", "--json", "--history"]))).expect("valid JSON");
+    assert_eq!(history["count"], 2, "--history returns both attestations: {history}");
+    let payload = history;
     let records = payload["records"].as_array().expect("records array");
     let mut keys: Vec<String> = records
         .iter()
@@ -596,10 +599,11 @@ fn a_resynced_scenario_reads_as_one_current_record() {
     canon_store::tier::Tier::write(&tier, &scenario(first, "the title before the edit")).unwrap();
     canon_store::tier::Tier::write(&tier, &scenario(first + chrono::Duration::hours(1), "the title after the edit")).unwrap();
 
-    let raw = canon_store::tier::Tier::read(&tier, &canon_store::tier::TierQuery::kind(canon_model::RecordKind::Scenario)).unwrap();
-    assert_eq!(raw.records.len(), 2, "the ledger is append-only: a re-sync leaves both generations on disk");
+    let raw = tier.read_history(canon_model::RecordKind::Scenario).unwrap();
+    assert_eq!(raw.records.len(), 2, "a re-sync keeps both generations: the current one in the ledger, the prior one in the archive");
+    assert_eq!(canon_store::tier::Tier::read(&tier, &canon_store::tier::TierQuery::kind(canon_model::RecordKind::Scenario)).unwrap().records.len(), 1);
 
-    let outcome = canon_cli::query::run(dir.path(), None, canon_model::RecordKind::Scenario, None, None, None, None).expect("query the scenario corpus");
+    let outcome = canon_cli::query::run(dir.path(), None, canon_model::RecordKind::Scenario, None, None, None, None, false).expect("query the scenario corpus");
     assert_eq!(outcome.records.len(), 1, "`canon query --kind scenario` must fold to the CURRENT record, the way the gate already does");
     assert_eq!(
         outcome.records[0].0.get("title").and_then(|t| t.as_str()),

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-17T19:45:52.151334Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "081a6f26f19b8342d59cf825e717f15057a4d754a5bfe7513ede99a4783b262b",
+  "scenario_id": "query.read.07",
+  "schema": 1,
+  "source_digest": "10e30c234f8273cb9c25056f08774be29179d14fbe9be082f46eb3ee09bb2a59",
+  "subject_id": "query-reads",
+  "title": "A scope filter narrows the rollup, not only the printed rows"
+}

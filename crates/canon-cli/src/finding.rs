@@ -1764,7 +1764,9 @@ mod tests {
         close.resolution_sha = Some(head.into());
         assert_eq!(run_close(dir.path(), &close), 0);
         promote_staged(dir.path());
-        assert_eq!(committed_bodies(dir.path()).len(), 2, "the key legitimately carries two versions now");
+        assert_eq!(committed_bodies(dir.path()).len(), 1, "the ledger holds the key's current version: the fixed one");
+        let ledger_root = GateCtx::from_repo(dir.path()).unwrap().ledger_root;
+        assert_eq!(GitTier::new(ledger_root).read_history(RecordKind::Finding).unwrap().records.len(), 2, "the open version it replaced is in the archive");
 
         assert_eq!(run_close(dir.path(), &close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Rejected)), 0);
         let staged = staged_bodies(dir.path());

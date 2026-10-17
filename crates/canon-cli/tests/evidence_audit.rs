@@ -1,5 +1,5 @@
-//! 0.15 D2 and D3 through the real binary: re-attesting a scenario never
-//! silently drops a bound file (`--drop-attachment`), and an external
+//! 0.15 D3 and 0.23 D1 through the real binary: a record binds exactly the
+//! files its own write names (nothing is carried forward), and an external
 //! evaluator's audit (`--kind audit`) is recorded beside the declared
 //! verdict, sampled by `spec_coverage.require_audit`, and turns a refuted
 //! success into `false-success`.
@@ -119,12 +119,11 @@ fn write_policy(repo: &Path, yaml: &str) {
     write(repo, ".canon/policy.yaml", yaml.as_bytes());
 }
 
-/// evidence.add.40 / .41: a re-attest that names no file for a bound
-/// path carries the earlier binding forward (0.21 T7); re-binding new
-/// bytes at the same path replaces it; `--drop-attachment` is the only
-/// way to lose a binding, records the drop, and `canon status` lists it.
+/// evidence.add.40 / .41 (0.23 D1): a re-attest binds exactly the files its
+/// own write names. Nothing is carried forward from the earlier record, and
+/// nothing is recorded as dropped.
 #[test]
-fn a_reattest_carries_bindings_forward_unless_dropped_on_purpose() {
+fn a_reattest_binds_exactly_the_files_it_names() {
     let dir = setup();
     let repo = dir.path();
     scenario(repo, "game.run.01", None);
@@ -134,74 +133,55 @@ fn a_reattest_carries_bindings_forward_unless_dropped_on_purpose() {
 
     let out = ok(repo, &attest_args("game.run.01", &["--artifact", "reports/run.log", "--json"]));
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(json["data"]["records"][0]["carried"], serde_json::json!(["reports/shot.png"]), "{json}");
+    assert!(json["data"]["records"][0].get("carried").is_none(), "{json}");
     ok(repo, &["gate", "promote"]);
     let latest = committed(repo).pop().unwrap();
     let paths: Vec<&str> = latest["attachments"].as_array().unwrap().iter().map(|a| a["path"].as_str().unwrap()).collect();
-    assert!(paths.contains(&"reports/shot.png") && paths.contains(&"reports/run.log"), "the screenshot is still bound: {latest}");
+    assert_eq!(paths, ["reports/run.log"], "the screenshot is not carried: {latest}");
     assert!(latest.get("attachment_drop").is_none(), "{latest}");
 
-    write(repo, "reports/shot.png", b"second frame");
-    record(repo, &attest_args("game.run.01", &["--artifact", "reports/shot.png", "--artifact", "reports/run.log"]));
-
-    record(
-        repo,
-        &attest_args("game.run.01", &["--artifact", "reports/run.log", "--drop-attachment", "reports/shot.png", "--drop-reason", "screenshots moved to the e2e lane"]),
-    );
-    let latest = committed(repo).pop().unwrap();
-    assert_eq!(latest["attachment_drop"], serde_json::json!({"paths": ["reports/shot.png"], "reason": "screenshots moved to the e2e lane"}), "{latest}");
-
-    // The drop is not inherited: the latest record now binds only the log.
-    record(repo, &attest_args("game.run.01", &["--artifact", "reports/run.log"]));
-
     let report = status_json(repo);
-    let drops = report["drops"].as_array().expect("status --json lists drops");
-    assert_eq!(drops.len(), 1, "{report}");
-    assert_eq!(drops[0]["scenario"], "game.run.01");
-    assert_eq!(drops[0]["paths"], serde_json::json!(["reports/shot.png"]));
-    assert_eq!(drops[0]["reason"], "screenshots moved to the e2e lane");
-    assert_eq!(drops[0]["by"], "impl-agent");
-    let human = text(&ok(repo, &["status"]));
-    assert!(human.contains("dropped bindings (1):") && human.contains("game.run.01: reports/shot.png — \"screenshots moved to the e2e lane\" (by impl-agent at "), "{human}");
+    assert!(report.get("drops").is_none(), "status reports no drops: {report}");
 }
 
-/// evidence.add.42: the latest record includes one still in staging
-/// (`--no-promote`: `canon init` repos promote on write), so its files
-/// are carried too.
+/// evidence.add.41 (0.23 D1): binding a screenshot again with new bytes on
+/// the single-scenario path binds it at its new digest, and nothing else:
+/// the log the earlier record bound is not carried.
 #[test]
-fn an_unpromoted_record_is_the_latest_the_carry_reads() {
+fn evidence_add_41_a_rebound_screenshot_binds_its_new_digest_and_nothing_else() {
     let dir = setup();
     let repo = dir.path();
     scenario(repo, "game.run.01", None);
-    write(repo, "reports/a.txt", b"a");
-    write(repo, "reports/b.txt", b"b");
-    write(repo, "reports/c.txt", b"c");
-    ok(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt", "--artifact", "reports/b.txt", "--no-promote"]));
-    let out = ok(repo, &attest_args("game.run.01", &["--artifact", "reports/c.txt", "--no-promote", "--json"]));
-    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(json["data"]["records"][0]["carried"], serde_json::json!(["reports/a.txt", "reports/b.txt"]), "{json}");
-    assert_eq!(staged(repo), 2);
+    write(repo, "reports/shot.png", b"first frame");
+    write(repo, "reports/run.log", b"ok");
+    record(repo, &attest_args("game.run.01", &["--artifact", "reports/shot.png", "--artifact", "reports/run.log"]));
+    let first = committed(repo).pop().unwrap();
+    let sha_of = |record: &serde_json::Value, path: &str| record["attachments"].as_array().unwrap().iter().find(|a| a["path"] == path).map(|a| a["sha256"].clone());
+    let old_digest = sha_of(&first, "reports/shot.png").expect("the first record binds the screenshot");
+    assert!(sha_of(&first, "reports/run.log").is_some(), "{first}");
+
+    write(repo, "reports/shot.png", b"second frame, retaken");
+    record(repo, &attest_args("game.run.01", &["--artifact", "reports/shot.png"]));
+    let latest = committed(repo).pop().unwrap();
+    assert_ne!(latest["at"], first["at"], "the later record is the latest: {latest}");
+    let paths: Vec<&str> = latest["attachments"].as_array().unwrap().iter().map(|a| a["path"].as_str().unwrap()).collect();
+    assert_eq!(paths, ["reports/shot.png"], "the screenshot alone, the log is not carried: {latest}");
+    let expected = format!("{:x}", Sha256::digest(b"second frame, retaken"));
+    let new_digest = sha_of(&latest, "reports/shot.png").unwrap();
+    assert_eq!(new_digest, serde_json::Value::String(expected), "{latest}");
+    assert_ne!(new_digest, old_digest, "new bytes, new digest");
 }
 
-/// evidence.add.43: malformed drop flags are refused before anything is read.
+/// evidence.add.43 (0.23 D1): the drop flags no longer exist.
 #[test]
-fn malformed_drop_flags_are_refused() {
+fn the_drop_flags_are_refused_as_unknown() {
     let dir = setup();
     let repo = dir.path();
     scenario(repo, "game.run.01", None);
-    write(repo, "reports/a.txt", b"a");
-    record(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt"]));
-
-    let out = refused(repo, &attest_args("game.run.01", &["--drop-attachment", "reports/a.txt"]));
-    assert!(out.contains("--drop-attachment needs --drop-reason"), "{out}");
-    let out = refused(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt", "--drop-reason", "why"]));
-    assert!(out.contains("--drop-reason explains a --drop-attachment; none was given"), "{out}");
-    let out = refused(repo, &attest_args("game.run.01", &["--artifact", "reports/a.txt", "--drop-attachment", "reports/a.txt", "--drop-reason", "why"]));
-    assert!(out.contains("--drop-attachment `reports/a.txt` is not a file the latest evidence record for game.run.01 binds and this record leaves out (it leaves out: nothing)"), "{out}");
-    let out = refused(repo, &attest_args("game.run.01", &["--drop-attachment", "reports/a.txt", "--drop-reason", "line\nbreak"]));
-    assert!(out.contains("--drop-reason must be non-empty, single-line text"), "{out}");
-    let out = refused(repo, &["evidence", "add", "--task", "cats#1", "--kind", "test-run", "--ref", "x", "--role", "implementer", "--drop-attachment", "a", "--drop-reason", "r"]);
-    assert!(out.contains("task-only evidence carries no drop guard"), "{out}");
+    for flag in ["--drop-attachment", "--drop-reason"] {
+        let out = refused(repo, &attest_args("game.run.01", &[flag, "reports/a.txt"]));
+        assert!(out.contains(flag), "{out}");
+    }
     assert_eq!(staged(repo), 0);
 }
 
@@ -278,23 +258,18 @@ fn a_refuted_audit_is_false_success_until_a_newer_audit_confirms() {
     record(repo, &attest_args("game.run.01", &[]));
     assert_eq!(canon(repo, &["gate", "check"]).status.code(), Some(1), "a declared faithful re-attest does not override a refuted audit");
 
-    // The audit fold has its own drop guard: the counterexample report is
-    // left out on purpose, with why.
-    let out = refused(repo, &audit_args("game.run.01", "confirmed", &[]));
-    assert!(out.contains("the latest audit record for game.run.01") && out.contains("`reports/counter.xml`"), "{out}");
-    record(repo, &audit_args("game.run.01", "confirmed", &["--drop-attachment", "reports/counter.xml", "--drop-reason", "the counterexample is fixed"]));
+    // A new audit replaces the refutation and binds only what it names.
+    record(repo, &audit_args("game.run.01", "confirmed", &[]));
     ok(repo, &["gate", "check"]);
     approve_brief(repo, "run");
     ok(repo, &["subject", "status", "run", "--to", "shipped", "--actor-id", "lead"]);
 }
 
-/// gate.check.65: the false-success fix names the counterexamples a
-/// re-audit must drop on purpose. The gate line and `canon status`'s next
-/// command both carry `--drop-attachment <path>`, shell-quoted, and
-/// `--drop-reason`; the printed command, placeholders filled in, runs
-/// through a shell and the real binary, is accepted, and clears the gate.
+/// gate.check.65 (0.23 D1): the false-success line names the
+/// counterexamples the refutation bound, and a new confirmed audit replaces
+/// it without carrying them; the gate clears.
 #[test]
-fn the_false_success_fix_names_the_counterexample_drop() {
+fn a_new_audit_replaces_a_refutation_and_binds_only_what_it_names() {
     let dir = setup();
     let repo = dir.path();
     subject_at(repo, "run", "verifying");
@@ -305,63 +280,15 @@ fn the_false_success_fix_names_the_counterexample_drop() {
     let report_arg = format!("junit:{path}");
     record(repo, &audit_args("game.run.01", "refuted", &["--report", &report_arg]));
 
-    let quoted = r#"--drop-attachment 'reports/counter example'\''s.xml' --drop-reason "<why the counterexample no longer applies>""#;
     let gate = text(&canon(repo, &["gate", "check"]));
-    assert!(gate.contains(&format!("a new audit that no longer binds the counterexamples records why: {quoted}")), "{gate}");
+    assert!(gate.contains("false-success game.run.01") && gate.contains(&format!("counterexamples: {path}")), "{gate}");
+    assert!(!gate.contains("--drop-attachment"), "{gate}");
 
-    let report = status_json(repo);
-    let command = report["next"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter_map(|n| n["command"].as_str())
-        .find(|c| c.contains("--kind audit --scenario-id game.run.01"))
-        .unwrap_or_else(|| panic!("a re-audit next step: {report}"))
-        .to_string();
-    assert!(command.ends_with(&format!(" {quoted}")), "{command}");
-
-    // The command without the drop is what the guard refuses; the printed
-    // one, run as a shell would, is recorded and false-success clears.
-    refused(repo, &audit_args("game.run.01", "confirmed", &[]));
-    let runnable = command
-        .strip_prefix("canon ")
-        .expect("the next step is a canon command")
-        .replace("<evaluator>", "testjack")
-        .replace("<version>", "1.4.1")
-        .replace("<sha256>", DIGEST)
-        .replace("<confirmed|refuted|indeterminate>", "confirmed")
-        .replace("<evaluator run>", "testjack run 43")
-        .replace("<why the counterexample no longer applies>", "the counterexample is fixed");
-    let shell = Command::new("sh")
-        .arg("-c")
-        .arg(format!("\"$CANON_BIN\" {runnable}"))
-        .env("CANON_BIN", env!("CARGO_BIN_EXE_canon"))
-        .env("CANON_ACTOR", "canon")
-        .current_dir(repo)
-        .output()
-        .expect("spawn sh");
-    assert!(shell.status.success(), "the printed command must run as printed: {runnable}\n{}", text(&shell));
-    ok(repo, &["gate", "promote"]);
-    let dropped = committed(repo).pop().unwrap();
-    assert_eq!(dropped["attachment_drop"]["paths"][0], path, "{dropped}");
+    record(repo, &audit_args("game.run.01", "confirmed", &[]));
+    let confirmed = committed(repo).pop().unwrap();
+    assert!(confirmed["attachments"].as_array().is_none_or(|a| a.is_empty()), "the counterexample is not carried: {confirmed}");
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(0), "{}", text(&gate));
-}
-
-/// gate.check.65: a refutation with no counterexample bound has nothing
-/// to drop, so neither the gate line nor the next command names a drop.
-#[test]
-fn a_refutation_without_counterexamples_names_no_drop() {
-    let dir = setup();
-    let repo = dir.path();
-    subject_at(repo, "run", "verifying");
-    scenario(repo, "game.run.01", Some("run"));
-    record(repo, &attest_args("game.run.01", &[]));
-    record(repo, &audit_args("game.run.01", "refuted", &[]));
-    let gate = text(&canon(repo, &["gate", "check"]));
-    assert!(gate.contains("false-success game.run.01") && !gate.contains("--drop-attachment"), "{gate}");
-    let report = status_json(repo);
-    assert!(report["next"].as_array().unwrap().iter().all(|n| !n["command"].as_str().unwrap_or_default().contains("--drop-attachment")), "{report}");
 }
 
 /// The scenarios a `require_audit` policy with `seed` and `rate` samples,

@@ -401,43 +401,55 @@ fn authoring_migrate_06_an_ambiguous_change_stays_and_is_named() {
     assert!(!out.contains("remove the plans source"), "{out}");
 }
 
-/// authoring.migrate.07: reviews written before review pinning, pinned to
-/// a commit from before the move, stay current after `specs` moves to
-/// `.canon/specs`: the legacy lookup reads `former_roots` at the pin. The
-/// gate prints the same advisory before and after; without
-/// `former_roots` they would be undecidable.
+/// authoring.migrate.07: a review written before review pinning, pinned to
+/// a commit from before the move, is pinned as current by `canon migrate`
+/// after `specs` moves to `.canon/specs`: the lookup reads `former_roots` at
+/// the pin, so the review is checked, not undecidable. Without
+/// `former_roots` (the same move made by hand, nothing recording the old
+/// root) the same review could not be checked.
 #[test]
-fn authoring_migrate_07_legacy_reviews_pinned_before_the_move_stay_current() {
-    let dir = tempfile::tempdir().unwrap();
+fn authoring_migrate_07_legacy_reviews_pinned_before_the_move_are_pinned_current() {
+    // The 0.17 P1 layout at the old default root, as canon's own corpus was, with a legacy review pinned to it.
+    let legacy_repo = || {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path();
+        git(repo, &["init", "-q"]);
+        write(repo, "canon.yaml", &OLD_YAML.replace("  sources:\n    - dialect: openspec\n      root: .\n", "  sources: []\n"));
+        write(repo, ".canon/policy.yaml", "spec_coverage:\n  require_review:\n    scope: []\n");
+        write(repo, "specs/kind=feature/area=cart/add.feature", CART);
+        let pin = commit_all(repo, "cart add");
+        ok(repo, &["evidence", "add", "--scenario-id", "cart.add.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+        plant(
+            repo,
+            RecordKind::Review,
+            serde_json::json!({
+                "schema": 1, "kind": "review", "at": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
+                "actor": {"agent_id": "reviewer-2", "role": "reviewer"}, "project_id": "root", "scenario_id": "cart.add.01",
+                "reviewer": "reviewer-2", "pin": pin, "provenance_ref": {"upstream_ref": "docs/plan.md#review"},
+            }),
+        );
+        commit_all(repo, "evidence and a legacy review");
+        assert_eq!(canon(repo, &["gate", "check"]).status.code(), Some(1), "a review that predates 0.23 pinning does not count before the migration");
+        dir
+    };
+
+    let dir = legacy_repo();
     let repo = dir.path();
-    git(repo, &["init", "-q"]);
-    write(repo, "canon.yaml", &OLD_YAML.replace("  sources:\n    - dialect: openspec\n      root: .\n", "  sources: []\n"));
-    write(repo, ".canon/policy.yaml", "spec_coverage:\n  require_review:\n    scope: []\n");
-    // The 0.17 P1 layout at the old default root, as canon's own corpus was.
-    write(repo, "specs/kind=feature/area=cart/add.feature", CART);
-    let pin = commit_all(repo, "cart add");
-    ok(repo, &["evidence", "add", "--scenario-id", "cart.add.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
-    plant(
-        repo,
-        RecordKind::Review,
-        serde_json::json!({
-            "schema": 1, "kind": "review", "at": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
-            "actor": {"agent_id": "reviewer-2", "role": "reviewer"}, "project_id": "root", "scenario_id": "cart.add.01",
-            "reviewer": "reviewer-2", "pin": pin, "provenance_ref": {"upstream_ref": "docs/plan.md#review"},
-        }),
-    );
-    commit_all(repo, "evidence and a legacy review");
-    let advisory = "advisory: 1 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 1 current, 0 stale, 0 undecidable\n";
-    assert!(ok(repo, &["gate", "check"]).contains(advisory), "before the move");
-
-    ok(repo, &["migrate"]);
+    let out = ok(repo, &["migrate"]);
     assert!(read(repo, "canon.yaml").contains("      root: .canon/specs\n      former_roots: [specs]\n"));
+    assert!(out.contains("canon migrate: pinned 1 review(s) to what their evidence says") && !out.contains("could not be checked"), "checked at its former root, so not undecidable: {out}");
     let after = ok(repo, &["gate", "check"]);
-    assert!(after.contains("canon gate check: clean (0 violations)") && after.contains(advisory), "after the move: {after}");
+    assert!(after.contains("canon gate check: clean (0 violations)"), "after the move: {after}");
 
-    let yaml = read(repo, "canon.yaml");
-    write(repo, "canon.yaml", &yaml.replace("      former_roots: [specs]\n", ""));
-    assert!(text(&canon(repo, &["gate", "check"])).contains("0 current, 0 stale, 1 undecidable"), "the former root is what finds it");
+    // The same move without `former_roots`: the pin's commit has the scenario at a path the root no longer names.
+    let dir = legacy_repo();
+    let repo = dir.path();
+    git(repo, &["mv", "specs", ".canon/specs"]);
+    write(repo, "canon.yaml", &read(repo, "canon.yaml").replace("      root: specs\n", "      root: .canon/specs\n"));
+    commit_all(repo, "move the root by hand");
+    let out = ok(repo, &["migrate"]);
+    assert!(!read(repo, "canon.yaml").contains("former_roots"), "{}", read(repo, "canon.yaml"));
+    assert!(out.contains("canon migrate: pinned 1 review(s)") && out.contains("1 of those could not be checked"), "without former_roots the review is undecidable: {out}");
 }
 
 /// authoring.migrate.08: a `canon.yaml` whose `specs.roots` it cannot

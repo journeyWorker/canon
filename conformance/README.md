@@ -127,7 +127,7 @@ case that turns the gate red, refuses, or (for the policy) prints an advisory:
 |---|---|---|
 | Scenario text changed after review (stale spec) | `review-pin-stale-spec` | `gate check` exit 1, `unreviewed-promotion` "its spec changed" |
 | Evidence re-attested after review (stale evidence) | `review-pin-stale-evidence` | `gate check` exit 1, `unreviewed-promotion` "its evidence changed"; `subject status … shipped` exit 1 |
-| Re-attest naming fewer files | `evidence-add-drop-attachment` | `evidence add` exit 0 carrying the earlier files forward; with `--drop-attachment/--drop-reason` the drop is recorded and listed by `status` |
+| Re-attest naming fewer files | `evidence-add-binds-only-named` | `evidence add` exit 0 binding only the files it names, nothing carried forward; `--drop-attachment` is refused (exit 2) |
 | Refuted audit | `gate-check-audit-false-success` | `gate check` exit 1, `false-success` despite a faithful verdict |
 | Indeterminate reviewer | `review-outcome-indeterminate-gap` | `gate check` exit 1, `unreviewed-promotion` "no signed review"; transition refused |
 | Unavailable reviewer | `review-outcome-unavailable-gap` | as indeterminate |
@@ -139,18 +139,21 @@ A conformance fixture repository has no commits, so the resolving side of short
 SHAs (`finding add/close` storing the full SHA) is pinned by
 `crates/canon-cli/tests/finding.rs` instead.
 
-## Legacy reviews checked against their pin (0.16)
+## Reviews written before 0.23 pinning (`canon migrate`)
 
-A review written before 0.15 carries no pins, only the commit it reviewed. The
-gate reads the scenario at that commit. A fixture repository has no commits,
-so only the undecidable side is a case here:
+A review written before 0.23 pins evidence record files (0.15-0.22) or only
+the commit it reviewed (before 0.15). The gate no longer compares either: such
+a review does not count until `canon migrate` pins it to what the evidence
+says. A fixture repository has no commits, so the undecidable side is the case
+here:
 
 | Situation | Case | What a consumer sees |
 |---|---|---|
-| Pinned commit not in the clone (fake sha) | `gate-check-legacy-review-missing-pin` | the review still counts: `subject status … verifying` and `gate check` exit 0, with an advisory counting it undecidable and naming `fetch-depth: 0` |
+| Pre-0.15 review, pinned commit not in the clone (fake sha) | `gate-check-unmigrated-review-needs-migrate` | `subject status … verifying` exits 1 (`unreviewed-promotion`: predates 0.23 review pinning) and `gate check` prints an advisory naming `canon migrate`; after `canon migrate` (which pins it as the scenario stands and says how many could not be checked) the transition and the gate exit 0 |
 
-The current, stale-by-spec, stale-by-evidence and moved-file cases need real
-history and are pinned by `crates/canon-cli/tests/legacy_pins.rs`.
+The current and stale decisions of a migration, and the pre-0.15 reviews read
+out of git history, need real commits and are pinned by
+`crates/canon-cli/tests/migrate_pins.rs`.
 
 ## The version case (live stamp)
 

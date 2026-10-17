@@ -270,103 +270,59 @@ fn paths_of(record: &Value) -> Vec<String> {
     paths
 }
 
-/// evidence.add.90 (0.21 T7): a suite-wide batch that names no screenshot
-/// carries the scenario's earlier attachments into its new record
-/// unchanged, and `status` shows no dropped bindings.
+/// evidence.add.90 (0.23 D1): a suite-wide batch binds exactly the files
+/// its own write names; the scenario's earlier attachments are not carried
+/// into the new record, and nothing reports a drop.
 #[test]
-fn evidence_add_90_a_batch_carries_a_scenarios_earlier_attachments_forward() {
+fn evidence_add_90_a_batch_binds_only_what_it_names() {
     let dir = shots_repo();
     let repo = dir.path();
-    let first = latest_of(repo, "shop.cart.01");
 
     let out = attest_all(repo, "junit:reports/junit.xml", &["--json"]);
     assert_eq!(out.status.code(), Some(0), "{}{}", stdout(&out), stderr(&out));
     let json: Value = serde_json::from_slice(&out.stdout).unwrap();
     let records = json["data"]["records"].as_array().unwrap();
-    let carried_of = |id: &str| records.iter().find(|r| r["subject"] == id).unwrap()["carried"].clone();
-    assert_eq!(carried_of("shop.cart.01"), serde_json::json!(["shots/a.png", "shots/b.png"]), "{json}");
-    assert_eq!(carried_of("shop.cart.02"), serde_json::json!([]), "{json}");
+    assert!(records.iter().all(|r| r.get("carried").is_none()), "no carried list: {json}");
 
     let latest = latest_of(repo, "shop.cart.01");
-    assert_eq!(paths_of(&latest), ["reports/junit.xml", "shots/a.png", "shots/b.png"], "{latest}");
+    assert_eq!(paths_of(&latest), ["reports/junit.xml"], "{latest}");
     assert!(latest.get("attachment_drop").is_none(), "{latest}");
-    let digest = |record: &Value, path: &str| record["attachments"].as_array().unwrap().iter().find(|a| a["path"] == path).unwrap()["sha256"].clone();
-    assert_eq!(digest(&latest, "shots/a.png"), digest(&first, "shots/a.png"), "carried unchanged");
 
     let status: Value = serde_json::from_str(&ok(repo, &["status", "--json"])).unwrap();
-    assert!(status["data"]["drops"].as_array().map_or(true, |d| d.is_empty()), "{status}");
+    assert!(status["data"].get("drops").is_none(), "{status}");
     assert!(!ok(repo, &["status"]).contains("dropped bindings"));
 }
 
-/// evidence.add.91: `--drop-attachment` is the only way to lose a binding
-/// in a batch; it applies to each scenario that binds the path and is
-/// recorded as a drop.
+/// evidence.add.91 (0.23 D1): `--drop-attachment` and `--drop-reason` no
+/// longer exist; nothing is written.
 #[test]
-fn evidence_add_91_a_batch_drop_is_explicit_and_recorded() {
+fn evidence_add_91_the_drop_flags_are_gone() {
     let dir = shots_repo();
     let repo = dir.path();
+    let before = evidence_files(repo);
 
     let out = attest_all(repo, "junit:reports/junit.xml", &["--drop-attachment", "shots/a.png", "--drop-reason", "frame a was retaken elsewhere"]);
-    assert_eq!(out.status.code(), Some(0), "{}{}", stdout(&out), stderr(&out));
-    let latest = latest_of(repo, "shop.cart.01");
-    assert_eq!(paths_of(&latest), ["reports/junit.xml", "shots/b.png"], "{latest}");
-    assert_eq!(latest["attachment_drop"], serde_json::json!({"paths": ["shots/a.png"], "reason": "frame a was retaken elsewhere"}), "{latest}");
-    assert!(latest_of(repo, "shop.cart.02").get("attachment_drop").is_none());
-    assert!(ok(repo, &["status"]).contains("dropped bindings (1):"));
-
-    let before = evidence_files(repo);
-    let out = attest_all(repo, "junit:reports/junit.xml", &["--drop-attachment", "shots/zzz.png", "--drop-reason", "nothing binds it"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert!(stderr(&out).contains("EVIDENCE_BATCH_REFUSED") && stderr(&out).contains("`shots/zzz.png`"), "{}", stderr(&out));
-    assert_eq!(evidence_files(repo), before, "a drop naming nothing writes nothing");
+    assert!(stderr(&out).contains("--drop-attachment"), "{}", stderr(&out));
+    assert_eq!(evidence_files(repo), before, "a refused flag writes nothing");
 }
 
-/// evidence.add.92: a batch that names a file at a bound path replaces
-/// that binding (new digest) and still carries the others.
+/// evidence.add.92 (0.23 D1): a batch that names a file at a bound path
+/// binds that file's new bytes (new digest), and only that file.
 #[test]
-fn evidence_add_92_a_batch_file_at_the_same_path_replaces_the_earlier_binding() {
+fn evidence_add_92_a_batch_file_at_the_same_path_binds_the_new_bytes() {
     let dir = shots_repo();
     let repo = dir.path();
     let first = latest_of(repo, "shop.cart.01");
     write(repo, "shots/a.png", "frame a, retaken");
 
-    let out = attest_all(repo, "junit:reports/junit.xml", &["--artifact", "shots/a.png", "--json"]);
+    let out = attest_all(repo, "junit:reports/junit.xml", &["--artifact", "shots/a.png"]);
     assert_eq!(out.status.code(), Some(0), "{}{}", stdout(&out), stderr(&out));
-    let json: Value = serde_json::from_slice(&out.stdout).unwrap();
-    let entry = json["data"]["records"].as_array().unwrap().iter().find(|r| r["subject"] == "shop.cart.01").unwrap().clone();
-    assert_eq!(entry["carried"], serde_json::json!(["shots/b.png"]), "{json}");
 
     let latest = latest_of(repo, "shop.cart.01");
-    assert_eq!(paths_of(&latest), ["reports/junit.xml", "shots/a.png", "shots/b.png"], "{latest}");
+    assert_eq!(paths_of(&latest), ["reports/junit.xml", "shots/a.png"], "{latest}");
     let digest = |record: &Value, path: &str| record["attachments"].as_array().unwrap().iter().find(|a| a["path"] == path).unwrap()["sha256"].clone();
     assert_ne!(digest(&latest, "shots/a.png"), digest(&first, "shots/a.png"), "new bytes, new digest");
-    assert_eq!(digest(&latest, "shots/b.png"), digest(&first, "shots/b.png"));
-    assert!(latest.get("attachment_drop").is_none(), "{latest}");
-}
-
-/// evidence.add.93: a carried attachment whose blob the store lacks is
-/// refused with its own code, not carried silently, and nothing is written.
-#[test]
-fn evidence_add_93_a_carried_blob_missing_from_the_store_is_refused() {
-    let dir = shots_repo();
-    let repo = dir.path();
-    let first = latest_of(repo, "shop.cart.01");
-    let sha = first["attachments"].as_array().unwrap().iter().find(|a| a["path"] == "shots/b.png").unwrap()["sha256"].as_str().unwrap().to_string();
-    std::fs::remove_file(repo.join(".canon/artifacts/sha256").join(&sha)).unwrap();
-    let before = evidence_files(repo);
-
-    let out = attest_all(repo, "junit:reports/junit.xml", &[]);
-    assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
-    assert!(stderr(&out).contains("EVIDENCE_CARRY_BLOB_MISSING") && stderr(&out).contains("`shots/b.png`") && stderr(&out).contains(&sha), "{}", stderr(&out));
-    assert_eq!(evidence_files(repo), before, "nothing written");
-
-    let single = canon(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
-    assert_eq!(single.status.code(), Some(2), "{}", stderr(&single));
-    assert!(stderr(&single).contains("EVIDENCE_CARRY_BLOB_MISSING"), "{}", stderr(&single));
-
-    // Dropping it on purpose is the way out.
-    ok(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--drop-attachment", "shots/b.png", "--drop-reason", "blob lost"]);
-    assert_eq!(paths_of(&latest_of(repo, "shop.cart.01")), ["shots/a.png"]);
 }
 
 /// evidence.add.84: `--task --report` with no scenario id binds every
@@ -481,10 +437,16 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
     let gate = |repo: &Path| stdout(&canon(repo, &["gate", "check"]));
     assert!(!gate(repo).contains("unreviewed-promotion shop.cart.01"), "the review is current");
 
-    let out = attest("shop.cart.01");
+    // The same verdict from the same checks says what the review saw (0.23 D5).
+    let same = attest("shop.cart.01");
+    assert!(same.status.success(), "{}", stderr(&same));
+    assert!(!stdout(&same).contains("stale"), "no notice for evidence that says the same: {}", stdout(&same));
+    assert!(!gate(repo).contains("unreviewed-promotion shop.cart.01"), "the review is still current");
+
+    let out = canon(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--verdict", "not-applicable", "--summary", "skipped in this run"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let expected = format!(
-        "canon evidence add: review by `reviewer-2` of shop.cart.01 is now stale (it pinned the evidence this record supersedes); re-pin it: canon review add --project-id root --scenario-id shop.cart.01 --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer --pin {head} --session-id sess-review --upstream-ref 'tests/cart.rs#shop_cart_01'"
+        "canon evidence add: review by `reviewer-2` of shop.cart.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review add --project-id root --scenario-id shop.cart.01 --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer --pin {head} --session-id sess-review --upstream-ref 'tests/cart.rs#shop_cart_01'"
     );
     let text = stdout(&out);
     let line = text.lines().find(|l| l.contains("is now stale")).unwrap_or_else(|| panic!("no stale-review line: {text}"));

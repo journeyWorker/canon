@@ -242,12 +242,44 @@ pub fn store_files<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<usize, (&'
 /// fails, [`HeldStore::rollback`] removes exactly the blobs this call
 /// published, while no other writer could have published them meanwhile.
 pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldStore, (&'f BoundFile, canon_gate::artifact_store::StoreError)> {
-    use canon_gate::artifact_store::{StoreError, StoreLock};
+    use canon_gate::artifact_store::{ArtifactStore, StoreError, StoreLock};
 
     let Some(first) = files.first() else {
-        return Ok(HeldStore { lock: None, published: Vec::new() });
+        return Ok(HeldStore { lock: None, published: Vec::new(), uploaded: 0 });
     };
     let lock = StoreLock::acquire(repo).map_err(|e| (first, e))?;
+    // The backend is read UNDER the lock, so a `canon artifacts migrate`
+    // that finished while this call waited is seen, and no blob is
+    // written to a local store the repo no longer uses.
+    let store = ArtifactStore::open(repo).map_err(|e| (first, e))?;
+    let object = match store {
+        ArtifactStore::Local => None,
+        ArtifactStore::Object(object) => Some(object),
+    };
+    if let Some(object) = object {
+        // Every file is re-read and re-hashed before anything is
+        // uploaded: one that changed since it was bound refuses the whole
+        // call, so a record never names bytes the store lacks. The local
+        // lock is released first; the lock only guards the local store,
+        // and an upload must not hold other writers off for its duration.
+        drop(lock);
+        for file in files {
+            let actual = std::fs::File::open(&file.resolved)
+                .and_then(canon_gate::artifact_store::sha256_reader)
+                .map_err(|e| (file, StoreError::from(e)))?;
+            if actual != file.sha256 {
+                return Err((file, StoreError::Changed { expected: file.sha256.clone(), actual }));
+            }
+        }
+        let mut uploaded = 0;
+        for file in files {
+            let stored = std::fs::File::open(&file.resolved).map_err(StoreError::from).and_then(|reader| object.upload(&file.sha256, reader)).map_err(|e| (file, e))?;
+            if stored == canon_gate::artifact_store::StoreOutcome::Stored {
+                uploaded += 1;
+            }
+        }
+        return Ok(HeldStore { lock: None, published: Vec::new(), uploaded });
+    }
     let mut staged = Vec::new();
     let mut sources = Vec::new();
     for file in files {
@@ -261,23 +293,28 @@ pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldS
         }
     }
     let published = lock.publish_paths(staged).map_err(|(index, e)| (sources[index], e))?;
-    Ok(HeldStore { lock: Some(lock), published })
+    Ok(HeldStore { lock: Some(lock), published, uploaded: 0 })
 }
 
-/// The blobs one [`store_files_held`] call published, with the store
-/// lock still held. Dropping it keeps them and releases the lock.
+/// The blobs one [`store_files_held`] call stored, with the local store
+/// lock still held (none for an object store). Dropping it keeps them
+/// and releases the lock.
 pub struct HeldStore {
     lock: Option<canon_gate::artifact_store::StoreLock>,
     published: Vec<PathBuf>,
+    uploaded: usize,
 }
 
 impl HeldStore {
     /// How many blobs this call newly stored.
     pub fn stored(&self) -> usize {
-        self.published.len()
+        self.published.len() + self.uploaded
     }
 
-    /// Remove the blobs this call published, then release the lock.
+    /// Remove the local blobs this call published, then release the lock.
+    /// Uploaded objects stay: a content-addressed object another writer
+    /// may already count as stored is never deleted, and an orphan costs
+    /// only its bytes.
     pub fn rollback(self) {
         if let Some(lock) = &self.lock {
             lock.unpublish(&self.published);
@@ -286,11 +323,14 @@ impl HeldStore {
 }
 
 /// The line a write command prints after [`store_files`].
-pub fn stored_line(command: &str, bound: usize, stored: usize) -> String {
-    format!(
-        "{command}: artifact store holds {bound} bound file(s) under {}/ ({stored} newly stored) — commit them with the ledger",
-        canon_model::paths::ARTIFACTS_SHA256_DIR
-    )
+pub fn stored_line(repo: &Path, command: &str, bound: usize, stored: usize) -> String {
+    match canon_gate::artifact_store::ArtifactStore::open(repo) {
+        Ok(store @ canon_gate::artifact_store::ArtifactStore::Object(_)) => format!("{command}: artifact store holds {bound} bound file(s) in {} ({stored} newly uploaded) — nothing to commit", store.location()),
+        _ => format!(
+            "{command}: artifact store holds {bound} bound file(s) under {}/ ({stored} newly stored) — commit them with the ledger",
+            canon_model::paths::ARTIFACTS_SHA256_DIR
+        ),
+    }
 }
 
 /// One `--report` read and parsed: where it lives, its digest, and its

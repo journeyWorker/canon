@@ -103,8 +103,16 @@ pub fn resolve_partition(kind: RecordKind, json: &Value) -> Result<PartitionKey,
         RecordKind::Handoff => Ok(PartitionKey { area: None, natural_key: get_str(json, "id")?.to_string() }),
         RecordKind::Review => {
             let project_id = get_str(json, "project_id")?;
-            let scenario_id = get_str(json, "scenario_id")?;
             let pin = get_str(json, "pin")?;
+            // A change-level review (0.23) names its change instead of a
+            // scenario and files under the fixed `change` area: a scenario
+            // id always has dots, so neither key can be mistaken for the
+            // other.
+            if json.get("scenario_id").is_none() {
+                let change_id = get_str(json, "change_id")?;
+                return Ok(PartitionKey { area: Some("change".to_string()), natural_key: format!("{project_id}__change-{change_id}__{pin}") });
+            }
+            let scenario_id = get_str(json, "scenario_id")?;
             Ok(PartitionKey { area: Some(scenario_area(scenario_id)?), natural_key: format!("{project_id}__{scenario_id}__{pin}") })
         }
         RecordKind::Divergence => {

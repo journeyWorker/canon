@@ -105,6 +105,43 @@ canon query --kind trajectory --json --limit 50 --fields at,kind
 canon query --kind trajectory --json --limit 50 --cursor <nextCursor>
 ```
 
+## The ledger is latest-only; the archive holds history
+
+The `local` rung's directory (`.canon/ledger`) holds the current record of
+each key. Appending a newer version (evidence for a scenario and role, a
+closed finding, a rewritten scenario, a subject's next status) moves the
+versions it supersedes to `.canon/archive`: same `kind=<kind>/…` layout and
+file names, tracked in git. `status`, the gate, the guards and `canon query`
+read the ledger only.
+
+```bash
+canon query --kind evidence_record --history   # every version, archive included
+canon ledger compact --dry-run                 # report; writes nothing
+canon ledger compact                           # pre-0.23 ledger or interrupted move; idempotent; `canon migrate` runs it
+```
+
+A crash between the write and the move leaves a readable ledger that the next
+append or `canon ledger compact` finishes. The archive is local, not routed
+through `tiers:`; a `tiers.local.root` whose directory is not named `ledger`
+has no archive and keeps every version.
+
+## Where artifact bytes live (`artifact_store:`)
+
+```yaml
+artifact_store: { backend: local }                  # default
+# artifact_store: { backend: cold, prefix: artifacts/ }   # an `s3` tier of `tiers:`
+```
+
+`local` is `.canon/artifacts/sha256/`, git-tracked and credential-free. An
+object-store tier gets `evidence add`, `review add` and `evidence vault`
+uploads under `<prefix>sha256/<digest>` and keeps nothing locally. The gate
+and `canon artifacts verify [--full]` ask the store and refuse, never pass,
+when it cannot be reached. `canon artifacts migrate --to <tier> [--dry-run]`
+uploads, reads back and verifies every local blob, then writes the
+`artifact_store:` block, removes the local copies and ignores
+`.canon/artifacts/`; commit the removals, `.gitignore` and `canon.yaml`. It is
+resumable and a second run finds nothing to do.
+
 ## What `canon report` does and doesn't read
 
 canon exposes layered `stg_`/`int_`/`mart_` query views; `canon report`
@@ -173,9 +210,11 @@ record bodies.
 ## Staged writes and promotion
 
 Four writes stage their record instead of committing it: `canon evidence
-add`, `canon finding add` and `canon finding close` (under
-`.canon/ledger/_staging/`, committed by `canon gate promote`) and `canon
-divergence add` (committed by `canon divergence promote`). `canon.yaml`'s
+add`, `canon finding add`, `canon finding close` and `canon divergence add`
+(under `.canon/ledger/_staging/`, one staging shape for every kind,
+committed by `canon gate promote`; `canon divergence promote` commits only
+the staged divergences). `canon divergence resolve|defer|accept` stage and
+promote their own record in the same run. `canon.yaml`'s
 `write:` section decides whether they promote in the same run:
 
 ```yaml
@@ -184,9 +223,8 @@ write:
 ```
 
 - `auto` — the command stages, then promotes that one record through the
-  same validation and assignment `canon gate promote` (or `canon
-  divergence promote`) applies. Records other runs staged stay staged;
-  only `canon gate promote` / `canon divergence promote` commit
+  same validation and assignment `canon gate promote` applies. Records
+  other runs staged stay staged; only `canon gate promote` commits
   everything staged. The one success line names the committed record
   (`wrote kind=…/….json`; promotion renames it, so the staged file is not
   named) and ends `— staged and promoted in this run; nothing to

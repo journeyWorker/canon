@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-17T19:45:52.148550Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "ee03ca33016120d309c9a6f72ead8b6adb0656067607b30f60dc5e08f9d51fe7",
+  "scenario_id": "query.read.06",
+  "schema": 1,
+  "source_digest": "10e30c234f8273cb9c25056f08774be29179d14fbe9be082f46eb3ee09bb2a59",
+  "subject_id": "query-reads",
+  "title": "A status filter scopes the result to the records that carry that status"
+}

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-2"
+  },
+  "at": "2026-10-17T20:08:46.386282Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_audit evidence_add_41_a_rebound_screenshot_binds_its_new_digest_and_nothing_else"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 71,
+  "scenario_id": "evidence.add.41",
+  "schema": 1,
+  "staging_id": "70e399448940",
+  "verdict": "faithful"
+}

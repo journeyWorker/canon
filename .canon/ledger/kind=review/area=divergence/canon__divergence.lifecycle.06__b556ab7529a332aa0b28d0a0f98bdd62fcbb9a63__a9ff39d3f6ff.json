@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-g5",
+    "role": "reviewer"
+  },
+  "at": "2026-10-09T05:56:00.715625Z",
+  "kind": "review",
+  "pin": "b556ab7529a332aa0b28d0a0f98bdd62fcbb9a63",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "76a961db15715774d74de90ce9a6debf69bf71a4c0bf269f7f34de76311e8617",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "docs/superpowers/plans/2026-10-09-canon-0.13.0-reviewed-corpus.md#RV1"
+  },
+  "reviewer": "canon-reviewer-g5",
+  "scenario_id": "divergence.lifecycle.06",
+  "schema": 1
+}

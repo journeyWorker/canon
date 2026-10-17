@@ -224,42 +224,40 @@ Feature: evidence add
 
   # canon: {"schema":1,"at":"2026-10-10T19:35:32Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
-  @case:failure
+  @case:happy
   @evidence.add.40
-  Scenario: Re-attesting a scenario with fewer bound files is refused, naming the dropped paths
+  Scenario: A record binds exactly the files its own write names
     Given a scenario whose latest evidence record binds two files
     When evidence is added for it binding only one of them
-    Then the add exits 2 naming the left-out path
-    And the refusal names both ways out: re-bind it, or --drop-attachment with --drop-reason
-    And nothing is staged
+    Then the add is accepted and the new record binds that one file
+    And nothing from the earlier record is carried into it, and no drop is recorded or listed by canon status
 
   # canon: {"schema":1,"at":"2026-10-10T19:35:32Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
   @case:happy
   @evidence.add.41
-  Scenario: A deliberate drop is recorded with its reason and listed by canon status
+  Scenario: Binding a file again with new bytes binds the new digest
     Given a scenario whose latest evidence record binds a screenshot and a log
-    When evidence is added binding the screenshot again with new bytes, then binding only the log with --drop-attachment for the screenshot and a --drop-reason
-    Then both adds are accepted and the second record carries attachment_drop with that path and reason
-    And canon status lists the drop with its reason, actor and time
+    When evidence is added binding the screenshot again with new bytes
+    Then the new record binds the screenshot at its new digest and nothing else
 
   # canon: {"schema":1,"at":"2026-10-10T19:35:32Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
-  @case:edge
+  @case:happy
   @evidence.add.42
-  Scenario: A staged, unpromoted record is the latest record the drop guard compares with
-    Given a staged, unpromoted record for a scenario that binds two files
-    When evidence is added for the scenario binding only one of them
-    Then the add exits 2 naming the other file
+  Scenario: A batch binds only what it names and prints no carried list
+    Given a scenario whose latest evidence binds screenshots and a test report that names the scenario
+    When the suite is recorded with --all-scenarios and that report
+    Then the new record binds the report alone and the batch output has no carried list
 
   # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
   @case:failure
   @evidence.add.43
-  Scenario: Malformed drop flags are refused before anything is staged
+  Scenario: The drop flags no longer exist
     Given a scenario with bound evidence
-    When evidence is added with --drop-attachment but no --drop-reason, a reason but no path, a path that is not being dropped, a multi-line reason, or a drop on task-only evidence
-    Then each add exits 2 naming what is wrong and nothing is staged
+    When evidence is added with --drop-attachment or --drop-reason
+    Then each add exits 2 as an unknown flag and nothing is staged
 
   # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
@@ -343,7 +341,7 @@ Feature: evidence add
     When evidence add and divergence add run under write promote auto
     Then each run promotes and names its own record only
     And the other author's records are still staged
-    And gate promote and divergence promote commit them afterwards
+    And gate promote commits them afterwards
 
   # canon: {"schema":1,"at":"2026-10-11T17:14:21Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:evidence-attestation
@@ -366,7 +364,7 @@ Feature: evidence add
     When evidence add, finding add, finding close and divergence add run
     Then each prints one success line, naming the record's committed file under the ledger, which exists
     And no line names the staged file promotion moved, and no separate promote line is printed
-    And with --no-promote, evidence add and finding add print the staged file and canon gate promote, and divergence add prints the staged file and canon divergence promote
+    And with --no-promote, evidence add, finding add and divergence add print the staged file and canon gate promote
 
   # canon: {"schema":1,"at":"2026-10-12T07:30:40Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
@@ -464,8 +462,7 @@ Feature: evidence add
     When evidence is added with --all-scenarios
     Then the add exits 1 with the brief refusal and nothing is staged for any scenario
     And a summary carrying a fabrication marker refuses the batch the same way
-    And a scenario whose latest record binds a file the batch does not refuses it with exit 2, nothing written
-    And --all-scenarios with --scenario-id, --task, --report-case, a drop or an approval, or without --report or --project-id, is refused with exit 2
+    And --all-scenarios with --scenario-id, --task, --report-case or an approval, or without --report or --project-id, is refused with exit 2
     And a batch whose second record fails to stage, or whose second promotion is refused, leaves no record staged or committed and no new blob, and a read-only destination is refused before anything is written
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
@@ -495,11 +492,12 @@ Feature: evidence add
   @case:happy
   @evidence.add.86
   Scenario: A write that makes a pinned review stale names the review and its re-pin command
-    Given a scenario with a current signed review that pinned its latest evidence
-    When new evidence for the scenario is added, alone or in a batch
+    Given a scenario with a current signed review that pinned what its latest evidence said
+    When new evidence for the scenario with a different verdict or different checks is added, alone or in a batch
     Then the add prints one line per review now stale naming the reviewer, the scenario and the `canon review add ... --pin <sha>` command that re-pins it
     And that command keeps the review's session when it recorded one
     And running that command makes the review current again
+    And evidence that says the same, with the same verdict from the same checks, leaves the review current and prints no such line
     And evidence for a scenario with no current pinned review prints no such line
 
   # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}

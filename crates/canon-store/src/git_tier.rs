@@ -136,6 +136,80 @@ fn validate_file(kind: RecordKind, relative: &Path, bytes: &[u8]) -> Result<RawR
     Ok(raw)
 }
 
+/// A record file found by a scan, before it is read.
+struct Candidate {
+    absolute: PathBuf,
+    relative: PathBuf,
+    stamp: Option<FileStamp>,
+}
+
+/// Size and modification time of a file: what must be unchanged for a
+/// file read earlier in this process to still be the file on disk.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct FileStamp {
+    len: u64,
+    modified: std::time::SystemTime,
+}
+
+impl FileStamp {
+    /// How long a file must have been left alone before its stamp is
+    /// trusted: a rewrite inside one timestamp tick of the read would keep
+    /// the same size and time, so a younger file is always read again.
+    pub const SETTLE: std::time::Duration = std::time::Duration::from_secs(2);
+
+    pub fn of(metadata: &std::fs::Metadata) -> Option<Self> {
+        let modified = metadata.modified().ok()?;
+        (modified.elapsed().ok()? >= Self::SETTLE).then_some(Self { len: metadata.len(), modified })
+    }
+}
+
+type Loaded = Result<RawRecord, EvidenceViolation>;
+
+/// Validated record files already read by this process, by absolute path
+/// and kind. One command scans the same kind several times (the index
+/// refresh, the gate context, the status that follows a write); a file
+/// whose [`FileStamp`] is unchanged is not read and parsed again, and a
+/// new or changed file is, so the result is always what a fresh scan
+/// returns.
+static FILE_MEMO: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<(PathBuf, RecordKind), (FileStamp, Loaded)>>> = std::sync::LazyLock::new(Default::default);
+
+fn load_candidate(kind: RecordKind, candidate: &Candidate) -> Result<Loaded, StoreError> {
+    let key = (candidate.absolute.clone(), kind);
+    if let Some(stamp) = candidate.stamp {
+        let memo = FILE_MEMO.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some((seen, loaded)) = memo.get(&key) {
+            if *seen == stamp {
+                return Ok(loaded.clone());
+            }
+        }
+    }
+    let bytes = std::fs::read(&candidate.absolute)?;
+    let loaded = validate_file(kind, &candidate.relative, &bytes);
+    if let Some(stamp) = candidate.stamp {
+        FILE_MEMO.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(key, (stamp, loaded.clone()));
+    }
+    Ok(loaded)
+}
+
+/// Read and validate every candidate, in order. The files are independent,
+/// so a large kind is read by several threads; the first read error in
+/// path order is the one returned.
+fn load_candidates(kind: RecordKind, candidates: Vec<Candidate>) -> Result<Vec<(PathBuf, Loaded)>, StoreError> {
+    const PARALLEL_FROM: usize = 32;
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(8);
+    let results: Vec<Result<Loaded, StoreError>> = if candidates.len() < PARALLEL_FROM || threads < 2 {
+        candidates.iter().map(|candidate| load_candidate(kind, candidate)).collect()
+    } else {
+        let chunk = candidates.len().div_ceil(threads);
+        std::thread::scope(|scope| {
+            let handles: Vec<_> =
+                candidates.chunks(chunk).map(|part| scope.spawn(move || part.iter().map(|candidate| load_candidate(kind, candidate)).collect::<Vec<_>>())).collect();
+            handles.into_iter().flat_map(|handle| handle.join().expect("a record reader thread does not panic")).collect()
+        })
+    };
+    candidates.into_iter().zip(results).map(|(candidate, loaded)| Ok((candidate.relative, loaded?))).collect()
+}
+
 impl GitTier {
     /// `root` is `canon.yaml`'s `tiers.git.root` (design D3), an
     /// ordinary directory on local disk — no network, no credentials,
@@ -179,6 +253,7 @@ impl GitTier {
         if !kind_metadata.is_dir() {
             return Ok((records, violations));
         }
+        let mut candidates: Vec<Candidate> = Vec::new();
         for entry in walkdir::WalkDir::new(&kind_dir).sort_by_file_name().into_iter() {
             let entry = entry.map_err(|err| StoreError::Policy(format!("failed to scan `{}`: {err}", kind_dir.display())))?;
             let file_type = entry.file_type();
@@ -189,11 +264,14 @@ impl GitTier {
             if !file_type.is_file() {
                 continue;
             }
-            let absolute = entry.path();
+            let absolute = entry.path().to_path_buf();
             let relative = absolute.strip_prefix(&self.root).expect("walked entries are under root").to_path_buf();
+            let stamp = entry.metadata().ok().and_then(|metadata| FileStamp::of(&metadata));
+            candidates.push(Candidate { absolute, relative, stamp });
+        }
 
-            let bytes = std::fs::read(absolute)?;
-            let raw = match validate_file(kind, &relative, &bytes) {
+        for (relative, loaded) in load_candidates(kind, candidates)? {
+            let raw = match loaded {
                 Ok(raw) => raw,
                 Err(violation) => {
                     violations.push(violation);
@@ -473,14 +551,12 @@ impl GitTier {
         }
         Ok((records, violations))
     }
-}
 
-impl Tier for GitTier {
-    fn backend(&self) -> Backend {
-        Backend::Git
-    }
-
-    fn write(&self, record: &dyn StoredRecord) -> Result<WriteReceipt, StoreError> {
+    /// [`Tier::write`] without the archive step: the record lands and
+    /// nothing else moves. For a writer that removes what it wrote when a
+    /// later write of its batch fails: it must not have archived the
+    /// versions a record it is about to remove superseded.
+    pub fn write_unarchived(&self, record: &dyn StoredRecord) -> Result<WriteReceipt, StoreError> {
         let kind = record.kind();
         let raw = record.to_raw();
         let relative = expected_relative_path(kind, &raw.0)?;
@@ -514,6 +590,67 @@ impl Tier for GitTier {
             digest: crate::partition::content_digest12(&raw.0),
             deduped: false,
         })
+    }
+
+    /// Every record file of `kind` in this tier, validated as
+    /// [`Tier::read`] does, with its tier-relative path.
+    pub(crate) fn scan_all(&self, kind: RecordKind) -> Result<ScanResult, StoreError> {
+        self.scan_kind_where(kind, |_| true)
+    }
+
+    /// The record files directly in `dir` (tier-relative) whose file name
+    /// `belongs`, validated as a scan validates them. For the append
+    /// path, which only needs the files that can share a key with the
+    /// record it just wrote.
+    pub(crate) fn scan_dir(&self, kind: RecordKind, dir: &Path, belongs: &dyn Fn(&str) -> bool) -> Result<ScanResult, StoreError> {
+        let mut records = Vec::new();
+        let mut violations = Vec::new();
+        let entries = match std::fs::read_dir(self.absolute(dir)) {
+            Ok(entries) => entries,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok((records, violations)),
+            Err(err) => return Err(err.into()),
+        };
+        let mut names: Vec<String> = Vec::new();
+        for entry in entries {
+            let entry = entry?;
+            if !entry.file_type()?.is_file() {
+                continue;
+            }
+            if let Some(name) = entry.file_name().to_str().filter(|name| belongs(name)) {
+                names.push(name.to_string());
+            }
+        }
+        names.sort();
+        for name in names {
+            let relative = dir.join(name);
+            let bytes = std::fs::read(self.absolute(&relative))?;
+            match validate_file(kind, &relative, &bytes) {
+                Ok(raw) => records.push((relative, raw)),
+                Err(violation) => violations.push(violation),
+            }
+        }
+        Ok((records, violations))
+    }
+}
+
+impl Tier for GitTier {
+    fn backend(&self) -> Backend {
+        Backend::Git
+    }
+
+    /// Write, then move the versions this record supersedes to the
+    /// archive ([`crate::archive`]). The record is durable before the
+    /// move starts; a failed move is reported on stderr and leaves the
+    /// ledger readable (every fold still picks the latest), and the next
+    /// append or `canon ledger compact` moves it. Batch writers that may
+    /// roll back call [`GitTier::write_unarchived`] and archive once the
+    /// whole batch has landed.
+    fn write(&self, record: &dyn StoredRecord) -> Result<WriteReceipt, StoreError> {
+        let receipt = self.write_unarchived(record)?;
+        if let Err(e) = self.archive_after_write(receipt.kind, &record.to_raw()) {
+            eprintln!("canon: wrote {} but could not archive the versions it supersedes ({e}); `canon ledger compact` moves them", receipt.location);
+        }
+        Ok(receipt)
     }
 
     fn read(&self, query: &TierQuery) -> Result<TierReadResult, StoreError> {
@@ -611,6 +748,61 @@ mod tests {
         assert!(result.violations.is_empty(), "unexpected violations: {:?}", result.violations);
         assert_eq!(result.records.len(), 1);
         assert_eq!(result.records[0].0["change_id"], "s2-tiered-storage");
+    }
+
+    fn change_named(id: &str) -> Change {
+        Change::new(Envelope::new(1, RecordKind::Change, Utc::now(), actor()), ChangeId::parse(id).unwrap(), "S2", "tiered storage", ChangeStatus::InProgress)
+    }
+
+    fn set_age(path: &Path, age: std::time::Duration) {
+        let file = std::fs::OpenOptions::new().write(true).open(path).unwrap();
+        file.set_modified(std::time::SystemTime::now() - age).unwrap();
+    }
+
+    /// A scan repeated in one process reads what the disk holds now: an
+    /// edited file (same size, newer time), a deleted one and a new one are
+    /// all seen, memoized files included.
+    #[test]
+    fn a_repeated_scan_sees_an_edited_deleted_and_added_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = GitTier::new(dir.path());
+        let hour = std::time::Duration::from_secs(3600);
+        let kept = tier.write(&change_named("kept-change")).unwrap().location;
+        let edited = tier.write(&change_named("edited-change")).unwrap().location;
+        let gone = tier.write(&change_named("gone-change")).unwrap().location;
+        for location in [&kept, &edited, &gone] {
+            set_age(&dir.path().join(location), hour);
+        }
+        let first = tier.read(&TierQuery::kind(RecordKind::Change)).unwrap();
+        assert_eq!((first.records.len(), first.violations.len()), (3, 0));
+
+        let edited_path = dir.path().join(&edited);
+        let same_size_garbage = vec![b'x'; std::fs::metadata(&edited_path).unwrap().len() as usize];
+        std::fs::write(&edited_path, same_size_garbage).unwrap();
+        set_age(&edited_path, hour - std::time::Duration::from_secs(5));
+        std::fs::remove_file(dir.path().join(&gone)).unwrap();
+        tier.write(&change_named("added-change")).unwrap();
+
+        let second = tier.read(&TierQuery::kind(RecordKind::Change)).unwrap();
+        let ids: Vec<&str> = second.records.iter().map(|r| r.0["change_id"].as_str().unwrap()).collect();
+        assert_eq!(ids, ["added-change", "kept-change"]);
+        assert_eq!(second.violations.len(), 1, "the edited file is read again and refused: {:?}", second.violations);
+    }
+
+    /// A kind big enough to be read by several threads comes back in
+    /// path order, as the sequential scan returns it.
+    #[test]
+    fn a_large_kind_is_read_in_path_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = GitTier::new(dir.path());
+        let mut expected: Vec<String> = (0..80).map(|n| format!("change-{n:02}")).collect();
+        for id in &expected {
+            tier.write(&change_named(id)).unwrap();
+        }
+        expected.sort();
+        let result = tier.read(&TierQuery::kind(RecordKind::Change)).unwrap();
+        let ids: Vec<String> = result.records.iter().map(|r| r.0["change_id"].as_str().unwrap().to_string()).collect();
+        assert_eq!(ids, expected);
     }
 
     #[test]

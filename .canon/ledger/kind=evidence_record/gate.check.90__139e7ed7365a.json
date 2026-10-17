@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-1"
+  },
+  "at": "2026-10-17T20:04:24.951326Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate_pins migrate_pins_01_a_current_legacy_review_counts_only_after_migrate"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 47,
+  "scenario_id": "gate.check.90",
+  "schema": 1,
+  "staging_id": "bb04bb112dbd",
+  "verdict": "faithful"
+}

@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-final014",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T18:42:40.809657Z",
+  "kind": "review",
+  "pin": "d4addb34a1f76561dea2532816c4a77484d0bcbf",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "0793dedbc5a62b3e18275b9299459b4d22e36190a6e235a4ba0d7ce7da17d928",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "docs/superpowers/plans/2026-10-11-canon-0.14.0-working-loop.md#acceptance"
+  },
+  "reviewer": "canon-reviewer-final014",
+  "scenario_id": "gate.check.24",
+  "schema": 1
+}

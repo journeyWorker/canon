@@ -15,6 +15,9 @@ canon subject status <subject-id> --to <proposed|specced|building|verifying|ship
 canon subject status <subject-id> --to verifying --reason "<why>" --actor-id <unit> --as orchestrator --json   # reopen a shipped subject (--reason is required here; any other transition accepts it as a note)
 canon policy show --as orchestrator --json            # policy digest and its approval: approved, changed, unreadable or unapproved
 canon gate check --as orchestrator --json
+canon migrate --dry-run --as orchestrator --json       # on a repo upgraded from an earlier canon: the plan, nothing written
+canon migrate --as orchestrator --json                 # applies it (see "Upgraded repo")
+canon artifacts verify --as orchestrator --json        # the artifact store holds every bound file; refuses when an object store is unreachable
 ```
 
 ## Read the state
@@ -78,10 +81,27 @@ brief says the human ships. A follow-up on a shipped subject goes back to
 change, then `--to shipped` again. A chore on a shipped subject (`change
 new … --kind chore` names the reopen command) is approved first, then
 reopened the same way; shipping again needs the whole suite evidenced after
-the chore's approval (`evidence add --all-scenarios`) and a re-review. A
-blocker closed `fixed` needs the same. The refusal names the scenarios and
+the chore's approval (the implementer's `evidence add --all-scenarios`) and
+one change-level review of the chore from the reviewer (`review add --change
+<slug>`): the order is approval, evidence, review. A blocker closed
+`fixed` needs the suite again. The refusal names the scenarios and
 the command; never override them. `canon status` flags a shipped subject
 whose gate went red. A bad `--to` fails with `error.field` `--to` and
 `error.expected` listing the states.
+
+## Upgraded repo
+
+After a repo moves to a newer canon, run `canon migrate --dry-run`, then
+`canon migrate`. Besides the layout, it compacts the ledger (moves every
+superseded version to `.canon/archive`, as `canon ledger compact` does) and
+re-pins the reviews written before 0.23, which do not count until then (the
+gate, `status` and `subject status` print one advisory naming it). Commit
+what it changes. In CI run it with full history (`fetch-depth: 0`).
+
+`canon artifacts migrate --to <tier>` moves the local artifact store to an
+object store and removes the local blobs. It is the repo owner's decision,
+not a step of the loop: never run it yourself. If the repo is large, the
+store is slow or the human has not asked for it, ask the human first, and
+run it only on their answer (`--dry-run` previews it).
 
 Reference: `reference/canon-subject.md`.

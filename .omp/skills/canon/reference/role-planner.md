@@ -79,7 +79,8 @@ can observe: `change new … --kind chore`. Its brief is short (intent,
 category, invariants, checks, out of scope) and approved like any brief, one
 human stop. A chore adds no scenarios: the
 implementer runs the subject's suite again and binds it with
-`canon evidence add --all-scenarios …`, then a re-review follows. On a
+`canon evidence add --all-scenarios …`, then the reviewer records one
+change-level review of the chore (`canon review add --change <slug>`). On a
 shipped subject `change new` prints the reopen command for the orchestrator
 (`subject status <id> --to verifying --reason "<why>"`); the subject cannot
 ship again until the suite is evidenced after the chore's approval. Work that

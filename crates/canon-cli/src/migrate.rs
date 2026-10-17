@@ -10,7 +10,7 @@
 //!   0.16 default, also what an absent `specs:` key or an entry without
 //!   `root:` meant then) moves to `.canon/specs`, from either layout, and
 //!   `canon.yaml` records where it was as `specs.roots[].former_roots`, so
-//!   the legacy-pin lookup ([`canon_gate::legacy_pins`]) still finds a
+//!   the pin migration (`crate::migrate_legacy_pins`) still finds a
 //!   scenario at a commit from before the move. Any other root stays where
 //!   it is and only drops its `features/` level; no former root is needed
 //!   there, because the lookup lists every `.feature` file under the
@@ -208,6 +208,18 @@ pub fn run(repo: &Path, dry_run: bool, json: bool) -> i32 {
 
     print_plan(&repo, &plan, config != text, &mut log);
     if dry_run {
+        match crate::ledger::migrate_lines(&repo, true) {
+            Ok(lines) => lines.into_iter().for_each(|line| log.line(line)),
+            Err(e) => return e.emit("canon migrate", json),
+        }
+        match crate::migrate_pins::run(&repo, false) {
+            Ok(report) => {
+                for line in report.lines(true) {
+                    log.line(line);
+                }
+            }
+            Err(e) => log.line(format!("canon migrate: could not check the reviews against their evidence ({e}); a run that applies the plan checks them again")),
+        }
         log.line("canon migrate: --dry-run, nothing written");
         if json {
             crate::json_out::data("migrate", serde_json::json!({ "dryRun": true, "steps": log.into_lines() }));
@@ -265,6 +277,14 @@ pub fn run(repo: &Path, dry_run: bool, json: bool) -> i32 {
                 paths::SCENARIO_INDEX_GITIGNORE,
                 paths::SCENARIO_INDEX_GITIGNORE
             ));
+        }
+    }
+    match crate::ledger::migrate_lines(&repo, false) {
+        Ok(lines) => lines.into_iter().for_each(|line| log.line(line)),
+        Err(e) => {
+            return CliError::refused("MIGRATE_STOPPED", format!("{}; what moved is in the archive, so running `canon migrate` again finishes the rest", e.message))
+                .hint("run `canon ledger compact` (or `canon migrate`) again; it finishes the rest")
+                .emit("canon migrate", json);
         }
     }
     rebuild_index(&repo, log, json)
@@ -571,7 +591,13 @@ struct ChangeVersions {
 /// this run cannot read gives none, so no change counts as canon-written.
 fn change_versions(repo: &Path) -> BTreeMap<String, ChangeVersions> {
     let Ok(registry) = crate::subject::registry_for(&repo.join("canon.yaml"), &[RecordKind::Change]) else { return BTreeMap::new() };
-    let Ok(result) = registry.query(&TierQuery::kind(RecordKind::Change)) else { return BTreeMap::new() };
+    let Ok(mut result) = registry.query(&TierQuery::kind(RecordKind::Change)) else { return BTreeMap::new() };
+    // "First stored version" is a history read: archived versions count (0.23 D2).
+    if let Some(archive) = canon_gate::GateCtx::from_repo(repo).ok().and_then(|ctx| canon_store::git_tier::GitTier::new(ctx.ledger_root).archive_tier()) {
+        if let Ok(archived) = canon_store::tier::Tier::read(&archive, &TierQuery::kind(RecordKind::Change)) {
+            result.records.extend(archived.records);
+        }
+    }
     type At = chrono::DateTime<chrono::Utc>;
     let mut seen: BTreeMap<String, ((At, bool), (At, String))> = BTreeMap::new();
     for raw in result.records {
@@ -1056,6 +1082,18 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, json: bool) -> i32 
     match crate::inventory::run_sync(repo, None) {
         Ok(outcome) if outcome.is_clean() => {
             log.line(format!("canon migrate: rebuilt the scenario index: {} record(s) written", outcome.total_written()));
+            // After the index: a pre-0.15 review is judged against the
+            // scenario digests the rebuilt index holds.
+            match crate::migrate_pins::run(repo, true) {
+                Ok(report) => {
+                    for line in report.lines(false) {
+                        log.line(line);
+                    }
+                }
+                Err(e) => {
+                    return CliError::refused("MIGRATE_PINS_FAILED", format!("the files moved and the index was rebuilt, but the reviews were not pinned to what their evidence says: {e}")).hint("fix what the message names, then run `canon migrate` again; it finishes the reviews").emit("canon migrate", json);
+                }
+            }
             if json {
                 crate::json_out::data("migrate", serde_json::json!({ "dryRun": false, "steps": log.into_lines(), "indexRecordsWritten": outcome.total_written() }));
             }

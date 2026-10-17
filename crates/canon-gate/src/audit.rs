@@ -60,19 +60,17 @@ impl GateCheck for AuditCheck {
 }
 
 /// `Some(false-success)` when `record` (a scenario's latest audit) is
-/// `refuted`. When the refutation bound counterexamples, the fix names
-/// them: a newer audit that leaves them out passes the drop guard only
-/// with `--drop-attachment` and `--drop-reason` ([`counterexample_drop_flags`]).
+/// `refuted`. When the refutation bound counterexamples, the detail names
+/// them; a newer audit replaces the refutation and binds what it names.
 pub fn false_success(scenario_id: &str, record: &EvidenceRecord) -> Option<Violation> {
     let audit = record.audit.as_ref().filter(|a| a.result == AuditResult::Refuted)?;
     let counterexamples = counterexample_paths(record);
     let listed = if counterexamples.is_empty() { String::new() } else { format!(", counterexamples: {}", counterexamples.join(", ")) };
-    let drop = counterexample_drop_flags(record).map(|flags| format!("; a new audit that no longer binds the counterexamples records why: {flags}")).unwrap_or_default();
     Some(Violation::new(
         FailureClass::FalseSuccess,
         scenario_id,
         format!(
-            "latest audit refuted this scenario's declared success (evaluator `{}` {}, sha256 {}{listed}); a declared faithful verdict does not override it — fix the behavior, re-attest, and record the evaluator's new audit with `canon evidence add --kind audit`{drop}",
+            "latest audit refuted this scenario's declared success (evaluator `{}` {}, sha256 {}{listed}); a declared faithful verdict does not override it — fix the behavior, re-attest, and record the evaluator's new audit with `canon evidence add --kind audit`",
             audit.evaluator_id, audit.evaluator_version, audit.evaluator_digest
         ),
     ))
@@ -84,21 +82,6 @@ fn counterexample_paths(record: &EvidenceRecord) -> Vec<&str> {
     let mut paths: Vec<&str> = record.attachments.iter().map(|a| a.path.as_str()).collect();
     paths.dedup();
     paths
-}
-
-/// The flags a re-audit that leaves out `record`'s bound files must pass:
-/// `--drop-attachment <path>` per file, each path shell-quoted so the
-/// command runs as printed, then `--drop-reason "<why …>"`. `None` when
-/// `record` binds nothing. `canon gate check` and `canon status` both
-/// print this.
-pub fn counterexample_drop_flags(record: &EvidenceRecord) -> Option<String> {
-    let paths = counterexample_paths(record);
-    if paths.is_empty() {
-        return None;
-    }
-    let mut flags: Vec<String> = paths.iter().map(|path| format!("--drop-attachment {}", shell_quote(path))).collect();
-    flags.push("--drop-reason \"<why the counterexample no longer applies>\"".to_string());
-    Some(flags.join(" "))
 }
 
 /// `value` as one POSIX shell word: bare when it is made only of
@@ -280,7 +263,6 @@ mod tests {
                 diagnostics: Vec::new(),
             },
             evidence,
-            evidence_file_digests: Default::default(),
             audits,
             scenarios: vec![scenario],
             divergences: Vec::new(),
@@ -288,7 +270,6 @@ mod tests {
             changes: Vec::new(),
             reviews: Vec::new(),
             findings: Vec::new(),
-            legacy_pins: Default::default(),
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),

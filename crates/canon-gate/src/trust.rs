@@ -78,7 +78,8 @@ fn subject_of(record: &EvidenceRecord) -> String {
     }
 }
 
-/// Independently re-scan `ledger_root` for every well-formed
+/// Independently re-scan `ledger_root` — and the archive of superseded
+/// versions beside it (`crate::history`) — for every well-formed
 /// `EvidenceRecord`, RAW — used ONLY by [`ReleaseTrustCheck`] to
 /// recover its `class` companion (module doc; [`TrustLadderCheck`]
 /// needs no raw scan at all now). Fail-soft (`GateCheck::run`'s own §7
@@ -87,7 +88,7 @@ fn subject_of(record: &EvidenceRecord) -> String {
 /// proves the root loaded successfully once for this same
 /// `GateContext`, so this should not realistically fail independently.
 fn raw_evidence(ledger_root: &Path) -> Vec<canon_model::RawRecord> {
-    GitTier::new(ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).map(|read| read.records).unwrap_or_default()
+    GitTier::new(ledger_root).read_history(RecordKind::EvidenceRecord).map(|read| read.records).unwrap_or_default()
 }
 
 /// Every well-formed ledger [`Review`], indexed for [`TrustRung::classify`]'s
@@ -120,8 +121,9 @@ fn review_index(ledger_root: &Path) -> ReviewIndex {
     let reviews = GitTier::new(ledger_root).read(&TierQuery::kind(RecordKind::Review)).map(|read| read.records).unwrap_or_default();
     for raw in reviews {
         let Ok(review) = serde_json::from_value::<Review>(raw.0) else { continue };
-        index.composite.insert((review.project_id.clone(), review.scenario_id.clone()));
-        index.bare.insert(review.scenario_id);
+        let Some(scenario_id) = review.scenario_id else { continue };
+        index.composite.insert((review.project_id.clone(), scenario_id.clone()));
+        index.bare.insert(scenario_id);
     }
     index
 }

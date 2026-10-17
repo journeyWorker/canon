@@ -83,6 +83,18 @@ fn seed_evidence(repo: &Path, scenario: &str, verdict: EvidenceVerdict) {
     ledger(repo).write(&record).unwrap();
 }
 
+/// A review as `canon review add` writes it: pinned to the scenario and
+/// what its evidence says in `repo`'s ledger right now.
+fn pinned(repo: &Path, mut review: Review) -> Review {
+    let ctx = canon_gate::GateContext::load(canon_gate::GateCtx::from_repo(repo).unwrap(), &canon_policy::SchemaRegistry::load(), Utc::now()).unwrap();
+    let scenario = canon_gate::spec_coverage::latest_scenarios(&ctx)
+        .into_iter()
+        .find(|s| Some(&s.scenario_id) == review.scenario_id.as_ref() && s.project_id == review.project_id)
+        .expect("the reviewed scenario is indexed");
+    review.pins = Some(canon_gate::freshness::current_pins(&ctx, scenario));
+    review
+}
+
 fn seed_review(repo: &Path, scenario: &str, reviewer: &str) {
     let envelope = Envelope::new(1, RecordKind::Review, Utc::now(), actor(reviewer, "reviewer"));
     let review = Review::new(
@@ -93,7 +105,7 @@ fn seed_review(repo: &Path, scenario: &str, reviewer: &str) {
         format!("pin-{reviewer}-{scenario}"),
         ProvenanceRef::OriginalSpecRef("specs/demo.feature".into()),
     );
-    ledger(repo).write(&review).unwrap();
+    ledger(repo).write(&pinned(repo, review)).unwrap();
 }
 
 fn seed_blocker(repo: &Path, change: &str) {
@@ -292,10 +304,9 @@ fn status_counts_each_subject_through_the_gates_joins() {
 
     let text = stdout(&run(dir.path(), &["status"]));
     // The header: the version, then the effective coverage, case and review
-    // settings, then the warning that both seeded reviews predate pinning
-    // and, their pins being no commit of this repo, went unchecked.
+    // settings.
     let header = format!(
-        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=true scope=<every scenario>\n  require_cases: failure\n  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n  level: strict\n{UNAPPROVED}\nwarning: 2 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 0 current, 0 stale, 2 undecidable; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it\n\n",
+        "canon {}\npolicy: .canon/policy.yaml\n  spec_coverage: require_evidence=true scope=<every scenario>\n  require_cases: failure\n  require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true\n  level: strict\n{UNAPPROVED}\n\n",
         env!("CARGO_PKG_VERSION")
     );
     assert!(text.starts_with(&header), "expected the header\n{header}\ngot\n{text}");
@@ -328,8 +339,9 @@ fn status_counts_stale_and_unsigned_reviews() {
     review("world.demo.01", "signed");
     review("world.demo.02", "indeterminate");
     assert_eq!(subject(&status_json(dir.path()), "demo-subject")["reviewed"], 1, "the current signed review counts");
-    // Re-attest world.demo.01 after its review.
-    seed_evidence(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
+    // Attest world.demo.01 again after its review, with another verdict: the
+    // evidence now says something the review did not see.
+    seed_evidence(dir.path(), "world.demo.01", EvidenceVerdict::NotApplicable);
 
     let report = status_json(dir.path());
     let s = subject(&report, "demo-subject");

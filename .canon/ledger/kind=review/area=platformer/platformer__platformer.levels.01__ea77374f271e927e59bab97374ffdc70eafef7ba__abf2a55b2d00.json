@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "test-voice",
+    "role": "test"
+  },
+  "at": "2026-07-14T20:56:58.199063Z",
+  "kind": "review",
+  "pin": "ea77374f271e927e59bab97374ffdc70eafef7ba",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:platformer.levels.01: Completing a level unlocks the next in the menu"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "3ba0959224e735d0926ae299daaa8b130212daceca21450636698253ed80b169",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "platformer",
+  "provenance_ref": {
+    "original_spec_ref": "examples/platformer/specs/features/kind=feature/area=platformer/levels.feature"
+  },
+  "reviewer": "test-voice",
+  "scenario_id": "platformer.levels.01",
+  "schema": 1
+}

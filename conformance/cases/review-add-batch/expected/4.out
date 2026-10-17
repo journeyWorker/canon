@@ -23,7 +23,7 @@
       "kind": "review",
       "pin": "r1",
       "pins": {
-        "evidence": [],
+        "checks": [],
         "scenario_digest": "a9ae86ece48fa9c6f16833f05728135bd16f2cc25406783f074606c0c7dfe08c",
         "scenario_digest_scope": "scenario"
       },
@@ -50,7 +50,7 @@
       "kind": "review",
       "pin": "r1",
       "pins": {
-        "evidence": [],
+        "checks": [],
         "scenario_digest": "af9a434f41bab54c3ba97755e0e6e65354fe6bba46eae7f751040a3a511337f0",
         "scenario_digest_scope": "scenario"
       },
@@ -77,7 +77,7 @@
       "kind": "review",
       "pin": "r1",
       "pins": {
-        "evidence": [],
+        "checks": [],
         "scenario_digest": "33fd58bf82fc02283f839c8360cf9f5c8afe4c4778f2aa2e52d4ba90cdc81a0a",
         "scenario_digest_scope": "scenario"
       },

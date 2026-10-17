@@ -85,6 +85,12 @@ pub fn brief_digest(text: &str) -> String {
     format!("sha256:{:x}", Sha256::digest(without_field(text, "Approved:").as_bytes()))
 }
 
+/// [`brief_digest`] as a [`SpecDigest`]: what a change-level review of a
+/// chore pins (0.23 D5).
+pub fn brief_spec_digest(text: &str) -> canon_model::SpecDigest {
+    canon_model::SpecDigest::of(without_field(text, "Approved:").as_bytes())
+}
+
 /// What a brief's `Approved:` line says about its text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Approval {

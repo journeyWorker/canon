@@ -1567,7 +1567,7 @@ fn observed_edges(runs: &[Value]) -> BTreeSet<TaskEdge> {
 /// read-only surface into a failure mode over a condition it does not
 /// own.
 fn read_kind(repo: &Path, kind: RecordKind, notes: &mut Vec<String>) -> Vec<Value> {
-    match crate::query::run(repo, None, kind, None, None, None, None) {
+    match crate::query::run(repo, None, kind, None, None, None, None, false) {
         Ok(outcome) => outcome.records.into_iter().map(|record| record.0).collect(),
         Err(err) => {
             notes.push(format!("`{}` records unavailable ({err}) — that side of the diff is empty", kind.as_str()));
@@ -3000,7 +3000,7 @@ mod tier_tests {
     /// call, so these tests assert the surface an operator reads
     /// rather than a tier-internal detail (task 1.4).
     fn queried_runs(repo: &Path) -> Vec<Value> {
-        crate::query::run(repo, None, RecordKind::Run, None, None, None, None)
+        crate::query::run(repo, None, RecordKind::Run, None, None, None, None, false)
             .expect("a routed, reachable tier answers a run query")
             .records
             .into_iter()

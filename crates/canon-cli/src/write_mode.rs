@@ -15,8 +15,7 @@
 //! `canon.yaml`. `--no-promote` keeps one write staged under `auto`. The
 //! run promotes ONLY the record it just staged, through the same
 //! validation and assignment `canon gate promote` / `canon divergence
-//! promote` apply (`canon_gate::promote_staged` /
-//! `promote_staged_divergence`); a record another author staged stays
+//! promote` apply (`canon_gate::promote_staged`); a record another author staged stays
 //! staged until they, or a full promote, commit it. An absent `write:`
 //! key is `manual`: a repo that never set it keeps staging until someone
 //! promotes.
@@ -27,11 +26,8 @@ use std::path::Path;
 /// add`, `finding close`).
 pub const STAGED_FOR_GATE_PROMOTE: &str = "run `canon gate promote` to commit it";
 
-/// A divergence candidate staged for `canon divergence promote`.
-pub const STAGED_FOR_DIVERGENCE_PROMOTE: &str = "run `canon divergence promote` to commit it";
-
 /// A write that is already final: a ledger record committed directly
-/// (`review add`, `divergence resolve|defer`), a subject record, or a
+/// (`review add`), a subject record, or a
 /// file in the working tree (`scenario new`, `feature new`).
 pub const DIRECT: &str = "written directly; nothing to promote";
 

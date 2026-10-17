@@ -11,8 +11,9 @@
 //!
 //! An acceptance holds for a scenario while ALL of these are true:
 //! - it is the scenario's latest acceptance (by record time);
-//! - the scenario's latest evidence is the evidence it pinned, so new
-//!   evidence, divergent or not, ends it ([`Held::Stale`]);
+//! - the scenario's latest evidence still says what it pinned (its verdict
+//!   and the checks it bound, [`crate::freshness`]), so a different
+//!   verdict or different checks end it ([`Held::Stale`]);
 //! - it has not reached its `expiry` ([`Held::Expired`]).
 //!
 //! Anything else leaves the divergent verdict blocking, with a detail
@@ -27,7 +28,7 @@ use chrono::{DateTime, Utc};
 
 use crate::context::GateContext;
 use crate::ledger::latest_verdicts;
-use crate::review_gate::current_pins;
+use crate::freshness::{current_checks, evidence_current};
 use crate::spec_coverage::latest_scenarios;
 
 /// The text a divergent-verdict violation carries after its class and
@@ -63,7 +64,7 @@ impl Acceptance {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Held {
     Holds(Acceptance),
-    /// Evidence was recorded after the acceptance.
+    /// The scenario's latest evidence says something else than it did at the acceptance.
     Stale(Acceptance),
     /// The acceptance's `expiry` has passed.
     Expired(Acceptance),
@@ -89,11 +90,9 @@ pub fn held(ctx: &GateContext, scenario: &Scenario) -> Option<Held> {
         .iter()
         .filter(|d| d.project_id == scenario.project_id && d.scenario_id == scenario.scenario_id && matches!(d.status, DivergenceStatus::Accepted { .. }))
         .max_by_key(|d| (d.envelope.at, d.run_seq, d.round))?;
-    let DivergenceStatus::Accepted { evidence, .. } = &latest.status else { return None };
+    let DivergenceStatus::Accepted { checks, .. } = &latest.status else { return None };
     let acceptance = acceptance_of(latest)?;
-    let mut pinned = evidence.clone();
-    pinned.sort();
-    if pinned != current_pins(ctx, scenario).evidence {
+    if !evidence_current(checks.as_deref(), &current_checks(ctx, scenario)) {
         return Some(Held::Stale(acceptance));
     }
     if acceptance.expiry.is_some_and(|expiry| ctx.now >= expiry) {
@@ -113,7 +112,7 @@ pub fn is_accepted(ctx: &GateContext, scenario: &Scenario) -> bool {
 pub fn divergent_detail(ctx: &GateContext, scenario: &Scenario, by: &str) -> String {
     let base = format!("{DIVERGENT_DETAIL} (by {by})");
     match held(ctx, scenario) {
-        Some(Held::Stale(a)) => format!("{base}; the acceptance by {} (tracking {}) is stale — evidence was recorded after it", a.reviewer, a.tracking),
+        Some(Held::Stale(a)) => format!("{base}; the acceptance by {} (tracking {}) is stale — the latest evidence says a different verdict or names different checks than it did", a.reviewer, a.tracking),
         Some(Held::Expired(a)) => format!("{base}; the acceptance by {} (tracking {}) expired {}", a.reviewer, a.tracking, a.expiry.map_or_else(String::new, |e| e.format("%Y-%m-%d").to_string())),
         Some(Held::Holds(_)) | None => base,
     }
@@ -125,7 +124,7 @@ pub fn hint(cells: &[(String, String)]) -> String {
     let (project, scenario) = cells.first().cloned().unwrap_or_else(|| ("<project-id>".to_string(), "<scenario-id>".to_string()));
     let more = if cells.len() > 1 { format!(" (repeat --scenario-id for the other {})", cells.len() - 1) } else { String::new() };
     format!(
-        "fix the behavior and re-attest (`canon evidence add --scenario-id {scenario} --project-id {project} … --verdict faithful`), or record a known gap a reviewer accepts: `canon divergence accept --project-id {project} --scenario-id {scenario} --reason <text> --tracking <issue-url-or-ref> [--expiry YYYY-MM-DD] --reviewer <id> --role reviewer`{more}; acceptance is a reviewer step from a session other than the evidence's, and new evidence or its expiry ends it"
+        "fix the behavior and re-attest (`canon evidence add --scenario-id {scenario} --project-id {project} … --verdict faithful`), or record a known gap a reviewer accepts: `canon divergence accept --project-id {project} --scenario-id {scenario} --reason <text> --tracking <issue-url-or-ref> [--expiry YYYY-MM-DD] --reviewer <id> --role reviewer`{more}; acceptance is a reviewer step from a session other than the evidence's, and a changed verdict or check, or its expiry, ends it"
     )
 }
 
@@ -162,8 +161,10 @@ pub fn refusal(ctx: &GateContext, scenario: &Scenario, reviewer: &str, actor_id:
         let seen = latest.iter().map(|e| serde_json::to_value(e.verdict).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default()).collect::<BTreeSet<_>>().into_iter().collect::<Vec<_>>().join(", ");
         return Some(format!("{id}'s latest evidence is not divergent ({seen}): there is no gap to accept"));
     }
-    let evidence: Vec<_> = ctx
-        .evidence
+    // Independence holds against EVERY attestation, superseded ones
+    // included: the archive is read explicitly (`crate::history`).
+    let history = crate::history::evidence_history(ctx);
+    let evidence: Vec<_> = history
         .iter()
         .filter(|e| e.scenario_id.as_ref() == Some(&scenario.scenario_id) && e.project_id.as_ref().is_none_or(|p| *p == scenario.project_id))
         .collect();
@@ -179,9 +180,12 @@ pub fn refusal(ctx: &GateContext, scenario: &Scenario, reviewer: &str, actor_id:
 }
 
 /// The `evidence_sha` of `scenario`'s newest evidence record that carries
-/// one, for the acceptance's `sha` field.
+/// one, for the acceptance's `sha` field. The newest record that carries
+/// one need not be the latest record, so this reads the archive too
+/// (`crate::history`).
 pub fn evidence_sha(ctx: &GateContext, scenario: &Scenario) -> Option<canon_model::Sha> {
-    ctx.evidence
+    let history = crate::history::evidence_history(ctx);
+    history
         .iter()
         .filter(|e| e.scenario_id.as_ref() == Some(&scenario.scenario_id) && e.project_id.as_ref().is_none_or(|p| *p == scenario.project_id))
         .filter(|e| e.evidence_sha.is_some())
