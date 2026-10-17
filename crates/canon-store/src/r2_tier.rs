@@ -243,6 +243,16 @@ fn resolve_s3_connection(strict: bool, lookup: impl Fn(&str) -> Option<String>) 
     Ok(S3Connection { endpoint: endpoint.unwrap(), access_key_id: access_key_id.unwrap(), secret_access_key: secret_access_key.unwrap(), region })
 }
 
+/// Recognized ONLY by builds with `debug_assertions` — a release `canon`
+/// ignores it — so an offline integration test can exercise a genuine
+/// git+r2 aging move / query fan-out / artifact upload without live R2
+/// credentials or network. The same "rebindable root" convention
+/// `canon/skills/tiered-storage/SKILL.md` documents for the DuckDB views
+/// (`CANON_R2_ROOT`). Unset in ordinary use: a `canon.yaml`-configured
+/// s3-backed rung always resolves via [`R2Tier::connect_live`] — this env
+/// var is a test seam, never a silent production fallback ([`R2Tier::attach`]).
+pub const LOCAL_R2_ROOT_ENV: &str = "CANON_R2_LOCAL_ROOT";
+
 pub struct R2Tier {
     store: Arc<dyn ObjectStore>,
     prefix: String,
@@ -348,10 +358,48 @@ impl R2Tier {
             .with_access_key_id(conn.access_key_id)
             .with_secret_access_key(conn.secret_access_key)
             .with_virtual_hosted_style_request(false)
+            // An unreachable endpoint must refuse in seconds, not after
+            // object_store's default ten retries over minutes: a gate
+            // check or an evidence write waits on this.
+            .with_client_options(object_store::ClientOptions::new().with_connect_timeout(std::time::Duration::from_secs(5)).with_timeout(std::time::Duration::from_secs(120)))
+            .with_retry(object_store::RetryConfig { max_retries: 2, retry_timeout: std::time::Duration::from_secs(20), ..Default::default() })
             .build()
             .map_err(|e| StoreError::ObjectStore(e.to_string()))?;
 
         Self::with_object_store(Arc::new(store), prefix.to_string())
+    }
+
+    /// Resolve `cfg`'s s3-backed tier handle — the ONE place every
+    /// consumer (`canon-cli`'s tier builders, the gate's artifact store)
+    /// attaches an s3 rung. In DEBUG builds only, honors
+    /// [`LOCAL_R2_ROOT_ENV`] as an offline test seam ([`R2Tier::local`]);
+    /// the `#[cfg(debug_assertions)]` gate is load-bearing, not
+    /// cosmetic. `cargo build --release` compiles the whole `if` branch
+    /// out of the binary, so no env var — however it got into a
+    /// production shell — can ever substitute a local filesystem for the
+    /// real bucket that `canon tier age`'s destructive move+delete, or
+    /// an artifact upload, targets. A release binary always takes the
+    /// [`R2Tier::connect_live`] path, which fails loud
+    /// (`StoreError::BackendUnattached`) rather than silently succeeding
+    /// against the wrong backing store. Integration tests build in the
+    /// `dev`/`test` profile (`debug_assertions` on), so the override
+    /// keeps working for them.
+    pub fn attach(cfg: &crate::policy::R2TierConfig) -> Result<Self, StoreError> {
+        #[cfg(debug_assertions)]
+        if let Ok(local_root) = std::env::var(LOCAL_R2_ROOT_ENV) {
+            eprintln!(
+                "canon: {LOCAL_R2_ROOT_ENV} is set — substituting a LOCAL filesystem s3 tier at `{local_root}` \
+                 (debug-build test seam only; a release `canon` binary ignores this var and always attaches live s3)"
+            );
+            return Self::local(local_root, cfg.prefix.clone());
+        }
+        Self::connect_live(&cfg.bucket_env, &cfg.prefix)
+    }
+
+    /// The object store behind this tier, for a consumer that keeps its
+    /// own key layout in the same bucket (the artifact blob store).
+    pub(crate) fn object_store(&self) -> Arc<dyn ObjectStore> {
+        Arc::clone(&self.store)
     }
 
     fn object_path(&self, relative: &std::path::Path) -> ObjectPath {

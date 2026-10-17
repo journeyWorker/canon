@@ -118,6 +118,8 @@ const HUMAN: &[Role] = &[];
 pub const META: &[CommandMeta] = &[
     row("adapter authorize", Read, &[O]),
     row("adapter validate", Read, &[O]),
+    row_exits("artifacts migrate", Write, &[exit(0, "migrated, already migrated, or a dry run: nothing to do is success"), exit(2, "refused: the target is not an s3 tier, a blob does not match its name, the store is unreachable, or a write failed; nothing is removed until every blob verified")], &[O]),
+    row_exits("artifacts verify", Read, &[exit(0, "every bound file is stored (or, local store only, still proven by the working tree)"), exit(1, "a bound file is missing from the store or altered: data.problems names each"), exit(2, "refused: canon.yaml cannot be read or the store cannot be used or reached; an unreachable store is never a pass")], &[O]),
     row("brief approve", Write, HUMAN),
     row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "operational error, with a stable error code"), exit(2, "blocker findings")], &[P, R]),
     row_exits("change new", Write, REFUSES, &[P]),

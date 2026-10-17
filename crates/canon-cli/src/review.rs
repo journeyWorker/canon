@@ -344,7 +344,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         crate::say!(args.json, "{pinned}");
     }
     if !files.is_empty() {
-        crate::say!(args.json, "{}", crate::evidence_attach::stored_line("canon review add", files.len(), stored));
+        crate::say!(args.json, "{}", crate::evidence_attach::stored_line(&repo, "canon review add", files.len(), stored));
     }
     if !args.outcome.is_signed() {
         crate::say!(args.json, "canon review add: outcome `{}` is recorded as a review gap, never as an approval", args.outcome.as_str());
@@ -395,7 +395,7 @@ fn write_reviews(
         Err(e) => return Err(format!("cannot prepare {}: {e}", dir.display())),
     }
     let held = crate::evidence_attach::store_files_held(repo, files)
-        .map_err(|(file, e)| format!("could not store {} in the artifact store: {e}", file.resolved.display()))?;
+        .map_err(|(file, e)| format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint()))?;
     let committed = GitTier::new(ledger_root);
     let mut written: Vec<(String, bool)> = Vec::new();
     for review in reviews {

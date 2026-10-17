@@ -10,6 +10,7 @@
 //! without rewriting Git history.
 
 pub mod archive;
+pub mod artifact_blobs;
 pub mod atomic;
 pub mod cursor;
 pub mod file_lock;

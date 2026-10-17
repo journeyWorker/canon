@@ -965,11 +965,11 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     let stored = match crate::evidence_attach::store_files(&repo, &bound.files) {
         Ok(stored) => stored,
         Err((file, e)) => {
-            return CliError::refused("EVIDENCE_STORE_FAILED", format!("could not store {} in the artifact store: {e}", file.resolved.display())).hint("check that the artifact store is writable (permissions, disk space), then run the command again").emit("canon evidence add", args.json);
+            return CliError::refused("EVIDENCE_STORE_FAILED", format!("could not store {} in the artifact store: {e}", file.resolved.display())).hint(e.hint()).emit("canon evidence add", args.json);
         }
     };
     if !bound.files.is_empty() {
-        crate::say!(args.json, "{}", crate::evidence_attach::stored_line("canon evidence add", bound.files.len(), stored));
+        crate::say!(args.json, "{}", crate::evidence_attach::stored_line(&repo, "canon evidence add", bound.files.len(), stored));
     }
 
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
@@ -1246,7 +1246,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         }
     };
     let json = args.json;
-    crate::say!(json, "{}", crate::evidence_attach::stored_line("canon evidence add", batch.files.len(), landed.stored));
+    crate::say!(json, "{}", crate::evidence_attach::stored_line(repo, "canon evidence add", batch.files.len(), landed.stored));
     let mut written = Vec::new();
     for ((record, location), id) in records.iter().zip(&landed.locations).zip(&scenario_ids) {
         let settled = match &location.promoted {
@@ -1338,7 +1338,7 @@ fn land_batch(
     }
 
     let held = crate::evidence_attach::store_files_held(repo, files)
-        .map_err(|(file, e)| (format!("could not store {} in the artifact store: {e}", file.resolved.display()), 2))?;
+        .map_err(|(file, e)| (format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint()), 2))?;
     let staging = GitTier::new(&staging_root);
     let mut locations: Vec<BatchLocation> = Vec::new();
     let rollback = |locations: &[BatchLocation], held: crate::evidence_attach::HeldStore| {
@@ -1508,7 +1508,7 @@ fn head_sha(repo: &Path) -> Option<String> {
 /// gate's question, and a superseded record's lost file never does. `2`
 /// when the ledger cannot be read or a write fails.
 pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
-    use canon_gate::artifact_store::{blob_display, stored_blob, working_tree_path, StoreError, StoreLock, StoreOutcome, MIB};
+    use canon_gate::artifact_store::{working_tree_path, ArtifactStore, Observed, StoreError, StoreLock, StoreOutcome, MIB};
 
     let repo = resolve_repo_root(repo);
     // The gate's own context, so the reviews vaulted are exactly the ones
@@ -1540,9 +1540,22 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
             return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon evidence vault", json);
         }
     };
+    // Read under the lock, like every writer (`store_files_held`).
+    let store = match ArtifactStore::open(&repo) {
+        Ok(store) => store,
+        Err(e) => return CliError::refused("EVIDENCE_VAULT_FAILED", format!("the artifact store cannot be used: {e}")).hint(e.hint()).emit("canon evidence vault", json),
+    };
+    // The lock guards the local store only; an object store is not held
+    // against other writers for the length of its uploads.
+    let lock = lock.filter(|_| store.is_local());
     for (path, sha256) in &files {
-        let lock = lock.as_ref().expect("the lock is taken whenever there is a file");
-        if stored_blob(&repo, sha256).as_str() == sha256 {
+        let observed = store.observe(&repo, sha256, false);
+        if let Observed::Unavailable(why) = &observed {
+            return CliError::refused("EVIDENCE_VAULT_FAILED", format!("could not check {}: {why}", store.display(sha256)))
+                .hint(canon_gate::artifact_store::OBJECT_STORE_HINT)
+                .emit("canon evidence vault", json);
+        }
+        if observed.as_str() == sha256 {
             already += 1;
             continue;
         }
@@ -1565,12 +1578,16 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
             ));
             continue;
         }
-        match lock.store(sha256, file) {
-            Ok(StoreOutcome::Stored) => stored.push(format!("{} <- {path}", blob_display(sha256))),
+        let outcome = match &store {
+            ArtifactStore::Local => lock.as_ref().expect("the lock is taken whenever there is a file").store(sha256, file),
+            ArtifactStore::Object(object) => object.upload(sha256, file),
+        };
+        match outcome {
+            Ok(StoreOutcome::Stored) => stored.push(format!("{} <- {path}", store.display(sha256))),
             Ok(StoreOutcome::AlreadyStored) => already += 1,
             Err(StoreError::Changed { actual, .. }) => missing.push(format!("{path} (recorded sha256 {sha256}): working tree: {actual}")),
-            Err(e @ (StoreError::Io(_) | StoreError::InvalidDigest(_) | StoreError::UnsafeStoreDir | StoreError::Locked(_))) => {
-                return CliError::refused("EVIDENCE_VAULT_FAILED", format!("could not write {}: {e}", blob_display(sha256))).hint("check that the artifact store is writable (permissions, disk space), then run the command again").emit("canon evidence vault", json);
+            Err(e) => {
+                return CliError::refused("EVIDENCE_VAULT_FAILED", format!("could not write {}: {e}", store.display(sha256))).hint(e.hint()).emit("canon evidence vault", json);
             }
         }
     }
@@ -1588,7 +1605,7 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
     for line in &missing {
         crate::say!(json, "  not stored {line}");
     }
-    if !stored.is_empty() {
+    if !stored.is_empty() && store.is_local() {
         crate::say!(json, "commit {}/ with the ledger", canon_model::paths::ARTIFACTS_SHA256_DIR);
     }
     if !missing.is_empty() {

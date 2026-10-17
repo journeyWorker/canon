@@ -32,6 +32,8 @@ const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs"];
 /// conversions and constants emitted by the caller. A prefix names a command
 /// or a group (`brief` is `brief approve` and `brief check`).
 const FILE_DEFAULTS: &[(&str, &[&str])] = &[
+    // `store_error`: the refusal of a store that cannot be opened or attached, emitted by both commands.
+    ("artifacts.rs", &["artifacts verify", "artifacts migrate"]),
     // `CHANGED_CODE`, picked by `evidence add`'s brief refusal.
     ("brief.rs", &["evidence add"]),
     ("brief_approve.rs", &["brief approve"]),
