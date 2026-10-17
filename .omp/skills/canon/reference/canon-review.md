@@ -189,8 +189,10 @@ chore's slug and refuses a feature change.
 screenshot, a recording, a trace — exactly as `canon evidence add
 --artifact` binds one: the path must resolve to a file inside the
 repository, a file over 25 MiB is refused unless `--max-artifact-mib <N>`
-raises the limit, and the bytes are copied into
-`.canon/artifacts/sha256/<hex>` (commit it with the ledger) before the
+raises the limit, and the bytes are stored by digest (in
+`.canon/artifacts/sha256/<hex>` unless `canon.yaml`'s `artifact_store:` names an
+object store, where they are uploaded and nothing is kept locally; commit
+the local store with the ledger) before the
 review is written. Any refusal exits 2 and writes and stores nothing. The
 review records each distinct file once, in the order given:
 
@@ -241,12 +243,16 @@ reviewer never types them:
   `scenario_digest`; then the review pins its `source_digest` (the
   sha256 of the whole `.feature` file) and records
   `scenario_digest_scope: file`;
-- `evidence` — the scenario's latest evidence record per role, each as
-  `{key, digest}`: the ledger file `kind=evidence_record/<key>__<digest>.json`.
-  A scenario with no evidence yet is pinned with an empty list.
+- `checks` — the scenario's latest evidence per role, each as `{role,
+  verdict, checks}`: its verdict and the identity of what it checked (the
+  report format and the matched case names, as `junit:<case>`, or the
+  artifact digests). It names no evidence record, so recording the same
+  verdict from the same checks again leaves the review current. A scenario
+  with no evidence yet is pinned with an empty list.
 
-It prints `canon review add: pinned <id> at scenario digest <12 hex> and
-<n> latest evidence record(s); …` (`at source digest` for a file pin). A
+It prints `canon review add: pinned <id> at scenario digest <12 hex> and the
+verdict and checks of its <n> role(s) of evidence; …` (`at source digest` for
+a file pin). A
 scenario with no record (never synced) is refused with exit 2 and nothing
 is written: there is nothing to pin.
 
@@ -324,9 +330,9 @@ The scenario is reviewed when at least one of those latest reviews:
 
 1. is `signed`;
 2. still matches its pins — the scenario record's current
-   `source_digest`, and its current latest evidence record per role —
-   when it has pins; or, written before 0.15 without pins, still
-   describes its scenario at the commit it pinned (below);
+   `scenario_digest` (or `source_digest` for a file pin), and the verdict and
+   checks of its latest evidence per role — when it has pins; reviews
+   written before 0.23 count only after `canon migrate` (below);
 3. passes `distinct_actor`, when that is on.
 
 ### Reviews written before 0.23 pinning
