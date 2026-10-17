@@ -82,6 +82,210 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.22.0 release
+
+Version 0.22.0 makes canon's gates honest in both directions. An honest
+`divergent` verdict on a known, tracked gap no longer forces a false
+`faithful` or a waiver; a fixed blocker, a chore and a weakened policy no
+longer pass without the checks they imply; and every refusal says what to do
+next. The 0.21 deprecated names are removed. Plan:
+`docs/superpowers/plans/2026-10-17-canon-0.22.0-honest-gates.md`.
+
+**Why.** The second dogfood round on 0.21.1 and the 2026-10-16 briefing.
+Honest verdicts were penalized: a `divergent` scenario blocked shipping with
+`hint: null`, and the only ways through were a waiver or a false `faithful`
+(#78). Some changes were not re-verified: a chore reopened a shipped subject
+and the old evidence shipped it again (#77), and a blocker closed `fixed`
+lifted the block with no new evidence (#72). Policy drift was advisory only:
+weakening the approved `policy.yaml` passed the ship guard and `gate check`
+(#71). `status` asked the human to answer a brief that was still an empty
+skeleton (#70). The reviewer reference never asked whether a test checks the
+scenario or only mirrors the implementation (#73). And three issues in a row
+(#62, #63, #78) were refusals with a null hint, which 0.20's contract was
+meant to end.
+
+### D1: accepted divergence (#78)
+
+`canon divergence accept --project-id <root> --scenario-id <id> --reason
+<text> --tracking <url-or-ref> [--expiry YYYY-MM-DD] --reviewer <id> [--actor-id
+<id>] [--session-id <id>] --role reviewer` records a reviewer's acceptance of a
+scenario whose latest evidence is `divergent` as a known, tracked gap.
+`--scenario-id` repeats; the call is all or nothing. It is a reviewer step
+(`--role reviewer`, or `--as reviewer`/`CANON_ROLE`), and it is refused with
+`DIVERGENCE_ACCEPT_REFUSED` (exit 2, nothing written) for another role, for
+evidence that is not divergent, and for the evidence's own actor or session.
+An empty `--reason`/`--tracking`, an unindexed scenario or an unparseable
+`--expiry` is `DIVERGENCE_INVALID_ARGUMENT`.
+
+- **Pinned.** The record is a `Divergence` with the new status `accepted`
+  (`reason`, `tracking`, optional `expiry`, `evidence`: the pins of the
+  evidence it saw, as a review pins). It is not a new record kind.
+- **Stale.** New evidence for the scenario, divergent or not, ends the
+  acceptance; so does reaching `--expiry` (a date is the start of that day,
+  UTC; an RFC 3339 time is taken as given). The latest acceptance wins.
+- **Counted.** While it holds, the ship guard treats the cell as covered. A
+  stale or expired acceptance blocks again, and the refusal says why.
+- **Never silent.** `canon status` lists `accepted-divergence <id> —
+  <tracking> (expires <date>|no expiry)` (JSON: `accepted_divergences`, omitted
+  when empty) and `canon gate check` prints the same lines as an
+  `accepted_divergence` advisory; neither fails the gate.
+- **The way out is named.** The `uncovered-cell` refusal for a divergent
+  verdict, and the `status` step, name both: fix and re-attest, or
+  `canon divergence accept`.
+
+### D2: re-verification after a fix and after a chore (#72, #77)
+
+One freshness rule, two triggers: a subject cannot ship while one of its
+scenarios with evidence has no evidence recorded after the trigger.
+
+- **Fixed blocker (#72).** A blocker finding whose latest disposition is
+  `fixed` keeps blocking (`open-blocker`) until every evidenced scenario of
+  its change's subjects has evidence newer than the time it was closed
+  `fixed` (not the time it was raised). The review pins go stale on that new
+  evidence, so the re-review follows. This is a review check, so it is waived
+  by `--override-reason` like the others, and it applies where
+  `require_review` blocks on findings.
+- **Chore (#77).** An approved chore change on the subject needs evidence
+  newer than its approval, for every evidenced scenario, before `--to shipped`
+  (an `uncovered-cell` violation; `gate check` reports it for a subject past
+  `building`; not waivable). The `status` next step after the reopen names
+  `canon evidence add --all-scenarios …`, then the re-review.
+- **Approval time.** `canon brief approve` now writes the approval time as
+  RFC 3339 UTC to the second (`Approved: <who> 2026-10-17T05:12:33Z — "…"`).
+  An `Approved:` line from before, carrying only a date, is read as the start
+  of that day. A chore whose approval line has no readable time triggers
+  nothing.
+- **Reopen.** `canon change new` on a shipped subject prints the reopen
+  command (`canon subject status <id> --to verifying --reason …`) and adds it to
+  `meta.next`, with the reason it is not yet worked under the subject.
+- Every refusal names the scenarios and the batch command in its `hint`.
+
+### D3: approved policy fails closed (#71)
+
+A `.canon/policy.yaml` whose bytes differ from the approved digest
+(`Changed`), or whose approval file cannot be read (`Unreadable`), is a
+violation: `canon gate check` exits 1 (`unreviewed-promotion policy — policy
+changed since approval` or `policy approval unreadable`), and shipping or
+reopening a subject is refused with `POLICY_CHANGED_SINCE_APPROVAL` or
+`POLICY_APPROVAL_UNREADABLE` (exit 1). `--override-reason` does not waive it;
+the human re-approves with `canon policy approve --by <human> --note "<words>"`
+or the approved files are restored from git. A policy never approved
+(`Unapproved`) stays advisory. `canon status` still warns and exits 0.
+`canon policy show [--json]` prints the policy path, its current digest, the
+approval state (`none`, `approved`, `unapproved`, `changed`, `unreadable`),
+approver, time, approved digest and note, and says when the gate fails closed.
+
+### D4: status follows the brief (#70)
+
+While the current change's brief has `canon brief check` blockers, a subject's
+step in `status` is the planner's `canon brief check --change <slug>` (`N
+blocker(s): write the brief …`, `actor: agent`, `role: planner`) instead of
+the human stop. The human step appears only when the brief is clean and
+unapproved. `change new`, `subject adopt` and every other `meta.next` follow
+the same rule, since they use the same engine.
+
+### D5: every refusal carries a hint
+
+`crates/canon-cli/tests/hints.rs` reads the sources and fails when a
+`CliError::refused`/`failed` construction has no `.hint(…)` in its chain; its
+allowlist of errors whose message already is the next step is empty, and an
+entry that matches nothing fails too. Every refusal that lacked one now has
+one (about thirty cases in the conformance corpus gain a `hint:` line).
+
+### D6: the reviewer checks the checks (#73)
+
+`role-reviewer.md` gains "Check the checks": read each bound test against its
+scenario's Then steps, and record a finding when a check pins behavior the
+scenario does not require or skips a Then step it states. Skill text only; it
+also teaches `divergence accept` and the re-verification after a fixed
+blocker. The planner, implementer, orchestrator and `canon-gate`/`-policy`/
+`-subject` references and the website docs (English and Korean) follow D1–D4.
+
+### D7: 0.21 deprecations removed
+
+`context-pack create`, `prompt register`, `divergence stage`, `demo attest`
+and the two-positional `subject status <id> <state>` are gone, with
+`deprecation.rs`, `meta.deprecated` in JSON and `deprecated` in `canon
+schema`. They are now plain usage errors.
+
+**Migration** from 0.21.
+
+- Use the 0.21 names: `context-pack new`, `prompt add`, `divergence add`,
+  `demo add`, `subject status <id> --to <state>`. Callers that read
+  `meta.deprecated` can drop the branch.
+- `canon gate check` exits 1 when `policy.yaml` changed since its approval or
+  its approval is unreadable; a CI job that tolerated the advisory now needs
+  the human's `canon policy approve` (or the file restored).
+- `subject status --to shipped` (and the reopen) is refused with
+  `POLICY_CHANGED_SINCE_APPROVAL`/`POLICY_APPROVAL_UNREADABLE` in that case,
+  and, after a blocker closed `fixed` or an approved chore, until the suite is
+  recorded again with `evidence add --all-scenarios`.
+- Human stderr gains a `hint: …` line on every refusal that had none; JSON
+  `error.hint` is now a string on all of them.
+- `canon status` may show the planner's brief step where it showed the human
+  stop; an agent that stopped on any `human` step now stops only when the
+  brief is clean.
+- New `Approved:` lines carry a timestamp; older date-only lines still read.
+- JSON shapes: the status subject entry gains the optional
+  `accepted_divergences` (omitted when empty); `meta.deprecated` and the
+  schema `deprecated` field are gone; `gate check` advisories can include
+  `accepted_divergence`; `divergence` records gain the status `accepted`
+  (`divergence.schema.json` is regenerated). The subject JSON `status_reason`
+  from 0.21.1 is unchanged.
+
+**Changed conformance expectations.**
+
+- Version strings (`0.21.1` → `0.22.0`) in every case that prints one.
+- A `hint:` line on refusals that had none: `change-new` (steps 4, 5),
+  `evidence-add-all-scenarios-refused-contradiction`,
+  `evidence-add-brief-override`, `evidence-add-fabrication-marker-whole-token`,
+  `evidence-add-refused-malformed-write-config`,
+  `evidence-add-refused-newline-injection`,
+  `evidence-add-refused-no-subject-key`,
+  `evidence-add-refused-report-contradiction`,
+  `finding-add-refused-unresolvable-short-sha`, `gate-check-invalid-canon-yaml`,
+  `gate-check-refused-pre-0-17-layout`, `init-providers-refused-unknown`,
+  `init-scaffold-and-rerun`, `migrate-refused-uncommitted`,
+  `policy-approve-refused-no-policy`, `review-add-batch`,
+  `review-gate-malformed-finding`, `review-outcome-indeterminate-gap`,
+  `subject-reopen-refused-unapproved-brief`,
+  `subject-ship-refused-missing-verdict`,
+  `subject-ship-refused-no-tagged-scenarios`,
+  `subject-ship-refused-require-cases-gap`,
+  `subject-status-off-chain-transition`, `usage-error-unreadable-canon-yaml`.
+- The planner brief step replaces the human stop while the brief has
+  blockers: `change-new`, `status-brief-proposed` (steps 3–5),
+  `subject-adopt-second-subject` (steps 4–6), and the status cases that print
+  a next step for a brief.
+- `review-gate-open-blocker`: after `finding close --disposition fixed` the
+  next step is the suite again (`evidence add --all-scenarios`), the move to
+  `verifying` is refused as a fixed blocker not re-verified, and passes after
+  fresh evidence and re-review.
+- `policy-approve-changed-advisory` becomes `policy-approve-changed-fails-closed`:
+  `gate check` reports the changed policy as a violation and exits 1;
+  `status` still warns and exits 0; re-approval makes the gate clean.
+
+**New conformance cases.** `policy-approve-changed-fails-closed` (replaces
+`policy-approve-changed-advisory`). `review-gate-open-blocker` gains steps 5
+and 6 (the reverified move and the clean gate check). Accepted divergence,
+chore re-verification, `policy show` and the hint rule are covered by contract
+tests (`divergence_accept.rs`, `reverify.rs`, `policy_fail_closed.rs`,
+`hints.rs`), not the corpus.
+
+Closes #70
+
+Closes #71
+
+Closes #72
+
+Closes #73
+
+Closes #77
+
+Closes #78
+
+ACCEPTANCE-PLACEHOLDER: dogfood eval 10
+
 ## 0.21.1 release
 
 Patch release for three dogfood findings from a game repo on 0.21.0.
