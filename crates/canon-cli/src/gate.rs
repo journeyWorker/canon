@@ -136,7 +136,14 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     // An index the `.feature` edits are not in grades specs that no longer
     // exist (0.16 M6): fail closed, one violation per unrefreshable root.
     let unrefreshable = crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation(""));
-    let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).collect());
+    // A chore approved on a subject asks for the suite again (0.22 D2): a
+    // subject past `building` with evidenced scenarios and none newer.
+    let reverify = canon_gate::spec_coverage::latest_subjects(&gate_context)
+        .into_iter()
+        .filter(|s| matches!(s.status, canon_model::SubjectStatus::Verifying | canon_model::SubjectStatus::Shipped))
+        .flat_map(|s| crate::reverify::chore_violations(&repo, &gate_context, s))
+        .collect::<Vec<_>>();
+    let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).chain(reverify).collect());
     let mut advisories: Vec<serde_json::Value> = Vec::new();
     let advisory = |kind: &str, message: String, items: Vec<String>| serde_json::json!({ "kind": kind, "message": message, "items": items });
     crate::say_raw!(json, "{}", format_gate_report(&report));

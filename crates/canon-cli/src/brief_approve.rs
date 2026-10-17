@@ -4,7 +4,8 @@
 //! It writes `Approved: <who> <when> — "<words>" (brief sha256:<digest>)`
 //! into the change's `brief.md` and records the policy approval in the
 //! same call ([`crate::policy_approval`]; skipped when the repo has no
-//! policy file). The digest covers the brief with every `Approved:` line
+//! policy file). `<when>` is the UTC time to the second, RFC 3339: the
+//! chore re-verification rule (0.22 D2) reads it. The digest covers the brief with every `Approved:` line
 //! removed ([`crate::brief::brief_digest`]), so any later edit to the
 //! brief makes every reader say `BRIEF_CHANGED_SINCE_APPROVAL`.
 //!
@@ -96,7 +97,7 @@ pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
         Ok(text) => text,
         Err(e) => return refuse(json, "BRIEF_UNREADABLE", &format!("cannot read `{}`: {e}", checked.brief), EXIT_ERROR),
     };
-    let when = Utc::now().format("%Y-%m-%d").to_string();
+    let when = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let approved = match approved_text(&text, by, &when, note) {
         Ok(approved) => approved,
         Err(e) => return refuse(json, "BRIEF_UNAPPROVABLE", &e, EXIT_REFUSED),

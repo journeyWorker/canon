@@ -697,6 +697,9 @@ pub fn run_status(
     if ships {
         blocking.extend(crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation("verifying → shipped: ")));
         blocking.extend(brief_check_violation(&repo, subject_id, &changes));
+        if let Some(ctx) = &gate_context {
+            blocking.extend(crate::reverify::chore_violations(&repo, ctx, &subject));
+        }
     }
     if reopens {
         blocking.extend(reopen_violation(&repo, &subject, &changes));
@@ -727,7 +730,7 @@ pub fn run_status(
     if !blocking.is_empty() {
         let lines = blocking.iter().chain(&waivable).map(Violation::line).collect::<Vec<_>>().join("\n");
         let mut error = CliError::failed("SUBJECT_GATE_VIOLATION", lines).with_exit(EXIT_GATED);
-        let mut hints = Vec::new();
+        let mut hints: Vec<String> = crate::reverify::hint(&blocking.iter().chain(&waivable).collect::<Vec<_>>()).into_iter().collect();
         if let Some(ctx) = &gate_context {
             let divergent = divergent_cells(ctx, subject_id, &blocking);
             if !divergent.is_empty() {
@@ -753,11 +756,14 @@ pub fn run_status(
         let Some(reason) = override_reason else {
             let lines = waivable.iter().map(Violation::line).collect::<Vec<_>>().join("\n");
             let mut fixes = Vec::new();
-            if review_gaps {
+            if review_gaps && !waivable.iter().all(canon_gate::review_gate::is_reverify) {
                 fixes.push("record an independent review (`canon review add`) and close blocker findings");
             }
             if brief_gap.is_some() {
                 fixes.push("get the human's answer to the brief and record it with `canon brief approve`");
+            }
+            if waivable.iter().any(canon_gate::review_gate::is_reverify) {
+                fixes.push("record the suite again with `canon evidence add --project-id <root> --all-scenarios --report <format>:<path> …` for the scenarios named, then re-review");
             }
             return CliError::failed("SUBJECT_GATE_VIOLATION", lines)
                 .with_exit(EXIT_GATED)
@@ -914,8 +920,9 @@ fn review_checks(ctx: &GateContext, rr: &RequireReview, exclude_lanes: &[String]
 /// status`'s red flag on a shipped subject (0.18 D3) and the ship guard
 /// cannot disagree. The brief and the unrefreshable-index check are not
 /// here: status reports both on their own.
-pub(crate) fn shipped_gate_gaps(ctx: &GateContext, subject: &Subject) -> Vec<Violation> {
+pub(crate) fn shipped_gate_gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Violation> {
     let mut gaps = ship_gate_violations(ctx, &subject.subject_id);
+    gaps.extend(crate::reverify::chore_violations(repo, ctx, subject));
     if let Some((rr, exclude_lanes)) = active_require_review(ctx).filter(|(rr, _)| rr.covers(SubjectStatus::Shipped)) {
         let (unwaivable, waivable, _) = review_checks(ctx, rr, exclude_lanes, subject);
         let waiver = subject.status_override.as_ref().filter(|waiver| waiver.to == subject.status);

@@ -61,6 +61,16 @@
 //! `subject_ids` names it), is an `open-blocker` violation. A change
 //! shared by several subjects gates each of them.
 //!
+//! # Fixed blockers need re-verification (0.22 D2, #72)
+//! A blocker whose latest disposition is `fixed` keeps blocking, as an
+//! `open-blocker` violation, until every evidenced scenario of each
+//! subject holding its change has an evidence record newer than the
+//! finding's `fixed` record (when it was closed, [`fixed_blockers`]): evidence recorded before the fix cannot verify it.
+//! New evidence already stales a pinned review, so the re-review follows
+//! with no rule of its own. [`scenarios_without_evidence_after`] is the
+//! one freshness rule; the chore trigger (a chore change approved on the
+//! subject) reads it from `canon subject status`.
+//!
 //! A Finding row the ledger read refused (unparseable, schema-invalid,
 //! misfiled) is a `malformed-evidence` violation naming its file, for
 //! every subject, and no waiver covers it. The rule cannot tell whether
@@ -80,6 +90,8 @@
 //! visible, never silent, and never wider than what it named.
 
 use std::collections::{BTreeMap, BTreeSet};
+
+use chrono::{DateTime, Utc};
 
 use canon_model::{
     ChangeId, EvidencePin, EvidenceRecord, Finding, FindingDisposition, FindingSeverity, PinnedSpec, RecordKind, Review, ReviewPins, Scenario, StatusOverride, Subject, SubjectId,
@@ -222,6 +234,29 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
                 None => outcome.violations.push(violation),
             }
         }
+        for fixed in fixed_blockers(ctx) {
+            let Some(holding) = holders.get(&fixed.finding.change_id) else { continue };
+            let mut unmet: BTreeSet<(&str, &str)> = BTreeSet::new();
+            for subject in holding {
+                unmet.extend(scenarios_without_evidence_after(ctx, &subject.subject_id, fixed.closed).into_iter().map(|s| (s.project_id.as_str(), s.scenario_id.as_str())));
+            }
+            if unmet.is_empty() {
+                continue;
+            }
+            let names: Vec<&str> = holding.iter().map(|s| s.subject_id.as_str()).collect();
+            let violation = fixed_blocker_violation(&fixed, &names, &unmet.into_iter().collect::<Vec<_>>());
+            let waived: Option<(&Subject, &StatusOverride)> = holding
+                .iter()
+                .map(|s| waiver_for(s.subject_id.as_str(), &violation).map(|w| (*s, w)))
+                .collect::<Option<Vec<_>>>()
+                .and_then(|all| all.into_iter().next());
+            match waived {
+                Some((subject, waiver)) => {
+                    outcome.advisories.push(ReviewAdvisory { violation, subject_id: subject.subject_id.clone(), waiver: waiver.clone() })
+                }
+                None => outcome.violations.push(violation),
+            }
+        }
     }
     outcome
 }
@@ -245,6 +280,13 @@ pub fn subject_guard(ctx: &GateContext, require_review: &RequireReview, exclude_
         violations.extend(
             open_blockers(ctx).into_iter().filter(|f| changes.contains(&f.change_id)).map(|f| open_blocker_violation(f, &[subject_id.as_str()])),
         );
+        for fixed in fixed_blockers(ctx).into_iter().filter(|f| changes.contains(&f.finding.change_id)) {
+            let unmet: Vec<(&str, &str)> =
+                scenarios_without_evidence_after(ctx, subject_id, fixed.closed).into_iter().map(|s| (s.project_id.as_str(), s.scenario_id.as_str())).collect();
+            if !unmet.is_empty() {
+                violations.push(fixed_blocker_violation(&fixed, &[subject_id.as_str()], &unmet));
+            }
+        }
     }
     violations
 }
@@ -674,6 +716,87 @@ fn open_blocker_violation(finding: &Finding, subjects: &[&str]) -> Violation {
             finding.reviewer,
             finding.change_id.as_str(),
             finding.summary
+        ),
+    )
+}
+
+/// A blocker whose latest disposition is `fixed` (module doc).
+#[derive(Debug, Clone, Copy)]
+pub struct FixedBlocker<'a> {
+    /// Its latest version: the `fixed` one.
+    pub finding: &'a Finding,
+    /// When it was closed `fixed`: the `at` of its latest record. A fix
+    /// is re-verified by evidence recorded after this.
+    pub closed: DateTime<Utc>,
+}
+
+/// Every blocker finding whose latest disposition is `fixed`, each with
+/// the time it was closed (the `at` of that latest record).
+pub fn fixed_blockers(ctx: &GateContext) -> Vec<FixedBlocker<'_>> {
+    latest_by_key(&ctx.findings, |f| (f.change_id.as_str().to_string(), f.round, f.seq))
+        .into_iter()
+        .filter(|f| f.severity == FindingSeverity::Blocker && f.disposition() == FindingDisposition::Fixed)
+        .map(|finding| FixedBlocker { finding, closed: finding.envelope.at })
+        .collect()
+}
+
+/// The one freshness rule (module doc): the scenarios `subject` owns that
+/// have evidence but none recorded after `after`. A scenario with no
+/// evidence at all is not listed; the ship guard reports it as missing
+/// evidence on its own.
+pub fn scenarios_without_evidence_after<'a>(ctx: &'a GateContext, subject: &SubjectId, after: DateTime<Utc>) -> Vec<&'a Scenario> {
+    subject_scenarios(ctx, subject)
+        .into_iter()
+        .filter(|scenario| {
+            let evidence = scenario_evidence(ctx, scenario);
+            !evidence.is_empty() && evidence.iter().all(|e| e.envelope.at <= after)
+        })
+        .collect()
+}
+
+/// What a re-verification refusal says, ending in the command that
+/// clears it. `scenarios` are `(project_id, scenario_id)` pairs.
+pub fn reverify_remedy(scenarios: &[(&str, &str)]) -> String {
+    let mut projects: Vec<&str> = scenarios.iter().map(|(project, _)| *project).collect();
+    projects.dedup();
+    let project = projects.first().copied().unwrap_or("<root>");
+    let more = if projects.len() > 1 { format!(" (once per spec root: {})", projects.join(", ")) } else { String::new() };
+    format!(
+        "record the evidence again with `canon evidence add --project-id {project} --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" …`{more}; the re-review follows, as new evidence makes a pinned review stale"
+    )
+}
+
+/// `<first three>, … N more`: the scenarios a re-verification names.
+pub fn reverify_scenarios(scenarios: &[(&str, &str)]) -> String {
+    let shown = scenarios.iter().take(3).map(|(_, id)| format!("`{id}`")).collect::<Vec<_>>().join(", ");
+    match scenarios.len().saturating_sub(3) {
+        0 => shown,
+        more => format!("{shown}, … {more} more"),
+    }
+}
+
+/// Whether `violation` is a re-verification refusal ([`reverify_remedy`]),
+/// so a caller can add the batch command as the refusal's hint.
+pub fn is_reverify(violation: &Violation) -> bool {
+    violation.detail.contains(REVERIFY_MARK)
+}
+
+const REVERIFY_MARK: &str = "no evidence recorded after";
+
+fn fixed_blocker_violation(fixed: &FixedBlocker<'_>, subjects: &[&str], unmet: &[(&str, &str)]) -> Violation {
+    let finding = fixed.finding;
+    let subjects = subjects.iter().map(|s| format!("`{s}`")).collect::<Vec<_>>().join(", ");
+    Violation::new(
+        FailureClass::OpenBlocker,
+        format!("{}#{}.{}", finding.change_id.as_str(), finding.round, finding.seq),
+        format!(
+            "blocker finding by `{}` on change `{}` (subject {subjects}) is closed `fixed` but not re-verified: {} evidenced scenario(s) ({}) have {REVERIFY_MARK} the finding was closed `fixed` ({}); {}",
+            finding.reviewer,
+            finding.change_id.as_str(),
+            unmet.len(),
+            reverify_scenarios(unmet),
+            fixed.closed.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            reverify_remedy(unmet)
         ),
     )
 }

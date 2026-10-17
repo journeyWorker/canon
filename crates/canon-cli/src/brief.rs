@@ -72,6 +72,7 @@ use canon_gate::spec_coverage::{latest_scenarios, latest_subjects, subject_chang
 use canon_gate::GateContext;
 use canon_ingest::markdown::{field, without_field};
 use canon_model::{paths, ChangeId, ProjectId, ScenarioId, Subject, SubjectStatus, TaskId};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
@@ -129,6 +130,19 @@ pub fn approval_of(text: &str) -> Approval {
             }
         }
     }
+}
+
+/// When the human approved: the `<when>` of an `Approved:` line,
+/// `<who> <when> — "<words>" (brief sha256:<digest>)`. Written as a UTC
+/// RFC 3339 time (0.22); a line from before that carries only a date,
+/// read as the start of that day, UTC. `None` when no time is readable.
+pub fn approved_at(line: &str) -> Option<DateTime<Utc>> {
+    let head = line.split_once(" — ").map_or(line, |(head, _)| head);
+    let when = head.split_whitespace().next_back()?;
+    DateTime::parse_from_rfc3339(when)
+        .map(|at| at.with_timezone(&Utc))
+        .ok()
+        .or_else(|| NaiveDate::parse_from_str(when, "%Y-%m-%d").ok().and_then(|day| day.and_hms_opt(0, 0, 0)).map(|at| at.and_utc()))
 }
 
 /// Whether a subject's newest adopted change records the human's
@@ -387,4 +401,17 @@ pub fn override_lines(ctx: &GateContext) -> Vec<String> {
             ))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::approved_at;
+
+    #[test]
+    fn the_approval_time_reads_as_a_time_or_a_date_and_never_from_the_note() {
+        let at = |line: &str| approved_at(line).map(|t| t.to_rfc3339());
+        assert_eq!(at("Journey 2026-10-17T05:12:33Z — \"ok\" (brief sha256:ab)").as_deref(), Some("2026-10-17T05:12:33+00:00"));
+        assert_eq!(at("Ana Kim 2026-10-12 — \"ship 2026-12-31\"").as_deref(), Some("2026-10-12T00:00:00+00:00"));
+        assert_eq!(at("Journey — \"no time here\""), None);
+    }
 }

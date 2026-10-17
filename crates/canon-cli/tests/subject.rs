@@ -571,6 +571,25 @@ fn seed_blocker(repo: &Path, fixed_after: Option<i64>) {
     ledger(repo).write(&finding).unwrap();
 }
 
+/// What a fix is followed by (0.22 D2): the suite run again, then a new
+/// review of it, both after the blocker was raised and closed.
+fn seed_reverification(repo: &Path, scenario: &str) {
+    let later = |seconds: i64| Utc::now() + chrono::Duration::seconds(seconds);
+    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, later(10), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
+    let evidence = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful).with_project_id(ProjectId::parse("demo").unwrap());
+    ledger(repo).write(&evidence).unwrap();
+    let envelope = Envelope::new(1, RecordKind::Review, later(11), Actor::new("reviewer-2", RoleId::parse("reviewer").unwrap()));
+    let review = Review::new(
+        envelope,
+        ProjectId::parse("demo").unwrap(),
+        ScenarioId::parse(scenario).unwrap(),
+        "reviewer-2",
+        format!("pin-re-review-{scenario}"),
+        ProvenanceRef::OriginalSpecRef("specs/demo.feature".into()),
+    );
+    ledger(repo).write(&review).unwrap();
+}
+
 fn current_subject(repo: &Path) -> Value {
     query_subjects(repo, &[])["records"][0].clone()
 }
@@ -762,8 +781,12 @@ fn an_open_blocker_refuses_and_a_fixed_one_clears() {
     assert_eq!(current_subject(dir.path())["status"], "building");
 
     // The same natural key, closed later as fixed: the fold reads the
-    // latest version, so the blocker no longer counts.
+    // latest version, so the blocker no longer counts as open, but it
+    // keeps blocking until the suite ran again (0.22 D2).
     seed_blocker(dir.path(), Some(5));
+    let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    seed_reverification(dir.path(), "world.demo.01");
     let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(current_subject(dir.path())["status"], "verifying");
@@ -1541,7 +1564,8 @@ fn subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again() {
     assert_eq!(current_subject(dir.path())["status"], "verifying");
 
     seed_blocker(dir.path(), Some(5));
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
+    seed_reverification(dir.path(), "world.demo.01");
+    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now() + chrono::Duration::seconds(10), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
     let evidence = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("world.demo.02").unwrap()), None, EvidenceVerdict::Faithful)
         .with_project_id(ProjectId::parse("demo").unwrap());
     ledger(dir.path()).write(&evidence).unwrap();
