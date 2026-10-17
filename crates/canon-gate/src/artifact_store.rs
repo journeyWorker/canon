@@ -205,10 +205,28 @@ pub enum Observed {
     Sha256(String),
 }
 
+/// What each file hashed so far in this process held, while its size and
+/// modification time are unchanged ([`canon_store::git_tier::FileStamp`]).
+/// `canon gate check` asks about the same blob once per record and review
+/// that binds it; the bytes are read and hashed once.
+static OBSERVED: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<PathBuf, (canon_store::git_tier::FileStamp, String)>>> = std::sync::LazyLock::new(Default::default);
+
 impl Observed {
     fn of(path: &Path) -> Self {
+        let stamp = std::fs::metadata(path).ok().and_then(|meta| canon_store::git_tier::FileStamp::of(&meta));
+        if let Some(stamp) = stamp {
+            let seen = OBSERVED.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            if let Some((_, sha)) = seen.get(path).filter(|(was, _)| *was == stamp) {
+                return Observed::Sha256(sha.clone());
+            }
+        }
         match File::open(path).and_then(sha256_reader) {
-            Ok(sha) => Observed::Sha256(sha),
+            Ok(sha) => {
+                if let Some(stamp) = stamp {
+                    OBSERVED.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(path.to_path_buf(), (stamp, sha.clone()));
+                }
+                Observed::Sha256(sha)
+            }
             Err(_) => Observed::Missing,
         }
     }
