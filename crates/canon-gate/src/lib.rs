@@ -53,6 +53,7 @@ pub mod coverage;
 pub mod dispatch;
 pub mod evidence_binding;
 pub mod failure_class;
+pub mod history;
 pub mod hooks;
 pub mod ledger;
 pub mod legacy_pins;

@@ -374,6 +374,11 @@ fn rollup_for(kind: RecordKind, records: &[RawRecord]) -> Option<(usize, usize)>
     Some((done, records.len()))
 }
 
+/// `history`: every version of the kind, the ledger's and the archive's
+/// ([`canon_store::git_tier::GitTier::read_history`]), unfolded, oldest
+/// first. Without it, the current records only: the ledger holds one
+/// version per key, so this is the working set the gate reads.
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     repo: &Path,
     canon_yaml: Option<&Path>,
@@ -382,9 +387,11 @@ pub fn run(
     change_id: Option<&ChangeId>,
     status: Option<&str>,
     domain: Option<&str>,
+    history: bool,
 ) -> Result<QueryOutcome, QueryError> {
     let canon_yaml_path = resolve_canon_yaml(repo, canon_yaml);
     let loaded = tiers::build_lenient_tiers_for_kind(&canon_yaml_path, kind)?;
+    let archive = if history && canon_store::archive::is_archived_kind(kind) { loaded.git.as_ref().and_then(GitTier::archive_tier) } else { None };
     let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
 
     let mut query = TierQuery::kind(kind);
@@ -392,10 +399,15 @@ pub fn run(
         query = query.since(since);
     }
 
-    let result = registry.query(&query)?;
+    let mut result = registry.query(&query)?;
+    if let Some(archive) = archive {
+        let archived = canon_store::tier::Tier::read(&archive, &query)?;
+        result.records.extend(archived.records);
+        result.violations.extend(archived.violations);
+        result.records.sort_by_key(canon_store::tier::raw_record_at);
+    }
     let violation_count = result.violations.len();
-    let records = fold_pg_routed_kind(kind, result.records);
-    let records = fold_rewritten_kind(kind, records);
+    let records = if history { result.records } else { fold_rewritten_kind(kind, fold_pg_routed_kind(kind, result.records)) };
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
     Ok(QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None })

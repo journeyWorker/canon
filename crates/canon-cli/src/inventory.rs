@@ -1395,7 +1395,8 @@ mod tests {
         let gate_ctx = GateCtx::from_repo(repo.path()).unwrap();
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
-        assert_eq!(result.records.len(), 2, "the prior record is appended alongside, never overwritten");
+        assert_eq!(result.records.len(), 1, "the ledger holds one record per scenario: the new generation");
+        assert_eq!(tier.read_history(RecordKind::Scenario).unwrap().records.len(), 2, "the prior record is moved to the archive alongside, never overwritten");
     }
 
     #[test]

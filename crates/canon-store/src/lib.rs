@@ -9,6 +9,7 @@
 //! cross-rung purge boundary; it removes allowlisted operational records
 //! without rewriting Git history.
 
+pub mod archive;
 pub mod atomic;
 pub mod cursor;
 pub mod file_lock;
@@ -51,6 +52,12 @@ pub const VIEWS_SQL: &str = include_str!("../sql/views.sql");
 /// The rebindable-root env var [`VIEWS_SQL`] reads (module header):
 /// the git tier's `tiers.git.root`.
 pub const CANON_GIT_ROOT_ENV: &str = "CANON_GIT_ROOT";
+
+/// The rebindable-root env var [`VIEWS_SQL`] reads (0.23 D2): the
+/// archive of superseded record versions (`<repo>/.canon/archive`,
+/// [`archive::archive_root_of`]), laid out like the git root. Unset or
+/// empty reads no archive.
+pub const CANON_ARCHIVE_ROOT_ENV: &str = "CANON_ARCHIVE_ROOT";
 
 /// The rebindable-root env var [`VIEWS_SQL`] reads: the r2 tier's
 /// local (or synced) parquet root.

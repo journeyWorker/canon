@@ -723,7 +723,9 @@ fn promote_verbatim(
     // body" and "is this natural key already claimed".
     let mut committed_by_path: HashMap<PathBuf, RawRecord> = HashMap::new();
     let mut committed_versions: Vec<(String, PathBuf, RawRecord)> = Vec::new();
-    for raw in committed.read(&TierQuery::kind(kind))?.records {
+    // History, not just the ledger: a retry of a promotion whose commit was since
+    // archived must be recognised as already committed (0.23 D2).
+    for raw in committed.read_history(kind)?.records {
         let relative = expected_relative_path(kind, &raw.0).map_err(StoreError::Layout)?;
         let natural_key = resolve_partition(kind, &raw.0).map_err(StoreError::Layout)?.natural_key;
         committed_versions.push((natural_key, relative.clone(), raw.clone()));
@@ -992,7 +994,9 @@ fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, scope: Scope<'_>
     // exactly one, so N candidates for the same key in one call get N
     // distinct sequential values without re-scanning disk per
     // candidate.
-    let committed_read = committed.read(&TierQuery::kind(RecordKind::EvidenceRecord))?;
+    // The recovery index reads the archive too: a committed attestation that a
+    // newer version archived is still "already committed" (0.23 D2).
+    let committed_read = committed.read_history(RecordKind::EvidenceRecord)?;
     let mut next_seq: HashMap<(RoleId, String), u64> = HashMap::new();
     // The SAME scan also indexes every committed record by the
     // `staging_id` it was promoted under (module doc's recovery section),
@@ -1197,7 +1201,7 @@ fn divergence_partition_key(project_id: &ProjectId, role: Option<&RoleId>, scena
 /// `committed`'s own already-landed `Divergence` records (mirrors
 /// [`promote`]'s own `next_seq` scan).
 fn scan_divergence_next_seq(committed: &GitTier) -> Result<HashMap<(ProjectId, RoleId, String), u64>, StoreError> {
-    let committed_read = committed.read(&TierQuery::kind(RecordKind::Divergence))?;
+    let committed_read = committed.read_history(RecordKind::Divergence)?;
     let mut next_seq: HashMap<(ProjectId, RoleId, String), u64> = HashMap::new();
     for raw in &committed_read.records {
         let Ok(record) = serde_json::from_value::<Divergence>(raw.0.clone()) else { continue };
@@ -1623,7 +1627,7 @@ mod tests {
         assert!(report.refused.is_empty(), "a disposition transition is the one supersession `Unique` admits: {:?}", report.refused);
         assert_eq!(report.promoted.len(), 1);
         let dispositions: Vec<String> = committed
-            .read(&TierQuery::kind(RecordKind::Finding))
+            .read_history(RecordKind::Finding)
             .unwrap()
             .records
             .iter()
@@ -1661,7 +1665,7 @@ mod tests {
         let report = promote(&staging, &committed, false).unwrap();
         assert!(report.promoted.is_empty(), "the current disposition is already `fixed`, so this body carries no new fact");
         assert_eq!(report.refused.len(), 1);
-        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 2, "no third body");
+        assert_eq!(committed.read_history(RecordKind::Finding).unwrap().records.len(), 2, "no third body");
     }
 
     /// Two transitions of one key in a SINGLE drain have no defined
@@ -2098,6 +2102,59 @@ mod tests {
         // The unrelated staged candidate is still sitting there, untouched.
         assert_eq!(std::fs::read_dir(&staging_dir).unwrap().count(), 1);
         assert_eq!(committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap().records.len(), 1);
+    }
+
+    /// 0.23 D2: a retry whose original commit was since ARCHIVED (a newer
+    /// version of the same cell superseded it) is still recognised as
+    /// already committed, never appended again.
+    #[test]
+    fn a_retried_promote_recognises_a_commit_that_was_archived_since() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+        let original = evidence("implementer", Some("world.firstbuy-hotdeal.15"));
+
+        staging.write(&original).unwrap();
+        let first = promote(&staging, &committed, false).unwrap();
+        assert_eq!(first.promoted.len(), 1);
+
+        let mut newer = evidence("implementer", Some("world.firstbuy-hotdeal.15"));
+        newer.envelope.at = original.envelope.at + chrono::Duration::seconds(30);
+        staging.write(&newer).unwrap();
+        assert_eq!(promote(&staging, &committed, false).unwrap().promoted.len(), 1);
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1, "the first commit is archived now");
+        assert_eq!(committed.read_history(RecordKind::EvidenceRecord).unwrap().records.len(), 2);
+
+        // The interruption, replayed: the original's staging file survives.
+        staging.write(&original).unwrap();
+        let retry = promote(&staging, &committed, false).unwrap();
+        assert!(retry.promoted.is_empty(), "nothing new is appended: {:?}", retry.promoted);
+        assert_eq!(retry.recovered.len(), 1);
+        assert_eq!(retry.recovered[0].target, first.promoted[0].target);
+        assert_eq!(committed.read_history(RecordKind::EvidenceRecord).unwrap().records.len(), 2, "history is unchanged by the retry");
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1);
+        assert!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.is_empty(), "the retry drains staging");
+    }
+
+    /// The same for the generic (finding) path: a body already committed at
+    /// an archived path is drained, not re-appended.
+    #[test]
+    fn a_retried_finding_promote_recognises_an_archived_commit() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+        let open = finding("s44-spec-derived-worklist", 1, 1);
+        staging.write(&open).unwrap();
+        promote(&staging, &committed, false).unwrap();
+        let mut fixed = open.clone().fixed_by(Sha::parse(&"a".repeat(40)).unwrap());
+        fixed.envelope.at = open.envelope.at + chrono::Duration::hours(1);
+        staging.write(&fixed).unwrap();
+        promote(&staging, &committed, false).unwrap();
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 1, "the open version is archived");
+
+        staging.write(&open).unwrap();
+        let retry = promote(&staging, &committed, false).unwrap();
+        assert!(retry.promoted.is_empty(), "{:?}", retry.promoted);
+        assert_eq!(committed.read_history(RecordKind::Finding).unwrap().records.len(), 2, "nothing was appended");
+        assert!(staging.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.is_empty());
     }
 
     /// The `ReviewEvidence` BLOCKER (module doc's recovery section): the

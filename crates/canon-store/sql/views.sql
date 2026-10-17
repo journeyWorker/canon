@@ -453,12 +453,25 @@ LOAD json;
 -- which sorts below every real digest. NOTHING ELSE is taken from
 -- `record_path`: `kind`/`at`/`scenario_id` in particular are never
 -- read from the path, however legible it is.
+-- The archive (0.23 D2, `CANON_ARCHIVE_ROOT`, the `archive` directory
+-- beside the ledger) holds the versions the ledger no longer carries:
+-- same layout, same file names. It is read here so a mart that counts
+-- attestations or divergence events over time (`mart_review_burndown`,
+-- `mart_trust_matrix`'s `evidence_count`) still sees every one, while
+-- the marts that fold to the current record are unaffected: `version_rank`
+-- picks the same winner with or without the superseded rows. Unset or
+-- empty reads no archive.
 CREATE OR REPLACE VIEW stg_git_records AS
 WITH raw AS (
     SELECT
         filename                AS record_path,
         CAST(content AS JSON)   AS j
     FROM read_text(getenv('CANON_GIT_ROOT') || '/kind=*/**/*.json')
+    UNION ALL
+    SELECT
+        filename                AS record_path,
+        CAST(content AS JSON)   AS j
+    FROM read_text(coalesce(nullif(getenv('CANON_ARCHIVE_ROOT'), ''), getenv('CANON_GIT_ROOT') || '/_no_archive') || '/kind=*/**/*.json')
 )
 SELECT
     record_path,

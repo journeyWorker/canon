@@ -162,8 +162,10 @@ pub fn refusal(ctx: &GateContext, scenario: &Scenario, reviewer: &str, actor_id:
         let seen = latest.iter().map(|e| serde_json::to_value(e.verdict).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default()).collect::<BTreeSet<_>>().into_iter().collect::<Vec<_>>().join(", ");
         return Some(format!("{id}'s latest evidence is not divergent ({seen}): there is no gap to accept"));
     }
-    let evidence: Vec<_> = ctx
-        .evidence
+    // Independence holds against EVERY attestation, superseded ones
+    // included: the archive is read explicitly (`crate::history`).
+    let history = crate::history::evidence_history(ctx);
+    let evidence: Vec<_> = history
         .iter()
         .filter(|e| e.scenario_id.as_ref() == Some(&scenario.scenario_id) && e.project_id.as_ref().is_none_or(|p| *p == scenario.project_id))
         .collect();
@@ -179,9 +181,12 @@ pub fn refusal(ctx: &GateContext, scenario: &Scenario, reviewer: &str, actor_id:
 }
 
 /// The `evidence_sha` of `scenario`'s newest evidence record that carries
-/// one, for the acceptance's `sha` field.
+/// one, for the acceptance's `sha` field. The newest record that carries
+/// one need not be the latest record, so this reads the archive too
+/// (`crate::history`).
 pub fn evidence_sha(ctx: &GateContext, scenario: &Scenario) -> Option<canon_model::Sha> {
-    ctx.evidence
+    let history = crate::history::evidence_history(ctx);
+    history
         .iter()
         .filter(|e| e.scenario_id.as_ref() == Some(&scenario.scenario_id) && e.project_id.as_ref().is_none_or(|p| *p == scenario.project_id))
         .filter(|e| e.evidence_sha.is_some())

@@ -358,6 +358,9 @@ fn write_reviews(
                         let _ = std::fs::remove_file(ledger_root.join(location));
                     }
                 }
+                if !written.is_empty() {
+                    crate::ledger::restore_after_rollback(ledger_root, RecordKind::Review);
+                }
                 held.rollback();
                 if reviews.len() == 1 {
                     return Err(e.to_string());

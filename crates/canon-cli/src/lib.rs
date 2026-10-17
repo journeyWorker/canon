@@ -28,6 +28,7 @@ pub mod inventory_selftest;
 pub mod json_out;
 pub mod language;
 pub mod learn;
+pub mod ledger;
 pub mod migrate;
 pub mod next;
 pub mod paging;

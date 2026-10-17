@@ -133,11 +133,20 @@ impl GateCheck for CoverageCheck {
         // (module doc's `CellSubject`) — records with neither
         // `task_id` nor `scenario_id` are simply not a coverage
         // subject and never enter a group.
+        // No `risk_routing` rule, no required cell: nothing to report.
+        if ctx.policy.risk_routing.is_empty() {
+            return Vec::new();
+        }
         let mut groups: BTreeMap<CellSubject, Vec<&EvidenceRecord>> = BTreeMap::new();
         // A task+scenario record answers BOTH cells (`all_of`), the same
         // keying `crate::ledger::latest_verdicts` uses, so coverage and
         // the ship decision judge the same cells.
-        for record in &ctx.evidence {
+        //
+        // A rule applies when ANY record of the artifact proves it, and
+        // a role is covered when ANY record carries it: superseded
+        // records count, so this reads the archive too (`crate::history`).
+        let history = crate::history::evidence_history(ctx);
+        for record in &history {
             for subject in CellSubject::all_of(record) {
                 groups.entry(subject).or_default().push(record);
             }

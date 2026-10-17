@@ -92,7 +92,7 @@ fn staged_findings(repo: &Path) -> Vec<PathBuf> {
 }
 
 fn committed_findings(repo: &Path) -> Vec<PathBuf> {
-    files(repo.join(".canon/ledger/kind=finding"))
+    { let mut all = files(repo.join(".canon/ledger/kind=finding")); all.extend(files(repo.join(".canon/archive/kind=finding"))); all }
 }
 
 fn body_at(path: &Path) -> serde_json::Value {
