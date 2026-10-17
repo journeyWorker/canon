@@ -255,7 +255,11 @@ experimental:
 `--artifact`/`--report`는 묶은 파일을 `.canon/artifacts/sha256/<hex>`에
 복사합니다. 이 내용 주소 저장소는 git으로 추적되므로 레저와 함께 커밋합니다.
 25 MiB를 넘는 파일은 `--max-artifact-mib`로 한도를 올리지 않으면 거부됩니다
-(종료 코드 `2`). `canon gate check`는 서브젝트 상태와 상관없이 최신 증거
+(종료 코드 `2`). 이것이 기본 저장소입니다. `canon.yaml`의 `artifact_store:`가
+오브젝트 스토어 단을 가리키면 같은 쓰기가 blob을 digest로 올리고 로컬에는
+아무것도 남기지 않으며, gate와 `canon artifacts verify [--full]`은 스토어에
+물어보고 닿지 못하면 통과시키지 않고 거부합니다([티어드 스토리지](/ko/concepts/tiered-storage/)
+참고). `canon gate check`는 서브젝트 상태와 상관없이 최신 증거
 레코드에 묶인 모든 파일을 다시 검사합니다:
 
 - 저장된 blob이 온전하면 → 깨끗함. 작업 트리 파일을 다시 써도 마찬가지입니다

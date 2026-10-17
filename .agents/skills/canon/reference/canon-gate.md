@@ -523,6 +523,16 @@ again. The directory is tracked in git (`canon init` never ignores it):
 commit it with the ledger. A file larger than 25 MiB is refused (exit 2);
 raise the limit with `--max-artifact-mib <N>`.
 
+Where those bytes live is `canon.yaml`'s `artifact_store: { backend: local |
+<s3 tier>, prefix: artifacts/ }` (default `local`: the directory above,
+git-tracked, no credentials). With an object-store tier, `evidence add`,
+`review add` and `evidence vault` upload each blob under
+`<prefix>sha256/<digest>` and keep nothing locally. `canon gate check` and
+`canon artifacts verify [--full]` ask the store (a HEAD per digest; `--full`
+downloads and re-hashes) and refuse, never pass, when it cannot be reached.
+`canon artifacts migrate --to <tier> [--dry-run]` moves an existing local
+store; it is the repo owner's decision. See `canon-storage`.
+
 `canon gate check` re-checks every file bound to a LATEST evidence record
 (the latest per task and per `(project_id, scenario_id)`):
 
