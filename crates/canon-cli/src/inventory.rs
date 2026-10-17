@@ -34,7 +34,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use canon_fmt::Violation;
-use crate::migrate_legacy_pins::SpecSources;
+use canon_gate::{GateContext, GateCtx};
 use canon_model::ids::SpecDigest;
 use canon_model::{paths, Actor, Envelope, ProjectId, RecordKind, Scenario, ScenarioId, SubjectId};
 use canon_store::file_lock::{FileLock, FileLockError};
@@ -44,6 +44,7 @@ use canon_store::tier::{StoreError, Tier, TierQuery};
 use chrono::Utc;
 
 use crate::context::resolve_repo_root;
+use crate::migrate_legacy_pins::SpecSources;
 use crate::subject::enum_membership_violation;
 
 /// The stable literal id BOTH the absent-`specs:` default AND

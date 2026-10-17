@@ -1,10 +1,10 @@
-description: "0.15 D1: a pinned review stops counting once its scenario is re-attested: after `canon review add` and the move to verifying (exit 0), a new `canon evidence add` promoted by `canon gate promote` makes `canon gate check` exit 1 with `unreviewed-promotion` naming the evidence change, and `canon subject status <id> --to shipped` refuses on the same stale review (exit 1)"
+description: "0.15 D1: a pinned review stops counting once its scenario's evidence says something different: after `canon review add` and the move to verifying (exit 0), a new `canon evidence add` with another verdict, promoted by `canon gate promote`, makes `canon gate check` exit 1 with `unreviewed-promotion` naming the evidence change, and `canon subject status <id> --to shipped` refuses on the same stale review (exit 1)"
 steps:
   - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --reviewer, reviewer-2, --pin, r1, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review]
     exit: 0
   - args: [subject, status, cart, --to, verifying]
     exit: 0
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, cargo test cart_add, --role, implementer, --actor-id, impl-agent, --session-id, sess-impl]
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, cargo test cart_add, --role, implementer, --actor-id, impl-agent, --session-id, sess-impl, --verdict, not-applicable, --summary, case skipped in this run]
     exit: 0
   - args: [gate, promote]
     exit: 0

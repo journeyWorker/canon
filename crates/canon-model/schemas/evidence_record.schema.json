@@ -21,17 +21,6 @@
       "type": "string",
       "format": "date-time"
     },
-    "attachment_drop": {
-      "description": "Bound files of the scenario's previous latest record this one\ndeliberately no longer binds, and why (0.15 D2). Additive.",
-      "anyOf": [
-        {
-          "$ref": "#/$defs/AttachmentDrop"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "attachments": {
       "description": "Files this evidence is bound to (experimental evidence binding;\nadditive and skipped when empty, so unbound records are unchanged\non the wire).",
       "type": "array",
@@ -204,25 +193,6 @@
       },
       "required": [
         "agent_id"
-      ]
-    },
-    "AttachmentDrop": {
-      "description": "Files a re-attestation deliberately stopped binding (0.15 D2): the\nrepository-relative paths the scenario's previous latest record bound\nand this record does not, and the author's one-line reason. Without\nit `canon evidence add` refuses a record that would drop them.",
-      "type": "object",
-      "properties": {
-        "paths": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "reason": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "paths",
-        "reason"
       ]
     },
     "AuditResult": {

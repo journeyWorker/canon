@@ -5,8 +5,7 @@
 //! been: the policy's level (0.16 D3, [`crate::policy_level`]), each
 //! subject's scenario, evidence and review counts, its open
 //! blockers and missing required cases, the scenarios no subject owns,
-//! the bindings a re-attestation dropped on purpose (0.15 D2), the audit
-//! obligations `spec_coverage.require_audit` sampled and every refuted
+//! the audit obligations `spec_coverage.require_audit` sampled and every refuted
 //! audit (0.15 D3), and a short `next:` list of concrete commands.
 //!
 //! # One set of joins
@@ -276,6 +275,8 @@ pub struct SubjectSummary {
     /// [`crate::reverify`]): the next step's input, not part of the report.
     #[serde(skip)]
     pub reverify: Vec<crate::reverify::Gap>,
+    /// Approved chore changes with no qualifying change-level review (0.23 D5).
+    pub chore_reviews: Vec<(canon_model::ChangeId, String)>,
 }
 
 /// One flow step of the brief and what covers it.
@@ -422,7 +423,7 @@ pub fn split_by_role(steps: Vec<NextStep>, role: Role) -> (Vec<NextStep>, BTreeM
 }
 
 /// The top-level fields of the `--json` report, which `--fields` may name.
-/// `drops` and `audits` are omitted from a report that has none.
+/// `audits` is omitted from a report that has none.
 const REPORT_FIELDS: [&str; 10] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits", "next", "nextOmitted", "waitingOn"];
 
 /// Build the report for an already-resolved repo root. The caller has
@@ -863,6 +864,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         red,
         flow: changes.last().map(|change| flow_steps(ctx, joins, repo, change, distinct_actor)).unwrap_or_default(),
         reverify: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::gaps(repo, ctx, subject) } else { Vec::new() },
+        chore_reviews: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::chore_review_gaps(repo, ctx, subject) } else { Vec::new() },
     }
 }
 
@@ -1168,6 +1170,18 @@ fn subject_steps(
                 blocker.seq
             ),
             why: format!("{id}: {} open blocker finding(s) (first: {}); fix it, commit, then close it", summary.open_blockers, blocker.summary),
+        });
+    }
+
+    if let Some((change, why)) = summary.chore_reviews.first() {
+        next.push(NextStep {
+            actor: StepActor::Agent,
+            role: Some(Role::Reviewer),
+            command: format!(
+                "canon review add --project-id <root> --change {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"",
+                change.as_str()
+            ),
+            why: format!("{id}: {why}"),
         });
     }
 

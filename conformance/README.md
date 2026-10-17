@@ -127,7 +127,7 @@ case that turns the gate red, refuses, or (for the policy) prints an advisory:
 |---|---|---|
 | Scenario text changed after review (stale spec) | `review-pin-stale-spec` | `gate check` exit 1, `unreviewed-promotion` "its spec changed" |
 | Evidence re-attested after review (stale evidence) | `review-pin-stale-evidence` | `gate check` exit 1, `unreviewed-promotion` "its evidence changed"; `subject status … shipped` exit 1 |
-| Re-attest naming fewer files | `evidence-add-drop-attachment` | `evidence add` exit 0 carrying the earlier files forward; with `--drop-attachment/--drop-reason` the drop is recorded and listed by `status` |
+| Re-attest naming fewer files | `evidence-add-binds-only-named` | `evidence add` exit 0 binding only the files it names, nothing carried forward; `--drop-attachment` is refused (exit 2) |
 | Refuted audit | `gate-check-audit-false-success` | `gate check` exit 1, `false-success` despite a faithful verdict |
 | Indeterminate reviewer | `review-outcome-indeterminate-gap` | `gate check` exit 1, `unreviewed-promotion` "no signed review"; transition refused |
 | Unavailable reviewer | `review-outcome-unavailable-gap` | as indeterminate |
@@ -147,7 +147,7 @@ so only the undecidable side is a case here:
 
 | Situation | Case | What a consumer sees |
 |---|---|---|
-| Pinned commit not in the clone (fake sha) | `gate-check-legacy-review-missing-pin` | the review still counts: `subject status … verifying` and `gate check` exit 0, with an advisory counting it undecidable and naming `fetch-depth: 0` |
+| Pinned commit not in the clone (fake sha) | `gate-check-unmigrated-review-needs-migrate` | the review still counts: `subject status … verifying` and `gate check` exit 0, with an advisory counting it undecidable and naming `fetch-depth: 0` |
 
 The current, stale-by-spec, stale-by-evidence and moved-file cases need real
 history and are pinned by `crates/canon-cli/tests/legacy_pins.rs`.

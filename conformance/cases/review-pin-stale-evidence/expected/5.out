@@ -1,6 +1,6 @@
 canon gate check: 1 violation(s)
 
 unreviewed-promotion (1):
-  unreviewed-promotion cart.add.01 — stale review by `reviewer-2`: its evidence changed (the latest evidence records are not the pinned ones) since the review; a pinned review counts only while what it saw is current — review it again (`canon review add`)
+  unreviewed-promotion cart.add.01 — stale review by `reviewer-2`: its evidence changed (the latest evidence says a different verdict or names different checks than the review saw) since the review; a review counts only while what it saw is current — review it again (`canon review add`)
 
 advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`

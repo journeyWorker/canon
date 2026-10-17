@@ -74,9 +74,10 @@ After the first `status`, follow `meta.next` of each write; do not call
    reviewer closed `fixed`, and an approved chore, are not done until every
    evidenced scenario has evidence newer than the close or the approval:
    run the suite and bind it with `canon evidence add --all-scenarios …`
-   (the shipping refusal names the scenarios and this command). The
-   re-review follows; a scenario whose gap was accepted is accepted again
-   by the reviewer once new evidence supersedes the old.
+   (the shipping refusal names the scenarios and this command). A
+   review stays current while the verdicts and checks are unchanged; a
+   scenario whose gap was accepted is accepted again by the reviewer once
+   new evidence says something different.
 
 ## Retry safety
 

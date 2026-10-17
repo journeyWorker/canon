@@ -76,7 +76,7 @@ fn files_under(dir: PathBuf) -> Vec<PathBuf> {
 }
 
 fn staged(repo: &Path) -> usize {
-    files_under(repo.join(".canon/ledger/_staging")).len() + files_under(repo.join(".canon/ledger/_staging_divergence")).len()
+    files_under(repo.join(".canon/ledger/_staging")).len()
 }
 
 fn committed(repo: &Path, kind: &str) -> usize {
@@ -196,7 +196,7 @@ fn a_malformed_write_section_or_both_flags_are_refused_before_anything_is_staged
 /// evidence.add.65: a promote on write commits only the record its own
 /// run staged. A record another author staged with `--no-promote` — an
 /// attestation or a divergence candidate — stays staged until a full
-/// `canon gate promote` / `canon divergence promote` commits it.
+/// `canon gate promote` commits it.
 #[test]
 fn a_promote_on_write_commits_only_its_own_record() {
     let dir = init_repo();
@@ -236,7 +236,7 @@ fn a_promote_on_write_commits_only_its_own_record() {
 /// prints ONE success line naming the record's committed file, never the
 /// staged file promotion moved (dogfood eval 3 H2); with `--no-promote`
 /// the line names the staged file and the promote that commits it:
-/// `canon gate promote`, or `canon divergence promote` for a divergence.
+/// `canon gate promote`.
 #[test]
 fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     let dir = init_repo();
@@ -264,7 +264,7 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     let kept: [(&str, Vec<&str>, &str); 3] = [
         ("canon evidence add", with(evidence("game.run.01"), &["--summary", "attested again", "--no-promote"]), STAGED),
         ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "2", "--severity", "note", "--reviewer", "r", "--summary", "s", "--no-promote"], STAGED),
-        ("canon divergence add", vec!["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"], "— run `canon divergence promote` to commit it"),
+        ("canon divergence add", vec!["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"], STAGED),
     ];
     for (command, args, suffix) in kept {
         let text = stdout(&ok(repo, &args));

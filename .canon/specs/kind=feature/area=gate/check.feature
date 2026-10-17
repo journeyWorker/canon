@@ -272,7 +272,7 @@ Feature: gate check
   @gate.check.61
   Scenario: A newer confirmed audit clears false-success and lets the subject ship
     Given a scenario whose latest audit is refuted
-    When a newer confirmed audit is recorded, naming the counterexample report with --drop-attachment
+    When a newer confirmed audit is recorded, binding only what it names
     Then the gate is clean and the owning subject can ship
 
   # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
@@ -309,23 +309,21 @@ Feature: gate check
   @subject:gate-trust-spine
   @case:edge
   @gate.check.40
-  Scenario: Reviews written before pinning whose pin cannot be read keep counting, and the gate names them in one advisory line
-    Given require_review and a review written before 0.15, with no pins, whose pin is no commit of this clone
-    When its scenario's spec changes and `canon gate check` runs
-    Then the review still counts and the gate exits 0
-    And one advisory line counts the in-effect reviews that predate review pinning as current, stale and undecidable
-    And `canon status` prints the same advisory, and `canon subject status` prints it for the subject's own scenarios
+  Scenario: A review that predates 0.23 pinning does not count and the gate says canon migrate
+    Given require_review and a review written before 0.23, pinned to nothing or to evidence record files
+    When `canon gate check` runs
+    Then the gate exits 1 with unreviewed-promotion on that scenario, saying the review predates 0.23 review pinning and that `canon migrate` rewrites it
+    And one advisory line counts the scenarios whose review is not migrated, and `canon status` and `canon subject status` print the same advisory
 
   # canon: {"schema":1,"at":"2026-10-10T20:02:32Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
   @case:edge
   @gate.check.65
-  Scenario: The false-success fix names the counterexamples a re-audit must drop
+  Scenario: The false-success line names the counterexamples and a new audit replaces the refutation
     Given a scenario whose latest audit is refuted and binds a counterexample report whose path has a space and a quote
-    When the gate is checked and canon status is read
-    Then the false-success line and the re-audit next command name --drop-attachment with the counterexample path shell-quoted, and --drop-reason
-    And the printed command, placeholders filled in, runs through a shell, is accepted and clears the gate
-    And a refutation that binds no counterexample names no drop
+    When the gate is checked and then a confirmed audit is recorded that names no file
+    Then the false-success line names the counterexample path and no drop flag
+    And the confirmed audit binds nothing from the refutation and the gate is clean
 
   # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
@@ -343,65 +341,51 @@ Feature: gate check
   @subject:gate-trust-spine
   @case:happy
   @gate.check.90
-  Scenario: A review written before pinning still counts while its scenario is unchanged since the commit it pinned
-    Given require_review and a review written before 0.15 whose pin is the commit it reviewed
-    And the scenario's file changed since that commit only in comments and indentation
-    When `canon gate check` runs
-    Then the scenario's digest at the pinned commit, computed as inventory sync computes it, equals its current digest
-    And the review counts and the gate exits 0
-    And the advisory counts the review as checked against its commit and current
+  Scenario: canon migrate pins a review written before 0.15 that is still current, and it counts afterwards
+    Given require_review and reviews written before 0.15 whose pin is the commit they reviewed, and the scenarios unchanged since
+    When `canon gate check` runs, then `canon migrate`, then `canon gate check` again
+    Then the first gate exits 1 and names `canon migrate`
+    And migrate rewrites each review with the verdict and checks of its scenario's latest evidence, keeping its reviewer
+    And the second gate exits 0, and a second migrate finds nothing to convert
 
   # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
   @case:failure
   @gate.check.91
-  Scenario: A review written before pinning goes stale when its scenario changed after the commit it pinned
+  Scenario: canon migrate leaves a review stale when its scenario changed after the commit it pinned
     Given require_review and reviews written before 0.15 of two scenarios, pinned to the commit they reviewed
-    When one scenario's steps change in a later commit and `canon gate check` runs
-    Then the gate exits 1 with unreviewed-promotion on that scenario, saying its spec changed since the pinned commit
-    And the other scenario's review still counts
-    And the advisory counts one current and one stale review and names the stale scenario
-    And `canon status` prints the same advisory
+    When one scenario's steps change in a later commit and `canon migrate` runs
+    Then the unchanged scenario's review is pinned and counts, and the changed one's review is left as it was
+    And `canon gate check` exits 1 with unreviewed-promotion on the changed scenario only
 
   # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
   @case:failure
   @gate.check.92
-  Scenario: A review written before pinning goes stale when its scenario has evidence newer than the review
+  Scenario: canon migrate leaves a review stale when its scenario has evidence newer than the review
     Given require_review and a review written before 0.15 of a scenario unchanged since its pinned commit
-    When evidence for that scenario is recorded after the review and `canon gate check` runs
-    Then the gate exits 1 with unreviewed-promotion on that scenario, saying it has declared evidence newer than the review
+    When evidence for that scenario is recorded after the review and `canon migrate` runs
+    Then the review is left as it was and `canon gate check` exits 1 with unreviewed-promotion on that scenario
 
   # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
   @case:edge
   @gate.check.93
-  Scenario: A review written before pinning whose commit or scenario is not in the clone counts and is named in the advisory
+  Scenario: canon migrate pins a review whose commit or scenario is not in the clone as the scenario stands
     Given require_review and reviews written before 0.15, one pinned to a commit this clone does not have and one to a commit that predates its scenario
-    When `canon gate check` runs
-    Then both reviews still count and the gate exits 0, never reporting a missing commit as a violation
-    And the advisory counts them as undecidable and suggests checking out full history with fetch-depth 0
+    When `canon migrate` runs and then `canon gate check`
+    Then both reviews are pinned and count and the gate exits 0, never reporting a missing commit as a violation
+    And migrate counts them as unchecked and suggests checking out full history with fetch-depth 0
 
   # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
   @case:edge
   @gate.check.94
-  Scenario: A review written before pinning finds its scenario in the file it lived in at the pinned commit
+  Scenario: canon migrate finds a review's scenario in the file it lived in at the pinned commit
     Given require_review and reviews written before 0.15 pinned to a commit where their scenarios lived in another feature file
-    When the scenarios have since moved, unchanged, to a new file and `canon gate check` runs
+    When the scenarios have since moved, unchanged, to a new file and `canon migrate` runs
     Then the scenarios are found in the old file at the pinned commit
-    And both reviews count as current and the gate exits 0
-
-  # canon: {"schema":1,"at":"2026-10-12T11:44:52Z","actor":{"agent_id":"canon"}}
-  @subject:gate-trust-spine
-  @case:failure
-  @gate.check.95
-  Scenario: A scenario index generation from before 0.15 cannot leave a legacy review undecidable
-    Given require_review and reviews written before 0.15 pinned to the commit they reviewed
-    And a scenario index holding only generations written before 0.15, with no scenario digest, for a feature file whose bytes are unchanged
-    When canon gate check runs
-    Then its refresh rewrites those generations as canon inventory sync would
-    And the reviews are checked against their pin and counted current, never undecidable
+    And both reviews are pinned and the gate exits 0
 
   # canon: {"schema":1,"at":"2026-10-12T11:44:52Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
@@ -410,6 +394,6 @@ Feature: gate check
   Scenario: A moved spec root is searched at its former path and only for its own project
     Given a spec root moved from specs to .canon/specs with former_roots [specs], and a second root declaring the same scenario ids with the same text
     And reviews written before 0.15 for both projects, pinned to a commit from before the move, when only the first project existed
-    When canon gate check runs
-    Then the first project's review is found at its former root and counted current
-    And the second project's review is undecidable, never matched against the first project's scenario
+    When canon migrate runs
+    Then the first project's review is found at its former root and pinned as current
+    And the second project's review is undecidable and pinned as the scenario stands, never matched against the first project's scenario

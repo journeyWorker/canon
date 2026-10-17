@@ -25,19 +25,19 @@ Feature: divergence lifecycle
   @subject:divergence-lifecycle
   @case:happy
   @divergence.lifecycle.03
-  Scenario: Resolving and deferring commit directly and leave a batch mid-stage alone
+  Scenario: Resolving and deferring stage and promote their own record and leave other staged work alone
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given an unrelated candidate a reviewer is still staging
     When one scenario is resolved and another is deferred with a reason and an expiry
-    Then both are committed without a promote step
+    Then both are committed in their own run, each promoted from staging like any other staged record
     And the staged candidate is still sitting there untouched, so a routine resolve never promotes somebody else's work
 
   @subject:divergence-lifecycle
   @case:happy
   @divergence.lifecycle.04
-  Scenario: A directly committed resolution is what the status view reports
+  Scenario: A resolution is what the status view reports
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given a scenario resolved directly
+    Given a scenario resolved
     When the divergence status is read
     Then the read exits zero, because it is a capability query and never a gate
     And the current state of that scenario is resolved

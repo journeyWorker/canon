@@ -19,10 +19,11 @@
       "outcome": "indeterminate",
       "pin": "r1",
       "pins": {
-        "evidence": [
+        "checks": [
           {
-            "digest": "ca470d326b9c",
-            "key": "cart.add.01"
+            "checks": [],
+            "role": "implementer",
+            "verdict": "faithful"
           }
         ],
         "scenario_digest": "6bb1bf1434056901ffd5b6536d525c726f106806f724be808733ec1d02a15c6a",
@@ -49,10 +50,11 @@
       "kind": "review",
       "pin": "r2",
       "pins": {
-        "evidence": [
+        "checks": [
           {
-            "digest": "ca470d326b9c",
-            "key": "cart.add.01"
+            "checks": [],
+            "role": "implementer",
+            "verdict": "faithful"
           }
         ],
         "scenario_digest": "6bb1bf1434056901ffd5b6536d525c726f106806f724be808733ec1d02a15c6a",

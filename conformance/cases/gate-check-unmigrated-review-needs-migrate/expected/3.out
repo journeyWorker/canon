@@ -1,0 +1,8 @@
+canon migrate: plan:
+  .gitignore: add .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock
+  rebuild the scenario index (full sync)
+  left: .canon stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
+  left: .git stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
+canon migrate: added to .gitignore: .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock
+canon migrate: rebuilt the scenario index: 0 record(s) written
+canon migrate: pinned 1 review(s) to what their evidence says (the verdict and the checks of its latest record): 0 were pinned to evidence records, 1 to a commit before 0.15; 1 of those could not be checked because their commit, or the scenario at it, is not in this clone, so they are pinned as the scenario stands (check out full history, `fetch-depth: 0` in CI, to check them)

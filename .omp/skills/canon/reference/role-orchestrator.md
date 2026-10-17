@@ -78,8 +78,9 @@ brief says the human ships. A follow-up on a shipped subject goes back to
 change, then `--to shipped` again. A chore on a shipped subject (`change
 new … --kind chore` names the reopen command) is approved first, then
 reopened the same way; shipping again needs the whole suite evidenced after
-the chore's approval (`evidence add --all-scenarios`) and a re-review. A
-blocker closed `fixed` needs the same. The refusal names the scenarios and
+the chore's approval (`evidence add --all-scenarios`) and the chore's own
+change-level review (`review add --change <slug>`). A blocker closed
+`fixed` needs the suite again. The refusal names the scenarios and
 the command; never override them. `canon status` flags a shipped subject
 whose gate went red. A bad `--to` fails with `error.field` `--to` and
 `error.expected` listing the states.

@@ -140,58 +140,39 @@
 //! it is a kind that needs no identity assigned, not one whose
 //! identity is skipped.
 //!
-//! # NOT extended to `Divergence` (s15 P3b, design D10)
-//! `Divergence` is deliberately absent from [`STAGED_KINDS`] and keeps
-//! its OWN, separate promote path
-//! ([`promote_divergence`]/[`commit_divergence`]) rather than joining
-//! the registry, because its staging shape is NOT a full `Divergence`
-//! record: `Divergence.run_seq: TotalOrder` stays REQUIRED (the committed-
-//! record invariant [`crate::fold`]'s ordering depends on), so a staged,
-//! run_seq-less candidate cannot even deserialize as one. [`DivergenceCandidate`]
-//! is the run_seq-less staging shape ("a staging JSONL-equivalent, NOT a
-//! committed Divergence record" — design D10's own framing); staging
-//! candidates live as flat, content-digest-named JSON files under
-//! `<ledger_root>/_staging_divergence/` ([`stage_divergence`]) — NEVER
-//! through [`GitTier`]'s kind=/area= Hive layout, since
-//! `canon_store::partition::resolve_partition`'s `Divergence` arm
-//! requires `run_seq` to compute even the natural key, and a staged
-//! candidate has none yet. [`promote_divergence`] partitions run_seq by
-//! `(project_id, role, surface)` — `project_id` from the REQUIRED field,
-//! `role` from the writing actor, `surface` from `scenario_id.surface_key()`
-//! — batch-promoting every staged candidate, mirroring [`promote`]'s own
-//! shape. `canon divergence resolve`/`defer` (native-verdict-lifecycle
-//! spec) go through [`commit_divergence`] instead — a single-candidate
-//! direct commit that never touches the batch staging directory at all,
-//! so a routine resolve/defer can never accidentally promote an unrelated
-//! candidate a reviewer is still mid-`stage`ing.
-//!
-//! That a third promotion path exists at all is a known wart, and s43
-//! did not untangle it: folding a divergence candidate in would mean
-//! reconciling a DIFFERENT staging representation, a different staging
-//! directory, and a different CLI surface, which is its own change.
-//! [`STAGED_KINDS`] is the seam that stops a FOURTH one appearing.
+//! # `Divergence` stages the same way (0.23)
+//! A divergence is staged exactly like evidence: the full `Divergence`
+//! record under `_staging/kind=divergence/`, with `run_seq` `0` meaning
+//! "not assigned yet" (committed sequences start at 1). Promotion
+//! assigns the monotonic `run_seq` within the `(project_id, role,
+//! surface)` partition (`project_id` from the record, `role` from the
+//! writing actor, `surface` from `scenario_id.surface_key()`), stamps
+//! the `staging_id` companion key, and recovers an interrupted commit
+//! the way evidence does ([`StagedAssignment::RunSeqPerProjectRoleSurface`]).
+//! There is one staging directory, one promote path and one recovery
+//! rule for every staged kind; `canon divergence resolve`/`defer`/`accept`
+//! stage and promote like every other authoring command.
 //!
 //! # Promote on write: one candidate, never the batch (0.16)
 //! An authoring command run with `--promote` (or under `write: {
 //! promote: auto }`) promotes the ONE record it just staged:
-//! [`promote_staged`] for the [`STAGED_KINDS`] families,
-//! [`promote_staged_divergence`] for a divergence candidate. Both run
+//! [`promote_staged`] for every [`STAGED_KINDS`] family. It runs
 //! the batch path's own per-kind code over a one-candidate set, so the
 //! validation and assignment are identical; what they never do is drain
 //! a record some other author staged and has not chosen to commit.
-//! `canon gate promote` / `canon divergence promote` remain the only
-//! commands that drain everything.
+//! `canon gate promote` (and `canon divergence promote`, which drains
+//! only the staged divergences) remain the only commands that drain
+//! everything.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use canon_model::{Divergence, DivergenceStatus, EvidenceRecord, Envelope, ProjectId, RawRecord, RecordKind, RoleId, ScenarioId, Sha, TotalOrder};
+use canon_model::{Divergence, EvidenceRecord, ProjectId, RawRecord, RecordKind, RoleId};
 use canon_store::fold::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
 use canon_store::partition::{content_digest12, expected_relative_path, resolve_partition};
 use canon_store::tier::{RawWrite, StoreError, Tier, TierQuery};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 
 use crate::failure_class::{FailureClass, Violation};
 
@@ -412,6 +393,11 @@ pub enum StagedAssignment {
     /// type — so this variant has exactly one member and adding a
     /// second would mean generalizing the partition key first.
     RunSeqPerRoleSurface,
+    /// A monotonic `run_seq` per `(project_id, role, surface)` for a
+    /// staged `Divergence` (module doc): the same assignment and
+    /// recovery as [`Self::RunSeqPerRoleSurface`] over the partition
+    /// that adds the record's `project_id`.
+    RunSeqPerProjectRoleSurface,
     /// Nothing at all: the kind's natural key is complete the moment it
     /// is authored, so the committed body is the staged body byte for
     /// byte.
@@ -502,7 +488,7 @@ pub struct StagedKind {
 /// making it promotable — and so the set of promotable kinds is
 /// enumerable from one place by an operator, a diagnostic, and the
 /// per-kind tally `canon gate promote` prints.
-pub const STAGED_KINDS: [StagedKind; 2] = [
+pub const STAGED_KINDS: [StagedKind; 3] = [
     StagedKind {
         kind: RecordKind::EvidenceRecord,
         assignment: StagedAssignment::RunSeqPerRoleSurface,
@@ -512,6 +498,9 @@ pub const STAGED_KINDS: [StagedKind; 2] = [
     // complete at authoring time — nothing for promotion to assign, and
     // exactly one record allowed to claim it.
     StagedKind { kind: RecordKind::Finding, assignment: StagedAssignment::Nothing, natural_key: NaturalKeyRule::Unique },
+    // 0.23: a divergence, staged like evidence and promoted with a
+    // `run_seq` per `(project_id, role, surface)`.
+    StagedKind { kind: RecordKind::Divergence, assignment: StagedAssignment::RunSeqPerProjectRoleSurface, natural_key: NaturalKeyRule::Versioned },
 ];
 
 /// Promote every well-formed `_staging/` candidate of every kind in
@@ -609,6 +598,7 @@ enum Scope<'a> {
 fn promote_kind(staged_kind: StagedKind, staging: &GitTier, committed: &GitTier, scope: Scope<'_>, dry_run: bool, report: &mut PromoteReport) -> Result<(), StoreError> {
     match staged_kind.assignment {
         StagedAssignment::RunSeqPerRoleSurface => promote_with_run_seq(staging, committed, scope, dry_run, report),
+        StagedAssignment::RunSeqPerProjectRoleSurface => promote_divergences(staging, committed, scope, dry_run, report),
         StagedAssignment::Nothing => promote_verbatim(staged_kind, staging, committed, scope, dry_run, report),
     }
 }
@@ -1103,234 +1093,103 @@ fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, scope: Scope<'_>
     Ok(())
 }
 
-/// A staged `Divergence` candidate — every `Divergence` field except
-/// `run_seq` (module doc: `Divergence.run_seq` stays REQUIRED, so a
-/// run_seq-less candidate cannot deserialize as one). [`stage_divergence`]
-/// writes one of these; [`promote_divergence`]/[`commit_divergence`]
-/// assign the monotonic `run_seq` and construct the committed
-/// [`Divergence`] only at that point.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DivergenceCandidate {
-    #[serde(flatten)]
-    pub envelope: Envelope,
-    pub project_id: ProjectId,
-    pub scenario_id: ScenarioId,
-    pub sha: Sha,
-    pub status: DivergenceStatus,
-    pub round: u32,
-    pub reviewer: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub detail: String,
+/// The `run_seq` a staged `Divergence` carries until promotion assigns
+/// one (module doc).
+pub const UNASSIGNED_RUN_SEQ: u64 = 0;
+
+/// This divergence's `(project_id, role, surface)` run_seq-partition key
+/// (module doc). `None` when it carries no `actor.role` at all: such a
+/// record cannot be promoted under this scheme.
+fn divergence_partition_key(record: &Divergence) -> Option<(ProjectId, RoleId, String)> {
+    Some((record.project_id.clone(), record.envelope.actor.role.clone()?, record.scenario_id.surface_key()))
 }
 
-/// `<ledger_root>/_staging_divergence/` — a FLAT staging directory for
-/// [`DivergenceCandidate`]s (module doc: never `GitTier`'s kind=/area=
-/// Hive layout, since `resolve_partition`'s `Divergence` arm requires a
-/// `run_seq` a staged candidate has none of yet).
-pub fn divergence_staging_dir(ledger_root: &Path) -> PathBuf {
-    ledger_root.join("_staging_divergence")
-}
-
-/// Stage one [`DivergenceCandidate`] — a content-digest-named JSON file
-/// under `staging_dir` (module doc's digest-suffixed-uniqueness
-/// convention, `canon_store::partition`'s own precedent), never through
-/// `GitTier` (module doc). Returns the file's path.
-pub fn stage_divergence(staging_dir: &Path, candidate: &DivergenceCandidate) -> std::io::Result<PathBuf> {
-    std::fs::create_dir_all(staging_dir)?;
-    let body = serde_json::to_value(candidate).expect("DivergenceCandidate always serializes");
-    let digest = content_digest12(&body);
-    let path = staging_dir.join(format!("{digest}.json"));
-    std::fs::write(&path, serde_json::to_string_pretty(&body).expect("serde_json::Value always serializes"))?;
-    Ok(path)
-}
-
-/// Every staged [`DivergenceCandidate`] under `staging_dir`, alongside
-/// its file path (so a successful promotion can delete exactly that
-/// file) — a malformed/unparseable staging file is reported as a
-/// [`Refused`] directly (module doc's soft-skip / fail-loud split,
-/// mirrored from `staging.read()`'s own `violations` for `EvidenceRecord`,
-/// even though there is no `Tier` here to do it for us). A missing
-/// `staging_dir` (nothing ever staged) is "zero candidates", never an
-/// error.
-fn read_staged_divergence(staging_dir: &Path) -> (Vec<(PathBuf, DivergenceCandidate)>, Vec<Refused>) {
-    let mut candidates = Vec::new();
-    let mut refused = Vec::new();
-
-    let Ok(entries) = std::fs::read_dir(staging_dir) else {
-        return (candidates, refused);
-    };
-    for entry in entries.filter_map(Result::ok) {
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("json") {
-            continue;
-        }
-        match read_staged_divergence_file(&path) {
-            Ok(candidate) => candidates.push((path, candidate)),
-            Err(malformed) => refused.push(malformed),
-        }
-    }
-    candidates.sort_by_key(|(_, c)| (c.project_id.clone(), c.scenario_id.clone(), c.round));
-    (candidates, refused)
-}
-
-/// One staged [`DivergenceCandidate`] file, or the refusal
-/// [`read_staged_divergence`] reports for a malformed one — the per-file
-/// read the batch and [`promote_staged_divergence`] share.
-fn read_staged_divergence_file(path: &Path) -> Result<DivergenceCandidate, Refused> {
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|s| serde_json::from_str::<DivergenceCandidate>(&s).ok())
-        .ok_or_else(|| refuse("<staging-divergence>", format!("{}: malformed staged Divergence candidate", path.display())))
-}
-
-/// This candidate's `(project_id, role, surface)` run_seq-partition key
-/// (module doc, design D10) — `project_id` from the REQUIRED field,
-/// `role` from the writing actor, `surface` from
-/// `scenario_id.surface_key()`. `None` when the candidate carries no
-/// `actor.role` at all — such a candidate cannot be promoted under this
-/// scheme.
-fn divergence_partition_key(project_id: &ProjectId, role: Option<&RoleId>, scenario_id: &ScenarioId) -> Option<(ProjectId, RoleId, String)> {
-    Some((project_id.clone(), role?.clone(), scenario_id.surface_key()))
-}
-
-/// `1 + max(run_seq)` per `(project_id, role, surface)`, scanning only
-/// `committed`'s own already-landed `Divergence` records (mirrors
-/// [`promote`]'s own `next_seq` scan).
-fn scan_divergence_next_seq(committed: &GitTier) -> Result<HashMap<(ProjectId, RoleId, String), u64>, StoreError> {
-    let committed_read = committed.read(&TierQuery::kind(RecordKind::Divergence))?;
-    let mut next_seq: HashMap<(ProjectId, RoleId, String), u64> = HashMap::new();
-    for raw in &committed_read.records {
-        let Ok(record) = serde_json::from_value::<Divergence>(raw.0.clone()) else { continue };
-        let Some(key) = divergence_partition_key(&record.project_id, record.envelope.actor.role.as_ref(), &record.scenario_id) else { continue };
-        if let Some(seq) = raw.0.get("run_seq").and_then(serde_json::Value::as_u64) {
-            let slot = next_seq.entry(key).or_insert(0);
-            *slot = (*slot).max(seq);
-        }
-    }
-    Ok(next_seq)
-}
-
-/// Commit one [`DivergenceCandidate`] to `committed`, assigning it the
-/// next `run_seq` within its `(project_id, role, surface)` partition
-/// (`next_seq` tracks the running max across a whole batch — module
-/// doc's [`promote`] precedent). `Ok(Err(Refused))` for a candidate with
-/// a mismatched `kind` or no derivable partition key, never a panic;
-/// refusal never consumes a `run_seq` (design D10).
-fn commit_divergence_candidate(
-    candidate: &DivergenceCandidate,
-    committed: &GitTier,
-    next_seq: &mut HashMap<(ProjectId, RoleId, String), u64>,
-    dry_run: bool,
-) -> Result<Result<Promoted, Refused>, StoreError> {
-    let subject = candidate.scenario_id.to_string();
-
-    if candidate.envelope.kind != RecordKind::Divergence {
-        return Ok(Err(refuse(subject, format!("staged candidate carries `kind={}`, not `divergence`", candidate.envelope.kind.as_str()))));
-    }
-
-    let Some(key) = divergence_partition_key(&candidate.project_id, candidate.envelope.actor.role.as_ref(), &candidate.scenario_id) else {
-        return Ok(Err(refuse(subject, "no derivable (project_id, role, surface) run_seq partition key: candidate carries no `actor.role`")));
-    };
-
-    let seq = {
-        let slot = next_seq.entry(key.clone()).or_insert(0);
-        *slot += 1;
-        *slot
-    };
-
-    let divergence = Divergence::new(
-        candidate.envelope.clone(),
-        candidate.project_id.clone(),
-        candidate.scenario_id.clone(),
-        candidate.sha.clone(),
-        candidate.status.clone(),
-        TotalOrder::new(seq),
-        candidate.round,
-        candidate.reviewer.clone(),
-        candidate.detail.clone(),
-    );
-
-    let target = expected_relative_path(RecordKind::Divergence, &serde_json::to_value(&divergence).expect("Divergence always serializes")).map_err(StoreError::Layout)?;
-
-    if !dry_run {
-        committed.write(&divergence)?;
-    }
-
-    Ok(Ok(Promoted { kind: RecordKind::Divergence, assigned: Some(RunSeqAssignment { role: key.1, surface: key.2, run_seq: seq }), target }))
-}
-
-/// Batch-promote every staged [`DivergenceCandidate`] under `staging_dir`
-/// to `committed` (module doc, design D10) — mirrors [`promote`]'s own
-/// shape, over the Divergence-specific staging representation.
-pub fn promote_divergence(staging_dir: &Path, committed: &GitTier, dry_run: bool) -> Result<PromoteReport, StoreError> {
-    let mut report = PromoteReport::default();
-
-    let (candidates, malformed) = read_staged_divergence(staging_dir);
+/// Promote the staged `Divergence` candidates in `scope`: `1 +
+/// max(run_seq)` per `(project_id, role, surface)` over the committed
+/// tier, the `staging_id` recovery [`promote_with_run_seq`] has, and a
+/// refusal (never consuming a `run_seq`) for a candidate with no
+/// derivable partition key.
+fn promote_divergences(staging: &GitTier, committed: &GitTier, scope: Scope<'_>, dry_run: bool, report: &mut PromoteReport) -> Result<(), StoreError> {
+    let (staged, malformed) = staged_in_scope(staging, RecordKind::Divergence, scope)?;
     report.refused.extend(malformed);
 
-    let mut next_seq = scan_divergence_next_seq(committed)?;
+    let committed_read = committed.read(&TierQuery::kind(RecordKind::Divergence))?;
+    let mut next_seq: HashMap<(ProjectId, RoleId, String), u64> = HashMap::new();
+    let mut already_committed: HashMap<String, RecoveredCommit> = HashMap::new();
+    for raw in &committed_read.records {
+        let Ok(record) = serde_json::from_value::<Divergence>(raw.0.clone()) else { continue };
+        let Some(key) = divergence_partition_key(&record) else { continue };
+        let seq = record.run_seq.get();
+        let slot = next_seq.entry(key).or_insert(0);
+        *slot = (*slot).max(seq);
 
-    for (path, candidate) in candidates {
-        promote_divergence_file(&path, &candidate, committed, &mut next_seq, dry_run, &mut report)?;
-    }
-
-    Ok(report)
-}
-
-/// Promote ONE staged divergence candidate — the file at `staging_file`
-/// that [`stage_divergence`] returned — and nothing else staged beside
-/// it (0.16 promote on write): the same per-file read, the same
-/// `run_seq` assignment and the same staging removal
-/// [`promote_divergence`] applies to each candidate. Every other staged
-/// candidate stays staged for `canon divergence promote`.
-pub fn promote_staged_divergence(staging_file: &Path, committed: &GitTier) -> Result<PromoteReport, StoreError> {
-    let mut report = PromoteReport::default();
-    match read_staged_divergence_file(staging_file) {
-        Ok(candidate) => {
-            let mut next_seq = scan_divergence_next_seq(committed)?;
-            promote_divergence_file(staging_file, &candidate, committed, &mut next_seq, false, &mut report)?;
+        let Some(staging_id) = raw.0.get(STAGING_ID_KEY).and_then(serde_json::Value::as_str) else { continue };
+        if already_committed.get(staging_id).is_some_and(|existing| existing.run_seq <= seq) {
+            continue;
         }
-        Err(malformed) => report.refused.push(malformed),
+        let target = expected_relative_path(RecordKind::Divergence, &raw.0).map_err(StoreError::Layout)?;
+        already_committed.insert(staging_id.to_string(), RecoveredCommit { run_seq: seq, target });
     }
-    Ok(report)
-}
 
-/// Commit one staged candidate read from `path` and, on success, delete
-/// that staging file — the per-candidate step both
-/// [`promote_divergence`] and [`promote_staged_divergence`] run.
-fn promote_divergence_file(
-    path: &Path,
-    candidate: &DivergenceCandidate,
-    committed: &GitTier,
-    next_seq: &mut HashMap<(ProjectId, RoleId, String), u64>,
-    dry_run: bool,
-    report: &mut PromoteReport,
-) -> Result<(), StoreError> {
-    match commit_divergence_candidate(candidate, committed, next_seq, dry_run)? {
-        Ok(promoted) => {
+    let mut candidates: Vec<(Divergence, RawRecord)> = Vec::new();
+    for raw in staged {
+        match serde_json::from_value::<Divergence>(raw.0.clone()) {
+            Ok(record) => candidates.push((record, raw)),
+            Err(e) => report.refused.push(refuse("<staging>", format!("candidate re-parse failed after passing the staging read's own validation: {e}"))),
+        }
+    }
+    candidates.sort_by_key(|(record, _)| (record.project_id.clone(), record.scenario_id.clone(), record.round));
+
+    for (record, raw) in candidates {
+        let subject = record.scenario_id.to_string();
+        let Some(key) = divergence_partition_key(&record) else {
+            report.refused.push(refuse(subject, "no derivable (project_id, role, surface) run_seq partition key: candidate carries no `actor.role`"));
+            continue;
+        };
+        let staging_id = staging_candidate_id(&raw.0);
+        let staging_relative = expected_relative_path(RecordKind::Divergence, &raw.0).map_err(StoreError::Layout)?;
+
+        if let Some(existing) = already_committed.get(&staging_id) {
             if !dry_run {
-                std::fs::remove_file(path)?;
+                std::fs::remove_file(staging.root().join(&staging_relative))?;
             }
-            report.promoted.push(promoted);
+            report.recovered.push(Promoted {
+                kind: RecordKind::Divergence,
+                assigned: Some(RunSeqAssignment { role: key.1, surface: key.2, run_seq: existing.run_seq }),
+                target: existing.target.clone(),
+            });
+            continue;
         }
-        Err(refused) => report.refused.push(refused),
+
+        let seq = {
+            let slot = next_seq.entry(key.clone()).or_insert(0);
+            *slot += 1;
+            *slot
+        };
+        let body = committed_body(&raw.0, seq, &staging_id);
+        let target = expected_relative_path(RecordKind::Divergence, &body).map_err(StoreError::Layout)?;
+        if !dry_run {
+            committed.write(&RawWrite(RawRecord(body)))?;
+            std::fs::remove_file(staging.root().join(&staging_relative))?;
+        }
+        report.promoted.push(Promoted { kind: RecordKind::Divergence, assigned: Some(RunSeqAssignment { role: key.1, surface: key.2, run_seq: seq }), target });
     }
     Ok(())
 }
 
-/// `canon divergence resolve`/`defer`'s own direct-commit convenience
-/// path (module doc): assign the next run_seq and commit ONE candidate
-/// directly, without touching the batch `_staging_divergence/` directory
-/// at all — a routine resolve/defer never risks promoting a DIFFERENT,
-/// unrelated candidate a reviewer is still mid-`stage`ing.
-pub fn commit_divergence(candidate: &DivergenceCandidate, committed: &GitTier) -> Result<Result<Promoted, Refused>, StoreError> {
-    let mut next_seq = scan_divergence_next_seq(committed)?;
-    commit_divergence_candidate(candidate, committed, &mut next_seq, false)
+/// Promote only the staged `kind` candidates: what `canon divergence
+/// promote` runs, the batch of [`promote`] narrowed to one family.
+pub fn promote_only(kind: RecordKind, staging: &GitTier, committed: &GitTier, dry_run: bool) -> Result<PromoteReport, StoreError> {
+    let mut report = PromoteReport::default();
+    if let Some(staged_kind) = STAGED_KINDS.into_iter().find(|staged| staged.kind == kind) {
+        promote_kind(staged_kind, staging, committed, Scope::All, dry_run, &mut report)?;
+    }
+    Ok(report)
 }
 
 #[cfg(test)]
 mod tests {
-    use canon_model::{Actor, Envelope, EvidenceVerdict, ScenarioId};
+    use canon_model::{Actor, Envelope, EvidenceVerdict, ScenarioId, Sha};
     use tempfile::TempDir;
 
     use super::*;
@@ -1431,25 +1290,8 @@ mod tests {
 
         let gone = promote_staged(&staging, &committed, Path::new(&own)).unwrap();
         assert_eq!(gone.refused.len(), 1, "nothing staged at the path is a refusal, never a silent success: {gone:?}");
-        let outside = promote_staged(&staging, &committed, Path::new("kind=divergence/x.json")).unwrap();
+        let outside = promote_staged(&staging, &committed, Path::new("kind=review/x.json")).unwrap();
         assert_eq!(outside.refused.len(), 1, "a path outside every promotable kind is refused: {outside:?}");
-    }
-
-    /// [`promote_staged_divergence`] commits the one staged file it is
-    /// given and leaves every other staged candidate in place.
-    #[test]
-    fn promote_staged_divergence_commits_only_the_named_file() {
-        let dir = TempDir::new().unwrap();
-        let (_, committed) = tiers(&dir);
-        let staging_dir = divergence_staging_dir(committed.root());
-        let bystander = stage_divergence(&staging_dir, &divergence_candidate("app-a", "world.firstbuy-hotdeal.14", "reviewer", DivergenceStatus::Open, 1)).unwrap();
-        let own = stage_divergence(&staging_dir, &divergence_candidate("app-a", "world.firstbuy-hotdeal.26", "reviewer", DivergenceStatus::Open, 1)).unwrap();
-
-        let report = promote_staged_divergence(&own, &committed).unwrap();
-        assert!(report.is_clean(), "{report:?}");
-        assert_eq!(report.promoted.len(), 1);
-        assert!(!own.exists() && bystander.exists());
-        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap().records.len(), 1);
     }
 
     /// The committed body of an unassigned kind is the staged body
@@ -1810,18 +1652,14 @@ mod tests {
     }
 
     /// Every kind an authoring command can stage MUST be registered, or
-    /// its records are stranded (module doc). `Divergence` is the one
-    /// deliberate exclusion — it has its own staging directory and
-    /// promote path — so pinning the exact set makes adding a staging
-    /// writer without registering its kind a test failure rather than a
-    /// silent hole.
+    /// its records are stranded (module doc). Pinning the exact set makes
+    /// adding a staging writer without registering its kind a test failure
+    /// rather than a silent hole.
     #[test]
     fn the_staged_kind_registry_is_exactly_the_kinds_promote_drains() {
         let kinds: Vec<RecordKind> = STAGED_KINDS.iter().map(|staged| staged.kind).collect();
-        assert_eq!(kinds, vec![RecordKind::EvidenceRecord, RecordKind::Finding]);
-        assert!(!kinds.contains(&RecordKind::Divergence), "Divergence promotes through `promote_divergence`, not this registry");
+        assert_eq!(kinds, vec![RecordKind::EvidenceRecord, RecordKind::Finding, RecordKind::Divergence]);
     }
-
 
     #[test]
     fn promote_assigns_monotonic_gap_free_run_seq_within_one_invocation() {
@@ -1982,80 +1820,52 @@ mod tests {
         assert_eq!(surfaces.len(), 2);
     }
 
-    fn divergence_candidate(project_id: &str, scenario_id: &str, role: &str, status: DivergenceStatus, round: u32) -> DivergenceCandidate {
-        DivergenceCandidate {
-            envelope: Envelope::new(1, RecordKind::Divergence, chrono::Utc::now(), Actor::new("reviewer-1", RoleId::parse(role).unwrap())),
-            project_id: ProjectId::parse(project_id).unwrap(),
-            scenario_id: ScenarioId::parse(scenario_id).unwrap(),
-            sha: Sha::parse("a".repeat(40)).unwrap(),
-            status,
+    fn staged_divergence(project_id: &str, scenario_id: &str, role: Option<&str>, round: u32) -> Divergence {
+        let actor = match role {
+            Some(role) => Actor::new("reviewer-1", RoleId::parse(role).unwrap()),
+            None => Actor::new_unattributed("legacy-writer"),
+        };
+        Divergence::new(
+            Envelope::new(1, RecordKind::Divergence, chrono::Utc::now(), actor),
+            ProjectId::parse(project_id).unwrap(),
+            ScenarioId::parse(scenario_id).unwrap(),
+            canon_model::Sha::parse(&"a".repeat(40)).unwrap(),
+            canon_model::DivergenceStatus::Open,
+            canon_model::TotalOrder::new(UNASSIGNED_RUN_SEQ),
             round,
-            reviewer: "reviewer-1".to_string(),
-            detail: String::new(),
-        }
+            "reviewer-1",
+            "detail",
+        )
     }
 
     #[test]
     fn divergence_stage_then_promote_assigns_a_monotonic_run_seq() {
         let dir = TempDir::new().unwrap();
-        let ledger_root = dir.path().join(".canon").join("ledger");
-        let staging_dir = divergence_staging_dir(&ledger_root);
-        let committed = GitTier::new(&ledger_root);
+        let (staging, committed) = tiers(&dir);
+        staging.write(&staged_divergence("app-a", "world.firstbuy-hotdeal.14", Some("reviewer"), 1)).unwrap();
+        staging.write(&staged_divergence("app-a", "world.firstbuy-hotdeal.26", Some("reviewer"), 1)).unwrap();
 
-        stage_divergence(&staging_dir, &divergence_candidate("app-a", "world.firstbuy-hotdeal.14", "reviewer", DivergenceStatus::Open, 1)).unwrap();
-        stage_divergence(&staging_dir, &divergence_candidate("app-a", "world.firstbuy-hotdeal.26", "reviewer", DivergenceStatus::Open, 1)).unwrap();
-
-        let report = promote_divergence(&staging_dir, &committed, false).unwrap();
+        let report = promote(&staging, &committed, false).unwrap();
         assert!(report.is_clean(), "refused: {:?}", report.refused);
-        assert_eq!(report.promoted.len(), 2);
         let mut seqs: Vec<Option<u64>> = report.promoted.iter().map(|p| p.run_seq()).collect();
         seqs.sort_unstable();
-        assert_eq!(seqs, vec![Some(1), Some(2)], "no gaps, strictly increasing within one (project_id, role, surface) partition");
-
-        // Staging is empty afterward; both committed Divergence records exist.
-        assert!(std::fs::read_dir(&staging_dir).unwrap().next().is_none());
+        assert_eq!(seqs, vec![Some(1), Some(2)]);
+        assert!(staging.read(&TierQuery::kind(RecordKind::Divergence)).unwrap().records.is_empty());
         assert_eq!(committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap().records.len(), 2);
 
-        // A THIRD candidate in the SAME partition, staged+promoted in a
-        // SEPARATE call, continues from the committed max — never restarts.
-        stage_divergence(&staging_dir, &divergence_candidate("app-a", "world.firstbuy-hotdeal.33", "reviewer", DivergenceStatus::Open, 1)).unwrap();
-        let report2 = promote_divergence(&staging_dir, &committed, false).unwrap();
+        staging.write(&staged_divergence("app-a", "world.firstbuy-hotdeal.33", Some("reviewer"), 1)).unwrap();
+        let report2 = promote_only(RecordKind::Divergence, &staging, &committed, false).unwrap();
         assert_eq!(report2.promoted.len(), 1);
-        assert_eq!(report2.promoted[0].run_seq(), Some(3));
-    }
-
-    #[test]
-    fn divergence_promote_refuses_a_malformed_candidate_without_consuming_a_run_seq() {
-        let dir = TempDir::new().unwrap();
-        let ledger_root = dir.path().join(".canon").join("ledger");
-        let staging_dir = divergence_staging_dir(&ledger_root);
-        let committed = GitTier::new(&ledger_root);
-        std::fs::create_dir_all(&staging_dir).unwrap();
-
-        // Malformed: not even valid JSON for a DivergenceCandidate (missing required fields).
-        std::fs::write(staging_dir.join("malformed.json"), serde_json::to_string(&serde_json::json!({"not": "a candidate"})).unwrap()).unwrap();
-
-        stage_divergence(&staging_dir, &divergence_candidate("app-a", "world.firstbuy-hotdeal.41", "reviewer", DivergenceStatus::Open, 1)).unwrap();
-
-        let report = promote_divergence(&staging_dir, &committed, false).unwrap();
-        assert_eq!(report.promoted.len(), 1, "promoted: {:?}", report.promoted);
-        assert_eq!(report.promoted[0].run_seq(), Some(1), "the malformed sibling must not have consumed run_seq 1");
-        assert_eq!(report.refused.len(), 1);
-        assert_eq!(report.refused[0].violation.class, FailureClass::MalformedEvidence);
+        assert_eq!(report2.promoted[0].run_seq(), Some(3), "continues from the committed max");
     }
 
     #[test]
     fn divergence_promote_refuses_a_candidate_with_no_derivable_partition_key() {
         let dir = TempDir::new().unwrap();
-        let ledger_root = dir.path().join(".canon").join("ledger");
-        let staging_dir = divergence_staging_dir(&ledger_root);
-        let committed = GitTier::new(&ledger_root);
+        let (staging, committed) = tiers(&dir);
+        staging.write(&staged_divergence("app-a", "world.firstbuy-hotdeal.50", None, 1)).unwrap();
 
-        let mut candidate = divergence_candidate("app-a", "world.firstbuy-hotdeal.50", "reviewer", DivergenceStatus::Open, 1);
-        candidate.envelope.actor = Actor::new_unattributed("legacy-writer");
-        stage_divergence(&staging_dir, &candidate).unwrap();
-
-        let report = promote_divergence(&staging_dir, &committed, false).unwrap();
+        let report = promote(&staging, &committed, false).unwrap();
         assert!(report.promoted.is_empty());
         assert_eq!(report.refused.len(), 1);
         assert_eq!(report.refused[0].violation.class, FailureClass::MalformedEvidence);
@@ -2065,38 +1875,41 @@ mod tests {
     #[test]
     fn divergence_promotion_partitions_run_seq_by_project_id_role_surface() {
         let dir = TempDir::new().unwrap();
-        let ledger_root = dir.path().join(".canon").join("ledger");
-        let staging_dir = divergence_staging_dir(&ledger_root);
-        let committed = GitTier::new(&ledger_root);
+        let (staging, committed) = tiers(&dir);
+        staging.write(&staged_divergence("app-a", "world.firstbuy-hotdeal.14", Some("reviewer"), 1)).unwrap();
+        staging.write(&staged_divergence("app-b", "world.firstbuy-hotdeal.26", Some("reviewer"), 1)).unwrap();
 
-        // Same (role, surface_key), DIFFERENT project_id — independent sequences.
-        stage_divergence(&staging_dir, &divergence_candidate("app-a", "world.firstbuy-hotdeal.14", "reviewer", DivergenceStatus::Open, 1)).unwrap();
-        stage_divergence(&staging_dir, &divergence_candidate("app-b", "world.firstbuy-hotdeal.26", "reviewer", DivergenceStatus::Open, 1)).unwrap();
-
-        let report = promote_divergence(&staging_dir, &committed, false).unwrap();
+        let report = promote(&staging, &committed, false).unwrap();
         assert!(report.is_clean(), "refused: {:?}", report.refused);
-        assert_eq!(report.promoted.len(), 2);
-        assert!(report.promoted.iter().all(|p| p.run_seq() == Some(1)), "different project_id partitions both independently start at run_seq 1");
+        assert!(report.promoted.iter().all(|p| p.run_seq() == Some(1)), "a different project_id starts its own sequence");
     }
 
     #[test]
-    fn commit_divergence_direct_commit_never_touches_the_staging_directory() {
+    fn promote_staged_promotes_one_divergence_and_leaves_the_rest_staged() {
         let dir = TempDir::new().unwrap();
-        let ledger_root = dir.path().join(".canon").join("ledger");
-        let staging_dir = divergence_staging_dir(&ledger_root);
-        let committed = GitTier::new(&ledger_root);
+        let (staging, committed) = tiers(&dir);
+        let mine = staging.write(&staged_divergence("app-a", "world.firstbuy-hotdeal.14", Some("reviewer"), 1)).unwrap();
+        staging.write(&staged_divergence("app-a", "world.firstbuy-hotdeal.26", Some("reviewer"), 1)).unwrap();
 
-        // A candidate a reviewer is still mid-`stage`ing, untouched by
-        // a SEPARATE `resolve`/`defer` direct commit below.
-        stage_divergence(&staging_dir, &divergence_candidate("app-a", "world.firstbuy-hotdeal.14", "reviewer", DivergenceStatus::Open, 1)).unwrap();
+        let report = promote_staged(&staging, &committed, Path::new(&mine.location)).unwrap();
+        assert!(report.is_clean(), "refused: {:?}", report.refused);
+        assert_eq!(report.promoted.len(), 1);
+        assert_eq!(staging.read(&TierQuery::kind(RecordKind::Divergence)).unwrap().records.len(), 1, "the other candidate is untouched");
+    }
 
-        let resolved = divergence_candidate("app-a", "world.firstbuy-hotdeal.99", "reviewer", DivergenceStatus::Resolved, 1);
-        let outcome = commit_divergence(&resolved, &committed).unwrap();
-        let promoted = outcome.expect("resolve candidate should promote cleanly");
-        assert_eq!(promoted.run_seq(), Some(1));
+    #[test]
+    fn a_retried_divergence_promote_recovers_instead_of_duplicating() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+        let record = staged_divergence("app-a", "world.firstbuy-hotdeal.14", Some("reviewer"), 1);
+        staging.write(&record).unwrap();
+        let first = promote(&staging, &committed, false).unwrap();
+        assert_eq!(first.promoted.len(), 1);
 
-        // The unrelated staged candidate is still sitting there, untouched.
-        assert_eq!(std::fs::read_dir(&staging_dir).unwrap().count(), 1);
+        staging.write(&record).unwrap();
+        let retry = promote(&staging, &committed, false).unwrap();
+        assert!(retry.promoted.is_empty());
+        assert_eq!(retry.recovered.len(), 1);
         assert_eq!(committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap().records.len(), 1);
     }
 

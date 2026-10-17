@@ -87,9 +87,11 @@ ship guard and stays listed as `accepted-divergence` in `status` and
   directly; nothing to promote. canon stores and re-checks attached bytes
   and never compares images.
 - A blocker you close `fixed` stays blocking until the implementer records
-  the whole suite again (`evidence add --all-scenarios`); re-review after
-  it, since new evidence makes your pinned review stale.
+  the whole suite again (`evidence add --all-scenarios`); your pinned review
+  stays current when the new evidence says the same, otherwise look again.
 - Fixes you ask for return as a re-review of the same change. When a new
   evidence record makes your review stale, look again before you re-pin.
+  A chore has no scenarios: review it with `canon review add --change <slug>`
+  (its invariants and checks against the diff).
 
 Reference: `reference/canon-review.md`.

@@ -100,6 +100,32 @@
         "agent_id"
       ]
     },
+    "CheckPin": {
+      "description": "What one role's latest evidence for a scenario said (0.23 D5): its\nverdict and the identity of the checks it bound. A report-backed\nrecord's checks are `<format>:<case name>` for each matched case; an\nartifact-only record's are `sha256:<digest>` for each file. New\nevidence with the same verdict and the same checks is the same pin.",
+      "type": "object",
+      "properties": {
+        "checks": {
+          "description": "Sorted, each once.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verdict": {
+          "$ref": "#/$defs/EvidenceVerdict"
+        }
+      },
+      "required": [
+        "verdict",
+        "checks"
+      ]
+    },
     "DivergenceStatus": {
       "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).\n\n`Accepted` (0.22) is a reviewer's disposition of a known gap: the\nscenario's latest evidence is `divergent`, and the gap is tracked\nelsewhere (`tracking`). It is bound to the evidence it saw\n(`evidence`, the same pins a [`Review`] carries), so new evidence\nends it, and it lapses at `expiry` when one is set. The ship guard\nand `canon gate check` read it ([`crate::fold`] only reports it).",
       "oneOf": [
@@ -142,8 +168,18 @@
             "accepted": {
               "type": "object",
               "properties": {
+                "checks": {
+                  "description": "The scenario's latest evidence at acceptance (0.23): verdict and\nchecks per role, the pin a review carries.",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "$ref": "#/$defs/CheckPin"
+                  }
+                },
                 "evidence": {
-                  "description": "The scenario's latest evidence at acceptance, by ledger file.",
+                  "description": "The latest evidence record files at acceptance (0.22). Read\nonly by `canon migrate`.",
                   "type": "array",
                   "items": {
                     "$ref": "#/$defs/EvidencePin"
@@ -166,8 +202,7 @@
               },
               "required": [
                 "reason",
-                "tracking",
-                "evidence"
+                "tracking"
               ]
             }
           },
@@ -179,7 +214,7 @@
       ]
     },
     "EvidencePin": {
-      "description": "One pinned evidence record: its ledger natural key (the `task_id`,\nelse the `scenario_id`, it is filed under) and its 12-hex content\ndigest, together the record's ledger file stem `<key>__<digest>`.",
+      "description": "One pinned evidence record (0.15–0.22): its ledger natural key (the\n`task_id`, else the `scenario_id`, it is filed under) and its 12-hex\ncontent digest, together the record's ledger file stem `<key>__<digest>`.",
       "type": "object",
       "properties": {
         "digest": {
@@ -192,6 +227,15 @@
       "required": [
         "key",
         "digest"
+      ]
+    },
+    "EvidenceVerdict": {
+      "description": "The three-way verdict an evidence record carries. `Divergent` is an\nexplicit third value rather than \"no record exists\" — the donor\nparity harness represents non-faithful as *absence* of a\ndesign-review/code-review record, which works for a directory-scanned\nledger but not for a single, standalone canon record whose own\n`Deserialize` must always succeed or fail on its own — so canon makes\nthe state explicit instead of leaning on record-absence.",
+      "type": "string",
+      "enum": [
+        "faithful",
+        "not_applicable",
+        "divergent"
       ]
     },
     "ProjectId": {

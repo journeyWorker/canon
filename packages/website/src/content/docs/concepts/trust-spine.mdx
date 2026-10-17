@@ -127,26 +127,25 @@ count by actor alone. A missing or self-only review is
 `unreviewed-promotion`. A review carries no verdict; the ship gate still
 checks verdicts.
 
-A review pins what it saw: `review add` records the scenario's source
-digest and its latest evidence records, and the review counts only while
-both are unchanged. Edit the `.feature` file (and sync it) or re-attest
-the scenario, and the review is stale — `unreviewed-promotion` naming the
-spec, the evidence, or both. Only a `signed` review counts; a reviewer run
-recorded `--outcome indeterminate` or `unavailable` is a gap, and the
-latest review per reviewer wins. Reviews written before 0.15 carry no
-pins, but each names the commit it reviewed (`pin`). The gate reads the
-scenario there through `git`, with the same per-scenario digest `inventory
-sync` computes: a review stays current while that digest equals today's
-and no declared evidence is newer than the review, and is stale
-otherwise. When the commit, or the scenario at it, is not in the clone
-(a shallow checkout, rewritten history), the review is undecidable and
-still counts — a missing commit is never a violation. `gate check` prints
-one `advisory: N review(s) predate review pinning (0.15) and were checked
-against the commit each one pinned: C current, S stale, U undecidable …`
-line. A stale one whose scenario already has another current review is
-counted as superseded; only the scenarios still owed a review are named
-for re-review. In CI, check out full history
-(`actions/checkout` with `fetch-depth: 0`) for the gate job.
+A review pins what it saw: `review add` records the scenario's digest and
+what its latest evidence says per role (the verdict and the identity of the
+checks it bound), and the review counts only while both are unchanged. Edit
+the `.feature` file (and sync it) or attest the scenario again with a
+different verdict or a different set of cases, and the review is stale —
+`unreviewed-promotion` naming the spec, the evidence, or both. Recording
+the suite again with the same verdicts from the same cases is new evidence
+that says the same thing, so the review stays current. A chore, which adds
+no scenarios, is reviewed as a change instead: `canon review add --change
+<slug>` pins its brief, and shipping needs that one review. Only a `signed`
+review counts; a reviewer run recorded `--outcome indeterminate` or
+`unavailable` is a gap, and the latest review per reviewer wins. Reviews
+written before 0.23 pin evidence record files, or (before 0.15) only the
+commit they reviewed; they do not count until `canon migrate` rewrites
+them to what the evidence says, which keeps the ones that were current and
+leaves the stale ones stale. `gate check` prints one advisory naming how
+many scenarios still wait for it. In CI, check out full history
+(`actions/checkout` with `fetch-depth: 0`) for the job that runs
+`canon migrate`.
 
 With `block_on_findings`, review findings (`canon finding add
 --severity blocker|should-fix|note`) are read at their latest version per
@@ -220,23 +219,14 @@ refuses it when `scope` covers `shipped`. A malformed `require_audit`
 makes the whole `spec_coverage` section unusable. `canon status` shows
 sampled, confirmed, owed and refuted counts.
 
-## Dropping a binding on purpose
+## A record binds what its own write names
 
-Re-attesting a scenario must not quietly lose its proof. When the
-scenario's current latest record of the same fold (declared, or audit for
-an audit; staged or committed) binds files the new record does not,
-`canon evidence add` refuses (exit `2`) and names them. Re-bind them (new
-bytes at the same path are fine), or drop them explicitly:
-
-```bash
-canon evidence add ... --drop-attachment reports/old.xml \
-  --drop-reason "suite split into reports/unit.xml"
-```
-
-`--drop-attachment` is repeatable; `--drop-reason` is one line and
-required with it. The drop is recorded as `attachment_drop: {paths,
-reason}` and listed by `canon status` under `dropped bindings`.
-Task-only evidence has no drop guard.
+`canon evidence add` binds exactly the files the write names (`--artifact`,
+`--report`, `--report-case`). Nothing is carried forward from an earlier
+record, in one add or in a suite batch, and there is no drop flag: history
+keeps the earlier records, and a new record is reviewed on its own files. An
+audit replaces a refutation the same way, so a counterexample never rides
+along into a confirming audit.
 
 ## Experimental: evidence binding
 

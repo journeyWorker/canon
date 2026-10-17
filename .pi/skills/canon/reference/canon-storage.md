@@ -173,9 +173,11 @@ record bodies.
 ## Staged writes and promotion
 
 Four writes stage their record instead of committing it: `canon evidence
-add`, `canon finding add` and `canon finding close` (under
-`.canon/ledger/_staging/`, committed by `canon gate promote`) and `canon
-divergence add` (committed by `canon divergence promote`). `canon.yaml`'s
+add`, `canon finding add`, `canon finding close` and `canon divergence add`
+(under `.canon/ledger/_staging/`, one staging shape for every kind,
+committed by `canon gate promote`; `canon divergence promote` commits only
+the staged divergences). `canon divergence resolve|defer|accept` stage and
+promote their own record in the same run. `canon.yaml`'s
 `write:` section decides whether they promote in the same run:
 
 ```yaml
@@ -184,9 +186,8 @@ write:
 ```
 
 - `auto` — the command stages, then promotes that one record through the
-  same validation and assignment `canon gate promote` (or `canon
-  divergence promote`) applies. Records other runs staged stay staged;
-  only `canon gate promote` / `canon divergence promote` commit
+  same validation and assignment `canon gate promote` applies. Records
+  other runs staged stay staged; only `canon gate promote` commits
   everything staged. The one success line names the committed record
   (`wrote kind=…/….json`; promotion renames it, so the staged file is not
   named) and ends `— staged and promoted in this run; nothing to

@@ -544,6 +544,18 @@ fn review_via_cli(repo: &Path, actor: &str, session: Option<&str>) -> Output {
     run(repo, &args)
 }
 
+/// A review as `canon review add` writes it: pinned to the scenario and
+/// what its evidence says in `repo`'s ledger right now.
+fn pinned(repo: &Path, mut review: Review) -> Review {
+    let ctx = canon_gate::GateContext::load(canon_gate::GateCtx::from_repo(repo).unwrap(), &canon_policy::SchemaRegistry::load(), Utc::now()).unwrap();
+    let scenario = canon_gate::spec_coverage::latest_scenarios(&ctx)
+        .into_iter()
+        .find(|s| Some(&s.scenario_id) == review.scenario_id.as_ref() && s.project_id == review.project_id)
+        .expect("the reviewed scenario is indexed");
+    review.pins = Some(canon_gate::freshness::current_pins(&ctx, scenario));
+    review
+}
+
 fn seed_review(repo: &Path, reviewer: &str, actor: &str) {
     let envelope = Envelope::new(1, RecordKind::Review, Utc::now(), Actor::new(actor, RoleId::parse("reviewer").unwrap()));
     let review = Review::new(
@@ -554,7 +566,7 @@ fn seed_review(repo: &Path, reviewer: &str, actor: &str) {
         format!("pin-{reviewer}-{actor}"),
         ProvenanceRef::OriginalSpecRef("specs/demo.feature".into()),
     );
-    ledger(repo).write(&review).unwrap();
+    ledger(repo).write(&pinned(repo, review)).unwrap();
 }
 
 fn seed_blocker(repo: &Path, fixed_after: Option<i64>) {
@@ -587,7 +599,7 @@ fn seed_reverification(repo: &Path, scenario: &str) {
         format!("pin-re-review-{scenario}"),
         ProvenanceRef::OriginalSpecRef("specs/demo.feature".into()),
     );
-    ledger(repo).write(&review).unwrap();
+    ledger(repo).write(&pinned(repo, review)).unwrap();
 }
 
 fn current_subject(repo: &Path) -> Value {
@@ -954,13 +966,13 @@ fn an_unavailable_review_is_a_gap_at_the_gate_and_the_status_guard() {
     assert_eq!(current_subject(dir.path())["status"], "building", "an unavailable review approves nothing");
 }
 
-/// gate.check.40: a review written before 0.15 (planted by hand, no
-/// `pins`/`outcome` keys) whose pin is no commit of this clone keeps
-/// qualifying even after its scenario's spec changes; `canon gate check`,
+/// gate.check.40 (0.23): a review written before 0.23 pinning (planted by
+/// hand, no `pins` or `outcome` keys) does not count: the ship guard and
+/// `canon gate check` refuse naming `canon migrate`, and `canon gate check`,
 /// `canon subject status` and `canon status` each print the one advisory
-/// line counting it as undecidable, and all exit 0.
+/// line counting the scenarios whose review waits for it.
 #[test]
-fn an_undecidable_pre_015_review_still_qualifies_and_every_surface_prints_the_advisory() {
+fn an_unmigrated_review_does_not_count_and_every_surface_names_migrate() {
     let dir = repo();
     write_policy(dir.path(), REQUIRE_REVIEW);
     seed_attested_subject(dir.path());
@@ -979,28 +991,21 @@ fn an_undecidable_pre_015_review_still_qualifies_and_every_surface_prints_the_ad
     let path = dir.path().join(".canon/ledger").join(relative);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(&path, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
-    // The spec changes after the review and is re-synced: a new scenario
-    // generation with another source digest.
-    let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now() + chrono::Duration::seconds(5), Actor::new("canon", RoleId::parse("implementer").unwrap()));
-    let mut edited = Scenario::new(envelope, ProjectId::parse("demo").unwrap(), ScenarioId::parse("world.demo.01").unwrap(), "seeded", "", SpecDigest::of(b"edited"));
-    edited.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
-    ledger(dir.path()).write(&edited).unwrap();
 
-    let advisory = "1 review(s) predate review pinning (0.15) and were checked against the commit each one pinned: 0 current, 0 stale, 1 undecidable; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it";
+    let advisory = "1 scenario(s) have a review that predates 0.23 review pinning (world.demo.01); such a review does not count until `canon migrate` rewrites it to what the evidence says";
     let guard = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
-    assert_eq!(guard.status.code(), Some(0), "the unpinned review still qualifies: {}", stderr(&guard));
+    assert_eq!(guard.status.code(), Some(1), "the unpinned review does not count: {}", stderr(&guard));
     assert!(stderr(&guard).contains(&format!("canon subject status: advisory: {advisory}\n")), "{}", stderr(&guard));
-    assert_eq!(current_subject(dir.path())["status"], "verifying");
+    assert!(stderr(&guard).contains("predates 0.23 review pinning") && stderr(&guard).contains("`canon migrate`"), "{}", stderr(&guard));
+    assert_eq!(current_subject(dir.path())["status"], "building");
 
     let gate = run(dir.path(), &["gate", "check"]);
-    assert_eq!(gate.status.code(), Some(0), "{}", stdout(&gate));
-    let unapproved = "policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`";
-    assert_eq!(stdout(&gate), format!("canon gate check: clean (0 violations)\n\nadvisory: {unapproved}\n\nadvisory: {advisory}\n"));
+    assert_eq!(gate.status.code(), Some(0), "a building subject is not yet in review scope: {}", stdout(&gate));
+    assert!(stdout(&gate).contains(&format!("advisory: {advisory}\n")), "{}", stdout(&gate));
 
     let status = run(dir.path(), &["status"]);
     assert_eq!(status.status.code(), Some(0));
     assert!(stdout(&status).contains(&format!("warning: {advisory}\n")), "{}", stdout(&status));
-    assert!(stdout(&status).contains("demo-subject: 1 scenarios, 1 evidenced, 1 reviewed"), "{}", stdout(&status));
 }
 
 // ── the ship guard needs the approved brief (0.16 D1) ──
@@ -1578,7 +1583,7 @@ fn subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again() {
         "pin-reviewer-2-02",
         ProvenanceRef::OriginalSpecRef("specs/demo.feature".into()),
     );
-    ledger(dir.path()).write(&review).unwrap();
+    ledger(dir.path()).write(&pinned(dir.path(), review)).unwrap();
     let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(current_subject(dir.path())["status"], "shipped");

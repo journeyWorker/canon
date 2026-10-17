@@ -165,8 +165,8 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
     let sha = "a".repeat(40);
     staged(
         &["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"],
-        "— run `canon divergence promote` to commit it",
+        "— run `canon gate promote` to commit it",
     );
     staged(&["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
-    direct(&["divergence", "resolve", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "3", "--reviewer", "r", "--role", "reviewer"]);
+    staged(&["divergence", "resolve", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "3", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
 }

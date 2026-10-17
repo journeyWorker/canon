@@ -120,3 +120,93 @@ fn editing_the_background_stales_every_scenario_that_inherits_it() {
     let out = gate(repo, 1);
     assert!(out.contains(&stale_line("cart.add.01")) && out.contains(&stale_line("cart.add.02")), "{out}");
 }
+
+// ── 0.23 D5: a review pins what the evidence says, not which record it is ──
+
+const REPORT: &str = r#"<testsuite><testcase name="cart.add.01 adds"/><testcase name="cart.add.02 counts"/></testsuite>"#;
+
+fn record_suite(repo: &Path, report: &str) {
+    std::fs::create_dir_all(repo.join("reports")).unwrap();
+    std::fs::write(repo.join("reports/junit.xml"), report).unwrap();
+    ok(
+        repo,
+        &[
+            "evidence", "add", "--project-id", "root", "--all-scenarios", "--report", "junit:reports/junit.xml", "--kind", "test-run", "--ref", "npm test", "--role", "implementer",
+            "--actor-id", "impl-agent",
+        ],
+    );
+    ok(repo, &["gate", "promote"]);
+}
+
+fn evidence_records(repo: &Path) -> usize {
+    std::fs::read_dir(repo.join(".canon/ledger/kind=evidence_record")).map(|d| d.count()).unwrap_or(0)
+}
+
+/// A repo whose evidence is the suite's report and whose scenarios are both
+/// reviewed against it.
+fn reviewed_against_a_report() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
+    ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    std::fs::create_dir_all(repo.join(".canon")).unwrap();
+    std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
+    write_feature(repo, BASE);
+    record_suite(repo, REPORT);
+    for id in ["cart.add.01", "cart.add.02"] {
+        ok(
+            repo,
+            &[
+                "review", "add", "--project-id", "root", "--scenario-id", id, "--reviewer", "reviewer-2", "--pin", "r1", "--original-spec-ref", FEATURE, "--actor-id", "reviewer-2",
+                "--role", "reviewer", "--session-id", "sess-review",
+            ],
+        );
+    }
+    gate(repo, 0);
+    dir
+}
+
+/// review.add.30: recording the suite again with the same verdicts from the
+/// same cases is new evidence that says the same thing, so every review
+/// stays current and no review is owed.
+#[test]
+fn review_add_30_re_recording_the_suite_with_the_same_verdicts_keeps_every_review_current() {
+    let dir = reviewed_against_a_report();
+    let repo = dir.path();
+    let before = evidence_records(repo);
+    record_suite(repo, REPORT);
+    assert!(evidence_records(repo) > before, "the suite was recorded again");
+    let out = gate(repo, 0);
+    assert!(!out.contains("stale review") && !out.contains("unreviewed-promotion"), "{out}");
+}
+
+/// review.add.31: a case that appears (or disappears) changes what the
+/// evidence names, so the review of that scenario is stale and its sibling's
+/// is not.
+#[test]
+fn review_add_31_a_changed_case_set_stales_only_that_scenarios_review() {
+    let dir = reviewed_against_a_report();
+    let repo = dir.path();
+    record_suite(repo, r#"<testsuite><testcase name="cart.add.01 adds"/><testcase name="cart.add.01 adds twice"/><testcase name="cart.add.02 counts"/></testsuite>"#);
+    let out = gate(repo, 1);
+    assert!(out.contains("unreviewed-promotion cart.add.01 — stale review by `reviewer-2`: its evidence changed"), "{out}");
+    assert!(!out.contains("cart.add.02"), "{out}");
+}
+
+/// review.add.32: a different verdict stales the review of that scenario.
+#[test]
+fn review_add_32_a_changed_verdict_stales_the_review() {
+    let dir = reviewed_against_a_report();
+    let repo = dir.path();
+    ok(
+        repo,
+        &[
+            "evidence", "add", "--project-id", "root", "--scenario-id", "cart.add.02", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent",
+            "--verdict", "divergent", "--summary", "the count is off by one",
+        ],
+    );
+    ok(repo, &["gate", "promote"]);
+    let out = gate(repo, 1);
+    assert!(out.contains("unreviewed-promotion cart.add.02 — stale review by `reviewer-2`: its evidence changed"), "{out}");
+    assert!(!out.contains("unreviewed-promotion cart.add.01"), "{out}");
+}

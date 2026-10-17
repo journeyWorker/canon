@@ -216,12 +216,12 @@ use canon_gate::review_gate::{in_effect_reviews, review_gap, ReviewGapKind};
 use canon_gate::{scan_note_text, verify_risk_approval, FailureClass, GateContext, GateCtx, Violation};
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{
-    approval_payload_bytes, Actor, AttachmentDrop, AuditResult, BriefOverride, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId,
+    approval_payload_bytes, Actor, AuditResult, BriefOverride, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId,
     ProvenanceRef, RawRecord, RecordKind, ReportFormat, Review, RoleId, RunId, Scenario, ScenarioId, SessionId, Sha, TaskId, WaivedViolation, APPROVAL_NAMESPACE,
 };
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
-use canon_store::tier::{RawWrite, Tier, TierQuery};
+use canon_store::tier::{RawWrite, Tier};
 use chrono::{DateTime, Utc};
 
 use crate::cli_error::CliError;
@@ -1511,13 +1511,12 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
     // The gate's own context, so the reviews vaulted are exactly the ones
     // it re-checks. Its evidence read is `validate_evidence_batch` over
     // every committed record, split into declared records and audits.
-    let mut gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
+    let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(gate_context) => gate_context,
         Err(e) => {
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon evidence vault", json);
         }
     };
-    crate::inventory::resolve_legacy_pins(&mut gate_context);
     let files: std::collections::BTreeSet<(String, String)> = gate_context
         .evidence
         .iter()
@@ -1672,8 +1671,6 @@ mod tests {
             evaluator_version: None,
             evaluator_digest: None,
             audit_result: None,
-            drop_attachments: Vec::new(),
-            drop_reason: None,
             override_reason: None,
             promote: crate::write_mode::PromoteFlag::Config,
             json: false,

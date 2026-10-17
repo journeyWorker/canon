@@ -10,9 +10,6 @@ subjects (0):
 
 unowned (1, no @subject): cart.add.01
 
-dropped bindings (1):
-  cart.add.01: reports/shot.txt — "screenshots moved to the e2e lane" (by impl-agent at <ts>)
-
 next:
   # no subject exists yet; a subject is the unit status, review and shipping track
   canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit>

@@ -207,23 +207,13 @@ rate 1은 전부). `exclude_lanes`가 적용됩니다. 샘플된 범위 안 시�
 `spec_coverage` 섹션 전체를 쓸 수 없게 됩니다. `canon status`는 sampled,
 confirmed, owed, refuted 개수를 보여줍니다.
 
-## 바인딩을 의도적으로 빼기
+## 기록은 자기 쓰기가 가리킨 파일만 묶습니다
 
-시나리오를 다시 신고할 때 증명이 조용히 사라지면 안 됩니다. 같은 fold(선언,
-또는 audit이면 audit)의 현재 최신 레코드(스테이징 또는 커밋)가 묶은 파일을
-새 레코드가 묶지 않으면 `canon evidence add`는 그 경로를 밝히며 거부합니다
-(종료 코드 `2`). 다시 묶거나(같은 경로의 새 바이트는 괜찮습니다), 명시적으로
-뺍니다:
-
-```bash
-canon evidence add ... --drop-attachment reports/old.xml \
-  --drop-reason "suite split into reports/unit.xml"
-```
-
-`--drop-attachment`는 반복 가능하고, 함께 쓰는 `--drop-reason`은 한 줄이며
-필수입니다. 드롭은 `attachment_drop: {paths, reason}`으로 기록되고
-`canon status`의 `dropped bindings`에 나열됩니다. 태스크 전용 증거에는
-드롭 가드가 없습니다.
+`canon evidence add`는 쓰기가 가리킨 파일(`--artifact`, `--report`,
+`--report-case`)만 정확히 묶습니다. 이전 기록에서 아무것도 이월하지 않고
+(한 건이든 스위트 일괄이든), 드롭 플래그도 없습니다. 이전 기록은 이력에
+남고, 새 기록은 자기 파일을 기준으로 다시 리뷰됩니다. audit도 같은 방식으로
+refuted를 대체하므로, 반례가 confirmed audit에 딸려 가지 않습니다.
 
 ## 실험 기능: 증거 바인딩
 

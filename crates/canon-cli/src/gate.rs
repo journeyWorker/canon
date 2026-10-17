@@ -124,13 +124,12 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     // every check this run engages reads `gate_context.now`, never its
     // own wall-clock read.
     let now = Utc::now();
-    let mut gate_context = match GateContext::load(ctx, &registry, now) {
+    let gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
             return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate check", json);
         }
     };
-    crate::inventory::resolve_legacy_pins(&mut gate_context);
 
     let checks = canon_gate::check_set(release);
     // An index the `.feature` edits are not in grades specs that no longer
@@ -177,9 +176,9 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         crate::say_raw!(json, "{}", format_accepted_divergences(&lines));
         advisories.push(advisory("accepted_divergence", format!("{} divergent scenario(s) accepted as known gaps — not failing the gate", lines.len()), lines));
     }
-    if let Some(counts) = canon_gate::review_gate::legacy_review_advisory(&gate_context) {
-        crate::say_raw!(json, "\nadvisory: {}\n", counts.note());
-        advisories.push(advisory("legacy_review", counts.note().to_string(), Vec::new()));
+    if let Some(note) = canon_gate::review_gate::unmigrated_review_note(&gate_context) {
+        crate::say_raw!(json, "\nadvisory: {}\n", note);
+        advisories.push(advisory("unmigrated_review", note, Vec::new()));
     }
     let overrides = crate::brief::override_lines(&gate_context);
     crate::say_raw!(json, "{}", format_brief_overrides(&overrides));

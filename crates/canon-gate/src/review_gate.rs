@@ -396,8 +396,13 @@ pub fn current_reviews(ctx: &GateContext) -> Vec<&Review> {
 /// such a review; `canon migrate` rewrites it.
 pub fn unmigrated_review_scenarios(ctx: &GateContext) -> Vec<String> {
     let live: BTreeSet<(&canon_model::ProjectId, &canon_model::ScenarioId)> = latest_scenarios(ctx).into_iter().map(|s| (&s.project_id, &s.scenario_id)).collect();
+    // A scenario another review already covers is owed nothing: the old
+    // review `canon migrate` left stale beside it is only history.
+    let covered: BTreeSet<(&canon_model::ProjectId, &canon_model::ScenarioId)> =
+        current_reviews(ctx).into_iter().filter_map(|r| r.scenario_id.as_ref().map(|id| (&r.project_id, id))).collect();
     let ids: BTreeSet<String> = in_effect_reviews(ctx)
         .into_iter()
+        .filter(|r| r.scenario_id.as_ref().is_none_or(|id| !covered.contains(&(&r.project_id, id))))
         .filter(|r| r.pins.as_ref().is_none_or(|p| p.checks.is_none()))
         .filter_map(|r| r.scenario_id.as_ref().filter(|id| live.contains(&(&r.project_id, id))).map(|id| id.as_str().to_string()))
         .collect();
