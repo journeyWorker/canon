@@ -19,25 +19,17 @@
 //! reviews must:
 //! - be `signed` (0.15 D4). `indeterminate` and `unavailable` are gaps
 //!   with their own detail, never an approval and never a rejection.
-//! - still match what it pinned (0.15 D1), when it carries `pins`: the
+//! - still match what it pinned (0.15 D1, reshaped by 0.23 D5): the
 //!   scenario's current digest of the kind it pinned — its own
 //!   `scenario_digest` when the record had one at review time, else the
-//!   file-wide `source_digest` — and the current latest evidence record
-//!   per role for the scenario ([`current_pins`]). Each pin is compared
-//!   like for like, so a file-pinned review never goes stale just because
-//!   the scenario record gained a `scenario_digest`. Otherwise it is a
-//!   stale review, and the detail names whether the spec, the evidence,
-//!   or both changed.
-//! - still describe its scenario (0.16 D6), when it carries no `pins`
-//!   (written before 0.15): the scenario's digest at the commit the review
-//!   pinned (`pin`, read by [`crate::legacy_pins`]) must equal its current
-//!   `scenario_digest`, and no declared evidence record of the scenario
-//!   may be newer than the review ([`legacy_currency`]). Otherwise it is
-//!   stale, with the same kind of detail. When the pinned commit or the
-//!   scenario at it is not in this clone, the review is undecidable and
-//!   keeps counting as in 0.15. [`legacy_review_advisory`] feeds the one
-//!   advisory line `canon gate check`, `canon subject status` and `canon
-//!   status` print with the current, stale and undecidable counts.
+//!   file-wide `source_digest` — and what the latest evidence per role says
+//!   now, its verdict and the identity of the checks it bound
+//!   ([`crate::freshness`]). Evidence recorded again with the same verdict
+//!   from the same checks leaves the review current. Otherwise it is a
+//!   stale review, and the detail names whether the spec, the evidence, or
+//!   both changed. A review pinned before 0.23 (to evidence record ids, or
+//!   to nothing) is not comparable: it is stale until `canon migrate`
+//!   rewrites it.
 //! - with `distinct_actor`, have a `reviewer` and an envelope actor that
 //!   both differ from every actor on that scenario's evidence records, and
 //!   when its envelope carries a `session_id`, that session must differ
@@ -65,11 +57,14 @@
 //! A blocker whose latest disposition is `fixed` keeps blocking, as an
 //! `open-blocker` violation, until every evidenced scenario of each
 //! subject holding its change has an evidence record newer than the
-//! finding's `fixed` record (when it was closed, [`fixed_blockers`]): evidence recorded before the fix cannot verify it.
-//! New evidence already stales a pinned review, so the re-review follows
-//! with no rule of its own. [`scenarios_without_evidence_after`] is the
-//! one freshness rule; the chore trigger (a chore change approved on the
-//! subject) reads it from `canon subject status`.
+//! finding's `fixed` record (when it was closed, [`fixed_blockers`]):
+//! evidence recorded before the fix cannot verify it.
+//! [`crate::freshness::scenarios_without_evidence_after`] is that rule. A
+//! scenario review stays current when the new evidence says the same
+//! thing (0.23 D5); the finding's close is the reviewer's step. The chore
+//! trigger (a chore change approved on the subject) reads the same rule
+//! from `canon subject status`, and asks for one change-level review
+//! instead of a re-review per scenario ([`change_review_gap`]).
 //!
 //! A Finding row the ledger read refused (unparseable, schema-invalid,
 //! misfiled) is a `malformed-evidence` violation naming its file, for
@@ -94,13 +89,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use chrono::{DateTime, Utc};
 
 use canon_model::{
-    ChangeId, EvidencePin, EvidenceRecord, Finding, FindingDisposition, FindingSeverity, PinnedSpec, RecordKind, Review, ReviewPins, Scenario, StatusOverride, Subject, SubjectId,
-    SubjectStatus,
+    ChangeId, CheckPin, Finding, FindingDisposition, FindingSeverity, PinnedSpec, RecordKind, Review, Scenario, SpecDigest, StatusOverride, Subject, SubjectId, SubjectStatus,
 };
 
 use crate::context::GateContext;
-use crate::legacy_pins::PinnedScenario;
 use crate::failure_class::{FailureClass, Violation};
+use crate::freshness::{current_checks, drift, scenario_evidence, scenarios_without_evidence_after, Drift};
 use crate::policy::{subject_status_name, RequireReview, SpecCoverage};
 use crate::spec_coverage::{latest_by_key, latest_scenarios, latest_subjects, scope_decision, subject_change_ids, subject_scenarios, ScopeDecision};
 
@@ -351,246 +345,84 @@ pub struct ReviewGap {
     pub violation: Violation,
 }
 
-/// What changed under a review since it was written.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Staleness {
-    /// A pinned review: the spec pin no longer matches (naming which kind
-    /// of pin it was), or the latest evidence records are not the pinned
-    /// ones.
-    Pinned { spec: Option<PinnedSpec>, evidence: bool },
-    /// A review without pins, checked against its commit (0.16 D6).
-    Legacy { spec: bool, evidence: bool },
-}
 
-/// Every evidence record for the scenario's id whose `project_id`
-/// matches or is absent. Counting a project-less record is the stricter
-/// reading: it can only make a review not count, never let one count.
-fn scenario_evidence<'a>(ctx: &'a GateContext, scenario: &Scenario) -> Vec<&'a EvidenceRecord> {
-    ctx.evidence
-        .iter()
-        .filter(|e| e.scenario_id.as_ref() == Some(&scenario.scenario_id) && e.project_id.as_ref().is_none_or(|p| *p == scenario.project_id))
-        .collect()
-}
-
-/// What a review of `scenario` pins right now (0.15 D1): its
-/// `scenario_digest` (scope `scenario`) when the record carries one, else
-/// its file-wide `source_digest` (scope `file`), and the latest evidence
-/// record per role for it (the fold `latest_verdicts` applies), each
-/// named by its ledger file: the natural key and digest of
-/// `kind=evidence_record/<key>__<digest>.json`, in `(key, digest)` order.
-/// A record not read from a file (built in memory) is named by its own
-/// content digest. `canon review add` writes this; [`review_gap`]
-/// compares a pinned review against the scenario and these evidence pins.
-pub fn current_pins(ctx: &GateContext, scenario: &Scenario) -> ReviewPins {
-    let evidence = scenario_evidence(ctx, scenario);
-    let mut pins: Vec<EvidencePin> = latest_by_key(&evidence, |e| e.envelope.actor.role.as_ref().map(|r| r.as_str().to_string()))
-        .into_iter()
-        .map(|record| {
-            let body = serde_json::to_value(record).unwrap_or_default();
-            let key = canon_store::partition::resolve_partition(RecordKind::EvidenceRecord, &body)
-                .expect("an evidence record's natural key always resolves (`unscoped` at worst)")
-                .natural_key;
-            let typed = canon_store::partition::content_digest12(&body);
-            let digest = ctx.evidence_file_digests.get(&typed).cloned().unwrap_or(typed);
-            EvidencePin { key, digest }
-        })
-        .collect();
-    pins.sort();
-    let (scenario_digest, scenario_digest_scope) = match &scenario.scenario_digest {
-        Some(digest) => (digest.clone(), PinnedSpec::Scenario),
-        None => (scenario.source_digest.clone(), PinnedSpec::File),
-    };
-    ReviewPins { scenario_digest, scenario_digest_scope, evidence: pins }
-}
-
-/// `None` when `review` still describes `scenario`: a pinned review that
-/// matches it and the `current` evidence pins, or a legacy review that is
-/// current or undecidable ([`legacy_currency`]); otherwise what changed.
-/// A spec pin is compared like for like: a file pin against the
-/// scenario's `source_digest`, a scenario pin against its
-/// `scenario_digest` (a record without one no longer matches it).
-fn staleness(ctx: &GateContext, review: &Review, scenario: &Scenario, current: &ReviewPins) -> Option<Staleness> {
-    let Some(pins) = review.pins.as_ref() else {
-        return match legacy_currency(ctx, review, scenario) {
-            LegacyCurrency::Stale { spec, evidence } => Some(Staleness::Legacy { spec, evidence }),
-            LegacyCurrency::Current | LegacyCurrency::Undecidable => None,
-        };
-    };
-    let spec_current = match pins.scenario_digest_scope {
-        PinnedSpec::File => pins.scenario_digest == scenario.source_digest,
-        PinnedSpec::Scenario => scenario.scenario_digest.as_ref() == Some(&pins.scenario_digest),
-    };
-    let pinned: BTreeSet<&EvidencePin> = pins.evidence.iter().collect();
-    let now: BTreeSet<&EvidencePin> = current.evidence.iter().collect();
-    let spec = (!spec_current).then_some(pins.scenario_digest_scope);
-    let evidence = pinned != now;
-    (spec.is_some() || evidence).then_some(Staleness::Pinned { spec, evidence })
-}
-
-/// Whether a review without `pins` still describes `scenario` (0.16 D6,
-/// module doc).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LegacyCurrency {
-    /// The scenario's digest at the review's pinned commit is its current
-    /// one, and no declared evidence of it is newer than the review.
-    Current,
-    /// The scenario changed since the pinned commit (`spec`), or declared
-    /// evidence of it is newer than the review (`evidence`), or both.
-    Stale { spec: bool, evidence: bool },
-    /// The pinned commit, or the scenario at it, is not in this clone
-    /// ([`crate::legacy_pins`]), or the scenario record has no digest to
-    /// compare with. The review keeps counting, as in 0.15.
-    Undecidable,
-}
-
-/// [`LegacyCurrency`] of `review`, a review without `pins`, against
-/// `scenario`, from what [`GateContext::legacy_pins`] read at its pin.
-pub fn legacy_currency(ctx: &GateContext, review: &Review, scenario: &Scenario) -> LegacyCurrency {
-    let (Some(PinnedScenario::Digest(at_pin)), Some(now)) = (ctx.legacy_pins.get(review), scenario.scenario_digest.as_ref()) else {
-        return LegacyCurrency::Undecidable;
-    };
-    let spec = at_pin != now;
-    let evidence = scenario_evidence(ctx, scenario).iter().any(|e| e.envelope.at > review.envelope.at);
-    if spec || evidence {
-        LegacyCurrency::Stale { spec, evidence }
-    } else {
-        LegacyCurrency::Current
-    }
-}
-
-/// The latest review per `reviewer` of `(project_id, scenario_id)`
+/// The latest scenario review per `reviewer` of `(project_id, scenario_id)`
 /// (module doc), in reviewer order.
 fn latest_reviews<'a>(ctx: &'a GateContext, scenario: &Scenario) -> Vec<&'a Review> {
-    let reviews: Vec<&Review> = ctx.reviews.iter().filter(|r| r.project_id == scenario.project_id && r.scenario_id == scenario.scenario_id).collect();
+    let reviews: Vec<&Review> = ctx.reviews.iter().filter(|r| r.project_id == scenario.project_id && r.scenario_id.as_ref() == Some(&scenario.scenario_id)).collect();
     latest_by_key(&reviews, |r| r.reviewer.clone()).into_iter().copied().collect()
 }
 
-/// The in-effect reviews: the latest per `(project_id, scenario_id,
-/// reviewer)`, the fold every review rule reads (module doc).
+/// The in-effect reviews: the latest per `(project_id, scenario_id or
+/// change_id, reviewer)`, the fold every review rule reads (module doc).
 pub fn in_effect_reviews(ctx: &GateContext) -> Vec<&Review> {
-    latest_by_key(&ctx.reviews, |r| (r.project_id.clone(), r.scenario_id.clone(), r.reviewer.clone()))
+    latest_by_key(&ctx.reviews, |r| (r.project_id.clone(), r.scenario_id.clone(), r.change_id.clone(), r.reviewer.clone()))
 }
 
 /// The in-effect reviews that are still current (0.18 D5): every
-/// [`in_effect_reviews`] entry except one that no longer describes its
-/// live scenario — a pinned review whose spec or evidence pin moved, or a
-/// legacy review whose currency check says stale. A stale review is
-/// superseded: the gate reads the scenario's newer review in its place,
-/// or reports the gap itself (`unreviewed-promotion`), so nothing the
-/// stale one bound is still claimed. A legacy review that is undecidable
-/// keeps counting, and so is kept, as is a review whose scenario has no
-/// live record to compare it with: dropping either would only ever skip
-/// a check. Review artifacts are re-checked over exactly these
-/// ([`crate::artifact_store`]).
+/// [`in_effect_reviews`] entry except a scenario review that no longer
+/// describes its live scenario ([`drift`]). A stale review is superseded:
+/// the gate reads the scenario's newer review in its place, or reports the
+/// gap itself (`unreviewed-promotion`), so nothing the stale one bound is
+/// still claimed. A review whose scenario has no live record to compare it
+/// with is kept, as is a change-level review (its currency is the chore
+/// rule's): dropping either would only ever skip a check. Review artifacts
+/// are re-checked over exactly these ([`crate::artifact_store`]).
 pub fn current_reviews(ctx: &GateContext) -> Vec<&Review> {
     let live: BTreeMap<(&canon_model::ProjectId, &canon_model::ScenarioId), &Scenario> =
         latest_scenarios(ctx).into_iter().map(|s| ((&s.project_id, &s.scenario_id), s)).collect();
-    let mut pins: BTreeMap<(&canon_model::ProjectId, &canon_model::ScenarioId), ReviewPins> = BTreeMap::new();
+    let mut checks: BTreeMap<(&canon_model::ProjectId, &canon_model::ScenarioId), Vec<CheckPin>> = BTreeMap::new();
     let mut current = Vec::new();
     for review in in_effect_reviews(ctx) {
-        let key = (&review.project_id, &review.scenario_id);
+        let Some(scenario_id) = &review.scenario_id else {
+            current.push(review);
+            continue;
+        };
+        let key = (&review.project_id, scenario_id);
         let Some(scenario) = live.get(&key).copied() else {
             current.push(review);
             continue;
         };
-        let now = pins.entry(key).or_insert_with(|| current_pins(ctx, scenario));
-        if staleness(ctx, review, scenario, now).is_none() {
+        let now = checks.entry(key).or_insert_with(|| current_checks(ctx, scenario));
+        if drift(review.pins.as_ref(), scenario, now).is_none() {
             current.push(review);
         }
     }
     current
 }
 
-/// How the in-effect reviews without `pins` (written before 0.15) of
-/// live scenarios came out of the legacy check: one count per review,
-/// and the scenarios a stale one leaves without a qualifying review.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct LegacyReviewCounts {
-    pub current: usize,
-    /// Every stale legacy review, superseded or not.
-    pub stale: usize,
-    /// The stale ones whose scenario already has another qualifying
-    /// review (current, signed, distinct when the policy asks): nothing
-    /// is owed for them.
-    pub superseded: usize,
-    pub undecidable: usize,
-    /// The scenario ids with a stale legacy review and no qualifying
-    /// review in its place, sorted: the ones to review again.
-    pub needs_review: BTreeSet<String>,
+/// The scenarios whose in-effect review predates 0.23 review pinning (it
+/// pins evidence record ids, or nothing), sorted. The gate does not count
+/// such a review; `canon migrate` rewrites it.
+pub fn unmigrated_review_scenarios(ctx: &GateContext) -> Vec<String> {
+    let live: BTreeSet<(&canon_model::ProjectId, &canon_model::ScenarioId)> = latest_scenarios(ctx).into_iter().map(|s| (&s.project_id, &s.scenario_id)).collect();
+    let ids: BTreeSet<String> = in_effect_reviews(ctx)
+        .into_iter()
+        .filter(|r| r.pins.as_ref().is_none_or(|p| p.checks.is_none()))
+        .filter_map(|r| r.scenario_id.as_ref().filter(|id| live.contains(&(&r.project_id, id))).map(|id| id.as_str().to_string()))
+        .collect();
+    ids.into_iter().collect()
 }
 
-impl LegacyReviewCounts {
-    /// Every in-effect legacy review of a live scenario `owned` accepts.
-    /// A review of a scenario no feature file declares any more is not
-    /// counted: it reviews nothing the gate reads. Whether a stale one is
-    /// superseded is [`review_gap`]'s answer for its scenario, under the
-    /// active `distinct_actor` (on when no rule is active, the stricter
-    /// reading).
-    pub fn of(ctx: &GateContext, owned: impl Fn(&Scenario) -> bool) -> Self {
-        let live: BTreeMap<(&canon_model::ProjectId, &canon_model::ScenarioId), &Scenario> =
-            latest_scenarios(ctx).into_iter().map(|s| ((&s.project_id, &s.scenario_id), s)).collect();
-        let distinct_actor = active_require_review(ctx).is_none_or(|(rr, _)| rr.distinct_actor);
-        let mut counts = Self::default();
-        for review in in_effect_reviews(ctx).into_iter().filter(|r| r.pins.is_none()) {
-            let Some(scenario) = live.get(&(&review.project_id, &review.scenario_id)).copied().filter(|s| owned(s)) else { continue };
-            match legacy_currency(ctx, review, scenario) {
-                LegacyCurrency::Current => counts.current += 1,
-                LegacyCurrency::Stale { .. } => {
-                    counts.stale += 1;
-                    if review_gap(ctx, scenario, distinct_actor).is_none() {
-                        counts.superseded += 1;
-                    } else {
-                        counts.needs_review.insert(scenario.scenario_id.as_str().to_string());
-                    }
-                }
-                LegacyCurrency::Undecidable => counts.undecidable += 1,
-            }
-        }
-        counts
-    }
-
-    pub fn total(&self) -> usize {
-        self.current + self.stale + self.undecidable
-    }
-
-    /// The one advisory line about these reviews, without a prefix. Only
-    /// the scenarios still owed a review are named for re-review.
-    pub fn note(&self) -> String {
-        let mut line = format!(
-            "{} review(s) predate review pinning (0.15) and were checked against the commit each one pinned: {} current, {} stale, {} undecidable",
-            self.total(),
-            self.current,
-            self.stale,
-            self.undecidable
-        );
-        if self.superseded > 0 {
-            line.push_str(&format!("; {} stale one(s) superseded by a current review of the same scenario, so nothing is owed for them", self.superseded));
-        }
-        if !self.needs_review.is_empty() {
-            let ids = self.needs_review.iter().map(String::as_str).collect::<Vec<_>>().join(", ");
-            line.push_str(&format!("; a stale one with no current review in its place no longer counts — review its scenario again (`canon review add`): {ids}"));
-        }
-        if self.undecidable > 0 {
-            line.push_str(
-                "; an undecidable one still counts unchecked, because its pinned commit or the scenario at it is not in this clone — check out full history (`fetch-depth: 0` in CI) to check it",
-            );
-        }
-        line
-    }
-}
-
-/// `canon gate check`'s legacy-review advisory: `Some(counts)` when
-/// `require_review` is active and readable and at least one in-effect
-/// review of a live scenario carries no pins. Advisory only; it never
-/// changes the exit code (a stale legacy review is reported by
-/// [`review_gap`] like any other stale review).
-pub fn legacy_review_advisory(ctx: &GateContext) -> Option<LegacyReviewCounts> {
+/// The one advisory line `canon gate check`, `canon subject status` and
+/// `canon status` print about reviews [`unmigrated_review_scenarios`]
+/// names, or `None` when there are none or `require_review` is not
+/// active and readable.
+pub fn unmigrated_review_note(ctx: &GateContext) -> Option<String> {
     let (require_review, _) = active_require_review(ctx)?;
     if !unreadable_review_kinds(ctx, require_review).is_empty() {
         return None;
     }
-    let counts = LegacyReviewCounts::of(ctx, |_| true);
-    (counts.total() > 0).then_some(counts)
+    let ids = unmigrated_review_scenarios(ctx);
+    if ids.is_empty() {
+        return None;
+    }
+    let shown = ids.iter().take(5).map(String::as_str).collect::<Vec<_>>().join(", ");
+    let more = if ids.len() > 5 { format!(", … {} more", ids.len() - 5) } else { String::new() };
+    Some(format!(
+        "{} scenario(s) have a review that predates 0.23 review pinning ({shown}{more}); such a review does not count until `canon migrate` rewrites it to what the evidence says",
+        ids.len()
+    ))
 }
 
 /// `Some(gap)` when `scenario` has no qualifying review (module doc),
@@ -608,12 +440,12 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
             "no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review add`) once its subject is claimed done".to_string(),
         );
     }
-    let current = current_pins(ctx, scenario);
+    let now = current_checks(ctx, scenario);
     let (signed, unsigned): (Vec<&Review>, Vec<&Review>) = reviews.into_iter().partition(|r| r.outcome.is_signed());
-    let mut stale: Vec<(&Review, Staleness)> = Vec::new();
+    let mut stale: Vec<(&Review, Drift)> = Vec::new();
     let mut fresh: Vec<&Review> = Vec::new();
     for review in signed {
-        match staleness(ctx, review, scenario, &current) {
+        match drift(review.pins.as_ref(), scenario, &now) {
             Some(changed) => stale.push((review, changed)),
             None => fresh.push(review),
         }
@@ -651,14 +483,19 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
     }
 
     if !stale.is_empty() {
-        let pinned: Vec<(&Review, Option<PinnedSpec>, bool)> =
-            stale.iter().filter_map(|(r, c)| match c { Staleness::Pinned { spec, evidence } => Some((*r, *spec, *evidence)), Staleness::Legacy { .. } => None }).collect();
+        let who = |keep: &dyn Fn(&Drift) -> bool| stale.iter().filter(|(_, d)| keep(d)).map(|(r, _)| format!("`{}`", r.reviewer)).collect::<Vec<_>>().join(", ");
         let mut parts = Vec::new();
-        if !pinned.is_empty() {
-            let who = pinned.iter().map(|(r, _, _)| format!("`{}`", r.reviewer)).collect::<Vec<_>>().join(", ");
-            let scenario_spec = pinned.iter().any(|(_, spec, _)| *spec == Some(PinnedSpec::Scenario));
-            let file_spec = pinned.iter().any(|(_, spec, _)| *spec == Some(PinnedSpec::File));
-            let evidence = pinned.iter().any(|(_, _, evidence)| *evidence);
+        let unmigrated = who(&|d| d.unmigrated);
+        if !unmigrated.is_empty() {
+            parts.push(format!(
+                "review by {unmigrated} predates 0.23 review pinning (it pins evidence records, or nothing): `canon migrate` rewrites it to what the evidence says, and a review that is not migrated does not count"
+            ));
+        }
+        let moved = stale.iter().filter(|(_, d)| !d.unmigrated).map(|(_, d)| d).collect::<Vec<_>>();
+        if !moved.is_empty() {
+            let scenario_spec = moved.iter().any(|d| d.spec == Some(PinnedSpec::Scenario));
+            let file_spec = moved.iter().any(|d| d.spec == Some(PinnedSpec::File));
+            let evidence = moved.iter().any(|d| d.evidence);
             let spec_what = match (scenario_spec, file_spec) {
                 (true, false) => Some("the scenario's digest"),
                 (false, true) => Some("the .feature file's source digest"),
@@ -666,25 +503,13 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
                 (false, false) => None,
             };
             let changed = match (spec_what, evidence) {
-                (Some(what), true) => format!("its spec and its evidence changed ({what} and the latest evidence records are not the pinned ones)"),
+                (Some(what), true) => format!("its spec and its evidence changed ({what} is not the pinned one, and the latest evidence says a different verdict or names different checks)"),
                 (Some(what), false) => format!("its spec changed ({what} is not the pinned one)"),
-                (None, _) => "its evidence changed (the latest evidence records are not the pinned ones)".to_string(),
+                (None, _) => "its evidence changed (the latest evidence says a different verdict or names different checks than the review saw)".to_string(),
             };
-            parts.push(format!("stale review by {who}: {changed} since the review"));
+            parts.push(format!("stale review by {}: {changed} since the review", who(&|d| !d.unmigrated)));
         }
-        for (review, change) in &stale {
-            let Staleness::Legacy { spec, evidence } = change else { continue };
-            let pin = &review.pin;
-            let spec_changed = format!("its spec changed since {pin} (the scenario's digest at that commit is not its current one)");
-            let changed = match (spec, evidence) {
-                (true, true) => format!("{spec_changed}, and it has declared evidence newer than the review"),
-                (true, false) => spec_changed,
-                (false, _) => "it has declared evidence newer than the review".to_string(),
-            };
-            parts.push(format!("stale review by `{}` (written before review pinning; checked against commit {pin}): {changed}", review.reviewer));
-        }
-        let counts = if pinned.len() == stale.len() { "a pinned review counts" } else { "a review counts" };
-        return gap(ReviewGapKind::Stale, format!("{}; {counts} only while what it saw is current — review it again (`canon review add`)", parts.join("; ")));
+        return gap(ReviewGapKind::Stale, format!("{}; a review counts only while what it saw is current — review it again (`canon review add`)", parts.join("; ")));
     }
 
     let outcomes = unsigned.iter().map(|r| format!("`{}` {}", r.reviewer, r.outcome.as_str())).collect::<Vec<_>>().join(", ");
@@ -740,20 +565,6 @@ pub fn fixed_blockers(ctx: &GateContext) -> Vec<FixedBlocker<'_>> {
         .collect()
 }
 
-/// The one freshness rule (module doc): the scenarios `subject` owns that
-/// have evidence but none recorded after `after`. A scenario with no
-/// evidence at all is not listed; the ship guard reports it as missing
-/// evidence on its own.
-pub fn scenarios_without_evidence_after<'a>(ctx: &'a GateContext, subject: &SubjectId, after: DateTime<Utc>) -> Vec<&'a Scenario> {
-    subject_scenarios(ctx, subject)
-        .into_iter()
-        .filter(|scenario| {
-            let evidence = scenario_evidence(ctx, scenario);
-            !evidence.is_empty() && evidence.iter().all(|e| e.envelope.at <= after)
-        })
-        .collect()
-}
-
 /// What a re-verification refusal says, ending in the command that
 /// clears it. `scenarios` are `(project_id, scenario_id)` pairs.
 pub fn reverify_remedy(scenarios: &[(&str, &str)]) -> String {
@@ -762,7 +573,7 @@ pub fn reverify_remedy(scenarios: &[(&str, &str)]) -> String {
     let project = projects.first().copied().unwrap_or("<root>");
     let more = if projects.len() > 1 { format!(" (once per spec root: {})", projects.join(", ")) } else { String::new() };
     format!(
-        "record the evidence again with `canon evidence add --project-id {project} --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" …`{more}; the re-review follows, as new evidence makes a pinned review stale"
+        "record the evidence again with `canon evidence add --project-id {project} --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" …`{more}; a scenario review stays current when the verdict and the checks are the same, and a changed verdict or check stales it"
     )
 }
 
@@ -799,4 +610,48 @@ fn fixed_blocker_violation(fixed: &FixedBlocker<'_>, subjects: &[&str], unmet: &
             reverify_remedy(unmet)
         ),
     )
+}
+
+/// Why a chore change has no qualifying change-level review (0.23 D5), or
+/// `None` when it has one. The reviews of `change` are folded to the latest
+/// per reviewer; one must be `signed`, pinned to the brief as it reads now
+/// (`brief`, [`PinnedSpec::Brief`]: an edit to the brief after the review
+/// stales it), and, with `distinct_actor`, by a reviewer and an actor that
+/// attested none of the evidence of `subject`'s scenarios, nor from one of
+/// its sessions. [`crate::freshness`] has no scenario to compare here, so
+/// the pin check is this one comparison.
+pub fn change_review_gap(ctx: &GateContext, subject: &Subject, change: &ChangeId, brief: &SpecDigest, distinct_actor: bool) -> Option<String> {
+    let reviews: Vec<&Review> = ctx.reviews.iter().filter(|r| r.change_id.as_ref() == Some(change)).collect();
+    let reviews: Vec<&Review> = latest_by_key(&reviews, |r| r.reviewer.clone()).into_iter().copied().collect();
+    if reviews.is_empty() {
+        return Some(format!("no review of change `{}` (a chore needs one change-level review)", change.as_str()));
+    }
+    let (signed, unsigned): (Vec<&Review>, Vec<&Review>) = reviews.into_iter().partition(|r| r.outcome.is_signed());
+    let (current, stale): (Vec<&Review>, Vec<&Review>) = signed
+        .into_iter()
+        .partition(|r| r.pins.as_ref().is_some_and(|p| p.scenario_digest_scope == PinnedSpec::Brief && p.scenario_digest == *brief));
+    if current.is_empty() {
+        if !stale.is_empty() {
+            let who = stale.iter().map(|r| format!("`{}`", r.reviewer)).collect::<Vec<_>>().join(", ");
+            return Some(format!("stale review of change `{}` by {who}: its brief was edited since the review; review the chore again", change.as_str()));
+        }
+        let outcomes = unsigned.iter().map(|r| format!("`{}` {}", r.reviewer, r.outcome.as_str())).collect::<Vec<_>>().join(", ");
+        return Some(format!("no signed review of change `{}`: the latest review recorded no sign-off ({outcomes})", change.as_str()));
+    }
+    if !distinct_actor {
+        return None;
+    }
+    let evidence: Vec<&canon_model::EvidenceRecord> = crate::spec_coverage::subject_scenarios(ctx, &subject.subject_id).into_iter().flat_map(|s| scenario_evidence(ctx, s)).collect();
+    let actors: BTreeSet<&str> = evidence.iter().map(|e| e.envelope.actor.agent_id.as_str()).collect();
+    let sessions: BTreeSet<&str> = evidence.iter().filter_map(|e| e.envelope.actor.session_id.as_ref()).map(|s| s.as_str()).collect();
+    let independent = |r: &Review| {
+        !actors.contains(r.reviewer.as_str()) && !actors.contains(r.envelope.actor.agent_id.as_str()) && r.envelope.actor.session_id.as_ref().is_none_or(|s| !sessions.contains(s.as_str()))
+    };
+    if current.iter().any(|r| independent(r)) {
+        return None;
+    }
+    Some(format!(
+        "every review of change `{}` is by an actor, or from a session, that also attested the subject's evidence; spec_coverage.require_review.distinct_actor wants an independent reviewer",
+        change.as_str()
+    ))
 }

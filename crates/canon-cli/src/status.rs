@@ -104,7 +104,7 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use canon_gate::policy::subject_status_name;
-use canon_gate::review_gate::{legacy_review_advisory, open_blockers, review_gap, ReviewGapKind};
+use canon_gate::review_gate::{open_blockers, review_gap, ReviewGapKind};
 use canon_gate::spec_coverage::{case_gaps, latest_scenarios, latest_subjects, subject_change_ids, subject_scenarios};
 use canon_gate::review_gate::active_require_review;
 use canon_gate::audit;
@@ -150,10 +150,6 @@ pub struct StatusReport {
     pub subjects: Vec<SubjectSummary>,
     /// Scenario ids (latest generation) whose `@subject:` tag is absent.
     pub unowned: Vec<String>,
-    /// Every recorded `--drop-attachment` (0.15 D2), oldest first.
-    /// Omitted when none was recorded.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub drops: Vec<DropSummary>,
     /// Audit obligations and refutations (0.15 D3). Omitted when
     /// `require_audit` is off and no latest audit is refuted.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -179,21 +175,6 @@ pub struct StatusReport {
     /// Change id → the subjects joined to it.
     #[serde(skip)]
     pub change_subjects: BTreeMap<String, Vec<String>>,
-}
-
-/// One recorded binding drop: which record dropped which files, and why.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DropSummary {
-    pub scenario: String,
-    pub project_id: String,
-    pub paths: Vec<String>,
-    pub reason: String,
-    /// The dropping record's actor.
-    pub by: String,
-    pub at: String,
-    /// Whether the dropping record is an audit (its own fold).
-    pub audit: bool,
 }
 
 /// Where audits stand (0.15 D3).
@@ -442,7 +423,7 @@ pub fn split_by_role(steps: Vec<NextStep>, role: Role) -> (Vec<NextStep>, BTreeM
 
 /// The top-level fields of the `--json` report, which `--fields` may name.
 /// `drops` and `audits` are omitted from a report that has none.
-const REPORT_FIELDS: [&str; 11] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "drops", "audits", "next", "nextOmitted", "waitingOn"];
+const REPORT_FIELDS: [&str; 10] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits", "next", "nextOmitted", "waitingOn"];
 
 /// Build the report for an already-resolved repo root. The caller has
 /// refreshed a stale scenario index (`canon status` does, first).
@@ -478,14 +459,13 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
             warnings.extend(crate::policy_approval::advisory(repo));
             warnings.push(format!("cannot read this repo's ledger: {e}"));
             next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into(), actor: StepActor::Agent, role: Some(Role::Orchestrator) });
-            return finish(repo, &policy, warnings, Vec::new(), Vec::new(), Vec::new(), None, next);
+            return finish(repo, &policy, warnings, Vec::new(), Vec::new(), None, next);
         }
     };
 
     if pending_index {
         crate::inventory::overlay_stale_index(&mut ctx);
     }
-    crate::inventory::resolve_legacy_pins(&mut ctx);
     warnings.extend(policy_warning(&ctx.policy));
     warnings.extend(crate::policy_approval::advisory(repo));
     let routed_away: Vec<&str> = ctx
@@ -501,8 +481,8 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     if unreadable > 0 {
         warnings.push(format!("{unreadable} ledger record(s) could not be read and are not counted; `canon gate check` names them"));
     }
-    if let Some(counts) = legacy_review_advisory(&ctx) {
-        warnings.push(counts.note());
+    if let Some(note) = canon_gate::review_gate::unmigrated_review_note(&ctx) {
+        warnings.push(note);
     }
     warnings.extend(crate::brief::override_lines(&ctx));
 
@@ -529,7 +509,6 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
             dangling.entry(id).or_default().push(scenario.scenario_id.as_str());
         }
     }
-    let drops = recorded_drops(&ctx);
     let audits = audit_summary(&ctx);
 
     // ── fail closed: a corpus read as empty for a routing reason ──
@@ -545,7 +524,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         });
         let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
         let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
-        return finish(repo, &ctx.policy, warnings, summaries, unowned, drops, audits, next);
+        return finish(repo, &ctx.policy, warnings, summaries, unowned, audits, next);
     }
 
     // ── fail closed: .feature edits the index refresh could not take ──
@@ -585,7 +564,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         }
         let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
         let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
-        return finish(repo, &ctx.policy, warnings, summaries, unowned, drops, audits, next);
+        return finish(repo, &ctx.policy, warnings, summaries, unowned, audits, next);
     }
 
     // ── next: global rules ──
@@ -686,7 +665,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     };
     let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
     let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
-    let mut report = finish(repo, &ctx.policy, warnings, summaries, unowned, drops, audits, next);
+    let mut report = finish(repo, &ctx.policy, warnings, summaries, unowned, audits, next);
     for (range, id) in owners {
         for slot in &mut report.step_subjects[range] {
             *slot = Some(id.clone());
@@ -704,7 +683,6 @@ fn finish(
     warnings: Vec<String>,
     subjects: Vec<SubjectSummary>,
     unowned: Vec<String>,
-    drops: Vec<DropSummary>,
     audits: Option<AuditSummary>,
     mut next: Vec<NextStep>,
 ) -> StatusReport {
@@ -722,7 +700,6 @@ fn finish(
         warnings,
         subjects,
         unowned,
-        drops,
         audits,
         next,
         next_omitted,
@@ -732,28 +709,6 @@ fn finish(
         scenario_owner: BTreeMap::new(),
         change_subjects: BTreeMap::new(),
     }
-}
-
-/// Every recorded binding drop, declared and audit records alike,
-/// oldest first.
-fn recorded_drops(ctx: &GateContext) -> Vec<DropSummary> {
-    let mut records: Vec<_> = ctx.evidence.iter().chain(&ctx.audits).filter(|r| r.attachment_drop.is_some()).collect();
-    records.sort_by_key(|r| r.envelope.at);
-    records
-        .into_iter()
-        .filter_map(|r| {
-            let drop = r.attachment_drop.as_ref()?;
-            Some(DropSummary {
-                scenario: r.scenario_id.as_ref().map(|s| s.as_str().to_string()).unwrap_or_default(),
-                project_id: r.project_id.as_ref().map(|p| p.as_str().to_string()).unwrap_or_default(),
-                paths: drop.paths.clone(),
-                reason: drop.reason.clone(),
-                by: r.envelope.actor.agent_id.clone(),
-                at: r.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-                audit: r.is_audit(),
-            })
-        })
-        .collect()
 }
 
 /// The `require_audit` sample's state and every refuted latest audit,
@@ -1252,27 +1207,13 @@ fn subject_steps(
             project_of(scenario)
         )
     };
-    // A re-audit that leaves out a refutation's counterexamples passes
-    // the drop guard only by naming them, so the command does.
-    let latest_audits = audit::latest_audits(ctx);
-    let counterexample_drops = |scenario: &str| {
-        latest_audits
-            .iter()
-            .find(|((project, id), _)| id.as_str() == scenario && project.as_str() == project_of(scenario))
-            .and_then(|(_, record)| audit::counterexample_drop_flags(record))
-            .map(|flags| format!(" {flags}"))
-            .unwrap_or_default()
-    };
     for (class, why) in [
         (canon_gate::FailureClass::FalseSuccess, "scenario(s) have a refuted latest audit (false-success); fix the behavior, re-attest, and have the external evaluator re-audit"),
         (canon_gate::FailureClass::UncoveredCell, "sampled scenario(s) owe an audit; an external evaluator re-audits each, canon only records the result"),
     ] {
         let gaps: Vec<&canon_gate::Violation> = audit_gaps.iter().filter(|v| v.class == class).collect();
         if let Some(first) = gaps.first() {
-            let mut command = audit_command(&first.subject);
-            if class == canon_gate::FailureClass::FalseSuccess {
-                command.push_str(&counterexample_drops(&first.subject));
-            }
+            let command = audit_command(&first.subject);
             next.push(NextStep { command, why: format!("{id}: {} {why} (first: {})", gaps.len(), first.subject), actor: StepActor::Agent, role: Some(Role::Orchestrator) });
         }
     }
@@ -1434,14 +1375,6 @@ pub fn render(report: &StatusReport) -> String {
         let _ = writeln!(out, "unowned ({}, no @subject): {shown}{}", report.unowned.len(), if more > 0 { format!(", … {more} more") } else { String::new() });
     }
 
-    if !report.drops.is_empty() {
-        let _ = writeln!(out);
-        let _ = writeln!(out, "dropped bindings ({}):", report.drops.len());
-        for drop in &report.drops {
-            let fold = if drop.audit { " (audit)" } else { "" };
-            let _ = writeln!(out, "  {}{fold}: {} — {:?} (by {} at {})", drop.scenario, drop.paths.join(", "), drop.reason, drop.by, drop.at);
-        }
-    }
     if let Some(audits) = &report.audits {
         let _ = writeln!(out);
         let _ = writeln!(out, "audits: {} sampled, {} confirmed, {} owed, {} refuted", audits.sampled, audits.confirmed, audits.owed.len(), audits.refuted.len());

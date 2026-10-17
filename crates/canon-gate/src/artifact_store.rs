@@ -514,7 +514,7 @@ pub fn unstored_attachments(ctx: &GateContext) -> Vec<UnstoredAttachment> {
         for artifact in distinct_review_files(review) {
             if unstored(&artifact.path, &artifact.sha256) {
                 out.push(UnstoredAttachment {
-                    subject: review.scenario_id.as_str().to_string(),
+                    subject: review.target().to_string(),
                     path: artifact.path.clone(),
                     sha256: artifact.sha256.clone(),
                     reviewer: Some(review.reviewer.clone()),
@@ -582,7 +582,7 @@ impl GateCheck for ArtifactStoreCheck {
                 }
                 violations.push(Violation::new(
                     FailureClass::StaleEvidence,
-                    review.scenario_id.as_str().to_string(),
+                    review.target().to_string(),
                     format!(
                         "review by `{}` (actor `{}`, {}) bound file `{}` recorded sha256 {}; stored blob {}: {}; working tree: {} — {}, look again and re-record the review with `canon review add --artifact <path>`",
                         review.reviewer,
@@ -656,14 +656,12 @@ mod tests {
             },
             evidence,
             audits: Vec::new(),
-            evidence_file_digests: Default::default(),
             scenarios: Vec::new(),
             divergences: Vec::new(),
             subjects: Vec::new(),
             changes: Vec::new(),
             reviews: Vec::new(),
             findings: Vec::new(),
-            legacy_pins: Default::default(),
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
