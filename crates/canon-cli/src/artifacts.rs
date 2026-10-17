@@ -216,7 +216,7 @@ pub fn run_migrate(repo: &Path, to: &str, dry_run: bool, json: bool) -> i32 {
         }
         return refuse(
             "moving artifact bytes back from an object store to `local` is not supported".to_string(),
-            "the bytes stay in the store; to read them again, keep `artifacts.backend` as it is",
+            "the bytes stay in the store; to read them again, keep `artifact_store.backend` as it is",
         );
     }
     let (target, new_yaml) = match resolve_target(&repo, to) {
