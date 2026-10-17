@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-1"
+  },
+  "at": "2026-10-17T20:04:25.758897Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate_pins migrate_pins_02_a_legacy_review_of_a_changed_scenario_stays_stale"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 48,
+  "scenario_id": "gate.check.91",
+  "schema": 1,
+  "staging_id": "e5afe0e3e44c",
+  "verdict": "faithful"
+}
