@@ -339,7 +339,31 @@ caches are covered by contract tests (`ledger_archive.rs`,
 
 Closes #80
 
-ACCEPTANCE-PLACEHOLDER: dogfood eval 11
+**Acceptance (dogfood eval 11, omp, `language: ko`, orchestrated roles).**
+The same baseline as eval 10 (`canon migrate` applied with the 0.23 build:
+gate clean before and after). An orchestrator spawned planner, implementer
+and reviewer subagents for a combo system, then for a chore moving the combo
+math into one module.
+
+- Feature: the brief stopped for the human in under 3 minutes (0 blockers),
+  then 20 new scenarios (103 in all) shipped with gate clean. The reviewer
+  found a flaky combo e2e test; it was fixed inside the approved change and
+  re-reviewed. 66 canon calls for 20 new scenarios (3.3 per scenario; eval 10:
+  2.2), most of the difference from two review rounds' findings (16 calls)
+  and `status` (10).
+- Chore: one change-level review instead of re-reviewing every scenario (eval
+  10's chore re-reviewed 100). The reviewer caught the implementer binding two
+  determinism scenarios to the chore's comparison instead of their own and
+  sent them back; shipped, gate clean.
+- After the run the ledger holds one file per key (103 evidence records; 614
+  superseded versions in `.canon/archive`), and no record carries a file
+  forward.
+- Found by the run: both implementers looped every screenshot into an
+  `--all-scenarios` batch, so each record binds ~30 unrelated files (#83);
+  role-implementer.md now says a batch carries reports and a screenshot goes
+  with its own scenario. `evals/dogfood/trace_check.py` counts only code that
+  landed in git as implementation (a reviewer's uncommitted diagnostic spec is
+  scratch).
 
 ## 0.22.0 release
 
