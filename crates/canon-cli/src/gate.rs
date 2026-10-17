@@ -163,6 +163,12 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
             advisories.push(advisory("review_waivers", format!("{} waived review gap(s) — not failing the gate", review.len()), review.iter().map(|a| a.line()).collect()));
         }
     }
+    let accepted = canon_gate::acceptance::accepted_divergences(&gate_context);
+    if !accepted.is_empty() {
+        let lines: Vec<String> = accepted.iter().map(canon_gate::acceptance::Acceptance::line).collect();
+        crate::say_raw!(json, "{}", format_accepted_divergences(&lines));
+        advisories.push(advisory("accepted_divergence", format!("{} divergent scenario(s) accepted as known gaps — not failing the gate", lines.len()), lines));
+    }
     if let Some(counts) = canon_gate::review_gate::legacy_review_advisory(&gate_context) {
         crate::say_raw!(json, "\nadvisory: {}\n", counts.note());
         advisories.push(advisory("legacy_review", counts.note().to_string(), Vec::new()));
@@ -249,6 +255,20 @@ fn format_review_advisories(advisories: &[canon_gate::ReviewAdvisory]) -> String
     let mut out = format!("\nreview waivers: {} advisory(ies) — not failing the gate:\n", advisories.len());
     for advisory in advisories {
         out.push_str(&format!("  waived {}\n", advisory.line()));
+    }
+    out
+}
+
+/// Divergent scenarios a reviewer accepted as tracked known gaps
+/// (`canon divergence accept`, 0.22 D1): advisories, never violations,
+/// listed so an accepted gap is never silent. Prints nothing when empty.
+fn format_accepted_divergences(lines: &[String]) -> String {
+    if lines.is_empty() {
+        return String::new();
+    }
+    let mut out = format!("\naccepted divergences: {} known gap(s) — not failing the gate:\n", lines.len());
+    for line in lines {
+        out.push_str(&format!("  {line}\n"));
     }
     out
 }

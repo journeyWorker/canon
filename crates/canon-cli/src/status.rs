@@ -249,6 +249,12 @@ pub struct SubjectSummary {
     pub evidenced: usize,
     /// Counted scenarios whose latest verdict (for some role) is divergent.
     pub divergent: usize,
+    /// Counted divergent scenarios a reviewer accepted as known gaps
+    /// (`canon divergence accept`) whose acceptance still holds, each as
+    /// `accepted-divergence <id> — <tracking> (expires <date>)`. They are
+    /// not in `divergent`; omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub accepted_divergences: Vec<String>,
     /// Counted scenarios with a qualifying review under the
     /// `require_review` rule (any current signed review when it is off).
     pub reviewed: usize,
@@ -854,10 +860,14 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
 
     let mut evidenced = 0;
     let mut divergent = 0;
+    let mut accepted_divergences = Vec::new();
     for scenario in &counted {
         let (has, diverged) = joins.verdict_state(scenario);
         evidenced += usize::from(has);
-        divergent += usize::from(diverged);
+        match canon_gate::acceptance::held(ctx, scenario) {
+            Some(canon_gate::acceptance::Held::Holds(acceptance)) if diverged => accepted_divergences.push(acceptance.line()),
+            _ => divergent += usize::from(diverged),
+        }
     }
     let gaps: Vec<ReviewGapKind> = counted.iter().filter_map(|s| review_gap(ctx, s, distinct_actor)).map(|gap| gap.kind).collect();
     let reviewed = counted.len() - gaps.len();
@@ -880,6 +890,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         excluded,
         evidenced,
         divergent,
+        accepted_divergences,
         reviewed,
         stale_reviews,
         unsigned_reviews: gap_count(ReviewGapKind::Unsigned),
@@ -1145,7 +1156,7 @@ fn subject_steps(
                 ),
             });
         }
-        if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1) {
+        if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1 && !canon_gate::acceptance::is_accepted(ctx, s)) {
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
@@ -1154,7 +1165,7 @@ fn subject_steps(
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
-                why: format!("{id}: {} scenario(s) have a divergent latest verdict; fix the behavior, then re-attest", summary.divergent),
+                why: format!("{id}: {} scenario(s) have a divergent latest verdict; fix the behavior, then re-attest, or have a reviewer accept the tracked gap (`canon divergence accept`)", summary.divergent),
             });
         }
     }
@@ -1341,6 +1352,9 @@ pub fn render(report: &StatusReport) -> String {
             let _ = writeln!(out, "    {}: {line}", s.id);
             for gap in &s.missing_cases {
                 let _ = writeln!(out, "      missing @case:{} on {}", gap.case, gap.surface);
+            }
+            for line in &s.accepted_divergences {
+                let _ = writeln!(out, "      advisory: {line}");
             }
             if let Some(brief) = &s.brief {
                 let _ = match (&brief.approval, &brief.brief, &brief.change) {

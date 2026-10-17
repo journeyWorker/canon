@@ -43,6 +43,7 @@
 //! the five migrated fields and stays a raw-JSON companion read
 //! (`trust`'s own module doc).
 
+pub mod acceptance;
 pub mod approval;
 pub mod artifact_store;
 pub mod audit;

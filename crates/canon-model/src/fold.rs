@@ -63,6 +63,10 @@ pub enum FoldedState {
     Resolved,
     StillDivergent,
     Deferred { reason: String, expiry: DateTime<Utc> },
+    /// A reviewer accepted the gap (`DivergenceStatus::Accepted`) and it
+    /// has not lapsed. Whether the evidence it pinned is still the
+    /// latest is the gate's question, not the fold's.
+    Accepted { tracking: String, expiry: Option<DateTime<Utc>> },
     /// The group's winning record claims `Resolved`, but the supplied
     /// `live_bindings` re-check shows the CURRENT ledger's binding no
     /// longer matches what was resolved (design D8's no-TOCTOU
@@ -120,6 +124,13 @@ fn fold_one(winner: &Divergence, live: Option<&BindingSnapshot>, as_of: DateTime
                 FoldedState::StillDivergent
             } else {
                 FoldedState::Deferred { reason: reason.clone(), expiry: *expiry }
+            }
+        }
+        DivergenceStatus::Accepted { tracking, expiry, .. } => {
+            if expiry.is_some_and(|expiry| as_of >= expiry) {
+                FoldedState::StillDivergent
+            } else {
+                FoldedState::Accepted { tracking: tracking.clone(), expiry: *expiry }
             }
         }
         DivergenceStatus::Resolved => match live {
@@ -253,13 +264,13 @@ mod tests {
     #[test]
     fn resolved_invalid_is_not_a_divergence_status_variant() {
         // Structural, not just a runtime probe: `DivergenceStatus` only
-        // ever deserializes to Open/Resolved/StillDivergent/Deferred —
+        // ever deserializes to Open/Resolved/StillDivergent/Deferred/Accepted —
         // there is no wire string that produces `ResolvedInvalid`,
         // because the variant does not exist on that type at all (it
         // only exists on `FoldedState`, checked by the match above
         // needing no `ResolvedInvalid` arm).
         match DivergenceStatus::Open {
-            DivergenceStatus::Open | DivergenceStatus::Resolved | DivergenceStatus::StillDivergent | DivergenceStatus::Deferred { .. } => {}
+            DivergenceStatus::Open | DivergenceStatus::Resolved | DivergenceStatus::StillDivergent | DivergenceStatus::Deferred { .. } | DivergenceStatus::Accepted { .. } => {}
         }
     }
 

@@ -727,8 +727,18 @@ pub fn run_status(
     if !blocking.is_empty() {
         let lines = blocking.iter().chain(&waivable).map(Violation::line).collect::<Vec<_>>().join("\n");
         let mut error = CliError::failed("SUBJECT_GATE_VIOLATION", lines).with_exit(EXIT_GATED);
+        let mut hints = Vec::new();
+        if let Some(ctx) = &gate_context {
+            let divergent = divergent_cells(ctx, subject_id, &blocking);
+            if !divergent.is_empty() {
+                hints.push(canon_gate::acceptance::hint(&divergent));
+            }
+        }
         if override_reason.is_some() {
-            error = error.hint("--override-reason waives only the review checks (unreviewed-promotion, open-blocker); the violations above that are not review checks still refuse this transition");
+            hints.push("--override-reason waives only the review checks (unreviewed-promotion, open-blocker); the violations above that are not review checks still refuse this transition".to_string());
+        }
+        if !hints.is_empty() {
+            error = error.hint(hints.join("; "));
         }
         return error.emit("canon subject status", json);
     }
@@ -968,11 +978,11 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
         let entries: Vec<&LedgerEntry> = verdicts.iter().filter(|((subject, _), _)| subject == &sid).map(|(_, entry)| entry).collect();
         if entries.is_empty() {
             violations.push(Violation::new(FailureClass::UncoveredCell, sid.clone(), "verifying → shipped: no ledger verdict for this linked scenario"));
-        } else if let Some(divergent) = entries.iter().find(|e| e.verdict == EvidenceVerdict::Divergent) {
+        } else if let Some(divergent) = entries.iter().find(|e| e.verdict == EvidenceVerdict::Divergent).filter(|_| !canon_gate::acceptance::is_accepted(gate_context, scenario)) {
             violations.push(Violation::new(
                 FailureClass::UncoveredCell,
                 sid.clone(),
-                format!("verifying → shipped: latest verdict is divergent (by {})", divergent.agent_id),
+                format!("verifying → shipped: {}", canon_gate::acceptance::divergent_detail(gate_context, scenario, &divergent.agent_id)),
             ));
         }
     }
@@ -990,6 +1000,19 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
         violation
     }));
     violations
+}
+
+/// The `(project_id, scenario_id)` of each divergent-verdict refusal among
+/// `blocking` ([`canon_gate::acceptance::DIVERGENT_DETAIL`]), for the hint
+/// that names the way out.
+fn divergent_cells(ctx: &GateContext, subject_id: &SubjectId, blocking: &[Violation]) -> Vec<(String, String)> {
+    let owned = subject_scenarios(ctx, subject_id);
+    blocking
+        .iter()
+        .filter(|v| v.class == FailureClass::UncoveredCell && v.detail.contains(canon_gate::acceptance::DIVERGENT_DETAIL))
+        .filter_map(|v| owned.iter().find(|s| s.scenario_id.as_str() == v.subject))
+        .map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string()))
+        .collect()
 }
 
 /// The `verifying → shipped` brief-structure check (0.19 D2): the blocker

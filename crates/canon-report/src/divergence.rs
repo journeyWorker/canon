@@ -79,11 +79,12 @@ pub struct DivergenceBurndownSummary {
     pub still_divergent: usize,
     pub deferred: usize,
     pub resolved_invalid: usize,
+    pub accepted: usize,
 }
 
 impl DivergenceBurndownSummary {
     pub fn total(&self) -> usize {
-        self.open + self.resolved + self.still_divergent + self.deferred + self.resolved_invalid
+        self.open + self.resolved + self.still_divergent + self.deferred + self.resolved_invalid + self.accepted
     }
 }
 
@@ -97,6 +98,7 @@ pub fn summarize(states: &BTreeMap<(ProjectId, ScenarioId), FoldedState>) -> Div
             FoldedState::StillDivergent => summary.still_divergent += 1,
             FoldedState::Deferred { .. } => summary.deferred += 1,
             FoldedState::ResolvedInvalid => summary.resolved_invalid += 1,
+            FoldedState::Accepted { .. } => summary.accepted += 1,
         }
     }
     summary
