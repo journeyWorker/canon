@@ -284,7 +284,29 @@ Closes #77
 
 Closes #78
 
-ACCEPTANCE-PLACEHOLDER: dogfood eval 10
+**Acceptance (dogfood eval 10, omp, `language: ko`, orchestrated roles).**
+An orchestrator agent spawned planner, implementer and reviewer subagents for
+a hit-feedback feature on the shipped game (screen flash, cat blink, and
+phone vibration that headless desktop Chrome cannot produce), then for a
+chore splitting weapon tables into per-weapon files.
+
+- Right after `change new`, `meta.next` was the planner's `canon brief check
+  --change hit-feedback` with 7 blockers, not a human stop (#70).
+- The vibration limit was recorded honestly: the brief scoped automated
+  checks to a stubbed `navigator.vibrate` and named real-device vibration as
+  unverified, and the report repeated it. No verdict claimed more.
+  `divergence accept` was not needed in this run; it is covered by
+  `tests/divergence_accept.rs`.
+- The chore: one human stop; `brief approve` named the reopen in
+  `meta.next`; the subject was red until the suite was recorded again after
+  the chore's approval and re-reviewed by another session (#77); shipped,
+  100/100 evidenced and reviewed, gate clean.
+- Feature turn: 37 canon calls for 17 new scenarios (2.2 per scenario). No
+  canon refusal in any session carried a null hint.
+- Found by the run: carried attachments pile up across changes and agents
+  did not find how to drop a stale one (#80);
+  `evals/dogfood/trace_check.py` now treats scratch paths outside the repo,
+  including unexpanded `$VAR` paths, as neither code nor a pre-stop write.
 
 ## 0.21.1 release
 
