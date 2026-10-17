@@ -8,13 +8,14 @@
   "kind": "review",
   "pin": "9533ed1eae0aff89b28dacca20da7cc180e9fa7a",
   "pins": {
-    "evidence": [
+    "checks": [
       {
-        "digest": "f870dd101bf7",
-        "key": "gate.check.93"
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
       }
     ],
-    "scenario_digest": "5f2cafa11a3784e600834faef599d1ef1252a1791f11d808a1cf0f7206080f7d",
+    "scenario_digest": "4a369eb55418286c3679f5e3a27d8984f3820d90ae3ec1898a71e00ba75fb081",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
@@ -22,6 +23,6 @@
     "upstream_ref": "feat/0.23"
   },
   "reviewer": "canon-reviewer-023",
-  "scenario_id": "gate.check.93",
+  "scenario_id": "gate.check.91",
   "schema": 1
 }
