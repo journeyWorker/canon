@@ -282,6 +282,10 @@ pub struct SubjectSummary {
     /// Omitted for a brief with no flow steps (a legacy brief) or no brief.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub flow: Vec<FlowStep>,
+    /// What the subject must be re-verified for before it ships (0.22 D2,
+    /// [`crate::reverify`]): the next step's input, not part of the report.
+    #[serde(skip)]
+    pub reverify: Vec<crate::reverify::Gap>,
 }
 
 /// One flow step of the brief and what covers it.
@@ -870,7 +874,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         .collect();
     let review_due = rr.is_some_and(|rr| rr.covers(subject.status) || next_status(subject.status).is_some_and(|n| rr.covers(n)));
     let stale_reviews = gap_count(ReviewGapKind::Stale);
-    let red = if subject.status == SubjectStatus::Shipped { shipped_red(ctx, subject) } else { Vec::new() };
+    let red = if subject.status == SubjectStatus::Shipped { shipped_red(repo, ctx, subject) } else { Vec::new() };
 
     SubjectSummary {
         id: subject.subject_id.as_str().to_string(),
@@ -889,6 +893,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         brief: brief_with_findings(repo, plan_roots, subject, &changes),
         red,
         flow: changes.last().map(|change| flow_steps(ctx, joins, repo, change, distinct_actor)).unwrap_or_default(),
+        reverify: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::gaps(repo, ctx, subject) } else { Vec::new() },
     }
 }
 
@@ -953,9 +958,9 @@ fn brief_with_findings(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, c
 /// What makes a `shipped` subject's gate red ([`SubjectSummary::red`]):
 /// the ship guard's own gaps ([`crate::subject::shipped_gate_gaps`]),
 /// grouped by failure class in the order the guard reports them.
-fn shipped_red(ctx: &GateContext, subject: &Subject) -> Vec<String> {
+fn shipped_red(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<String> {
     let mut classes: Vec<(&'static str, usize, String)> = Vec::new();
-    for violation in crate::subject::shipped_gate_gaps(ctx, subject) {
+    for violation in crate::subject::shipped_gate_gaps(repo, ctx, subject) {
         match classes.iter_mut().find(|(class, _, _)| *class == violation.class.as_str()) {
             Some((_, count, _)) => *count += 1,
             None => classes.push((violation.class.as_str(), 1, violation.subject)),
@@ -966,7 +971,7 @@ fn shipped_red(ctx: &GateContext, subject: &Subject) -> Vec<String> {
 
 /// `canon subject status <id> --to verifying --reason …`: the reopen command
 /// status names for a red shipped subject (0.18 D3).
-fn reopen_command(id: &str) -> String {
+pub(crate) fn reopen_command(id: &str) -> String {
     format!("canon subject status {id} --to verifying --reason \"<why it reopens>\" --actor-id <unit>")
 }
 
@@ -1143,6 +1148,19 @@ fn subject_steps(
                     summary.scenarios,
                     if promote_manual { ", then `canon gate promote` (`write.promote: manual`)" } else { "" }
                 ),
+            });
+        }
+        // A fixed blocker or an approved chore asks for the whole suite
+        // again (0.22 D2); the re-review follows the new evidence.
+        if let Some(gap) = summary.reverify.first() {
+            next.push(NextStep {
+                actor: StepActor::Agent,
+                role: Some(Role::Implementer),
+                command: format!(
+                    "canon evidence add --project-id {} --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --actor-id <unit> --session-id <session> --ref \"<test command>\"",
+                    gap.project()
+                ),
+                why: gap.why(id),
             });
         }
         if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1) {

@@ -39,6 +39,7 @@ pub mod policy_level;
 pub mod query;
 pub mod retention;
 pub mod report;
+pub mod reverify;
 pub mod retrieve;
 pub mod review;
 pub mod role;

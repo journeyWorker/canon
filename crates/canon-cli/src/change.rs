@@ -37,7 +37,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use canon_ingest::{native_plan_adapter, PlanSourceHandle};
-use canon_model::{paths, Change, ChangeId, SubjectId};
+use canon_model::{paths, Change, ChangeId, SubjectId, SubjectStatus};
 
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
@@ -158,6 +158,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     }
     drop(staging);
 
+    let shipped = subject.status == SubjectStatus::Shipped;
     if let Err(e) = crate::subject::persist_adoption(&repo, change, subject) {
         let repair = format!("canon ingest plans && {}", crate::subject::adopt_command(slug, subject_id));
         if e.subject_written {
@@ -180,6 +181,34 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         subject_id.as_str(),
         crate::write_mode::DIRECT
     );
-    crate::next::finish(&repo, "change new", &crate::next::Scope::Change(slug.as_str().to_string()), false, json, serde_json::json!({ "changeId": slug.as_str(), "subjectId": subject_id.as_str(), "brief": brief }));
+    // A shipped subject stays shipped until reopened: say how, once the
+    // brief is approved (the reopen refuses an unapproved one).
+    let reopen = shipped.then(|| crate::status::reopen_command(subject_id.as_str()));
+    if let Some(command) = &reopen {
+        crate::say!(json, "canon change new: subject `{}` is shipped and stays so until reopened; once the brief is approved, run `{command}`", subject_id.as_str());
+    }
+    let extra = reopen
+        .map(|command| crate::status::NextStep {
+            actor: crate::status::StepActor::Agent,
+            role: Some(crate::role::Role::Orchestrator),
+            command,
+            why: format!(
+                "subject `{}` is shipped, so the new change `{}` is not worked under it until it reopens; reopen once the brief is approved (an unapproved brief refuses the reopen), then the work, the suite again with `canon evidence add --all-scenarios`, and the re-review",
+                subject_id.as_str(),
+                slug.as_str()
+            ),
+        })
+        .into_iter()
+        .collect();
+    crate::next::finish_with_steps(
+        &repo,
+        "change new",
+        &crate::next::Scope::Change(slug.as_str().to_string()),
+        false,
+        json,
+        serde_json::json!({ "changeId": slug.as_str(), "subjectId": subject_id.as_str(), "brief": brief }),
+        serde_json::Value::Null,
+        extra,
+    );
     0
 }
