@@ -54,6 +54,7 @@ pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("learn approve", "canon learn approve 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --principal alice"),
     ("learn promote", "canon learn promote 01ARZ3NDEKTSV4RRFFQ69G5FAV"),
     ("learn rollback", "canon learn rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approved-at 2030-01-01T00:00:00Z"),
+    ("ledger compact", "canon ledger compact --dry-run"),
     ("migrate", "canon migrate"),
     ("plugin sync", "canon plugin sync my-plugin"),
     ("policy approve", "canon policy approve --by alice"),

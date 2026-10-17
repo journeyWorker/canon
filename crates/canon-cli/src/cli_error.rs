@@ -246,6 +246,8 @@ const CODES: &[(&str, &str)] = &[
     ("LEARN_SIGNATURE_UNREADABLE", "the detached signature file could not be read"),
     ("LEARN_STRATEGY_NOT_FOUND", "no strategy with that id"),
     ("LEARN_TRAJECTORY_NOT_FOUND", "the contradicting trajectory does not exist"),
+    ("LEDGER_ARCHIVE_UNAVAILABLE", "`ledger compact` found no archive: the ledger root is not a directory named `ledger`"),
+    ("LEDGER_COMPACT_FAILED", "a superseded version could not be moved to the archive; what moved stays moved"),
     ("MIGRATE_INDEX_FAILED", "files moved but the scenario index was not rebuilt; run `canon inventory sync`"),
     ("MIGRATE_REFUSED", "`migrate` refused: the repository's layout or config cannot be moved safely"),
     ("MIGRATE_STOPPED", "`migrate` stopped partway; running it again finishes the rest"),

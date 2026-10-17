@@ -473,14 +473,12 @@ impl GitTier {
         }
         Ok((records, violations))
     }
-}
 
-impl Tier for GitTier {
-    fn backend(&self) -> Backend {
-        Backend::Git
-    }
-
-    fn write(&self, record: &dyn StoredRecord) -> Result<WriteReceipt, StoreError> {
+    /// [`Tier::write`] without the archive step: the record lands and
+    /// nothing else moves. For a writer that removes what it wrote when a
+    /// later write of its batch fails: it must not have archived the
+    /// versions a record it is about to remove superseded.
+    pub fn write_unarchived(&self, record: &dyn StoredRecord) -> Result<WriteReceipt, StoreError> {
         let kind = record.kind();
         let raw = record.to_raw();
         let relative = expected_relative_path(kind, &raw.0)?;
@@ -514,6 +512,67 @@ impl Tier for GitTier {
             digest: crate::partition::content_digest12(&raw.0),
             deduped: false,
         })
+    }
+
+    /// Every record file of `kind` in this tier, validated as
+    /// [`Tier::read`] does, with its tier-relative path.
+    pub(crate) fn scan_all(&self, kind: RecordKind) -> Result<ScanResult, StoreError> {
+        self.scan_kind_where(kind, |_| true)
+    }
+
+    /// The record files directly in `dir` (tier-relative) whose file name
+    /// `belongs`, validated as a scan validates them. For the append
+    /// path, which only needs the files that can share a key with the
+    /// record it just wrote.
+    pub(crate) fn scan_dir(&self, kind: RecordKind, dir: &Path, belongs: &dyn Fn(&str) -> bool) -> Result<ScanResult, StoreError> {
+        let mut records = Vec::new();
+        let mut violations = Vec::new();
+        let entries = match std::fs::read_dir(self.absolute(dir)) {
+            Ok(entries) => entries,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok((records, violations)),
+            Err(err) => return Err(err.into()),
+        };
+        let mut names: Vec<String> = Vec::new();
+        for entry in entries {
+            let entry = entry?;
+            if !entry.file_type()?.is_file() {
+                continue;
+            }
+            if let Some(name) = entry.file_name().to_str().filter(|name| belongs(name)) {
+                names.push(name.to_string());
+            }
+        }
+        names.sort();
+        for name in names {
+            let relative = dir.join(name);
+            let bytes = std::fs::read(self.absolute(&relative))?;
+            match validate_file(kind, &relative, &bytes) {
+                Ok(raw) => records.push((relative, raw)),
+                Err(violation) => violations.push(violation),
+            }
+        }
+        Ok((records, violations))
+    }
+}
+
+impl Tier for GitTier {
+    fn backend(&self) -> Backend {
+        Backend::Git
+    }
+
+    /// Write, then move the versions this record supersedes to the
+    /// archive ([`crate::archive`]). The record is durable before the
+    /// move starts; a failed move is reported on stderr and leaves the
+    /// ledger readable (every fold still picks the latest), and the next
+    /// append or `canon ledger compact` moves it. Batch writers that may
+    /// roll back call [`GitTier::write_unarchived`] and archive once the
+    /// whole batch has landed.
+    fn write(&self, record: &dyn StoredRecord) -> Result<WriteReceipt, StoreError> {
+        let receipt = self.write_unarchived(record)?;
+        if let Err(e) = self.archive_after_write(receipt.kind, &record.to_raw()) {
+            eprintln!("canon: wrote {} but could not archive the versions it supersedes ({e}); `canon ledger compact` moves them", receipt.location);
+        }
+        Ok(receipt)
     }
 
     fn read(&self, query: &TierQuery) -> Result<TierReadResult, StoreError> {

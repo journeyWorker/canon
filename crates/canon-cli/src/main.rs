@@ -352,6 +352,9 @@ enum Command {
         /// Project a plugin's overlay fields onto each record (fail-soft)
         #[arg(long)]
         plugin: Option<String>,
+        /// Every version of the kind, the ledger's and the archive's, oldest first, instead of the current records
+        #[arg(long, conflicts_with = "plugin")]
+        history: bool,
         /// Scope --kind change/task to one ChangeId (other kinds exit 2)
         #[arg(long, value_parser = canon_cli::query::parse_change_id)]
         change_id: Option<ChangeId>,
@@ -457,6 +460,12 @@ enum Command {
     Tier {
         #[command(subcommand)]
         action: TierCommand,
+    },
+    /// Keep the ledger to the current version of each record
+    #[command(after_help = "Examples:\n  canon ledger compact --dry-run\n  canon ledger compact\n\nMoves every superseded version of a record (an evidence record a newer one replaced, a\nscenario or finding rewritten since) from .canon/ledger to .canon/archive, once. The\nledger then holds the current decision per key, and every default read (status, gate\ncheck, guards, query) reads only that; `canon query --kind <kind> --history` reads the\narchive too. Appending a new version moves the versions it supersedes on its own, so\nthis is for a ledger written before 0.23, or after an interrupted move. Idempotent;\n`canon migrate` runs it. A record that carries a standing claim (a flagged overlay, a\nbrief override, an approval at the current evidence) stays in the ledger.")]
+    Ledger {
+        #[command(subcommand)]
+        action: LedgerCommand,
     },
     /// Run canon's built-in fixture self-tests
     Selftest {
@@ -1672,6 +1681,22 @@ enum SkillsCommand {
 }
 
 #[derive(Subcommand)]
+enum LedgerCommand {
+    /// Move superseded versions of every record out of the ledger into the archive
+    Compact {
+        /// Report what would move and write nothing
+        #[arg(long)]
+        dry_run: bool,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum TierCommand {
     /// Apply canon.yaml aging rules, moving old records to their destination tier
     Age {
@@ -1786,11 +1811,14 @@ fn main() -> ExitCode {
             SkillsCommand::Check { source, target, providers, json } => run_skills_check(source.as_deref(), &target, providers.as_deref(), json),
             SkillsCommand::Doctor { source, target, providers, json } => run_skills_doctor(source.as_deref(), &target, providers.as_deref(), json),
         },
+        Command::Ledger { action } => match action {
+            LedgerCommand::Compact { dry_run, repo, json } => ExitCode::from(canon_cli::ledger::run_compact(&repo, dry_run, json) as u8),
+        },
         Command::Tier { action } => match action {
             TierCommand::Age { dry_run, repo, canon_yaml, json } => run_tier_age(&repo, canon_yaml.as_deref(), dry_run, json),
         },
-        Command::Query { kind, since, repo, canon_yaml, json, plugin, change_id, status, domain, include_sensitive, page, fields } => {
-            run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, change_id, status, domain, include_sensitive, page.page(), fields)
+        Command::Query { kind, since, repo, canon_yaml, json, plugin, history, change_id, status, domain, include_sensitive, page, fields } => {
+            run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, history, change_id, status, domain, include_sensitive, page.page(), fields)
         }
         Command::Export { kind, before, after, out, repo, json, include_sensitive, page, fields } => ExitCode::from(canon_cli::retention::run_export(&repo, kind, before, after, out.as_deref(), json, include_sensitive, &page.page(), fields.as_deref())),
         Command::Purge { kind, before, repo, plan, confirm, json } => {
@@ -2285,6 +2313,7 @@ fn run_query(
     since: Option<DateTime<Utc>>,
     json: bool,
     plugin: Option<String>,
+    history: bool,
     change_id: Option<ChangeId>,
     status: Option<String>,
     domain: Option<String>,
@@ -2307,7 +2336,7 @@ fn run_query(
         return ExitCode::from(2);
     }
     let Some(plugin_id) = plugin else {
-        return match canon_cli::query::run(repo, canon_yaml, kind, since, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
+        return match canon_cli::query::run(repo, canon_yaml, kind, since, change_id.as_ref(), status.as_deref(), domain.as_deref(), history) {
             Ok(outcome) => {
                 let outcome = match canon_cli::query::page_outcome(outcome, &page, fields, false) {
                     Ok(outcome) => outcome,
@@ -2587,7 +2616,7 @@ fn verify_adapter_context_join(repo: &std::path::Path, summary: &canon_cli::adap
     if canon_cli::context_pack::verify(repo, &summary.context_pack_id).is_err() {
         return false;
     }
-    let Ok(outcome) = canon_cli::query::run(repo, None, RecordKind::Run, None, None, None, None) else {
+    let Ok(outcome) = canon_cli::query::run(repo, None, RecordKind::Run, None, None, None, None, false) else {
         return false;
     };
     outcome.records.iter().any(|record| {

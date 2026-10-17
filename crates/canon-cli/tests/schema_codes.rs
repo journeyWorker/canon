@@ -49,6 +49,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("gate.rs", &["gate task", "evidence add"]),
     ("init.rs", &["init"]),
     ("learn.rs", &["learn"]),
+    ("ledger.rs", &["ledger compact"]),
     // Every code is next to its emit.
     ("main.rs", &[]),
     ("migrate.rs", &["migrate"]),

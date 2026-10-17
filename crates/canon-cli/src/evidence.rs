@@ -1570,6 +1570,9 @@ fn land_batch(
                 let _ = std::fs::remove_file(ledger_root.join(target));
             }
         }
+        if locations.iter().any(|location| location.promoted.is_some()) {
+            crate::ledger::restore_after_rollback(ledger_root, RecordKind::EvidenceRecord);
+        }
         held.rollback();
     };
     for body in bodies {

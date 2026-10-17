@@ -80,11 +80,12 @@ fn staged(repo: &Path) -> usize {
 }
 
 fn committed(repo: &Path, kind: &str) -> usize {
-    files_under(repo.join(format!(".canon/ledger/kind={kind}"))).len()
+    // Versions committed: the ledger's and the archive's.
+    files_under(repo.join(format!(".canon/ledger/kind={kind}"))).len() + files_under(repo.join(format!(".canon/archive/kind={kind}"))).len()
 }
 
 fn scenario_records(repo: &Path) -> Vec<serde_json::Value> {
-    files_under(repo.join(".canon/ledger/kind=scenario")).iter().map(|p| serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap()).collect()
+    files_under(repo.join(".canon/ledger/kind=scenario")).iter().chain(files_under(repo.join(".canon/archive/kind=scenario")).iter()).map(|p| serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap()).collect()
 }
 
 fn evidence(id: &str) -> Vec<&str> {

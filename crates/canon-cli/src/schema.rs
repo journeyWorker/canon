@@ -159,6 +159,7 @@ pub const META: &[CommandMeta] = &[
     row("learn approve", Write, &[O]),
     row("learn promote", Write, &[O]),
     row("learn rollback", Write, &[O]),
+    row_exits("ledger compact", Write, &[exit(0, "compacted, or nothing to move"), exit(1, "a move failed; what moved stays moved, the rest is untouched"), exit(2, "refused: the ledger has no archive, or canon.yaml is unreadable")], &[O]),
     row_exits("migrate", Write, &[exit(0, "migrated, or nothing to do"), exit(1, "migrated, but the index rebuild found the corpus unclean"), exit(2, "refused or failed; nothing is written")], &[O]),
     row("plugin sync", Write, &[O]),
     row_exits("policy approve", Write, REFUSES, HUMAN),

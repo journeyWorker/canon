@@ -449,6 +449,9 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
         for (_, target) in &wrote {
             let _ = std::fs::remove_file(if target.is_absolute() { target.clone() } else { context.ctx.ledger_root.join(target) });
         }
+        if !wrote.is_empty() {
+            crate::ledger::restore_after_rollback(&context.ctx.ledger_root, RecordKind::Divergence);
+        }
         let error = CliError::refused("WRITE_FAILED", failure).hint(if scenarios.len() > 1 {
             "no acceptance is written (every record this run wrote was removed): check that the ledger directory is writable, then run `canon divergence accept` again"
         } else {

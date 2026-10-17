@@ -1623,7 +1623,7 @@ mod tests {
         assert!(report.refused.is_empty(), "a disposition transition is the one supersession `Unique` admits: {:?}", report.refused);
         assert_eq!(report.promoted.len(), 1);
         let dispositions: Vec<String> = committed
-            .read(&TierQuery::kind(RecordKind::Finding))
+            .read_history(RecordKind::Finding)
             .unwrap()
             .records
             .iter()
@@ -1661,7 +1661,7 @@ mod tests {
         let report = promote(&staging, &committed, false).unwrap();
         assert!(report.promoted.is_empty(), "the current disposition is already `fixed`, so this body carries no new fact");
         assert_eq!(report.refused.len(), 1);
-        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Finding)).unwrap().records.len(), 2, "no third body");
+        assert_eq!(committed.read_history(RecordKind::Finding).unwrap().records.len(), 2, "no third body");
     }
 
     /// Two transitions of one key in a SINGLE drain have no defined
