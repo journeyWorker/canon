@@ -10,7 +10,7 @@
 //!   0.16 default, also what an absent `specs:` key or an entry without
 //!   `root:` meant then) moves to `.canon/specs`, from either layout, and
 //!   `canon.yaml` records where it was as `specs.roots[].former_roots`, so
-//!   the legacy-pin lookup ([`canon_gate::legacy_pins`]) still finds a
+//!   the pin migration (`crate::migrate_legacy_pins`) still finds a
 //!   scenario at a commit from before the move. Any other root stays where
 //!   it is and only drops its `features/` level; no former root is needed
 //!   there, because the lookup lists every `.feature` file under the
