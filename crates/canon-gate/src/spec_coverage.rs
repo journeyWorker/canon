@@ -179,11 +179,12 @@ impl GateCheck for SpecCoverageCheck {
             }
 
             if let Some(entry) = verdicts.iter().find(|((subject, _), _)| subject == scenario.scenario_id.as_str()).map(|(_, entry)| entry) {
-                if entry.verdict == EvidenceVerdict::Divergent {
+                if entry.verdict == EvidenceVerdict::Divergent && !crate::acceptance::is_accepted(ctx, scenario) {
+                    let cell = [(scenario.project_id.as_str().to_string(), scenario.scenario_id.as_str().to_string())];
                     violations.push(Violation::new(
                         FailureClass::UncoveredCell,
                         scenario.scenario_id.as_str(),
-                        format!("latest ledger verdict is divergent (by {})", entry.agent_id),
+                        format!("{}; {}", crate::acceptance::divergent_detail(ctx, scenario, &entry.agent_id), crate::acceptance::hint(&cell)),
                     ));
                 }
             }
@@ -423,7 +424,7 @@ fn mismatch_detail(state: &FoldedState) -> Option<String> {
         FoldedState::ResolvedInvalid { .. } => {
             Some("spec divergence is marked resolved against an app sha that has since moved — the resolution no longer binds".to_string())
         }
-        FoldedState::Resolved { .. } | FoldedState::Deferred { .. } => None,
+        FoldedState::Resolved { .. } | FoldedState::Deferred { .. } | FoldedState::Accepted { .. } => None,
     }
 }
 

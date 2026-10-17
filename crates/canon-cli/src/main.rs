@@ -1345,6 +1345,40 @@ enum DivergenceCliCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Accept a divergent scenario as a tracked known gap (a reviewer step): its latest evidence must be divergent and not the accepting actor's or session's. The acceptance pins that evidence, so new evidence ends it, and lapses at --expiry; until then the ship guard counts the cell as covered while `status` and `gate check` list it as `accepted-divergence`
+    Accept {
+        #[arg(long, value_parser = canon_cli::review::parse_project_id)]
+        project_id: ProjectId,
+        /// The accepted scenario; repeatable, one acceptance per scenario, all or nothing
+        #[arg(long = "scenario-id", required = true, value_parser = canon_cli::review::parse_scenario_id)]
+        scenario_ids: Vec<ScenarioId>,
+        /// Why the gap is accepted
+        #[arg(long)]
+        reason: String,
+        /// Where the gap is tracked: an issue URL or reference
+        #[arg(long)]
+        tracking: String,
+        /// The date (YYYY-MM-DD, UTC) the acceptance stops holding; none means it holds until new evidence
+        #[arg(long, value_parser = canon_cli::divergence::parse_expiry_date)]
+        expiry: Option<DateTime<Utc>>,
+        #[arg(long)]
+        reviewer: String,
+        /// The invoking actor's id
+        #[arg(long, default_value = "canon")]
+        actor_id: String,
+        /// Must be reviewer. Required unless the declared role (--as / CANON_ROLE) is reviewer, which it then defaults to
+        #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
+        role: Option<RoleId>,
+        /// The accepting session (recorded as actor.session_id); it must not be one that attested the scenario's evidence
+        #[arg(long, value_parser = canon_cli::review::parse_session_id)]
+        session_id: Option<canon_model::SessionId>,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
     /// Show the current divergence burn-down state
     Status {
         /// Repo root (default: nearest ancestor with a canon.yaml)
@@ -1358,7 +1392,7 @@ enum DivergenceCliCommand {
         json: bool,
         #[command(flatten)]
         page: canon_cli::paging::PageFlags,
-        /// With --json, keep only these scenario fields (comma-separated): project_id, scenario_id, state, reason, expiry; an unknown field is refused
+        /// With --json, keep only these scenario fields (comma-separated): project_id, scenario_id, state, reason, expiry, tracking; an unknown field is refused
         #[arg(long, value_delimiter = ',')]
         fields: Option<Vec<String>>,
     },
@@ -2027,6 +2061,14 @@ fn main() -> ExitCode {
             }
             DivergenceCliCommand::Defer { project_id, scenario_id, sha, round, reviewer, reason, expiry, actor_id, role, repo, json } => {
                 ExitCode::from(canon_cli::divergence::run_defer(&repo, &project_id, &scenario_id, &sha, round, &reviewer, &reason, expiry, &actor_id, &role, json) as u8)
+            }
+            DivergenceCliCommand::Accept { project_id, scenario_ids, reason, tracking, expiry, reviewer, actor_id, role, session_id, repo, json } => {
+                let role = match record_role(role, "canon divergence accept", json) {
+                    Ok(role) => role,
+                    Err(code) => return code,
+                };
+                canon_cli::inventory::refresh_stale_index(&repo, "canon divergence accept");
+                ExitCode::from(canon_cli::divergence::run_accept(&repo, &canon_cli::divergence::AcceptArgs { project_id, scenario_ids, reason, tracking, expiry, reviewer, actor_id, role, session_id, json }) as u8)
             }
             DivergenceCliCommand::Status { repo, as_of, json, page, fields } => ExitCode::from(canon_cli::divergence::run_status(&repo, as_of, json, &page.page(), fields.as_deref()) as u8),
         },

@@ -196,6 +196,7 @@ const CODES: &[(&str, &str)] = &[
     ("DISPATCH_NOT_RUNNING", "the run's recorded status cannot be closed"),
     ("DISPATCH_ROLE_REGIME_MISMATCH", "--role does not match the --regime's role"),
     ("DISPATCH_RUN_NOT_FOUND", "no dispatch manifest for that run id"),
+    ("DIVERGENCE_ACCEPT_REFUSED", "a divergence acceptance was refused: not a reviewer, the evidence is not divergent, or it was attested by the accepting actor or session"),
     ("DIVERGENCE_INVALID_ARGUMENT", "a divergence flag value is invalid"),
     ("DIVERGENCE_REFUSED", "a divergence candidate was refused by a gate rule"),
     ("EVIDENCE_APPROVAL_INVALID", "the human approval attached to an attestation is missing, malformed or fails verification"),

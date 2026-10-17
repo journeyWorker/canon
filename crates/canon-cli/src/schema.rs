@@ -137,6 +137,7 @@ pub const META: &[CommandMeta] = &[
     row("dispatch begin", Write, &[O]),
     row_exits("dispatch diff", Read, &[exit(0, "always, including when the observed graph differs from the declared plan or a side cannot be read (a note on stderr and in `notes`): it reports, it never gates")], &[O]),
     row("dispatch end", Write, &[O]),
+    row_exits("divergence accept", Write, REFUSES, &[R]),
     row("divergence add", Write, &[I, R]),
     row("divergence defer", Write, &[I, R]),
     row("divergence promote", Write, &[I, O]),
