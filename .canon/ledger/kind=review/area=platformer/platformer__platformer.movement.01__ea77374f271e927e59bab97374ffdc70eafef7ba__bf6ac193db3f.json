@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "test-voice",
+    "role": "test"
+  },
+  "at": "2026-07-14T20:56:57.861995Z",
+  "kind": "review",
+  "pin": "ea77374f271e927e59bab97374ffdc70eafef7ba",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:platformer.movement.01: Left world edge clamps the player"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "b2b3f1319b4532eda247154b64a639e9d9821dd4a1dee39001e58b51a07eec4b",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "platformer",
+  "provenance_ref": {
+    "original_spec_ref": "examples/platformer/specs/features/kind=feature/area=platformer/movement.feature"
+  },
+  "reviewer": "test-voice",
+  "scenario_id": "platformer.movement.01",
+  "schema": 1
+}

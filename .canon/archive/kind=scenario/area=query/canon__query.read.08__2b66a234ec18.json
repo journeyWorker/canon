@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-17T19:45:52.154044Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "e453f2c0ea42dd3abe3645d754cd64e88a596b05fe07275ea69d2d02c1efa8ec",
+  "scenario_id": "query.read.08",
+  "schema": 1,
+  "source_digest": "10e30c234f8273cb9c25056f08774be29179d14fbe9be082f46eb3ee09bb2a59",
+  "subject_id": "query-reads",
+  "title": "A kind routed to a tier this repo cannot attach fails loud instead of reading empty"
+}

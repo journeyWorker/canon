@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-17T19:45:52.145375Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "080874e07cadcc2fdcbd0772ae23e1158bbab6fdbb264c536fb2d6efc5f9eb8c",
+  "scenario_id": "query.read.05",
+  "schema": 1,
+  "source_digest": "10e30c234f8273cb9c25056f08774be29179d14fbe9be082f46eb3ee09bb2a59",
+  "subject_id": "query-reads",
+  "title": "A since cutoff admits records at or after it and nothing older"
+}

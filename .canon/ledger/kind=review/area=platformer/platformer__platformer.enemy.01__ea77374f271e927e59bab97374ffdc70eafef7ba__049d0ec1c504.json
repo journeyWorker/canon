@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "test-voice",
+    "role": "test"
+  },
+  "at": "2026-07-14T20:56:58.151393Z",
+  "kind": "review",
+  "pin": "ea77374f271e927e59bab97374ffdc70eafef7ba",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:platformer.enemy.01: Pinecone contact costs a heart and grants brief invulnerability"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "0d3b1e084a09c4fc15f17e75ab02339c177251088446d93b9b8790e869a5a38f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "platformer",
+  "provenance_ref": {
+    "original_spec_ref": "examples/platformer/specs/features/kind=feature/area=platformer/enemy.feature"
+  },
+  "reviewer": "test-voice",
+  "scenario_id": "platformer.enemy.01",
+  "schema": 1
+}

@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "test-voice",
+    "role": "test"
+  },
+  "at": "2026-07-14T21:37:06.852070Z",
+  "kind": "review",
+  "pin": "505a668efedaed6dfb5e125a0d927f118b2dfad1",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:platformer.session.04: Idle and resize sessions stay error-free"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "cae1c68b76cb48485638ae5bc96b14aff0af6fff41d274f8ac5227cb8d39b756",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "platformer",
+  "provenance_ref": {
+    "original_spec_ref": "examples/platformer/specs/features/kind=feature/area=platformer/session.feature"
+  },
+  "reviewer": "test-voice",
+  "scenario_id": "platformer.session.04",
+  "schema": 1
+}
