@@ -128,10 +128,10 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
     let scenario = ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     assert_eq!(meta_next(&scenario)[0], status_step(repo, "demo"), "scenario new");
 
-    let moved = ok(repo, &["subject", "status", "demo", "specced", "--json"]);
+    let moved = ok(repo, &["subject", "status", "demo", "--to", "specced", "--json"]);
     assert_eq!(meta_next(&moved)[0], status_step(repo, "demo"), "subject status");
 
-    ok(repo, &["subject", "status", "demo", "building", "--json"]);
+    ok(repo, &["subject", "status", "demo", "--to", "building", "--json"]);
     let evidence = ok(
         repo,
         &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--kind", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],
@@ -215,8 +215,8 @@ fn two_roles_waiting() -> TempDir {
     ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject", "demo", "--case", "failure", "--flow", "F1", "--json"]);
-    ok(repo, &["subject", "status", "demo", "specced", "--json"]);
-    ok(repo, &["subject", "status", "demo", "building", "--json"]);
+    ok(repo, &["subject", "status", "demo", "--to", "specced", "--json"]);
+    ok(repo, &["subject", "status", "demo", "--to", "building", "--json"]);
     ok(
         repo,
         &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--kind", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],

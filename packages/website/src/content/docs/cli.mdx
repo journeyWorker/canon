@@ -235,11 +235,6 @@ adds `meta.next` (`[{command, why, actor, role}]`, at most five, with
 to the subject the write touched; `actor: human` marks a step only a human
 takes. canon never runs a step.
 
-**Deprecated names.** A renamed command (`context-pack create`, `prompt
-register`, `divergence stage`, `demo attest`, and `subject status <id>
-<state>`) still runs for one release, warns on stderr, and sets
-`meta.deprecated: {use, removedIn}`.
-
 **Retry safety.** Repeating `evidence add` or `review add` with identical
 input returns the existing record with `meta.unchanged: true`.
 

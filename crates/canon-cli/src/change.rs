@@ -117,20 +117,20 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let language = match crate::language::configured(&repo) {
         Ok(language) => language,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon change new", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon change new", json);
         }
     };
 
     let subject = match crate::subject::lookup_adoption(&repo, subject_id, slug) {
         Ok((None, _)) => {
-            return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())).emit("canon change new", json);
+            return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())).hint("author it with `canon subject new <id> --domain <domain> --title <title>`, or check the id against the subjects `canon status` lists").emit("canon change new", json);
         }
         Ok((Some(_), Some(_))) => {
-            return CliError::refused("CHANGE_EXISTS", format!("change `{}` already exists; pick another slug", slug.as_str())).emit("canon change new", json);
+            return CliError::refused("CHANGE_EXISTS", format!("change `{}` already exists; pick another slug", slug.as_str())).hint("pick another slug for `canon change new`, or keep working in the existing change").emit("canon change new", json);
         }
         Ok((Some(subject), None)) => subject,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon change new", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon change new", json);
         }
     };
 
@@ -139,7 +139,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let archived = changes.join("archive").join(slug.as_str());
     if dir.exists() || archived.exists() {
         let existing = if dir.exists() { &dir } else { &archived };
-        return CliError::refused("CHANGE_EXISTS", format!("`{}` already exists; pick another slug", display_rel(existing, &repo))).emit("canon change new", json);
+        return CliError::refused("CHANGE_EXISTS", format!("`{}` already exists; pick another slug", display_rel(existing, &repo))).hint("pick another slug for `canon change new`, or keep working in the existing change").emit("canon change new", json);
     }
 
     let staging_path = repo.join(paths::CANON_DIR).join(format!("change-new-{}-{}", slug.as_str(), std::process::id()));
@@ -147,14 +147,14 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let change = match stage_change(&staging_path, slug, kind, title, &language) {
         Ok(change) => change,
         Err(e) => {
-            return CliError::refused("CHANGE_INVALID_ARGUMENT", e.to_string()).emit("canon change new", json);
+            return CliError::refused("CHANGE_INVALID_ARGUMENT", e.to_string()).hint("`canon schema change new` lists the accepted arguments and their forms").emit("canon change new", json);
         }
     };
 
     let published = Created(Some(first_missing_ancestor(&dir)));
     let publish = fs::create_dir_all(&changes).and_then(|()| fs::rename(staging_path.join(slug.as_str()), &dir));
     if let Err(e) = publish {
-        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", display_rel(&dir, &repo))).emit("canon change new", json);
+        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", display_rel(&dir, &repo))).hint("check that the path is writable and the disk has room, then run the command again").emit("canon change new", json);
     }
     drop(staging);
 
@@ -167,7 +167,11 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
             published.keep();
         }
         let message = e.describe(slug, subject_id, &repair);
-        let error = if e.subject_written { CliError::refused("CHANGE_ADOPTION_INCOMPLETE", message) } else { CliError::refused("WRITE_FAILED", message) };
+        let error = if e.subject_written {
+            CliError::refused("CHANGE_ADOPTION_INCOMPLETE", message).hint(format!("finish the adoption: run `{repair}`"))
+        } else {
+            CliError::refused("WRITE_FAILED", message).hint("check that the path is writable and the disk has room, then run the command again")
+        };
         return error.emit("canon change new", json);
     }
     published.keep();

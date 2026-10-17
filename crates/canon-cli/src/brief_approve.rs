@@ -54,8 +54,20 @@ struct ApproveJson<'a> {
     policy_approved: bool,
 }
 
+/// The next step for each code `run_approve` refuses with.
+fn hint_for(code: &str) -> &'static str {
+    match code {
+        "APPROVAL_INCOMPLETE" => "pass --by <name> and --note <the human's answer>, each one non-empty line",
+        "BRIEF_HAS_BLOCKERS" => "run `canon brief check`, clear the blockers it lists, then ask the human to approve",
+        "BRIEF_UNAPPROVABLE" => "fix the brief as the message says (`canon brief check` re-reads it), then run `canon brief approve` again",
+        "BRIEF_UNREADABLE" => "check that brief.md is a readable UTF-8 file, then run `canon brief approve` again",
+        "POLICY_APPROVAL_FAILED" => "check that .canon/policy.yaml is readable and writable, then run `canon brief approve` again",
+        _ => "check that the change's brief.md is writable, then run `canon brief approve` again",
+    }
+}
+
 fn refuse(json: bool, code: &'static str, message: &str, exit: i32) -> i32 {
-    CliError::failed(code, message).with_exit(exit).emit("canon brief approve", json)
+    CliError::failed(code, message).hint(hint_for(code)).with_exit(exit).emit("canon brief approve", json)
 }
 
 /// `canon brief approve`. Returns the process exit code.

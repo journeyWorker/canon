@@ -172,16 +172,16 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         (Some(r), None) => ProvenanceRef::UpstreamRef(r.clone()),
         (None, Some(r)) => ProvenanceRef::OriginalSpecRef(r.clone()),
         (None, None) => {
-            return CliError::refused("REVIEW_INVALID_ARGUMENT", "neither --upstream-ref nor --original-spec-ref given; a review must carry a resolvable provenance ref").emit("canon review add", args.json);
+            return CliError::refused("REVIEW_INVALID_ARGUMENT", "neither --upstream-ref nor --original-spec-ref given; a review must carry a resolvable provenance ref").hint("pass exactly one of --upstream-ref <ref> or --original-spec-ref <ref>").emit("canon review add", args.json);
         }
         (Some(_), Some(_)) => {
-            return CliError::refused("REVIEW_INVALID_ARGUMENT", "--upstream-ref and --original-spec-ref are mutually exclusive; exactly one provenance ref is required").emit("canon review add", args.json);
+            return CliError::refused("REVIEW_INVALID_ARGUMENT", "--upstream-ref and --original-spec-ref are mutually exclusive; exactly one provenance ref is required").hint("pass exactly one of --upstream-ref <ref> or --original-spec-ref <ref>").emit("canon review add", args.json);
         }
     };
     let scenario_ids = match requested_scenarios(args) {
         Ok(ids) => ids,
         Err(e) => {
-            return CliError::refused("REVIEW_INVALID_ARGUMENT", e.to_string()).emit("canon review add", args.json);
+            return CliError::refused("REVIEW_INVALID_ARGUMENT", e.to_string()).hint("`canon schema review add` lists the accepted arguments and their forms").emit("canon review add", args.json);
         }
     };
 
@@ -189,7 +189,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon review add", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon review add", args.json);
         }
     };
     let indexed = latest_scenarios(&gate_context);
@@ -200,12 +200,12 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         let nothing = if scenario_ids.len() > 1 { " (nothing is written for any of the scenarios)" } else { "" };
         return CliError::refused("REVIEW_SCENARIO_NOT_INDEXED", format!("no scenario record for {ids} in spec root `{}`; a review pins the scenario it saw, so index it first (`canon inventory sync`){nothing}",
             args.project_id.as_str()
-        )).emit("canon review add", args.json);
+        )).hint("run `canon inventory sync`, then run `canon review add` again").emit("canon review add", args.json);
     }
     let bound = match crate::evidence_attach::bind_artifacts(&repo, &args.artifacts, args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB)) {
         Ok(bound) => bound,
         Err(e) => {
-            let refusal = CliError::refused("REVIEW_ARTIFACT_REFUSED", e.message().to_string());
+            let refusal = CliError::refused("REVIEW_ARTIFACT_REFUSED", e.message().to_string()).hint("`canon schema review add` lists the artifact options and their limits");
             let refusal = match e.hint() {
                 Some(hint) => refusal.hint(hint),
                 None => refusal,
@@ -299,7 +299,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let (stored, written) = match write_reviews(&repo, &gate_context.ctx.ledger_root, &files, &only_reviews, &mut |tier, review| tier.write(review)) {
         Ok(landed) => landed,
         Err(error) => {
-            let mut error = CliError::refused("WRITE_FAILED", error.to_string());
+            let mut error = CliError::refused("WRITE_FAILED", error.to_string()).hint("check that the path is writable and the disk has room, then run the command again");
             if reviews.len() > 1 {
                 error = error.hint("no review is written: every review and blob this run wrote or stored was removed");
             }

@@ -398,7 +398,7 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
         };
         match shown {
             Ok(text) => println!("{text}"),
-            Err(e) => return crate::cli_error::CliError::failed("SERIALIZE_FAILED", format!("failed to serialize status: {e}")).emit("canon status", true),
+            Err(e) => return crate::cli_error::CliError::failed("SERIALIZE_FAILED", format!("failed to serialize status: {e}")).hint("this is a canon bug: report it together with the command line that produced it").emit("canon status", true),
         }
     } else {
         print!("{}", render(&report));

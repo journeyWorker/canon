@@ -22,16 +22,12 @@
 //! 0.21 adds three things the table and clap cannot say alone. `roles` says
 //! which roles' steps use a command ([`CommandMeta::roles`]); bare `canon
 //! schema` lists only the declared role's commands (`CANON_ROLE` or `--as`),
-//! and `--all` lists every command. A command renamed in 0.21 stays as a
-//! hidden clap subcommand ([`crate::deprecation::DEPRECATED`]); `schema`
-//! answers for it with `deprecated: { use, removedIn }` and the replacement's
-//! effect, exits, roles and error codes, and lists it only under `--all`. A
-//! command whose effect depends on its arguments carries `effectNote`.
+//! and `--all` lists every command. A command whose effect depends on its
+//! arguments carries `effectNote`.
 
 use clap::{ArgAction, Command};
 use serde::Serialize;
 
-use crate::deprecation::{self, Deprecation};
 use crate::role::Role;
 
 /// What running a command does to the repo and the machine.
@@ -118,9 +114,7 @@ use Role::{Implementer as I, Orchestrator as O, Planner as P, Reviewer as R};
 const EVERYONE: &[Role] = &[P, I, R, O];
 const HUMAN: &[Role] = &[];
 
-/// One row per leaf command, canonical path first. Deprecated paths
-/// ([`crate::deprecation::DEPRECATED`]) have no row: they answer with their
-/// replacement's.
+/// One row per leaf command, canonical path first.
 pub const META: &[CommandMeta] = &[
     row("adapter authorize", Read, &[O]),
     row("adapter validate", Read, &[O]),
@@ -212,14 +206,11 @@ pub fn leaf_paths(root: &Command) -> Vec<String> {
     out
 }
 
-/// Drift between clap, [`META`] and the deprecation table: empty when they
-/// agree exactly. A deprecated path is a clap leaf with no [`META`] row; its
-/// replacement must be a leaf with one.
-pub fn check_metadata(root: &Command, meta: &[CommandMeta], deprecated: &[Deprecation]) -> Vec<String> {
+/// Drift between clap and [`META`]: empty when they agree exactly.
+pub fn check_metadata(root: &Command, meta: &[CommandMeta]) -> Vec<String> {
     let leaves = leaf_paths(root);
-    let is_deprecated = |leaf: &str| deprecated.iter().any(|d| d.old == leaf);
     let mut problems = Vec::new();
-    for leaf in leaves.iter().filter(|l| !is_deprecated(l)) {
+    for leaf in &leaves {
         if !meta.iter().any(|m| m.path == leaf) {
             problems.push(format!("clap leaf `{leaf}` has no metadata row"));
         }
@@ -228,9 +219,6 @@ pub fn check_metadata(root: &Command, meta: &[CommandMeta], deprecated: &[Deprec
         if !leaves.iter().any(|l| l == m.path) {
             problems.push(format!("metadata row `{}` names no clap leaf command", m.path));
         }
-        if is_deprecated(m.path) {
-            problems.push(format!("metadata row `{}` is for a deprecated path; it answers with its replacement's row", m.path));
-        }
     }
     let mut seen: Vec<&str> = Vec::new();
     for m in meta {
@@ -238,14 +226,6 @@ pub fn check_metadata(root: &Command, meta: &[CommandMeta], deprecated: &[Deprec
             problems.push(format!("metadata row `{}` appears twice", m.path));
         }
         seen.push(m.path);
-    }
-    for d in deprecated {
-        if !leaves.iter().any(|l| l == d.old) {
-            problems.push(format!("deprecated path `{}` names no clap leaf command", d.old));
-        }
-        if !meta.iter().any(|m| m.path == d.new) {
-            problems.push(format!("`{}` is deprecated for `{}`, which has no metadata row", d.old, d.new));
-        }
     }
     problems
 }
@@ -283,9 +263,6 @@ struct CommandSchema {
     effect_note: Option<&'static str>,
     /// The roles whose steps use the command; empty means humans only.
     roles: Vec<Role>,
-    /// Present on a deprecated command: its replacement and the release that removes it.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    deprecated: Option<DeprecatedSchema>,
     supports_json: bool,
     arguments: Vec<ArgSchema>,
     options: Vec<ArgSchema>,
@@ -303,27 +280,10 @@ struct CommandSchema {
 }
 
 #[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DeprecatedSchema {
-    /// The replacement command path.
-    #[serde(rename = "use")]
-    replacement: &'static str,
-    removed_in: &'static str,
-}
-
-impl DeprecatedSchema {
-    fn of(deprecation: &Deprecation) -> Self {
-        Self { replacement: deprecation.new, removed_in: deprecation::REMOVED_IN }
-    }
-}
-
-#[derive(Serialize)]
 struct ListEntry {
     command: String,
     effect: Effect,
     roles: Vec<Role>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    deprecated: Option<DeprecatedSchema>,
     about: Option<String>,
 }
 
@@ -422,7 +382,7 @@ pub fn example_for(path: &str) -> Option<&'static str> {
 pub fn check_examples(root: &Command) -> Vec<String> {
     let leaves = leaf_paths(root);
     let mut problems = Vec::new();
-    for leaf in leaves.iter().filter(|leaf| crate::deprecation::lookup(leaf).is_none()) {
+    for leaf in &leaves {
         if example_for(leaf).is_none() {
             problems.push(format!("clap leaf `{leaf}` has no example"));
         }
@@ -477,11 +437,8 @@ fn arg_schema(arg: &clap::Arg) -> ArgSchema {
 
 fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
     let key = canonical.join(" ");
-    // A deprecated command answers with its replacement's row, codes and example.
-    let deprecation = deprecation::lookup(&key);
-    let key_for_example = deprecation.map_or(key.clone(), |d| d.new.to_string());
-    let meta = meta_for(deprecation.map_or(key.as_str(), |d| d.new));
-    let codes = error_codes(deprecation.map_or(key.as_str(), |d| d.new));
+    let meta = meta_for(&key);
+    let codes = error_codes(&key);
     let mut cmd = cmd.clone();
     cmd.build();
     // clap's own `--help` / `--version` flags are noise; a command's own argument that happens to be
@@ -493,14 +450,13 @@ fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
     let options: Vec<ArgSchema> = cmd.get_arguments().filter(|a| !a.is_positional()).filter(visible).map(arg_schema).collect();
     let supports_json = options.iter().any(|o| o.name == "json");
     CommandSchema {
-        command: key,
+        command: key.clone(),
         path: canonical.to_vec(),
         aliases: cmd.get_all_aliases().map(str::to_string).collect(),
         about: cmd.get_about().map(|a| a.to_string()),
         effect: meta.map_or(Effect::Write, |m| m.effect),
         effect_note: meta.and_then(|m| m.effect_note),
         roles: meta.map_or_else(Vec::new, |m| m.roles.to_vec()),
-        deprecated: deprecation.map(DeprecatedSchema::of),
         supports_json,
         arguments,
         options,
@@ -515,24 +471,22 @@ fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
                     .collect()
             })
             .collect(),
-        example: example_for(&key_for_example),
+        example: example_for(&key),
         error_codes: codes,
     }
 }
 
 /// The commands under `under`, hidden from the bare listing when they are
-/// deprecated (unless `all`) or outside the declared `role`'s steps (unless
-/// `all`).
+/// outside the declared `role`'s steps (unless `all`).
 fn list_entries(root: &Command, under: &[String], role: Option<Role>, all: bool) -> Vec<ListEntry> {
     let prefix = under.join(" ");
     leaf_paths(root)
         .into_iter()
         .filter(|p| prefix.is_empty() || p == &prefix || p.starts_with(&format!("{prefix} ")))
         .filter_map(|p| {
-            let deprecation = deprecation::lookup(&p);
-            let meta = meta_for(deprecation.map_or(p.as_str(), |d| d.new));
+            let meta = meta_for(p.as_str());
             let roles = meta.map_or(&[][..], |m| m.roles);
-            if !all && (deprecation.is_some() || role.is_some_and(|r| !roles.contains(&r))) {
+            if !all && role.is_some_and(|r| !roles.contains(&r)) {
                 return None;
             }
             let mut cmd = root;
@@ -542,7 +496,6 @@ fn list_entries(root: &Command, under: &[String], role: Option<Role>, all: bool)
             Some(ListEntry {
                 effect: meta.map_or(Effect::Write, |m| m.effect),
                 roles: roles.to_vec(),
-                deprecated: deprecation.map(DeprecatedSchema::of),
                 about: cmd.get_about().map(|a| a.to_string()),
                 command: p,
             })
@@ -553,8 +506,7 @@ fn list_entries(root: &Command, under: &[String], role: Option<Role>, all: bool)
 /// Run `canon schema`: print to stdout and return the exit code. A path that
 /// does not resolve is a refusal (exit 2) on stderr naming the nearest matches.
 /// A bare listing shows the declared role's commands (`CANON_ROLE` / `--as`),
-/// or every command without a declared role; `all` lists every command,
-/// deprecated ones included.
+/// or every command without a declared role; `all` lists every command.
 pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, all: bool) -> u8 {
     if errors {
         print_errors(json);
@@ -581,10 +533,7 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, all: boo
                 let width = commands.iter().map(|c| c.command.len()).max().unwrap_or(0);
                 for c in &commands {
                     let about = c.about.as_deref().unwrap_or("");
-                    match &c.deprecated {
-                        Some(d) => println!("{:<width$}  {:<11} deprecated: use canon {} (removed in {})", c.command, c.effect.as_str(), d.replacement, d.removed_in),
-                        None => println!("{:<width$}  {:<11} {}", c.command, c.effect.as_str(), about),
-                    }
+                    println!("{:<width$}  {:<11} {}", c.command, c.effect.as_str(), about);
                 }
             }
         }
@@ -632,9 +581,6 @@ fn print_human(s: &CommandSchema) {
         println!("roles: humans only");
     } else {
         println!("roles: {}", s.roles.iter().map(|r| r.as_str()).collect::<Vec<_>>().join(", "));
-    }
-    if let Some(d) = &s.deprecated {
-        println!("deprecated: use canon {} (removed in {})", d.replacement, d.removed_in);
     }
     if !s.aliases.is_empty() {
         println!("aliases: {}", s.aliases.join(", "));
@@ -699,21 +645,10 @@ mod tests {
     #[test]
     fn drift_is_reported_both_ways() {
         let meta = [row("format", Read, EVERYONE), row("ghost", Read, EVERYONE)];
-        let problems = check_metadata(&tree(), &meta, &[]);
+        let problems = check_metadata(&tree(), &meta);
         assert!(problems.iter().any(|p| p.contains("`evidence add`") && p.contains("no metadata row")));
         assert!(problems.iter().any(|p| p.contains("`ghost`")));
-        assert!(check_metadata(&tree(), &[row("format", Read, EVERYONE), row("evidence add", Write, &[I])], &[]).is_empty());
-    }
-
-    #[test]
-    fn a_deprecated_leaf_needs_no_row_but_its_replacement_does() {
-        let tree = tree().subcommand(Command::new("old").hide(true));
-        let table = [Deprecation { old: "old", new: "format" }];
-        let meta = [row("format", Read, EVERYONE), row("evidence add", Write, &[I])];
-        assert!(check_metadata(&tree, &meta, &table).is_empty());
-        let gone = [Deprecation { old: "old", new: "nowhere" }];
-        assert!(check_metadata(&tree, &meta, &gone).iter().any(|p| p.contains("`nowhere`") && p.contains("no metadata row")));
-        assert!(check_metadata(&tree, &[row("format", Read, EVERYONE), row("old", Read, EVERYONE), row("evidence add", Write, &[I])], &table).iter().any(|p| p.contains("deprecated path")));
+        assert!(check_metadata(&tree(), &[row("format", Read, EVERYONE), row("evidence add", Write, &[I])]).is_empty());
     }
 
     #[test]

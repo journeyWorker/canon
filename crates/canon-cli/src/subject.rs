@@ -362,7 +362,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
     // BEFORE `Subject::new` so a malformed value is a clean refusal
     // here, never the model's debug-assert panic.
     if SubjectId::parse(domain).is_err() {
-        return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("domain `{domain}` is not a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)")).emit("canon subject new", json);
+        return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("domain `{domain}` is not a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)")).hint("`canon schema subject new` lists the accepted arguments and their forms").emit("canon subject new", json);
     }
 
     // Membership is a SEPARATE question from shape, and needs the
@@ -371,23 +371,23 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 
     let repo = resolve_repo_root(repo);
     if let Some(violation) = domain_membership_violation(&repo, domain) {
-        return CliError::refused("SUBJECT_INVALID_ARGUMENT", violation.to_string()).emit("canon subject new", json);
+        return CliError::refused("SUBJECT_INVALID_ARGUMENT", violation.to_string()).hint("`canon schema subject new` lists the accepted arguments and their forms").emit("canon subject new", json);
     }
     let canon_yaml_path = resolve_canon_yaml(&repo, None);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject new", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject new", json);
         }
     };
 
     match find_subject(&registry, subject_id) {
         Ok(Some(_)) => {
-            return CliError::refused("SUBJECT_EXISTS", format!("subject `{}` already exists", subject_id.as_str())).emit("canon subject new", json);
+            return CliError::refused("SUBJECT_EXISTS", format!("subject `{}` already exists", subject_id.as_str())).hint("pick another id for a new subject, or look at this one with `canon subject status <id>`").emit("canon subject new", json);
         }
         Ok(None) => {}
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject new", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject new", json);
         }
     }
 
@@ -401,7 +401,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
             0
         }
         Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon subject new", json)
+            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon subject new", json)
         }
     }
 }
@@ -433,7 +433,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
             0
         }
         Err(e) => {
-            CliError::refused("SUBJECT_ADOPT_REFUSED", e.to_string()).emit("canon subject adopt", json)
+            CliError::refused("SUBJECT_ADOPT_REFUSED", e.to_string()).hint("fix what the message names, then run `canon subject adopt` again").emit("canon subject adopt", json)
         }
     }
 }
@@ -619,7 +619,7 @@ pub fn run_status(
         ("--reason", reason, "the transition note, with the actor"),
     ] {
         if text.is_some_and(|text| text.trim().is_empty() || text.contains(['\n', '\r'])) {
-            return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("{flag} must be one non-empty line; it is recorded on the subject as {recorded}")).emit("canon subject status", json);
+            return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("{flag} must be one non-empty line; it is recorded on the subject as {recorded}")).hint("`canon schema subject status` lists the accepted arguments and their forms").emit("canon subject status", json);
         }
     }
 
@@ -628,17 +628,17 @@ pub fn run_status(
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json);
         }
     };
 
     let mut subject = match find_subject(&registry, subject_id) {
         Ok(Some(s)) => s,
         Ok(None) => {
-            return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).emit("canon subject status", json);
+            return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).hint("`canon subject new <id> --domain <domain> --title <title>` creates it; check the id against the subjects `canon status` lists").emit("canon subject status", json);
         }
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json);
         }
     };
 
@@ -647,7 +647,7 @@ pub fn run_status(
         return CliError::refused("SUBJECT_INVALID_TRANSITION", format!("invalid transition {} → {} (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)",
             status_str(current),
             status_str(target)
-        )).field("--to").expected(["proposed", "specced", "building", "verifying", "shipped", "retired"].into_iter().filter(|s| parse_status(s).is_ok_and(|to| is_valid_transition(current, to)))).emit("canon subject status", json);
+        )).hint("follow the chain proposed → specced → building → verifying → shipped; `canon subject status <id>` shows where the subject stands").field("--to").expected(["proposed", "specced", "building", "verifying", "shipped", "retired"].into_iter().filter(|s| parse_status(s).is_ok_and(|to| is_valid_transition(current, to)))).emit("canon subject status", json);
     }
     let reopens = current == SubjectStatus::Shipped && target == SubjectStatus::Verifying;
     if reopens && reason.is_none() {
@@ -691,7 +691,7 @@ pub fn run_status(
                 Some(ctx)
             }
             Err(e) => {
-                return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json);
+                return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json);
             }
         }
     } else {
@@ -824,7 +824,7 @@ pub fn run_status(
             0
         }
         Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon subject status", json)
+            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon subject status", json)
         }
     }
 }
@@ -844,12 +844,12 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, override_reason: Option<&st
     let canon_yaml_path = resolve_canon_yaml(&repo, None);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
-        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json),
+        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json),
     };
     let subject = match find_subject(&registry, subject_id) {
         Ok(Some(s)) => s,
-        Ok(None) => return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).emit("canon subject status", json),
-        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json),
+        Ok(None) => return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).hint("`canon subject new <id> --domain <domain> --title <title>` creates it; check the id against the subjects `canon status` lists").emit("canon subject status", json),
+        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json),
     };
     if json {
         crate::json_out::data("subject status", serde_json::to_value(&subject).expect("subject serializes"));

@@ -1,1 +1,2 @@
 canon scenario new: LAYOUT_MIGRATION_REQUIRED — spec root `root` (`specs`) is on the pre-0.17 layout (`features/kind=feature/area=cart/add.feature` sits under `features/`); canon reads `kind=feature/area=<area>/<surface>.feature` directly under the root, and `canon migrate` moves `features/kind=feature/` there; nothing written
+hint: run `canon migrate` to move the repository to the current layout

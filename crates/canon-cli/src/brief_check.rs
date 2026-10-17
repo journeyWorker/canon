@@ -1007,7 +1007,7 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
     if let Some(change) = requested {
         return crate::brief::canon_brief(repo, change)
             .map(|path| (change.clone(), path))
-            .ok_or_else(|| CliError::failed("BRIEF_NOT_FOUND", format!("no brief at {}/{}/brief.md", paths::CHANGES_DIR, change.as_str())));
+            .ok_or_else(|| CliError::failed("BRIEF_NOT_FOUND", format!("no brief at {}/{}/brief.md", paths::CHANGES_DIR, change.as_str())).hint("check the slug against the changes directory, or create the change with `canon change new <slug> --subject <id> --title <title>`"));
     }
     let dir = repo.join(paths::CHANGES_DIR);
     let mut live: Vec<(ChangeId, PathBuf)> = std::fs::read_dir(&dir)
@@ -1019,23 +1019,23 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
         .collect();
     live.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
     match live.len() {
-        0 => Err(CliError::failed("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR))),
+        0 => Err(CliError::failed("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR)).hint("create one with `canon change new <slug> --subject <id> --title <title>`; it scaffolds brief.md")),
         1 => Ok(live.remove(0)),
         _ => Err(CliError::failed(
             "CHANGE_AMBIGUOUS",
             format!("{} live changes have a brief ({}); pass --change <slug>", live.len(), live.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>().join(", ")),
-        )),
+        ).hint("pass --change <slug> naming one of the listed changes")),
     }
 }
 
 /// Reads and judges the brief of `requested` (or the only live change).
 pub fn check(repo: &Path, requested: Option<&ChangeId>) -> Result<Checked, CliError> {
     let (change, path) = resolve_change(repo, requested)?;
-    let text = std::fs::read_to_string(&path).map_err(|e| CliError::failed("BRIEF_UNREADABLE", format!("cannot read `{}`: {e}", rel(repo, &path))))?;
-    let language = crate::language::configured(repo).map_err(|e| CliError::failed("CONFIG_UNREADABLE", e))?;
+    let text = std::fs::read_to_string(&path).map_err(|e| CliError::failed("BRIEF_UNREADABLE", format!("cannot read `{}`: {e}", rel(repo, &path))).hint("check that brief.md is a readable UTF-8 file, then run the command again"))?;
+    let language = crate::language::configured(repo).map_err(|e| CliError::failed("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again"))?;
     let phase = phase_of(repo, &change, &text);
     let flows = match phase {
-        Phase::Building if !is_chore(&text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")))?),
+        Phase::Building if !is_chore(&text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")).hint("fix `specs.roots` in canon.yaml (`canon init --check-config` reports what is wrong), then run the command again"))?),
         _ => None,
     };
     let evaluation = evaluate(&text, &language, flows.as_ref());
@@ -1118,7 +1118,7 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
                 }
                 println!("{}", serde_json::to_string_pretty(&value).expect("a JSON value always serializes"));
             }
-            Err(e) => return CliError::failed("SERIALIZE_FAILED", e.to_string()).emit("canon brief check", true),
+            Err(e) => return CliError::failed("SERIALIZE_FAILED", e.to_string()).hint("this is a canon bug: report it together with the command line that produced it").emit("canon brief check", true),
         }
     } else {
         println!("canon brief check: {} ({}) — {} blocker(s), {} advisory(ies)", checked.brief, checked.language.tag, counts.blockers, counts.advisories);

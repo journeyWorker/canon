@@ -116,13 +116,13 @@ pub fn run_stage(
     let promote = match crate::write_mode::should_promote(&repo, promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).emit("canon divergence add", json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon divergence add", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
     let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
@@ -141,7 +141,7 @@ pub fn run_stage(
     let path = match stage_divergence(&staging_dir, &candidate) {
         Ok(path) => path,
         Err(e) => {
-            return CliError::refused("WRITE_FAILED", e.to_string()).emit("canon divergence add", json);
+            return CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon divergence add", json);
         }
     };
     if !promote {
@@ -168,11 +168,11 @@ pub fn run_stage(
                 crate::say!(json, "canon divergence add: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
                 let mut data = crate::gate::promote_json(&report, false);
                 data["staged"] = serde_json::json!(path.display().to_string());
-                return CliError::failed("PROMOTE_REFUSED", "the staged divergence was refused by promotion; it stays staged").emit_with_data("canon divergence add", json, data);
+                return CliError::failed("PROMOTE_REFUSED", "the staged divergence was refused by promotion; it stays staged").hint("`canon gate check` names what promotion refused; fix it, then run `canon divergence promote` (the record stays staged)").emit_with_data("canon divergence add", json, data);
             }
         },
         Err(e) => {
-            let code = CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).emit("canon divergence add", json);
+            let code = CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).hint("the record is staged; run `canon divergence promote` once the cause the message names is fixed").emit("canon divergence add", json);
             crate::say!(json, "canon divergence add: staged {} — {}", path.display(), crate::write_mode::STAGED_FOR_DIVERGENCE_PROMOTE);
             return code;
         }
@@ -186,7 +186,7 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon divergence promote", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence promote", json);
         }
     };
     let staging_dir = divergence_staging_dir(&gate_ctx.ledger_root);
@@ -202,11 +202,11 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
                 }
                 0
             } else {
-                CliError::failed("PROMOTE_REFUSED", format!("{} staged divergence(s) refused", report.refused.len())).emit_with_data("canon divergence promote", json, data)
+                CliError::failed("PROMOTE_REFUSED", format!("{} staged divergence(s) refused", report.refused.len())).hint("`canon gate check` names what promotion refused; fix it, then run `canon divergence promote` (the record stays staged)").emit_with_data("canon divergence promote", json, data)
             }
         }
         Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon divergence promote", json)
+            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon divergence promote", json)
         }
     }
 }
@@ -233,7 +233,7 @@ fn run_commit(
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit(&format!("canon divergence {verb}"), json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit(&format!("canon divergence {verb}"), json);
         }
     };
     let committed = GitTier::new(&gate_ctx.ledger_root);
@@ -258,10 +258,10 @@ fn run_commit(
             0
         }
         Ok(Err(refused)) => {
-            CliError::failed("DIVERGENCE_REFUSED", refused.violation.line()).emit(&format!("canon divergence {verb}"), json)
+            CliError::failed("DIVERGENCE_REFUSED", refused.violation.line()).hint("`canon divergence status` lists the scenario's divergences and their state; fix what the violation names, then run the command again").emit(&format!("canon divergence {verb}"), json)
         }
         Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).emit(&format!("canon divergence {verb}"), json)
+            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit(&format!("canon divergence {verb}"), json)
         }
     }
 }
@@ -487,7 +487,7 @@ pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon divergence status", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence status", json);
         }
     };
     let as_of = as_of.unwrap_or_else(Utc::now);

@@ -243,11 +243,6 @@ stderr로 갑니다.
 좁혀집니다. `actor: human`은 사람만 할 수 있는 단계입니다. canon은 단계를 직접
 실행하지 않습니다.
 
-**폐기 예정 이름.** 이름이 바뀐 명령(`context-pack create`, `prompt register`,
-`divergence stage`, `demo attest`, `subject status <id> <state>`)은 한 릴리스 동안
-계속 동작하며 stderr에 경고를 내고 `meta.deprecated: {use, removedIn}`을
-설정합니다.
-
 **재시도 안전.** `evidence add`나 `review add`를 같은 입력으로 반복하면 기존
 레코드를 `meta.unchanged: true`와 함께 돌려줍니다.
 
