@@ -7,7 +7,7 @@ Feature: query read
   Scenario: A re-materialized scenario reads as one current record and the survivor is the latest
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a scenario index record written once and then written again an hour later under a changed title
-    When the ledger is read raw, both generations are on disk, because the ledger is append-only
+    When the history is read raw, both generations exist: the later in the ledger, the earlier moved to the archive by the second write
     Then a query for that kind reports exactly one record for the natural key
     And the record it reports carries the later title, never an arbitrary generation
 

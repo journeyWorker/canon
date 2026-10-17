@@ -141,6 +141,70 @@ canon query --kind trajectory --json
 정확히 읽힙니다: `canon query`가 두 단을 `at` 기준으로 병합하며, 크로스
 티어 JOIN은 없습니다.
 
+## ledger는 최신 버전만 가지고, 이력은 archive에 있음
+
+`local` 단의 디렉터리(`.canon/ledger`)에는 키마다 **현재** 레코드 하나만
+있습니다. 레코드의 새 버전을 쓰면(시나리오·역할별 새 증거 레코드, 닫힌
+finding, 다시 쓴 시나리오, 다음 상태로 넘어간 서브젝트) 그것이 대체하는
+버전은 `.canon/archive`로 옮겨집니다. archive는 같은 `kind=<kind>/…`
+레이아웃과 파일 이름을 쓰고 git으로 추적됩니다. gate, `canon status`, 가드,
+`canon query`는 ledger만 읽으므로 비용은 편집 횟수가 아니라 키 수에 따라
+달라집니다.
+
+```bash
+# 한 종류의 모든 버전, archive 포함.
+canon query --kind evidence_record --history
+
+# 0.23 이전에 쓴 ledger를 키마다 파일 하나로 맞춥니다(멱등,
+# `canon migrate`가 실행합니다). --dry-run은 보고만 하고 쓰지 않습니다.
+canon ledger compact --dry-run
+canon ledger compact
+```
+
+버전이 대체되었다는 것은 리더가 접는 어떤 그룹에서도 더는 현재 레코드가 아니라는
+뜻입니다. 증거는 시나리오와 역할, 프로젝트, 태스크, run-sequence 파티션별로
+접히므로 다른 역할의 새 레코드가 이 레코드를 대체하지 않습니다. 규칙이 접지 않고
+읽는 레코드(`flagged` 오버레이, `reviewed` 라이프사이클 태그, brief override,
+현재 증거에 대한 승인)도 남습니다. 이력이 꼭 필요한 몇몇 규칙은 archive를 명시적으로
+읽습니다: `risk_routing` 커버리지, `canon divergence accept`의 독립성 검사, release
+트러스트 검사, `canon gate task`.
+
+쓰기가 먼저 일어나고 이동이 뒤따르므로, 둘 사이에서 중단되어도 ledger는 읽을 수
+있고(모든 fold가 여전히 최신을 고릅니다) 다음 append나 `canon ledger compact`가
+마무리합니다. archive는 로컬이며 `tiers:`로 라우팅되지 않습니다. 이름이 `ledger`가
+아닌 디렉터리를 가리키는 `tiers.local.root`에는 archive가 없고 모든 버전이
+남습니다.
+
+## 아티팩트 바이트가 있는 곳
+
+증거 레코드는 digest만 가집니다. 그 뒤의 바이트(리포트, 스크린샷, 녹화)는
+아티팩트 스토어에 있고, 어디에 둘지는 `canon.yaml`에서 레포가 고릅니다:
+
+```yaml
+artifact_store: { backend: local }                        # 기본값
+# artifact_store: { backend: cold, prefix: artifacts/ }   # `tiers:`의 `s3` 단
+```
+
+`local`은 `.canon/artifacts/sha256/`이며 git으로 추적되고 자격 증명이 필요
+없습니다. 오브젝트 스토어 단을 쓰면 `canon evidence add`, `canon review add`,
+`canon evidence vault`가 blob을 digest로 `<prefix>sha256/<digest>`에 올리고
+로컬에는 아무것도 남기지 않습니다. gate와 `canon artifacts verify [--full]`은
+스토어에 물어보며(업로드 때 기록한 크기·sha256에 대해 digest마다 HEAD 한 번,
+`--full`은 내려받아 다시 해시) 스토어에 닿지 못하면 통과시키지 않고 거부합니다.
+
+```bash
+canon artifacts verify --full
+canon artifacts migrate --to cold --dry-run   # 기존 로컬 스토어 이전 미리보기
+canon artifacts migrate --to cold
+```
+
+`migrate`는 모든 로컬 blob을 해시하고 올린 뒤 다시 읽어 확인하고, 그 다음에야
+`artifact_store:` 블록을 쓰고 로컬 사본을 지우고 `.canon/artifacts/`를 ignore에
+추가합니다. 삭제된 blob, `.gitignore`, `canon.yaml` 변경을 커밋하세요. 이어서 실행할 수
+있고(중단된 실행도 gate가 통과하는 레포를 남깁니다) 두 번째 실행은 할 일이
+없습니다. 스토어 이전은 레포 소유자가 정할 일이며, 바이트를 로컬로 되돌리는 것은
+지원하지 않습니다.
+
 ## DuckDB 뷰 읽기
 
 `crates/canon-store/sql/views.sql`은 로컬에서 오프라인으로 읽을 수 있는

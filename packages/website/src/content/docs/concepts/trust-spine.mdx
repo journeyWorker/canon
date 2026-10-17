@@ -268,7 +268,12 @@ the trust gap, it does not close it.
 `--artifact`/`--report` copy each bound file into
 `.canon/artifacts/sha256/<hex>`, a content-addressed store tracked in git
 — commit it with the ledger. Files over 25 MiB are refused (exit 2) unless
-`--max-artifact-mib` raises the limit. `canon gate check` re-checks every
+`--max-artifact-mib` raises the limit. That is the default store. When
+`canon.yaml`'s `artifact_store:` names an object-store tier, the same writes
+upload the blob by digest and keep nothing locally; the gate and
+`canon artifacts verify [--full]` ask the store and refuse, never pass, when
+it cannot be reached (see [Tiered storage](/concepts/tiered-storage/)).
+`canon gate check` re-checks every
 file bound to a latest evidence record, whatever its subject's status:
 
 - an intact stored blob → clean, even after the working-tree file is
