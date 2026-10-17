@@ -637,6 +637,8 @@ def main(argv: list[str] | None = None) -> int:
         "bun.lock",
         "canon.yaml",
         "docker-compose.yml",
+        # The Orca "Kata Sandbox" workspace recipe (#66); Orca reads it from the root.
+        "orca.yaml",
         "package.json",
     }
     # `check=False` + reading only stdout would pass VACUOUSLY: in a source
