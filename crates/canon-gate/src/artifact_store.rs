@@ -299,7 +299,7 @@ pub enum StoreError {
     /// `canon.yaml` or its `artifact_store:` block cannot be used.
     #[error("{0}")]
     Config(String),
-    /// The object-store tier `artifacts.backend` names cannot be attached
+    /// The object-store tier `artifact_store.backend` names cannot be attached
     /// (credentials or bucket unset).
     #[error("the artifact store tier `{tier}` cannot be attached: {reason}")]
     Unattached { tier: String, reason: String },
