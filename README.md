@@ -82,6 +82,265 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.23.0 release
+
+Version 0.23.0 keeps only the current decision in canon's working set. A
+record that a newer one supersedes is history: it moves to an archive, is never
+copied into new records, and is read only when history is asked for. Rules that
+existed only to patch an earlier rule are removed, and one freshness rule
+replaces several. Plan:
+`docs/superpowers/plans/2026-10-18-canon-0.23.0-latest-only.md`.
+
+**Why.** Issue #80 and the 2026-10-18 efficiency audit of a 100-scenario repo
+(dogfood eval 10) and of canon's own ledger.
+
+- *Carry-forward (#80).* 0.21 re-listed every earlier attachment in each new
+  evidence record: records grew from 0.7 KB to 5.4 KB, with 20.6 attachments on
+  average (33 at most), stale reports from other changes attached, and agents
+  could not find how to drop one.
+- *History in the working set.* 541 of 641 `evidence_record` files were
+  superseded (84%), as were 96% of `subject` and 75% of `finding` files, and
+  every read scanned them before folding to the latest.
+- *Artifact bytes in git.* Content-addressed, so never duplicated, but every
+  new screenshot stayed in history for good.
+- *Work done twice.* A write loaded the corpus for its guard and again for
+  `meta.next`; each command reread the same records, `.feature` files and blobs;
+  `gate check` took 3.4 s on eval 10's repo.
+- *Reviews pinned to record ids.* Recording the suite again staled every
+  review: 82 unchanged scenarios were re-reviewed after a feature and all 100
+  after a behavior-preserving chore.
+- *Overlapping freshness rules.* Review pins, the 0.22 re-verification
+  triggers and accepted-divergence pins each implemented "pinned to what, stale
+  when" on their own; pre-0.15 reviews used a second algorithm (348 such
+  reviews measured in 0.16).
+- *Three staging shapes*, with divergence bypassing staging altogether.
+
+### D1: no carry-forward (#80)
+
+An evidence record binds exactly the files its own write names; nothing earlier
+is added. `--drop-attachment`/`--drop-reason`, the record's `attachment_drop`
+field and the `EVIDENCE_CARRY_BLOB_MISSING` code are removed (the flags are now
+a usage error, exit 2). Old records are not hidden: they are history (D2), and
+a new record is judged on its own files (D5).
+
+### D2: latest-only ledger, `.canon/archive`
+
+- **Archive on append.** Appending a version of a natural-keyed record moves the
+  versions it supersedes from `.canon/ledger/kind=<k>/…` to
+  `.canon/archive/kind=<k>/…` (same layout and file names, tracked in git). The
+  ledger then holds one file per key. A move is a rename; a crash between the
+  write and the move leaves a readable ledger and the next append or compaction
+  finishes it.
+- **Default reads see the ledger only.** `status`, `gate check`, the guards and
+  `canon query` read the working set. `canon query --kind <kind> --history`
+  returns every version, ledger and archive, oldest first. Rules that genuinely
+  need history read the archive explicitly: the gate's evidence history
+  (accepted-divergence timing, coverage counts) and `gate promote`'s recovery
+  and duplicate checks for evidence, finding and divergence records.
+- **`canon ledger compact [--dry-run] [--json]`** moves the superseded versions
+  of an existing ledger once; idempotent; `canon migrate` runs it. Exit 0 done,
+  1 a move failed (`LEDGER_COMPACT_FAILED`; run it again), 2 refused
+  (`LEDGER_ARCHIVE_UNAVAILABLE`: the tier root is not a directory named
+  `ledger`, so there is no archive and every version stays).
+- **Archived kinds:** `change`, `subject`, `scenario`, `finding`,
+  `evidence_record`, `review`, `divergence`.
+- **What stays unarchived, and why.** Execution kinds (`task`, `handoff`,
+  `session`, `run`, `event`, `trajectory`) route to the hot and cold rungs, not
+  git; `strategy_item` has no folding reader. Within an archived kind, a record
+  stays while it still wins any fold a reader applies (the evidence ledger is
+  folded per cell, per scenario, per task and per run_seq partition) or carries
+  a claim a rule reads without folding: a `flagged` overlay or `reviewed`
+  lifecycle tag, a brief override (listed by `status`), and an approval bound to
+  the current evidence generation (risk tiers count distinct approvers). A
+  record that does not parse or has no join key stays too: compaction never
+  guesses.
+
+### D3: artifact bytes off git (`artifact_store:`)
+
+`canon.yaml` gains `artifact_store: { backend, prefix }`; the existing
+`artifacts:` block stays the ingest source config.
+
+- `backend: local` (default, also when the block is absent) is
+  `.canon/artifacts/sha256/`, git-tracked and credential-free, as before.
+- `backend: <tier>` names an `s3` tier of `tiers:` (R2 or S3, same credentials)
+  and stores blobs at `<prefix>sha256/<digest>` (`prefix` default `artifacts/`).
+  `evidence add`, `review add` and `evidence vault` upload there and keep nothing
+  locally; records keep only digests.
+- `canon artifacts verify [--full]` checks every file the latest evidence and
+  the current reviews bind: presence and size/digest metadata (one HEAD per
+  digest), or with `--full` download and re-hash. Exit 0 all stored, 1 a file
+  missing or altered (`ARTIFACTS_VERIFY_FAILED`), 2 the store cannot be reached
+  (`ARTIFACTS_STORE_UNREACHABLE`: a refusal, never a pass). The gate asks the same
+  store.
+- `canon artifacts migrate --to <tier> [--dry-run]` hashes every local blob,
+  uploads it by digest, reads it back, writes the `artifact_store:` block, only
+  then removes the local copies and adds `.canon/artifacts/` to `.gitignore`.
+  A blob that does not match its name, a target that is not an `s3` tier or a bad
+  stored copy is `ARTIFACTS_MIGRATE_REFUSED` (exit 2). A run stopped anywhere
+  leaves a repo the gate still passes; a second run finds nothing to do. Moving
+  bytes back to local is not supported.
+
+### D4: compute once
+
+One process reads each record file, each `.feature` file and each artifact blob
+once: record scans are memoized by path while size and modification time are
+unchanged (a file rewritten within one timestamp tick is always read again), a
+large kind is read by several threads and returned in path order, `.feature`
+files are scanned once for the staleness check, the index refresh, status, the
+gate and the brief's flow coverage, and a blob hashed for one record is not
+hashed again for the next that binds it. Results equal a fresh scan. On
+eval 10's repo `gate check` went 2.9 s → 0.4 s in this slice alone.
+
+### D5: reviews pin what the evidence says
+
+- **Pin.** A review pins its scenario's digest and, per role, the latest
+  evidence's verdict and the identity of its checks: the report format and
+  matched case names (`junit:<case>`), or the artifact digests for evidence bound
+  to artifacts only. It names no evidence record. Recording the suite again with
+  the same verdicts from the same cases leaves the review current; a different
+  verdict, a case that appears or disappears, or a changed scenario stales it,
+  and the message says which.
+- **Review JSON.** `pins.evidence: [{key, digest}]` becomes
+  `pins.checks: [{role, verdict, checks: [...]}]`; `scenario_digest` and
+  `scenario_digest_scope` are unchanged.
+- **Chore.** Re-recording the suite after a chore no longer stales unchanged
+  scenarios. A chore is satisfied by either one change-level review, `canon
+  review add --change <slug> …` (pins the chore's brief less its `Approved:` line,
+  so editing the brief stales it; refused for a feature change; `distinct_actor`
+  applies), or, as 0.22 reviewed chores, every evidenced scenario having a current
+  signed review recorded after the chore's approval and after its latest
+  evidence. Upgraded repos stay green. `canon status` lists each subject's
+  `choreReviews` (JSON).
+- **Fixed blocker.** Still needs evidence newer than the close; scenario reviews
+  stay current when verdicts and checks are unchanged.
+
+### D6: one freshness rule, one staging shape, no legacy path
+
+- **One module.** `canon_gate::freshness` answers "pinned to what, stale when"
+  for review pins, accepted-divergence pins and the re-verification triggers.
+- **One staging shape.** Evidence, finding and divergence all stage under
+  `.canon/ledger/_staging/` and are committed by `canon gate promote` (its
+  summary line now counts `divergence=N`; `canon divergence promote` commits only
+  staged divergences). `divergence resolve|defer|accept` stage and promote their
+  own record in the same run and print "staged and promoted in this run; nothing
+  to promote". `--no-promote` still leaves a record staged.
+- **Legacy freshness removed.** The pre-0.15 review algorithm (read the scenario
+  at the pinned commit, with its advisory) is deleted from the gate. A review
+  that predates 0.23 pins does not count until `canon migrate` pins it: the gate,
+  `status` and `subject status` print one advisory naming how many scenarios wait,
+  and a transition that needs the review is refused as `unreviewed-promotion`.
+- **`canon migrate` re-pins.** After the file moves it runs `ledger compact` and
+  then rewrites each 0.15–0.22 or pre-0.15 review and accepted divergence that was
+  *current under the rule it was written under* to the 0.23 pin, keeping its
+  envelope, reviewer and artifacts. A stale one stays stale and its scenario needs
+  a new review. A pre-0.15 commit this clone cannot read (shallow clone, rewritten
+  history) pins the review as the scenario stands, and the run says how many. A
+  review of a scenario no `.feature` file declares is left alone. Idempotent;
+  `MIGRATE_PINS_FAILED` means files moved but pinning did not finish (run it again).
+
+**Measured.** Dogfood eval 10's repo (100 scenarios), 0.22.0 against the 0.23
+release build after `canon migrate`:
+
+| | 0.22.0 | 0.23 |
+|---|---|---|
+| ledger | 1441 files / 7.2 MB | 735 files / 3.2 MB (706 superseded versions in `.canon/archive`) |
+| `status --json` | 382 ms | 84 ms |
+| `gate check` | 2229 ms | 135 ms |
+| `gate check` result | clean | clean (identical before and after migrate) |
+
+Recording the suite again with the same JUnit reports left 100 gate lines about
+stale or unreviewed scenarios under 0.22 and 18 under 0.23; the 18 are
+hit-feedback scenarios whose reviewed evidence also bound determinism files the
+re-record did not name, so they are genuinely different checks. On canon's own
+repo `canon migrate` archived 284 versions and re-pinned 494 reviews (101 stale
+ones left stale); the git pack went 679 MB → 74 MB after `git gc`, which is
+unreachable objects from deleted branches, not ledger data. W4 timings (median
+of 5, same repo, before the archive): `gate check` 2860 → 390 ms, `evidence add`
+1162 → 557, `review add` 589 → 382, `subject status --to verifying` 662 → 317.
+
+**Migration** from 0.22.
+
+- Run `canon migrate` once (commit the result). It compacts the ledger into
+  `.canon/archive` and re-pins reviews and accepted divergences that were
+  current. Reviews that were already stale stay stale and are re-reviewed per
+  scenario, as before. Until you run it, an old review does not count and the
+  gate says how many scenarios are waiting. In CI, check out full history
+  (`fetch-depth: 0`) for the job that runs it, or a pre-0.15 review whose commit
+  is missing is pinned as the scenario stands instead of being checked.
+- `evidence add --drop-attachment/--drop-reason` are removed, and so is
+  `EVIDENCE_CARRY_BLOB_MISSING`. A record binds only what its write names; name
+  every file the evidence should bind.
+- Review JSON: `pins.evidence` is now `pins.checks` (`{role, verdict, checks}`);
+  `Review.scenario_id` is optional and `change_id` is new (change-level
+  reviews); `attachment_drop` is gone from the evidence schema; the status
+  subject entry gains `choreReviews`.
+- `canon query` returns the ledger only. Add `--history` to read the archive
+  too; a script that read superseded versions needs it.
+- Divergence commands (`resolve`, `defer`, `accept`) print "staged and promoted
+  in this run; nothing to promote"; `gate promote` reports `divergence=N`.
+- A chore ships with one `canon review add --change <slug>` or with per-scenario
+  re-reviews recorded after its evidence; recording the suite again no longer
+  stales unchanged scenarios.
+- `artifact_store:` is optional; without it nothing changes. Use `canon
+  artifacts migrate --to <tier>` to move bytes off git.
+
+**Changed conformance expectations.**
+
+- Version strings (`0.22.0` → `0.23.0`) in every case that prints one.
+- `canon gate promote` summary and the nothing-staged line name divergence
+  (`promoted evidence_record=N, finding=N, divergence=0`; `… (evidence_record,
+  finding, divergence)`): `evidence-add-all-scenarios`,
+  `evidence-add-all-scenarios-refused-contradiction`,
+  `evidence-add-promote-on-write`, `evidence-add-refused-report-contradiction`,
+  `evidence-add-refused-unapproved-brief`, `finding-add-self-found-blocker`,
+  `finding-list-open-json`, `gate-check-audit-confirmed-clean`,
+  `gate-check-audit-false-success`, `gate-check-audit-sampled-missing`,
+  `gate-task-warns-canon-command-proof`, `review-gate-open-blocker`,
+  `review-gate-same-session-not-counted`, `review-pin-stale-evidence`.
+- `review add` says "pinned … at scenario digest … and the verdict and checks of
+  its N role(s) of evidence" (was "N latest evidence record(s)"), and review JSON
+  carries `pins.checks`: `review-add-artifact-stored`, `review-add-batch`,
+  `review-outcome-indeterminate-gap`, `review-outcome-unavailable-gap`,
+  `review-gate-same-session-not-counted`, `review-pin-stale-evidence`,
+  `review-pin-stale-spec`, `evidence-add-refused-unapproved-brief`.
+- The pre-0.15 review advisory is gone, because fixtures hold current pins:
+  `finding-add-self-found-blocker`, `review-gate-distinct-review-passes`,
+  `review-gate-malformed-finding`, `review-gate-open-blocker`,
+  `review-gate-self-review-not-counted`, `status-gaps`.
+- `review-outcome-indeterminate-gap` step 8: `query --kind review` returns the
+  latest review only (1 record, was 2).
+- `review-pin-stale-evidence`: the re-attestation now records a different verdict
+  (`--verdict not-applicable`), since the same verdict from the same checks leaves
+  a review current; the stale message reads "the latest evidence says a different
+  verdict or names different checks than the review saw".
+- `review-gate-open-blocker`: the reverify hint (step 3) record the suite again
+  "(a review stays current while the verdicts and checks are the same)".
+- `gate-check-audit-false-success` step 6: the false-success hint no longer
+  suggests `--drop-attachment`.
+- `status` JSON gains `choreReviews: []` on each subject: `status-brief-proposed`,
+  `status-brief-unapproved`, `status-gaps`, `status-ship-ready`.
+- `context-json-policy-summary`: `evidence_record` loses `attachment_drop`;
+  `review` gains `change_id`, and `scenario_id` is no longer required.
+- `evidence-add-drop-attachment` becomes `evidence-add-binds-only-named`
+  (binding only the named files; `--drop-attachment` is a usage error).
+- `gate-check-legacy-review-missing-pin` becomes
+  `gate-check-unmigrated-review-needs-migrate` (see below). Fixture reviews in
+  five cases were rewritten to 0.23 pins (file names change with the digest).
+
+**New conformance cases.** `evidence-add-binds-only-named` (re-attesting binds
+exactly the named files, nothing carried forward, `--drop-attachment` exit 2) and
+`gate-check-unmigrated-review-needs-migrate` (a pre-0.23 review is refused and
+advised until `canon migrate` pins it; then the transition and the gate pass).
+The archive, `ledger compact`, `artifacts verify|migrate`, review pins and
+change-level reviews, the chore rule, migration pinning and the compute-once
+caches are covered by contract tests (`ledger_archive.rs`,
+`artifacts_object_store.rs`, `review_pins.rs`, `migrate_pins.rs`,
+`reverify.rs`), not the corpus.
+
+Closes #80
+
+ACCEPTANCE-PLACEHOLDER: dogfood eval 11
+
 ## 0.22.0 release
 
 Version 0.22.0 makes canon's gates honest in both directions. An honest
