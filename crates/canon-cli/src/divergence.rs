@@ -353,7 +353,12 @@ pub struct AcceptArgs {
 /// code: `0` on success, `2` refused.
 pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
     const CMD: &str = "canon divergence accept";
-    let invalid = |message: String, field: &str| CliError::refused("DIVERGENCE_INVALID_ARGUMENT", message).field(field).emit(CMD, args.json);
+    let invalid = |message: String, field: &str| {
+        CliError::refused("DIVERGENCE_INVALID_ARGUMENT", message)
+            .field(field)
+            .hint(format!("give {field} a value and run `canon divergence accept` again; `canon schema divergence accept --json` lists every flag"))
+            .emit(CMD, args.json)
+    };
     if args.role.as_str() != "reviewer" {
         return CliError::refused("DIVERGENCE_ACCEPT_REFUSED", format!("accepting a divergence is a reviewer step, not `{}`", args.role.as_str()))
             .field("--role")
@@ -379,7 +384,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
     let repo = resolve_repo_root(repo);
     let context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| canon_gate::GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(context) => context,
-        Err(e) => return CliError::refused("CONFIG_UNREADABLE", e).emit(CMD, args.json),
+        Err(e) => return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml (`canon init --check-config` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
     };
     let indexed = canon_gate::spec_coverage::latest_scenarios(&context);
     let mut scenarios = Vec::new();
@@ -444,10 +449,11 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
         for (_, target) in &wrote {
             let _ = std::fs::remove_file(if target.is_absolute() { target.clone() } else { context.ctx.ledger_root.join(target) });
         }
-        let mut error = CliError::refused("WRITE_FAILED", failure);
-        if scenarios.len() > 1 {
-            error = error.hint("no acceptance is written: every record this run wrote was removed");
-        }
+        let error = CliError::refused("WRITE_FAILED", failure).hint(if scenarios.len() > 1 {
+            "no acceptance is written (every record this run wrote was removed): check that the ledger directory is writable, then run `canon divergence accept` again"
+        } else {
+            "check that the ledger directory is writable, then run `canon divergence accept` again"
+        });
         return error.emit(CMD, args.json);
     }
     for (scenario, target) in &wrote {

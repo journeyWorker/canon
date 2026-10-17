@@ -668,10 +668,10 @@ pub fn run_status(
     if ships || reopens {
         if let Some((closed, detail)) = crate::policy_approval::closed_failure(&repo) {
             let error = match closed {
-                crate::policy_approval::Closed::Unreadable => CliError::failed("POLICY_APPROVAL_UNREADABLE", detail),
-                crate::policy_approval::Closed::Changed => CliError::failed("POLICY_CHANGED_SINCE_APPROVAL", detail),
+                crate::policy_approval::Closed::Unreadable => CliError::failed("POLICY_APPROVAL_UNREADABLE", detail).hint(crate::policy_approval::REAPPROVE_HINT),
+                crate::policy_approval::Closed::Changed => CliError::failed("POLICY_CHANGED_SINCE_APPROVAL", detail).hint(crate::policy_approval::REAPPROVE_HINT),
             };
-            return error.with_exit(EXIT_GATED).hint(crate::policy_approval::REAPPROVE_HINT).emit("canon subject status", json);
+            return error.with_exit(EXIT_GATED).emit("canon subject status", json);
         }
     }
     // A reopen moves a subject back to fix its gaps, so the review guard
@@ -741,7 +741,6 @@ pub fn run_status(
 
     if !blocking.is_empty() {
         let lines = blocking.iter().chain(&waivable).map(Violation::line).collect::<Vec<_>>().join("\n");
-        let mut error = CliError::failed("SUBJECT_GATE_VIOLATION", lines).with_exit(EXIT_GATED);
         let mut hints: Vec<String> = crate::reverify::hint(&blocking.iter().chain(&waivable).collect::<Vec<_>>()).into_iter().collect();
         if let Some(ctx) = &gate_context {
             let divergent = divergent_cells(ctx, subject_id, &blocking);
@@ -752,10 +751,10 @@ pub fn run_status(
         if override_reason.is_some() {
             hints.push("--override-reason waives only the review checks (unreviewed-promotion, open-blocker); the violations above that are not review checks still refuse this transition".to_string());
         }
-        if !hints.is_empty() {
-            error = error.hint(hints.join("; "));
+        if hints.is_empty() {
+            hints.push("fix each violation above (`canon gate check` lists them with their causes), then run this transition again".to_string());
         }
-        return error.emit("canon subject status", json);
+        return CliError::failed("SUBJECT_GATE_VIOLATION", lines).with_exit(EXIT_GATED).hint(hints.join("; ")).emit("canon subject status", json);
     }
 
     // A waiver, a reopen note, and a transition reason belong to the

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "canon_version": "0.21.1",
-  "source_commit": "7976cf968f6ffcdd5a0fff803dbfde3e9a604bb1",
-  "source_hash": "sha256:b7e167c65708d9e63b4fcbbf518d4f1bd115061db70c12727011748b49579438",
+  "source_commit": "1f2d71bd759c934c85f04f88a7449ba681e38aa3",
+  "source_hash": "sha256:82ab65d843eb6f3bac11523b377a84712055a06f70fb3ce46cbf850a38e94a6a",
   "providers": [
     "claude",
     "codex",
@@ -10,7 +10,7 @@
     "pi"
   ],
   "files": {
-    ".agents/skills/canon/SKILL.md": "sha256:edbc1a429ede61076249200b89b48633a69c6bdc1d99b69a7d9567bb072d4385",
+    ".agents/skills/canon/SKILL.md": "sha256:09b52eccd02db3a9bcbf4467c1672cd92f1ede8cebbb5dc45f62467875647543",
     ".agents/skills/canon/reference/brief-align.md": "sha256:52d5c18a513c9acb12f96d280b4b4c83381f13ada7eed3690fcc94bd30c2407a",
     ".agents/skills/canon/reference/brief-clarify.md": "sha256:e74f39db33c71bf9cfee17418116a983b94a8d86eb5741040ab626a9fd4382da",
     ".agents/skills/canon/reference/brief-harden.md": "sha256:c0bb015558686cacab190c1a913cc960a0007c7279897410588a99c2cc2ee193",
@@ -38,7 +38,7 @@
     ".agents/skills/canon/reference/role-planner.md": "sha256:18f7687f00e67e613cb0ad5f2914472a5750d66260cab82145919ec6c8546592",
     ".agents/skills/canon/reference/role-reviewer.md": "sha256:6385940e9aef2a9172ba801f5096c68bb9de7e59be97f8c132318040e4db2153",
     ".agents/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:bd63c90f8f579a3b00922ea14b95369b5e778772c9da35908a63da69616e1c00",
-    ".claude/skills/canon/SKILL.md": "sha256:edbc1a429ede61076249200b89b48633a69c6bdc1d99b69a7d9567bb072d4385",
+    ".claude/skills/canon/SKILL.md": "sha256:09b52eccd02db3a9bcbf4467c1672cd92f1ede8cebbb5dc45f62467875647543",
     ".claude/skills/canon/reference/brief-align.md": "sha256:52d5c18a513c9acb12f96d280b4b4c83381f13ada7eed3690fcc94bd30c2407a",
     ".claude/skills/canon/reference/brief-clarify.md": "sha256:e74f39db33c71bf9cfee17418116a983b94a8d86eb5741040ab626a9fd4382da",
     ".claude/skills/canon/reference/brief-harden.md": "sha256:c0bb015558686cacab190c1a913cc960a0007c7279897410588a99c2cc2ee193",
@@ -66,7 +66,7 @@
     ".claude/skills/canon/reference/role-planner.md": "sha256:18f7687f00e67e613cb0ad5f2914472a5750d66260cab82145919ec6c8546592",
     ".claude/skills/canon/reference/role-reviewer.md": "sha256:6385940e9aef2a9172ba801f5096c68bb9de7e59be97f8c132318040e4db2153",
     ".claude/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:bd63c90f8f579a3b00922ea14b95369b5e778772c9da35908a63da69616e1c00",
-    ".omp/skills/canon/SKILL.md": "sha256:edbc1a429ede61076249200b89b48633a69c6bdc1d99b69a7d9567bb072d4385",
+    ".omp/skills/canon/SKILL.md": "sha256:09b52eccd02db3a9bcbf4467c1672cd92f1ede8cebbb5dc45f62467875647543",
     ".omp/skills/canon/reference/brief-align.md": "sha256:52d5c18a513c9acb12f96d280b4b4c83381f13ada7eed3690fcc94bd30c2407a",
     ".omp/skills/canon/reference/brief-clarify.md": "sha256:e74f39db33c71bf9cfee17418116a983b94a8d86eb5741040ab626a9fd4382da",
     ".omp/skills/canon/reference/brief-harden.md": "sha256:c0bb015558686cacab190c1a913cc960a0007c7279897410588a99c2cc2ee193",
@@ -94,7 +94,7 @@
     ".omp/skills/canon/reference/role-planner.md": "sha256:18f7687f00e67e613cb0ad5f2914472a5750d66260cab82145919ec6c8546592",
     ".omp/skills/canon/reference/role-reviewer.md": "sha256:6385940e9aef2a9172ba801f5096c68bb9de7e59be97f8c132318040e4db2153",
     ".omp/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:bd63c90f8f579a3b00922ea14b95369b5e778772c9da35908a63da69616e1c00",
-    ".pi/skills/canon/SKILL.md": "sha256:edbc1a429ede61076249200b89b48633a69c6bdc1d99b69a7d9567bb072d4385",
+    ".pi/skills/canon/SKILL.md": "sha256:09b52eccd02db3a9bcbf4467c1672cd92f1ede8cebbb5dc45f62467875647543",
     ".pi/skills/canon/reference/brief-align.md": "sha256:52d5c18a513c9acb12f96d280b4b4c83381f13ada7eed3690fcc94bd30c2407a",
     ".pi/skills/canon/reference/brief-clarify.md": "sha256:e74f39db33c71bf9cfee17418116a983b94a8d86eb5741040ab626a9fd4382da",
     ".pi/skills/canon/reference/brief-harden.md": "sha256:c0bb015558686cacab190c1a913cc960a0007c7279897410588a99c2cc2ee193",

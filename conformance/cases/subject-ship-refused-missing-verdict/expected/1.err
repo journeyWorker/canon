@@ -1,3 +1,4 @@
 canon subject status: refreshed the scenario index from 1 changed feature file(s) (specs/kind=feature/area=checkout/add.feature): 2 record(s) written
 canon subject status: advisory: checkout's brief is not approved — checkout adopts no change, so there is no brief to answer and shipping is not refused
 canon subject status: SUBJECT_GATE_VIOLATION — uncovered-cell checkout.pay.02 — verifying → shipped: no ledger verdict for this linked scenario
+hint: fix each violation above (`canon gate check` lists them with their causes), then run this transition again

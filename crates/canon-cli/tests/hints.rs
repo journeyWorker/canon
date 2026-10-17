@@ -14,8 +14,6 @@ use std::path::{Path, PathBuf};
 
 /// `(file, code, reason)`: constructions whose chain has no `.hint(` and may keep none.
 const ALLOWED: &[(&str, &str, &str)] = &[
-    // 0.22 V1/V2 rewrite the ship guard's refusals; they add the hint with it, and this entry goes then.
-    ("subject.rs", "SUBJECT_GATE_VIOLATION", "V1/V2 own this site"),
 ];
 
 fn src_dir() -> PathBuf {
