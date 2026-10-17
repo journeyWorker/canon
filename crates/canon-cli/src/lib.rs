@@ -4,6 +4,7 @@
 
 pub mod adapter;
 pub mod artifact_ingest;
+pub mod artifacts;
 pub mod brief;
 pub mod brief_approve;
 pub mod brief_check;

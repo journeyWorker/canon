@@ -107,3 +107,38 @@ fn write_read_round_trip_against_a_live_minio_bucket() {
         "expected the written trajectory's own run_id back out of a live read"
     );
 }
+
+/// The artifact blob store (0.23 D3) against the same live bucket: upload
+/// by digest key with size/digest metadata, a HEAD that reads it back, the
+/// full re-hash, and a missing key reading as `Missing`, not an error.
+#[test]
+fn artifact_blobs_round_trip_against_a_live_minio_bucket() {
+    use canon_store::artifact_blobs::{ObjectBlobStore, Probe};
+    use canon_store::policy::R2TierConfig;
+    use sha2::{Digest, Sha256};
+
+    let endpoint = std::env::var("CANON_S3_ENDPOINT").unwrap_or_else(|_| DEFAULT_ENDPOINT.to_string());
+    let (host, port) = endpoint_host_port(&endpoint);
+    if !tcp_reachable(&host, port) {
+        if require_live() {
+            panic!("CANON_REQUIRE_LIVE=1 but MinIO at {endpoint} is unreachable — run `docker compose up -d --wait postgres minio` (repo root) first");
+        }
+        eprintln!("skipping: MinIO at {endpoint} is unreachable (set CANON_REQUIRE_LIVE=1 to make this a hard failure)");
+        return;
+    }
+    if std::env::var("CANON_S3_BUCKET").is_err() {
+        std::env::set_var("CANON_S3_BUCKET", DEFAULT_BUCKET);
+    }
+
+    let blobs = ObjectBlobStore::attach(&R2TierConfig { bucket_env: "CANON_S3_BUCKET".to_string(), prefix: "unused/".to_string() }, "artifacts-test/").expect("attach to live MinIO");
+    // A fresh digest per run: the bucket outlives the test.
+    let bytes = format!("live artifact {}", uuid::Uuid::new_v4()).into_bytes();
+    let digest = format!("{:x}", Sha256::digest(&bytes));
+
+    assert_eq!(blobs.probe(&digest).expect("HEAD a missing key"), Probe::Missing);
+    assert!(blobs.put(&digest, bytes.clone()).expect("upload"), "a fresh digest uploads");
+    assert!(!blobs.put(&digest, bytes.clone()).expect("re-upload"), "the same bytes find the object and upload nothing");
+    assert_eq!(blobs.probe(&digest).expect("HEAD"), Probe::Present { size: bytes.len() as u64 });
+    assert_eq!(blobs.verify_full(&digest).expect("download and re-hash"), Probe::Present { size: bytes.len() as u64 });
+    assert!(blobs.list().expect("list").contains(&digest));
+}

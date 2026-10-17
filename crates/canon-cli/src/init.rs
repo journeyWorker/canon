@@ -757,6 +757,22 @@ pub fn run_check_config(repo: &Path, json: bool) -> i32 {
         }
     }
 
+    // `artifacts:` (0.23 D3): absent is the local default and prints
+    // nothing, like `language:`. A backend that names no s3 tier fails
+    // here, not at the first evidence write.
+    let artifacts_present = serde_yaml::from_str::<serde_yaml::Value>(&text).ok().and_then(|doc| doc.get("artifacts").cloned()).is_some();
+    match canon_store::artifact_blobs::ArtifactsConfig::from_yaml_at(&text, repo) {
+        Ok(config) if artifacts_present => match config.backend {
+            canon_store::artifact_blobs::ArtifactsBackend::Local => report.push_str("[PASS] artifacts (backend: local)\n"),
+            canon_store::artifact_blobs::ArtifactsBackend::Tier { name, .. } => report.push_str(&format!("[PASS] artifacts (backend: {name}, prefix: {})\n", config.prefix)),
+        },
+        Ok(_) => {}
+        Err(e) => {
+            all_ok = false;
+            report.push_str(&format!("[FAIL] artifacts: {e}\n"));
+        }
+    }
+
     crate::say_raw!(json, "{report}");
     let sections: Vec<serde_json::Value> = report
         .lines()

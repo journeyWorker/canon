@@ -13,6 +13,8 @@
 pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("adapter authorize", "canon adapter authorize --response adapter-response.json --repo ."),
     ("adapter validate", "canon adapter validate --response adapter-response.json"),
+    ("artifacts migrate", "canon artifacts migrate --to cold --dry-run"),
+    ("artifacts verify", "canon artifacts verify"),
     ("brief approve", "canon brief approve --by alice --note \"approved as written\""),
     ("brief check", "canon brief check"),
     ("change new", "canon change new add-search --subject demo --title \"Add search\""),

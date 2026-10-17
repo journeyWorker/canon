@@ -52,30 +52,6 @@ use canon_store::r2_tier::R2Tier;
 use canon_store::sqlite_tier::SqliteTier;
 use canon_store::tier::{StoreError, Tier, TierQuery, TierReadResult};
 
-/// Recognized ONLY by this CLI — never by `canon-store` itself — so an
-/// offline integration test can exercise a genuine git+r2 aging move /
-/// query fan-out without live R2 credentials or network. This is the
-/// same "rebindable root" convention `canon/skills/tiered-storage/
-/// SKILL.md` already documents for the DuckDB views (`CANON_R2_ROOT`),
-/// applied here to the CLI's own tier construction. Unset in ordinary
-/// use: a `canon.yaml`-configured s3-backed rung always resolves via
-/// `R2Tier::connect_live` there — this env var is a test seam, never a
-/// silent production fallback.
-///
-/// That "never a silent production fallback" claim is HARD-ENFORCED,
-/// not just documented: [`build_r2_tier`] only reads this var behind
-/// `#[cfg(debug_assertions)]`, which a `--release` build compiles OUT
-/// entirely. `canon tier age` does a destructive move+delete against
-/// whichever `r2` handle `build_tiers` resolves; a stray
-/// `CANON_R2_LOCAL_ROOT` surviving into a production shell must NEVER
-/// be able to silently redirect that mutation (or `canon query`'s read
-/// fan-out) at a local filesystem instead of the real bucket. A
-/// release `canon` binary therefore ignores this var unconditionally
-/// and always calls `R2Tier::connect_live`, which itself fails loud
-/// (`StoreError::BackendUnattached`) when it can't attach — never a
-/// silent local substitution.
-pub const LOCAL_R2_ROOT_ENV: &str = "CANON_R2_LOCAL_ROOT";
-
 #[derive(Debug, thiserror::Error)]
 pub enum TierCliError {
     #[error("reading `{path}`: {source}")]
@@ -176,8 +152,8 @@ pub fn build_tiers(canon_yaml_path: &Path) -> Result<LoadedTiers, TierCliError> 
                 // Mirror the Postgres arm: a declared-but-unattached
                 // cold/s3 rung names the RUNG + backend ("cold tier (s3)
                 // is not attached (…)"), not the rung-less
-                // `BackendUnattached` `build_r2_tier` returns on its own.
-                r2 = Some(build_r2_tier(cfg).map_err(|e| match e {
+                // `BackendUnattached` `R2Tier::attach` returns on its own.
+                r2 = Some(R2Tier::attach(cfg).map_err(|e| match e {
                     StoreError::BackendUnattached { backend, reason } => {
                         StoreError::tier_unavailable(rung, Some(backend), reason)
                     }
@@ -199,31 +175,6 @@ pub fn build_tiers(canon_yaml_path: &Path) -> Result<LoadedTiers, TierCliError> 
     }
 
     Ok(LoadedTiers { policy, git, pg, r2, sqlite, unavailable_reasons: BTreeMap::new() })
-}
-
-/// Resolve `cfg`'s s3-backed tier handle. In DEBUG builds only, honors
-/// [`LOCAL_R2_ROOT_ENV`] as an offline test seam (`R2Tier::local`) —
-/// the `#[cfg(debug_assertions)]` gate below is load-bearing, not
-/// cosmetic. `cargo build --release` compiles the whole `if` branch
-/// out of the binary, so no env var — however it got into a
-/// production shell — can ever substitute a local filesystem for the
-/// real bucket `canon tier age`'s destructive move+delete (or `canon
-/// query`'s read fan-out) targets. A release binary always takes the
-/// `R2Tier::connect_live` path below, which fails loud
-/// (`StoreError::BackendUnattached`) rather than silently succeeding
-/// against the wrong backing store. Integration tests build in the
-/// `dev`/`test` profile (`debug_assertions` on), so the override keeps
-/// working for them.
-pub(crate) fn build_r2_tier(cfg: &R2TierConfig) -> Result<R2Tier, StoreError> {
-    #[cfg(debug_assertions)]
-    if let Ok(local_root) = std::env::var(LOCAL_R2_ROOT_ENV) {
-        eprintln!(
-            "canon: {LOCAL_R2_ROOT_ENV} is set — substituting a LOCAL filesystem s3 tier at `{local_root}` \
-             (debug-build test seam only; a release `canon` binary ignores this var and always attaches live s3)"
-        );
-        return R2Tier::local(local_root, cfg.prefix.clone());
-    }
-    R2Tier::connect_live(&cfg.bucket_env, &cfg.prefix)
 }
 
 /// Attach `cfg`'s postgres-backed tier, degrading a genuine
@@ -258,7 +209,7 @@ fn attach_postgres(cfg: &PgTierConfig) -> Result<(Option<PgTier>, Option<String>
     }
 }
 
-/// Attach `cfg`'s s3-backed tier via [`build_r2_tier`], degrading a
+/// Attach `cfg`'s s3-backed tier via [`R2Tier::attach`], degrading a
 /// genuine `StoreError::BackendUnattached` (bucket credential
 /// absent/unreachable) to `(None, Some(reason))`; any other error
 /// propagates loud. The returned `Option<String>` mirrors
@@ -267,7 +218,7 @@ fn attach_postgres(cfg: &PgTierConfig) -> Result<(Option<PgTier>, Option<String>
 /// -- the ONE degrade-or-propagate decision for the s3 backend
 /// (renamed from `attach_r2` per s27 design D4).
 fn attach_s3(cfg: &R2TierConfig) -> Result<(Option<R2Tier>, Option<String>), TierCliError> {
-    match build_r2_tier(cfg) {
+    match R2Tier::attach(cfg) {
         Ok(tier) => Ok((Some(tier), None)),
         Err(StoreError::BackendUnattached { reason, .. }) => Ok((None, Some(reason))),
         Err(err) => Err(TierCliError::Store(err)),
@@ -543,6 +494,8 @@ static R2_SEAM_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[cfg(test)]
 mod tests {
+    use canon_store::r2_tier::LOCAL_R2_ROOT_ENV;
+
     use super::*;
 
     /// The debug/test path this override exists for keeps working:
@@ -557,7 +510,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::env::set_var(LOCAL_R2_ROOT_ENV, dir.path());
         let cfg = R2TierConfig { bucket_env: "CANON_R2_BUCKET_UNUSED_IN_THIS_TEST".to_string(), prefix: "canon/".to_string() };
-        let result = build_r2_tier(&cfg);
+        let result = R2Tier::attach(&cfg);
         std::env::remove_var(LOCAL_R2_ROOT_ENV);
         result.expect("a dev/test-profile build must still honor the local-r2 test seam `Fixture::run_canon` relies on");
     }
@@ -565,7 +518,7 @@ mod tests {
     /// The production-safety gate itself, asserted directly (IMP-1):
     /// under a RELEASE build (`debug_assertions` off — `cargo test
     /// --release`), `CANON_R2_LOCAL_ROOT` must NOT substitute a local
-    /// filesystem; `build_r2_tier` must fall straight through to
+    /// filesystem; `R2Tier::attach` must fall straight through to
     /// `R2Tier::connect_live` and fail loud (never silently succeed
     /// against the wrong backing store) when it predictably can't
     /// attach in a test process with no live bucket/credentials. Only
@@ -580,7 +533,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::env::set_var(LOCAL_R2_ROOT_ENV, dir.path());
         let cfg = R2TierConfig { bucket_env: "CANON_R2_RELEASE_TEST_BUCKET_UNSET".to_string(), prefix: "canon/".to_string() };
-        let result = build_r2_tier(&cfg);
+        let result = R2Tier::attach(&cfg);
         std::env::remove_var(LOCAL_R2_ROOT_ENV);
         let err = result.expect_err("a release build must NEVER silently substitute a local r2 tier from CANON_R2_LOCAL_ROOT");
         assert!(
@@ -596,6 +549,8 @@ mod lenient_tier_tests {
     use std::path::PathBuf;
 
     use canon_store::policy::AgingRuleConfig;
+
+    use canon_store::r2_tier::LOCAL_R2_ROOT_ENV;
 
     use super::*;
 
@@ -763,8 +718,8 @@ mod lenient_tier_tests {
     /// by `canon tier age`) names the RUNG + backend for an unattached
     /// cold/s3 tier — "cold tier (s3) is not attached (…)" — symmetric
     /// with the hot/postgres arm, never the rung-less `BackendUnattached`
-    /// `build_r2_tier` returns on its own. Debug build + `LOCAL_R2_ROOT_ENV`
-    /// unset so `build_r2_tier` reaches `connect_live`, which fails loud
+    /// `R2Tier::attach` returns on its own. Debug build + `LOCAL_R2_ROOT_ENV`
+    /// unset so `R2Tier::attach` reaches `connect_live`, which fails loud
     /// when neither the configured `bucket_env` nor the generic
     /// `S3_BUCKET` resolves.
     #[cfg(debug_assertions)]
