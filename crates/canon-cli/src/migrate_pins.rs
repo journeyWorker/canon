@@ -247,10 +247,12 @@ fn records_of<T: serde::de::DeserializeOwned>(tier: &GitTier, kind: RecordKind) 
         .collect())
 }
 
-/// Write `new` and remove the file `old` was read from.
+/// Write `new` and remove the file `old` was read from. Unarchived: the
+/// migrated record keeps `old`'s time, so the archive's latest-version
+/// rule could pick either copy; this replacement removes `old` itself.
 fn replace<T: canon_model::CanonRecord + PartialEq + serde::Serialize>(tier: &GitTier, ledger_root: &Path, on_disk: &[(T, String)], old: &T, new: &T, kind: RecordKind) -> Result<(), String> {
     let old_path = on_disk.iter().find(|(record, _)| record == old).map(|(_, path)| path.clone());
-    tier.write(new).map_err(|e| format!("cannot write the migrated {}: {e}", kind.as_str()))?;
+    tier.write_unarchived(new).map_err(|e| format!("cannot write the migrated {}: {e}", kind.as_str()))?;
     if let Some(path) = old_path {
         std::fs::remove_file(ledger_root.join(&path)).map_err(|e| format!("cannot replace {path}: {e}"))?;
     }
