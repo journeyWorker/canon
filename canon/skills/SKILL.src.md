@@ -25,7 +25,9 @@ a feature, a one-line request included. A human is needed once per scope:
   approves the brief and the policy, `.canon/policy.yaml`, which is what
   the gate grades the work against. Record it only from the human's answer:
   `canon brief approve --change <slug> --by <the human> --note "<their words>"`.
-  Never edit the policy to make the gate pass. A brief edited after its
+  Never edit the policy to make the gate pass: a policy that differs from
+  the approved one fails closed (`POLICY_CHANGED_SINCE_APPROVAL`, not
+  waivable); stop and ask the human. A brief edited after its
   approval is not approved (`BRIEF_CHANGED_SINCE_APPROVAL`): it needs a new
   answer. The ship guard and `canon evidence add` refuse an unapproved or
   edited brief, but those are backstops: the stop itself is at step 1.
@@ -35,7 +37,9 @@ a feature, a one-line request included. A human is needed once per scope:
   implement, evidence, independent review. A follow-up that adds or changes
   a step of the brief edits the brief: that is a scope change and needs a
   new answer. A follow-up on a shipped subject reopens it
-  (`canon subject status <id> --to verifying --reason "<why>"`).
+  (`canon subject status <id> --to verifying --reason "<why>"`); a fix
+  closed `fixed`, and an approved chore, then need the whole suite evidenced
+  again (`evidence add --all-scenarios`) and re-reviewed before it ships.
 - When no human can answer one of the brief's questions, write your
   assumption into the brief's Questions and assumptions, build on it, and say
   so in your report. That covers the brief's questions and work inside an
@@ -87,8 +91,11 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
 - Pass `--json` and read stdout as one document. On failure it is
   `{"error":{"code","message","hint","retryable","field","expected"}}`: branch
   on `error.code`, fix the option `field` names using the `expected` values,
-  and follow `error.hint`. The codes are stable; `canon schema --errors --json`
-  lists them.
+  and follow `error.hint`. Every refusal carries a concrete `hint`: follow
+  it. The codes are stable; `canon schema --errors --json` lists them.
+- `canon status` sends the planner to write the brief while `brief check`
+  has blockers; the human stop appears only when the brief is clean and
+  unapproved.
 - Page long lists with `--limit <n>` and `--cursor <nextCursor>` (`--all`
   for everything), and project fields with `--fields a,b` (`status`, `export`,
   `query`, `finding list`, `divergence status`, `context`).

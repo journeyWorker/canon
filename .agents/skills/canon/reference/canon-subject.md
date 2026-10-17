@@ -146,7 +146,14 @@ owns must also carry a scenario of each required `@case:` (e.g. one
 `@case:failure`) — attested golden-path scenarios alone do not ship. A
 Subject with no tagged scenario is refused rather than shipped on an
 empty set; so is one whose `scenario` records route away from the
-gate's rung. Each refusal prints by failure class (`uncovered-cell`),
+gate's rung. A `Divergent` latest verdict is refused as `uncovered-cell`
+unless a reviewer accepted it (`canon divergence accept`, see
+`canon-gate`): the hint names both ways out. Re-verification: a blocker
+closed `fixed` keeps blocking, and a chore's approval keeps the subject
+from shipping, until every evidenced scenario has evidence recorded after
+the close or the approval; the refusal names the scenarios and the
+`canon evidence add --all-scenarios …` command. Each refusal prints by
+failure class (`uncovered-cell`), carries a `hint`,
 exits 1, and the status stays `verifying`. `retired` is not gated.
 
 **The brief (0.16, 0.17, 0.19):** `verifying → shipped` also refuses where a brief
@@ -280,6 +287,12 @@ canon subject status: demo-subject → verifying — written directly; nothing t
 - The review guard does not run on a reopen (it prints `skipped … — a
   reopen moves the subject back to fix its gaps; shipping again runs
   it`). `verifying → shipped` afterwards runs every guard above again.
+- A policy that fails closed (`POLICY_CHANGED_SINCE_APPROVAL`,
+  `POLICY_APPROVAL_UNREADABLE`: see `canon-policy`) refuses the reopen and
+  the ship, and `--override-reason` does not waive it.
+- `canon change new` on a shipped subject prints the reopen command
+  (`canon subject status <id> --to verifying --reason "<why it reopens>"`)
+  in its output and `meta.next`.
 - `canon status` flags a shipped subject whose gate went red (whatever
   `verifying → shipped` would now refuse it on) and its only step is
   this reopen.
@@ -563,10 +576,14 @@ uses, so status and the gate cannot disagree about a gap:
   than one `specs.roots[]` entry, every suggested `canon scenario new`
   carries `--project`: the owning root for a missing case, `<root-id>`
   (the reason lists the roots) for a subject that owns no scenario yet.
-- **The one human step.** Every step is the agent's to run except one:
-  a subject whose brief is enforced (its newest change's canon
+- **The one human step.** Every step is the agent's to run except one,
+  and it comes only once the brief is clean: while `canon brief check
+  --change <slug>` has blockers, the subject gets the planner step
+  `write the brief: canon brief check --change <slug> lists N blockers`
+  (`role: planner`) instead. A subject whose brief is enforced (its
+  newest change's canon
   `brief.md` has no `Approved:` line, or it has no canon `brief.md` yet
-  and comes from an external openspec `proposal.md`) gets
+  and comes from an external openspec `proposal.md`) and clean gets
   `human: stop and report the brief in <brief>; build and attest nothing for <id> until the human answers (one answer approves brief and policy)`,
   where `<brief>` is the canon `brief.md`, or the external `proposal.md`
   when no canon brief exists yet. Its reason reads ``<id>: <why

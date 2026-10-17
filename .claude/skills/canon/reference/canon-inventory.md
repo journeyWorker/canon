@@ -72,7 +72,7 @@ scenario index                  # refreshed by every reader; `canon inventory sy
         │
         ▼
 canon review add                # attests a review — see canon-inventory downstream / canon-gate
-canon divergence {add,promote,resolve,defer,status}   # tracks/resolves a divergence
+canon divergence {add,promote,resolve,defer,accept,status}   # tracks/resolves a divergence
 canon gate check [--release]    # trust-ladder / staleness / coverage — see canon-gate
         │
         ▼
@@ -158,7 +158,7 @@ specs:
 
 - **Review** — `canon review add` attests a verdict against a synced
   scenario. (See `canon-inventory` downstream commands and each command's `--help`.)
-- **Divergence** — `canon divergence {add,promote,resolve,defer,status}`
+- **Divergence** — `canon divergence {add,promote,resolve,defer,accept,status}`
   tracks/resolves divergences against synced scenarios.
 - **Gate** — `canon gate check` enforces trust-ladder / staleness /
   coverage over the corpus (see `canon-gate`).

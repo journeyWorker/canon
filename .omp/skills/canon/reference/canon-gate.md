@@ -21,15 +21,15 @@ Every violation carries one of these stable, grep-able strings:
 
 | Class | Meaning |
 |---|---|
-| `uncovered-cell` | Either a policy-required evidence cell (role × artifact) with no matching record, or — with `spec_coverage` enabled — a spec scenario that is unimplemented or mismatched, or a feature surface missing a `require_cases` case. The detail string distinguishes them. Coverage means "a test exists", not "a test passed": even a `Divergent` verdict satisfies the role-cell form. |
-| `unreviewed-promotion` | An artifact tagged `reviewed` has no matching ledger review record — or, with `spec_coverage.require_review` set, an in-scope scenario has no qualifying `Review`: none at all, only self-reviews, only stale reviews (the spec or evidence it pinned changed since), or only `indeterminate`/`unavailable` ones. See `canon-review`. |
+| `uncovered-cell` | Either a policy-required evidence cell (role × artifact) with no matching record, or — with `spec_coverage` enabled — a spec scenario that is unimplemented or mismatched, or a feature surface missing a `require_cases` case. The detail string distinguishes them. Coverage means "a test exists", not "a test passed": even a `Divergent` verdict satisfies the role-cell form. At `verifying → shipped`, a `Divergent` latest verdict is `uncovered-cell` unless a reviewer accepted it (see Accepted divergence below), and a chore's approval, like a blocker closed `fixed`, needs every evidenced scenario evidenced again afterwards (see Re-verification below). |
+| `unreviewed-promotion` | An artifact tagged `reviewed` has no matching ledger review record — or, with `spec_coverage.require_review` set, an in-scope scenario has no qualifying `Review`: none at all, only self-reviews, only stale reviews (the spec or evidence it pinned changed since), or only `indeterminate`/`unavailable` ones. Also, subject `policy`: the policy changed since its approval or its approval is unreadable (fails closed; see `canon-policy`). See `canon-review`. |
 | `trust-below-required` | Achieved trust level is below `policy.yaml`'s `trust_required` for its class — RELEASE-scoped only (`canon gate check --release`); never fires on an ordinary run. |
 | `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. Also: a file bound to a latest evidence record whose bytes are gone — no intact blob in `.canon/artifacts/sha256/` and no working-tree copy with the recorded digest — or a file bound to an in-effect review with no intact blob (see Bound evidence stays provable below). |
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of passing evidence. |
 | `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` evidence record. |
 | `fabricated-evidence` | An evidence note contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) standing as a whole word — never inside a path, a file name, a URL or a longer word, so `pack.json/atlas` is not `n/a` — or a bare `verified` claim with no attached command result. `canon evidence add` refuses such a note before writing (`canon evidence add: refused — fabricated-evidence …`, exit 1). |
-| `open-blocker` | With `spec_coverage.require_review` set (and `block_on_findings`, the default), a Finding whose latest version is severity `blocker`, disposition `open`, on a change an in-scope subject adopted. Subject string `<change_id>#<round>.<seq>`. See `canon-review`. |
+| `open-blocker` | With `spec_coverage.require_review` set (and `block_on_findings`, the default), a Finding whose latest version is severity `blocker`, disposition `open`, on a change an in-scope subject adopted — or closed `fixed` while an evidenced scenario of the subject has no evidence recorded after the close (re-verification). Subject string `<change_id>#<round>.<seq>`. See `canon-review`. |
 | `false-success` | The latest audit record (`canon evidence add --kind audit`) of a scenario says `refuted`: an external evaluator found a counterexample to the claimed success. Always on, regardless of policy or sampling, and takes precedence over any declared faithful verdict; only a newer audit (`confirmed` or `indeterminate`) clears it. The detail names the evaluator, its version, its sha256 and the counterexample paths. |
 
 ## `canon gate check [--repo <dir>] [--release]`
@@ -51,11 +51,12 @@ Exit `0` clean, `1` gate-red (any violation), `2` usage/load failure
 resolves through the nearest-ancestor `canon.yaml` walk, so it reads the
 repo ROOT's `.canon/policy.yaml` and `.canon/ledger` from any subdirectory.
 
-When `.canon/policy.yaml` exists but has no approval, or its bytes no
-longer match the approved digest, the gate prints `advisory: policy not
-approved: …` or `advisory: policy changed since approval: …` after its
-result, naming `canon policy approve --by <who>`; the exit code is
-unchanged (see `canon-policy`).
+When `.canon/policy.yaml` exists but has no approval, the gate prints
+`advisory: policy not approved: …` after its result, naming
+`canon policy approve --by <who>`; the exit code is unchanged. When its
+bytes no longer match the approved digest, or the approval cannot be read,
+the gate fails closed: the violation is reported and the exit is `1` (see
+`canon-policy`).
 
 Before it reads the scenario index, the gate rebuilds any stale part of
 it from the changed `.feature` files (the same code `canon inventory
@@ -199,6 +200,35 @@ Two refusals rather than a silent pass, both surfacing as
 Malformed rows in those three kinds do NOT surface as
 `malformed-evidence`; they are kept off the evidence violation set on
 purpose, so enabling nothing changes no existing verdict.
+
+### Accepted divergence and re-verification
+
+```bash
+canon divergence accept --project-id <root-id> --scenario-id <id> --reason "<why>" --tracking <issue-url-or-ref> [--expiry YYYY-MM-DD] --reviewer <me> --actor-id <me> --session-id <session> --as reviewer
+```
+
+A reviewer accepts a scenario whose latest evidence is `divergent` as a
+known gap limited by something outside the change; never to skip a fix.
+Refused (`DIVERGENCE_ACCEPT_REFUSED`) unless the latest verdict is
+divergent and the session and actor differ from the evidence's. The record
+pins that evidence: new evidence for the scenario, or `--expiry` passing,
+ends it. While it holds, the ship guard counts the cell covered and
+`status` and `gate check` keep listing it, never silently:
+
+```
+accepted divergences: 1 known gap(s) — not failing the gate:
+  accepted-divergence demo.page.02 — https://example.test/issues/1 (no expiry)
+```
+
+Re-verification is one rule with two triggers: a blocker whose latest
+disposition is `fixed`, and a chore change once approved, keep the subject
+from shipping until every one of its evidenced scenarios has evidence
+recorded after the close or the approval. The refusal names the scenarios
+and the batch command: `canon evidence add --project-id <root-id>
+--all-scenarios --report <format>:<path> --kind test-run --role
+implementer --ref "<test command>" …`. That evidence stales the pinned
+reviews, so a re-review follows (and a new `divergence accept`, where the
+gap remains).
 
 ### Audit records (`--kind audit`)
 
