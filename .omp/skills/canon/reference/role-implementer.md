@@ -65,8 +65,10 @@ After the first `status`, follow `meta.next` of each write; do not call
    `canon artifacts verify` to ask the store yourself; it refuses, never
    passes, when an object store cannot be reached. Moving an existing store
    (`canon artifacts migrate`) is the repo owner's call: do not run it.
-   For a scenario about what users see, bind the screenshot
-   or recording (`--artifact <path>`). An external evaluator's audit is
+   For a scenario about what users see, bind its own screenshot or recording
+   with that scenario: `--scenario-id <id> --artifact <path>`. A batch
+   (`--all-scenarios`) binds every file it names to every scenario, so give
+   a batch only the reports; never loop all screenshots into it. An external evaluator's audit is
    `--kind audit`; canon never generates one. Evidence for a task of an
    imported plan (`--task <id>`) must bind the artifact or report that proves
    the task; a canon command is never that proof. When the behavior cannot
