@@ -77,15 +77,15 @@ pub fn run_demo_init(repo: &Path, json: bool) -> i32 {
     let policy_path = repo.join(".canon").join("policy.yaml");
     if let Some(parent) = policy_path.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
-            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).emit("canon demo init", json);
+            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon demo init", json);
         }
     }
     if let Err(e) = std::fs::write(&policy_path, DEMO_POLICY_YAML) {
-        return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", policy_path.display())).emit("canon demo init", json);
+        return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", policy_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon demo init", json);
     }
 
     if let Err(e) = write_evidence(repo, "dev-agent", "dev") {
-        return CliError::refused("WRITE_FAILED", format!("failed to seed dev evidence: {e}")).emit("canon demo init", json);
+        return CliError::refused("WRITE_FAILED", format!("failed to seed dev evidence: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon demo init", json);
     }
 
     crate::say!(json, "canon demo: scaffolded a throwaway evidence loop in `{}`.", repo.display());
@@ -115,11 +115,11 @@ pub fn run_demo_init(repo: &Path, json: bool) -> i32 {
 pub fn run_demo_add(repo: &Path, json: bool) -> i32 {
     let root = resolve_repo_root(repo);
     if !root.join("canon.yaml").exists() {
-        return CliError::refused("DEMO_NOT_INITIALIZED", format!("no `canon.yaml` found under `{}` — run `canon demo init` first", root.display())).emit("canon demo add", json);
+        return CliError::refused("DEMO_NOT_INITIALIZED", format!("no `canon.yaml` found under `{}` — run `canon demo init` first", root.display())).hint("run `canon demo init` first, or pass --repo <the demo directory>").emit("canon demo add", json);
     }
 
     if let Err(e) = write_evidence(&root, "reviewer-agent", "reviewer") {
-        return CliError::refused("WRITE_FAILED", format!("failed to record reviewer evidence: {e}")).emit("canon demo add", json);
+        return CliError::refused("WRITE_FAILED", format!("failed to record reviewer evidence: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon demo add", json);
     }
 
     crate::say!(json, "canon demo: recorded the reviewer's evidence for scenario `{DEMO_SCENARIO}`.");

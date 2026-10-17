@@ -145,10 +145,6 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
                 cwd = scratch.path().join("fresh");
                 std::fs::create_dir_all(&cwd).unwrap();
             }
-            "demo attest" => {
-                ok(scratch.path(), home.path(), &["demo", "init", "--repo", "canon-demo"]);
-                cwd = scratch.path().join("canon-demo");
-            }
             _ => {}
         }
         let mut argv = words(example);

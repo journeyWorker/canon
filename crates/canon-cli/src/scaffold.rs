@@ -334,7 +334,7 @@ struct Planner {
 
 impl Planner {
     fn new(repo_root: &Path) -> Result<Self, CliError> {
-        let roots = SyncCtx::from_repo(repo_root).and_then(|ctx| ctx.spec_roots(None)).map_err(|e| CliError::refused("CONFIG_UNREADABLE", e.to_string()))?;
+        let roots = SyncCtx::from_repo(repo_root).and_then(|ctx| ctx.spec_roots(None)).map_err(|e| CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again"))?;
         let corpus = roots.iter().map(|root| corpus_tags(&root.root)).collect();
         Ok(Self { repo_root: repo_root.to_path_buf(), roots, corpus, flows: HashMap::new() })
     }
@@ -347,13 +347,13 @@ impl Planner {
                 let key = (spec.subject.as_ref().map(|s| s.as_str().to_string()), spec.change.as_ref().map(|c| c.as_str().to_string()), flow.clone());
                 let repo_root = &self.repo_root;
                 let found = self.flows.entry(key).or_insert_with(|| crate::brief_check::flow_tag_value(repo_root, spec.subject.as_ref(), spec.change.as_ref(), flow)).clone();
-                Some(found.map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).field("flow"))?)
+                Some(found.map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).hint("`canon schema scenario new` lists the accepted arguments and their forms").field("flow"))?)
             }
         };
         for (axis, value) in [("lane", spec.lane.as_deref()), ("case", spec.case.as_deref())] {
             if let Some(value) = value {
                 if let Some(violation) = crate::subject::enum_membership_violation(&self.repo_root, axis, value) {
-                    return Err(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", violation).field(axis));
+                    return Err(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", violation).hint("`canon schema scenario new` lists the accepted arguments and their forms").field(axis));
                 }
             }
         }
@@ -369,7 +369,7 @@ impl Planner {
                 // own root selection — the SAME [`resolve_spec_root`], so
                 // `--project` means one thing across both commands and an
                 // unresolvable root is never guessed at.
-                let root = resolve_spec_root("canon scenario new", &self.roots, spec.project.as_ref()).map_err(|msg| CliError::refused("SPEC_ROOT_UNRESOLVED", msg).field("project"))?;
+                let root = resolve_spec_root("canon scenario new", &self.roots, spec.project.as_ref()).map_err(|msg| CliError::refused("SPEC_ROOT_UNRESOLVED", msg).hint("pass --project <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").field("project"))?;
                 resolve_feature_path(root, tag.area(), tag.surface())
             }
             Some(feature) => {
@@ -378,14 +378,14 @@ impl Planner {
                     return Err(CliError::refused("FEATURE_OUTSIDE_SPEC_ROOTS", format!("`{}` does not resolve under any configured `specs.roots[]` entry ({}); never a silent orphan write outside the validated corpus",
                         resolved.display(),
                         self.roots.iter().map(|r| r.root.display().to_string()).collect::<Vec<_>>().join(", ")
-                    )).field("feature"));
+                    )).hint("put the file under a configured `specs.roots[]` entry, or add its root to canon.yaml").field("feature"));
                 }
                 resolved
             }
         };
         for root in self.roots.iter().filter(|root| path_under_root(&feature_path, &root.root)) {
             if let Err(msg) = refuse_pre_0_17(&self.repo_root, root) {
-                return Err(CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg));
+                return Err(CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg).hint("run `canon migrate` to move the repository to the current layout"));
             }
         }
 
@@ -395,12 +395,12 @@ impl Planner {
                     tag.as_str(),
                     root.id.as_str(),
                     root.root.display()
-                )).field("id"));
+                )).hint("choose an unused scenario id; `canon inventory sync` refreshes the index of the existing ones").field("id"));
             }
         }
 
         let existing = if feature_path.exists() {
-            fs::read_to_string(&feature_path).map_err(|e| CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", feature_path.display())))?
+            fs::read_to_string(&feature_path).map_err(|e| CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", feature_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root"))?
         } else {
             String::new()
         };
@@ -410,7 +410,7 @@ impl Planner {
         // `.feature` file that already carries" the tag, the SAME target
         // file, regardless of corpus-root config.
         if canon_fmt::gherkin::scan(&existing).scenario_ids.iter().any(|t| t == tag.as_str()) {
-            return Err(CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists in `{}`; never a silent duplicate", tag.as_str(), feature_path.display())).field("id"));
+            return Err(CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists in `{}`; never a silent duplicate", tag.as_str(), feature_path.display())).hint("choose an unused scenario id; `canon inventory sync` refreshes the index of the existing ones").field("id"));
         }
         Ok(Planned { feature_path, flow_tag, existing })
     }
@@ -437,9 +437,9 @@ fn stage(pending: &mut Vec<Pending>, planned: Planned, spec: &ScenarioSpec, prov
 fn write_pending(pending: &[Pending]) -> Result<(), CliError> {
     for file in pending {
         if let Some(parent) = file.path.parent() {
-            fs::create_dir_all(parent).map_err(|e| CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())))?;
+            fs::create_dir_all(parent).map_err(|e| CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).hint("check that the path is writable and the disk has room, then run the command again"))?;
         }
-        fs::write(&file.path, &file.content).map_err(|e| CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", file.path.display())))?;
+        fs::write(&file.path, &file.content).map_err(|e| CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", file.path.display())).hint("check that the path is writable and the disk has room, then run the command again"))?;
     }
     Ok(())
 }
@@ -511,10 +511,10 @@ impl BatchLine {
     /// The same grammar checks the single form's clap parsers make.
     fn into_spec(self) -> Result<ScenarioSpec, CliError> {
         fn field<T>(name: &'static str, parsed: Result<T, String>) -> Result<T, CliError> {
-            parsed.map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).field(name))
+            parsed.map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).hint("`canon schema scenario new` lists the accepted arguments and their forms").field(name))
         }
         if self.change.is_some() && self.flow.is_none() {
-            return Err(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", "`change` needs `flow`").field("change"));
+            return Err(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", "`change` needs `flow`").hint("`canon schema scenario new` lists the accepted arguments and their forms").field("change"));
         }
         Ok(ScenarioSpec {
             tag: field("id", parse_scenario_tag(&self.id))?,
@@ -565,11 +565,11 @@ pub fn run_scenario_batch(repo: &Path, source: &str, actor: &Actor, at: DateTime
     };
     let text = match text {
         Ok(text) => text,
-        Err(e) => return CliError::refused("REPO_UNREADABLE", format!("--from {source}: {e}")).field("from").emit(COMMAND, json),
+        Err(e) => return CliError::refused("REPO_UNREADABLE", format!("--from {source}: {e}")).hint("check that the repository is readable from here, or pass --repo <path> for its root").field("from").emit(COMMAND, json),
     };
     let lines: Vec<(usize, &str)> = text.lines().enumerate().map(|(i, l)| (i + 1, l.trim())).filter(|(_, l)| !l.is_empty() && !l.starts_with('#')).collect();
     if lines.is_empty() {
-        return CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("--from {source} holds no scenario line (one JSON object per line)")).field("from").emit(COMMAND, json);
+        return CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("--from {source} holds no scenario line (one JSON object per line)")).hint("`canon schema scenario new` lists the accepted arguments and their forms").field("from").emit(COMMAND, json);
     }
 
     let repo_root = resolve_repo_root(repo);
@@ -585,18 +585,18 @@ pub fn run_scenario_batch(repo: &Path, source: &str, actor: &Actor, at: DateTime
         let value: serde_json::Value = match serde_json::from_str(raw) {
             Ok(value) => value,
             Err(e) => {
-                bad.push(BadLine { line: *line, id: None, error: CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("not a JSON object: {e}")) });
+                bad.push(BadLine { line: *line, id: None, error: CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("not a JSON object: {e}")).hint("`canon schema scenario new` lists the accepted arguments and their forms") });
                 continue;
             }
         };
         let id = value.get("id").and_then(|v| v.as_str()).map(str::to_string);
         let planned = serde_json::from_value::<BatchLine>(value)
-            .map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e.to_string()))
+            .map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e.to_string()).hint("`canon schema scenario new` lists the accepted arguments and their forms"))
             .and_then(BatchLine::into_spec)
             .and_then(|spec| {
                 let planned = planner.plan(&spec)?;
                 match seen.get(spec.tag.as_str()) {
-                    Some(first) => Err(CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` repeats line {first} of this batch; never a silent duplicate", spec.tag.as_str())).field("id")),
+                    Some(first) => Err(CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` repeats line {first} of this batch; never a silent duplicate", spec.tag.as_str())).hint("choose an unused scenario id; `canon inventory sync` refreshes the index of the existing ones").field("id")),
                     None => Ok((spec, planned)),
                 }
             });
@@ -688,18 +688,18 @@ pub fn run_feature_new(
     let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
         Ok(roots) => roots,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon feature new", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon feature new", json);
         }
     };
     let root = match resolve_spec_root("canon feature new", &roots, project) {
         Ok(root) => root,
         Err(msg) => {
-            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.to_string()).emit("canon feature new", json);
+            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.to_string()).hint("pass --project <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").emit("canon feature new", json);
         }
     };
 
     if let Err(msg) = refuse_pre_0_17(&repo_root, root) {
-        return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.to_string()).emit("canon feature new", json);
+        return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.to_string()).hint("run `canon migrate` to move the repository to the current layout").emit("canon feature new", json);
     }
 
     let feature_path = resolve_feature_path(root, &area_surface.area, &area_surface.surface);
@@ -712,7 +712,7 @@ pub fn run_feature_new(
 
     if let Some(parent) = feature_path.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
-            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).emit("canon feature new", json);
+            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon feature new", json);
         }
     }
 
@@ -735,14 +735,14 @@ pub fn run_feature_new(
                 0
             }
             Err(e) => {
-                CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", feature_path.display())).emit("canon feature new", json)
+                CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", feature_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon feature new", json)
             }
         },
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            CliError::refused("FEATURE_EXISTS", format!("`{}` already exists; never overwriting an existing feature file", feature_path.display())).emit("canon feature new", json)
+            CliError::refused("FEATURE_EXISTS", format!("`{}` already exists; never overwriting an existing feature file", feature_path.display())).hint("choose another area.surface, or edit the existing feature file").emit("canon feature new", json)
         }
         Err(e) => {
-            CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", feature_path.display())).emit("canon feature new", json)
+            CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", feature_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon feature new", json)
         }
     }
 }

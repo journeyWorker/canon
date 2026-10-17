@@ -126,8 +126,8 @@ impl ScopeError {
     /// `--status` the values the queried kind accepts.
     pub fn to_cli_error(&self) -> CliError {
         match self {
-            ScopeError::UnsupportedKind { flag, .. } => CliError::refused("QUERY_INVALID_ARGUMENT", self.to_string()).field(*flag),
-            ScopeError::InvalidStatus { valid, .. } => CliError::refused("QUERY_INVALID_ARGUMENT", self.to_string()).field("--status").expected(valid.iter().cloned()),
+            ScopeError::UnsupportedKind { flag, .. } => CliError::refused("QUERY_INVALID_ARGUMENT", self.to_string()).hint("`canon schema query` lists the accepted filters and their values").field(*flag),
+            ScopeError::InvalidStatus { valid, .. } => CliError::refused("QUERY_INVALID_ARGUMENT", self.to_string()).hint("`canon schema query` lists the accepted filters and their values").field("--status").expected(valid.iter().cloned()),
         }
     }
 }

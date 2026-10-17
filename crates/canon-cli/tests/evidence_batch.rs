@@ -557,7 +557,7 @@ fn review_add_81_a_batch_with_an_unindexed_scenario_writes_nothing() {
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(
         stderr(&out),
-        "canon review add: REVIEW_SCENARIO_NOT_INDEXED — no scenario record for `shop.cart.77` in spec root `root`; a review pins the scenario it saw, so index it first (`canon inventory sync`) (nothing is written for any of the scenarios)\n"
+        "canon review add: REVIEW_SCENARIO_NOT_INDEXED — no scenario record for `shop.cart.77` in spec root `root`; a review pins the scenario it saw, so index it first (`canon inventory sync`) (nothing is written for any of the scenarios)\nhint: run `canon inventory sync`, then run `canon review add` again\n"
     );
     assert!(reviews(repo).is_empty());
 

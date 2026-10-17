@@ -1,8 +1,8 @@
-//! 0.21 D1 + D3 through the real binary: the renamed commands keep running
-//! for one release with a warning and `meta.deprecated`, `schema` hides them
-//! unless `--all`, `subject status <id> --to <state>` replaces the two-positional
-//! form, and a declared role (`CANON_ROLE` / `--as`) narrows `schema` and
-//! defaults `--role` on `evidence add`.
+//! The 0.22 grammar through the real binary: the 0.21 deprecated forms are
+//! gone (clap usage errors), `schema` carries no deprecation, `subject status
+//! <id> --to <state>` is the only transition form, and a declared role
+//! (`CANON_ROLE` / `--as`) narrows `schema` and defaults `--role` on
+//! `evidence add`.
 
 use std::path::Path;
 use std::process::{Command, Output};
@@ -72,89 +72,44 @@ fn repo_with_manifest() -> tempfile::TempDir {
     dir
 }
 
-fn warning(old: &str, new: &str) -> String {
-    format!("canon {old}: deprecated — use canon {new}")
-}
-
-fn deprecated_meta(out: &Output, replacement: &str) {
-    assert_eq!(json_of(out)["meta"]["deprecated"], json!({ "use": replacement, "removedIn": "0.22.0" }), "{}", stdout(out));
-}
-
-// ── D1: deprecated forms ──
+// ── D7: the 0.21 deprecations are gone; the new forms are the only forms ──
 
 #[test]
-fn context_pack_create_still_runs_warns_and_names_its_replacement() {
+fn the_removed_command_names_are_clap_usage_errors() {
     let dir = repo_with_manifest();
-    let old = canon(dir.path(), &["context-pack", "create", "--manifest", "manifest.json", "--json"]);
-    assert!(old.status.success(), "{}{}", stdout(&old), stderr(&old));
-    assert!(stderr(&old).contains(&warning("context-pack create", "context-pack new")), "{}", stderr(&old));
-    deprecated_meta(&old, "context-pack new");
-    assert!(json_of(&old)["data"]["id"].as_str().is_some_and(|id| id.starts_with("sha256:")), "{}", stdout(&old));
-
-    let new = ok(dir.path(), &["context-pack", "new", "--manifest", "manifest.json", "--json"]);
-    assert!(!stderr(&new).contains("deprecated"), "{}", stderr(&new));
-    assert!(json_of(&new)["meta"].get("deprecated").is_none(), "{}", stdout(&new));
-    assert!(json_of(&new)["data"]["id"].as_str().is_some_and(|id| id.starts_with("sha256:")), "{}", stdout(&new));
-}
-
-#[test]
-fn prompt_register_still_runs_warns_and_names_its_replacement() {
-    let dir = repo_with_manifest();
-    let old = canon(dir.path(), &["prompt", "register", "--name", "reviewer", "--version", "v1", "--manifest", "manifest.json", "--json"]);
-    assert!(old.status.success(), "{}{}", stdout(&old), stderr(&old));
-    assert!(stderr(&old).contains(&warning("prompt register", "prompt add")), "{}", stderr(&old));
-    deprecated_meta(&old, "prompt add");
-
-    let new = ok(dir.path(), &["prompt", "add", "--name", "reviewer", "--version", "v2", "--manifest", "manifest.json", "--json"]);
-    assert!(!stderr(&new).contains("deprecated"), "{}", stderr(&new));
-    assert!(json_of(&new)["meta"].get("deprecated").is_none(), "{}", stdout(&new));
-}
-
-#[test]
-fn divergence_stage_still_runs_warns_and_names_its_replacement() {
-    let dir = repo_with_scenario();
-    let sha = "a".repeat(40);
-    let args = |verb: &str, round: &str| -> Vec<String> {
-        ["divergence", verb, "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", round, "--reviewer", "r", "--role", "reviewer", "--json"].map(str::to_string).to_vec()
-    };
-    let run = |args: Vec<String>| canon(dir.path(), &args.iter().map(String::as_str).collect::<Vec<_>>());
-    let old = run(args("stage", "1"));
-    assert!(old.status.success(), "{}{}", stdout(&old), stderr(&old));
-    assert!(stderr(&old).contains(&warning("divergence stage", "divergence add")), "{}", stderr(&old));
-    deprecated_meta(&old, "divergence add");
-
-    let new = run(args("add", "2"));
-    assert!(new.status.success(), "{}{}", stdout(&new), stderr(&new));
-    assert!(!stderr(&new).contains("deprecated"), "{}", stderr(&new));
-    assert!(json_of(&new)["meta"].get("deprecated").is_none(), "{}", stdout(&new));
-}
-
-#[test]
-fn demo_attest_still_runs_warns_and_names_its_replacement() {
-    let dir = tempfile::tempdir().unwrap();
-    let demo = dir.path().join("demo");
-    ok(dir.path(), &["demo", "init", "--repo", demo.to_str().unwrap()]);
-    let old = canon(dir.path(), &["demo", "attest", "--repo", demo.to_str().unwrap(), "--json"]);
-    assert!(old.status.success(), "{}{}", stdout(&old), stderr(&old));
-    assert!(stderr(&old).contains(&warning("demo attest", "demo add")), "{}", stderr(&old));
-    deprecated_meta(&old, "demo add");
-
-    let new = ok(dir.path(), &["demo", "add", "--repo", demo.to_str().unwrap(), "--json"]);
-    assert!(!stderr(&new).contains("deprecated"), "{}", stderr(&new));
-    assert!(json_of(&new)["meta"].get("deprecated").is_none(), "{}", stdout(&new));
-}
-
-#[test]
-fn the_old_forms_are_hidden_from_help() {
-    let dir = tempfile::tempdir().unwrap();
-    for (group, old, new) in [("context-pack", "create", "new"), ("prompt", "register", "add"), ("divergence", "stage", "add"), ("demo", "attest", "add")] {
-        let help = stdout(&canon(dir.path(), &[group, "--help"]));
-        assert!(!help.lines().any(|l| l.trim_start().starts_with(old)), "{group} --help lists `{old}`:\n{help}");
-        assert!(help.lines().any(|l| l.trim_start().starts_with(new)), "{group} --help lacks `{new}`:\n{help}");
+    for args in [
+        &["context-pack", "create", "--manifest", "manifest.json"][..],
+        &["prompt", "register", "--name", "r", "--version", "v1", "--manifest", "manifest.json"],
+        &["divergence", "stage", "--project-id", "root"],
+        &["demo", "attest"],
+    ] {
+        let mut argv = args.to_vec();
+        argv.push("--json");
+        let out = canon(dir.path(), &argv);
+        assert_eq!(out.status.code(), Some(2), "canon {args:?}: {}{}", stdout(&out), stderr(&out));
+        let error = &json_of(&out)["error"];
+        assert_eq!(error["code"], "USAGE", "canon {args:?}: {}", stdout(&out));
+        assert!(error["message"].as_str().unwrap_or_default().contains("unrecognized subcommand"), "canon {args:?}: {}", stdout(&out));
     }
 }
 
-// ── D1: schema ──
+#[test]
+fn the_new_forms_run_without_any_deprecation_marker() {
+    let dir = repo_with_manifest();
+    let pack = ok(dir.path(), &["context-pack", "new", "--manifest", "manifest.json", "--json"]);
+    assert!(json_of(&pack)["data"]["id"].as_str().is_some_and(|id| id.starts_with("sha256:")), "{}", stdout(&pack));
+    assert!(json_of(&pack)["meta"].get("deprecated").is_none(), "{}", stdout(&pack));
+    ok(dir.path(), &["prompt", "add", "--name", "reviewer", "--version", "v2", "--manifest", "manifest.json", "--json"]);
+
+    let scenario = repo_with_scenario();
+    let sha = "a".repeat(40);
+    ok(scenario.path(), &["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer", "--json"]);
+
+    let tmp = tempfile::tempdir().unwrap();
+    let demo = tmp.path().join("demo");
+    ok(tmp.path(), &["demo", "init", "--repo", demo.to_str().unwrap()]);
+    ok(tmp.path(), &["demo", "add", "--repo", demo.to_str().unwrap(), "--json"]);
+}
 
 fn listed(out: &Output) -> Vec<Value> {
     json_of(out)["data"]["commands"].as_array().expect("a command listing").clone()
@@ -165,22 +120,20 @@ fn names(commands: &[Value]) -> Vec<&str> {
 }
 
 #[test]
-fn schema_hides_deprecated_commands_unless_all_and_shows_the_replacement() {
+fn schema_lists_neither_removed_commands_nor_deprecation_fields() {
     let dir = tempfile::tempdir().unwrap();
-    let bare = listed(&canon(dir.path(), &["schema", "--json"]));
     let all = listed(&canon(dir.path(), &["schema", "--all", "--json"]));
-    for (old, new) in [("context-pack create", "context-pack new"), ("prompt register", "prompt add"), ("divergence stage", "divergence add"), ("demo attest", "demo add")] {
-        assert!(!names(&bare).contains(&old), "bare schema lists deprecated `{old}`");
-        assert!(names(&bare).contains(&new), "bare schema lacks `{new}`");
-        let entry = all.iter().find(|c| c["command"] == old).unwrap_or_else(|| panic!("--all lacks `{old}`"));
-        assert_eq!(entry["deprecated"], json!({ "use": new, "removedIn": "0.22.0" }));
-        assert_eq!(entry["effect"], "write", "a deprecated command answers with its replacement's effect");
+    for old in ["context-pack create", "prompt register", "divergence stage", "demo attest"] {
+        assert!(!names(&all).contains(&old), "--all still lists removed `{old}`");
+        let out = canon(dir.path(), &["schema", old, "--json"]);
+        assert_eq!(out.status.code(), Some(2), "schema {old}: {}", stderr(&out));
     }
-    assert!(bare.iter().all(|c| c.get("deprecated").is_none()));
-
-    let one = json_of(&canon(dir.path(), &["schema", "demo", "attest", "--json"]));
-    assert_eq!(one["data"]["deprecated"], json!({ "use": "demo add", "removedIn": "0.22.0" }));
-    assert_eq!(one["data"]["errorCodes"], json_of(&canon(dir.path(), &["schema", "demo", "add", "--json"]))["data"]["errorCodes"]);
+    for new in ["context-pack new", "prompt add", "divergence add", "demo add"] {
+        assert!(names(&all).contains(&new), "--all lacks `{new}`");
+    }
+    assert!(all.iter().all(|c| c.get("deprecated").is_none()));
+    let one = json_of(&canon(dir.path(), &["schema", "demo", "add", "--json"]));
+    assert!(one["data"].get("deprecated").is_none(), "{one}");
 }
 
 #[test]
@@ -223,16 +176,13 @@ fn subject_status_to_transitions_and_without_to_shows() {
 }
 
 #[test]
-fn the_two_positional_subject_status_form_warns_and_still_transitions() {
+fn the_two_positional_subject_status_form_is_a_usage_error_and_changes_nothing() {
     let dir = subject_repo();
-    let old = ok(dir.path(), &["subject", "status", "demo", "specced", "--json"]);
-    assert!(stderr(&old).contains(&warning("subject status <id> <state>", "subject status <id> --to <state>")), "{}", stderr(&old));
-    deprecated_meta(&old, "subject status <id> --to <state>");
+    let old = canon(dir.path(), &["subject", "status", "demo", "specced", "--json"]);
+    assert_eq!(old.status.code(), Some(2), "{}", stderr(&old));
+    assert_eq!(json_of(&old)["error"]["code"], "USAGE", "{}", stdout(&old));
     let shown = ok(dir.path(), &["subject", "status", "demo"]);
-    assert!(stdout(&shown).contains("(dev, specced)"), "the deprecated form transitioned the subject: {}", stdout(&shown));
-
-    let both = canon(dir.path(), &["subject", "status", "demo", "building", "--to", "building"]);
-    assert_eq!(both.status.code(), Some(2), "{}", stderr(&both));
+    assert!(stdout(&shown).contains("(dev, proposed)"), "the refused form must not transition the subject: {}", stdout(&shown));
 }
 
 // ── D3: roles ──

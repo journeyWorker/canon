@@ -178,7 +178,7 @@ pub fn run_selftest(json: bool) -> ExitCode {
         let mut summary = serde_json::json!({ "clean": report.is_clean(), "suites": suites });
         if !report.is_clean() {
             // The failure keeps this command's own shape and gains the shared `error`.
-            let error = crate::cli_error::CliError::failed("SELFTEST_FAILED", "a selftest suite did not pass against its fixtures");
+            let error = crate::cli_error::CliError::failed("SELFTEST_FAILED", "a selftest suite did not pass against its fixtures").hint("the fixtures that differ are listed above; this is a canon defect, so report it with the output");
             eprintln!("{}", error.human("canon selftest"));
             summary["error"] = error.to_json()["error"].clone();
         }

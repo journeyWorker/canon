@@ -1,1 +1,2 @@
 canon init: INIT_CONFIG_EXISTS — `./canon.yaml` already exists; never overwriting an existing config
+hint: keep the existing canon.yaml and check it with `canon init --check-config`, or remove it first to start over
