@@ -966,16 +966,9 @@ fn an_unavailable_review_is_a_gap_at_the_gate_and_the_status_guard() {
     assert_eq!(current_subject(dir.path())["status"], "building", "an unavailable review approves nothing");
 }
 
-/// gate.check.40 (0.23): a review written before 0.23 pinning (planted by
-/// hand, no `pins` or `outcome` keys) does not count: the ship guard and
-/// `canon gate check` refuse naming `canon migrate`, and `canon gate check`,
-/// `canon subject status` and `canon status` each print the one advisory
-/// line counting the scenarios whose review waits for it.
-#[test]
-fn an_unmigrated_review_does_not_count_and_every_surface_names_migrate() {
-    let dir = repo();
-    write_policy(dir.path(), REQUIRE_REVIEW);
-    seed_attested_subject(dir.path());
+/// A review of `world.demo.01` as written before 0.23 pinning (planted by
+/// hand, no `pins` or `outcome` keys).
+fn plant_unpinned_review(repo: &Path) {
     let legacy = serde_json::json!({
         "schema": 1,
         "kind": "review",
@@ -988,11 +981,26 @@ fn an_unmigrated_review_does_not_count_and_every_surface_names_migrate() {
         "provenance_ref": {"original_spec_ref": "specs/demo.feature"},
     });
     let relative = canon_store::partition::expected_relative_path(RecordKind::Review, &legacy).unwrap();
-    let path = dir.path().join(".canon/ledger").join(relative);
+    let path = repo.join(".canon/ledger").join(relative);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(&path, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
+}
 
-    let advisory = "1 scenario(s) have a review that predates 0.23 review pinning (world.demo.01); such a review does not count until `canon migrate` rewrites it to what the evidence says";
+const UNMIGRATED_ADVISORY: &str = "1 scenario(s) have a review that predates 0.23 review pinning (world.demo.01); such a review does not count until `canon migrate` rewrites it to what the evidence says";
+
+/// gate.check.40 (0.23): a review written before 0.23 pinning (planted by
+/// hand, no `pins` or `outcome` keys) does not count: the ship guard and
+/// `canon gate check` refuse naming `canon migrate`, and `canon gate check`,
+/// `canon subject status` and `canon status` each print the one advisory
+/// line counting the scenarios whose review waits for it.
+#[test]
+fn an_unmigrated_review_does_not_count_and_every_surface_names_migrate() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject(dir.path());
+    plant_unpinned_review(dir.path());
+
+    let advisory = UNMIGRATED_ADVISORY;
     let guard = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
     assert_eq!(guard.status.code(), Some(1), "the unpinned review does not count: {}", stderr(&guard));
     assert!(stderr(&guard).contains(&format!("canon subject status: advisory: {advisory}\n")), "{}", stderr(&guard));
@@ -1006,6 +1014,38 @@ fn an_unmigrated_review_does_not_count_and_every_surface_names_migrate() {
     let status = run(dir.path(), &["status"]);
     assert_eq!(status.status.code(), Some(0));
     assert!(stdout(&status).contains(&format!("warning: {advisory}\n")), "{}", stdout(&status));
+}
+
+/// review.add.61 (0.23): the status guard judges a review that predates
+/// 0.23 pinning as the gate does: it refuses with the gate's detail naming
+/// `canon migrate` and prints the advisory, `canon status` counts the
+/// scenario as a stale review, and once the scenario is reviewed again the
+/// same move goes through.
+#[test]
+fn review_add_61_the_guard_and_status_judge_a_review_that_predates_pinning_as_the_gate_does() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject(dir.path());
+    plant_unpinned_review(dir.path());
+
+    let guard = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
+    assert_eq!(guard.status.code(), Some(1), "{}", stderr(&guard));
+    let err = stderr(&guard);
+    assert!(err.contains("unreviewed-promotion world.demo.01 — building → verifying:") && err.contains("predates 0.23 review pinning") && err.contains("`canon migrate`"), "{err}");
+    assert!(err.contains(&format!("canon subject status: advisory: {UNMIGRATED_ADVISORY}\n")), "{err}");
+    assert_eq!(current_subject(dir.path())["status"], "building");
+
+    let report: Value = serde_json::from_str(&stdout(&run(dir.path(), &["status", "--json"]))).unwrap();
+    let subject = report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo-subject").unwrap().clone();
+    assert_eq!((subject["reviewed"].as_u64(), subject["staleReviews"].as_u64()), (Some(0), Some(1)), "counted as a stale review: {subject}");
+    let text = stdout(&run(dir.path(), &["status"]));
+    assert!(text.contains("1 stale review(s)"), "{text}");
+
+    let review = review_via_cli(dir.path(), "reviewer-2", Some("sess-review"));
+    assert!(review.status.success(), "{}", stderr(&review));
+    let moved = run(dir.path(), &["subject", "status", "demo-subject", "--to", "verifying"]);
+    assert!(moved.status.success(), "reviewed again, the move goes through: {}", stderr(&moved));
+    assert_eq!(current_subject(dir.path())["status"], "verifying");
 }
 
 // ── the ship guard needs the approved brief (0.16 D1) ──

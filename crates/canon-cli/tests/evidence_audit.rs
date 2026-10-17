@@ -144,6 +144,34 @@ fn a_reattest_binds_exactly_the_files_it_names() {
     assert!(report.get("drops").is_none(), "status reports no drops: {report}");
 }
 
+/// evidence.add.41 (0.23 D1): binding a screenshot again with new bytes on
+/// the single-scenario path binds it at its new digest, and nothing else:
+/// the log the earlier record bound is not carried.
+#[test]
+fn evidence_add_41_a_rebound_screenshot_binds_its_new_digest_and_nothing_else() {
+    let dir = setup();
+    let repo = dir.path();
+    scenario(repo, "game.run.01", None);
+    write(repo, "reports/shot.png", b"first frame");
+    write(repo, "reports/run.log", b"ok");
+    record(repo, &attest_args("game.run.01", &["--artifact", "reports/shot.png", "--artifact", "reports/run.log"]));
+    let first = committed(repo).pop().unwrap();
+    let sha_of = |record: &serde_json::Value, path: &str| record["attachments"].as_array().unwrap().iter().find(|a| a["path"] == path).map(|a| a["sha256"].clone());
+    let old_digest = sha_of(&first, "reports/shot.png").expect("the first record binds the screenshot");
+    assert!(sha_of(&first, "reports/run.log").is_some(), "{first}");
+
+    write(repo, "reports/shot.png", b"second frame, retaken");
+    record(repo, &attest_args("game.run.01", &["--artifact", "reports/shot.png"]));
+    let latest = committed(repo).pop().unwrap();
+    assert_ne!(latest["at"], first["at"], "the later record is the latest: {latest}");
+    let paths: Vec<&str> = latest["attachments"].as_array().unwrap().iter().map(|a| a["path"].as_str().unwrap()).collect();
+    assert_eq!(paths, ["reports/shot.png"], "the screenshot alone, the log is not carried: {latest}");
+    let expected = format!("{:x}", Sha256::digest(b"second frame, retaken"));
+    let new_digest = sha_of(&latest, "reports/shot.png").unwrap();
+    assert_eq!(new_digest, serde_json::Value::String(expected), "{latest}");
+    assert_ne!(new_digest, old_digest, "new bytes, new digest");
+}
+
 /// evidence.add.43 (0.23 D1): the drop flags no longer exist.
 #[test]
 fn the_drop_flags_are_refused_as_unknown() {
