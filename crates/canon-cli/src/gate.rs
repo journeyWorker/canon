@@ -114,7 +114,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon gate check", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon gate check", json);
         }
     };
     let registry = SchemaRegistry::load();
@@ -127,7 +127,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     let mut gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon gate check", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate check", json);
         }
     };
     crate::inventory::resolve_legacy_pins(&mut gate_context);
@@ -136,7 +136,15 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     // An index the `.feature` edits are not in grades specs that no longer
     // exist (0.16 M6): fail closed, one violation per unrefreshable root.
     let unrefreshable = crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation(""));
-    let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).collect());
+    // A chore approved on a subject asks for the suite again (0.22 D2): a
+    // subject past `building` with evidenced scenarios and none newer.
+    let reverify = canon_gate::spec_coverage::latest_subjects(&gate_context)
+        .into_iter()
+        .filter(|s| matches!(s.status, canon_model::SubjectStatus::Verifying | canon_model::SubjectStatus::Shipped))
+        .flat_map(|s| crate::reverify::chore_violations(&repo, &gate_context, s))
+        .collect::<Vec<_>>();
+    // An approval that no longer holds fails closed (0.22 D3); a policy never approved is only an advisory below.
+    let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).chain(reverify).chain(crate::policy_approval::violation(&repo)).collect());
     let mut advisories: Vec<serde_json::Value> = Vec::new();
     let advisory = |kind: &str, message: String, items: Vec<String>| serde_json::json!({ "kind": kind, "message": message, "items": items });
     crate::say_raw!(json, "{}", format_gate_report(&report));
@@ -144,7 +152,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         crate::say_raw!(json, "{}", format_coverage_off_advisory(count));
         advisories.push(advisory("spec_coverage_off", format!("{count} scenario(s) are not checked for evidence; see .canon/policy.yaml"), Vec::new()));
     }
-    if let Some(line) = crate::policy_approval::advisory(&repo) {
+    if let Some(line) = crate::policy_approval::advisory(&repo).filter(|_| crate::policy_approval::closed_failure(&repo).is_none()) {
         crate::say_raw!(json, "\nadvisory: {line}\n");
         advisories.push(advisory("policy_approval", line, Vec::new()));
     }
@@ -162,6 +170,12 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         if !review.is_empty() {
             advisories.push(advisory("review_waivers", format!("{} waived review gap(s) — not failing the gate", review.len()), review.iter().map(|a| a.line()).collect()));
         }
+    }
+    let accepted = canon_gate::acceptance::accepted_divergences(&gate_context);
+    if !accepted.is_empty() {
+        let lines: Vec<String> = accepted.iter().map(canon_gate::acceptance::Acceptance::line).collect();
+        crate::say_raw!(json, "{}", format_accepted_divergences(&lines));
+        advisories.push(advisory("accepted_divergence", format!("{} divergent scenario(s) accepted as known gaps — not failing the gate", lines.len()), lines));
     }
     if let Some(counts) = canon_gate::review_gate::legacy_review_advisory(&gate_context) {
         crate::say_raw!(json, "\nadvisory: {}\n", counts.note());
@@ -249,6 +263,20 @@ fn format_review_advisories(advisories: &[canon_gate::ReviewAdvisory]) -> String
     let mut out = format!("\nreview waivers: {} advisory(ies) — not failing the gate:\n", advisories.len());
     for advisory in advisories {
         out.push_str(&format!("  waived {}\n", advisory.line()));
+    }
+    out
+}
+
+/// Divergent scenarios a reviewer accepted as tracked known gaps
+/// (`canon divergence accept`, 0.22 D1): advisories, never violations,
+/// listed so an accepted gap is never silent. Prints nothing when empty.
+fn format_accepted_divergences(lines: &[String]) -> String {
+    if lines.is_empty() {
+        return String::new();
+    }
+    let mut out = format!("\naccepted divergences: {} known gap(s) — not failing the gate:\n", lines.len());
+    for line in lines {
+        out.push_str(&format!("  {line}\n"));
     }
     out
 }
@@ -382,7 +410,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let task_id = match TaskId::parse(task_id_str) {
         Ok(t) => t,
         Err(e) => {
-            return CliError::refused("GATE_TASK_INVALID_ARGUMENT", e.to_string()).emit("canon gate task", json);
+            return CliError::refused("GATE_TASK_INVALID_ARGUMENT", e.to_string()).hint("`canon schema gate task` lists the accepted arguments and their forms").emit("canon gate task", json);
         }
     };
 
@@ -394,21 +422,21 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let LocatedTask { write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
         Ok(located) => located,
         Err(e) => {
-            return CliError::refused("TASK_NOT_FOUND", e.to_string()).emit("canon gate task", json);
+            return CliError::refused("TASK_NOT_FOUND", e.to_string()).hint("task ids look like <change_id>#<n>; open the change's plan document to find the right number").emit("canon gate task", json);
         }
     };
 
     let document = match std::fs::read_to_string(&document_path) {
         Ok(d) => d,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", format!("cannot read {}: {e}", document_path.display())).emit("canon gate task", json);
+            return CliError::refused("REPO_UNREADABLE", format!("cannot read {}: {e}", document_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate task", json);
         }
     };
 
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon gate task", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon gate task", json);
         }
     };
     let registry = SchemaRegistry::load();
@@ -419,14 +447,14 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon gate task", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate task", json);
         }
     };
 
     let raw_records = match GitTier::new(gate_context.ctx.ledger_root.clone()).read(&TierQuery::kind(RecordKind::EvidenceRecord)) {
         Ok(read) => read.records,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon gate task", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate task", json);
         }
     };
 
@@ -443,7 +471,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
         Ok(Some(atom)) => match typed_path_evidence(&repo, &atom, &raw_records, &task_id) {
             Ok(pair) => pair,
             Err(e) => {
-                return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).emit("canon gate task", json);
+                return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon gate task", json);
             }
         },
         Ok(None) => {
@@ -451,13 +479,13 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
             let notes = match notes_of(same_task_id, &task_id) {
                 Ok(n) => n,
                 Err(e) => {
-                    return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).emit("canon gate task", json);
+                    return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon gate task", json);
                 }
             };
             (gate_context.evidence.clone(), notes)
         }
         Err(e) => {
-            return CliError::refused("TYPED_ATOMS_INVALID", e.to_string()).emit("canon gate task", json);
+            return CliError::refused("TYPED_ATOMS_INVALID", e.to_string()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again").emit("canon gate task", json);
         }
     };
 
@@ -476,7 +504,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let flip = match write_back.flip_task(&document, &task_id, approved_note.as_deref().unwrap_or("")) {
         Ok(o) => o,
         Err(e @ WriteBackError::RowNotFound(_)) => {
-            return CliError::failed("TASK_ROW_NOT_FOUND", e.to_string()).emit("canon gate task", json);
+            return CliError::failed("TASK_ROW_NOT_FOUND", e.to_string()).hint("check that the task number exists in the plan document; `canon ingest plans` re-reads the plans").emit("canon gate task", json);
         }
         // Gate-red, not usage (the variant's own doc): the offending
         // text came from an already-COMMITTED ledger record's approved
@@ -487,10 +515,10 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
         // authored some other way still cannot forge a second checked
         // row.
         Err(e @ WriteBackError::MultiLineEvidenceNote { .. }) => {
-            return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).emit("canon gate task", json);
+            return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon gate task", json);
         }
         Err(e @ WriteBackError::Unsupported { .. }) => {
-            return CliError::refused("GATE_TASK_UNSUPPORTED", e.to_string()).emit("canon gate task", json);
+            return CliError::refused("GATE_TASK_UNSUPPORTED", e.to_string()).hint("use a form the command supports (`canon schema gate task` lists the arguments)").emit("canon gate task", json);
         }
     };
 
@@ -508,7 +536,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     match decision {
         TaskFlipDecision::Approved { .. } => {
             if let Err(e) = std::fs::write(&document_path, &flip.document) {
-                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", document_path.display())).emit("canon gate task", json);
+                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", document_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate task", json);
             }
             crate::say!(json, "canon gate task: {task_id} flipped — {}", crate::write_mode::DIRECT);
             if let Some(warning) = canon_command_proof_warning(&task_id, &raw_records) {
@@ -520,7 +548,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
             0
         }
         TaskFlipDecision::Blocked { violations } => {
-            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(|v| v.line()).collect::<Vec<_>>().join("\n")).emit("canon gate task", json)
+            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(|v| v.line()).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task <id> ...`, then run `canon gate task` again").emit("canon gate task", json)
         }
     }
 }
@@ -657,8 +685,8 @@ impl TypedContractError {
     /// same two conditions.
     pub(crate) fn to_cli_error(&self) -> CliError {
         match self {
-            Self::Corpus(message) => CliError::refused("TYPED_ATOMS_INVALID", message.as_str()),
-            Self::Invalid(message) => CliError::failed("GATE_TASK_EVIDENCE_INVALID", message.as_str()),
+            Self::Corpus(message) => CliError::refused("TYPED_ATOMS_INVALID", message.as_str()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again"),
+            Self::Invalid(message) => CliError::failed("GATE_TASK_EVIDENCE_INVALID", message.as_str()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`"),
         }
     }
 }
@@ -814,7 +842,7 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon gate promote", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon gate promote", json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ctx.ledger_root));
@@ -839,7 +867,7 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
             }
         }
         Err(e) => {
-            CliError::refused("PROMOTE_FAILED", e.to_string()).emit("canon gate promote", json)
+            CliError::refused("PROMOTE_FAILED", e.to_string()).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`").emit("canon gate promote", json)
         }
     }
 }
@@ -960,7 +988,7 @@ pub(crate) fn try_promote(ledger_root: &Path, location: &str) -> Result<String, 
                 data: Some(promote_json(&report, false)),
             }),
         },
-        Err(e) => Err(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")), data: None }),
+        Err(e) => Err(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`"), data: None }),
     }
 }
 
@@ -1063,13 +1091,13 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     let claude_outcome = match install_into(&claude_path, &entry) {
         Ok(o) => o,
         Err(e) => {
-            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).emit("canon gate install-hooks", json);
+            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
         }
     };
     let codex_outcome = match install_into(&codex_path, &entry) {
         Ok(o) => o,
         Err(e) => {
-            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).emit("canon gate install-hooks", json);
+            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
         }
     };
 
@@ -1078,7 +1106,7 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
         let script_path = repo.join(paths::PRE_COMMIT_SCRIPT);
         if !script_path.exists() {
             if let Err(e) = write_pre_commit_script(&script_path) {
-                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).emit("canon gate install-hooks", json);
+                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate install-hooks", json);
             }
             script_written = true;
             crate::say!(json, "canon gate install-hooks: wrote {}", script_path.display());
@@ -1162,7 +1190,7 @@ pub fn run_selftest(json: bool) -> i32 {
             })
         })
         .collect();
-    CliError::failed("SELFTEST_FAILED", format!("{} fixture(s) did not match their expected violations", failures.len()))
+    CliError::failed("SELFTEST_FAILED", format!("{} fixture(s) did not match their expected violations", failures.len())).hint("the fixtures that differ are listed above; this is a canon defect, so report it with the output")
         .emit_with_data("canon gate selftest", json, serde_json::json!({ "clean": false, "failures": failures }))
 }
 

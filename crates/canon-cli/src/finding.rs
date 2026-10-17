@@ -524,19 +524,19 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).emit("canon finding add", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding add", args.json);
         }
     };
 
     if args.round == 0 || args.seq == 0 {
         return CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); a 0 would sort ahead of the first real finding in a key whose whole job is ordering rounds",
             args.round, args.seq
-        )).emit("canon finding add", args.json);
+        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").emit("canon finding add", args.json);
     }
 
     for (flag, value) in [("--reviewer", args.reviewer.as_str()), ("--summary", args.summary.as_str())] {
         if value.trim().is_empty() {
-            return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).emit("canon finding add", args.json);
+            return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
         }
     }
 
@@ -553,7 +553,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         ("--actor-id", Some(args.actor_id.as_str())),
     ] {
         let Some((offset, separator)) = value.and_then(first_row_line_break) else { continue };
-        return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).emit("canon finding add", args.json);
+        return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
     }
 
     // The coherence pair, as a NAMED diagnostic rather than a second
@@ -563,12 +563,12 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     // `malformed` record two commands later.
     match (args.disposition, &args.resolution_sha) {
         (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").field("--resolution-sha").emit("canon finding add", args.json);
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").hint("pass --resolution-sha <commit> (`git rev-parse HEAD` prints the current one), or choose another --disposition").field("--resolution-sha").emit("canon finding add", args.json);
         }
         (disposition, Some(sha)) if disposition != FindingDisposition::Fixed => {
             return CliError::refused("FINDING_RESOLUTION_SHA_UNEXPECTED", format!("--resolution-sha {sha} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the sha or set --disposition fixed",
                 disposition.as_str()
-            )).field("--resolution-sha").emit("canon finding add", args.json);
+            )).hint("drop --resolution-sha, or set --disposition fixed").field("--resolution-sha").emit("canon finding add", args.json);
         }
         _ => {}
     }
@@ -608,7 +608,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         // Unreachable: `(Fixed, None)` was refused above. Handled
         // rather than assumed away, and never by fabricating a sha.
         (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").field("--resolution-sha").emit("canon finding add", args.json);
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").hint("pass --resolution-sha <commit> (`git rev-parse HEAD` prints the current one), or choose another --disposition").field("--resolution-sha").emit("canon finding add", args.json);
         }
     };
     if let Some(sha) = shas.reviewed {
@@ -625,14 +625,14 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let natural_key = match resolve_partition(RecordKind::Finding, &body) {
         Ok(key) => key.natural_key,
         Err(violation) => {
-            return CliError::refused("FINDING_INVALID_ARGUMENT", violation.detail.to_string()).emit("canon finding add", args.json);
+            return CliError::refused("FINDING_INVALID_ARGUMENT", violation.detail.to_string()).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
         }
     };
 
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon finding add", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding add", args.json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
@@ -641,11 +641,11 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         Ok(Some(occupant)) => {
             return CliError::refused("FINDING_SEQ_OCCUPIED", format!("{} is already occupied by a {occupant} finding (`{}`, round {}, seq {}); pick the next free --seq rather than authoring a second record under one finding's identity. To move THAT finding's disposition instead, use `canon finding close`.",
                 natural_key, args.change_id, args.round, args.seq
-            )).emit("canon finding add", args.json);
+            )).hint("pick the next free --seq, or move the existing finding with `canon finding close`").emit("canon finding add", args.json);
         }
         Ok(None) => {}
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon finding add", args.json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon finding add", args.json);
         }
     }
 
@@ -687,7 +687,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
             settled.exit_code()
         }
         Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon finding add", args.json)
+            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon finding add", args.json)
         }
     }
 }
@@ -751,14 +751,14 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).emit("canon finding close", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding close", args.json);
         }
     };
 
     if args.round == 0 || args.seq == 0 {
         return CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); no finding was ever authored under a 0",
             args.round, args.seq
-        )).emit("canon finding close", args.json);
+        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").emit("canon finding close", args.json);
     }
 
     // The same coherence pair `add` enforces, in this command's own
@@ -767,12 +767,12 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     // correctly does not exist.
     match (args.disposition, &args.resolution_sha) {
         (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").field("--resolution-sha").emit("canon finding close", args.json);
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").hint("pass --resolution-sha <commit> (`git rev-parse HEAD` prints the current one), or choose another --disposition").field("--resolution-sha").emit("canon finding close", args.json);
         }
         (disposition, Some(sha)) if disposition != FindingDisposition::Fixed => {
             return CliError::refused("FINDING_RESOLUTION_SHA_UNEXPECTED", format!("--resolution-sha {sha} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the sha or set --disposition fixed",
                 disposition.as_str()
-            )).field("--resolution-sha").emit("canon finding close", args.json);
+            )).hint("drop --resolution-sha, or set --disposition fixed").field("--resolution-sha").emit("canon finding close", args.json);
         }
         _ => {}
     }
@@ -782,7 +782,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         Err(Unresolved::NoCommit) => {
             return CliError::refused("FINDING_UNRESOLVABLE_COMMIT", format!("--resolution-sha {} does not name a commit this repository holds; a resolution sha nobody can check out closes nothing",
                 args.resolution_sha.as_ref().expect("only a present flag can fail to resolve")
-            )).emit("canon finding close", args.json);
+            )).hint("pass the full sha of a commit this repository holds (`git rev-parse <rev>` prints it)").emit("canon finding close", args.json);
         }
         Err(Unresolved::Abbreviation(why)) => {
             return abbreviation_refusal("--resolution-sha", args.resolution_sha.as_ref().expect("only a present flag can fail to resolve"), &why).emit("canon finding close", args.json);
@@ -792,7 +792,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon finding close", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding close", args.json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
@@ -810,11 +810,11 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
                 args.round,
                 args.seq,
                 args.disposition.as_str()
-            )).emit("canon finding close", args.json);
+            )).hint("run `canon gate promote` first, then close the finding").emit("canon finding close", args.json);
         }
         Ok(None) => {}
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon finding close", args.json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon finding close", args.json);
         }
     }
 
@@ -823,10 +823,10 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         Ok(None) => {
             return CliError::refused("FINDING_NOT_FOUND", format!("no committed finding at (`{}`, round {}, seq {}). `close` moves an EXISTING finding's disposition; authoring a new one is `canon finding add`.",
                 args.change_id, args.round, args.seq
-            )).emit("canon finding close", args.json);
+            )).hint("`canon finding list` shows the committed findings; author a new one with `canon finding add`").emit("canon finding close", args.json);
         }
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon finding close", args.json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon finding close", args.json);
         }
     };
 
@@ -871,7 +871,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         // Unreachable: refused by the coherence pair above. Handled
         // rather than assumed away, and never by fabricating a sha.
         (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").field("--resolution-sha").emit("canon finding close", args.json);
+            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").hint("pass --resolution-sha <commit> (`git rev-parse HEAD` prints the current one), or choose another --disposition").field("--resolution-sha").emit("canon finding close", args.json);
         }
     };
     if let Some(sha) = existing.reviewed_sha.clone() {
@@ -921,7 +921,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
             settled.exit_code()
         }
         Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon finding close", args.json)
+            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon finding close", args.json)
         }
     }
 }
@@ -976,7 +976,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).emit("canon finding list", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding list", args.json);
         }
     };
     let read = current_findings(&GitTier::new(&ledger_root), &args.change_id)
@@ -984,7 +984,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
     let (mut findings, staged) = match read {
         Ok(read) => read,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon finding list", args.json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon finding list", args.json);
         }
     };
     if args.open {
@@ -1194,7 +1194,7 @@ fn resolve_shas(repo: &Path, args: &FindingArgs) -> Result<ResolvedShas, CliErro
         *slot = Some(resolve_commit(repo, arg, verify_full).map_err(|unresolved| match unresolved {
             Unresolved::NoCommit => CliError::refused("FINDING_UNRESOLVABLE_COMMIT", format!(
                 "{flag} {arg} is well-formed but names no commit in this repository. Canon does not read the commit's message or diff and is not doing so now; it only refuses a record whose provenance points at nothing. This flag is commit-only, so an object id that names a tag, a tree or a blob is refused here too. Check the sha (a short sha padded to 40 characters is the way this has actually happened), or omit the flag."
-            )),
+            )).hint("pass the full sha of a commit this repository holds (`git rev-parse <rev>` prints it)"),
             Unresolved::Abbreviation(why) => abbreviation_refusal(flag, arg, &why),
         })?);
     }
@@ -1251,7 +1251,7 @@ fn resolve_commit(repo: &Path, arg: &CommitArg, verify_full: bool) -> Result<Sha
 /// The refusal for an abbreviation that did not resolve, naming the
 /// flag, the value and why.
 fn abbreviation_refusal(flag: &str, arg: &CommitArg, why: &str) -> CliError {
-    CliError::refused("FINDING_UNRESOLVABLE_COMMIT", format!("{flag} {arg} cannot be resolved to a commit: {why}. Pass more of the sha, or the full sha (`git rev-parse <rev>` prints it)."))
+    CliError::refused("FINDING_UNRESOLVABLE_COMMIT", format!("{flag} {arg} cannot be resolved to a commit: {why}. Pass more of the sha, or the full sha (`git rev-parse <rev>` prints it).")).hint("pass the full sha of a commit this repository holds (`git rev-parse <rev>` prints it)")
 }
 
 /// `true` iff `git -C repo <args>` succeeds and prints exactly

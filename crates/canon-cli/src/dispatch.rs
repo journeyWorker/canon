@@ -308,7 +308,23 @@ impl DispatchError {
             Self::EndInProgress { .. } => "DISPATCH_END_IN_PROGRESS",
             Self::Unreadable { .. } => "DISPATCH_MANIFEST_UNREADABLE",
         };
-        let mut error = if self.is_usage() { CliError::refused(code, self.to_string()) } else { CliError::failed(code, self.to_string()) };
+        let hint = match self {
+            Self::RoleRegimeMismatch { .. } => "pass --role equal to the leading segment of --regime (`canon regime-key` prints a regime key)".to_string(),
+            Self::SkillDigestWithoutId => "pass --skill-id <id> with --skill-digest, or drop the digest".to_string(),
+            Self::Io(_) => "check that the repository's .canon directory is writable, then run the command again".to_string(),
+            Self::Serialize(_) => "this is a canon bug: report it together with the command line that produced it".to_string(),
+            Self::ContextPack(inner) => inner.to_cli_error().hint.unwrap_or_default(),
+            Self::TaskNotFound { .. } => "task ids look like <change_id>#<n>; open the change's plan document to find the right number".to_string(),
+            Self::NoPlanSources { .. } => "write the change's plan document, then run `canon ingest plans` so --task can resolve against it".to_string(),
+            Self::PlanCorpus { .. } => "fix the plan document the message names, then run the command again".to_string(),
+            Self::NoSuchRun { .. } => "pass the --run id `canon dispatch begin` printed for this repository".to_string(),
+            Self::AlreadyEnded { .. } => "the run is closed; start a new one with `canon dispatch begin`".to_string(),
+            Self::NotRunning { .. } => "only a run in the running state can be ended; start a new one with `canon dispatch begin`".to_string(),
+            Self::RunIdMismatch { .. } => "the manifest under .canon was edited or misplaced: restore it from version control, or start a new run with `canon dispatch begin`".to_string(),
+            Self::EndInProgress { .. } => "another process is closing this run; wait a moment, then run `canon dispatch end` again".to_string(),
+            Self::Unreadable { .. } => "restore the manifest from version control, or start a new run with `canon dispatch begin`".to_string(),
+        };
+        let mut error = if self.is_usage() { CliError::refused(code, self.to_string()).hint(hint) } else { CliError::failed(code, self.to_string()).hint(hint) };
         if let Self::RoleRegimeMismatch { regime_role, .. } = self {
             error = error.field("--role").expected([regime_role.clone()]);
         }

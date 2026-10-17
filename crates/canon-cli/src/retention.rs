@@ -318,7 +318,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
                 _ => (0, 0),
             };
             let _ = append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted);
-            let error = CliError::refused("RETENTION_PURGE_FAILED", err.to_string());
+            let error = CliError::refused("RETENTION_PURGE_FAILED", err.to_string()).hint("run `canon purge --plan` again to see what remains, then confirm with `--confirm <planDigest>`");
             let partial = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) | RetentionError::PartialPurge { matched, deleted, .. } => {
                     Some(partial_purge_value(kind, before, *matched, *deleted, &err.to_string()))
@@ -442,7 +442,7 @@ pub fn run_export(
         }
         Err(ExportFailure::Retention(err)) => {
             let _ = append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, 0, 0);
-            CliError::refused("RETENTION_EXPORT_FAILED", err.to_string()).emit("canon export", json_output) as u8
+            CliError::refused("RETENTION_EXPORT_FAILED", err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output) as u8
         }
     }
 }

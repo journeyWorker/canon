@@ -176,7 +176,7 @@ fn dispatch_refuses_a_role_regime_mismatch_as_a_stable_usage_error() {
     assert!(output.stdout.is_empty(), "refusal must not emit a success snapshot");
     assert_eq!(
         String::from_utf8_lossy(&output.stderr),
-        "canon dispatch begin: DISPATCH_ROLE_REGIME_MISMATCH — --role `reviewer` does not match --regime `dev/canon/join-spine/9c93d024b1a2`'s own leading role segment `dev` — pass the SAME role to both\n"
+        "canon dispatch begin: DISPATCH_ROLE_REGIME_MISMATCH — --role `reviewer` does not match --regime `dev/canon/join-spine/9c93d024b1a2`'s own leading role segment `dev` — pass the SAME role to both\nhint: pass --role equal to the leading segment of --regime (`canon regime-key` prints a regime key)\n"
     );
     assert!(!repo.path().join(".canon/dispatch").exists(), "a refused dispatch must not write a manifest");
 }

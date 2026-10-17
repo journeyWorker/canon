@@ -103,6 +103,13 @@ fn present(steps: Vec<NextStep>, role: Option<Role>) -> After {
 /// `staged`: the write waits for `canon gate promote` and is not in the
 /// ledger.
 pub fn after(repo: &Path, scope: &Scope, staged: bool) -> After {
+    after_with(repo, scope, staged, Vec::new())
+}
+
+/// [`after`] with `extra` steps the command itself knows, listed after
+/// the engine's: `canon change new` on a shipped subject names the reopen,
+/// which status only offers once the subject's gate is red.
+pub fn after_with(repo: &Path, scope: &Scope, staged: bool, extra: Vec<NextStep>) -> After {
     let role = Role::current(None);
     if staged {
         let promote = NextStep {
@@ -114,7 +121,9 @@ pub fn after(repo: &Path, scope: &Scope, staged: bool) -> After {
         return present(vec![promote], role);
     }
     let repo = crate::context::resolve_repo_root(repo);
-    present(scoped(&status::resolve_with_pending_index(&repo), scope), role)
+    let mut steps = scoped(&status::resolve_with_pending_index(&repo), scope);
+    steps.extend(extra);
+    present(steps, role)
 }
 
 impl After {
@@ -163,7 +172,13 @@ pub fn finish(repo: &Path, command: &str, scope: &Scope, staged: bool, json: boo
 
 /// [`finish`] with extra `meta` keys beside `next` (a page's cursor).
 pub fn finish_with_meta(repo: &Path, command: &str, scope: &Scope, staged: bool, json: bool, data: Value, extra_meta: Value) {
-    let after = after(repo, scope, staged);
+    finish_with_steps(repo, command, scope, staged, json, data, extra_meta, Vec::new());
+}
+
+/// [`finish_with_meta`] with `extra` steps ([`after_with`]).
+#[allow(clippy::too_many_arguments)]
+pub fn finish_with_steps(repo: &Path, command: &str, scope: &Scope, staged: bool, json: bool, data: Value, extra_meta: Value, extra: Vec<NextStep>) {
+    let after = after_with(repo, scope, staged, extra);
     if json {
         crate::json_out::data_with_next_and_meta(command, data, &after, extra_meta);
     } else {

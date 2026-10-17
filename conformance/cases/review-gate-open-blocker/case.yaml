@@ -1,8 +1,12 @@
-description: "An open blocker finding on a subject's adopted change refuses `canon subject status <id> --to verifying` with `open-blocker` (exit 1); once its `finding close --disposition fixed` (staged in the fixture by the real command, since the case repo holds no commit to name) is promoted, the same transition exits 0 and `canon gate check` is clean"
+description: "An open blocker finding on a subject's adopted change refuses `canon subject status <id> --to verifying` with `open-blocker` (exit 1); once its `finding close --disposition fixed` (staged in the fixture by the real command, since the case repo holds no commit to name) is promoted, the blocker still refuses (exit 1) until the evidenced scenario has evidence recorded after the finding was raised (0.22 D2); after that evidence the same transition exits 0 and `canon gate check` is clean"
 steps:
   - args: [subject, status, cart, --to, verifying]
     exit: 1
   - args: [gate, promote]
+    exit: 0
+  - args: [subject, status, cart, --to, verifying]
+    exit: 1
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --promote]
     exit: 0
   - args: [subject, status, cart, --to, verifying]
     exit: 0

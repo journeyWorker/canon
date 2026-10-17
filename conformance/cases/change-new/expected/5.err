@@ -1,1 +1,2 @@
 canon change new: SUBJECT_NOT_FOUND — subject `no-such-subject` does not exist (author it with `canon subject new` first)
+hint: author it with `canon subject new <id> --domain <domain> --title <title>`, or check the id against the subjects `canon status` lists

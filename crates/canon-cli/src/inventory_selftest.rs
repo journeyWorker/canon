@@ -249,6 +249,7 @@ fn folded_state_tag(state: Option<&FoldedState>) -> &'static str {
         Some(FoldedState::StillDivergent) => "still-divergent",
         Some(FoldedState::Deferred { .. }) => "deferred",
         Some(FoldedState::ResolvedInvalid) => "resolved-invalid",
+        Some(FoldedState::Accepted { .. }) => "accepted",
         None => "absent",
     }
 }

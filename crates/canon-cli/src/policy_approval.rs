@@ -107,6 +107,104 @@ pub fn advisory(repo: &Path) -> Option<String> {
     }
 }
 
+/// Why an approval fails closed (module doc).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Closed {
+    /// The policy's bytes differ from the approved digest.
+    Changed,
+    /// The approval file cannot be read.
+    Unreadable,
+}
+
+impl Closed {
+    /// The words the gate's violation line starts with.
+    pub fn label(self) -> &'static str {
+        match self {
+            Closed::Changed => "policy changed since approval",
+            Closed::Unreadable => "policy approval unreadable",
+        }
+    }
+}
+
+/// The fail-closed reading of the approval (module doc): why, and a
+/// one-line message, for a policy that changed since its approval or whose
+/// approval cannot be read; `None` for no policy, an approved policy, and a
+/// never-approved one (advisory only).
+pub fn closed_failure(repo: &Path) -> Option<(Closed, String)> {
+    match approval_state(repo) {
+        ApprovalState::Changed { approval, current_digest } => Some((
+            Closed::Changed,
+            format!(
+                "{} is {current_digest}, but `{}` approved {} at {}; the gate grades the work against the policy in force, so a policy that is not the approved one fails closed (--override-reason does not waive it)",
+                paths::POLICY_FILE,
+                approval.approved_by,
+                approval.policy_digest,
+                approval.approved_at
+            ),
+        )),
+        ApprovalState::Unreadable { detail } => Some((
+            Closed::Unreadable,
+            format!("{} cannot be read ({detail}), so the policy in force cannot be checked against its approval; the gate fails closed (--override-reason does not waive it)", paths::POLICY_APPROVAL_FILE),
+        )),
+        ApprovalState::NoPolicy | ApprovalState::Approved(_) | ApprovalState::Unapproved => None,
+    }
+}
+
+/// What resolves [`closed_failure`]: the human re-approves, or the approved
+/// bytes come back.
+pub const REAPPROVE_HINT: &str = "the human re-approves the policy in force with `canon policy approve --by <human> --note \"<words>\"`, or restore the approved .canon/policy.yaml (and .canon/policy.approval.json) from git";
+
+/// [`closed_failure`] as the violation `canon gate check` reports.
+pub fn violation(repo: &Path) -> Option<canon_gate::Violation> {
+    let (closed, detail) = closed_failure(repo)?;
+    Some(canon_gate::Violation::new(canon_gate::FailureClass::UnreviewedPromotion, "policy", format!("{}: {detail}; {REAPPROVE_HINT}", closed.label())))
+}
+
+/// `canon policy show [--json]`: the read-back for `canon policy approve`.
+/// Exits `0` whatever the state is: it reports, the gate decides.
+pub fn run_show(repo: &Path, json: bool) -> i32 {
+    let repo = resolve_repo_root(repo);
+    let state = approval_state(&repo);
+    let current = fs::read(repo.join(paths::POLICY_FILE)).ok().map(|bytes| policy_digest(&bytes));
+    let (name, approval, detail) = match &state {
+        ApprovalState::NoPolicy => ("none", None, None),
+        ApprovalState::Approved(a) => ("approved", Some(a), None),
+        ApprovalState::Unapproved => ("unapproved", None, None),
+        ApprovalState::Changed { approval, .. } => ("changed", Some(approval), None),
+        ApprovalState::Unreadable { detail } => ("unreadable", None, Some(detail.as_str())),
+    };
+    let data = serde_json::json!({
+        "policy": paths::POLICY_FILE,
+        "policyDigest": current,
+        "approval": paths::POLICY_APPROVAL_FILE,
+        "state": name,
+        "approvedBy": approval.map(|a| &a.approved_by),
+        "approvedAt": approval.map(|a| &a.approved_at),
+        "approvedDigest": approval.map(|a| &a.policy_digest),
+        "note": approval.and_then(|a| a.note.as_ref()),
+        "detail": detail,
+    });
+    if json {
+        crate::json_out::data("policy show", data);
+        return 0;
+    }
+    println!("policy: {}", paths::POLICY_FILE);
+    println!("digest: {}", current.as_deref().unwrap_or("-"));
+    println!("approval: {name}{}", detail.map(|d| format!(" ({d})")).unwrap_or_default());
+    if let Some(a) = approval {
+        println!("approved by: {}", a.approved_by);
+        println!("approved at: {}", a.approved_at);
+        println!("approved digest: {}", a.policy_digest);
+        if let Some(note) = &a.note {
+            println!("note: {note}");
+        }
+    }
+    if let Some((closed, _)) = closed_failure(&repo) {
+        println!("gate: fails closed ({}); {REAPPROVE_HINT}", closed.label());
+    }
+    0
+}
+
 /// Writes the policy approval record for `by` under an already-resolved
 /// repo root. `Err` carries the refusal text (no policy to approve, an
 /// empty `by`, or a read/write failure). Shared by `canon policy approve`
@@ -157,7 +255,7 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32
             0
         }
         Err(e) => {
-            CliError::refused("POLICY_APPROVAL_FAILED", e.to_string()).emit("canon policy approve", json)
+            CliError::refused("POLICY_APPROVAL_FAILED", e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --by <name>` again").emit("canon policy approve", json)
         }
     }
 }

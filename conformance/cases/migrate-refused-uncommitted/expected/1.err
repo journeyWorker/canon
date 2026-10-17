@@ -1,2 +1,3 @@
 canon migrate: MIGRATE_UNCOMMITTED — uncommitted changes under the paths it moves; commit or stash them, then run it again:
   ?? specs/features/kind=feature/area=cart/add.feature
+hint: commit or stash the listed paths (`git status` shows them), then run `canon migrate` again

@@ -21,6 +21,7 @@ const NEEDS_STATE: &[(&str, &str)] = &[
     ("context-pack new", "a context manifest file"),
     ("context-pack show", "a context pack made by `context-pack new`"),
     ("context-pack verify", "a context pack made by `context-pack new`"),
+    ("divergence accept", "a scenario whose latest evidence is divergent, attested by another actor and session"),
     ("evidence approval-payload", "a git commit to bind: --artifact-sha must name a commit of the repo"),
     ("dispatch end", "a run opened by `dispatch begin`, whose run id this one closes"),
     ("gate check", "a repo that passes the gate: the scratch repo has unattested scenarios, which exit 1 by contract"),
@@ -144,10 +145,6 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
             "init" => {
                 cwd = scratch.path().join("fresh");
                 std::fs::create_dir_all(&cwd).unwrap();
-            }
-            "demo attest" => {
-                ok(scratch.path(), home.path(), &["demo", "init", "--repo", "canon-demo"]);
-                cwd = scratch.path().join("canon-demo");
             }
             _ => {}
         }

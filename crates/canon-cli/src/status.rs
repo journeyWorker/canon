@@ -48,7 +48,10 @@
 //! brief to answer (its `.canon/changes/<change>/brief.md`, or an
 //! external openspec `proposal.md` while that canon file does not exist)
 //! and no `Approved:` line in the canon `brief.md` (the brief is
-//! enforced) gets the one `human` step status ever emits, and it is the
+//! enforced) gets the one `human` step status ever emits once `canon brief
+//! check` has no blocker left for it (0.22 D4); while it has some, the
+//! subject's step is the planner's `canon brief check --change <slug>`,
+//! `N blocker(s): write the brief`. Either is the
 //! subject's only step, whatever its status: the agent stops and reports
 //! the brief, and nothing is built or attested for the subject (no
 //! `feature new`, `scenario new`, `evidence add`, review or status
@@ -249,6 +252,12 @@ pub struct SubjectSummary {
     pub evidenced: usize,
     /// Counted scenarios whose latest verdict (for some role) is divergent.
     pub divergent: usize,
+    /// Counted divergent scenarios a reviewer accepted as known gaps
+    /// (`canon divergence accept`) whose acceptance still holds, each as
+    /// `accepted-divergence <id> — <tracking> (expires <date>)`. They are
+    /// not in `divergent`; omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub accepted_divergences: Vec<String>,
     /// Counted scenarios with a qualifying review under the
     /// `require_review` rule (any current signed review when it is off).
     pub reviewed: usize,
@@ -282,6 +291,10 @@ pub struct SubjectSummary {
     /// Omitted for a brief with no flow steps (a legacy brief) or no brief.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub flow: Vec<FlowStep>,
+    /// What the subject must be re-verified for before it ships (0.22 D2,
+    /// [`crate::reverify`]): the next step's input, not part of the report.
+    #[serde(skip)]
+    pub reverify: Vec<crate::reverify::Gap>,
 }
 
 /// One flow step of the brief and what covers it.
@@ -385,7 +398,7 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
         };
         match shown {
             Ok(text) => println!("{text}"),
-            Err(e) => return crate::cli_error::CliError::failed("SERIALIZE_FAILED", format!("failed to serialize status: {e}")).emit("canon status", true),
+            Err(e) => return crate::cli_error::CliError::failed("SERIALIZE_FAILED", format!("failed to serialize status: {e}")).hint("this is a canon bug: report it together with the command line that produced it").emit("canon status", true),
         }
     } else {
         print!("{}", render(&report));
@@ -854,10 +867,14 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
 
     let mut evidenced = 0;
     let mut divergent = 0;
+    let mut accepted_divergences = Vec::new();
     for scenario in &counted {
         let (has, diverged) = joins.verdict_state(scenario);
         evidenced += usize::from(has);
-        divergent += usize::from(diverged);
+        match canon_gate::acceptance::held(ctx, scenario) {
+            Some(canon_gate::acceptance::Held::Holds(acceptance)) if diverged => accepted_divergences.push(acceptance.line()),
+            _ => divergent += usize::from(diverged),
+        }
     }
     let gaps: Vec<ReviewGapKind> = counted.iter().filter_map(|s| review_gap(ctx, s, distinct_actor)).map(|gap| gap.kind).collect();
     let reviewed = counted.len() - gaps.len();
@@ -870,7 +887,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         .collect();
     let review_due = rr.is_some_and(|rr| rr.covers(subject.status) || next_status(subject.status).is_some_and(|n| rr.covers(n)));
     let stale_reviews = gap_count(ReviewGapKind::Stale);
-    let red = if subject.status == SubjectStatus::Shipped { shipped_red(ctx, subject) } else { Vec::new() };
+    let red = if subject.status == SubjectStatus::Shipped { shipped_red(repo, ctx, subject) } else { Vec::new() };
 
     SubjectSummary {
         id: subject.subject_id.as_str().to_string(),
@@ -880,6 +897,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         excluded,
         evidenced,
         divergent,
+        accepted_divergences,
         reviewed,
         stale_reviews,
         unsigned_reviews: gap_count(ReviewGapKind::Unsigned),
@@ -889,6 +907,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         brief: brief_with_findings(repo, plan_roots, subject, &changes),
         red,
         flow: changes.last().map(|change| flow_steps(ctx, joins, repo, change, distinct_actor)).unwrap_or_default(),
+        reverify: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::gaps(repo, ctx, subject) } else { Vec::new() },
     }
 }
 
@@ -953,9 +972,9 @@ fn brief_with_findings(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, c
 /// What makes a `shipped` subject's gate red ([`SubjectSummary::red`]):
 /// the ship guard's own gaps ([`crate::subject::shipped_gate_gaps`]),
 /// grouped by failure class in the order the guard reports them.
-fn shipped_red(ctx: &GateContext, subject: &Subject) -> Vec<String> {
+fn shipped_red(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<String> {
     let mut classes: Vec<(&'static str, usize, String)> = Vec::new();
-    for violation in crate::subject::shipped_gate_gaps(ctx, subject) {
+    for violation in crate::subject::shipped_gate_gaps(repo, ctx, subject) {
         match classes.iter_mut().find(|(class, _, _)| *class == violation.class.as_str()) {
             Some((_, count, _)) => *count += 1,
             None => classes.push((violation.class.as_str(), 1, violation.subject)),
@@ -966,7 +985,7 @@ fn shipped_red(ctx: &GateContext, subject: &Subject) -> Vec<String> {
 
 /// `canon subject status <id> --to verifying --reason …`: the reopen command
 /// status names for a red shipped subject (0.18 D3).
-fn reopen_command(id: &str) -> String {
+pub(crate) fn reopen_command(id: &str) -> String {
     format!("canon subject status {id} --to verifying --reason \"<why it reopens>\" --actor-id <unit>")
 }
 
@@ -1052,6 +1071,17 @@ fn subject_steps(
     let before = next.len();
 
     if let Some(brief) = summary.brief.as_ref().filter(|brief| brief.enforced) {
+        // A brief `canon brief check` still has blockers for is the planner's
+        // to write; the human is asked only once it is clean (0.22 D4).
+        if let (Some(change), Some(counts)) = (brief.change.as_deref(), brief.findings.as_ref().filter(|counts| counts.blockers > 0)) {
+            next.push(NextStep {
+                actor: StepActor::Agent,
+                role: Some(Role::Planner),
+                command: format!("canon brief check --change {change}"),
+                why: format!("{id}: {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it", counts.blockers, brief.report_in()),
+            });
+            return;
+        }
         next.push(NextStep {
             actor: StepActor::Human,
             role: None,
@@ -1145,7 +1175,20 @@ fn subject_steps(
                 ),
             });
         }
-        if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1) {
+        // A fixed blocker or an approved chore asks for the whole suite
+        // again (0.22 D2); the re-review follows the new evidence.
+        if let Some(gap) = summary.reverify.first() {
+            next.push(NextStep {
+                actor: StepActor::Agent,
+                role: Some(Role::Implementer),
+                command: format!(
+                    "canon evidence add --project-id {} --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --actor-id <unit> --session-id <session> --ref \"<test command>\"",
+                    gap.project()
+                ),
+                why: gap.why(id),
+            });
+        }
+                if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1 && !canon_gate::acceptance::is_accepted(ctx, s)) {
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
@@ -1154,7 +1197,7 @@ fn subject_steps(
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
-                why: format!("{id}: {} scenario(s) have a divergent latest verdict; fix the behavior, then re-attest", summary.divergent),
+                why: format!("{id}: {} scenario(s) have a divergent latest verdict; fix the behavior, then re-attest, or have a reviewer accept the tracked gap (`canon divergence accept`)", summary.divergent),
             });
         }
     }
@@ -1341,6 +1384,9 @@ pub fn render(report: &StatusReport) -> String {
             let _ = writeln!(out, "    {}: {line}", s.id);
             for gap in &s.missing_cases {
                 let _ = writeln!(out, "      missing @case:{} on {}", gap.case, gap.surface);
+            }
+            for line in &s.accepted_divergences {
+                let _ = writeln!(out, "      advisory: {line}");
             }
             if let Some(brief) = &s.brief {
                 let _ = match (&brief.approval, &brief.brief, &brief.change) {

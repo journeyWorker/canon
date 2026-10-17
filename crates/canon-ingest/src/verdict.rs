@@ -181,6 +181,7 @@ pub fn derive_native_review_verdict(actor_role: &RoleId) -> VerdictRow {
 /// | `StillDivergent` | `Failure` | `GuardrailCandidate` |
 /// | `Open` | — | `None` (freshly staged, in-flight — no terminal verdict yet) |
 /// | `Deferred { .. }` | — | `None` (intentionally deferred — no terminal verdict) |
+/// | `Accepted { .. }` | — | `None` (a known gap a reviewer accepted — no terminal verdict) |
 ///
 /// `role` is ALWAYS `actor_role` regardless of status (spec
 /// Requirement 2) — never `derive_verdict`'s `RemediationResolved`
@@ -193,7 +194,7 @@ pub fn derive_native_divergence_verdict(status: &DivergenceStatus, actor_role: &
         DivergenceStatus::StillDivergent => {
             Some(VerdictRow { role: actor_role.clone(), polarity: Polarity::Failure, becomes: Becomes::GuardrailCandidate })
         }
-        DivergenceStatus::Open | DivergenceStatus::Deferred { .. } => None,
+        DivergenceStatus::Open | DivergenceStatus::Deferred { .. } | DivergenceStatus::Accepted { .. } => None,
     }
 }
 

@@ -101,21 +101,43 @@ its result:
 advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
 ```
 
-Once the policy's bytes no longer match the approved digest, it prints
-this instead:
+Once the policy's bytes no longer match the approved digest, or the
+approval file cannot be read, the gate fails closed instead:
 
 ```
-advisory: policy changed since approval: .canon/policy.yaml is sha256:<now>, but `<who>` approved sha256:<then> at <time>; a human reviews it and runs `canon policy approve --by <who>`
+unreviewed-promotion policy — policy changed since approval: .canon/policy.yaml is sha256:<now>, but `<who>` approved sha256:<then> at <time>; … (--override-reason does not waive it); the human re-approves the policy in force with `canon policy approve --by <human> --note "<words>"`, or restore the approved .canon/policy.yaml (and .canon/policy.approval.json) from git
 ```
 
-An approval file that does not parse reads
-`advisory: policy approval unreadable: …`.
-`canon status` prints the same text as a `warning:` line (and in
-`--json` `warnings`). The advisory never changes an exit code: canon
-cannot tell whether a human or an agent ran the command, so the record
-names who approved which bytes, and the advisory says when that no
-longer holds. An agent runs `canon policy approve` only to record a
-human's answer, never without one and never on its own behalf.
+`canon gate check` exits `1`; `canon subject status` (the ship guard and
+the reopen) refuses with `POLICY_CHANGED_SINCE_APPROVAL`, or
+`POLICY_APPROVAL_UNREADABLE` for an unreadable approval, and
+`--override-reason` does not waive either. A policy never approved stays
+an advisory. `canon status` prints the same text as a `warning:` line (and
+in `--json` `warnings`). canon cannot tell whether a human or an agent
+ran `policy approve`, so the record names who approved which bytes and
+the gate fails when that no longer holds. An agent never edits the policy
+to pass the gate: it stops and asks the human, who re-approves or restores
+it. An agent runs `canon policy approve` only to record a human's answer,
+never without one and never on its own behalf.
+
+## `canon policy show [--json]`
+
+Prints the policy path and current digest, and the approval state
+(`approved`, `changed`, `unreadable` or `unapproved`) with the approver,
+time and approved digest:
+
+```
+policy: .canon/policy.yaml
+digest: sha256:37ea…
+approval: approved
+approved by: Ann
+approved at: 2026-10-17T04:57:45Z
+approved digest: sha256:37ea…
+note: ok
+```
+
+For `changed` and `unreadable` it adds `gate: fails closed (…)` with the
+human's way out. Read-only; it writes nothing.
 
 ## The closed CEL profile
 

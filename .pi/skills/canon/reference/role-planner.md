@@ -21,7 +21,11 @@ canon brief approve --change <slug> --by "<the human>" --note "<their words>" --
 
 After the first `status`, follow `meta.next` of each write. `brief check`
 lists blockers and advisories; bare `canon brief --as planner` names the next
-steps.
+steps. While the brief has blockers, `status` and `change new`'s `meta.next`
+send you to write it (`write the brief: canon brief check --change <slug>
+lists N blockers`); the human step appears only once the brief is clean and
+unapproved. A policy that no longer matches its approval fails closed
+(`POLICY_CHANGED_SINCE_APPROVAL`): never edit it; the human re-approves.
 
 ## Steps
 
@@ -75,7 +79,10 @@ can observe: `change new … --kind chore`. Its brief is short (intent,
 category, invariants, checks, out of scope) and approved like any brief, one
 human stop. A chore adds no scenarios: the
 implementer runs the subject's suite again and binds it with
-`canon evidence add --all-scenarios …`, then a re-review follows. Work that
+`canon evidence add --all-scenarios …`, then a re-review follows. On a
+shipped subject `change new` prints the reopen command for the orchestrator
+(`subject status <id> --to verifying --reason "<why>"`); the subject cannot
+ship again until the suite is evidenced after the chore's approval. Work that
 changes behavior is never a chore: it is a feature change.
 
 ## Hand-off

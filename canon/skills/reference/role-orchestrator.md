@@ -13,6 +13,7 @@ canon status --as orchestrator --json --fields next,waitingOn   # at the start a
 canon brief approve --change <slug> --by "<the human>" --note "<their words>" --as orchestrator --json
 canon subject status <subject-id> --to <proposed|specced|building|verifying|shipped> --actor-id <unit> --as orchestrator --json
 canon subject status <subject-id> --to verifying --reason "<why>" --actor-id <unit> --as orchestrator --json   # reopen a shipped subject (--reason is required here; any other transition accepts it as a note)
+canon policy show --as orchestrator --json            # policy digest and its approval: approved, changed, unreadable or unapproved
 canon gate check --as orchestrator --json
 ```
 
@@ -57,9 +58,14 @@ When `status` or `meta.next` shows a step with `actor: human` (the brief's
 approval), stop everything for that scope, report the brief to the human in
 its language, and wait. Do not start the implementer before the answer.
 Record the answer with `brief approve`. Never approve it yourself and never
-edit the policy to pass the gate. Inside an approved scope never stop for a
-human: fixes, follow-ups and re-reviews go straight to the implementer and
-reviewer in the same change.
+edit the policy to pass the gate. A policy that no longer matches the
+approval fails closed (`POLICY_CHANGED_SINCE_APPROVAL`, or
+`POLICY_APPROVAL_UNREADABLE`): the ship guard and the reopen refuse, and
+`--override-reason` does not waive it. Run `canon policy show`, then stop and
+ask the human to re-approve (`canon policy approve --by <human>`) or restore
+the approved policy from git; never edit the policy yourself. Inside an
+approved scope never stop for a human: fixes, follow-ups and re-reviews go
+straight to the implementer and reviewer in the same change.
 
 ## Move the subject
 
@@ -69,7 +75,12 @@ evidence or reviews, open blockers, an unapproved brief); fix the gap rather
 than overriding. Move to `shipped` yourself once its guard passes, unless the
 brief says the human ships. A follow-up on a shipped subject goes back to
 `verifying` with `--reason`, then the implementer and reviewer in the same
-change, then `--to shipped` again. `canon status` flags a shipped subject
+change, then `--to shipped` again. A chore on a shipped subject (`change
+new … --kind chore` names the reopen command) is approved first, then
+reopened the same way; shipping again needs the whole suite evidenced after
+the chore's approval (`evidence add --all-scenarios`) and a re-review. A
+blocker closed `fixed` needs the same. The refusal names the scenarios and
+the command; never override them. `canon status` flags a shipped subject
 whose gate went red. A bad `--to` fails with `error.field` `--to` and
 `error.expected` listing the states.
 

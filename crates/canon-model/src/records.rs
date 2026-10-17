@@ -1012,6 +1012,13 @@ impl ReviewOutcome {
 /// here — it is a fold-time-DERIVED [`crate::fold::FoldedState`]
 /// output, never a persisted status (design D8/D9: the on-disk record
 /// is never rewritten to reflect a stale binding).
+///
+/// `Accepted` (0.22) is a reviewer's disposition of a known gap: the
+/// scenario's latest evidence is `divergent`, and the gap is tracked
+/// elsewhere (`tracking`). It is bound to the evidence it saw
+/// (`evidence`, the same pins a [`Review`] carries), so new evidence
+/// ends it, and it lapses at `expiry` when one is set. The ship guard
+/// and `canon gate check` read it ([`crate::fold`] only reports it).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DivergenceStatus {
@@ -1019,6 +1026,15 @@ pub enum DivergenceStatus {
     Resolved,
     StillDivergent,
     Deferred { reason: String, expiry: DateTime<Utc> },
+    Accepted {
+        reason: String,
+        /// Where the gap is tracked: an issue URL or reference.
+        tracking: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        expiry: Option<DateTime<Utc>>,
+        /// The scenario's latest evidence at acceptance, by ledger file.
+        evidence: Vec<EvidencePin>,
+    },
 }
 
 /// A tracked divergence (join-spine `scenario_id` row). `run_seq`/

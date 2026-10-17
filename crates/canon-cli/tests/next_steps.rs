@@ -108,11 +108,18 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
     let (dir, created) = repo_with_change();
     let repo = dir.path();
 
-    // `change new`: the unapproved brief is the subject's only step, and a human's.
+    // `change new`: the brief is still a skeleton with blockers, so the
+    // subject's step is the planner's, not the human's (0.22 D4).
     let steps = meta_next(&created);
-    assert_eq!(steps[0], status_step(repo, "demo"));
-    assert_eq!(steps[0]["actor"], "human");
-    assert!(steps[0]["role"].is_null());
+    assert_eq!(steps[0]["actor"], "agent");
+    assert_eq!(steps[0]["role"], "planner");
+    assert_eq!(steps[0]["command"], "canon brief check --change add-login");
+    assert!(steps[0]["why"].as_str().unwrap().contains("blocker(s): write the brief"), "{}", steps[0]);
+
+    // Once the brief is written clean, the one human stop is the subject's only step.
+    let step = status_step(repo, "demo");
+    assert_eq!(step["actor"], "human");
+    assert!(step["role"].is_null());
 
     let approved = ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
     assert_eq!(meta_next(&approved)[0], status_step(repo, "demo"), "brief approve");
@@ -121,10 +128,10 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
     let scenario = ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     assert_eq!(meta_next(&scenario)[0], status_step(repo, "demo"), "scenario new");
 
-    let moved = ok(repo, &["subject", "status", "demo", "specced", "--json"]);
+    let moved = ok(repo, &["subject", "status", "demo", "--to", "specced", "--json"]);
     assert_eq!(meta_next(&moved)[0], status_step(repo, "demo"), "subject status");
 
-    ok(repo, &["subject", "status", "demo", "building", "--json"]);
+    ok(repo, &["subject", "status", "demo", "--to", "building", "--json"]);
     let evidence = ok(
         repo,
         &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--kind", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],
@@ -208,8 +215,8 @@ fn two_roles_waiting() -> TempDir {
     ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject", "demo", "--case", "failure", "--flow", "F1", "--json"]);
-    ok(repo, &["subject", "status", "demo", "specced", "--json"]);
-    ok(repo, &["subject", "status", "demo", "building", "--json"]);
+    ok(repo, &["subject", "status", "demo", "--to", "specced", "--json"]);
+    ok(repo, &["subject", "status", "demo", "--to", "building", "--json"]);
     ok(
         repo,
         &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--kind", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],

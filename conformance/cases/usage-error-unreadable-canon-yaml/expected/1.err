@@ -1,1 +1,2 @@
 canon inventory sync: INVENTORY_FAILED — parsing `<repo>/canon.yaml`: canon.yaml TierPolicy: did not find expected ',' or ']' at line 3 column 6, while parsing a flow sequence at line 2 column 10
+hint: fix the problems the message names, then run `canon inventory sync` again

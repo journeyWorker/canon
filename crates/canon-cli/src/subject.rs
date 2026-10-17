@@ -362,7 +362,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
     // BEFORE `Subject::new` so a malformed value is a clean refusal
     // here, never the model's debug-assert panic.
     if SubjectId::parse(domain).is_err() {
-        return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("domain `{domain}` is not a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)")).emit("canon subject new", json);
+        return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("domain `{domain}` is not a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)")).hint("`canon schema subject new` lists the accepted arguments and their forms").emit("canon subject new", json);
     }
 
     // Membership is a SEPARATE question from shape, and needs the
@@ -371,23 +371,23 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 
     let repo = resolve_repo_root(repo);
     if let Some(violation) = domain_membership_violation(&repo, domain) {
-        return CliError::refused("SUBJECT_INVALID_ARGUMENT", violation.to_string()).emit("canon subject new", json);
+        return CliError::refused("SUBJECT_INVALID_ARGUMENT", violation.to_string()).hint("`canon schema subject new` lists the accepted arguments and their forms").emit("canon subject new", json);
     }
     let canon_yaml_path = resolve_canon_yaml(&repo, None);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject new", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject new", json);
         }
     };
 
     match find_subject(&registry, subject_id) {
         Ok(Some(_)) => {
-            return CliError::refused("SUBJECT_EXISTS", format!("subject `{}` already exists", subject_id.as_str())).emit("canon subject new", json);
+            return CliError::refused("SUBJECT_EXISTS", format!("subject `{}` already exists", subject_id.as_str())).hint("pick another id for a new subject, or look at this one with `canon subject status <id>`").emit("canon subject new", json);
         }
         Ok(None) => {}
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject new", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject new", json);
         }
     }
 
@@ -401,7 +401,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
             0
         }
         Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon subject new", json)
+            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon subject new", json)
         }
     }
 }
@@ -433,7 +433,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
             0
         }
         Err(e) => {
-            CliError::refused("SUBJECT_ADOPT_REFUSED", e.to_string()).emit("canon subject adopt", json)
+            CliError::refused("SUBJECT_ADOPT_REFUSED", e.to_string()).hint("fix what the message names, then run `canon subject adopt` again").emit("canon subject adopt", json)
         }
     }
 }
@@ -619,7 +619,7 @@ pub fn run_status(
         ("--reason", reason, "the transition note, with the actor"),
     ] {
         if text.is_some_and(|text| text.trim().is_empty() || text.contains(['\n', '\r'])) {
-            return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("{flag} must be one non-empty line; it is recorded on the subject as {recorded}")).emit("canon subject status", json);
+            return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("{flag} must be one non-empty line; it is recorded on the subject as {recorded}")).hint("`canon schema subject status` lists the accepted arguments and their forms").emit("canon subject status", json);
         }
     }
 
@@ -628,17 +628,17 @@ pub fn run_status(
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json);
         }
     };
 
     let mut subject = match find_subject(&registry, subject_id) {
         Ok(Some(s)) => s,
         Ok(None) => {
-            return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).emit("canon subject status", json);
+            return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).hint("`canon subject new <id> --domain <domain> --title <title>` creates it; check the id against the subjects `canon status` lists").emit("canon subject status", json);
         }
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json);
         }
     };
 
@@ -647,7 +647,7 @@ pub fn run_status(
         return CliError::refused("SUBJECT_INVALID_TRANSITION", format!("invalid transition {} → {} (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)",
             status_str(current),
             status_str(target)
-        )).field("--to").expected(["proposed", "specced", "building", "verifying", "shipped", "retired"].into_iter().filter(|s| parse_status(s).is_ok_and(|to| is_valid_transition(current, to)))).emit("canon subject status", json);
+        )).hint("follow the chain proposed → specced → building → verifying → shipped; `canon subject status <id>` shows where the subject stands").field("--to").expected(["proposed", "specced", "building", "verifying", "shipped", "retired"].into_iter().filter(|s| parse_status(s).is_ok_and(|to| is_valid_transition(current, to)))).emit("canon subject status", json);
     }
     let reopens = current == SubjectStatus::Shipped && target == SubjectStatus::Verifying;
     if reopens && reason.is_none() {
@@ -662,6 +662,18 @@ pub fn run_status(
     let schemas = SchemaRegistry::load();
     let policy = PolicyResolution::resolve(&repo, &schemas);
     let ships = current == SubjectStatus::Verifying && target == SubjectStatus::Shipped;
+    // A policy that no longer matches its approval fails closed (0.22 D3):
+    // shipping or reopening would grade against bytes no human approved, and
+    // `--override-reason` waives only review checks.
+    if ships || reopens {
+        if let Some((closed, detail)) = crate::policy_approval::closed_failure(&repo) {
+            let error = match closed {
+                crate::policy_approval::Closed::Unreadable => CliError::failed("POLICY_APPROVAL_UNREADABLE", detail).hint(crate::policy_approval::REAPPROVE_HINT),
+                crate::policy_approval::Closed::Changed => CliError::failed("POLICY_CHANGED_SINCE_APPROVAL", detail).hint(crate::policy_approval::REAPPROVE_HINT),
+            };
+            return error.with_exit(EXIT_GATED).emit("canon subject status", json);
+        }
+    }
     // A reopen moves a subject back to fix its gaps, so the review guard
     // that gates moving forward into its scope does not run on it;
     // shipping again runs it.
@@ -679,7 +691,7 @@ pub fn run_status(
                 Some(ctx)
             }
             Err(e) => {
-                return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json);
+                return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json);
             }
         }
     } else {
@@ -697,6 +709,9 @@ pub fn run_status(
     if ships {
         blocking.extend(crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation("verifying → shipped: ")));
         blocking.extend(brief_check_violation(&repo, subject_id, &changes));
+        if let Some(ctx) = &gate_context {
+            blocking.extend(crate::reverify::chore_violations(&repo, ctx, &subject));
+        }
     }
     if reopens {
         blocking.extend(reopen_violation(&repo, &subject, &changes));
@@ -726,11 +741,20 @@ pub fn run_status(
 
     if !blocking.is_empty() {
         let lines = blocking.iter().chain(&waivable).map(Violation::line).collect::<Vec<_>>().join("\n");
-        let mut error = CliError::failed("SUBJECT_GATE_VIOLATION", lines).with_exit(EXIT_GATED);
-        if override_reason.is_some() {
-            error = error.hint("--override-reason waives only the review checks (unreviewed-promotion, open-blocker); the violations above that are not review checks still refuse this transition");
+        let mut hints: Vec<String> = crate::reverify::hint(&blocking.iter().chain(&waivable).collect::<Vec<_>>()).into_iter().collect();
+        if let Some(ctx) = &gate_context {
+            let divergent = divergent_cells(ctx, subject_id, &blocking);
+            if !divergent.is_empty() {
+                hints.push(canon_gate::acceptance::hint(&divergent));
+            }
         }
-        return error.emit("canon subject status", json);
+        if override_reason.is_some() {
+            hints.push("--override-reason waives only the review checks (unreviewed-promotion, open-blocker); the violations above that are not review checks still refuse this transition".to_string());
+        }
+        if hints.is_empty() {
+            hints.push("fix each violation above (`canon gate check` lists them with their causes), then run this transition again".to_string());
+        }
+        return CliError::failed("SUBJECT_GATE_VIOLATION", lines).with_exit(EXIT_GATED).hint(hints.join("; ")).emit("canon subject status", json);
     }
 
     // A waiver, a reopen note, and a transition reason belong to the
@@ -743,11 +767,14 @@ pub fn run_status(
         let Some(reason) = override_reason else {
             let lines = waivable.iter().map(Violation::line).collect::<Vec<_>>().join("\n");
             let mut fixes = Vec::new();
-            if review_gaps {
+            if review_gaps && !waivable.iter().all(canon_gate::review_gate::is_reverify) {
                 fixes.push("record an independent review (`canon review add`) and close blocker findings");
             }
             if brief_gap.is_some() {
                 fixes.push("get the human's answer to the brief and record it with `canon brief approve`");
+            }
+            if waivable.iter().any(canon_gate::review_gate::is_reverify) {
+                fixes.push("record the suite again with `canon evidence add --project-id <root> --all-scenarios --report <format>:<path> …` for the scenarios named, then re-review");
             }
             return CliError::failed("SUBJECT_GATE_VIOLATION", lines)
                 .with_exit(EXIT_GATED)
@@ -796,7 +823,7 @@ pub fn run_status(
             0
         }
         Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).emit("canon subject status", json)
+            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon subject status", json)
         }
     }
 }
@@ -816,12 +843,12 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, override_reason: Option<&st
     let canon_yaml_path = resolve_canon_yaml(&repo, None);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
-        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json),
+        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json),
     };
     let subject = match find_subject(&registry, subject_id) {
         Ok(Some(s)) => s,
-        Ok(None) => return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).emit("canon subject status", json),
-        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).emit("canon subject status", json),
+        Ok(None) => return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).hint("`canon subject new <id> --domain <domain> --title <title>` creates it; check the id against the subjects `canon status` lists").emit("canon subject status", json),
+        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json),
     };
     if json {
         crate::json_out::data("subject status", serde_json::to_value(&subject).expect("subject serializes"));
@@ -904,8 +931,9 @@ fn review_checks(ctx: &GateContext, rr: &RequireReview, exclude_lanes: &[String]
 /// status`'s red flag on a shipped subject (0.18 D3) and the ship guard
 /// cannot disagree. The brief and the unrefreshable-index check are not
 /// here: status reports both on their own.
-pub(crate) fn shipped_gate_gaps(ctx: &GateContext, subject: &Subject) -> Vec<Violation> {
+pub(crate) fn shipped_gate_gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Violation> {
     let mut gaps = ship_gate_violations(ctx, &subject.subject_id);
+    gaps.extend(crate::reverify::chore_violations(repo, ctx, subject));
     if let Some((rr, exclude_lanes)) = active_require_review(ctx).filter(|(rr, _)| rr.covers(SubjectStatus::Shipped)) {
         let (unwaivable, waivable, _) = review_checks(ctx, rr, exclude_lanes, subject);
         let waiver = subject.status_override.as_ref().filter(|waiver| waiver.to == subject.status);
@@ -968,11 +996,11 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
         let entries: Vec<&LedgerEntry> = verdicts.iter().filter(|((subject, _), _)| subject == &sid).map(|(_, entry)| entry).collect();
         if entries.is_empty() {
             violations.push(Violation::new(FailureClass::UncoveredCell, sid.clone(), "verifying → shipped: no ledger verdict for this linked scenario"));
-        } else if let Some(divergent) = entries.iter().find(|e| e.verdict == EvidenceVerdict::Divergent) {
+        } else if let Some(divergent) = entries.iter().find(|e| e.verdict == EvidenceVerdict::Divergent).filter(|_| !canon_gate::acceptance::is_accepted(gate_context, scenario)) {
             violations.push(Violation::new(
                 FailureClass::UncoveredCell,
                 sid.clone(),
-                format!("verifying → shipped: latest verdict is divergent (by {})", divergent.agent_id),
+                format!("verifying → shipped: {}", canon_gate::acceptance::divergent_detail(gate_context, scenario, &divergent.agent_id)),
             ));
         }
     }
@@ -990,6 +1018,19 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
         violation
     }));
     violations
+}
+
+/// The `(project_id, scenario_id)` of each divergent-verdict refusal among
+/// `blocking` ([`canon_gate::acceptance::DIVERGENT_DETAIL`]), for the hint
+/// that names the way out.
+fn divergent_cells(ctx: &GateContext, subject_id: &SubjectId, blocking: &[Violation]) -> Vec<(String, String)> {
+    let owned = subject_scenarios(ctx, subject_id);
+    blocking
+        .iter()
+        .filter(|v| v.class == FailureClass::UncoveredCell && v.detail.contains(canon_gate::acceptance::DIVERGENT_DETAIL))
+        .filter_map(|v| owned.iter().find(|s| s.scenario_id.as_str() == v.subject))
+        .map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string()))
+        .collect()
 }
 
 /// The `verifying → shipped` brief-structure check (0.19 D2): the blocker

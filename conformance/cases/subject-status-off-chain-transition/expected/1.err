@@ -1,1 +1,2 @@
 canon subject status: SUBJECT_INVALID_TRANSITION — invalid transition proposed → shipped (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)
+hint: follow the chain proposed → specced → building → verifying → shipped; `canon subject status <id>` shows where the subject stands

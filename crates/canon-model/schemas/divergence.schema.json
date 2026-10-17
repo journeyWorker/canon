@@ -101,7 +101,7 @@
       ]
     },
     "DivergenceStatus": {
-      "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).",
+      "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).\n\n`Accepted` (0.22) is a reviewer's disposition of a known gap: the\nscenario's latest evidence is `divergent`, and the gap is tracked\nelsewhere (`tracking`). It is bound to the evidence it saw\n(`evidence`, the same pins a [`Review`] carries), so new evidence\nends it, and it lapses at `expiry` when one is set. The ship guard\nand `canon gate check` read it ([`crate::fold`] only reports it).",
       "oneOf": [
         {
           "type": "string",
@@ -135,7 +135,63 @@
           "required": [
             "deferred"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "accepted": {
+              "type": "object",
+              "properties": {
+                "evidence": {
+                  "description": "The scenario's latest evidence at acceptance, by ledger file.",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/EvidencePin"
+                  }
+                },
+                "expiry": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "tracking": {
+                  "description": "Where the gap is tracked: an issue URL or reference.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason",
+                "tracking",
+                "evidence"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "accepted"
+          ]
         }
+      ]
+    },
+    "EvidencePin": {
+      "description": "One pinned evidence record: its ledger natural key (the `task_id`,\nelse the `scenario_id`, it is filed under) and its 12-hex content\ndigest, together the record's ledger file stem `<key>__<digest>`.",
+      "type": "object",
+      "properties": {
+        "digest": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "digest"
       ]
     },
     "ProjectId": {

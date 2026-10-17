@@ -207,7 +207,7 @@ Feature: evidence add
   @case:happy
   @evidence.add.21
   Scenario: Every write command says whether it staged or wrote directly
-    Given the write commands evidence add, finding add and close, review add, divergence stage and resolve, subject new, adopt and status, scenario new and feature new
+    Given the write commands evidence add, finding add and close, review add, divergence add and resolve, subject new, adopt and status, scenario new and feature new
     When each succeeds
     Then a staged write ends with the promote command that commits it
     And a direct write ends with written directly; nothing to promote
@@ -308,7 +308,7 @@ Feature: evidence add
   @evidence.add.62
   Scenario: Auto promotion commits every staged write and no-promote keeps one staged
     Given a repository whose canon.yaml says write promote auto, as canon init writes it
-    When evidence add, finding add, finding close and divergence stage run
+    When evidence add, finding add, finding close and divergence add run
     Then nothing is left staged
     And an evidence add with --no-promote stays staged until gate promote
 
@@ -340,7 +340,7 @@ Feature: evidence add
   @evidence.add.65
   Scenario: A promote on write commits only the record its own run staged
     Given another author staged an evidence record and a divergence candidate with --no-promote
-    When evidence add and divergence stage run under write promote auto
+    When evidence add and divergence add run under write promote auto
     Then each run promotes and names its own record only
     And the other author's records are still staged
     And gate promote and divergence promote commit them afterwards
@@ -363,10 +363,10 @@ Feature: evidence add
   @evidence.add.67
   Scenario: A promoted write prints one success line that names the committed record
     Given a repository whose canon.yaml says write promote auto, as canon init writes it
-    When evidence add, finding add, finding close and divergence stage run
+    When evidence add, finding add, finding close and divergence add run
     Then each prints one success line, naming the record's committed file under the ledger, which exists
     And no line names the staged file promotion moved, and no separate promote line is printed
-    And with --no-promote, evidence add and finding add print the staged file and canon gate promote, and divergence stage prints the staged file and canon divergence promote
+    And with --no-promote, evidence add and finding add print the staged file and canon gate promote, and divergence add prints the staged file and canon divergence promote
 
   # canon: {"schema":1,"at":"2026-10-12T07:30:40Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation

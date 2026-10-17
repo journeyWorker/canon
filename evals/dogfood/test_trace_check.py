@@ -54,6 +54,15 @@ class TraceCheckTests(unittest.TestCase):
         self.assertEqual(report["implementer_sessions"], ["orch-impl"])
         self.assertEqual(report["reviewer_sessions"], ["orch-reviewer"])
 
+    def test_scratch_outside_the_repo_is_neither_code_nor_a_pre_stop_write(self):
+        # Dogfood eval 10: a planner wrote notes under /tmp before its brief
+        # stop, and a reviewer wrote `$TMPDIR/det.ts` (an unexpanded variable).
+        for path in ("../../../tmp/notes.md", "/tmp/x.ts", "$TMPDIR/det.ts", "${HOME}/y.ts"):
+            self.assertTrue(trace_check.outside_repo(path), path)
+            self.assertFalse(trace_check.is_code_path(path), path)
+        for path in ("src/game.ts", ".canon/changes/x/brief.md", "e2e/a.spec.ts"):
+            self.assertFalse(trace_check.outside_repo(path), path)
+
     def test_recovery_depth_counts_intervening_canon_calls(self):
         report = self.report("reviewer_recovery_fail.jsonl")
         session = report["sessions"][0]
