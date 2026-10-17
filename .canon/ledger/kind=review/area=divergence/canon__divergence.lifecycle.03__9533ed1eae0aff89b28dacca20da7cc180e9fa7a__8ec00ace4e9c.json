@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-023",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-023-1"
+  },
+  "at": "2026-10-17T20:15:03.978822Z",
+  "kind": "review",
+  "pin": "9533ed1eae0aff89b28dacca20da7cc180e9fa7a",
+  "pins": {
+    "evidence": [
+      {
+        "digest": "f4ceb2b927ee",
+        "key": "divergence.lifecycle.03"
+      }
+    ],
+    "scenario_digest": "0a4f49305f14380fee11e6dbb6d3209053c83eb306a182f30a4bb687ffa4d231",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "feat/0.23"
+  },
+  "reviewer": "canon-reviewer-023",
+  "scenario_id": "divergence.lifecycle.03",
+  "schema": 1
+}
