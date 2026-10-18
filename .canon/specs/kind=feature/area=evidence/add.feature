@@ -519,3 +519,72 @@ Feature: evidence add
     When evidence is added with them
     Then the command exits 1 with one "canon evidence add: refused —" line per finding, each naming fabricated-evidence, the scenario, the field and the marker
     And nothing is staged or committed
+
+  # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.93
+  Scenario: A batch binds each test's own attachments to that test's scenario and no other
+    Given a JUnit report whose test cases each list their own screenshot in a system-out attachment line, with paths relative to the report's directory
+    When evidence is added with --report and --all-scenarios
+    Then each scenario's record binds the report and the files its own cases name, and no file named by another scenario's case
+    And a file two of one scenario's cases name is bound once, and every file is stored by digest
+
+  # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.94
+  Scenario: A Cucumber embedding is stored by digest and bound to the scenario it belongs to
+    Given a Cucumber JSON report whose scenario steps embed base64 screenshots
+    When evidence is added with --report cucumber:<path> and --all-scenarios
+    Then each scenario's record binds a named attachment for each of its own embeddings, whose digest is the decoded bytes
+    And the decoded bytes are in the artifact store
+
+  # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.95
+  Scenario: A bare artifact is refused in a batch because it would bind to every scenario
+    Given indexed scenarios and a report that owns a case for several of them
+    When evidence is added with --all-scenarios and --artifact <path>
+    Then the add exits 2 with the code EVIDENCE_INVALID_ARGUMENT and a hint naming per-test report attachments and --artifact <scenario-id>=<path>
+    And nothing is staged, committed or stored
+
+  # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.96
+  Scenario: An artifact scoped to a scenario binds to that scenario's record alone
+    Given indexed scenarios and a report that owns a case for several of them
+    When evidence is added with --all-scenarios and --artifact <scenario-id>=<path>
+    Then only that scenario's record binds the file
+    And a scenario that has no record in the batch is refused with exit 2 and nothing is written
+    And a single-scenario add accepts --artifact naming its own scenario and refuses one naming another
+
+  # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.97
+  Scenario: A report attachment that is missing, outside the repository or over the size limit refuses the bind
+    Given a report whose case names an attachment that is not on disk, one outside the repository, or one larger than --max-artifact-mib
+    When evidence is added from that report, in a batch or for one scenario
+    Then the add exits 2 naming the case and the attachment path
+    And nothing is staged, committed or stored
+
+  # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.98
+  Scenario: A single scenario's report binds the attachments of the cases matched to it
+    Given a report with attachments on the cases of two scenarios
+    When evidence is added for one scenario with --scenario-id and --report
+    Then the record binds the report and the files of that scenario's cases only
+
+  # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.99
+  Scenario: A re-run with new screenshot bytes leaves a pinned review current
+    Given a scenario with a current signed review that pinned its report evidence, the cases having screenshots
+    When the suite runs again and evidence is added with the same cases and verdicts but new screenshot bytes
+    Then the new record binds the new bytes, prints no stale-review line, and the review stays current

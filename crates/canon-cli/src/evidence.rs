@@ -671,6 +671,9 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     if let Err(error) = check_all_scenarios_flags(args) {
         return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.to_string()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
     }
+    if let Err(error) = check_artifact_scopes(args) {
+        return error.emit("canon evidence add", args.json);
+    }
     let audit = match audit_of(args) {
         Ok(audit) => audit,
         Err(error) => {
@@ -826,7 +829,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     }
     let bound = match crate::evidence_attach::bind(&crate::evidence_attach::BindRequest {
         repo: &repo,
-        artifacts: &args.artifacts,
+        artifacts: &args.artifacts.iter().map(|value| crate::evidence_attach::parse_artifact(value).1).collect::<Vec<_>>(),
         reports: &args.reports,
         report_cases: &args.report_cases,
         scenario_id: args.scenario_id.as_ref().map(ScenarioId::as_str),
@@ -1119,6 +1122,33 @@ fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), String> {
     Ok(())
 }
 
+/// `--artifact` binds to ONE record (0.24 D4, #83): `--all-scenarios`
+/// refuses a bare `--artifact <path>` (it would bind to every record of
+/// the batch) and takes `--artifact <scenario-id>=<path>`; a single
+/// record accepts the bare form and the form naming its own scenario.
+fn check_artifact_scopes(args: &EvidenceArgs) -> Result<(), CliError> {
+    let refuse = |message: String, hint: &str| CliError::refused("EVIDENCE_INVALID_ARGUMENT", message).hint(hint.to_string());
+    for value in &args.artifacts {
+        match crate::evidence_attach::parse_artifact(value) {
+            (None, path) if args.all_scenarios => {
+                return Err(refuse(
+                    format!("--artifact `{}` would be bound to every scenario's record of the batch; no record is written", path.display()),
+                    "let the report carry per-test attachments (Playwright's JUnit reporter writes `[[ATTACHMENT|<path>]]` per test; Cucumber JSON embeddings do the same), or bind a file to one scenario with `--artifact <scenario-id>=<path>`",
+                ));
+            }
+            (Some(scope), path) if !args.all_scenarios && args.scenario_id.as_ref().map(ScenarioId::as_str) != Some(scope.as_str()) => {
+                let own = args.scenario_id.as_ref().map_or("this record names no scenario".to_string(), |id| format!("this record is for `{}`", id.as_str()));
+                return Err(refuse(
+                    format!("--artifact `{scope}={}` is scoped to scenario `{scope}`, but {own}", path.display()),
+                    "pass the plain path (`--artifact <path>`) to bind the file to this record, or `--artifact <this-scenario-id>=<path>`; a path that really contains `=` is written `./<path>`",
+                ));
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 /// `canon evidence add --all-scenarios` (0.18 D1): one record per indexed
 /// scenario of `--project-id` that owns a case in the reports
 /// ([`crate::evidence_attach::bind_all_scenarios`]), each with its own
@@ -1143,7 +1173,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     let indexed: Vec<&str> = indexed.into_iter().map(ScenarioId::as_str).collect();
     let batch = match crate::evidence_attach::bind_all_scenarios(&crate::evidence_attach::BatchRequest {
         repo,
-        artifacts: &args.artifacts,
+        scoped_artifacts: &args.artifacts.iter().filter_map(|value| { let (scope, path) = crate::evidence_attach::parse_artifact(value); scope.map(|scope| (scope, path)) }).collect::<Vec<_>>(),
         reports: &args.reports,
         indexed: &indexed,
         verdict: args.verdict,
