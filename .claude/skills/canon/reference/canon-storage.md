@@ -115,7 +115,7 @@ file names, tracked in git. `status`, the gate, the guards and `canon query`
 read the ledger only.
 
 ```bash
-canon query --kind evidence_record --history   # every version, archive included
+canon query --kind evidence --history   # every version, archive included
 canon ledger compact --dry-run                 # report; writes nothing
 canon ledger compact                           # pre-0.23 ledger or interrupted move; idempotent; `canon migrate` runs it
 ```
