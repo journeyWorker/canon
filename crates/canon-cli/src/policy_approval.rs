@@ -1,5 +1,6 @@
 //! `canon policy approve --by <who> [--note <text>] [--repo <dir>]`
-//! (0.15 D5): who approved the policy, and which bytes they approved.
+//! (0.15 D5): who approved the policy, and which bytes they approved;
+//! `canon policy show [--repo <dir>]` (0.22 D2) reads it back.
 //!
 //! `.canon/policy.yaml` is what the gate grades the work against, and the
 //! skill makes approving it a human stop point. Until 0.15 that approval
@@ -12,100 +13,74 @@
 //! `approved_by`, `approved_at` (RFC3339 UTC) and `note` (`null` when
 //! none). It is a file in the working tree rather than a ledger record:
 //! one approval is in force at a time, git keeps its history, and the
-//! command writes it directly, with nothing to promote.
+//! command writes it directly, with nothing to promote. The state it
+//! gives the policy is [`canon_gate::policy_approval::approval_state`].
 //!
 //! # What reads it
-//! `canon gate check` and `canon status` print one advisory line when a
-//! policy exists but has no approval, or when its bytes no longer match
-//! the approved digest, or when the approval file cannot be read. The
-//! advisory never changes an exit code: canon cannot tell a human from an
-//! agent running this command, so the record is attribution, not proof,
-//! and a gate that failed on it would only teach agents to run it.
+//! A policy whose bytes changed after the approval, or an approval file
+//! that does not read, fails closed (0.22 D1, #71): `canon gate check`
+//! reports `unapproved-policy` and exits 1, `canon subject status`
+//! refuses every transition that runs the gate's guards
+//! ([`refusal_hint`], not waivable), and `canon status` makes
+//! the human's review its one step ([`crate::status`]). Before 0.22 it was
+//! an advisory, and deleting `require_review` shipped work with no
+//! review. A policy never approved stays the advisory [`advisory`]
+//! prints: there is no approved digest to be stale against, and every
+//! repo initialised before 0.15 is in that state. canon cannot tell a
+//! human from an agent running `policy approve`, so the record is
+//! attribution, not proof; what it stops is a silent edit.
 
 use std::fs;
 use std::path::Path;
 
+use canon_gate::policy_approval::{approval_state, policy_digest, violation, ApprovalState, PolicyApproval};
 use canon_model::paths;
 use chrono::{SecondsFormat, Utc};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
+use crate::role::Role;
+use crate::status::{NextStep, StepActor};
 
-/// The approval record's wire shape. Unknown keys are refused on read,
-/// like every other authored canon file, so a hand edit that adds a key
-/// reads as unreadable rather than as silently approved.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct PolicyApproval {
-    pub policy_digest: String,
-    pub approved_by: String,
-    pub approved_at: String,
-    pub note: Option<String>,
-}
-
-/// What the approval file says about the policy in force.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ApprovalState {
-    /// No `.canon/policy.yaml` (or it cannot be read): nothing to approve.
-    NoPolicy,
-    /// The approved digest matches the policy's current bytes.
-    Approved(PolicyApproval),
-    /// A policy exists and no approval file does.
-    Unapproved,
-    /// The policy's bytes changed after the recorded approval.
-    Changed { approval: PolicyApproval, current_digest: String },
-    /// The approval file exists but is not a readable approval record.
-    Unreadable { detail: String },
-}
-
-/// `sha256:<hex>` over `bytes`, the digest spelling canon uses elsewhere
-/// (`context_pack`, `dispatch`).
-pub fn policy_digest(bytes: &[u8]) -> String {
-    format!("sha256:{:x}", Sha256::digest(bytes))
-}
-
-/// Read the policy and its approval under an already-resolved repo root.
-pub fn approval_state(repo: &Path) -> ApprovalState {
-    let Ok(policy) = fs::read(repo.join(paths::POLICY_FILE)) else {
-        return ApprovalState::NoPolicy;
-    };
-    let text = match fs::read_to_string(repo.join(paths::POLICY_APPROVAL_FILE)) {
-        Ok(text) => text,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return ApprovalState::Unapproved,
-        Err(e) => return ApprovalState::Unreadable { detail: e.to_string() },
-    };
-    let approval: PolicyApproval = match serde_json::from_str(&text) {
-        Ok(approval) => approval,
-        Err(e) => return ApprovalState::Unreadable { detail: e.to_string() },
-    };
-    let current_digest = policy_digest(&policy);
-    if approval.policy_digest == current_digest {
-        ApprovalState::Approved(approval)
-    } else {
-        ApprovalState::Changed { approval, current_digest }
-    }
-}
-
-/// The one advisory line `canon gate check` and `canon status` print, or
-/// `None` when there is nothing to say (no policy, or an approval that
-/// still matches). Each line names the command that resolves it.
+/// The one advisory line `canon gate check` and `canon status` print for
+/// a policy that was never approved, or `None` (no policy, approved, or
+/// a state [`canon_gate::policy_approval::violation`] fails on).
 pub fn advisory(repo: &Path) -> Option<String> {
-    const FIX: &str = "a human reviews it and runs `canon policy approve --by <who>`";
-    match approval_state(repo) {
-        ApprovalState::NoPolicy | ApprovalState::Approved(_) => None,
-        ApprovalState::Unapproved => Some(format!("policy not approved: {} has no approval record ({}); {FIX}", paths::POLICY_FILE, paths::POLICY_APPROVAL_FILE)),
-        ApprovalState::Changed { approval, current_digest } => Some(format!(
-            "policy changed since approval: {} is {current_digest}, but `{}` approved {} at {}; {FIX}",
+    matches!(approval_state(repo), ApprovalState::Unapproved).then(|| {
+        format!(
+            "policy not approved: {} has no approval record ({}); a human reviews it and runs `canon policy approve --by <who>`",
             paths::POLICY_FILE,
-            approval.approved_by,
-            approval.policy_digest,
-            approval.approved_at
-        )),
-        ApprovalState::Unreadable { detail } => Some(format!("policy approval unreadable: {} ({detail}); {FIX}", paths::POLICY_APPROVAL_FILE)),
-    }
+            paths::POLICY_APPROVAL_FILE
+        )
+    })
 }
+
+/// The hint on `canon subject status`'s refusal of a transition that runs
+/// the gate's guards while the approved policy does not hold (0.22 D1:
+/// `POLICY_CHANGED_SINCE_APPROVAL`, `POLICY_APPROVAL_UNREADABLE`).
+/// `--override-reason` does not waive it: a waiver graded by a policy
+/// nobody approved would be circular.
+pub fn refusal_hint(override_given: bool) -> String {
+    let waiver = if override_given { "; --override-reason does not waive it" } else { "" };
+    format!("stop and report the policy to the human: `canon policy show` reads its state, and the human's approval lifts this{waiver}")
+}
+
+/// `canon status`'s one human step while the approved policy does not
+/// hold (0.22 D1); no transition is suggested beside it.
+pub fn review_step(repo: &Path) -> Option<NextStep> {
+    let violation = violation(&approval_state(repo))?;
+    Some(NextStep {
+        actor: StepActor::Human,
+        role: None,
+        command: REVIEW_STEP.to_string(),
+        why: format!("{}; `canon policy show` reads the state", violation.line()),
+    })
+}
+
+/// [`review_step`]'s command, fixed so [`crate::next`] keeps it in every
+/// scoped list: it blocks every subject.
+pub const REVIEW_STEP: &str =
+    "stop and report .canon/policy.yaml to the human: it does not match an approval, so move no subject until the human reviews it and approves it";
 
 /// Writes the policy approval record for `by` under an already-resolved
 /// repo root. `Err` carries the refusal text (no policy to approve, an
@@ -138,7 +113,7 @@ pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApprova
 
 /// `canon policy approve`. Returns the process exit code: `0` written,
 /// `2` refused (no policy to approve, an empty `--by`, or a write
-/// failure).
+/// failure). Its first next step is the read-back, `canon policy show`.
 pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     match record(&repo, by, note) {
@@ -153,13 +128,65 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32
                 crate::write_mode::DIRECT
             );
             let data = serde_json::json!({ "policy": paths::POLICY_FILE, "policyDigest": approval.policy_digest, "approvedBy": approval.approved_by, "approvedAt": approval.approved_at, "approval": paths::POLICY_APPROVAL_FILE });
-            crate::next::finish(&repo, "policy approve", &crate::next::Scope::Repo, false, json, data);
+            let read_back = NextStep {
+                actor: StepActor::Agent,
+                role: Some(Role::Orchestrator),
+                command: "canon policy show".into(),
+                why: "read back the approval in force: the digest it names, who approved it, and when".into(),
+            };
+            crate::next::finish_with_first(&repo, "policy approve", &crate::next::Scope::Repo, json, data, read_back);
             0
         }
         Err(e) => {
             CliError::refused("POLICY_APPROVAL_FAILED", e.to_string()).emit("canon policy approve", json)
         }
     }
+}
+
+/// `canon policy show` (0.22 D2): the policy path, its current digest,
+/// the approval state, and the approval when one reads. A read: always
+/// exits `0`, whatever the state.
+pub fn run_show(repo: &Path, json: bool) -> i32 {
+    let repo = resolve_repo_root(repo);
+    let state = approval_state(&repo);
+    let current = fs::read(repo.join(paths::POLICY_FILE)).ok().map(|bytes| policy_digest(&bytes));
+    let approval = match &state {
+        ApprovalState::Approved(approval) | ApprovalState::Changed { approval, .. } => Some(approval),
+        _ => None,
+    };
+    let unreadable = match &state {
+        ApprovalState::Unreadable { detail } => Some(detail.as_str()),
+        _ => None,
+    };
+    if json {
+        let approval = approval.map(|a| serde_json::json!({ "policyDigest": a.policy_digest, "approvedBy": a.approved_by, "approvedAt": a.approved_at, "note": a.note }));
+        crate::json_out::data(
+            "policy show",
+            serde_json::json!({ "policy": paths::POLICY_FILE, "policyDigest": current, "state": state.as_str(), "approvalFile": paths::POLICY_APPROVAL_FILE, "approval": approval, "approvalError": unreadable }),
+        );
+        return 0;
+    }
+    println!("canon policy show: {}", paths::POLICY_FILE);
+    println!("  state: {}", state.as_str());
+    if let Some(digest) = &current {
+        println!("  digest: {digest}");
+    }
+    if let Some(a) = approval {
+        let note = a.note.as_deref().map(|note| format!(" — {note}")).unwrap_or_default();
+        println!("  approved: {} by `{}` at {}{note}", a.policy_digest, a.approved_by, a.approved_at);
+    }
+    match &state {
+        ApprovalState::NoPolicy => println!("  no policy file, so there is nothing to approve"),
+        ApprovalState::Approved(_) => {}
+        ApprovalState::Unapproved => println!("  no approval record ({}); a human reviews the policy and runs `canon policy approve --by <who>`", paths::POLICY_APPROVAL_FILE),
+        ApprovalState::Changed { .. } | ApprovalState::Unreadable { .. } => {
+            if let Some(detail) = unreadable {
+                println!("  {} does not read: {detail}", paths::POLICY_APPROVAL_FILE);
+            }
+            println!("  `canon gate check` fails and `canon subject status` refuses until {}", canon_gate::policy_approval::FIX);
+        }
+    }
+    0
 }
 
 #[cfg(test)]
@@ -177,13 +204,19 @@ mod tests {
     fn approval_tracks_the_policy_bytes() {
         let dir = repo_with_policy("spec_coverage: {}\n");
         assert_eq!(approval_state(dir.path()), ApprovalState::Unapproved);
+        assert!(advisory(dir.path()).is_some_and(|line| line.starts_with("policy not approved")));
         assert_eq!(run_approve(dir.path(), "alice", Some("first look"), false), 0);
         assert!(matches!(&approval_state(dir.path()), ApprovalState::Approved(a) if a.approved_by == "alice" && a.note.as_deref() == Some("first look")));
         assert_eq!(advisory(dir.path()), None);
 
         fs::write(dir.path().join(paths::POLICY_FILE), "spec_coverage: { require_evidence: true }\n").unwrap();
         assert!(matches!(approval_state(dir.path()), ApprovalState::Changed { .. }));
-        assert!(advisory(dir.path()).is_some_and(|line| line.starts_with("policy changed since approval")));
+        assert_eq!(advisory(dir.path()), None, "a changed policy is a violation, not an advisory");
+        assert!(refusal_hint(true).contains("canon policy show") && refusal_hint(true).contains("does not waive"));
+        assert!(review_step(dir.path()).is_some_and(|step| step.actor == StepActor::Human));
+
+        fs::write(dir.path().join(paths::POLICY_APPROVAL_FILE), "not json").unwrap();
+        assert!(review_step(dir.path()).is_some(), "an unreadable approval holds every subject too");
     }
 
     #[test]
@@ -192,16 +225,7 @@ mod tests {
         assert_eq!(run_approve(dir.path(), "alice", None, false), 2);
         assert!(!dir.path().join(paths::POLICY_APPROVAL_FILE).exists());
         assert_eq!(advisory(dir.path()), None);
-    }
-
-    #[test]
-    fn an_unknown_key_reads_as_unreadable() {
-        let dir = repo_with_policy("x: 1\n");
-        fs::write(
-            dir.path().join(paths::POLICY_APPROVAL_FILE),
-            r#"{"policy_digest":"sha256:00","approved_by":"a","approved_at":"t","note":null,"extra":1}"#,
-        )
-        .unwrap();
-        assert!(matches!(approval_state(dir.path()), ApprovalState::Unreadable { .. }));
+        assert!(review_step(dir.path()).is_none());
+        assert_eq!(run_show(dir.path(), true), 0);
     }
 }

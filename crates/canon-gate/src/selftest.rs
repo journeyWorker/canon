@@ -33,9 +33,10 @@
 //! with no runtime dependency on this repo's own checkout layout.
 //!
 //! # Two fixture shapes, one oracle format
-//! Eight of the ten classes (`uncovered-cell`, `unreviewed-promotion`,
+//! Nine of the eleven classes (`uncovered-cell`, `unreviewed-promotion`,
 //! `trust-below-required`, `stale-evidence`, `malformed-evidence`,
-//! `flagged`, `open-blocker`, `false-success`) are reachable through the assembled
+//! `flagged`, `open-blocker`, `false-success`, `unapproved-policy`) are
+//! reachable through the assembled
 //! [`crate::dispatch::check_set`] over a loaded [`crate::GateContext`] —
 //! `canon gate check`'s own dispatcher, engaged here with `release: true`
 //! so the release-scoped `trust-below-required` class can fire too (this
@@ -145,7 +146,7 @@ fn git_output(dir: &Path, args: &[&str]) -> String {
     String::from_utf8(output.stdout).expect("git output is UTF-8")
 }
 
-// ── the ten fixture corpus builders ──
+// ── the eleven fixture corpus builders ──
 
 fn build_uncovered_cell(dir: &Path) {
     write_policy_yaml(dir, "risk_routing:\n  reviewer: true\n");
@@ -263,6 +264,14 @@ fn build_false_success(dir: &Path) {
     tier.write(&audit).expect("write false-success fixture audit");
 }
 
+fn build_unapproved_policy(dir: &Path) {
+    // 0.22 D1: the approval names the digest of other bytes than the
+    // policy now holds, as after `require_review` was deleted.
+    write_policy_yaml(dir, "schema: 1\n");
+    let approval = serde_json::json!({ "policy_digest": crate::policy_approval::policy_digest(b"schema: 1\nspec_coverage:\n  require_review: {}\n"), "approved_by": "selftest-human", "approved_at": "2026-10-16T00:00:00Z", "note": null });
+    std::fs::write(dir.join(canon_model::paths::POLICY_APPROVAL_FILE), approval.to_string()).expect("write unapproved-policy fixture approval");
+}
+
 fn build_unevidenced_flip(_dir: &Path) -> (String, TaskId, Vec<EvidenceNote>) {
     let task_id = TaskId::parse("s5-selftest-unevidenced-flip#1").expect("valid TaskId");
     ("- [ ] 1 Do the selftest thing\n".to_string(), task_id, Vec::new())
@@ -344,6 +353,10 @@ fn run_false_success(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String)> {
     run_check_fixture(build_false_success, now)
 }
 
+fn run_unapproved_policy(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String)> {
+    run_check_fixture(build_unapproved_policy, now)
+}
+
 fn fixtures() -> Vec<Fixture> {
     vec![
         Fixture { class: FailureClass::UncoveredCell, run: run_uncovered_cell, expected: include_str!("../fixtures/uncovered-cell/expected_failures.txt") },
@@ -356,6 +369,7 @@ fn fixtures() -> Vec<Fixture> {
         Fixture { class: FailureClass::FabricatedEvidence, run: run_fabricated_evidence, expected: include_str!("../fixtures/fabricated-evidence/expected_failures.txt") },
         Fixture { class: FailureClass::OpenBlocker, run: run_open_blocker, expected: include_str!("../fixtures/open-blocker/expected_failures.txt") },
         Fixture { class: FailureClass::FalseSuccess, run: run_false_success, expected: include_str!("../fixtures/false-success/expected_failures.txt") },
+        Fixture { class: FailureClass::UnapprovedPolicy, run: run_unapproved_policy, expected: include_str!("../fixtures/unapproved-policy/expected_failures.txt") },
     ]
 }
 
@@ -472,7 +486,7 @@ mod tests {
     use super::*;
 
     /// Tests lock this (assignment acceptance criterion): every one of
-    /// the ten `FAILURE_CLASSES` strings fires on its own fixture,
+    /// the eleven `FAILURE_CLASSES` strings fires on its own fixture,
     /// exactly (missing AND extra both empty, every fixture).
     #[test]
     fn every_failure_class_fires_exactly_on_its_own_fixture() {

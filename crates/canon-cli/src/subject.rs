@@ -98,6 +98,16 @@
 //! its gaps); shipping again runs every guard above, as the first ship
 //! did.
 //!
+//! # The approved policy holds (0.22 D1, #71)
+//! `building → verifying`, `verifying → shipped` and the reopen run the
+//! gate's guards, so they grade against `.canon/policy.yaml`. When its
+//! bytes changed after the recorded approval, or the approval file does
+//! not read, each refuses first (`POLICY_CHANGED_SINCE_APPROVAL`,
+//! `POLICY_APPROVAL_UNREADABLE`, exit `1`, record unchanged), whatever
+//! the policy now says. `--override-reason` does not waive it, as it does
+//! not waive the reopen's brief gap: a waiver of the policy that grades
+//! the waiver would be circular. A human's approval lifts it.
+//!
 //! # A change may belong to several subjects (0.18 D4)
 //! `canon subject adopt` appends: adopting a change under a second
 //! subject adds that subject to the change's `subject_ids` and the
@@ -657,6 +667,17 @@ pub fn run_status(
         .field("--reason")
         .hint(format!("canon subject status {} --to verifying --reason \"<why it reopens>\" --as <role>", subject_id.as_str()))
         .emit("canon subject status", json);
+    }
+    // 0.22 D1 (#71): every transition that runs the gate's guards grades
+    // against the policy a human approved. A changed or unreadable
+    // approval refuses before any guard runs, and no override waives it.
+    if matches!((current, target), (SubjectStatus::Building, SubjectStatus::Verifying) | (SubjectStatus::Verifying, SubjectStatus::Shipped)) || reopens {
+        let state = canon_gate::policy_approval::approval_state(&repo);
+        if let Some(violation) = canon_gate::policy_approval::violation(&state) {
+            let code = if matches!(state, canon_gate::policy_approval::ApprovalState::Unreadable { .. }) { "POLICY_APPROVAL_UNREADABLE" } else { "POLICY_CHANGED_SINCE_APPROVAL" };
+            let message = format!("{} → {}: {}", status_str(current), status_str(target), violation.line());
+            return CliError::failed(code, message).hint(crate::policy_approval::refusal_hint(override_reason.is_some())).emit("canon subject status", json);
+        }
     }
 
     let schemas = SchemaRegistry::load();

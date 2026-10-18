@@ -24,7 +24,7 @@ use crate::brief::brief_digest;
 use crate::brief_check::{check, Severity};
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
-use crate::policy_approval::ApprovalState;
+use canon_gate::policy_approval::ApprovalState;
 use canon_ingest::markdown::{field, without_field};
 
 const EXIT_REFUSED: i32 = 2;
@@ -103,7 +103,7 @@ pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
     };
     // Policy first: a failed policy write leaves the brief untouched, and a
     // failed brief write leaves a policy approval that is true on its own.
-    let policy_approved = !matches!(crate::policy_approval::approval_state(&repo), ApprovalState::NoPolicy);
+    let policy_approved = !matches!(canon_gate::policy_approval::approval_state(&repo), ApprovalState::NoPolicy);
     if policy_approved {
         if let Err(e) = crate::policy_approval::record(&repo, by, Some(note)) {
             return refuse(json, "POLICY_APPROVAL_FAILED", &e, EXIT_ERROR);

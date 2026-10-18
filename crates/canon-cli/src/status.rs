@@ -74,6 +74,16 @@
 //! ([`subject_change_ids`]), so a change shared by two subjects counts
 //! its blockers against both.
 //!
+//! # The approved policy holds (0.22 D1, #71)
+//! A policy whose bytes changed after its approval, or an approval file
+//! that does not read, is `unapproved-policy` in `canon gate check`, and
+//! `canon subject status` refuses the transitions that run the gate's
+//! guards. Here it is a `human` step of its own
+//! ([`crate::policy_approval::review_step`]): the agent stops and reports
+//! the policy, and no subject is suggested to move on, a red shipped
+//! subject's reopen included, until the human approves it. A policy
+//! never approved stays a warning.
+//!
 //! # No bookkeeping steps (0.16 M6)
 //! Readers refresh a stale scenario index themselves
 //! ([`crate::inventory::refresh_stale_index`]), so no step says "then
@@ -336,8 +346,8 @@ pub struct NextStep {
     pub role: Option<Role>,
 }
 
-/// Who carries out a `next` step (0.16 D1). The only `human` step is
-/// getting a brief approved.
+/// Who carries out a `next` step (0.16 D1). The `human` steps are
+/// getting a brief approved and getting a changed policy approved (0.22 D1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum StepActor {
@@ -463,6 +473,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
             let policy = PolicyResolution::resolve(repo, &registry);
             warnings.extend(policy_warning(&policy));
             warnings.extend(crate::policy_approval::advisory(repo));
+            next.extend(crate::policy_approval::review_step(repo));
             warnings.push(format!("cannot read this repo's ledger: {e}"));
             next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into(), actor: StepActor::Agent, role: Some(Role::Orchestrator) });
             return finish(repo, &policy, warnings, Vec::new(), Vec::new(), Vec::new(), None, next);
@@ -475,6 +486,16 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     crate::inventory::resolve_legacy_pins(&mut ctx);
     warnings.extend(policy_warning(&ctx.policy));
     warnings.extend(crate::policy_approval::advisory(repo));
+    // A policy that no longer matches its approval holds every subject
+    // (0.22 D1): the human's review is the step, and no transition is
+    // suggested beside it.
+    let policy_held = match crate::policy_approval::review_step(repo) {
+        Some(step) => {
+            next.push(step);
+            true
+        }
+        None => false,
+    };
     let routed_away: Vec<&str> = ctx
         .unreadable_kinds
         .iter()
@@ -643,7 +664,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         by_priority.sort_by_key(|(s, _)| (rank(&NEXT_ORDER, s.status), s.subject_id.as_str().to_string()));
         for (subject, summary) in by_priority {
             let start = next.len();
-            subject_steps(&ctx, &joins, &scenarios, &roots, !policy_blocks, promote_manual, subject, summary, &mut next);
+            subject_steps(&ctx, &joins, &scenarios, &roots, !policy_blocks && !policy_held, promote_manual, subject, summary, &mut next);
             owners.push((start..next.len(), subject.subject_id.as_str().to_string()));
         }
     }
@@ -1033,7 +1054,8 @@ fn awaits_brief(summary: &SubjectSummary) -> bool {
 /// The per-subject `next:` rules (module doc), each producing at most one
 /// step. An enforced unapproved brief is the subject's only step; else
 /// the gap rules; the status advance only when none fired and
-/// `may_advance` (no blocking policy gap). `promote_manual` is whether
+/// `may_advance` (no blocking policy gap, and the approved policy holds;
+/// without it a red shipped subject's reopen is withheld too). `promote_manual` is whether
 /// `canon.yaml` keeps writes staged for `canon gate promote`.
 #[allow(clippy::too_many_arguments)]
 fn subject_steps(
@@ -1071,6 +1093,9 @@ fn subject_steps(
     // A shipped subject whose gate went red (0.18 D3) is reopened first:
     // every gap below is follow-up work inside its approved change.
     if status == SubjectStatus::Shipped && !summary.red.is_empty() {
+        if !may_advance {
+            return;
+        }
         let tasks = match summary.brief.as_ref().and_then(|brief| brief.change.as_deref()) {
             Some(change) => format!("keep the follow-up in its approved change `{change}` (never `canon change new`)"),
             None => "keep the follow-up in its change".to_string(),

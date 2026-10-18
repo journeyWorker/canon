@@ -1,9 +1,10 @@
 //! Stable failure-class strings (design decision 9, D9): the SAME
-//! ten strings every wave-2 check (coverage/D3a, verdict-ledger/D3b,
+//! eleven strings every wave-2 check (coverage/D3a, verdict-ledger/D3b,
 //! staleness, trust-ladder promotion, the flag ratchet,
 //! `gated-task-completion`'s checkbox-flip guard,
-//! `spec_coverage.require_review`'s open-blocker rule, and the audit
-//! check's false-success rule) emits, grep-stable
+//! `spec_coverage.require_review`'s open-blocker rule, the audit
+//! check's false-success rule, and the policy-approval check) emits,
+//! grep-stable
 //! like `tools/parity.py::FAILURE_CLASSES`
 //! (the donor parity-harness audit's static-gate notes §3.1) —
 //! never renamed without migrating every fixture + hook in the same
@@ -19,14 +20,14 @@
 //! `as_str`/`from_str_exact` shape, `canon-model/src/evidence.rs` — a
 //! DIFFERENT closed vocabulary for a different gate layer: S1's five
 //! classes cover evidence-INTEGRITY malformed-input; this crate's
-//! ten cover the trust-SPINE gate's own violations. `malformed` (S1)
+//! eleven cover the trust-SPINE gate's own violations. `malformed` (S1)
 //! and `malformed-evidence` (here) are deliberately distinct strings
 //! for exactly that reason.).
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// The trust-spine gate's ten closed failure classes (design
+/// The trust-spine gate's eleven closed failure classes (design
 /// decision 9). Renaming a variant's [`FailureClass::as_str`] value is
 /// a coordinated migration (fixtures + hooks in the same change) —
 /// never a silent rename.
@@ -96,14 +97,21 @@ pub enum FailureClass {
     /// audit is a recorded fact, whether or not
     /// `spec_coverage.require_audit` sampled the scenario.
     FalseSuccess,
+    /// `.canon/policy.yaml` no longer matches the digest a human
+    /// approved, or `.canon/policy.approval.json` does not read as an
+    /// approval (0.22 D1, #71): the gate would grade against a policy
+    /// nobody approved. A policy never approved stays an advisory.
+    /// [`crate::policy_approval::PolicyApprovalCheck`] emits it; not
+    /// waivable by `--override-reason`.
+    UnapprovedPolicy,
 }
 
 impl FailureClass {
-    /// All ten classes, in [`FAILURE_CLASSES`]'s own order — the one
+    /// All eleven classes, in [`FAILURE_CLASSES`]'s own order — the one
     /// iteration point [`FAILURE_CLASSES`] and
-    /// [`FailureClass::from_str_exact`] both walk, so "ten classes"
+    /// [`FailureClass::from_str_exact`] both walk, so "eleven classes"
     /// is asserted structurally, not by a comment that can drift.
-    pub const ALL: [FailureClass; 10] = [
+    pub const ALL: [FailureClass; 11] = [
         FailureClass::UncoveredCell,
         FailureClass::UnreviewedPromotion,
         FailureClass::TrustBelowRequired,
@@ -114,6 +122,7 @@ impl FailureClass {
         FailureClass::FabricatedEvidence,
         FailureClass::OpenBlocker,
         FailureClass::FalseSuccess,
+        FailureClass::UnapprovedPolicy,
     ];
 
     /// The stable, grep-able wire string. Matches
@@ -132,6 +141,7 @@ impl FailureClass {
             FailureClass::FabricatedEvidence => "fabricated-evidence",
             FailureClass::OpenBlocker => "open-blocker",
             FailureClass::FalseSuccess => "false-success",
+            FailureClass::UnapprovedPolicy => "unapproved-policy",
         }
     }
 
@@ -149,7 +159,7 @@ impl FailureClass {
 /// enum, is what a shell hook or a fixture's `expected_failures.txt`
 /// greps against (static-gate.md §3.1's rationale for a plain string
 /// list over an `Enum`).
-pub const FAILURE_CLASSES: [&str; 10] = [
+pub const FAILURE_CLASSES: [&str; 11] = [
     "uncovered-cell",
     "unreviewed-promotion",
     "trust-below-required",
@@ -160,6 +170,7 @@ pub const FAILURE_CLASSES: [&str; 10] = [
     "fabricated-evidence",
     "open-blocker",
     "false-success",
+    "unapproved-policy",
 ];
 
 /// One gate violation — mirrors `tools/parity.py::Violation(cls,
@@ -199,7 +210,7 @@ mod tests {
     use super::*;
 
     /// `FAILURE_CLASSES` stability test (acceptance criterion): the
-    /// ten wire strings are exactly [`FailureClass::ALL`]'s
+    /// eleven wire strings are exactly [`FailureClass::ALL`]'s
     /// `as_str()` output, in the same order, and every string
     /// round-trips through [`FailureClass::from_str_exact`] — the two
     /// representations (grep-stable const, typed enum) can never
@@ -233,11 +244,11 @@ mod tests {
     }
 
     #[test]
-    fn all_has_exactly_ten_classes_no_duplicates() {
+    fn all_has_exactly_eleven_classes_no_duplicates() {
         let mut seen = std::collections::HashSet::new();
         for class in FailureClass::ALL {
             assert!(seen.insert(class.as_str()), "duplicate failure class: {}", class.as_str());
         }
-        assert_eq!(seen.len(), 10);
+        assert_eq!(seen.len(), 11);
     }
 }

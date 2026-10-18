@@ -1,0 +1,4 @@
+# canon gate selftest fixture — unapproved-policy (0.22 D1, #71).
+# `.canon/policy.approval.json` records the digest of a policy that
+# carried `spec_coverage.require_review`; the policy no longer does.
+unapproved-policy .canon/policy.yaml

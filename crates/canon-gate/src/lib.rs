@@ -57,6 +57,7 @@ pub mod ledger;
 pub mod legacy_pins;
 pub mod markers;
 pub mod policy;
+pub mod policy_approval;
 pub mod policy_keys;
 pub mod promote;
 pub mod report;
@@ -85,6 +86,7 @@ pub use policy::{
     allowed_signers_path, AuditRate, BindingMode, BindingStrength, EvidenceBinding, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution,
     PolicyResolveError, RequireAudit, RequireReview, RiskTierRule, SpecCoverage, StalenessPolicy, KNOWN_TOP_LEVEL_KEYS,
 };
+pub use policy_approval::PolicyApprovalCheck;
 pub use policy_keys::PolicyKeysCheck;
 pub use review_gate::{review_advisories, ReviewAdvisory};
 pub use promote::{

@@ -58,7 +58,7 @@ pub struct After {
 
 /// Steps that block every subject, so a scoped list keeps them.
 fn blocks_everything(step: &NextStep) -> bool {
-    matches!(step.command.as_str(), "canon init" | "canon init --check-config" | "canon migrate" | "canon inventory sync" | "canon gate check")
+    matches!(step.command.as_str(), "canon init" | "canon init --check-config" | "canon migrate" | "canon inventory sync" | "canon gate check" | crate::policy_approval::REVIEW_STEP)
 }
 
 /// The report's steps narrowed to `scope`.
@@ -163,9 +163,21 @@ pub fn finish(repo: &Path, command: &str, scope: &Scope, staged: bool, json: boo
 
 /// [`finish`] with extra `meta` keys beside `next` (a page's cursor).
 pub fn finish_with_meta(repo: &Path, command: &str, scope: &Scope, staged: bool, json: bool, data: Value, extra_meta: Value) {
-    let after = after(repo, scope, staged);
+    emit(command, json, data, &after(repo, scope, staged), extra_meta);
+}
+
+/// [`finish`] with `first` ahead of the engine's steps: a write whose own
+/// read-back comes next (`policy approve` → `canon policy show`, 0.22 D2).
+pub fn finish_with_first(repo: &Path, command: &str, scope: &Scope, json: bool, data: Value, first: NextStep) {
+    let repo = crate::context::resolve_repo_root(repo);
+    let mut steps = vec![first];
+    steps.extend(scoped(&status::resolve_with_pending_index(&repo), scope));
+    emit(command, json, data, &present(steps, Role::current(None)), Value::Null);
+}
+
+fn emit(command: &str, json: bool, data: Value, after: &After, extra_meta: Value) {
     if json {
-        crate::json_out::data_with_next_and_meta(command, data, &after, extra_meta);
+        crate::json_out::data_with_next_and_meta(command, data, after, extra_meta);
     } else {
         for line in after.lines() {
             println!("{line}");

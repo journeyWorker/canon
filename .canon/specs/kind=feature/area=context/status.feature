@@ -165,11 +165,11 @@ Feature: context status
   @subject:context-capability
   @case:failure
   @context.status.40
-  Scenario: Status warns that the policy in force is not the approved one
-    Given a repository whose policy has no approval record, or whose policy changed after it was approved
+  Scenario: Status stops for the human while the policy in force is not the approved one
+    Given a repository whose policy has no approval record, then one whose policy changed after it was approved, then one whose approval file does not read
     When canon status runs
-    Then it warns that the policy is not approved, or changed since approval, and names `canon policy approve`
-    And the warning appears in the --json warnings too
+    Then a policy with no approval record is a warning naming `canon policy approve`, in the --json warnings too, and no step is withheld
+    And a changed policy or an unreadable approval is a human step to stop and report the policy, naming unapproved-policy and `canon policy show`, with no step moving a subject on
     And status still exits 0
 
   # canon: {"schema":1,"at":"2026-10-11T14:44:45Z","actor":{"agent_id":"canon-scaffold"}}

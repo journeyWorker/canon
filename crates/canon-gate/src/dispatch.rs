@@ -70,6 +70,10 @@ pub fn check_set(release: bool) -> Vec<Box<dyn GateCheck>> {
         // 0.15 D3: a scenario whose latest audit is refuted is
         // `false-success`. Silent when no audit record is refuted.
         Box::new(crate::audit::AuditCheck),
+        // 0.22 D1 (#71): a policy changed since its approval, or an
+        // approval that does not read, is `unapproved-policy`. Silent
+        // when there is no policy or it was never approved.
+        Box::new(crate::policy_approval::PolicyApprovalCheck),
     ];
     if release {
         checks.push(Box::new(ReleaseTrustCheck));
@@ -98,7 +102,8 @@ mod tests {
         assert!(checks.iter().any(|c| c.name() == "evidence-artifacts"), "registered always; silent when no record binds a file");
         assert!(checks.iter().any(|c| c.name() == "policy-keys"));
         assert!(checks.iter().any(|c| c.name() == "audit"), "registered always; silent when no audit is refuted");
-        assert_eq!(checks.len(), 10);
+        assert!(checks.iter().any(|c| c.name() == "policy-approval"), "registered always; silent unless the approved policy changed");
+        assert_eq!(checks.len(), 11);
     }
 
     #[test]
@@ -106,7 +111,7 @@ mod tests {
         let checks = check_set(true);
         assert!(checks.iter().any(|c| c.name() == "trust-ladder"), "a release profile must never drop the always-on trust-ladder check");
         assert!(checks.iter().any(|c| c.name() == "release-trust-required"));
-        assert_eq!(checks.len(), 11);
+        assert_eq!(checks.len(), 12);
     }
 
     #[test]

@@ -345,3 +345,23 @@ Feature: subject lifecycle
     When the changes are queried
     Then the change shows that subject as a one-element subject_ids
     And adopting it under a second subject appends that subject and writes the change as the list at the current schema generation
+
+  # canon: {"schema":1,"at":"2026-10-16T17:40:21Z","actor":{"agent_id":"canon-022-p1-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.35
+  Scenario: A policy changed since its approval refuses every guarded transition, override or not
+    Given a subject ready to ship under a policy approved with require_review, after the require_review key was deleted
+    When it is moved building to verifying, verifying to shipped, with and without --override-reason, and reopened from shipped
+    Then each move exits 1 with POLICY_CHANGED_SINCE_APPROVAL naming both digests and the approver, and the subject keeps its status
+    And the hint names canon policy show, and says --override-reason does not waive it when one was given
+    And once a human approves the policy the subject ships
+
+  # canon: {"schema":1,"at":"2026-10-16T17:40:21Z","actor":{"agent_id":"canon-022-p1-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.36
+  Scenario: An unreadable policy approval refuses the ship
+    Given a subject ready to ship and a .canon/policy.approval.json that does not read as an approval
+    When it is moved to shipped, with and without --override-reason
+    Then the command exits 1 with POLICY_APPROVAL_UNREADABLE naming the approval file, and the subject stays verifying

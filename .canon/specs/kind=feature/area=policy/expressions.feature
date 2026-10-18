@@ -131,8 +131,41 @@ Feature: policy expressions
   @subject:policy-expressions
   @case:edge
   @policy.expressions.32
-  Scenario: The gate advises while the policy is unapproved or changed since approval
+  Scenario: The gate fails on a policy changed since its approval until a human approves the change
     Given a repository with a policy
-    When canon gate check runs before any approval, after an approval, and after the policy changes
-    Then it prints a policy-not-approved advisory, then nothing, then a changed-since-approval advisory naming both digests
-    And the gate's exit code is the same in all three runs
+    When canon gate check runs before any approval, after an approval, after the policy changes, and after a human approves the change
+    Then it prints a policy-not-approved advisory and exits 0, then is clean, then exits 1 with an unapproved-policy violation, then is clean again
+    And the violation names the policy path, the current and the approved digest, the approver and the time, and canon policy approve --by <who> or canon brief approve
+    And with --json the violation's class is unapproved-policy
+
+  # canon: {"schema":1,"at":"2026-10-16T17:40:21Z","actor":{"agent_id":"canon-022-p1-impl"}}
+  @subject:policy-expressions
+  @case:failure
+  @policy.expressions.33
+  Scenario: An approval file that does not read fails the gate
+    Given a repository whose .canon/policy.approval.json does not parse as an approval
+    When canon gate check runs
+    Then it exits 1 with an unapproved-policy violation naming the approval file and the parse error
+    And once a human runs canon policy approve the gate is clean
+
+  # canon: {"schema":1,"at":"2026-10-16T17:40:21Z","actor":{"agent_id":"canon-022-p1-impl"}}
+  @subject:policy-expressions
+  @case:happy
+  @policy.expressions.34
+  Scenario: A policy never approved stays an advisory
+    Given a repository with a policy and no approval record, and a subject ready to ship
+    When canon gate check, canon status and canon subject status --to shipped run
+    Then the gate exits 0 with a policy-not-approved advisory naming canon policy approve
+    And status keeps the warning and no human step
+    And the subject ships
+
+  # canon: {"schema":1,"at":"2026-10-16T17:40:21Z","actor":{"agent_id":"canon-022-p1-impl"}}
+  @subject:policy-expressions
+  @case:happy
+  @policy.expressions.35
+  Scenario: canon policy show reads back the approval state
+    Given a repository with no policy, then a policy never approved, approved, changed after its approval, and with an unreadable approval file
+    When canon policy show runs, with and without --json
+    Then it exits 0 each time and reports the state none, unapproved, approved, changed and unreadable
+    And it names the policy path and its current digest, and the approver, time, note and approved digest when an approval reads
+    And canon policy approve names canon policy show as its next step

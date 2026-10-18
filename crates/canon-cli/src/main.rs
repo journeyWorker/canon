@@ -124,8 +124,8 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// Record who approved the gate's policy (.canon/policy.yaml) and which bytes
-    #[command(after_help = "Examples:\n  canon policy approve --by alice --note 'reviewed the starter policy'\n\nWrites .canon/policy.approval.json (commit it): the policy's sha256, who\napproved it, when, and the note. `canon gate check` and `canon status` print an\nadvisory while the policy is unapproved or has changed since its approval;\nthe advisory never changes an exit code.")]
+    /// Record who approved the gate's policy (.canon/policy.yaml) and which bytes, and read it back
+    #[command(after_help = "Examples:\n  canon policy approve --by alice --note 'reviewed the starter policy'\n  canon policy show\n\nWrites .canon/policy.approval.json (commit it): the policy's sha256, who\napproved it, when, and the note. A policy that changed after its approval, or an\napproval file that does not read, fails `canon gate check` (unapproved-policy) and\nrefuses `canon subject status` until a human approves it again; --override-reason\ndoes not waive it. A policy never approved is an advisory in `canon gate check`\nand `canon status`.")]
     Policy {
         #[command(subcommand)]
         action: PolicyCommand,
@@ -491,6 +491,16 @@ enum PolicyCommand {
         /// Why, or what was reviewed
         #[arg(long)]
         note: Option<String>,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show the policy in force: its digest, whether a human approved these bytes, and the approval
+    #[command(after_help = "Examples:\n  canon policy show\n  canon policy show --json\n\nA read: exits 0 whatever the state. state is approved, unapproved (no approval\nrecord), changed (the policy changed after its approval: `canon gate check` fails and\n`canon subject status` refuses until a human approves it), unreadable (the approval\nfile does not read; the same as changed) or none (no policy).")]
+    Show {
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -2089,6 +2099,7 @@ fn main() -> ExitCode {
         Command::Migrate { repo, dry_run, json } => ExitCode::from(canon_cli::migrate::run(&repo, dry_run, json) as u8),
         Command::Policy { action } => match action {
             PolicyCommand::Approve { by, note, repo, json } => ExitCode::from(canon_cli::policy_approval::run_approve(&repo, &by, note.as_deref(), json) as u8),
+            PolicyCommand::Show { repo, json } => ExitCode::from(canon_cli::policy_approval::run_show(&repo, json) as u8),
         },
         Command::Demo { action } => match action {
             DemoCommand::Init { repo, json } => ExitCode::from(canon_cli::demo::run_demo_init(&repo, json) as u8),
