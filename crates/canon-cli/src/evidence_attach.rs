@@ -47,6 +47,20 @@
 //! a verdict from them. A case whose id is not indexed is named and
 //! skipped. Every record pins the same report blob.
 //!
+//! # Attachments by test (0.24 D4, #83)
+//! A report says which file belongs to which test, so a record binds the
+//! files of ITS cases and no other: a JUnit `<testcase>`'s `<system-out>`
+//! lines `[[ATTACHMENT|<path>]]` (Playwright's reporter; the path is
+//! relative to the report's directory, an absolute one must lie inside
+//! the repository) and a Cucumber step's `embeddings` (base64 bytes,
+//! stored by digest under a name derived from the report, the case and
+//! the embedding's index). Such a file that is missing, escapes the
+//! repository or exceeds the size limit refuses the bind, naming the
+//! case and the path. A bare `--artifact` is bound to the record of a
+//! single scenario; the batch refuses it (it would bind to every
+//! record) and takes `--artifact <scenario-id>=<path>` instead
+//! ([`parse_artifact`]).
+//!
 //! # Storing the bytes (0.14 D4)
 //! [`bind`] only reads. It returns each bound file's resolved path and
 //! digest alongside the attachments, and `canon evidence add` copies the
@@ -64,6 +78,7 @@
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use canon_model::{EvidenceAttachment, EvidenceVerdict, ReportFormat, ReportOutcome};
 use quick_xml::events::{BytesStart, Event};
@@ -134,6 +149,32 @@ pub struct ReportCase {
     /// Cucumber scenario tags (`@` stripped); empty for JUnit.
     pub tags: Vec<String>,
     pub outcome: ReportOutcome,
+    /// The files the report names as this case's own.
+    pub attachments: Vec<CaseFile>,
+}
+
+/// A file a report says belongs to one case.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CaseFile {
+    /// A JUnit `[[ATTACHMENT|<path>]]` path, as written: relative to the
+    /// report's directory.
+    Path(String),
+    /// A Cucumber embedding, decoded.
+    Embedded { mime: String, bytes: Arc<[u8]> },
+}
+
+/// `--artifact <path>` or `--artifact <scenario-id>=<path>`: the scenario
+/// id scopes the file to that scenario's record. The part before the
+/// first `=` is a scope only when it is shaped like a scenario id
+/// (`<area>.<surface>.<nn>`), so a path containing `=` stays a path;
+/// write `./<id>=<file>` for a file literally named that way.
+pub fn parse_artifact(value: &Path) -> (Option<String>, PathBuf) {
+    if let Some((id, path)) = value.to_str().and_then(|v| v.split_once('=')) {
+        if canon_model::ScenarioId::parse(id).is_ok() {
+            return (Some(id.to_string()), PathBuf::from(path));
+        }
+    }
+    (None, value.to_path_buf())
 }
 
 /// Parse `--report`'s `<format>:<path>`.
@@ -181,6 +222,23 @@ pub struct BindRequest<'a> {
 pub struct BoundFile {
     pub resolved: PathBuf,
     pub sha256: String,
+    /// The bytes of a Cucumber embedding: there is no file, and
+    /// `resolved` is only the name the record shows.
+    pub embedded: Option<Arc<[u8]>>,
+}
+
+impl BoundFile {
+    fn on_disk(resolved: PathBuf, sha256: String) -> Self {
+        BoundFile { resolved, sha256, embedded: None }
+    }
+
+    /// The bytes behind the digest.
+    fn reader(&self) -> std::io::Result<Box<dyn Read>> {
+        match &self.embedded {
+            Some(bytes) => Ok(Box::new(std::io::Cursor::new(bytes.clone()))),
+            None => Ok(Box::new(std::fs::File::open(&self.resolved)?)),
+        }
+    }
 }
 
 /// What [`bind`] produced: the record's attachments and the files
@@ -192,10 +250,21 @@ pub struct Bound {
 }
 
 impl Bound {
-    fn add_file(&mut self, resolved: PathBuf, sha256: &str) {
-        if !self.files.iter().any(|f| f.sha256 == sha256) {
-            self.files.push(BoundFile { resolved, sha256: sha256.to_string() });
-        }
+    fn add_file(&mut self, file: BoundFile) {
+        add_unique_file(&mut self.files, file);
+    }
+}
+
+fn add_unique_file(files: &mut Vec<BoundFile>, file: BoundFile) {
+    if !files.iter().any(|f| f.sha256 == file.sha256) {
+        files.push(file);
+    }
+}
+
+/// Add an opaque attachment unless the record already binds those bytes.
+fn push_unique(attachments: &mut Vec<EvidenceAttachment>, attachment: EvidenceAttachment) {
+    if !attachments.iter().any(|a| a.format.is_none() && a.sha256 == attachment.sha256) {
+        attachments.push(attachment);
     }
 }
 
@@ -217,7 +286,7 @@ fn hash_artifact(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Bo
     let (relative, resolved, file) = open_in_repo(repo, path, max_bytes).map_err(|e| e.on("--artifact"))?;
     let sha256 = canon_gate::artifact_store::sha256_reader(file)
         .map_err(|e| BindError::usage(format!("read {}: {e}", path.display()), "check the file is readable by this user").on("--artifact"))?;
-    Ok((relative, BoundFile { resolved, sha256 }))
+    Ok((relative, BoundFile::on_disk(resolved, sha256)))
 }
 
 /// Copy every bound file into the artifact store, all or nothing,
@@ -264,7 +333,8 @@ pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldS
         // and an upload must not hold other writers off for its duration.
         drop(lock);
         for file in files {
-            let actual = std::fs::File::open(&file.resolved)
+            let actual = file
+                .reader()
                 .and_then(canon_gate::artifact_store::sha256_reader)
                 .map_err(|e| (file, StoreError::from(e)))?;
             if actual != file.sha256 {
@@ -273,7 +343,7 @@ pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldS
         }
         let mut uploaded = 0;
         for file in files {
-            let stored = std::fs::File::open(&file.resolved).map_err(StoreError::from).and_then(|reader| object.upload(&file.sha256, reader)).map_err(|e| (file, e))?;
+            let stored = file.reader().map_err(StoreError::from).and_then(|reader| object.upload(&file.sha256, reader)).map_err(|e| (file, e))?;
             if stored == canon_gate::artifact_store::StoreOutcome::Stored {
                 uploaded += 1;
             }
@@ -283,7 +353,8 @@ pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldS
     let mut staged = Vec::new();
     let mut sources = Vec::new();
     for file in files {
-        let blob = std::fs::File::open(&file.resolved)
+        let blob = file
+            .reader()
             .map_err(StoreError::from)
             .and_then(|reader| lock.stage(&file.sha256, reader))
             .map_err(|e| (file, e))?;
@@ -356,6 +427,44 @@ impl ParsedReport {
         }
     }
 
+    /// The files `case` names as its own (module doc), each read inside
+    /// the repository and the size limit. Any that cannot be refuses,
+    /// naming the case and the path.
+    fn case_files(&self, repo: &Path, case: &ReportCase, max_bytes: u64) -> Result<Vec<(EvidenceAttachment, BoundFile)>, BindError> {
+        let refusal = |written: &str, why: String| {
+            BindError::usage(
+                format!("case `{}` in {} names the attachment `{written}`, which cannot be bound: {why}", case.name, self.given.display()),
+                format!(
+                    "an attachment path in the report is resolved against the report's directory and must stay inside the repository; keep the run's output there (or regenerate the report), raise the limit with {} <MiB>, or drop the attachment from the test",
+                    canon_gate::MAX_ARTIFACT_FLAG
+                ),
+            )
+            .on("--report")
+        };
+        let mut out = Vec::new();
+        for (index, file) in case.attachments.iter().enumerate() {
+            let (path, bound) = match file {
+                CaseFile::Path(written) => {
+                    let given = Path::new(written);
+                    let candidate = if given.is_absolute() { given.to_path_buf() } else { self.resolved.parent().unwrap_or(Path::new("")).join(given) };
+                    let (relative, resolved, opened) = open_in_repo(repo, &candidate, max_bytes).map_err(|e| refusal(written, e.message().to_string()))?;
+                    let sha256 = canon_gate::artifact_store::sha256_reader(opened).map_err(|e| refusal(written, format!("read it: {e}")))?;
+                    (relative, BoundFile::on_disk(resolved, sha256))
+                }
+                CaseFile::Embedded { mime, bytes } => {
+                    let name = format!("{}.attachments/{}/{}.{}", self.relative, slug(&case.name), index + 1, mime_extension(mime));
+                    if bytes.len() as u64 > max_bytes {
+                        return Err(refusal(&name, format!("it is {} bytes, over the artifact store's limit of {max_bytes} bytes", bytes.len())));
+                    }
+                    let sha256 = format!("{:x}", Sha256::digest(bytes));
+                    (name.clone(), BoundFile { resolved: PathBuf::from(&name), sha256, embedded: Some(bytes.clone()) })
+                }
+            };
+            out.push((EvidenceAttachment { path, sha256: bound.sha256.clone(), format: None, case: None, outcome: None }, bound));
+        }
+        Ok(out)
+    }
+
     /// The refusal of a faithful verdict over `matched`, when any of
     /// them did not pass.
     fn contradiction(&self, matched: &[&ReportCase]) -> Option<String> {
@@ -365,6 +474,44 @@ impl ParsedReport {
             .map(|c| format!("`{}` as {}", c.name, outcome_name(c.outcome)))
             .collect();
         (!contradicting.is_empty()).then(|| format!("{} records case {}", self.given.display(), contradicting.join(", ")))
+    }
+}
+
+/// Bind the files of `cases` into `attachments` (once per digest) and
+/// return the files behind the new ones.
+fn bind_case_files(report: &ParsedReport, repo: &Path, cases: &[&ReportCase], max_bytes: u64, attachments: &mut Vec<EvidenceAttachment>) -> Result<Vec<BoundFile>, BindError> {
+    let mut files = Vec::new();
+    for case in cases {
+        for (attachment, file) in report.case_files(repo, case, max_bytes)? {
+            push_unique(attachments, attachment);
+            add_unique_file(&mut files, file);
+        }
+    }
+    Ok(files)
+}
+
+/// A case name as one path segment.
+fn slug(name: &str) -> String {
+    let slug: String = name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' { c } else { '-' }).collect();
+    let slug = slug.trim_matches('-');
+    if slug.is_empty() { "case".to_string() } else { slug.chars().take(80).collect() }
+}
+
+fn mime_extension(mime: &str) -> &'static str {
+    match mime.split(';').next().unwrap_or_default().trim().to_ascii_lowercase().as_str() {
+        "image/png" => "png",
+        "image/jpeg" | "image/jpg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "image/svg+xml" => "svg",
+        "text/plain" => "txt",
+        "text/html" => "html",
+        "text/csv" => "csv",
+        "application/json" => "json",
+        "application/zip" => "zip",
+        "video/webm" => "webm",
+        "video/mp4" => "mp4",
+        _ => "bin",
     }
 }
 
@@ -411,14 +558,8 @@ pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
 
     for path in request.artifacts {
         let (relative, file) = hash_artifact(&repo, path, request.max_bytes)?;
-        bound.attachments.push(EvidenceAttachment {
-            path: relative,
-            sha256: file.sha256.clone(),
-            format: None,
-            case: None,
-            outcome: None,
-        });
-        bound.add_file(file.resolved, &file.sha256);
+        push_unique(&mut bound.attachments, EvidenceAttachment { path: relative, sha256: file.sha256.clone(), format: None, case: None, outcome: None });
+        bound.add_file(file);
     }
 
     let mut named_unmatched: Vec<&str> = request.report_cases.iter().map(String::as_str).collect();
@@ -439,8 +580,11 @@ pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
                 return Err(BindError::Contradiction(format!("{contradiction}; {FAITHFUL_NEEDS_PASSES}")));
             }
         }
-        bound.add_file(report.resolved.clone(), &report.sha256);
+        bound.add_file(BoundFile::on_disk(report.resolved.clone(), report.sha256.clone()));
         bound.attachments.extend(matched.iter().map(|case| report.attachment(case)));
+        for file in bind_case_files(&report, &repo, &matched, request.max_bytes, &mut bound.attachments)? {
+            bound.add_file(file);
+        }
     }
     if let Some(name) = named_unmatched.first() {
         return Err(BindError::usage(
@@ -455,8 +599,10 @@ pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
 /// Inputs for [`bind_all_scenarios`].
 pub struct BatchRequest<'a> {
     pub repo: &'a Path,
-    /// Bound to every record.
-    pub artifacts: &'a [PathBuf],
+    /// `--artifact <scenario-id>=<path>`: each bound to that scenario's
+    /// record only. A bare `--artifact` is not a batch input (it would
+    /// bind to every record); the caller refuses it.
+    pub scoped_artifacts: &'a [(String, PathBuf)],
     pub reports: &'a [(ReportFormat, PathBuf)],
     /// The indexed scenario ids of the spec root, the ones a record may
     /// be written for.
@@ -516,13 +662,11 @@ pub fn bind_all_scenarios(request: &BatchRequest<'_>) -> Result<BatchBound, Bind
 
     let repo = canonical_repo(request.repo)?;
     let mut batch = BatchBound::default();
-    let mut shared = Vec::new();
-    for path in request.artifacts {
+    let mut scoped = Vec::new();
+    for (id, path) in request.scoped_artifacts {
         let (relative, file) = hash_artifact(&repo, path, request.max_bytes)?;
-        shared.push(EvidenceAttachment { path: relative, sha256: file.sha256.clone(), format: None, case: None, outcome: None });
-        if !batch.files.iter().any(|f| f.sha256 == file.sha256) {
-            batch.files.push(file);
-        }
+        let attachment = EvidenceAttachment { path: relative, sha256: file.sha256.clone(), format: None, case: None, outcome: None };
+        scoped.push((id.as_str(), attachment, file));
     }
     let reports = request
         .reports
@@ -545,7 +689,10 @@ pub fn bind_all_scenarios(request: &BatchRequest<'_>) -> Result<BatchBound, Bind
 
     let mut contradictions = Vec::new();
     for id in request.indexed {
-        let mut attachments = shared.clone();
+        let mut attachments: Vec<EvidenceAttachment> = Vec::new();
+        for (_, attachment, _) in scoped.iter().filter(|(scope, _, _)| scope == id) {
+            push_unique(&mut attachments, attachment.clone());
+        }
         let mut outcomes = Vec::new();
         for report in &reports {
             let matched: Vec<&ReportCase> = report.cases.iter().filter(|c| owns_scenario(c, id)).collect();
@@ -556,6 +703,9 @@ pub fn bind_all_scenarios(request: &BatchRequest<'_>) -> Result<BatchBound, Bind
             }
             outcomes.extend(matched.iter().map(|c| c.outcome));
             attachments.extend(matched.iter().map(|case| report.attachment(case)));
+            for file in bind_case_files(report, &repo, &matched, request.max_bytes, &mut attachments)? {
+                add_unique_file(&mut batch.files, file);
+            }
         }
         if outcomes.is_empty() {
             continue;
@@ -582,10 +732,20 @@ pub fn bind_all_scenarios(request: &BatchRequest<'_>) -> Result<BatchBound, Bind
         )
         .on("--report"));
     }
-    for report in &reports {
-        if !batch.files.iter().any(|f| f.sha256 == report.sha256) {
-            batch.files.push(BoundFile { resolved: report.resolved.clone(), sha256: report.sha256.clone() });
+    for (scope, attachment, _) in &scoped {
+        if !batch.scenarios.iter().any(|s| s.scenario_id == *scope) {
+            return Err(BindError::usage(
+                format!("--artifact `{scope}={}` names a scenario with no record in this batch; the batch writes a record only for an indexed scenario of --project-id that owns a case in the report", attachment.path),
+                "check the scenario id, index the scenario (`canon inventory sync`) and name its test after the id so the report carries a case for it, or drop the scoped --artifact",
+            )
+            .on("--artifact"));
         }
+    }
+    for (_, _, file) in scoped {
+        add_unique_file(&mut batch.files, file);
+    }
+    for report in &reports {
+        add_unique_file(&mut batch.files, BoundFile::on_disk(report.resolved.clone(), report.sha256.clone()));
     }
     Ok(batch)
 }
@@ -775,10 +935,45 @@ pub fn parse_junit(text: &str) -> Result<Vec<ReportCase>, String> {
     let mut reader = quick_xml::Reader::from_str(text);
     let mut cases = Vec::new();
     let mut open: Option<ReportCase> = None;
+    // The text of the open case's `<system-out>`, where Playwright's
+    // reporter writes one `[[ATTACHMENT|<path>]]` line per attachment.
+    let mut system_out: Option<String> = None;
     loop {
         match reader.read_event().map_err(|e| e.to_string())? {
             Event::Start(e) if e.local_name().as_ref() == b"testcase" => open = Some(testcase(&e)?),
             Event::Empty(e) if e.local_name().as_ref() == b"testcase" => cases.push(testcase(&e)?),
+            Event::Start(e) if e.local_name().as_ref() == b"system-out" && open.is_some() => system_out = Some(String::new()),
+            Event::Text(t) => {
+                if let Some(buffer) = system_out.as_mut() {
+                    buffer.push_str(&t.decode().map_err(|e| e.to_string())?);
+                }
+            }
+            Event::CData(c) => {
+                if let Some(buffer) = system_out.as_mut() {
+                    buffer.push_str(&c.decode().map_err(|e| e.to_string())?);
+                }
+            }
+            Event::GeneralRef(r) => {
+                if let Some(buffer) = system_out.as_mut() {
+                    if let Some(c) = r.resolve_char_ref().map_err(|e| e.to_string())? {
+                        buffer.push(c);
+                    } else {
+                        match r.decode().map_err(|e| e.to_string())?.as_ref() {
+                            "amp" => buffer.push('&'),
+                            "lt" => buffer.push('<'),
+                            "gt" => buffer.push('>'),
+                            "quot" => buffer.push('"'),
+                            "apos" => buffer.push('\''),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            Event::End(e) if e.local_name().as_ref() == b"system-out" => {
+                if let (Some(text), Some(case)) = (system_out.take(), open.as_mut()) {
+                    case.attachments.extend(attachment_lines(&text));
+                }
+            }
             Event::Start(e) | Event::Empty(e) => {
                 if let Some(case) = open.as_mut() {
                     match e.local_name().as_ref() {
@@ -808,6 +1003,15 @@ pub fn parse_junit(text: &str) -> Result<Vec<ReportCase>, String> {
     Ok(cases)
 }
 
+/// The `[[ATTACHMENT|<path>]]` lines of one `<system-out>`.
+fn attachment_lines(text: &str) -> Vec<CaseFile> {
+    text.lines()
+        .filter_map(|line| line.trim().strip_prefix("[[ATTACHMENT|")?.strip_suffix("]]"))
+        .filter(|path| !path.is_empty())
+        .map(|path| CaseFile::Path(path.to_string()))
+        .collect()
+}
+
 fn testcase(e: &BytesStart<'_>) -> Result<ReportCase, String> {
     let attr = |name: &str| -> Result<String, String> {
         match e.try_get_attribute(name).map_err(|err| err.to_string())? {
@@ -826,6 +1030,7 @@ fn testcase(e: &BytesStart<'_>) -> Result<ReportCase, String> {
         name,
         group: attr("classname")?,
         tags: Vec::new(),
+        attachments: Vec::new(),
         outcome: ReportOutcome::Passed,
     })
 }
@@ -845,7 +1050,7 @@ pub fn parse_cucumber(text: &str) -> Result<Vec<ReportCase>, String> {
             .and_then(|v| v.as_str())
             .unwrap_or_default()
             .to_string();
-        let mut background: Option<ReportOutcome> = None;
+        let mut background: Option<(ReportOutcome, Vec<CaseFile>)> = None;
         for element in feature
             .get("elements")
             .and_then(|v| v.as_array())
@@ -853,11 +1058,18 @@ pub fn parse_cucumber(text: &str) -> Result<Vec<ReportCase>, String> {
             .flatten()
         {
             let outcome = element_outcome(element);
+            let files = element_embeddings(element)?;
             if element.get("type").and_then(|v| v.as_str()) == Some("background") {
-                background = Some(outcome);
+                background = Some((outcome, files));
                 continue;
             }
-            let outcome = background.take().map_or(outcome, |b| worse(b, outcome));
+            let (outcome, attachments) = match background.take() {
+                Some((before, mut earlier)) => {
+                    earlier.extend(files);
+                    (worse(before, outcome), earlier)
+                }
+                None => (outcome, files),
+            };
             let name = element
                 .get("name")
                 .and_then(|v| v.as_str())
@@ -876,6 +1088,7 @@ pub fn parse_cucumber(text: &str) -> Result<Vec<ReportCase>, String> {
                 group: group.clone(),
                 tags,
                 outcome,
+                attachments,
             });
         }
     }
@@ -883,6 +1096,43 @@ pub fn parse_cucumber(text: &str) -> Result<Vec<ReportCase>, String> {
         return Err("no scenario element".to_string());
     }
     Ok(cases)
+}
+
+/// The embeddings of a Cucumber element's hooks and steps (`embeddings`,
+/// or the newer `attachments`): base64 `data` with a `mime_type`
+/// (`mimeType`, `media_type`, `media.type`); a `body` whose
+/// `contentEncoding` is `IDENTITY` is the bytes as written.
+fn element_embeddings(element: &serde_json::Value) -> Result<Vec<CaseFile>, String> {
+    use base64::Engine;
+
+    let mut files = Vec::new();
+    for key in ["before", "steps", "after"] {
+        for item in element.get(key).and_then(|v| v.as_array()).into_iter().flatten() {
+            for list in ["embeddings", "attachments"] {
+                for embedding in item.get(list).and_then(|v| v.as_array()).into_iter().flatten() {
+                    let text = ["data", "body"].iter().find_map(|k| embedding.get(*k).and_then(|v| v.as_str())).unwrap_or_default();
+                    if text.is_empty() {
+                        continue;
+                    }
+                    let mime = ["mime_type", "mimeType", "media_type", "mediaType"]
+                        .iter()
+                        .find_map(|k| embedding.get(*k).and_then(|v| v.as_str()))
+                        .or_else(|| embedding.pointer("/media/type").and_then(|v| v.as_str()))
+                        .unwrap_or_default()
+                        .to_string();
+                    let identity = ["contentEncoding", "content_encoding"].iter().find_map(|k| embedding.get(*k).and_then(|v| v.as_str())).is_some_and(|e| e.eq_ignore_ascii_case("identity"));
+                    let bytes = if identity {
+                        text.as_bytes().to_vec()
+                    } else {
+                        let compact: String = text.split_whitespace().collect();
+                        base64::engine::general_purpose::STANDARD.decode(compact).map_err(|e| format!("an embedding of a {key} item is not valid base64: {e}"))?
+                    };
+                    files.push(CaseFile::Embedded { mime, bytes: bytes.into() });
+                }
+            }
+        }
+    }
+    Ok(files)
 }
 
 fn element_outcome(element: &serde_json::Value) -> ReportOutcome {
@@ -1024,7 +1274,7 @@ pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
             } else {
                 return None;
             };
-            Some(ReportCase { name: name.clone(), group: String::new(), tags: Vec::new(), outcome })
+            Some(ReportCase { name: name.clone(), group: String::new(), tags: Vec::new(), outcome, attachments: Vec::new() })
         })
         .collect();
     if cases.is_empty() {
@@ -1380,7 +1630,7 @@ mod tests {
         let explained = format!("{stream}\n{suite_end_fail}");
         assert_eq!(
             parse_swift_testing(&explained).unwrap()[0],
-            ReportCase { name: "a_b_01()".to_string(), group: String::new(), tags: Vec::new(), outcome: ReportOutcome::Passed },
+            ReportCase { name: "a_b_01()".to_string(), group: String::new(), tags: Vec::new(), outcome: ReportOutcome::Passed, attachments: Vec::new() },
             "a suite's end that reports a failing test inside it leaves that test's siblings as they ended"
         );
         let ended_failed = [test("a_b_01"), event("a_b_01", "testStarted", ""), event("a_b_01", "testEnded", r#","messages":[{"symbol":"fail","text":"failed"}]"#)].join("\n");
@@ -1408,10 +1658,10 @@ mod tests {
         std::fs::write(repo.path().join("junit.xml"), report).unwrap();
         std::fs::write(repo.path().join("trace.zip"), b"trace").unwrap();
         let reports = vec![(ReportFormat::Junit, repo.path().join("junit.xml"))];
-        let artifacts = vec![repo.path().join("trace.zip")];
+        let artifacts = vec![("shop.cart.01".to_string(), repo.path().join("trace.zip"))];
         let request = BatchRequest {
             repo: repo.path(),
-            artifacts: &artifacts,
+            scoped_artifacts: &artifacts,
             reports: &reports,
             indexed: &["shop.cart.01", "shop.cart.02", "shop.cart.03", "shop.cart.04"],
             verdict: None,
@@ -1427,8 +1677,8 @@ mod tests {
             summary,
             vec![
                 ("shop.cart.01", EvidenceVerdict::Faithful, vec![None, Some("shop.cart.01 adds")]),
-                ("shop.cart.02", EvidenceVerdict::Divergent, vec![None, Some("shop.cart.02 refuses"), Some("shop.cart.02 counts")]),
-                ("shop.cart.03", EvidenceVerdict::NotApplicable, vec![None, Some("tests::shop_cart_03_skips")]),
+                ("shop.cart.02", EvidenceVerdict::Divergent, vec![Some("shop.cart.02 refuses"), Some("shop.cart.02 counts")]),
+                ("shop.cart.03", EvidenceVerdict::NotApplicable, vec![Some("tests::shop_cart_03_skips")]),
             ],
             "shop.cart.04 owns no case and gets no record"
         );
@@ -1457,5 +1707,31 @@ mod tests {
         assert_eq!(bind(&all).unwrap().attachments.len(), 5);
         let faithful = BindRequest { scenario_id: None, all_cases: true, ..request(repo.path(), &[], &reports, EvidenceVerdict::Faithful) };
         assert!(matches!(bind(&faithful), Err(BindError::Contradiction(m)) if m.contains("cart.add.010 later")));
+    }
+
+    /// A testcase's attachments are the `[[ATTACHMENT|..]]` lines of ITS
+    /// system-out (text, CDATA, entities), not another case's nor a
+    /// suite-level one.
+    #[test]
+    fn junit_attachments_belong_to_their_case() {
+        let cases = parse_junit(
+            "<testsuite><system-out>[[ATTACHMENT|suite.png]]</system-out>\
+             <testcase name=\"a.b.01\"><system-out><![CDATA[\n[[ATTACHMENT|x/1.png]]\n\n  [[ATTACHMENT|x/2.png]]\nnot one\n]]></system-out></testcase>\
+             <testcase name=\"a.b.02\"><system-out>[[ATTACHMENT|a&amp;b.png]]</system-out></testcase>\
+             <testcase name=\"a.b.03\"/></testsuite>",
+        )
+        .unwrap();
+        let paths = |case: &ReportCase| -> Vec<String> { case.attachments.iter().map(|f| match f { CaseFile::Path(p) => p.clone(), CaseFile::Embedded { .. } => unreachable!() }).collect() };
+        assert_eq!(paths(&cases[0]), ["x/1.png", "x/2.png"]);
+        assert_eq!(paths(&cases[1]), ["a&b.png"]);
+        assert!(cases[2].attachments.is_empty());
+    }
+
+    /// `<id>=<path>` scopes only when the prefix is shaped like a scenario id.
+    #[test]
+    fn artifact_scope_needs_an_id_shaped_prefix() {
+        assert_eq!(parse_artifact(Path::new("cart.add.01=shots/a.png")), (Some("cart.add.01".to_string()), PathBuf::from("shots/a.png")));
+        assert_eq!(parse_artifact(Path::new("shots/a=b.png")), (None, PathBuf::from("shots/a=b.png")));
+        assert_eq!(parse_artifact(Path::new("./cart.add.01=a.png")), (None, PathBuf::from("./cart.add.01=a.png")));
     }
 }
