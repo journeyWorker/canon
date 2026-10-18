@@ -49,7 +49,7 @@
 //! and no `Approved:` line in the canon `brief.md` (the brief is
 //! enforced) gets the one `human` step status ever emits once `canon brief
 //! check` has no blocker left for it (0.22 D4); while it has some, the
-//! subject's step is the planner's `canon brief check --change <slug>`,
+//! subject's step is the planner's `canon brief check --change-id <slug>`,
 //! `N blocker(s): write the brief`. Either is the
 //! subject's only step, whatever its status: the agent stops and reports
 //! the brief, and nothing is built or attested for the subject (no
@@ -609,7 +609,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     // instead of one "owns no scenario" step per subject. But when the
     // .feature corpus itself holds no scenario, there is nothing to
     // index: the next step is writing features and scenarios, so each
-    // subject gets its `scenario new … --subject` step below.
+    // subject gets its `scenario new … --subject-id` step below.
     let corpus_has_scenarios = || spec_roots.iter().any(|root| !scan_feature_corpus(&root.root).is_empty());
     let promote_manual = crate::write_mode::configured_promote_mode(&repo.join("canon.yaml")) != Ok(crate::write_mode::PromoteMode::Auto);
     let mut owners: Vec<(std::ops::Range<usize>, String)> = Vec::new();
@@ -628,8 +628,8 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
-                command: format!("canon feature new <area>.<surface> --title \"<feature>\"{}", project_flag(&roots, None)),
-                why: "no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject <id>`".into(),
+                command: format!("canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit>{}", project_flag(&roots, None)),
+                why: "no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject-id <id>`".into(),
             });
         }
         let mut by_priority: Vec<&(&Subject, SubjectSummary)> = summaries.iter().filter(|(s, _)| NEXT_ORDER.contains(&s.status)).collect();
@@ -959,14 +959,14 @@ fn next_number(scenarios: &[&Scenario], project: &str, surface: &str) -> String 
     format!("{surface}.{:02}", max + 1)
 }
 
-/// `canon scenario new`'s `--project` flag: needed (and refused when
+/// `canon scenario new`'s `--project-id` flag: needed (and refused when
 /// absent) only when the repo configures more than one spec root. A
 /// known owning root is named exactly; otherwise a placeholder.
 fn project_flag(roots: &[ProjectId], project: Option<&str>) -> String {
     if roots.len() <= 1 {
         return String::new();
     }
-    format!(" --project {}", project.unwrap_or("<root-id>"))
+    format!(" --project-id {}", project.unwrap_or("<root-id>"))
 }
 
 /// The step for the first brief flow step with no scenario or no failure
@@ -995,7 +995,7 @@ fn flow_step(id: &str, all: &[&Scenario], roots: &[ProjectId], summary: &Subject
     Some(NextStep {
         actor: StepActor::Agent,
         role: Some(role),
-        command: format!("canon scenario new {suggested} --subject {id} --case {case} --flow {} --title \"{title}\"{}", step.id, project_flag(roots, project.as_deref())),
+        command: format!("canon scenario new {suggested} --subject-id {id} --case {case} --flow {} --title \"{title}\" --actor-id <unit>{}", step.id, project_flag(roots, project.as_deref())),
         why: format!("{id}: brief flow step {} has {gap}, and the ship guard refuses until it has one; tag it with --flow so it covers the step", step.id),
     })
 }
@@ -1034,7 +1034,7 @@ fn subject_steps(
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Planner),
-                command: format!("canon brief check --change {change}"),
+                command: format!("canon brief check --change-id {change}"),
                 why: format!("{id}: {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it", counts.blockers, brief.report_in()),
             });
             return;
@@ -1083,7 +1083,7 @@ fn subject_steps(
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Implementer),
-            command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject {id} --case happy{}", project_flag(roots, None)),
+            command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id {id} --case happy --actor-id <unit>{}", project_flag(roots, None)),
             why: format!("{id} owns no scenario; specify its behavior, one scenario per behavior{roots_note}"),
         });
         return;
@@ -1105,7 +1105,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Implementer),
             command: format!(
-                "canon scenario new {} --title \"<what happens on this path>\" --subject {id} --case {}{}",
+                "canon scenario new {} --title \"<what happens on this path>\" --subject-id {id} --case {} --actor-id <unit>{}",
                 next_number(all, &gap.project_id, &gap.surface),
                 gap.case,
                 project_flag(roots, Some(&gap.project_id))
@@ -1178,7 +1178,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Reviewer),
             command: format!(
-                "canon review add --project-id <root> --change {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"",
+                "canon review add --project-id <root> --change-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"",
                 change.as_str()
             ),
             why: format!("{id}: {why}"),

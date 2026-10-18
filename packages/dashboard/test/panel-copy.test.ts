@@ -329,11 +329,11 @@ test("the flywheel funnel states the applied split per distinct strategy, not pe
   expect(FUNNEL_NOTE).toContain("partition `applied` exactly");
   const attributed = FUNNEL_COLUMNS.find((c) => c.key === "applied_attributed");
   expect(attributed?.description).toContain("Per distinct strategy, not per run");
-  expect(attributed?.description).toContain("canon ingest artifacts --run");
+  expect(attributed?.description).toContain("canon ingest artifacts --run-id");
   expect(attributed?.description).toContain("not causation");
   const proxy = FUNNEL_COLUMNS.find((c) => c.key === "applied_proxy");
   expect(proxy?.description).toContain("terminal Run.status");
-  expect(proxy?.description).toContain("never passes `canon ingest artifacts --run`");
+  expect(proxy?.description).toContain("never passes `canon ingest artifacts --run-id`");
 });
 
 test("every panel note reaches the reader as prose, not only as a tooltip", () => {

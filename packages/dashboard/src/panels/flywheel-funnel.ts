@@ -74,13 +74,13 @@ export const COLUMNS: ColumnDef[] = [
     key: "applied_attributed",
     label: "Applied (attributed)",
     description:
-      "Per distinct strategy, not per run: the strategy is named in some run's injected_guidance, and that SAME run has at least one trajectory of the SAME role stamped with that run id (Trajectory.run_id, set only by `canon ingest artifacts --run`) whose outcome is resolved. The stronger of the two rules — still co-occurrence in one run, not causation.",
+      "Per distinct strategy, not per run: the strategy is named in some run's injected_guidance, and that SAME run has at least one trajectory of the SAME role stamped with that run id (Trajectory.run_id, set only by `canon ingest artifacts --run-id`) whose outcome is resolved. The stronger of the two rules — still co-occurrence in one run, not causation.",
   },
   {
     key: "applied_proxy",
     label: "Applied (proxy)",
     description:
-      "No such trajectory exists, so all that is recorded is the recipient run's own terminal Run.status (succeeded/failed/aborted). The weaker rule: a repo that never passes `canon ingest artifacts --run` reads its whole Applied here.",
+      "No such trajectory exists, so all that is recorded is the recipient run's own terminal Run.status (succeeded/failed/aborted). The weaker rule: a repo that never passes `canon ingest artifacts --run-id` reads its whole Applied here.",
   },
 ];
 

@@ -184,7 +184,7 @@
 //! ([`RowProvenance`]): S7's rolled-up `verdict_record` (outcome+reward,
 //! written back by `canon_learn::mark_trajectory_verdict` — this
 //! driver's own persist loop, or the S7 webhook receiver) and the
-//! `run_id` a `--run` pass stamped. Both are deliberately outside
+//! `run_id` a `--run-id` pass stamped. Both are deliberately outside
 //! [`trajectory_content_digest`] AND [`trajectory_derivation_key`], for
 //! reasons stated at each, so two rows CAN share a derivation key and
 //! still disagree about them.
@@ -318,7 +318,7 @@
 //! evidence TEXT to a trajectory some OTHER event's verdict created.
 //!
 //! # s42: attributing a trajectory to its dispatched run
-//! [`run`] takes an OPTIONAL [`RunId`] — `canon ingest artifacts --run`,
+//! [`run`] takes an OPTIONAL [`RunId`] — `canon ingest artifacts --run-id`,
 //! s42 (`close-the-open-loops`) task 3.2 — and stamps it onto every
 //! trajectory this pass WRITES ([`plan_trajectory`]). That closes s40
 //! task 3.1, which asked `mart_flywheel_funnel`'s `applied` stage to
@@ -391,7 +391,7 @@ pub enum ArtifactIngestError {
     /// `main.rs` as a nonzero exit exactly like `Learn`/`RegimeKey`.
     #[error("canon.yaml artifacts config: {0}")]
     ConfigXor(String),
-    /// `--run <RunId>` (s42 (`close-the-open-loops`) task 3.2) names a
+    /// `--run-id <RunId>` (s42 (`close-the-open-loops`) task 3.2) names a
     /// run this repo has no dispatch manifest for — rejected by
     /// [`resolve_dispatched_run`] BEFORE any adapter read runs.
     ///
@@ -405,10 +405,10 @@ pub enum ArtifactIngestError {
     /// no claim, and the one failure mode this whole field exists to
     /// avoid.
     #[error(
-        "--run `{run_id}` has no dispatch manifest at {path} — only a run begun by `canon dispatch begin` on this repo can be attributed; omit --run to ingest without attribution"
+        "--run-id `{run_id}` has no dispatch manifest at {path} — only a run begun by `canon dispatch begin` on this repo can be attributed; omit --run-id to ingest without attribution"
     )]
     UnknownRun { run_id: String, path: String },
-    /// `--run <RunId>` names a manifest that exists but is not a `Run`
+    /// `--run-id <RunId>` names a manifest that exists but is not a `Run`
     /// record this driver can read — s42 (`close-the-open-loops`)
     /// re-review (`ReviewAttribution` finding 1). Covers every way
     /// `crate::dispatch::read_dispatched_manifest`'s first two rungs can
@@ -423,10 +423,10 @@ pub enum ArtifactIngestError {
     /// and the pre-hardening code could not tell them apart at all
     /// because it probed with `metadata` and never opened the file.
     #[error(
-        "--run `{run_id}`'s dispatch manifest at {path} is not a readable Run record ({detail}) — attribution is only ever taken from the manifest `canon dispatch begin` wrote; repair or remove it, or omit --run to ingest without attribution"
+        "--run-id `{run_id}`'s dispatch manifest at {path} is not a readable Run record ({detail}) — attribution is only ever taken from the manifest `canon dispatch begin` wrote; repair or remove it, or omit --run-id to ingest without attribution"
     )]
     UnreadableRunManifest { run_id: String, path: String, detail: String },
-    /// `--run <RunId>` names a manifest whose OWN `run_id` is a
+    /// `--run-id <RunId>` names a manifest whose OWN `run_id` is a
     /// different run — `crate::dispatch::read_dispatched_manifest`'s
     /// third rung, the same `DispatchError::RunIdMismatch` `canon
     /// dispatch end` refuses a close on.
@@ -437,10 +437,10 @@ pub enum ArtifactIngestError {
     /// onto EVERY trajectory the pass writes, which is a false
     /// attribution rather than a failed one.
     #[error(
-        "--run `{run_id}`'s dispatch manifest at {path} records run_id `{found}` — the filename is that side-channel's only index, so admitting it would attribute every trajectory of this pass to a run you did not name"
+        "--run-id `{run_id}`'s dispatch manifest at {path} records run_id `{found}` — the filename is that side-channel's only index, so admitting it would attribute every trajectory of this pass to a run you did not name"
     )]
     MisfiledRunManifest { run_id: String, path: String, found: String },
-    /// `--run <RunId>` names a readable, correctly-filed manifest whose
+    /// `--run-id <RunId>` names a readable, correctly-filed manifest whose
     /// run was never DISPATCHED: `canon_model::records::RunStatus::
     /// Pending`, the one state that means no execution ever started.
     ///
@@ -454,7 +454,7 @@ pub enum ArtifactIngestError {
     /// attribute anything. `Pending` is the one status where attributing
     /// would assert an execution that never happened.
     #[error(
-        "--run `{run_id}` records status `pending` at {path} — a pending run was never dispatched, so no execution exists for this pass's trajectories to belong to; begin the run with `canon dispatch begin`, or omit --run to ingest without attribution"
+        "--run-id `{run_id}` records status `pending` at {path} — a pending run was never dispatched, so no execution exists for this pass's trajectories to belong to; begin the run with `canon dispatch begin`, or omit --run-id to ingest without attribution"
     )]
     RunNeverDispatched { run_id: String, path: String },
 }
@@ -1822,7 +1822,7 @@ fn superseded_driver_ids(existing: &[Trajectory]) -> Vec<TrajectoryId> {
 ///   value arrives later through
 ///   [`canon_learn::mark_trajectory_verdict`] — [`run`]'s own persist
 ///   loop, or the S7 webhook receiver, aimed at ONE id.
-/// - `run_id`: the dispatched run a `--run` pass was executing inside,
+/// - `run_id`: the dispatched run a `--run-id` pass was executing inside,
 ///   stamped by [`plan_trajectory`] onto the row that pass writes and
 ///   onto no other. Two passes under two runs therefore attribute two
 ///   different rows.
@@ -2131,7 +2131,7 @@ fn rebuild_namespace_converged(
 /// # `run_id` is stamped here, and only from `run_id`
 /// `run_id` is the DISPATCHED RUN this pass was told it is executing
 /// inside (s42 (`close-the-open-loops`) task 3.2, `canon ingest
-/// artifacts --run`), stamped onto the candidate and onto nothing else.
+/// artifacts --run-id`), stamped onto the candidate and onto nothing else.
 /// It is never derived from a timestamp, a role, or the newest manifest
 /// in `.canon/dispatch/`: `mart_flywheel_funnel`'s attribution stage
 /// reads this field as a claim that the run carried the guidance this
@@ -2206,7 +2206,7 @@ fn plan_trajectory(
     Ok(if canonical.is_some() { PersistPlan::Supersede(trajectory) } else { PersistPlan::Fresh(trajectory) })
 }
 
-/// Admits `--run <RunId>` (s42 (`close-the-open-loops`) task 3.2) by
+/// Admits `--run-id <RunId>` (s42 (`close-the-open-loops`) task 3.2) by
 /// resolving the dispatch manifest [`crate::dispatch::begin`] wrote for
 /// it, at the SAME `<repo>/.canon/dispatch/<run_id>.json` path
 /// [`crate::dispatch::end`] resolves a close through, and holding it to
@@ -2250,7 +2250,7 @@ fn plan_trajectory(
 /// begin` and survives `dispatch end` (which rewrites it in place),
 /// whereas the tier write s42 task 1.1 adds is documented as degrading to
 /// manifest-only when the hot rung is down. Gating attribution on the
-/// tier would make a correct `--run` fail on exactly the repos that
+/// tier would make a correct `--run-id` fail on exactly the repos that
 /// degraded.
 fn resolve_dispatched_run(repo: &Path, run_id: Option<&RunId>) -> Result<(), ArtifactIngestError> {
     let Some(run_id) = run_id else { return Ok(()) };
@@ -2287,7 +2287,7 @@ fn resolve_dispatched_run(repo: &Path, run_id: Option<&RunId>) -> Result<(), Art
 /// `ArtifactAdapter` (module doc).
 ///
 /// `run_id` is the dispatched run this pass is executing inside, from
-/// `canon ingest artifacts --run` (s42 (`close-the-open-loops`) task
+/// `canon ingest artifacts --run-id` (s42 (`close-the-open-loops`) task
 /// 3.2). `None` — the overwhelming case, and every pre-s42 invocation —
 /// means the trajectories this pass writes record NO run, rather than one
 /// guessed from the clock or from `.canon/dispatch/`'s newest entry. A
@@ -3748,7 +3748,7 @@ mod tests {
         );
     }
 
-    /// `--run` is admitted against this repo's own dispatch manifests, at
+    /// `--run-id` is admitted against this repo's own dispatch manifests, at
     /// the same path `canon dispatch end` resolves a close through. A
     /// well-formed ULID naming no dispatch is a LOUD failure: stamping it
     /// would produce an attribution `mart_flywheel_funnel` drops on the
@@ -3763,7 +3763,7 @@ mod tests {
         assert_eq!(run_id, &unknown.to_string(), "the error names the run the operator typed");
         assert!(path.ends_with(&format!("{unknown}.json")), "and the exact path consulted: {path}");
 
-        resolve_dispatched_run(dir.path(), None).expect("no --run at all is the ordinary, always-admissible case");
+        resolve_dispatched_run(dir.path(), None).expect("no --run-id at all is the ordinary, always-admissible case");
 
         // A manifest that really is this run's dispatch record admits it.
         // A bare `"{}"` used to be enough — the bar was `metadata`, so
@@ -4317,7 +4317,7 @@ mod tests {
     }
 
     // ── s42 re-review: provenance-preserving convergence, a retriable
-    //    rebuild order, and a typed `--run` admission ──
+    //    rebuild order, and a typed `--run-id` admission ──
 
     /// A `Run` manifest of exactly the shape `canon dispatch begin`
     /// writes — serialized through the real `canon_model::records::Run`,
@@ -4424,7 +4424,7 @@ mod tests {
     #[test]
     fn a_superseded_copy_carrying_its_own_run_attribution_is_kept_and_reported() {
         // The other independently-written field, same blocker.
-        // `plan_trajectory` stamps `run_id` onto the row a `--run` pass
+        // `plan_trajectory` stamps `run_id` onto the row a `--run-id` pass
         // WRITES and onto no other, so a namespace really can hold an
         // attributed loser beside an unattributed canonical row —
         // and deleting it erases that run's only line in

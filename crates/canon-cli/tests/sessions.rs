@@ -143,9 +143,9 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
     direct(&["scenario", "new", "game.run.01", "--title", "A run ends at zero health", "--case", "failure"]);
     ok(repo, &["inventory", "sync"]);
     direct(&["subject", "new", "runs", "--domain", "dev", "--title", "Runs"]);
-    direct(&["subject", "adopt", "cats", "--subject", "runs"]);
+    direct(&["subject", "adopt", "cats", "--subject-id", "runs"]);
     direct(&["subject", "status", "runs", "--to", "specced"]);
-    direct(&["change", "new", "runs-boss", "--subject", "runs", "--title", "A boss wave"]);
+    direct(&["change", "new", "runs-boss", "--subject-id", "runs", "--title", "A boss wave"]);
 
     staged(
         &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer", "--no-promote"],

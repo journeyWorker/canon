@@ -9,9 +9,9 @@
 //! `retrieve_guidance` itself (that module's own doc), never
 //! duplicated here.
 //!
-//! # s36 derived-scope surface (`--domain`/`--subject`)
+//! # s36 derived-scope surface (`--domain`/`--subject-id`)
 //! Alongside the explicit `--regime <k>` path, [`run_scoped`] accepts a
-//! DERIVED scope: `--domain <d>` (with an optional `--subject <id>`),
+//! DERIVED scope: `--domain <d>` (with an optional `--subject-id <id>`),
 //! mutually exclusive with `--regime` and enforced as a loud usage
 //! error. The derived path builds the ordered fallback ladder
 //! `<domain>-<subject_id>` → `<domain>` ([`derive_candidates`]) and
@@ -88,7 +88,7 @@ pub fn parse_regime(s: &str) -> Result<RegimeKey, String> {
     RegimeKey::parse(s).map_err(|e| e.to_string())
 }
 
-/// `--subject`'s `clap` value parser — a [`SubjectId`] kebab slug (s36
+/// `--subject-id`'s `clap` value parser — a [`SubjectId`] kebab slug (s36
 /// `subject-domain-loop`). Validated here so a malformed subject id is
 /// a clean clap usage error, never a silently-coerced regime segment.
 pub fn parse_subject(s: &str) -> Result<SubjectId, String> {
@@ -105,11 +105,11 @@ pub enum RetrieveCliError {
     )]
     RoleRegimeMismatch { role: String, regime_key: String, regime_role: String },
 
-    /// Both `--regime` and the derived `--domain`/`--subject` pair were
+    /// Both `--regime` and the derived `--domain`/`--subject-id` pair were
     /// given — the two scoping modes are mutually exclusive (s36:
     /// `--regime` XOR the derived pair).
     #[error(
-        "pass EITHER --regime (an explicit regime_key) OR --domain (with an optional --subject), never both — they are two mutually exclusive ways to scope the same retrieval"
+        "pass EITHER --regime (an explicit regime_key) OR --domain (with an optional --subject-id), never both — they are two mutually exclusive ways to scope the same retrieval"
     )]
     ScopeConflict,
 
@@ -118,16 +118,16 @@ pub enum RetrieveCliError {
     #[error("one of --regime or --domain is required to scope the retrieval")]
     NoScope,
 
-    /// `--subject` was given without `--domain`. A subject is scoped
+    /// `--subject-id` was given without `--domain`. A subject is scoped
     /// WITHIN its domain (the candidate area is `<domain>-<subject_id>`),
-    /// so a bare `--subject` has no domain to hang off (s36).
-    #[error("--subject requires --domain — a subject is retrieved within its domain (candidate area `<domain>-<subject_id>`)")]
+    /// so a bare `--subject-id` has no domain to hang off (s36).
+    #[error("--subject-id requires --domain — a subject is retrieved within its domain (candidate area `<domain>-<subject_id>`)")]
     SubjectWithoutDomain,
 
     /// A derived candidate did not form a valid `regime_key` — e.g. the
     /// resolved repo directory has no usable name for the `<repo>`
     /// segment. Reports the underlying grammar error verbatim (s36).
-    #[error("could not derive a valid regime_key from --domain/--subject: {segment_error}")]
+    #[error("could not derive a valid regime_key from --domain/--subject-id: {segment_error}")]
     DerivationFailed { segment_error: String },
 }
 
@@ -140,7 +140,7 @@ fn open_strategy_store(repo: &Path) -> ParquetStrategyStore {
     ParquetStrategyStore::open(repo.join(learn_config.root).join("strategies"))
 }
 
-/// The `<hash>` a DERIVED `--domain`/`--subject` candidate carries: the
+/// The `<hash>` a DERIVED `--domain`/`--subject-id` candidate carries: the
 /// byte-for-byte Rust twin of `canon/skills/scripts/
 /// canon-retrieve-pre-dispatch.sh`'s `printf '%s' <area> | sha256sum | cut -c1-12`
 /// area-hash — the ONE retrieval-side `<area>`→`<hash>` derivation, NOT
@@ -170,7 +170,7 @@ fn repo_segment(repo: &Path) -> String {
     repo.file_name().and_then(|s| s.to_str()).unwrap_or_default().to_string()
 }
 
-/// Build the ordered fallback candidates for a `--domain`/`--subject`
+/// Build the ordered fallback candidates for a `--domain`/`--subject-id`
 /// query (s36 `subject-domain-loop`): `<domain>-<subject_id>` then the
 /// bare `<domain>` when a subject is given, else `<domain>` alone. Each
 /// `<area>` becomes a full `regime_key` through canon-model's ONE
@@ -209,7 +209,7 @@ pub fn derive_candidates(
 pub struct ScopedRetrieval {
     /// The ordered candidates actually queried, most-specific first: one
     /// for the `--regime` path, one or two for the derived
-    /// `--domain`/`--subject` pair. Never empty once [`run_scoped`]
+    /// `--domain`/`--subject-id` pair. Never empty once [`run_scoped`]
     /// returns `Ok`.
     pub candidates: Vec<RegimeKey>,
     /// Index into [`Self::candidates`] of the regime whose lookup
@@ -239,14 +239,14 @@ impl ScopedRetrieval {
 
 /// `canon retrieve`'s scoped entry (s36 `subject-domain-loop`): the ONE
 /// function `main.rs`'s `Retrieve` arm calls. Enforces `--regime` XOR
-/// the derived `--domain`/`--subject` pair as a LOUD usage error
+/// the derived `--domain`/`--subject-id` pair as a LOUD usage error
 /// (`main.rs` exits `2`), then resolves guidance:
 ///
 /// - `--regime`: the explicit-key path — `--role` must equal the key's
 ///   own leading segment (the caller-contract check
 ///   [`retrieve_guidance`] only `debug_assert_eq!`s), then a single
 ///   [`retrieve_guidance`] lookup.
-/// - `--domain`[`/--subject`]: the derived path — [`derive_candidates`]
+/// - `--domain`[`/--subject-id`]: the derived path — [`derive_candidates`]
 ///   builds the `<domain>-<subject_id>` → `<domain>` ladder and
 ///   [`retrieve_first_nonempty`] serves the first non-empty rung.
 ///

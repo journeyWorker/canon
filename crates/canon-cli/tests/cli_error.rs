@@ -65,7 +65,7 @@ fn repo_with_unapproved_brief() -> TempDir {
     let repo = dir.path();
     ok(repo, &["init", "--providers", "none"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
+    ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
     let tasks = repo.join(".canon/changes/add-login/tasks.md");
     let mut text = std::fs::read_to_string(&tasks).unwrap_or_else(|_| "# Tasks: Add login\n".to_string());
     text.push_str("\n- [ ] 1 Write the failure-path scenarios\n");
@@ -161,7 +161,7 @@ fn json_failures_from_a_command_with_its_own_flag_carry_code_message_hint_and_re
     assert_eq!(human_code(&out), "APPROVAL_INCOMPLETE", "stderr says the same thing: {}", stderr(&out));
 
     // An operational failure (not a refusal) keeps exit 1.
-    let out = run(repo, &["brief", "check", "--change", "no-such-change", "--json"]);
+    let out = run(repo, &["brief", "check", "--change-id", "no-such-change", "--json"]);
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
     assert_eq!(json_error(&out)["code"], "BRIEF_NOT_FOUND");
 

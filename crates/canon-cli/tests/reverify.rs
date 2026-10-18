@@ -101,12 +101,12 @@ fn review_add(repo: &Path, scenario: &str) {
 
 /// A blocker on `c-demo`: raised at `raised`, and when `fixed` is given,
 /// closed `fixed` at that time (a second record of the same natural key).
-/// `canon review add --change`: the chore's change-level review.
+/// `canon review add --change-id`: the chore's change-level review.
 fn change_review(repo: &Path, change: &str) -> Output {
     run(
         repo,
         &[
-            "review", "add", "--project-id", "demo", "--change", change, "--reviewer", "reviewer-3", "--pin", "pin-sha", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id",
+            "review", "add", "--project-id", "demo", "--change-id", change, "--reviewer", "reviewer-3", "--pin", "pin-sha", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id",
             "reviewer-3", "--role", "reviewer",
         ],
     )
@@ -263,7 +263,7 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("chore change `bump-client` approved") && err.contains("`world.demo.01`"), "{err}");
-    assert!(err.contains("hint: ") && err.contains("--all-scenarios") && err.contains("canon review add --change"), "{err}");
+    assert!(err.contains("hint: ") && err.contains("--all-scenarios") && err.contains("canon review add --change-id"), "{err}");
     assert_eq!(subject_json(r)["status"], "verifying");
 
     // The suite again, same verdict: the scenario review stays current, and
@@ -276,7 +276,7 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert!(err.contains("no review of change `bump-client`") && !err.contains("unreviewed-promotion world.demo.01"), "{err}");
     let next = status_steps(r);
     assert!(
-        next[0]["command"].as_str().unwrap().starts_with("canon review add") && next[0]["command"].as_str().unwrap().contains("--change bump-client"),
+        next[0]["command"].as_str().unwrap().starts_with("canon review add") && next[0]["command"].as_str().unwrap().contains("--change-id bump-client"),
         "the change review follows: {next:?}"
     );
 
@@ -312,7 +312,7 @@ fn a_chore_reviewed_scenario_by_scenario_after_its_evidence_needs_no_change_revi
 }
 
 /// 0.23 D5: the chore's review pins its brief. Editing the brief stales it,
-/// an unsigned outcome never counts, and `--change` refuses a feature change.
+/// an unsigned outcome never counts, and `--change-id` refuses a feature change.
 #[test]
 fn a_chore_review_goes_stale_when_the_brief_changes_and_a_feature_change_is_refused() {
     let dir = repo();
@@ -388,11 +388,11 @@ fn change_new_on_a_shipped_subject_names_the_reopen() {
     seed_subject(r, SubjectStatus::Shipped, &[], ago(250));
     let reopen = "canon subject status demo-subject --to verifying --reason";
 
-    let out = run(r, &["change", "new", "bump-client", "--subject", "demo-subject", "--kind", "chore", "--title", "Bump the client"]);
+    let out = run(r, &["change", "new", "bump-client", "--subject-id", "demo-subject", "--kind", "chore", "--title", "Bump the client"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(stdout(&out).contains("subject `demo-subject` is shipped and stays so until reopened") && stdout(&out).contains(reopen), "{}", stdout(&out));
 
-    let out = run(r, &["change", "new", "bump-again", "--subject", "demo-subject", "--kind", "chore", "--title", "Bump again", "--json"]);
+    let out = run(r, &["change", "new", "bump-again", "--subject-id", "demo-subject", "--kind", "chore", "--title", "Bump again", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let value: Value = serde_json::from_str(&stdout(&out)).unwrap();
     let next = value["meta"]["next"].as_array().unwrap();
@@ -401,7 +401,7 @@ fn change_new_on_a_shipped_subject_names_the_reopen() {
     // A subject that is not shipped gets no reopen step.
     let dir = repo();
     seed_subject(dir.path(), SubjectStatus::Building, &[], ago(250));
-    let out = run(dir.path(), &["change", "new", "bump-client", "--subject", "demo-subject", "--kind", "chore", "--title", "Bump the client", "--json"]);
+    let out = run(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo-subject", "--kind", "chore", "--title", "Bump the client", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(!stdout(&out).contains("--to verifying"), "{}", stdout(&out));
 }

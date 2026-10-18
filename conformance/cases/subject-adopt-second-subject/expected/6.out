@@ -1,2 +1,2 @@
 canon subject adopt: change `refactor-core` is already linked to subject `editing`; nothing written
-next: canon brief check --change refactor-core — editing: 7 blocker(s): write the brief in .canon/changes/refactor-core/brief.md until `canon brief check` is clean; only then does the human answer it
+next: canon brief check --change-id refactor-core — editing: 7 blocker(s): write the brief in .canon/changes/refactor-core/brief.md until `canon brief check` is clean; only then does the human answer it

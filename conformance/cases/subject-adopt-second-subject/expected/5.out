@@ -1,2 +1,2 @@
 canon subject adopt: linked change `refactor-core` to subject `editing` as well; the change now belongs to `perception` and `editing` — written directly; nothing to promote
-next: canon brief check --change refactor-core — editing: 7 blocker(s): write the brief in .canon/changes/refactor-core/brief.md until `canon brief check` is clean; only then does the human answer it
+next: canon brief check --change-id refactor-core — editing: 7 blocker(s): write the brief in .canon/changes/refactor-core/brief.md until `canon brief check` is clean; only then does the human answer it

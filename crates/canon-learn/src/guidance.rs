@@ -35,7 +35,7 @@
 //! domain-scoped namespace) — never a fifth segment or a re-parsed
 //! nested key (the grammar stays exactly `<role>/<repo>/<area>/<hash>`;
 //! retrieval always DERIVES candidates from the structured `--domain`/
-//! `--subject` inputs, so the in-segment encoding is written, never
+//! `--subject-id` inputs, so the in-segment encoding is written, never
 //! parsed back).
 //!
 //! Why the domain fallback is load-bearing: a subject is finite, so its
@@ -133,7 +133,7 @@ pub fn retrieve_guidance(store: &dyn StrategyStore, role: &RoleId, regime_key: &
 /// it. The candidate order IS the fallback hierarchy the caller derived
 /// (`<domain>-<subject_id>` before `<domain>`) — this helper owns only
 /// "try in order, stop at the first hit", never the derivation (the CLI
-/// builds the candidates from structured `--domain`/`--subject` inputs;
+/// builds the candidates from structured `--domain`/`--subject-id` inputs;
 /// module doc).
 ///
 /// Deterministic and fail-soft to EXACTLY the degree [`retrieve_guidance`]

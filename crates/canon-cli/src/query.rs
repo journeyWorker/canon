@@ -62,21 +62,38 @@ pub struct QueryOutcome {
     pub fields: Option<Vec<String>>,
 }
 
-/// `--kind`'s `clap` value parser — `<k>` is a [`RecordKind`] wire
-/// string (`RecordKind::as_str()`, e.g. `handoff`/`strategy_item`),
-/// the same snake_case vocabulary `canon.yaml`'s own `routing`/`aging`
-/// keys use (`canon-store`'s `policy` module doc), never a second
-/// casing convention.
+/// `--kind`'s `clap` value parser — `<k>` is a [`RecordKind`] spelled by
+/// [`kind_cli_name`] (e.g. `handoff`, `strategy_item`, `evidence`): the
+/// snake_case wire string of `canon.yaml`'s own `routing`/`aging` keys
+/// (`canon-store`'s `policy` module doc) without the `_record` suffix.
+/// A deprecated `<kind>_record` value is accepted and mapped.
 pub fn parse_kind(s: &str) -> Result<RecordKind, String> {
-    RecordKind::ALL.into_iter().find(|k| k.as_str() == s).ok_or_else(|| {
-        let known = RecordKind::ALL.iter().map(|k| k.as_str()).collect::<Vec<_>>().join(", ");
+    let canonical = crate::deprecation::kind_replacement(s).unwrap_or(s);
+    RecordKind::ALL.into_iter().find(|k| kind_cli_name(*k) == canonical).ok_or_else(|| {
+        let known = RecordKind::ALL.iter().map(|k| kind_cli_name(*k)).collect::<Vec<_>>().join(", ");
         format!("unknown record kind `{s}` (expected one of: {known})")
     })
 }
 
-/// `--kind`'s clap parser: one of the record kinds, known to clap.
+/// A record kind as `--kind` spells it: the wire string without the
+/// `_record` suffix (`evidence_record` is `evidence`). The wire string
+/// itself (the record's `kind` field, ledger paths, `canon.yaml` routing
+/// keys) is storage and stays [`RecordKind::as_str`]; anything canon prints
+/// for an agent to type back after `--kind` uses this.
+pub fn kind_cli_name(kind: RecordKind) -> &'static str {
+    match kind {
+        RecordKind::EvidenceRecord => "evidence",
+        other => other.as_str(),
+    }
+}
+
+/// `--kind`'s clap parser: one of the record kinds, known to clap. The
+/// deprecated `<kind>_record` spellings parse too, hidden from help and from
+/// the possible values `canon schema` lists ([`crate::deprecation::KIND_VALUES`]).
 pub fn kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind> {
-    crate::cli_error::closed_set(RecordKind::ALL.iter().map(|k| k.as_str()).collect::<Vec<_>>(), parse_kind)
+    let visible = RecordKind::ALL.iter().map(|k| clap::builder::PossibleValue::new(kind_cli_name(*k)));
+    let deprecated = crate::deprecation::KIND_VALUES.iter().map(|(old, _)| clap::builder::PossibleValue::new(*old).hide(true));
+    crate::cli_error::closed_set(visible.chain(deprecated).collect::<Vec<_>>(), parse_kind)
 }
 
 /// `--since`'s `clap` value parser — an RFC3339/ISO-8601 timestamp.
@@ -115,9 +132,9 @@ fn status_domain(kind: RecordKind) -> &'static [&'static str] {
 /// `--status` value outside the QUERIED kind's own status domain.
 #[derive(Debug, thiserror::Error)]
 pub enum ScopeError {
-    #[error("`{flag}` applies only to {supported} (got `--kind {}`)", .kind.as_str())]
+    #[error("`{flag}` applies only to {supported} (got `--kind {}`)", kind_cli_name(*.kind))]
     UnsupportedKind { flag: &'static str, supported: &'static str, kind: RecordKind },
-    #[error("`--status {value}` is not valid for `--kind {}` (expected one of: {})", .kind.as_str(), .valid.join(", "))]
+    #[error("`--status {value}` is not valid for `--kind {}` (expected one of: {})", kind_cli_name(*.kind), .valid.join(", "))]
     InvalidStatus { kind: RecordKind, value: String, valid: Vec<String> },
 }
 
@@ -468,7 +485,7 @@ pub fn format_human(outcome: &QueryOutcome) -> String {
 /// formatter.
 pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: bool) -> String {
     let since_desc = outcome.since.map(|s| s.to_rfc3339()).unwrap_or_else(|| "none".to_string());
-    let mut out = format!("canon query --kind {} --since {}: {} record(s)", outcome.kind.as_str(), since_desc, outcome.records.len());
+    let mut out = format!("canon query --kind {} --since {}: {} record(s)", kind_cli_name(outcome.kind), since_desc, outcome.records.len());
     if outcome.violation_count > 0 {
         out.push_str(&format!("  ({} violation(s) reported, excluded)", outcome.violation_count));
     }
@@ -621,6 +638,7 @@ fn finish_json(payload: &mut Value, outcome: &QueryOutcome) {
     if let Some(page) = &outcome.page {
         object.insert("meta".to_string(), page.to_json());
     }
+    crate::deprecation::tag_document(payload);
 }
 
 /// The human tail both formatters share: the next-cursor line when more
@@ -871,7 +889,7 @@ pub fn format_human_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projec
 pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], _include_sensitive: bool) -> String {
     let since_desc = outcome.since.map(|s| s.to_rfc3339()).unwrap_or_else(|| "none".to_string());
     let mut out =
-        format!("canon query --kind {} --since {} --plugin {}: {} record(s)", outcome.kind.as_str(), since_desc, plugin_id, outcome.records.len());
+        format!("canon query --kind {} --since {} --plugin {}: {} record(s)", kind_cli_name(outcome.kind), since_desc, plugin_id, outcome.records.len());
     if outcome.violation_count > 0 {
         out.push_str(&format!("  ({} violation(s) reported, excluded)", outcome.violation_count));
     }

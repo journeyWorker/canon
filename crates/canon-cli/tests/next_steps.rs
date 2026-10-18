@@ -50,7 +50,7 @@ fn repo_with_change() -> (TempDir, Value) {
     let repo = dir.path();
     ok(repo, &["init", "--providers", "none", "--json"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo", "--json"]);
-    let created = ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login", "--json"]);
+    let created = ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login", "--json"]);
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief()).unwrap();
     (dir, created)
 }
@@ -113,7 +113,7 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
     let steps = meta_next(&created);
     assert_eq!(steps[0]["actor"], "agent");
     assert_eq!(steps[0]["role"], "planner");
-    assert_eq!(steps[0]["command"], "canon brief check --change add-login");
+    assert_eq!(steps[0]["command"], "canon brief check --change-id add-login");
     assert!(steps[0]["why"].as_str().unwrap().contains("blocker(s): write the brief"), "{}", steps[0]);
 
     // Once the brief is written clean, the one human stop is the subject's only step.
@@ -125,7 +125,7 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
     assert_eq!(meta_next(&approved)[0], status_step(repo, "demo"), "brief approve");
     assert_eq!(meta_next(&approved)[0]["actor"], "agent");
 
-    let scenario = ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
+    let scenario = ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     assert_eq!(meta_next(&scenario)[0], status_step(repo, "demo"), "scenario new");
 
     let moved = ok(repo, &["subject", "status", "demo", "--to", "specced", "--json"]);
@@ -150,7 +150,7 @@ fn a_staged_write_names_the_promote_that_makes_it_count() {
     let (dir, _) = repo_with_change();
     let repo = dir.path();
     ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
-    ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
+    ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     let staged = ok(
         repo,
         &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--kind", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--no-promote", "--json"],
@@ -213,8 +213,8 @@ fn two_roles_waiting() -> TempDir {
     let (dir, _) = repo_with_change();
     let repo = dir.path();
     ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
-    ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
-    ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject", "demo", "--case", "failure", "--flow", "F1", "--json"]);
+    ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
+    ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject-id", "demo", "--case", "failure", "--flow", "F1", "--json"]);
     ok(repo, &["subject", "status", "demo", "--to", "specced", "--json"]);
     ok(repo, &["subject", "status", "demo", "--to", "building", "--json"]);
     ok(
@@ -245,7 +245,7 @@ fn a_declared_role_keeps_its_steps_and_counts_the_rest() {
     assert!(String::from_utf8_lossy(&text.stdout).contains("waiting on implementer: 1"));
 
     // A write under a role gets the same filter in `meta.next`.
-    let wrote = json_of(&canon(repo, &["scenario", "new", "auth.login.03", "--title", "Edge", "--subject", "demo", "--case", "edge", "--flow", "F1", "--json"], Some("reviewer")), "scenario new as reviewer");
+    let wrote = json_of(&canon(repo, &["scenario", "new", "auth.login.03", "--title", "Edge", "--subject-id", "demo", "--case", "edge", "--flow", "F1", "--json"], Some("reviewer")), "scenario new as reviewer");
     let steps = meta_next(&wrote);
     assert!(!steps.is_empty() && steps.iter().all(|s| s["role"] == "reviewer"), "{steps:?}");
     assert_eq!(wrote["meta"]["waitingOn"]["implementer"], 1, "{wrote}");
@@ -271,25 +271,25 @@ fn a_flow_step_with_only_a_happy_scenario_is_asked_for_its_failure_case_with_its
     let repo = dir.path();
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_two_flows()).unwrap();
     ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
-    ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
-    ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject", "demo", "--case", "failure", "--flow", "F1", "--json"]);
+    ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
+    ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject-id", "demo", "--case", "failure", "--flow", "F1", "--json"]);
 
     // F2 has no scenario yet: the step is the happy case. Scenarios are the
     // implementer's (the planner reference writes none).
     let none = flow_step_of(repo, "F2").expect("a step for F2");
     let command = none["command"].as_str().unwrap();
-    assert!(command.starts_with("canon scenario new auth.login.03 --subject demo --case happy --flow F2 --title "), "{none}");
+    assert!(command.starts_with("canon scenario new auth.login.03 --subject-id demo --case happy --flow F2 --title "), "{none}");
     assert_eq!(none["role"], "implementer", "{none}");
 
     // F2 gains only its happy scenario: the same step now asks for the failure case.
-    let wrote = ok(repo, &["scenario", "new", "auth.login.03", "--title", "Sign out", "--subject", "demo", "--case", "happy", "--flow", "F2", "--json"]);
+    let wrote = ok(repo, &["scenario", "new", "auth.login.03", "--title", "Sign out", "--subject-id", "demo", "--case", "happy", "--flow", "F2", "--json"]);
     for step in [flow_step_of(repo, "F2").expect("status names F2's failure case"), meta_next(&wrote).into_iter().find(|s| s["command"].as_str().unwrap().contains("--flow F2 ")).expect("meta.next names it too")] {
         let command = step["command"].as_str().unwrap();
-        assert!(command.starts_with("canon scenario new auth.login.04 --subject demo --case failure --flow F2 --title "), "{step}");
+        assert!(command.starts_with("canon scenario new auth.login.04 --subject-id demo --case failure --flow F2 --title "), "{step}");
         assert_eq!(step["role"], "implementer", "{step}");
     }
 
     // Once F2 has a failure scenario, no step asks for it again.
-    ok(repo, &["scenario", "new", "auth.login.04", "--title", "Sign out twice", "--subject", "demo", "--case", "failure", "--flow", "F2", "--json"]);
+    ok(repo, &["scenario", "new", "auth.login.04", "--title", "Sign out twice", "--subject-id", "demo", "--case", "failure", "--flow", "F2", "--json"]);
     assert!(flow_step_of(repo, "F2").is_none(), "F2 is covered");
 }

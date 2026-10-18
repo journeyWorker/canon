@@ -1365,7 +1365,7 @@ ORDER BY role, regime_key;
 --               has at least one trajectory of the SAME role stamped
 --               with that run's own `run_id`
 --               (`canon_learn::Trajectory::run_id`, stamped only by
---               an explicit `canon ingest artifacts --run`) whose
+--               an explicit `canon ingest artifacts --run-id`) whose
 --               `outcome` is one of the resolved variants. This is
 --               s40 task 3.1's ORIGINAL wording — "a resolved
 --               trajectory joined to its own run" — which s40 left
@@ -1377,7 +1377,7 @@ ORDER BY role, regime_key;
 --               falls back to that run's own terminal `Run.status`.
 --               Weaker on purpose: all it records is that the run
 --               reached a terminal state. A repo that never passes
---               `--run` reads `applied_attributed 0` and every count
+--               `--run-id` reads `applied_attributed 0` and every count
 --               under `applied_proxy`, which is the honest
 --               description of what its corpus supports.
 --

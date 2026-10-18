@@ -1,0 +1,86 @@
+{
+  "approved": false,
+  "brief": ".canon/changes/add-login/brief.md",
+  "change": "add-login",
+  "counts": {
+    "advisories": 0,
+    "blockers": 7
+  },
+  "error": {
+    "code": "BRIEF_HAS_BLOCKERS",
+    "hint": "fix each blocker in `findings`, then run `canon brief check` again",
+    "message": "7 blocker(s) in .canon/changes/add-login/brief.md",
+    "retryable": false
+  },
+  "findings": [
+    {
+      "excerpt": "What problem this solves, for whom, and why now. One to three sentences.",
+      "hint": "replace the template hint with the section's content",
+      "line": 8,
+      "rule": "brief.placeholder",
+      "section": "intent",
+      "severity": "blocker"
+    },
+    {
+      "excerpt": "What is observably true once this ships, from the user's side.",
+      "hint": "replace the template hint with the section's content",
+      "line": 13,
+      "rule": "brief.placeholder",
+      "section": "outcome",
+      "severity": "blocker"
+    },
+    {
+      "excerpt": "A numbered list; each item starts with its id and reads sees → does → becomes: `…",
+      "hint": "replace the template hint with the section's content",
+      "line": 18,
+      "rule": "brief.placeholder",
+      "section": "flow",
+      "severity": "blocker"
+    },
+    {
+      "excerpt": "One `### F1 …` subheading per flow step, in the flow's order: rules, states and …",
+      "hint": "replace the template hint with the section's content",
+      "line": 23,
+      "rule": "brief.placeholder",
+      "section": "detail",
+      "severity": "blocker"
+    },
+    {
+      "excerpt": "Per step: what must be observable, and which failure path is covered. Do not wri…",
+      "hint": "replace the template hint with the section's content",
+      "line": 28,
+      "rule": "brief.placeholder",
+      "section": "acceptance",
+      "severity": "blocker"
+    },
+    {
+      "excerpt": "What is unresolved and what you assumed; anything that could change policy goes …",
+      "hint": "replace the template hint with the section's content",
+      "line": 33,
+      "rule": "brief.placeholder",
+      "section": "questions",
+      "severity": "blocker"
+    },
+    {
+      "excerpt": "What this change deliberately does not do. Write `None.` if nothing.",
+      "hint": "replace the template hint with the section's content",
+      "line": 38,
+      "rule": "brief.placeholder",
+      "section": "out-of-scope",
+      "severity": "blocker"
+    }
+  ],
+  "language": "en",
+  "legacy": false,
+  "meta": {
+    "deprecated": [
+      {
+        "removedIn": "0.25.0",
+        "use": "--change-id",
+        "used": "--change"
+      }
+    ]
+  },
+  "phase": "shaping",
+  "waivers": []
+}
